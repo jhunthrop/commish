@@ -2,7 +2,9 @@
 
 import { useMemo } from "react";
 import type { Player } from "@/domain/player";
+import type { SurvivalOdds } from "@/draft-service/assistant/view";
 import { Button } from "@/components/ui";
+import { OddsPercent } from "../../advisor/components/odds-percent";
 import type { CheatSheet } from "../state/sheet";
 import { sheetQueueSeed } from "../state/sheet";
 import { QUILT_CONFIG } from "../state/config";
@@ -24,6 +26,8 @@ export interface DrawerSheetTabProps extends Pick<RoomActs, "canDraft" | "submit
    *  current local sheet — every row below still behaves exactly as it always has either way. */
   readonly hasServerSheet: boolean;
   readonly onStartServerSheet: () => void;
+  /** The advisor's next-turn odds; `null` prints none. */
+  readonly odds?: SurvivalOdds | null;
 }
 
 /**
@@ -32,7 +36,7 @@ export interface DrawerSheetTabProps extends Pick<RoomActs, "canDraft" | "submit
  * where the manager and the board disagree, and the sheet's one bridge to the server is the
  * queue seed: the top five undrafted names become the autopick queue in one tap.
  */
-export function DrawerSheetTab({ leagueId, sheet, playersById, boardRanks, available, onMove, onSeedQueue, onReset, canDraft, submitting, onDraft, onPeek, hasServerSheet, onStartServerSheet }: DrawerSheetTabProps) {
+export function DrawerSheetTab({ leagueId, sheet, playersById, boardRanks, available, onMove, onSeedQueue, onReset, canDraft, submitting, onDraft, onPeek, hasServerSheet, onStartServerSheet, odds = null }: DrawerSheetTabProps) {
   const seed = useMemo(() => sheetQueueSeed(sheet, available, QUILT_CONFIG.sheetQueueSeedCount), [sheet, available]);
   let firstAvailableSeen = false;
 
@@ -79,14 +83,17 @@ export function DrawerSheetTab({ leagueId, sheet, playersById, boardRanks, avail
               onPeek={onPeek}
               meta={note === undefined ? undefined : <span className="italic">&ldquo;{note}&rdquo;</span>}
               verdict={
-                board === null ? null : (
-                  <span
-                    data-testid="sheet-vs-board"
-                    className={`font-mono text-xs tabular-nums ${you < board ? "text-positive" : you > board ? "text-negative" : "text-text-faint"}`}
-                  >
-                    you {you} · board {board}
-                  </span>
-                )
+                <>
+                  {board === null ? null : (
+                    <span
+                      data-testid="sheet-vs-board"
+                      className={`font-mono text-xs tabular-nums ${you < board ? "text-positive" : you > board ? "text-negative" : "text-text-faint"}`}
+                    >
+                      you {you} · board {board}
+                    </span>
+                  )}
+                  {odds === null || drafted ? null : <OddsPercent odds={odds} playerId={playerId} />}
+                </>
               }
               actions={
                 <>

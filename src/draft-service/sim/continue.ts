@@ -1,62 +1,52 @@
 /**
- * THE SIM CONTINUATION SEAM — Draft HQ's "make-it-back odds" primitive. A live room's Assistant
- * wants to know, for a player still on the board, whether the asking seat is likely to get
- * another crack at them: continue the room's OWN mid-draft `DraftState` with the existing bot
- * brain until the asking seat is back on the clock, then look at what is still undrafted. Task 2
- * builds the odds loop (many seeded continuations, aggregated) on top of this one primitive.
+ * THE ROOM CONTINUATION — one seeded run of a live room forward, every seat driven as a bot,
+ * stopping after `throughPick` (or when the draft completes). The advisor's odds are built on
+ * many of these from the SAME room state (`room-odds.ts`), and one run serves every seat in the
+ * room at once (the founder's cost ruling, simplification round): survival before a seat's next
+ * turn depends only on the picks made before that turn, so the run records every pick it
+ * played and the table slices it per viewer.
  *
  * This module carries none of `run.ts`'s own legality logic twice — it drives the identical real
  * engine (`admitCommand`/`reduceDraft`, via the SAME exported `submit` helper `run.ts` uses for a
  * headless run), the same `SIM_INSTANT` literal, the same seeded bot brain
  * (`chooseBotPick`/`assignArchetypes`/`rngFor`). The one behavior a headless run never needed:
  * this continuation starts from a REAL room's state (never re-fetched here — the caller replays
- * the room's own action log and hands the result in), and it must stop, not run to the end of the
- * draft, the instant the asking seat is back on the clock for the LAST time the caller asked for.
+ * the room's own action log and hands the result in).
  *
- * CONTROLLER RESOLUTION (the asking seat's own current pick, ruling R-3): when the asking seat is
- * ALREADY on the clock at the moment this is called, its own current pick is played FIRST — from
- * the board minus `excludeFromAskingSeat`, under a fixed neutral archetype (`best_available`:
- * `chooseBotPick` under it reduces to the engine's own rank-and-need answer, never a persona
- * choice for the seat whose own odds are being measured) — before continuation resumes toward the
- * seat's NEXT turn. When the asking seat is NOT on the clock, no exclusion applies to anyone:
- * every other seat picks exactly as a real bot would, shortlist included, because other seats
- * taking the asking seat's targets is the entire thing being measured.
+ * THE ON-CLOCK SEAT'S OWN PICK (ruling R-3, kept for the one seat it still applies to): the seat
+ * on the clock right now is the one seat whose next pick is a human decision the viewer of that
+ * seat is being advised on, and "will he still be there at my next turn" is a question about
+ * PASSING on him. So that seat's current pick is played under the neutral archetype
+ * (`best_available`, the engine's own rank-and-need answer, never a persona) from the board
+ * minus `excludeFromOnClockSeat`, so the players the on-clock viewer is deciding between stay on
+ * the board for every other seat to take. Every other pick in the run, that seat's later ones
+ * included, plays under the seat's driver.
  *
- * THE HORIZON (draft advisor round, spec 3.1a). `horizon` is how many of the asking seat's
- * UPCOMING turns to play through: one run snapshots the board at each of them
- * (`undraftedAtTurn[k]` is the k-th upcoming turn, `undrafted` stays the first for every existing
- * caller), and between them the asking seat's own intermediate picks play under the same neutral
- * brain and the same exclusion its current pick does, so a target's odds at a later turn are
- * never spoiled by the asking seat itself taking him earlier. `played` is every pick the run made,
- * which is what the "ahead of you" read tallies.
- *
- * THE DRIVERS (same amendment). `drivers` is the advisor's opponent model (`seat-model.ts`): a
- * seat with an inferred or prior archetype samples under it, a seat on autopick picks exactly as
- * the clock would (`bestAvailableFor`). Absent, every seat draws the seeded archetype deal
- * `run.ts` uses, which keeps every pre-amendment caller byte-identical.
+ * THE DRIVERS (`seat-model.ts`): a seat with an inferred or prior archetype samples under it, a
+ * seat on autopick picks exactly as the clock would (`bestAvailableFor`). Absent, every seat
+ * draws the seeded archetype deal `run.ts` uses.
  */
 import type { MakePickAction } from "@/domain/draft";
-import { availablePool, bestAvailableFor, isComplete, teamOnClock, type DraftState } from "@/draft-engine";
+import { bestAvailableFor, isComplete, teamOnClock, type DraftState } from "@/draft-engine";
 import { assignArchetypes, type BotArchetype } from "@/mock-draft/archetypes";
 import { chooseBotPick } from "@/mock-draft/bots";
 import { rngFor } from "@/mock-draft/rng";
 import { SIM_INSTANT, submit } from "./run";
 import { NEUTRAL_ARCHETYPE, type SeatDriver, type SeatDrivers } from "./seat-model";
 
-/** No player excluded — the shared instance every non-asking-seat pick submits under. */
+/** No player excluded — the shared instance every ordinary pick submits under. */
 const NO_EXCLUSIONS: ReadonlySet<string> = new Set();
 
-export interface ContinueDraftInput {
+const NEUTRAL_DRIVER: SeatDriver = { kind: "archetype", archetype: NEUTRAL_ARCHETYPE, basis: "prior", picksObserved: 0 };
+
+export interface ContinueRoomInput {
   /** A live snake DraftState mid-draft — the room's replayed state, never re-fetched here. */
   readonly state: DraftState;
-  /** The seat asking. Continuation stops the moment this seat is back on the clock for the
-   *  `horizon`-th time (or the draft completes). */
-  readonly askingTeamId: string;
-  /** Players the asking seat must NOT take in this run (ruling R-3). */
-  readonly excludeFromAskingSeat: ReadonlySet<string>;
   readonly seed: number;
-  /** How many of the asking seat's upcoming turns to play through. Default 1. */
-  readonly horizon?: number;
+  /** The last pick number this run plays. The run stops once the room is past it. */
+  readonly throughPick: number;
+  /** Players the on-clock seat's CURRENT pick must not take (see the module docblock). */
+  readonly excludeFromOnClockSeat: ReadonlySet<string>;
   /** The opponent model. Absent means the seeded archetype deal (see the module docblock). */
   readonly drivers?: SeatDrivers;
 }
@@ -67,16 +57,11 @@ export interface PlayedPick {
   readonly playerId: string;
 }
 
-export interface ContinueDraftResult {
-  /** Player ids still undrafted when the asking seat first came back on the clock. */
-  readonly undrafted: ReadonlySet<string>;
-  /** One snapshot per upcoming turn reached, first turn first. Shorter than `horizon` only when
-   *  the draft ended before the later turns existed. */
-  readonly undraftedAtTurn: readonly ReadonlySet<string>[];
-  /** True when the draft completed before the asking seat's `horizon`-th upcoming turn. */
-  readonly draftEnded: boolean;
+export interface ContinueRoomResult {
   /** Every pick this run made, in pick order. */
   readonly played: readonly PlayedPick[];
+  /** True when the draft completed before `throughPick` was reached. */
+  readonly draftEnded: boolean;
 }
 
 /** One seat's pick for `state.pickNumber`: the autopick policy for a seat the clock drives,
@@ -107,48 +92,28 @@ function driverFor(drivers: SeatDrivers | undefined, dealt: Readonly<Record<stri
   return { kind: "archetype", archetype, basis: "prior", picksObserved: 0 };
 }
 
-const NEUTRAL_DRIVER: SeatDriver = { kind: "archetype", archetype: NEUTRAL_ARCHETYPE, basis: "prior", picksObserved: 0 };
-
-function snapshot(state: DraftState): ReadonlySet<string> {
-  return new Set(availablePool(state).map((entry) => entry.playerId));
-}
-
 /**
- * Drives `input.state` forward, one real `MAKE_PICK` at a time, until `askingTeamId` has been
- * back on the clock `horizon` times or the draft completes. Never mutates the caller's state —
- * `reduceDraft` already returns new state at every step, and this function only ever reassigns
- * its own local binding.
+ * Drives `input.state` forward, one real `MAKE_PICK` at a time, through `throughPick` or until
+ * the draft completes. Never mutates the caller's state — `reduceDraft` already returns new
+ * state at every step, and this function only ever reassigns its own local binding.
  */
-export function continueDraft(input: ContinueDraftInput): ContinueDraftResult {
-  const { askingTeamId, excludeFromAskingSeat, seed, drivers } = input;
-  const horizon = input.horizon ?? 1;
+export function continueRoom(input: ContinueRoomInput): ContinueRoomResult {
+  const { seed, throughPick, excludeFromOnClockSeat, drivers } = input;
   const dealt = assignArchetypes(seed, input.state.draftOrder);
-  const askingSeatStartsOnClock = !isComplete(input.state) && teamOnClock(input.state) === askingTeamId;
+  const onClockPick = input.state.pickNumber;
 
   let state = input.state;
-  let askingSeatPlayedCurrentPick = !askingSeatStartsOnClock;
-  const snapshots: ReadonlySet<string>[] = [];
   const played: PlayedPick[] = [];
-
-  while (!isComplete(state) && snapshots.length < horizon) {
+  while (!isComplete(state) && state.pickNumber <= throughPick) {
     const teamId = teamOnClock(state);
     if (teamId === null) break; // defensive: cannot occur in a snake continuation with no owed picks
-
-    const isAsking = teamId === askingTeamId;
-    if (isAsking && askingSeatPlayedCurrentPick) {
-      snapshots.push(snapshot(state));
-      if (snapshots.length === horizon) break;
-    }
-    if (isAsking) askingSeatPlayedCurrentPick = true;
-
-    const next = isAsking
-      ? playPick(state, teamId, NEUTRAL_DRIVER, seed, excludeFromAskingSeat)
+    const isOnClockPick = state.pickNumber === onClockPick;
+    const next = isOnClockPick
+      ? playPick(state, teamId, NEUTRAL_DRIVER, seed, excludeFromOnClockSeat)
       : playPick(state, teamId, driverFor(drivers, dealt, teamId), seed, NO_EXCLUSIONS);
     if (next === null) break;
     state = next.state;
     played.push(next.pick);
   }
-
-  const first = snapshots[0] ?? snapshot(state);
-  return { undrafted: first, undraftedAtTurn: snapshots, draftEnded: isComplete(state), played };
+  return { played, draftEnded: isComplete(state) };
 }

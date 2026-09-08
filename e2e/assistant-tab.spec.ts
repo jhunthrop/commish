@@ -2,12 +2,12 @@ import { MOCK_CONFIG } from "../src/mock-draft/config";
 import { expect, test } from "./support/fixtures";
 
 /**
- * Task 12: the Assistant tab, end to end on a real mock room — the one surface this plan's own
- * unit suite cannot prove by itself, because `assistantCall` (`@/draft-service/assistant/call`)
- * reads a REAL `getDraftStore().getDraftState`, a REAL evidence board and a REAL cached-sim
- * lookup, none of which a component test constructs. This spec proves the whole wire: a real
- * mock room, a real `GET /api/drafts/[draftId]/assistant` call, three real candidates rendered
- * before the host's own pick, and a real post-pick beat once that pick lands.
+ * The Assistant tab, end to end on a real mock room — the one surface the unit suite cannot
+ * prove by itself, because `advisorFor` (`@/draft-service/assistant/service`) reads a REAL
+ * `getDraftStore().getDraftState` and a REAL evidence board, none of which a component test
+ * constructs. This spec proves the whole wire: a real mock room, a real
+ * `GET /api/drafts/[draftId]/assistant` call, the one card and the pool odds rendered before
+ * the host's own pick, and a real post-pick beat once that pick lands.
  *
  * `setTableChip`/`AVAILABLE_PLAYERS_LIST`/`makeTopPick` below are copied from `mock-draft.spec.ts`
  * rather than imported — this suite keeps no shared per-spec helper module (see that file's own
@@ -55,7 +55,7 @@ async function makeTopPick(page: import("@playwright/test").Page): Promise<void>
   }).toPass({ timeout: 20_000 });
 }
 
-test("mock room -> the Assistant tab shows the advisor's now card before your pick, and a beat line after it", async ({ managerA }) => {
+test("mock room -> the pool carries the odds, the Assistant tab shows the one card before your pick, and a beat line after it", async ({ managerA }) => {
   test.setTimeout(180_000);
 
   await managerA.goto("/");
@@ -73,28 +73,30 @@ test("mock room -> the Assistant tab shows the advisor's now card before your pi
   if ((await gotIt.count()) > 0) await gotIt.click();
 
   // --- The Assistant tab, opened before this seat has made any pick at all: the advisor always
-  // previews the asking seat's own current-or-next decision, so the now card, the plan rail and
-  // the signals strip are already there the moment the room exists (draft advisor round).
+  // previews the asking seat's own current-or-next decision, so the one card is already there
+  // the moment the room exists.
   await managerA.getByTestId("drawer-handles").getByRole("tab", { name: "Assistant" }).click();
-  const rows = managerA.getByTestId("advisor-now-row");
-  await expect(rows.first()).toBeVisible({ timeout: 15_000 });
-  await expect(rows).toHaveCount(5);
-  await expect(managerA.getByTestId("advisor-plan")).toBeVisible();
-  await expect(managerA.getByTestId("advisor-signals")).toBeVisible();
+  const card = managerA.getByTestId("advisor-card");
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await expect(managerA.getByTestId("advisor-name")).not.toBeEmpty();
+  await expect(managerA.getByTestId("advisor-why")).not.toBeEmpty();
+  await expect(managerA.getByTestId("advisor-stamp")).toContainText(/runs$/);
 
   // --- The human's own real turn, then a real pick through the Pool tab -----------------------
   // The room's real on-clock copy is the clock strip's "YOUR PICK · {place}" (clock-strip.tsx) —
   // never "You're on the clock", which the copy law's contraction ban forbids anyway.
   await expect(managerA.getByText(/YOUR PICK/).first()).toBeVisible({ timeout: ON_CLOCK_TIMEOUT_MS });
   await managerA.getByTestId("drawer-handles").getByRole("tab", { name: "Pool" }).click();
+  // --- The pool rows carry the same next-turn odds the card does (spec section 7). Scoped to the
+  // desk tree: the phone tree renders the same rows hidden at this width.
+  await expect(managerA.getByTestId("quilt-room").getByTestId("advisor-odds-pct").first()).toBeVisible({ timeout: 15_000 });
   await makeTopPick(managerA);
 
   // --- Back on the Assistant tab, the post-pick beat has landed. Never asserted to an exact
   // sentence: `postPickBeat` (`beat.ts`) picks between "Best available." and a named-player
-  // sentence depending on whether this seat's own top-of-pool pick matches the assistant's own
-  // top candidate under `recommendPick`'s expected-value scoring — a real fact about a real
-  // evidence board this spec does not control, so the only honest assertion is that a beat
-  // rendered at all.
+  // sentence depending on whether this seat's own top-of-pool pick matches the card's own pick
+  // under `recommendPick`'s expected-value scoring — a real fact about a real evidence board
+  // this spec does not control, so the only honest assertion is that a beat rendered at all.
   await managerA.getByTestId("drawer-handles").getByRole("tab", { name: "Assistant" }).click();
   const beat = managerA.getByTestId("assistant-beat");
   await expect(beat).toBeVisible({ timeout: 15_000 });

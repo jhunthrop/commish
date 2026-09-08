@@ -33,14 +33,30 @@ const GLOW: Readonly<Partial<Record<BadgeTone, string>>> = {
   negative: "ring-2 ring-negative/25",
 };
 
+/**
+ * THE SOFT FILL (simplification round, coordinator's band ruling): a chip whose ground is a tint
+ * of its own tone, so a good outcome reads as good on daylight paper where a hairline alone
+ * does not. A tint of the family, never a fifth pigment (the same rule `GLOW` follows), and never
+ * `accent`: money is a fill only when it is money or an action, and the accent budget sweep
+ * forbids the tint outside the sanctioned primitives.
+ */
+const SOFT: Readonly<Partial<Record<BadgeTone, string>>> = {
+  neutral: "bg-surface-raised border-transparent",
+  positive: "bg-positive/10 border-transparent",
+  negative: "bg-negative/10 border-transparent",
+  warning: "bg-warning/10 border-transparent",
+};
+
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   readonly tone?: BadgeTone;
   /** The live pill's tinted ring — a real state, not decoration: a caller sets this only when
    *  the thing the badge names is actually live right now. */
   readonly glow?: boolean;
+  /** A soft fill of the tone's own tint in place of the hairline (see `SOFT`); `accent` ignores it. */
+  readonly soft?: boolean;
 }
 
-export function Badge({ tone = "neutral", glow = false, className = "", children, ...rest }: BadgeProps) {
+export function Badge({ tone = "neutral", glow = false, soft = false, className = "", children, ...rest }: BadgeProps) {
   return (
     <span
       // `whitespace-nowrap` (LED-11): a pill is a single glanceable shape, never a paragraph —
@@ -50,7 +66,7 @@ export function Badge({ tone = "neutral", glow = false, className = "", children
       // wrapping the label — a break the gauntlet caught only in one theme's screenshot because
       // it sits on a pixel-width knife's edge, not because either theme is doing anything the
       // other isn't (`week-status-badge.test.tsx`'s regression: the class is unconditional).
-      className={`inline-flex items-center whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-medium ${TONE[tone]} ${glow ? (GLOW[tone] ?? "") : ""} ${className}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-medium ${TONE[tone]} ${soft ? (SOFT[tone] ?? "") : ""} ${glow ? (GLOW[tone] ?? "") : ""} ${className}`}
       {...rest}
     >
       {children}

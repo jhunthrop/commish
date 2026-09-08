@@ -1,55 +1,28 @@
 /**
  * EVERY ADVISOR TUNABLE, in one place (the config-over-hardcoding rule this product keeps
- * everywhere else). Spec: `docs/superpowers/specs/2026-09-07-draft-advisor-design.md`.
+ * everywhere else). Spec: `docs/superpowers/specs/2026-09-07-draft-advisor-design.md`, section 7.
+ * The survival bands the card and the pool colour by live in `@/domain/draft-odds`, shared with
+ * the client.
  */
 export const ADVISOR_CONFIG = {
-  plan: {
-    /** Turns ahead the plan covers (spec 3.1: "your next three turns"). */
-    horizon: 3,
-    /** Seeded continuations behind the plan's odds. Measured 2026-09-07, 200 runs through turn 3
-     *  with 40 targets: 176 ms on a 12-team, 15-round board at pick 41, and 348 ms (median of 5,
-     *  range 345-384) at the worst case a room can pose, 14 teams, 16 rounds, seat 1 asking at
-     *  pick 1 (the longest gap to its third turn). Inference of the seat drivers is 6 ms on top.
-     *  Under half a second per recompute is the budget this constant is held to. */
-    runs: 200,
-    /** How deep into the undrafted board (by value order) the plan draws its target pool from. */
-    candidatePoolSize: 40,
-    /** Named targets per turn (spec: "two or three named targets"). */
-    targetsPerTurn: 3,
-    /** Below this survival at a turn a target is a REACH for that turn (spec 3.1a): the plan
-     *  places him at an earlier turn where he clears it, or drops him. */
-    reachFloor: 0.25,
-    /** A fallback is the best player at the turn's position who clears this at that turn. */
-    fallbackFloor: 0.7,
-  },
-  now: {
-    /** Rows on the now card (spec 3.2: "top five by the existing score"). */
-    shortlistSize: 5,
-  },
+  /** Seeded room continuations behind every odds number, one simulation per room state serving
+   *  every seat. Measured in the simplification round (see the ledger): 200 runs through the
+   *  furthest next turn at the worst case a room can pose (14 teams, 16 rounds, pick 1) is the
+   *  budget this constant is held to, and the count the card states. */
+  runs: 200,
+  /** How many candidates `recommendPick` ranks for a seat on the clock: the first is the card's
+   *  pick, and the on-clock seat's whole shortlist is held off its own current pick in the runs
+   *  (R-3). */
+  shortlistSize: 5,
+  /** How deep the card looks off the clock for the first candidate the runs leave on the board
+   *  past the reach floor (persona pass: a pick you cannot make is not one you should make). */
+  offClockShortlistSize: 12,
   signals: {
     /** A run: `runThreshold` of the last `runWindow` picks at one position (spec 3.3). */
     runWindow: 4,
     runThreshold: 3,
   },
-  voice: {
-    /** The writer runs when you are within this many picks of the clock, and on it (spec 3.5). */
-    writeWithinPicks: 2,
-    /** The writer's own budget inside one advisor request; late text lands on the next poll. */
-    budgetMs: 2_000,
-    /** Word caps per slot, held by the same validator the player peek's slots are. The reason
-     *  cap is set from measurement the way the peek's bands were: two live fires on the demo
-     *  fixture (2026-09-07, glm-5.3-flash) wrote reasons of 30 to 38 words against a prompt
-     *  asking for at most 28, and every one was grounded prose lost to the cap alone. The prompt
-     *  asks for one sentence under 30; the validator holds the line at 40, the peek's own
-     *  module cap. */
-    strategyMaxWords: 45,
-    reasonMaxWords: 40,
-    /** What the prompt asks the writer for; the cap above is what the validator enforces. */
-    reasonWordsAsked: 30,
-    /** Sized like the peek's narrative call: a reasoning model spends tokens thinking first. */
-    maxTokens: 1_200,
-  },
-  /** How long one room state's computed advisor view is remembered on the server, so a voice
-   *  re-poll never re-runs the simulator for the same sequence. */
-  memoTtlMs: 90_000,
+  /** Room odds tables remembered at once, one per room state; a new pick evicts the room's old
+   *  table, and the least-recently-computed room goes past this. */
+  memoRooms: 64,
 } as const;

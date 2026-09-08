@@ -2,14 +2,13 @@
  * THE ADVISOR DEMO'S OWN FIXTURE. A headless, deterministic 10-team draft (`runOneDraft`,
  * `@/draft-service/sim/run`, the same real engine every mock room and Simulator run rides),
  * replayed pick by pick, with a REAL `AdvisorView` (`advisorCore`, `@/draft-service/assistant/
- * advisor`) precomputed at every step for the demo's own point-of-view seat. No database, no
- * gateway, no network: every player, projection and NFL team code below is synthetic (labelled
- * as such — `"RB 4"`, never a real athlete's name), but every NUMBER the fixture hands the page
- * is the real output of the real decision layer running over that synthetic board — the plan's
- * odds are the simulator's own runs, the seats-ahead reads come from those same runs, the tier
- * collapses are the board's own drops. Nothing here invents a number; the fixture only invents
- * the PLAYERS the real math then runs over. The writer never runs here, so every sentence is
- * the template floor and says so (`data-voice="template"`).
+ * advisor`, over the room's own odds table from `simulateRoomOdds`) precomputed at every step for
+ * the demo's own point-of-view seat. No database, no network: every player, projection and NFL
+ * team code below is synthetic (labelled as such — `"RB 4"`, never a real athlete's name), but
+ * every NUMBER the fixture hands the page is the real output of the real decision layer running
+ * over that synthetic board — the odds are the simulator's own runs, the tiers are the board's
+ * own. Nothing here invents a number; the fixture only invents the PLAYERS the real math then
+ * runs over.
  *
  * COMPUTED ONCE, AT MODULE SCOPE, as plain JSON-safe data so it can cross the server-to-client
  * boundary as an ordinary prop. `DEMO_RUNS` continuations per step keep that one-time build
@@ -20,14 +19,17 @@ import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import type { Position } from "@/domain/player";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "@/draft-engine";
-import { advisorCore } from "@/draft-service/assistant/advisor";
-import type { ValuedEntry } from "@/draft-service/assistant/call";
+import { advisorCore, seedFor } from "@/draft-service/assistant/advisor";
+import { onClockShortlist, type ValuedEntry } from "@/draft-service/assistant/recommend";
+import { tierStandings } from "@/draft-service/assistant/tiers";
 import type { AdvisorView } from "@/draft-service/assistant/view";
+import { simulateRoomOdds } from "@/draft-service/sim/room-odds";
 import { runOneDraft, submit, SIM_INSTANT } from "@/draft-service/sim/run";
+import { inferSeatDrivers } from "@/draft-service/sim/seat-model";
 import { valueBoardIndexed, type LeagueShape } from "@/projections/decide/replacement";
 
-/** Ten teams, four rounds — enough to show a run, a tier collapse, a bye collision, a three-turn
- *  plan and this seat's own build without a full 15-round draft to click through. */
+/** Ten teams, four rounds — enough to show a run, a tier closing, a bye and this seat's own
+ *  turns without a full 15-round draft to click through. */
 export const DEMO_TEAM_COUNT = 10;
 export const DEMO_ROUNDS = 4;
 /** One fixed literal, never `Date.now()` — this IS the "seeded and reproducible" claim. */
@@ -36,7 +38,6 @@ export const DEMO_SEED = 20260905;
 export const DEMO_RUNS = 100;
 
 const DEMO_SEED_NAMESPACE = "assistant-demo";
-const DEMO_COMPUTED_BASIS = "A replayed room, seeded and reproducible. Not a live board.";
 
 const TEAM_IDS: readonly string[] = Array.from({ length: DEMO_TEAM_COUNT }, (_, i) => `team_${i + 1}`);
 /** Seat 4 of 10 — neither first nor last, so the demo shows an ordinary snake turn. */
@@ -112,9 +113,9 @@ export interface AssistantDemoFixture {
   readonly rounds: number;
   readonly seed: number;
   readonly runs: number;
-  /** Team id -> "You" or "Team N", as data: the client component imports only this type. */
-  readonly teamLabels: Readonly<Record<string, string>>;
   readonly players: readonly DemoPlayer[];
+  /** Every player id, best first by value over replacement: the order the demo's list reads in. */
+  readonly boardOrder: readonly string[];
   readonly byeWeeksByTeam: readonly (readonly [string, number])[];
   /** In pick-number order, length `teamCount * rounds`. */
   readonly picks: readonly DemoPick[];
@@ -127,21 +128,10 @@ function buildDraftConfig(): DraftConfig {
   return { draftId: `assistant_demo_${DEMO_SEED}`, leagueId: "assistant_demo", format: "snake", kickoffAt: SIM_INSTANT, auctionBudget: null, slotConfig: STANDARD_ROSTER_SLOTS, clockSchedule: [] };
 }
 
-/** Every player id one view names, so the wire carries only those names rather than the whole
- *  board forty-one times over. The ledger is the writer's, and the writer never runs here. */
-function slimForWire(view: AdvisorView): AdvisorView {
-  const referenced = new Set<string>([
-    ...view.now.map((candidate) => candidate.playerId),
-    ...view.plan.turns.flatMap((turn) => [...turn.targets.map((target) => target.playerId), ...(turn.fallback === null ? [] : [turn.fallback.playerId])]),
-    ...view.signals.ahead.flatMap((seat) => (seat.topPlayer === null ? [] : [seat.topPlayer.playerId])),
-  ]);
-  const names = Object.fromEntries(Object.entries(view.names).filter(([playerId]) => referenced.has(playerId)));
-  return { ...view, names, ledger: { numbers: [], names: [] } };
-}
-
-function advisorAt(state: DraftState, valued: ReadonlyMap<string, ValuedEntry>, shape: LeagueShape, names: Readonly<Record<string, string>>, previous: AdvisorView | null): AdvisorView {
-  const view = advisorCore({ state, askingTeamId: DEMO_POV_TEAM_ID, valued, shape, seedNamespace: DEMO_SEED_NAMESPACE, winningBuilds: null, computedBasis: DEMO_COMPUTED_BASIS, names, runs: DEMO_RUNS });
-  if (view !== null) return slimForWire(view);
+function advisorAt(state: DraftState, valued: ReadonlyMap<string, ValuedEntry>, shape: LeagueShape, previous: AdvisorView | null): AdvisorView {
+  const table = simulateRoomOdds({ state, seed: seedFor(DEMO_SEED_NAMESPACE, state.sequence), runs: DEMO_RUNS, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) });
+  const view = advisorCore({ state, askingTeamId: DEMO_POV_TEAM_ID, valued, shape, table, tiers: tierStandings(state, valued) });
+  if (view !== null) return view;
   // Defensive only: an in-progress snake draft always owes every seat one more pick while
   // `DEMO_ROUNDS < totalRosterSlots`. Should it ever not, the last honest view stands.
   if (previous === null) throw new Error("assistant demo: the point-of-view seat has no turn to advise at all");
@@ -152,10 +142,9 @@ function buildFixture(): AssistantDemoFixture {
   const pool = buildPool();
   const draftPool: readonly DraftPoolEntry[] = pool.map((entry) => ({ playerId: entry.playerId, position: entry.position }));
   const shape: LeagueShape = { teamCount: DEMO_TEAM_COUNT, rosterSlots: STANDARD_ROSTER_SLOTS };
-  const { byPlayerId } = valueBoardIndexed(pool.map((entry) => ({ playerId: entry.playerId, position: entry.position, projectedPoints: entry.projectedPoints })), shape);
+  const { sorted, byPlayerId } = valueBoardIndexed(pool.map((entry) => ({ playerId: entry.playerId, position: entry.position, projectedPoints: entry.projectedPoints })), shape);
   const adpByPlayerId = evidenceRanks(pool);
   const valued: ReadonlyMap<string, ValuedEntry> = new Map([...byPlayerId].map(([playerId, entry]) => [playerId, { ...entry, averageDraftPosition: adpByPlayerId.get(playerId)! }] as const));
-  const names = Object.fromEntries(pool.map((entry) => [entry.playerId, entry.displayName]));
 
   const runResult = runOneDraft({ teamIds: TEAM_IDS, board: draftPool, rosterSlots: STANDARD_ROSTER_SLOTS, rounds: DEMO_ROUNDS, seed: DEMO_SEED });
   const start: StartDraftAction = { v: DRAFT_ACTION_VERSION, type: "START_DRAFT", timestamp: SIM_INSTANT, draftOrder: TEAM_IDS, pool: draftPool, minBid: 1 };
@@ -165,7 +154,7 @@ function buildFixture(): AssistantDemoFixture {
     states.push(submit(states[states.length - 1]!, action));
   }
 
-  const advisor = states.reduce<AdvisorView[]>((views, state) => [...views, advisorAt(state, valued, shape, names, views[views.length - 1] ?? null)], []);
+  const advisor = states.reduce<AdvisorView[]>((views, state) => [...views, advisorAt(state, valued, shape, views[views.length - 1] ?? null)], []);
   const picks: readonly DemoPick[] = runResult.picks.map((pick) => ({ pickNumber: pick.pickNumber, round: pick.round, teamId: pick.teamId, teamLabel: demoTeamLabel(pick.teamId), playerId: pick.playerId }));
 
   return {
@@ -176,8 +165,8 @@ function buildFixture(): AssistantDemoFixture {
     rounds: DEMO_ROUNDS,
     seed: DEMO_SEED,
     runs: DEMO_RUNS,
-    teamLabels: Object.fromEntries(TEAM_IDS.map((teamId) => [teamId, demoTeamLabel(teamId)])),
     players: pool.map(({ playerId, displayName, position, nflTeam }) => ({ playerId, displayName, position, nflTeam })),
+    boardOrder: sorted.map((entry) => entry.playerId),
     byeWeeksByTeam: DEMO_BYE_WEEKS,
     picks,
     advisor,

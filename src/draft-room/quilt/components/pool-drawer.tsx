@@ -6,6 +6,7 @@ import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
 import type { BoardReason } from "@/projections/preseason/board";
 import type { Law } from "@/projections/laws/types";
+import type { UseAdvisorResult } from "../../advisor/use-advisor";
 import type { CheatSheet } from "../state/sheet";
 import type { CollapseEvent, ExpandedSurface } from "../state/collapse";
 import { needFractions } from "../state/lens";
@@ -39,8 +40,10 @@ export interface PoolDrawerProps extends RoomActs {
    *  this league. `false` offers "start your sheet" instead of the room's usual sheet controls. */
   readonly hasServerSheet: boolean;
   readonly onStartServerSheet: () => void;
-  /** The caller's own queue, in order, for the advisor's queued rows. */
+  /** The caller's own queue, in order, for the advisor's queued card. */
   readonly queue: readonly string[];
+  /** The room's one advisor fetch: the card on the Assistant tab, the odds on every list. */
+  readonly advisor: UseAdvisorResult;
 }
 
 /**
@@ -52,7 +55,9 @@ export interface PoolDrawerProps extends RoomActs {
  * in `use-room-keys`, and the handles dispatch the identical events.
  */
 export function PoolDrawer(props: PoolDrawerProps) {
-  const { surface, dispatch, view, myTeamId, byeWeeks } = props;
+  const { surface, dispatch, view, myTeamId, byeWeeks, advisor } = props;
+  const odds = advisor.view?.odds ?? null;
+  const tiers = advisor.view?.tiers ?? {};
   const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
   const open = surface.kind === "drawer";
   const hasByes = byeWeeks.size > 0;
@@ -96,6 +101,8 @@ export function PoolDrawer(props: PoolDrawerProps) {
             reasons={props.reasons}
             focusSearch={height === "full"}
             needs={needs}
+            odds={odds}
+            tiers={tiers}
             canDraft={props.canDraft}
             submitting={props.submitting}
             queuedPlayerIds={props.queuedPlayerIds}
@@ -105,17 +112,14 @@ export function PoolDrawer(props: PoolDrawerProps) {
           />
         ) : tab === "assistant" ? (
           <DrawerAssistantTab
-            draftId={view.draftId}
             view={view}
             myTeamId={props.myTeamId}
-            teams={props.teams}
+            advisor={advisor}
             playersById={props.playersById}
             queue={props.queue}
             byeWeeks={props.byeWeeks}
-            laws={props.laws}
             canDraft={props.canDraft}
             submitting={props.submitting}
-            queuedPlayerIds={props.queuedPlayerIds}
             onDraft={props.onDraft}
             onQueueToggle={props.onQueueToggle}
           />
@@ -135,6 +139,7 @@ export function PoolDrawer(props: PoolDrawerProps) {
             onPeek={props.onPeek}
             hasServerSheet={props.hasServerSheet}
             onStartServerSheet={props.onStartServerSheet}
+            odds={odds}
           />
         ) : tab === "roster" ? (
           <DrawerRosterTab view={view} myTeamId={props.myTeamId} playersById={props.playersById} onPeek={props.onPeek} />
@@ -148,6 +153,7 @@ export function PoolDrawer(props: PoolDrawerProps) {
             submitting={props.submitting}
             onDraft={props.onDraft}
             onPeek={props.onPeek}
+            odds={odds}
           />
         ) : (
           <DrawerPicksTab view={view} teams={props.teams} playersById={props.playersById} myTeamId={props.myTeamId} onPeek={props.onPeek} />

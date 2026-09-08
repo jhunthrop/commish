@@ -4,6 +4,7 @@ import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 import type { Player } from "@/domain/player";
 import { useToast } from "@/components/ui";
 import { formatCountdown, useCountdown } from "@/components/ui/countdown";
+import { advisorRoomKey, useAdvisor } from "../advisor/use-advisor";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { useQueueHandlers } from "../hooks/use-queue-handlers";
 import { boardRanks } from "../state/pick-review";
@@ -70,6 +71,9 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   );
   const { pending, begin, undo } = usePendingPick(submitPick, view.deadlineAt);
   const queueHandlers = useQueueHandlers(room);
+  // ONE advisor fetch per room (simplification round): the Assistant tab's card and the odds
+  // column on every list read the same view, recomputed on every pick event.
+  const advisor = useAdvisor(view.draftId, advisorRoomKey(view.picks.length, view.pickNumber), room.myTeamId);
 
   const boardIds = useMemo(() => room.players.map((player) => player.id), [room.players]);
   const { sheet, move, note, reset, hasServerSheet, startServerSheet } = useSheet(view.draftId, boardIds, view.leagueId);
@@ -203,6 +207,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           hasServerSheet={hasServerSheet}
           onStartServerSheet={startServerSheet}
           queue={room.queue}
+          advisor={advisor}
           {...acts}
         />
       </div>
@@ -234,6 +239,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           available={available}
           hasServerSheet={hasServerSheet}
           onStartServerSheet={startServerSheet}
+          advisor={advisor}
         />
       </div>
     </>

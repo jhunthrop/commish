@@ -22,53 +22,44 @@ describe("ASSISTANT_DEMO_FIXTURE", () => {
     for (const pick of ASSISTANT_DEMO_FIXTURE.picks.filter((p) => p.teamId !== DEMO_POV_TEAM_ID)) expect(pick.teamLabel).toMatch(/^Team \d+$/);
   });
 
-  it("puts the point-of-view seat on the clock exactly once per round, with five candidates each time", () => {
+  it("puts the point-of-view seat on the clock exactly once per round, with a pick each time", () => {
     const onClock = ASSISTANT_DEMO_FIXTURE.advisor.filter((view) => view.onTheClock);
     expect(onClock).toHaveLength(DEMO_ROUNDS);
     for (const view of onClock) {
-      expect(view.now.length).toBeGreaterThan(0);
-      expect(view.now.length).toBeLessThanOrEqual(5);
+      expect(view.pick).not.toBeNull();
       expect(view.picksUntilYourTurn).toBe(0);
     }
   });
 
-  it("shows all three bands at every step: a plan with odds over the stated runs, signals, and a now card", () => {
-    for (const view of ASSISTANT_DEMO_FIXTURE.advisor) {
-      expect(view.plan.runs).toBe(DEMO_RUNS);
-      for (const turn of view.plan.turns) {
-        for (const target of turn.targets) {
-          const own = target.oddsByTurn[turn.turn - 1];
-          expect(own).not.toBeNull();
-          expect(own!.survival).toBeGreaterThanOrEqual(0);
-          expect(own!.survival).toBeLessThanOrEqual(1);
-          expect(own!.runs).toBeGreaterThan(0);
-        }
+  it("carries the one card and the pool odds at every step: a pick with its why, odds over the stated runs for every undrafted player, tiers for the projected ones", () => {
+    const drafted = new Set<string>();
+    ASSISTANT_DEMO_FIXTURE.advisor.forEach((view, step) => {
+      if (step > 0) drafted.add(ASSISTANT_DEMO_FIXTURE.picks[step - 1]!.playerId);
+      expect(view.runs).toBe(DEMO_RUNS);
+      expect(view.pick).not.toBeNull();
+      expect(view.pick!.why.split(/(?<=[.!?])\s+/).length).toBeLessThanOrEqual(2);
+      expect(view.pick!.makeItBack!.runs).toBe(DEMO_RUNS);
+      const undrafted = ASSISTANT_DEMO_FIXTURE.players.map((p) => p.playerId).filter((id) => !drafted.has(id));
+      expect(Object.keys(view.odds!.survived).sort()).toEqual([...undrafted].sort());
+      for (const id of undrafted) {
+        const standing = view.tiers[id];
+        if (id.startsWith("k") || id.startsWith("def")) expect(standing).toBeUndefined();
+        else expect(standing!.left).toBeGreaterThan(0);
       }
-      expect(Array.isArray(view.signals.ahead)).toBe(true);
-      expect(view.now.length).toBeGreaterThan(0);
-      expect(view.voice.status).toBe("absent");
-    }
+    });
   });
 
-  it("plans three turns at every step: the replay stops at round four of a fifteen-round draft, so a turn beyond the end never comes up", () => {
-    for (const view of ASSISTANT_DEMO_FIXTURE.advisor) expect(view.plan.turns).toHaveLength(3);
+  it("moves the odds as the room steps: at least one player's survival changes between the first two views", () => {
+    const [first, second] = ASSISTANT_DEMO_FIXTURE.advisor;
+    const moved = Object.entries(second!.odds!.survived).filter(([id, count]) => first!.odds!.survived[id] !== count);
+    expect(moved.length).toBeGreaterThan(0);
   });
 
-  it("reads at least one seat ahead from its own picks once the room has drafted a while", () => {
-    const later = ASSISTANT_DEMO_FIXTURE.advisor.slice(25);
-    const inferred = later.flatMap((view) => view.signals.ahead.filter((seat) => seat.driver.kind === "archetype" && seat.driver.basis === "inferred"));
-    const prior = later.flatMap((view) => view.signals.ahead.filter((seat) => seat.driver.kind === "archetype" && seat.driver.basis === "prior"));
-    expect(inferred.length + prior.length).toBeGreaterThan(0);
-  });
-
-  it("every player referenced by a pick is in the players list, and every view carries a name for each id it shows", () => {
+  it("orders the board best first by value and names every player, never a real athlete", () => {
     const names = new Map(ASSISTANT_DEMO_FIXTURE.players.map((p) => [p.playerId, p.displayName]));
-    for (const pick of ASSISTANT_DEMO_FIXTURE.picks) expect(names.get(pick.playerId)).toMatch(/^[A-Z]+ \d+$/);
-    for (const view of ASSISTANT_DEMO_FIXTURE.advisor) {
-      const shown = [...view.now.map((c) => c.playerId), ...view.plan.turns.flatMap((turn) => turn.targets.map((t) => t.playerId))];
-      for (const id of shown) expect(view.names[id]).toBe(names.get(id));
-    }
-    for (const label of Object.values(ASSISTANT_DEMO_FIXTURE.teamLabels)) expect(label).toMatch(/^(You|Team \d+)$/);
+    expect(ASSISTANT_DEMO_FIXTURE.boardOrder).toHaveLength(ASSISTANT_DEMO_FIXTURE.players.length);
+    for (const id of ASSISTANT_DEMO_FIXTURE.boardOrder) expect(names.get(id)).toMatch(/^[A-Z]+ \d+$/);
+    for (const view of ASSISTANT_DEMO_FIXTURE.advisor) expect(names.has(view.pick!.playerId)).toBe(true);
   });
 
   it("is seeded and reproducible", () => {

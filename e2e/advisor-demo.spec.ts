@@ -2,18 +2,19 @@ import { mkdirSync } from "node:fs";
 import { expect, test } from "./support/fixtures";
 
 /**
- * THE ADVISOR ON THE SEEDED FIXTURE (draft advisor round, spec 5): open the Draft HQ demo, see
- * the three bands, queue a target off the clock, step to your turn and draft from the card
- * through the confirmation. The demo renders the SAME `AdvisorPanel` the live room's tab renders,
- * over real `advisorCore` views precomputed from a replayed room, so this is the one browser
- * proof of the bands and the two verbs without a live simulator behind a mock room.
+ * THE ADVISOR ON THE SEEDED FIXTURE (spec section 7): open the Draft HQ demo, see the one card,
+ * queue its pick off the clock, watch the pool odds move as the room steps, step to your turn
+ * and draft from the card through the confirmation. The demo renders the SAME `NextPickCard` the
+ * live room's tab renders, over real `advisorCore` views precomputed from a replayed room, so
+ * this is the one browser proof of the card and the two verbs without a live simulator behind a
+ * mock room.
  *
- * Also the design-review artifact: the three states are photographed into
+ * Also the design-review artifact: the states are photographed into
  * `.superpowers/mocks/screenshots/` beside the mocks they were judged against.
  */
 const OUT_DIR = ".superpowers/mocks/screenshots";
 
-test("advisor demo -> three bands, queue a target, draft on the clock", async ({ managerA }) => {
+test("advisor demo -> one card, odds on every row, queue off the clock, draft on it", async ({ managerA }) => {
   test.setTimeout(120_000);
   mkdirSync(OUT_DIR, { recursive: true });
   await managerA.setViewportSize({ width: 1440, height: 1000 });
@@ -21,41 +22,46 @@ test("advisor demo -> three bands, queue a target, draft on the clock", async ({
   await managerA.goto("/app/draft/assistant");
   await expect(managerA.getByTestId("demo-replay-label")).toBeVisible({ timeout: 30_000 });
 
-  // --- The three bands, before pick 1 ---------------------------------------------------------
-  const signals = managerA.getByTestId("advisor-signals");
-  const plan = managerA.getByTestId("advisor-plan");
-  const now = managerA.getByTestId("advisor-now");
-  await expect(signals).toBeVisible();
-  await expect(plan).toBeVisible();
-  await expect(now).toBeVisible();
-  await expect(managerA.getByTestId("advisor-plan-turn")).toHaveCount(3);
-  await expect(managerA.getByTestId("advisor-stamp")).toContainText("As of 1.01");
-  await expect(managerA.getByTestId("advisor-strategy")).toHaveAttribute("data-voice", "template");
+  // --- The one card, before pick 1 --------------------------------------------------------------
+  const card = managerA.getByTestId("advisor-card");
+  await expect(card).toBeVisible();
+  await expect(card).toHaveAttribute("data-on-clock", "false");
+  await expect(managerA.getByTestId("advisor-header")).toHaveText("Your next pick is 1.04, 3 picks away");
+  await expect(managerA.getByTestId("advisor-odds")).toContainText(/of 100$/);
+  await expect(managerA.getByTestId("advisor-stamp")).toContainText("As of 1.01 · 100 runs");
+  await expect(managerA.getByTestId("advisor-why")).not.toBeEmpty();
+  const rows = managerA.getByTestId("demo-odds-row");
+  await expect(rows.first()).toBeVisible();
+  const before = await rows.allInnerTexts();
   await managerA.screenshot({ path: `${OUT_DIR}/advisor-off-clock.png`, fullPage: true });
 
-  // --- Queue a target off the clock: the row says where it sits ------------------------------
-  const rows = now.getByTestId("advisor-now-row");
-  await expect(rows).toHaveCount(5);
-  await rows.nth(0).getByRole("button", { name: "Queue", exact: true }).click();
-  await expect(rows.nth(0).getByRole("button", { name: "Queued 1", exact: true })).toBeVisible();
-  await rows.nth(2).getByRole("button", { name: "Queue", exact: true }).click();
-  await expect(rows.nth(2).getByRole("button", { name: "Queued 2", exact: true })).toBeVisible();
+  // --- Queue the card's pick off the clock: the verb says where it sits -------------------------
+  await card.getByRole("button", { name: "Queue", exact: true }).click();
+  await expect(card.getByRole("button", { name: "Queued 1", exact: true })).toBeVisible();
 
-  // --- Step to your first turn: Draft is the verb on every row -------------------------------
+  // --- Tier headers over one position, none over the mixed list ----------------------------------
+  await expect(managerA.getByTestId("advisor-tier-header")).toHaveCount(0);
+  await managerA.getByRole("button", { name: "RB", exact: true }).click();
+  await expect(managerA.getByTestId("advisor-tier-header").first()).toContainText(/^Tier \d+, \d+ of \d+ left$/);
+  await managerA.getByRole("button", { name: "All", exact: true }).click();
+
+  // --- Step to your first turn: the odds moved, Draft is the verb --------------------------------
   const forward = managerA.getByRole("button", { name: "Forward" });
   for (let i = 0; i < 3; i += 1) await forward.click();
   await expect(managerA.getByTestId("demo-step-label")).toHaveText("Pick 3 of 40");
-  await expect(now).toHaveAttribute("data-on-clock", "true");
-  await expect(now.getByRole("button", { name: "Draft", exact: true })).toHaveCount(5);
-  await expect(managerA.getByTestId("advisor-changed")).toBeVisible();
-  // The verb buttons ride `transition-colors` from their off-clock style; let the paint settle
-  // so the photograph shows the resting state rather than a frame mid-transition.
+  await expect(card).toHaveAttribute("data-on-clock", "true");
+  await expect(managerA.getByTestId("advisor-header")).toHaveText("You're on the clock");
+  await expect(card.getByRole("button", { name: "Draft", exact: true })).toBeVisible();
+  const after = await rows.allInnerTexts();
+  expect(after).not.toEqual(before);
+  // The verb rides `transition-colors` from its off-clock style; let the paint settle so the
+  // photograph shows the resting state rather than a frame mid-transition.
   await managerA.waitForTimeout(500);
   await managerA.screenshot({ path: `${OUT_DIR}/advisor-on-clock.png`, fullPage: true });
 
   // --- Draft from the card, through the confirmation --------------------------------------------
-  const topName = await rows.nth(0).getByTestId("advisor-now-name").innerText();
-  await rows.nth(0).getByRole("button", { name: "Draft", exact: true }).click();
+  const topName = await managerA.getByTestId("advisor-name").innerText();
+  await card.getByRole("button", { name: "Draft", exact: true }).click();
   const dialog = managerA.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText(`Draft ${topName}?`);
@@ -65,8 +71,8 @@ test("advisor demo -> three bands, queue a target, draft on the clock", async ({
   await expect(managerA.getByTestId("demo-step-label")).toHaveText("Pick 4 of 40");
   await expect(managerA.getByTestId("assistant-beat")).toBeVisible();
 
-  // --- The phone composition: three bands stacked ------------------------------------------------
+  // --- The phone composition: the same card, full-width verb -------------------------------------
   await managerA.setViewportSize({ width: 390, height: 844 });
-  await expect(managerA.getByTestId("advisor-plan-turn")).toHaveCount(3);
+  await expect(card).toBeVisible();
   await managerA.screenshot({ path: `${OUT_DIR}/advisor-mobile.png`, fullPage: true });
 });

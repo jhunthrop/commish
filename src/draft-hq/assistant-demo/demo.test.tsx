@@ -19,51 +19,59 @@ describe("AssistantDemo", () => {
     expect(screen.getByTestId("demo-replay-label")).toHaveTextContent(`${ASSISTANT_DEMO_FIXTURE.runs} runs`);
   });
 
-  it("starts before pick 1 with Back disabled, showing all three bands", () => {
+  it("starts before pick 1 with Back disabled, showing the one card and the odds list", () => {
     render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
     expect(screen.getByTestId("demo-step-label")).toHaveTextContent("Before pick 1");
     expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
-    expect(screen.getByTestId("advisor-signals")).toBeInTheDocument();
-    expect(screen.getByTestId("advisor-plan")).toBeInTheDocument();
-    expect(screen.getByTestId("advisor-now")).toBeInTheDocument();
-    expect(screen.getAllByTestId("advisor-plan-turn")).toHaveLength(3);
+    expect(screen.getByTestId("advisor-card")).toHaveAttribute("data-on-clock", "false");
+    expect(screen.getByTestId("advisor-header")).toHaveTextContent("Your next pick is 1.04, 3 picks away");
     expect(screen.getByTestId("advisor-stamp")).toHaveTextContent(`As of 1.01 · ${ASSISTANT_DEMO_FIXTURE.runs} runs`);
+    expect(screen.getAllByTestId("demo-odds-row").length).toBeGreaterThan(0);
+    expect(within(screen.getByTestId("demo-odds-list")).getAllByTestId("advisor-odds-pct").length).toBeGreaterThan(0);
   });
 
-  it("every sentence is the template floor, and says so", () => {
+  it("steps forward one pick at a time, and the stamp and the percentages move with the room", async () => {
     render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
-    expect(screen.getByTestId("advisor-strategy")).toHaveAttribute("data-voice", "template");
-    for (const reason of screen.getAllByTestId("advisor-reason")) expect(reason).toHaveAttribute("data-voice", "template");
-  });
-
-  it("steps forward one pick at a time and the stamp moves with the room", async () => {
-    render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
+    const before = within(screen.getByTestId("demo-odds-list"))
+      .getAllByTestId("demo-odds-row")
+      .map((row) => row.textContent);
     await stepTo(2);
     expect(screen.getByTestId("demo-step-label")).toHaveTextContent(`Pick 2 of ${ASSISTANT_DEMO_FIXTURE.picks.length}`);
     expect(screen.getByTestId("demo-latest-pick")).toHaveTextContent(ASSISTANT_DEMO_FIXTURE.picks[1]!.teamLabel);
     expect(screen.getByTestId("advisor-stamp")).toHaveTextContent("As of 1.03");
+    const after = within(screen.getByTestId("demo-odds-list"))
+      .getAllByTestId("demo-odds-row")
+      .map((row) => row.textContent);
+    expect(after).not.toEqual(before);
   });
 
-  it("queues a target off the clock and shows its queue order on the row", async () => {
+  it("groups a single position under tier headers, and shows none over the mixed list", async () => {
     const user = userEvent.setup();
     render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
-    const rows = screen.getAllByTestId("advisor-now-row");
-    await user.click(within(rows[0]!).getByRole("button", { name: "Queue" }));
-    expect(within(rows[0]!).getByRole("button", { name: "Queued 1" })).toBeInTheDocument();
-    await user.click(within(rows[1]!).getByRole("button", { name: "Queue" }));
-    expect(within(rows[1]!).getByRole("button", { name: "Queued 2" })).toBeInTheDocument();
-    await user.click(within(rows[0]!).getByRole("button", { name: "Queued 1" }));
-    expect(within(rows[1]!).getByRole("button", { name: "Queued 1" })).toBeInTheDocument();
+    expect(screen.queryAllByTestId("advisor-tier-header")).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: "RB" }));
+    const headers = screen.getAllByTestId("advisor-tier-header");
+    expect(headers.length).toBeGreaterThan(0);
+    expect(headers[0]).toHaveTextContent(/^Tier \d+, \d+ of \d+ left$/);
   });
 
-  it("drafts from the now card on the clock through a confirmation, then steps the replay and says what the replay did", async () => {
+  it("queues the card's pick off the clock and shows its queue order", async () => {
+    const user = userEvent.setup();
+    render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
+    await user.click(screen.getByRole("button", { name: "Queue" }));
+    expect(screen.getByRole("button", { name: "Queued 1" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Queued 1" }));
+    expect(screen.getByRole("button", { name: "Queue" })).toBeInTheDocument();
+  });
+
+  it("drafts from the card on the clock through a confirmation, then steps the replay and says what the replay did", async () => {
     const user = userEvent.setup();
     render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
     await stepTo(firstOnClockStep);
-    expect(screen.getByTestId("advisor-now")).toHaveAttribute("data-on-clock", "true");
-    const rows = screen.getAllByTestId("advisor-now-row");
+    expect(screen.getByTestId("advisor-card")).toHaveAttribute("data-on-clock", "true");
+    expect(screen.getByTestId("advisor-header")).toHaveTextContent("You're on the clock");
     expect(screen.queryByRole("button", { name: "Queue" })).toBeNull();
-    await user.click(within(rows[0]!).getByRole("button", { name: "Draft" }));
+    await user.click(screen.getByRole("button", { name: "Draft" }));
     await user.click(screen.getByRole("button", { name: "Confirm pick" }));
     expect(screen.getByTestId("demo-draft-note")).toHaveTextContent(/You took/);
     expect(screen.getByTestId("demo-step-label")).toHaveTextContent(`Pick ${firstOnClockStep + 1} of`);
