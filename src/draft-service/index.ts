@@ -4,6 +4,7 @@ import { getPublisher } from "@/lib/realtime/publisher";
 import type { PublishFn } from "./store";
 import { createMockBotDriver, type MockBotDriver } from "@/mock-draft-service/driver";
 import { createDraftAdvancer, draftLoopTarget, runDraftAdvanceLoop, type AdvanceLoopHandle, type DraftAdvancer } from "./advance";
+import { warmAdvisorRoom } from "./assistant/service";
 import { createNudgeScheduler, type NudgeScheduler } from "./nudge";
 import { createNudgeCopy } from "./nudge-copy";
 import { createDraftStore, type DraftStore } from "./store";
@@ -135,6 +136,23 @@ export async function advanceDraftNow(draftId: string): Promise<void> {
 }
 
 /**
+ * THE ADVISOR'S BACKGROUND WARM (founder report 2026-09-08, the hang): fired by the watcher
+ * loop on every sequence it observes, one macrotask later. The yield matters: the loop's own
+ * tick runs right after the pick's commit, and the room-facts compute is synchronous CPU —
+ * running it inline would sit between the pick's frame reaching Redis and the stream relaying
+ * it to the watching browser. One `setTimeout(0)` lets that relay (and any request already
+ * queued) go first. Never throws into the loop; a failed warm costs the next viewer a cold
+ * compute, which is the request path as it was.
+ */
+function scheduleAdvisorWarm(draftId: string): void {
+  setTimeout(() => {
+    warmAdvisorRoom(getDb(), draftId).catch((error: unknown) => {
+      console.error("[draft] advisor warm failed", { draftId }, error);
+    });
+  }, 0);
+}
+
+/**
  * THE SSE STREAM'S TICK (driver 2): called by the league events route as it accepts a
  * connection. Resolves the league's draft and — while it still has work to ever do — runs the
  * advance loop until the client disconnects or the draft completes, handing back the handle the
@@ -147,7 +165,7 @@ export async function startDraftAdvanceLoopForLeague(leagueId: string, signal: A
     // stays pure wiring.
     const draftId = await draftLoopTarget(getDb(), leagueId, systemClock.now());
     if (draftId === null) return null;
-    return runDraftAdvanceLoop(draftId, signal, { advance: getDraftAdvancer().advance, clock: systemClock });
+    return runDraftAdvanceLoop(draftId, signal, { advance: getDraftAdvancer().advance, clock: systemClock, onSequence: () => scheduleAdvisorWarm(draftId) });
   } catch (error: unknown) {
     console.error("[draft] could not start the stream's advance loop", { leagueId }, error);
     return null;

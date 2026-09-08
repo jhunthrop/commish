@@ -14,7 +14,7 @@ import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-supp
 import { simulateRoomOdds } from "../sim/room-odds";
 import { resetAdvisorMemoForTests } from "./memo";
 import { recommendNow } from "./recommend";
-import { advisorFor } from "./service";
+import { advisorFor, warmAdvisorRoom } from "./service";
 
 const db = createTestDb();
 const DRAFT_ID = "draft_advisor_service";
@@ -66,6 +66,20 @@ describe("advisorFor", () => {
     expect(first!.odds!.runs).toBeGreaterThan(0);
     expect(second!.odds!.pickNumber).toBe(2);
     expect(first!.pick!.playerId).toMatch(/^p\d$/);
+  });
+
+  it("warmAdvisorRoom computes the room facts for the current state ahead of any viewer, so the viewer's own request simulates nothing", async () => {
+    const { onClockUser } = await fixture();
+    const simulate = vi.fn(simulateRoomOdds);
+    await warmAdvisorRoom(db, DRAFT_ID, { simulate });
+    expect(simulate).toHaveBeenCalledTimes(1);
+    const view = await advisorFor(db, DRAFT_ID, onClockUser, { simulate });
+    expect(view).not.toBeNull();
+    expect(simulate).toHaveBeenCalledTimes(1);
+    // Warming again for the same sequence is free, and a draft that does not exist is a no-op.
+    await warmAdvisorRoom(db, DRAFT_ID, { simulate });
+    await warmAdvisorRoom(db, "no_such_draft", { simulate });
+    expect(simulate).toHaveBeenCalledTimes(1);
   });
 
   it("is null for a member with no seat and before the draft runs", async () => {

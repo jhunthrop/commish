@@ -627,6 +627,33 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick, deadline-driven)", () => 
     }
   });
 
+  it("reports each sequence it observes exactly once — at connect, and after any advance that moved the log — the hook the advisor's warm rides", async () => {
+    vi.useFakeTimers();
+    try {
+      const loopClock = fakeClockFrom(BASE_NOW);
+      const sequences = [5, 5, 7];
+      const advance = vi.fn(async (draftId: string) => ok(draftId, { nextDueAt: atMs(60_000), sequence: sequences.shift() ?? 7 }));
+      const onSequence = vi.fn();
+      const controller = new AbortController();
+      const loop = runDraftAdvanceLoop("draft_seq", controller.signal, { advance, clock: loopClock, onSequence });
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(onSequence).toHaveBeenCalledTimes(1);
+      expect(onSequence).toHaveBeenLastCalledWith(5);
+
+      loop.observe(6); // a wake that finds the log where it was: nothing to report
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(onSequence).toHaveBeenCalledTimes(1);
+
+      loop.observe(7); // the log moved
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(onSequence).toHaveBeenCalledTimes(2);
+      expect(onSequence).toHaveBeenLastCalledWith(7);
+      controller.abort();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("a wake during a running advance queues exactly one more run, never an overlap", async () => {
     vi.useFakeTimers();
     try {
