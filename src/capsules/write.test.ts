@@ -248,8 +248,10 @@ describe("the gateway call spacing", () => {
     await postChatCompletion(MESSAGES, 200, deps);
     await postChatCompletion(MESSAGES, 200, deps);
 
-    // Three calls at a 60ms gap cannot finish inside 120ms, whatever the fixture does.
-    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(120);
+    // Three calls at a 60ms gap spend two gaps waiting. Asserted with slack rather than at the
+    // exact 120ms boundary: a timer may fire a millisecond early, and a test that fails on that is
+    // measuring the event loop rather than the limiter.
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(100);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 

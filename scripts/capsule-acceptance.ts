@@ -32,8 +32,9 @@ const SAMPLE_SIZE = Number(ARGUMENTS.find((argument) => !argument.startsWith("--
 /** `--model=zai/glm-5.2-fast` puts another model through the identical prompts, validator and rate
  *  limiter, which is the only way a comparison says anything about the MODEL (task 11). */
 const MODEL = ARGUMENTS.find((argument) => argument.startsWith("--model="))?.slice("--model=".length);
-/** `--no-thinking` asks the model not to reason before it writes, where the gateway accepts it. */
-const NO_THINKING = ARGUMENTS.includes("--no-thinking");
+/** `--thinking` puts the model's reasoning back on, which is what production ran before task 11
+ *  measured it and turned it off. `--no-thinking` is kept as a no-op alias for the default. */
+const THINKING = ARGUMENTS.includes("--thinking");
 /** `--texts=<path>` writes each player's compact read to a file, for the persona read. */
 const TEXTS_PATH = ARGUMENTS.find((argument) => argument.startsWith("--texts="))?.slice("--texts=".length);
 
@@ -162,7 +163,7 @@ async function main(): Promise<void> {
   const sample = await sampleFor(db);
   console.log(
     `capsule acceptance: ${sample.length} player(s)${TEMPLATES_ONLY ? " still on the template" : ""}, ` +
-      `model ${MODEL ?? CAPSULE_MODEL}${NO_THINKING ? " with thinking disabled" : ""}, ` +
+      `model ${MODEL ?? CAPSULE_MODEL}${THINKING ? " thinking" : " not thinking"}, ` +
       `${CAPSULE_CONFIG.gateway.callsPerMinute} calls a minute.`,
   );
   const texts: string[] = [];
@@ -176,7 +177,7 @@ async function main(): Promise<void> {
     const result = await generateCapsule(facts, {
       apiKey,
       ...(MODEL === undefined ? {} : { model: MODEL }),
-      ...(NO_THINKING ? { thinking: false } : {}),
+      ...(THINKING ? { thinking: true } : {}),
       onCallLatency: (ms) => tally.latencies.push(ms),
     });
     const written = result.source === "llm";

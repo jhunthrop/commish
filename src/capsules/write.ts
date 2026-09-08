@@ -89,10 +89,11 @@ export interface CapsuleWriterDeps {
    *  Called once per HTTP attempt, whatever its outcome. */
   readonly onCallLatency?: (ms: number) => void;
   /**
-   * `false` asks the model NOT to think before it writes (task 11). Sent as the two shapes the
-   * Zhipu GLM family accepts through an OpenAI-compatible gateway, both at once, because the
-   * gateway documents neither and an ignored extra field is harmless where a missing one is the
-   * whole experiment. `undefined` sends nothing at all, which is production's own behaviour.
+   * Whether the model may think before it writes. Defaults to `CAPSULE_CONFIG.gateway.thinking`,
+   * which the task 11 measurement set to `false` — see that constant for the numbers. Sent as the
+   * two shapes the Zhipu GLM family accepts through an OpenAI-compatible gateway, both at once,
+   * because the gateway documents neither and an ignored extra field is harmless where a missing
+   * one is the whole experiment.
    */
   readonly thinking?: boolean;
 }
@@ -303,7 +304,7 @@ export async function postChatCompletion(
       const response = await doFetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${deps.apiKey}` },
-        body: JSON.stringify({ model: deps.model ?? CAPSULE_MODEL, messages, max_tokens: maxTokens, ...(deps.thinking === false ? THINKING_DISABLED : {}) }),
+        body: JSON.stringify({ model: deps.model ?? CAPSULE_MODEL, messages, max_tokens: maxTokens, ...((deps.thinking ?? CAPSULE_CONFIG.gateway.thinking) === false ? THINKING_DISABLED : {}) }),
         signal: controller.signal,
       });
       deps.onCallLatency?.(Date.now() - startedAt);

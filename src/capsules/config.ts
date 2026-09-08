@@ -56,6 +56,31 @@ export const CAPSULE_CONFIG = {
     callsPerMinute: GATEWAY_CALLS_PER_MINUTE,
     /** `callsPerMinute` as the gap `write.ts` actually enforces between two calls. */
     minCallSpacingMs: MIN_CALL_SPACING_MS,
+    /**
+     * THE WRITER DOES NOT THINK BEFORE IT WRITES (task 11, founder's question: should this be a
+     * non-reasoning model?).
+     *
+     * Measured on dev, same prompts, same validator, same rate limiter, the model the only thing
+     * that moved:
+     *
+     *   glm-5.3-flash, reasoning on   67% written (56 of 84 answered), 16-20% throttled,
+     *                                 $0.00239 a player, call latency p50 6.6s p90 12.7s
+     *   glm-5.3-flash, reasoning OFF  80% written (48 of 60 answered over two runs), 0% throttled,
+     *                                 $0.00153 a player, call latency p50 3.4s p90 6.4s
+     *   glm-5.2-fast                  0% written (10 of 10 throttled), and it billed $0.09 a
+     *                                 player anyway. It is not a non-reasoning model: a one-word
+     *                                 probe spent 99 reasoning tokens at twenty times the price.
+     *
+     * The prose is the other half and it is not worse: five players read side by side (the ledger
+     * carries them) show the same voice, with the reasoning-off reads finishing their sentences
+     * where the reasoning-on ones twice ran out of budget mid-clause and once fell to template.
+     * The thinking was being spent on the length and the framing rules, then run out of, which is
+     * exactly what the reasoning-on failures looked like.
+     *
+     * Reasoning stays SELECTABLE (`CapsuleWriterDeps.thinking`, `--no-thinking`'s own inverse) so
+     * the comparison can be re-run against a future model without a code change.
+     */
+    thinking: false,
   },
   /** The two sizes a capsule ships in — same facts, same writer/validator machinery, two prompts
    *  and two length bands (founder, live-fire review: "a competitor's player readout set the
