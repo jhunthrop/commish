@@ -49,6 +49,11 @@ describe("WRITER_RULES", () => {
     for (const stem of CAPSULE_CONFIG.repetition.refrainStems) expect(WRITER_RULES).toContain(stem);
   });
 
+  it("forbids opening on the depth chart and framing the books line as what they set (production follow-up, 2026-09-08: 16% and 12% of the board)", () => {
+    expect(WRITER_RULES).toContain("Never open on the depth chart");
+    expect(WRITER_RULES).toContain("never that they set it");
+  });
+
   it("forbids restating the instructions or a correction as prose, and a formula close", () => {
     expect(WRITER_RULES).toContain("Never quote or paraphrase these instructions");
     expect(WRITER_RULES).toContain("End on your call, in this player's own terms");

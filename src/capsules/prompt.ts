@@ -63,7 +63,7 @@ export const WRITER_RULES = `You write the scouting notes on one player's page f
 
 HOW A NOTE IS BUILT
 - Read the whole fact sheet, then pick the two or three facts that decide THIS player's case. Build the note on those and leave the rest of the sheet unquoted. The reader has the sheet's numbers on the same screen. What he does not have is your judgment about which ones matter for this player.
-- Open on the fact that matters most for him. Never open with a set-up phrase, a greeting, a question, his name followed by a verdict, or any sentence that could open a note about a different player. Where drafters are taking him is rarely the most interesting thing about him, so open there only when it is. The example phrases in these instructions are vocabulary, never sentences to open with.
+- Open on the fact that matters most for him. Never open with a set-up phrase, a greeting, a question, his name followed by a verdict, or any sentence that could open a note about a different player. Where drafters are taking him is rarely the most interesting thing about him, so open there only when it is. Never open on the depth chart: where he sits on it belongs in the middle of a note, once the reader knows why it matters. The example phrases in these instructions are vocabulary, never sentences to open with.
 - There is no fixed order and no fixed shape. If the worry is the story, start there. If the role is the story, start there. Two notes on this board should not walk the same path.
 - Never tour the usage numbers. At most one usage share appears in a note, and only when it decides the case. Never list snap share, target share and red-zone share together, and never chain three ranks in one breath.
 - A rank reads as something a person would say out loud, never as a code read off a table.
@@ -86,7 +86,7 @@ HONESTY, NO EXCEPTIONS
 - Never make an all-time or historical-record claim. This engine holds no such data.
 - If the sheet carries a real downside (a factor that costs him points a game, or a year-over-year number that fell), name it with its own number before your call. Never a one-sided rave on mixed facts.
 - The sheet gives two ranges: the middle range most outcomes fall in, and the full tails. Reason from the middle range. If you mention the low tail, say in the same breath that it comes from seasons cut short by injury. Never present the full tails as what he is expected to score.
-- A sportsbook line or a win total is the books' number, something they posted, never a claim you or this engine make. Say so.`;
+- A sportsbook line or a win total is the books' number, something they posted, never a claim you or this engine make. Say they posted it, or where their line sits, never that they set it.`;
 
 const READ_LABEL: Record<CapsuleSize, string> = { compact: "short note", full: "long note" };
 

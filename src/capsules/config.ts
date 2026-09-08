@@ -210,11 +210,14 @@ export const CAPSULE_CONFIG = {
       "the engine of", // 56%, the old instructions' own example verb
       "makes the case", // 44%
       "most seasons land", // 44%, the sheet's own band sentence read back
-      "the books set", // 36%
+      "the books set", // 36% on the baseline; 11.7% (49 of 420 written) on the 2026-09-07 production regeneration
       // The trading register (founder ruling, 2026-09-07), 84%, 44% and 40% on the baseline:
       "the market",
       "i'm buying",
       "he's a buy",
+      // THE PRODUCTION REGENERATION (2026-09-07, 659 players, 420 written, measured 2026-09-08):
+      "the depth chart is", // the top opener family, 16.2% (68 players) against the 10% line
+      "it says nothing about whether he can play", // the top stock sentence, 2.3% (15 players), the no-props note's old brief read back
     ],
   },
   /** A law group's own `|netEffectPoints|` at or above this reads as a real, citable downside —
