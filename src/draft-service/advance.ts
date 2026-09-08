@@ -317,6 +317,14 @@ export function draftEventSequence(event: { readonly type: string; readonly payl
 export interface AdvanceLoopDeps {
   readonly advance: DraftAdvancer["advance"];
   readonly clock: Clock;
+  /**
+   * Called with the draft's log sequence after any tick that found it somewhere new — the
+   * connect tick included, and a wake that applied nothing but observed another driver's pick
+   * — and never twice for one sequence. The seam the advisor's background warm rides
+   * (`startDraftAdvanceLoopForLeague`): while somebody watches a room, every pick event
+   * computes the room's facts once, ahead of the viewers' own requests. Must not throw.
+   */
+  readonly onSequence?: (sequence: number) => void;
   /** Test seams over the `DRAFT_ADVANCE_CONFIG.sse*` bounds. */
   readonly idlePollMs?: number;
   readonly maxSleepMs?: number;
@@ -390,7 +398,9 @@ export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: 
         return;
       }
       erroring = false;
+      const moved = outcome.sequence !== null && outcome.sequence !== lastSequence;
       lastSequence = outcome.sequence;
+      if (moved) deps.onSequence?.(outcome.sequence!);
       // Terminal: a finished draft, or one that is gone (vanished or dissolved) — no timer left open.
       if (outcome.outcome === "not_found" || outcome.phase === "complete") stop();
       else schedule(sleepFor(outcome));

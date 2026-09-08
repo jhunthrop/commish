@@ -53,7 +53,7 @@ export function createNudgeScheduler({
 }: NudgeSchedulerDeps): NudgeScheduler {
   // Task 4's guard, cached per team: a team's owner never changes mid-draft, so one indexed
   // read per team (never per nudge check) is enough to know for the rest of this scheduler's
-  // lifetime whether the moderator may ever speak to it. `MOCK_CONFIG.botDelay.maxSeconds`
+  // lifetime whether the moderator may ever speak to it. `MOCK_CONFIG.botDelay`'s top
   // (`@/mock-draft/config`) already keeps a bot's own pick well inside the nudge threshold, so
   // this guard is structurally moot in practice — it exists to make "the moderator never talks
   // to a bot" a FACT this scheduler enforces, not a coincidence of two configs staying in sync.

@@ -8,7 +8,7 @@ import { teamOnClock, type DraftState } from "@/draft-engine";
 import { createDraftStore, type DraftStore } from "@/draft-service/store";
 import { createDraftTicker, liveDraftsQuery, type DraftTicker } from "@/draft-service/ticker";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
-import { botThinkDelaySeconds } from "@/mock-draft/bots";
+import { botThinkDelayMs } from "@/mock-draft/bots";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 import { rngFor } from "@/mock-draft/rng";
 import { createMockRoom } from "./creation";
@@ -29,6 +29,10 @@ const advance = (ms: number): void => {
 /** The fixture's own `botSeed` (`seedDraftFixture` stamps 7) — named so the delay-boundary test
  *  reads as arithmetic, not as a magic number agreeing with another magic number. */
 const FIXTURE_BOT_SEED = 7;
+
+/** The delay draw's upper bound (`MOCK_CONFIG.botDelay`): a clock advanced this far past a turn's
+ *  start is past ANY bot's seeded delay for that turn. */
+const MAX_DELAY_MS = MOCK_CONFIG.botDelay.baseMs + MOCK_CONFIG.botDelay.jitterMs;
 
 function testStore(publishLog?: string[]): DraftStore {
   return createDraftStore({
@@ -263,7 +267,7 @@ describe("the bot driver (Task 6, Step 3)", () => {
     await ticker.tick();
     expect((await store.getDraftState(fixture.draftId))!.picks).toHaveLength(0);
 
-    advance(MOCK_CONFIG.botDelay.maxSeconds * 1000);
+    advance(MAX_DELAY_MS);
     await ticker.tick();
     const state = await store.getDraftState(fixture.draftId);
     expect(state!.picks).toHaveLength(1);
@@ -283,8 +287,7 @@ describe("the bot driver (Task 6, Step 3)", () => {
     const onClock = state!.draftOrder[0]!;
 
     // The identical stream the driver derives: the room's stored seed, this pick's own key.
-    const delaySeconds = botThinkDelaySeconds(30, rngFor(FIXTURE_BOT_SEED, `${onClock}:delay:1`));
-    const dueAtMs = Date.parse(BASE_NOW) + delaySeconds * 1000;
+    const dueAtMs = Date.parse(BASE_NOW) + botThinkDelayMs(30, rngFor(FIXTURE_BOT_SEED, `${onClock}:delay:1`));
 
     now = new Date(Math.ceil(dueAtMs) - 1).toISOString();
     await ticker.tick();
@@ -304,7 +307,7 @@ describe("the bot driver (Task 6, Step 3)", () => {
     const ticker = testTicker(store);
     await store.startDraft(fixture.draftId);
 
-    advance(MOCK_CONFIG.botDelay.maxSeconds * 1000);
+    advance(MAX_DELAY_MS);
     await ticker.tick();
 
     expect((await store.getDraftState(fixture.draftId))!.picks).toHaveLength(1);
@@ -428,9 +431,9 @@ describe("the bot driver (Task 6, Step 3)", () => {
     await store.startDraft(fixture.draftId);
     const stale = await store.getDraftState(fixture.draftId);
     const driver = createMockBotDriver({ db, store });
-    advance(MOCK_CONFIG.botDelay.maxSeconds * 1000);
+    advance(MAX_DELAY_MS);
 
-    expect(await driver.driveBotPick(stale!, now)).toEqual({ picked: true, picks: 1 }); // meta cached here
+    expect(await driver.driveBotPick(stale!, now)).toEqual({ picked: true }); // meta cached here
     await db.delete(mockRooms).where(eq(mockRooms.leagueId, fixture.leagueId));
 
     // CONTROL — the cache is real: with the sidecar row already gone, the cached meta still
@@ -495,9 +498,9 @@ describe("the bot driver (Task 6, Step 3)", () => {
     await store.startDraft(fixture.draftId);
     const stale = await store.getDraftState(fixture.draftId);
     const { driveBotPick } = createMockBotDriver({ db, store });
-    advance(MOCK_CONFIG.botDelay.maxSeconds * 1000);
+    advance(MAX_DELAY_MS);
 
-    expect(await driveBotPick(stale!, now)).toEqual({ picked: true, picks: 1 });
+    expect(await driveBotPick(stale!, now)).toEqual({ picked: true });
     // The same STALE state again: the driver re-derives the identical pick, and the real
     // admit/reduce path — judging against the FRESH log under the row lock — refuses it.
     const second = await driveBotPick(stale!, now);
@@ -507,7 +510,7 @@ describe("the bot driver (Task 6, Step 3)", () => {
   });
 });
 
-describe("sim-to-next-pick (the founder's directive: no wait at all against bots)", () => {
+describe("a lone human's room paces its bots too (founder report 2026-09-08: no burst, no sim lane)", () => {
   /** The human's next legal pick in the sprint fixture: any untaken player at a position the
    *  human's own roster still has open. Position is the id's own prefix (qb1/rb2/wr1...). */
   function nextHumanPlayer(state: DraftState, humanTeamId: string): string {
@@ -518,85 +521,59 @@ describe("sim-to-next-pick (the founder's directive: no wait at all against bots
     return playerId;
   }
 
-  it("a lone human's room sims the whole bot stretch in ONE drive call, with ZERO think-delay", async () => {
-    // One human (team 1), one bot — `simToNextPick` by seat arithmetic. `advance` is NEVER
-    // called in this test: on the paced path even the fastest possible delay draw
-    // (`botDelay.minSeconds: 3`) would refuse every drive below, so every landed pick is the
-    // sim lane's own doing.
-    const fixture = await seedAllBotMock("sim", { botTeams: 1 });
+  it("a drive lands at most ONE bot pick, and only once that pick's own seeded delay has elapsed", async () => {
+    // One human (team 1), one bot: the seat arithmetic that used to select the zero-delay sim
+    // lane. A 2-team snake puts the bot on the clock twice in a row at the turn edge, which is
+    // exactly the stretch that used to land in one call.
+    const fixture = await seedAllBotMock("paced_solo", { botTeams: 1 });
     const store = testStore();
     await store.startDraft(fixture.draftId);
     const humanTeamId = fixture.teamIds[0]!;
     const { driveBotPick } = createMockBotDriver({ db, store });
 
     let state = (await store.getDraftState(fixture.draftId))!;
-    let driveCalls = 0;
-    // Drive the room to completion with no clock movement at all: the human picks through the
-    // real store; every bot stretch between two human turns lands in ONE drive call.
-    for (let i = 0; i < 20 && state.phase !== "complete"; i += 1) {
-      const onClock = teamOnClock(state);
-      if (onClock === humanTeamId) {
-        const picked = await store.applyAction(fixture.draftId, {
-          v: DRAFT_ACTION_VERSION,
-          type: "MAKE_PICK",
-          timestamp: now,
-          teamId: humanTeamId,
-          playerId: nextHumanPlayer(state, humanTeamId),
-        });
-        if (!picked.ok) throw new Error(picked.reason);
-        state = picked.state;
-        continue;
-      }
-      const outcome = await driveBotPick(state, now);
-      driveCalls += 1;
-      // Every drive against a bot-on-clock state lands the ENTIRE consecutive stretch: the
-      // human is back on the clock (or the room is done) after every single call.
-      expect(outcome).toMatchObject({ picked: true });
-      state = (await store.getDraftState(fixture.draftId))!;
-      const nextUp = teamOnClock(state);
-      expect(nextUp === humanTeamId || nextUp === null).toBe(true);
+    if (teamOnClock(state) === humanTeamId) {
+      const picked = await store.applyAction(fixture.draftId, { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp: now, teamId: humanTeamId, playerId: nextHumanPlayer(state, humanTeamId) });
+      if (!picked.ok) throw new Error(picked.reason);
+      state = picked.state;
     }
-
-    expect(state.phase).toBe("complete");
-    expect(state.picks).toHaveLength(6);
-    // The 2-team snake's bot stretches around the human: 3 bot picks landed across at most 2
-    // drive calls proves at least one call carried more than one pick.
-    const botPicks = state.picks.filter((pick) => pick.teamId !== humanTeamId);
-    expect(botPicks).toHaveLength(3);
-    expect(botPicks.every((pick) => !pick.auto)).toBe(true);
-    expect(driveCalls).toBeLessThan(botPicks.length);
+    const picksBefore = state.picks.length;
+    // The bot's turn just began: nothing is due, whatever the seat count.
+    expect(await driveBotPick(state, now)).toBeNull();
+    advance(MAX_DELAY_MS);
+    expect(await driveBotPick(state, now)).toEqual({ picked: true });
+    const after = (await store.getDraftState(fixture.draftId))!;
+    expect(after.picks).toHaveLength(picksBefore + 1);
+    // The bot holds the clock again (the snake's turn edge), and its NEXT pick is not due yet:
+    // the second pick waits its own delay instead of riding the first drive.
+    expect(teamOnClock(after)).not.toBe(humanTeamId);
+    expect(await driveBotPick(after, now)).toBeNull();
   });
 
-  it("completion settles in the SAME call — results are live the instant the last pick lands, no extra tick", async () => {
-    const fixture = await seedAllBotMock("sim_settle", { botTeams: 1 });
+  it("completion settles in the drive that observes it, paced or not", async () => {
+    const fixture = await seedAllBotMock("paced_settle", { botTeams: 1 });
     const store = testStore();
     await store.startDraft(fixture.draftId);
     const humanTeamId = fixture.teamIds[0]!;
     const { driveBotPick } = createMockBotDriver({ db, store });
 
     let state = (await store.getDraftState(fixture.draftId))!;
-    for (let i = 0; i < 20 && state.phase !== "complete"; i += 1) {
+    for (let i = 0; i < 40 && state.phase !== "complete"; i += 1) {
       if (teamOnClock(state) === humanTeamId) {
-        const picked = await store.applyAction(fixture.draftId, {
-          v: DRAFT_ACTION_VERSION,
-          type: "MAKE_PICK",
-          timestamp: now,
-          teamId: humanTeamId,
-          playerId: nextHumanPlayer(state, humanTeamId),
-        });
+        const picked = await store.applyAction(fixture.draftId, { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp: now, teamId: humanTeamId, playerId: nextHumanPlayer(state, humanTeamId) });
         if (!picked.ok) throw new Error(picked.reason);
         state = picked.state;
       } else {
+        advance(MAX_DELAY_MS);
         await driveBotPick(state, now);
         state = (await store.getDraftState(fixture.draftId))!;
       }
     }
     expect(state.phase).toBe("complete");
+    expect(state.picks.every((pick) => !pick.auto)).toBe(true);
 
     // Whichever seat made the final pick, ONE more drive call against the finished state is
-    // the most that stands between the last pick and a settled row (a bot-finished room is
-    // settled by the very loop that finished it; a human-finished room by the drive the
-    // actions route fires inside the same request).
+    // the most that stands between the last pick and a settled row.
     await driveBotPick(state, now);
     const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, fixture.draftId));
     expect(row?.status).toBe("complete");
@@ -604,7 +581,7 @@ describe("sim-to-next-pick (the founder's directive: no wait at all against bots
 });
 
 describe("the whole practice round, through the real writers", () => {
-  it("a solo room drafts itself to completion: bots sim instantly (sim-to-next-pick), the absent host is autopicked, status never lies", async () => {
+  it("a solo room drafts itself to completion: bots pick at their seeded delay, the absent host is autopicked, status never lies", async () => {
     await seedPracticePlayers(db);
     await db.insert(users).values({ id: "solo_full_host", email: "solo_full@test.local", displayName: "Solo Host" });
     const created = await createMockRoom(
@@ -635,11 +612,9 @@ describe("the whole practice round, through the real writers", () => {
 
     // Task 4's law still holds at the completing pick itself: the pick that finishes a mock
     // writes NO status through `commitDraftState` — the flip is only ever the bare guarded
-    // SETTLE (Task 6 fix round, ruled). A solo room sims (`simToNextPick`), so a bot-finished
-    // room is settled inside the very drive that finished it; a host-autopick finish waits one
-    // tick for the drive that observes it. Either way, within one tick of completion the row is
-    // settled and its `liveDraftsQuery` slot is freed for real drafts (the slot-freed
-    // regression the ruling exists for) — promptly, never the retention window.
+    // SETTLE (Task 6 fix round, ruled). Within one tick of completion the row is settled and
+    // its `liveDraftsQuery` slot is freed for real drafts (the slot-freed regression the ruling
+    // exists for) — promptly, never the retention window.
     await ticker.tick();
     const [after] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, room.draftId));
     expect(after?.status).toBe("complete");
@@ -647,7 +622,7 @@ describe("the whole practice round, through the real writers", () => {
   });
 });
 
-describe("dueBotPick (the drivers' one due computation — paced ticker, sim lane and catch-up all read it)", () => {
+describe("dueBotPick (the drivers' one due computation — the paced ticker and the catch-up funnel both read it)", () => {
   it("prices a paced bot turn at turnStartedAt + the seeded think-delay, naming the exact pick the live drive lands", async () => {
     const fixture = await seedAllBotMock("duecalc");
     const store = testStore();
@@ -660,8 +635,7 @@ describe("dueBotPick (the drivers' one due computation — paced ticker, sim lan
     expect(due).not.toBeNull();
     expect(due!.teamId).toBe(onClock);
     // The identical stream the live driver derives: the room's stored seed, this pick's own key.
-    const delaySeconds = botThinkDelaySeconds(30, rngFor(FIXTURE_BOT_SEED, `${onClock}:delay:1`));
-    expect(due!.dueAtMs).toBe(Date.parse(state.turnStartedAt!) + delaySeconds * 1000);
+    expect(due!.dueAtMs).toBe(Date.parse(state.turnStartedAt!) + botThinkDelayMs(30, rngFor(FIXTURE_BOT_SEED, `${onClock}:delay:1`)));
     // The selection thunk is pure: asking twice answers identically and moves no cursor.
     const playerId = due!.choosePick();
     expect(playerId).not.toBeNull();
@@ -670,13 +644,13 @@ describe("dueBotPick (the drivers' one due computation — paced ticker, sim lan
     // One computation, two callers: the live drive at the due instant lands THIS pick.
     now = new Date(Math.ceil(due!.dueAtMs)).toISOString();
     const driven = await driver.driveBotPick(state, now);
-    expect(driven).toEqual({ picked: true, picks: 1 });
+    expect(driven).toEqual({ picked: true });
     const after = (await store.getDraftState(fixture.draftId))!;
     expect(after.picks[0]!.playerId).toBe(playerId);
   });
 
-  it("prices a sim room's bot turn at the turn's own start (zero delay) and answers null while the human holds the clock", async () => {
-    const fixture = await seedAllBotMock("duesim", { botTeams: 1 });
+  it("prices a lone human's room's bot turn at the same seeded delay as any room (no zero-delay lane) and answers null while the human holds the clock", async () => {
+    const fixture = await seedAllBotMock("duesolo", { botTeams: 1 });
     const store = testStore();
     const driver = createMockBotDriver({ db, store });
     await store.startDraft(fixture.draftId);
@@ -705,14 +679,17 @@ describe("dueBotPick (the drivers' one due computation — paced ticker, sim lan
         state = picked.state;
         continue;
       }
-      // A sim room's bot pick is due the instant its turn starts — no think-delay at all.
+      // The bot's pick is due its own seeded delay after its turn began — a lone human's room
+      // prices exactly like a shared one.
       expect(due).not.toBeNull();
-      expect(due!.dueAtMs).toBe(Date.parse(state.turnStartedAt!));
+      const expectedDelayMs = botThinkDelayMs(30, rngFor(FIXTURE_BOT_SEED, `${onClock}:delay:${state.pickNumber}`));
+      expect(due!.dueAtMs).toBe(Date.parse(state.turnStartedAt!) + expectedDelayMs);
+      expect(expectedDelayMs).toBeGreaterThan(0);
       botTurnsPriced += 1;
       const applied = await store.applyAction(fixture.draftId, {
         v: DRAFT_ACTION_VERSION,
         type: "MAKE_PICK",
-        timestamp: now,
+        timestamp: new Date(Math.ceil(due!.dueAtMs)).toISOString(),
         teamId: due!.teamId,
         playerId: due!.choosePick()!,
       });

@@ -26,7 +26,8 @@ const BOT_COUNT = TEAM_COUNT - 1;
 /** The widest clock tier (see `mock-draft.spec.ts`'s own `PICK_SECONDS` docblock: the narrow
  *  30s tier measured fragile against a real browser under this repo's own background load). */
 const PICK_SECONDS = 90;
-const ON_CLOCK_TIMEOUT_MS = (BOT_COUNT + 2) * MOCK_CONFIG.botDelay.maxSeconds * 1_000;
+/** Every bot ahead of the host at its slowest seeded delay, padded for scheduler jitter. */
+const ON_CLOCK_TIMEOUT_MS = (BOT_COUNT + 2) * (MOCK_CONFIG.botDelay.baseMs + MOCK_CONFIG.botDelay.jitterMs) + 15_000;
 const OUT_DIR = ".superpowers/mocks/screenshots";
 const DESK = { width: 1440, height: 900 };
 const PHONE = { width: 390, height: 844 };
@@ -50,7 +51,7 @@ const AVAILABLE_PLAYERS_LIST = "Available players, best first";
  *  rows are `drawer-row`s whose name is a `PlayerName` BUTTON (the row's first button in DOM
  *  order) — there is no name testid contract in the quilt, so the name is read from that button
  *  and the row is re-found by it. */
-async function makeTopPick(page: Page): Promise<void> {
+async function makeTopPick(page: Page): Promise<string> {
   const pool = page.getByRole("list", { name: AVAILABLE_PLAYERS_LIST });
   await pool.getByRole("button", { name: "Draft", exact: true }).first().waitFor({ timeout: 15_000 });
   const firstRow = pool.getByTestId("drawer-row").first();
@@ -62,6 +63,7 @@ async function makeTopPick(page: Page): Promise<void> {
     }
     await expect(uniqueRow).toHaveCount(0, { timeout: 5_000 });
   }).toPass({ timeout: 20_000 });
+  return pickedName;
 }
 
 interface FoldMeasure {
@@ -156,12 +158,19 @@ test("mock room -> the lead card and rows before your pick, Draft above the fold
   await managerA.setViewportSize(DESK);
   await managerA.getByTestId("drawer-handles").getByRole("tab", { name: "Pool" }).click();
   await expect(desk.getByTestId("advisor-odds-pct").first()).toBeVisible({ timeout: 15_000 });
-  await makeTopPick(managerA);
+  const pickedName = await makeTopPick(managerA);
 
-  // --- After the pick the tab moves on to the next decision: the card again, no beat line.
+  // --- After the pick the tab moves on to the next decision: the card again, no beat line —
+  // and never the wrong people (founder report 2026-09-08): while the view computed before
+  // this pick is still the one on screen, the man just drafted is filtered out of the lead and
+  // the rows at render time, and the card says it is re-reading; the fresh view then lands.
   await managerA.getByTestId("drawer-handles").getByRole("tab", { name: "Assistant" }).click();
+  await expect(desk.getByTestId("advisor-name").filter({ hasText: pickedName })).toHaveCount(0);
+  await expect(desk.getByTestId("advisor-candidate").filter({ hasText: pickedName })).toHaveCount(0);
   await expect(card).toBeVisible({ timeout: 15_000 });
   await expect(card).toHaveAttribute("data-on-clock", "false", { timeout: 15_000 });
+  await expect(desk.getByTestId("advisor-recomputing")).toHaveCount(0, { timeout: 15_000 });
+  await expect(desk.getByTestId("advisor-name")).not.toHaveText(pickedName);
   await expect(managerA.getByTestId("assistant-beat")).toHaveCount(0);
   await expect(managerA.getByText("Best available.")).toHaveCount(0);
 });

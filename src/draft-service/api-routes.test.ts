@@ -21,9 +21,10 @@ import { GET as getDraft } from "@/app/api/drafts/[draftId]/route";
 import { GET as getPlayers } from "@/app/api/drafts/[draftId]/players/route";
 import { POST as postAction } from "@/app/api/drafts/[draftId]/actions/route";
 import { POST as postStart } from "@/app/api/drafts/[draftId]/start/route";
-import { getDraftStore, simMockToNextHumanTurn } from "@/draft-service";
+import { getDraftAdvancer, getDraftStore } from "@/draft-service";
 import { teamOnClock } from "@/draft-engine";
-import { MOCK_COPY } from "@/mock-draft/config";
+import { expectedBotThinkDelaySeconds } from "@/mock-draft/bots";
+import { MOCK_CONFIG, MOCK_COPY } from "@/mock-draft/config";
 import type { MockMode } from "@/mock-draft/config";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -233,10 +234,9 @@ describe("GET /api/drafts/[draftId] — Task 8's mock room info", () => {
     expect(body.data.mock.practiceBanner).toBe(MOCK_COPY.practiceBanner);
     expect(body.data.mock.botBadge).toBe(MOCK_COPY.botBadge);
     expect(body.data.mock.botMarkerLabel).toBe(MOCK_COPY.botMarkerLabel);
-    // Sim-to-next-pick (the founder's 2026-08-26 directive): ONE human seat means this room
-    // sims, so its honest per-bot price is zero — `formatYourTurn` renders that as "any
-    // moment". The paced price for a shared room is asserted on the link-mode test below.
-    expect(body.data.mock.expectedBotPickSeconds).toBe(0);
+    // Every room paces the same way (founder report 2026-09-08 retired the one-human zero-delay
+    // lane): the ETA is the delay draw's expected value for this room's 60s clock.
+    expect(body.data.mock.expectedBotPickSeconds).toBe(expectedBotThinkDelaySeconds(60));
     // Not "link" mode, so ShareLinkPanel has nothing to show; not complete, so no results yet.
     expect(body.data.mock.share).toBeNull();
     expect(body.data.mock.results).toBeNull();
@@ -262,9 +262,9 @@ describe("GET /api/drafts/[draftId] — Task 8's mock room info", () => {
       startsAt: "2026-09-10T17:00:00.000Z",
     });
     expect(body.data.mock.results).toBeNull();
-    // TWO human seats: nobody sims over a person, so the ETA is the paced delay draw's
-    // expected value for this room's 60s clock — (3 + min(9, 30)) / 2 (Task 10, finding 1).
-    expect(body.data.mock.expectedBotPickSeconds).toBe(6);
+    // The ETA is the paced delay draw's expected value for this room's 60s clock (Task 10,
+    // finding 1) — the same number a one-human room reports, since every room paces.
+    expect(body.data.mock.expectedBotPickSeconds).toBe(expectedBotThinkDelaySeconds(60));
   });
 
   it("answers a null share for a solo mock, even unstarted", async () => {
@@ -446,60 +446,58 @@ describe("POST /api/drafts/[draftId]/actions", () => {
     expect(response.status).toBe(403);
   });
 
-  it("sim-to-next-pick: a lone human drafts a whole mock in exactly their own three requests — bots answer inside each one", async () => {
-    // The founder's directive made real at the route: no ticker runs in this test AT ALL, yet
-    // the room finishes in exactly the human's own number of picks. Every response body is the
-    // POST-sim board — the human is already back on the clock (or the room is done) by the
-    // time their screen updates.
-    // Its OWN draft id, never `MOCK_DRAFT_ID`: the route sims through the process-wide shared
-    // driver, whose per-draft meta cache is keyed by draft id and invalidated only by the real
-    // sweep — earlier tests in this file already taught it a differently-seated room under the
-    // shared id. Production ids are unique; only truncate-and-reseed can collide.
-    const SIM_DRAFT_ID = "draft_api_sim";
+  it("a mock pick request answers the human's own pick and nothing else; the bot's pick lands through the advance funnel at its seeded delay (founder report 2026-09-08)", async () => {
+    // Its OWN draft id, never `MOCK_DRAFT_ID`: the process-wide shared driver's per-draft meta
+    // cache is keyed by draft id and invalidated only by the real sweep — earlier tests in this
+    // file already taught it a differently-seated room under the shared id. Production ids are
+    // unique; only truncate-and-reseed can collide.
+    const PACED_DRAFT_ID = "draft_api_paced";
     const f = await seedDraftFixture(db, {
-      draftId: SIM_DRAFT_ID, leagueId: "league_api_sim", format: "snake", teamCount: 2,
+      draftId: PACED_DRAFT_ID, leagueId: "league_api_paced", format: "snake", teamCount: 2,
       slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
-      isMock: true, botTeams: 1, // one bot seat — `simToNextPick` by seat arithmetic
+      isMock: true, botTeams: 1, // one bot seat: the room that used to sim its whole stretch inside the pick request
     });
     await seedMockPlayers();
-    const simParams = Promise.resolve({ draftId: SIM_DRAFT_ID });
+    const pacedParams = Promise.resolve({ draftId: PACED_DRAFT_ID });
     const humanTeamId = f.teamIds[0]!; // botTeams takes seats from the end — team 1 is the host
-    const started = await getDraftStore().startDraft(SIM_DRAFT_ID);
+    const maxDelayMs = MOCK_CONFIG.botDelay.baseMs + MOCK_CONFIG.botDelay.jitterMs;
+    const pastEveryDelay = (): string => new Date(Date.now() + maxDelayMs).toISOString();
+    const started = await getDraftStore().startDraft(PACED_DRAFT_ID);
     if (!started.ok) throw new Error(started.reason);
-    // If the bot drew an earlier slot, the same drive the ticker's own lane (or a prior
-    // request) would fire brings the human on the clock first.
-    if (teamOnClock(started.state) !== humanTeamId) await simMockToNextHumanTurn(SIM_DRAFT_ID);
+    // If the bot drew the first slot, the funnel brings the human on the clock the same way
+    // the room's SSE loop would: one advance past the bot's own delay.
+    if (teamOnClock(started.state) !== humanTeamId) await getDraftAdvancer().advance(PACED_DRAFT_ID, pastEveryDelay());
+    const before = (await getDraftStore().getDraftState(PACED_DRAFT_ID))!;
+    expect(teamOnClock(before)).toBe(humanTeamId);
+    const botPicksBefore = before.picks.filter((pick) => pick.teamId !== humanTeamId).length;
 
     signedInAs(f.userIds[0]!);
-    let requests = 0;
-    for (let i = 0; i < 3; i += 1) {
-      const state = (await getDraftStore().getDraftState(SIM_DRAFT_ID))!;
-      if (state.phase === "complete") break;
-      // The invariant under test: between the human's requests a bot is NEVER left holding
-      // the clock — each request already simmed the stretch behind it.
-      expect(teamOnClock(state)).toBe(humanTeamId);
-      const taken = new Set(state.picks.map((pick) => pick.playerId));
-      const filled = new Set(state.picks.filter((pick) => pick.teamId === humanTeamId).map((pick) => pick.playerId.slice(0, 2)));
-      const playerId = ["qb1", "qb2", "rb1", "rb2", "wr1", "wr2"].find((id) => !taken.has(id) && !filled.has(id.slice(0, 2)))!;
-      const response = await postAction(
-        new Request(`http://test/api/drafts/${SIM_DRAFT_ID}/actions`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ type: "MAKE_PICK", playerId }),
-        }),
-        { params: simParams },
-      );
-      expect(response.status).toBe(200);
-      requests += 1;
-      const body = await response.json();
-      expect(body.data.draft.onClockTeamId === humanTeamId || body.data.draft.phase === "complete").toBe(true);
-    }
+    const taken = new Set(before.picks.map((pick) => pick.playerId));
+    const filled = new Set(before.picks.filter((pick) => pick.teamId === humanTeamId).map((pick) => pick.playerId.slice(0, 2)));
+    const playerId = ["qb1", "qb2", "rb1", "rb2", "wr1", "wr2"].find((id) => !taken.has(id) && !filled.has(id.slice(0, 2)))!;
+    const response = await postAction(
+      new Request(`http://test/api/drafts/${PACED_DRAFT_ID}/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "MAKE_PICK", playerId }),
+      }),
+      { params: pacedParams },
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    // The response is the pick's own state: exactly one action past `before`, and no bot pick
+    // rode the request — the bot's turn is priced at its seeded delay, ahead of the request.
+    expect(body.data.draft.sequence).toBe(before.sequence + 1);
+    const after = (await getDraftStore().getDraftState(PACED_DRAFT_ID))!;
+    expect(after.picks).toHaveLength(before.picks.length + 1);
+    expect(after.picks.filter((pick) => pick.teamId !== humanTeamId)).toHaveLength(botPicksBefore);
 
-    const final = (await getDraftStore().getDraftState(SIM_DRAFT_ID))!;
-    expect(final.phase).toBe("complete");
-    expect(final.picks).toHaveLength(6);
-    expect(requests).toBe(3); // the human's own picks were the ONLY requests the whole draft took
-    expect(final.picks.filter((pick) => pick.teamId !== humanTeamId).every((pick) => !pick.auto)).toBe(true);
+    // The bots still move: once its delay has elapsed, the funnel lands exactly the one due pick.
+    if (teamOnClock(after) !== humanTeamId) {
+      const advanced = await getDraftAdvancer().advance(PACED_DRAFT_ID, pastEveryDelay());
+      expect(advanced.applied).toBe(1);
+      expect((await getDraftStore().getDraftState(PACED_DRAFT_ID))!.picks.filter((pick) => pick.teamId !== humanTeamId)).toHaveLength(botPicksBefore + 1);
+    }
   });
 });
 
