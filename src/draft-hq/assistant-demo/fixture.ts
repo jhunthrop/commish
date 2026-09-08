@@ -186,28 +186,3 @@ function buildFixture(): AssistantDemoFixture {
 
 /** Built once, at module scope — see the module docblock. */
 export const ASSISTANT_DEMO_FIXTURE: AssistantDemoFixture = buildFixture();
-
-export interface DemoRoom {
-  readonly state: DraftState;
-  readonly valued: ReadonlyMap<string, ValuedEntry>;
-  readonly shape: LeagueShape;
-  readonly askingTeamId: string;
-}
-
-/** The replayed room as it stood after `step` picks, for a server-side caller that wants to run
- *  the real advisor over it with its own names (the live voice firing recorded in the ledger).
- *  Never crosses to the client: `AssistantDemoFixture` above is the JSON-safe shape that does. */
-export function demoRoomAt(step: number): DemoRoom {
-  const pool = buildPool();
-  const draftPool: readonly DraftPoolEntry[] = pool.map((entry) => ({ playerId: entry.playerId, position: entry.position }));
-  const shape: LeagueShape = { teamCount: DEMO_TEAM_COUNT, rosterSlots: STANDARD_ROSTER_SLOTS };
-  const { byPlayerId } = valueBoardIndexed(pool.map((entry) => ({ playerId: entry.playerId, position: entry.position, projectedPoints: entry.projectedPoints })), shape);
-  const adpByPlayerId = evidenceRanks(pool);
-  const valued: ReadonlyMap<string, ValuedEntry> = new Map([...byPlayerId].map(([playerId, entry]) => [playerId, { ...entry, averageDraftPosition: adpByPlayerId.get(playerId)! }] as const));
-  const start: StartDraftAction = { v: DRAFT_ACTION_VERSION, type: "START_DRAFT", timestamp: SIM_INSTANT, draftOrder: TEAM_IDS, pool: draftPool, minBid: 1 };
-  const state = ASSISTANT_DEMO_FIXTURE.picks.slice(0, step).reduce<DraftState>((current, pick) => {
-    const action: MakePickAction = { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp: SIM_INSTANT, teamId: pick.teamId, playerId: pick.playerId };
-    return submit(current, action);
-  }, submit(initialDraftState(buildDraftConfig()), start));
-  return { state, valued, shape, askingTeamId: DEMO_POV_TEAM_ID };
-}
