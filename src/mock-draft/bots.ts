@@ -9,7 +9,7 @@ import type { DraftPoolEntry } from "@/domain/draft";
 import { MS_PER_SECOND } from "@/domain/duration";
 import type { Position } from "@/domain/player";
 import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
-import { assignSlot, availablePool, needMultiplier, queuedEntriesFor, rankWeight, rosterFor, type DraftState } from "@/draft-engine";
+import { assignSlot, availablePool, draftedPlayerIds, needMultiplier, queuedEntriesFor, rankWeight, rosterFor, type DraftState } from "@/draft-engine";
 import type { BotArchetype } from "./archetypes";
 import { MOCK_CONFIG } from "./config";
 import type { Rng } from "./rng";
@@ -30,15 +30,34 @@ function botNeedMultiplier(position: Position, roster: readonly RosterSlot[], sl
 }
 
 /**
+ * THE POOL'S POSITION INDEX, one per pool array (the immutability rule's sanctioned memo shape:
+ * a `WeakMap` keyed by an object that never changes). A draft's `pool` is snapshotted at
+ * START_DRAFT and every reducer carries the same array forward, so the advisor's 200
+ * continuations of one room — some 4,600 simulated picks — all read one index instead of each
+ * walking 1,700 entries to place four recent picks (the 2026-09-08 pace round's CPU profile put
+ * that walk at 13% of every simulate; the pool round-trips below were another 70%).
+ */
+const positionIndexByPool = new WeakMap<readonly DraftPoolEntry[], ReadonlyMap<string, Position>>();
+
+function positionIndexFor(pool: readonly DraftPoolEntry[]): ReadonlyMap<string, Position> {
+  const held = positionIndexByPool.get(pool);
+  if (held !== undefined) return held;
+  const index: ReadonlyMap<string, Position> = new Map(pool.map((entry) => [entry.playerId, entry.position] as const));
+  positionIndexByPool.set(pool, index);
+  return index;
+}
+
+/**
  * How many of the last `runReaction.window` picks landed at each position — read off
  * `state.picks` against the pool's own position record, computed once per pick and handed to
  * `runMultiplier` for every candidate.
  */
 function recentPositionCounts(state: DraftState): ReadonlyMap<Position, number> {
-  const recentIds = new Set(state.picks.slice(-MOCK_CONFIG.strategy.runReaction.window).map((pick) => pick.playerId));
+  const positionOf = positionIndexFor(state.pool);
   const counts = new Map<Position, number>();
-  for (const entry of state.pool) {
-    if (recentIds.has(entry.playerId)) counts.set(entry.position, (counts.get(entry.position) ?? 0) + 1);
+  for (const pick of state.picks.slice(-MOCK_CONFIG.strategy.runReaction.window)) {
+    const position = positionOf.get(pick.playerId);
+    if (position !== undefined) counts.set(position, (counts.get(position) ?? 0) + 1);
   }
   return counts;
 }
@@ -112,6 +131,23 @@ export function botCandidateWeights(state: DraftState, teamId: string, archetype
 }
 
 /**
+ * The first queued player this roster can still legally take, or null — the same preference
+ * `bestAvailableFor` states first. Answered without touching the pool when the team holds no
+ * queue at all (every bot, and every simulated seat): `queuedEntriesFor` already projects the
+ * queue onto the pool, so "still available" is "not yet drafted", a set the size of the pick
+ * log rather than of the board.
+ */
+function legalQueuedPick(state: DraftState, teamId: string): string | null {
+  if ((state.queues[teamId] ?? []).length === 0) return null;
+  const roster = rosterFor(state, teamId);
+  const drafted = draftedPlayerIds(state);
+  const queued = queuedEntriesFor(state, teamId).find(
+    (entry) => !drafted.has(entry.playerId) && assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig }).ok,
+  );
+  return queued?.playerId ?? null;
+}
+
+/**
  * The bot brain: one temperature-sampled pick for `teamId`, drawn from the caller's own seeded
  * stream (`rngFor(seed, teamId)` — the stream key T1 made load-bearing). Preference order
  * mirrors `bestAvailableFor` exactly: a legal queued player first (bots hold no queues today,
@@ -120,12 +156,8 @@ export function botCandidateWeights(state: DraftState, teamId: string, archetype
  * nothing that remains — the same answer `bestAvailableFor` would give.
  */
 export function chooseBotPick(state: DraftState, teamId: string, archetype: BotArchetype, rng: Rng): string | null {
-  const roster = rosterFor(state, teamId);
-  const slotConfig = state.config.slotConfig;
-  const availableIds = new Set(availablePool(state).map((entry) => entry.playerId));
-  const canRoster = (entry: DraftPoolEntry): boolean => assignSlot({ position: entry.position, roster, slotConfig }).ok;
-  const queued = queuedEntriesFor(state, teamId).find((entry) => availableIds.has(entry.playerId) && canRoster(entry));
-  if (queued !== undefined) return queued.playerId;
+  const queued = legalQueuedPick(state, teamId);
+  if (queued !== null) return queued;
 
   const candidates = botCandidateWeights(state, teamId, archetype);
   if (candidates.length === 0) return null;
