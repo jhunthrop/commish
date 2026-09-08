@@ -9,7 +9,7 @@ import type { Law } from "@/projections/laws/types";
 import { PlayerName } from "@/league-room/components/player-peek";
 import { postPickBeat } from "../../advisor/beat";
 import { AdvisorPanel } from "../../advisor/components/advisor-panel";
-import { changedSinceLines } from "../../advisor/format";
+import { changedSinceLine } from "../../advisor/format";
 import { planDelta } from "../../advisor/plan-delta";
 import { advisorRoomKey, useAdvisor } from "../../advisor/use-advisor";
 import { byeCollisionFor, stackNoteFor, type StackCandidate } from "../../assistant/roster-fit";
@@ -69,9 +69,9 @@ export function DrawerAssistantTab({ draftId, view, myTeamId, teams, playersById
   }, [prePickView, view.picks, playersById]);
 
   const changedSince = useMemo(() => {
-    if (advisor === null || previousPlan === null) return [];
+    if (advisor === null || previousPlan === null) return null;
     const nameOf = (id: string): string => advisor.names[id] ?? id;
-    return changedSinceLines(planDelta(previousPlan, advisor.plan), nameOf, advisor.teamCount, (turn) => advisor.plan.turns[turn - 1]?.pickNumber ?? null);
+    return changedSinceLine(planDelta(previousPlan, advisor.plan), nameOf, advisor.teamCount, (turn) => advisor.plan.turns[turn - 1]?.pickNumber ?? null);
   }, [advisor, previousPlan]);
 
   if (myTeamId === null) return <p className="text-sm text-text-faint">{NO_SEAT_COPY}</p>;

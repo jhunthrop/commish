@@ -70,13 +70,18 @@ function listNames(names: readonly string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
+/** Clauses joined into one sentence: "A, B, and C." */
+function oneSentence(clauses: readonly string[]): string {
+  if (clauses.length === 1) return `${clauses[0]}.`;
+  return `${clauses.slice(0, -1).join(", ")}, and ${clauses[clauses.length - 1]}.`;
+}
+
 /**
- * The changed-since lines, in the manager's words: departures consolidated into one line,
- * then the biggest moves, at most `changedSinceMaxLines` names on the whole strip, the rest a
- * count folded onto the last line ("and 6 more changes"), so a room that turned over the plan
- * reads as a headline rather than a ledger.
+ * The changed-since line, ONE sentence in the manager's words: the departures first, then the
+ * biggest moves, at most `changedSinceMaxLines` names, the rest a count. "C and E came off the
+ * plan, B at 2.07 fell from 90% to 20%, and 2 more changes." `null` when nothing moved.
  */
-export function changedSinceLines(changes: readonly PlanChange[], name: (playerId: string) => string, teamCount: number, turnPick: (turn: number) => number | null): readonly string[] {
+export function changedSinceLine(changes: readonly PlanChange[], name: (playerId: string) => string, teamCount: number, turnPick: (turn: number) => number | null): string | null {
   const ordered = [...changes].sort((a, b) => changeWeight(b) - changeWeight(a));
   const named = ordered.slice(0, ADVISOR_ROOM_CONFIG.changedSinceMaxLines);
   const departed = named.filter((change) => change.kind === "left_plan").map((change) => name(change.playerId));
@@ -85,12 +90,9 @@ export function changedSinceLines(changes: readonly PlanChange[], name: (playerI
     if (change.kind !== "odds_moved") return [];
     const pick = turnPick(change.turn);
     const at = pick === null ? `turn ${change.turn}` : pickLabel(pick, teamCount);
-    return [`${name(change.playerId)} at ${at} moved ${change.to > change.from ? "up" : "down"}, ${percentText(change.from)} to ${percentText(change.to)}`];
+    return [`${name(change.playerId)} at ${at} ${change.to > change.from ? "rose" : "fell"} from ${percentText(change.from)} to ${percentText(change.to)}`];
   });
-  const lines = [...departures, ...moves];
   const rest = ordered.length - named.length;
-  if (lines.length === 0) return [];
-  const last = lines[lines.length - 1]!;
-  const tail = rest > 0 ? `${last}, and ${rest} more ${rest === 1 ? "change" : "changes"}.` : `${last}.`;
-  return [...lines.slice(0, -1).map((line) => `${line}.`), tail];
+  const clauses = [...departures, ...moves, ...(rest > 0 ? [`${rest} more ${rest === 1 ? "change" : "changes"}`] : [])];
+  return clauses.length === 0 ? null : oneSentence(clauses);
 }

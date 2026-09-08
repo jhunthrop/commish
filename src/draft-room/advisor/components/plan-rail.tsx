@@ -7,8 +7,8 @@ export interface PlanRailProps {
   readonly plan: DraftPlan;
   readonly teamCount: number;
   readonly nameOf: (playerId: string) => string;
-  /** "Changed since 4.03" lines, already worded. Empty when nothing moved. */
-  readonly changedSince: readonly string[];
+  /** The "changed since 4.03" sentence, already worded. `null` when nothing moved. */
+  readonly changedSince: string | null;
   readonly changedSincePick: number | null;
   readonly recomputing: boolean;
 }
@@ -64,14 +64,10 @@ export function PlanRail({ plan, teamCount, nameOf, changedSince, changedSincePi
           </span>
         ) : null}
       </div>
-      {changedSince.length === 0 ? null : (
-        <ul data-testid="advisor-changed" aria-label={changedSincePick === null ? "Changed since your last look" : `Changed since ${pickLabel(changedSincePick, teamCount)}`} className="flex flex-col gap-0.5">
-          {changedSince.map((line) => (
-            <li key={line} className="text-xs text-text-muted">
-              {line}
-            </li>
-          ))}
-        </ul>
+      {changedSince === null ? null : (
+        <p data-testid="advisor-changed" aria-label={changedSincePick === null ? "Changed since your last look" : `Changed since ${pickLabel(changedSincePick, teamCount)}`} className="text-xs text-text-muted">
+          {changedSince}
+        </p>
       )}
       {plan.turns.length === 0 ? (
         <p className="text-sm text-text-faint">You have no turn left to plan for.</p>

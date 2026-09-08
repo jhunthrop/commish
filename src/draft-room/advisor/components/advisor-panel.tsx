@@ -10,7 +10,7 @@ export interface AdvisorPanelProps {
   readonly acts: AdvisorActs;
   readonly renderName: (playerId: string, name: string) => ReactNode;
   readonly seatLabel: (seat: SeatAhead) => string;
-  readonly changedSince: readonly string[];
+  readonly changedSince: string | null;
   readonly changedSincePick: number | null;
   readonly recomputing: boolean;
   /** The post-pick beat, when this seat's own pick just landed. */

@@ -188,8 +188,8 @@ describe("DrawerAssistantTab", () => {
     mockedUseAdvisor.mockReturnValue(advisorResult({ view: makeView({ stamp: { computedAtPick: 2, sequence: 2 } }), previousPlan, recomputing: true }));
     renderTab();
     const changed = screen.getByTestId("advisor-changed");
-    expect(changed).toHaveTextContent("Cole Whitmore came off the plan.");
-    expect(changed).toHaveTextContent("Marcus Reed at 2.02 moved down, 90% to 46%.");
+    expect(changed).toHaveTextContent("Cole Whitmore came off the plan, and Marcus Reed at 2.02 fell from 90% to 46%.");
+    expect(changed.tagName).toBe("P");
     expect(screen.getByTestId("advisor-recomputing")).toBeInTheDocument();
     expect(screen.getAllByTestId("advisor-now-row")).toHaveLength(2);
   });

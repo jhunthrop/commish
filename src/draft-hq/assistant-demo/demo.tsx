@@ -5,7 +5,7 @@ import type { AdvisorView, SeatAhead } from "@/draft-service/assistant/view";
 import { Button, Card, Modal } from "@/components/ui";
 import { postPickBeat } from "@/draft-room/advisor/beat";
 import { AdvisorPanel } from "@/draft-room/advisor/components/advisor-panel";
-import { changedSinceLines } from "@/draft-room/advisor/format";
+import { changedSinceLine } from "@/draft-room/advisor/format";
 import { planDelta } from "@/draft-room/advisor/plan-delta";
 import { foldLandedView } from "@/draft-room/advisor/use-advisor";
 import { byeCollisionFor } from "@/draft-room/assistant/roster-fit";
@@ -69,7 +69,7 @@ export function AssistantDemo({ fixture }: AssistantDemoProps) {
     return pickedPick === undefined ? null : postPickBeat({ pickedPlayerId: pickedPick.playerId, prePickView, playerName: nameOf });
   }, [latched, step, fixture.picks, displayNameById]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const changedSince = previous === null ? [] : changedSinceLines(planDelta(previous.plan, view.plan), nameOf, view.teamCount, (turn) => view.plan.turns[turn - 1]?.pickNumber ?? null);
+  const changedSince = previous === null ? null : changedSinceLine(planDelta(previous.plan, view.plan), nameOf, view.teamCount, (turn) => view.plan.turns[turn - 1]?.pickNumber ?? null);
 
   const top = view.now[0] ?? null;
   const povRosterTeamCodes = picksSoFar.filter((pick) => pick.teamId === fixture.povTeamId).flatMap((pick) => nflTeamById.get(pick.playerId) ?? []);

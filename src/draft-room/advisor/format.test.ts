@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SeatAhead } from "@/draft-service/assistant/view";
-import { changedSinceLines, collapseText, isReachAt, oddsLineText, percentText, runsText, seatAheadText } from "./format";
+import { changedSinceLine, collapseText, isReachAt, oddsLineText, percentText, runsText, seatAheadText } from "./format";
 
 const BANNED = /[—;]/;
 
@@ -18,8 +18,8 @@ describe("advisor format", () => {
     expect(isReachAt({ ...target, reachFromTurn: null }, 3)).toBe(false);
   });
 
-  it("caps the changed-since lines, departures first, and counts the rest", () => {
-    const lines = changedSinceLines(
+  it("caps the names, departures first, and counts the rest, always in one sentence", () => {
+    const line = changedSinceLine(
       [
         { kind: "odds_moved", playerId: "a", turn: 1, from: 0.5, to: 0.4 },
         { kind: "odds_moved", playerId: "b", turn: 1, from: 0.9, to: 0.2 },
@@ -31,14 +31,14 @@ describe("advisor format", () => {
       10,
       () => 17,
     );
-    expect(lines).toEqual(["C and E came off the plan.", "B at 2.07 moved down, 90% to 20%, and 2 more changes."]);
-    const departuresOnly = changedSinceLines(
+    expect(line).toBe("C and E came off the plan, B at 2.07 fell from 90% to 20%, and 2 more changes.");
+    const departuresOnly = changedSinceLine(
       [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ kind: "left_plan" as const, playerId: `p${n}`, turn: 1 })),
       (id) => `RB ${id.slice(1)}`,
       10,
       () => 17,
     );
-    expect(departuresOnly).toEqual(["RB 1, RB 2 and RB 3 came off the plan, and 6 more changes."]);
+    expect(departuresOnly).toBe("RB 1, RB 2 and RB 3 came off the plan, and 6 more changes.");
   });
 
   it("words a tier collapse from the board's own numbers", () => {
@@ -56,8 +56,8 @@ describe("advisor format", () => {
     expect(seatAheadText({ ...base, topPosition: null, topPlayer: null }, name).read).toBe("No read yet.");
   });
 
-  it("words the changed-since lines, with no banned punctuation", () => {
-    const lines = changedSinceLines(
+  it("words the changed-since line as one sentence, with no banned punctuation", () => {
+    const line = changedSinceLine(
       [
         { kind: "odds_moved", playerId: "rb4", turn: 1, from: 0.5, to: 0.2 },
         { kind: "left_plan", playerId: "rb5", turn: 1 },
@@ -66,8 +66,10 @@ describe("advisor format", () => {
       10,
       () => 17,
     );
-    expect(lines).toEqual(["Blake Rivers came off the plan.", "Avery Stone at 2.07 moved down, 50% to 20%."]);
-    for (const line of lines) expect(line).not.toMatch(BANNED);
+    expect(line).toBe("Blake Rivers came off the plan, and Avery Stone at 2.07 fell from 50% to 20%.");
+    expect(line).not.toMatch(BANNED);
+    expect(changedSinceLine([], (id) => id, 10, () => 17)).toBeNull();
+    expect(changedSinceLine([{ kind: "odds_moved", playerId: "a", turn: 1, from: 0.2, to: 0.6 }], (id) => id.toUpperCase(), 10, () => 17)).toBe("A at 2.07 rose from 20% to 60%.");
   });
 
   it("words the odds line with a verb at zero, in between, and at every run", () => {
