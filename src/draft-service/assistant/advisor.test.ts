@@ -7,6 +7,7 @@ import { advisorCore, seedFor } from "./advisor";
 import { ADVISOR_CONFIG } from "./config";
 import { SURVIVAL_BANDS } from "@/domain/draft-odds";
 import { onClockShortlist, recommendNow } from "./recommend";
+import { tierCollapses } from "./signals";
 import { FIXTURE_SHAPE, FIXTURE_TEAM_IDS, fixtureAdvance, fixtureStart, fixtureValued } from "./test-fixture";
 import { tierStandings } from "./tiers";
 import type { AdvisorView } from "./view";
@@ -19,7 +20,7 @@ function viewAfter(picks: number, askingTeamId = ASKING): AdvisorView {
   const state = fixtureAdvance(fixtureStart(), picks);
   const valued = fixtureValued();
   const table = simulateRoomOdds({ state, seed: seedFor("advisor-test", state.sequence), runs: RUNS, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, FIXTURE_SHAPE) });
-  const view = advisorCore({ state, askingTeamId, valued, shape: FIXTURE_SHAPE, table, tiers: tierStandings(state, valued) });
+  const view = advisorCore({ state, askingTeamId, valued, shape: FIXTURE_SHAPE, table, tiers: tierStandings(state, valued), collapses: tierCollapses(state, valued) });
   if (view === null) throw new Error("expected a view");
   return view;
 }
@@ -96,17 +97,47 @@ describe("advisorCore", () => {
     }
   });
 
+  it("carries ten candidates on and off the clock, the card's pick first, each once, every one undrafted with a rank", () => {
+    expect(ADVISOR_CONFIG.shortlistSize).toBe(10);
+    for (const picks of [3, 12]) {
+      const state = fixtureAdvance(fixtureStart(), picks);
+      const view = viewAfter(picks);
+      const undrafted = new Set(availablePool(state).map((entry) => entry.playerId));
+      expect(view.candidates).toHaveLength(ADVISOR_CONFIG.shortlistSize);
+      expect(view.candidates[0]!.playerId).toBe(view.pick!.playerId);
+      expect(new Set(view.candidates.map((candidate) => candidate.playerId)).size).toBe(view.candidates.length);
+      for (const candidate of view.candidates) {
+        expect(undrafted.has(candidate.playerId)).toBe(true);
+        expect(candidate.positionRank).toBeGreaterThan(0);
+        expect(view.odds!.survived[candidate.playerId]).toBeDefined();
+      }
+    }
+  });
+
+  it("carries the room signals: no run before the room has picked, and only positions at a real cliff", () => {
+    const fresh = viewAfter(0);
+    expect(fresh.signals.run).toBeNull();
+    for (const collapse of fresh.signals.collapses) {
+      expect(collapse.playersLeftInTier).toBeGreaterThan(0);
+      expect(collapse.dropToNextTier).toBeGreaterThan(0);
+      expect(["QB", "RB", "WR", "TE"]).toContain(collapse.position);
+    }
+    expect(viewAfter(12).signals.collapses).toEqual(tierCollapses(fixtureAdvance(fixtureStart(), 12), fixtureValued()));
+  });
+
   it("off the clock, names the first shortlisted player the runs leave on the board past the reach floor", () => {
     const state = fixtureAdvance(fixtureStart(), 4); // seat 4 just picked; its next turn is 17
     const valued = fixtureValued();
     const table = simulateRoomOdds({ state, seed: seedFor("advisor-test", state.sequence), runs: RUNS, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, FIXTURE_SHAPE) });
-    const view = advisorCore({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE, table, tiers: tierStandings(state, valued) })!;
-    const shortlist = recommendNow({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE, shortlistSize: ADVISOR_CONFIG.offClockShortlistSize });
-    expect(shortlist.length).toBeGreaterThan(ADVISOR_CONFIG.shortlistSize);
+    const view = advisorCore({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE, table, tiers: tierStandings(state, valued), collapses: [] })!;
+    const shortlist = recommendNow({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE });
+    expect(shortlist).toHaveLength(ADVISOR_CONFIG.shortlistSize);
     const survivalOf = (id: string) => (view.odds!.survived[id] ?? 0) / view.odds!.runs;
     const reachable = shortlist.find((rec) => survivalOf(rec.playerId) >= SURVIVAL_BANDS.reach);
     expect(view.onTheClock).toBe(false);
     expect(view.pick!.playerId).toBe((reachable ?? shortlist[0])!.playerId);
+    // The candidates keep the whole shortlist, the card's pick moved to the front.
+    expect(view.candidates.map((candidate) => candidate.playerId).sort()).toEqual(shortlist.map((rec) => rec.playerId).sort());
 
     // A hand-built table in which every run's other seats take the shortlist's first man at
     // pick 5 and nobody touches the second: the card moves down to the second.
@@ -116,7 +147,7 @@ describe("advisorCore", () => {
       .slice(0, 11);
     const run = [shortlist[0]!.playerId, ...filler].map((playerId, index) => ({ pickNumber: 5 + index, teamId: FIXTURE_TEAM_IDS[9]!, playerId }));
     const handBuilt = { runs: 4, fromPick: 5, throughPick: 16, played: [run, run, run, run] };
-    const moved = advisorCore({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE, table: handBuilt, tiers: {} })!;
+    const moved = advisorCore({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE, table: handBuilt, tiers: {}, collapses: [] })!;
     expect(moved.pick!.playerId).toBe(shortlist[1]!.playerId);
     expect(moved.odds!.survived[shortlist[0]!.playerId]).toBe(0);
     expect(moved.pick!.makeItBack).toEqual({ survival: 1, runs: 4 });
@@ -136,8 +167,8 @@ describe("advisorCore", () => {
     const valued = fixtureValued();
     const table = simulateRoomOdds({ state, seed: 1, runs: 5, excludeFromOnClockSeat: new Set() });
     const tiers = tierStandings(state, valued);
-    expect(advisorCore({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE, table, tiers })).toBeNull();
-    const last = advisorCore({ state, askingTeamId: teamOnClock(state)!, valued, shape: FIXTURE_SHAPE, table, tiers });
+    expect(advisorCore({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE, table, tiers, collapses: [] })).toBeNull();
+    const last = advisorCore({ state, askingTeamId: teamOnClock(state)!, valued, shape: FIXTURE_SHAPE, table, tiers, collapses: [] });
     expect(last!.odds).toBeNull();
     expect(last!.pick === null || last!.pick.makeItBack === null).toBe(true);
   });

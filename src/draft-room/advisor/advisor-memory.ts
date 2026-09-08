@@ -3,13 +3,12 @@ import { ADVISOR_ROOM_CONFIG } from "./config";
 
 export interface AdvisorMemoryEntry {
   readonly lastView: AdvisorView | null;
-  readonly prePickView: AdvisorView | null;
 }
 
 /**
  * THE ADVISOR'S MODULE-SCOPE MEMORY (the founder's architecture ruling, 2026-09-05, carried over
- * from the assistant tab): a remount picks up exactly where the last instance left off: the last
- * view and the post-pick beat's latch. A bounded map keyed by `draftId`.
+ * from the assistant tab): a remount picks up exactly where the last instance left off, the last
+ * view on screen until the refetch lands. A bounded map keyed by `draftId`.
  */
 const memory = new Map<string, AdvisorMemoryEntry>();
 

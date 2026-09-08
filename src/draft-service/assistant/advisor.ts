@@ -15,7 +15,7 @@ import { seatsAheadFor, survivalFor, type RoomOddsTable, type SeatSurvival } fro
 import { ADVISOR_CONFIG } from "./config";
 import { askingWindow, recommendNow, type ValuedEntry } from "./recommend";
 import { detectRun } from "./signals";
-import type { AdvisorView, NextPick, OddsCell, SurvivalOdds, TierStandingView } from "./view";
+import type { AdvisorView, Candidate, NextPick, OddsCell, PositionRun, SurvivalOdds, TierCollapse, TierStandingView } from "./view";
 import { buildWhy } from "./why";
 
 export interface AdvisorCoreInput {
@@ -27,14 +27,11 @@ export interface AdvisorCoreInput {
   readonly table: RoomOddsTable;
   /** The room's tier standings for exactly this `state` (`tiers.ts`), computed once per state. */
   readonly tiers: Readonly<Record<string, TierStandingView>>;
-  /** The seat's shortlist, `shortlistSizeFor` deep, when the caller holds it (the service memoises
-   *  it per seat and state); absent, computed here. */
+  /** The room's tier collapses for exactly this `state` (`signals.ts`), computed once per state. */
+  readonly collapses: readonly TierCollapse[];
+  /** The seat's shortlist, `ADVISOR_CONFIG.shortlistSize` deep, when the caller holds it (the
+   *  service memoises it per seat and state); absent, computed here. */
   readonly shortlist?: readonly Recommendation[];
-}
-
-/** How deep the card looks: the on-clock shortlist, or the deeper off-clock one (see `pickToName`). */
-export function shortlistSizeFor(state: DraftState, askingTeamId: string): number {
-  return teamOnClock(state) === askingTeamId ? ADVISOR_CONFIG.shortlistSize : ADVISOR_CONFIG.offClockShortlistSize;
 }
 
 function oddsCellFor(survival: SeatSurvival | null, playerId: string): OddsCell | null {
@@ -48,13 +45,13 @@ function oddsView(survival: SeatSurvival | null): SurvivalOdds | null {
   return { pickNumber: survival.pickNumber, runs: survival.runsReached, survived: Object.fromEntries(survival.survived) };
 }
 
-function nextPickFor(input: AdvisorCoreInput, top: Recommendation, survival: SeatSurvival | null): NextPick {
+function nextPickFor(input: AdvisorCoreInput, top: Recommendation, survival: SeatSurvival | null, run: PositionRun | null): NextPick {
   const { state, askingTeamId, valued, table } = input;
   const entry = valued.get(top.playerId);
   const assigned = assignSlot({ position: top.position, roster: rosterFor(state, askingTeamId), slotConfig: state.config.slotConfig });
   const fillsSlot = assigned.ok ? assigned.slot : null;
   const why = buildWhy(
-    { position: top.position, positionRank: entry?.positionRank ?? 0, fillsSlot, reasons: top.reasons, run: detectRun(state), ahead: seatsAheadFor(table, state, askingTeamId), runs: table.runs },
+    { position: top.position, positionRank: entry?.positionRank ?? 0, fillsSlot, reasons: top.reasons, run, ahead: seatsAheadFor(table, state, askingTeamId), runs: table.runs },
     state.pickNumber,
   );
   return {
@@ -83,15 +80,27 @@ function pickToName(recommendations: readonly Recommendation[], onTheClock: bool
   return reachable ?? first;
 }
 
+/** The shortlist as the tab shows it: the card's pick first, the rest in the engine's order, at
+ *  most `ADVISOR_CONFIG.shortlistSize` (the depth the tab's selector can ask for). */
+function candidatesFor(shortlist: readonly Recommendation[], top: Recommendation | null, valued: ReadonlyMap<string, ValuedEntry>): readonly Candidate[] {
+  if (top === null) return [];
+  const ordered = [top, ...shortlist.filter((rec) => rec.playerId !== top.playerId)].slice(0, ADVISOR_CONFIG.shortlistSize);
+  return ordered.map((rec) => {
+    const entry = valued.get(rec.playerId);
+    return { playerId: rec.playerId, position: rec.position, positionRank: entry?.positionRank ?? 0, valueOverReplacement: entry?.valueOverReplacement ?? 0 };
+  });
+}
+
 /** `null` only when the asking seat has no further turn to advise. */
 export function advisorCore(input: AdvisorCoreInput): AdvisorView | null {
-  const { state, askingTeamId, table, tiers } = input;
+  const { state, askingTeamId, table, tiers, collapses } = input;
   const window = askingWindow(state, askingTeamId);
   if (window === null) return null;
   const onTheClock = teamOnClock(state) === askingTeamId;
   const survival = survivalFor(table, state, askingTeamId);
-  const shortlist = input.shortlist ?? recommendNow({ ...input, shortlistSize: shortlistSizeFor(state, askingTeamId) });
+  const shortlist = input.shortlist ?? recommendNow(input);
   const top = pickToName(shortlist, onTheClock, survival);
+  const run = detectRun(state);
   return {
     pickNumber: window.pickNumber,
     onTheClock,
@@ -99,7 +108,9 @@ export function advisorCore(input: AdvisorCoreInput): AdvisorView | null {
     teamCount: state.draftOrder.length,
     stamp: { computedAtPick: state.pickNumber, sequence: state.sequence },
     runs: table.runs,
-    pick: top === null ? null : nextPickFor(input, top, survival),
+    pick: top === null ? null : nextPickFor(input, top, survival, run),
+    candidates: candidatesFor(shortlist, top, input.valued),
+    signals: { run, collapses },
     odds: oddsView(survival),
     tiers,
   };

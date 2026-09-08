@@ -4,14 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { Player, Position } from "@/domain/player";
 import { Button, Card, Modal, PositionBadge, SegmentGroup } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { postPickBeat } from "@/draft-room/advisor/beat";
-import { NextPickCard } from "@/draft-room/advisor/components/next-pick-card";
-import { OddsPercent } from "@/draft-room/advisor/components/odds-percent";
+import { AdvisorPanel } from "@/draft-room/advisor/components/advisor-panel";
+import { OddsGlance } from "@/draft-room/advisor/components/odds-glance";
 import { ADVISOR_ROOM_CONFIG } from "@/draft-room/advisor/config";
 import { groupByTier } from "@/draft-room/advisor/tier-groups";
-import { foldLandedView } from "@/draft-room/advisor/use-advisor";
 import { addToQueue, removeFromQueue } from "@/draft-room/state/queue";
-import type { AdvisorView } from "@/draft-service/assistant/view";
 import type { AssistantDemoFixture, DemoPlayer } from "./fixture";
 
 export interface AssistantDemoProps {
@@ -22,17 +19,6 @@ const ALL = "ALL";
 const LIST_POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE"];
 const FILTER_OPTIONS = [{ value: ALL, label: "All" }, ...LIST_POSITIONS.map((position) => ({ value: position, label: position }))];
 
-/** The post-pick latch the live hook keeps, replayed over the fixture's own sequence of views. */
-function latchedViews(views: readonly AdvisorView[]): readonly (AdvisorView | null)[] {
-  return views.reduce<{ readonly held: ReturnType<typeof foldLandedView>; readonly out: readonly (AdvisorView | null)[] }>(
-    (acc, view) => {
-      const held = foldLandedView(acc.held, view);
-      return { held, out: [...acc.out, held.prePickView] };
-    },
-    { held: { view: null, prePickView: null }, out: [] },
-  ).out;
-}
-
 /** The synthetic player as the room's primitives expect one: no headshot, so the face is the
  *  initials on the club colour, exactly what a real room shows for a player the feed has no
  *  photo for. */
@@ -41,8 +27,8 @@ function toPlayer(demo: DemoPlayer): Player {
 }
 
 /**
- * THE GUIDED DEMO. Steps a fixed, precomputed replay one pick at a time and renders the SAME one
- * card the room's advisor tab renders, from `fixture.advisor[step]` — a real `AdvisorView`
+ * THE GUIDED DEMO. Steps a fixed, precomputed replay one pick at a time and renders the SAME
+ * advisor panel the room's tab renders, from `fixture.advisor[step]` — a real `AdvisorView`
  * computed by the identical `advisorCore` a live room calls — and, under it, the board with the
  * same next-turn odds the room's pool rows carry, tier headers included when one position shows.
  * Queue is a local list here; Draft opens a confirmation (a phone's own two-step rule) and then
@@ -68,20 +54,12 @@ export function AssistantDemo({ fixture }: AssistantDemoProps) {
 
   const playersById = useMemo(() => new Map(fixture.players.map((player) => [player.playerId, toPlayer(player)] as const)), [fixture.players]);
   const byeWeeks = useMemo(() => new Map(fixture.byeWeeksByTeam), [fixture.byeWeeksByTeam]);
-  const latched = useMemo(() => latchedViews(fixture.advisor), [fixture.advisor]);
   const nameOf = (playerId: string): string => playersById.get(playerId)?.name ?? playerId;
 
   const view = fixture.advisor[step]!;
   const picksSoFar = fixture.picks.slice(0, step);
   const drafted = useMemo(() => new Set(picksSoFar.map((pick) => pick.playerId)), [picksSoFar]);
   const queueOrder = useMemo(() => new Map(queue.filter((id) => !drafted.has(id)).map((id, index) => [id, index + 1] as const)), [queue, drafted]);
-
-  const beat = useMemo(() => {
-    const prePickView = latched[step] ?? null;
-    if (prePickView === null) return null;
-    const pickedPick = fixture.picks.find((pick) => pick.pickNumber === prePickView.stamp.computedAtPick);
-    return pickedPick === undefined ? null : postPickBeat({ pickedPlayerId: pickedPick.playerId, prePickView, playerName: nameOf });
-  }, [latched, step, fixture.picks, playersById]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const positionRanks = useMemo(() => {
     const seen = new Map<Position, number>();
@@ -102,7 +80,6 @@ export function AssistantDemo({ fixture }: AssistantDemoProps) {
 
   const latestPick = step > 0 ? fixture.picks[step - 1]! : null;
   const replayPick = step < totalPicks ? fixture.picks[step]! : null;
-  const cardPlayer = view.pick === null ? null : (playersById.get(view.pick.playerId) ?? null);
 
   function confirmDraft(playerId: string): void {
     setConfirmId(null);
@@ -145,7 +122,7 @@ export function AssistantDemo({ fixture }: AssistantDemoProps) {
         )}
       </Card>
 
-      <NextPickCard
+      <AdvisorPanel
         view={view}
         acts={{
           canDraft: view.onTheClock && replayPick !== null,
@@ -154,10 +131,9 @@ export function AssistantDemo({ fixture }: AssistantDemoProps) {
           onDraft: (playerId) => setConfirmId(playerId),
           onQueueToggle: (playerId) => setQueue((current) => (current.includes(playerId) ? removeFromQueue(current, playerId) : addToQueue(current, playerId))),
         }}
-        player={cardPlayer}
-        byeWeek={cardPlayer === null ? null : (byeWeeks.get(cardPlayer.nflTeam) ?? null)}
+        playersById={playersById}
+        byeWeeks={byeWeeks}
         recomputing={false}
-        beat={beat}
       />
 
       <Card as="section" aria-label="The board, with your odds" className="flex flex-col gap-3">
@@ -178,7 +154,7 @@ export function AssistantDemo({ fixture }: AssistantDemoProps) {
               <li key={player.id} data-testid="demo-odds-row" className="flex items-center gap-2 rounded-md bg-surface-raised px-2.5 py-1.5">
                 <PositionBadge position={player.position} rank={positionRanks.get(player.id)} size="sm" />
                 <span className="min-w-0 flex-1 truncate font-display text-md font-semibold text-text-primary">{player.name}</span>
-                {view.odds === null ? null : <OddsPercent odds={view.odds} playerId={player.id} />}
+                {view.odds === null ? null : <OddsGlance odds={view.odds} playerId={player.id} />}
               </li>
             )),
           ])}

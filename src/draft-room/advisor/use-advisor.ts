@@ -10,11 +10,6 @@ export interface UseAdvisorResult {
   /** The held view, shown only for candidates still on the room's board at render time
    *  (`presentView`): a name the room has since drafted never reaches the card or a row. */
   readonly view: AdvisorView | null;
-  /** The view that was live during this seat's most recently resolved turn (the post-pick beat's
-   *  latch): set the moment a view for a LATER pick lands over one that had `onTheClock`, kept
-   *  through every other seat's picks until this seat's next pick resolves. Kept as computed —
-   *  it is a record of that turn, not a recommendation. */
-  readonly prePickView: AdvisorView | null;
   /** True while a recompute is in flight, or while the held view's stamp is older than the
    *  room's own sequence (a fresh one is on its way). The previous view keeps rendering; never a
    *  blank. */
@@ -32,47 +27,33 @@ export interface AdvisorRoom {
 
 const NETWORK_ERROR = "We couldn't reach the advisor. Check your connection and try again.";
 
-interface Held {
-  readonly view: AdvisorView | null;
-  readonly prePickView: AdvisorView | null;
-}
-
-const EMPTY: Held = { view: null, prePickView: null };
-
-/** The next held state after a view lands: the latch moves only when the room itself moved (a
- *  later pick), never on a repeat of the same state. */
-export function foldLandedView(held: Held, landed: AdvisorView): Held {
-  const previous = held.view;
-  const roomMoved = previous === null || landed.stamp.computedAtPick !== previous.stamp.computedAtPick;
-  return {
-    view: landed,
-    prePickView: roomMoved && previous !== null && previous.onTheClock ? previous : held.prePickView,
-  };
-}
-
 function pickEntries<T>(record: Readonly<Record<string, T>>, keep: ReadonlySet<string>): Readonly<Record<string, T>> {
   return Object.fromEntries(Object.entries(record).filter(([playerId]) => keep.has(playerId)));
 }
 
 /**
  * THE WRONG-PEOPLE GUARD (founder report 2026-09-08): a view computed at one state, rendered
- * against a later one. The card's pick, every odds row and every tier row are kept only for
- * players still on the room's board right now; a candidate drafted between compute and render
- * drops out here, whatever the server said. The stamp is untouched — the view still says what
- * state it was computed at.
+ * against a later one. The card's pick, the candidate rows, every odds row and every tier row
+ * are kept only for players still on the room's board right now; a candidate drafted between
+ * compute and render drops out here, whatever the server said. `candidates[0]` IS the card's
+ * pick (the rows are the rest), so a drafted lead empties the list with it — the wire's own
+ * "empty exactly when `pick` is null" — rather than promoting a row into a card whose sentence
+ * was written about someone else. The stamp is untouched: the view still says what state it
+ * was computed at.
  */
 export function presentView(view: AdvisorView, available: ReadonlySet<string>): AdvisorView {
+  const leadStands = view.pick !== null && available.has(view.pick.playerId);
   return {
     ...view,
-    pick: view.pick !== null && available.has(view.pick.playerId) ? view.pick : null,
+    pick: leadStands ? view.pick : null,
+    candidates: leadStands ? view.candidates.filter((candidate) => available.has(candidate.playerId)) : [],
     odds: view.odds === null ? null : { ...view.odds, survived: pickEntries(view.odds.survived, available) },
     tiers: pickEntries(view.tiers, available),
   };
 }
 
-function hydrate(draftId: string): Held {
-  const remembered = recallAdvisor(draftId);
-  return { view: remembered?.lastView ?? null, prePickView: remembered?.prePickView ?? null };
+function hydrate(draftId: string): AdvisorView | null {
+  return recallAdvisor(draftId)?.lastView ?? null;
 }
 
 /**
@@ -89,10 +70,9 @@ function hydrate(draftId: string): Held {
 export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvisorResult {
   const { draftId, sequence, availablePlayerIds } = room;
   const deps = useDraftRoomDeps();
-  const [held, setHeld] = useState<Held>(() => hydrate(draftId));
+  const [held, setHeld] = useState<AdvisorView | null>(() => hydrate(draftId));
   const [inFlight, setInFlight] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const heldRef = useRef<Held>(held);
   const draftIdRef = useRef<string>(draftId);
   const aliveRef = useRef(true);
   const inFlightRef = useRef(false);
@@ -107,10 +87,9 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
         setError(body.error);
         return;
       }
-      heldRef.current = foldLandedView(heldRef.current, body.data);
-      setHeld(heldRef.current);
+      setHeld(body.data);
       setError(null);
-      rememberAdvisor(draftId, { lastView: heldRef.current.view, prePickView: heldRef.current.prePickView });
+      rememberAdvisor(draftId, { lastView: body.data });
     } catch {
       if (aliveRef.current) setError(NETWORK_ERROR);
     }
@@ -144,12 +123,10 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
     if (draftIdRef.current !== draftId) {
       forgetAdvisor(draftIdRef.current);
       draftIdRef.current = draftId;
-      heldRef.current = hydrate(draftId);
-      setHeld(heldRef.current);
+      setHeld(hydrate(draftId));
     }
     if (myTeamId === null) {
-      heldRef.current = EMPTY;
-      setHeld(EMPTY);
+      setHeld(null);
       setError(null);
       forgetAdvisor(draftId);
       return;
@@ -157,7 +134,7 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
     recompute();
   }, [draftId, sequence, myTeamId, recompute]);
 
-  const view = useMemo(() => (held.view === null ? null : presentView(held.view, availablePlayerIds)), [held.view, availablePlayerIds]);
-  const stale = held.view !== null && held.view.stamp.sequence < sequence;
-  return { view, prePickView: held.prePickView, recomputing: inFlight || stale, error };
+  const view = useMemo(() => (held === null ? null : presentView(held, availablePlayerIds)), [held, availablePlayerIds]);
+  const stale = held !== null && held.stamp.sequence < sequence;
+  return { view, recomputing: inFlight || stale, error };
 }

@@ -15,27 +15,34 @@ function renderCard(over: Partial<NextPickCardProps> = {}) {
     player: PLAYER,
     byeWeek: 10,
     recomputing: false,
-    beat: null,
     ...over,
   };
   return { ...render(<NextPickCard {...props} />), props };
 }
 
 describe("NextPickCard", () => {
-  it("leads with the face, the name largest, the facts line, one big number as runs over runs, the why and the stamp, axe-clean", async () => {
+  it("is one header line, one row with the face, the name, the facts and the odds as the row's big figure, the why and the verb, axe-clean", async () => {
     const { container } = renderCard();
     expect(screen.getByTestId("advisor-header")).toHaveTextContent("You're on the clock");
     expect(screen.getByTestId("player-face-team")).toHaveAttribute("data-team", "KC");
     expect(screen.getByTestId("advisor-name")).toHaveTextContent("Marcus Reed");
-    expect(screen.getByTestId("advisor-name").className).toContain("text-2xl");
     expect(screen.getByTestId("advisor-facts")).toHaveTextContent("RB 3, KC, bye 10");
     expect(screen.getByTestId("advisor-facts")).toHaveAttribute("title", "41.2 points over replacement on our board");
+    const row = screen.getByTestId("advisor-lead-row");
+    expect(row).toContainElement(screen.getByTestId("advisor-odds"));
     expect(screen.getByTestId("advisor-odds")).toHaveTextContent("92 of 200");
-    expect(screen.getByText("still there at your next pick, 2.10, if you pass on him")).toBeInTheDocument();
+    expect(screen.getByText("still there at 2.10 if you pass")).toBeInTheDocument();
     expect(screen.getByTestId("advisor-why")).toHaveTextContent(/20.6 point drop/);
     expect(screen.getByTestId("advisor-stamp")).toHaveTextContent("As of 1.01 · 200 runs");
     expect(screen.queryByText(/value over replacement/)).toBeNull();
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("keeps the card compact: a medium face, no display-size figure, a small verb", () => {
+    renderCard();
+    expect(screen.getByTestId("player-face-team").className).toContain("size-11");
+    expect(screen.getByTestId("advisor-odds").className).not.toContain("display-lg");
+    expect(screen.getByRole("button", { name: "Draft" }).className).toContain("min-h-9");
   });
 
   it("colours the big number green only at or above the safe band, never red", () => {
@@ -66,7 +73,7 @@ describe("NextPickCard", () => {
       acts: { canDraft: false, submitting: false, queueOrder: new Map([["rb1", 2]]), onDraft: vi.fn(), onQueueToggle },
     });
     expect(screen.getByTestId("advisor-header")).toHaveTextContent("Your next pick is 2.07, 11 picks away");
-    expect(screen.getByText("still there at your next pick, 2.10")).toBeInTheDocument();
+    expect(screen.getByText("still there at 2.10")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Draft" })).toBeNull();
     const queued = screen.getByRole("button", { name: "Queued 2" });
     expect(queued).toHaveAttribute("aria-pressed", "true");
@@ -74,10 +81,9 @@ describe("NextPickCard", () => {
     expect(onQueueToggle).toHaveBeenCalledWith("rb1");
   });
 
-  it("says when there is no next pick to wait for, shows the beat and the recomputing state, and the empty line with no pick", () => {
-    renderCard({ view: advisorView({ odds: null, pick: nextPick({ makeItBack: null }) }), beat: "Best available.", recomputing: true });
-    expect(screen.getByText("This is your last turn, so there is no next pick to wait for.")).toBeInTheDocument();
-    expect(screen.getByTestId("assistant-beat")).toHaveTextContent("Best available.");
+  it("says when there is no next pick to wait for, shows the recomputing state, and the empty line with no pick", () => {
+    renderCard({ view: advisorView({ odds: null, pick: nextPick({ makeItBack: null }) }), recomputing: true });
+    expect(screen.getByText("Your last turn, so nothing to wait for.")).toBeInTheDocument();
     expect(screen.getByTestId("advisor-recomputing")).toBeInTheDocument();
     renderCard({ view: advisorView({ pick: null }), player: null });
     expect(screen.getByText("Nothing on the board fits your roster right now.")).toBeInTheDocument();

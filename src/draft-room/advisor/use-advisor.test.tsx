@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import type { AdvisorView } from "@/draft-service/assistant/view";
 import { DraftRoomDepsProvider, type DraftRoomDeps } from "../hooks/deps";
 import { resetAdvisorMemoryForTests } from "./advisor-memory";
-import { advisorView } from "./test-view";
-import { foldLandedView, presentView, useAdvisor, type AdvisorRoom } from "./use-advisor";
+import { advisorView, CANDIDATES } from "./test-view";
+import { presentView, useAdvisor, type AdvisorRoom } from "./use-advisor";
 
 function jsonOf(body: unknown): Response {
   return { json: async () => body } as unknown as Response;
@@ -15,7 +15,7 @@ function view(computedAtPick: number, onTheClock: boolean): AdvisorView {
   return advisorView({ pickNumber: computedAtPick, onTheClock, stamp: { computedAtPick, sequence: computedAtPick } });
 }
 
-const EVERYONE: ReadonlySet<string> = new Set(["rb1", "wr1", "te1"]);
+const EVERYONE: ReadonlySet<string> = new Set(CANDIDATES.map((candidate) => candidate.playerId));
 
 /** The room as the hook reads it: the draft, the log sequence the client holds, and who is still on the board. */
 function roomAt(sequence: number, available: ReadonlySet<string> = EVERYONE, draftId = "d1"): AdvisorRoom {
@@ -29,35 +29,34 @@ const wrapper = (deps: DraftRoomDeps) =>
 
 const noopSource = () => ({ addEventListener: () => {}, close: () => {} });
 
-describe("foldLandedView", () => {
-  it("latches the on-clock view only when the room moved", () => {
-    const empty = { view: null, prePickView: null };
-    const first = foldLandedView(empty, view(4, true));
-    expect(first.prePickView).toBeNull();
-    const repeat = foldLandedView(first, view(4, true));
-    expect(repeat.prePickView).toBeNull();
-    const moved = foldLandedView(repeat, view(5, false));
-    expect(moved.prePickView?.stamp.computedAtPick).toBe(4);
-    const later = foldLandedView(moved, view(6, false));
-    expect(later.prePickView?.stamp.computedAtPick).toBe(4);
-  });
-});
-
 describe("presentView (the wrong-people guard: only candidates still on the board at render time)", () => {
-  it("drops a named pick, an odds row and a tier row for anyone the room has since drafted, and keeps the rest", () => {
-    const held = view(3, false); // names rb1; odds and tiers over rb1, wr1, te1
-    const shown = presentView(held, new Set(["wr1", "te1"]));
-    expect(shown.pick).toBeNull();
-    expect(Object.keys(shown.odds!.survived).sort()).toEqual(["te1", "wr1"]);
-    expect(Object.keys(shown.tiers).sort()).toEqual(["te1", "wr1"]);
+  it("drops a drafted candidate from the rows, the odds and the tiers while the lead stands", () => {
+    const held = view(3, false); // the lead is rb1; wr1 is the first row
+    const without = new Set([...EVERYONE].filter((id) => id !== "wr1"));
+    const shown = presentView(held, without);
+    expect(shown.pick).toEqual(held.pick);
+    expect(shown.candidates.map((candidate) => candidate.playerId)).toEqual(CANDIDATES.map((candidate) => candidate.playerId).filter((id) => id !== "wr1"));
+    expect(shown.candidates[0]!.playerId).toBe("rb1");
+    expect(Object.keys(shown.odds!.survived)).not.toContain("wr1");
+    expect(Object.keys(shown.tiers)).not.toContain("wr1");
     expect(shown.odds!.runs).toBe(held.odds!.runs);
     expect(shown.stamp).toEqual(held.stamp);
+  });
+
+  it("empties the card and the rows together when the lead himself was drafted: never a card written about someone else", () => {
+    const held = view(3, false);
+    const without = new Set([...EVERYONE].filter((id) => id !== "rb1"));
+    const shown = presentView(held, without);
+    expect(shown.pick).toBeNull();
+    expect(shown.candidates).toEqual([]);
+    expect(Object.keys(shown.odds!.survived)).not.toContain("rb1");
   });
 
   it("is the identical view when everyone it names is still available", () => {
     const held = view(3, true);
     const shown = presentView(held, EVERYONE);
     expect(shown.pick).toEqual(held.pick);
+    expect(shown.candidates).toEqual(held.candidates);
     expect(shown.odds).toEqual(held.odds);
     expect(shown.tiers).toEqual(held.tiers);
   });
@@ -106,25 +105,25 @@ describe("useAdvisor", () => {
   });
 
   it("a candidate drafted between compute and render is filtered out of what the hook returns, and a stamp behind the room reads as recomputing", async () => {
-    // The server answers a view stamped at sequence 3 that names rb1. By the time it renders,
-    // the room the client holds is at sequence 4 and rb1 is gone (the fetch for sequence 4 is
-    // still out). The card must not name him, and the view must say it is recomputing.
+    // The server answers a view stamped at sequence 3 whose first row is wr1. By the time it
+    // renders, the room the client holds is at sequence 4 and wr1 is gone (the fetch for
+    // sequence 4 is still out). No row may name him, and the view must say it is recomputing.
     const pending: ((response: Response) => void)[] = [];
     const fetchJson = vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve)));
     const deps: DraftRoomDeps = { fetchJson, openEventSource: noopSource };
     const { result, rerender } = renderHook(({ room }) => useAdvisor(room, "t1"), { wrapper: wrapper(deps), initialProps: { room: roomAt(3) } });
-    rerender({ room: roomAt(4, new Set(["wr1", "te1"])) });
+    rerender({ room: roomAt(4, new Set([...EVERYONE].filter((id) => id !== "wr1"))) });
     await act(async () => {
       pending[0]!(jsonOf({ ok: true, data: view(3, false) }));
       await Promise.resolve();
     });
     await waitFor(() => expect(result.current.view).not.toBeNull());
-    expect(result.current.view?.pick).toBeNull();
-    expect(Object.keys(result.current.view!.odds!.survived).sort()).toEqual(["te1", "wr1"]);
+    expect(result.current.view!.candidates.map((candidate) => candidate.playerId)).not.toContain("wr1");
+    expect(Object.keys(result.current.view!.odds!.survived)).not.toContain("wr1");
     expect(result.current.recomputing).toBe(true);
 
     await act(async () => {
-      pending[1]!(jsonOf({ ok: true, data: advisorView({ pickNumber: 4, onTheClock: true, stamp: { computedAtPick: 4, sequence: 4 }, pick: null, odds: { pickNumber: 20, runs: 200, survived: { wr1: 150, te1: 20 } }, tiers: {} }) }));
+      pending[1]!(jsonOf({ ok: true, data: advisorView({ pickNumber: 4, onTheClock: true, stamp: { computedAtPick: 4, sequence: 4 }, candidates: CANDIDATES.filter((candidate) => candidate.playerId !== "wr1") }) }));
       await Promise.resolve();
     });
     await waitFor(() => expect(result.current.recomputing).toBe(false));
@@ -162,7 +161,7 @@ describe("useAdvisor", () => {
     expect(fetchJson).toHaveBeenCalledTimes(2);
   });
 
-  it("survives a remount through the module memory, latch included", async () => {
+  it("survives a remount through the module memory: the last view renders before the refetch lands", async () => {
     const bodies = [view(1, true), view(2, false)];
     let index = 0;
     const fetchJson = vi.fn(async () => jsonOf({ ok: true, data: bodies[Math.min(index++, 1)] }));
@@ -170,11 +169,10 @@ describe("useAdvisor", () => {
     const first = renderHook(({ room }) => useAdvisor(room, "t1"), { wrapper: wrapper(deps), initialProps: { room: roomAt(1) } });
     await waitFor(() => expect(first.result.current.view?.stamp.computedAtPick).toBe(1));
     first.rerender({ room: roomAt(2) });
-    await waitFor(() => expect(first.result.current.prePickView?.stamp.computedAtPick).toBe(1));
+    await waitFor(() => expect(first.result.current.view?.stamp.computedAtPick).toBe(2));
     first.unmount();
 
     const second = renderHook(() => useAdvisor(roomAt(2), "t1"), { wrapper: wrapper(deps) });
-    expect(second.result.current.prePickView?.stamp.computedAtPick).toBe(1);
     expect(second.result.current.view?.stamp.computedAtPick).toBe(2);
   });
 

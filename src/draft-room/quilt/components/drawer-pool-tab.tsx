@@ -6,7 +6,7 @@ import type { BoardReason } from "@/projections/preseason/board";
 import type { SurvivalOdds, TierStandingView } from "@/draft-service/assistant/view";
 import { Badge, Button, EmptyState, Movement, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { OddsPercent } from "../../advisor/components/odds-percent";
+import { OddsGlance } from "../../advisor/components/odds-glance";
 import { groupByTier } from "../../advisor/tier-groups";
 import { DRAFT_ROOM_CONFIG } from "../../state/config";
 import type { NeedFraction } from "../state/lens";
@@ -189,7 +189,7 @@ export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons,
                         </span>
                       )}
                       {gap === 0 ? null : <Movement places={gap} against="ADP" />}
-                      {odds === null ? null : <OddsPercent odds={odds} playerId={player.id} />}
+                      {odds === null ? null : <OddsGlance odds={odds} playerId={player.id} />}
                     </>
                   }
                   actions={

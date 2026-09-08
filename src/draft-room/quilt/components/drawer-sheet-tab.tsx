@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import type { Player } from "@/domain/player";
 import type { SurvivalOdds } from "@/draft-service/assistant/view";
 import { Button } from "@/components/ui";
-import { OddsPercent } from "../../advisor/components/odds-percent";
+import { OddsGlance } from "../../advisor/components/odds-glance";
 import type { CheatSheet } from "../state/sheet";
 import { sheetQueueSeed } from "../state/sheet";
 import { QUILT_CONFIG } from "../state/config";
@@ -92,7 +92,7 @@ export function DrawerSheetTab({ leagueId, sheet, playersById, boardRanks, avail
                       you {you} · board {board}
                     </span>
                   )}
-                  {odds === null || drafted ? null : <OddsPercent odds={odds} playerId={playerId} />}
+                  {odds === null || drafted ? null : <OddsGlance odds={odds} playerId={playerId} />}
                 </>
               }
               actions={

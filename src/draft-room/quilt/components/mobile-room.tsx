@@ -181,7 +181,6 @@ export function MobileRoom(props: MobileRoomProps) {
           />
         ) : tab === "assistant" ? (
           <DrawerAssistantTab
-            view={view}
             myTeamId={room.myTeamId}
             advisor={advisor}
             playersById={playersById}

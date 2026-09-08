@@ -21,10 +21,11 @@ import { getDraftStore, resolveDraftActor } from "@/draft-service";
 import { evidencePoolFor } from "../sim/evidence";
 import { simulateRoomOdds, type RoomOddsInput, type RoomOddsTable } from "../sim/room-odds";
 import { inferSeatDrivers } from "../sim/seat-model";
-import { advisorCore, seedFor, shortlistSizeFor } from "./advisor";
+import { advisorCore, seedFor } from "./advisor";
 import { ADVISOR_CONFIG } from "./config";
 import { roomFactsFor, seatShortlistFor, type RoomFacts } from "./memo";
 import { askingWindow, onClockShortlist, recommendNow, valuedEvidence, type RecommendInput, type ValuedEntry } from "./recommend";
+import { tierCollapses } from "./signals";
 import { tierStandings } from "./tiers";
 import type { AdvisorView } from "./view";
 
@@ -50,6 +51,7 @@ async function roomFactsForState(db: Db, draftId: string, state: DraftState, sim
   const facts = roomFactsFor(draftId, state.sequence, () => ({
     table: simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) }),
     tiers: tierStandings(state, valued),
+    collapses: tierCollapses(state, valued),
   }));
   return { shape, valued, facts };
 }
@@ -71,8 +73,8 @@ export async function advisorFor(db: Db, draftId: string, userId: string, deps: 
   if (askingWindow(state, teamId) === null) return null;
 
   const { shape, valued, facts } = await roomFactsForState(db, draftId, state, simulate);
-  const shortlist = seatShortlistFor(draftId, state.sequence, teamId, () => recommend({ state, askingTeamId: teamId, valued, shape, shortlistSize: shortlistSizeFor(state, teamId) }));
-  return advisorCore({ state, askingTeamId: teamId, valued, shape, table: facts.table, tiers: facts.tiers, shortlist });
+  const shortlist = seatShortlistFor(draftId, state.sequence, teamId, () => recommend({ state, askingTeamId: teamId, valued, shape, shortlistSize: ADVISOR_CONFIG.shortlistSize }));
+  return advisorCore({ state, askingTeamId: teamId, valued, shape, table: facts.table, tiers: facts.tiers, collapses: facts.collapses, shortlist });
 }
 
 /**
