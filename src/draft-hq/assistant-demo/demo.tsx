@@ -1,34 +1,46 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { BoardReason } from "@/projections/preseason/board";
-import { Button, Card, PositionBadge } from "@/components/ui";
-import { postPickBeat } from "@/draft-room/assistant/beat";
-import { oddsPhrase } from "@/draft-room/assistant/odds-phrase";
-import { detectRun, tierCountdowns } from "@/draft-room/assistant/reads";
-import { reasonSentence } from "@/draft-room/assistant/reason-sentence";
+import type { AdvisorView, SeatAhead } from "@/draft-service/assistant/view";
+import { Button, Card, Modal } from "@/components/ui";
+import { postPickBeat } from "@/draft-room/advisor/beat";
+import { AdvisorPanel } from "@/draft-room/advisor/components/advisor-panel";
+import { changedSinceLine } from "@/draft-room/advisor/format";
+import { planDelta } from "@/draft-room/advisor/plan-delta";
+import { foldLandedView } from "@/draft-room/advisor/use-advisor";
 import { byeCollisionFor } from "@/draft-room/assistant/roster-fit";
+import { addToQueue, removeFromQueue } from "@/draft-room/state/queue";
 import type { AssistantDemoFixture } from "./fixture";
-import { latchPrePickCalls } from "./pre-pick-latch";
 
 export interface AssistantDemoProps {
   readonly fixture: AssistantDemoFixture;
 }
 
+/** The post-pick latch the live hook keeps, replayed over the fixture's own sequence of views. */
+function latchedViews(views: readonly AdvisorView[]): readonly (AdvisorView | null)[] {
+  return views.reduce<{ readonly held: ReturnType<typeof foldLandedView>; readonly out: readonly (AdvisorView | null)[] }>(
+    (acc, view) => {
+      const held = foldLandedView(acc.held, view);
+      return { held, out: [...acc.out, held.prePickView] };
+    },
+    { held: { view: null, prePickView: null, previousPlan: null }, out: [] },
+  ).out;
+}
+
 /**
- * THE GUIDED DEMO — Task 12. Steps a fixed, precomputed replay (`AssistantDemoFixture`) one pick
- * at a time and renders the SAME panes `DrawerAssistantTab` renders in a live room, called
- * against exactly this step's own state: `detectRun`/`tierCountdowns` (Task 4) over the board as
- * it stands after `step` picks, `byeCollisionFor` (Task 5) against this seat's own roster so far,
- * and `postPickBeat` (Task 7, with `oddsPhrase`) once a pick of this seat's own has landed. The
- * one thing NOT recomputed here is the call itself (`AssistantCallView`, three candidates with
- * real reasons and real make-it-back odds): that is `fixture.calls[step]`, precomputed once by
- * `assistantCallCore` — the identical function a real room's Assistant calls — at fixture-build
- * time. No fetch, no gateway, ever: every control below only ever moves `step`.
+ * THE GUIDED DEMO. Steps a fixed, precomputed replay one pick at a time and renders the SAME
+ * three bands the room's advisor tab renders, from `fixture.advisor[step]` — a real `AdvisorView`
+ * computed by the identical `advisorCore` a live room calls. Queue is a local list here; Draft
+ * opens a confirmation (a phone's own two-step rule) and then steps the replay forward. The
+ * replay's own pick at that step is what the room actually did, and the demo says so when your
+ * pick differs from it, rather than pretending the replay followed you.
  */
 export function AssistantDemo({ fixture }: AssistantDemoProps) {
   const totalPicks = fixture.picks.length;
   const [step, setStep] = useState(0);
+  const [queue, setQueue] = useState<readonly string[]>([]);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [draftNote, setDraftNote] = useState<string | null>(null);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
@@ -39,67 +51,51 @@ export function AssistantDemo({ fixture }: AssistantDemoProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [totalPicks]);
 
-  const positionsById = useMemo(() => new Map(fixture.players.map((player) => [player.playerId, player.position] as const)), [fixture.players]);
   const displayNameById = useMemo(() => new Map(fixture.players.map((player) => [player.playerId, player.displayName] as const)), [fixture.players]);
   const nflTeamById = useMemo(() => new Map(fixture.players.map((player) => [player.playerId, player.nflTeam] as const)), [fixture.players]);
   const byeWeeks = useMemo(() => new Map(fixture.byeWeeksByTeam), [fixture.byeWeeksByTeam]);
+  const latched = useMemo(() => latchedViews(fixture.advisor), [fixture.advisor]);
+  const nameOf = (playerId: string): string => displayNameById.get(playerId) ?? playerId;
 
-  const reasonsById = useMemo<ReadonlyMap<string, readonly BoardReason[]>>(() => {
-    const map = new Map<string, BoardReason[]>();
-    for (const row of fixture.tierReasons) {
-      map.set(row.playerId, [{ code: "tier_cliff", playersLeftInTier: row.playersLeftInTier, dropToNextTier: row.dropToNextTier }]);
-    }
-    return map;
-  }, [fixture.tierReasons]);
-
-  const prePickCalls = useMemo(() => latchPrePickCalls(fixture.calls), [fixture.calls]);
-
-  const picksSoFar = useMemo(() => fixture.picks.slice(0, step), [fixture.picks, step]);
-  const draftedIds = useMemo(() => new Set(picksSoFar.map((pick) => pick.playerId)), [picksSoFar]);
-  const undraftedIds = useMemo(() => fixture.players.filter((player) => !draftedIds.has(player.playerId)).map((player) => player.playerId), [fixture.players, draftedIds]);
-  const recentPositions = useMemo(
-    () =>
-      picksSoFar.flatMap((pick) => {
-        const position = positionsById.get(pick.playerId);
-        return position === undefined ? [] : [position];
-      }),
-    [picksSoFar, positionsById],
-  );
-  const run = useMemo(() => detectRun(recentPositions), [recentPositions]);
-  const tierRows = useMemo(() => tierCountdowns(undraftedIds, positionsById, reasonsById), [undraftedIds, positionsById, reasonsById]);
-
-  const call = fixture.calls[step]!;
-  const prePickCall = prePickCalls[step] ?? null;
+  const view = fixture.advisor[step]!;
+  const previous = step === 0 ? null : fixture.advisor[step - 1]!;
+  const picksSoFar = fixture.picks.slice(0, step);
+  const queueOrder = useMemo(() => new Map(queue.filter((id) => !picksSoFar.some((pick) => pick.playerId === id)).map((id, index) => [id, index + 1] as const)), [queue, picksSoFar]);
 
   const beat = useMemo(() => {
-    if (prePickCall === null) return null;
-    const pickedPick = fixture.picks.find((pick) => pick.pickNumber === prePickCall.pickNumber);
-    if (pickedPick === undefined) return null;
-    return postPickBeat({ pickedPlayerId: pickedPick.playerId, prePickCall, playerName: (id) => displayNameById.get(id) ?? id });
-  }, [prePickCall, fixture.picks, displayNameById]);
+    const prePickView = latched[step] ?? null;
+    if (prePickView === null) return null;
+    const pickedPick = fixture.picks.find((pick) => pick.pickNumber === prePickView.stamp.computedAtPick);
+    return pickedPick === undefined ? null : postPickBeat({ pickedPlayerId: pickedPick.playerId, prePickView, playerName: nameOf });
+  }, [latched, step, fixture.picks, displayNameById]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const povRosterTeamCodes = useMemo(
-    () =>
-      picksSoFar
-        .filter((pick) => pick.teamId === fixture.povTeamId)
-        .flatMap((pick) => {
-          const nflTeam = nflTeamById.get(pick.playerId);
-          return nflTeam === undefined ? [] : [nflTeam];
-        }),
-    [picksSoFar, fixture.povTeamId, nflTeamById],
-  );
+  const changedSince = previous === null ? null : changedSinceLine(planDelta(previous.plan, view.plan), nameOf, view.teamCount, (turn) => view.plan.turns[turn - 1]?.pickNumber ?? null);
 
-  const top = call.candidates[0] ?? null;
-  const topNflTeam = top === null ? null : (nflTeamById.get(top.playerId) ?? null);
-  const byeNote = top === null || topNflTeam === null ? null : byeCollisionFor(topNflTeam, byeWeeks, povRosterTeamCodes);
+  const top = view.now[0] ?? null;
+  const povRosterTeamCodes = picksSoFar.filter((pick) => pick.teamId === fixture.povTeamId).flatMap((pick) => nflTeamById.get(pick.playerId) ?? []);
+  const bye = top === null ? null : byeCollisionFor(nflTeamById.get(top.playerId) ?? "", byeWeeks, povRosterTeamCodes);
+  const notes = bye === null || top === null ? [] : [`${nameOf(top.playerId)} shares Bye ${bye.week} with ${bye.count} rostered ${bye.count === 1 ? "player" : "players"}. Drafting him would make it ${bye.wouldMake}.`];
 
   const latestPick = step > 0 ? fixture.picks[step - 1]! : null;
+  const replayPick = step < totalPicks ? fixture.picks[step]! : null;
+
+  function confirmDraft(playerId: string): void {
+    setConfirmId(null);
+    const taken = nameOf(playerId);
+    if (replayPick === null) return;
+    setDraftNote(
+      replayPick.playerId === playerId
+        ? `You took ${taken}. The replay took him here too.`
+        : `You took ${taken}. The replay's own pick here was ${nameOf(replayPick.playerId)}, and the replay continues from that.`,
+    );
+    setStep((current) => Math.min(totalPicks, current + 1));
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <Card className="flex flex-col gap-3">
         <p data-testid="demo-replay-label" className="text-sm text-text-muted">
-          {`A replayed room, seeded and reproducible. ${fixture.teamCount} teams, seed ${fixture.seed}. You hold seat ${fixture.povSeatNumber} in the snake order.`}
+          {`A replayed room, seeded and reproducible. ${fixture.teamCount} teams, seed ${fixture.seed}, ${fixture.runs} runs behind every odds number. You hold seat ${fixture.povSeatNumber} in the snake order. The writer never runs here, so every sentence is the template floor.`}
         </p>
         <div className="flex items-center justify-between gap-4">
           <Button variant="secondary" size="sm" onClick={() => setStep((current) => Math.max(0, current - 1))} disabled={step === 0}>
@@ -114,64 +110,51 @@ export function AssistantDemo({ fixture }: AssistantDemoProps) {
         </div>
         {latestPick === null ? null : (
           <p data-testid="demo-latest-pick" className="text-sm text-text-muted">
-            {`${latestPick.teamLabel} took ${displayNameById.get(latestPick.playerId) ?? latestPick.playerId} (${positionsById.get(latestPick.playerId) ?? "?"}).`}
+            {`${latestPick.teamLabel} took ${nameOf(latestPick.playerId)}.`}
+          </p>
+        )}
+        {draftNote === null ? null : (
+          <p data-testid="demo-draft-note" className="text-sm text-text-primary">
+            {draftNote}
           </p>
         )}
       </Card>
 
-      <div className="flex flex-col gap-3">
-        {beat === null ? null : (
-          <p data-testid="assistant-beat" className="rounded-sm bg-surface-raised px-2.5 py-1.5 text-sm font-semibold text-text-primary">
-            {beat}
-          </p>
-        )}
-        {run === null ? null : (
-          <p data-testid="assistant-run-alert" className="rounded-sm bg-surface-raised px-2.5 py-1.5 text-sm font-semibold text-text-primary">
-            {`${run.position} is on a run. ${run.count} of the last ${run.window} picks were ${run.position}.`}
-          </p>
-        )}
-        {tierRows.length === 0 ? null : (
-          <ul data-testid="assistant-tier-strip" className="flex flex-col gap-1">
-            {tierRows.map((row) => (
-              <li key={row.position} className="text-xs text-text-faint">
-                {`Only ${row.playersLeftInTier} ${row.position} left in this tier. The price drops ${row.dropToNextTier.toFixed(1)} points after that.`}
-              </li>
-            ))}
-          </ul>
-        )}
+      <AdvisorPanel
+        view={view}
+        acts={{
+          canDraft: view.onTheClock && replayPick !== null,
+          submitting: false,
+          queueOrder,
+          onDraft: (playerId) => setConfirmId(playerId),
+          onQueueToggle: (playerId) => setQueue((current) => (current.includes(playerId) ? removeFromQueue(current, playerId) : addToQueue(current, playerId))),
+        }}
+        renderName={(_, name) => <span>{name}</span>}
+        seatLabel={(seat: SeatAhead) => fixture.teamLabels[seat.teamId] ?? `Seat ${seat.seat}`}
+        changedSince={changedSince}
+        changedSincePick={previous?.plan.computedAtPick ?? null}
+        recomputing={false}
+        beat={beat}
+        notes={notes}
+      />
 
-        {call.candidates.length === 0 ? (
-          <p className="text-sm text-text-faint">The assistant has nothing to say right now.</p>
-        ) : (
+      <Modal
+        open={confirmId !== null}
+        title={confirmId === null ? "Draft" : `Draft ${nameOf(confirmId)}?`}
+        onClose={() => setConfirmId(null)}
+        footer={
           <>
-            <p className="text-xs text-text-faint">{call.onTheClock ? "You are on the clock." : "Previewing your very next turn."}</p>
-            <ol data-testid="assistant-candidates" className="flex flex-col gap-2">
-              {call.candidates.map((candidate) => (
-                <li key={candidate.playerId} className="flex flex-col gap-1 rounded-sm bg-surface-raised px-2.5 py-1.5">
-                  <div className="flex items-center gap-2">
-                    <PositionBadge position={candidate.position} size="sm" />
-                    <span className="font-display text-md font-semibold text-text-primary">{displayNameById.get(candidate.playerId) ?? candidate.playerId}</span>
-                  </div>
-                  <ul className="flex flex-col gap-0.5 text-xs text-text-faint">
-                    {candidate.reasons.map((reason) => (
-                      <li key={reason.code}>{reasonSentence(reason)}</li>
-                    ))}
-                  </ul>
-                  {candidate.makeItBack === null || candidate.makeItBack.survival === null ? null : (
-                    <p className="text-xs text-text-faint">{`Our sims make it ${oddsPhrase(candidate.makeItBack.survival)} he is still here at your next turn.`}</p>
-                  )}
-                </li>
-              ))}
-            </ol>
+            <Button variant="secondary" onClick={() => setConfirmId(null)}>
+              Back
+            </Button>
+            <Button variant="verb" onClick={() => confirmId !== null && confirmDraft(confirmId)}>
+              Confirm pick
+            </Button>
           </>
-        )}
-
-        {byeNote === null || top === null ? null : (
-          <p data-testid="assistant-bye-note" className="text-xs text-text-faint">
-            {`${displayNameById.get(top.playerId) ?? top.playerId} shares Bye ${byeNote.week} with ${byeNote.count} rostered ${byeNote.count === 1 ? "player" : "players"}. Drafting him would make it ${byeNote.wouldMake}.`}
-          </p>
-        )}
-      </div>
+        }
+      >
+        <p className="text-sm text-text-muted">In a live room this is the same pick path the pool uses, with the same undo window.</p>
+      </Modal>
     </div>
   );
 }

@@ -39,6 +39,8 @@ export interface PoolDrawerProps extends RoomActs {
    *  this league. `false` offers "start your sheet" instead of the room's usual sheet controls. */
   readonly hasServerSheet: boolean;
   readonly onStartServerSheet: () => void;
+  /** The caller's own queue, in order, for the advisor's queued rows. */
+  readonly queue: readonly string[];
 }
 
 /**
@@ -106,12 +108,16 @@ export function PoolDrawer(props: PoolDrawerProps) {
             draftId={view.draftId}
             view={view}
             myTeamId={props.myTeamId}
-            players={props.players}
+            teams={props.teams}
             playersById={props.playersById}
-            available={available}
+            queue={props.queue}
             byeWeeks={props.byeWeeks}
-            reasons={props.reasons}
             laws={props.laws}
+            canDraft={props.canDraft}
+            submitting={props.submitting}
+            queuedPlayerIds={props.queuedPlayerIds}
+            onDraft={props.onDraft}
+            onQueueToggle={props.onQueueToggle}
           />
         ) : tab === "sheet" ? (
           <DrawerSheetTab

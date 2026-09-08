@@ -17,6 +17,7 @@ import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getDraftStore } from "@/draft-service";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
+import { resetAdvisorMemoForTests } from "@/draft-service/assistant/service";
 import { GET as getAssistant } from "./route";
 
 const db = createTestDb();
@@ -51,7 +52,11 @@ async function fixture() {
 beforeEach(async () => {
   await truncateAll(db);
   getDraftStore().invalidate(DRAFT_ID);
+  resetAdvisorMemoForTests();
   vi.mocked(getCurrentUser).mockReset();
+  // No writer in this suite: the template floor is the whole answer, and a real key here would
+  // put a gateway call inside a route test.
+  vi.stubEnv("AI_GATEWAY_API_KEY", "");
 });
 
 describe("GET /api/drafts/[draftId]/assistant", () => {
@@ -77,7 +82,7 @@ describe("GET /api/drafts/[draftId]/assistant", () => {
     expect((await response.json()).ok).toBe(false);
   });
 
-  it("answers 200 with the on-clock seat's call once the draft is running", async () => {
+  it("answers 200 with the on-clock seat's advisor view once the draft is running", async () => {
     const f = await fixture();
     const started = await getDraftStore().startDraft(DRAFT_ID);
     if (!started.ok) throw new Error(started.reason);
@@ -90,6 +95,15 @@ describe("GET /api/drafts/[draftId]/assistant", () => {
     expect(body.ok).toBe(true);
     expect(body.data.pickNumber).toBe(1);
     expect(body.data.onTheClock).toBe(true);
-    expect(body.data.candidates.length).toBeGreaterThan(0);
+    expect(body.data.now.length).toBeGreaterThan(0);
+    expect(body.data.picksUntilYourTurn).toBe(0);
+    expect(body.data.stamp.computedAtPick).toBe(1);
+    expect(body.data.plan.runs).toBeGreaterThan(0);
+    expect(Array.isArray(body.data.plan.turns)).toBe(true);
+    expect(Array.isArray(body.data.signals.ahead)).toBe(true);
+    expect(body.data.voice).toEqual({ status: "absent", strategy: null, reasons: {} });
+    // Names come from the players table, never the id.
+    expect(body.data.names[body.data.now[0].playerId]).toMatch(/^Player \d$/);
+    expect(typeof body.data.strategyTemplate).toBe("string");
   });
 });

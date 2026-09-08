@@ -178,12 +178,16 @@ export function MobileRoom(props: MobileRoomProps) {
             draftId={view.draftId}
             view={view}
             myTeamId={room.myTeamId}
-            players={room.players}
+            teams={room.teams}
             playersById={playersById}
-            available={props.available}
+            queue={room.queue}
             byeWeeks={props.byeWeeks}
-            reasons={props.reasons}
             laws={props.laws}
+            canDraft={mobileActs.canDraft}
+            submitting={mobileActs.submitting}
+            queuedPlayerIds={mobileActs.queuedPlayerIds}
+            onDraft={mobileActs.onDraft}
+            onQueueToggle={mobileActs.onQueueToggle}
           />
         ) : tab === "sheet" ? (
           <DrawerSheetTab

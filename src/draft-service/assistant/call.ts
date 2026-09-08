@@ -56,6 +56,7 @@ import { valueBoardIndexed, type LeagueShape, type ValuedPlayer } from "@/projec
 import { classifyBuild, type BuildLabel, type ClassifiablePick } from "../sim/classify";
 import { evidencePoolFor } from "../sim/evidence";
 import { makeItBackOdds, type MakeItBackOdds } from "../sim/make-it-back";
+import type { SeatDrivers } from "../sim/seat-model";
 import { SIM_CONFIG, SIM_SHARPNESS } from "../sim/config";
 import { deriveSeed } from "../sim/service";
 import { findCachedRun, hashSimConfig } from "../sim/store";
@@ -104,7 +105,7 @@ function seedFor(seedNamespace: string, pickNumber: number): number {
  *  consistent market. The fallback is deliberately the value rank rather than a rank by raw
  *  points, which is the ordering that put quarterbacks on top of the Simulator (founder,
  *  2026-09-05). */
-function valuedEvidence(pool: readonly SimPlayerEvidence[], shape: LeagueShape): ReadonlyMap<string, ValuedEntry> {
+export function valuedEvidence(pool: readonly SimPlayerEvidence[], shape: LeagueShape): ReadonlyMap<string, ValuedEntry> {
   const { sorted, byPlayerId } = valueBoardIndexed(pool.map((entry) => ({ playerId: entry.playerId, position: entry.position, projectedPoints: entry.projectedPoints })), shape);
   const valueRankByPlayerId = new Map(sorted.map((entry, index) => [entry.playerId, index] as const));
   const marketByPlayerId = new Map(pool.map((entry) => [entry.playerId, entry.marketRank] as const));
@@ -124,7 +125,7 @@ interface AskingWindow {
 /** Scans forward from the draft's current pick for the asking seat's own next two turns. Null
  *  only defensively: an `in_progress` draft's own draft order always owes every seat at least one
  *  more pick from `state.pickNumber` onward, by `totalPickCount`'s own construction. */
-function askingWindow(state: DraftState, askingTeamId: string): AskingWindow | null {
+export function askingWindow(state: DraftState, askingTeamId: string): AskingWindow | null {
   const lastPick = totalPickCount(state);
   let pickNumber: number | null = null;
   let nextPickNumber: number | null = null;
@@ -171,9 +172,9 @@ function classifiablePicks(state: DraftState, askingTeamId: string): readonly Cl
  *  "impossible" row for a question that does not apply. A row whose own `survival` came back null
  *  (every seeded run ended before the asking seat's next turn) collapses to null here too — see
  *  `AssistantCandidate.makeItBack`'s own contract. */
-function candidatesWithOdds(state: DraftState, askingTeamId: string, recommendations: readonly Recommendation[], nextPickNumber: number | null, seed: number): readonly AssistantCandidate[] {
+function candidatesWithOdds(state: DraftState, askingTeamId: string, recommendations: readonly Recommendation[], nextPickNumber: number | null, seed: number, drivers: SeatDrivers | undefined, runs: number | undefined): readonly AssistantCandidate[] {
   const shortlistIds = recommendations.map((rec) => rec.playerId);
-  const odds = nextPickNumber === null || shortlistIds.length === 0 ? [] : makeItBackOdds({ state, askingTeamId, shortlistIds, seed });
+  const odds = nextPickNumber === null || shortlistIds.length === 0 ? [] : makeItBackOdds({ state, askingTeamId, shortlistIds, seed, drivers, runs });
   const oddsByPlayerId = new Map(odds.map((row) => [row.playerId, row] as const));
   return recommendations.map((rec) => {
     const row = oddsByPlayerId.get(rec.playerId) ?? null;
@@ -193,7 +194,7 @@ function summaryForSlot(summary: StoredSimSummary, slot: number): SimSummary | n
 /** `findCachedRun` alone — never `requestSimRun` — so a live pick clock can never be made to wait
  *  on (or pay for) a sim nobody has asked for yet. See the module docblock for why the config
  *  reconstructed here is the exact one `canonicalSimFor` would have used. */
-async function winningBuildsFor(db: Db, userId: string, leagueId: string, shape: LeagueShape, slot: number, boardGeneration: string): Promise<readonly BuildOutcome[] | null> {
+export async function winningBuildsFor(db: Db, userId: string, leagueId: string, shape: LeagueShape, slot: number, boardGeneration: string): Promise<readonly BuildOutcome[] | null> {
   const knobs = { slot, rounds: totalRosterSlots(shape.rosterSlots), runs: SIM_CONFIG.syncRunThreshold, sharpness: SIM_SHARPNESS.mixed };
   const config: SimConfig = { teamCount: shape.teamCount, rosterSlots: shape.rosterSlots, ...knobs, seed: deriveSeed(shape, { leagueId, ...knobs }) };
   const cached = await findCachedRun(db, userId, hashSimConfig(config), boardGeneration);
@@ -221,6 +222,14 @@ export interface AssistantCallCoreInput {
    *  demo's own "replayed, not live" label. Carried through rather than fixed to one shape,
    *  since a demo and a real room have two honestly different things to say here. */
   readonly computedBasis: string;
+  /** How many candidates to hand back. Default 3 (the original call); the advisor asks for 5. */
+  readonly shortlistSize?: number;
+  /** The advisor's opponent model for the make-it-back runs (`sim/seat-model.ts`). Absent
+   *  keeps the seeded archetype deal. */
+  readonly drivers?: SeatDrivers;
+  /** Make-it-back runs. Default `MAKE_IT_BACK_RUNS`; the advisor hands its plan's own count so
+   *  one card never states two run counts. */
+  readonly runs?: number;
 }
 
 /**
@@ -231,7 +240,7 @@ export interface AssistantCallCoreInput {
  * for why this is the one function both the real Assistant and its replayed demo call.
  */
 export function assistantCallCore(input: AssistantCallCoreInput): AssistantCallView | null {
-  const { state, askingTeamId, valued, shape, seedNamespace, winningBuilds, computedBasis } = input;
+  const { state, askingTeamId, valued, shape, seedNamespace, winningBuilds, computedBasis, drivers } = input;
 
   const window = askingWindow(state, askingTeamId);
   if (window === null) return null;
@@ -245,9 +254,9 @@ export function assistantCallCore(input: AssistantCallCoreInput): AssistantCallV
     shape,
     pickNumber: window.pickNumber,
     nextPickNumber: window.nextPickNumber,
-    shortlistSize: 3,
+    shortlistSize: input.shortlistSize ?? 3,
   });
-  const candidates = candidatesWithOdds(state, askingTeamId, recommendations, window.nextPickNumber, seedFor(seedNamespace, window.pickNumber));
+  const candidates = candidatesWithOdds(state, askingTeamId, recommendations, window.nextPickNumber, seedFor(seedNamespace, window.pickNumber), drivers, input.runs);
 
   return {
     pickNumber: window.pickNumber,

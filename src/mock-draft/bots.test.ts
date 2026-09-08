@@ -16,7 +16,7 @@ import {
 } from "@/draft-engine";
 import { submitCommand } from "@/draft-engine/test-support";
 import { BOT_ARCHETYPES, assignArchetypes, type BotArchetype } from "./archetypes";
-import { botThinkDelaySeconds, chooseBotPick, expectedBotThinkDelaySeconds } from "./bots";
+import { botCandidateWeights, botThinkDelaySeconds, chooseBotPick, expectedBotThinkDelaySeconds } from "./bots";
 import { MOCK_CONFIG } from "./config";
 import { rngFor } from "./rng";
 
@@ -306,5 +306,40 @@ describe("botThinkDelaySeconds", () => {
     const rng = rngFor(4, "cadence");
     const delays = new Set(Array.from({ length: 20 }, () => botThinkDelaySeconds(60, rng)));
     expect(delays.size).toBeGreaterThan(1);
+  });
+});
+
+// The advisor's opponent model (draft advisor round, spec 3.1a) infers a seat's archetype from
+// the likelihood the sampler would have made that seat's observed picks — which is exactly these
+// weights. Exported so the inference reads the ONE sampler rather than a second scoring rule.
+describe("botCandidateWeights", () => {
+  it("returns the top eligible candidates in board order with a positive weight each, summing to what chooseBotPick samples from", () => {
+    const state = apply(initialDraftState(CONFIG), START);
+    const teamId = teamOnClock(state)!;
+    const rows = botCandidateWeights(state, teamId, archetypeNamed("best_available"));
+    expect(rows.length).toBe(MOCK_CONFIG.strategy.reachDepth);
+    expect(rows.map((row) => row.playerId)).toEqual(POOL.slice(0, MOCK_CONFIG.strategy.reachDepth).map((entry) => entry.playerId));
+    for (const row of rows) expect(row.weight).toBeGreaterThan(0);
+    // Board order decays: the first candidate always outweighs the last under a neutral brain.
+    expect(rows[0]!.weight).toBeGreaterThan(rows[rows.length - 1]!.weight);
+  });
+
+  it("a position-biased brain weighs that position's candidates heavier than the neutral brain does", () => {
+    const state = apply(initialDraftState(CONFIG), START);
+    const teamId = teamOnClock(state)!;
+    const neutral = new Map(botCandidateWeights(state, teamId, archetypeNamed("best_available")).map((row) => [row.playerId, row.weight]));
+    const qbEarly = botCandidateWeights(state, teamId, archetypeNamed("qb_early"));
+    const qbRow = qbEarly.find((row) => POSITION_OF.get(row.playerId) === "QB");
+    expect(qbRow).toBeDefined();
+    expect(qbRow!.weight).toBeGreaterThan(neutral.get(qbRow!.playerId)!);
+  });
+
+  it("chooseBotPick only ever returns a player these weights name", () => {
+    const state = apply(initialDraftState(CONFIG), START);
+    const teamId = teamOnClock(state)!;
+    const named = new Set(botCandidateWeights(state, teamId, archetypeNamed("rb_heavy")).map((row) => row.playerId));
+    for (let seed = 1; seed <= 25; seed++) {
+      expect(named.has(chooseBotPick(state, teamId, archetypeNamed("rb_heavy"), rngFor(seed, teamId))!)).toBe(true);
+    }
   });
 });

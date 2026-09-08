@@ -18,6 +18,7 @@
  */
 import type { DraftState } from "@/draft-engine";
 import { continueDraft } from "./continue";
+import type { SeatDrivers } from "./seat-model";
 
 /** Measured cheap: a continuation is under two rounds of picks (Task 2 plan). */
 export const MAKE_IT_BACK_RUNS = 200;
@@ -28,6 +29,8 @@ export interface MakeItBackInput {
   readonly shortlistIds: readonly string[];
   readonly seed: number;
   readonly runs?: number; // default MAKE_IT_BACK_RUNS
+  /** The advisor's opponent model (`seat-model.ts`, spec 3.1a). Absent keeps the seeded deal. */
+  readonly drivers?: SeatDrivers;
 }
 
 export interface MakeItBackOdds {
@@ -40,8 +43,8 @@ export interface MakeItBackOdds {
 /** One seeded continuation's contribution: for each shortlist id, whether it was still undrafted
  *  when the asking seat came back on the clock — undefined (never counted) when the draft ended
  *  first, the one case this run contributes nothing to the tally. */
-function runSurvivalFlags(state: DraftState, askingTeamId: string, shortlistIds: readonly string[], exclude: ReadonlySet<string>, seed: number): ReadonlyMap<string, boolean> | null {
-  const result = continueDraft({ state, askingTeamId, excludeFromAskingSeat: exclude, seed });
+function runSurvivalFlags(state: DraftState, askingTeamId: string, shortlistIds: readonly string[], exclude: ReadonlySet<string>, seed: number, drivers: SeatDrivers | undefined): ReadonlyMap<string, boolean> | null {
+  const result = continueDraft({ state, askingTeamId, excludeFromAskingSeat: exclude, seed, drivers });
   if (result.draftEnded) return null;
   return new Map(shortlistIds.map((id) => [id, result.undrafted.has(id)]));
 }
@@ -52,7 +55,7 @@ function runSurvivalFlags(state: DraftState, askingTeamId: string, shortlistIds:
  * fraction of non-ended runs where he survived to the asking seat's next turn.
  */
 export function makeItBackOdds(input: MakeItBackInput): readonly MakeItBackOdds[] {
-  const { state, askingTeamId, shortlistIds, seed } = input;
+  const { state, askingTeamId, shortlistIds, seed, drivers } = input;
   const runs = input.runs ?? MAKE_IT_BACK_RUNS;
   const exclude: ReadonlySet<string> = new Set(shortlistIds);
 
@@ -60,7 +63,7 @@ export function makeItBackOdds(input: MakeItBackInput): readonly MakeItBackOdds[
   let nonEndedRuns = 0;
 
   for (let runIndex = 0; runIndex < runs; runIndex++) {
-    const flags = runSurvivalFlags(state, askingTeamId, shortlistIds, exclude, seed + runIndex);
+    const flags = runSurvivalFlags(state, askingTeamId, shortlistIds, exclude, seed + runIndex, drivers);
     if (flags === null) continue;
     nonEndedRuns++;
     for (const id of shortlistIds) {

@@ -80,37 +80,55 @@ function weightedIndex(weights: readonly number[], rng: Rng): number {
   return weights.length - 1;
 }
 
+/** One sampler candidate and the weight the brain gives him at this exact turn. */
+export interface BotCandidateWeight {
+  readonly playerId: string;
+  readonly weight: number;
+}
+
+/**
+ * THE SAMPLER'S OWN WEIGHTS, exposed (draft advisor round, spec 3.1a). Every legal candidate
+ * inside the reach window, in board order, each scored `rankWeight × posBias × needMultiplier ×
+ * runMultiplier` for `archetype` — the exact distribution `chooseBotPick` draws from, so the
+ * advisor's opponent model can ask "how likely was this seat's observed pick under each brain"
+ * against the ONE sampler rather than a second scoring rule that could drift from it. Empty when
+ * the roster can take nothing that remains.
+ */
+export function botCandidateWeights(state: DraftState, teamId: string, archetype: BotArchetype): readonly BotCandidateWeight[] {
+  const roster = rosterFor(state, teamId);
+  const slotConfig = state.config.slotConfig;
+  const canRoster = (entry: DraftPoolEntry): boolean => assignSlot({ position: entry.position, roster, slotConfig }).ok;
+  const candidates = topEligible(availablePool(state), canRoster);
+  const recentCounts = recentPositionCounts(state);
+  return candidates.map((entry, index) => ({
+    playerId: entry.playerId,
+    weight:
+      rankWeight(index, MOCK_CONFIG.strategy.temperature) *
+      (archetype.posBias[entry.position] ?? 1) *
+      botNeedMultiplier(entry.position, roster, slotConfig, archetype) *
+      runMultiplier(entry.position, recentCounts, archetype),
+  }));
+}
+
 /**
  * The bot brain: one temperature-sampled pick for `teamId`, drawn from the caller's own seeded
  * stream (`rngFor(seed, teamId)` — the stream key T1 made load-bearing). Preference order
  * mirrors `bestAvailableFor` exactly: a legal queued player first (bots hold no queues today,
  * but the autopick policy is stated once, not twice), then a rank-weighted sample over the top
- * `reachDepth` eligible entries, each scored
- * `rankWeight × posBias × needMultiplier × runMultiplier`. Null only when the roster can take
+ * `reachDepth` eligible entries under `botCandidateWeights`. Null only when the roster can take
  * nothing that remains — the same answer `bestAvailableFor` would give.
  */
 export function chooseBotPick(state: DraftState, teamId: string, archetype: BotArchetype, rng: Rng): string | null {
   const roster = rosterFor(state, teamId);
   const slotConfig = state.config.slotConfig;
-  const board = availablePool(state);
+  const availableIds = new Set(availablePool(state).map((entry) => entry.playerId));
   const canRoster = (entry: DraftPoolEntry): boolean => assignSlot({ position: entry.position, roster, slotConfig }).ok;
-
-  const availableIds = new Set(board.map((entry) => entry.playerId));
   const queued = queuedEntriesFor(state, teamId).find((entry) => availableIds.has(entry.playerId) && canRoster(entry));
   if (queued !== undefined) return queued.playerId;
 
-  const candidates = topEligible(board, canRoster);
+  const candidates = botCandidateWeights(state, teamId, archetype);
   if (candidates.length === 0) return null;
-
-  const recentCounts = recentPositionCounts(state);
-  const weights = candidates.map(
-    (entry, index) =>
-      rankWeight(index, MOCK_CONFIG.strategy.temperature) *
-      (archetype.posBias[entry.position] ?? 1) *
-      botNeedMultiplier(entry.position, roster, slotConfig, archetype) *
-      runMultiplier(entry.position, recentCounts, archetype),
-  );
-  return candidates[weightedIndex(weights, rng)]!.playerId;
+  return candidates[weightedIndex(candidates.map((candidate) => candidate.weight), rng)]!.playerId;
 }
 
 /**
