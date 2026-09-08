@@ -82,9 +82,13 @@ export function buildTurnLedger(view: LedgerSource): TurnLedger {
     ...nowNumbers(view),
     ...signalNumbers(view),
   ]);
+  // The tier letters the card prints ("tier A") in both the forms a writer capitalises them,
+  // so "Tier A" is a phrase on the card rather than a two-word name nobody supplied (the live
+  // firing of 2026-09-07 lost its strategy note to exactly that).
   const names = new Set<string>([
     ...Object.values(view.names),
     ...view.signals.ahead.map((seat) => `Seat ${seat.seat}`),
+    ...view.signals.collapses.flatMap((row) => [`Tier ${row.tierLabel}`, `tier ${row.tierLabel}`]),
   ]);
   return { numbers: [...numbers], names: [...names] };
 }
