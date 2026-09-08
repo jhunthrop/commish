@@ -106,12 +106,16 @@ describe("teamPage", () => {
     expect(page.players[2]).toMatchObject({ positionRank: 1, boardRank: null, projectedPoints: null });
     expect(page.depthCharts?.release).toEqual({ asOf: "2026-08-28", groups: [{ position: "RB", slots: [{ slot: 1, name: "Jahmyr Gibbs", playerId: "4429795" }] }] });
     expect(page.depthCharts?.harvest?.asOf).toBe("2026-09-05");
-    expect(page.depthCharts?.harvest?.groups[0]?.slots.map((slot) => slot.name)).toEqual(["Jahmyr Gibbs", "Isiah Pacheco"]);
+    // Pacheco is on the harvest chart but not in this fixture's `players`: named, never linked.
+    expect(page.depthCharts?.harvest?.groups[0]?.slots.map((slot) => [slot.name, slot.playerId])).toEqual([
+      ["Jahmyr Gibbs", "4429795"],
+      ["Isiah Pacheco", null],
+    ]);
     expect(page.competition).toEqual({
       season: PRIOR,
-      targets: [{ playerId: GIBBS_NFL, name: "Jahmyr Gibbs", count: 6, share: 1 }],
-      carries: [{ playerId: GIBBS_NFL, name: "Jahmyr Gibbs", count: 40, share: 1 }],
-      redZoneTouches: [{ playerId: GIBBS_NFL, name: "Jahmyr Gibbs", count: 4 }],
+      targets: [{ nflPlayerId: GIBBS_NFL, playerId: "4429795", name: "Jahmyr Gibbs", count: 6, share: 1 }],
+      carries: [{ nflPlayerId: GIBBS_NFL, playerId: "4429795", name: "Jahmyr Gibbs", count: 40, share: 1 }],
+      redZoneTouches: [{ nflPlayerId: GIBBS_NFL, playerId: "4429795", name: "Jahmyr Gibbs", count: 4 }],
     });
     // Odd weeks at home: 1, 3, 5, 7, 9, 11, 13, 15, 17 (the bye week 8 is even), nine of sixteen.
     expect(page.schedule).toMatchObject({ weekOneOpponent: { week: 1, opponent: "NO", home: true }, homeGames: 9, roadGames: 7 });

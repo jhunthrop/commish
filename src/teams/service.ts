@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { coachingFor } from "@/capsules/facts/coaching";
 import { namesFor, scheduledGamesFor, teamMetricRowsFor } from "@/capsules/facts/depth-reads";
 import { scheduleFor } from "@/capsules/facts/schedule";
@@ -143,22 +143,40 @@ async function releaseListings(db: Db, roster: Awaited<ReturnType<typeof clubRos
   return { asOf: stamped, listings };
 }
 
+/** A harvest listing links only to a player the product's own directory holds for this club: the
+ *  feed's id is the product's id space, but a man the feed lists and `players` does not would be a
+ *  link to a page that 404s, so he renders as plain text instead (player-links fix round). */
+function knownToProduct(listings: readonly DepthListing[], roster: Awaited<ReturnType<typeof clubRoster>>): readonly DepthListing[] {
+  const known = new Set(roster.map((row) => row.playerId));
+  return listings.map((listing) => (listing.playerId !== null && known.has(listing.playerId) ? listing : { ...listing, playerId: null }));
+}
+
 async function depthChartsFor(db: Db, code: string, roster: Awaited<ReturnType<typeof clubRoster>>, asOf: Date): Promise<TeamDepthCharts | null> {
   const [release, harvest] = await Promise.all([releaseListings(db, roster, asOf), newestHarvestChart(db)]);
   const releaseChart = release.asOf === null ? null : depthChartFor(release.asOf, release.listings);
-  const harvestChart = harvest === null ? null : depthChartFor(harvest.capturedAt, harvestListingsFor(harvest.payload, code));
+  const harvestChart = harvest === null ? null : depthChartFor(harvest.capturedAt, knownToProduct(harvestListingsFor(harvest.payload, code), roster));
   return releaseChart === null && harvestChart === null ? null : { season: PRODUCT_SEASON, release: releaseChart, harvest: harvestChart };
+}
+
+/** The product ids the crosswalk holds for a set of universe ids: what a leader's name links by. */
+async function productIdsFor(db: Db, nflPlayerIds: readonly string[]): Promise<ReadonlyMap<string, string>> {
+  const rows = await db
+    .select({ nflPlayerId: playerCrosswalk.nflPlayerId, playerId: playerCrosswalk.playerId })
+    .from(playerCrosswalk)
+    .where(inArray(playerCrosswalk.nflPlayerId, [...nflPlayerIds]));
+  return new Map(rows.flatMap((row) => (row.nflPlayerId === null ? [] : [[row.nflPlayerId, row.playerId] as const])));
 }
 
 async function competitionSection(db: Db, sourceCode: string, asOf: Date) {
   const placements = await priorSeasonPlacements(db, asOf);
   const playerIds = [...placements].filter(([, team]) => team === sourceCode).map(([playerId]) => playerId);
   if (playerIds.length === 0) return null;
-  const [rows, names] = await Promise.all([
+  const [rows, names, productIds] = await Promise.all([
     observationsAsOf(db, { season: TEAM_PRIOR_SEASON, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf, source: PBP_PLAYER_SOURCE, playerIds }),
     namesFor(db, playerIds),
+    productIdsFor(db, playerIds),
   ]);
-  return competitionFor(TEAM_PRIOR_SEASON, rows, names);
+  return competitionFor(TEAM_PRIOR_SEASON, rows, { names, productIds });
 }
 
 async function defenseSection(db: Db, code: string, board: readonly BoardRow[]): Promise<TeamDefenseSummary | null> {

@@ -75,7 +75,15 @@ test("finds the Lions by nickname, lands on the team page, and follows a roster 
     await expect(managerA.getByRole("heading", { level: 2, name: title })).toBeVisible();
   }
   await managerA.screenshot({ path: `${OUT_DIR}/team-page-desktop.png`, fullPage: true });
-  await managerA.getByRole("list", { name: "Fantasy players" }).getByRole("link", { name: "Jahmyr Gibbs" }).click();
+  // A plain click on a roster row opens his peek in place (player-links fix round); the peek's own
+  // "Full page" link is the way to his page, and it is the same href the anchor carried.
+  const rosterLink = managerA.getByRole("list", { name: "Fantasy players" }).getByRole("link", { name: "Jahmyr Gibbs" });
+  await expect(rosterLink).toHaveAttribute("href", new RegExp(`/app/leagues/[^/]+/players/${GIBBS_ID}$`));
+  await rosterLink.click();
+  const peek = managerA.getByRole("dialog", { name: "Jahmyr Gibbs" });
+  await expect(peek).toBeVisible();
+  await expect(managerA).toHaveURL(/\/app\/teams\/DET$/);
+  await peek.getByRole("link", { name: "Full page" }).click({ timeout: PLAYER_PAGE_TIMEOUT_MS });
   await expect(managerA).toHaveURL(new RegExp(`/app/leagues/[^/]+/players/${GIBBS_ID}$`), { timeout: PLAYER_PAGE_TIMEOUT_MS });
 });
 
@@ -88,6 +96,25 @@ test("says in those words that nothing matches, and the other spelling of a club
   await expect(managerA.getByRole("dialog")).toHaveCount(0);
   await managerA.goto("/app/teams/LA");
   await expect(managerA).toHaveURL(/\/app\/teams\/LAR$/);
+});
+
+test("from the Broncos page, a name in the carries table opens his peek in place", async ({ managerA }) => {
+  await managerA.setViewportSize({ width: 1440, height: 900 });
+  await managerA.goto("/app/teams/DEN");
+  await expect(managerA.getByRole("heading", { level: 1, name: "Denver Broncos" })).toBeVisible();
+  const carries = managerA.getByRole("table", { name: "Carries" });
+  const link = carries.getByRole("link").first();
+  const name = (await link.textContent())?.trim() ?? "";
+  expect(name).not.toBe("");
+  await expect(link).toHaveAttribute("href", /\/app\/leagues\/[^/]+\/players\/[^/]+$/);
+  await carries.scrollIntoViewIfNeeded();
+  await managerA.getByRole("heading", { level: 2, name: "Target and touch competition" }).locator("..").locator("..").screenshot({ path: `${OUT_DIR}/team-page-linked-tables.png` });
+  await link.click();
+  const peek = managerA.getByRole("dialog", { name });
+  await expect(peek).toBeVisible();
+  await expect(peek.getByRole("link", { name: "Full page" })).toHaveAttribute("href", /\/app\/leagues\/[^/]+\/players\/[^/]+$/, { timeout: PLAYER_PAGE_TIMEOUT_MS });
+  await expect(managerA).toHaveURL(/\/app\/teams\/DEN$/);
+  await managerA.screenshot({ path: `${OUT_DIR}/team-page-peek.png` });
 });
 
 test("on a phone the header's icon opens a full-screen search and the team page stacks", async ({ browser }) => {

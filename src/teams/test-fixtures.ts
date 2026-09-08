@@ -37,13 +37,18 @@ export const FULL_TEAM: TeamPageData = {
   depthCharts: {
     season: 2026,
     release: { asOf: "2026-08-28", groups: [{ position: "RB", slots: [{ slot: 1, name: "Jahmyr Gibbs", playerId: "4429795" }, { slot: 2, name: "Isiah Pacheco", playerId: "4361529" }] }] },
-    harvest: { asOf: "2026-09-05", groups: [{ position: "QB", slots: [{ slot: 1, name: "Jared Goff", playerId: "3046779" }] }] },
+    // Altmyer is listed by the harvest and unknown to the universe: named, never linked.
+    harvest: { asOf: "2026-09-05", groups: [{ position: "QB", slots: [{ slot: 1, name: "Jared Goff", playerId: "3046779" }, { slot: 2, name: "Luke Altmyer", playerId: null }] }] },
   },
   competition: {
     season: 2025,
-    targets: [{ playerId: "asb", name: "Amon-Ra St. Brown", count: 150, share: 0.27 }],
-    carries: [{ playerId: "gib", name: "Jahmyr Gibbs", count: 250, share: 0.54 }],
-    redZoneTouches: [{ playerId: "gib", name: "Jahmyr Gibbs", count: 41 }],
+    targets: [{ nflPlayerId: "asb", playerId: "4374302", name: "Amon-Ra St. Brown", count: 150, share: 0.27 }],
+    // Montgomery has no crosswalk row: named in the table, never linked.
+    carries: [
+      { nflPlayerId: "gib", playerId: "4429795", name: "Jahmyr Gibbs", count: 250, share: 0.54 },
+      { nflPlayerId: "mont", playerId: null, name: "David Montgomery", count: 158, share: 0.37 },
+    ],
+    redZoneTouches: [{ nflPlayerId: "gib", playerId: "4429795", name: "Jahmyr Gibbs", count: 41 }],
   },
   schedule: {
     weekOneOpponent: { week: 1, opponent: "NO", home: true },

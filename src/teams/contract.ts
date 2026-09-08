@@ -87,18 +87,19 @@ export interface TeamDepthCharts {
   readonly harvest: DatedDepthChart | null;
 }
 
-export interface UsageShare {
-  readonly playerId: string;
+export interface UsageCount {
+  /** The universe id (`nfl_players.id`) the play-by-play attribution is keyed on. */
+  readonly nflPlayerId: string;
+  /** The product's own player id when the crosswalk resolves him, for a link; `null` otherwise,
+   *  and the name renders as plain text rather than a dead link. */
+  readonly playerId: string | null;
   readonly name: string;
   readonly count: number;
-  /** The player's count over the club's attributed total, 0..1, four decimals. */
-  readonly share: number;
 }
 
-export interface UsageCount {
-  readonly playerId: string;
-  readonly name: string;
-  readonly count: number;
+export interface UsageShare extends UsageCount {
+  /** The player's count over the club's attributed total, 0..1, four decimals. */
+  readonly share: number;
 }
 
 /** Last season's top target earners, top rushers and red-zone touch leaders on the club. */

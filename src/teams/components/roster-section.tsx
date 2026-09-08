@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { PlayerRow } from "@/components/ui";
-import { usePlayerPageHref } from "@/components/app-shell/shell-leagues";
 import { tierLetter } from "@/draft-hq/board/copy";
 import type { TeamBoardPlayer } from "../contract";
+import { usePlayerLink } from "./player-name-link";
 import { Section } from "./section";
 
 /** The mono facts after a roster row's name, each only when the board states it. The tier is the
@@ -21,25 +21,25 @@ export function rosterMetaLine(row: TeamBoardPlayer): string {
 
 /**
  * THE FANTASY PLAYERS ON THIS CLUB (coordinator's section 4): every board row in board order, in
- * the pool row treatment, each a link to his analysis page in the league the reader's links belong
- * to (`usePlayerPageHref`). A reader with no league gets the rows without links, which is the
- * honest rendering of a page that does not exist for him yet. The survival odds column is left to
- * the draft room, as ruled.
+ * the pool row treatment, each a real anchor to his analysis page that opens the peek in place on
+ * a plain click (`usePlayerLink`, the one resolution every name on this page shares). A reader
+ * with no league gets the rows without links, which is the honest rendering of a page that does
+ * not exist for him yet. The survival odds column is left to the draft room, as ruled.
  */
 export function RosterSection({ players, season }: { readonly players: readonly TeamBoardPlayer[]; readonly season: number }) {
-  const hrefFor = usePlayerPageHref();
+  const linkFor = usePlayerLink();
   return (
     <Section title="Fantasy players" basis={`The ${season} board, 12-team PPR, in board order`} held={players.length > 0}>
       <ul className="flex flex-col gap-1.5" aria-label="Fantasy players">
         {players.map((row) => {
-          const href = hrefFor(row.player.id);
+          const link = linkFor(row.player.id, row.player.name);
           const rendered = <PlayerRow player={row.player} positionRank={row.positionRank ?? undefined} meta={rosterMetaLine(row)} />;
           return (
             <li key={row.player.id}>
-              {href === null ? (
+              {link === null ? (
                 rendered
               ) : (
-                <Link href={href} aria-label={row.player.name} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                <Link href={link.href} onClick={link.onClick} aria-label={row.player.name} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
                   {rendered}
                 </Link>
               )}
