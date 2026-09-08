@@ -3,7 +3,7 @@ import { CAPSULE_CONFIG, DRAFTING_SENTENCES, LAB_REPORT_TERMS, TRADING_TERMS } f
 import type { PlayerFacts } from "./facts";
 import type { NarrativeSlotRequest } from "./narrative";
 import { renderFactsForModel } from "./render";
-import type { CapsuleSize } from "./validate";
+import { wordCount, type CapsuleSize } from "./validate";
 
 /**
  * THE WRITER'S INSTRUCTIONS (refrains round, 2026-09-07).
@@ -90,10 +90,6 @@ HONESTY, NO EXCEPTIONS
 
 const READ_LABEL: Record<CapsuleSize, string> = { compact: "short note", full: "long note" };
 
-function bandOf(size: CapsuleSize): string {
-  return `${CAPSULE_CONFIG.sizes[size].minWords} to ${CAPSULE_CONFIG.sizes[size].maxWords} words`;
-}
-
 /** The middle of a band, the number the writer is told to aim for: asked for a range, the model
  *  lands at its bottom and under it (the first one-call run rejected five long notes at 222 to 238
  *  words against a 240 floor); asked for the midpoint, it lands inside. */
@@ -102,12 +98,20 @@ function targetOf(size: CapsuleSize): number {
   return Math.round((minWords + maxWords) / 2);
 }
 
+/** ONE COUNT TO HIT, NEVER A RANGE (written rate round, 2026-09-08). "About 270 words (240 to 300
+ *  words)" put 15 of 40 long notes under the floor at 201 to 239 words: the range's bottom read as
+ *  the target. The band stays in the validator; the writer hears one number. */
 function lengthOf(size: CapsuleSize): string {
-  return `about ${targetOf(size)} words (${bandOf(size)})`;
+  return `${targetOf(size)} words`;
+}
+
+/** A slot's count to aim for, under its cap: see `CAPSULE_CONFIG.narrativeTargetShareOfCap`. */
+function slotLengthOf(maxWords: number): string {
+  return `about ${Math.round(maxWords * CAPSULE_CONFIG.narrativeTargetShareOfCap)} words, never more than ${maxWords}`;
 }
 
 function slotSpecFor(requests: readonly NarrativeSlotRequest[]): string {
-  return requests.map((request) => `  - "${request.key}" (at most ${request.maxWords} words): ${request.brief}`).join("\n");
+  return requests.map((request) => `  - "${request.key}" (${slotLengthOf(request.maxWords)}): ${request.brief}`).join("\n");
 }
 
 function partsSpecFor(facts: PlayerFacts, requests: readonly NarrativeSlotRequest[]): string {
@@ -133,19 +137,40 @@ export function bundlePromptFor(facts: PlayerFacts, requests: readonly Narrative
 
 const SAME_TEXT_OTHERWISE = "change nothing else: the same facts, the same numbers, the same order, the same voice.";
 
+const SENTENCE_COUNT_WORDS = ["one", "two", "three"] as const;
+
+/** How many sentences a deficit is worth: one at the least, `maxSentencesAdded` at the most. */
+function sentencesFor(deficit: number): string {
+  const { wordsPerSentence, maxSentencesAdded } = CAPSULE_CONFIG.lengthCorrection;
+  const count = Math.min(maxSentencesAdded, Math.max(1, Math.round(deficit / wordsPerSentence)));
+  const word = SENTENCE_COUNT_WORDS[count - 1] ?? String(count);
+  return count === 1 ? `${word} sentence of fact from the sheet that sharpens the case` : `${word} sentences of fact from the sheet that sharpen the case`;
+}
+
 /**
  * The length correction. A small overrun (`CAPSULE_CONFIG.lengthCorrection.trimOverrunWords` or
  * fewer over the cap) asks for the same text minus one sentence at the end, the smallest edit that
- * lands inside the band; anything else asks for the middle of the band, cutting or adding.
+ * lands inside the band; anything else states the middle of the band as the count to hit, with the
+ * ask sized to the distance (`sentencesFor`): a fixed "two or three sentences" took a 237-word note
+ * to 302 (written rate round, 2026-09-08).
  */
 function lengthInstruction(size: CapsuleSize, quoted: string, correction: NonNullable<PriorAttempt["lengthCorrection"]>): string {
-  const { words, minWords, maxWords } = correction;
+  const { words, maxWords } = correction;
   const overrun = words - maxWords;
   if (isTrimOverrun(correction)) {
     return `${quoted}\n\nIt is ${words} words, ${overrun} over the ${maxWords} word cap. Return the same text with one sentence taken off the end, and ${SAME_TEXT_OTHERWISE}`;
   }
-  const move = overrun > 0 ? "Cut the sentences that carry the least" : "Add two or three more sentences of fact from the sheet that sharpen the case";
-  return `${quoted}\n\nIt is ${words} words. It has to be between ${minWords} and ${maxWords} words, so aim for about ${targetOf(size)}. ${move}, and ${SAME_TEXT_OTHERWISE}`;
+  const target = targetOf(size);
+  const distance = Math.abs(target - words);
+  const move = words > target ? `cut the sentences that carry the least (about ${distance} words)` : `add ${sentencesFor(distance)} (about ${distance} more words)`;
+  return `${quoted}\n\nIt is ${words} words. Bring it to ${target} words: ${move}, and ${SAME_TEXT_OTHERWISE}`;
+}
+
+/** The cap, stated on a soft correction: one compact read went 105 to 121 words fixing a single
+ *  sentence (written rate round, 2026-09-08), and "change nothing else" said nothing about length. */
+function capReminder(size: CapsuleSize, body: string): string {
+  const { maxWords } = CAPSULE_CONFIG.sizes[size];
+  return `It is ${wordCount(body)} words now and the cap is ${maxWords}, so it must not grow past ${maxWords} words.`;
 }
 
 /** The five things a correction call can ask for, decided from the prior attempt alone. Named
@@ -176,7 +201,7 @@ function correctionInstruction(size: CapsuleSize, prior: PriorAttempt): string {
     case "length":
       return lengthInstruction(size, quoted, prior.lengthCorrection!);
     case "soft":
-      return `${quoted}\n\nIt is nearly right. Fix exactly these points, in your own words, and change nothing else:\n${prior.softCorrections!.map((point) => `- ${point}`).join("\n")}`;
+      return `${quoted}\n\nIt is nearly right. Fix exactly these points, in your own words, and change nothing else:\n${prior.softCorrections!.map((point) => `- ${point}`).join("\n")}\n\n${capReminder(size, prior.body)}`;
     case "rewrite":
       return `${quoted}\n\nIt broke these rules:\n${prior.violations.map((violation) => `- ${violation}`).join("\n")}\n\nWrite the ${label} again from scratch, ${lengthOf(size)}, ${shape}, fixing every point above.`;
   }

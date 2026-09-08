@@ -101,24 +101,32 @@ describe("bundlePromptFor", () => {
   const requests = narrativeRequestsFor(FACTS);
   const prompt = bundlePromptFor(FACTS, requests, NO_WORN_PHRASES);
 
-  it("carries the fact sheet and asks for one JSON object with the three keys and the word bands", () => {
+  it("carries the fact sheet and asks for one JSON object with the three keys", () => {
     expect(prompt).toContain("Fact sheet:");
     expect(prompt).toContain("Rashad Long");
     expect(prompt).toContain("Return ONE JSON object");
     expect(prompt).toContain('"compact"');
     expect(prompt).toContain('"full"');
     expect(prompt).toContain('"narrative"');
-    expect(prompt).toContain(`${CAPSULE_CONFIG.sizes.compact.minWords} to ${CAPSULE_CONFIG.sizes.compact.maxWords} words`);
-    expect(prompt).toContain(`${CAPSULE_CONFIG.sizes.full.minWords} to ${CAPSULE_CONFIG.sizes.full.maxWords} words`);
   });
 
-  it("aims each note at the middle of its band, because a model asked for a range lands under it", () => {
-    expect(prompt).toContain("about 98 words (75 to 120 words)");
-    expect(prompt).toContain("about 270 words (240 to 300 words)");
+  /**
+   * A COUNT TO HIT, NEVER A RANGE (written rate round, 2026-09-08). Asked for "about 270 words
+   * (240 to 300 words)", the long note came in under the floor on 15 of 40 players (201 to 239
+   * words); the range's bottom reads as the target. The prompt now states the middle of the band
+   * as the count to write, and the band itself stays in the validator where it belongs.
+   */
+  it("states each note's length as one count to hit, the middle of its band, never as a range", () => {
+    expect(prompt).toContain('"compact": the short note for his card, 98 words,');
+    expect(prompt).toContain('"full": the long note for his page, 270 words,');
+    expect(prompt).not.toContain("75 to 120");
+    expect(prompt).not.toContain("240 to 300");
+    expect(prompt).not.toContain("about 98");
+    expect(prompt).not.toContain("about 270");
   });
 
-  it("lists every narrative slot this player's facts support, with its word cap", () => {
-    for (const request of requests) expect(prompt).toContain(`"${request.key}" (at most ${request.maxWords} words)`);
+  it("lists every narrative slot this player's facts support, with a count under its cap to aim for (the call came back at 31 to 33 words against a 30 cap)", () => {
+    for (const request of requests) expect(prompt).toContain(`"${request.key}" (about ${Math.round(request.maxWords * 0.75)} words, never more than ${request.maxWords})`);
   });
 
   it("tells the writer there is no fixed order and that the two reads must not share sentences", () => {
@@ -146,10 +154,32 @@ describe("correctionPromptFor", () => {
   it("asks for the same text at the right length, and nothing else, on a band failure", () => {
     const prompt = correctionPromptFor(FACTS, "compact", { body: "Too short.", violations: ["Word count 2 is outside the required 75-120 word band."], lengthCorrection: { words: 2, minWords: 75, maxWords: 120 } });
     expect(prompt).toContain("Too short.");
-    expect(prompt).toContain("It is 2 words. It has to be between 75 and 120 words, so aim for about 98");
+    expect(prompt).toContain("It is 2 words. Bring it to 98 words:");
     expect(prompt).toContain("change nothing else");
     expect(prompt).toContain("Return only the corrected short note");
     expect(prompt).not.toContain("broke these rules");
+  });
+
+  /**
+   * THE ASK IS SIZED TO THE DEFICIT (written rate round, 2026-09-08). "Add two or three more
+   * sentences" took a 237-word long note to 302 and a 229-word one to 302: a fixed ask does not
+   * know how far under the floor the note was. The correction now states the count to hit and how
+   * many sentences (of about `lengthCorrection.wordsPerSentence` words) that is, one at the least.
+   */
+  it("sizes an underrun's ask to the deficit: one sentence for a few words, three for forty", () => {
+    const { minWords, maxWords } = CAPSULE_CONFIG.sizes.full;
+    const at = (words: number) => correctionPromptFor(FACTS, "full", { body: "Short.", violations: ["x"], lengthCorrection: { words, minWords, maxWords } });
+    expect(at(237)).toContain("It is 237 words. Bring it to 270 words: add two sentences of fact from the sheet that sharpen the case (about 33 more words)");
+    expect(at(262)).toContain("Bring it to 270 words: add one sentence of fact from the sheet that sharpens the case (about 8 more words)");
+    expect(at(201)).toContain("Bring it to 270 words: add three sentences of fact from the sheet that sharpen the case (about 69 more words)");
+    expect(at(321)).toContain("It is 321 words. Bring it to 270 words: cut the sentences that carry the least (about 51 words)");
+    expect(at(237)).not.toContain("two or three");
+  });
+
+  it("tells a soft correction the cap, so fixing one sentence cannot grow the note past it (one compact read went 105 to 121)", () => {
+    const body = Array.from({ length: 105 }, () => "word").join(" ");
+    const prompt = correctionPromptFor(FACTS, "compact", { body, violations: ["x"], softCorrections: ["Fix the floor sentence."] });
+    expect(prompt).toContain("It is 105 words now and the cap is 120, so it must not grow past 120 words.");
   });
 
   it("trims a small overrun by one sentence off the end, the same text otherwise (production follow-up, 2026-09-08: ten full reads lost at 301 or 302 words)", () => {
@@ -161,12 +191,12 @@ describe("correctionPromptFor", () => {
       expect(prompt).toContain(`It is ${words} words, ${words - maxWords} over the ${maxWords} word cap.`);
       expect(prompt).toContain("the same text with one sentence taken off the end");
       expect(prompt).toContain("change nothing else");
-      expect(prompt).not.toContain("aim for about");
-      expect(prompt).not.toContain("Cut the sentences that carry the least");
+      expect(prompt).not.toContain("Bring it to");
+      expect(prompt).not.toContain("cut the sentences that carry the least");
     }
     const past = at(maxWords + trimOverrunWords + 1);
-    expect(past).toContain("Cut the sentences that carry the least");
-    expect(past).toContain(`aim for about ${Math.round((minWords + maxWords) / 2)}`);
+    expect(past).toContain("cut the sentences that carry the least");
+    expect(past).toContain(`Bring it to ${Math.round((minWords + maxWords) / 2)} words`);
     expect(past).not.toContain("one sentence taken off the end");
     expect(maxWords).toBe(300);
   });
@@ -183,14 +213,13 @@ describe("correctionPromptFor", () => {
     const prompt = correctionPromptFor(FACTS, "compact", { body: "He caught 137 passes.", violations: ['The number "137" does not trace to any supplied fact.'] });
     expect(prompt).toContain("broke these rules");
     expect(prompt).toContain('"137"');
-    expect(prompt).toContain("Write the short note again from scratch");
-    expect(prompt).toContain("about 98 words (75 to 120 words)");
+    expect(prompt).toContain("Write the short note again from scratch, 98 words,");
   });
 
   it("asks for the missing note outright when the bundle left it out", () => {
     const prompt = correctionPromptFor(FACTS, "full", { body: "", violations: [], missing: true });
     expect(prompt).toContain("had no long note");
-    expect(prompt).toContain("about 270 words (240 to 300 words)");
+    expect(prompt).toContain("Write it now: 270 words,");
     expect(prompt).not.toContain('"""');
   });
 

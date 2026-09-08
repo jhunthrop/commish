@@ -121,7 +121,23 @@ export const CAPSULE_CONFIG = {
    */
   lengthCorrection: {
     trimOverrunWords: 5,
+    /**
+     * THE ASK IS SIZED TO THE DEFICIT (written rate round, 2026-09-08). A long note under its
+     * floor was told to "add two or three more sentences" whatever the deficit, and a 237-word
+     * note came back at 302: three sentences is sixty words, and the note needed thirty. The
+     * correction now states the count to hit and asks for as many sentences as the deficit is
+     * worth at this many words each, one at the least and three at the most.
+     */
+    wordsPerSentence: 20,
+    maxSentencesAdded: 3,
   },
+  /**
+   * A SLOT AIMS UNDER ITS CAP (written rate round, 2026-09-08). Told "at most 30 words", the call
+   * came back at 31 to 33 on three players of forty; the cap read as the target. The prompt states
+   * this share of the cap as the count to aim for, with the cap beside it, and the validator's own
+   * cap is unchanged.
+   */
+  narrativeTargetShareOfCap: 0.75,
   /**
    * THE ONE CALL PER PLAYER (refrains round, 2026-09-07) — the compact read, the full read and the
    * narrative slots in one JSON object (`bundle.ts`). The prose itself is about 120 plus 300 plus

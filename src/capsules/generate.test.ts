@@ -146,7 +146,7 @@ describe("generateCapsule", () => {
 
     expect(result.compact).toMatchObject({ source: "llm", text: GOOD_COMPACT });
     expect(corrections).toHaveLength(1);
-    expect(corrections[0]).toContain("It is 41 words. It has to be between 75 and 120 words");
+    expect(corrections[0]).toContain("It is 41 words. Bring it to 98 words:");
     expect(corrections[0]).toContain(tooShort);
     expect(corrections[0]).not.toContain("broke these rules");
   });
