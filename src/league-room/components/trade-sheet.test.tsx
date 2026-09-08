@@ -172,7 +172,7 @@ describe("TradeSheet", () => {
 
   it("still stands when the assessment is unavailable, with no invented values", async () => {
     render(sheet(capturingDeps([{ ok: false, error: "unavailable" }]).deps));
-    await waitFor(() => expect(screen.queryByText(/Pricing both sides/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/Valuing both sides/)).toBeNull());
     expect(screen.queryByText(/side value/)).toBeNull();
     expect(screen.getByRole("button", { name: "Accept trade" })).toBeTruthy();
   });

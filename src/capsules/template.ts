@@ -47,10 +47,10 @@ export function renderTemplateCapsule(facts: PlayerFacts): string {
   }
 
   if (market.adp === null) {
-    // The one ADP sentence the floor keeps: a player nobody is drafting is a fact no other surface
-    // states. A player with an ADP already has it in the rail above this card. In drafting words,
-    // never "the market has not priced him" (founder ruling, 2026-09-07).
-    sentences.push("No ADP on file for him: drafters are not taking him yet.");
+    // The one ADP sentence the floor keeps: a player with NO ADP is a fact no other surface
+    // states. A player who has one already shows it in the rail above this card. "He has no ADP",
+    // never "the market has not priced him": fantasy words, not trading words (founder 2026-09-07).
+    sentences.push("He has no ADP.");
   }
 
   const strongestLaw = [...facts.evidence].filter((item) => item.kind === "law").sort((a, b) => Math.abs(b.netEffectPoints) - Math.abs(a.netEffectPoints))[0];

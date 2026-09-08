@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { BoardReason } from "@/projections/preseason/board";
+import type { SurvivalOdds, TierStandingView } from "@/draft-service/assistant/view";
 import { Badge, Button, EmptyState, Movement, PositionBadge } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
+import { OddsPercent } from "../../advisor/components/odds-percent";
+import { groupByTier } from "../../advisor/tier-groups";
 import { DRAFT_ROOM_CONFIG } from "../../state/config";
 import type { NeedFraction } from "../state/lens";
 import { marketOrderNoteFor } from "../../lib/market-order-note";
@@ -28,6 +32,16 @@ export interface DrawerPoolTabProps extends RoomActs {
    *  grammar the founder ruled in. Omitted on the phone: the 390pt filter row already spends
    *  its width on search plus six position stickers (spec, mobile judgment). */
   readonly needs?: readonly NeedFraction[];
+  /** The advisor's next-turn odds for every undrafted player; `null` while none are held or the
+   *  viewer has no next turn, and then no row prints one. */
+  readonly odds?: SurvivalOdds | null;
+  /** The advisor's tier standings; a position-filtered list groups under them. */
+  readonly tiers?: Readonly<Record<string, TierStandingView>>;
+}
+
+interface PoolRow {
+  readonly player: Player;
+  readonly rank: number;
 }
 
 /**
@@ -36,7 +50,7 @@ export interface DrawerPoolTabProps extends RoomActs {
  * and a GENERIC edge count; the name opens the season peek (`PlayerName`), and the row's own
  * "Card" button opens this room's own draft-context card for everything deeper.
  */
-export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons, focusSearch, needs, canDraft, submitting, queuedPlayerIds, onDraft, onQueueToggle, onPeek }: DrawerPoolTabProps) {
+export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons, focusSearch, needs, odds = null, tiers = {}, canDraft, submitting, queuedPlayerIds, onDraft, onQueueToggle, onPeek }: DrawerPoolTabProps) {
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState<string>(ALL);
   const searchRef = useRef<HTMLInputElement | null>(null);
@@ -54,6 +68,8 @@ export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons,
       .filter(({ player }) => (position === ALL || player.position === position) && (needle === "" || player.name.toLowerCase().includes(needle)));
   }, [players, available, query, position]);
   const visible = rows.slice(0, DRAFT_ROOM_CONFIG.poolPageSize);
+  // Tier headers only over ONE position: a mixed list has no single ladder to group under.
+  const groups = useMemo(() => (position === ALL ? [{ header: null, rows: visible }] : groupByTier<PoolRow>(visible, (row) => row.player.id, tiers)), [position, visible, tiers]);
   // Only while a single position is selected: the note is about THAT position, and printing it over
   // the mixed ALL list would be attaching a claim to rows it is not about.
   const marketOrderNote = position === ALL ? null : marketOrderNoteFor(position as Position);
@@ -133,57 +149,67 @@ export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons,
         />
       ) : (
         <ol aria-label="Available players, best first" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-          {visible.map(({ player, rank }, index) => {
-            const adp = formatAdp(player.adp);
-            const bye = byeWeeks.get(player.nflTeam);
-            const gap = player.adp === null ? 0 : Math.round(player.adp) - rank;
-            const edges = edgeSummary(reasons.get(player.id) ?? []);
-            const queued = queuedPlayerIds.has(player.id);
-            return (
-              <DrawerRow
-                key={player.id}
-                leagueId={leagueId}
-                player={player}
-                rank={rank}
-                positionRank={ranks.get(player.id)}
-                highlight={index === 0}
-                onPeek={onPeek}
-                meta={
-                  <>
-                    {player.nflTeam}
-                    {bye === undefined ? "" : ` · Bye ${bye}`}
-                    {adp === null ? "" : ` · ${adp}`}
-                  </>
-                }
-                verdict={
-                  <>
-                    {/* The edge count is a desktop luxury: a 390pt row spends its width on the
-                        name, the meta and the verb, and the peek carries the edges. */}
-                    {edges === null ? null : (
-                      <span className="hidden md:inline">
-                        <Badge tone="neutral">{edges.split(" · ")[0]}</Badge>
-                      </span>
-                    )}
-                    {gap === 0 ? null : <Movement places={gap} against="the market" />}
-                  </>
-                }
-                actions={
-                  <>
-                    <Button size="sm" variant="ghost" disabled={submitting} aria-label={queued ? `Remove ${player.name} from your queue` : `Add ${player.name} to your queue`} onClick={() => onQueueToggle(player.id)}>
-                      <span aria-hidden="true" className={queued ? "text-accent" : "text-text-muted"}>
-                        {queued ? "★" : "☆"}
-                      </span>
-                    </Button>
-                    {canDraft ? (
-                      <Button size="sm" variant="verb" disabled={submitting} onClick={() => onDraft(player.id)}>
-                        Draft
+          {groups.flatMap((group, groupIndex) => [
+            ...(group.header === null
+              ? []
+              : [
+                  <li key={`tier:${group.header}`} data-testid="advisor-tier-header" className={`${MICRO_LABEL} px-2.5 pt-2 text-text-faint`}>
+                    {group.header}
+                  </li>,
+                ]),
+            ...group.rows.map(({ player, rank }, index) => {
+              const adp = formatAdp(player.adp);
+              const bye = byeWeeks.get(player.nflTeam);
+              const gap = player.adp === null ? 0 : Math.round(player.adp) - rank;
+              const edges = edgeSummary(reasons.get(player.id) ?? []);
+              const queued = queuedPlayerIds.has(player.id);
+              return (
+                <DrawerRow
+                  key={player.id}
+                  leagueId={leagueId}
+                  player={player}
+                  rank={rank}
+                  positionRank={ranks.get(player.id)}
+                  highlight={groupIndex === 0 && index === 0}
+                  onPeek={onPeek}
+                  meta={
+                    <>
+                      {player.nflTeam}
+                      {bye === undefined ? "" : ` · Bye ${bye}`}
+                      {adp === null ? "" : ` · ${adp}`}
+                    </>
+                  }
+                  verdict={
+                    <>
+                      {/* The edge count is a desktop luxury: a 390pt row spends its width on the
+                          name, the meta and the verb, and the peek carries the edges. */}
+                      {edges === null ? null : (
+                        <span className="hidden md:inline">
+                          <Badge tone="neutral">{edges.split(" · ")[0]}</Badge>
+                        </span>
+                      )}
+                      {gap === 0 ? null : <Movement places={gap} against="ADP" />}
+                      {odds === null ? null : <OddsPercent odds={odds} playerId={player.id} />}
+                    </>
+                  }
+                  actions={
+                    <>
+                      <Button size="sm" variant="ghost" disabled={submitting} aria-label={queued ? `Remove ${player.name} from your queue` : `Add ${player.name} to your queue`} onClick={() => onQueueToggle(player.id)}>
+                        <span aria-hidden="true" className={queued ? "text-accent" : "text-text-muted"}>
+                          {queued ? "★" : "☆"}
+                        </span>
                       </Button>
-                    ) : null}
-                  </>
-                }
-              />
-            );
-          })}
+                      {canDraft ? (
+                        <Button size="sm" variant="verb" disabled={submitting} onClick={() => onDraft(player.id)}>
+                          Draft
+                        </Button>
+                      ) : null}
+                    </>
+                  }
+                />
+              );
+            }),
+          ])}
         </ol>
       )}
       {rows.length > visible.length ? (

@@ -210,10 +210,10 @@ test.describe("Player Dossier", () => {
     await expect(managerA.getByLabel("Role")).toBeVisible();
 
     // Real seeded numbers, not placeholders: the call card's own board points (now naming its own
-    // basis — fix round 1, IMPORTANT 8) and the market's own ADP-basis pick, both stated straight
-    // from this fixture's own `recordPreseasonProjections` row.
+    // basis — fix round 1, IMPORTANT 8) and the ADP-basis pick, both stated straight from this
+    // fixture's own `recordPreseasonProjections` row.
     await expect(managerA.getByLabel("The call")).toContainText("225 PPR pts");
-    await expect(managerA.getByLabel("The call")).toContainText("+18 points vs his price");
+    await expect(managerA.getByLabel("The call")).toContainText("+18 points vs his ADP");
   });
 
   test("the full page shows the uncapped dossier, an honest capsule fallback, and both scoring bases named", async ({ managerA }) => {

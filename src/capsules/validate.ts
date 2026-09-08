@@ -510,11 +510,11 @@ function promptNumbers(promptText: string): readonly number[] {
 }
 
 /**
- * WHAT A TEXT IS GRADED AGAINST — the seam between the two writers. A capsule read is grounded on
- * a player's facts (`groundingOf`); a draft advisor slot is grounded on the turn's own ledger and
- * the turn sheet it was prompted with (`src/draft-service/assistant/voice`). Both hand this one
- * shape in, so "anything the prompt renders is quotable" holds for either without the validator
- * knowing whose prompt it was.
+ * WHAT A TEXT IS GRADED AGAINST — the seam any writer grounds through. A capsule read is grounded
+ * on a player's facts (`groundingOf`); a second writer hands the same shape in (its own number and
+ * name ledgers plus the sheet it was prompted with), so "anything the prompt renders is quotable"
+ * holds for either without the validator knowing whose prompt it was. The draft advisor no longer
+ * writes prose (spec section 7), so the capsule writer is the one caller today.
  */
 export interface GroundingSource {
   readonly numberLedger: readonly number[];

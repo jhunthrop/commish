@@ -2,8 +2,9 @@ import Link from "next/link";
 import { RAIL_LABEL } from "@/components/ui/config";
 
 /**
- * DRAFT HQ'S SUB-NAV (spec §2): HQ · The Board · My Sheet · Simulator · Assistant · Market ·
- * Playbook, rendered by every page under `/app/draft/*`.
+ * DRAFT HQ'S SUB-NAV (spec §2): HQ · The Board · My Sheet · Simulator · Assistant · ADP ·
+ * Playbook, rendered by every page under `/app/draft/*`. The spec's "Market" section is named
+ * ADP here for what the screen shows (fantasy words, not trading words, founder 2026-09-07).
  *
  * A plain server component, not a client one: every page under this section already knows which
  * section it is (it is the route that rendered), so highlighting the "here" segment needs no
@@ -11,7 +12,7 @@ import { RAIL_LABEL } from "@/components/ui/config";
  * Passing `current` explicitly keeps this component usable from a server page with zero client
  * JS cost.
  */
-export type DraftSection = "hq" | "board" | "sheet" | "simulator" | "assistant" | "market" | "playbook";
+export type DraftSection = "hq" | "board" | "sheet" | "simulator" | "assistant" | "adp" | "playbook";
 
 interface SectionLink {
   readonly value: DraftSection;
@@ -25,7 +26,7 @@ const SECTIONS: readonly SectionLink[] = [
   { value: "sheet", href: "/app/draft/sheet", label: "My Sheet" },
   { value: "simulator", href: "/app/draft/simulator", label: "Simulator" },
   { value: "assistant", href: "/app/draft/assistant", label: "Assistant" },
-  { value: "market", href: "/app/draft/market", label: "Market" },
+  { value: "adp", href: "/app/draft/adp", label: "ADP" },
   { value: "playbook", href: "/app/draft/playbook", label: "Playbook" },
 ];
 

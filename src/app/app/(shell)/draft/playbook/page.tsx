@@ -27,7 +27,7 @@ const BUILD_TITLE: Readonly<Record<BuildLabel, string>> = {
 
 const BUILD_CLAIM: Readonly<Record<BuildLabel, string>> = {
   "hero-RB": "One running back early, then the board's own best player every round after.",
-  "zero-RB": "Fade running back through the first three rounds, on purpose.",
+  "zero-RB": "No running back through the first three rounds, on purpose.",
   "robust-RB": "Two or more running backs inside the first three rounds.",
   "early-TE": "A tight end inside the first two rounds, ahead of the room.",
   "late-QB": "No quarterback drafted anywhere in the first six rounds.",

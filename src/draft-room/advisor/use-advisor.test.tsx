@@ -4,30 +4,15 @@ import type { ReactNode } from "react";
 import type { AdvisorView } from "@/draft-service/assistant/view";
 import { DraftRoomDepsProvider, type DraftRoomDeps } from "../hooks/deps";
 import { resetAdvisorMemoryForTests } from "./advisor-memory";
+import { advisorView } from "./test-view";
 import { advisorRoomKey, foldLandedView, useAdvisor } from "./use-advisor";
 
 function jsonOf(body: unknown): Response {
   return { json: async () => body } as unknown as Response;
 }
 
-function view(computedAtPick: number, onTheClock: boolean, voiceStatus: AdvisorView["voice"]["status"] = "absent"): AdvisorView {
-  return {
-    pickNumber: computedAtPick,
-    onTheClock,
-    picksUntilYourTurn: 0,
-    teamCount: 10,
-    stamp: { computedAtPick, sequence: computedAtPick },
-    now: [],
-    plan: { computedAtPick, runs: 200, horizon: 3, reachFloor: 0.25, turns: [] },
-    signals: { run: null, collapses: [], ahead: [] },
-    yourBuild: [],
-    winningBuilds: null,
-    computedBasis: "gen1",
-    names: {},
-    strategyTemplate: "The board is quiet.",
-    voice: { status: voiceStatus, strategy: null, reasons: {} },
-    ledger: { numbers: [], names: [] },
-  };
+function view(computedAtPick: number, onTheClock: boolean): AdvisorView {
+  return advisorView({ pickNumber: computedAtPick, onTheClock, stamp: { computedAtPick, sequence: computedAtPick } });
 }
 
 const wrapper = (deps: DraftRoomDeps) =>
@@ -38,19 +23,16 @@ const wrapper = (deps: DraftRoomDeps) =>
 const noopSource = () => ({ addEventListener: () => {}, close: () => {} });
 
 describe("foldLandedView", () => {
-  it("latches the on-clock view and rolls the previous plan only when the room moved", () => {
-    const empty = { view: null, prePickView: null, previousPlan: null };
+  it("latches the on-clock view only when the room moved", () => {
+    const empty = { view: null, prePickView: null };
     const first = foldLandedView(empty, view(4, true));
     expect(first.prePickView).toBeNull();
-    const repoll = foldLandedView(first, view(4, true, "ready"));
-    expect(repoll.prePickView).toBeNull();
-    expect(repoll.previousPlan).toBeNull();
-    const moved = foldLandedView(repoll, view(5, false));
+    const repeat = foldLandedView(first, view(4, true));
+    expect(repeat.prePickView).toBeNull();
+    const moved = foldLandedView(repeat, view(5, false));
     expect(moved.prePickView?.stamp.computedAtPick).toBe(4);
-    expect(moved.previousPlan?.computedAtPick).toBe(4);
     const later = foldLandedView(moved, view(6, false));
     expect(later.prePickView?.stamp.computedAtPick).toBe(4);
-    expect(later.previousPlan?.computedAtPick).toBe(5);
   });
 });
 
@@ -70,7 +52,7 @@ describe("useAdvisor", () => {
     expect(fetchJson).toHaveBeenCalledTimes(1);
   });
 
-  it("recomputes on every room key change (a pick landing), keeping the previous view on screen while it flies", async () => {
+  it("recomputes on a room key change, keeping the previous view on screen while it flies", async () => {
     let release: ((response: Response) => void) | null = null;
     let calls = 0;
     const fetchJson = vi.fn(() => {
@@ -84,8 +66,6 @@ describe("useAdvisor", () => {
     const { result, rerender } = renderHook(({ key }) => useAdvisor("d1", key, "t1"), { wrapper: wrapper(deps), initialProps: { key: advisorRoomKey(2, 3) } });
     await waitFor(() => expect(result.current.view?.stamp.computedAtPick).toBe(3));
 
-    // Another seat's pick lands: the pick number the advisor answers for is unchanged (3 is still
-    // this seat's next turn) but the room moved, so the advisor recomputes.
     rerender({ key: advisorRoomKey(3, 3) });
     await waitFor(() => expect(result.current.recomputing).toBe(true));
     expect(result.current.view?.stamp.computedAtPick).toBe(3);
@@ -97,31 +77,35 @@ describe("useAdvisor", () => {
     expect(fetchJson).toHaveBeenCalledTimes(2);
   });
 
-  it("re-polls while the writer is pending, and stops once it lands", async () => {
-    vi.useFakeTimers();
-    try {
-      const bodies = [view(4, true, "pending"), view(4, true, "ready"), view(4, true, "ready")];
-      let index = 0;
-      const fetchJson = vi.fn(async () => jsonOf({ ok: true, data: bodies[Math.min(index++, bodies.length - 1)] }));
-      const deps: DraftRoomDeps = { fetchJson, openEventSource: noopSource };
-      const { result } = renderHook(() => useAdvisor("d1", advisorRoomKey(3, 4), "t1"), { wrapper: wrapper(deps) });
-      await act(async () => {
-        await Promise.resolve();
-      });
-      expect(result.current.view?.voice.status).toBe("pending");
-      await act(async () => {
-        vi.advanceTimersByTime(3_000);
-        await Promise.resolve();
-      });
-      expect(fetchJson).toHaveBeenCalledTimes(2);
-      expect(result.current.view?.voice.status).toBe("ready");
-      await act(async () => {
-        vi.advanceTimersByTime(10_000);
-      });
-      expect(fetchJson).toHaveBeenCalledTimes(2);
-    } finally {
-      vi.useRealTimers();
-    }
+  it("coalesces pick events that land while a request is in flight into exactly one follow-up request", async () => {
+    const pending: ((response: Response) => void)[] = [];
+    const fetchJson = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    const deps: DraftRoomDeps = { fetchJson, openEventSource: noopSource };
+    const { result, rerender } = renderHook(({ key }) => useAdvisor("d1", key, "t1"), { wrapper: wrapper(deps), initialProps: { key: "0:1" } });
+    expect(fetchJson).toHaveBeenCalledTimes(1);
+    // Three picks land while the first request is still out.
+    rerender({ key: "1:2" });
+    rerender({ key: "2:3" });
+    rerender({ key: "3:4" });
+    expect(fetchJson).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      pending[0]!(jsonOf({ ok: true, data: view(2, false) }));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(2));
+    expect(result.current.recomputing).toBe(true);
+    await act(async () => {
+      pending[1]!(jsonOf({ ok: true, data: view(4, false) }));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(result.current.recomputing).toBe(false));
+    expect(result.current.view?.stamp.computedAtPick).toBe(4);
+    expect(fetchJson).toHaveBeenCalledTimes(2);
   });
 
   it("survives a remount through the module memory, latch included", async () => {

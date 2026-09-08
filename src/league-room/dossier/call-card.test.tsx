@@ -15,27 +15,27 @@ function gapEl(container: HTMLElement) {
 }
 
 describe("CallCard", () => {
-  it("prints all three price columns with their stated bases", () => {
-    const { container } = render(<CallCard verdict="The market is overpricing him." market={MARKET} ourBoard={OUR_BOARD} gap={-20} />);
+  it("prints all three columns with their stated bases", () => {
+    const { container } = render(<CallCard verdict="He is a reach where he is going." market={MARKET} ourBoard={OUR_BOARD} gap={-20} />);
     expect(container.textContent).toContain("pick 24.3");
     expect(container.textContent).toContain("experts 23rd");
     expect(container.textContent).toContain("WR24");
     expect(container.textContent).toContain("54th overall");
     expect(container.textContent).toContain("197 PPR pts");
-    expect(container.textContent).toContain("-20 points vs his price");
+    expect(container.textContent).toContain("-20 points vs his ADP");
   });
 
   it("colors the verdict and the gap column negative when the gap is negative", () => {
-    const { container } = render(<CallCard verdict="Fade." market={MARKET} ourBoard={OUR_BOARD} gap={-20} />);
+    const { container } = render(<CallCard verdict="Let him go." market={MARKET} ourBoard={OUR_BOARD} gap={-20} />);
     expect(verdictEl(container)).toHaveClass("text-negative");
     expect(gapEl(container)).toHaveClass("text-negative");
   });
 
   it("colors the verdict and the gap column positive when the gap is positive", () => {
-    const { container } = render(<CallCard verdict="Buy." market={MARKET} ourBoard={OUR_BOARD} gap={20} />);
+    const { container } = render(<CallCard verdict="Draft him." market={MARKET} ourBoard={OUR_BOARD} gap={20} />);
     expect(verdictEl(container)).toHaveClass("text-positive");
     expect(gapEl(container)).toHaveClass("text-positive");
-    expect(container.textContent).toContain("+20 points vs his price");
+    expect(container.textContent).toContain("+20 points vs his ADP");
   });
 
   it("takes no verdict tint for a genuine zero gap or an absent one", () => {
@@ -46,7 +46,7 @@ describe("CallCard", () => {
     const unpriced = render(<CallCard verdict={null} market={MARKET} ourBoard={OUR_BOARD} gap={null} />);
     expect(verdictEl(unpriced.container)).toBeNull();
     expect(gapEl(unpriced.container)).toHaveClass("text-text-muted");
-    expect(unpriced.container.textContent).toContain("Not priced by the market.");
+    expect(unpriced.container.textContent).toContain("No ADP to compare against.");
   });
 
   it("renders the talent-vs-games sentence only when the per-game rank and expected games both exist", () => {
@@ -67,7 +67,7 @@ describe("CallCard", () => {
   });
 
   it("follows the copy rules — no em-dash, no semicolon — in every sentence it composes itself", () => {
-    const { container } = render(<CallCard verdict="The market is overpricing him." market={MARKET} ourBoard={OUR_BOARD} gap={-20} />);
+    const { container } = render(<CallCard verdict="He is a reach where he is going." market={MARKET} ourBoard={OUR_BOARD} gap={-20} />);
     const verdict = verdictEl(container)!.textContent!;
     const gap = gapEl(container)!.textContent!;
     const talent = container.querySelector('[data-call="talent-vs-games"]')!.textContent!;
@@ -78,7 +78,7 @@ describe("CallCard", () => {
   });
 
   it("renders axe-clean in both themes", async () => {
-    await renderSurface(<CallCard verdict="The market is overpricing him." market={MARKET} ourBoard={OUR_BOARD} gap={-20} />, async ({ container }) => {
+    await renderSurface(<CallCard verdict="He is a reach where he is going." market={MARKET} ourBoard={OUR_BOARD} gap={-20} />, async ({ container }) => {
       expect(await axe(container)).toHaveNoViolations();
     });
   });

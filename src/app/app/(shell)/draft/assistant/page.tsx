@@ -27,8 +27,8 @@ export default function DraftAssistantPage() {
       <div className="flex flex-col gap-1">
         <PageTitle>Assistant</PageTitle>
         <p className="max-w-prose text-sm text-text-muted">
-          The advisor reads the room after every pick: the plan for your next three turns, what the seats ahead of you are likely to take, and the
-          picks for right now, each one a Draft or a Queue away. Step through a replayed room below and try both.
+          The advisor reads the room after every pick and hands you one card: the next pick to make, why, and the odds he is still there at
+          your next turn, a Draft or a Queue away. Every player on the board carries the same odds. Step through a replayed room below and try both.
         </p>
       </div>
       <AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />

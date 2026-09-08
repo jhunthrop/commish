@@ -89,9 +89,9 @@ describe("renderTemplateCapsule", () => {
     expect(text).not.toContain("+2.4");
   });
 
-  it("keeps the no-ADP sentence: the one drafting fact no other surface states", () => {
+  it("keeps the no-ADP sentence: the one ADP fact no other surface states", () => {
     const facts = buildPlayerFacts({ ...baseInput(), market: { adp: null, positionAdp: null, boardRank: 14 } });
-    expect(renderTemplateCapsule(facts)).toContain("No ADP on file for him: drafters are not taking him yet.");
+    expect(renderTemplateCapsule(facts)).toContain("He has no ADP.");
   });
 
   it("states a genuinely clean read, dated, distinct from 'never checked'", () => {
@@ -104,7 +104,7 @@ describe("renderTemplateCapsule", () => {
   it("states a missing ADP honestly rather than a fabricated one", () => {
     const facts = buildPlayerFacts(baseInput({ market: { adp: null, positionAdp: null, boardRank: 14 } }));
     const text = renderTemplateCapsule(facts);
-    expect(text).toContain("No ADP on file for him: drafters are not taking him yet.");
+    expect(text).toContain("He has no ADP.");
   });
 
   it("states the real injury designation when present", () => {

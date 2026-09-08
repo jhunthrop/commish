@@ -6,6 +6,7 @@ import type { DraftStateView } from "@/draft-engine";
 import type { BoardReason } from "@/projections/preseason/board";
 import type { Law } from "@/projections/laws/types";
 import { PositionBadge } from "@/components/ui";
+import type { UseAdvisorResult } from "../../advisor/use-advisor";
 import type { DraftRoom as DraftRoomState } from "../../hooks/use-draft-room";
 import type { CheatSheet } from "../state/sheet";
 import type { Lens } from "../state/lens";
@@ -76,6 +77,8 @@ export interface MobileRoomProps {
   readonly onStartServerSheet: () => void;
   /** The room-lifetime season-history cache, shared with the desktop tree. */
   readonly historyCache: PlayerHistoryCache;
+  /** The room's one advisor fetch, shared with the desktop tree. */
+  readonly advisor: UseAdvisorResult;
 }
 
 /**
@@ -86,7 +89,8 @@ export interface MobileRoomProps {
  * sheet — and then the same undo window desktop gets.
  */
 export function MobileRoom(props: MobileRoomProps) {
-  const { room, view, playersById, myTurn, acts, pending, onUndo, clockLabel } = props;
+  const { room, view, playersById, myTurn, acts, pending, onUndo, clockLabel, advisor } = props;
+  const odds = advisor.view?.odds ?? null;
   const [tab, setTab] = useState<MobileTab>("pool");
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [peekId, setPeekId] = useState<string | null>(null);
@@ -171,21 +175,20 @@ export function MobileRoom(props: MobileRoomProps) {
             byeWeeks={props.byeWeeks}
             reasons={props.reasons}
             focusSearch={false}
+            odds={odds}
+            tiers={advisor.view?.tiers ?? {}}
             {...mobileActs}
           />
         ) : tab === "assistant" ? (
           <DrawerAssistantTab
-            draftId={view.draftId}
             view={view}
             myTeamId={room.myTeamId}
-            teams={room.teams}
+            advisor={advisor}
             playersById={playersById}
             queue={room.queue}
             byeWeeks={props.byeWeeks}
-            laws={props.laws}
             canDraft={mobileActs.canDraft}
             submitting={mobileActs.submitting}
-            queuedPlayerIds={mobileActs.queuedPlayerIds}
             onDraft={mobileActs.onDraft}
             onQueueToggle={mobileActs.onQueueToggle}
           />
@@ -205,6 +208,7 @@ export function MobileRoom(props: MobileRoomProps) {
             onPeek={mobileActs.onPeek}
             hasServerSheet={props.hasServerSheet}
             onStartServerSheet={props.onStartServerSheet}
+            odds={odds}
           />
         ) : tab === "roster" ? (
           <DrawerRosterTab view={view} myTeamId={room.myTeamId} playersById={playersById} onPeek={mobileActs.onPeek} />

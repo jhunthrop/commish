@@ -23,6 +23,22 @@ describe("Badge", () => {
     expect(screen.getAllByText("Live")[1]!.className).toMatch(/ring-accent-glow/);
   });
 
+  it("fills softly with the tone's own tint when soft is set, and never tints accent", () => {
+    render(
+      <Badge tone="positive" soft>
+        Safe
+      </Badge>,
+    );
+    expect(screen.getByText("Safe").className).toMatch(/bg-positive\/10/);
+    expect(screen.getByText("Safe").className).toMatch(/text-positive/);
+    render(
+      <Badge tone="accent" soft>
+        Money
+      </Badge>,
+    );
+    expect(screen.getByText("Money").className).not.toMatch(/bg-accent/);
+  });
+
   it("ignores glow on a tone with no glow token", () => {
     render(
       <Badge tone="neutral" glow>

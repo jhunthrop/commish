@@ -10,43 +10,55 @@ describe("verdictLine", () => {
     expect(verdictLine([], "WR")).toBeNull();
   });
 
-  it("under-priced: the market undervalues the evidence", () => {
+  it("going later than he should: drafters undervalue the evidence", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_anchor", marketPoints: 200, delta: 14.2 }, SCARCITY];
     const line = verdictLine(reasons, "WR");
-    expect(line).toContain("The market is underpricing him");
-    expect(line).toContain("worth about 14 more points");
+    expect(line).toContain("He is going later than he should");
+    expect(line).toContain("worth about 14 more points than where he is being drafted");
     expect(line).toContain("He sits WR21.");
   });
 
-  it("over-priced: the market overvalues the evidence", () => {
+  it("a reach: drafters overvalue the evidence", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_anchor", marketPoints: 200, delta: -9.5 }, SCARCITY];
     const line = verdictLine(reasons, "RB");
-    expect(line).toContain("The market is overpricing him");
-    expect(line).toContain("about 9 points under his price");
+    expect(line).toContain("He is a reach where he is going");
+    expect(line).toContain("about 9 points under his draft slot");
   });
 
-  it("fairly-priced: a delta inside the band reads as agreement, not a direction", () => {
+  it("about right: a delta inside the band reads as agreement, not a direction", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_anchor", marketPoints: 200, delta: FAIR_PRICE_BAND_POINTS - 1 }, SCARCITY];
     const line = verdictLine(reasons, "TE");
-    expect(line).toContain("about right");
-    expect(line).not.toContain("underpricing");
-    expect(line).not.toContain("overpricing");
+    expect(line).toContain("Drafters have him about right");
+    expect(line).not.toContain("going later than he should");
+    expect(line).not.toContain("a reach");
   });
 
   it("a delta exactly at the band edge still counts as a stated direction, not \"about right\" (the band is < not <=)", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_anchor", marketPoints: 200, delta: FAIR_PRICE_BAND_POINTS }, SCARCITY];
-    expect(verdictLine(reasons, "TE")).toContain("underpricing");
+    expect(verdictLine(reasons, "TE")).toContain("going later than he should");
   });
 
-  it("no-market, with a position rank on record: the evidence alone states his rank", () => {
+  it("no ADP, with a position rank on record: the evidence alone states his rank", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_unlisted" }, SCARCITY];
     const line = verdictLine(reasons, "RB");
-    expect(line).toBe("The evidence makes him RB21. The market has not priced him.");
+    expect(line).toBe("The evidence makes him RB21. He has no ADP.");
   });
 
-  it("no-market, with nothing else on record either: the honest last resort", () => {
+  it("no ADP, with nothing else on record either: the honest last resort", () => {
     const reasons: readonly BoardReason[] = [{ code: "rookie", overallPick: 42, landingMultiplier: 1 }];
-    expect(verdictLine(reasons, "RB")).toBe("The market has not priced him. The evidence stands alone.");
+    expect(verdictLine(reasons, "RB")).toBe("He has no ADP. The evidence stands alone.");
+  });
+
+  /** Fantasy words, not trading words (founder, 2026-09-07): no branch says market or price. */
+  it("speaks in fantasy football's own words on every branch", () => {
+    const branches = [
+      verdictLine([{ code: "market_anchor", marketPoints: 200, delta: 14.2 }, SCARCITY], "WR"),
+      verdictLine([{ code: "market_anchor", marketPoints: 200, delta: -9.5 }, SCARCITY], "RB"),
+      verdictLine([{ code: "market_anchor", marketPoints: 200, delta: 1 }, SCARCITY], "TE"),
+      verdictLine([{ code: "market_unlisted" }, SCARCITY, TIER_CLIFF], "WR"),
+      verdictLine([{ code: "rookie", overallPick: 42, landingMultiplier: 1 }], "RB"),
+    ];
+    for (const line of branches) expect(line).not.toMatch(/\b(market|price|priced|pricing)\b/i);
   });
 
   it("a tier cliff supersedes the plain position-rank supporting clause", () => {
@@ -56,19 +68,19 @@ describe("verdictLine", () => {
     expect(line).not.toContain("He sits WR21");
   });
 
-  it("a tier cliff also supports the no-market branch", () => {
+  it("a tier cliff also supports the no-ADP branch", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_unlisted" }, SCARCITY, TIER_CLIFF];
     const line = verdictLine(reasons, "WR");
-    expect(line).toBe("The evidence makes him WR21. The market has not priced him. Three left in his tier before a 4.2 point drop.");
+    expect(line).toBe("The evidence makes him WR21. He has no ADP. Three left in his tier before a 4.2 point drop.");
   });
 
   it("leads with the written call when the capsule has one, and keeps the measured facts under it", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_anchor", marketPoints: 200, delta: -9.5 }, SCARCITY, TIER_CLIFF];
-    const line = verdictLine(reasons, "RB", { call: "He is the engine of that offense and the price has not caught up." })!;
+    const line = verdictLine(reasons, "RB", { call: "He is the engine of that offense and the room has not caught up." })!;
 
-    expect(line.startsWith("He is the engine of that offense and the price has not caught up.")).toBe(true);
+    expect(line.startsWith("He is the engine of that offense and the room has not caught up.")).toBe(true);
     // Nothing measured leaves the page in exchange for voice.
-    expect(line).toContain("The market is overpricing him");
+    expect(line).toContain("He is a reach where he is going");
     expect(line).toContain("Three left in his tier before a 4.2 point drop.");
   });
 

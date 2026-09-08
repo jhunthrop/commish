@@ -6,7 +6,12 @@ import { PlayerPeekHost } from "@/league-room/components/player-peek";
 import { PLAYERS } from "../../test-fixtures";
 import { DrawerPoolTab } from "./drawer-pool-tab";
 
-function mount() {
+interface MountOptions {
+  readonly odds?: Parameters<typeof DrawerPoolTab>[0]["odds"];
+  readonly tiers?: Parameters<typeof DrawerPoolTab>[0]["tiers"];
+}
+
+function mount(options: MountOptions = {}) {
   render(
     <LeagueRoomDepsProvider deps={{ fetchJson: () => new Promise(() => {}), openEventSource: () => ({ addEventListener: () => {}, close: () => {} }) }}>
       <PlayerPeekHost />
@@ -17,6 +22,8 @@ function mount() {
         byeWeeks={new Map()}
         reasons={new Map()}
         focusSearch={false}
+        odds={options.odds}
+        tiers={options.tiers}
         canDraft
         submitting={false}
         queuedPlayerIds={new Set()}
@@ -81,7 +88,7 @@ describe("DrawerPoolTab — a position with no projection says so", () => {
     });
     const note = screen.getByTestId("market-order-note");
     expect(note.textContent).toContain("Kickers");
-    expect(note.textContent).toContain("usually drafted");
+    expect(note.textContent).toContain("ranked by ADP");
   });
 
   it("shows nothing when a projected position's filter is on", () => {
@@ -90,5 +97,39 @@ describe("DrawerPoolTab — a position with no projection says so", () => {
       fireEvent.click(screen.getByRole("button", { name: "Show WR only" }));
     });
     expect(screen.queryByTestId("market-order-note")).not.toBeInTheDocument();
+  });
+});
+
+describe("DrawerPoolTab — the advisor's odds on every row (simplification round)", () => {
+  const odds = { pickNumber: 20, runs: 200, survived: Object.fromEntries(PLAYERS.map((player, index) => [player.id, index === 0 ? 40 : 180])) };
+
+  it("prints no odds and no tier headers until the advisor has some", () => {
+    mount();
+    expect(screen.queryAllByTestId("advisor-odds-pct")).toHaveLength(0);
+    expect(screen.queryAllByTestId("advisor-tier-header")).toHaveLength(0);
+  });
+
+  it("prints a banded percentage on every row with the runs in its tooltip", () => {
+    mount({ odds });
+    const chips = screen.getAllByTestId("advisor-odds-pct");
+    expect(chips).toHaveLength(PLAYERS.length);
+    expect(chips[0]).toHaveTextContent("20%");
+    expect(chips[0]).toHaveAttribute("data-band", "reach");
+    expect(chips[0]).toHaveAttribute("title", "still there at your next pick, 40 of 200 runs");
+    expect(chips[1]).toHaveAttribute("data-band", "safe");
+  });
+
+  it("groups one position under its tier headers, board order kept inside a tier, and none over the mixed list", () => {
+    const position = PLAYERS[0]!.position;
+    const same = PLAYERS.filter((player) => player.position === position);
+    const tiers = Object.fromEntries(same.map((player, index) => [player.id, { tier: index === 0 ? 2 : 1, left: 1, size: 2 }]));
+    mount({ odds, tiers });
+    expect(screen.queryAllByTestId("advisor-tier-header")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: `Show ${position} only` }));
+    const headers = screen.getAllByTestId("advisor-tier-header");
+    expect(headers.map((header) => header.textContent)).toEqual(same.length > 1 ? ["Tier 1, 1 of 2 left", "Tier 2, 1 of 2 left"] : ["Tier 2, 1 of 2 left"]);
+    const list = screen.getByRole("list", { name: "Available players, best first" });
+    const order = [...list.querySelectorAll('[data-testid="drawer-row"], [data-testid="advisor-tier-header"]')].map((node) => node.getAttribute("data-testid"));
+    expect(order[0]).toBe("advisor-tier-header");
   });
 });

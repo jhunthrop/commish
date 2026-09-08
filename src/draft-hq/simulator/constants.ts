@@ -13,7 +13,7 @@
  */
 export const SIM_RUN_OPTIONS = [100, 1_000, 10_000] as const;
 
-/** How tightly the room drafts to market ADP: casual reaches, sharp takes the market in order. */
+/** How tightly the room drafts to ADP: casual reaches, sharp takes the board in ADP order. */
 export const SIM_SHARPNESS = { casual: 0, mixed: 0.5, sharp: 1 } as const;
 export type SimSharpnessName = keyof typeof SIM_SHARPNESS;
 
