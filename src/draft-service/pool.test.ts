@@ -249,15 +249,17 @@ describe("rankedPlayers", () => {
 
   it("skips a stat line whose player is missing from the roster read, rather than throwing", async () => {
     // `playerStatLines.playerId` is a NOT NULL foreign key to `players.id` ON DELETE CASCADE —
-    // through real Postgres a stat line can never outlive its player. The two reads
-    // (`roster`, `lines`) are still two independent SELECTs rather than one JOIN, so the guard
-    // stays defensive; a stub `Db` is the only way to put it in the state it defends against.
+    // through real Postgres a stat line can never outlive its player, and the season-totals
+    // aggregate joins `players` besides. The roster read and the totals read are still two
+    // independent statements, so the guard stays defensive; a stub `Db` is the only way to put
+    // it in the state it defends against.
+    const ghostTotals = { playerId: "ghost", defenseTierPoints: 0, ...zeroLine, twoPointConversions: 0, fieldGoalsMissed: 0, extraPointsMissed: 0, kickReturnTouchdowns: 0, puntReturnTouchdowns: 0, defensiveFumblesRecovered: 0, safeties: 0, rushingYards: 999 };
     const stubDb = {
       select: () => ({
         from: (table: unknown) => {
           if (table === players) return Promise.resolve([]);
           if (table === scoringSettings) return { where: () => Promise.resolve([]) };
-          if (table === playerStatLines) return { where: () => Promise.resolve([{ ...zeroLine, playerId: "ghost", week: 1, rushingYards: 999 }]) };
+          if (table === playerStatLines) return { innerJoin: () => ({ where: () => ({ groupBy: () => Promise.resolve([ghostTotals]) }) }) };
           return Promise.resolve([]);
         },
       }),

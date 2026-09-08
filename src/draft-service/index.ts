@@ -3,7 +3,7 @@ import { isLLMEnabled, getLlmClient } from "@/lib/llm/client";
 import { getPublisher } from "@/lib/realtime/publisher";
 import type { PublishFn } from "./store";
 import { createMockBotDriver, type MockBotDriver } from "@/mock-draft-service/driver";
-import { createDraftAdvancer, draftLoopTarget, runDraftAdvanceLoop, type DraftAdvancer } from "./advance";
+import { createDraftAdvancer, draftLoopTarget, runDraftAdvanceLoop, type AdvanceLoopHandle, type DraftAdvancer } from "./advance";
 import { createNudgeScheduler, type NudgeScheduler } from "./nudge";
 import { createNudgeCopy } from "./nudge-copy";
 import { createDraftStore, type DraftStore } from "./store";
@@ -156,18 +156,20 @@ export async function advanceDraftNow(draftId: string): Promise<void> {
 /**
  * THE SSE STREAM'S TICK (driver 2): called by the league events route as it accepts a
  * connection. Resolves the league's draft and — while it still has work to ever do — runs the
- * advance loop until the client disconnects or the draft completes. Fire-and-forget and
- * never-throwing for the same reason `advanceDraftNow` is: the stream must open regardless.
+ * advance loop until the client disconnects or the draft completes, handing back the handle the
+ * route wakes with each draft frame it relays. Never-throwing for the same reason
+ * `advanceDraftNow` is: the stream must open regardless; `null` means no loop runs.
  */
-export async function startDraftAdvanceLoopForLeague(leagueId: string, signal: AbortSignal): Promise<void> {
+export async function startDraftAdvanceLoopForLeague(leagueId: string, signal: AbortSignal): Promise<AdvanceLoopHandle | null> {
   try {
-    // `draftLoopTarget` owns the terminal-status gate (complete AND dissolved — fix round
-    // MEDIUM 2), so this wrapper stays pure wiring.
-    const draftId = await draftLoopTarget(getDb(), leagueId);
-    if (draftId === null) return;
-    runDraftAdvanceLoop(draftId, signal, { advance: getDraftAdvancer().advance, clock: systemClock });
+    // `draftLoopTarget` owns the terminal-status and distant-kickoff gates, so this wrapper
+    // stays pure wiring.
+    const draftId = await draftLoopTarget(getDb(), leagueId, systemClock.now());
+    if (draftId === null) return null;
+    return runDraftAdvanceLoop(draftId, signal, { advance: getDraftAdvancer().advance, clock: systemClock });
   } catch (error: unknown) {
     console.error("[draft] could not start the stream's advance loop", { leagueId }, error);
+    return null;
   }
 }
 

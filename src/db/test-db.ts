@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { afterAll, expect } from "vitest";
 import { resetRankedPlayersCacheForTests } from "@/draft-service/pool";
+import { invalidateAllTtlMemosForTests } from "@/lib/cache/ttl-memo";
 import { envOr } from "@/lib/env";
 import { createDb, type Db } from "./client";
 import { DB_POOL_CONFIG } from "./config";
@@ -73,6 +74,8 @@ export async function truncateAll(db: Db): Promise<void> {
   // across `it` blocks under a fresh seed each time. Without this, a cache entry built before
   // this truncate would outlive the data it was computed from.
   resetRankedPlayersCacheForTests();
+  // The reference memos (`createTtlMemo`) outlive a truncate for the identical reason.
+  invalidateAllTtlMemosForTests();
 }
 
 /**

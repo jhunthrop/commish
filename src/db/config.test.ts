@@ -41,4 +41,9 @@ describe("connection-pool budget", () => {
   it("uses the computed budget as the default pool size", () => {
     expect(DB_POOL_CONFIG.defaultMaxConnections).toBe(requestPoolSizePerInstance());
   });
+
+  it("pins the serverless pool well under the long-lived budget, with every timeout set (finding 8)", () => {
+    expect(DB_POOL_CONFIG.vercel).toEqual({ maxConnections: 5, idleTimeoutSeconds: 20, connectTimeoutSeconds: 10, maxLifetimeSeconds: 1800 });
+    expect(DB_POOL_CONFIG.vercel.maxConnections).toBeLessThan(requestPoolSizePerInstance());
+  });
 });

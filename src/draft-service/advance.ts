@@ -1,6 +1,6 @@
-import { and, eq, lte } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, mockRooms } from "@/db/schema";
+import { drafts, leagues, mockRooms } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import { currentDeadline, type DraftState } from "@/draft-engine";
@@ -40,6 +40,12 @@ import type { ApplyResult, DraftStore } from "./store";
  * A losing racer's duplicate action is refused harmlessly; the loop treats any refusal as "the
  * other driver got there first", reloads fresh state, and stops after two consecutive refusals
  * rather than ever spinning.
+ *
+ * NEXT DUE INSTANT (Neon cost audit 2026-09-07, findings 1 and 2): every outcome names the next
+ * instant this draft owes work — the running clock's deadline, a bot's seeded due pick if
+ * earlier, or a scheduled draft's kickoff — so the drivers can SLEEP until it instead of polling.
+ * The SSE loop arms a timer on it, the sweep registers it in the wake set, and neither touches
+ * Postgres again before it passes.
  */
 /**
  * The tri-state a caller steers by (fix round HIGH 1): `"ok"` — the call ran to a quiet end
@@ -65,6 +71,13 @@ export interface AdvanceOutcome {
    *  `[draft] advance wedged` line, distinct from every benign path, for alerting to grep; the
    *  sweep job counts these in its step detail. Full dead-lettering is out of scope (spec). */
   readonly wedged: boolean;
+  /** ISO instant of the next work this draft owes, or null when none is known (terminal, errored,
+   *  exhausted with work still due — which is "now" — or a draft with no running clock). */
+  readonly nextDueAt: string | null;
+  /** The log sequence the draft stood at when this call ended, or null when it had no state to
+   *  report. The watcher loop compares it against the sequence a stream frame carries, so a frame
+   *  announcing its own action never wakes it. */
+  readonly sequence: number | null;
 }
 
 export interface DraftAdvancer {
@@ -89,7 +102,23 @@ export interface DraftAdvancerDeps {
   readonly maxActionsPerAdvance?: number;
 }
 
-type DeferredStart = "started" | "raced" | "not-due";
+type DeferredStart = "started" | "raced" | { readonly notDueUntilMs: number | null };
+
+type NextDue = { readonly kind: "applied"; readonly dueWork: string; readonly result: ApplyResult } | { readonly kind: "waiting"; readonly dueAtMs: number | null };
+
+interface DueLoopResult {
+  readonly state: DraftState;
+  readonly applied: number;
+  readonly exhausted: boolean;
+  readonly wedged: boolean;
+  readonly nextDueAt: string | null;
+}
+
+const isoOrNull = (ms: number | null): string | null => (ms === null ? null : new Date(ms).toISOString());
+
+function report(draftId: string, applied: number, partial: Partial<AdvanceOutcome>): AdvanceOutcome {
+  return { draftId, applied, exhausted: false, phase: null, outcome: "ok", wedged: false, nextDueAt: null, sequence: null, ...partial };
+}
 
 export function createDraftAdvancer({
   db,
@@ -108,14 +137,13 @@ export function createDraftAdvancer({
    * seats full), so a private league is never touched and a short public room is never started
    * — and then the identical `startDraft({ auto: true })` seam the platform's own scan uses.
    * Kickoff ROLLS stay with the sweep's `autoStartDueDrafts`: a read must not move a kickoff.
+   * A not-due answer carries the instant the room becomes due, for the drivers' timers.
    */
-  async function startIfDue(state: DraftState, now: string): Promise<DeferredStart> {
+  async function startIfDue(state: DraftState, now: string, kickoffAt: Date): Promise<DeferredStart> {
     if (state.config.isMock === true) {
-      const [room] = await db
-        .select({ leagueId: mockRooms.leagueId })
-        .from(mockRooms)
-        .where(and(eq(mockRooms.leagueId, state.config.leagueId), lte(mockRooms.startsAt, new Date(Date.parse(now)))));
-      if (room === undefined) return "not-due";
+      const [room] = await db.select({ startsAt: mockRooms.startsAt }).from(mockRooms).where(eq(mockRooms.leagueId, state.config.leagueId));
+      if (room === undefined) return { notDueUntilMs: null };
+      if (room.startsAt.getTime() > Date.parse(now)) return { notDueUntilMs: room.startsAt.getTime() };
       const outcome = await startMockDraft(db, state.config.leagueId, { store, newId });
       if (outcome.ok) return "started";
       // A mapped 409 is the benign lost race (the T5 carry): another driver already produced
@@ -123,10 +151,10 @@ export function createDraftAdvancer({
       // logged here the way the ticker's due-scan lane reports its own non-benign failures.
       if (outcome.status === 409) return "raced";
       console.error("[draft] deferred mock start refused", { leagueId: state.config.leagueId, reason: outcome.reason });
-      return "not-due";
+      return { notDueUntilMs: null };
     }
     const due = await dueDraftsQuery(db, now, state.config.draftId);
-    if (due.length === 0) return "not-due";
+    if (due.length === 0) return { notDueUntilMs: kickoffAt.getTime() > Date.parse(now) ? kickoffAt.getTime() : null };
     const started = await store.startDraft(state.config.draftId, { auto: true });
     // `claimAutoStart` already lost to another instance, or the room emptied under the query —
     // either way the fresh state read below is the honest answer.
@@ -135,9 +163,11 @@ export function createDraftAdvancer({
 
   /** One due action: the bot's pick when a bot holds a due clock (its think-delay always
    *  elapses inside the turn's clock — the T1 guarantee, the same ordering `tickOne` keeps),
-   *  otherwise the clock's own expiry. Null when nothing is due yet; `dueWork` names what was
-   *  attempted so a wedged trip can say what the draft is stuck on (fix round MEDIUM 3). */
-  async function applyNextDue(state: DraftState, nowMs: number): Promise<{ readonly dueWork: string; readonly result: ApplyResult } | null> {
+   *  otherwise the clock's own expiry. `waiting` when nothing is due yet, carrying the earlier of
+   *  the bot's due instant and the deadline; `dueWork` names what was attempted so a wedged trip
+   *  can say what the draft is stuck on (fix round MEDIUM 3). */
+  async function applyNextDue(state: DraftState, nowMs: number): Promise<NextDue> {
+    let botDueAtMs: number | null = null;
     if (state.config.isMock === true) {
       const due = await mockDriver.dueBotPick(state);
       if (due !== null && due.dueAtMs <= nowMs) {
@@ -149,134 +179,177 @@ export function createDraftAdvancer({
           // the first whole millisecond at-or-after it, so the recorded instant never precedes
           // the true due instant and two advancers stamp identically.
           const timestamp = new Date(Math.ceil(due.dueAtMs)).toISOString();
-          const result = await store.applyAction(state.config.draftId, {
-            v: DRAFT_ACTION_VERSION,
-            type: "MAKE_PICK",
-            timestamp,
-            teamId: due.teamId,
-            playerId,
-          });
-          return { dueWork: `bot-pick due ${timestamp}`, result };
+          const result = await store.applyAction(state.config.draftId, { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp, teamId: due.teamId, playerId });
+          return { kind: "applied", dueWork: `bot-pick due ${timestamp}`, result };
         }
       }
+      if (due !== null && due.dueAtMs > nowMs) botDueAtMs = Math.ceil(due.dueAtMs);
     }
     const deadline = currentDeadline(state);
-    if (deadline === null || Date.parse(deadline) > nowMs) return null;
-    const result = await store.applyAction(state.config.draftId, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: deadline });
-    return { dueWork: `expire due ${deadline}`, result };
+    const deadlineMs = deadline === null ? null : Date.parse(deadline);
+    if (deadlineMs === null || deadlineMs > nowMs) {
+      const dueAtMs = botDueAtMs !== null && (deadlineMs === null || botDueAtMs < deadlineMs) ? botDueAtMs : deadlineMs;
+      return { kind: "waiting", dueAtMs };
+    }
+    const result = await store.applyAction(state.config.draftId, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: deadline! });
+    return { kind: "applied", dueWork: `expire due ${deadline}`, result };
+  }
+
+  /** The in-progress loop: apply due work until nothing is due, the ceiling is hit, or the
+   *  refusal breaker trips. Returns the state it ended on and what the drivers need next. */
+  async function applyDueWork(initial: DraftState, now: string, maxActions: number, alreadyApplied: number): Promise<DueLoopResult | null> {
+    const nowMs = Date.parse(now);
+    let state = initial;
+    let applied = alreadyApplied;
+    let refusals = 0;
+    while (state.phase === "in_progress") {
+      if (applied >= maxActions) return { state, applied, exhausted: true, wedged: false, nextDueAt: now };
+      const attempt = await applyNextDue(state, nowMs);
+      if (attempt.kind === "waiting") {
+        // Nothing due — the clock is still running: the moderator's window, exactly where
+        // `tickOne` gives it. It never applies an action, so it can never change what this
+        // call would otherwise have done.
+        await nudger.nudge(state, now);
+        return { state, applied, exhausted: false, wedged: false, nextDueAt: isoOrNull(attempt.dueAtMs) };
+      }
+      if (attempt.result.ok) {
+        state = attempt.result.state;
+        applied += 1;
+        refusals = 0;
+        continue;
+      }
+      // A refusal means a concurrent driver got there first (or this draft genuinely cannot
+      // advance — e.g. no eligible autopick). Reload once and re-derive; two consecutive
+      // refusals end the call rather than spin.
+      refusals += 1;
+      if (refusals >= 2) {
+        // THE WEDGED LINE (fix round MEDIUM 3): due work is still pending and the store
+        // refused it twice against fresh state — this draft will not advance on its own.
+        // Deliberately distinct text from every benign path so an alert can grep it; full
+        // dead-lettering stays out of scope (spec).
+        console.error("[draft] advance wedged", { draftId: state.config.draftId, reason: attempt.result.reason, dueWork: attempt.dueWork });
+        return { state, applied, exhausted: false, wedged: true, nextDueAt: null };
+      }
+      const fresh = await store.getDraftState(state.config.draftId);
+      if (fresh === null) return null;
+      state = fresh;
+    }
+    return { state, applied, exhausted: false, wedged: false, nextDueAt: null };
+  }
+
+  async function advanceOrThrow(draftId: string, now: string, maxActions: number): Promise<AdvanceOutcome> {
+    // Terminal statuses first (fix round MEDIUM 2): a DISSOLVED draft still carries an
+    // action log — replaying it looks in_progress — but nothing may ever advance it again,
+    // so it classifies with not_found (a loop stops, a read just renders what it has). One
+    // primary-key read; the row's absence is the same answer the state load would give.
+    const [row] = await db.select({ status: drafts.status, kickoffAt: drafts.kickoffAt }).from(drafts).where(eq(drafts.id, draftId));
+    if (row === undefined || row.status === "dissolved") return report(draftId, 0, { outcome: "not_found" });
+    let state = await store.getDraftState(draftId);
+    if (state === null) return report(draftId, 0, { outcome: "not_found" });
+
+    let applied = 0;
+    if (state.phase === "scheduled") {
+      const start = await startIfDue(state, now, row.kickoffAt);
+      if (start === "started") applied += 1;
+      if (typeof start === "object") return report(draftId, applied, { phase: state.phase, nextDueAt: isoOrNull(start.notDueUntilMs), sequence: state.sequence });
+      const fresh = await store.getDraftState(draftId);
+      if (fresh === null) return report(draftId, applied, { outcome: "not_found" });
+      state = fresh;
+    }
+
+    const loop = await applyDueWork(state, now, maxActions, applied);
+    if (loop === null) return report(draftId, applied, { outcome: "not_found" });
+    // A finished mock settles its status row in the same call (`settleMockDraftCompletion`
+    // is guarded and idempotent), so its `liveDraftsQuery` slot frees immediately — the same
+    // promptness the driver's own settle lane keeps.
+    if (loop.state.phase === "complete" && loop.state.config.isMock === true) await settleMockDraftCompletion(db, draftId);
+    return report(draftId, loop.applied, {
+      exhausted: loop.exhausted,
+      phase: loop.state.phase,
+      wedged: loop.wedged,
+      nextDueAt: loop.nextDueAt,
+      sequence: loop.state.sequence,
+    });
   }
 
   return {
     async advance(draftId, now, opts) {
       const maxActions = Math.min(maxActionsPerAdvance, opts?.maxActions ?? maxActionsPerAdvance);
-      let applied = 0;
       try {
-        // Terminal statuses first (fix round MEDIUM 2): a DISSOLVED draft still carries an
-        // action log — replaying it looks in_progress — but nothing may ever advance it again,
-        // so it classifies with not_found (a loop stops, a read just renders what it has). One
-        // primary-key read; the row's absence is the same answer the state load would give.
-        const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
-        if (row === undefined || row.status === "dissolved") {
-          return { draftId, applied, exhausted: false, phase: null, outcome: "not_found", wedged: false };
-        }
-        let state = await store.getDraftState(draftId);
-        if (state === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found", wedged: false };
-
-        if (state.phase === "scheduled") {
-          const start = await startIfDue(state, now);
-          if (start === "started") applied += 1;
-          if (start === "not-due") return { draftId, applied, exhausted: false, phase: state.phase, outcome: "ok", wedged: false };
-          const fresh = await store.getDraftState(draftId);
-          if (fresh === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found", wedged: false };
-          state = fresh;
-        }
-
-        const nowMs = Date.parse(now);
-        let refusals = 0;
-        let wedged = false;
-        while (state.phase === "in_progress") {
-          if (applied >= maxActions) return { draftId, applied, exhausted: true, phase: state.phase, outcome: "ok", wedged };
-          const attempt = await applyNextDue(state, nowMs);
-          if (attempt === null) {
-            // Nothing due — the clock is still running: the moderator's window, exactly where
-            // `tickOne` gives it. It never applies an action, so it can never change what this
-            // call would otherwise have done.
-            await nudger.nudge(state, now);
-            break;
-          }
-          if (attempt.result.ok) {
-            state = attempt.result.state;
-            applied += 1;
-            refusals = 0;
-            continue;
-          }
-          // A refusal means a concurrent driver got there first (or this draft genuinely cannot
-          // advance — e.g. no eligible autopick). Reload once and re-derive; two consecutive
-          // refusals end the call rather than spin.
-          refusals += 1;
-          if (refusals >= 2) {
-            // THE WEDGED LINE (fix round MEDIUM 3): due work is still pending and the store
-            // refused it twice against fresh state — this draft will not advance on its own.
-            // Deliberately distinct text from every benign path so an alert can grep it; full
-            // dead-lettering stays out of scope (spec).
-            wedged = true;
-            console.error("[draft] advance wedged", { draftId, reason: attempt.result.reason, dueWork: attempt.dueWork });
-            break;
-          }
-          const fresh = await store.getDraftState(draftId);
-          if (fresh === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found", wedged: false };
-          state = fresh;
-        }
-
-        // A finished mock settles its status row in the same call (`settleMockDraftCompletion`
-        // is guarded and idempotent), so its `liveDraftsQuery` slot frees immediately — the same
-        // promptness the driver's own settle lane keeps.
-        if (state.phase === "complete" && state.config.isMock === true) {
-          await settleMockDraftCompletion(db, draftId);
-        }
-        return { draftId, applied, exhausted: false, phase: state.phase, outcome: "ok", wedged };
+        return await advanceOrThrow(draftId, now, maxActions);
       } catch (error: unknown) {
         // The ticker's own discipline, held per call: one draft's DB error must not fail the
         // read (or stream, or sweep) that triggered the advance.
         console.error("[draft] advance failed", { draftId }, error);
-        return { draftId, applied, exhausted: false, phase: null, outcome: "error", wedged: false };
+        return report(draftId, 0, { outcome: "error" });
       }
     },
   };
 }
 
 /**
- * Which draft a league's SSE connection should tick, or null when there is nothing to ever tick
- * (no draft, or a terminal status — `complete` AND `dissolved`, fix round MEDIUM 2: a reopened
- * dissolved house league must not run a fruitless advance loop for every reconnect forever).
+ * Which draft a league's SSE connection should tick, or null when there is nothing to tick: no
+ * draft, a terminal status (`complete` AND `dissolved`, fix round MEDIUM 2: a reopened dissolved
+ * house league must not run a fruitless advance loop for every reconnect forever), or a REAL
+ * draft still scheduled further than `DRAFT_ADVANCE_CONFIG.sseScheduledWindowMs` from kickoff
+ * (Neon cost audit finding 2: a league drafting next month was polled as hard as a live room).
  */
-export async function draftLoopTarget(db: Db, leagueId: string): Promise<string | null> {
-  const [row] = await db.select({ id: drafts.id, status: drafts.status }).from(drafts).where(eq(drafts.leagueId, leagueId));
+export async function draftLoopTarget(db: Db, leagueId: string, now: string): Promise<string | null> {
+  const [row] = await db
+    .select({ id: drafts.id, status: drafts.status, kickoffAt: drafts.kickoffAt, isMock: leagues.isMock })
+    .from(drafts)
+    .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
+    .where(eq(drafts.leagueId, leagueId));
   if (row === undefined || row.status === "complete" || row.status === "dissolved") return null;
+  const distant = row.kickoffAt.getTime() - Date.parse(now) > DRAFT_ADVANCE_CONFIG.sseScheduledWindowMs;
+  if (row.status === "scheduled" && !row.isMock && distant) return null;
   return row.id;
+}
+
+/** The log sequence a draft frame's payload carries (`draftClockView`), or null for any other frame. */
+export function draftEventSequence(event: { readonly type: string; readonly payload: unknown }): number | null {
+  if (!event.type.startsWith("draft.")) return null;
+  const payload = event.payload as { readonly clock?: { readonly sequence?: unknown } } | null;
+  const sequence = payload?.clock?.sequence;
+  return typeof sequence === "number" ? sequence : null;
 }
 
 export interface AdvanceLoopDeps {
   readonly advance: DraftAdvancer["advance"];
   readonly clock: Clock;
-  /** Defaults to `DRAFT_ADVANCE_CONFIG.sseIntervalMs`. */
-  readonly intervalMs?: number;
+  /** Test seams over the `DRAFT_ADVANCE_CONFIG.sse*` bounds. */
+  readonly idlePollMs?: number;
+  readonly maxSleepMs?: number;
+  readonly minSleepMs?: number;
+}
+
+export interface AdvanceLoopHandle {
+  /** A draft frame arrived on the stream: wake the loop unless the frame announces this loop's
+   *  own last action (its sequence is not newer than the one the loop just produced). */
+  observe(sequence: number): void;
 }
 
 /**
  * THE SSE STREAM'S OWN TICK (driver 2): while a client is connected to a draft room's league
- * stream, this loop calls the advance routine on a short interval so bot picks and clock
- * expiries move in real time for whoever is watching. Fire-and-forget from the route: it
- * advances once immediately (the connection setup's own fast-forward), then on the interval;
- * never overlaps itself (a slow advance skips fires rather than stacking); exits cleanly the
- * moment the request aborts; and stops on its own once the draft completes or vanishes — a
- * finished room holds no timer open. No transaction is ever held across ticks: each applied
- * action is its own short transaction inside the store.
+ * stream, this loop calls the advance routine so bot picks and clock expiries move in real time
+ * for whoever is watching. Fire-and-forget from the route: it advances once immediately (the
+ * connection setup's own fast-forward), then SLEEPS UNTIL the advancer's own `nextDueAt` — the
+ * clock deadline, a bot's seeded due pick, a kickoff — bounded by `sseMinSleepMs` and
+ * `sseMaxSleepMs`, or polls at `sseIdlePollMs` when no instant is known. A draft frame from
+ * another driver (`observe`) wakes it early, so a pick by another seat resets its timer with no
+ * query of its own. It never overlaps itself (a wake during a run queues exactly one more run);
+ * exits cleanly the moment the request aborts; and stops on its own once the draft completes or
+ * vanishes — a finished room holds no timer open. No transaction is ever held across ticks.
  */
-export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: AdvanceLoopDeps): void {
-  const intervalMs = deps.intervalMs ?? DRAFT_ADVANCE_CONFIG.sseIntervalMs;
+export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: AdvanceLoopDeps): AdvanceLoopHandle {
+  const idlePollMs = deps.idlePollMs ?? DRAFT_ADVANCE_CONFIG.sseIdlePollMs;
+  const maxSleepMs = deps.maxSleepMs ?? DRAFT_ADVANCE_CONFIG.sseMaxSleepMs;
+  const minSleepMs = deps.minSleepMs ?? DRAFT_ADVANCE_CONFIG.sseMinSleepMs;
   let running = false;
   let stopped = false;
+  let wakeRequested = false;
+  let lastSequence: number | null = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   // True while the last tick(s) errored — the log-once-per-streak latch (fix round HIGH 1): a
   // transient failure must neither kill the loop nor log once a second for the connection's life.
   let erroring = false;
@@ -284,11 +357,27 @@ export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: 
   const stop = (): void => {
     if (stopped) return;
     stopped = true;
-    clearInterval(timer);
+    clearTimeout(timer);
+  };
+
+  const sleepFor = (outcome: AdvanceOutcome): number => {
+    if (outcome.nextDueAt === null) return idlePollMs;
+    const until = Date.parse(outcome.nextDueAt) - Date.parse(deps.clock.now());
+    return Math.min(maxSleepMs, Math.max(minSleepMs, until));
+  };
+
+  const schedule = (ms: number): void => {
+    if (stopped) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => void tick(), ms);
   };
 
   const tick = async (): Promise<void> => {
-    if (running || stopped) return;
+    if (stopped) return;
+    if (running) {
+      wakeRequested = true;
+      return;
+    }
     running = true;
     try {
       const outcome = await deps.advance(draftId, deps.clock.now());
@@ -297,20 +386,31 @@ export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: 
         // repro, does). Stopping here left a watched room frozen for the rest of its connection.
         if (!erroring) console.error("[draft] advance loop erroring; ticking on", { draftId });
         erroring = true;
+        schedule(idlePollMs);
         return;
       }
       erroring = false;
+      lastSequence = outcome.sequence;
       // Terminal: a finished draft, or one that is gone (vanished or dissolved) — no timer left open.
       if (outcome.outcome === "not_found" || outcome.phase === "complete") stop();
+      else schedule(sleepFor(outcome));
     } finally {
       running = false;
+      if (wakeRequested) {
+        wakeRequested = false;
+        void tick();
+      }
     }
   };
 
-  const timer = setInterval(() => {
-    void tick();
-  }, intervalMs);
   signal.addEventListener("abort", stop, { once: true });
   if (signal.aborted) stop();
-  void tick();
+  else void tick();
+
+  return {
+    observe: (sequence) => {
+      if (stopped || (lastSequence !== null && sequence <= lastSequence)) return;
+      void tick();
+    },
+  };
 }

@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { nflGames } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb, recordStatements, truncateAll } from "@/db/test-db";
 import { LEAGUE_CONFIG } from "@/league";
-import { byeWeeksByTeam } from "./nfl-schedule";
+import { byeWeeksByTeam, fixtureLabelsByTeam } from "./nfl-schedule";
 
 const db = createTestDb();
 
@@ -79,5 +79,25 @@ describe("byeWeeksByTeam", () => {
 
   it("returns an empty map when no schedule has been ingested", async () => {
     expect((await byeWeeksByTeam(db)).size).toBe(0);
+  });
+});
+
+describe("the reference memos (Neon cost audit finding 7)", () => {
+  it("serves byes and a week's fixtures from memory on the second read: no statement at all", async () => {
+    await db.insert(nflGames).values([...seasonSeries("KC", "DEN", { except: 7 })]);
+    await byeWeeksByTeam(db);
+    await fixtureLabelsByTeam(db, 1);
+    const statements = await recordStatements(db, async (logged) => {
+      expect((await byeWeeksByTeam(logged)).get("KC")).toBe(7);
+      expect((await fixtureLabelsByTeam(logged, 1)).get("KC")).toMatchObject({ opp: "vs DEN" });
+    });
+    expect(statements).toEqual([]);
+  });
+
+  it("keys fixtures by week: another week reads once", async () => {
+    await db.insert(nflGames).values([...seasonSeries("KC", "DEN", { except: 7 })]);
+    await fixtureLabelsByTeam(db, 1);
+    const statements = await recordStatements(db, (logged) => fixtureLabelsByTeam(logged, 2));
+    expect(statements).toHaveLength(1);
   });
 });

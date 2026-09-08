@@ -6,6 +6,7 @@ import type { Clock } from "@/domain/timing";
 import { backoffDelayMs } from "./backoff";
 import { JOBS_CONFIG } from "./config";
 import { TerminalJobError, type AnyJobDefinition } from "./contract";
+import type { WakeSet } from "./wake";
 import {
   completedStepsFor,
   isSupersededAttempt,
@@ -24,6 +25,8 @@ export interface ExecutorDeps {
   readonly workerId: string;
   /** Test seam only: shrinks the heartbeat interval so a heartbeat test does not wait 10s. */
   readonly heartbeatIntervalMs?: number;
+  /** Where heartbeats and retries register their wake instants (`wake.ts`). Defaults to the installed set. */
+  readonly wake?: WakeSet;
 }
 
 export interface ExecutionReport {
@@ -144,7 +147,7 @@ export async function executeClaimedJob(
   }
 
   const heartbeat = setInterval(() => {
-    void recordHeartbeat(deps.db, deps.clock, claimed.jobId).catch((error: unknown) => {
+    void recordHeartbeat(deps.db, deps.clock, claimed.jobId, deps.wake).catch((error: unknown) => {
       console.error(`[jobs] heartbeat failed for job ${claimed.jobId}: ${formatErrorForLog(error)}`);
     });
   }, deps.heartbeatIntervalMs ?? JOBS_CONFIG.heartbeatIntervalMs);
@@ -201,11 +204,13 @@ async function finishFailed(deps: ExecutorDeps, claimed: ClaimedJob, failure: Fa
   if (retryable) {
     const runAt = new Date(new Date(deps.clock.now()).getTime() + backoffDelayMs(failure.backoff, claimed.attempt, deps.random));
     try {
-      await recordAttemptFailure(deps.db, deps.clock, claimed, {
-        error: failure.error,
-        errorKind: failure.kind,
-        disposition: { kind: "retry", runAt },
-      });
+      await recordAttemptFailure(
+        deps.db,
+        deps.clock,
+        claimed,
+        { error: failure.error, errorKind: failure.kind, disposition: { kind: "retry", runAt } },
+        deps.wake,
+      );
     } catch (error: unknown) {
       if (isSupersededAttempt(error)) return supersededReport(claimed);
       throw error;
@@ -222,11 +227,13 @@ async function finishFailed(deps: ExecutorDeps, claimed: ClaimedJob, failure: Fa
   }
 
   try {
-    await recordAttemptFailure(deps.db, deps.clock, claimed, {
-      error: failure.error,
-      errorKind: failure.kind,
-      disposition: { kind: "dead-letter" },
-    });
+    await recordAttemptFailure(
+      deps.db,
+      deps.clock,
+      claimed,
+      { error: failure.error, errorKind: failure.kind, disposition: { kind: "dead-letter" } },
+      deps.wake,
+    );
   } catch (error: unknown) {
     if (isSupersededAttempt(error)) return supersededReport(claimed);
     throw error;

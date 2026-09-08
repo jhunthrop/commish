@@ -8,6 +8,14 @@ import { jobRunSteps, jobRuns, jobs } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
 import { JOBS_CONFIG } from "./config";
+import { WAKE_MEMBERS, wakeMember, wakeSet, type WakeSet } from "./wake";
+
+// EVERY WRITE THAT MAKES WORK DUE REGISTERS ITS INSTANT in the wake set (`wake.ts`), after the
+// transaction commits and best-effort: an enqueue at its `run_at`, a retry at its backoff, a
+// requeue now, and a claim (or heartbeat) at the moment the attempt would turn stale. The minute
+// tick reads that set instead of Postgres, which is what lets an idle minute cost zero statements.
+// The `wake` parameter defaults to the installed set so no caller has to thread one; the runner
+// passes its own so a test can watch the registrations.
 
 export interface EnqueueRequest {
   readonly name: string;
@@ -28,7 +36,7 @@ export interface EnqueueResult {
   readonly jobId: number | null;
 }
 
-export async function enqueueJob(db: Db | DbTx, clock: Clock, request: EnqueueRequest): Promise<EnqueueResult> {
+export async function enqueueJob(db: Db | DbTx, clock: Clock, request: EnqueueRequest, wake: WakeSet = wakeSet()): Promise<EnqueueResult> {
   const inserted = await db
     .insert(jobs)
     .values({
@@ -46,7 +54,9 @@ export async function enqueueJob(db: Db | DbTx, clock: Clock, request: EnqueueRe
     .onConflictDoNothing({ target: jobs.idempotencyKey })
     .returning({ id: jobs.id });
   const row = inserted[0];
-  return row === undefined ? { enqueued: false, jobId: null } : { enqueued: true, jobId: row.id };
+  if (row === undefined) return { enqueued: false, jobId: null };
+  await wake.add(wakeMember.job(row.id), request.runAt.getTime());
+  return { enqueued: true, jobId: row.id };
 }
 
 export interface ClaimedJob {
@@ -66,9 +76,9 @@ export interface ClaimedJob {
  * entirely rather than blocking on it. Claiming also opens the attempt's `job_runs` row, in the
  * same transaction, so history can never be missing its own beginning.
  */
-export async function claimNextJob(db: Db, clock: Clock, workerId: string): Promise<ClaimedJob | null> {
+export async function claimNextJob(db: Db, clock: Clock, workerId: string, wake: WakeSet = wakeSet()): Promise<ClaimedJob | null> {
   const now = new Date(clock.now());
-  return db.transaction(async (tx) => {
+  const claimed = await db.transaction(async (tx) => {
     const candidates = await tx
       .select()
       .from(jobs)
@@ -90,11 +100,16 @@ export async function claimNextJob(db: Db, clock: Clock, workerId: string): Prom
       .returning({ id: jobRuns.id });
     return { jobId: row.id, runId: runRows[0]!.id, name: row.name, payload: row.payload, attempt, maxAttempts: row.maxAttempts };
   });
+  if (claimed !== null) await wake.add(WAKE_MEMBERS.reclaim, now.getTime() + JOBS_CONFIG.reclaimWakeDelayMs);
+  return claimed;
 }
 
-/** Refreshed on an interval while an attempt runs — the liveness signal `reclaimStaleJobs` reads. */
-export async function recordHeartbeat(db: Db, clock: Clock, jobId: number): Promise<void> {
-  await db.update(jobs).set({ heartbeatAt: new Date(clock.now()) }).where(eq(jobs.id, jobId));
+/** Refreshed on an interval while an attempt runs — the liveness signal `reclaimStaleJobs` reads.
+ *  Each beat pushes the reclaim wake out ahead of itself, so a live attempt is never scanned. */
+export async function recordHeartbeat(db: Db, clock: Clock, jobId: number, wake: WakeSet = wakeSet()): Promise<void> {
+  const now = new Date(clock.now());
+  await db.update(jobs).set({ heartbeatAt: now }).where(eq(jobs.id, jobId));
+  await wake.add(WAKE_MEMBERS.reclaim, now.getTime() + JOBS_CONFIG.reclaimWakeDelayMs);
 }
 
 export async function succeedJob(db: Db, clock: Clock, claimed: ClaimedJob): Promise<void> {
@@ -121,7 +136,13 @@ export interface AttemptFailure {
   readonly disposition: FailureDisposition;
 }
 
-export async function recordAttemptFailure(db: Db, clock: Clock, claimed: ClaimedJob, failure: AttemptFailure): Promise<void> {
+export async function recordAttemptFailure(
+  db: Db,
+  clock: Clock,
+  claimed: ClaimedJob,
+  failure: AttemptFailure,
+  wake: WakeSet = wakeSet(),
+): Promise<void> {
   const now = new Date(clock.now());
   await db.transaction(async (tx) => {
     await tx
@@ -140,6 +161,7 @@ export async function recordAttemptFailure(db: Db, clock: Clock, claimed: Claime
         .where(eq(jobs.id, claimed.jobId));
     }
   });
+  if (failure.disposition.kind === "retry") await wake.add(wakeMember.job(claimed.jobId), failure.disposition.runAt.getTime());
 }
 
 /**
@@ -182,10 +204,10 @@ export interface ReclaimedJob {
  * earns no backoff) or dead-letters it as `abandoned`. `SKIP LOCKED` again, so two concurrent
  * ticks reclaim disjoint sets.
  */
-export async function reclaimStaleJobs(db: Db, clock: Clock): Promise<readonly ReclaimedJob[]> {
+export async function reclaimStaleJobs(db: Db, clock: Clock, wake: WakeSet = wakeSet()): Promise<readonly ReclaimedJob[]> {
   const now = new Date(clock.now());
   const cutoff = new Date(now.getTime() - JOBS_CONFIG.staleAfterMs);
-  return db.transaction(async (tx) => {
+  const outcomes = await db.transaction(async (tx) => {
     const stale = await tx
       .select()
       .from(jobs)
@@ -214,6 +236,10 @@ export async function reclaimStaleJobs(db: Db, clock: Clock): Promise<readonly R
     }
     return outcomes;
   });
+  for (const outcome of outcomes) {
+    if (outcome.disposition === "requeued") await wake.add(wakeMember.job(outcome.jobId), now.getTime());
+  }
+  return outcomes;
 }
 
 /**

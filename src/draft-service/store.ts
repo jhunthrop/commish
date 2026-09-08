@@ -8,6 +8,7 @@ import {
   admitCommand,
   AUCTION_CONFIG,
   AUTOPICK_CONFIG,
+  currentDeadline,
   DRAFT_SKIP_POLICY,
   draftActionSchema,
   draftEventsFor,
@@ -16,6 +17,7 @@ import {
   replayDraft,
   type DraftState,
 } from "@/draft-engine";
+import { wakeMember, wakeSet, type WakeSet } from "@/jobs/wake";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { sweepQuietly } from "@/integrity-service/multi-account";
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
@@ -55,6 +57,15 @@ export interface DraftStoreDeps {
    * live Redis connection to exercise the transaction/rollback behavior around it.
    */
   readonly deliverNotice?: (notice: MemberNotice) => Promise<void>;
+  /**
+   * THE SWEEP'S WAKE NOTE (Neon cost audit 2026-09-07, finding 1). After every applied action the
+   * store registers this draft's next clock deadline in the wake set (`@/jobs/wake`), so the
+   * minute cron's draft sweep — the backstop for a room nobody is watching — fires at that instant
+   * and stays asleep otherwise. A finished draft is forgotten. Resolved at CALL time when not
+   * injected (`wakeSet()`), so a store built before `src/instrumentation.ts` installs the Redis
+   * set still lands its notes; tests hand in a memory set.
+   */
+  readonly wake?: WakeSet;
 }
 
 export type ApplyResult =
@@ -275,9 +286,18 @@ export function createDraftStore({
   onPublishError,
   audit = getAuditLogger(),
   deliverNotice: deliver = deliverNotice,
+  wake,
 }: DraftStoreDeps): DraftStore {
   const cache = new Map<string, DraftState>();
   const mutex = createKeyedMutex();
+
+  /** See `DraftStoreDeps.wake`: the next deadline while a clock runs, forgotten once none does. */
+  async function noteWake(state: DraftState): Promise<void> {
+    const set = wake ?? wakeSet();
+    const deadline = state.phase === "in_progress" ? currentDeadline(state) : null;
+    if (deadline === null) await set.remove([wakeMember.draft(state.config.draftId)]);
+    else await set.add(wakeMember.draft(state.config.draftId), Date.parse(deadline));
+  }
 
   async function load(draftId: string, tx?: DbTx): Promise<DraftState | null> {
     const source = tx ?? db;
@@ -600,6 +620,7 @@ export function createDraftStore({
 
           cache.set(draftId, outcome.state);
           if (previous !== null && applied !== null) await broadcast(previous, outcome.state, applied);
+          await noteWake(outcome.state);
           // THE MULTI-ACCOUNT SWEEP'S SECOND TRIGGER (final review, HIGH 2), after the commit for
           // the same reason `broadcast` is: this transaction has just released `drafts` FOR
           // UPDATE, and the sweep appends to the PLATFORM chain — a third lock, on an anchor row,

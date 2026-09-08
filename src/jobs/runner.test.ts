@@ -1,14 +1,25 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, truncateAll, truncateJobTables } from "@/db/test-db";
+import { createTestDb, recordStatements, truncateAll, truncateJobTables } from "@/db/test-db";
 import type { Clock } from "@/domain/timing";
 import { defineJob, type AnyJobDefinition } from "./contract";
 import { runTick, type RunnerDeps } from "./runner";
+import { createScheduleMemory } from "./schedule";
+import { SCHEDULES } from "./schedules";
+import { JOB_DEFINITIONS } from "./registry";
 import { enqueueJob } from "./store";
+import { createMemoryWakeSet, WAKE_MEMBERS, wakeMember, type WakeSet } from "./wake";
 
 const db = createTestDb();
 
 const T0 = "2026-09-08T12:00:00.000Z";
 const clock: Clock = { now: () => T0 };
+const T0_MS = Date.parse(T0);
+/** A wake set whose sweep sentinel sits far in the future: nothing is due unless a test adds it. */
+async function quietWake(): Promise<WakeSet> {
+  const wake = createMemoryWakeSet();
+  await wake.add(WAKE_MEMBERS.sweepSafety, T0_MS + 60 * 60_000);
+  return wake;
+}
 
 function countingDefinition(counter: { count: number }): AnyJobDefinition {
   return defineJob({
@@ -129,5 +140,97 @@ describe("runTick", () => {
     const report = await runTick(deps(monotonic), definitions, { budgetMs: 60_000, maxJobs: 10, schedules: [] });
     expect(report.stoppedBecause).toBe("budget");
     expect(report.executed.length).toBeLessThan(3);
+  });
+});
+
+describe("the wake gate (Neon cost audit finding 1): an idle minute costs zero statements", () => {
+  it("a warm instance with nothing due runs the REAL schedules and issues no Postgres statement at all", async () => {
+    const wake = await quietWake();
+    const scheduleMemory = createScheduleMemory();
+    const gated = { ...deps(), wake, scheduleMemory };
+    // The cold tick reads the cursors once (and bootstraps them); the warm tick is what the cron
+    // runs 1,439 times a day.
+    await runTick(gated, JOB_DEFINITIONS, { budgetMs: 60_000, maxJobs: 10, schedules: SCHEDULES });
+    const statements = await recordStatements(db, (logged) =>
+      runTick({ ...gated, db: logged }, JOB_DEFINITIONS, { budgetMs: 60_000, maxJobs: 10, schedules: SCHEDULES }),
+    );
+    expect(statements).toEqual([]);
+  });
+
+  it("reports the idle tick honestly: no claim loop, no reclaim, every schedule quiet or gated off", async () => {
+    const wake = await quietWake();
+    const scheduleMemory = createScheduleMemory();
+    const gated = { ...deps(), wake, scheduleMemory };
+    await runTick(gated, JOB_DEFINITIONS, { budgetMs: 60_000, maxJobs: 10, schedules: SCHEDULES });
+    // The next cron minute: the sweep's minute fire is due, and the gate holds it.
+    const nextMinute = { ...gated, clock: { now: () => new Date(T0_MS + 60_000).toISOString() } };
+    const report = await runTick(nextMinute, JOB_DEFINITIONS, { budgetMs: 60_000, maxJobs: 10, schedules: SCHEDULES });
+    expect(report.stoppedBecause).toBe("idle");
+    expect(report.reclaimed).toEqual([]);
+    expect(report.executed).toEqual([]);
+    expect(report.schedules.find((s) => s.schedule === "draft-sweep-minutely")).toMatchObject({ gatedOff: true, enqueued: [] });
+  });
+
+  it("claims a job the wake set names, and forgets the member so the next tick is idle again", async () => {
+    const wake = await quietWake();
+    const counter = { count: 0 };
+    const definitions = new Map([["count-me", countingDefinition(counter)]]);
+    await enqueueJob(db, clock, { name: "count-me", idempotencyKey: "gated-1", payload: {}, maxAttempts: 3, runAt: new Date(T0) }, wake);
+
+    const first = await runTick({ ...deps(), wake }, definitions, { budgetMs: 60_000, maxJobs: 10, schedules: [] });
+    expect(first.executed).toHaveLength(1);
+    expect(counter.count).toBe(1);
+
+    const second = await runTick({ ...deps(), wake }, definitions, { budgetMs: 60_000, maxJobs: 10, schedules: [] });
+    expect(second.stoppedBecause).toBe("idle");
+  });
+
+  it("a job queued for LATER is invisible until its instant, then claimed", async () => {
+    const wake = await quietWake();
+    const counter = { count: 0 };
+    const definitions = new Map([["count-me", countingDefinition(counter)]]);
+    const later = new Date(T0_MS + 5 * 60_000);
+    await enqueueJob(db, clock, { name: "count-me", idempotencyKey: "gated-later", payload: {}, maxAttempts: 3, runAt: later }, wake);
+
+    expect((await runTick({ ...deps(), wake }, definitions, { budgetMs: 60_000, maxJobs: 10, schedules: [] })).stoppedBecause).toBe("idle");
+    const at = { ...deps(), wake, clock: { now: () => later.toISOString() } };
+    expect((await runTick(at, definitions, { budgetMs: 60_000, maxJobs: 10, schedules: [] })).executed).toHaveLength(1);
+  });
+
+  it("scans for stale attempts only once the claim's reclaim wake has passed", async () => {
+    const wake = await quietWake();
+    const counter = { count: 0 };
+    const definitions = new Map([["count-me", countingDefinition(counter)]]);
+    await enqueueJob(db, clock, { name: "count-me", idempotencyKey: "gated-reclaim", payload: {}, maxAttempts: 3, runAt: new Date(T0) }, wake);
+    await runTick({ ...deps(), wake }, definitions, { budgetMs: 60_000, maxJobs: 10, schedules: [] });
+
+    // The claim registered `reclaim` for later; a tick before that instant must not scan.
+    const reclaimAt = (await wake.due(T0_MS + 60 * 60_000)).members;
+    expect(reclaimAt).toContain(WAKE_MEMBERS.reclaim);
+    const statements = await recordStatements(db, (logged) => runTick({ ...deps(), wake, db: logged }, definitions, { budgetMs: 60_000, maxJobs: 10, schedules: [] }));
+    expect(statements.filter((s) => /"running"/.test(s))).toEqual([]);
+  });
+
+  it("the sweep schedule fires when a draft registered a due instant, and the sweep job is claimed in the same tick", async () => {
+    const wake = await quietWake();
+    await wake.add(wakeMember.draft("draft_due"), T0_MS - 1);
+    const noopSweep = defineJob({
+      name: "draft-sweep",
+      maxAttempts: 2,
+      timeoutMs: 5_000,
+      backoff: { baseMs: 30_000, maxMs: 60_000 },
+      parsePayload: () => ({}),
+      steps: [{ name: "sweep", run: async () => ({ summary: "noop", detail: [] }) }],
+    });
+    const sweepOnly = SCHEDULES.filter((s) => s.name === "draft-sweep-minutely");
+    const definitions = new Map([["draft-sweep", noopSweep]]);
+    const scheduleMemory = createScheduleMemory();
+    // Cold tick bootstraps the cursor; the next minute is the one under test.
+    await runTick({ ...deps(), wake, scheduleMemory }, definitions, { budgetMs: 60_000, maxJobs: 10, schedules: sweepOnly });
+    const nextMinute = { ...deps(), wake, scheduleMemory, clock: { now: () => new Date(T0_MS + 60_000).toISOString() } };
+    await wake.add(wakeMember.draft("draft_due"), T0_MS - 1);
+    const report = await runTick(nextMinute, definitions, { budgetMs: 60_000, maxJobs: 10, schedules: sweepOnly });
+    expect(report.schedules[0]!.enqueued).toHaveLength(1);
+    expect(report.executed.map((e) => e.name)).toEqual(["draft-sweep"]);
   });
 });

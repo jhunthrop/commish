@@ -13,6 +13,7 @@ import { JOBS_CONFIG } from "@/jobs/config";
 import { formatErrorForLog } from "@/jobs/execute";
 import { JOB_DEFINITIONS } from "@/jobs/registry";
 import { runTick, type TickReport } from "@/jobs/runner";
+import { UNGATED_WAKE_SET } from "@/jobs/wake";
 
 const state = { stopping: false };
 
@@ -39,7 +40,9 @@ async function main(): Promise<void> {
   const once = process.argv.includes("--once");
   const db = createDb();
   const workerId = `${hostname()}:${process.pid}:${randomUUID().slice(0, 8)}`;
-  const deps = { db, clock: { now: () => new Date().toISOString() }, random: Math.random, workerId };
+  // Ungated on purpose: a local Postgres has no compute to suspend, and the wake gate exists only
+  // to let Neon's suspend (see `@/jobs/wake`). This runner checks everything every tick.
+  const deps = { db, clock: { now: () => new Date().toISOString() }, random: Math.random, workerId, wake: UNGATED_WAKE_SET };
 
   const stop = (signal: string): void => {
     console.log(`[jobs] ${signal} received; finishing the in-flight tick, then exiting.`);

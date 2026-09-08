@@ -5,6 +5,8 @@ import type { TeamCard } from "@/domain/league";
 import { clinchedTeamIds, computeStandings, LEAGUE_CONFIG, seasonProgress } from "@/league";
 import type { TeamStandingsRow } from "@/league-room/contract";
 
+type MatchupRow = typeof matchups.$inferSelect;
+
 /** Every week this league already has a stored median for, keyed by week number — a week absent
  *  from the map has no median yet (unsettled, or the toggle is off), matching `weeks.median_score`
  *  itself, which is nullable for exactly those cases. */
@@ -93,13 +95,15 @@ export async function leagueStandings(
   leagueId: string,
   teamCards: readonly TeamCard[],
   medianGame: boolean,
+  /** The league's matchups, when the caller already holds them (`leagueHome` does): the same
+   *  select this function would otherwise issue again (Neon cost audit finding 7). */
+  leagueMatchups?: readonly MatchupRow[],
 ): Promise<readonly TeamStandingsRow[]> {
   // REGULAR SEASON ONLY (roadmap item 6's own honesty pin): the bracket engine writes playoff
   // matchups into the same table, and a championship loss must never subtract from the record
   // that seeded it. Standings are a regular-season fact.
-  const matchupRows = (await db.select().from(matchups).where(eq(matchups.leagueId, leagueId))).filter(
-    (row) => row.weekNumber <= LEAGUE_CONFIG.regularSeasonWeeks,
-  );
+  const allRows = leagueMatchups ?? (await db.select().from(matchups).where(eq(matchups.leagueId, leagueId)));
+  const matchupRows = allRows.filter((row) => row.weekNumber <= LEAGUE_CONFIG.regularSeasonWeeks);
   const medianByWeek = await medianByWeekFor(db, leagueId);
   const standings = computeStandings({ teamIds: teamCards.map((card) => card.id), matchups: matchupRows, medianByWeek });
 

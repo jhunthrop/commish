@@ -7,6 +7,7 @@ import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
 import { currentDeadline, DRAFT_SKIP_POLICY, initialDraftState, type DraftConfig } from "@/draft-engine";
 import type { MemberNotice } from "@/integrity-service/notify";
 import { DRAFT_GRADES_JOB_NAME } from "@/jobs/defs/draft-grades-job";
+import { createMemoryWakeSet, wakeMember } from "@/jobs/wake";
 import { PUBLIC_ROOM_SHORT_REFUSAL } from "@/matchmaking/roll";
 import { settleMockDraftCompletion } from "@/mock-draft-service/driver";
 import { draftOrderFor } from "./order";
@@ -348,6 +349,29 @@ describe("draft store — persistence", () => {
     });
     const state = await broken.getDraftState(draftId);
     expect(state?.sequence).toBe(2);
+  });
+});
+
+describe("draft store — the sweep's wake note (Neon cost audit finding 1)", () => {
+  it("registers the running clock's deadline after every applied action, and forgets the draft once it completes", async () => {
+    const { draftId, teamIds } = await fixture();
+    const wake = createMemoryWakeSet();
+    const store = createDraftStore({ db, publish, clock, deliverNotice: deliverNoticeFake, wake });
+
+    expect((await store.applyAction(draftId, start(teamIds))).ok).toBe(true);
+    const afterStart = Date.parse(currentDeadline((await store.getDraftState(draftId))!)!);
+    expect((await wake.due(afterStart - 1)).members).toEqual([]);
+    expect((await wake.due(afterStart)).members).toEqual([wakeMember.draft(draftId)]);
+
+    // A pick resets the clock: the note moves to the NEW turn's deadline (the same instant here,
+    // since every action in this file is stamped at T — what matters is that it is re-registered).
+    expect((await store.applyAction(draftId, pick(teamIds[0]!, "qb1"))).ok).toBe(true);
+    const afterPick = Date.parse(currentDeadline((await store.getDraftState(draftId))!)!);
+    expect((await wake.due(afterPick)).members).toEqual([wakeMember.draft(draftId)]);
+
+    await runFullDraft(store, draftId);
+    expect((await store.getDraftState(draftId))!.phase).toBe("complete");
+    expect((await wake.due(afterPick + 365 * 24 * 60 * 60_000)).members).toEqual([]);
   });
 });
 

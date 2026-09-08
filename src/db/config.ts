@@ -55,6 +55,22 @@ export const DB_POOL_CONFIG = {
    */
   testMaxConnections: 3,
   testIdleTimeoutSeconds: 5,
+  /**
+   * THE SERVERLESS POOL (Neon cost audit 2026-09-07, finding 8). The formula above sizes a
+   * long-lived process against a self-hosted Postgres; a Vercel function instance is neither.
+   * Every measured request path ran on at most three connections in parallel, so nineteen idle
+   * TCP connections per instance were seventeen TLS handshakes on every cold start and sockets
+   * held open into a Neon compute that wants to suspend. Five is headroom over three; twenty
+   * idle seconds closes a socket the moment a burst ends; ten seconds bounds a hung connect
+   * under a Neon wake; thirty minutes of lifetime recycles a socket across the pooler's own
+   * rotations. Chosen by `getDb()` when `VERCEL` is set, and nowhere else.
+   */
+  vercel: {
+    maxConnections: 5,
+    idleTimeoutSeconds: 20,
+    connectTimeoutSeconds: 10,
+    maxLifetimeSeconds: 30 * 60,
+  },
 } as const;
 
 /** The formula in this module's docblock, executable. */

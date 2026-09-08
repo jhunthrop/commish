@@ -13,6 +13,13 @@ function frame(event: RealtimeEvent): Uint8Array {
 
 const KEEPALIVE = encoder.encode(": keepalive\n\n");
 
+/**
+ * The opening bytes: the browser's reconnect delay for the planned close (`retry:` is the SSE
+ * field that sets it), then the same comment frame the keepalive sends. The `retry:` line is
+ * part of the comment frame's own message, so an `EventSource` still sees no event here.
+ */
+const OPENING = encoder.encode(`retry: ${REALTIME_CONFIG.retryHintMs}\n: keepalive\n\n`);
+
 /** Live-only cursor: XREAD's "everything from now on". */
 const LIVE = "$";
 
@@ -46,14 +53,22 @@ export function resumeCursor(lastEventId: string | null, now: number): string {
   return lastEventId;
 }
 
+export interface EventStreamOptions {
+  /** Called with every frame this connection relays, after it is enqueued — the league route's
+   *  seam for waking its draft advance loop off the stream it already reads (finding 2). */
+  readonly onEvent?: (event: RealtimeEvent) => void;
+  /** Test seam over `REALTIME_CONFIG.plannedCloseMs`. */
+  readonly plannedCloseMs?: number;
+}
+
 /**
  * The shared SSE builder both `createLeagueEventStream` and `createUserEventStream` go
  * through — one connection ceiling (`openPerUser`/`maxStreamsPerUser`), one keepalive
- * cadence, one resume rule, one Redis connection lifecycle, regardless of which stream key
- * the caller resolved. A notices tab is a Redis socket and an fd like any other, so it
- * correctly counts against the same per-user ceiling a league room's tabs do.
+ * cadence, one resume rule, one Redis connection lifecycle, one planned close, regardless of
+ * which stream keys the caller resolved. A notices tab is a Redis socket and an fd like any
+ * other, so it correctly counts against the same per-user ceiling a league room's tabs do.
  */
-function createEventStream(request: Request, userId: string, streamKey: string): Response {
+function createEventStream(request: Request, userId: string, streamKeys: readonly [string, ...string[]], options: EventStreamOptions = {}): Response {
   const open = openPerUser.get(userId) ?? 0;
   if (open >= REALTIME_CONFIG.maxStreamsPerUser) {
     return fail("You have too many live connections open. Close a tab and try again.", 429);
@@ -70,15 +85,20 @@ function createEventStream(request: Request, userId: string, streamKey: string):
   };
 
   const afterId = resumeCursor(request.headers.get("last-event-id"), Date.now());
+  const [streamKey, ...extraStreamKeys] = streamKeys;
 
   const controller = new AbortController();
   request.signal.addEventListener("abort", () => controller.abort(), { once: true });
+  // THE PLANNED CLOSE (finding 3): end the stream ourselves, cleanly, before the platform's
+  // function cap kills it. The client reconnects after `retryHintMs` and resumes from its
+  // Last-Event-ID, inside the catch-up window, so nothing is lost and nothing is logged.
+  const plannedClose = setTimeout(() => controller.abort(), options.plannedCloseMs ?? REALTIME_CONFIG.plannedCloseMs);
 
   const stream = new ReadableStream<Uint8Array>({
     async start(sink) {
       let keepalive: ReturnType<typeof setInterval> | undefined;
       let redis: ReturnType<typeof createRedisConnection> | undefined;
-      // THE OPENING BYTE, before anything that can block. An `EventSource` does not fire `open`
+      // THE OPENING BYTES, before anything that can block. An `EventSource` does not fire `open`
       // — and a fetch does not resolve its response — until the first chunk of the body arrives,
       // and this body's next write was the keepalive fifteen seconds later: `subscribe()` blocks
       // on XREAD and a quiet league has nothing to say. So every room in this product spent its
@@ -93,7 +113,7 @@ function createEventStream(request: Request, userId: string, streamKey: string):
       // carries no event and cannot be mistaken for one — it exists only to complete the
       // response head and flip the client to open. Enqueued before `createRedisConnection()`,
       // which can itself take a moment on a cold socket.
-      sink.enqueue(KEEPALIVE);
+      sink.enqueue(OPENING);
       try {
         redis = createRedisConnection();
         keepalive = setInterval(() => {
@@ -103,13 +123,15 @@ function createEventStream(request: Request, userId: string, streamKey: string):
             controller.abort();
           }
         }, REALTIME_CONFIG.keepaliveMs);
-        for await (const event of subscribe({ redis, streamKey, afterId, signal: controller.signal })) {
+        for await (const event of subscribe({ redis, streamKey, extraStreamKeys, afterId, signal: controller.signal })) {
           sink.enqueue(frame(event));
+          options.onEvent?.(event);
         }
       } catch (error: unknown) {
         if (!controller.signal.aborted) throw error;
       } finally {
         clearInterval(keepalive);
+        clearTimeout(plannedClose);
         redis?.disconnect();
         release();
         try {
@@ -140,9 +162,13 @@ function createEventStream(request: Request, userId: string, streamKey: string):
  *
  * Resume: reads the standard Last-Event-ID header (sent automatically by EventSource on
  * reconnect) and replays everything after it. A fresh connection starts at "$" (live only).
+ *
+ * ALSO CARRIES THE CALLER'S OWN USER STREAM (finding 3): the notice frames that used to need a
+ * second connection per tab ride this one, on the same socket, for the same caller — never a
+ * leaguemate's, because the user key is the signed-in caller's own.
  */
-export function createLeagueEventStream(request: Request, leagueId: string, userId: string): Response {
-  return createEventStream(request, userId, REALTIME_CONFIG.leagueStreamKey(leagueId));
+export function createLeagueEventStream(request: Request, leagueId: string, userId: string, options?: EventStreamOptions): Response {
+  return createEventStream(request, userId, [REALTIME_CONFIG.leagueStreamKey(leagueId), REALTIME_CONFIG.userStreamKey(userId)], options);
 }
 
 /**
@@ -150,8 +176,8 @@ export function createLeagueEventStream(request: Request, leagueId: string, user
  * (`REALTIME_CONFIG.userStreamKey`), used today for `notice.created`. Same resume rule, same
  * connection ceiling as `createLeagueEventStream`: `GET /api/notices/stream` calls this with
  * the caller's own id, and there is no route anywhere that takes a user id from a request —
- * see `src/app/api/notices/stream/route.ts`.
+ * see `src/app/api/notices/stream/route.ts`. A tab with no league stream open holds this one.
  */
-export function createUserEventStream(request: Request, userId: string): Response {
-  return createEventStream(request, userId, REALTIME_CONFIG.userStreamKey(userId));
+export function createUserEventStream(request: Request, userId: string, options?: EventStreamOptions): Response {
+  return createEventStream(request, userId, [REALTIME_CONFIG.userStreamKey(userId)], options);
 }

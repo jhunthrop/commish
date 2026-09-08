@@ -3,8 +3,16 @@ import { kickoffInstant } from "./kickoff";
 import type { getDb } from "@/db/client";
 import { nflGames } from "@/db/schema";
 import { LEAGUE_CONFIG } from "@/league";
+import { createTtlMemo } from "@/lib/cache/ttl-memo";
+import { REFERENCE_MEMO_CONFIG } from "./config";
 
 type Db = ReturnType<typeof getDb>;
+
+// Memoized per process (Neon cost audit finding 7): every league room render re-read the same
+// week's schedule rows. See `REFERENCE_MEMO_CONFIG` for each TTL's reasoning.
+const fixtureLabelsMemo = createTtlMemo<ReadonlyMap<string, FixtureLabel>>(REFERENCE_MEMO_CONFIG.fixtureLabelsTtlMs);
+const byeWeeksMemo = createTtlMemo<ReadonlyMap<string, number>>(REFERENCE_MEMO_CONFIG.byeWeeksTtlMs);
+const BYE_WEEKS_KEY = "byes";
 
 /** One NFL team's fixture for a week, already worded for a lineup row. */
 export interface FixtureLabel {
@@ -32,7 +40,11 @@ function dayOf(gameDate: string): string {
  * same way. A team absent from the map is on BYE that week: a real fact derived from a real
  * schedule, not an invention, and the one case a lineup manager most needs shouted.
  */
-export async function fixtureLabelsByTeam(db: Db, week: number): Promise<ReadonlyMap<string, FixtureLabel>> {
+export function fixtureLabelsByTeam(db: Db, week: number): Promise<ReadonlyMap<string, FixtureLabel>> {
+  return fixtureLabelsMemo.get(`week:${week}`, () => readFixtureLabelsByTeam(db, week));
+}
+
+async function readFixtureLabelsByTeam(db: Db, week: number): Promise<ReadonlyMap<string, FixtureLabel>> {
   const rows = await db
     .select({
       home: nflGames.homeNflTeam,
@@ -76,7 +88,11 @@ export async function fixtureLabelsByTeam(db: Db, week: number): Promise<Readonl
  * partially ingested schedule names no byes, and a game outside the regular-season window can
  * neither fill nor invent one.
  */
-export async function byeWeeksByTeam(db: Db): Promise<ReadonlyMap<string, number>> {
+export function byeWeeksByTeam(db: Db): Promise<ReadonlyMap<string, number>> {
+  return byeWeeksMemo.get(BYE_WEEKS_KEY, () => readByeWeeksByTeam(db));
+}
+
+async function readByeWeeksByTeam(db: Db): Promise<ReadonlyMap<string, number>> {
   const rows = await db
     .select({ week: nflGames.week, home: nflGames.homeNflTeam, away: nflGames.awayNflTeam })
     .from(nflGames)
