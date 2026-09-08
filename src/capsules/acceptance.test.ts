@@ -335,3 +335,35 @@ describe("the word bands are exactly the configured ones", () => {
     expect(CAPSULE_CONFIG.sizes.full).toMatchObject({ minWords: 240, maxWords: 300 });
   });
 });
+
+/**
+ * THE NARROWED FLOOR RULE (fix round) — the founder's ruling is about a bare "floor of 91", a p10
+ * restated as a talent claim. Two narrowings were measured into this rule and both need pinning:
+ * a floor with no FIGURE beside it is an ordinary thing an analyst says, and the availability
+ * language that satisfies the rule is the widened list rather than the original four phrasings.
+ */
+describe("the floor rule, narrowed", () => {
+  const facts = buildPlayerFacts(baseInput());
+
+  it("lets a floor with no number through, availability language or not", () => {
+    const result = slotResult("He has a high floor and the role behind it is not going anywhere.", facts);
+    expect(result.ok).toBe(true);
+  });
+
+  it("still refuses a floor with a number and no availability language", () => {
+    const result = slotResult("His floor is 178 points and that is the number to plan a season around.", facts);
+    expect(result.ok).toBe(false);
+    expect(result.violations).toContain(UNFRAMED_FLOOR_VIOLATION);
+  });
+
+  it("accepts a floor with a number once availability is anywhere in the text", () => {
+    for (const framing of [
+      "the durability is the only question",
+      "he was sidelined twice last year",
+      "the games he misses are the whole risk",
+    ]) {
+      const result = slotResult(`His floor is 178 points, and ${framing} behind that number.`, facts);
+      expect({ framing, ok: result.ok }).toEqual({ framing, ok: true });
+    }
+  });
+});
