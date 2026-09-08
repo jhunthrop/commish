@@ -15,9 +15,9 @@ function okResponse(content: string): Response {
 }
 
 const GOOD_COMPACT =
-  "This player is a clear buy for his offense this season. Our number backs the price against his board rank and market slot, and the range from top to bottom still lands him firmly in his tier. Draft him with confidence at his current price this season, he anchors the offense every single week without fail, and the whole coaching staff plainly builds the game plan around keeping him involved on early downs and on passing downs alike.";
+  "This player is a clear buy for his offense this season. Our number backs the price against his board rank and market slot, and the range from top to bottom still lands him firmly in his tier. Draft him with confidence at his current price this season, he anchors the offense every single week without fail, and the whole coaching staff plainly builds the game plan around keeping him involved on early downs and on passing downs alike plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further.";
 const GOOD_FULL =
-  `${GOOD_COMPACT} The case only gets stronger once you look at the full picture: our number sits well clear of his market slot, and his board rank backs up the price plainly. He is the workhorse of his offense, the engine of a unit that leans on him on early downs and in the passing game alike, and that workload level is exactly why the range still lands him firmly in his tier from top to bottom this year. Nothing in the fact sheet points to a real downside here, so the call is simple: he is a buy at his current market price, full stop, book him with confidence on your board this season and do not look back at all, because the whole shape of his offense points the same direction week after week and there is no reason to expect that to change any time soon this fall.`;
+  `${GOOD_COMPACT} The case only gets stronger once you look at the full picture: our number sits well clear of his market slot, and his board rank backs up the price plainly. He is the workhorse of his offense, the engine of a unit that leans on him on early downs and in the passing game alike, and that workload level is exactly why the range still lands him firmly in his tier from top to bottom this year. Nothing in the fact sheet points to a real downside here, so the call is simple: he is a buy at his current market price, full stop, book him with confidence on your board this season and do not look back at all, because the whole shape of his offense points the same direction week after week and there is no reason to expect that to change any time soon this fall. plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably.`;
 
 /** A fetch fixture size-aware the way a real gateway response is: `write.ts`'s own size
  *  instruction text names the size directly, so a fixture can answer each request with a body
@@ -211,11 +211,12 @@ describe("runCapsuleSweepStep — across ticks", () => {
     for (const index of [1, 2, 3]) {
       await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 250 - index });
     }
-    // Production geometry: the step reserves 25s a player (5s pacing plus one gateway round at its
-    // own 20s timeout). One clock read is spent on the pass's own `asOf`, so with a 20s step the
-    // first loop check sits at 20s and fits inside a 50s window, and the second sits at 40s and
-    // does not. `pacingMs: 0` only stops the test sleeping; the reserve is the production one.
-    const clock = advancingClock("2026-09-04T12:00:00.000Z", 20_000);
+    // Production geometry: the step reserves 35s a player (three calls at the gateway's own 5s
+    // spacing plus one 20s gateway timeout). One clock read is spent on the pass's own `asOf`, so
+    // with a 10s step the first loop check sits at 10s and fits inside a 50s window, and the
+    // second sits at 20s and does not. `pacingMs: 0` only stops the test sleeping; the reserve is
+    // the production one.
+    const clock = advancingClock("2026-09-04T12:00:00.000Z", 10_000);
     const outcome = await runCapsuleSweepStep(
       db,
       clock,
@@ -240,8 +241,8 @@ describe("runCapsuleSweepStep — across ticks", () => {
     for (const index of Array.from({ length: 12 }, (_, i) => i + 1)) {
       await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 300 - index });
     }
-    // The budget production runs at (JOBS_TICK_BUDGET_MS=280000). At a 25s reserve and a clock
-    // that walks 25s a read, the run fits ten players and stops before the eleventh.
+    // The budget production runs at (JOBS_TICK_BUDGET_MS=280000). At a 35s reserve and a clock
+    // that walks 25s a read, the run fits nine players and stops before the tenth.
     const clock = advancingClock("2026-09-04T12:00:00.000Z", 25_000);
     const outcome = await runCapsuleSweepStep(
       db,
@@ -251,10 +252,10 @@ describe("runCapsuleSweepStep — across ticks", () => {
       new Date("2026-09-04T12:04:40.000Z"),
     );
 
-    expect(outcome.summary).toContain("10 processed");
-    expect(outcome.summary).toContain("continuing this tick's remainder in a follow-up run of 2");
-    expect((await getStoredCapsule(db, "p10"))?.source).toBe("llm");
-    expect(await getStoredCapsule(db, "p11")).toBeNull();
+    expect(outcome.summary).toContain("9 processed");
+    expect(outcome.summary).toContain("continuing this tick's remainder in a follow-up run of 3");
+    expect((await getStoredCapsule(db, "p9"))?.source).toBe("llm");
+    expect(await getStoredCapsule(db, "p10")).toBeNull();
   });
 
   it("a tick with no room for even one player enqueues nothing and says why", async () => {
@@ -322,7 +323,7 @@ describe("runCapsuleSweepStep — the repetition chain", () => {
   it("flags a sentence the whole board is saying and stamps both players for regeneration", async () => {
     await seedTwo();
 
-    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch() }, {});
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch(), pacingMs: 0 }, {});
 
     expect(outcome.summary).toContain("1 stock sentence(s) found, 2 player(s) queued");
     expect((await getStoredCapsule(db, "p1"))?.narrative).toEqual({ call: STOCK });
@@ -332,12 +333,12 @@ describe("runCapsuleSweepStep — the repetition chain", () => {
 
   it("quotes the flagged sentence into the next run's own prompt", async () => {
     await seedTwo();
-    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch() }, {});
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch(), pacingMs: 0 }, {});
 
     // The stamped hash makes both players eligible again, and this run's avoid list is computed
     // from what the board is still saying, so the flagged sentence reaches the prompt verbatim.
     const prompts: string[] = [];
-    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch(prompts) }, {});
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch(prompts), pacingMs: 0 }, {});
 
     const narrativePrompt = prompts.find((prompt) => prompt.includes("Return ONE JSON object"));
     expect(narrativePrompt).toBeDefined();

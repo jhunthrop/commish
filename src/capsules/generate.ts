@@ -2,7 +2,7 @@ import { CAPSULE_MODEL } from "./config";
 import type { PlayerFacts } from "./facts";
 import { generateNarrative, type NarrativeResult } from "./narrative";
 import { renderTemplateCapsule } from "./template";
-import { validateCapsule, type CapsuleSize } from "./validate";
+import { softCorrectionFor, validateCapsule, type CapsuleSize } from "./validate";
 import { addGatewayUsage, CapsuleGenerationError, generateCapsuleBody, type CapsuleWriterDeps, type GatewayUsage, type PriorAttempt } from "./write";
 
 /**
@@ -65,6 +65,10 @@ async function generateOneSize(facts: PlayerFacts, size: CapsuleSize, deps: Caps
   // that text rather than a fresh attempt (capsule acceptance round, 2026-09-07 — see
   // `PriorAttempt.lengthCorrection`).
   let lengthCorrection: PriorAttempt["lengthCorrection"];
+  // Set when every violation was a FRAMING note (the unframed floor claim, the uncited downside):
+  // the retry keeps the prose and fixes the clause, rather than throwing away a capsule that was
+  // honest and in voice for the sake of one sentence (acceptance round, task 10).
+  let softCorrections: readonly string[] | undefined;
   let usage: GatewayUsage | null = null;
   // Classifies the FALLBACK, not every attempt along the way: only the last attempt's own outcome
   // decides whether the eventual template read is labeled "throttled" or "failed validation" (see
@@ -73,13 +77,15 @@ async function generateOneSize(facts: PlayerFacts, size: CapsuleSize, deps: Caps
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
-      const generated = await generateCapsuleBody(facts, size, deps, attempt === 1 ? undefined : { body: priorBody, violations, lengthCorrection });
+      const generated = await generateCapsuleBody(facts, size, deps, attempt === 1 ? undefined : { body: priorBody, violations, lengthCorrection, softCorrections });
       usage = addGatewayUsage(usage, generated.usage);
       const result = validateCapsule(generated.text, facts, size);
       if (result.ok) return { text: generated.text, source: "llm", usage, fallbackReason: null };
       priorBody = generated.text;
       violations = result.violations;
       lengthCorrection = result.bandFailure ?? undefined;
+      const corrections = result.violations.map((violation) => softCorrectionFor(violation));
+      softCorrections = corrections.every((correction) => correction !== null) ? (corrections as readonly string[]) : undefined;
       lastAttemptWasTransportFailure = false;
     } catch (error: unknown) {
       // A transport failure that survived `write.ts`'s own retry (which, for a 429 specifically,
@@ -94,6 +100,7 @@ async function generateOneSize(facts: PlayerFacts, size: CapsuleSize, deps: Caps
       priorBody = "";
       violations = [`The previous attempt failed to generate at all (${error instanceof Error ? error.message : String(error)}). Try again.`];
       lengthCorrection = undefined;
+      softCorrections = undefined;
       lastAttemptWasTransportFailure = true;
     }
   }
