@@ -12,11 +12,12 @@
  * second person.
  */
 import type { Position } from "@/domain/player";
+import { positionWord } from "@/domain/position-words";
 import { BENCH_SLOT, type RosterSlotType } from "@/domain/roster";
 import type { PickReason } from "@/projections/decide/draft";
 import { shipsProjectedRows } from "@/projections/preseason/kdef-decision";
 import type { SeatTendency } from "../sim/room-odds";
-import type { PositionRun } from "./signals";
+import type { PositionRun } from "./view";
 
 export interface WhyFacts {
   readonly position: Position;
@@ -34,19 +35,6 @@ export interface WhySentence {
   readonly text: string;
   /** `cliff:1`, `value:0`: the family and the shape dealt this turn. */
   readonly shape: string;
-}
-
-const POSITION_WORDS: Readonly<Record<Position, readonly [string, string]>> = {
-  QB: ["quarterback", "quarterbacks"],
-  RB: ["back", "backs"],
-  WR: ["receiver", "receivers"],
-  TE: ["tight end", "tight ends"],
-  K: ["kicker", "kickers"],
-  DEF: ["defense", "defenses"],
-};
-
-export function positionWord(position: Position, plural: boolean): string {
-  return POSITION_WORDS[position][plural ? 1 : 0];
 }
 
 function capitalize(text: string): string {

@@ -4,7 +4,7 @@ import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 import type { Player } from "@/domain/player";
 import { useToast } from "@/components/ui";
 import { formatCountdown, useCountdown } from "@/components/ui/countdown";
-import { advisorRoomKey, useAdvisor } from "../advisor/use-advisor";
+import { useAdvisor } from "../advisor/use-advisor";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { useQueueHandlers } from "../hooks/use-queue-handlers";
 import { boardRanks } from "../state/pick-review";
@@ -71,15 +71,16 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   );
   const { pending, begin, undo } = usePendingPick(submitPick, view.deadlineAt);
   const queueHandlers = useQueueHandlers(room);
+  const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
   // ONE advisor fetch per room (simplification round): the Assistant tab's card and the odds
-  // column on every list read the same view, recomputed on every pick event.
-  const advisor = useAdvisor(view.draftId, advisorRoomKey(view.picks.length, view.pickNumber), room.myTeamId);
+  // column on every list read the same view, recomputed on every applied action, and shown only
+  // for players still on this board (`presentView`, the wrong-people guard).
+  const advisor = useAdvisor({ draftId: view.draftId, sequence: view.sequence, availablePlayerIds: available }, room.myTeamId);
 
   const boardIds = useMemo(() => room.players.map((player) => player.id), [room.players]);
   const { sheet, move, note, reset, hasServerSheet, startServerSheet } = useSheet(view.draftId, boardIds, view.leagueId);
   const ranks = useMemo(() => boardRanks(room.players), [room.players]);
   const mySheetRanks = useMemo(() => sheetRanksOf(sheet), [sheet]);
-  const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
   const byeWeeks = room.byeWeeks ?? new Map<string, number>();
   const reasons = room.reasons ?? new Map();
   const laws = room.laws ?? [];

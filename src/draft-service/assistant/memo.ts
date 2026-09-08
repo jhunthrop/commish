@@ -1,6 +1,6 @@
 /**
- * THE ROOM FACTS MEMO — everything about one room state that no seat owns (the odds table and
- * the tier standings), remembered so twelve viewers of one room cost one simulation and a room
+ * THE ROOM FACTS MEMO — everything about one room state that no seat owns (the odds table, the
+ * tier standings and the tier collapses), remembered so twelve viewers of one room cost one simulation and a room
  * nobody has open costs nothing (the founder's cost ruling, simplification round). Keyed by
  * draft id: a request for a NEWER sequence of the same draft replaces the room's entry (the old
  * state can never be asked for again), and the least-recently computed room is evicted past
@@ -12,11 +12,13 @@
 import type { Recommendation } from "@/projections/decide/draft";
 import type { RoomOddsTable } from "../sim/room-odds";
 import { ADVISOR_CONFIG } from "./config";
-import type { TierStandingView } from "./view";
+import type { TierCollapse, TierStandingView } from "./view";
 
 export interface RoomFacts {
   readonly table: RoomOddsTable;
   readonly tiers: Readonly<Record<string, TierStandingView>>;
+  /** The strip's tier collapses (`signals.ts`), a fact about the room, not the viewer. */
+  readonly collapses: readonly TierCollapse[];
 }
 
 interface Entry {

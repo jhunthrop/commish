@@ -150,27 +150,23 @@ replays byte-identically too: the driver derives each bot's stream cursor from t
 itself (the non-auto pick count — exactly one draw per sampled pick), never from memory, and
 human picks never advance a bot's stream.
 
-Bot cadence has two lanes, chosen by seat arithmetic (`MockDraftMeta.simToNextPick`,
-`src/mock-draft-service/driver.ts`):
+Bot cadence is ONE lane for every room, a lone human's included (founder report 2026-09-08,
+which retired the older one-human "sim to next pick" lane after a live mock landed every bot
+pick in one burst and two drivers raced the same stretch):
 
-- **Sim-to-next-pick — exactly one human seat** (founder directive, 2026-08-26: "there
-  shouldn't be a wait at all — like Madden's sim to next pick"). Zero think-delay, and one
-  drive call carries every consecutive bot pick. The actions route fires that drive inside the
-  human's own pick request (`simMockToNextHumanTurn`, `@/draft-service`) and answers with the
-  post-sim board, so the lone human is back on the clock the moment their screen updates — a
-  whole solo draft takes exactly as many requests as the human has picks. The wire's
-  `expectedBotPickSeconds` is `0` for these rooms, which the dock renders as "any moment".
-  Completion settles inside the same call, so the results view is live the instant the last
-  pick lands. Pick CHOICE is untouched — the delay rides its own rng stream, so a sim room's
-  log is byte-identical to the log the paced driver would have produced.
-- **Paced — two or more human seats**: a seeded think-delay (`botDelay`: 3–9s, capped at half
-  the fastest clock) so a live lobby sees a human-feeling room, never an eleven-pick burst —
-  sampled live at Task 10's checkpoint: median 6.0s across 43 gaps, zero bursts, zero bot
-  autopicks. The room's "your turn" ETA prices bot turns at the delay draw's midpoint
-  (`expectedBotThinkDelaySeconds`), carried over the wire as
-  `MockRoomInfo.expectedBotPickSeconds`. Realism is FOR the people sharing the room; a lone
-  human has no one to share it with, which is why the lane split is seat arithmetic and never a
-  setting.
+- **Paced, one pick per call.** Each bot pick falls due a seeded think-delay after the previous
+  pick — `MOCK_CONFIG.botDelay { baseMs: 700, jitterMs: 250 }`, uniform 450–950 ms, drawn from
+  the pick's own rng stream (`botThinkDelayMs`, `src/mock-draft/bots.ts`), so the board
+  animates pick by pick and the draft still replays exactly. A drive (`driveBotPick`) or an
+  advance call (`applyDueWork`, `src/draft-service/advance.ts`) lands at most the one pick that
+  is due, stamped at its due instant, so the next bot's delay chains from the landed pick and
+  never from a driver's tick. Measured after the change: consecutive bot picks 527–947 ms
+  apart across a full 12-team mock, never two in one call.
+- **Nothing rides the pick request.** The actions route answers the human's own pick and
+  returns; the room's SSE advance loop (woken by that pick's frame) and advance-on-read land the
+  bots at their due instants. The room's "your turn" ETA prices every bot turn at the delay
+  draw's midpoint (`expectedBotThinkDelaySeconds`), carried over the wire as
+  `MockRoomInfo.expectedBotPickSeconds`.
 
 ## The exclusion architecture — "a rehearsal never counts"
 

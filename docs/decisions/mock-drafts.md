@@ -156,29 +156,27 @@ differential proof was extended over the settle (still zero consequence statemen
 invite accept), proven both ways. The exclusion contract runs in both directions: no mock row
 in a real aggregate, no bot row in a real league.
 
-## 17. Sim-to-next-pick for a lone human; paced cadence only when humans share the room (founder directive, 2026-08-26)
+## 17. Every room paces its bots, one pick per call, 700 ms plus or minus 250 ms (founder report 2026-09-08; supersedes the 2026-08-26 sim-to-next-pick directive)
 
-The founder, on solo mocks: "there shouldn't be a wait at all — think about it in Madden when
-doing a draft and 'sim to next pick' should be the default." Ruled and shipped post-merge:
+The 2026-08-26 directive ("there shouldn't be a wait at all — like Madden's sim to next pick")
+gave a lone human's room a zero-delay lane that applied every consecutive bot pick in one call.
+The founder's live mock on 2026-09-08 showed what that cost: the board landed all at once, the
+room hung on his turn, and the card named drafted players. Measured, then ruled:
 
-- The lane split is SEAT ARITHMETIC, never a setting: exactly one human seat sims
-  (`MockDraftMeta.simToNextPick`); two or more humans keep the paced 3–9s cadence, because
-  realism is for the people sharing the room and a lone human has no one to share it with. The
-  production invariant (every room has at least its host) makes "exactly one" and "at most one"
-  the same test; an all-bot fixture room keeps the cadence, which keeps the delay/replay proofs
-  driveable as written.
-- Zero think-delay changes NOTHING about pick choice: the delay draw rides its own rng stream,
-  so a sim room's log is byte-identical to the paced driver's would-be log — the replay law
-  survives untouched.
-- The drive is level-triggered from two edges: the ticker's own lane (≤1s after start or a
-  host autopick) and `simMockToNextHumanTurn` inside the human's own pick request, which
-  answers with the post-sim board. A whole solo draft = exactly the human's own pick count in
-  requests, proven at the route in `api-routes.test.ts`.
-- The tick budget (`maxBotPicksPerTick`) is spent per PICK, gated between drives — a started
-  stretch runs to its natural end. Completion settles inside the finishing drive, so results
-  are live the instant the last pick lands.
-- The wire prices a sim room's bot turns at `expectedBotPickSeconds: 0` — the dock's existing
-  arithmetic renders that as "any moment"; no new copy.
+- ONE lane, seat count irrelevant: every bot pick falls due `MOCK_CONFIG.botDelay` after the
+  previous pick — `{ baseMs: 700, jitterMs: 250 }`, uniform 450–950 ms, seeded per pick
+  (`botThinkDelayMs`). A drive or an advance call lands at most the one due pick, stamped at
+  its due instant, so the next delay chains from the landed pick. `simToNextPick`,
+  `simToHumanTurn` and `simMockToNextHumanTurn` are gone; the pick request answers its own pick
+  and nothing else rides its path.
+- Why one lane: two drivers of the same zero-delay stretch (the request's sim and the SSE
+  loop's observe-wake) raced, each backed off on refusal, and the loop parked on its 30 s idle
+  poll — the measured 31 s stall. One driver per due instant has no stretch to race over.
+- Pick CHOICE is untouched: the delay draw rides its own rng stream, so the replay law holds
+  as before (`driver.test.ts`'s replay proof).
+- The tick budget (`maxBotPicksPerTick`) is spent one per landed pick. Completion settles in
+  the drive that observes it.
+- The wire prices every room's bot turns at the draw's midpoint (`expectedBotPickSeconds`).
 
 ## Deferred and refused, each with the fact it waits on
 

@@ -47,7 +47,7 @@ const BOT_COUNT = TEAM_COUNT - 1;
 /**
  * `MOCK_CONFIG.pickClockSecondsOptions`' own WIDEST tier (90s), not its narrowest (30s) —
  * deliberately, even though every one of these three is a "fast clock" next to any real
- * league's own (minutes to hours): `MOCK_CONFIG.botDelay` (3-9s) governs how fast BOTS move
+ * league's own (minutes to hours): `MOCK_CONFIG.botDelay` (under a second) governs how fast BOTS move
  * regardless of which tier a room picks, so 90s costs the bot-driven portions of this journey
  * nothing. What it buys is real reliability for the HUMAN'S own one live click: 30s measured
  * true against a real browser proved fragile in practice (a real run's own autopick fired before
@@ -76,12 +76,12 @@ async function setTableChip(page: import("@playwright/test").Page, chip: string,
   }).toPass({ timeout: 20_000 });
 }
 
-/** `MOCK_CONFIG.botDelay.maxSeconds` (9) times the widest gap a solo room's own shuffled draft
- *  order (`drawSequenceFor`, `@/draft-service/order.ts` — seeded from the draft id, never
- *  predictable ahead of creation) could ever put between the host's own seat and pick 1: every
- *  other seat is a bot, so the worst case is the host landing last in the shuffle. Padded well
- *  past the arithmetic bound for real scheduler jitter. */
-const ON_CLOCK_TIMEOUT_MS = (BOT_COUNT + 2) * MOCK_CONFIG.botDelay.maxSeconds * 1_000;
+/** The slowest seeded bot delay (`MOCK_CONFIG.botDelay`, base plus jitter) times the widest gap
+ *  a solo room's own shuffled draft order (`drawSequenceFor`, `@/draft-service/order.ts` —
+ *  seeded from the draft id, never predictable ahead of creation) could ever put between the
+ *  host's own seat and pick 1: every other seat is a bot, so the worst case is the host landing
+ *  last in the shuffle. Padded well past the arithmetic bound for real scheduler jitter. */
+const ON_CLOCK_TIMEOUT_MS = (BOT_COUNT + 2) * (MOCK_CONFIG.botDelay.baseMs + MOCK_CONFIG.botDelay.jitterMs) + 15_000;
 
 /** The exact conflict `DraftStore.applyAction` answers when another actor's action already
  *  advanced the log first (`store.ts`'s own `isSequenceConflict` branch) — never guessed, this
@@ -315,19 +315,16 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
   const pickNumberBeforeOurTurn = pickNumberFromTurnLabel(await managerA.getByTestId("turn-label").innerText());
   await makeTopPick(managerA);
 
-  // --- Bots pick around it, SIM-TO-NEXT-PICK style (the founder's directive: a lone human
-  // never waits): the pick request itself sims every consecutive bot pick, so the receipt of
-  // "the bots picked around me" is the human being back ON the clock — quickly, never a
-  // think-delay cadence — with the board's own pick number already advanced past their own
-  // pick. A 12-team snake's last seat picks twice in a row, so "back on the clock" covers
-  // every seat; the pick number strictly exceeding the human's own pick is what proves other
-  // seats (or the wrap's own second turn) genuinely moved without one further action from this
-  // page. The 20s bound is generous slack for the request plus SSE folding — the paced lane's
-  // 3–9s-per-bot arithmetic would blow it eleven times over, so this bound also PROVES the sim
-  // lane is the one driving.
-  await expect(managerA.getByTestId("room-rail").getByText("You're on the clock")).toBeVisible({ timeout: 20_000 });
+  // --- Bots pick around it at a lifelike pace (founder report 2026-09-08): each bot's pick
+  // lands `MOCK_CONFIG.botDelay` (450 to 950 ms) after the previous one, driven by the room's
+  // own SSE advance loop, so the receipt of "the bots picked around me" is the human being back
+  // ON the clock with the board's own pick number already advanced past their own pick. A
+  // 12-team snake's last seat picks twice in a row, so "back on the clock" covers every seat;
+  // the pick number strictly exceeding the human's own pick is what proves other seats (or the
+  // wrap's own second turn) genuinely moved without one further action from this page.
+  await expect(managerA.getByTestId("room-rail").getByText("You're on the clock")).toBeVisible({ timeout: ON_CLOCK_TIMEOUT_MS });
   await expect
-    .poll(async () => pickNumberFromTurnLabel(await managerA.getByTestId("turn-label").innerText()), { timeout: 20_000 })
+    .poll(async () => pickNumberFromTurnLabel(await managerA.getByTestId("turn-label").innerText()), { timeout: ON_CLOCK_TIMEOUT_MS })
     .toBeGreaterThan(pickNumberBeforeOurTurn);
 
   // --- Fast-forward the remaining board server-side (the sanctioned shortcut — see the

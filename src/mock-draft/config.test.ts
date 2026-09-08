@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MS_PER_SECOND } from "@/domain/duration";
 import { DRAFT_SERVICE_CONFIG } from "@/draft-service/config";
 import { copyViolations } from "@/integrity/copy-rules";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
@@ -80,11 +81,15 @@ function nameViolations(name: string): readonly string[] {
 describe("MOCK_CONFIG", () => {
   it("keeps every bot think-delay inside the fastest pick clock, with room for the human safety net", () => {
     const fastest = Math.min(...MOCK_CONFIG.pickClockSecondsOptions);
-    expect(MOCK_CONFIG.botDelay.maxSeconds).toBeLessThan(fastest * MOCK_CONFIG.botDelay.maxFractionOfClock);
+    const { baseMs, jitterMs, maxFractionOfClock } = MOCK_CONFIG.botDelay;
+    expect((baseMs + jitterMs) / MS_PER_SECOND).toBeLessThan(fastest * maxFractionOfClock);
   });
 
-  it("keeps the minimum bot think-delay below the maximum", () => {
-    expect(MOCK_CONFIG.botDelay.minSeconds).toBeLessThan(MOCK_CONFIG.botDelay.maxSeconds);
+  it("paces a bot pick at the ruled lifelike cadence: 700 ms base, plus or minus 250 ms, never a zero delay (founder report 2026-09-08)", () => {
+    const { baseMs, jitterMs } = MOCK_CONFIG.botDelay;
+    expect(jitterMs).toBeLessThan(baseMs);
+    expect(baseMs - jitterMs).toBe(450);
+    expect(baseMs + jitterMs).toBe(950);
   });
 
   it("holds a bot roster larger than the largest room, so the seat draw never runs dry", () => {

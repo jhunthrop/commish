@@ -906,7 +906,7 @@ describe("draft ticker — mock lanes (Phase 4.5, Task 6)", () => {
       sweepMocks: NO_SWEEP,
       driveMockPick: async (state) => {
         seenStates.push(state);
-        return { picked: true as const, picks: 1 };
+        return { picked: true as const };
       },
     });
 
@@ -1011,7 +1011,7 @@ describe("draft ticker — mock lanes (Phase 4.5, Task 6)", () => {
     await seedSharedPlayers();
     const first = await liveMockDraft("wire_budget_a");
     const second = await liveMockDraft("wire_budget_b");
-    const driveMockPick = vi.fn(async () => ({ picked: true as const, picks: 1 }));
+    const driveMockPick = vi.fn(async () => ({ picked: true as const }));
     const ticking = createDraftTicker({
       db,
       store: first.store,
@@ -1048,27 +1048,4 @@ describe("draft ticker — mock lanes (Phase 4.5, Task 6)", () => {
     expect(driveMockPick).not.toHaveBeenCalled();
   });
 
-  it("a sim stretch spends its whole pick count: one stretch can exhaust the budget for the tick", async () => {
-    // Sim-to-next-pick (the founder's directive): a lone human's room lands a whole bot
-    // stretch in one drive, and the budget is spent per PICK, never per call — so a budget of
-    // 3 is gone after one 3-pick stretch, and the second live mock is not driven this tick.
-    await seedSharedPlayers();
-    const first = await liveMockDraft("wire_sim_budget_a");
-    await liveMockDraft("wire_sim_budget_b");
-    const driveMockPick = vi.fn(async () => ({ picked: true as const, picks: 3 }));
-    const ticking = createDraftTicker({
-      db,
-      store: first.store,
-      clock,
-      autoStart: async () => [],
-      reconcileHouse: NO_OP_HOUSE_RECONCILE,
-      startDueMocks: NO_MOCK_STARTS,
-      sweepMocks: NO_SWEEP,
-      driveMockPick,
-      maxBotPicksPerTick: 3,
-    });
-
-    await ticking.tick();
-    expect(driveMockPick).toHaveBeenCalledTimes(1);
-  });
 });
