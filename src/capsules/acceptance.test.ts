@@ -271,15 +271,22 @@ describe("the soft rules are corrected before they are refused", () => {
  * LEDGER carries, and every number the whole sheet prints grounds through the validator.
  */
 describe("the depth section, grounded", () => {
-  /** Populated group by group from the depth suite's own shapes: only the groups that carry
-   *  numbers need to be here, since a group with no number cannot break a number rule. */
-  const depth = {
-    ...EMPTY_DEPTH,
-    gamesMissed: [{ season: 2025, missed: 3, of: 17 }],
-    priorSeasons: [{ season: 2024, games: 16, points: 289.6, pointsPerGame: 18.1 }],
-  } as unknown as PlayerFactsDepth;
+  /** One typed depth, group by group over the honest empty one. Typed rather than cast (fix
+   *  round): a double cast would have let a group's shape drift out from under this test, which is
+   *  precisely the drift the test exists to catch now that the sheet has a second author. */
+  function depthWith(groups: Partial<PlayerFactsDepth>): PlayerFactsDepth {
+    return { ...EMPTY_DEPTH, ...groups };
+  }
 
-  const facts = buildPlayerFacts({ ...baseInput(), depth } as PlayerFactsInput);
+  const facts = buildPlayerFacts({
+    ...baseInput(),
+    depth: depthWith({
+      // Only the groups that carry NUMBERS need to be here: a group with no number cannot break a
+      // number rule, and every group's own rendering is pinned by `render-depth.test.ts`.
+      gamesMissed: [{ season: 2025, missed: 3, teamGames: 17 }],
+      priorSeasons: [{ season: 2024, points: 289.6, gamesPlayed: 16, positionRank: 3, qualifierCount: 48 }],
+    }),
+  });
 
   it("prints no number the depth ledger does not carry", () => {
     const section = renderDepthSection(facts);
