@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, mockRooms } from "@/db/schema";
+import { drafts, leagues, mockRooms } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import { currentDeadline, type DraftState } from "@/draft-engine";
@@ -74,6 +74,10 @@ export interface AdvanceOutcome {
   /** ISO instant of the next work this draft owes, or null when none is known (terminal, errored,
    *  exhausted with work still due — which is "now" — or a draft with no running clock). */
   readonly nextDueAt: string | null;
+  /** The log sequence the draft stood at when this call ended, or null when it had no state to
+   *  report. The watcher loop compares it against the sequence a stream frame carries, so a frame
+   *  announcing its own action never wakes it. */
+  readonly sequence: number | null;
 }
 
 export interface DraftAdvancer {
@@ -113,7 +117,7 @@ interface DueLoopResult {
 const isoOrNull = (ms: number | null): string | null => (ms === null ? null : new Date(ms).toISOString());
 
 function report(draftId: string, applied: number, partial: Partial<AdvanceOutcome>): AdvanceOutcome {
-  return { draftId, applied, exhausted: false, phase: null, outcome: "ok", wedged: false, nextDueAt: null, ...partial };
+  return { draftId, applied, exhausted: false, phase: null, outcome: "ok", wedged: false, nextDueAt: null, sequence: null, ...partial };
 }
 
 export function createDraftAdvancer({
@@ -247,7 +251,7 @@ export function createDraftAdvancer({
     if (state.phase === "scheduled") {
       const start = await startIfDue(state, now, row.kickoffAt);
       if (start === "started") applied += 1;
-      if (typeof start === "object") return report(draftId, applied, { phase: state.phase, nextDueAt: isoOrNull(start.notDueUntilMs) });
+      if (typeof start === "object") return report(draftId, applied, { phase: state.phase, nextDueAt: isoOrNull(start.notDueUntilMs), sequence: state.sequence });
       const fresh = await store.getDraftState(draftId);
       if (fresh === null) return report(draftId, applied, { outcome: "not_found" });
       state = fresh;
@@ -259,7 +263,13 @@ export function createDraftAdvancer({
     // is guarded and idempotent), so its `liveDraftsQuery` slot frees immediately — the same
     // promptness the driver's own settle lane keeps.
     if (loop.state.phase === "complete" && loop.state.config.isMock === true) await settleMockDraftCompletion(db, draftId);
-    return report(draftId, loop.applied, { exhausted: loop.exhausted, phase: loop.state.phase, wedged: loop.wedged, nextDueAt: loop.nextDueAt });
+    return report(draftId, loop.applied, {
+      exhausted: loop.exhausted,
+      phase: loop.state.phase,
+      wedged: loop.wedged,
+      nextDueAt: loop.nextDueAt,
+      sequence: loop.state.sequence,
+    });
   }
 
   return {
@@ -278,37 +288,68 @@ export function createDraftAdvancer({
 }
 
 /**
- * Which draft a league's SSE connection should tick, or null when there is nothing to ever tick
- * (no draft, or a terminal status — `complete` AND `dissolved`, fix round MEDIUM 2: a reopened
- * dissolved house league must not run a fruitless advance loop for every reconnect forever).
+ * Which draft a league's SSE connection should tick, or null when there is nothing to tick: no
+ * draft, a terminal status (`complete` AND `dissolved`, fix round MEDIUM 2: a reopened dissolved
+ * house league must not run a fruitless advance loop for every reconnect forever), or a REAL
+ * draft still scheduled further than `DRAFT_ADVANCE_CONFIG.sseScheduledWindowMs` from kickoff
+ * (Neon cost audit finding 2: a league drafting next month was polled as hard as a live room).
  */
-export async function draftLoopTarget(db: Db, leagueId: string): Promise<string | null> {
-  const [row] = await db.select({ id: drafts.id, status: drafts.status }).from(drafts).where(eq(drafts.leagueId, leagueId));
+export async function draftLoopTarget(db: Db, leagueId: string, now: string): Promise<string | null> {
+  const [row] = await db
+    .select({ id: drafts.id, status: drafts.status, kickoffAt: drafts.kickoffAt, isMock: leagues.isMock })
+    .from(drafts)
+    .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
+    .where(eq(drafts.leagueId, leagueId));
   if (row === undefined || row.status === "complete" || row.status === "dissolved") return null;
+  const distant = row.kickoffAt.getTime() - Date.parse(now) > DRAFT_ADVANCE_CONFIG.sseScheduledWindowMs;
+  if (row.status === "scheduled" && !row.isMock && distant) return null;
   return row.id;
+}
+
+/** The log sequence a draft frame's payload carries (`draftClockView`), or null for any other frame. */
+export function draftEventSequence(event: { readonly type: string; readonly payload: unknown }): number | null {
+  if (!event.type.startsWith("draft.")) return null;
+  const payload = event.payload as { readonly clock?: { readonly sequence?: unknown } } | null;
+  const sequence = payload?.clock?.sequence;
+  return typeof sequence === "number" ? sequence : null;
 }
 
 export interface AdvanceLoopDeps {
   readonly advance: DraftAdvancer["advance"];
   readonly clock: Clock;
-  /** Defaults to `DRAFT_ADVANCE_CONFIG.sseIntervalMs`. */
-  readonly intervalMs?: number;
+  /** Test seams over the `DRAFT_ADVANCE_CONFIG.sse*` bounds. */
+  readonly idlePollMs?: number;
+  readonly maxSleepMs?: number;
+  readonly minSleepMs?: number;
+}
+
+export interface AdvanceLoopHandle {
+  /** A draft frame arrived on the stream: wake the loop unless the frame announces this loop's
+   *  own last action (its sequence is not newer than the one the loop just produced). */
+  observe(sequence: number): void;
 }
 
 /**
  * THE SSE STREAM'S OWN TICK (driver 2): while a client is connected to a draft room's league
- * stream, this loop calls the advance routine on a short interval so bot picks and clock
- * expiries move in real time for whoever is watching. Fire-and-forget from the route: it
- * advances once immediately (the connection setup's own fast-forward), then on the interval;
- * never overlaps itself (a slow advance skips fires rather than stacking); exits cleanly the
- * moment the request aborts; and stops on its own once the draft completes or vanishes — a
- * finished room holds no timer open. No transaction is ever held across ticks: each applied
- * action is its own short transaction inside the store.
+ * stream, this loop calls the advance routine so bot picks and clock expiries move in real time
+ * for whoever is watching. Fire-and-forget from the route: it advances once immediately (the
+ * connection setup's own fast-forward), then SLEEPS UNTIL the advancer's own `nextDueAt` — the
+ * clock deadline, a bot's seeded due pick, a kickoff — bounded by `sseMinSleepMs` and
+ * `sseMaxSleepMs`, or polls at `sseIdlePollMs` when no instant is known. A draft frame from
+ * another driver (`observe`) wakes it early, so a pick by another seat resets its timer with no
+ * query of its own. It never overlaps itself (a wake during a run queues exactly one more run);
+ * exits cleanly the moment the request aborts; and stops on its own once the draft completes or
+ * vanishes — a finished room holds no timer open. No transaction is ever held across ticks.
  */
-export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: AdvanceLoopDeps): void {
-  const intervalMs = deps.intervalMs ?? DRAFT_ADVANCE_CONFIG.sseIntervalMs;
+export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: AdvanceLoopDeps): AdvanceLoopHandle {
+  const idlePollMs = deps.idlePollMs ?? DRAFT_ADVANCE_CONFIG.sseIdlePollMs;
+  const maxSleepMs = deps.maxSleepMs ?? DRAFT_ADVANCE_CONFIG.sseMaxSleepMs;
+  const minSleepMs = deps.minSleepMs ?? DRAFT_ADVANCE_CONFIG.sseMinSleepMs;
   let running = false;
   let stopped = false;
+  let wakeRequested = false;
+  let lastSequence: number | null = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   // True while the last tick(s) errored — the log-once-per-streak latch (fix round HIGH 1): a
   // transient failure must neither kill the loop nor log once a second for the connection's life.
   let erroring = false;
@@ -316,11 +357,27 @@ export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: 
   const stop = (): void => {
     if (stopped) return;
     stopped = true;
-    clearInterval(timer);
+    clearTimeout(timer);
+  };
+
+  const sleepFor = (outcome: AdvanceOutcome): number => {
+    if (outcome.nextDueAt === null) return idlePollMs;
+    const until = Date.parse(outcome.nextDueAt) - Date.parse(deps.clock.now());
+    return Math.min(maxSleepMs, Math.max(minSleepMs, until));
+  };
+
+  const schedule = (ms: number): void => {
+    if (stopped) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => void tick(), ms);
   };
 
   const tick = async (): Promise<void> => {
-    if (running || stopped) return;
+    if (stopped) return;
+    if (running) {
+      wakeRequested = true;
+      return;
+    }
     running = true;
     try {
       const outcome = await deps.advance(draftId, deps.clock.now());
@@ -329,20 +386,31 @@ export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: 
         // repro, does). Stopping here left a watched room frozen for the rest of its connection.
         if (!erroring) console.error("[draft] advance loop erroring; ticking on", { draftId });
         erroring = true;
+        schedule(idlePollMs);
         return;
       }
       erroring = false;
+      lastSequence = outcome.sequence;
       // Terminal: a finished draft, or one that is gone (vanished or dissolved) — no timer left open.
       if (outcome.outcome === "not_found" || outcome.phase === "complete") stop();
+      else schedule(sleepFor(outcome));
     } finally {
       running = false;
+      if (wakeRequested) {
+        wakeRequested = false;
+        void tick();
+      }
     }
   };
 
-  const timer = setInterval(() => {
-    void tick();
-  }, intervalMs);
   signal.addEventListener("abort", stop, { once: true });
   if (signal.aborted) stop();
-  void tick();
+  else void tick();
+
+  return {
+    observe: (sequence) => {
+      if (stopped || (lastSequence !== null && sequence <= lastSequence)) return;
+      void tick();
+    },
+  };
 }

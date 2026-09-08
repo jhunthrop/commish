@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { REALTIME_CONFIG } from "./config";
+import { createPublisher } from "./publish";
+import { createRedisConnection } from "./redis";
 import { createLeagueEventStream, createUserEventStream, resumeCursor } from "./sse";
 
 const NOW = Date.parse("2026-08-17T12:00:00.000Z");
@@ -89,6 +91,52 @@ describe("createLeagueEventStream — the opening frame", () => {
     expect(first).toBe(": keepalive\n\n");
     expect(REALTIME_CONFIG.keepaliveMs).toBeGreaterThan(1_000);
     await reader.cancel();
+  });
+});
+
+describe("createLeagueEventStream — onEvent (the advance loop's wake seam, finding 2)", () => {
+  const controllers: AbortController[] = [];
+
+  beforeEach(() => {
+    vi.stubEnv("REDIS_URL", process.env.REDIS_URL ?? "redis://localhost:6379");
+  });
+
+  afterEach(async () => {
+    for (const controller of controllers) controller.abort();
+    controllers.length = 0;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    vi.unstubAllEnvs();
+  });
+
+  it("hands every relayed frame to onEvent after it is written to the client", async () => {
+    const leagueId = `league_sse_onevent_${Date.now()}`;
+    const controller = new AbortController();
+    controllers.push(controller);
+    const seen: string[] = [];
+    // A recent resume cursor rather than "$": the opening comment frame is written BEFORE the
+    // XREAD is armed, so a live-only cursor could miss a frame published in that gap. Resuming
+    // from a second ago replays whatever lands after it, whenever the read is issued.
+    const headers = { "last-event-id": `${Date.now() - 1_000}-0` };
+    const response = createLeagueEventStream(new Request("http://localhost/x", { signal: controller.signal, headers }), leagueId, "user_sse_onevent", {
+      onEvent: (event) => {
+        seen.push(`${event.type}:${JSON.stringify(event.payload)}`);
+      },
+    });
+    const reader = response.body!.getReader();
+    await reader.read(); // the opening comment frame
+
+    const redis = createRedisConnection();
+    try {
+      const publisher = createPublisher({ redis, clock: { now: () => "2026-09-08T12:00:00.000Z" } });
+      await publisher.publish({ leagueId, type: "draft.pick", payload: { clock: { sequence: 3 } } });
+      const frame = new TextDecoder().decode((await reader.read()).value);
+      expect(frame).toContain("event: draft.pick");
+      expect(seen).toEqual(['draft.pick:{"clock":{"sequence":3}}']);
+    } finally {
+      await redis.del(REALTIME_CONFIG.leagueStreamKey(leagueId));
+      redis.disconnect();
+      await reader.cancel();
+    }
   });
 });
 

@@ -5,7 +5,8 @@ import { draftActions, drafts, players } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { DraftAction } from "@/domain/draft";
 import { createMockBotDriver, type MockBotDriver } from "@/mock-draft-service/driver";
-import { createDraftAdvancer, draftLoopTarget, runDraftAdvanceLoop, type DraftAdvancer } from "./advance";
+import { createDraftAdvancer, draftEventSequence, draftLoopTarget, runDraftAdvanceLoop, type AdvanceOutcome, type DraftAdvancer } from "./advance";
+import { DRAFT_ADVANCE_CONFIG } from "./config";
 import { createDraftStore, type DraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -479,38 +480,173 @@ describe("dissolved drafts are terminal (fix round MEDIUM 2)", () => {
 
   it("draftLoopTarget gates the SSE loop: live drafts watched, complete and dissolved never", async () => {
     const live = await seedAbandonedMock("looklive");
-    expect(await draftLoopTarget(db, live.leagueId)).toBe(live.draftId);
+    expect(await draftLoopTarget(db, live.leagueId, now)).toBe(live.draftId);
 
     await db.update(drafts).set({ status: "dissolved" }).where(eq(drafts.id, live.draftId));
-    expect(await draftLoopTarget(db, live.leagueId)).toBeNull();
+    expect(await draftLoopTarget(db, live.leagueId, now)).toBeNull();
 
     await db.update(drafts).set({ status: "complete" }).where(eq(drafts.id, live.draftId));
-    expect(await draftLoopTarget(db, live.leagueId)).toBeNull();
+    expect(await draftLoopTarget(db, live.leagueId, now)).toBeNull();
 
-    expect(await draftLoopTarget(db, "league_without_draft")).toBeNull();
+    expect(await draftLoopTarget(db, "league_without_draft", now)).toBeNull();
+  });
+
+  it("draftLoopTarget starts no loop for a REAL draft scheduled beyond the window, but does for a mock and for one inside it (finding 2)", async () => {
+    const distant = await seedDraftFixture(db, {
+      draftId: "draft_distant",
+      leagueId: "league_distant",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date(Date.parse(BASE_NOW) + DRAFT_ADVANCE_CONFIG.sseScheduledWindowMs + 1),
+      auctionBudget: null,
+    });
+    expect(await draftLoopTarget(db, distant.leagueId, now)).toBeNull();
+    // A minute later the same kickoff is inside the window: the next reconnect starts the loop.
+    expect(await draftLoopTarget(db, distant.leagueId, atMs(60_000))).toBe(distant.draftId);
+
+    const mock = await seedAbandonedMock("mockdistant", { startsAtMs: Date.parse(BASE_NOW) + 24 * 60 * 60_000 });
+    expect(await draftLoopTarget(db, mock.leagueId, now)).toBe(mock.draftId);
   });
 });
 
-describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
-  it("keeps ticking through a transient error and succeeds later — one log per error streak, never per tick (the reviewer's repro)", async () => {
+describe("draftEventSequence", () => {
+  it("reads the clock sequence off a draft frame and nothing off any other", () => {
+    expect(draftEventSequence({ type: "draft.pick", payload: { clock: { sequence: 7 } } })).toBe(7);
+    expect(draftEventSequence({ type: "draft.pick", payload: { clock: {} } })).toBeNull();
+    expect(draftEventSequence({ type: "draft.pick", payload: null })).toBeNull();
+    expect(draftEventSequence({ type: "chat.message", payload: { clock: { sequence: 7 } } })).toBeNull();
+  });
+});
+
+describe("runDraftAdvanceLoop (the SSE watcher's tick, deadline-driven)", () => {
+  const ok = (draftId: string, partial: Partial<AdvanceOutcome> = {}): AdvanceOutcome => ({
+    draftId,
+    applied: 0,
+    exhausted: false,
+    phase: "in_progress",
+    outcome: "ok",
+    wedged: false,
+    nextDueAt: null,
+    sequence: 1,
+    ...partial,
+  });
+  /** Fake timers AND a domain clock that follows them, so `nextDueAt` arithmetic sees the same time. */
+  function fakeClockFrom(startIso: string): Clock {
+    const start = Date.parse(startIso);
+    const startedAt = Date.now();
+    return { now: () => new Date(start + (Date.now() - startedAt)).toISOString() };
+  }
+
+  it("sleeps until the deadline: one advance at connect, none for 29 seconds, one at the 30-second deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      const loopClock = fakeClockFrom(BASE_NOW);
+      const advance = vi.fn(async (draftId: string) => ok(draftId, { nextDueAt: atMs(30_000) }));
+      const controller = new AbortController();
+      runDraftAdvanceLoop("draft_deadline", controller.signal, { advance, clock: loopClock });
+
+      await vi.advanceTimersByTimeAsync(29_000);
+      expect(advance).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(advance).toHaveBeenCalledTimes(2);
+      controller.abort();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("an idle tab on a draft with a far deadline makes zero calls per second: at most one per max sleep, and idle-polls when no instant is known", async () => {
+    vi.useFakeTimers();
+    try {
+      const loopClock = fakeClockFrom(BASE_NOW);
+      const far = vi.fn(async (draftId: string) => ok(draftId, { nextDueAt: atMs(60 * 60_000) }));
+      const controller = new AbortController();
+      runDraftAdvanceLoop("draft_far", controller.signal, { advance: far, clock: loopClock, maxSleepMs: 60_000 });
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      // Was 600 calls (one a second); now the connect call plus one per capped sleep.
+      expect(far.mock.calls.length).toBeLessThanOrEqual(11);
+      controller.abort();
+
+      const unknown = vi.fn(async (draftId: string) => ok(draftId, { nextDueAt: null }));
+      const controller2 = new AbortController();
+      runDraftAdvanceLoop("draft_unknown", controller2.signal, { advance: unknown, clock: loopClock, idlePollMs: 30_000 });
+      await vi.advanceTimersByTimeAsync(90_000);
+      expect(unknown).toHaveBeenCalledTimes(4);
+      controller2.abort();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a frame from another driver wakes it at once; a frame announcing its own last action does not", async () => {
+    vi.useFakeTimers();
+    try {
+      const loopClock = fakeClockFrom(BASE_NOW);
+      const advance = vi.fn(async (draftId: string) => ok(draftId, { nextDueAt: atMs(60_000), sequence: 5 }));
+      const controller = new AbortController();
+      const loop = runDraftAdvanceLoop("draft_observe", controller.signal, { advance, clock: loopClock });
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(advance).toHaveBeenCalledTimes(1);
+
+      loop.observe(5); // its own pick, echoed back by the stream
+      loop.observe(4); // an older frame replayed on reconnect
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(advance).toHaveBeenCalledTimes(1);
+
+      loop.observe(6); // somebody else's pick: the deadline moved
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(advance).toHaveBeenCalledTimes(2);
+      controller.abort();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a wake during a running advance queues exactly one more run, never an overlap", async () => {
+    vi.useFakeTimers();
+    try {
+      const loopClock = fakeClockFrom(BASE_NOW);
+      let release: (() => void) | null = null;
+      const calls: number[] = [];
+      const advance = vi.fn(async (draftId: string) => {
+        calls.push(calls.length);
+        if (calls.length === 1) await new Promise<void>((resolve) => (release = resolve));
+        return ok(draftId, { nextDueAt: atMs(60_000), sequence: calls.length });
+      });
+      const controller = new AbortController();
+      const loop = runDraftAdvanceLoop("draft_overlap", controller.signal, { advance, clock: loopClock });
+      await vi.advanceTimersByTimeAsync(10);
+      loop.observe(10);
+      loop.observe(11);
+      loop.observe(12);
+      expect(calls).toHaveLength(1);
+      release!();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(calls).toHaveLength(2);
+      controller.abort();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps ticking through a transient error at the idle cadence — one log per error streak — and stops on completion", async () => {
     vi.useFakeTimers();
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
-      const script: ("error" | "ok")[] = ["error", "error", "ok", "ok"];
-      const phases: ("in_progress" | "complete")[] = ["in_progress", "complete"];
+      const loopClock = fakeClockFrom(BASE_NOW);
+      const script: ("error" | "ok")[] = ["error", "error", "ok"];
       const advance = vi.fn(async (draftId: string) => {
-        const kind = script.shift() ?? "ok";
-        if (kind === "error") return { draftId, applied: 0, exhausted: false, phase: null, outcome: "error" as const, wedged: false, nextDueAt: null };
-        return { draftId, applied: 1, exhausted: false, phase: phases.shift() ?? ("complete" as const), outcome: "ok" as const, wedged: false, nextDueAt: null };
+        const kind = script.shift() ?? "done";
+        if (kind === "error") return ok(draftId, { phase: null, outcome: "error", sequence: null });
+        return ok(draftId, { phase: kind === "ok" ? "in_progress" : "complete", nextDueAt: atMs(1_000) });
       });
       const controller = new AbortController();
-      runDraftAdvanceLoop("draft_flaky_loop", controller.signal, { advance, clock, intervalMs: 1_000 });
+      runDraftAdvanceLoop("draft_flaky", controller.signal, { advance, clock: loopClock, idlePollMs: 5_000 });
 
-      await vi.advanceTimersByTimeAsync(10_000);
-      // The two transient errors did NOT kill the loop: the later ok ticks ran, and the loop
-      // stopped itself only on completion.
-      expect(advance.mock.calls.length).toBe(4);
-      // One structured line for the whole error streak, not one per erroring tick.
+      await vi.advanceTimersByTimeAsync(60_000);
+      // connect (error) → +5s (error) → +5s (ok, due in 1s) → +1s (complete, stop). Nothing after.
+      expect(advance).toHaveBeenCalledTimes(4);
       expect(errorLog.mock.calls.filter((call) => String(call[0]).includes("advance loop"))).toHaveLength(1);
     } finally {
       errorLog.mockRestore();
@@ -518,75 +654,27 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
     }
   });
 
-  it("stops on not_found — a vanished draft holds no timer open", async () => {
+  it("stops on not_found and on abort — a vanished draft or a closed tab holds no timer open", async () => {
     vi.useFakeTimers();
     try {
-      const advance = vi.fn(async (draftId: string) => ({
-        draftId,
-        applied: 0,
-        exhausted: false,
-        phase: null,
-        outcome: "not_found" as const,
-        wedged: false, nextDueAt: null,
-      }));
+      const loopClock = fakeClockFrom(BASE_NOW);
+      const gone = vi.fn(async (draftId: string) => ok(draftId, { phase: null, outcome: "not_found", sequence: null }));
+      runDraftAdvanceLoop("draft_gone", new AbortController().signal, { advance: gone, clock: loopClock });
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(gone).toHaveBeenCalledTimes(1);
+
+      const live = vi.fn(async (draftId: string) => ok(draftId, { nextDueAt: atMs(1_000) }));
       const controller = new AbortController();
-      runDraftAdvanceLoop("draft_vanished", controller.signal, { advance, clock, intervalMs: 1_000 });
-      await vi.advanceTimersByTimeAsync(5_000);
-      expect(advance.mock.calls.length).toBe(1);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("advances on the interval while connected, never overlaps, and stops cleanly on abort", async () => {
-    vi.useFakeTimers();
-    try {
-      const calls: string[] = [];
-      let release: (() => void) | null = null;
-      const advance = vi.fn(async (draftId: string) => {
-        calls.push(draftId);
-        // The first call blocks until released — interval fires during it must be skipped.
-        if (calls.length === 1) await new Promise<void>((resolve) => (release = resolve));
-        return { draftId, applied: 0, exhausted: false, phase: "in_progress" as const, outcome: "ok" as const, wedged: false, nextDueAt: null };
-      });
-      const controller = new AbortController();
-      runDraftAdvanceLoop("draft_loop", controller.signal, { advance, clock, intervalMs: 1_000 });
-
-      await vi.advanceTimersByTimeAsync(3_000);
-      expect(calls).toHaveLength(1); // still in flight: the overlap guard skipped two fires
-      release!();
-      await vi.advanceTimersByTimeAsync(2_000);
-      expect(calls.length).toBeGreaterThanOrEqual(2);
-
-      const settled = calls.length;
+      const loop = runDraftAdvanceLoop("draft_closed", controller.signal, { advance: live, clock: loopClock });
+      await vi.advanceTimersByTimeAsync(2_500);
+      const settled = live.mock.calls.length;
       controller.abort();
-      await vi.advanceTimersByTimeAsync(5_000);
-      expect(calls.length).toBe(settled); // no tick after disconnect
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("stops itself once the draft completes (or vanishes) — a finished room holds no timer open", async () => {
-    vi.useFakeTimers();
-    try {
-      const phases: ("in_progress" | "complete")[] = ["in_progress", "complete"];
-      const advance = vi.fn(async (draftId: string) => ({
-        draftId,
-        applied: 0,
-        exhausted: false,
-        phase: phases.shift() ?? "complete",
-        outcome: "ok" as const,
-        wedged: false, nextDueAt: null,
-      }));
-      const controller = new AbortController();
-      runDraftAdvanceLoop("draft_done", controller.signal, { advance, clock, intervalMs: 1_000 });
-
+      loop.observe(99);
       await vi.advanceTimersByTimeAsync(10_000);
-      // First interval tick sees in_progress, second sees complete and stops the loop.
-      expect(advance.mock.calls.length).toBeLessThanOrEqual(3);
+      expect(live.mock.calls.length).toBe(settled);
     } finally {
       vi.useRealTimers();
     }
   });
 });
+

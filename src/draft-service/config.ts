@@ -60,11 +60,26 @@ export const DRAFT_ADVANCE_CONFIG = {
    */
   maxActionsPerAdvance: 200,
   /**
-   * How often a connected draft-room watcher's SSE loop advances its draft (ms). One second is
-   * the same cadence the dev ticker keeps (`tickIntervalMs`), which is what makes a watched
-   * room on Vercel feel exactly like a watched room locally.
+   * THE WATCHER LOOP IS DEADLINE-DRIVEN (Neon cost audit 2026-09-07, finding 2). It used to
+   * advance once a second for the life of every open tab — two to three statements a second per
+   * tab, for drafts weeks from kickoff. It now sleeps until the advancer's own `nextDueAt` (the
+   * clock deadline, a bot's seeded due pick, a kickoff) and wakes early only when a draft frame
+   * from another driver arrives on the stream it already reads. These three bound that sleep.
    */
-  sseIntervalMs: 1_000,
+  /** When no due instant is known (no running clock, a transient error): the fallback cadence. */
+  sseIdlePollMs: 30_000,
+  /** The longest the loop ever sleeps, so a lost frame or a dropped subscription costs at most
+   *  this much latency before the loop re-reads the truth for itself. */
+  sseMaxSleepMs: 60_000,
+  /** The shortest sleep, so a due instant already in the past cannot spin the loop. */
+  sseMinSleepMs: 250,
+  /**
+   * A REAL draft still `scheduled` further than this from kickoff starts no loop at all: the
+   * stream's own planned reconnects (`REALTIME_CONFIG.plannedCloseMs`) re-evaluate on each
+   * connection, and the minute sweep is the backstop. Mock rooms always loop — they live minutes,
+   * and their start instant moves under a host's own actions.
+   */
+  sseScheduledWindowMs: 2 * 60_000,
   /**
    * Sweep-wide ceiling on actions one `draft-sweep` job run may apply across ALL drafts, so a
    * minute tick's sweep can never outgrow the job runner's own budget. Level-triggered: work

@@ -53,7 +53,13 @@ export function resumeCursor(lastEventId: string | null, now: number): string {
  * the caller resolved. A notices tab is a Redis socket and an fd like any other, so it
  * correctly counts against the same per-user ceiling a league room's tabs do.
  */
-function createEventStream(request: Request, userId: string, streamKey: string): Response {
+export interface EventStreamOptions {
+  /** Called with every frame this connection relays, after it is enqueued — the league route's
+   *  seam for waking its draft advance loop off the stream it already reads (finding 2). */
+  readonly onEvent?: (event: RealtimeEvent) => void;
+}
+
+function createEventStream(request: Request, userId: string, streamKey: string, options: EventStreamOptions = {}): Response {
   const open = openPerUser.get(userId) ?? 0;
   if (open >= REALTIME_CONFIG.maxStreamsPerUser) {
     return fail("You have too many live connections open. Close a tab and try again.", 429);
@@ -105,6 +111,7 @@ function createEventStream(request: Request, userId: string, streamKey: string):
         }, REALTIME_CONFIG.keepaliveMs);
         for await (const event of subscribe({ redis, streamKey, afterId, signal: controller.signal })) {
           sink.enqueue(frame(event));
+          options.onEvent?.(event);
         }
       } catch (error: unknown) {
         if (!controller.signal.aborted) throw error;
@@ -141,8 +148,8 @@ function createEventStream(request: Request, userId: string, streamKey: string):
  * Resume: reads the standard Last-Event-ID header (sent automatically by EventSource on
  * reconnect) and replays everything after it. A fresh connection starts at "$" (live only).
  */
-export function createLeagueEventStream(request: Request, leagueId: string, userId: string): Response {
-  return createEventStream(request, userId, REALTIME_CONFIG.leagueStreamKey(leagueId));
+export function createLeagueEventStream(request: Request, leagueId: string, userId: string, options?: EventStreamOptions): Response {
+  return createEventStream(request, userId, REALTIME_CONFIG.leagueStreamKey(leagueId), options);
 }
 
 /**
