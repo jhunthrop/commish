@@ -17,7 +17,7 @@ import { ADVISOR_CONFIG } from "./config";
 import { buildTurnLedger } from "./ledger";
 import { computePlan } from "./plan";
 import { roomSignals } from "./signals";
-import { strategyTemplate, templateReason, type TemplateContext } from "./template";
+import { strategyTemplate, templateFamily, templateReason, type TemplateContext } from "./template";
 import type { AdvisorView, AdvisorVoice, NowCandidate } from "./view";
 
 export interface AdvisorCoreInput extends Omit<AssistantCallCoreInput, "shortlistSize" | "drivers"> {
@@ -29,10 +29,12 @@ export interface AdvisorCoreInput extends Omit<AssistantCallCoreInput, "shortlis
 
 const VOICE_ABSENT: AdvisorVoice = { status: "absent", strategy: null, reasons: {} };
 
-function nowCandidate(candidate: AssistantCandidate, state: DraftState, askingTeamId: string, valued: ReadonlyMap<string, ValuedEntry>, context: TemplateContext): NowCandidate {
+type NowFacts = Omit<NowCandidate, "templateReason" | "templateShape">;
+
+function nowFacts(candidate: AssistantCandidate, state: DraftState, askingTeamId: string, valued: ReadonlyMap<string, ValuedEntry>): NowFacts {
   const entry = valued.get(candidate.playerId);
   const assigned = assignSlot({ position: candidate.position, roster: rosterFor(state, askingTeamId), slotConfig: state.config.slotConfig });
-  const base = {
+  return {
     playerId: candidate.playerId,
     position: candidate.position,
     valueOverReplacement: entry?.valueOverReplacement ?? 0,
@@ -41,7 +43,19 @@ function nowCandidate(candidate: AssistantCandidate, state: DraftState, askingTe
     fillsSlot: assigned.ok ? assigned.slot : null,
     reasons: candidate.reasons,
   };
-  return { ...base, templateReason: templateReason(base, context) };
+}
+
+/** The now rows with their template sentences, shapes dealt per fact family in row order so no
+ *  two rows on the card share one (`template.ts`'s own docblock). */
+function nowRows(facts: readonly NowFacts[], context: TemplateContext): readonly NowCandidate[] {
+  const dealt = new Map<"cliff" | "value", number>();
+  return facts.map((row) => {
+    const family = templateFamily(row.reasons);
+    const variant = dealt.get(family) ?? 0;
+    dealt.set(family, variant + 1);
+    const sentence = templateReason(row, context, variant);
+    return { ...row, templateReason: sentence.text, templateShape: sentence.shape };
+  });
 }
 
 function picksUntil(state: DraftState, pickNumber: number): number {
@@ -69,7 +83,7 @@ export function advisorCore(input: AdvisorCoreInput): AdvisorView | null {
     picksUntilYourTurn: picksUntil(state, call.pickNumber),
     teamCount,
     stamp: { computedAtPick: state.pickNumber, sequence: state.sequence },
-    now: call.candidates.map((candidate) => nowCandidate(candidate, state, askingTeamId, valued, context)),
+    now: nowRows(call.candidates.map((candidate) => nowFacts(candidate, state, askingTeamId, valued)), context),
     plan,
     signals,
     yourBuild: call.yourBuild,

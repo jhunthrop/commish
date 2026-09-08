@@ -1,11 +1,15 @@
 /**
  * THE TEMPLATE FLOOR — the deterministic sentences the advisor shows until the writer's own land
- * (spec 3.2 and 3.5: "the template stays the floor"). Every number is the turn's own: a survival
- * is stated as runs over runs, a value as points over replacement, a drop as the board's own
- * points. No em-dash, no semicolon, second person, plain.
+ * (spec 3.2 and 3.5: "the template stays the floor"). Every number is the turn's own: a value as
+ * points over replacement, a drop as the board's own points, a rank as the board's own rank.
+ * No em-dash, no semicolon, second person, plain.
  *
- * Two candidates never read alike because each sentence is built from that candidate's own
- * rank, slot, value and odds; the writer, not this file, is what makes them sound like a person.
+ * SHAPES, NOT ONE SHAPE (fix round 1): a card whose five rows all read "X is one of 1 RB left
+ * before a drop" is a template the reader learns to skip. Each fact family carries five sentence
+ * shapes, one per row the shortlist can hold, dealt in row order within the family, so no two
+ * rows on a card share a shape id and adjacent rows never share one. The shape id travels on
+ * the wire (`NowCandidate.templateShape`) so a test can check the structure, not just the words.
+ * The row's odds cell prints the make-it-back count, so no shape restates it.
  */
 import type { Position } from "@/domain/player";
 import { pickLabel } from "@/domain/pick-label";
@@ -25,34 +29,77 @@ export function runsPhrase(odds: OddsCell): string {
   return `${Math.round(odds.survival * odds.runs)} of ${odds.runs} runs`;
 }
 
-function pointsPhrase(points: number): string {
-  return `${points.toFixed(1)} points`;
-}
+type Cliff = Extract<PickReason, { code: "tier_cliff" }>;
 
-function cliffReason(reasons: readonly PickReason[]): Extract<PickReason, { code: "tier_cliff" }> | undefined {
-  return reasons.find((reason): reason is Extract<PickReason, { code: "tier_cliff" }> => reason.code === "tier_cliff");
+function cliffReason(reasons: readonly PickReason[]): Cliff | undefined {
+  return reasons.find((reason): reason is Cliff => reason.code === "tier_cliff");
 }
 
 function slotClause(slot: RosterSlotType | null): string {
   return slot === null ? "has no slot on your roster" : `fills your ${slot} slot`;
 }
 
+interface RowFacts {
+  readonly name: string;
+  readonly position: Position;
+  readonly slot: string;
+  readonly rank: number;
+  readonly vor: string;
+}
+
+/** Five shapes for a row whose position sits at a real cliff. `count` includes him. */
+const CLIFF_SHAPES: readonly ((row: RowFacts, drop: string, count: number) => string)[] = [
+  (row, drop) => `Behind ${row.name} at ${row.position} the drop is ${drop} points, and he ${row.slot}.`,
+  (row, drop, count) => `${row.name} ${row.slot}. The ${row.position} tier he sits in holds ${count} and falls ${drop} points once it is gone.`,
+  (row, drop, count) => `Take ${row.name} for the ${row.position} tier: ${count} left in it, and the board loses ${drop} points after that.`,
+  (row, drop) => `${row.name} ${row.slot} and holds the ${row.position} line, ${drop} points above what comes next.`,
+  (row, drop, count) => `The ${row.position} tier is down to ${count} with ${row.name} in it, and ${drop} points go with it. He ${row.slot}.`,
+];
+
+/** Five shapes for a row argued on value alone. */
+const VALUE_SHAPES: readonly ((row: RowFacts) => string)[] = [
+  (row) => `${row.name} ranks No. ${row.rank} at ${row.position} and ${row.slot}, ${row.vor} points over replacement.`,
+  (row) => `${row.vor} points over replacement is the case for ${row.name}, the No. ${row.rank} ${row.position}, and he ${row.slot}.`,
+  (row) => `${row.name} ${row.slot}. At No. ${row.rank} among ${row.position} he is worth ${row.vor} points over replacement.`,
+  (row) => `The No. ${row.rank} ${row.position} is ${row.name}, ${row.vor} points over replacement, and he ${row.slot}.`,
+  (row) => `${row.name} is ${row.vor} points over replacement, No. ${row.rank} at ${row.position}, and ${row.slot}.`,
+];
+
 /** The row already prints the make-it-back count as its own number (the card's odds cell), so
- *  the sentence never restates it: two survival claims on one row is the defect the old tab
- *  had. The one odds fact worth a sentence is that there is no next turn at all. */
+ *  the sentence never restates it. The one odds fact worth a sentence is that there is no next
+ *  turn at all. */
 function lastTurnClause(nextPickNumber: number | null): string {
   return nextPickNumber === null ? " This is your last turn, so there is no next pick to wait for." : "";
 }
 
-/** One sentence for one now-card row, from that row's own facts. */
-export function templateReason(candidate: Omit<NowCandidate, "templateReason">, context: TemplateContext): string {
-  const name = context.names[candidate.playerId] ?? candidate.playerId;
+export interface TemplateSentence {
+  readonly text: string;
+  /** `cliff:2`, `value:0`: the family and the shape dealt to this row. */
+  readonly shape: string;
+}
+
+/**
+ * One sentence for one now-card row, from that row's own facts. `variant` is the row's index
+ * WITHIN its fact family on this card (the caller deals it), so shapes rotate without repeating.
+ */
+export function templateReason(candidate: Omit<NowCandidate, "templateReason" | "templateShape">, context: TemplateContext, variant: number): TemplateSentence {
+  const row: RowFacts = {
+    name: context.names[candidate.playerId] ?? candidate.playerId,
+    position: candidate.position,
+    slot: slotClause(candidate.fillsSlot),
+    rank: candidate.positionRank,
+    vor: candidate.valueOverReplacement.toFixed(1),
+  };
   const cliff = cliffReason(candidate.reasons);
-  const lead =
-    cliff === undefined
-      ? `${name} ranks No. ${candidate.positionRank} at ${candidate.position} and ${slotClause(candidate.fillsSlot)}, ${pointsPhrase(candidate.valueOverReplacement)} over replacement.`
-      : `${name} is one of ${cliff.playersLeftInTier} ${cliff.position} left before a ${cliff.dropToNextTier.toFixed(1)} point drop, and he ${slotClause(candidate.fillsSlot)}.`;
-  return `${lead}${lastTurnClause(context.nextPickNumber)}`;
+  const shapes = cliff === undefined ? VALUE_SHAPES : CLIFF_SHAPES;
+  const index = variant % shapes.length;
+  const lead = cliff === undefined ? VALUE_SHAPES[index]!(row) : CLIFF_SHAPES[index]!(row, cliff.dropToNextTier.toFixed(1), cliff.playersLeftInTier);
+  return { text: `${lead}${lastTurnClause(context.nextPickNumber)}`, shape: `${cliff === undefined ? "value" : "cliff"}:${index}` };
+}
+
+/** The fact family a row falls in, so a caller can deal variants per family. */
+export function templateFamily(reasons: readonly PickReason[]): "cliff" | "value" {
+  return cliffReason(reasons) === undefined ? "value" : "cliff";
 }
 
 function positionWord(position: Position, plural: boolean): string {

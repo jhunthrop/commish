@@ -61,10 +61,25 @@ describe("advisorCore", () => {
     }
   });
 
-  it("never puts two identical sentences on one card", () => {
-    const view = viewAfter(3);
-    const sentences = [view.strategyTemplate, ...view.now.map((candidate) => candidate.templateReason)].map(normalizeSentence);
-    expect(new Set(sentences).size).toBe(sentences.length);
+  it("never puts two identical sentences on one card, and no two rows share a sentence shape", () => {
+    for (const picks of [3, 12, 30]) {
+      const view = viewAfter(picks);
+      const sentences = [view.strategyTemplate, ...view.now.map((candidate) => candidate.templateReason)].map(normalizeSentence);
+      expect(new Set(sentences).size).toBe(sentences.length);
+      const shapes = view.now.map((candidate) => candidate.templateShape);
+      expect(new Set(shapes).size).toBe(shapes.length);
+      for (const shape of shapes) expect(shape).toMatch(/^(cliff|value):[0-4]$/);
+      view.now.forEach((candidate, index) => {
+        const next = view.now[index + 1];
+        if (next !== undefined) expect(next.templateShape).not.toBe(candidate.templateShape);
+      });
+    }
+  });
+
+  it("retires the 'one of 1 left' form: no template sentence says a player is one of one", () => {
+    for (const picks of [3, 12, 30]) {
+      for (const candidate of viewAfter(picks).now) expect(candidate.templateReason).not.toMatch(/one of 1\b/);
+    }
   });
 
   it("writes a strategy note of at most two sentences from the plan and the signals, with no banned punctuation", () => {
@@ -97,6 +112,7 @@ describe("advisorCore", () => {
       for (const target of turn.targets) for (const cell of target.oddsByTurn) if (cell !== null) expect(ledger.has(cell.survival)).toBe(true);
     }
     for (const seat of view.signals.ahead) expect(view.ledger.names).toContain(`Seat ${seat.seat}`);
+    for (const row of view.signals.collapses) expect(view.ledger.names).toContain(`Tier ${row.tierLabel}`);
   });
 
   it("is reproducible for the same room state", () => {

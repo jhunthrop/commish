@@ -94,6 +94,9 @@ export interface NowCandidate {
   readonly reasons: readonly PickReason[];
   /** The deterministic sentence, always present. The writer's sentence replaces it on screen. */
   readonly templateReason: string;
+  /** The sentence shape the template dealt this row (`cliff:2`, `value:0`): no two rows on one
+   *  card share one. */
+  readonly templateShape: string;
 }
 
 export type VoiceStatus = "ready" | "pending" | "absent";

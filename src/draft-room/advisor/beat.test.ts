@@ -3,7 +3,7 @@ import type { AdvisorView, NowCandidate } from "@/draft-service/assistant/view";
 import { postPickBeat } from "./beat";
 
 function candidate(playerId: string, makeItBack: NowCandidate["makeItBack"]): NowCandidate {
-  return { playerId, position: "RB", valueOverReplacement: 40, positionRank: 1, makeItBack, fillsSlot: "RB", reasons: [], templateReason: "x" };
+  return { playerId, position: "RB", valueOverReplacement: 40, positionRank: 1, makeItBack, fillsSlot: "RB", reasons: [], templateReason: "x", templateShape: "value:0" };
 }
 
 function view(now: readonly NowCandidate[]): AdvisorView {
