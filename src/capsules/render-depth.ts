@@ -1,6 +1,6 @@
 import { POSITION_PLURAL } from "@/league-room/lib/player-season-view";
 import type { PlayerFacts, PlayerFactsRankedStat } from "./facts";
-import type { PlayerFactsDepth, PlayerFactsFixture } from "./facts/types";
+import type { PlayerFactsDepth, PlayerFactsFixture, PlayerFactsGamesMissed } from "./facts/types";
 
 /**
  * THE DEPTH SECTION — `PlayerFacts.depth` turned into the same plain, dated, sourced sentences
@@ -36,12 +36,47 @@ function seasonEndingLines(depth: PlayerFactsDepth): readonly string[] {
   });
 }
 
-/** GAMES MISSED, one sentence for every season the roster actually carried him. A season the store
- *  holds no roster weeks for is not in the list at all, so the sentence never implies a zero. */
-function gamesMissedLine(depth: PlayerFactsDepth): string | null {
-  if (depth.gamesMissed.length === 0) return null;
-  const parts = depth.gamesMissed.map((season) => `${season.missed} of a possible ${season.teamGames} in ${season.season}`);
-  return `Games missed, counted over the weeks a roster actually carried him: ${parts.join(", ")}.`;
+/** Ascending weeks as the runs a manager reads: "weeks 3 to 8 and 12", "week 4". */
+function weekRuns(weeks: readonly number[]): string {
+  const runs: string[] = [];
+  let start: number | null = null;
+  let previous: number | null = null;
+  for (const week of weeks) {
+    if (start === null || previous === null || week !== previous + 1) {
+      if (start !== null && previous !== null) runs.push(start === previous ? `${start}` : `${start} to ${previous}`);
+      start = week;
+    }
+    previous = week;
+  }
+  if (start !== null && previous !== null) runs.push(start === previous ? `${start}` : `${start} to ${previous}`);
+  const plural = weeks.length > 1 ? "weeks" : "week";
+  return `${plural} ${runs.length <= 1 ? runs.join("") : `${runs.slice(0, -1).join(", ")} and ${runs[runs.length - 1]}`}`;
+}
+
+/** The unavailable half of one season's record, or the archives' silence. */
+function missedClauses(record: PlayerFactsGamesMissed): readonly string[] {
+  if (record.unavailableWeeks === null) return ["the injury and roster archives hold nothing for that season"];
+  const missed = record.unavailableWeeks.length;
+  const clauses = [missed === 0 ? "none missed to injury or a reserve list" : `${missed} missed to injury or a reserve list (${weekRuns(record.unavailableWeeks)})`];
+  const scratches = record.healthyDidNotPlay ?? 0;
+  if (scratches > 0) clauses.push(missed === 0 ? `the other ${scratches} were healthy weeks he did not play` : `${scratches} healthy ${scratches === 1 ? "week" : "weeks"} he did not play`);
+  return clauses;
+}
+
+/**
+ * ONE SEASON'S RECORD, one sentence per season the store knows him in. Games played and his first
+ * appearance first, then only the weeks the archives say he was unavailable are called missed;
+ * a healthy week he did not play is printed as exactly that, a role fact. A season the archives do
+ * not cover states their silence rather than a zero (founder report 2026-09-08).
+ */
+function gamesMissedLine(record: PlayerFactsGamesMissed): string {
+  const played = `Played ${record.gamesPlayed} of ${record.teamGames} in ${record.season}`;
+  const first = record.firstPlayedWeek === null ? null : `first appearance in week ${record.firstPlayedWeek}`;
+  const [missed, scratches] = missedClauses(record);
+  if (record.unavailableWeeks === null) return `${[played, first].filter((part) => part !== null).join(", ")}; ${missed}.`;
+  const head = [played, first, missed].filter((part) => part !== null).join(", ");
+  if (scratches === undefined) return `${head}.`;
+  return record.unavailableWeeks.length === 0 ? `${head}; ${scratches}.` : `${head}, ${scratches}.`;
 }
 
 /** THIS SEASON'S DESIGNATION HISTORY, one clause per run. A run over a single capture states that
@@ -283,7 +318,7 @@ function depthLines(facts: PlayerFacts): readonly string[] {
   return [
     // Each fact's own renderer is added here as it is wired, in the spec's own fact order.
     ...seasonEndingLines(depth),
-    gamesMissedLine(depth),
+    ...depth.gamesMissed.map(gamesMissedLine),
     injuryHistoryLine(depth),
     coachingLine(depth),
     pedigreeLine(depth),

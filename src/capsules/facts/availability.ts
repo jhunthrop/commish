@@ -1,4 +1,5 @@
 import { deriveSeasonEnding, type WeeklyInjuryReport, type WeeklyRosterStatus } from "@/projections/availability/season-end";
+import { classifySeasonWeeks } from "@/projections/availability/week-classification";
 import type { PlayerFactsGamesMissed, PlayerFactsSeasonEnding } from "./types";
 
 /**
@@ -10,11 +11,11 @@ import type { PlayerFactsGamesMissed, PlayerFactsSeasonEnding } from "./types";
  * tested against hand-built histories rather than against whatever a seeded database happens to
  * contain.
  *
- * THE DERIVATION ITSELF IS NOT REIMPLEMENTED HERE. `deriveSeasonEnding`
- * (`@/projections/availability/season-end`) already carries the whole rule — report anchor first
- * because it alone names a body part, roster status as the fallback, and a comeback resolving
- * itself for free — and was verified against the real 2025 release. This module only shapes its
- * answer into the fact-sheet type and drops the seasons it refused.
+ * THE DERIVATIONS THEMSELVES ARE NOT REIMPLEMENTED HERE. `deriveSeasonEnding`
+ * (`@/projections/availability/season-end`) already carries the season-ending rule, and
+ * `classifySeasonWeeks` (`@/projections/availability/week-classification`) carries the one rule for
+ * what a missed game is, shared with the projection so the sheet and the board can never disagree
+ * about a player's record. This module only shapes their answers into the fact-sheet types.
  */
 
 /** One season's raw evidence for one player, as `collect-depth.ts` reads it. */
@@ -47,36 +48,49 @@ export function seasonEndingsFor(inputs: readonly SeasonEndingInput[]): readonly
   return endings;
 }
 
-/** One season's roster and participation weeks for one player. */
+/** One season's roster, report and participation weeks for one player. */
 export interface GamesMissedInput {
   readonly season: number;
   /** The team's own scheduled games that season, for an honest denominator. */
   readonly teamGames: number;
+  /** Whether BOTH designation archives hold rows for this season (`availabilityStoreCoverage`). */
+  readonly covered: boolean;
   /** Every week the weekly roster file carried a row for him, whatever the status. */
-  readonly rosteredWeeks: readonly number[];
+  readonly rosterRows: readonly WeeklyRosterStatus[];
+  /** Every week the injury report named him. */
+  readonly injuryRows: readonly WeeklyInjuryReport[];
   /** Every week he actually has a played line for. */
   readonly gamesPlayedWeeks: readonly number[];
 }
 
 /**
- * How many games he missed, per season.
+ * What each season's record says: games played, when he first appeared, which weeks the archives
+ * say he was unavailable, and how many rostered weeks he was healthy and did not play.
  *
- * COUNTED OVER THE WEEKS THE ROSTER ACTUALLY CARRIED HIM, never over the team's schedule. A player
- * who signed in week 8 did not "miss" weeks 1 to 7 for any reason a fact sheet should print, and a
- * player nobody rostered at all did not miss a season — he was not in the league. `teamGames` rides
- * along only so the sentence can state the denominator it is a share of, never as the subtrahend.
+ * A MISSED GAME IS A GAME HE WAS UNAVAILABLE FOR (founder report 2026-09-08). The first version of
+ * this counted rostered weeks minus played weeks, which printed "missed 6 of a possible 17" for a
+ * healthy backup who was simply not the starter yet. The healthy did-not-play weeks are still
+ * counted, and printed, as what they are: a role fact.
  *
- * A SEASON WITH NO ROSTER ROWS PRODUCES NO ENTRY, which is the whole point: the honest answer to
- * "how many games did he miss in a season this store holds nothing for" is silence, and a zero
- * there would read as a durable season he may never have played.
+ * A SEASON NEITHER STORE KNOWS HIM IN PRODUCES NO ENTRY. A season the archives do not cover at all
+ * still carries his played games and his first appearance, with the unavailable weeks and the
+ * scratch count ABSENT (`null`): without designations the two kinds of unplayed week are the same
+ * row, and a zero would read as a clean season the store never observed.
  */
 export function gamesMissedFor(inputs: readonly GamesMissedInput[]): readonly PlayerFactsGamesMissed[] {
   const missed: PlayerFactsGamesMissed[] = [];
   for (const input of inputs) {
-    if (input.rosteredWeeks.length === 0) continue;
-    const played = new Set(input.gamesPlayedWeeks);
-    const count = input.rosteredWeeks.filter((week) => !played.has(week)).length;
-    missed.push({ season: input.season, missed: count, teamGames: input.teamGames });
+    if (input.rosterRows.length === 0 && input.gamesPlayedWeeks.length === 0) continue;
+    const playedWeeks = [...new Set(input.gamesPlayedWeeks)].sort((a, b) => a - b);
+    const classes = input.covered ? classifySeasonWeeks(input) : null;
+    missed.push({
+      season: input.season,
+      teamGames: input.teamGames,
+      gamesPlayed: playedWeeks.length,
+      firstPlayedWeek: playedWeeks[0] ?? null,
+      unavailableWeeks: classes === null ? null : classes.unavailableWeeks,
+      healthyDidNotPlay: classes === null ? null : classes.didNotPlayWeeks.length,
+    });
   }
   return missed;
 }

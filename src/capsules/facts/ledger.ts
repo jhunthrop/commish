@@ -54,7 +54,12 @@ function dateNumbers(iso: string): readonly number[] {
 function absenceNumbers(depth: PlayerFactsDepth): readonly number[] {
   const numbers: number[] = [];
   for (const ending of depth.seasonEndings) numbers.push(ending.season, ending.lastPlayedWeek, ending.firstMissedWeek);
-  for (const missed of depth.gamesMissed) numbers.push(missed.season, missed.missed, missed.teamGames);
+  for (const record of depth.gamesMissed) {
+    numbers.push(record.season, record.teamGames, record.gamesPlayed);
+    if (record.firstPlayedWeek !== null) numbers.push(record.firstPlayedWeek);
+    if (record.unavailableWeeks !== null) numbers.push(record.unavailableWeeks.length, ...record.unavailableWeeks);
+    if (record.healthyDidNotPlay !== null) numbers.push(record.healthyDidNotPlay);
+  }
   for (const spell of depth.injuryHistory) {
     numbers.push(spell.captureCount, ...dateNumbers(spell.firstSeenAt), ...dateNumbers(spell.lastSeenAt));
   }

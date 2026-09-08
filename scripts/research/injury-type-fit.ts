@@ -59,7 +59,11 @@ function toAvailabilityInput(row: FeatureRow): AvailabilityInput {
     age: row.age,
     status: row.status,
     projectedSnapShare: row.projectedSnapShare,
-    history: row.history,
+    // THE ROUND'S OWN READING, PRESERVED AS RUN: this research judged its gate (FINAL, 2026-09-05)
+    // with every unplayed game read as an absence. The shipped model has since moved to the
+    // classified count (`availability/week-classification.ts`); restating this script's history
+    // under the new rule would change numbers a FINAL results document already reports.
+    history: row.history.map((entry) => ({ ...entry, gamesUnavailable: Math.max(0, entry.teamGames - entry.gamesPlayed) })),
     baselineRate: null,
   };
 }

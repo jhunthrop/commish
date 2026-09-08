@@ -34,15 +34,23 @@ export interface PlayerFactsSeasonEnding {
   readonly primaryInjury: string | null;
 }
 
-/** HOW MANY GAMES HE MISSED, counted only over the weeks the roster actually carried him — see
- *  `availability.ts`'s own `gamesMissedFor` docblock for why that is not "team games minus games
- *  played". A season with no roster rows at all yields NO entry. */
+/** ONE SEASON'S RECORD: games played, the first week he appeared, the weeks the designation
+ *  archives say he was UNAVAILABLE (the only weeks the sheet calls missed) and the rostered weeks he
+ *  was healthy and did not play (a role fact, printed as such). See `availability.ts`'s own
+ *  `gamesMissedFor` docblock. A season neither store knows him in yields NO entry. */
 export interface PlayerFactsGamesMissed {
   readonly season: number;
-  readonly missed: number;
   /** The team's own scheduled games that season, carried so the sentence can state an honest
-   *  denominator rather than leaving "3 missed" to float against an unstated total. */
+   *  denominator rather than leaving "11 played" to float against an unstated total. */
   readonly teamGames: number;
+  readonly gamesPlayed: number;
+  /** `null` for a man who never played that season. */
+  readonly firstPlayedWeek: number | null;
+  /** Ascending. `null` where the injury and roster archives do not cover the season: absence, never
+   *  a zero the store did not observe. */
+  readonly unavailableWeeks: readonly number[] | null;
+  /** `null` under the same coverage rule. */
+  readonly healthyDidNotPlay: number | null;
 }
 
 /** ONE RUN of the same designation in this season's harvest captures. A run is collapsed into a

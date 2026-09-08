@@ -10,7 +10,7 @@ import { contextualiseOpportunity, contextualiseRates } from "../model/context";
 import { predictRates } from "../model/efficiency";
 import type { FeatureFlags } from "../model/features";
 import { predictOpportunity, type PredictedOpportunity } from "../model/opportunity";
-import { FITTED_MODEL, type ModelPriors } from "../model/source";
+import type { ModelPriors } from "../model/source";
 import type { RosterPlayer, ShareDelta } from "../features/redistribution";
 import { LAST_POSSIBLE_WEEK } from "../store";
 import {
@@ -33,6 +33,7 @@ import { registry } from "../laws/registry";
 import type { Law } from "../laws/types";
 import { LIVE_ADMITTED_DERIVED_SEASONS } from "../nflverse/stat-lines";
 import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
+import { availabilityBySeason } from "./availability-history";
 import {
   ageAtSeason,
   expectedGamesPlayed,
@@ -44,7 +45,7 @@ import {
 import { scaleStatLine, type BoardCandidate, type BoardReason } from "./board";
 import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints } from "@/scoring/compute";
-import type { AvailabilityObservation, CareerObservation, DepthObservation, RookieObservation } from "./fit";
+import type { CareerObservation, DepthObservation, RookieObservation } from "./fit";
 import { INJURY_SOURCE } from "../news/retrieve";
 import { observationsAsOf } from "../store";
 import { applyCareerStage, experienceBandFor, NEUTRAL_CAREER_PRIORS, type CareerPriors } from "./career";
@@ -265,8 +266,13 @@ export interface PreseasonInputs {
   readonly usage: readonly PlayerWeekUsage[];
   readonly priorPlayerTeams: readonly PlayerWeekTeam[];
   readonly teamObservations: readonly TeamWeekObservation[];
-  /** Games appeared in, per prior season, per player. The availability model's evidence. */
-  readonly gamesPlayed: ReadonlyMap<number, ReadonlyMap<string, number>>;
+  /**
+   * The availability model's evidence: per prior season, per player, the games he played and the
+   * games the designation archives say he was unavailable for (`availability/season-record.ts`).
+   * A player-season with neither has no entry; a season neither archive covers carries
+   * `gamesUnavailable: null` and contributes no availability evidence at all.
+   */
+  readonly availability: ReadonlyMap<number, ReadonlyMap<string, SeasonAvailability>>;
   /** Where each club put each man on its published week-one depth chart. Empty before ingestion. */
   readonly depthChart: DepthChart;
   /** The registry every "law" reason (`preseasonCandidates`) is drawn against — only its CONFIRMED
@@ -555,22 +561,6 @@ async function assertNoGameDerivedObservationOfTheLiveSeasonIsVisible(db: Readon
   }
 }
 
-/** How many games each player appeared in, per season, from the store's own opportunity rows. */
-async function gamesPlayedBySeason(
-  db: ReadonlyDb,
-  seasons: readonly number[],
-  asOf: Date,
-): Promise<ReadonlyMap<number, ReadonlyMap<string, number>>> {
-  const bySeason = new Map<number, Map<string, number>>();
-  for (const season of seasons) {
-    const rows = await usageAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf });
-    const counts = new Map<string, number>();
-    for (const row of rows) counts.set(row.playerId, (counts.get(row.playerId) ?? 0) + 1);
-    bySeason.set(season, counts);
-  }
-  return bySeason;
-}
-
 /**
  * `loadPreseason`'s optional inputs, as one options object (fix round, M9) rather than a growing
  * positional tail. `laws` and `boardMoment` were the second and third optional parameters before
@@ -754,7 +744,7 @@ export async function loadPreseason(
     usage,
     priorPlayerTeams,
     teamObservations,
-    gamesPlayed: await gamesPlayedBySeason(db, priorSeasons, moment),
+    availability: (await availabilityBySeason(db, priorSeasons, moment)).bySeason,
     depthChart: await depthChartAsOf(db, season, moment),
     laws,
     lawFacts,
@@ -920,13 +910,13 @@ export function incumbentClaims(
  * offseason decides who eats it. Doing it the other way would apply a redistribution to a volume it
  * was never measured against, which is the note `model/source.ts` leaves for exactly this reason.
  */
-export function preseasonCandidates(
-  inputs: PreseasonInputs,
-  features: PreseasonFeatures,
-  priors: PreseasonPriors,
-): readonly BoardCandidate[] {
-  const week = 1;
-  const rosterByPlayer = new Map(inputs.roster.map((row) => [row.playerId, row] as const));
+/** The week every preseason board is taken for. */
+const BOARD_WEEK = 1;
+
+/** The team context and projection input a preseason board reads, shared by the opportunity and
+ *  the rate passes so the two can never see a different roster. */
+function projectionInputFor(inputs: PreseasonInputs): ProjectionInput {
+  const week = BOARD_WEEK;
   // The team context a preseason projection reads. `playerTeams` holds ONLY this season's week-one
   // roster, not last season's weeks: `latestTeams` picks the highest week number it is shown and
   // does not compare seasons, so mixing the two would hand every feature last December's employer.
@@ -938,7 +928,7 @@ export function preseasonCandidates(
       .map((row) => ({ season: inputs.season, week, playerId: row.playerId, team: row.team, asOf: row.asOf })),
     teamObservations: inputs.teamObservations,
   };
-  const input: ProjectionInput = {
+  return {
     season: inputs.season,
     week,
     asOf: inputs.moment,
@@ -953,8 +943,32 @@ export function preseasonCandidates(
     positions: inputs.positions,
     teamContext,
   };
+}
 
-  const base = predictOpportunity(inputs.usage, { season: inputs.season, week, positions: inputs.positions }, priors.model.opportunity);
+/**
+ * THE BOARD'S OWN OPPORTUNITY — layer 1's prediction, schemed, redistributed for the offseason and
+ * corrected by the published depth chart, in that order. The order is the order the model itself
+ * uses and it matters: scheme sizes the pie, then the offseason decides who eats it. Doing it the
+ * other way would apply a redistribution to a volume it was never measured against, which is the
+ * note `model/source.ts` leaves for exactly this reason.
+ *
+ * ONE FUNCTION FOR THE BOARD AND FOR THE AVAILABILITY FIT (founder report 2026-09-08). The
+ * availability model brackets a player's ROLE on this snap share, and the fit used to bracket its
+ * own population on the bare layer-1 share while the board bracketed on the corrected one, so a
+ * "featured" quarterback meant two different populations in the two places and the fitted cell
+ * was the truth about neither. Both now read the identical quantity.
+ */
+export function boardOpportunity(
+  inputs: PreseasonInputs,
+  features: Pick<PreseasonFeatures, "offseason" | "depthChart">,
+  priors: Pick<PreseasonPriors, "model" | "depth">,
+): {
+  readonly opportunity: ReadonlyMap<string, PredictedOpportunity>;
+  readonly moves: readonly OffseasonMove[];
+  readonly deltas: ReadonlyMap<string, ShareDelta>;
+} {
+  const input = projectionInputFor(inputs);
+  const base = predictOpportunity(inputs.usage, { season: inputs.season, week: BOARD_WEEK, positions: inputs.positions }, priors.model.opportunity);
   const schemed = contextualiseOpportunity(base, input, PRESEASON_MODEL_FEATURES, priors.model.context);
 
   const moves = offseasonMovesFrom(inputs);
@@ -970,6 +984,18 @@ export function preseasonCandidates(
   const opportunity = features.depthChart
     ? applyDepthChart(redistributed, inputs.depthChart, inputs.positions, priors.depth)
     : redistributed;
+  return { opportunity, moves, deltas };
+}
+
+export function preseasonCandidates(
+  inputs: PreseasonInputs,
+  features: PreseasonFeatures,
+  priors: PreseasonPriors,
+): readonly BoardCandidate[] {
+  const week = BOARD_WEEK;
+  const rosterByPlayer = new Map(inputs.roster.map((row) => [row.playerId, row] as const));
+  const input = projectionInputFor(inputs);
+  const { opportunity, moves, deltas } = boardOpportunity(inputs, features, priors);
 
   const rates = contextualiseRates(
     predictRates(inputs.history, inputs.usage, { season: inputs.season, week, positions: inputs.positions }, priors.model.efficiency),
@@ -978,19 +1004,15 @@ export function preseasonCandidates(
     priors.model.context,
   );
 
-  const metrics = indexTeamMetrics(teamContext);
+  const metrics = indexTeamMetrics(input.teamContext);
   const newPlayCaller = (team: string): boolean =>
     metrics(team, { season: inputs.season, week }, COACH_METRICS.tenureSeasons) === 0;
 
-  const historyFor = (playerId: string): readonly SeasonAvailability[] => {
-    const seasons: SeasonAvailability[] = [];
-    for (const [season, counts] of inputs.gamesPlayed) {
-      const played = counts.get(playerId);
-      if (played === undefined) continue;
-      seasons.push({ season, gamesPlayed: played, teamGames: teamGamesIn(season) });
-    }
-    return seasons;
-  };
+  const historyFor = (playerId: string): readonly SeasonAvailability[] =>
+    [...inputs.availability.values()].flatMap((records) => {
+      const record = records.get(playerId);
+      return record === undefined ? [] : [record];
+    });
 
   const candidates: BoardCandidate[] = [];
   const claims = incumbentClaims(inputs, opportunity);
@@ -1162,60 +1184,7 @@ export function rookieDraftBuckets(inputs: PreseasonInputs): ReadonlyMap<string,
  * The fence that matters is the other one, and it is in `fit.ts`: the held-out seasons are passed
  * explicitly and the fit throws if it is handed one.
  */
-const FINAL_OUTCOME = new Date("9999-12-31T00:00:00.000Z");
-
-/**
- * One season of availability labels: who was on a week-one roster, and how many games he then
- * played.
- *
- * The population is the week-one roster rather than everyone who appeared, and that is the whole
- * design. Fitting on players who appeared would condition on the outcome — a man who missed the
- * season would be absent from his own label — and the model would learn that everybody plays
- * fifteen games.
- */
-export async function loadAvailabilityObservations(
-  db: ReadonlyDb,
-  seasons: readonly number[],
-  priors: ModelPriors = FITTED_MODEL,
-): Promise<readonly AvailabilityObservation[]> {
-  const positions = await allPositions(db);
-  const earliest = Math.min(...seasons) - HISTORY_SEASONS;
-  const latest = Math.max(...seasons);
-  const spanSeasons = Array.from({ length: latest - earliest + 1 }, (_, index) => earliest + index);
-  const gamesPlayed = await gamesPlayedBySeason(db, spanSeasons, FINAL_OUTCOME);
-
-  const observations: AvailabilityObservation[] = [];
-  for (const season of seasons) {
-    const roster = await preseasonRostersAsOf(db, { season, asOf: FINAL_OUTCOME });
-    // Role comes from the same preseason inputs a board would have had, never from the completed
-    // season: a term fitted against a snap share the season itself produced would be fitted against
-    // a quantity that does not exist in August.
-    const inputs = await loadPreseason(db, season);
-    const opportunity = predictOpportunity(inputs.usage, { season, week: 1, positions }, priors.opportunity);
-    for (const row of roster) {
-      const position = positions.get(row.playerId);
-      if (position === undefined) continue;
-      const history: SeasonAvailability[] = [];
-      for (let prior = season - HISTORY_SEASONS; prior <= season - 1; prior += 1) {
-        const played = gamesPlayed.get(prior)?.get(row.playerId);
-        if (played === undefined) continue;
-        history.push({ season: prior, gamesPlayed: played, teamGames: teamGamesIn(prior) });
-      }
-      observations.push({
-        season,
-        playerId: row.playerId,
-        position,
-        age: ageAtSeason(row.birthDate, season),
-        status: row.status,
-        projectedSnapShare: opportunity.get(row.playerId)?.snapShare ?? 0,
-        history,
-        baselineRate: null,
-        gamesPlayed: gamesPlayed.get(season)?.get(row.playerId) ?? 0,
-      });
-    }
-  }
-  return observations;
-}
+export const FINAL_OUTCOME = new Date("9999-12-31T00:00:00.000Z");
 
 /**
  * One season of rookie labels: draft capital, the room he landed in, and the shares he then took.
