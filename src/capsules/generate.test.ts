@@ -151,6 +151,26 @@ describe("generateCapsule", () => {
     expect(corrections[0]).not.toContain("broke these rules");
   });
 
+  it("answers a trading word with a SOFT correction that names the drafting replacement and keeps the prose (production follow-up, 2026-09-08)", async () => {
+    const priced = GOOD_COMPACT.replace("drafters are taking him around pick 13", "the price is pick 13");
+    expect(validateCapsule(priced, FACTS, "compact").violations).toHaveLength(1);
+    const corrections: string[] = [];
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (requestKind(init) === "bundle") return okResponse(bundleJson({ compact: priced }));
+      corrections.push(userMessageOf(init));
+      return okResponse(GOOD_COMPACT);
+    });
+
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+
+    expect(result.compact).toMatchObject({ source: "llm", text: GOOD_COMPACT });
+    expect(corrections).toHaveLength(1);
+    expect(corrections[0]).toContain(priced);
+    expect(corrections[0]).toContain("It is nearly right");
+    expect(corrections[0]).toContain("drafters are taking him around pick 100");
+    expect(corrections[0]).not.toContain("broke these rules");
+  });
+
   it("writes a read the bundle left out with one call for that read alone", async () => {
     const corrections: string[] = [];
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {

@@ -1,5 +1,5 @@
 import { BUNDLE_KEYS } from "./bundle";
-import { CAPSULE_CONFIG, LAB_REPORT_TERMS, TRADING_TERMS } from "./config";
+import { CAPSULE_CONFIG, DRAFTING_SENTENCES, LAB_REPORT_TERMS, TRADING_TERMS } from "./config";
 import type { PlayerFacts } from "./facts";
 import type { NarrativeSlotRequest } from "./narrative";
 import { renderFactsForModel } from "./render";
@@ -63,7 +63,7 @@ export const WRITER_RULES = `You write the scouting notes on one player's page f
 
 HOW A NOTE IS BUILT
 - Read the whole fact sheet, then pick the two or three facts that decide THIS player's case. Build the note on those and leave the rest of the sheet unquoted. The reader has the sheet's numbers on the same screen. What he does not have is your judgment about which ones matter for this player.
-- Open on the fact that matters most for him. Never open with a set-up phrase, a greeting, a question, his name followed by a verdict, or any sentence that could open a note about a different player. Where drafters are taking him is rarely the most interesting thing about him, so open there only when it is. The example phrases in these instructions are vocabulary, never sentences to open with.
+- Open on the fact that matters most for him. Never open with a set-up phrase, a greeting, a question, his name followed by a verdict, or any sentence that could open a note about a different player. Where drafters are taking him is rarely the most interesting thing about him, so open there only when it is. Never open on the depth chart: where he sits on it belongs in the middle of a note, once the reader knows why it matters. The example phrases in these instructions are vocabulary, never sentences to open with.
 - There is no fixed order and no fixed shape. If the worry is the story, start there. If the role is the story, start there. Two notes on this board should not walk the same path.
 - Never tour the usage numbers. At most one usage share appears in a note, and only when it decides the case. Never list snap share, target share and red-zone share together, and never chain three ranks in one breath.
 - A rank reads as something a person would say out loud, never as a code read off a table.
@@ -71,9 +71,10 @@ HOW A NOTE IS BUILT
 - Never quote or paraphrase these instructions, the fact sheet's own sentences, or a correction you were given. If a sentence of yours would fit a style guide or a stat table, cut it.
 
 WORDS
-- Fantasy football words, never trading words. Talk about ADP, picks and rounds: "drafters are taking him around pick 100", "he is going a round later than he should", "let him fall", "draft him", "let him go", a reach, a steal, a sleeper, a bust, points over replacement. Never these words: ${nameTerms(TRADING_TERMS)}. "Upside" and "downside" only when tied to a fantasy outcome (a top-five finish, a lost month), never as bare nouns.
+- Fantasy football words, never trading words. Talk about ADP, picks and rounds: "let him fall", "draft him", "let him go", a reach, a steal, a sleeper, a bust, points over replacement. Never these words: ${nameTerms(TRADING_TERMS)}. "Upside" and "downside" only when tied to a fantasy outcome (a top-five finish, a lost month), never as bare nouns.
+- The three sentences to catch yourself on: ${DRAFTING_SENTENCES.map((pair) => `not "${pair.insteadOf}" but "${pair.write}"`).join(", ")}.
 - Phrases this board has worn out, never to be written or paraphrased: ${CAPSULE_CONFIG.repetition.refrainStems.map((stem) => `"${stem}"`).join(", ")}.
-- Never these words either: ${nameTerms(LAB_REPORT_TERMS)}. Say "our number", "the case", "costs him", "is worth". "Our number" takes a plain verb (has him at, puts him at, is), never "says".
+- Never these words either: ${nameTerms(LAB_REPORT_TERMS)}. Say "our number", "our projection", "we project him for 136 points", "the case", "costs him", "is worth". "Our number" takes a plain verb (has him at, puts him at, is), never "says".
 - Never write the word "floor". Say what the low end actually is: the weeks he missed, the weeks he scored under the bar, the season the range bottoms out at.
 - Write like you talk. Contractions are welcome. Short sentences land harder than long ones. Never an em-dash, never a semicolon. Use a period, a comma, or "and".
 - Never name a rival fantasy product.
@@ -85,7 +86,7 @@ HONESTY, NO EXCEPTIONS
 - Never make an all-time or historical-record claim. This engine holds no such data.
 - If the sheet carries a real downside (a factor that costs him points a game, or a year-over-year number that fell), name it with its own number before your call. Never a one-sided rave on mixed facts.
 - The sheet gives two ranges: the middle range most outcomes fall in, and the full tails. Reason from the middle range. If you mention the low tail, say in the same breath that it comes from seasons cut short by injury. Never present the full tails as what he is expected to score.
-- A sportsbook line or a win total is the books' number, something they posted, never a claim you or this engine make. Say so.`;
+- A sportsbook line or a win total is the books' number, something they posted, never a claim you or this engine make. Say they posted it, or where their line sits, never that they set it.`;
 
 const READ_LABEL: Record<CapsuleSize, string> = { compact: "short note", full: "long note" };
 
@@ -130,6 +131,23 @@ export function bundlePromptFor(facts: PlayerFacts, requests: readonly Narrative
   return sections.filter((section): section is string => section !== null).join("\n\n");
 }
 
+const SAME_TEXT_OTHERWISE = "change nothing else: the same facts, the same numbers, the same order, the same voice.";
+
+/**
+ * The length correction. A small overrun (`CAPSULE_CONFIG.lengthCorrection.trimOverrunWords` or
+ * fewer over the cap) asks for the same text minus one sentence at the end, the smallest edit that
+ * lands inside the band; anything else asks for the middle of the band, cutting or adding.
+ */
+function lengthInstruction(size: CapsuleSize, quoted: string, correction: NonNullable<PriorAttempt["lengthCorrection"]>): string {
+  const { words, minWords, maxWords } = correction;
+  const overrun = words - maxWords;
+  if (overrun > 0 && overrun <= CAPSULE_CONFIG.lengthCorrection.trimOverrunWords) {
+    return `${quoted}\n\nIt is ${words} words, ${overrun} over the ${maxWords} word cap. Return the same text with one sentence taken off the end, and ${SAME_TEXT_OTHERWISE}`;
+  }
+  const move = overrun > 0 ? "Cut the sentences that carry the least" : "Add two or three more sentences of fact from the sheet that sharpen the case";
+  return `${quoted}\n\nIt is ${words} words. It has to be between ${minWords} and ${maxWords} words, so aim for about ${targetOf(size)}. ${move}, and ${SAME_TEXT_OTHERWISE}`;
+}
+
 function correctionInstruction(size: CapsuleSize, prior: PriorAttempt): string {
   const label = READ_LABEL[size];
   const shape = size === "compact" ? "one paragraph" : "up to three paragraphs";
@@ -137,11 +155,7 @@ function correctionInstruction(size: CapsuleSize, prior: PriorAttempt): string {
     return `Your previous answer had no ${label} for this player. Write it now: ${lengthOf(size)}, ${shape}, built on the two or three facts that decide his case.`;
   }
   const quoted = `You wrote this ${label}:\n"""${prior.body}"""`;
-  if (prior.lengthCorrection !== undefined) {
-    const { words, minWords, maxWords } = prior.lengthCorrection;
-    const move = words > maxWords ? "Cut the sentences that carry the least" : "Add two or three more sentences of fact from the sheet that sharpen the case";
-    return `${quoted}\n\nIt is ${words} words. It has to be between ${minWords} and ${maxWords} words, so aim for about ${targetOf(size)}. ${move}, and change nothing else: the same facts, the same numbers, the same order, the same voice.`;
-  }
+  if (prior.lengthCorrection !== undefined) return lengthInstruction(size, quoted, prior.lengthCorrection);
   if (prior.softCorrections !== undefined && prior.softCorrections.length > 0) {
     return `${quoted}\n\nIt is nearly right. Fix exactly these points, in your own words, and change nothing else:\n${prior.softCorrections.map((point) => `- ${point}`).join("\n")}`;
   }

@@ -120,7 +120,10 @@ export function narrativeRequestsFor(facts: PlayerFacts): readonly NarrativeSlot
     requests.push({
       key: absenceSlotKey(ABSENCE_MODULES.books),
       maxWords: NARRATIVE_WORD_CAPS.module,
-      brief: "The books have posted nothing on him. Say so plainly and say what a reader should take from that, which is nothing about his talent.",
+      // Not "which is nothing about his talent" (production follow-up, 2026-09-08): a brief that
+      // hands the writer a finished idea gets it back as one sentence on fifteen players ("It says
+      // nothing about whether he can play"). The idea stays; the sentence is his to make.
+      brief: "The books have posted nothing on him. Say so plainly, then say what a reader should take from that in his own terms (his role, where drafters take him), never as a verdict on his talent.",
     });
   }
 

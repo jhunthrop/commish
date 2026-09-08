@@ -127,6 +127,17 @@ describe("measureSameness", () => {
   });
 });
 
+describe("the refrains the 2026-09-07 production regeneration measured (production follow-up, 2026-09-08)", () => {
+  it("are on the list the measure counts and the prompt forbids", () => {
+    for (const stem of ["the depth chart is", "the books set", "it says nothing about whether he can play"]) expect(CAPSULE_CONFIG.repetition.refrainStems).toContain(stem);
+  });
+
+  it("are found however the read cases or punctuates them", () => {
+    expect(containsStem("The depth chart is the whole story here.", "the depth chart is")).toBe(true);
+    expect(containsStem("It says nothing about whether he can play, only that nobody has posted a line.", "it says nothing about whether he can play")).toBe(true);
+  });
+});
+
 describe("the thresholds", () => {
   const stem = CAPSULE_CONFIG.repetition.refrainStems[0]!;
   /** Twenty players: two share an opener (10%, at the line), three say a refrain (15%, over it),

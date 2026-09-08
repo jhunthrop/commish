@@ -111,6 +111,18 @@ export const CAPSULE_CONFIG = {
     },
   },
   /**
+   * A READ ONE OR TWO WORDS OVER THE CAP IS HONEST PROSE LOST TO THE CAP (production follow-up,
+   * 2026-09-08: ten full reads fell to the template at 301 or 302 words against the 240-300 band,
+   * and the correction that asked the writer to "cut the sentences that carry the least" and aim
+   * for the middle came back over again). An overrun of this many words or fewer is answered by
+   * asking for the same text with one sentence taken off the end, which is the smallest edit that
+   * lands inside the band; a second overrun still falls to the template. The band itself is not
+   * widened: it is where the model lands, and a wider cap only moves the line the outliers cross.
+   */
+  lengthCorrection: {
+    trimOverrunWords: 5,
+  },
+  /**
    * THE ONE CALL PER PLAYER (refrains round, 2026-09-07) — the compact read, the full read and the
    * narrative slots in one JSON object (`bundle.ts`). The prose itself is about 120 plus 300 plus
    * 400 words, roughly 1,100 tokens with the JSON around it; the cap sits well above that for the
@@ -198,19 +210,28 @@ export const CAPSULE_CONFIG = {
       "the engine of", // 56%, the old instructions' own example verb
       "makes the case", // 44%
       "most seasons land", // 44%, the sheet's own band sentence read back
-      "the books set", // 36%
+      "the books set", // 36% on the baseline; 11.7% (49 of 420 written) on the 2026-09-07 production regeneration
       // The trading register (founder ruling, 2026-09-07), 84%, 44% and 40% on the baseline:
       "the market",
       "i'm buying",
       "he's a buy",
+      // THE PRODUCTION REGENERATION (2026-09-07, 659 players, 420 written, measured 2026-09-08):
+      "the depth chart is", // the top opener family, 16.2% (68 players) against the 10% line
+      "it says nothing about whether he can play", // the top stock sentence, 2.3% (15 players), the no-props note's old brief read back
     ],
   },
   /** A law group's own `|netEffectPoints|` at or above this reads as a real, citable downside —
    *  below it is noise a capsule need not dwell on. The mandated-tension check (`validate.ts`)
    *  requires the STRONGEST such group's own number be cited before the call, on every capsule
    *  whose facts carry one — a one-sided rave on genuinely mixed evidence is a validation
-   *  failure, not a style choice. */
-  tensionThresholdPoints: 0.5,
+   *  failure, not a style choice.
+   *
+   *  ONE POINT A GAME, NOT HALF (production follow-up, 2026-09-08). At 0.5 the mandate rejected ten
+   *  or more honest reads in one production night for never citing a downside of a few tenths of a
+   *  point a game, a number a person talking to a friend would not mention. A point a game is
+   *  seventeen points a season, the size at which the downside changes the call and a reader would
+   *  want it said before it. Under that, the read may still cite it; it is no longer failed for not. */
+  tensionThresholdPoints: 1.0,
   /** Per-sweep-run cap on fresh generations (two gateway calls each) — the spreading mechanism
    *  that lets a full board's first run clear the free-tier throttle across several nightly
    *  sweeps rather than exhausting it in one run. Generous, per the base-product ruling (spec
@@ -256,10 +277,14 @@ export const CAPSULE_CONFIG = {
  * WORDS A CAPSULE MAY NEVER USE. Two families, both from founder live-fire review of real
  * gateway output:
  *
- * - LAB-REPORT REGISTER ("p10 to p90 range", "evidence projection", "measured young-age edge")
+ * - LAB-REPORT REGISTER ("p10 to p90 range", "the evidence", "measured young-age edge")
  *   leaking straight from this engine's own internal fact vocabulary into fan-facing prose —
  *   `render.ts` exists specifically so the model never sees these words in the first place, and
  *   this list is the mechanical backstop for the rare paraphrase that reintroduces one anyway.
+ *   NOT "projection" (production follow-up, 2026-09-08: six players fell to the template on it in
+ *   one night). "Projection" and "we project him for" are how fantasy people talk, and the app's
+ *   own copy says "our projection versus ADP"; the ruling bans the TRADING register below, and the
+ *   measurement jargon here, never the fantasy word.
  * - "implying"/"implied" for a market-anchor number specifically: `marketPoints` is the FITTED
  *   REALIZATION curve — what players taken at that draft slot HISTORICALLY RETURNED, busts and
  *   injuries pooled (`src/projections/market/curve.ts`) — never what drafters expect, so a
@@ -275,7 +300,6 @@ export const LAB_REPORT_TERMS: readonly string[] = [
   "p10",
   "p90",
   "percentile",
-  "projection",
   "evidence",
   "measured",
   "effect size",
@@ -330,6 +354,46 @@ export const TRADING_TERMS: readonly string[] = [
   "dividend",
   "return on",
 ];
+
+/**
+ * THE SENTENCES THE WRITER KEEPS REACHING FOR (production follow-up, 2026-09-08: "price" alone put
+ * fourteen players on the template in one night, under a prompt that already named the word as
+ * banned). A ban names the word; this teaches the replacement at the point of use, each trading
+ * sentence beside the drafting sentence to write instead. The prompt prints the pairs as one line
+ * of the writer rules, and a "price" correction hands back the three drafting sentences.
+ */
+export const DRAFTING_SENTENCES: readonly { readonly insteadOf: string; readonly write: string }[] = [
+  { insteadOf: "the price is right", write: "he is going a round later than he should" },
+  { insteadOf: "at this price", write: "drafters are taking him around pick 100" },
+  { insteadOf: "the price is too high", write: "a reach at his ADP" },
+];
+
+const PRICE_REPLACEMENTS: readonly string[] = DRAFTING_SENTENCES.map((pair) => pair.write);
+const ADP_PICK_REPLACEMENT: readonly string[] = ["drafters are taking him around pick 100"];
+
+/**
+ * THE DRAFTING WORDS FOR EACH TRADING WORD, keyed by the `TRADING_TERMS` entry `validate.ts` finds
+ * (production follow-up, 2026-09-08). "Rewrite without it" left the writer to guess the
+ * replacement, and the guess was the same trading word again; a correction that names the phrase
+ * gets the phrase. Every entry of `TRADING_TERMS` has one, and `validate.test.ts` pins that.
+ */
+export const TRADING_REPLACEMENTS: Readonly<Record<string, readonly string[]>> = {
+  market: ["drafters", "where drafters take him"],
+  price: PRICE_REPLACEMENTS,
+  priced: PRICE_REPLACEMENTS,
+  buy: ["draft him", "take him at that pick"],
+  sell: ["let him go"],
+  fade: ["let him fall", "pass on him"],
+  "trade at": ADP_PICK_REPLACEMENT,
+  "trades at": ADP_PICK_REPLACEMENT,
+  "trading at": ADP_PICK_REPLACEMENT,
+  undervalued: ["he is going a round later than he should"],
+  overvalued: ["a reach at his ADP"],
+  premium: ["a reach"],
+  discount: ["a steal"],
+  dividend: ["points over replacement"],
+  "return on": ["what he gives back"],
+};
 
 export const BANNED_VOCABULARY: readonly string[] = [...LAB_REPORT_TERMS, ...ALL_TIME_TERMS, ...TRADING_TERMS];
 

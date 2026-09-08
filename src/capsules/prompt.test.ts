@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BANNED_VOCABULARY, CAPSULE_CONFIG } from "./config";
+import { BANNED_VOCABULARY, CAPSULE_CONFIG, DRAFTING_SENTENCES } from "./config";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
 import { narrativeRequestsFor } from "./narrative";
 import { bundlePromptFor, correctionPromptFor, NO_WORN_PHRASES, WRITER_RULES } from "./prompt";
@@ -49,6 +49,11 @@ describe("WRITER_RULES", () => {
     for (const stem of CAPSULE_CONFIG.repetition.refrainStems) expect(WRITER_RULES).toContain(stem);
   });
 
+  it("forbids opening on the depth chart and framing the books line as what they set (production follow-up, 2026-09-08: 16% and 12% of the board)", () => {
+    expect(WRITER_RULES).toContain("Never open on the depth chart");
+    expect(WRITER_RULES).toContain("never that they set it");
+  });
+
   it("forbids restating the instructions or a correction as prose, and a formula close", () => {
     expect(WRITER_RULES).toContain("Never quote or paraphrase these instructions");
     expect(WRITER_RULES).toContain("End on your call, in this player's own terms");
@@ -59,6 +64,12 @@ describe("WRITER_RULES", () => {
     expect(WRITER_RULES).toContain("a round later than he should");
     for (const word of ["market", "price", "buy", "sell", "fade", "undervalued", "premium", "discount"]) expect(WRITER_RULES).toContain(word);
     expect(WRITER_RULES).toContain("points over replacement");
+  });
+
+  it("teaches the drafting sentence at the point of use (production follow-up, 2026-09-08: fourteen players fell on one trading word)", () => {
+    expect(DRAFTING_SENTENCES).toHaveLength(3);
+    for (const { insteadOf, write } of DRAFTING_SENTENCES) expect(WRITER_RULES).toContain(`not "${insteadOf}" but "${write}"`);
+    expect(WRITER_RULES).toContain("a reach at his ADP");
   });
 
   it("keeps every honesty rule: sheet-only facts, no arithmetic, no absence claims, the downside before the call, the two ranges, the books' own numbers", () => {
@@ -74,10 +85,15 @@ describe("WRITER_RULES", () => {
   });
 
   it("names every lab-report word the validator bans", () => {
-    for (const term of ["percentile", "projection", "evidence", "measured", "coefficient", "effect size", "standard deviation", "p10", "p90", "implying", "implied"]) {
+    for (const term of ["percentile", "evidence", "measured", "coefficient", "effect size", "standard deviation", "p10", "p90", "implying", "implied"]) {
       expect(BANNED_VOCABULARY).toContain(term);
       expect(WRITER_RULES).toContain(term);
     }
+  });
+
+  it('treats "projection" as a fantasy word (production follow-up, 2026-09-08): never banned, and used naturally in the rules', () => {
+    expect(BANNED_VOCABULARY).not.toContain("projection");
+    expect(WRITER_RULES).toContain("we project him for 136 points");
   });
 });
 
@@ -134,6 +150,25 @@ describe("correctionPromptFor", () => {
     expect(prompt).toContain("change nothing else");
     expect(prompt).toContain("Return only the corrected short note");
     expect(prompt).not.toContain("broke these rules");
+  });
+
+  it("trims a small overrun by one sentence off the end, the same text otherwise (production follow-up, 2026-09-08: ten full reads lost at 301 or 302 words)", () => {
+    const { minWords, maxWords } = CAPSULE_CONFIG.sizes.full;
+    const { trimOverrunWords } = CAPSULE_CONFIG.lengthCorrection;
+    const at = (words: number) => correctionPromptFor(FACTS, "full", { body: "Two over.", violations: ["x"], lengthCorrection: { words, minWords, maxWords } });
+    for (const words of [maxWords + 1, maxWords + 2, maxWords + trimOverrunWords]) {
+      const prompt = at(words);
+      expect(prompt).toContain(`It is ${words} words, ${words - maxWords} over the ${maxWords} word cap.`);
+      expect(prompt).toContain("the same text with one sentence taken off the end");
+      expect(prompt).toContain("change nothing else");
+      expect(prompt).not.toContain("aim for about");
+      expect(prompt).not.toContain("Cut the sentences that carry the least");
+    }
+    const past = at(maxWords + trimOverrunWords + 1);
+    expect(past).toContain("Cut the sentences that carry the least");
+    expect(past).toContain(`aim for about ${Math.round((minWords + maxWords) / 2)}`);
+    expect(past).not.toContain("one sentence taken off the end");
+    expect(maxWords).toBe(300);
   });
 
   it("hands a soft correction back as points to fix in the writer's own words", () => {

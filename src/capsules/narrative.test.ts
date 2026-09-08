@@ -56,6 +56,12 @@ describe("narrativeRequestsFor", () => {
     expect(keys).toContain(absenceSlotKey(ABSENCE_MODULES.books));
   });
 
+  it("briefs the no-props note in the player's own terms, never as a stock sentence about his talent (production follow-up, 2026-09-08: fifteen players wrote the same one)", () => {
+    const brief = narrativeRequestsFor(buildPlayerFacts(baseInput())).find((request) => request.key === absenceSlotKey(ABSENCE_MODULES.books))!.brief;
+    expect(brief).toContain("in his own terms");
+    expect(brief).not.toContain("which is nothing about his talent");
+  });
+
   it("asks for one slot per evidence group, keyed the way the module renders it", () => {
     const facts = buildPlayerFacts(baseInput());
     const keys = narrativeRequestsFor(facts).map((request) => request.key);
@@ -93,7 +99,7 @@ describe("validateNarrativeSlot", () => {
     expect(validateNarrativeSlot("Justin Herbert throws him the ball every week now.", groundingOf(facts), 40).ok).toBe(false);
     expect(validateNarrativeSlot("He is a steal — the ADP is wrong.", groundingOf(facts), 40).ok).toBe(false);
     expect(validateNarrativeSlot("He is a steal; the ADP is wrong.", groundingOf(facts), 40).ok).toBe(false);
-    expect(validateNarrativeSlot("His projection sits above his ADP.", groundingOf(facts), 40).ok).toBe(false);
+    expect(validateNarrativeSlot("His percentile sits above his ADP.", groundingOf(facts), 40).ok).toBe(false);
   });
 
   it("does not demand the tension citation a whole read has to carry", () => {
