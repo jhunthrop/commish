@@ -345,7 +345,7 @@ export function PlayerPool({
                     // gap: once the board has run past a man's own rank, "still here at pick 44"
                     // is the fact worth the column. Everywhere else the column carries the gap,
                     // which is the product's whole thesis stated sixty times without a word.
-                    verdict={steal !== null ? <VerdictChip verdict={steal} /> : marketGap === null ? null : <Movement places={marketGap} against="the market" />}
+                    verdict={steal !== null ? <VerdictChip verdict={steal} /> : marketGap === null ? null : <Movement places={marketGap} against="ADP" />}
                     action={
                       <div className="flex items-center gap-1">
                         {row.drafted ? null : (

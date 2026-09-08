@@ -124,10 +124,10 @@ export default async function DraftHqPage() {
           verb="See what's coming"
         />
         <FutureSurfaceCard
-          eyebrow="The Market"
+          eyebrow="ADP"
           title="Where the room is wrong"
-          sentence="Not built yet. The Board already shows today's market edge on every ranked player; trends and alerts arrive with this surface."
-          href="/app/draft/market"
+          sentence="Not built yet. The Board already shows where our projection differs from ADP on every ranked player. Trends and alerts arrive with this surface."
+          href="/app/draft/adp"
           verb="See what's coming"
         />
         <FutureSurfaceCard

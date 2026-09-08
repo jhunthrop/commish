@@ -70,7 +70,7 @@ export function reachSentence(input: ReachInput): string | null {
   if (gap < REACH_THRESHOLD_PICKS) return null;
 
   const picksFromNow = Math.round(gap);
-  const lead = `The market has him going about ${picksFromNow} picks from now.`;
+  const lead = `Drafters are taking him about ${picksFromNow} picks from now.`;
   if (makeItBack === null) return lead;
 
   // ONE ODDS VOICE (final review finding 7): the shared `oddsPhrase` — the same quarter-rounded

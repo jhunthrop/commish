@@ -36,8 +36,8 @@ const CSV_HEADER = [
   "Projected pts",
   "Floor",
   "Ceiling",
-  "Market ADP",
-  "Vs market (picks)",
+  "ADP",
+  "Vs ADP (picks)",
   "Auction value",
   // The four LAST SEASON columns (the 2026-09-06 kicker and team defense round). Their own
   // columns and never folded into "Projected pts": a measured season and a projected one are
@@ -362,10 +362,10 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                 {showLastSeason ? "Per game" : "Most seasons"}
               </th>
               <th scope="col" className="px-2 py-2 text-right">
-                Market ADP
+                ADP
               </th>
               <th scope="col" className="px-2 py-2 text-right">
-                Vs market
+                Vs ADP
               </th>
               <th scope="col" className="px-2 py-2" />
               {dollarView ? (
@@ -487,7 +487,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                       {row.marketAdp === null ? (
                         <>
                           <span aria-hidden="true">{NOT_STARTED_DASH}</span>
-                          <span className="sr-only">No market data</span>
+                          <span className="sr-only">No ADP</span>
                         </>
                       ) : (
                         row.marketAdp.toFixed(1)
@@ -497,7 +497,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                       {vsMarket === null ? (
                         <>
                           <span aria-hidden="true">{NOT_STARTED_DASH}</span>
-                          <span className="sr-only">No comparison against the market yet</span>
+                          <span className="sr-only">No comparison against ADP yet</span>
                         </>
                       ) : (
                         <span className={vsMarket.tone === "positive" ? "font-medium text-positive" : "text-text-muted"}>{vsMarket.text}</span>

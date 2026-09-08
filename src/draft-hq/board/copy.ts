@@ -18,18 +18,19 @@ export function strongestEvidenceSentence(groups: readonly EvidenceGroup[]): str
 }
 
 /**
- * FIX 2 — "Vs market": whole picks, in words, never a bare signed number. The value case
- * ("market takes him 25 picks later") is the one that earns green ink — the market underrating
- * him relative to our own rank is real value. The overpriced case ("priced 17 picks early") is
+ * FIX 2 — "Vs ADP": whole picks, in words, never a bare signed number. The value case
+ * ("drafters take him 25 picks later") is the one that earns green ink — drafters underrating
+ * him relative to our own rank is real value. The reach case ("drafters reach 17 picks early") is
  * NEUTRAL ink, never red: red implies a bad player, and this number never meant that — it means
- * the market reaches for him earlier than the evidence does, which is a fact about the market,
- * not a verdict on the man.
+ * drafters reach for him earlier than the evidence does, which is a fact about the room, not a
+ * verdict on the man. Drafters and ADP, never "the market" or "priced": fantasy words, not trading
+ * words (founder, 2026-09-07).
  *
- * `gap` is the caller's own `marketAdp - rank` (positive: market drafts him later than we rank
- * him). Rounds to the nearest whole pick, since a market ADP is fractional but nobody drafts a
- * fraction of a pick; a gap that rounds to exactly zero reads as "even with the market" — neither
- * color, because agreeing with the market is information, not a verdict, the same law `EdgeCell`
- * already keeps for a zero gap.
+ * `gap` is the caller's own `marketAdp - rank` (positive: drafters take him later than we rank
+ * him). Rounds to the nearest whole pick, since an ADP is fractional but nobody drafts a fraction
+ * of a pick; a gap that rounds to exactly zero reads as "even with ADP" — neither color, because
+ * agreeing with the room is information, not a verdict, the same law `EdgeCell` already keeps for
+ * a zero gap.
  */
 export interface VsMarketLabel {
   readonly text: string;
@@ -39,10 +40,10 @@ export interface VsMarketLabel {
 export function vsMarketLabel(gap: number | null): VsMarketLabel | null {
   if (gap === null) return null;
   const wholePicks = Math.round(gap);
-  if (wholePicks === 0) return { text: "even with the market", tone: "neutral" };
-  if (wholePicks > 0) return { text: `market takes him ${wholePicks} pick${wholePicks === 1 ? "" : "s"} later`, tone: "positive" };
+  if (wholePicks === 0) return { text: "even with ADP", tone: "neutral" };
+  if (wholePicks > 0) return { text: `drafters take him ${wholePicks} pick${wholePicks === 1 ? "" : "s"} later`, tone: "positive" };
   const early = Math.abs(wholePicks);
-  return { text: `priced ${early} pick${early === 1 ? "" : "s"} early`, tone: "neutral" };
+  return { text: `drafters reach ${early} pick${early === 1 ? "" : "s"} early`, tone: "neutral" };
 }
 
 /**

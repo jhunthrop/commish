@@ -62,13 +62,14 @@ function toneClassFor(roundedGap: number | null): string {
   return roundedGap > 0 ? "text-positive" : "text-negative";
 }
 
-/** "+20 points vs his price" / "-20 points vs his price" / "0 points vs his price" / the honest
+/** "+20 points vs his ADP" / "-20 points vs his ADP" / "0 points vs his ADP" / the honest
  *  absence — the sign is printed, never implied by color alone (the same rule `EdgeCell` keeps),
- *  so the fact survives a screen reader or a monochrome print. */
+ *  so the fact survives a screen reader or a monochrome print. "His ADP", never "his price":
+ *  fantasy words, not trading words (founder, 2026-09-07). */
 function gapSentence(roundedGap: number | null): string {
-  if (roundedGap === null) return "Not priced by the market.";
+  if (roundedGap === null) return "No ADP to compare against.";
   const sign = roundedGap > 0 ? "+" : "";
-  return `${sign}${roundedGap} points vs his price`;
+  return `${sign}${roundedGap} points vs his ADP`;
 }
 
 /**
@@ -88,8 +89,8 @@ function talentVsGamesSentence(position: Position, perGameRank: number | null, e
  * three price columns the mock states side by side (the market's own read, our board's own read,
  * the gap between them), and the talent-vs-games sentence when the two facts it needs both exist.
  *
- * EVERY NUMBER NAMES ITS BASIS (global constraint) — "pick" and "experts" name the market's own
- * two readings; "overall"/"pts" name our board's; "vs his price" names what the gap is measured
+ * EVERY NUMBER NAMES ITS BASIS (global constraint) — "pick" and "experts" name the drafters' own
+ * two readings; "overall"/"pts" name our board's; "vs his ADP" names what the gap is measured
  * against. Nothing on this card is a bare number.
  *
  * COLOR DISCIPLINE: the verdict channel (`toneClassFor`) is the ONLY chroma on this card, applied
@@ -110,7 +111,7 @@ export function CallCard({ verdict, market, ourBoard, gap, perGameSentence = nul
         </p>
       )}
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm tabular-nums text-text-muted">
-        <span data-call="market">
+        <span data-call="adp">
           pick {market.adp === null ? NOT_STARTED_DASH : market.adp.toFixed(1)} · experts{" "}
           {market.expertRank === null ? NOT_STARTED_DASH : ordinal(market.expertRank)}
         </span>

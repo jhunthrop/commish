@@ -2,7 +2,7 @@ import { NOT_STARTED_DASH } from "./game-state-chip";
 import { Stat, type StatComparison } from "./stat";
 
 export interface SourceValue {
-  /** The source's own name, printed inline as the number's eyebrow: "Market", "Experts", "PPG". */
+  /** The source's own name, printed inline as the number's eyebrow: "ADP", "Experts", "PPG". */
   readonly label: string;
   /**
    * The number, already formatted, or `null` for a source this product cannot currently reach.

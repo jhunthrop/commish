@@ -46,8 +46,8 @@ function Edge({ body }: { readonly body: PlayerSeasonBody }) {
   const gap = adp === null || body.expertRank === null ? null : adp - body.expertRank;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className={`${MICRO_LABEL} text-text-faint`}>Experts vs market</span>
-      <EdgeCell gap={gap} against="the draft market" />
+      <span className={`${MICRO_LABEL} text-text-faint`}>Experts vs ADP</span>
+      <EdgeCell gap={gap} against="ADP" />
     </div>
   );
 }

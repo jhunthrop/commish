@@ -122,13 +122,13 @@ describe("boardCsvLines", () => {
     });
     const [, line] = boardCsvLines([marketOrder], SHAPE);
     const cells = line!.split(",");
-    // Rank, Name, Position, Team, Bye, Projected, Floor, Ceiling, Market ADP, Vs market, Auction.
+    // Rank, Name, Position, Team, Bye, Projected, Floor, Ceiling, ADP, Vs ADP, Auction.
     expect(cells[0]).toBe(""); // no overall rank: it is not on the value board
     expect(cells[5]).toBe(""); // projected
     expect(cells[6]).toBe(""); // floor
     expect(cells[7]).toBe(""); // ceiling
     expect(cells[8]).toBe("130.1"); // the one number it does carry
-    expect(cells[9]).toBe(""); // vs market: the ordering must not be compared with itself
+    expect(cells[9]).toBe(""); // vs ADP: the ordering must not be compared with itself
     expect(line).not.toMatch(/(^|,)0\.0(,|$)/);
   });
 });

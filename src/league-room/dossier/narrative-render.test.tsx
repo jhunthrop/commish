@@ -109,7 +109,7 @@ describe("the narrative's render choice", () => {
 
   it("CallCard: the written per-game sentence replaces the templated talent-versus-games line", () => {
     const props = {
-      verdict: "The market is overpricing him.",
+      verdict: "He is a reach where he is going.",
       market: { adp: 12.5, expertRank: 14 },
       ourBoard: { position: "RB" as const, positionRank: 4, boardRank: 14, points: 248, scoringLabel: "PPR", perGameRank: 3, expectedGames: 15 },
       gap: -9.5,

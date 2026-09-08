@@ -9,21 +9,21 @@ describe("vsMarketLabel", () => {
   });
 
   it("states the value case in words, whole picks, positive tone", () => {
-    expect(vsMarketLabel(25.3)).toEqual({ text: "market takes him 25 picks later", tone: "positive" });
+    expect(vsMarketLabel(25.3)).toEqual({ text: "drafters take him 25 picks later", tone: "positive" });
   });
 
-  it("states the overpriced case in words, whole picks, NEUTRAL tone, never negative", () => {
-    expect(vsMarketLabel(-17.4)).toEqual({ text: "priced 17 picks early", tone: "neutral" });
+  it("states the reach case in words, whole picks, NEUTRAL tone, never negative", () => {
+    expect(vsMarketLabel(-17.4)).toEqual({ text: "drafters reach 17 picks early", tone: "neutral" });
   });
 
   it("singularizes exactly one pick", () => {
-    expect(vsMarketLabel(1)).toEqual({ text: "market takes him 1 pick later", tone: "positive" });
-    expect(vsMarketLabel(-1)).toEqual({ text: "priced 1 pick early", tone: "neutral" });
+    expect(vsMarketLabel(1)).toEqual({ text: "drafters take him 1 pick later", tone: "positive" });
+    expect(vsMarketLabel(-1)).toEqual({ text: "drafters reach 1 pick early", tone: "neutral" });
   });
 
   it("a gap rounding to zero reads as even, neutral, no verdict", () => {
-    expect(vsMarketLabel(0.4)).toEqual({ text: "even with the market", tone: "neutral" });
-    expect(vsMarketLabel(-0.4)).toEqual({ text: "even with the market", tone: "neutral" });
+    expect(vsMarketLabel(0.4)).toEqual({ text: "even with ADP", tone: "neutral" });
+    expect(vsMarketLabel(-0.4)).toEqual({ text: "even with ADP", tone: "neutral" });
   });
 });
 

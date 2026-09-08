@@ -196,7 +196,7 @@ describe("PlayerPage — the Outlook", () => {
     });
     await renderPage();
     expect(screen.getByText("Outlook")).toBeInTheDocument();
-    expect(screen.getByText(/The market is underpricing him/)).toBeInTheDocument();
+    expect(screen.getByText(/He is going later than he should/)).toBeInTheDocument();
     // Five groups total (two law groups, three fact groups) — no cap, no "The full case" expander.
     expect(screen.getByText(/Age 29 season/)).toBeInTheDocument();
     expect(screen.getByText(/320 touches last season/)).toBeInTheDocument();
@@ -349,7 +349,7 @@ describe("PlayerPage — the dossier composition (Task 6)", () => {
   it("falls back to today's layout — no dossier modules — when the dossier is null", async () => {
     vi.mocked(playerSeason).mockResolvedValue({ ...bodyFor(2026, [2026]), reasons: DOSSIER_REASONS, dossier: null });
     await renderPage();
-    expect(screen.getByText(/The market is underpricing him/)).toBeInTheDocument();
+    expect(screen.getByText(/He is going later than he should/)).toBeInTheDocument();
     expect(screen.queryByLabelText("The call")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Season range")).not.toBeInTheDocument();
   });

@@ -11,14 +11,14 @@ import { Movement } from "./movement";
  */
 describe("Movement (law 2)", () => {
   it("says what happened in words, not only in a triangle", async () => {
-    await renderSurface(<Movement places={9} against="the market" />, ({ getByText }) => {
-      expect(getByText("9 places higher than the market")).toBeInTheDocument();
+    await renderSurface(<Movement places={9} against="ADP" />, ({ getByText }) => {
+      expect(getByText("9 places higher than ADP")).toBeInTheDocument();
     });
   });
 
   it("carries no chroma for an unchanged rank, because unchanged is a fact and facts are grey", async () => {
-    await renderSurface(<Movement places={0} against="the market" />, ({ container, getByText }) => {
-      expect(getByText("Unchanged against the market")).toBeInTheDocument();
+    await renderSurface(<Movement places={0} against="ADP" />, ({ container, getByText }) => {
+      expect(getByText("Unchanged against ADP")).toBeInTheDocument();
       expect(container.querySelector("[data-movement]")).toBeNull();
       expect(container.innerHTML).not.toMatch(/text-positive|text-negative/);
     });
@@ -34,8 +34,8 @@ describe("Movement (law 2)", () => {
   });
 
   it("says place, not places, for one", async () => {
-    await renderSurface(<Movement places={1} against="the market" />, ({ getByText }) => {
-      expect(getByText("1 place higher than the market")).toBeInTheDocument();
+    await renderSurface(<Movement places={1} against="ADP" />, ({ getByText }) => {
+      expect(getByText("1 place higher than ADP")).toBeInTheDocument();
     });
   });
 });
@@ -47,18 +47,18 @@ describe("EdgeCell (law 1)", () => {
    * verdict about something we have not measured.
    */
   it("takes no tint at all when there is nothing to compare", async () => {
-    await renderSurface(<EdgeCell gap={null} against="the market" />, ({ container, getByText }) => {
+    await renderSurface(<EdgeCell gap={null} against="ADP" />, ({ container, getByText }) => {
       expect(container.querySelector('[data-edge="unknown"]')).not.toBeNull();
       expect(container.innerHTML).not.toMatch(/text-positive|text-negative/);
-      expect(getByText("No comparison against the market yet")).toBeInTheDocument();
+      expect(getByText("No comparison against ADP yet")).toBeInTheDocument();
     });
   });
 
   it("prints the sign, so the direction survives a monochrome print", async () => {
-    await renderSurface(<EdgeCell gap={5.7} against="the market" />, ({ container }) => {
+    await renderSurface(<EdgeCell gap={5.7} against="ADP" />, ({ container }) => {
       expect(container.textContent).toContain("+5.7");
     });
-    await renderSurface(<EdgeCell gap={-6.9} against="the market" />, ({ container }) => {
+    await renderSurface(<EdgeCell gap={-6.9} against="ADP" />, ({ container }) => {
       expect(container.textContent).toContain("−6.9");
     });
   });

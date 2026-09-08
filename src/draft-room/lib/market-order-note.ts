@@ -12,8 +12,8 @@ import { shipsProjectedRows } from "@/projections/preseason/kdef-decision";
  * of it less.
  *
  * THE COPY SAYS WHAT IS TRUE AND NOTHING ELSE. It does not apologise, it does not promise a fix, and
- * it is not a tip. It names the ordering the rows actually carry and the reason there is no number
- * beside them.
+ * it is not a tip. It names the ordering the rows actually carry (ADP, in fantasy's own word, never
+ * "market order": founder ruling 2026-09-07) and the reason there is no number beside them.
  *
  * Returns `null` for every position that DOES carry a projection, which is the four skill positions
  * today and either of these two the day a later round's judgment passes. Nothing here hardcodes
@@ -27,5 +27,5 @@ const POSITION_NOUN: Readonly<Record<string, string>> = {
 export function marketOrderNoteFor(position: Position): string | null {
   if (shipsProjectedRows(position)) return null;
   const noun = POSITION_NOUN[position] ?? position;
-  return `${noun} are listed in the order they are usually drafted. We are not showing a projection because the model did not clear its own accuracy bar for the position.`;
+  return `${noun} are ranked by ADP because we do not project this position. The model did not clear its own accuracy bar for it.`;
 }
