@@ -1,7 +1,7 @@
 // THE ACCEPTANCE MEASUREMENT (capsule acceptance round, 2026-09-07) — what share of board players
 // the writer actually gets WRITTEN, and when it fails, why.
 //
-// Run: npm run capsules:acceptance -- [sample size] [--cap=0.60] [--texts=out.json]   (default 30)
+// Run: npm run capsules:acceptance -- [sample size] [--cap=0.60] [--texts=out.json] [--rejections=out.json]   (default 30)
 //      npm run capsules:acceptance -- 100 --templates-only
 //
 // THIS SPENDS GATEWAY MONEY. One `generateCapsule` per sampled player is one gateway call (plus a
@@ -22,8 +22,10 @@ import { createDb, type Db } from "@/db/client";
 import { collectBoardFacts } from "@/capsules/collect";
 import { CAPSULE_CONFIG, CAPSULE_MODEL } from "@/capsules/config";
 import type { PlayerFacts } from "@/capsules/facts";
-import { generateCapsule, type CapsuleFallbackReason, type CapsuleGenerationResult } from "@/capsules/generate";
+import { generateCapsule, type CapsuleFallbackReason, type CapsuleGenerationResult, type ReadAttempt } from "@/capsules/generate";
+import { renderFactsForModel } from "@/capsules/render";
 import { measureSameness, samenessOverThreshold, type SamenessReport, type SamenessRow } from "@/capsules/sameness";
+import { wordCount, type CapsuleSize } from "@/capsules/validate";
 import type { GatewayResponseInfo } from "@/capsules/write";
 import { getStoredCapsulesFor } from "@/capsules/store";
 
@@ -45,6 +47,12 @@ const THINKING = ARGUMENTS.includes("--thinking");
 /** `--texts=<path>` writes every player's parts (both reads, the narrative, each part's own
  *  source) as JSON, for the persona read and for mining the board's own refrains. */
 const TEXTS_PATH = ARGUMENTS.find((argument) => argument.startsWith("--texts="))?.slice("--texts=".length);
+/** `--rejections=<path>` writes every player's fact sheet, every attempt at each read (stage,
+ *  words, body, violations) and every refused narrative slot as JSON: the material for classifying
+ *  a rejection by hand rather than by its category alone (written rate round, 2026-09-08). */
+const REJECTIONS_PATH = ARGUMENTS.find((argument) => argument.startsWith("--rejections="))?.slice("--rejections=".length);
+
+const SIZES: readonly CapsuleSize[] = ["compact", "full"];
 
 /** The causes an engineer can act on. Ordered most-actionable first; `categoryOf` returns the
  *  first that matches, so the order is also the precedence. */
@@ -72,15 +80,29 @@ function decidingViolation(fallbackReason: CapsuleFallbackReason | null): string
   return fallbackReason.kind === "throttled" ? "throttled" : fallbackReason.firstViolation;
 }
 
-function wordsIn(text: string): number {
-  return text.trim().split(/\s+/).filter((word) => word.length > 0).length;
+const BAND_VIOLATION = /outside the required .* word band/;
+
+/** Words over (+) or under (-) the size's band, zero inside it. */
+function bandOffset(size: CapsuleSize, words: number): number {
+  const { minWords, maxWords } = CAPSULE_CONFIG.sizes[size];
+  if (words > maxWords) return words - maxWords;
+  if (words < minWords) return words - minWords;
+  return 0;
 }
 
-/** The word count a band violation is complaining about, so the rejected lengths can be measured
- *  alongside the accepted ones without the script holding every rejected body. */
-function rejectedWordsOf(violation: string): number | null {
-  const match = /^Word count (\d+) is outside/.exec(violation);
-  return match === null ? null : Number(match[1]);
+/** One attempt as the shape printout states it: "trim 122 (+2)", or the first violation's
+ *  category when the attempt failed on something other than the band. */
+function describeAttempt(size: CapsuleSize, attempt: ReadAttempt): string {
+  const offset = bandOffset(size, attempt.words);
+  const band = offset === 0 ? "" : ` (${offset > 0 ? "+" : ""}${offset})`;
+  const first = attempt.violations[0];
+  const failedOn = first === undefined ? "" : BAND_VIOLATION.test(first) ? "" : ` [${categoryOf(first)}]`;
+  return `${attempt.stage} ${attempt.words}${band}${failedOn}`;
+}
+
+/** One read's whole attempt log on a line: "compact: draft 123 (+3) -> trim 122 (+2)". */
+function describeAttempts(size: CapsuleSize, attempts: readonly ReadAttempt[]): string {
+  return `${size}: ${attempts.map((attempt) => describeAttempt(size, attempt)).join(" -> ")}`;
 }
 
 /** p10/p50/p90 of a sample, for choosing a word band against what the model actually writes. */
@@ -160,6 +182,26 @@ class Tally {
   readonly playerLatencies: number[] = [];
   /** Gateway calls made per player, so "one call per player" is a measured count, not a claim. */
   readonly callsPerPlayer: number[] = [];
+  /** Every read that fell to the template on the word band, with its whole attempt log, so the
+   *  shape of the failure (an ignored trim, a draft far out, a correction that moved the wrong
+   *  way) is visible rather than inferred (written rate round, 2026-09-08). */
+  readonly bandFallbacks: { readonly player: string; readonly size: CapsuleSize; readonly attempts: readonly ReadAttempt[] }[] = [];
+  /** How often each kind of correction was asked for, and how often it landed. */
+  readonly corrections = new Map<string, { asked: number; landed: number }>();
+
+  recordAttempts(player: string, size: CapsuleSize, attempts: readonly ReadAttempt[], written: boolean): void {
+    const last = attempts[attempts.length - 1];
+    if (!written && last !== undefined && last.violations[0] !== undefined && BAND_VIOLATION.test(last.violations[0])) {
+      this.bandFallbacks.push({ player, size, attempts });
+    }
+    for (const attempt of attempts) {
+      if (attempt.stage === "draft") continue;
+      const entry = this.corrections.get(attempt.stage) ?? { asked: 0, landed: 0 };
+      entry.asked += 1;
+      if (attempt.violations.length === 0) entry.landed += 1;
+      this.corrections.set(attempt.stage, entry);
+    }
+  }
 
   record(violation: string): void {
     const category = categoryOf(violation);
@@ -184,7 +226,7 @@ class Tally {
     console.log(`Player latency: ${quantiles(this.playerLatencies)} (ms). Calls a player: ${quantiles(this.callsPerPlayer)}.`);
     console.log("");
     console.log("Lengths written (the band should be a range the model lands in):");
-    for (const size of ["compact", "full"]) {
+    for (const size of SIZES) {
       console.log(`  ${size} accepted  ${quantiles(this.acceptedWords.get(size) ?? [])}`);
       console.log(`  ${size} rejected  ${quantiles(this.rejectedWords.get(size) ?? [])}`);
     }
@@ -195,6 +237,31 @@ class Tally {
     for (const [category, count] of ordered) {
       console.log(`  ${String(count).padStart(4)}  ${category}`);
       console.log(`        e.g. ${this.examples.get(category) ?? ""}`);
+    }
+    this.printAttemptShapes();
+  }
+
+  /** The word band's own printout: every fallback's attempts, then the over/under split at each
+   *  stage, then how every kind of correction fared. */
+  private printAttemptShapes(): void {
+    console.log("");
+    console.log("Word band fallbacks, every attempt (words, +over/-under the band):");
+    if (this.bandFallbacks.length === 0) console.log("  (none)");
+    for (const { player, size, attempts } of this.bandFallbacks) console.log(`  ${player.padEnd(24)} ${describeAttempts(size, attempts)}`);
+    const split = (pick: (attempts: readonly ReadAttempt[]) => ReadAttempt | undefined): string => {
+      const offsets = this.bandFallbacks.map(({ size, attempts }) => {
+        const attempt = pick(attempts);
+        return attempt === undefined ? null : bandOffset(size, attempt.words);
+      });
+      const over = offsets.filter((offset) => offset !== null && offset > 0).length;
+      const under = offsets.filter((offset) => offset !== null && offset < 0).length;
+      const inside = offsets.filter((offset) => offset === 0).length;
+      return `${over} over, ${under} under, ${inside} inside`;
+    };
+    console.log(`  after the draft: ${split((attempts) => attempts[0])}; after the correction: ${split((attempts) => attempts[1])}`);
+    console.log("Corrections by kind (asked, landed):");
+    for (const [kind, { asked, landed }] of [...this.corrections.entries()].sort((a, b) => b[1].asked - a[1].asked)) {
+      console.log(`  ${kind.padEnd(8)} ${String(asked).padStart(3)} asked, ${String(landed).padStart(3)} landed`);
     }
   }
 }
@@ -224,6 +291,13 @@ async function main(): Promise<void> {
   );
   const texts: { readonly name: string; readonly result: CapsuleGenerationResult }[] = [];
   const samenessRows: SamenessRow[] = [];
+  const rejections: {
+    readonly name: string;
+    readonly sheet: string;
+    readonly compact: readonly ReadAttempt[];
+    readonly full: readonly ReadAttempt[];
+    readonly refusedSlots: CapsuleGenerationResult["narrative"]["refused"];
+  }[] = [];
 
   const tally = new Tally();
   // THE THROTTLE'S OWN WORDS (founder, 2026-09-07) — every 429 verbatim, and one success to
@@ -264,13 +338,15 @@ async function main(): Promise<void> {
     if (throttled) tally.throttled += 1;
     tally.costUsd += result.usage?.costUsd ?? 0;
 
-    for (const [name, size] of [["compact", result.compact], ["full", result.full]] as const) {
-      const violation = decidingViolation(size.fallbackReason);
-      if (violation === null) tally.recordLength(name, wordsIn(size.text), true);
+    for (const size of SIZES) {
+      const read = result[size];
+      const violation = decidingViolation(read.fallbackReason);
+      tally.recordAttempts(facts.identity.name, size, read.attempts, violation === null);
+      if (violation === null) tally.recordLength(size, wordCount(read.text), true);
       else {
         tally.record(violation);
-        const rejectedWords = rejectedWordsOf(violation);
-        if (rejectedWords !== null) tally.recordLength(name, rejectedWords, false);
+        const last = read.attempts[read.attempts.length - 1];
+        if (BAND_VIOLATION.test(violation) && last !== undefined) tally.recordLength(size, last.words, false);
       }
     }
     // The narrative's own rejections are counted in the same tally, prefixed so a reader can tell
@@ -282,6 +358,7 @@ async function main(): Promise<void> {
     );
     texts.push({ name: facts.identity.name, result });
     samenessRows.push(samenessRowOf(facts, result));
+    rejections.push({ name: facts.identity.name, sheet: renderFactsForModel(facts), compact: result.compact.attempts, full: result.full.attempts, refusedSlots: result.narrative.refused });
   }
 
   tally.print();
@@ -304,6 +381,7 @@ async function main(): Promise<void> {
     }));
     writeFileSync(TEXTS_PATH, JSON.stringify(dump, null, 2));
   }
+  if (REJECTIONS_PATH !== undefined) writeFileSync(REJECTIONS_PATH, JSON.stringify(rejections, null, 2));
   await db.$client.end();
 }
 

@@ -76,9 +76,9 @@ describe("writePeekDocuments", () => {
     await upsertCapsule(db, "rb1", "facts_hash_2", {
       source: "template",
       model: null,
-      compact: { text: "A newly written capsule.", usage: null, source: "template", fallbackReason: null },
-      full: { text: "A newly written capsule, at length.", usage: null, source: "template", fallbackReason: null },
-      narrative: { slots: {}, model: null, rejected: [], failure: null },
+      compact: { text: "A newly written capsule.", usage: null, source: "template", fallbackReason: null, attempts: [] },
+      full: { text: "A newly written capsule, at length.", usage: null, source: "template", fallbackReason: null, attempts: [] },
+      narrative: { slots: {}, model: null, rejected: [], refused: [], failure: null },
       usage: null,
     });
 

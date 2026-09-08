@@ -141,25 +141,45 @@ const SAME_TEXT_OTHERWISE = "change nothing else: the same facts, the same numbe
 function lengthInstruction(size: CapsuleSize, quoted: string, correction: NonNullable<PriorAttempt["lengthCorrection"]>): string {
   const { words, minWords, maxWords } = correction;
   const overrun = words - maxWords;
-  if (overrun > 0 && overrun <= CAPSULE_CONFIG.lengthCorrection.trimOverrunWords) {
+  if (isTrimOverrun(correction)) {
     return `${quoted}\n\nIt is ${words} words, ${overrun} over the ${maxWords} word cap. Return the same text with one sentence taken off the end, and ${SAME_TEXT_OTHERWISE}`;
   }
   const move = overrun > 0 ? "Cut the sentences that carry the least" : "Add two or three more sentences of fact from the sheet that sharpen the case";
   return `${quoted}\n\nIt is ${words} words. It has to be between ${minWords} and ${maxWords} words, so aim for about ${targetOf(size)}. ${move}, and ${SAME_TEXT_OTHERWISE}`;
 }
 
+/** The five things a correction call can ask for, decided from the prior attempt alone. Named
+ *  here, where the prompt is chosen, and recorded on the read's own attempt log (`generate.ts`) so
+ *  the acceptance script can say which correction a failed read was given. */
+export type CorrectionKind = "missing" | "trim" | "length" | "soft" | "rewrite";
+
+function isTrimOverrun(correction: NonNullable<PriorAttempt["lengthCorrection"]>): boolean {
+  const overrun = correction.words - correction.maxWords;
+  return overrun > 0 && overrun <= CAPSULE_CONFIG.lengthCorrection.trimOverrunWords;
+}
+
+export function correctionKindOf(prior: PriorAttempt): CorrectionKind {
+  if (prior.missing === true) return "missing";
+  if (prior.lengthCorrection !== undefined) return isTrimOverrun(prior.lengthCorrection) ? "trim" : "length";
+  if (prior.softCorrections !== undefined && prior.softCorrections.length > 0) return "soft";
+  return "rewrite";
+}
+
 function correctionInstruction(size: CapsuleSize, prior: PriorAttempt): string {
   const label = READ_LABEL[size];
   const shape = size === "compact" ? "one paragraph" : "up to three paragraphs";
-  if (prior.missing === true) {
-    return `Your previous answer had no ${label} for this player. Write it now: ${lengthOf(size)}, ${shape}, built on the two or three facts that decide his case.`;
-  }
   const quoted = `You wrote this ${label}:\n"""${prior.body}"""`;
-  if (prior.lengthCorrection !== undefined) return lengthInstruction(size, quoted, prior.lengthCorrection);
-  if (prior.softCorrections !== undefined && prior.softCorrections.length > 0) {
-    return `${quoted}\n\nIt is nearly right. Fix exactly these points, in your own words, and change nothing else:\n${prior.softCorrections.map((point) => `- ${point}`).join("\n")}`;
+  switch (correctionKindOf(prior)) {
+    case "missing":
+      return `Your previous answer had no ${label} for this player. Write it now: ${lengthOf(size)}, ${shape}, built on the two or three facts that decide his case.`;
+    case "trim":
+    case "length":
+      return lengthInstruction(size, quoted, prior.lengthCorrection!);
+    case "soft":
+      return `${quoted}\n\nIt is nearly right. Fix exactly these points, in your own words, and change nothing else:\n${prior.softCorrections!.map((point) => `- ${point}`).join("\n")}`;
+    case "rewrite":
+      return `${quoted}\n\nIt broke these rules:\n${prior.violations.map((violation) => `- ${violation}`).join("\n")}\n\nWrite the ${label} again from scratch, ${lengthOf(size)}, ${shape}, fixing every point above.`;
   }
-  return `${quoted}\n\nIt broke these rules:\n${prior.violations.map((violation) => `- ${violation}`).join("\n")}\n\nWrite the ${label} again from scratch, ${lengthOf(size)}, ${shape}, fixing every point above.`;
 }
 
 /** The user message of a per-part correction: the fact sheet, the prior attempt, what to fix, and

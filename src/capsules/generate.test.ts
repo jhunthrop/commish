@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
 import { describeCapsuleFallback, generateCapsule, type CapsuleSizeResult } from "./generate";
-import { validateCapsule } from "./validate";
+import { validateCapsule, wordCount } from "./validate";
 
 /**
  * ONE CALL PER PLAYER (refrains round, 2026-09-07). Every test drives a fake `fetch`: the bundle
@@ -171,6 +171,51 @@ describe("generateCapsule", () => {
     expect(corrections[0]).not.toContain("broke these rules");
   });
 
+  /**
+   * THE SHAPE OF A FAILURE IS RECORDED (written rate round, 2026-09-08). Seventy-four production
+   * reads fell on the word band and the tally logged only the deciding violation, so whether the
+   * correction was ignored or the draft was further out was not knowable. Every attempt at a read
+   * now rides on the result with its stage, its word count and its violations, for the acceptance
+   * script to print; the sweep ignores it.
+   */
+  it("records every attempt at a read: the draft, then the correction by its kind, each with its words and violations", async () => {
+    const tooShort = `He is a clear steal at this ADP and nothing else about him needs saying today. ${Array.from({ length: 25 }, () => "plainly").join(" ")}.`;
+    const fetchMock = fetchAnswering(() => bundleJson({ compact: tooShort }), () => GOOD_COMPACT);
+
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+
+    expect(result.compact.attempts).toEqual([
+      { stage: "draft", words: 41, body: tooShort, violations: ["Word count 41 is outside the required 75-120 word band."] },
+      { stage: "length", words: wordCount(GOOD_COMPACT), body: GOOD_COMPACT, violations: [] },
+    ]);
+    // The full read was right first time: one attempt, no violations.
+    expect(result.full.attempts).toEqual([{ stage: "draft", words: wordCount(GOOD_FULL), body: GOOD_FULL, violations: [] }]);
+  });
+
+  it("names the correction's kind: a small overrun is a trim, a trading word is soft, a fabrication is a rewrite, a left-out read is missing", async () => {
+    // Two words over the 120 cap: inside the five-word trim allowance.
+    const overrun = `${GOOD_COMPACT} ${Array.from({ length: 122 - wordCount(GOOD_COMPACT) }, () => "plainly").join(" ")}.`;
+    expect(wordCount(overrun)).toBe(122);
+    const priced = GOOD_COMPACT.replace("drafters are taking him around pick 13", "the price is pick 13");
+    const stagesOf = async (bundle: string) => {
+      const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchAnswering(() => bundle, (kind) => (kind === "compact" ? GOOD_COMPACT : GOOD_FULL)) });
+      return { compact: result.compact.attempts.map((attempt) => attempt.stage), full: result.full.attempts.map((attempt) => attempt.stage) };
+    };
+    expect((await stagesOf(bundleJson({ compact: overrun }))).compact).toEqual(["draft", "trim"]);
+    expect((await stagesOf(bundleJson({ compact: priced }))).compact).toEqual(["draft", "soft"]);
+    // A fabrication inside the band: "999" traces to nothing, so the whole note is rewritten.
+    expect((await stagesOf(bundleJson({ compact: GOOD_COMPACT.replace("248", "999") }))).compact).toEqual(["draft", "rewrite"]);
+    expect((await stagesOf(JSON.stringify({ compact: GOOD_COMPACT, narrative: { call: GROUNDED_CALL } }))).full).toEqual(["missing"]);
+  });
+
+  it("keeps a refused narrative slot's own text beside its violations, so a rejected sentence can be read back", async () => {
+    const fabricated = "He caught 137 passes a year ago and nobody tracked it.";
+    const fetchMock = fetchAnswering(() => bundleJson({ narrative: { call: GROUNDED_CALL, "absence:usage": fabricated } }));
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+    expect(result.narrative.refused).toEqual([{ key: "absence:usage", text: fabricated, violations: ['The number "137" does not trace to any supplied fact.'] }]);
+    expect(result.narrative.rejected).toEqual(['absence:usage: The number "137" does not trace to any supplied fact.']);
+  });
+
   it("writes a read the bundle left out with one call for that read alone", async () => {
     const corrections: string[] = [];
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
@@ -254,13 +299,13 @@ describe("generateCapsule", () => {
  *  database in the loop. `capsule-sweep-job.ts`'s own detail lines are the one caller. */
 describe("describeCapsuleFallback", () => {
   function llmResult(): CapsuleSizeResult {
-    return { text: "Body.", source: "llm", usage: null, fallbackReason: null };
+    return { text: "Body.", source: "llm", usage: null, fallbackReason: null, attempts: [] };
   }
   function throttledResult(): CapsuleSizeResult {
-    return { text: "Template body.", source: "template", usage: null, fallbackReason: { kind: "throttled" } };
+    return { text: "Template body.", source: "template", usage: null, fallbackReason: { kind: "throttled" }, attempts: [] };
   }
   function failedValidationResult(firstViolation: string): CapsuleSizeResult {
-    return { text: "Template body.", source: "template", usage: null, fallbackReason: { kind: "failed_validation", firstViolation } };
+    return { text: "Template body.", source: "template", usage: null, fallbackReason: { kind: "failed_validation", firstViolation }, attempts: [] };
   }
 
   it('reports "llm" when neither size fell back', () => {

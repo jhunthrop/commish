@@ -20,7 +20,8 @@ export interface ValidationResult {
   readonly bandFailure: { readonly words: number; readonly minWords: number; readonly maxWords: number } | null;
 }
 
-function wordCount(text: string): number {
+/** The one word count every band, attempt log and acceptance tally is measured by. */
+export function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter((word) => word.length > 0).length;
 }
 

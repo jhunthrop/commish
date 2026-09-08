@@ -568,9 +568,9 @@ describe("playerSeason's season history", () => {
     expect(untouched.capsule).toBeNull();
 
     await upsertCapsule(db, "rb1", "hash-1", {
-      compact: { text: "Compact body.", source: "llm", usage: null, fallbackReason: null },
-      full: { text: "Full body.", source: "llm", usage: null, fallbackReason: null },
-      narrative: { slots: { call: "He is the whole offense in that backfield." }, model: "zai/glm-5.3-flash", rejected: [], failure: null },
+      compact: { text: "Compact body.", source: "llm", usage: null, fallbackReason: null, attempts: [] },
+      full: { text: "Full body.", source: "llm", usage: null, fallbackReason: null, attempts: [] },
+      narrative: { slots: { call: "He is the whole offense in that backfield." }, model: "zai/glm-5.3-flash", rejected: [], refused: [], failure: null },
       source: "llm",
       model: "zai/glm-5.3-flash",
       usage: null,

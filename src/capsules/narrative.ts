@@ -42,19 +42,29 @@ export interface NarrativeSlotRequest {
   readonly brief: string;
 }
 
+/** One slot the validator refused: the sentence as written and every violation it carried, so a
+ *  rejected sentence can be read back beside its reason (written rate round, 2026-09-08). */
+export interface RefusedSlot {
+  readonly key: string;
+  readonly text: string;
+  readonly violations: readonly string[];
+}
+
 export interface NarrativeResult {
   readonly slots: NarrativeSlots;
   readonly model: string | null;
   /** One line per slot the validator refused, for the sweep's own detail lines: an operator
    *  needs to see WHICH sentence the model kept failing to ground, not just a count. */
   readonly rejected: readonly string[];
+  /** The same refusals with the sentence itself, for the acceptance script's own dump. */
+  readonly refused: readonly RefusedSlot[];
   /** Set when no slot survived at all, naming why (a refused gateway, a body with no narrative
    *  object in it). */
   readonly failure: string | null;
 }
 
 /** No slots, no failure: the state before a call, and the honest one when nothing was asked. */
-export const EMPTY_NARRATIVE: NarrativeResult = { slots: {}, model: null, rejected: [], failure: null };
+export const EMPTY_NARRATIVE: NarrativeResult = { slots: {}, model: null, rejected: [], refused: [], failure: null };
 
 /** The narrative that a whole-player failure leaves behind, naming why. */
 export function failedNarrative(failure: string): NarrativeResult {
@@ -183,14 +193,15 @@ export function settleNarrative(raw: Readonly<Record<string, unknown>> | null, f
   if (raw === null) return failedNarrative("the answer carried no narrative object");
   const grounding = groundingOf(facts);
   const slots: Record<string, string> = {};
-  const rejected: string[] = [];
+  const refused: RefusedSlot[] = [];
   for (const request of requests) {
     const value = raw[request.key];
     if (typeof value !== "string" || value.trim() === "") continue;
     const text = value.trim();
     const result = validateNarrativeSlot(text, grounding, request.maxWords);
     if (result.ok) slots[request.key] = text;
-    else rejected.push(`${request.key}: ${result.violations[0] ?? "unknown violation"}`);
+    else refused.push({ key: request.key, text, violations: result.violations });
   }
-  return { slots, model: Object.keys(slots).length > 0 ? model : null, rejected, failure: null };
+  const rejected = refused.map((slot) => `${slot.key}: ${slot.violations[0] ?? "unknown violation"}`);
+  return { slots, model: Object.keys(slots).length > 0 ? model : null, rejected, refused, failure: null };
 }
