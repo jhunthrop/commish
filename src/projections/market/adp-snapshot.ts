@@ -50,8 +50,12 @@ export function adpSnapshotCaptureFor(format: BoardFormat): AdpSnapshotCapture {
   return { format, source: spec.adpSource, snapshotFormat: spec.snapshotFormat, feedFormat: spec.feedFormat };
 }
 
-/** Every format one fire captures, PPR first. Its length is the job's own request budget. */
+/** Every format one fire captures, PPR first. */
 export const ADP_SNAPSHOT_CAPTURES: readonly AdpSnapshotCapture[] = BOARD_FORMATS.map(adpSnapshotCaptureFor);
+
+/** THE JOB'S OWN UPSTREAM BUDGET: one request per format per fire, three a night. Named so the
+ *  schedule's description, the job's docblock and the test all read one number. */
+export const ADP_SNAPSHOT_REQUESTS_PER_FIRE = ADP_SNAPSHOT_CAPTURES.length;
 
 /** The PPR capture's own source/format pair, the one every pre-round row was written under. */
 export const ADP_SNAPSHOT_CONFIG = {
@@ -66,6 +70,9 @@ export interface AdpSnapshotFormatResult {
    *  (never a fabricated 1 or 0 for "no data"). */
   readonly resolutionRate: number | null;
   readonly written: number;
+  /** What this format's own fetch or parse threw, or `null` when it landed. EACH FORMAT IS ITS
+   *  OWN TRY: a half-PPR feed that is down tonight never costs the PPR capture its rows. */
+  readonly error: string | null;
 }
 
 export interface AdpSnapshotResult {
@@ -102,6 +109,8 @@ export interface AdpSnapshotOptions {
   readonly formats?: readonly BoardFormat[];
 }
 
+type FormatCapture = AdpSnapshotFormatResult & { readonly resolved: number };
+
 /** One format's fetch, resolve and append. The instant is shared by every format of one fire. */
 async function captureFormat(
   db: Db,
@@ -110,10 +119,10 @@ async function captureFormat(
   identities: Awaited<ReturnType<typeof rosterIdentitiesFor>>,
   capturedAt: Date,
   fetchImpl: typeof globalThis.fetch,
-): Promise<AdpSnapshotFormatResult & { readonly resolved: number }> {
+): Promise<FormatCapture> {
   const board = await fetchAverageDraftPosition(season, fetchImpl, capture.feedFormat);
   const resolution = resolveRankings(board.candidates, identities);
-  const base = { format: capture.format, candidatesRead: board.candidates.length, resolutionRate: resolution.resolutionRate, resolved: resolution.resolved.length };
+  const base = { format: capture.format, candidatesRead: board.candidates.length, resolutionRate: resolution.resolutionRate, resolved: resolution.resolved.length, error: null };
   if (resolution.resolved.length === 0) return { ...base, written: 0 };
 
   const rows = resolution.resolved.map((entry) => ({
@@ -127,12 +136,36 @@ async function captureFormat(
   return { ...base, written: inserted.length };
 }
 
+/** The same capture, with its own failure caught and named rather than thrown past the other
+ *  formats: nothing published, nothing resolved, nothing written, and the message. */
+async function captureFormatOrFailure(
+  db: Db,
+  capture: AdpSnapshotCapture,
+  season: number,
+  identities: Awaited<ReturnType<typeof rosterIdentitiesFor>>,
+  capturedAt: Date,
+  fetchImpl: typeof globalThis.fetch,
+): Promise<FormatCapture> {
+  try {
+    return await captureFormat(db, capture, season, identities, capturedAt, fetchImpl);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { format: capture.format, candidatesRead: 0, resolutionRate: null, resolved: 0, written: 0, error: message };
+  }
+}
+
 /**
  * One capture: fetch each format's live feed, resolve it against the current season's own roster,
  * write whatever resolved as a fresh, append-only batch of rows. Safe against a same-night retry
  * STRUCTURALLY, not by luck: see `AdpSnapshotOptions.now`'s own docblock for the real mechanism
  * (the schedule's fire instant, not wall-clock `Date.now()`) that makes the unique index catch a
  * retried attempt rather than merely a retry that happens to land in the same millisecond.
+ *
+ * EACH FORMAT IS ITS OWN TRY (the scoring-formats round). A secondary format's failure is recorded
+ * on its own `byFormat` entry and the fire succeeds with the PPR rows it wrote. The PPR capture
+ * failing is the one failure that still THROWS, after every other format has had its turn: PPR is
+ * the board the product reads, the job's retry exists for exactly that fetch, and the secondary
+ * rows already written are no-ops on the retry (same instant, same unique index).
  */
 export async function ingestAdpSnapshot(db: Db, options: AdpSnapshotOptions = {}): Promise<AdpSnapshotResult> {
   const season = options.season ?? PRODUCT_SEASON;
@@ -142,9 +175,15 @@ export async function ingestAdpSnapshot(db: Db, options: AdpSnapshotOptions = {}
 
   const identities = await rosterIdentitiesFor(db, season);
   const capturedAt = now();
-  const results: (AdpSnapshotFormatResult & { readonly resolved: number })[] = [];
+  const results: FormatCapture[] = [];
   for (const capture of captures) {
-    results.push(await captureFormat(db, capture, season, identities, capturedAt, fetchImpl));
+    results.push(await captureFormatOrFailure(db, capture, season, identities, capturedAt, fetchImpl));
+  }
+
+  const primary = results.find((result) => result.format === DEFAULT_BOARD_FORMAT);
+  if (primary !== undefined && primary.error !== null) {
+    const others = results.filter((result) => result !== primary).map((result) => `${result.format}: ${result.error ?? `${result.written} written`}`);
+    throw new Error(`adp-snapshot: the ${DEFAULT_BOARD_FORMAT} capture failed (${primary.error})${others.length > 0 ? `; ${others.join("; ")}` : ""}.`);
   }
 
   const candidatesRead = results.reduce((sum, result) => sum + result.candidatesRead, 0);
@@ -153,7 +192,7 @@ export async function ingestAdpSnapshot(db: Db, options: AdpSnapshotOptions = {}
     candidatesRead,
     resolutionRate: candidatesRead === 0 ? null : resolved / candidatesRead,
     written: results.reduce((sum, result) => sum + result.written, 0),
-    byFormat: results.map(({ format, candidatesRead: read, resolutionRate, written }) => ({ format, candidatesRead: read, resolutionRate, written })),
+    byFormat: results.map(({ format, candidatesRead: read, resolutionRate, written, error }) => ({ format, candidatesRead: read, resolutionRate, written, error })),
   };
 }
 

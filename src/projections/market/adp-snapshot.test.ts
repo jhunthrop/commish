@@ -5,7 +5,7 @@ import { adpSnapshots, nflPlayers, playerCrosswalk, players, preseasonRosters } 
 import type { FfcResponse } from "@/projections/preseason/publishers";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
-import { ADP_SNAPSHOT_CONFIG, ADP_SNAPSHOT_CAPTURES, adpSnapshotHistory, ingestAdpSnapshot } from "./adp-snapshot";
+import { ADP_SNAPSHOT_CONFIG, ADP_SNAPSHOT_CAPTURES, ADP_SNAPSHOT_REQUESTS_PER_FIRE, adpSnapshotHistory, ingestAdpSnapshot } from "./adp-snapshot";
 
 /** A fixture `fetch` standing in for Fantasy Football Calculator's live feed, exactly like
  *  `publishers.test.ts`'s own fixtures — this suite never touches the network. */
@@ -30,7 +30,7 @@ describe("ingestAdpSnapshot", () => {
     const fixture: FfcResponse = { meta: { end_date: "2026-08-30" }, players: [{ name: "Puka Nacua", position: "WR", team: "LAR", adp: 8.4 }] };
     const result = await ingestAdpSnapshot(db, { fetchImpl: fixtureFetch(fixture), now: () => new Date("2026-09-01T00:00:00.000Z"), formats: ["ppr"] });
 
-    expect(result).toEqual({ candidatesRead: 1, resolutionRate: 1, written: 1, byFormat: [{ format: "ppr", candidatesRead: 1, resolutionRate: 1, written: 1 }] });
+    expect(result).toEqual({ candidatesRead: 1, resolutionRate: 1, written: 1, byFormat: [{ format: "ppr", candidatesRead: 1, resolutionRate: 1, written: 1, error: null }] });
     const rows = await db.select().from(adpSnapshots);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ playerId: "nfl-1", source: ADP_SNAPSHOT_CONFIG.source, format: ADP_SNAPSHOT_CONFIG.format, adp: 8.4 });
@@ -97,6 +97,53 @@ describe("ingestAdpSnapshot", () => {
     // The same instant, three formats: the unique index separates them by source, so a retry of
     // the whole fire still writes nothing new.
     expect((await ingestAdpSnapshot(db, { fetchImpl, now })).written).toBe(0);
+  });
+
+  it("budgets one upstream request per format, three a fire", () => {
+    expect(ADP_SNAPSHOT_REQUESTS_PER_FIRE).toBe(3);
+    expect(ADP_SNAPSHOT_CAPTURES.map((capture) => capture.format)).toEqual(["ppr", "half", "std"]);
+  });
+
+  /** A feed that answers PPR and standard but fails half PPR with an HTTP error. */
+  function halfDownFetch(): typeof globalThis.fetch {
+    return (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("/adp/half-ppr?")) return { ok: false, status: 503 } as unknown as Response;
+      const body: FfcResponse = { meta: { end_date: "2026-08-30" }, players: [{ name: "Puka Nacua", position: "WR", team: "LAR", adp: url.includes("/adp/ppr?") ? 8.4 : 14.2 }] };
+      return { ok: true, json: async () => body } as unknown as Response;
+    }) as typeof globalThis.fetch;
+  }
+
+  it("a failed secondary format never costs the PPR capture: each format is its own try, its own row, named in the result", async () => {
+    await db.insert(nflPlayers).values([{ id: "nfl-1", name: "Puka Nacua", position: "WR" }]);
+    await db.insert(preseasonRosters).values([{ season: PRODUCT_SEASON, team: "LAR", playerId: "nfl-1", position: "WR", status: "active", asOf: ROSTER_ASOF }]);
+
+    const result = await ingestAdpSnapshot(db, { fetchImpl: halfDownFetch(), now: () => new Date("2026-09-01T00:00:00.000Z") });
+
+    expect(result.written).toBe(2);
+    expect(result.byFormat.map((entry) => [entry.format, entry.written, entry.error === null])).toEqual([
+      ["ppr", 1, true],
+      ["half", 0, false],
+      ["std", 1, true],
+    ]);
+    expect(result.byFormat[1]!.error).toMatch(/HTTP 503/);
+    const rows = await db.select().from(adpSnapshots);
+    expect(rows.map((row) => row.source).sort()).toEqual([BENCHMARK_SOURCES.adp, BENCHMARK_SOURCES.adpStd].sort());
+  });
+
+  it("a failed PPR capture still throws, after the other formats have had their turn, naming every outcome", async () => {
+    await db.insert(nflPlayers).values([{ id: "nfl-1", name: "Puka Nacua", position: "WR" }]);
+    await db.insert(preseasonRosters).values([{ season: PRODUCT_SEASON, team: "LAR", playerId: "nfl-1", position: "WR", status: "active", asOf: ROSTER_ASOF }]);
+    const pprDown = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("/adp/ppr?")) return { ok: false, status: 500 } as unknown as Response;
+      const body: FfcResponse = { meta: { end_date: "2026-08-30" }, players: [{ name: "Puka Nacua", position: "WR", team: "LAR", adp: 12 }] };
+      return { ok: true, json: async () => body } as unknown as Response;
+    }) as typeof globalThis.fetch;
+
+    await expect(ingestAdpSnapshot(db, { fetchImpl: pprDown, now: () => new Date("2026-09-01T00:00:00.000Z") })).rejects.toThrow(/the ppr capture failed \(.*HTTP 500.*\); half: 1 written; std: 1 written/);
+    // The secondary rows landed and stay; the job's retry re-fetches PPR and finds them no-ops.
+    expect((await db.select().from(adpSnapshots)).map((row) => row.source).sort()).toEqual([BENCHMARK_SOURCES.adpHalf, BENCHMARK_SOURCES.adpStd].sort());
   });
 });
 
