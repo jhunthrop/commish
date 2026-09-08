@@ -1,16 +1,20 @@
 import { Table, type TableColumn } from "@/components/ui";
 import type { TeamCompetition, UsageCount, UsageShare } from "../contract";
 import { formatShare } from "./format";
+import { PlayerNameLink } from "./player-name-link";
 import { Section } from "./section";
 
+/** The leader's name as a link to his page, plain text when the crosswalk cannot resolve him. */
+const nameCell = (row: UsageCount) => <PlayerNameLink playerId={row.playerId} name={row.name} />;
+
 const SHARE_COLUMNS: readonly TableColumn<UsageShare>[] = [
-  { key: "name", header: "Player", cell: (row) => row.name },
+  { key: "name", header: "Player", cell: nameCell },
   { key: "count", header: "Count", cell: (row) => String(row.count), numeric: true },
   { key: "share", header: "Share", cell: (row) => formatShare(row.share), numeric: true },
 ];
 
 const COUNT_COLUMNS: readonly TableColumn<UsageCount>[] = [
-  { key: "name", header: "Player", cell: (row) => row.name },
+  { key: "name", header: "Player", cell: nameCell },
   { key: "count", header: "Touches", cell: (row) => String(row.count), numeric: true },
 ];
 
@@ -19,7 +23,7 @@ function Leaders<T extends UsageCount>({ caption, columns, rows }: { readonly ca
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span className="font-mono text-xs text-text-muted">{caption}</span>
-      <Table caption={caption} columns={columns} rows={rows} rowKey={(row) => row.playerId} density="dense" empty={null} />
+      <Table caption={caption} columns={columns} rows={rows} rowKey={(row) => row.nflPlayerId} density="dense" empty={null} />
     </div>
   );
 }

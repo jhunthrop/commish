@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { ShellLeaguesProvider } from "@/components/app-shell/shell-leagues";
+import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
+import { fixtureLeagueDeps } from "@/league-room/test-fixtures";
 import { EMPTY_TEAM, FULL_TEAM } from "../test-fixtures";
 import { NOT_HELD } from "./section";
 import { TeamPageView } from "./team-page-view";
@@ -72,11 +74,56 @@ describe("TeamPageView", () => {
     pathname = "/app/teams/DET";
   });
 
+  it("links every name in the depth chart and the three leader tables the same way, and leaves an unresolved name as text", () => {
+    pathname = "/app/leagues/lg_here/standings";
+    renderView(FULL_TEAM);
+    const weekOne = screen.getByRole("table", { name: "Week one chart" });
+    expect(within(weekOne).getByRole("link", { name: "Isiah Pacheco" })).toHaveAttribute("href", "/app/leagues/lg_here/players/4361529");
+    const current = screen.getByRole("table", { name: "Current chart" });
+    expect(within(current).getByRole("link", { name: "Jared Goff" })).toHaveAttribute("href", "/app/leagues/lg_here/players/3046779");
+    expect(within(current).queryByRole("link", { name: "Luke Altmyer" })).toBeNull();
+    expect(within(current).getByText("Luke Altmyer")).toBeInTheDocument();
+    const targets = screen.getByRole("table", { name: "Targets" });
+    expect(within(targets).getByRole("link", { name: "Amon-Ra St. Brown" })).toHaveAttribute("href", "/app/leagues/lg_here/players/4374302");
+    const carries = screen.getByRole("table", { name: "Carries" });
+    expect(within(carries).getByRole("link", { name: "Jahmyr Gibbs" })).toHaveAttribute("href", "/app/leagues/lg_here/players/4429795");
+    expect(within(carries).queryByRole("link", { name: "David Montgomery" })).toBeNull();
+    expect(within(carries).getByText("David Montgomery")).toBeInTheDocument();
+    const redZone = screen.getByRole("table", { name: "Red-zone touches" });
+    expect(within(redZone).getByRole("link", { name: "Jahmyr Gibbs" })).toHaveAttribute("href", "/app/leagues/lg_here/players/4429795");
+    // The column headers are untouched by the links.
+    expect(within(carries).getByRole("columnheader", { name: "Player" })).toBeInTheDocument();
+    pathname = "/app/teams/DET";
+  });
+
+  it("opens the peek in place on a plain click, and leaves a modified click to the anchor", async () => {
+    pathname = "/app/leagues/lg_here/standings";
+    const fixture = fixtureLeagueDeps({ ok: false, error: "not in this test" });
+    render(
+      <LeagueRoomDepsProvider deps={fixture.deps}>
+        <ShellLeaguesProvider leagueIds={["lg_first"]}>
+          <TeamPageView data={FULL_TEAM} />
+        </ShellLeaguesProvider>
+      </LeagueRoomDepsProvider>,
+    );
+    const carries = screen.getByRole("table", { name: "Carries" });
+    const link = within(carries).getByRole("link", { name: "Jahmyr Gibbs" });
+    const modified = fireEvent.click(link, { metaKey: true, detail: 1 });
+    expect(modified).toBe(true);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const plain = fireEvent.click(link, { detail: 1 });
+    expect(plain).toBe(false);
+    expect(await screen.findByRole("dialog", { name: "Jahmyr Gibbs" })).toBeInTheDocument();
+    expect(fixture.calls).toEqual(["GET /api/leagues/lg_here/player-season?playerId=4429795"]);
+    pathname = "/app/teams/DET";
+  });
+
   it("renders the rows without links for a reader with no league, never a link that dies", () => {
     renderView(FULL_TEAM, []);
     expect(screen.queryByRole("link", { name: "Jahmyr Gibbs" })).toBeNull();
     expect(within(screen.getByRole("list", { name: "Fantasy players" })).getByText("Jahmyr Gibbs")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Defense analysis page" })).toBeNull();
+    expect(within(screen.getByRole("table", { name: "Carries" })).queryAllByRole("link")).toHaveLength(0);
   });
 
   it("renders headings and the absence line only, never a zero, for a club the store holds nothing about", async () => {

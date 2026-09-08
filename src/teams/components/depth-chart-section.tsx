@@ -1,13 +1,18 @@
+import type { ReactNode } from "react";
 import { Table, type TableColumn } from "@/components/ui";
 import { TEAM_PAGE_CONFIG } from "../config";
+import { PlayerNameLink } from "./player-name-link";
 import type { DatedDepthChart, DepthChartGroup, TeamDepthCharts } from "../contract";
 import { formatStampedDate } from "./format";
 import { Section } from "./section";
 
 const SLOT_KEYS = Array.from({ length: TEAM_PAGE_CONFIG.depthChartSlots }, (_, index) => index + 1);
 
-function nameAt(group: DepthChartGroup, slot: number): string {
-  return group.slots.find((listed) => listed.slot === slot)?.name ?? "";
+/** The listed man at one slot as a link to his page (plain text when the universe cannot resolve
+ *  him), or nothing when the chart lists nobody there. */
+function nameAt(group: DepthChartGroup, slot: number): ReactNode {
+  const listed = group.slots.find((entry) => entry.slot === slot);
+  return listed === undefined ? "" : <PlayerNameLink playerId={listed.playerId} name={listed.name} />;
 }
 
 const COLUMNS: readonly TableColumn<DepthChartGroup>[] = [
