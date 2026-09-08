@@ -5,6 +5,7 @@ import { Badge, ReasonChip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { narrativeSlot, NARRATIVE_KEYS } from "@/capsules/narrative-slots";
 import type { PlayerCapsuleView } from "@/capsules/store";
+import { TEMPLATE_CAPSULE_NOTE } from "@/capsules/template";
 import type { Position } from "@/domain/player";
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
@@ -81,10 +82,11 @@ export function Outlook({ reasons, laws, position, capped = false, capsule }: Ou
       {capsule === null || capsule === undefined ? null : (
         <div className="flex flex-col gap-1">
           <p className="text-sm text-text-primary">{capped ? capsule.bodyCompact : capsule.bodyFull}</p>
-          {/* The quiet, honest provenance line (spec §9 AMENDED, reworded in the dossier-voice
-              round): it states what the text IS rather than promising a write-up, because a
-              promise a reader has been shown for months reads as a broken one. */}
-          {capsule.source === "template" ? <p className="text-xs text-text-faint">A summary from the numbers. The written read is on its way.</p> : null}
+          {/* The quiet, honest provenance line (spec §9 AMENDED; the promise dropped in the
+              overruns round, see `TEMPLATE_CAPSULE_NOTE`): it states what the text IS and
+              promises nothing, because a promise a reader has been shown for days reads as a
+              broken one. */}
+          {capsule.source === "template" ? <p className="text-xs text-text-faint">{TEMPLATE_CAPSULE_NOTE}</p> : null}
         </div>
       )}
       <div className="flex flex-col gap-1.5">

@@ -1,4 +1,5 @@
 import type { PlayerCapsuleView } from "@/capsules/store";
+import { TEMPLATE_CAPSULE_NOTE } from "@/capsules/template";
 import { Card } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 
@@ -31,7 +32,7 @@ export function ReadCard({ capsule, variant }: ReadCardProps) {
     <Card as="section" aria-label="The read" className="flex flex-col gap-1">
       <h3 className={`${MICRO_LABEL} text-text-faint`}>The read</h3>
       <p className="text-sm text-text-primary">{body}</p>
-      {capsule.source === "template" ? <p className="text-xs text-text-faint">A summary from the numbers. The written read is on its way.</p> : null}
+      {capsule.source === "template" ? <p className="text-xs text-text-faint">{TEMPLATE_CAPSULE_NOTE}</p> : null}
     </Card>
   );
 }

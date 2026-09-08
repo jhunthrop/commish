@@ -102,6 +102,16 @@ export async function upsertCapsule(db: Db, playerId: string, factsHash: string,
  */
 export const REGENERATE_FACTS_HASH = "stale:repetition";
 
+/**
+ * THE FRONT OF THE LINE (overruns round, 2026-09-08). A player whose stored read was WRITTEN and
+ * whose regeneration fell to the template is stamped with this hash as his template row is
+ * written, and the sweep processes stamped rows before the board order. The same mechanism as the
+ * repetition queue above (the queue is the cache key), one value apart so the two reasons stay
+ * distinguishable in the table. One-shot by construction: his row is template-sourced after the
+ * demotion, so a second failure is an ordinary template row and is never stamped again.
+ */
+export const RETRY_FIRST_FACTS_HASH = "stale:demoted";
+
 export async function queueCapsuleRegeneration(db: Db, playerIds: readonly string[]): Promise<number> {
   if (playerIds.length === 0) return 0;
   const updated = await db

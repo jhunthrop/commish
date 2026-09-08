@@ -90,7 +90,7 @@ function bandOffset(size: CapsuleSize, words: number): number {
   return 0;
 }
 
-/** One attempt as the shape printout states it: "trim 122 (+2)", or the first violation's
+/** One attempt as the shape printout states it: "length 122 (+2)", or the first violation's
  *  category when the attempt failed on something other than the band. */
 function describeAttempt(size: CapsuleSize, attempt: ReadAttempt): string {
   const offset = bandOffset(size, attempt.words);
@@ -100,7 +100,7 @@ function describeAttempt(size: CapsuleSize, attempt: ReadAttempt): string {
   return `${attempt.stage} ${attempt.words}${band}${failedOn}`;
 }
 
-/** One read's whole attempt log on a line: "compact: draft 123 (+3) -> trim 122 (+2)". */
+/** One read's whole attempt log on a line: "compact: draft 133 (+13) -> length 127 (+7) -> fresh 96". */
 function describeAttempts(size: CapsuleSize, attempts: readonly ReadAttempt[]): string {
   return `${size}: ${attempts.map((attempt) => describeAttempt(size, attempt)).join(" -> ")}`;
 }
@@ -183,8 +183,8 @@ class Tally {
   /** Gateway calls made per player, so "one call per player" is a measured count, not a claim. */
   readonly callsPerPlayer: number[] = [];
   /** Every read that fell to the template on the word band, with its whole attempt log, so the
-   *  shape of the failure (an ignored trim, a draft far out, a correction that moved the wrong
-   *  way) is visible rather than inferred (written rate round, 2026-09-08). */
+   *  shape of the failure (an ignored correction, a draft far out, a correction that moved the
+   *  wrong way) is visible rather than inferred (written rate round, 2026-09-08). */
   readonly bandFallbacks: { readonly player: string; readonly size: CapsuleSize; readonly attempts: readonly ReadAttempt[] }[] = [];
   /** How often each kind of correction was asked for, and how often it landed. */
   readonly corrections = new Map<string, { asked: number; landed: number }>();
@@ -258,11 +258,15 @@ class Tally {
       const inside = offsets.filter((offset) => offset === 0).length;
       return `${over} over, ${under} under, ${inside} inside`;
     };
-    console.log(`  after the draft: ${split((attempts) => attempts[0])}; after the correction: ${split((attempts) => attempts[1])}`);
+    console.log(`  after the draft: ${split((attempts) => attempts[0])}; after the correction: ${split((attempts) => attempts[1])}; after the fresh draft: ${split((attempts) => attempts[2])}`);
     console.log("Corrections by kind (asked, landed):");
     for (const [kind, { asked, landed }] of [...this.corrections.entries()].sort((a, b) => b[1].asked - a[1].asked)) {
       console.log(`  ${kind.padEnd(8)} ${String(asked).padStart(3)} asked, ${String(landed).padStart(3)} landed`);
     }
+    // THE FRESH DRAFT'S OWN LINE (overruns round, 2026-09-08): a read that reaches it had already
+    // fallen on the band twice, so every one that lands is a read the template would have had.
+    const fresh = this.corrections.get("fresh") ?? { asked: 0, landed: 0 };
+    console.log(`Reads saved by the fresh draft: ${fresh.landed} of ${fresh.asked} that reached it.`);
   }
 }
 

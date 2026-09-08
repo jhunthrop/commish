@@ -1,12 +1,15 @@
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
 import { nflPlayers, playerCrosswalk, playerPeekFacts, players, preseasonProjections } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { jobs } from "@/db/schema";
-import { getStoredCapsule, REGENERATE_FACTS_HASH } from "@/capsules/store";
+import { CAPSULE_CONFIG } from "@/capsules/config";
+import { getStoredCapsule, REGENERATE_FACTS_HASH, RETRY_FIRST_FACTS_HASH } from "@/capsules/store";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { runCapsuleSweepStep } from "./capsule-sweep-job";
+import { JOBS_CONFIG } from "../config";
+import { reservedMsPerPlayer, runCapsuleSweepStep } from "./capsule-sweep-job";
 
 const CLOCK = { now: () => "2026-09-04T12:00:00.000Z" };
 
@@ -185,6 +188,108 @@ describe("runCapsuleSweepStep", () => {
 });
 
 /**
+ * A WRITTEN PLAYER IS NOT DEMOTED SILENTLY (overruns round, 2026-09-08). Derrick Henry had a written
+ * read; a regeneration after his facts moved failed validation, the template replaced it, and the
+ * detail line read like any other template fallback. The old read cannot be kept (its facts are
+ * gone), but the sweep now says what happened and puts him at the front of the next run.
+ */
+describe("runCapsuleSweepStep — a written player whose regeneration fails", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    await truncateAll(db);
+  });
+
+  /** Twenty-plus words that fail grounding: "999" traces to no fact. */
+  const FABRICATED = "He will score 999 touchdowns this year for this offense, an absurd fabricated number that nobody on the fact sheet has ever hit, and drafters simply cannot rank a season like that.";
+  const fabricatingFetch = (async () => okResponse(JSON.stringify({ compact: FABRICATED, full: FABRICATED, narrative: {} }))) as typeof globalThis.fetch;
+
+  async function moveFactsOf(nflId: string, points: number): Promise<void> {
+    await db.update(preseasonProjections).set({ projectedPoints: points, medianPoints: points }).where(eq(preseasonProjections.playerId, nflId));
+  }
+
+  it('says "kept nothing, was written" in the detail line and stamps him to go first next run', async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Rashad Long", rank: 1, points: 248 });
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, {});
+    expect((await getStoredCapsule(db, "p1"))?.source).toBe("llm");
+    await moveFactsOf("00-1", 200);
+
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: fabricatingFetch }, {});
+
+    const line = outcome.detail.find((entry) => entry.startsWith("Rashad Long: template"))!;
+    expect(line).toMatch(/^Rashad Long: template \(failed validation: .+\), kept nothing, was written$/);
+    expect(outcome.summary).toContain("1 written player(s) fell to the template and go first next run");
+    const stored = await getStoredCapsule(db, "p1");
+    expect(stored?.source).toBe("template");
+    expect(stored?.factsHash).toBe(RETRY_FIRST_FACTS_HASH);
+  });
+
+  it("retries him at the front of the next run, ahead of the board order", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Player One", rank: 1, points: 248 });
+    await seedPlayer(db, { id: "p2", nflId: "00-2", name: "Player Two", rank: 2, points: 220 });
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, {});
+    // Player Two's facts move and his regeneration fails (the fixture fabricates for him alone:
+    // the first run's sameness check queues both players, since they share one read); then Player
+    // One's facts move too, so both are eligible and board order alone would put Player One first.
+    await moveFactsOf("00-2", 180);
+    const failingPlayerTwo = (async (url: unknown, init: unknown) => {
+      const { messages } = JSON.parse((init as RequestInit).body as string) as { messages: { content: string }[] };
+      return messages[1]!.content.includes("Player Two") ? fabricatingFetch(url as never, init as never) : sizeAwareFetch()(url as never, init as never);
+    }) as typeof globalThis.fetch;
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: failingPlayerTwo }, {});
+    expect((await getStoredCapsule(db, "p2"))?.factsHash).toBe(RETRY_FIRST_FACTS_HASH);
+    expect((await getStoredCapsule(db, "p1"))?.factsHash).not.toBe(RETRY_FIRST_FACTS_HASH);
+    await moveFactsOf("00-1", 230);
+
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, { budget: 1 });
+
+    expect(outcome.summary).toContain("2 needed a fresh generation");
+    expect(outcome.detail).toContain("Player Two: llm, $0.000050");
+    expect((await getStoredCapsule(db, "p2"))?.source).toBe("llm");
+    expect((await getStoredCapsule(db, "p2"))?.factsHash).not.toBe(RETRY_FIRST_FACTS_HASH);
+    expect(outcome.summary).toContain("1 left for the next sweep");
+  });
+
+  it("gives the front of the line once: a player who fails again from the template is an ordinary template row", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Rashad Long", rank: 1, points: 248 });
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, {});
+    await moveFactsOf("00-1", 200);
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: fabricatingFetch }, {});
+
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: fabricatingFetch }, {});
+
+    const line = outcome.detail.find((entry) => entry.startsWith("Rashad Long: template"))!;
+    expect(line).not.toContain("kept nothing");
+    expect(outcome.summary).not.toContain("fell to the template and go first");
+    const stored = await getStoredCapsule(db, "p1");
+    expect(stored?.source).toBe("template");
+    expect(stored?.factsHash).not.toBe(RETRY_FIRST_FACTS_HASH);
+  });
+});
+
+/**
+ * THE NIGHTLY BUDGET COVERS EVERYONE (overruns round, 2026-09-08). The 35-a-night cap predates the
+ * resumable sweep and the 12-calls-a-minute pacing; a demoted player was waiting days for his turn
+ * in the tail. The budget now covers the whole board, and the per-player reserve the tick geometry
+ * is built on states the four-call ceiling a player can actually cost.
+ */
+describe("the nightly budget and the tick geometry", () => {
+  /** The board the production regeneration of 2026-09-08 wrote. */
+  const BOARD_TODAY = 664;
+
+  it("covers today's whole board in one night", () => {
+    expect(CAPSULE_CONFIG.sweepGenerationBudget).toBeGreaterThanOrEqual(BOARD_TODAY);
+  });
+
+  it("reserves the four-call ceiling a player can cost, and the default tick still fits one player", () => {
+    const { sweepPacingMs, maxGatewayCallsPerPlayer, gateway } = CAPSULE_CONFIG;
+    expect(reservedMsPerPlayer()).toBe(sweepPacingMs + maxGatewayCallsPerPlayer * gateway.minCallSpacingMs + gateway.timeoutMs);
+    expect(reservedMsPerPlayer()).toBeLessThanOrEqual(JOBS_CONFIG.vercelTickBudgetMsDefault);
+  });
+});
+
+/**
  * RESUMABILITY (review C1) — the runner caps a claimed attempt at what is left of the TICK budget,
  * not at this job's own `timeoutMs`, so a 35-player batch was being cut off mid-run every night and
  * the repetition check at the end never ran at all. The step now stops before the deadline it is
@@ -215,11 +320,11 @@ describe("runCapsuleSweepStep — across ticks", () => {
     for (const index of [1, 2, 3]) {
       await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 250 - index });
     }
-    // Production geometry: the step reserves 35s a player (three calls at the gateway's own 5s
-    // spacing plus one 20s gateway timeout). One clock read is spent on the pass's own `asOf`, so
-    // with a 10s step the first loop check sits at 10s and fits inside a 50s window, and the
-    // second sits at 20s and does not. `pacingMs: 0` only stops the test sleeping; the reserve is
-    // the production one.
+    // Production geometry: the step reserves 40s a player (the four-call ceiling at the gateway's
+    // own 5s spacing plus one 20s gateway timeout). One clock read is spent on the pass's own
+    // `asOf`, so with a 10s step the first loop check sits at 10s and fits inside a 50s window
+    // exactly, and the second sits at 20s and does not. `pacingMs: 0` only stops the test
+    // sleeping; the reserve is the production one.
     const clock = advancingClock("2026-09-04T12:00:00.000Z", 10_000);
     const outcome = await runCapsuleSweepStep(
       db,
@@ -245,7 +350,7 @@ describe("runCapsuleSweepStep — across ticks", () => {
     for (const index of Array.from({ length: 12 }, (_, i) => i + 1)) {
       await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 300 - index });
     }
-    // The budget production runs at (JOBS_TICK_BUDGET_MS=280000). At a 35s reserve and a clock
+    // The budget production runs at (JOBS_TICK_BUDGET_MS=280000). At a 40s reserve and a clock
     // that walks 25s a read, the run fits nine players and stops before the tenth.
     const clock = advancingClock("2026-09-04T12:00:00.000Z", 25_000);
     const outcome = await runCapsuleSweepStep(
@@ -264,7 +369,7 @@ describe("runCapsuleSweepStep — across ticks", () => {
 
   it("a tick with no room for even one player enqueues nothing and says why", async () => {
     await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Player One", rank: 1, points: 248 });
-    // A deadline ten seconds out, against a 25s reserve: the guard fires on the first iteration.
+    // A deadline ten seconds out, against a 40s reserve: the guard fires on the first iteration.
     const outcome = await runCapsuleSweepStep(
       db,
       CLOCK,

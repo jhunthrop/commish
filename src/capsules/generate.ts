@@ -14,13 +14,18 @@ import { addGatewayUsage, CapsuleGenerationError, postChatCompletion, type Capsu
  * still validated on its own exactly as before: the two reads against their word bands, grounding
  * and the tension mandate, every narrative slot against its cap and grounding.
  *
- * A PART THAT FAILS COSTS ONE MORE CALL FOR THAT PART ALONE. A read whose only fault is its length
- * gets a length correction, a read framed wrongly gets its soft corrections, a read that fabricated
- * gets a fresh write, a read the bundle left out gets written outright; the other parts are kept
- * as they were. A narrative slot that fails is dropped, never retried, as before: the module behind
- * it renders its template sentence. The whole bundle failing (a throttle that outlasts `write.ts`'s
- * own backoff, a body with no object in it) is given one more whole attempt, the spec's own "one
- * regeneration", and then both reads fall to the template and the narrative is empty.
+ * A PART THAT FAILS COSTS MORE CALLS FOR THAT PART ALONE, UNDER ONE CEILING (overruns round,
+ * 2026-09-08). A read whose fault is its length, over or under, gets the count-to-hit correction;
+ * a read that misses its band a second time gets one fresh draft at that count; a read framed
+ * wrongly gets its soft corrections, a read that fabricated gets a fresh write, a read the bundle
+ * left out gets written outright. The other parts are kept as they were. Every call a player makes
+ * counts against `CAPSULE_CONFIG.maxGatewayCallsPerPlayer` (four): the bundle, its one parse
+ * retry, each read's own correction, and the fresh draft last, compact first when the two reads
+ * compete for it. A narrative slot that fails is dropped, never retried, as before: the module
+ * behind it renders its template sentence. The whole bundle failing (a throttle that outlasts
+ * `write.ts`'s own backoff, a body with no object in it) is given one more whole attempt, the
+ * spec's own "one regeneration", and then both reads fall to the template and the narrative is
+ * empty.
  *
  * Never throws — the template is the permanent floor because this function always has an answer.
  */
@@ -33,7 +38,7 @@ export type CapsuleFallbackReason =
   | { readonly kind: "failed_validation"; readonly firstViolation: string };
 
 /**
- * ONE ATTEMPT AT ONE READ (written rate round, 2026-09-08): the bundle's draft, then the one
+ * ONE ATTEMPT AT ONE READ (written rate round, 2026-09-08): the bundle's draft, then each
  * correction by its kind. Seventy-four production reads fell on the word band and the tally logged
  * only the deciding violation, so whether the correction was ignored or the draft was further out
  * could not be known. The acceptance script prints these; the sweep never reads them.
@@ -46,8 +51,8 @@ export interface ReadAttempt {
   readonly violations: readonly string[];
 }
 
-/** One size's own outcome. `usage` is what THIS part's own correction call billed, when one was
- *  made; the bundle call that wrote every part at once is on `CapsuleGenerationResult.usage`. */
+/** One size's own outcome. `usage` is what THIS part's own calls billed, when any were made; the
+ *  bundle call that wrote every part at once is on `CapsuleGenerationResult.usage`. */
 export interface CapsuleSizeResult {
   readonly text: string;
   readonly source: "llm" | "template";
@@ -70,18 +75,24 @@ export interface CapsuleGenerationResult {
   readonly source: "llm" | "template";
   readonly model: string | null;
   /** Everything the gateway billed for this player: the bundle call, its retry if it had one, and
-   *  every part's own correction call. `null` when no attempt ever got a billable response. */
+   *  every part's own calls. `null` when no attempt ever got a billable response. */
   readonly usage: GatewayUsage | null;
 }
 
-/** A whole-bundle attempt's own outcome: the parsed parts, or why there are none. */
+/** A whole-bundle attempt's own outcome: the parsed parts, or why there are none, and what it
+ *  cost in calls against the player's ceiling. */
 interface BundleOutcome {
   readonly bundle: CapsuleBundle | null;
   readonly usage: GatewayUsage | null;
   readonly failure: CapsuleFallbackReason | null;
+  readonly calls: number;
 }
 
 const NOT_AN_OBJECT = "The answer was not a single JSON object.";
+
+function sumUsage(...parts: readonly (GatewayUsage | null)[]): GatewayUsage | null {
+  return parts.reduce<GatewayUsage | null>((total, part) => (part === null ? total : addGatewayUsage(total, part)), null);
+}
 
 async function requestBundleOnce(facts: PlayerFacts, requests: readonly NarrativeSlotRequest[], deps: CapsuleWriterDeps, worn: WornPhrases, retryNote: string | null): Promise<BundleOutcome> {
   const user = retryNote === null ? bundlePromptFor(facts, requests, worn) : `${bundlePromptFor(facts, requests, worn)}\n\n${retryNote}`;
@@ -92,10 +103,10 @@ async function requestBundleOnce(facts: PlayerFacts, requests: readonly Narrativ
   try {
     const { content, usage } = await postChatCompletion(messages, CAPSULE_CONFIG.bundle.maxTokens, deps);
     const bundle = parseBundle(content);
-    return bundle === null ? { bundle: null, usage, failure: { kind: "failed_validation", firstViolation: NOT_AN_OBJECT } } : { bundle, usage, failure: null };
+    return bundle === null ? { bundle: null, usage, failure: { kind: "failed_validation", firstViolation: NOT_AN_OBJECT }, calls: 1 } : { bundle, usage, failure: null, calls: 1 };
   } catch (error: unknown) {
     const usage = error instanceof CapsuleGenerationError ? error.billedUsage : null;
-    return { bundle: null, usage, failure: { kind: "throttled" } };
+    return { bundle: null, usage, failure: { kind: "throttled" }, calls: 1 };
   }
 }
 
@@ -106,15 +117,15 @@ async function requestBundle(facts: PlayerFacts, requests: readonly NarrativeSlo
   if (first.bundle !== null) return first;
   const note = first.failure?.kind === "throttled" ? "Your previous attempt did not complete. Answer again in full." : `Your previous answer was not a single JSON object. Return exactly one JSON object with the three keys and nothing around it.`;
   const second = await requestBundleOnce(facts, requests, deps, worn, note);
-  return { ...second, usage: second.usage === null ? first.usage : addGatewayUsage(first.usage, second.usage) };
+  return { ...second, usage: sumUsage(first.usage, second.usage), calls: first.calls + second.calls };
 }
 
-/** What a failed validation hands back for correction: the length alone, the soft points alone,
- *  or the violations for a fresh write. */
+/** What a failed validation hands back for correction: the soft points alone, or the violations
+ *  for a fresh write. The band's own corrections are chosen in `nextCorrectionFor`. */
 function priorAttemptFrom(body: string, result: ValidationResult): PriorAttempt {
   const corrections = result.violations.map((violation) => softCorrectionFor(violation));
   const softCorrections = corrections.every((correction): correction is string => correction !== null) ? corrections : undefined;
-  return { body, violations: result.violations, lengthCorrection: result.bandFailure ?? undefined, softCorrections };
+  return { body, violations: result.violations, softCorrections };
 }
 
 function llmRead(text: string, usage: GatewayUsage | null, attempts: readonly ReadAttempt[]): CapsuleSizeResult {
@@ -129,38 +140,108 @@ function attemptOf(stage: ReadAttempt["stage"], body: string, result: Validation
   return { stage, words: wordCount(body), body, violations: result.violations };
 }
 
-/** One correction call for one read, graded exactly as the draft was. `attempts` is the log so
- *  far, the draft's own; the correction's attempt is appended whatever its outcome. */
-async function correctRead(facts: PlayerFacts, size: CapsuleSize, prior: PriorAttempt, attempts: readonly ReadAttempt[], deps: CapsuleWriterDeps): Promise<CapsuleSizeResult> {
+/** The latest text at one read and its verdict. */
+interface GradedText {
+  readonly text: string;
+  readonly result: ValidationResult;
+}
+
+/** Where one read stands: what it has been through, and what it has cost. */
+interface ReadState {
+  /** `null` only before a read the bundle left out has been written. */
+  readonly graded: GradedText | null;
+  readonly attempts: readonly ReadAttempt[];
+  /** The word count of every attempt that missed the band, in order, the latest included. */
+  readonly bandMisses: readonly number[];
+  /** Correction calls spent so far. The write of a left-out read is its draft, not a correction. */
+  readonly corrections: number;
+  /** Gateway calls this read has spent against the player's ceiling. */
+  readonly calls: number;
+  readonly usage: GatewayUsage | null;
+}
+
+const UNWRITTEN: ReadState = { graded: null, attempts: [], bandMisses: [], corrections: 0, calls: 0, usage: null };
+const MISSING_PRIOR: PriorAttempt = { body: "", violations: [], missing: true };
+const NOT_WRITTEN = "The answer carried no such read.";
+
+/** The state after one more text has been graded: the bundle's draft (no call of this read's
+ *  own) or the answer to one call. */
+function graded(state: ReadState, stage: ReadAttempt["stage"], text: string, result: ValidationResult, usage: GatewayUsage | null, calls: number): ReadState {
+  return {
+    graded: { text, result },
+    attempts: [...state.attempts, attemptOf(stage, text, result)],
+    bandMisses: result.bandFailure === null ? state.bandMisses : [...state.bandMisses, result.bandFailure.words],
+    corrections: state.corrections + (stage === "draft" || stage === "missing" ? 0 : 1),
+    calls: state.calls + calls,
+    usage: sumUsage(state.usage, usage),
+  };
+}
+
+/** One read as the bundle left it: graded when it was drafted, unwritten when it was left out. */
+function startOf(facts: PlayerFacts, size: CapsuleSize, drafted: string | null): ReadState {
+  return drafted === null ? UNWRITTEN : graded(UNWRITTEN, "draft", drafted, validateCapsule(drafted, facts, size), null, 0);
+}
+
+function needsCall(state: ReadState): boolean {
+  return state.graded === null || !state.graded.result.ok;
+}
+
+/**
+ * THE RETRY POLICY, from the latest failure and the read's history alone (overruns round,
+ * 2026-09-08). A band failure gets the count-to-hit correction on the read's first miss and one
+ * fresh draft at that count on its second, over or under alike. A failure of content (a fabricated
+ * number, a trading word, an uncited downside) gets the read's one soft or rewrite correction, and
+ * only when no correction has been spent yet: a length correction that lands inside the band and
+ * breaks another rule still falls to the template, as it did. `null` means the template.
+ */
+function nextCorrectionFor(state: ReadState): PriorAttempt | null {
+  if (state.graded === null) return MISSING_PRIOR;
+  const { text, result } = state.graded;
+  if (result.bandFailure !== null) {
+    if (state.bandMisses.length === 1) return { body: text, violations: result.violations, lengthCorrection: result.bandFailure };
+    if (state.bandMisses.length === 2) return { body: text, violations: result.violations, freshDraft: { words: state.bandMisses, minWords: result.bandFailure.minWords, maxWords: result.bandFailure.maxWords } };
+    return null;
+  }
+  return state.corrections === 0 ? priorAttemptFrom(text, result) : null;
+}
+
+function validationFailureOf(state: ReadState): CapsuleFallbackReason {
+  return { kind: "failed_validation", firstViolation: state.graded?.result.violations[0] ?? NOT_WRITTEN };
+}
+
+/** One call for one read, graded exactly as the draft was; `null` text when the gateway never
+ *  answered it (`write.ts` has already spent its own retries by then). */
+async function askOnce(facts: PlayerFacts, size: CapsuleSize, prior: PriorAttempt, deps: CapsuleWriterDeps): Promise<{ readonly text: string | null; readonly usage: GatewayUsage | null }> {
   const messages = [
     { role: "system", content: WRITER_RULES },
     { role: "user", content: correctionPromptFor(facts, size, prior) },
   ];
   try {
     const { content, usage } = await postChatCompletion(messages, CAPSULE_CONFIG.sizes[size].maxTokens, deps);
-    const text = content.trim();
-    const result = validateCapsule(text, facts, size);
-    const log = [...attempts, attemptOf(correctionKindOf(prior), text, result)];
-    if (result.ok) return llmRead(text, usage, log);
-    return templateRead(facts, usage, { kind: "failed_validation", firstViolation: result.violations[0] ?? "unknown violation" }, log);
+    return { text: content.trim(), usage };
   } catch (error: unknown) {
-    const usage = error instanceof CapsuleGenerationError ? error.billedUsage : null;
-    return templateRead(facts, usage, { kind: "throttled" }, attempts);
+    return { text: null, usage: error instanceof CapsuleGenerationError ? error.billedUsage : null };
   }
 }
 
-/** One read out of the bundle: kept when it validates, corrected once when it does not, written
- *  outright when the bundle left it out. */
-async function settleRead(facts: PlayerFacts, size: CapsuleSize, drafted: string | null, deps: CapsuleWriterDeps): Promise<CapsuleSizeResult> {
-  if (drafted === null) return correctRead(facts, size, { body: "", violations: [], missing: true }, [], deps);
-  const result = validateCapsule(drafted, facts, size);
-  const draft = attemptOf("draft", drafted, result);
-  if (result.ok) return llmRead(drafted, null, [draft]);
-  return correctRead(facts, size, priorAttemptFrom(drafted, result), [draft], deps);
+/** One read's own outcome, with the calls it spent so the other read's budget can be settled. */
+interface ReadSettlement {
+  readonly result: CapsuleSizeResult;
+  readonly calls: number;
 }
 
-function sumUsage(...parts: readonly (GatewayUsage | null)[]): GatewayUsage | null {
-  return parts.reduce<GatewayUsage | null>((total, part) => (part === null ? total : addGatewayUsage(total, part)), null);
+/**
+ * Settles one read from where it stands, one call per step, until it validates, the policy says
+ * template, or its share of the player's ceiling (`budget`) is spent.
+ */
+async function settleRead(facts: PlayerFacts, size: CapsuleSize, state: ReadState, budget: number, deps: CapsuleWriterDeps): Promise<ReadSettlement> {
+  if (state.graded !== null && state.graded.result.ok) return { result: llmRead(state.graded.text, state.usage, state.attempts), calls: state.calls };
+  const prior = nextCorrectionFor(state);
+  if (prior === null || state.calls >= budget) return { result: templateRead(facts, state.usage, validationFailureOf(state), state.attempts), calls: state.calls };
+  const answer = await askOnce(facts, size, prior, deps);
+  if (answer.text === null) return { result: templateRead(facts, sumUsage(state.usage, answer.usage), { kind: "throttled" }, state.attempts), calls: state.calls + 1 };
+  const next = graded(state, correctionKindOf(prior), answer.text, validateCapsule(answer.text, facts, size), answer.usage, 1);
+  return settleRead(facts, size, next, budget, deps);
 }
 
 function assemble(compact: CapsuleSizeResult, full: CapsuleSizeResult, narrative: NarrativeResult, bundleUsage: GatewayUsage | null, model: string): CapsuleGenerationResult {
@@ -179,8 +260,16 @@ export function describeCapsuleFallback(compact: CapsuleSizeResult, full: Capsul
   return validationReason === undefined ? "template (fell back)" : `template (failed validation: ${validationReason.firstViolation})`;
 }
 
-/** Both reads and the narrative, from one call and the same facts. `worn` is the board's current
- *  worn-out language, quoted into the prompt (see `WornPhrases`). */
+/**
+ * Both reads and the narrative, from one call and the same facts. `worn` is the board's current
+ * worn-out language, quoted into the prompt (see `WornPhrases`).
+ *
+ * THE CEILING IS SHARED (overruns round, 2026-09-08). What the bundle left of the four calls is
+ * settled compact first, the peek's own read, with one call held back for the full read whenever
+ * its draft failed, so a compact spending its extras can never take the full read's one correction.
+ * The reads are settled in turn rather than at once because `write.ts` spaces every call anyway,
+ * so nothing was gained by asking for two at the same time.
+ */
 export async function generateCapsule(facts: PlayerFacts, deps: CapsuleWriterDeps, worn: WornPhrases = NO_WORN_PHRASES): Promise<CapsuleGenerationResult> {
   const model = deps.model ?? CAPSULE_MODEL;
   const requests = narrativeRequestsFor(facts);
@@ -191,6 +280,9 @@ export async function generateCapsule(facts: PlayerFacts, deps: CapsuleWriterDep
     return assemble(templateRead(facts, null, failure), templateRead(facts, null, failure), narrative, outcome.usage, model);
   }
   const { bundle } = outcome;
-  const [compact, full] = await Promise.all([settleRead(facts, "compact", bundle.compact, deps), settleRead(facts, "full", bundle.full, deps)]);
-  return assemble(compact, full, settleNarrative(bundle.narrative, facts, requests, model), outcome.usage, model);
+  const remaining = CAPSULE_CONFIG.maxGatewayCallsPerPlayer - outcome.calls;
+  const fullStart = startOf(facts, "full", bundle.full);
+  const compact = await settleRead(facts, "compact", startOf(facts, "compact", bundle.compact), remaining - (needsCall(fullStart) ? 1 : 0), deps);
+  const full = await settleRead(facts, "full", fullStart, remaining - compact.calls, deps);
+  return assemble(compact.result, full.result, settleNarrative(bundle.narrative, facts, requests, model), outcome.usage, model);
 }

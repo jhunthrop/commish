@@ -35,6 +35,17 @@ function lawSentence(headline: string, netEffectPoints: number): string {
     : `${headline} costs him ${magnitude} points a game against what we would otherwise expect.`;
 }
 
+/**
+ * THE NOTE UNDER A TEMPLATE READ, wherever one renders (`read-card.tsx`, `outlook.tsx`). It states
+ * what the text is and nothing more (overruns round, 2026-09-08). It used to add "The written read
+ * is on its way", a constant said to every reader of a template row whether or not a write was
+ * actually queued for him, and a player demoted on a fixable length miss showed it for days. A
+ * promise would need a real check that the player is on tonight's eligible list, which is the
+ * sweep's own board pass and not something a card can ask for cheaply, so the promise is gone
+ * rather than guessed.
+ */
+export const TEMPLATE_CAPSULE_NOTE = "A summary from the numbers.";
+
 export function renderTemplateCapsule(facts: PlayerFacts): string {
   const { identity, market, projection, season, byeWeek, injury, lastSeasonStory } = facts;
   const sentences: string[] = [
