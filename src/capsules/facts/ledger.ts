@@ -124,7 +124,11 @@ function historyNumbers(depth: PlayerFactsDepth): readonly number[] {
   const numbers: number[] = [];
   const movement = depth.marketMovement;
   if (movement !== null) {
-    numbers.push(movement.latestAdp, movement.earlierAdp, movement.picks, ...dateNumbers(movement.latestAt), ...dateNumbers(movement.earlierAt));
+    // BOTH THE SIGNED MOVEMENT AND ITS SIZE. The rendered sentence puts the DIRECTION in words
+    // ("moved him down 11.5 picks") and the magnitude in the number, so a fall prints `11.5` while
+    // `picks` itself is `-11.5`. Grounding only the signed value left every fall's printed number
+    // off the ledger, which is the one case the sentence and the ledger could disagree about.
+    numbers.push(movement.latestAdp, movement.earlierAdp, movement.picks, Math.abs(movement.picks), ...dateNumbers(movement.latestAt), ...dateNumbers(movement.earlierAt));
   }
   const volatility = depth.volatility;
   if (volatility !== null) {

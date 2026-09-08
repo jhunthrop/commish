@@ -321,6 +321,14 @@ describe("the market movement, volatility and career lines", () => {
     for (const value of [13, 24, 11, 2026, 9, 7, 8]) expect(facts.numberLedger).toContain(value);
   });
 
+  it("prints a fall by its size and grounds that size, not only the signed movement", () => {
+    const facts = buildPlayerFacts(
+      depthInput({ ...EMPTY_DEPTH, marketMovement: { latestAdp: 24.5, latestAt: "2026-09-07", earlierAdp: 13, earlierAt: "2026-08-08", picks: -11.5 } }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- The market has moved him down 11.5 picks, from 13 on 2026-08-08 to 24.5 on 2026-09-07.");
+    expect(facts.numberLedger).toContain(11.5);
+  });
+
   it("renders no market movement line when the archive holds one capture", () => {
     expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, marketMovement: null })))).toBeNull();
   });
