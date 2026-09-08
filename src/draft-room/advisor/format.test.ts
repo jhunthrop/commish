@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SeatAhead } from "@/draft-service/assistant/view";
-import { changedSinceLines, collapseText, percentText, reachText, runsText, seatAheadText } from "./format";
+import { changedSinceLines, collapseText, isReachAt, percentText, runsText, seatAheadText } from "./format";
 
 const BANNED = /[—;]/;
 
@@ -10,11 +10,28 @@ describe("advisor format", () => {
     expect(percentText(0.46)).toBe("46%");
   });
 
-  it("names a reach only from the turn it applies to", () => {
+  it("calls a column a reach from the turn the odds fall under the floor", () => {
     const target = { playerId: "rb4", position: "RB" as const, valueOverReplacement: 1, positionRank: 4, oddsByTurn: [], reachFromTurn: 2 };
-    expect(reachText(target, 1)).toBeNull();
-    expect(reachText(target, 2)).toBe("A reach at turn 2");
-    expect(reachText({ ...target, reachFromTurn: null }, 3)).toBeNull();
+    expect(isReachAt(target, 1)).toBe(false);
+    expect(isReachAt(target, 2)).toBe(true);
+    expect(isReachAt(target, 3)).toBe(true);
+    expect(isReachAt({ ...target, reachFromTurn: null }, 3)).toBe(false);
+  });
+
+  it("caps the changed-since lines, departures first, and counts the rest", () => {
+    const lines = changedSinceLines(
+      [
+        { kind: "odds_moved", playerId: "a", turn: 1, from: 0.5, to: 0.4 },
+        { kind: "odds_moved", playerId: "b", turn: 1, from: 0.9, to: 0.2 },
+        { kind: "left_plan", playerId: "c", turn: 1 },
+        { kind: "odds_moved", playerId: "d", turn: 1, from: 0.3, to: 0.6 },
+        { kind: "left_plan", playerId: "e", turn: 1 },
+      ],
+      (id) => id.toUpperCase(),
+      10,
+      () => 17,
+    );
+    expect(lines).toEqual(["C is off the plan.", "E is off the plan.", "B at 2.07 moved down, 90% to 20%.", "2 more changes on the plan."]);
   });
 
   it("words a tier collapse from the board's own numbers", () => {
@@ -42,7 +59,7 @@ describe("advisor format", () => {
       10,
       () => 17,
     );
-    expect(lines).toEqual(["Avery Stone at 2.07 moved down, 50% to 20%.", "Blake Rivers is off the plan."]);
+    expect(lines).toEqual(["Blake Rivers is off the plan.", "Avery Stone at 2.07 moved down, 50% to 20%."]);
     for (const line of lines) expect(line).not.toMatch(BANNED);
   });
 });

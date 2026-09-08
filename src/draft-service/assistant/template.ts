@@ -37,13 +37,14 @@ function slotClause(slot: RosterSlotType | null): string {
   return slot === null ? "has no slot on your roster" : `fills your ${slot} slot`;
 }
 
-function oddsClause(makeItBack: OddsCell | null, nextPickNumber: number | null, teamCount: number): string {
-  if (nextPickNumber === null) return "This is your last turn, so there is no next pick to wait for.";
-  if (makeItBack === null) return "";
-  return `${runsPhrase(makeItBack)} still have him at ${pickLabel(nextPickNumber, teamCount)}.`;
+/** The row already prints the make-it-back count as its own number (the card's odds cell), so
+ *  the sentence never restates it: two survival claims on one row is the defect the old tab
+ *  had. The one odds fact worth a sentence is that there is no next turn at all. */
+function lastTurnClause(nextPickNumber: number | null): string {
+  return nextPickNumber === null ? " This is your last turn, so there is no next pick to wait for." : "";
 }
 
-/** One sentence pair for one now-card row, from that row's own facts. */
+/** One sentence for one now-card row, from that row's own facts. */
 export function templateReason(candidate: Omit<NowCandidate, "templateReason">, context: TemplateContext): string {
   const name = context.names[candidate.playerId] ?? candidate.playerId;
   const cliff = cliffReason(candidate.reasons);
@@ -51,8 +52,7 @@ export function templateReason(candidate: Omit<NowCandidate, "templateReason">, 
     cliff === undefined
       ? `${name} ranks No. ${candidate.positionRank} at ${candidate.position} and ${slotClause(candidate.fillsSlot)}, ${pointsPhrase(candidate.valueOverReplacement)} over replacement.`
       : `${name} is one of ${cliff.playersLeftInTier} ${cliff.position} left before a ${cliff.dropToNextTier.toFixed(1)} point drop, and he ${slotClause(candidate.fillsSlot)}.`;
-  const odds = oddsClause(candidate.makeItBack, context.nextPickNumber, context.teamCount);
-  return odds === "" ? lead : `${lead} ${odds}`;
+  return `${lead}${lastTurnClause(context.nextPickNumber)}`;
 }
 
 function positionWord(position: Position, plural: boolean): string {

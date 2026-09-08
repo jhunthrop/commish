@@ -48,10 +48,13 @@ test("advisor demo -> three bands, queue a target, draft on the clock", async ({
   await expect(now).toHaveAttribute("data-on-clock", "true");
   await expect(now.getByRole("button", { name: "Draft", exact: true })).toHaveCount(5);
   await expect(managerA.getByTestId("advisor-changed")).toBeVisible();
+  // The verb buttons ride `transition-colors` from their off-clock style; let the paint settle
+  // so the photograph shows the resting state rather than a frame mid-transition.
+  await managerA.waitForTimeout(500);
   await managerA.screenshot({ path: `${OUT_DIR}/advisor-on-clock.png`, fullPage: true });
 
   // --- Draft from the card, through the confirmation --------------------------------------------
-  const topName = await rows.nth(0).locator("span.font-display").first().innerText();
+  const topName = await rows.nth(0).getByTestId("advisor-now-name").innerText();
   await rows.nth(0).getByRole("button", { name: "Draft", exact: true }).click();
   const dialog = managerA.getByRole("dialog");
   await expect(dialog).toBeVisible();

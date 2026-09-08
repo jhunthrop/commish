@@ -1,7 +1,7 @@
 import { Meter, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { DraftPlan, PlanTarget, PlanTurn } from "@/draft-service/assistant/view";
-import { percentText, pickLabel, reachText } from "../format";
+import { isReachAt, percentText, pickLabel } from "../format";
 
 export interface PlanRailProps {
   readonly plan: DraftPlan;
@@ -15,7 +15,6 @@ export interface PlanRailProps {
 
 function TargetRow({ target, turn, plan, teamCount, nameOf }: { readonly target: PlanTarget; readonly turn: PlanTurn; readonly plan: DraftPlan; readonly teamCount: number; readonly nameOf: (playerId: string) => string }) {
   const own = target.oddsByTurn[turn.turn - 1] ?? null;
-  const reach = reachText(target, turn.turn);
   return (
     <li data-testid="advisor-plan-target" className="flex flex-col gap-1 rounded-md bg-surface-raised px-2.5 py-1.5">
       <div className="flex items-center gap-2">
@@ -31,13 +30,14 @@ function TargetRow({ target, turn, plan, teamCount, nameOf }: { readonly target:
       <div className="flex flex-wrap items-center gap-x-2 font-mono text-xs tabular-nums text-text-faint">
         {plan.turns.map((column, index) => {
           const cell = target.oddsByTurn[index] ?? null;
+          const reach = isReachAt(target, column.turn);
           return (
-            <span key={column.turn} data-testid="advisor-odds-column">
+            <span key={column.turn} data-testid="advisor-odds-column" data-reach={reach ? "true" : undefined} className={reach ? "text-negative" : ""}>
               {pickLabel(column.pickNumber, teamCount)} {cell === null ? "no odds" : percentText(cell.survival)}
+              {reach ? " reach" : ""}
             </span>
           );
         })}
-        {reach === null ? null : <span className="text-negative">{reach}</span>}
       </div>
     </li>
   );

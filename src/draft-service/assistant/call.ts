@@ -172,9 +172,9 @@ function classifiablePicks(state: DraftState, askingTeamId: string): readonly Cl
  *  "impossible" row for a question that does not apply. A row whose own `survival` came back null
  *  (every seeded run ended before the asking seat's next turn) collapses to null here too — see
  *  `AssistantCandidate.makeItBack`'s own contract. */
-function candidatesWithOdds(state: DraftState, askingTeamId: string, recommendations: readonly Recommendation[], nextPickNumber: number | null, seed: number, drivers: SeatDrivers | undefined): readonly AssistantCandidate[] {
+function candidatesWithOdds(state: DraftState, askingTeamId: string, recommendations: readonly Recommendation[], nextPickNumber: number | null, seed: number, drivers: SeatDrivers | undefined, runs: number | undefined): readonly AssistantCandidate[] {
   const shortlistIds = recommendations.map((rec) => rec.playerId);
-  const odds = nextPickNumber === null || shortlistIds.length === 0 ? [] : makeItBackOdds({ state, askingTeamId, shortlistIds, seed, drivers });
+  const odds = nextPickNumber === null || shortlistIds.length === 0 ? [] : makeItBackOdds({ state, askingTeamId, shortlistIds, seed, drivers, runs });
   const oddsByPlayerId = new Map(odds.map((row) => [row.playerId, row] as const));
   return recommendations.map((rec) => {
     const row = oddsByPlayerId.get(rec.playerId) ?? null;
@@ -227,6 +227,9 @@ export interface AssistantCallCoreInput {
   /** The advisor's opponent model for the make-it-back runs (`sim/seat-model.ts`). Absent
    *  keeps the seeded archetype deal. */
   readonly drivers?: SeatDrivers;
+  /** Make-it-back runs. Default `MAKE_IT_BACK_RUNS`; the advisor hands its plan's own count so
+   *  one card never states two run counts. */
+  readonly runs?: number;
 }
 
 /**
@@ -253,7 +256,7 @@ export function assistantCallCore(input: AssistantCallCoreInput): AssistantCallV
     nextPickNumber: window.nextPickNumber,
     shortlistSize: input.shortlistSize ?? 3,
   });
-  const candidates = candidatesWithOdds(state, askingTeamId, recommendations, window.nextPickNumber, seedFor(seedNamespace, window.pickNumber), drivers);
+  const candidates = candidatesWithOdds(state, askingTeamId, recommendations, window.nextPickNumber, seedFor(seedNamespace, window.pickNumber), drivers, input.runs);
 
   return {
     pickNumber: window.pickNumber,

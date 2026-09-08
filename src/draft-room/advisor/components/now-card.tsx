@@ -66,7 +66,7 @@ export function NowCard({ view, acts, renderName, reasonFor }: NowCardProps) {
               <li key={candidate.playerId} data-testid="advisor-now-row" className={`flex flex-col gap-1 rounded-md px-2.5 py-2 ${index === 0 ? "border border-accent bg-surface-raised" : "bg-surface-raised"}`}>
                 <div className="flex items-center gap-2">
                   <PositionBadge position={candidate.position} rank={candidate.positionRank} size="sm" />
-                  <span className="min-w-0 flex-1 truncate font-display text-md font-semibold text-text-primary">
+                  <span data-testid="advisor-now-name" className="min-w-0 flex-1 truncate font-display text-md font-semibold text-text-primary">
                     {renderName(candidate.playerId, view.names[candidate.playerId] ?? candidate.playerId)}
                   </span>
                   {candidate.fillsSlot === null ? null : <SlotChip slot={candidate.fillsSlot} />}

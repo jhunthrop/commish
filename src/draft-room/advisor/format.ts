@@ -7,6 +7,7 @@
 import type { Position } from "@/domain/player";
 import { pickLabel } from "@/domain/pick-label";
 import type { OddsCell, PlanTarget, SeatAhead, TierCollapse } from "@/draft-service/assistant/view";
+import { ADVISOR_ROOM_CONFIG } from "./config";
 import type { PlanChange } from "./plan-delta";
 
 export { pickLabel };
@@ -21,9 +22,9 @@ export function percentText(survival: number): string {
   return `${Math.round(survival * 100)}%`;
 }
 
-export function reachText(target: PlanTarget, turn: number): string | null {
-  if (target.reachFromTurn === null || target.reachFromTurn > turn) return null;
-  return `A reach at turn ${target.reachFromTurn}`;
+/** Whether waiting until `turn` for this target is a reach: his odds there sit under the floor. */
+export function isReachAt(target: PlanTarget, turn: number): boolean {
+  return target.reachFromTurn !== null && turn >= target.reachFromTurn;
 }
 
 export function collapseText(row: TierCollapse): string {
@@ -50,13 +51,23 @@ export function seatAheadText(seat: SeatAhead, name: (playerId: string) => strin
   return { read, basis };
 }
 
-/** "As of 4.07" and the changed-since lines, in the manager's words. */
+function changeWeight(change: PlanChange): number {
+  return change.kind === "left_plan" ? Number.POSITIVE_INFINITY : Math.abs(change.to - change.from);
+}
+
+/** The changed-since lines, in the manager's words: departures first, then the biggest moves,
+ *  capped so a room that turned over the whole plan reads as a headline and a count rather
+ *  than a ledger. */
 export function changedSinceLines(changes: readonly PlanChange[], name: (playerId: string) => string, teamCount: number, turnPick: (turn: number) => number | null): readonly string[] {
-  return changes.map((change) => {
+  const ordered = [...changes].sort((a, b) => changeWeight(b) - changeWeight(a));
+  const shown = ordered.slice(0, ADVISOR_ROOM_CONFIG.changedSinceMaxLines);
+  const lines = shown.map((change) => {
     const pick = turnPick(change.turn);
     const at = pick === null ? `turn ${change.turn}` : pickLabel(pick, teamCount);
     if (change.kind === "left_plan") return `${name(change.playerId)} is off the plan.`;
     const direction = change.to > change.from ? "up" : "down";
     return `${name(change.playerId)} at ${at} moved ${direction}, ${percentText(change.from)} to ${percentText(change.to)}.`;
   });
+  const rest = ordered.length - shown.length;
+  return rest > 0 ? [...lines, `${rest} more ${rest === 1 ? "change" : "changes"} on the plan.`] : lines;
 }

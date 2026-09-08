@@ -110,7 +110,7 @@ export function AssistantDemo({ fixture }: AssistantDemoProps) {
         </div>
         {latestPick === null ? null : (
           <p data-testid="demo-latest-pick" className="text-sm text-text-muted">
-            {`${latestPick.teamLabel} took ${nameOf(latestPick.playerId)} (${view.names[latestPick.playerId]?.split(" ")[0] ?? "?"}).`}
+            {`${latestPick.teamLabel} took ${nameOf(latestPick.playerId)}.`}
           </p>
         )}
         {draftNote === null ? null : (

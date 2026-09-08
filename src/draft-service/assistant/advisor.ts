@@ -53,13 +53,14 @@ function picksUntil(state: DraftState, pickNumber: number): number {
 export function advisorCore(input: AdvisorCoreInput): AdvisorView | null {
   const { state, askingTeamId, valued, names } = input;
   const drivers = inferSeatDrivers(state);
-  const call = assistantCallCore({ ...input, shortlistSize: ADVISOR_CONFIG.now.shortlistSize, drivers });
+  const runs = input.runs ?? ADVISOR_CONFIG.plan.runs;
+  const call = assistantCallCore({ ...input, shortlistSize: ADVISOR_CONFIG.now.shortlistSize, drivers, runs });
   if (call === null) return null;
 
   const teamCount = state.draftOrder.length;
   const nextPickNumber = upcomingTurnsFor(state, askingTeamId, 1)[0] ?? null;
   const context: TemplateContext = { names, teamCount, nextPickNumber };
-  const { plan, odds } = computePlan({ state, askingTeamId, valued, seed: seedFor(input.seedNamespace, state.sequence), drivers, runs: input.runs });
+  const { plan, odds } = computePlan({ state, askingTeamId, valued, seed: seedFor(input.seedNamespace, state.sequence), drivers, runs });
   const signals = roomSignals({ state, valued, odds, drivers });
 
   const partial = {
