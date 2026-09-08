@@ -17,6 +17,10 @@ interface Slot {
   readonly settled: VoiceResult | null;
 }
 
+/** A bounded, per-instance cache BY DESIGN (the immutability rule's one sanctioned shape, the
+ *  same as `assistant-memory.ts` and `service.ts`'s memos): the generation must outlive the
+ *  request that started it, and a Map that evicts least-recently-written past `MAX_SLOTS` is
+ *  the smallest thing that can hold it. Never read as state by anything but this module. */
 const MAX_SLOTS = 64;
 const slots = new Map<string, Slot>();
 

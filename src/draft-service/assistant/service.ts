@@ -50,6 +50,10 @@ function memoize<T>(store: Map<string, MemoEntry<T>>, key: string, ttlMs: number
   return value;
 }
 
+/** Two bounded, per-instance caches BY DESIGN (the immutability rule's one sanctioned shape):
+ *  `viewMemo` keeps one room state's computed advisor for `ADVISOR_CONFIG.memoTtlMs` so a voice
+ *  re-poll never re-runs the simulator, `namesMemo` keeps a draft's names for its lifetime. Both
+ *  evict least-recently-written past `MAX_MEMO`; a miss is a recompute, never a wrong answer. */
 const viewMemo = new Map<string, MemoEntry<AdvisorView | null>>();
 const namesMemo = new Map<string, MemoEntry<Promise<Readonly<Record<string, string>>>>>();
 
