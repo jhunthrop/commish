@@ -96,6 +96,11 @@ describe("bundlePromptFor", () => {
     expect(prompt).toContain(`${CAPSULE_CONFIG.sizes.full.minWords} to ${CAPSULE_CONFIG.sizes.full.maxWords} words`);
   });
 
+  it("aims each note at the middle of its band, because a model asked for a range lands under it", () => {
+    expect(prompt).toContain("about 98 words (75 to 120 words)");
+    expect(prompt).toContain("about 270 words (240 to 300 words)");
+  });
+
   it("lists every narrative slot this player's facts support, with its word cap", () => {
     for (const request of requests) expect(prompt).toContain(`"${request.key}" (at most ${request.maxWords} words)`);
   });
@@ -125,7 +130,7 @@ describe("correctionPromptFor", () => {
   it("asks for the same text at the right length, and nothing else, on a band failure", () => {
     const prompt = correctionPromptFor(FACTS, "compact", { body: "Too short.", violations: ["Word count 2 is outside the required 75-120 word band."], lengthCorrection: { words: 2, minWords: 75, maxWords: 120 } });
     expect(prompt).toContain("Too short.");
-    expect(prompt).toContain("It is 2 words. It has to be between 75 and 120 words");
+    expect(prompt).toContain("It is 2 words. It has to be between 75 and 120 words, so aim for about 98");
     expect(prompt).toContain("change nothing else");
     expect(prompt).toContain("Return only the corrected short note");
     expect(prompt).not.toContain("broke these rules");
@@ -144,13 +149,19 @@ describe("correctionPromptFor", () => {
     expect(prompt).toContain("broke these rules");
     expect(prompt).toContain('"137"');
     expect(prompt).toContain("Write the short note again from scratch");
-    expect(prompt).toContain("75 to 120 words");
+    expect(prompt).toContain("about 98 words (75 to 120 words)");
   });
 
   it("asks for the missing note outright when the bundle left it out", () => {
     const prompt = correctionPromptFor(FACTS, "full", { body: "", violations: [], missing: true });
     expect(prompt).toContain("had no long note");
-    expect(prompt).toContain("240 to 300 words");
+    expect(prompt).toContain("about 270 words (240 to 300 words)");
     expect(prompt).not.toContain('"""');
+  });
+
+  it("bans the word floor outright in the prompt, the top rejection of the first one-call run, while the validator's own rule is unchanged", () => {
+    expect(WRITER_RULES).toContain('Never write the word "floor"');
+    expect(WRITER_RULES).toContain("never sentences to open with");
+    expect(WRITER_RULES).toContain('never "says"');
   });
 });

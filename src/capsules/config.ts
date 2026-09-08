@@ -187,7 +187,11 @@ export const CAPSULE_CONFIG = {
       // From the baseline scan (share of the 25 written):
       "the books hang", // 80%, the sheet's own props sentence read back
       "at the bottom he's", // 72%, the two-outcomes close the old instructions asked for
-      "have historically", // 68%, the sheet's own anchor sentence read back
+      // NOT "have historically" (68% on the baseline, 48% on the first one-call run): it is how the
+      // ADP anchor fact is stated ("clear of what receivers drafted at pick 3 have historically
+      // given back"), the fact itself rather than a frame, and the reads that carry it vary the
+      // sentence around it. It is the same kind of phrase as "one spot behind" and is left to the
+      // sheet-touring rule's spirit: cite it when it decides the case.
       "our number says", // 64%
       "the honest hesitation", // 60%, the validator's own rule wording read back
       "at the top he's", // 60%
