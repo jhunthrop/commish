@@ -14,7 +14,7 @@ import { NEUTRAL_ARCHETYPE } from "../sim/seat-model";
 import { chooseBotPick } from "@/mock-draft/bots";
 import { rngFor } from "@/mock-draft/rng";
 import { SIM_INSTANT, submit } from "../sim/run";
-import type { ValuedEntry } from "./call";
+import type { ValuedEntry } from "./recommend";
 
 export const FIXTURE_TEAM_IDS: readonly string[] = Array.from({ length: 10 }, (_, i) => `team_${i + 1}`);
 export const FIXTURE_SHAPE: LeagueShape = { teamCount: FIXTURE_TEAM_IDS.length, rosterSlots: STANDARD_ROSTER_SLOTS };
