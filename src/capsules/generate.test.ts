@@ -42,9 +42,9 @@ const BAD_COMPLETION =
   "He will score 999 touchdowns this year for this SF offense, an absurd fabricated number that nobody on the fact sheet has ever hit, and the market simply cannot price a season like that.";
 
 const GOOD_COMPACT =
-  "Rashad Long is a clear buy for this SF offense. Our number says 248 season points against board rank 14 overall, well clear of ADP 12.5. He carries the load for a team leaning on him every week, and the range from 178 to 275 still lands him firmly in the RB6 tier. Draft him with confidence at his current price this season.";
+  "Rashad Long is a clear buy for this SF offense. Our number says 248 season points against board rank 14 overall, well clear of ADP 12.5. He carries the load for a team leaning on him every week, and the range from 178 to 275 still lands him firmly in the RB6 tier. Draft him with confidence at his current price this season plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly.";
 const GOOD_FULL =
-  `${GOOD_COMPACT} The case only gets stronger once you look at the full picture: our number of 248 season points sits well clear of his ADP of 12.5, and board rank 14 overall backs up the price. He is the workhorse of the SF backfield, the engine of an offense that leans on him on early downs and in the passing game alike, and that workload level is exactly why the range runs from 178 on the low end to 275 on the high end. Nothing in the fact sheet points to a real downside here, so the call is simple: he is a buy at his current market price, full stop, book him with confidence on your board this season and do not look back.`;
+  `${GOOD_COMPACT} The case only gets stronger once you look at the full picture: our number of 248 season points sits well clear of his ADP of 12.5, and board rank 14 overall backs up the price. He is the workhorse of the SF backfield, the engine of an offense that leans on him on early downs and in the passing game alike, and that workload level is exactly why the range runs from 178 on the low end to 275 on the high end. Nothing in the fact sheet points to a real downside here, so the call is simple: he is a buy at his current market price, full stop, book him with confidence on your board this season and do not look back. plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly.`;
 
 describe("generateCapsule", () => {
   it("returns llm text and provenance for both sizes on a clean generation", async () => {
@@ -125,7 +125,7 @@ describe("generateCapsule", () => {
     expect(result.compact.text).toBe(GOOD_COMPACT);
     // The retry hands the SAME text back with a length instruction and no violation list at all:
     // prose that was already grounded and already in voice is corrected, never thrown away.
-    expect(compactPrompts[1]).toContain("Rewrite it to between 60 and 110 words, changing nothing else");
+    expect(compactPrompts[1]).toContain("Rewrite it to between 75 and 120 words, changing nothing else");
     expect(compactPrompts[1]).toContain(tooShort);
     expect(compactPrompts[1]).not.toContain("violated these rules");
   });

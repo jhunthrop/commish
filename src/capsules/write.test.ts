@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
-import { CapsuleGenerationError, generateCapsuleBody } from "./write";
+import { CAPSULE_MODEL } from "./config";
+import { CapsuleGenerationError, generateCapsuleBody, postChatCompletion, type GatewayResponseInfo } from "./write";
 
 function baseInput(): PlayerFactsInput {
   return {
@@ -28,7 +29,7 @@ function okResponse(body: unknown): Response {
 /** Twenty-plus words — anything shorter is treated by `postChatCompletion` as a degenerate
  *  (reasoning-model) completion and retried as transport weather, never returned. */
 const LONG_BODY =
-  "Rashad Long is a clear buy at his current price, our number says 248 season points against board rank 14, and the range from 178 to 275 keeps him firmly in the RB6 conversation this season.";
+  "Rashad Long is a clear buy at his current price, our number says 248 season points against board rank 14, and the range from 178 to 275 keeps him firmly in the RB6 conversation this season plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily.";
 
 describe("generateCapsuleBody", () => {
   it("returns the completion text and usage on a clean 200", async () => {
@@ -228,5 +229,190 @@ describe("generateCapsuleBody", () => {
     const payload = JSON.parse(init.body as string) as { messages: { role: string; content: string }[] };
     expect(payload.messages[1]!.content).toContain("does not trace to any supplied fact");
     expect(payload.messages[1]!.content).toContain("Old bad body.");
+  });
+});
+
+/**
+ * THE RATE THIS ENGINE TALKS AT (acceptance round, task 10) — a live run threw 16 throttles in 100
+ * players and then spent three and a half minutes a player in backoff, because a player's three
+ * calls fire concurrently and a per-minute limit cares about the burst, not the average.
+ */
+describe("the gateway call spacing", () => {
+  const MESSAGES = [{ role: "user", content: "anything" }];
+
+  it("spaces two calls by the configured gap, whoever asked for them", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => okResponse({ choices: [{ message: { content: LONG_BODY } }] }));
+    const deps = { apiKey: "test-key", fetch: fetchMock, callSpacingMs: 60 };
+
+    const startedAt = Date.now();
+    await postChatCompletion(MESSAGES, 200, deps);
+    await postChatCompletion(MESSAGES, 200, deps);
+    await postChatCompletion(MESSAGES, 200, deps);
+
+    // Three calls at a 60ms gap spend two gaps waiting. Asserted with slack rather than at the
+    // exact 120ms boundary: a timer may fire a millisecond early, and a test that fails on that is
+    // measuring the event loop rather than the limiter.
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(100);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not pace an injected fetch by default, because a fixture is not the gateway", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => okResponse({ choices: [{ message: { content: LONG_BODY } }] }));
+    const startedAt = Date.now();
+    await postChatCompletion(MESSAGES, 200, { apiKey: "test-key", fetch: fetchMock });
+    await postChatCompletion(MESSAGES, 200, { apiKey: "test-key", fetch: fetchMock });
+    expect(Date.now() - startedAt).toBeLessThan(1_000);
+  });
+});
+
+describe("Retry-After", () => {
+  const MESSAGES = [{ role: "user", content: "anything" }];
+
+  it("waits the gateway's own number instead of guessing at the backoff", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(new Response("rate limited", { status: 429, headers: { "retry-after": "2" } }))
+        .mockResolvedValueOnce(okResponse({ choices: [{ message: { content: LONG_BODY } }] }));
+
+      const promise = postChatCompletion(MESSAGES, 200, { apiKey: "test-key", fetch: fetchMock, callSpacingMs: 0 });
+      // Two seconds is what the gateway asked for. The backoff track's own first step is twenty.
+      await vi.advanceTimersByTimeAsync(2_000);
+      const result = await promise;
+
+      expect(result.content).toBe(LONG_BODY);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores a header it cannot trust and keeps its own backoff", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(new Response("rate limited", { status: 429, headers: { "retry-after": "3600" } }))
+        .mockResolvedValueOnce(okResponse({ choices: [{ message: { content: LONG_BODY } }] }));
+
+      const promise = postChatCompletion(MESSAGES, 200, { apiKey: "test-key", fetch: fetchMock, callSpacingMs: 0 });
+      // An hour is past the backoff track's own longest wait, so the track's twenty seconds stands.
+      await vi.advanceTimersByTimeAsync(20_000);
+      const result = await promise;
+
+      expect(result.content).toBe(LONG_BODY);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+/**
+ * WHAT ACTUALLY GOES ON THE WIRE (fix round) — the reasoning setting and the model are the two
+ * things task 11 measured, and both are invisible from the outside: they live in the request body.
+ * These read the body the fixture was handed, so a refactor that stopped sending either one fails
+ * here rather than in a live run three weeks later.
+ */
+describe("the request body", () => {
+  const MESSAGES = [{ role: "user", content: "anything" }];
+
+  /** The parsed body of the one call a fixture received. */
+  async function bodyOf(deps: Parameters<typeof postChatCompletion>[2]): Promise<Record<string, unknown>> {
+    const seen: string[] = [];
+    const fetchMock = (async (_url: unknown, init: unknown) => {
+      seen.push((init as RequestInit).body as string);
+      return okResponse({ choices: [{ message: { content: LONG_BODY } }] });
+    }) as unknown as typeof globalThis.fetch;
+    await postChatCompletion(MESSAGES, 200, { ...deps, fetch: fetchMock });
+    return JSON.parse(seen[0]!) as Record<string, unknown>;
+  }
+
+  it("disables thinking by default, in both shapes the GLM family reads", async () => {
+    const body = await bodyOf({ apiKey: "test-key" });
+    expect(body.thinking).toEqual({ type: "disabled" });
+    expect(body.reasoning_effort).toBe("none");
+  });
+
+  it("sends neither field when a caller asks for thinking back", async () => {
+    const body = await bodyOf({ apiKey: "test-key", thinking: true });
+    expect(body).not.toHaveProperty("thinking");
+    expect(body).not.toHaveProperty("reasoning_effort");
+  });
+
+  it("carries CAPSULE_MODEL unless a caller names another", async () => {
+    expect((await bodyOf({ apiKey: "test-key" })).model).toBe(CAPSULE_MODEL);
+    expect((await bodyOf({ apiKey: "test-key", model: "zai/glm-5.2-fast" })).model).toBe("zai/glm-5.2-fast");
+  });
+});
+
+/**
+ * THE HEADER CAPTURE (fix round) — the founder's "which limit are we throttling on" is only ever
+ * answered by a response nobody kept, so the hook has to fire on the ordinary path too, carry only
+ * the headers that talk about limits, and read a 429's body WITHOUT consuming the stream the retry
+ * path still needs.
+ */
+describe("onGatewayResponse", () => {
+  const MESSAGES = [{ role: "user", content: "anything" }];
+
+  it("fires once on a 200, with only the limit headers", async () => {
+    const seen: GatewayResponseInfo[] = [];
+    const fetchMock = (async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: LONG_BODY } }] }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+          "x-ratelimit-limit-requests": "60",
+          "x-ratelimit-remaining-requests": "59",
+          "retry-after": "0",
+          "x-request-id": "not-a-limit-header",
+        },
+      })) as unknown as typeof globalThis.fetch;
+
+    await postChatCompletion(MESSAGES, 200, { apiKey: "test-key", fetch: fetchMock, onGatewayResponse: (info) => seen.push(info) });
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.status).toBe(200);
+    expect(seen[0]!.limitHeaders).toEqual({
+      "x-ratelimit-limit-requests": "60",
+      "x-ratelimit-remaining-requests": "59",
+      "retry-after": "0",
+    });
+    // Only the ones whose NAME talks about a limit: no content type, no request id, no body.
+    expect(seen[0]!.body).toBeUndefined();
+  });
+
+  it("captures a 429's body and still lets the retry path read the response", async () => {
+    vi.useFakeTimers();
+    try {
+      const seen: GatewayResponseInfo[] = [];
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response('{"error":{"message":"rate limit exceeded: 20 requests per minute"}}', {
+            status: 429,
+            headers: { "retry-after": "1", "x-ratelimit-limit-requests": "20" },
+          }),
+        )
+        .mockResolvedValueOnce(okResponse({ choices: [{ message: { content: LONG_BODY } }] }));
+
+      const promise = postChatCompletion(MESSAGES, 200, {
+        apiKey: "test-key",
+        fetch: fetchMock,
+        callSpacingMs: 0,
+        onGatewayResponse: (info) => seen.push(info),
+      });
+      await vi.advanceTimersByTimeAsync(1_000);
+      const result = await promise;
+
+      // The 429 was reported with its own words, and the call still went on to succeed, which is
+      // the proof the clone did not consume the stream the 429 branch reads after it.
+      expect(seen[0]!.status).toBe(429);
+      expect(seen[0]!.body).toContain("rate limit exceeded: 20 requests per minute");
+      expect(seen[0]!.limitHeaders).toEqual({ "retry-after": "1", "x-ratelimit-limit-requests": "20" });
+      expect(result.content).toBe(LONG_BODY);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

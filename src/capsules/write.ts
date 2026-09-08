@@ -28,6 +28,15 @@ export class CapsuleGenerationError extends Error {
   }
 }
 
+export interface GatewayResponseInfo {
+  readonly status: number;
+  readonly statusText: string;
+  /** Only the headers that talk about limits, by name — `ratelimit`, `retry` or `limit`. */
+  readonly limitHeaders: Readonly<Record<string, string>>;
+  /** The body, for a 429 only: whose limit it was is usually stated there and nowhere else. */
+  readonly body?: string;
+}
+
 export interface GatewayUsage {
   readonly promptTokens: number | null;
   readonly completionTokens: number | null;
@@ -59,6 +68,10 @@ export function addGatewayUsage(accumulated: GatewayUsage | null, next: GatewayU
   };
 }
 
+/** The two disable shapes the GLM family takes: Zhipu's own `thinking` object and the
+ *  OpenAI-compatible `reasoning_effort` the gateway passes through for models that read it. */
+const THINKING_DISABLED = { thinking: { type: "disabled" }, reasoning_effort: "none" } as const;
+
 /** Under this many words, a completion is a reasoning model's own empty exhaust rather than the
  *  artifact that was asked for — the two long reads' floor. The narrative call passes its own,
  *  much lower floor: a JSON object of short sentences is legitimately short. */
@@ -67,6 +80,68 @@ export const DEGENERATE_COMPLETION_WORDS = 20;
 export interface CapsuleWriterDeps {
   readonly apiKey: string;
   readonly fetch?: typeof globalThis.fetch;
+  /**
+   * The minimum gap between two gateway calls, `CAPSULE_CONFIG.gateway.minCallSpacingMs` when this
+   * module is talking to the real gateway and zero when a caller injected its own `fetch` — a
+   * fixture is not a rate-limited service, and a suite that slept three seconds a call would take
+   * an hour. Pass it explicitly to exercise the limiter itself.
+   */
+  readonly callSpacingMs?: number;
+  /**
+   * WHICH MODEL WRITES (task 11) — `CAPSULE_MODEL` unless a caller names another. A parameter
+   * rather than a constant read at the call site, so a comparison run can put two models through
+   * the identical prompts, the identical validator and the identical rate limiter and have the
+   * model be the only thing that differs. Production never sets it.
+   */
+  readonly model?: string;
+  /** Per-call round-trip time, for a comparison that has to report latency as well as quality.
+   *  Called once per HTTP attempt, whatever its outcome. */
+  readonly onCallLatency?: (ms: number) => void;
+  /**
+   * EVERY RESPONSE'S OWN RATE-LIMIT STORY (founder, 2026-09-07: "which limit are we throttling
+   * on?"). Called with the status, the status text, any header whose name mentions a rate limit or
+   * a retry, and the body of a 429. A diagnostic seam: the acceptance script sets it, production
+   * does not, and nothing here decides anything from what it reports.
+   */
+  readonly onGatewayResponse?: (info: GatewayResponseInfo) => void;
+  /**
+   * Whether the model may think before it writes. Defaults to `CAPSULE_CONFIG.gateway.thinking`,
+   * which the task 11 measurement set to `false` — see that constant for the numbers. Sent as the
+   * two shapes the Zhipu GLM family accepts through an OpenAI-compatible gateway, both at once,
+   * because the gateway documents neither and an ignored extra field is harmless where a missing
+   * one is the whole experiment.
+   */
+  readonly thinking?: boolean;
+}
+
+/**
+ * ONE GATEWAY, ONE PACE (acceptance round, task 10).
+ *
+ * THE MEASUREMENT: a live run threw 16 throttles in 100 players, and a second run spent three and
+ * a half MINUTES a player, almost all of it in 429 backoff. The per-player pause was never the
+ * shape of the problem: a player's three calls fire concurrently (`generateCapsule`'s own
+ * `Promise.all`), so the gateway saw a burst of three, a pause, a burst of three. A per-minute
+ * limit does not care about the average, it cares about the burst.
+ *
+ * This spaces EVERY call, wherever it was asked for, at the measured ceiling
+ * (`gateway.callsPerMinute`). Module scope on purpose: the limit belongs to the gateway, not to
+ * one sweep or one script, so two callers in one process queue behind each other rather than
+ * discovering the limit separately.
+ */
+let nextCallAt = 0;
+
+async function waitForGatewaySlot(spacingMs: number): Promise<void> {
+  if (spacingMs <= 0) return;
+  const now = Date.now();
+  const waitMs = Math.max(0, nextCallAt - now);
+  nextCallAt = Math.max(now, nextCallAt) + spacingMs;
+  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+}
+
+/** The spacing this call runs under: a caller's own, or the gateway's measured ceiling when this
+ *  module is using the real `fetch`. See `CapsuleWriterDeps.callSpacingMs`. */
+function spacingFor(deps: CapsuleWriterDeps): number {
+  return deps.callSpacingMs ?? (deps.fetch === undefined ? CAPSULE_CONFIG.gateway.minCallSpacingMs : 0);
 }
 
 /** A prior attempt's own violations, quoted verbatim into the retry's user message — "fix
@@ -82,6 +157,13 @@ export interface PriorAttempt {
    * set the retry asks for the SAME text at the right length and nothing more.
    */
   readonly lengthCorrection?: { readonly words: number; readonly minWords: number; readonly maxWords: number };
+  /**
+   * A FRAMING CORRECTION (acceptance round, task 10) — set when every violation was about HOW
+   * something was said rather than whether it was true. The retry keeps the prose and changes the
+   * one clause, for the same reason the length correction does: a capsule that was grounded, in
+   * voice and the right length is worth correcting, not discarding.
+   */
+  readonly softCorrections?: readonly string[];
 }
 
 /**
@@ -124,7 +206,11 @@ const SIZE_INSTRUCTIONS: Record<CapsuleSize, string> = {
 
 function userMessageFor(facts: PlayerFacts, size: CapsuleSize, prior?: PriorAttempt): string {
   const sections = [`Fact sheet:\n${renderFactsForModel(facts)}`, SIZE_INSTRUCTIONS[size]];
-  if (prior?.lengthCorrection !== undefined) {
+  if (prior?.softCorrections !== undefined && prior.softCorrections.length > 0) {
+    sections.push(
+      `Here is your previous attempt:\n"""${prior.body}"""\n\nIt is nearly right. Make exactly these corrections and change nothing else, keeping the same facts, the same numbers, the same length and the same voice:\n${prior.softCorrections.map((correction) => `- ${correction}`).join("\n")}`,
+    );
+  } else if (prior?.lengthCorrection !== undefined) {
     const { words, minWords, maxWords } = prior.lengthCorrection;
     sections.push(
       `Here is your previous attempt:\n"""${prior.body}"""\n\nThis is ${words} words. Rewrite it to between ${minWords} and ${maxWords} words, changing nothing else: keep the same facts, the same numbers, the same order and the same voice. ${words > maxWords ? "Cut the least useful clauses." : "Add one more beat from the fact sheet rather than padding a sentence you already wrote."}`,
@@ -176,6 +262,51 @@ function parseGatewayResponse(raw: string): { readonly content: string; readonly
   return { content, usage };
 }
 
+/** Any header whose NAME talks about a rate limit or a retry. The gateway documents none of them,
+ *  so this reads what it actually sends rather than a list of expected names. */
+function limitHeadersOf(response: Response): Readonly<Record<string, string>> {
+  const headers: Record<string, string> = {};
+  response.headers.forEach((value, name) => {
+    if (/ratelimit|retry|limit/i.test(name)) headers[name] = value;
+  });
+  return headers;
+}
+
+/**
+ * Hands one response to the diagnostic hook, if a caller set one. Extracted from
+ * `postChatCompletion` (fix round) so the transport function keeps its own shape: the retry tracks
+ * are the thing that is hard to read there, and a header-gathering block in the middle of them was
+ * making it harder.
+ *
+ * A 429's BODY comes through `clone()`: the branch below this call reads the response too, and
+ * consuming the stream here would leave it nothing.
+ */
+async function reportGatewayResponse(response: Response, deps: CapsuleWriterDeps): Promise<void> {
+  if (deps.onGatewayResponse === undefined) return;
+  deps.onGatewayResponse({
+    status: response.status,
+    statusText: response.statusText,
+    limitHeaders: limitHeadersOf(response),
+    ...(response.status === 429 ? { body: await response.clone().text() } : {}),
+  });
+}
+
+/**
+ * `Retry-After`, in milliseconds, when the gateway sent one this reader can trust: seconds (the
+ * common form) or an HTTP date. `null` for a missing, unparseable, negative or absurd header, and
+ * for anything past the backoff track's own longest wait — a throttle that really needs an hour is
+ * one this run should give up on and leave to the next sweep, not sleep through.
+ */
+function retryAfterMsOf(response: Response): number | null {
+  const raw = response.headers.get("retry-after");
+  if (raw === null) return null;
+  const ceiling = Math.max(...CAPSULE_CONFIG.gateway.retry.rateLimitBackoffMs);
+  const seconds = Number(raw.trim());
+  const ms = Number.isFinite(seconds) ? seconds * 1_000 : Date.parse(raw) - Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  return ms > ceiling ? null : Math.round(ms);
+}
+
 /**
  * One HTTP round trip. TWO RETRY TRACKS, never confused with each other (sweep resilience, color
  * v2, Task 4): a 429 gets its OWN exponential backoff (`retry.rateLimitBackoffMs` — three retries,
@@ -210,21 +341,30 @@ export async function postChatCompletion(
   let billedUsage: GatewayUsage | null = null;
 
   for (let attempt = 1; attempt <= maxAttemptsOverall; attempt += 1) {
+    await waitForGatewaySlot(spacingFor(deps));
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      const startedAt = Date.now();
       const response = await doFetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${deps.apiKey}` },
-        body: JSON.stringify({ model: CAPSULE_MODEL, messages, max_tokens: maxTokens }),
+        body: JSON.stringify({ model: deps.model ?? CAPSULE_MODEL, messages, max_tokens: maxTokens, ...((deps.thinking ?? CAPSULE_CONFIG.gateway.thinking) === false ? THINKING_DISABLED : {}) }),
         signal: controller.signal,
       });
+      deps.onCallLatency?.(Date.now() - startedAt);
       clearTimeout(timer);
+      await reportGatewayResponse(response, deps);
 
       if (response.status === 429) {
-        const delayMs = attempt <= retry.rateLimitBackoffMs.length ? retry.rateLimitBackoffMs[attempt - 1] : undefined;
-        if (delayMs !== undefined) {
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        const backoffMs = attempt <= retry.rateLimitBackoffMs.length ? retry.rateLimitBackoffMs[attempt - 1] : undefined;
+        if (backoffMs !== undefined) {
+          // THE GATEWAY'S OWN NUMBER WINS (acceptance round, task 10). A `Retry-After` header is
+          // the only statement anyone has about how long this throttle actually lasts, so waiting
+          // our own guess instead of its answer either wastes a minute or walks straight back into
+          // the limit. Capped at the backoff track's own longest step, so a header of an hour
+          // cannot hold a sweep's whole tick hostage.
+          await new Promise((resolve) => setTimeout(resolve, retryAfterMsOf(response) ?? backoffMs));
           continue;
         }
         throw new CapsuleGenerationError(`Gateway returned HTTP 429 after ${retry.rateLimitBackoffMs.length} backoff retries.`, true, billedUsage);

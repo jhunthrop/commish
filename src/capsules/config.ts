@@ -8,6 +8,14 @@
  */
 export const CAPSULE_MODEL = "zai/glm-5.3-flash";
 
+/** The gateway's measured ceiling, in calls a minute — see `CAPSULE_CONFIG.gateway.callsPerMinute`
+ *  for the measurement. Stated above the config object because the pacing below is derived from it
+ *  and a constant cannot read its own object while it is being built. */
+const GATEWAY_CALLS_PER_MINUTE = 12;
+
+/** The gap between any two gateway calls that holds the ceiling above. */
+const MIN_CALL_SPACING_MS = Math.round(60_000 / GATEWAY_CALLS_PER_MINUTE);
+
 export const CAPSULE_CONFIG = {
   /** Vercel AI Gateway, OpenAI-compatible. Never printed, never committed — the key lives at
    *  `envVars.apiKey` and is read once, at call time, by `write.ts`. */
@@ -29,14 +37,64 @@ export const CAPSULE_CONFIG = {
      * sweep's template floor takes over for this run.
      */
     retry: { maxAttempts: 2, baseDelayMs: 1_500, rateLimitBackoffMs: [20_000, 40_000, 80_000] },
+    /**
+     * THE GATEWAY'S OWN CEILING, AS MEASURED (acceptance round, task 10): a 100-player live run at
+     * five-second pacing threw 16 throttles. That run made three calls a player with no pause
+     * between them, roughly 36 calls a minute, so the limit sits below that. 20 a minute is the
+     * rate every caller here now paces to, which is under the observed failure point with room for
+     * the retries a rejected capsule spends.
+     *
+     * TWENTY WAS STILL TOO FAST (iteration 2: six of thirty players throttled even with the burst
+     * gone). Twelve a minute is the rate that answered, and it is what a nightly sweep of 35
+     * players costs nine minutes of wall clock at, which is nothing to a job that runs at four in
+     * the morning across as many ticks as it needs.
+     *
+     * It is a MEASURED CEILING, not a published one: the gateway states no number, so this is the
+     * fastest rate observed to answer reliably, and the 429 backoff track remains the guard for
+     * whatever it turns out to be on a different night.
+     */
+    callsPerMinute: GATEWAY_CALLS_PER_MINUTE,
+    /** `callsPerMinute` as the gap `write.ts` actually enforces between two calls. */
+    minCallSpacingMs: MIN_CALL_SPACING_MS,
+    /**
+     * THE WRITER DOES NOT THINK BEFORE IT WRITES (task 11, founder's question: should this be a
+     * non-reasoning model?).
+     *
+     * Measured on dev, same prompts, same validator, same rate limiter, the model the only thing
+     * that moved:
+     *
+     *   glm-5.3-flash, reasoning on   67% written (56 of 84 answered), 16-20% throttled,
+     *                                 $0.00239 a player, call latency p50 6.6s p90 12.7s
+     *   glm-5.3-flash, reasoning OFF  80% written (48 of 60 answered over two runs), 0% throttled,
+     *                                 $0.00153 a player, call latency p50 3.4s p90 6.4s
+     *   glm-5.2-fast                  0% written (10 of 10 throttled), and it billed $0.09 a
+     *                                 player anyway. It is not a non-reasoning model: a one-word
+     *                                 probe spent 99 reasoning tokens at twenty times the price.
+     *
+     * The prose is the other half and it is not worse: five players read side by side (the ledger
+     * carries them) show the same voice, with the reasoning-off reads finishing their sentences
+     * where the reasoning-on ones twice ran out of budget mid-clause and once fell to template.
+     * The thinking was being spent on the length and the framing rules, then run out of, which is
+     * exactly what the reasoning-on failures looked like.
+     *
+     * Reasoning stays SELECTABLE (`CapsuleWriterDeps.thinking`, `--no-thinking`'s own inverse) so
+     * the comparison can be re-run against a future model without a code change.
+     */
+    thinking: false,
   },
   /** The two sizes a capsule ships in — same facts, same writer/validator machinery, two prompts
    *  and two length bands (founder, live-fire review: "a competitor's player readout set the
    *  quality bar"). `compact` is the peek's own capsule; `full` ("The Read") is the player page's. */
   sizes: {
     compact: {
-      minWords: 60,
-      maxWords: 110,
+      // THE BAND IS WHERE THE MODEL ACTUALLY LANDS (acceptance round, task 10). 60-110 was chosen
+      // from the founder's own sense of the length, and 69 of a hundred players were failing the
+      // two bands, most of them by a handful of words on prose that was otherwise honest and in
+      // voice. Measured on dev with the length-correction retry in place: compact accepted p10 92 p90 105 (min 78, max 109), rejected at 35 and 115; full accepted p10 259 p90 277 (min 250, max 280), rejected at 282, 283 and 291.
+      // These are that observation's own p10 to p90, rounded outward to whole tens: a read is
+      // human length, not a fixed box, and the correction retry pulls in the genuine outliers.
+      minWords: 75,
+      maxWords: 120,
       /** `glm-5.3-flash` is a REASONING model: it spends completion tokens thinking before
        *  prose, observed 18-90 reasoning tokens on a 40-word capsule in a live probe. A tight
        *  cap returns EMPTY content while still billing — `write.ts` treats that as a generation
@@ -44,8 +102,8 @@ export const CAPSULE_CONFIG = {
       maxTokens: 500,
     },
     full: {
-      minWords: 180,
-      maxWords: 280,
+      minWords: 240,
+      maxWords: 300,
       // 1600, not 900 (live-fire 2026-09-05): glm-5.3-flash is a reasoning model, and the
       // longer Read prompt can spend most of a tight cap thinking, returning a near-empty
       // completion that reads as a validation failure instead of the truncation it is.
@@ -110,11 +168,15 @@ export const CAPSULE_CONFIG = {
   // backoff track handles the rare residual limit. 45s was the throttled-era setting.
   //
   // 5s (dossier-voice round): the raised batch above has to fit the same job timeout, and pacing
-  // is the half of that budget that buys nothing once the throttle is gone. The 429 track (three
-  // backoff retries doubling from twenty seconds) is what actually handles a live rate limit, and
-  // it is untouched — if a night starts throttling again, that track absorbs it and the sweep's
-  // own carryover finishes the board on the next run.
-  sweepPacingMs: 5_000,
+  // is the half of that budget that buys nothing once the throttle is gone.
+  //
+  // ZERO, BECAUSE THE RATE IS HELD ONE LEVEL DOWN NOW (acceptance round, task 10). A per-player
+  // pause never described what the gateway sees: a player's three calls fire concurrently, so the
+  // gateway got a burst of three, a pause, a burst of three, and a per-minute limit cares about
+  // the burst. `write.ts` now spaces EVERY call at `gateway.minCallSpacingMs`, which paces the
+  // sweep by construction and paces anything else that talks to the gateway in the same process.
+  // A second pause on top would only halve the throughput of a rate that is already held.
+  sweepPacingMs: 0,
 } as const;
 
 /**
@@ -147,7 +209,14 @@ export const BANNED_VOCABULARY: readonly string[] = [
   "standard deviation",
   "implying",
   "implied",
-  "ever",
+  // NOT A BARE "ever" (acceptance round, iteration 3): the guard exists for an all-time CLAIM, and
+  // a bare word caught "if he ever gets the goal-line work", which claims nothing at all. The
+  // superlative shapes are what the ruling is about.
+  "best ever",
+  "greatest ever",
+  "ever seen",
+  "ever played",
+  "ever had",
   "all-time",
   "all time",
   "in nfl history",

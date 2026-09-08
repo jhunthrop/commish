@@ -12,7 +12,7 @@ import { validateCapsule } from "./validate";
  * Every case here failed the OLD implementation; every one must pass the CURRENT one.
  */
 
-function pad(sentence: string, target = 65): string {
+function pad(sentence: string, target = 90): string {
   const words = sentence.trim().replace(/\.$/, "").split(/\s+/);
   const filler = ["truly", "clearly", "frankly", "simply", "plainly", "further", "notably", "steadily", "really", "overall"];
   let i = 0;

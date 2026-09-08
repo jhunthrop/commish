@@ -1,6 +1,7 @@
 import { BANNED_VOCABULARY, CAPSULE_CONFIG, COMPETITOR_NAMES, EM_DASH, SEMICOLON } from "./config";
 import type { PlayerFacts } from "./facts";
 import { NARRATIVE_MIN_WORDS } from "./narrative-slots";
+import { renderFactsForModel } from "./render";
 
 export type CapsuleSize = "compact" | "full";
 
@@ -88,11 +89,18 @@ function roundHalfUp(value: number, decimals: number): number {
  * "25%" and "24.76%" alike. Bounded to |entry| <= 1 so this can only ever turn a FRACTION into a
  * percentage, never license an arbitrary hundred-fold restatement of a points total.
  */
-function isDerivedFromLedger(value: number, ledger: readonly number[]): boolean {
+function isDerivedFromLedger(value: number, ledger: readonly number[], allowMagnitude = true): boolean {
   for (const entry of ledger) {
     if (value === entry) return true;
     if (Math.trunc(entry) === value || Math.ceil(entry) === value || Math.floor(entry) === value) return true;
-    for (const candidate of Math.abs(entry) <= 1 ? [entry, entry * 100] : [entry]) {
+    // THE MAGNITUDE OF A SIGNED FACT (acceptance round, task 10): a law worth -10.9 a game is
+    // stated by this product's own template as "costs him 10.9 points a game", and the writer is
+    // told to use that verb too. The sign lives in the sentence, so an unsigned 10.9 is a reading
+    // of -10.9, not a different number. (`citesTensionNumber` already granted exactly this for the
+    // one mandated citation; it belongs to every number.)
+    const magnitudes = allowMagnitude ? [Math.abs(entry)] : [];
+    const percents = Math.abs(entry) <= 1 ? [entry * 100, ...magnitudes.map((m) => m * 100)] : [];
+    for (const candidate of [entry, ...percents, ...magnitudes]) {
       if (candidate === value) return true;
       if (roundHalfUp(candidate, 0) === value || roundHalfUp(candidate, 1) === value || roundHalfUp(candidate, 2) === value) return true;
     }
@@ -121,6 +129,9 @@ const INITIALS_PATTERN = /^[A-Z](?:\.[A-Z])*$/;
 const COMMON_SENTENCE_STARTERS = new Set([
   "He", "She", "It", "They", "This", "That", "The", "A", "An", "His", "Her", "Their",
   "There", "But", "And", "Yet", "So", "Still", "Also", "However", "Meanwhile", "Now", "Then",
+  // The subordinating openers (acceptance round, task 10: "When Atlanta" failed as a person).
+  // None of these is ever a given name, which is the property the whole list turns on.
+  "When", "Where", "While", "If", "After", "Before", "Once", "Since", "Because", "Until", "Whenever",
 ]);
 
 function isInNameAbbreviation(bareWord: string): boolean {
@@ -154,7 +165,13 @@ function isPunctuationPeriod(word: string): boolean {
  * grounding as a fabricated person. A code in this set breaks a Titlecase run exactly the way a
  * comma does, so it can never join the word beside it into a name.
  */
-const POSITION_CODES: ReadonlySet<string> = new Set(["QB", "RB", "WR", "TE", "K", "DEF", "DST", "FLEX", "IR", "ADP", "PPR", "NFL", "TD", "TDS"]);
+const POSITION_CODES: ReadonlySet<string> = new Set([
+  "QB", "RB", "WR", "TE", "K", "DEF", "DST", "FLEX", "ADP", "PPR", "NFL", "TD", "TDS",
+  // THE INJURY DESIGNATIONS (acceptance round, task 10) — the fact sheet prints "designation Q as
+  // of ...", and a capsule writing "the Q designation" was failing as the two-word person "The Q".
+  // These are report codes; a code is a word, and a word is never half a name.
+  "Q", "O", "D", "IR", "PUP", "NFI", "SUSP", "DNP", "LP", "FP",
+]);
 
 /** The possessive or contraction a Titlecase token may carry ("Herbert's", "He's", "Mahomes’"),
  *  stripped before the token is considered as part of a name — the apostrophe inside a genuine
@@ -394,15 +411,37 @@ function containsCompetitorName(text: string): string | null {
  *  it was told not to, or introducing the word on its own — either way it must pair the word with
  *  real injury/availability language somewhere in the same text, or this fails it.
  *
+ *  AND A FLOOR IS ONLY BARE WITH A NUMBER ON IT (iteration 3: still 62 rejections of the whole
+ *  hundred, the top read-side cause by a distance). The founder's ruling is about the p10 restated
+ *  as a talent claim, which is a floor with a FIGURE beside it. "He has a high floor" carries no
+ *  figure, states no p10, and is a thing every analyst alive says about a role. The check now
+ *  fires on a floor sentence that carries a number and no availability language anywhere, which is
+ *  the sentence the ruling actually names.
+ *
+ *  THE VOCABULARY WAS THE BUG (acceptance round, task 10, iteration 2: 29 of 48 sizes died on this
+ *  one rule). The check accepted four phrasings, and the model writes the idea a dozen ways: "the
+ *  games he misses", "if he stays healthy", "durability", "sidelined". Every one of those frames
+ *  the low end as availability exactly as the rule intends, and every one of them was being failed.
+ *  `AVAILABILITY_LANGUAGE` is the widened list; the rule itself is unchanged, and a bare "floor of
+ *  91" with no availability language anywhere still fails.
+ *
  *  KNOWN LIMIT, ACCEPTED (fix round 1, LOW 3): the injury/availability word need only appear
  *  ANYWHERE in the text, not in the same sentence as "floor" — a capsule could in principle say
  *  "floor of 91" in one sentence and mention an unrelated injury elsewhere and still clear this
  *  check. Tightening to same-sentence proximity is a real improvement but a low-value one against
  *  the actual failure mode this exists to catch (a bare, unexplained floor claim with NO injury
  *  language anywhere), so it is left as a document limitation rather than built. */
+const AVAILABILITY_LANGUAGE =
+  /injur|health|hurt|miss(?:es|ed|ing)?\s+(?:time|games?|weeks?|snaps?)|games?\s+(?:he\s+)?miss|availab|durab|absen|sidelin|out for|stay(?:s|ing)? on the field|on the field for all/i;
+
 function hasUnframedFloorClaim(text: string): boolean {
-  if (!/\bfloor\b/i.test(text)) return false;
-  return !/injur|missed time|games missed|availability/i.test(text);
+  const sentences = splitSentences(text).filter((sentence) => /\bfloor\b/i.test(sentence));
+  if (sentences.length === 0) return false;
+  if (AVAILABILITY_LANGUAGE.test(text)) return false;
+  // A BARE FLOOR is a floor with a NUMBER on it. "He has a high floor" is an ordinary thing an
+  // analyst says about a role; "his floor is 178" is the p10 restated as a talent claim, and the
+  // founder's ruling names exactly that one ("a bare 'floor of 91' reads as a talent claim").
+  return sentences.some((sentence) => /\d/.test(sentence));
 }
 
 /**
@@ -436,9 +475,67 @@ function splitSentences(text: string): readonly string[] {
  *  cost-cue word, since "he averaged 1.8 yards" and "this costs him 1.8 a game" read very
  *  differently and only the second is an honest hesitation about the SAME downside. */
 function citesTensionNumber(text: string, requiredTension: number): boolean {
-  if (extractNumbers(text).some(({ value }) => isDerivedFromLedger(value, [requiredTension]))) return true;
+  // SIGNED ONLY on this branch (`allowMagnitude: false`) — the mandate is satisfied outright by a
+  // SIGNED citation, and by an unsigned one only inside a cost-cue sentence (the branch below).
+  // The general number check grants an unsigned magnitude everywhere, because "costs him 10.9" is
+  // an honest reading of -10.9; letting that same allowance satisfy the MANDATE would let a rave
+  // cite the bare magnitude of its own downside as though it were a positive stat, which is
+  // exactly the bypass `probe3` pins closed.
+  if (extractNumbers(text).some(({ value }) => isDerivedFromLedger(value, [requiredTension], false))) return true;
   const magnitude = Math.abs(requiredTension);
   return splitSentences(text).some((sentence) => COST_CUE_PATTERN.test(sentence) && extractNumbers(sentence).some(({ value }) => isDerivedFromLedger(Math.abs(value), [magnitude])));
+}
+
+/**
+ * THE NUMBERS THE PROMPT ACTUALLY SHOWED HIM (acceptance round, task 10) — every numeric token in
+ * the rendered fact sheet, in the exact forms it was rendered in.
+ *
+ * THE MEASUREMENT THAT FORCED IT: 125 of the rejections in a 100-player live run were ungrounded
+ * numbers, and the examples were figures the sheet had printed. `render.ts` states a share as
+ * "34.5%" while the ledger carried the fraction, states a rank as "RB4 of 32" while the ledger
+ * carried the components, and rounds a season total for readability. Every one of those is the
+ * model reading its own fact sheet back, which is the opposite of a fabrication.
+ *
+ * GROUNDING BY CONSTRUCTION. Anything the prompt renders is quotable; anything else still has to
+ * trace to the structured ledger or to an honest rounding of it. This cannot license an invented
+ * number, because the prompt is built from the same facts by a pure function
+ * (`renderFactsForModel`) that invents nothing either.
+ *
+ * Recomputed per validation rather than stored on `PlayerFacts`: the fact sheet is a few hundred
+ * bytes of string building, and putting it on the facts object would make `facts.ts` depend on the
+ * renderer that already depends on it.
+ */
+function promptNumbers(facts: PlayerFacts): readonly number[] {
+  return extractNumbers(renderFactsForModel(facts)).map((token) => token.value);
+}
+
+/**
+ * THE TWO SOFT RULES (acceptance round, task 10) — the violations that say a sentence is framed
+ * wrongly rather than that it states something untrue.
+ *
+ * 71 of 100 players in a live run were failing on "floor", and every one of them was prose the
+ * founder would have accepted with one clause changed. A rule that rejects that much honest
+ * writing is a rule being enforced at the wrong moment: the fix is to hand the text back with the
+ * rule stated and let the writer correct it, and to fall to the template only if he will not.
+ * `generate.ts` reads these to choose a correction over a rewrite; the rules themselves are
+ * unchanged, and a second failure still fails.
+ */
+export const UNFRAMED_FLOOR_VIOLATION =
+  'The text says "floor" without pairing it with injury/availability context. The low tail is an availability fact, not a talent claim.';
+
+/** The correction each soft violation is handed back with, in the words the writer needs. */
+export const SOFT_CORRECTIONS: Readonly<Record<string, string>> = {
+  [UNFRAMED_FLOOR_VIOLATION]:
+    'When you say "floor", say in the same breath what makes it the floor: games missed, not talent. Or drop the word and describe the low end as the injury seasons.',
+};
+
+/** True for a violation that is a framing note, not a fabrication — see `SOFT_CORRECTIONS`. */
+export function softCorrectionFor(violation: string): string | null {
+  if (violation in SOFT_CORRECTIONS) return SOFT_CORRECTIONS[violation] ?? null;
+  if (violation.startsWith("Mixed evidence:")) {
+    return `${violation} State it in one honest clause before your call, in your own words, and change nothing else.`;
+  }
+  return null;
 }
 
 /** What one piece of generated text is held to. The two long reads require the tension citation;
@@ -502,11 +599,12 @@ function validateGrounded(body: string, facts: PlayerFacts, band: GroundingBand)
   }
 
   if (hasUnframedFloorClaim(trimmed)) {
-    violations.push('The text says "floor" without pairing it with injury/availability context. The low tail is an availability fact, not a talent claim.');
+    violations.push(UNFRAMED_FLOOR_VIOLATION);
   }
 
+  const ledger = [...facts.numberLedger, ...promptNumbers(facts)];
   for (const { raw, value } of extractNumbers(trimmed)) {
-    if (!isDerivedFromLedger(value, facts.numberLedger)) {
+    if (!isDerivedFromLedger(value, ledger)) {
       violations.push(`The number "${raw}" does not trace to any supplied fact.`);
     }
   }

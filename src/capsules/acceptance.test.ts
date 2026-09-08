@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
+import { EMPTY_DEPTH, type PlayerFactsDepth } from "./facts/types";
+import { CAPSULE_CONFIG } from "./config";
 import { NARRATIVE_WORD_CAPS } from "./narrative-slots";
-import { validateCapsule, validateNarrativeSlot } from "./validate";
+import { depthNumbers } from "./facts/ledger";
+import { renderFactsForModel } from "./render";
+import { renderDepthSection } from "./render-depth";
+import { softCorrectionFor, UNFRAMED_FLOOR_VIOLATION, validateCapsule, validateNarrativeSlot } from "./validate";
 
 /**
  * THE ACCEPTANCE ROUND'S OWN FIXTURES (2026-09-07) — every rejection the coordinator's live
@@ -104,7 +109,7 @@ describe("cause 2: the word band is graded first, and alone", () => {
     expect(result.ok).toBe(false);
     expect(result.violations).toHaveLength(1);
     expect(result.violations[0]).toContain("outside the required");
-    expect(result.bandFailure).toEqual({ words: 15, minWords: 60, maxWords: 110 });
+    expect(result.bandFailure).toEqual({ words: 15, minWords: 75, maxWords: 120 });
   });
 
   it("does not report a grounding failure on a text it has already refused for its length", () => {
@@ -164,7 +169,7 @@ describe("cause 4: the mixed-evidence violation reads like a number a person wro
     const facts = buildPlayerFacts(
       baseInput({ reasons: [{ code: "law", lawId: "rb_age_curve", effect: -0.9372183908045988, magnitude: 29 }] }),
     );
-    const filler = Array.from({ length: 30 }, () => "plainly").join(" ");
+    const filler = Array.from({ length: 45 }, () => "plainly").join(" ");
     const body = validateCapsule(
       `Rashad Long is our number at 248 season points with a range from 178 to 275, and board rank 14 overall says the same about him, so the case is a plain one this season. ${filler}.`,
       facts,
@@ -174,5 +179,198 @@ describe("cause 4: the mixed-evidence violation reads like a number a person wro
     const tension = body.violations.find((violation) => violation.startsWith("Mixed evidence"));
     expect(tension).toContain("-0.9 pts/game");
     expect(tension).not.toContain("0.9372183908045988");
+  });
+});
+
+/**
+ * THE SECOND LIVE MEASUREMENT (2026-09-07, 100 players on dev: 42 written, $0.26). Its own
+ * rejections, most common first: 125 ungrounded numbers, 71 unframed floor claims, 69 word bands,
+ * 16 throttles, 8 ungrounded names, 7 uncited downsides. One fixture per cause.
+ */
+describe("grounded by construction: what the prompt shows is quotable", () => {
+  const facts = buildPlayerFacts(
+    baseInput({
+      usage: {
+        season: 2025,
+        snapShare: 0.345,
+        snapShareRank: { value: 0.345, positionRank: 8, qualifierCount: 41, namedNeighbor: null },
+        targetShare: null,
+        targetShareRank: null,
+        redZoneShare: null,
+        redZoneShareRank: null,
+      },
+    }),
+  );
+
+  it("grounds a percentage in exactly the form the fact sheet prints it", () => {
+    // The live rejection was: The number "34.5%" does not trace to any supplied fact.
+    expect(renderFactsForModel(facts)).toContain("34.5%");
+    expect(slotResult("He was on the field for 34.5% of the snaps, which is the whole case here.", facts).ok).toBe(true);
+  });
+
+  it("grounds every number the fact sheet renders, whatever form it renders it in", () => {
+    // The strongest possible statement of the rule, asserted against the sheet itself: nothing the
+    // model can read back at us is a fabrication.
+    const printed = renderFactsForModel(facts).match(/\d+(?:\.\d+)?/g) ?? [];
+    expect(printed.length).toBeGreaterThan(5);
+    for (const number of printed) {
+      expect(slotResult(`The sheet says ${number} and that is what it says about him.`, facts).ok).toBe(true);
+    }
+  });
+
+  it("still fails a number the prompt never showed and no rounding reaches", () => {
+    const result = slotResult("He was on the field for 61.2% of the snaps last season, every week.", facts);
+    expect(result.ok).toBe(false);
+    expect(result.violations[0]).toContain("61.2");
+  });
+});
+
+describe("the injury designation is a word, not a person", () => {
+  const facts = buildPlayerFacts(baseInput({ injury: { state: "designated", designation: "Q", asOf: "2026-09-01T00:00:00.000Z" } }));
+
+  it("reads 'The Q' as the report code the sheet printed", () => {
+    // The live rejection was: The name "The Q" does not trace to any supplied fact.
+    expect(slotResult("The Q next to his name is the only thing standing between him and a start.", facts).ok).toBe(true);
+  });
+
+  it("still fails a real fabricated name in the same sentence shape", () => {
+    expect(slotResult("The Marcus Long next to his name is the only thing standing there.", facts).ok).toBe(false);
+  });
+});
+
+describe("the soft rules are corrected before they are refused", () => {
+  it("hands the floor rule back as a correction rather than a rewrite", () => {
+    const correction = softCorrectionFor(UNFRAMED_FLOOR_VIOLATION);
+    expect(correction).toContain("games missed, not talent");
+  });
+
+  it("hands the uncited downside back with the number it wants stated", () => {
+    const correction = softCorrectionFor("Mixed evidence: the strongest downside (-1.8 pts/game) must be cited as an honest hesitation before the call.");
+    expect(correction).toContain("-1.8 pts/game");
+    expect(correction).toContain("change nothing else");
+  });
+
+  it("does not soften a fabrication: an ungrounded number has no correction at all", () => {
+    expect(softCorrectionFor('The number "137" does not trace to any supplied fact.')).toBeNull();
+    expect(softCorrectionFor('The name "Justin Herbert" does not trace to any supplied fact.')).toBeNull();
+  });
+
+  it("still fails the floor claim itself, so the correction has something to correct", () => {
+    const facts = buildPlayerFacts(baseInput());
+    const result = slotResult("His floor is 178 and that is the number to plan a season around.", facts);
+    expect(result.ok).toBe(false);
+    expect(result.violations).toContain(UNFRAMED_FLOOR_VIOLATION);
+  });
+});
+
+/**
+ * THE DEPTH SECTION IS GROUNDED TOO (fact-sheet depth merge, 2026-09-07). The sheet grew by about
+ * sixty percent, and the rule this round turned on is "what the prompt shows is quotable". That
+ * rule is only as good as the ledger behind the new lines, so this asserts the property directly
+ * rather than trusting the merge: every number the depth section PRINTS is a number the depth
+ * LEDGER carries, and every number the whole sheet prints grounds through the validator.
+ */
+describe("the depth section, grounded", () => {
+  /** One typed depth, group by group over the honest empty one. Typed rather than cast (fix
+   *  round): a double cast would have let a group's shape drift out from under this test, which is
+   *  precisely the drift the test exists to catch now that the sheet has a second author. */
+  function depthWith(groups: Partial<PlayerFactsDepth>): PlayerFactsDepth {
+    return { ...EMPTY_DEPTH, ...groups };
+  }
+
+  const facts = buildPlayerFacts({
+    ...baseInput(),
+    depth: depthWith({
+      // Only the groups that carry NUMBERS need to be here: a group with no number cannot break a
+      // number rule, and every group's own rendering is pinned by `render-depth.test.ts`.
+      gamesMissed: [{ season: 2025, missed: 3, teamGames: 17 }],
+      priorSeasons: [{ season: 2024, points: 289.6, gamesPlayed: 16, positionRank: 3, qualifierCount: 48 }],
+    }),
+  });
+
+  it("prints no number the depth ledger does not carry", () => {
+    const section = renderDepthSection(facts);
+    if (section === null) return;
+    const printed = (section.match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
+    const ledgered = new Set(depthNumbers(facts.depth).map((value) => Number(value)));
+    for (const value of printed) {
+      // Either the exact figure, or a figure the section rounded for readability, which the
+      // validator's own rounding tolerance then accepts.
+      const grounded = ledgered.has(value) || [...ledgered].some((entry) => Math.abs(entry - value) <= 0.5);
+      expect({ value, grounded }).toEqual({ value, grounded: true });
+    }
+  });
+
+  it("still grounds every number the whole rendered sheet shows, depth included", () => {
+    for (const number of renderFactsForModel(facts).match(/\d+(?:\.\d+)?/g) ?? []) {
+      expect(slotResult(`The sheet says ${number} and that is what it says about him.`, facts).ok).toBe(true);
+    }
+  });
+});
+
+/**
+ * THE BAND'S OWN EDGES (fix round) — the bands were set from a measured distribution, so the one
+ * thing a test must pin is that the numbers in `config.ts` ARE the numbers enforced, at the exact
+ * word where each side turns over. Asserted against the constants rather than against literals, so
+ * a future re-measure moves the band and these tests follow it.
+ */
+describe("the word bands are exactly the configured ones", () => {
+  const facts = buildPlayerFacts(baseInput());
+
+  /** `count` words with no digit and no capitalised token, so only the LENGTH is under test. */
+  function words(count: number): string {
+    return Array.from({ length: count }, (_, index) => (index === 0 ? "he" : "runs")).join(" ");
+  }
+
+  for (const size of ["compact", "full"] as const) {
+    const { minWords, maxWords } = CAPSULE_CONFIG.sizes[size];
+
+    it(`${size}: ${minWords - 1} words fails and ${minWords} passes`, () => {
+      expect(validateCapsule(words(minWords - 1), facts, size).bandFailure).toEqual({ words: minWords - 1, minWords, maxWords });
+      expect(validateCapsule(words(minWords), facts, size).bandFailure).toBeNull();
+    });
+
+    it(`${size}: ${maxWords} words passes and ${maxWords + 1} fails`, () => {
+      expect(validateCapsule(words(maxWords), facts, size).bandFailure).toBeNull();
+      expect(validateCapsule(words(maxWords + 1), facts, size).bandFailure).toEqual({ words: maxWords + 1, minWords, maxWords });
+    });
+  }
+
+  it("holds the bands the acceptance round measured", () => {
+    // Stated once, so a change to the constants is a deliberate act with a failing test beside it.
+    expect(CAPSULE_CONFIG.sizes.compact).toMatchObject({ minWords: 75, maxWords: 120 });
+    expect(CAPSULE_CONFIG.sizes.full).toMatchObject({ minWords: 240, maxWords: 300 });
+  });
+});
+
+/**
+ * THE NARROWED FLOOR RULE (fix round) — the founder's ruling is about a bare "floor of 91", a p10
+ * restated as a talent claim. Two narrowings were measured into this rule and both need pinning:
+ * a floor with no FIGURE beside it is an ordinary thing an analyst says, and the availability
+ * language that satisfies the rule is the widened list rather than the original four phrasings.
+ */
+describe("the floor rule, narrowed", () => {
+  const facts = buildPlayerFacts(baseInput());
+
+  it("lets a floor with no number through, availability language or not", () => {
+    const result = slotResult("He has a high floor and the role behind it is not going anywhere.", facts);
+    expect(result.ok).toBe(true);
+  });
+
+  it("still refuses a floor with a number and no availability language", () => {
+    const result = slotResult("His floor is 178 points and that is the number to plan a season around.", facts);
+    expect(result.ok).toBe(false);
+    expect(result.violations).toContain(UNFRAMED_FLOOR_VIOLATION);
+  });
+
+  it("accepts a floor with a number once availability is anywhere in the text", () => {
+    for (const framing of [
+      "the durability is the only question",
+      "he was sidelined twice last year",
+      "the games he misses are the whole risk",
+    ]) {
+      const result = slotResult(`His floor is 178 points, and ${framing} behind that number.`, facts);
+      expect({ framing, ok: result.ok }).toEqual({ framing, ok: true });
+    }
   });
 });

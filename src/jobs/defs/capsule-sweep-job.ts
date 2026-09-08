@@ -105,7 +105,10 @@ export interface CapsuleSweepDeps {
  * nothing else, and the next tick finds him still eligible.
  */
 function reservedMsPerPlayer(): number {
-  return CAPSULE_CONFIG.sweepPacingMs + CAPSULE_CONFIG.gateway.timeoutMs;
+  // Three calls a player, each held to the gateway's own spacing (`write.ts`'s limiter), plus one
+  // gateway timeout for the slowest of them. `sweepPacingMs` rides along for an operator who has
+  // put a pause back on top.
+  return CAPSULE_CONFIG.sweepPacingMs + 3 * CAPSULE_CONFIG.gateway.minCallSpacingMs + CAPSULE_CONFIG.gateway.timeoutMs;
 }
 
 export async function runCapsuleSweepStep(

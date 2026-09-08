@@ -23,9 +23,10 @@ function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput 
 }
 
 /** Pads a hand-written sentence out to `target` words with plain, digit-free, lowercase filler —
+ *  ninety by default, the middle of the compact band the acceptance round measured (75-120) —
  *  so a test can hit the validator's word-count band without introducing a stray number or a
  *  capitalized token that would trip the number/name checks this suite is not testing. */
-function compactWords(sentence: string, target = 70): string {
+function compactWords(sentence: string, target = 90): string {
   const words = sentence.trim().replace(/\.$/, "").split(/\s+/);
   const fillerPool = ["truly", "clearly", "frankly", "simply", "plainly", "further", "notably", "steadily", "really", "overall"];
   let i = 0;
@@ -84,12 +85,21 @@ describe("validateCapsule", () => {
     expect(result.violations.some((v) => v.toLowerCase().includes("yahoo"))).toBe(true);
   });
 
+  it("leaves a bare \"ever\" alone, which claims nothing at all", () => {
+    const facts = buildPlayerFacts(baseInput());
+    // a bare "ever" is ordinary English, not an all-time claim.
+    const body = compactWords("Rashad Long is a buy for the SF offense if he ever gets the goal-line work, our number of 248 season points and board rank 14 overall.");
+    expect(validateCapsule(body, facts, "compact").ok).toBe(true);
+  });
+
   it("catches an all-time superlative this engine cannot back up", () => {
     const facts = buildPlayerFacts(baseInput());
     const body = compactWords("Rashad Long is one of the best ever at his position for the SF offense, our number of 248 season points and board rank 14 overall this season.");
     const result = validateCapsule(body, facts, "compact");
     expect(result.ok).toBe(false);
-    expect(result.violations.some((v) => v.includes('"ever"'))).toBe(true);
+    // "best ever" is the shape the ruling is about; a bare "ever" is not (acceptance round,
+    // iteration 3: it was catching "if he ever gets the goal-line work", which claims nothing).
+    expect(result.violations.some((v) => v.includes('"best ever"'))).toBe(true);
   });
 
   it("catches a bare 'floor' claim with no injury or availability context", () => {
