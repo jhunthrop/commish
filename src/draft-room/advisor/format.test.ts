@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SeatAhead } from "@/draft-service/assistant/view";
-import { changedSinceLines, collapseText, isReachAt, percentText, runsText, seatAheadText } from "./format";
+import { changedSinceLines, collapseText, isReachAt, oddsLineText, percentText, runsText, seatAheadText } from "./format";
 
 const BANNED = /[—;]/;
 
@@ -31,7 +31,14 @@ describe("advisor format", () => {
       10,
       () => 17,
     );
-    expect(lines).toEqual(["C is off the plan.", "E is off the plan.", "B at 2.07 moved down, 90% to 20%.", "2 more changes on the plan."]);
+    expect(lines).toEqual(["C and E came off the plan.", "B at 2.07 moved down, 90% to 20%, and 2 more changes."]);
+    const departuresOnly = changedSinceLines(
+      [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ kind: "left_plan" as const, playerId: `p${n}`, turn: 1 })),
+      (id) => `RB ${id.slice(1)}`,
+      10,
+      () => 17,
+    );
+    expect(departuresOnly).toEqual(["RB 1, RB 2 and RB 3 came off the plan, and 6 more changes."]);
   });
 
   it("words a tier collapse from the board's own numbers", () => {
@@ -59,7 +66,13 @@ describe("advisor format", () => {
       10,
       () => 17,
     );
-    expect(lines).toEqual(["Blake Rivers is off the plan.", "Avery Stone at 2.07 moved down, 50% to 20%."]);
+    expect(lines).toEqual(["Blake Rivers came off the plan.", "Avery Stone at 2.07 moved down, 50% to 20%."]);
     for (const line of lines) expect(line).not.toMatch(BANNED);
+  });
+
+  it("words the odds line with a verb at zero, in between, and at every run", () => {
+    expect(oddsLineText({ survival: 0, runs: 100 }, 17, 10)).toBe("Gone before 2.07 in every run.");
+    expect(oddsLineText({ survival: 0.44, runs: 100 }, 17, 10)).toBe("Still there at 2.07 in 44 of 100 runs.");
+    expect(oddsLineText({ survival: 1, runs: 100 }, 17, 10)).toBe("Still there at 2.07 in every run.");
   });
 });

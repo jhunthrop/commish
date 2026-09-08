@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Button, PositionBadge, SlotChip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { AdvisorView, NowCandidate } from "@/draft-service/assistant/view";
-import { pickLabel, runsText } from "../format";
+import { oddsLineText, pickLabel } from "../format";
 import type { AdvisorActs } from "./advisor-acts";
 
 export interface NowCardProps {
@@ -17,11 +17,10 @@ export interface NowCardProps {
 
 function OddsCell({ candidate, view }: { readonly candidate: NowCandidate; readonly view: AdvisorView }) {
   const next = view.plan.turns[0]?.pickNumber ?? null;
-  if (candidate.makeItBack === null) return <span className="text-xs text-text-faint">{next === null ? "Your last turn" : "No odds"}</span>;
+  if (candidate.makeItBack === null || next === null) return <span className="text-xs text-text-faint">{next === null ? "Your last turn." : "No odds."}</span>;
   return (
-    <span className="font-mono text-xs tabular-nums text-text-muted">
-      {runsText(candidate.makeItBack)}
-      {next === null ? "" : ` at ${pickLabel(next, view.teamCount)}`}
+    <span data-testid="advisor-odds-line" className="font-mono text-xs tabular-nums text-text-muted">
+      {oddsLineText(candidate.makeItBack, next, view.teamCount)}
     </span>
   );
 }

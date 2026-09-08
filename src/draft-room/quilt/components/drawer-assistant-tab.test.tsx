@@ -44,6 +44,7 @@ function candidate(playerId: string, over: Partial<NowCandidate> = {}): NowCandi
     fillsSlot: player.position,
     reasons: [],
     templateReason: `${player.name} fills your ${player.position} slot, 41.2 points over replacement.`,
+    templateShape: `value:${PLAYERS.findIndex((entry) => entry.id === playerId)}`,
     ...over,
   };
 }
@@ -143,7 +144,7 @@ describe("DrawerAssistantTab", () => {
     expect(rows).toHaveLength(2);
     expect(within(rows[0]!).getByText("RB")).toBeInTheDocument();
     expect(rows[0]).toHaveTextContent("+41.2");
-    expect(rows[0]).toHaveTextContent("92 of 200 runs at 2.02");
+    expect(within(rows[0]!).getByTestId("advisor-odds-line")).toHaveTextContent("Still there at 2.02 in 92 of 200 runs.");
     expect(within(rows[0]!).getByTestId("advisor-reason")).toHaveAttribute("data-voice", "template");
     expect(await axe(container)).toHaveNoViolations();
   });
@@ -187,8 +188,8 @@ describe("DrawerAssistantTab", () => {
     mockedUseAdvisor.mockReturnValue(advisorResult({ view: makeView({ stamp: { computedAtPick: 2, sequence: 2 } }), previousPlan, recomputing: true }));
     renderTab();
     const changed = screen.getByTestId("advisor-changed");
+    expect(changed).toHaveTextContent("Cole Whitmore came off the plan.");
     expect(changed).toHaveTextContent("Marcus Reed at 2.02 moved down, 90% to 46%.");
-    expect(changed).toHaveTextContent("Cole Whitmore is off the plan.");
     expect(screen.getByTestId("advisor-recomputing")).toBeInTheDocument();
     expect(screen.getAllByTestId("advisor-now-row")).toHaveLength(2);
   });
