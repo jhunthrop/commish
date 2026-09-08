@@ -10,7 +10,7 @@ import { MobileRoom } from "./mobile-room";
 // 390px) — every tab's content beyond POOL (the default) needs its own deps this suite has no
 // reason to build, so the room's advisor is the "nothing loaded yet" shape every other
 // advisor-tab test starts from, and every act is a no-op.
-const NO_ADVISOR = { view: null, prePickView: null, recomputing: false, error: null };
+const NO_ADVISOR = { view: null, recomputing: false, error: null };
 
 function room(over: Partial<DraftRoomState> = {}): DraftRoomState {
   return {
