@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
 import { CAPSULE_MODEL } from "./config";
-import { CapsuleGenerationError, generateCapsuleBody, postChatCompletion } from "./write";
+import { CapsuleGenerationError, generateCapsuleBody, postChatCompletion, type GatewayResponseInfo } from "./write";
 
 function baseInput(): PlayerFactsInput {
   return {
@@ -343,5 +343,76 @@ describe("the request body", () => {
   it("carries CAPSULE_MODEL unless a caller names another", async () => {
     expect((await bodyOf({ apiKey: "test-key" })).model).toBe(CAPSULE_MODEL);
     expect((await bodyOf({ apiKey: "test-key", model: "zai/glm-5.2-fast" })).model).toBe("zai/glm-5.2-fast");
+  });
+});
+
+/**
+ * THE HEADER CAPTURE (fix round) — the founder's "which limit are we throttling on" is only ever
+ * answered by a response nobody kept, so the hook has to fire on the ordinary path too, carry only
+ * the headers that talk about limits, and read a 429's body WITHOUT consuming the stream the retry
+ * path still needs.
+ */
+describe("onGatewayResponse", () => {
+  const MESSAGES = [{ role: "user", content: "anything" }];
+
+  it("fires once on a 200, with only the limit headers", async () => {
+    const seen: GatewayResponseInfo[] = [];
+    const fetchMock = (async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: LONG_BODY } }] }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+          "x-ratelimit-limit-requests": "60",
+          "x-ratelimit-remaining-requests": "59",
+          "retry-after": "0",
+          "x-request-id": "not-a-limit-header",
+        },
+      })) as unknown as typeof globalThis.fetch;
+
+    await postChatCompletion(MESSAGES, 200, { apiKey: "test-key", fetch: fetchMock, onGatewayResponse: (info) => seen.push(info) });
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.status).toBe(200);
+    expect(seen[0]!.limitHeaders).toEqual({
+      "x-ratelimit-limit-requests": "60",
+      "x-ratelimit-remaining-requests": "59",
+      "retry-after": "0",
+    });
+    // Only the ones whose NAME talks about a limit: no content type, no request id, no body.
+    expect(seen[0]!.body).toBeUndefined();
+  });
+
+  it("captures a 429's body and still lets the retry path read the response", async () => {
+    vi.useFakeTimers();
+    try {
+      const seen: GatewayResponseInfo[] = [];
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response('{"error":{"message":"rate limit exceeded: 20 requests per minute"}}', {
+            status: 429,
+            headers: { "retry-after": "1", "x-ratelimit-limit-requests": "20" },
+          }),
+        )
+        .mockResolvedValueOnce(okResponse({ choices: [{ message: { content: LONG_BODY } }] }));
+
+      const promise = postChatCompletion(MESSAGES, 200, {
+        apiKey: "test-key",
+        fetch: fetchMock,
+        callSpacingMs: 0,
+        onGatewayResponse: (info) => seen.push(info),
+      });
+      await vi.advanceTimersByTimeAsync(1_000);
+      const result = await promise;
+
+      // The 429 was reported with its own words, and the call still went on to succeed, which is
+      // the proof the clone did not consume the stream the 429 branch reads after it.
+      expect(seen[0]!.status).toBe(429);
+      expect(seen[0]!.body).toContain("rate limit exceeded: 20 requests per minute");
+      expect(seen[0]!.limitHeaders).toEqual({ "retry-after": "1", "x-ratelimit-limit-requests": "20" });
+      expect(result.content).toBe(LONG_BODY);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
