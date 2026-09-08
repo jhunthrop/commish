@@ -6,7 +6,7 @@ import { NARRATIVE_WORD_CAPS } from "./narrative-slots";
 import { depthNumbers } from "./facts/ledger";
 import { renderFactsForModel } from "./render";
 import { renderDepthSection } from "./render-depth";
-import { softCorrectionFor, UNFRAMED_FLOOR_VIOLATION, validateCapsule, validateNarrativeSlot } from "./validate";
+import { groundingOf, softCorrectionFor, UNFRAMED_FLOOR_VIOLATION, validateCapsule, validateNarrativeSlot } from "./validate";
 
 /**
  * THE ACCEPTANCE ROUND'S OWN FIXTURES (2026-09-07) — every rejection the coordinator's live
@@ -51,7 +51,7 @@ const FACTS = buildPlayerFacts(baseInput());
 /** One short, grounded sentence — the shape of a narrative slot, which is where a single written
  *  number is easiest to test without a seventy-word band getting in the way. */
 function slotResult(text: string, facts = FACTS) {
-  return validateNarrativeSlot(text, facts, NARRATIVE_WORD_CAPS.module);
+  return validateNarrativeSlot(text, groundingOf(facts), NARRATIVE_WORD_CAPS.module);
 }
 
 describe("cause 1: an ungrounded NUMBER that was never ungrounded", () => {
@@ -128,7 +128,7 @@ describe("cause 2: the word band is graded first, and alone", () => {
 
   it("still fails a call of thirty-one words", () => {
     const thirtyOne = Array.from({ length: 31 }, (_, index) => (index === 0 ? "He" : "runs")).join(" ");
-    const result = validateNarrativeSlot(thirtyOne, FACTS, NARRATIVE_WORD_CAPS.call);
+    const result = validateNarrativeSlot(thirtyOne, groundingOf(FACTS), NARRATIVE_WORD_CAPS.call);
     expect(result.ok).toBe(false);
     expect(result.bandFailure).toEqual({ words: 31, minWords: 3, maxWords: 30 });
   });

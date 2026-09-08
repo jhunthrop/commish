@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
 import { generateNarrative, narrativePromptFor, narrativeRequestsFor } from "./narrative";
 import { absenceSlotKey, ABSENCE_MODULES, NARRATIVE_KEYS, narrativeSlot, normalizeSentence, whyGroupSlotKey } from "./narrative-slots";
-import { validateNarrativeSlot } from "./validate";
+import { groundingOf, validateNarrativeSlot } from "./validate";
 
 /**
  * THE NARRATIVE, WITHOUT A GATEWAY. Every test here drives a fake `fetch`: the round's own rule is
@@ -95,33 +95,33 @@ describe("validateNarrativeSlot", () => {
   const facts = buildPlayerFacts(baseInput());
 
   it("accepts a grounded call", () => {
-    expect(validateNarrativeSlot(GROUNDED_CALL, facts, 30).ok).toBe(true);
+    expect(validateNarrativeSlot(GROUNDED_CALL, groundingOf(facts), 30).ok).toBe(true);
   });
 
   it("rejects a number that traces to nothing on the fact sheet", () => {
-    const result = validateNarrativeSlot("He caught 137 passes last year and nobody can cover him.", facts, 30);
+    const result = validateNarrativeSlot("He caught 137 passes last year and nobody can cover him.", groundingOf(facts), 30);
     expect(result.ok).toBe(false);
     expect(result.violations[0]).toContain("137");
   });
 
   it("rejects thirty-one words in the call's own band", () => {
     const thirtyOne = Array.from({ length: 31 }, (_, index) => (index === 0 ? "He" : "runs")).join(" ");
-    const result = validateNarrativeSlot(thirtyOne, facts, 30);
+    const result = validateNarrativeSlot(thirtyOne, groundingOf(facts), 30);
     expect(result.ok).toBe(false);
     expect(result.violations[0]).toContain("outside the required");
   });
 
   it("rejects a fabricated teammate, an em-dash, a semicolon and the lab-report register", () => {
-    expect(validateNarrativeSlot("Justin Herbert throws him the ball every week now.", facts, 40).ok).toBe(false);
-    expect(validateNarrativeSlot("He is a buy — the price is wrong.", facts, 40).ok).toBe(false);
-    expect(validateNarrativeSlot("He is a buy; the price is wrong.", facts, 40).ok).toBe(false);
-    expect(validateNarrativeSlot("His projection sits above his price.", facts, 40).ok).toBe(false);
+    expect(validateNarrativeSlot("Justin Herbert throws him the ball every week now.", groundingOf(facts), 40).ok).toBe(false);
+    expect(validateNarrativeSlot("He is a buy — the price is wrong.", groundingOf(facts), 40).ok).toBe(false);
+    expect(validateNarrativeSlot("He is a buy; the price is wrong.", groundingOf(facts), 40).ok).toBe(false);
+    expect(validateNarrativeSlot("His projection sits above his price.", groundingOf(facts), 40).ok).toBe(false);
   });
 
   it("does not demand the tension citation a whole read has to carry", () => {
     // The strongest downside is -1.8 a game and this sentence never mentions it. A thirty-word
     // call cannot carry the case and the hesitation both; the reads still must.
-    expect(validateNarrativeSlot(GROUNDED_CALL, facts, 30).ok).toBe(true);
+    expect(validateNarrativeSlot(GROUNDED_CALL, groundingOf(facts), 30).ok).toBe(true);
   });
 });
 

@@ -9,7 +9,7 @@ import {
   type NarrativeSlots,
 } from "./narrative-slots";
 import { renderFactsForModel } from "./render";
-import { validateNarrativeSlot } from "./validate";
+import { groundingOf, validateNarrativeSlot } from "./validate";
 import { addGatewayUsage, CapsuleGenerationError, postChatCompletion, type CapsuleWriterDeps, type GatewayUsage } from "./write";
 
 /**
@@ -245,7 +245,7 @@ function validateSlots(
     const raw = parsed[request.key];
     if (typeof raw !== "string" || raw.trim() === "") continue;
     const text = raw.trim();
-    const result = validateNarrativeSlot(text, facts, request.maxWords);
+    const result = validateNarrativeSlot(text, groundingOf(facts), request.maxWords);
     if (result.ok) slots[request.key] = text;
     else rejected.push(`${request.key}: ${result.violations[0] ?? "unknown violation"}`);
   }

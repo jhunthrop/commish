@@ -11,18 +11,15 @@
  * a word cap per slot. A slot that fails is dropped and its template renders. Two slots that
  * say the same sentence keep only the first (the repetition rule, per card).
  *
- * The validator is typed over a whole `PlayerFacts`; for a narrative slot it reads exactly two
- * of its fields, the number and name ledgers (`validateGrounded`'s own path with
- * `requireTension: false`). `groundingFactsFor` is the smallest honest bridge until that module
- * accepts a narrower ledger type. `grounding.test.ts` pins that the bridge still passes and fails
- * on the same inputs.
+ * The validator grades against a `NarrativeGrounding`: the turn's number and name ledgers plus
+ * the turn sheet the model was prompted with, so anything the sheet printed is quotable by
+ * construction, the same rule the capsule writer lives under. `groundingFor` builds it.
  *
  * NOTHING HERE THROWS: a refused gateway or an unparseable body is a result with no slots.
  */
 import { NARRATIVE_MIN_WORDS, normalizeSentence } from "@/capsules/narrative-slots";
-import { validateNarrativeSlot } from "@/capsules/validate";
+import { validateNarrativeSlot, type NarrativeGrounding } from "@/capsules/validate";
 import { addGatewayUsage, CapsuleGenerationError, postChatCompletion, type CapsuleWriterDeps, type GatewayUsage } from "@/capsules/write";
-import type { PlayerFacts } from "@/capsules/facts";
 import { pickLabel } from "@/domain/pick-label";
 import { ADVISOR_CONFIG } from "../config";
 import { runsPhrase } from "../template";
@@ -44,10 +41,9 @@ export interface VoiceResult {
 
 const EMPTY: VoiceResult = { strategy: null, reasons: {}, rejected: [], usage: null, failure: null };
 
-/** The two ledgers the validator reads for a narrative slot, in the shape it is typed over. */
-export function groundingFactsFor(ledger: TurnLedger): PlayerFacts {
-  const facts: Pick<PlayerFacts, "numberLedger" | "nameLedger"> = { numberLedger: ledger.numbers, nameLedger: ledger.names };
-  return facts as PlayerFacts;
+/** The turn's ledgers and the sheet it was prompted with, in the validator's own shape. */
+export function groundingFor(ledger: TurnLedger, promptText: string): NarrativeGrounding {
+  return { numberLedger: ledger.numbers, nameLedger: ledger.names, promptText };
 }
 
 const VOICE_RULES = `You are the sharpest manager in a fantasy football draft room, leaning over a friend's shoulder during a live draft. You write short, plain, confident sentences in the second person about THIS turn in THIS room.
@@ -131,9 +127,10 @@ function parseSlotObject(content: string): Record<string, unknown> | null {
 
 const TIER_PHRASE = /last (man|one|guy) in (his|the|its) tier/i;
 
-/** One slot graded: the shared validator, then the advisor's own phrase ban. */
-export function gradeSlot(text: string, ledger: TurnLedger, maxWords: number): readonly string[] {
-  const result = validateNarrativeSlot(text, groundingFactsFor(ledger), maxWords);
+/** One slot graded: the shared validator, then the advisor's own phrase ban. `promptText` is the
+ *  turn sheet the slot was written from; an empty string grades against the ledgers alone. */
+export function gradeSlot(text: string, ledger: TurnLedger, maxWords: number, promptText = ""): readonly string[] {
+  const result = validateNarrativeSlot(text, groundingFor(ledger, promptText), maxWords);
   const violations = result.ok ? [] : result.violations;
   return TIER_PHRASE.test(text) ? [...violations, 'The text says "last man in his tier", which this product never says.'] : violations;
 }
@@ -148,13 +145,14 @@ interface Graded {
 export function gradeSlots(parsed: Record<string, unknown>, view: AdvisorView): Graded {
   const keys = [STRATEGY_SLOT, ...view.now.map((candidate) => reasonSlotKey(candidate.playerId))];
   const said = new Set<string>();
+  const promptText = voicePromptFor(view);
   let accepted: Record<string, string> = {};
   const rejected: string[] = [];
   for (const key of keys) {
     const raw = parsed[key];
     if (typeof raw !== "string" || raw.trim() === "") continue;
     const text = raw.trim();
-    const violations = gradeSlot(text, view.ledger, key === STRATEGY_SLOT ? ADVISOR_CONFIG.voice.strategyMaxWords : ADVISOR_CONFIG.voice.reasonMaxWords);
+    const violations = gradeSlot(text, view.ledger, key === STRATEGY_SLOT ? ADVISOR_CONFIG.voice.strategyMaxWords : ADVISOR_CONFIG.voice.reasonMaxWords, promptText);
     if (violations.length > 0) {
       rejected.push(`${key}: ${violations[0]}`);
       continue;

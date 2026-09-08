@@ -4,7 +4,7 @@ import { ADVISOR_CONFIG } from "../config";
 import { FIXTURE_POOL, FIXTURE_SHAPE, FIXTURE_TEAM_IDS, fixtureAdvance, fixtureStart, fixtureValued } from "../test-fixture";
 import type { AdvisorView } from "../view";
 import { resetVoiceBudgetForTests, voiceWithinBudget } from "./budget";
-import { generateAdvisorVoice, gradeSlot, gradeSlots, groundingFactsFor, reasonSlotKey, STRATEGY_SLOT, voicePromptFor } from "./generate";
+import { generateAdvisorVoice, gradeSlot, gradeSlots, groundingFor, reasonSlotKey, STRATEGY_SLOT, voicePromptFor } from "./generate";
 
 const ASKING = FIXTURE_TEAM_IDS[3]!;
 
@@ -25,7 +25,7 @@ function okResponse(content: string): Response {
   return new Response(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 500, completion_tokens: 120, total_tokens: 620, cost: 0.00004 } }), { status: 200 });
 }
 
-describe("groundingFactsFor and gradeSlot", () => {
+describe("groundingFor and gradeSlot", () => {
   it("passes a sentence whose numbers and names are on the ledger, and fails one that invents either", () => {
     const v = view();
     const top = v.now[0]!;
@@ -44,7 +44,7 @@ describe("groundingFactsFor and gradeSlot", () => {
     expect(gradeSlot(`${name} is ranked higher on ESPN.`, v.ledger, 28)[0]).toMatch(/competitor/);
     expect(gradeSlot(`${name} is the last man in his tier.`, v.ledger, 28).some((line) => /last man/.test(line))).toBe(true);
     expect(gradeSlot(`${name} ${"is very ".repeat(20)} good.`, v.ledger, 28)[0]).toMatch(/Word count/);
-    expect(groundingFactsFor(v.ledger).numberLedger).toBe(v.ledger.numbers);
+    expect(groundingFor(v.ledger, "").numberLedger).toBe(v.ledger.numbers);
   });
 
   it("holds a reason to exactly the configured cap: forty words pass, forty-one fail, and the prompt asks for under thirty", () => {

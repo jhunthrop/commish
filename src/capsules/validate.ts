@@ -505,8 +505,37 @@ function citesTensionNumber(text: string, requiredTension: number): boolean {
  * bytes of string building, and putting it on the facts object would make `facts.ts` depend on the
  * renderer that already depends on it.
  */
-function promptNumbers(facts: PlayerFacts): readonly number[] {
-  return extractNumbers(renderFactsForModel(facts)).map((token) => token.value);
+function promptNumbers(promptText: string): readonly number[] {
+  return extractNumbers(promptText).map((token) => token.value);
+}
+
+/**
+ * WHAT A TEXT IS GRADED AGAINST — the seam between the two writers. A capsule read is grounded on
+ * a player's facts (`groundingOf`); a draft advisor slot is grounded on the turn's own ledger and
+ * the turn sheet it was prompted with (`src/draft-service/assistant/voice`). Both hand this one
+ * shape in, so "anything the prompt renders is quotable" holds for either without the validator
+ * knowing whose prompt it was.
+ */
+export interface GroundingSource {
+  readonly numberLedger: readonly number[];
+  readonly nameLedger: readonly string[];
+  /** The rendered prompt the text was written from. Its numbers are quotable by construction. */
+  readonly promptText: string;
+  /** The strongest downside, cited when a band mandates tension. Null when nothing mandates it. */
+  readonly tension: number | null;
+}
+
+/** A narrative slot never carries the tension mandate, so its source never needs one. */
+export type NarrativeGrounding = Omit<GroundingSource, "tension">;
+
+/** A player's facts as the validator reads them: the ledgers, the rendered sheet, the downside. */
+export function groundingOf(facts: PlayerFacts): GroundingSource {
+  return {
+    numberLedger: facts.numberLedger,
+    nameLedger: facts.nameLedger,
+    promptText: renderFactsForModel(facts),
+    tension: strongestNegativeLawEffect(facts),
+  };
 }
 
 /**
@@ -558,7 +587,7 @@ interface GroundingBand {
  * function, so a sentence a module renders is held to exactly what a read is held to. A second
  * grounding implementation for the slots would be a second place for a fabricated number to get in.
  */
-function validateGrounded(body: string, facts: PlayerFacts, band: GroundingBand): ValidationResult {
+function validateGrounded(body: string, source: GroundingSource, band: GroundingBand): ValidationResult {
   const violations: string[] = [];
   const trimmed = body.trim();
 
@@ -602,7 +631,7 @@ function validateGrounded(body: string, facts: PlayerFacts, band: GroundingBand)
     violations.push(UNFRAMED_FLOOR_VIOLATION);
   }
 
-  const ledger = [...facts.numberLedger, ...promptNumbers(facts)];
+  const ledger = [...source.numberLedger, ...promptNumbers(source.promptText)];
   for (const { raw, value } of extractNumbers(trimmed)) {
     if (!isDerivedFromLedger(value, ledger)) {
       violations.push(`The number "${raw}" does not trace to any supplied fact.`);
@@ -610,12 +639,12 @@ function validateGrounded(body: string, facts: PlayerFacts, band: GroundingBand)
   }
 
   for (const phrase of extractProperNamePhrases(trimmed)) {
-    if (!isNameGroundedWithShedding(phrase, facts.nameLedger)) {
+    if (!isNameGroundedWithShedding(phrase, source.nameLedger)) {
       violations.push(`The name "${phrase}" does not trace to any supplied fact.`);
     }
   }
 
-  const requiredTension = band.requireTension ? strongestNegativeLawEffect(facts) : null;
+  const requiredTension = band.requireTension ? source.tension : null;
   if (requiredTension !== null && !citesTensionNumber(trimmed, requiredTension)) {
     violations.push(
       `Mixed evidence: the strongest downside (${roundHalfUp(requiredTension, 1)} pts/game) must be cited as an honest hesitation before the call.`,
@@ -628,7 +657,7 @@ function validateGrounded(body: string, facts: PlayerFacts, band: GroundingBand)
 /** One whole read, at its own size's word band, with the mandated-tension check that a note long
  *  enough to make a case must carry its strongest downside. */
 export function validateCapsule(body: string, facts: PlayerFacts, size: CapsuleSize): ValidationResult {
-  return validateGrounded(body, facts, { ...CAPSULE_CONFIG.sizes[size], requireTension: true });
+  return validateGrounded(body, groundingOf(facts), { ...CAPSULE_CONFIG.sizes[size], requireTension: true });
 }
 
 /**
@@ -638,6 +667,6 @@ export function validateCapsule(body: string, facts: PlayerFacts, size: CapsuleS
  * screen either way. The reads above still carry the mandate, so nothing about the page as a whole
  * gets to be one-sided on mixed evidence.
  */
-export function validateNarrativeSlot(body: string, facts: PlayerFacts, maxWords: number): ValidationResult {
-  return validateGrounded(body, facts, { minWords: NARRATIVE_MIN_WORDS, maxWords, requireTension: false });
+export function validateNarrativeSlot(body: string, source: NarrativeGrounding, maxWords: number): ValidationResult {
+  return validateGrounded(body, { ...source, tension: null }, { minWords: NARRATIVE_MIN_WORDS, maxWords, requireTension: false });
 }
