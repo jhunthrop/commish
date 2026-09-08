@@ -45,9 +45,9 @@ export const CAPSULE_CONFIG = {
      * the retries a rejected capsule spends.
      *
      * TWENTY WAS STILL TOO FAST (iteration 2: six of thirty players throttled even with the burst
-     * gone). Twelve a minute is the rate that answered, and it is what a nightly sweep of 35
-     * players costs nine minutes of wall clock at, which is nothing to a job that runs at four in
-     * the morning across as many ticks as it needs.
+     * gone). Twelve a minute is the rate that answered, and it is what a nightly sweep of the
+     * whole board costs an hour or two of wall clock at (see `sweepGenerationBudget`), which is
+     * nothing to a job that runs at four in the morning across as many ticks as it needs.
      *
      * It is a MEASURED CEILING, not a published one: the gateway states no number, so this is the
      * fastest rate observed to answer reliably, and the 429 backoff track remains the guard for
@@ -261,25 +261,29 @@ export const CAPSULE_CONFIG = {
    *  seventeen points a season, the size at which the downside changes the call and a reader would
    *  want it said before it. Under that, the read may still cite it; it is no longer failed for not. */
   tensionThresholdPoints: 1.0,
-  /** Per-sweep-run cap on fresh generations (two gateway calls each) — the spreading mechanism
-   *  that lets a full board's first run clear the free-tier throttle across several nightly
-   *  sweeps rather than exhausting it in one run. Generous, per the base-product ruling (spec
-   *  §15.1): no paywall gates capsule coverage, only pacing against the gateway. */
-  // 35 A NIGHT, ACROSS AS MANY TICKS AS IT TAKES (dossier-voice round §3.2, corrected by the
-  // review's C1). The number that binds is NOT the sweep job's own 480s `timeoutMs`: the runner
-  // caps a claimed attempt at whatever is left of the TICK budget
-  // (`JOBS_CONFIG.vercelTickBudgetMsDefault`, 50 seconds), so no single attempt was ever going to
-  // write 35 players at 5s pacing plus 7-20s of generation each. The sweep stops before the
-  // deadline it is handed and enqueues a continuation carrying the rest of this number, so 35 is
-  // the per-NIGHT ceiling rather than a per-attempt promise, and a tick writes the two or three
-  // players it has room for.
-  //
-  // THE COST, STATED: about $0.0022 a player for the two reads (the measured rate behind the
-  // spec's "roughly a dollar" for 460 players) and about a third again for the narrative call, so
-  // roughly $0.0033 a player and about 12 cents a night at this batch, under $4 a month. The
-  // one-time backlog regeneration the spec calls for is a separate, larger spend the coordinator
-  // runs deliberately; this constant only has to keep the board from drifting back.
-  sweepGenerationBudget: 35,
+  /**
+   * THE NIGHT'S CAP ON FRESH GENERATIONS, ACROSS AS MANY TICKS AS IT TAKES. The number that binds
+   * an attempt is NOT the sweep job's own `timeoutMs`: the runner caps a claimed attempt at
+   * whatever is left of the TICK budget (`JOBS_CONFIG.vercelTickBudgetMsDefault`, 50 seconds;
+   * `JOBS_TICK_BUDGET_MS` raises it to at most 280). The sweep stops before the deadline it is
+   * handed and enqueues a continuation carrying the rest of this number, so it is a per-NIGHT
+   * ceiling, never a per-attempt promise. Generous, per the base-product ruling (spec §15.1): no
+   * paywall gates capsule coverage, only pacing against the gateway.
+   *
+   * EVERYONE ELIGIBLE, EVERY NIGHT (overruns round, 2026-09-08). The 35 this used to be predates
+   * the resumable sweep and the per-call pacing: it spread a full board over nineteen nights of a
+   * throttled free tier, and it meant a player demoted to the template on a fixable miss waited
+   * days in the tail. The board is about 664 players; 700 covers it with room. At the gateway's
+   * paced 12 calls a minute and the measured call rate (p50 one call a player, the ceiling four),
+   * a night that regenerates the whole board is 60 to 90 minutes of ticks in the usual case and
+   * under four hours at the ceiling, all before the morning.
+   *
+   * THE COST, STATED: $0.0013 a player, measured on the written-rate round's dev runs (reasoning
+   * off, one bundle call plus its corrections). A night that rewrites the whole cap is 700 times
+   * that, $0.91; a normal night, only the players whose facts moved, is a fraction of it. Under
+   * $28 a month even if every night were a full rewrite.
+   */
+  sweepGenerationBudget: 700,
   /** Pause between players inside one sweep. The gateway rate-limits per minute, and the first
    *  live sweep proved a burst (two calls per player, back to back) throttles everything after
    *  the first player into the template floor (2026-09-05). Fifteen seconds a player was the

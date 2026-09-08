@@ -15,8 +15,9 @@
 // could never finish inside one attempt: the step was being cut off mid-batch every night and the
 // repetition check at the end never ran in production at all. The step now reads
 // `ctx.deadlineAt`, stops BEFORE the player that would cross it, and enqueues its own continuation
-// carrying the rest of tonight's budget. The 35 is still the per-night ceiling: the continuation's
-// payload is what is left of it, never a fresh 35.
+// carrying the rest of tonight's budget. `CAPSULE_CONFIG.sweepGenerationBudget` is the per-night
+// ceiling, sized to cover every eligible player: the continuation's payload is what is left of it,
+// never a fresh budget.
 //
 // THE REPETITION CHECK RUNS ONLY ON THE RUN THAT FINISHES THE NIGHT'S WORK, because it is a
 // question about the whole board and a half-swept board would flag sentences the second half is
@@ -155,29 +156,27 @@ export interface CapsuleSweepDeps {
 }
 
 /**
- * WHAT THE SWEEP RESERVES FOR ONE MORE PLAYER — the pacing pause plus ONE gateway round at the
- * gateway's own timeout (5s + 20s = 25s).
+ * WHAT THE SWEEP RESERVES FOR ONE MORE PLAYER — the pacing pause, every call of the player's own
+ * ceiling (`CAPSULE_CONFIG.maxGatewayCallsPerPlayer`, four, overruns round 2026-09-08) at the
+ * gateway's own spacing (`write.ts`'s limiter), plus one gateway timeout for the slowest of them:
+ * 0s + 4 x 5s + 20s = 40s. Most players are one call, but the reserve is a statement about what a
+ * player CAN cost, and it is kept honest against the tick: it fits the default 50s tick
+ * (`JOBS_CONFIG.vercelTickBudgetMsDefault`) once, and a raised `JOBS_TICK_BUDGET_MS` (capped at
+ * 280s by `tick-handler.ts`) seven times. `capsule-sweep-job.test.ts` pins both.
  *
  * IT IS THE REALISTIC RESERVE, NOT THE ABSOLUTE WORST CASE (review, blocker). The first version
- * reserved every retry of every one of the three calls (125s) against a window that is at most the
- * TICK budget (`JOBS_CONFIG.vercelTickBudgetMsDefault` is 50s, and `tick-handler.ts` caps even a
- * raised `JOBS_TICK_BUDGET_MS` at 280s). A reserve larger than the whole window fires on the first
- * iteration every time: nothing is ever written, the repetition check never runs, and the
- * zero-progress continuation dies on its own idempotency key. A guard that can never pass is worse
- * than no guard, because it looks like one.
+ * reserved every retry of every call (125s) against a window that is at most the tick budget. A
+ * reserve larger than the whole window fires on the first iteration every time: nothing is ever
+ * written, the repetition check never runs, and the zero-progress continuation dies on its own
+ * idempotency key. A guard that can never pass is worse than no guard, because it looks like one.
  *
  * THE RUNNER'S OWN CUT IS THE BACKSTOP for the player who overruns this reserve. That is safe here
  * and nowhere else in this job: every player is committed as he is written (`upsertCapsule`
  * inside the loop), so an attempt killed mid-player loses that one player's gateway spend and
  * nothing else, and the next tick finds him still eligible.
  */
-function reservedMsPerPlayer(): number {
-  // Up to three calls a player (the one bundle call plus a correction call for each read that
-  // failed, refrains round 2026-09-07), each held to the gateway's own spacing (`write.ts`'s
-  // limiter), plus one gateway timeout for the slowest of them. Most players are one call now, but
-  // the reserve is a statement about what a player CAN cost, and the runner's cut is the backstop
-  // either way. `sweepPacingMs` rides along for an operator who has put a pause back on top.
-  return CAPSULE_CONFIG.sweepPacingMs + 3 * CAPSULE_CONFIG.gateway.minCallSpacingMs + CAPSULE_CONFIG.gateway.timeoutMs;
+export function reservedMsPerPlayer(): number {
+  return CAPSULE_CONFIG.sweepPacingMs + CAPSULE_CONFIG.maxGatewayCallsPerPlayer * CAPSULE_CONFIG.gateway.minCallSpacingMs + CAPSULE_CONFIG.gateway.timeoutMs;
 }
 
 export async function runCapsuleSweepStep(
@@ -333,9 +332,9 @@ export async function runCapsuleSweepStep(
 export const capsuleSweepJob: AnyJobDefinition = defineJob<CapsuleSweepPayload>({
   name: CAPSULE_SWEEP_JOB_NAME,
   maxAttempts: 2,
-  // Generous: up to `sweepGenerationBudget` players, each up to two gateway calls at up to two
-  // attempts (one regeneration) per size, each bounded by the gateway's own `timeoutMs` and one
-  // retry. Comfortably below a typical serverless ceiling even at the rare worst case.
+  // Not the number that binds an attempt: the runner cuts a claimed attempt at the TICK budget
+  // (at most 280s), and the step hands the rest of the night to a continuation before that. This
+  // only has to sit above the largest tick with headroom.
   timeoutMs: 480_000,
   backoff: { baseMs: 60_000, maxMs: 10 * 60_000 },
   parsePayload: parseCapsuleSweepPayload,
