@@ -250,3 +250,29 @@ describe("the scoring-range usage line", () => {
     expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, scoringUsage: null })))).toBeNull();
   });
 });
+
+describe("the team context line", () => {
+  it("dates last season's shape and this season's opening price separately, and grounds both", () => {
+    const facts = buildPlayerFacts(
+      depthInput({
+        ...EMPTY_DEPTH,
+        teamContext: { priorSeason: 2025, paceSecondsPerPlay: 28.4, passRate: 0.581, wins: 11.5, weekOneImpliedTotal: 24.5, weekOneSpread: 3.5 },
+      }),
+    );
+    expect(renderDepthSection(facts)).toBe(
+      "The record:\n- SF in 2025: 28.4 seconds a play, 58% of situation-neutral plays passes, 11.5 wins. The books price their week one game at an implied 24.5 points and a spread of +3.5 in their favour.",
+    );
+    for (const value of [2025, 28.4, 0.581, 58, 11.5, 24.5, 3.5]) expect(facts.numberLedger).toContain(value);
+  });
+
+  it("prints only the half the store holds", () => {
+    const facts = buildPlayerFacts(
+      depthInput({ ...EMPTY_DEPTH, teamContext: { priorSeason: 2025, paceSecondsPerPlay: null, passRate: null, wins: null, weekOneImpliedTotal: 21.5, weekOneSpread: null } }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- The books price their week one game at an implied 21.5 points.");
+  });
+
+  it("renders no team context line when neither store holds a row", () => {
+    expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, teamContext: null })))).toBeNull();
+  });
+});

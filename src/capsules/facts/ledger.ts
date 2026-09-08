@@ -26,8 +26,16 @@ import type { PlayerFactsDepth } from "./types";
 
 const PERCENT = 100;
 
+/**
+ * THREE FORMS OF ONE SHARE, and the third is the one that actually matters here. `facts.ts`'s own
+ * ledger carries the raw fraction and the exact product, which is right, and is not enough on its
+ * own: the depth section PRINTS a whole percent (`Math.round`), and 0.581 times a hundred is
+ * 58.099999999999994 in floating point, not the 58 the model reads on the page. A writer quoting
+ * the sheet verbatim must ground against what the sheet printed, so the rounded form is on the
+ * ledger beside the two exact ones rather than left to a comparison tolerance to rescue.
+ */
 function shareNumbers(fraction: number): readonly number[] {
-  return [fraction, fraction * PERCENT];
+  return [fraction, fraction * PERCENT, Math.round(fraction * PERCENT)];
 }
 
 function rankedNumbers(rank: RankedStat | null): readonly number[] {
@@ -98,7 +106,7 @@ function contextNumbers(depth: PlayerFactsDepth): readonly number[] {
     numbers.push(context.priorSeason);
     if (context.paceSecondsPerPlay !== null) numbers.push(context.paceSecondsPerPlay);
     if (context.passRate !== null) numbers.push(...shareNumbers(context.passRate));
-    for (const value of [context.pointsScored, context.weekOneImpliedTotal, context.weekOneSpread]) {
+    for (const value of [context.wins, context.weekOneImpliedTotal, context.weekOneSpread]) {
       if (value !== null) numbers.push(value);
     }
   }

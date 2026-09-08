@@ -154,7 +154,17 @@ export interface PlayerFactsTeamContext {
   readonly priorSeason: number;
   readonly paceSecondsPerPlay: number | null;
   readonly passRate: number | null;
-  readonly pointsScored: number | null;
+  /**
+   * THE TEAM'S OWN REGULAR-SEASON WINS THAT YEAR, from the schedule store's `game_result` rows
+   * (a win 1, a tie a half, a loss 0), summed over the weeks the store holds.
+   *
+   * WINS RATHER THAN POINTS SCORED, which the spec asked for and this store deliberately does not
+   * hold: `schema`'s own `points_allowed` docblock says "a team's own points are deliberately not
+   * stored beside this, they are its opponent's points allowed, one join away", and the store
+   * carries no prior-season schedule to make that join through. A win is a fact keyed directly to
+   * the team, needs no join, and answers the same question a fact sheet is asking here.
+   */
+  readonly wins: number | null;
   readonly weekOneImpliedTotal: number | null;
   readonly weekOneSpread: number | null;
 }

@@ -196,6 +196,28 @@ function scoringUsageLine(facts: PlayerFacts): string | null {
   return clauses.length === 0 ? null : `Scoring-range usage (${usage.season}): ${clauses.join(". ")}.`;
 }
 
+/** THE OFFENCE HE PLAYS IN, last season's shape and this season's opening price, each dated so the
+ *  two are never read as one claim. No judgment: a fast offence is stated, never called good. */
+function teamContextLine(facts: PlayerFacts): string | null {
+  const context = facts.depth.teamContext;
+  if (context === null) return null;
+  const team = facts.identity.team;
+  const history = [
+    context.paceSecondsPerPlay === null ? null : `${context.paceSecondsPerPlay.toFixed(1)} seconds a play`,
+    context.passRate === null ? null : `${percent(context.passRate)} of situation-neutral plays passes`,
+    context.wins === null ? null : `${context.wins} wins`,
+  ].filter((part): part is string => part !== null);
+  const market = [
+    context.weekOneImpliedTotal === null ? null : `an implied ${context.weekOneImpliedTotal} points`,
+    context.weekOneSpread === null ? null : `a spread of ${context.weekOneSpread > 0 ? `+${context.weekOneSpread}` : context.weekOneSpread} in their favour`,
+  ].filter((part): part is string => part !== null);
+  const sentences = [
+    history.length === 0 ? null : `${team} in ${context.priorSeason}: ${history.join(", ")}.`,
+    market.length === 0 ? null : `The books price their week one game at ${market.join(" and ")}.`,
+  ].filter((sentence): sentence is string => sentence !== null);
+  return sentences.length === 0 ? null : sentences.join(" ");
+}
+
 /** Every line of the section, in `PlayerFactsDepth`'s own field order. Takes the whole `PlayerFacts`
  *  rather than the depth group alone because a few of these sentences name his own team and
  *  position, which live on `identity` and must never be restated inside the depth group itself. */
@@ -212,6 +234,7 @@ function depthLines(facts: PlayerFacts): readonly string[] {
     roleTrendLine(depth),
     targetCompetitionLine(depth),
     scoringUsageLine(facts),
+    teamContextLine(facts),
   ].filter((line): line is string => line !== null && line !== "");
 }
 
