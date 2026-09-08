@@ -15,8 +15,9 @@ import { createDb } from "@/db/client";
 import { FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
 import { FITTED_MODEL } from "@/projections/model/source";
 import { AGE_BRACKETS, ROLE_BRACKETS, expectedGamesPlayed } from "@/projections/preseason/availability";
+import { fitAvailabilityPriors } from "@/projections/preseason/availability-fit";
+import { loadAvailabilityObservations } from "@/projections/preseason/availability-history";
 import {
-  fitAvailabilityPriors,
   fitCareerPriors,
   fitDepthPriors,
   fitRookieGameRate,
@@ -29,7 +30,6 @@ import { FITTED_DEPTH_PRIORS } from "@/projections/preseason/fitted";
 import { EXPERIENCE_BANDS, careerMultiplier } from "@/projections/preseason/career";
 import { DRAFT_BUCKETS, draftBucketFor } from "@/projections/preseason/rookies";
 import {
-  loadAvailabilityObservations,
   loadCareerObservations,
   loadDepthObservations,
   loadRookieObservations,

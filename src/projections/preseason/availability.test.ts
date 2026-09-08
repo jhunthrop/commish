@@ -16,7 +16,7 @@ import {
   type AvailabilityPriors,
   type SeasonAvailability,
 } from "./availability";
-import { AGE_MULTIPLIER_BOUND } from "./fit";
+import { AGE_MULTIPLIER_BOUND } from "./availability-fit";
 import { FITTED_AVAILABILITY_PRIORS } from "./fitted";
 
 /**
