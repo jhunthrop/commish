@@ -50,7 +50,7 @@ export function templateReason(candidate: Omit<NowCandidate, "templateReason">, 
   const lead =
     cliff === undefined
       ? `${name} ranks No. ${candidate.positionRank} at ${candidate.position} and ${slotClause(candidate.fillsSlot)}, ${pointsPhrase(candidate.valueOverReplacement)} over replacement.`
-      : `${name} is one of ${cliff.playersLeftInTier} ${cliff.position} left before a ${pointsPhrase(cliff.dropToNextTier)} drop, and he ${slotClause(candidate.fillsSlot)}.`;
+      : `${name} is one of ${cliff.playersLeftInTier} ${cliff.position} left before a ${cliff.dropToNextTier.toFixed(1)} point drop, and he ${slotClause(candidate.fillsSlot)}.`;
   const odds = oddsClause(candidate.makeItBack, context.nextPickNumber, context.teamCount);
   return odds === "" ? lead : `${lead} ${odds}`;
 }

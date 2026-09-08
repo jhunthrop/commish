@@ -105,7 +105,7 @@ function seedFor(seedNamespace: string, pickNumber: number): number {
  *  consistent market. The fallback is deliberately the value rank rather than a rank by raw
  *  points, which is the ordering that put quarterbacks on top of the Simulator (founder,
  *  2026-09-05). */
-function valuedEvidence(pool: readonly SimPlayerEvidence[], shape: LeagueShape): ReadonlyMap<string, ValuedEntry> {
+export function valuedEvidence(pool: readonly SimPlayerEvidence[], shape: LeagueShape): ReadonlyMap<string, ValuedEntry> {
   const { sorted, byPlayerId } = valueBoardIndexed(pool.map((entry) => ({ playerId: entry.playerId, position: entry.position, projectedPoints: entry.projectedPoints })), shape);
   const valueRankByPlayerId = new Map(sorted.map((entry, index) => [entry.playerId, index] as const));
   const marketByPlayerId = new Map(pool.map((entry) => [entry.playerId, entry.marketRank] as const));
@@ -125,7 +125,7 @@ interface AskingWindow {
 /** Scans forward from the draft's current pick for the asking seat's own next two turns. Null
  *  only defensively: an `in_progress` draft's own draft order always owes every seat at least one
  *  more pick from `state.pickNumber` onward, by `totalPickCount`'s own construction. */
-function askingWindow(state: DraftState, askingTeamId: string): AskingWindow | null {
+export function askingWindow(state: DraftState, askingTeamId: string): AskingWindow | null {
   const lastPick = totalPickCount(state);
   let pickNumber: number | null = null;
   let nextPickNumber: number | null = null;
@@ -194,7 +194,7 @@ function summaryForSlot(summary: StoredSimSummary, slot: number): SimSummary | n
 /** `findCachedRun` alone — never `requestSimRun` — so a live pick clock can never be made to wait
  *  on (or pay for) a sim nobody has asked for yet. See the module docblock for why the config
  *  reconstructed here is the exact one `canonicalSimFor` would have used. */
-async function winningBuildsFor(db: Db, userId: string, leagueId: string, shape: LeagueShape, slot: number, boardGeneration: string): Promise<readonly BuildOutcome[] | null> {
+export async function winningBuildsFor(db: Db, userId: string, leagueId: string, shape: LeagueShape, slot: number, boardGeneration: string): Promise<readonly BuildOutcome[] | null> {
   const knobs = { slot, rounds: totalRosterSlots(shape.rosterSlots), runs: SIM_CONFIG.syncRunThreshold, sharpness: SIM_SHARPNESS.mixed };
   const config: SimConfig = { teamCount: shape.teamCount, rosterSlots: shape.rosterSlots, ...knobs, seed: deriveSeed(shape, { leagueId, ...knobs }) };
   const cached = await findCachedRun(db, userId, hashSimConfig(config), boardGeneration);
