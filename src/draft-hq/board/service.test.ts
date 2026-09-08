@@ -3,13 +3,14 @@ import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { leagues, nflPlayers, nflverseTeamDefenseWeeks, playerCrosswalk, players, preseasonProjections, scoringSettings, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { PPR_SCORING } from "@/domain/scoring";
+import { HALF_PPR_SCORING, PPR_SCORING } from "@/domain/scoring";
 import { roundPoints } from "@/scoring";
 import { valueOrderFor } from "@/draft-service/sim/value-order";
 import type { TeamDefenseWeekRow } from "@/projections/nflverse/team-defense-weeks";
+import { boardSourceFor } from "@/projections/preseason/board-formats";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { BOARD_LAST_SEASON, boardRows, isProjectedRow } from "./service";
+import { BOARD_LAST_SEASON, boardRows, isProjectedRow, resolveBoardFormat } from "./service";
 
 /** One archived defense week for the Rams, in the archive's OWN spelling (`LA`) — the fold onto
  *  the product's `DST-LAR` is the reader's job, and this fixture must not do it for it. */
@@ -261,6 +262,31 @@ describe("boardRows", () => {
       await seedPlayer({ id: "p1", nflId: "00-0000001", name: "Top Back", position: "RB", team: "SF", points: 300, rank: 1, adp: 1.2 });
       const rows = await boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } });
       expect(rows.map((row) => row.lastSeason)).toEqual([null]);
+    });
+
+    it("a half-PPR league reads the HALF board, decided by its scoring row, and a league-free read names its format (the scoring-formats round)", async () => {
+      await db.insert(users).values({ id: "u1", email: "one@example.com", displayName: "One" });
+      await db.insert(leagues).values({ id: "half-league", name: "Half Points", format: "snake", teamCount: 12, commissionerUserId: "u1" });
+      await db.insert(scoringSettings).values({ leagueId: "half-league", ...HALF_PPR_SCORING });
+      await seedPlayer({ id: "p1", nflId: "00-0000001", name: "Catch Machine", position: "WR", team: "SF", points: 300, rank: 1, adp: 1.2 });
+      // The same man on the half board, 45 points lighter (ninety catches at half a point less).
+      await db.insert(preseasonProjections).values({
+        season: PRODUCT_SEASON, source: boardSourceFor("half"), playerId: "00-0000001", rank: 1, positionRank: 1,
+        projectedPoints: 255, valueOverReplacement: 255, valueRank: 1, expectedGames: 17,
+        floorPoints: 235, medianPoints: 255, ceilingPoints: 275, tier: 0, asOf: new Date("2026-08-01T00:00:00Z"), momentKind: "live",
+      });
+
+      const shape = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS };
+      const [pprRow] = await boardRows(db, { shape });
+      const [leagueRow] = await boardRows(db, { shape, leagueId: "half-league" });
+      const [chosenRow] = await boardRows(db, { shape, format: "half" });
+      expect(pprRow!.projectedPoints).toBe(300);
+      expect(leagueRow!.projectedPoints).toBe(255);
+      expect(chosenRow!.projectedPoints).toBe(255);
+      // Inside a league the league decides: a selector's format is ignored when a league is named.
+      const [ignored] = await boardRows(db, { shape, leagueId: "half-league", format: "std" });
+      expect(ignored!.projectedPoints).toBe(255);
+      expect((await resolveBoardFormat(db, { leagueId: "half-league" })).basisLine).toBe(`${PRODUCT_SEASON} board, 12-team half PPR, in board order`);
     });
 
     it("measures last season under the LEAGUE's own scoring when one is named", async () => {

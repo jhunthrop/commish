@@ -3,7 +3,7 @@ import { ok } from "@/lib/api/respond";
 import { advanceDraftNow } from "@/draft-service";
 import { rankedPlayers } from "@/draft-service/pool";
 import type { DraftPlayersBody } from "@/draft-room/contract";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
+import { leagueBoardFormat } from "@/league-service/board-format";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { reasonsByLeaguePlayerId } from "@/projections/preseason/reasons-by-player";
 import { chipEligibleLaws, registry } from "@/projections/laws/registry";
@@ -32,7 +32,10 @@ export async function GET(request: Request, context: RouteContext) {
     await advanceDraftNow(actor.draftId);
     const db = getDb();
     const players = await rankedPlayers(db, actor.leagueId);
-    const [reasons, byes] = await Promise.all([reasonsByLeaguePlayerId(db, players, BOARD_SOURCE, PRODUCT_SEASON), byeWeeksByTeam(db)]);
+    // The league's own board (the scoring-formats round): a half-PPR room reads the half board's
+    // reasons, decided by its scoring row, never by a selector.
+    const board = await leagueBoardFormat(db, actor.leagueId);
+    const [reasons, byes] = await Promise.all([reasonsByLeaguePlayerId(db, players, board.source, PRODUCT_SEASON), byeWeeksByTeam(db)]);
     const body: DraftPlayersBody = {
       players,
       reasons,

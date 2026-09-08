@@ -63,7 +63,7 @@ function marketOrder(overrides: Partial<BoardRow>): BoardRow {
 }
 
 function mount(rows: readonly BoardRow[]) {
-  return render(<BoardView rows={rows} laws={[]} auctionShape={SHAPE} exportFilename="board.csv" />);
+  return render(<BoardView rows={rows} laws={[]} auctionShape={SHAPE} exportFilename="board.csv" scoringLabel="PPR" />);
 }
 
 function selectPosition(label: string): void {

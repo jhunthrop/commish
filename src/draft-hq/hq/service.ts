@@ -2,8 +2,9 @@ import type { Db } from "@/db/client";
 import type { Position } from "@/domain/player";
 import { plural } from "@/domain/duration";
 import { BENCH_SLOT, type RosterSlotConfig } from "@/domain/roster";
-import { GENERIC_BOARD_SHAPE } from "@/draft-hq/board/generic-board";
-import { boardRows, isProjectedRow, type BoardRow } from "@/draft-hq/board/service";
+import { genericBoardRows } from "@/draft-hq/board/generic-board";
+import { isProjectedRow, type BoardRow } from "@/draft-hq/board/service";
+import { BOARD_FORMATS, type BoardFormat } from "@/projections/preseason/board-formats";
 import { nextDraftingLeague as nextDraftingLeagueRow } from "@/draft-hq/league-context";
 import { defaultSheetFor } from "@/draft-hq/sheet/service";
 
@@ -34,9 +35,10 @@ export interface DraftHqBody {
   /** The caller's next SCHEDULED real draft (never a mock), soonest kickoff first — `null` for a
    *  caller with no upcoming draft to prepare for. */
   readonly nextDraft: DraftHqLeagueContext | null;
-  /** Top of the default board — real evidence points, never invented. Empty when the board has
+  /** Top of the board in each scoring format (the scoring-formats round), real evidence points,
+   *  never invented; the card shows the one this browser remembers. Empty when a format's board has
    *  not been built for this season yet. */
-  readonly boardPreview: readonly DraftHqBoardPreviewRow[];
+  readonly boardPreviews: Readonly<Record<BoardFormat, readonly DraftHqBoardPreviewRow[]>>;
   /** `null` when the caller has never started a sheet (the card then offers to start one rather
    *  than showing a fabricated zero dressed as a real count — a real zero and "never started"
    *  are different facts, exactly the "did not play" vs. "scored nothing" distinction this
@@ -94,29 +96,32 @@ async function nextDraftingLeagueContext(db: Db, userId: string): Promise<DraftH
   };
 }
 
+/** The top of one board by projection. PROJECTED ROWS ONLY (the 2026-09-05 kicker and team
+ *  defence round): the board also carries market-order rows for positions the engine published
+ *  nothing for. They sit after every projected row anyway, so the slice would not have reached
+ *  them, and the filter is what makes that a rule rather than a coincidence of ordering. */
+function previewOf(board: readonly BoardRow[]): readonly DraftHqBoardPreviewRow[] {
+  return board.filter(isProjectedRow).slice(0, HQ_BOARD_PREVIEW_ROWS).map((row) => ({
+    playerId: row.playerId,
+    name: row.name,
+    position: row.position,
+    positionRankInValue: row.positionRankInValue,
+    team: row.team,
+    projectedPoints: row.projectedPoints,
+  }));
+}
+
+/** All three formats' previews, each read from the memoized generic board of that format. */
+async function boardPreviewsFor(db: Db): Promise<Readonly<Record<BoardFormat, readonly DraftHqBoardPreviewRow[]>>> {
+  const boards = await Promise.all(BOARD_FORMATS.map((format) => genericBoardRows(db, format).catch((): readonly BoardRow[] => [])));
+  return Object.fromEntries(BOARD_FORMATS.map((format, index) => [format, previewOf(boards[index]!)])) as Record<BoardFormat, readonly DraftHqBoardPreviewRow[]>;
+}
+
 export async function draftHqBody(db: Db, userId: string): Promise<DraftHqBody> {
-  const [nextDraft, board, sheet] = await Promise.all([
-    nextDraftingLeagueContext(db, userId),
-    boardRows(db, { shape: GENERIC_BOARD_SHAPE }).catch(
-      (): readonly BoardRow[] => [],
-    ),
-    defaultSheetFor(db, userId, null),
-  ]);
+  const [nextDraft, boardPreviews, sheet] = await Promise.all([nextDraftingLeagueContext(db, userId), boardPreviewsFor(db), defaultSheetFor(db, userId, null)]);
   return {
     nextDraft,
-    // PROJECTED ROWS ONLY (the 2026-09-05 kicker and team defence round): this preview is the top
-    // of the board BY PROJECTION, and the board now also carries market-order rows for positions
-    // the engine published nothing for. They sit after every projected row anyway, so the slice
-    // would not have reached them, and the filter is what makes that a rule rather than a
-    // coincidence of ordering.
-    boardPreview: board.filter(isProjectedRow).slice(0, HQ_BOARD_PREVIEW_ROWS).map((row) => ({
-      playerId: row.playerId,
-      name: row.name,
-      position: row.position,
-      positionRankInValue: row.positionRankInValue,
-      team: row.team,
-      projectedPoints: row.projectedPoints,
-    })),
+    boardPreviews,
     sheetEntryCount: sheet === null ? null : sheet.entries.length,
   };
 }

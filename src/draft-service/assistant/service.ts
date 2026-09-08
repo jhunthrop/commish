@@ -10,6 +10,7 @@ import type { Db } from "@/db/client";
 import type { Recommendation } from "@/projections/decide/draft";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { getDraftStore, resolveDraftActor } from "@/draft-service";
+import { leagueBoardFormat } from "@/league-service/board-format";
 import { evidencePoolFor } from "../sim/evidence";
 import { simulateRoomOdds, type RoomOddsInput, type RoomOddsTable } from "../sim/room-odds";
 import { inferSeatDrivers } from "../sim/seat-model";
@@ -44,7 +45,8 @@ export async function advisorFor(db: Db, draftId: string, userId: string, deps: 
   if (askingWindow(state, teamId) === null) return null;
 
   const shape: LeagueShape = { teamCount: state.draftOrder.length, rosterSlots: state.config.slotConfig };
-  const { pool } = await evidencePoolFor(db);
+  // The league's own board (the scoring-formats round): a half-PPR room's advisor values the half board.
+  const { pool } = await evidencePoolFor(db, new Date(), (await leagueBoardFormat(db, actorResult.actor.leagueId)).source);
   const valued = valuedEvidence(pool, shape);
   const { table, tiers } = roomFactsFor(draftId, state.sequence, () => ({
     table: simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) }),

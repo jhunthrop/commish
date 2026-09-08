@@ -79,6 +79,7 @@
     "projections:register:freeze": "dotenv -e .env.local -- tsx scripts/register-freeze.ts",
     "projections:register:grade": "dotenv -e .env.local -- tsx scripts/register-grade.ts",
     "projections:market-edge:scorecard": "dotenv -e .env.local -- tsx scripts/market-edge-scorecard.ts",
+    "projections:formats:scorecard": "dotenv -e .env.local -- tsx scripts/scoring-format-scorecard.ts",
     "laws:measure": "dotenv -e .env.local -- tsx scripts/measure-laws.ts",
     "laws:discover:quantiles": "dotenv -e .env.local -- tsx scripts/discovery-quantile-fit.ts",
     "laws:discover": "dotenv -e .env.local -- tsx scripts/discover-laws.ts",

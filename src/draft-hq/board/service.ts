@@ -1,8 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { players as playersTable, playerCrosswalk, scoringSettings } from "@/db/schema";
+import { players as playersTable, playerCrosswalk } from "@/db/schema";
 import type { Position } from "@/domain/player";
-import { PPR_SCORING } from "@/domain/scoring";
 import type { ScoringRules } from "@/scoring";
 import { kdefSeasonLines } from "@/projections/kdef/season-lines";
 import { compareBoardOrder } from "@/projections/decide/board-order-compare";
@@ -10,32 +9,33 @@ import type { LeagueShape } from "@/projections/decide/replacement";
 import { valueBoardIndexed } from "@/projections/decide/replacement";
 import { tiersOf } from "@/projections/decide/tiers";
 import type { BoardReason } from "@/projections/preseason/board";
-import { BOARD_SOURCE, boardReasons, preseasonProjectionsAsOf } from "@/projections/preseason/board-store";
+import { DEFAULT_BOARD_FORMAT, type BoardFormat } from "@/projections/preseason/board-formats";
+import { boardReasons, preseasonProjectionsAsOf } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { marketOrderPositions } from "@/projections/preseason/kdef-decision";
+import { boardFormatForLeagueRules, boardFormatResolution, leagueScoringRules, type LeagueBoardFormat } from "@/league-service/board-format";
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 
 /**
  * THE BOARD, READ FOR A PRODUCT SURFACE (spec §3) — joins the stored evidence board
- * (`preseason_projections`, `BOARD_SOURCE`, keyed on `nfl_players.id`) back to the product's own
- * player directory (`players`, keyed on the stats provider's id) through `player_crosswalk`, and
- * recomputes the DRAFT-VALUE view (value over replacement, tiers, cliffs) under whichever
- * `LeagueShape` the caller asks for.
+ * (`preseason_projections`, one source per scoring format, keyed on `nfl_players.id`) back to the
+ * product's own player directory (`players`, keyed on the stats provider's id) through
+ * `player_crosswalk`, and recomputes the DRAFT-VALUE view (value over replacement, tiers, cliffs)
+ * under whichever `LeagueShape` the caller asks for.
  *
  * WHAT IS RECOMPUTED AND WHAT IS NOT, stated plainly because it is the one place this module
- * could quietly overclaim. `projectedPoints`/`floorPoints`/`medianPoints`/`ceilingPoints` are the
- * SHIPPED board's own numbers — composed once, offline, under `BOARD_SOURCE`'s fixed PPR,
- * 12-team scoring (`board-store.ts`'s own docblock: the per-game season line that would let a
- * different scoring FORMAT be re-priced live is deliberately not persisted). What genuinely
- * changes per league here is the DRAFT-VALUE half: `valueOverReplacement`, `valueRank`, position
- * rank-in-value-order and the tier ladder, all rebuilt from those same stored points against the
- * CALLER'S OWN `teamCount`/`rosterSlots` via `decide/replacement.ts`'s `valueBoard` — which is
- * exactly the mechanism that moves fourteen quarterbacks up a 2-QB league's board (a roster-shape
- * effect, not a scoring-format one), and costs nothing offline because it is arithmetic over
- * numbers already in hand. A genuine points recompute under a different scoring FORMAT (Standard
- * vs. Half vs. full PPR) would require storing the season stat line and re-running
- * `computeFantasyPoints` per format; that is real, undone engineering work, reported as deferred
- * rather than faked (see the report this task ships with).
+ * could quietly overclaim. `projectedPoints`/`floorPoints`/`medianPoints`/`ceilingPoints` are a
+ * SHIPPED board's own numbers, composed once, offline, under that board's format (the
+ * scoring-formats round, 2026-09-08: `commish_board_v9_{ppr,half,std}_12`, each scored under its
+ * exact preset and anchored to its own ADP feed; `board-formats.ts`). WHICH board is read is the
+ * format: named directly by a league-free surface's selector (`BoardOptions.format`), or decided
+ * by the league's own scoring row when a `leagueId` is given (`league-service/board-format.ts`, the
+ * nearest of the three for a custom sheet, with a note). What changes per league on top of that is
+ * the DRAFT-VALUE half: `valueOverReplacement`, `valueRank`, position rank-in-value-order and the
+ * tier ladder, all rebuilt from the stored points against the CALLER'S OWN `teamCount`/`rosterSlots`
+ * via `decide/replacement.ts`'s `valueBoard`, which is exactly the mechanism that moves fourteen
+ * quarterbacks up a 2-QB league's board, and costs nothing because it is arithmetic over numbers
+ * already in hand.
  */
 /** A finished season, summed. See `BoardRow.lastSeason`. */
 export interface BoardLastSeason {
@@ -140,15 +140,33 @@ export interface BoardOptions {
   readonly shape: LeagueShape;
   readonly asOf?: Date;
   /**
-   * Whose scoring rules `lastSeason` is measured under. Omitted means the same default every other
-   * league-free surface on this product falls back to (`PPR_SCORING`), which is what the generic
-   * board is: a real ruleset, named on screen, rather than a guess.
+   * Whose scoring rules decide the board: which of the three stored boards is read, and what
+   * `lastSeason` is measured under. Omitted means the same default every other league-free
+   * surface on this product falls back to (`PPR_SCORING`), which is what the generic board is: a
+   * real ruleset, named on screen, rather than a guess.
    *
    * Threaded as an id and read here rather than passed as a rules object, the way `rankedPlayers`
    * (`@/draft-service/pool.ts`) already does it — a caller that had to fetch the rules first would
    * be a second place that decides what a league without a `scoring_settings` row scores like.
    */
   readonly leagueId?: string;
+  /**
+   * A league-free surface's own choice of board (the scoring-formats round): the selector on the
+   * Draft HQ board, the HQ card, the rankings export. Ignored when a `leagueId` is given, because
+   * inside a league the league's own rules decide and no surface offers a selector. Omitted with no
+   * league means PPR.
+   */
+  readonly format?: BoardFormat;
+}
+
+/**
+ * Which board this read resolves to, and the rules `lastSeason` is measured under: the league's
+ * own row when a league is named, the chosen or default format otherwise. One small query for a
+ * league, none for a league-free read.
+ */
+export async function resolveBoardFormat(db: Db, { leagueId, format }: Pick<BoardOptions, "leagueId" | "format">): Promise<LeagueBoardFormat> {
+  if (leagueId !== undefined) return boardFormatForLeagueRules(await leagueScoringRules(db, leagueId));
+  return boardFormatResolution(format ?? DEFAULT_BOARD_FORMAT);
 }
 
 /** The tier standing a `valueBoard` position pool implies — the same aggregate
@@ -172,16 +190,17 @@ function tierStandingsOf(valuesDescending: readonly number[]): readonly { readon
  *  for `options.shape`. A stored board row whose player the crosswalk cannot resolve back to a
  *  product `players` row is dropped — a defensive symmetry with `boardReasons`' own drop-and-warn
  *  posture, though in practice every crosswalked player resolves both directions by construction. */
-export async function boardRows(db: Db, { shape, asOf = new Date(), leagueId }: BoardOptions): Promise<readonly BoardRow[]> {
-  const stamp = { season: PRODUCT_SEASON, source: BOARD_SOURCE, asOf };
+export async function boardRows(db: Db, { shape, asOf = new Date(), leagueId, format }: BoardOptions): Promise<readonly BoardRow[]> {
+  const resolved = await resolveBoardFormat(db, { leagueId, format });
+  const stamp = { season: PRODUCT_SEASON, source: resolved.source, asOf };
   const [projections, reasonsByNflId, byes] = await Promise.all([
     preseasonProjectionsAsOf(db, stamp),
-    boardReasons(db, BOARD_SOURCE, PRODUCT_SEASON),
+    boardReasons(db, resolved.source, PRODUCT_SEASON),
     byeWeeksByTeam(db),
   ]);
   // Appended, never interleaved: a market-order position has no value rank, so it takes no part in
   // the value sort below and cannot perturb a single projected row. See `marketOrderRows`.
-  const marketOrder = await marketOrderRows(db, byes, leagueId);
+  const marketOrder = await marketOrderRows(db, byes, resolved.rules);
   if (projections.length === 0) return marketOrder;
 
   const nflIds = projections.map((row) => row.playerId);
@@ -288,16 +307,13 @@ export async function boardRows(db: Db, { shape, asOf = new Date(), leagueId }: 
 export const BOARD_LAST_SEASON = PRODUCT_SEASON - 1;
 
 /**
- * Last season's measured points for a set of market-order players, under one league's rules.
- *
- * The rules are read HERE from `scoring_settings`, falling back to `PPR_SCORING` for a league whose
- * row has not been written and for the generic board that names no league at all — the same
- * fallback `rankedPlayers` and `playerSeason` already make, so the three cannot disagree about what
- * a ruleless league scores like.
+ * Last season's measured points for a set of market-order players, under one set of rules: the
+ * league's own row (`resolveBoardFormat`, falling back to `PPR_SCORING` for a league whose row has
+ * not been written) or, for a league-free board, the chosen format's exact preset. The same
+ * fallback `rankedPlayers` and `playerSeason` already make, so the readers cannot disagree about
+ * what a ruleless league scores like.
  */
-async function lastSeasonLines(db: Db, playerIds: readonly string[], leagueId: string | undefined): Promise<ReadonlyMap<string, BoardLastSeason>> {
-  const settingsRows = leagueId === undefined ? [] : await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, leagueId));
-  const rules: ScoringRules = settingsRows[0] ?? PPR_SCORING;
+async function lastSeasonLines(db: Db, playerIds: readonly string[], rules: ScoringRules): Promise<ReadonlyMap<string, BoardLastSeason>> {
   const lines = await kdefSeasonLines(db, { season: BOARD_LAST_SEASON, playerIds, rules });
   return new Map(
     [...lines].map(([playerId, line]) => [
@@ -338,7 +354,7 @@ async function lastSeasonLines(db: Db, playerIds: readonly string[], leagueId: s
  * learns nothing; a drafter reading what each of these kickers actually scored last year under his
  * own scoring is reading a measurement, which is the only currency this product deals in.
  */
-async function marketOrderRows(db: Db, byes: ReadonlyMap<string, number>, leagueId: string | undefined): Promise<readonly BoardRow[]> {
+async function marketOrderRows(db: Db, byes: ReadonlyMap<string, number>, rules: ScoringRules): Promise<readonly BoardRow[]> {
   const positions = marketOrderPositions();
   if (positions.length === 0) return [];
 
@@ -358,7 +374,7 @@ async function marketOrderRows(db: Db, byes: ReadonlyMap<string, number>, league
   // Only a PRICED player becomes a row (see the docblock), so only priced players are worth a
   // read of the archive.
   const priced = rows.flatMap((row) => (row.adp === null ? [] : [{ ...row, adp: row.adp }]));
-  const lastSeason = await lastSeasonLines(db, priced.map((row) => row.playerId), leagueId);
+  const lastSeason = await lastSeasonLines(db, priced.map((row) => row.playerId), rules);
 
   const rankedByPosition = new Map<string, number>();
   return priced

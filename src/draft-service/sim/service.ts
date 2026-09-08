@@ -10,6 +10,8 @@ import type { Db } from "@/db/client";
 import { leagues } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { enqueueJob } from "@/jobs/store";
+import { leagueBoardFormat } from "@/league-service/board-format";
+import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { simJob, SIM_JOB_NAME } from "@/jobs/defs/sim-job";
 import { SIM_CONFIG } from "./config";
 import { evidencePoolFor } from "./evidence";
@@ -58,13 +60,16 @@ export function deriveSeed(shape: { readonly teamCount: number; readonly rosterS
 
 export async function requestSimRun(db: Db, userId: string, input: RequestSimRunInput): Promise<RequestSimRunResult> {
   let shape = GENERIC_SHAPE;
+  let boardSource = BOARD_SOURCE;
   if (input.leagueId !== null) {
     const [league] = await db.select({ teamCount: leagues.teamCount, rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, input.leagueId)).limit(1);
     if (league === undefined) return { outcome: "league_not_found" };
     shape = { teamCount: league.teamCount, rosterSlots: league.rosterSlots };
+    // The league's own board (the scoring-formats round): its scoring row decides the format.
+    boardSource = (await leagueBoardFormat(db, input.leagueId)).source;
   }
 
-  const { pool, boardGeneration } = await evidencePoolFor(db);
+  const { pool, boardGeneration } = await evidencePoolFor(db, new Date(), boardSource);
   const config: SimConfig = { teamCount: shape.teamCount, rosterSlots: shape.rosterSlots, slot: input.slot, rounds: input.rounds, runs: input.runs, sharpness: input.sharpness, seed: deriveSeed(shape, input) };
   const configHash = hashSimConfig(config);
 
