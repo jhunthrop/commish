@@ -5,8 +5,8 @@ import { STAT_LINE_SOURCE, statMetricName } from "@/projections/lines";
 import { NFLVERSE_SOURCE, PARTICIPATION_METRICS } from "@/projections/nflverse/map";
 import { week1RosterAsOf } from "@/projections/nflverse/rosters";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@/projections/nflverse/schedule";
-import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
-import { BOARD_SOURCE, BOARD_SOURCE_V1_RAW, preseasonProjectionsAsOf } from "@/projections/preseason/board-store";
+import { BOARD_FORMAT_SPECS, BOARD_FORMATS, boardSourceFor, type BoardFormat } from "@/projections/preseason/board-formats";
+import { BOARD_SOURCE, BOARD_SOURCE_V1_RAW, preseasonProjectionsAsOf, type PreseasonProjectionRow } from "@/projections/preseason/board-store";
 import { recordPreseasonRankings, recordPreseasonRosters } from "@/projections/preseason/store";
 import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
 import { recordTeamObservations } from "@/projections/team-store";
@@ -183,10 +183,16 @@ describe("persistSeason — the props-anchor warning fires on a LIVE board with 
         asOf: week1RosterAsOf(SEASON),
       })),
     ]);
-    await recordPreseasonRankings(db, [
-      { season: SEASON, source: BENCHMARK_SOURCES.adp, playerId: VETERAN, rank: 10, asOf: RANKING_ASOF },
-      ...fillerIds.map((id, index) => ({ season: SEASON, source: BENCHMARK_SOURCES.adp, playerId: id, rank: 20 + index, asOf: RANKING_ASOF })),
-    ]);
+    // Every format's own feed lists the same six receivers (the scoring-formats round): each blended
+    // leg anchors to its own source, so a leg with no board of its own would hit the degeneracy
+    // guard exactly as a PPR board with no ADP would.
+    await recordPreseasonRankings(
+      db,
+      BOARD_FORMATS.flatMap((format) => [
+        { season: SEASON, source: BOARD_FORMAT_SPECS[format].adpSource, playerId: VETERAN, rank: 10, asOf: RANKING_ASOF },
+        ...fillerIds.map((id, index) => ({ season: SEASON, source: BOARD_FORMAT_SPECS[format].adpSource, playerId: id, rank: 20 + index, asOf: RANKING_ASOF })),
+      ]),
+    );
     await recordTeamObservations(db, [
       {
         season: SEASON,
@@ -211,6 +217,29 @@ describe("persistSeason — the props-anchor warning fires on a LIVE board with 
       const FAR_FUTURE = new Date("9999-12-31T00:00:00.000Z");
       const blendRows = await preseasonProjectionsAsOf(db, { season: SEASON, source: BOARD_SOURCE, asOf: FAR_FUTURE });
       expect(blendRows.length).toBeGreaterThan(0);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("writes all three formats' boards under their own sources, each scored under its own preset (the scoring-formats round)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await persistSeason(db, SEASON, clockBeforeKickoff, new Map());
+      const FAR_FUTURE = new Date("9999-12-31T00:00:00.000Z");
+      const boards = new Map<BoardFormat, readonly PreseasonProjectionRow[]>();
+      for (const format of BOARD_FORMATS) {
+        const rows = await preseasonProjectionsAsOf(db, { season: SEASON, source: boardSourceFor(format), asOf: FAR_FUTURE });
+        expect(rows.length).toBeGreaterThan(0);
+        expect(rows.every((row) => row.momentKind === "live")).toBe(true);
+        boards.set(format, rows);
+      }
+      expect(boardSourceFor("ppr")).toBe(BOARD_SOURCE);
+      // The veteran catches six a game: a point apiece under PPR, half under half PPR, nothing
+      // under standard. The three boards are the same model scored three ways, in that order.
+      const veteran = (format: BoardFormat) => boards.get(format)!.find((row) => row.playerId === VETERAN)!.projectedPoints;
+      expect(veteran("half")).toBeLessThan(veteran("ppr"));
+      expect(veteran("std")).toBeLessThan(veteran("half"));
     } finally {
       warnSpy.mockRestore();
     }

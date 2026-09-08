@@ -5,6 +5,7 @@ import { changedRowWhere, excludedSetFor } from "@/db/upsert";
 import type { JsonObject } from "@/domain/audit";
 import { BOARD_MEMO_GROUP, invalidateTtlMemoGroup } from "@/lib/cache/ttl-memo";
 import type { BoardEntry, BoardReason } from "./board";
+import { boardSourceFor, DEFAULT_BOARD_FORMAT } from "./board-formats";
 import type { BoardMoment } from "./source";
 
 /**
@@ -260,6 +261,14 @@ export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
  * purpose is protecting users who do not exist yet, would spend the season measuring a board nobody
  * intends to ship.
  *
+ * THREE FORMATS OF ONE VERSION (the scoring-formats round, 2026-09-08). This constant is now
+ * derived, `boardSourceFor(DEFAULT_BOARD_FORMAT)` (`board-formats.ts`), and its value is
+ * byte-identical to the literal it replaced. The half-PPR and standard boards are
+ * `commish_board_v9_half_12` and `commish_board_v9_std_12`: the same v9 model, the same reasons,
+ * the same stamp discipline, scored under `HALF_PPR_SCORING`/`STANDARD_SCORING` and anchored to that
+ * format's own ADP feed. A reader resolving a board for a league goes through `boardFormatForRules`,
+ * never through this constant, which names the league-free default only.
+ *
  * AND IT MAKES THE TREE HONEST AGAIN: the code IS the v9 configuration, so a persist under this name
  * reproduces what is stored, `assertSingleGeneration` reads one generation, and the freeze below can
  * stop protecting rows the tree cannot rebuild.
@@ -269,7 +278,7 @@ export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
  * instant, and grading scores both. The comparison the fit round could not make on 2024 without
  * spending the held-out season gets made prospectively on 2026 instead, at no cost to any gate.
  */
-export const BOARD_SOURCE = "commish_board_v9_ppr_12";
+export const BOARD_SOURCE = boardSourceFor(DEFAULT_BOARD_FORMAT);
 
 /**
  * THE PROTECTED PRIOR CHAMPION (Round D, the serve-v9 ruling).

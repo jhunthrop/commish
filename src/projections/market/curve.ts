@@ -1,7 +1,7 @@
 import type { Position } from "@/domain/player";
 import type { ReadonlyDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
-import { computeFantasyPoints } from "@/scoring/compute";
+import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import { isotonicNonIncreasing } from "../isotonic";
 import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
 import { projectedPosition } from "../nflverse/players";
@@ -135,10 +135,28 @@ export interface MarketCurveObservation {
  * A board row whose player has no position on that season's own roster (never ingested, or ingested
  * only as a position this curve does not carry — `K`, `DEF`) is DROPPED rather than guessed at.
  */
-export async function loadMarketCurveObservations(db: ReadonlyDb, seasons: readonly number[]): Promise<readonly MarketCurveObservation[]> {
+/**
+ * WHICH FEED AND WHICH RULES a curve is fit against (the scoring-formats round, 2026-09-08). The
+ * PPR fit is the default and is byte-identical to what every call before this round read; a
+ * half-PPR or standard fit hands in that format's own ADP source and preset, so the curve maps the
+ * format's own draft slot to the format's own points. Mixing them (a half-PPR slot priced in PPR
+ * points) would fit a curve no manager drafts under.
+ */
+export interface MarketCurveSourceOptions {
+  /** `preseason_rankings.source` of the ADP board to read. Defaults to `BENCHMARK_SOURCES.adp`. */
+  readonly adpSource?: string;
+  /** The preset the season's outcome is scored under. Defaults to `PPR_SCORING`. */
+  readonly rules?: ScoringRules;
+}
+
+export async function loadMarketCurveObservations(
+  db: ReadonlyDb,
+  seasons: readonly number[],
+  { adpSource = BENCHMARK_SOURCES.adp, rules = PPR_SCORING }: MarketCurveSourceOptions = {},
+): Promise<readonly MarketCurveObservation[]> {
   const observations: MarketCurveObservation[] = [];
   for (const season of seasons) {
-    const board = await preseasonRankingsAsOf(db, { season, source: BENCHMARK_SOURCES.adp, asOf: FINAL_OUTCOME });
+    const board = await preseasonRankingsAsOf(db, { season, source: adpSource, asOf: FINAL_OUTCOME });
     if (board.length === 0) continue;
     const roster = await preseasonRostersAsOf(db, { season, asOf: FINAL_OUTCOME });
     const positionOf = new Map(roster.map((row) => [row.playerId, row.position] as const));
@@ -154,7 +172,7 @@ export async function loadMarketCurveObservations(db: ReadonlyDb, seasons: reado
       const position = raw === undefined ? null : projectedPosition(raw);
       if (position === null || !isCurvePosition(position)) continue;
       const weeks = byPlayer.get(row.playerId) ?? [];
-      const points = weeks.reduce((sum, line) => sum + computeFantasyPoints(line, position, PPR_SCORING), 0);
+      const points = weeks.reduce((sum, line) => sum + computeFantasyPoints(line, position, rules), 0);
       observations.push({ season, position, adpRank: roundedRank(row.rank), points, gamesPlayed: weeks.length });
     }
   }
@@ -354,14 +372,19 @@ export interface MarketBoardResult {
  * roster row at all, or a roster row this curve does not carry a position for) is DROPPED rather
  * than guessed at — counted in `droppedCount` rather than silently absorbed into a shorter
  * `entries` array a caller would have to diff against the published board's own size to notice.
+ *
+ * `adpSource` (the scoring-formats round): a half-PPR or standard board hands in its own feed's
+ * source alongside its own fitted `priors`, so the slot and the curve that prices it belong to the
+ * same format. The default pair is the PPR pair every earlier caller read.
  */
 export async function marketBoard(
   db: ReadonlyDb,
   season: number,
   asOf: Date,
   priors: MarketCurvePriors = FITTED_MARKET_CURVE,
+  adpSource: string = BENCHMARK_SOURCES.adp,
 ): Promise<MarketBoardResult> {
-  const board = await preseasonRankingsAsOf(db, { season, source: BENCHMARK_SOURCES.adp, asOf });
+  const board = await preseasonRankingsAsOf(db, { season, source: adpSource, asOf });
   if (board.length === 0) return { entries: [], droppedCount: 0 };
   const roster = await preseasonRostersAsOf(db, { season, asOf });
   const positionOf = new Map(roster.map((row) => [row.playerId, row.position] as const));

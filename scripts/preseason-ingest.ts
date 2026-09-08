@@ -13,14 +13,15 @@
 // the reason `projection-backfill.ts` prints its own: a benchmark that resolved sixty percent of a
 // board would be scored on the sixty percent that happened to match, which selects on exactly the
 // players both sources found easy.
-import { createDb, type ReadonlyDb } from "@/db/client";
-import { nflPlayers } from "@/db/schema";
+import { createDb } from "@/db/client";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { ROSTER_SOURCE_CONFIG } from "@/projections/nflverse/rosters";
+import { ingestAdpBenchmark, rosterIdentitiesFor } from "@/projections/preseason/adp-benchmark";
 import { BENCHMARK_BOARD_FLOOR, BENCHMARK_SOURCES, resolveRankings, type RosterIdentity } from "@/projections/preseason/benchmarks";
+import { BOARD_FORMAT_SPECS, BOARD_FORMATS, DEFAULT_BOARD_FORMAT } from "@/projections/preseason/board-formats";
 import { ingestDepthCharts, ingestWeek1Rosters, type RosterIngestReport } from "@/projections/preseason/ingest";
-import { fetchAverageDraftPosition, fetchExpertConsensus, type PublishedBoard } from "@/projections/preseason/publishers";
-import { preseasonRostersAsOf, recordPreseasonRankings } from "@/projections/preseason/store";
+import { fetchExpertConsensus, type PublishedBoard } from "@/projections/preseason/publishers";
+import { recordPreseasonRankings } from "@/projections/preseason/store";
 
 const FIRST_SEASON = Number(process.argv[2] ?? ROSTER_SOURCE_CONFIG.earliestSeason);
 const LAST_SEASON = Number(process.argv[3] ?? 2024);
@@ -31,9 +32,6 @@ const LAST_SEASON = Number(process.argv[3] ?? 2024);
  * those never resolve, so the bar is well below the one a participation backfill has to clear.
  */
 const MINIMUM_RESOLUTION = 0.7;
-
-/** Far past any correction: benchmarks are SCORED AGAINST, never fed in, exactly like actuals. */
-const FINAL = new Date("9999-12-31T00:00:00.000Z");
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -63,22 +61,6 @@ function describeRosterWrite(report: RosterIngestReport): string {
   );
 }
 
-/** The season's own week-one roster, with names joined on, as the benchmark resolver needs it. */
-async function rosterIdentities(db: ReadonlyDb, season: number): Promise<readonly RosterIdentity[]> {
-  const roster = await preseasonRostersAsOf(db, { season, asOf: FINAL });
-  const names = new Map(
-    (await db.select({ id: nflPlayers.id, name: nflPlayers.name }).from(nflPlayers)).map((row) => [row.id, row.name]),
-  );
-  return roster
-    .map((row) => ({
-      playerId: row.playerId,
-      name: names.get(row.playerId) ?? "",
-      position: row.position,
-      team: row.team,
-    }))
-    .filter((identity) => identity.name !== "");
-}
-
 async function ingestBenchmark(
   db: ReturnType<typeof createDb>,
   season: number,
@@ -91,15 +73,48 @@ async function ingestBenchmark(
     db,
     resolution.resolved.map((row) => ({ season, source, playerId: row.playerId, rank: row.rank, asOf: board.publishedAt })),
   );
-  console.log(
-    `  ${source.padEnd(22)} ${String(board.candidates.length).padStart(4)} published, ${String(resolution.resolved.length).padStart(4)} resolved ` +
-      `(${percent(resolution.resolutionRate)}), ${written} new | publisher stamp "${board.publisherStamp}", ` +
-      `stored as ${board.publishedAt.toISOString().slice(0, 10)}`,
-  );
+  printBenchmarkLine(source, board.candidates.length, resolution.resolved.length, resolution.resolutionRate, written, board.publisherStamp, board.publishedAt);
   for (const missed of resolution.unresolved.slice(0, 5)) {
     console.log(`      unresolved: ${missed.name} (${missed.position}, ${missed.team ?? "no team"}) at ${missed.rank}`);
   }
   return resolution.resolutionRate;
+}
+
+function printBenchmarkLine(source: string, published: number, resolved: number, rate: number | null, written: number, stamp: string, publishedAt: Date): void {
+  console.log(
+    `  ${source.padEnd(22)} ${String(published).padStart(4)} published, ${String(resolved).padStart(4)} resolved ` +
+      `(${percent(rate)}), ${written} new | publisher stamp "${stamp}", stored as ${publishedAt.toISOString().slice(0, 10)}`,
+  );
+}
+
+/**
+ * THE THREE ADP FORMATS (the scoring-formats round, 2026-09-08), through the one shared ingest
+ * (`ingestAdpBenchmark`). The PPR board is the benchmark every scorecard reads and a miss there is
+ * a thin run exactly as before. Half PPR is published from 2018 and standard from 2013, and the
+ * feed answers an unpublished season with an EMPTY board, which `parseAverageDraftPosition`
+ * refuses: for the two secondary formats that refusal is reported as "not published upstream" and
+ * does not mark the run thin, because a season nobody drafted half PPR in is a fact about the
+ * feed rather than a degraded ingest.
+ */
+async function ingestAdpFormats(db: ReturnType<typeof createDb>, season: number, identities: readonly RosterIdentity[]): Promise<boolean> {
+  let thin = false;
+  for (const format of BOARD_FORMATS) {
+    try {
+      const report = await ingestAdpBenchmark(db, season, format, identities);
+      printBenchmarkLine(report.source, report.published, report.resolved, report.resolutionRate, report.written, report.publisherStamp, report.publishedAt);
+      for (const missed of report.unresolvedSample) console.log(`      unresolved: ${missed}`);
+      if (report.resolutionRate !== null && report.resolutionRate < MINIMUM_RESOLUTION) thin = true;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (format !== DEFAULT_BOARD_FORMAT && /published no \d{4} board/.test(message)) {
+        console.log(`  ${BOARD_FORMAT_SPECS[format].adpSource.padEnd(22)} not published upstream for ${season}`);
+        continue;
+      }
+      thin = true;
+      console.error(`  ${BOARD_FORMAT_SPECS[format].adpSource.padEnd(22)} FAILED: ${message}`);
+    }
+  }
+  return thin;
 }
 
 async function main(): Promise<void> {
@@ -139,22 +154,18 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const identities = await rosterIdentities(db, season);
+    const identities = await rosterIdentitiesFor(db, season);
 
-    for (const [source, load] of [
-      [BENCHMARK_SOURCES.adp, fetchAverageDraftPosition],
-      [BENCHMARK_SOURCES.ecr, fetchExpertConsensus],
-    ] as const) {
-      try {
-        const rate = await ingestBenchmark(db, season, source, await load(season), identities);
-        if (rate !== null && rate < MINIMUM_RESOLUTION) thin = true;
-      } catch (error: unknown) {
-        // A benchmark that cannot be fetched is REPORTED and the run continues, because the rosters
-        // are the part a board cannot be built without and the benchmarks are the part it is scored
-        // against. Losing the scoreboard is bad; losing it silently is what this line prevents.
-        thin = true;
-        console.error(`  ${source.padEnd(22)} FAILED: ${error instanceof Error ? error.message : String(error)}`);
-      }
+    if (await ingestAdpFormats(db, season, identities)) thin = true;
+    try {
+      const rate = await ingestBenchmark(db, season, BENCHMARK_SOURCES.ecr, await fetchExpertConsensus(season), identities);
+      if (rate !== null && rate < MINIMUM_RESOLUTION) thin = true;
+    } catch (error: unknown) {
+      // A benchmark that cannot be fetched is REPORTED and the run continues, because the rosters
+      // are the part a board cannot be built without and the benchmarks are the part it is scored
+      // against. Losing the scoreboard is bad; losing it silently is what this line prevents.
+      thin = true;
+      console.error(`  ${BENCHMARK_SOURCES.ecr.padEnd(22)} FAILED: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

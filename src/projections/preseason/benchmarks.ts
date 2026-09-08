@@ -54,6 +54,12 @@ export const BENCHMARK_BOARD_FLOOR = 2013;
 export const BENCHMARK_SOURCES = {
   /** Fantasy Football Calculator's twelve-team PPR average draft position — the MARKET. */
   adp: "ffc_adp_ppr_12",
+  /** The same publisher's twelve-team HALF-PPR board (the scoring-formats round, 2026-09-08).
+   *  Published from 2018 onward and for no season before; `BENCHMARK_BOARD_FLOOR` does not
+   *  describe it, and a fit over it reports the seasons it actually found rows for. */
+  adpHalf: "ffc_adp_half_12",
+  /** The same publisher's twelve-team STANDARD (non-PPR) board, published from 2013 onward. */
+  adpStd: "ffc_adp_std_12",
   /** FantasyPros' expert consensus ranking, PPR draft board — the CONSENSUS we replace. */
   ecr: "fantasypros_ecr_ppr",
 } as const;

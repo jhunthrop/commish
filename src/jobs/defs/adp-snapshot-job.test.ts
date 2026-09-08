@@ -30,35 +30,35 @@ describe("adp-snapshot job step", () => {
   it("captures the feed and reports a real summary line, never a hand-typed sentence", async () => {
     await db.insert(nflPlayers).values([{ id: "nfl-1", name: "Puka Nacua", position: "WR" }]);
     await db.insert(preseasonRosters).values([{ season: PRODUCT_SEASON, team: "LAR", playerId: "nfl-1", position: "WR", status: "active", asOf: ROSTER_ASOF }]);
-    vi.spyOn(ingestModule, "ingestAdpSnapshot").mockResolvedValue({ candidatesRead: 1, resolutionRate: 1, written: 1 });
+    vi.spyOn(ingestModule, "ingestAdpSnapshot").mockResolvedValue({ candidatesRead: 1, resolutionRate: 1, written: 1, byFormat: [{ format: "ppr", candidatesRead: 1, resolutionRate: 1, written: 1 }] });
 
     const outcome = await runAdpSnapshotStep(db, CLOCK, {});
     expect(outcome.summary).toContain("1 published");
     expect(outcome.summary).toContain("1 rows written");
-    expect(outcome.detail).toEqual([]);
+    expect(outcome.detail).toEqual(["ppr: 1 published, 1 written (100.0%)"]);
   });
 
   it("reports a zero-written night in the detail line, honestly, rather than hiding it", async () => {
-    vi.spyOn(ingestModule, "ingestAdpSnapshot").mockResolvedValue({ candidatesRead: 5, resolutionRate: 0, written: 0 });
+    vi.spyOn(ingestModule, "ingestAdpSnapshot").mockResolvedValue({ candidatesRead: 5, resolutionRate: 0, written: 0, byFormat: [{ format: "ppr", candidatesRead: 5, resolutionRate: 0, written: 0 }] });
     const outcome = await runAdpSnapshotStep(db, CLOCK, {});
-    expect(outcome.detail).toEqual(["no rows written this capture (resolution 0.0%)"]);
+    expect(outcome.detail).toEqual(["ppr: 5 published, 0 written (0.0%)", "no rows written this capture (resolution 0.0%)"]);
   });
 
   it("reports n/a resolution for an empty board rather than dividing by zero", async () => {
-    vi.spyOn(ingestModule, "ingestAdpSnapshot").mockResolvedValue({ candidatesRead: 0, resolutionRate: null, written: 0 });
+    vi.spyOn(ingestModule, "ingestAdpSnapshot").mockResolvedValue({ candidatesRead: 0, resolutionRate: null, written: 0, byFormat: [] });
     const outcome = await runAdpSnapshotStep(db, CLOCK, {});
     expect(outcome.summary).toContain("n/a");
   });
 
   it("fix round 1, MEDIUM 2: derives capturedAt from the schedule's own firedAt, never the wall clock, when present", async () => {
-    const spy = vi.spyOn(ingestModule, "ingestAdpSnapshot").mockResolvedValue({ candidatesRead: 1, resolutionRate: 1, written: 1 });
+    const spy = vi.spyOn(ingestModule, "ingestAdpSnapshot").mockResolvedValue({ candidatesRead: 1, resolutionRate: 1, written: 1, byFormat: [{ format: "ppr", candidatesRead: 1, resolutionRate: 1, written: 1 }] });
     await runAdpSnapshotStep(db, CLOCK, { firedAt: "2026-09-02T03:00:00.000Z" });
     const passedNow = spy.mock.calls[0]![1]!.now!();
     expect(passedNow.toISOString()).toBe("2026-09-02T03:00:00.000Z");
   });
 
   it("falls back to the injected clock when no firedAt is present (a hand-enqueued run)", async () => {
-    const spy = vi.spyOn(ingestModule, "ingestAdpSnapshot").mockResolvedValue({ candidatesRead: 1, resolutionRate: 1, written: 1 });
+    const spy = vi.spyOn(ingestModule, "ingestAdpSnapshot").mockResolvedValue({ candidatesRead: 1, resolutionRate: 1, written: 1, byFormat: [{ format: "ppr", candidatesRead: 1, resolutionRate: 1, written: 1 }] });
     await runAdpSnapshotStep(db, CLOCK, {});
     const passedNow = spy.mock.calls[0]![1]!.now!();
     expect(passedNow.toISOString()).toBe("2026-09-01T00:00:00.000Z");
@@ -77,9 +77,11 @@ describe("adp-snapshot job step", () => {
     // `firedAt` is what must stay fixed, and it does).
     const second = await runAdpSnapshotStep(db, CLOCK, firedAt);
 
-    expect(first.summary).toContain("1 rows written");
+    // The same fixture body answers all three formats' fetches, so one fire writes one row per
+    // format (the scoring-formats round) and the redelivered fire writes none of them again.
+    expect(first.summary).toContain("3 rows written");
     expect(second.summary).toContain("0 rows written");
-    expect(await db.select().from(adpSnapshots)).toHaveLength(1);
+    expect(await db.select().from(adpSnapshots)).toHaveLength(3);
   });
 });
 

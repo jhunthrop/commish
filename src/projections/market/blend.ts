@@ -1,13 +1,14 @@
 import type { ReadonlyDb } from "@/db/client";
 import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";
 import { PPR_SCORING } from "@/domain/scoring";
-import { computeFantasyPoints } from "@/scoring/compute";
+import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import { clusterKeyFor } from "../laws/clusters";
 import { pricingEligibleLawIds } from "../laws/pricing";
 import { registry } from "../laws/registry";
 import type { Law } from "../laws/types";
 import { spearman, type Observation } from "../metrics";
 import { scaleStatLine, type BoardCandidate, type BoardReason } from "../preseason/board";
+import { DEFAULT_BOARD_FORMAT, type BoardFormat } from "../preseason/board-formats";
 import { withAvailabilityRecency } from "../preseason/availability";
 import { kdefCandidates } from "../preseason/kdef-candidates";
 import { KDEF_POSITIONS, shipsProjectedRows } from "../preseason/kdef-decision";
@@ -24,6 +25,7 @@ import {
   type PreseasonPriors,
 } from "../preseason/source";
 import { FITTED_BLEND_CONSTANTS } from "./blend-fitted";
+import { blendConstantsFor, formatAnchorFor } from "./format-anchor";
 import { isCurvePosition, marketBoard, type CurvePosition, type ImpliedGamesByPosition, type MarketPriorEntry } from "./curve";
 
 /**
@@ -129,9 +131,27 @@ function pointsOnlyPerGame(candidate: BoardCandidate, seasonPoints: number): Sta
 
 /** A candidate's own composed season points — the same arithmetic `preseasonBoard` runs, exposed
  *  here so `blendBoard`'s "unlisted" fallback and `scoreBlendConstants`'s grid search both read the
- *  identical number a real board would show, rather than a second definition of it. */
-export function seasonPointsOf(candidate: BoardCandidate): number {
-  return computeFantasyPoints(scaleStatLine(candidate.perGame, candidate.games.expected), candidate.position, PPR_SCORING);
+ *  identical number a real board would show, rather than a second definition of it. `rules` (the
+ *  scoring-formats round) defaults to PPR, the preset every fit in this module was measured in. */
+export function seasonPointsOf(candidate: BoardCandidate, rules: ScoringRules = PPR_SCORING): number {
+  return computeFantasyPoints(scaleStatLine(candidate.perGame, candidate.games.expected), candidate.position, rules);
+}
+
+/**
+ * HOW A CANDIDATE'S OWN STAT MIX RESCALES A PPR SEASON TOTAL INTO ANOTHER FORMAT (the
+ * scoring-formats round): his raw line's points under `rules` over the same line's points under
+ * PPR. EXACTLY ONE for PPR itself (`x / x`), so the default board is unchanged bit for bit, and one
+ * for a line that scores nothing under PPR (a zero line has no mix to speak of). The rookie curve
+ * (`rookieCurve`, fit in PPR points) is the one prior the blend substitutes for the market that
+ * carries no stat line of its own, and this is how it enters a half-PPR or standard board: the
+ * curve's season total, scaled by the share of this rookie's own projected points that survives the
+ * format change. A receiving back keeps less of his PPR total than a rushing one, which is the
+ * honest shape of the difference between the two formats.
+ */
+function formatRatioOf(candidate: BoardCandidate, rules: ScoringRules): number {
+  const pprPoints = seasonPointsOf(candidate, PPR_SCORING);
+  if (pprPoints <= 0) return 1;
+  return seasonPointsOf(candidate, rules) / pprPoints;
 }
 
 /** How far a single confirmed law's own exposure-scaled delta, or the combined total across every
@@ -263,6 +283,14 @@ export interface BlendEvidenceOptions {
    * board), never re-read per candidate, and this module stays free of the odds store entirely.
    */
   readonly propsAnchor?: ReadonlyMap<string, number>;
+  /**
+   * THE FORMAT THE BOARD IS PRICED UNDER (the scoring-formats round, 2026-09-08). Defaults to
+   * `PPR_SCORING`. The raw arm's own season points (`seasonPointsOf`, the unlisted fallback) and the
+   * rookie prior's rescale (`formatRatioOf`) read it; the `market` entries handed in are expected to
+   * already be the same format's own feed priced through the same format's own curve
+   * (`format-anchor.ts`), and `constants.marketTailByPosition` that format's own tail.
+   */
+  readonly rules?: ScoringRules;
 }
 
 /** A full season's worth of games — the fixed reference `FULL_SEASON_GAMES` normalizes a law's
@@ -321,9 +349,9 @@ function marketTailFor(position: Position, table: MarketTailByPosition): number 
  * ordering among his unlisted peers while still guaranteeing no unlisted player ever outranks the
  * market's own cheapest drafted man at his position — the one property the tail cap exists for.
  */
-function tailCappedUnlistedPoints(candidate: BoardCandidate, constants: BlendConstants): number {
-  const raw = seasonPointsOf(candidate);
-  const tail = marketTailFor(candidate.position, constants.marketTailByPosition);
+function tailCappedUnlistedPoints(candidate: BoardCandidate, context: BlendContext): number {
+  const raw = seasonPointsOf(candidate, context.rules);
+  const tail = marketTailFor(candidate.position, context.constants.marketTailByPosition);
   return Math.min(raw, tail);
 }
 
@@ -456,13 +484,15 @@ interface BlendContext {
   readonly clusterKeyByLawId: ReadonlyMap<string, string>;
   /** Player id to props anchor points, in market units. Empty is the null cell. */
   readonly propsAnchor: ReadonlyMap<string, number>;
+  /** The preset this blend prices under; see `BlendEvidenceOptions.rules`. */
+  readonly rules: ScoringRules;
 }
 
 const EMPTY_PROPS_ANCHOR: ReadonlyMap<string, number> = new Map();
 
 /** Builds the per-blend context. Validates `propsAnchorWeight` here, once, rather than per candidate:
  *  a weight outside [0, 1] is a fit-input bug and extrapolating past either anchor is not a blend. */
-function blendContextOf(laws: readonly Law[], constants: BlendConstants, propsAnchor: ReadonlyMap<string, number>): BlendContext {
+function blendContextOf(laws: readonly Law[], constants: BlendConstants, propsAnchor: ReadonlyMap<string, number>, rules: ScoringRules = PPR_SCORING): BlendContext {
   const weight = constants.propsAnchorWeight;
   if (weight !== undefined && (!Number.isFinite(weight) || weight < 0 || weight > 1)) {
     throw new Error(`market/blend.ts: propsAnchorWeight must lie in [0, 1]; got ${weight}. A weight outside the two anchors is not a blend.`);
@@ -479,6 +509,7 @@ function blendContextOf(laws: readonly Law[], constants: BlendConstants, propsAn
     pricingEligibleIds: pricingEligibleLawIds(laws),
     clusterKeyByLawId: new Map(laws.map((law) => [law.id, clusterKeyFor(law.id)] as const)),
     propsAnchor,
+    rules,
   };
 }
 
@@ -532,6 +563,7 @@ export function blendBoard(market: readonly MarketPriorEntry[], model: readonly 
     evidence.laws ?? registry(),
     evidence.constants ?? FITTED_BLEND_CONSTANTS,
     evidence.propsAnchor ?? EMPTY_PROPS_ANCHOR,
+    evidence.rules ?? PPR_SCORING,
   );
   const marketByPlayer = new Map(market.map((entry) => [entry.playerId, entry] as const));
   return model.map((candidate) => blendCandidate(candidate, marketByPlayer.get(candidate.playerId), context, evidence.season));
@@ -571,7 +603,7 @@ function blendCandidate(candidate: BoardCandidate, marketEntry: MarketPriorEntry
   if (marketEntry === undefined) {
     return {
       ...candidate,
-      perGame: pointsOnlyPerGame(candidate, tailCappedUnlistedPoints(candidate, context.constants)),
+      perGame: pointsOnlyPerGame(candidate, tailCappedUnlistedPoints(candidate, context)),
       reasons: [...candidate.reasons, { code: "market_unlisted" }],
     };
   }
@@ -590,7 +622,9 @@ function blendCandidate(candidate: BoardCandidate, marketEntry: MarketPriorEntry
   // anyone else on the market board.
   const rookie = rookieReasonOf(candidate);
   if (rookie !== null && rookie.overallPick !== null) {
-    const modelPoints = recomposeRookieSeasonPoints(candidate, rookie.overallPick, season);
+    // The rookie curve is fit in PPR points; `formatRatioOf` is the identity under PPR and the
+    // candidate's own stat-mix rescale under any other format (its own docblock).
+    const modelPoints = recomposeRookieSeasonPoints(candidate, rookie.overallPick, season) * formatRatioOf(candidate, context.rules);
     const evidenceN = rookieCurveEvidenceN(candidate.position, rookie.overallPick);
     const rookiePoints = shrinkTowardMarket(modelPoints, marketEntry.marketPoints, evidenceN);
     return {
@@ -835,6 +869,15 @@ export interface ShippedCandidatesOptions {
   /** This season's props anchor; see `BlendEvidenceOptions.propsAnchor`. Absent is the null cell, and
    *  a caller that has not loaded an archive simply does not pass one. */
   readonly propsAnchor?: ReadonlyMap<string, number>;
+  /**
+   * WHICH SCORING FORMAT THE BOARD IS PRICED UNDER (the scoring-formats round, 2026-09-08). Defaults
+   * to PPR, the format every board before this round was. Resolves, through `format-anchor.ts`, to
+   * the format's own ADP feed, its own fitted curve, its own preset for the raw arm and the rookie
+   * rescale, and its own unlisted tail on top of `constants`. The raw arm (`raw: true`) is
+   * format-free: it returns the model's per-game lines, which `preseasonBoard` scores under whatever
+   * rules the caller hands it.
+   */
+  readonly format?: BoardFormat;
 }
 
 /** How many LISTED market players a position needs before a LIVE board trusts its own pricing for
@@ -933,7 +976,7 @@ export async function shippedPreseasonCandidates(
   db: ReadonlyDb,
   inputs: PreseasonInputs,
   priors: PreseasonPriors,
-  { raw = false, features = SHIPPED_PRESEASON_FEATURES, constants, laws, propsAnchor }: ShippedCandidatesOptions = {},
+  { raw = false, features = SHIPPED_PRESEASON_FEATURES, constants, laws, propsAnchor, format = DEFAULT_BOARD_FORMAT }: ShippedCandidatesOptions = {},
 ): Promise<readonly BoardCandidate[]> {
   // THE RAW ARM IS BUILT FROM THE COMMITTED PRIORS, UNTOUCHED (fit-round Task 3, deliverable D): the
   // blend's own fitted availability recency applies to the BLENDED board only. See
@@ -941,13 +984,14 @@ export async function shippedPreseasonCandidates(
   // with the thing it is comparing against.
   if (raw) return preseasonCandidates(inputs, features, priors);
 
-  const blendConstants = constants ?? FITTED_BLEND_CONSTANTS;
+  const anchor = formatAnchorFor(format);
+  const blendConstants = blendConstantsFor(constants ?? FITTED_BLEND_CONSTANTS, format);
   const candidates = preseasonCandidates(inputs, features, withBlendAvailabilityRecency(priors, blendConstants));
   // `inputs.moment` — never a second, internal `preseasonMomentFor` call — so a LIVE board's market
   // prior is taken at the SAME moment the rest of the board was built at (Task 4, `curve.ts`'s own
   // `marketBoard` docblock: that function used to derive this itself, unconditionally through the
   // replay-only `preseasonMomentFor`, which throws for a season that has not kicked off yet).
-  const { entries: market, droppedCount } = await marketBoard(db, inputs.season, inputs.moment);
+  const { entries: market, droppedCount } = await marketBoard(db, inputs.season, inputs.moment, anchor.curve, anchor.adpSource);
   assertLiveMarketCoverage(inputs, candidates, market);
   if (droppedCount > 0) {
     // "No curve" and not "unresolved": since the 2026-09-05 round the market board legitimately
@@ -959,8 +1003,8 @@ export async function shippedPreseasonCandidates(
       `market/blend.ts: marketBoard for ${inputs.season} dropped ${droppedCount} ADP row(s) whose position has no fitted market curve.`,
     );
   }
-  const blended = blendBoard(market, candidates, { season: inputs.season, constants, laws, propsAnchor });
-  return [...blended, ...(await kdefCandidatesFor(db, inputs))];
+  const blended = blendBoard(market, candidates, { season: inputs.season, constants: blendConstants, laws, propsAnchor, rules: anchor.rules });
+  return [...blended, ...(await kdefCandidatesFor(db, inputs, anchor.rules))];
 }
 
 /**
@@ -982,7 +1026,7 @@ export async function shippedPreseasonCandidates(
  * The builder is fully wired anyway, and that is the point: a later round whose judgment passes
  * flips one constant in `kdef-decision.ts` and these rows appear, with no plumbing left to write.
  */
-async function kdefCandidatesFor(db: ReadonlyDb, inputs: PreseasonInputs): Promise<readonly BoardCandidate[]> {
+async function kdefCandidatesFor(db: ReadonlyDb, inputs: PreseasonInputs, rules: ScoringRules): Promise<readonly BoardCandidate[]> {
   const shipping = KDEF_POSITIONS.filter((position) => shipsProjectedRows(position));
   if (shipping.length === 0) return [];
   const history = await loadKdefHistory(db, kdefHistorySeasonsFor(inputs.season), inputs.moment);
@@ -993,7 +1037,7 @@ async function kdefCandidatesFor(db: ReadonlyDb, inputs: PreseasonInputs): Promi
     history,
     kicker: FITTED_KICKER_PRIORS,
     defence: FITTED_DEFENSE_PRIORS,
-    rules: PPR_SCORING,
+    rules,
   }).filter((candidate) => shipping.includes(candidate.position));
 }
 

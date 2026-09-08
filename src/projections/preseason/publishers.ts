@@ -1,4 +1,5 @@
 import type { RankingCandidate } from "./benchmarks";
+import type { FfcAdpFormat } from "./board-formats";
 
 /**
  * FETCHING THE TWO PUBLISHED BOARDS — development-time calibration, never a runtime dependency.
@@ -43,8 +44,22 @@ export interface FfcResponse {
   readonly players?: readonly FfcPlayer[];
 }
 
+/** The twelve-team draft size every board this engine ingests is drafted at. */
+const FFC_TEAM_COUNT = 12;
+
 /**
- * Fantasy Football Calculator's twelve-team PPR average draft position for a past season.
+ * The feed's own URL for one season of one format (the scoring-formats round, 2026-09-08): the
+ * format is a path segment (`ppr`, `half-ppr`, `standard`), and the three boards are three real
+ * populations of drafts, not one board re-labelled. Exported so a test can pin the spelling.
+ */
+export function ffcAdpUrl(season: number, format: FfcAdpFormat): string {
+  return `https://fantasyfootballcalculator.com/api/v1/adp/${format}?year=${season}&teams=${FFC_TEAM_COUNT}&position=all`;
+}
+
+/**
+ * Fantasy Football Calculator's twelve-team average draft position for a past season, PPR unless
+ * a `format` says otherwise (the scoring-formats round: the same feed publishes half-PPR from 2018
+ * and standard from 2013, and a half-PPR board anchors to the half-PPR room).
  *
  * THE ONE BENCHMARK IN THIS ENGINE WITH AN HONEST DATE ON IT. The API returns the window the drafts
  * it averaged were run in, and for every season measured that window closes in the last days of
@@ -76,8 +91,9 @@ export interface FfcResponse {
 export async function fetchAverageDraftPosition(
   season: number,
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
+  format: FfcAdpFormat = "ppr",
 ): Promise<PublishedBoard> {
-  const url = `https://fantasyfootballcalculator.com/api/v1/adp/ppr?year=${season}&teams=12&position=all`;
+  const url = ffcAdpUrl(season, format);
   const response = await fetchImpl(url);
   if (!response.ok) {
     throw new Error(`Fantasy Football Calculator returned HTTP ${response.status} for ${season}.`);

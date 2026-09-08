@@ -49,6 +49,7 @@
     "e2e:install": "playwright install --with-deps chromium",
     "projections:decisions": "dotenv -e .env.local -- tsx scripts/decision-report.ts",
     "projections:preseason:ingest": "dotenv -e .env.local -- tsx scripts/preseason-ingest.ts",
+    "projections:adp:ingest": "dotenv -e .env.local -- tsx scripts/adp-benchmark-ingest.ts",
     "projections:preseason:fit": "dotenv -e .env.local -- tsx scripts/preseason-fit.ts",
     "projections:rookie-curve:fit": "dotenv -e .env.local -- tsx scripts/rookie-curve-fit.ts",
     "projections:rookie-historical-games:fit": "dotenv -e .env.local -- tsx scripts/rookie-historical-games-fit.ts",

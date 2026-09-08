@@ -1,7 +1,7 @@
 import type { ReadonlyDb } from "@/db/client";
 import type { Position } from "@/domain/player";
 import { PPR_SCORING } from "@/domain/scoring";
-import { computeFantasyPoints } from "@/scoring/compute";
+import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import { statLinesAsOf } from "@/projections/lines";
 import { RANK_BANDS, scoreCard, type Observation, type RankBandName, type ScoreCard } from "@/projections/metrics";
 import type { BoardEntry } from "./board";
@@ -64,18 +64,20 @@ export function gradableInputs(inputs: PreseasonInputs): PreseasonInputs {
 /** Far past any correction: outcomes are scored against, never fed in. */
 const FINAL = new Date("9999-12-31T00:00:00.000Z");
 
-/** What every player on a board actually scored over the regular season. Zero for a man who never played. */
+/** What every player on a board actually scored over the regular season, under `rules` (PPR unless a
+ *  format's own scorecard says otherwise; the scoring-formats round). Zero for a man who never played. */
 export async function actualSeasonPoints(
   db: ReadonlyDb,
   season: number,
   positions: ReadonlyMap<string, Position>,
+  rules: ScoringRules = PPR_SCORING,
 ): Promise<ReadonlyMap<string, number>> {
   const rows = await statLinesAsOf(db, { season, week: { from: 1, to: LAST_REGULAR_WEEK }, asOf: FINAL });
   const totals = new Map<string, number>();
   for (const row of rows) {
     const position = positions.get(row.line.playerId);
     if (position === undefined) continue;
-    totals.set(row.line.playerId, (totals.get(row.line.playerId) ?? 0) + computeFantasyPoints(row.line, position, PPR_SCORING));
+    totals.set(row.line.playerId, (totals.get(row.line.playerId) ?? 0) + computeFantasyPoints(row.line, position, rules));
   }
   return totals;
 }
