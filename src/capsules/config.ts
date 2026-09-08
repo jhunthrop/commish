@@ -111,13 +111,15 @@ export const CAPSULE_CONFIG = {
     },
   },
   /**
-   * THE NARRATIVE CALL (founder amendment 2026-09-07) — one call per player for the whole object
-   * of slots. Sized generously above the prose it returns for the same reason the two reads are:
-   * `glm-5.3-flash` spends completion tokens thinking, and a tight cap returns an empty body while
-   * still billing. A dozen slots of at most forty words is roughly 400 words of JSON.
+   * THE ONE CALL PER PLAYER (refrains round, 2026-09-07) — the compact read, the full read and the
+   * narrative slots in one JSON object (`bundle.ts`). The prose itself is about 120 plus 300 plus
+   * 400 words, roughly 1,100 tokens with the JSON around it; the cap sits well above that for the
+   * same reason the per-size caps below do: a reasoning model that runs out of budget returns an
+   * empty body and bills for it. The per-size `maxTokens` above still govern a part's own
+   * correction call, which returns that one part as plain text.
    */
-  narrative: {
-    maxTokens: 2000,
+  bundle: {
+    maxTokens: 3000,
   },
   /**
    * A SENTENCE ON MORE THAN THIS SHARE OF THE BOARD IS STOCK, not voice (founder amendment
@@ -131,6 +133,77 @@ export const CAPSULE_CONFIG = {
     /** How many flagged sentences the prompt quotes. A prompt that lists fifty sentences not to
      *  write is a prompt about sentences not to write; the worst offenders carry the signal. */
     maxQuotedSentences: 8,
+    /**
+     * THE BOARD-LEVEL SAMENESS MEASURE (refrains round, 2026-09-07). The founder read the
+     * production peeks and said almost every write-up read the same: "Buy X, the price is wrong.
+     * The stat that sells me is this. The honest worry is availability. Draft him with a plan
+     * behind him." The whole-sentence check above cannot see that, because a refrain with a
+     * different name or number in it is a different sentence to it. `sameness.ts` measures three
+     * things the reader actually notices, each as a share of the llm-written board:
+     *
+     *   (a) OPENER FAMILIES: the first `openerWords` words of a read with names and numbers
+     *       masked. Two of three reads from the 2026-09-07 regeneration opened "Let's talk about
+     *       X, because", so the line is a tenth of the board: past that, a reader opening two
+     *       peeks in a row hears the same voice clear its throat twice.
+     *   (b) REFRAINS: `refrainStems`, counted as the share of capsules carrying each anywhere in
+     *       the compact read, the full read or a narrative slot. Same line, same reason.
+     *   (c) SHEET-TOURING: the share of reads citing all three usage shares with their ranks. A
+     *       quarter, not a tenth, because a genuine three-down back's case sometimes IS all three
+     *       shares, and the rule is "cite what decides the case", not "never cite usage".
+     *
+     * MEASURED BEFORE THE CHANGE (40 players on dev, the prior prompt, three calls a player):
+     * see `.superpowers/sdd/dossier-voice/progress.md`, "Refrains and one call", for the baseline
+     * and the after; the stems below were kept only where that baseline showed them.
+     */
+    openerWords: 4,
+    maxOpenerFamilyShare: 0.1,
+    maxRefrainShare: 0.1,
+    maxSheetTouringShare: 0.25,
+    /**
+     * THE STOCK STEMS, DERIVED FROM THE BOARD. Compared after `sameness.ts`'s own normalisation
+     * (case folded, punctuation dropped), so an apostrophe or a comma never hides a stem.
+     *
+     * The first group is the founder's own reading of the production peeks ("Buy X, the price is
+     * wrong ... The stat that sells me ... Draft him with a plan behind him") and the three reads
+     * quoted from the 2026-09-07 regeneration ("Let's talk about X", "So the call is a fade"). The
+     * second group is what a 3-to-5 word scan of the 40-player baseline on dev (the prior prompt,
+     * 25 written) found on more than a tenth of the board and is a FRAME rather than a fact: the
+     * share it carried is beside each. Sheet echoes that are the fact itself ("weekly median in",
+     * "one spot behind") are deliberately not here: a read has to cite facts, and the sheet-touring
+     * measure is the check on citing too many. The third group is the trading register the same
+     * night's ruling banned outright, kept here so the board's share of it stays a number.
+     */
+    refrainStems: [
+      "the price is wrong",
+      "the stat that sells me",
+      "the honest worry",
+      "with a plan behind him",
+      "let's talk about",
+      "so the call",
+      "so my call",
+      "the band says",
+      "the volume case",
+      "not a talent read",
+      // From the baseline scan (share of the 25 written):
+      "the books hang", // 80%, the sheet's own props sentence read back
+      "at the bottom he's", // 72%, the two-outcomes close the old instructions asked for
+      // NOT "have historically" (68% on the baseline, 48% on the first one-call run): it is how the
+      // ADP anchor fact is stated ("clear of what receivers drafted at pick 3 have historically
+      // given back"), the fact itself rather than a frame, and the reads that carry it vary the
+      // sentence around it. It is the same kind of phrase as "one spot behind" and is left to the
+      // sheet-touring rule's spirit: cite it when it decides the case.
+      "our number says", // 64%
+      "the honest hesitation", // 60%, the validator's own rule wording read back
+      "at the top he's", // 60%
+      "the engine of", // 56%, the old instructions' own example verb
+      "makes the case", // 44%
+      "most seasons land", // 44%, the sheet's own band sentence read back
+      "the books set", // 36%
+      // The trading register (founder ruling, 2026-09-07), 84%, 44% and 40% on the baseline:
+      "the market",
+      "i'm buying",
+      "he's a buy",
+    ],
   },
   /** A law group's own `|netEffectPoints|` at or above this reads as a real, citable downside —
    *  below it is noise a capsule need not dwell on. The mandated-tension check (`validate.ts`)
@@ -197,7 +270,8 @@ export const CAPSULE_CONFIG = {
  *
  * Checked case-insensitively, whole-word (or whole-phrase) in `validate.ts`.
  */
-export const BANNED_VOCABULARY: readonly string[] = [
+/** The lab-report register, plus "implying"/"implied" (see above). The prompt names these too. */
+export const LAB_REPORT_TERMS: readonly string[] = [
   "p10",
   "p90",
   "percentile",
@@ -209,9 +283,12 @@ export const BANNED_VOCABULARY: readonly string[] = [
   "standard deviation",
   "implying",
   "implied",
-  // NOT A BARE "ever" (acceptance round, iteration 3): the guard exists for an all-time CLAIM, and
-  // a bare word caught "if he ever gets the goal-line work", which claims nothing at all. The
-  // superlative shapes are what the ruling is about.
+];
+
+/** NOT A BARE "ever" (acceptance round, iteration 3): the guard exists for an all-time CLAIM, and
+ *  a bare word caught "if he ever gets the goal-line work", which claims nothing at all. The
+ *  superlative shapes are what the ruling is about. */
+export const ALL_TIME_TERMS: readonly string[] = [
   "best ever",
   "greatest ever",
   "ever seen",
@@ -223,6 +300,38 @@ export const BANNED_VOCABULARY: readonly string[] = [
   "greatest of all time",
   "goat",
 ];
+
+/**
+ * THE TRADING REGISTER (founder ruling, 2026-09-07: "we say market everywhere like this is a stock
+ * trading app, it's a fantasy football app"). A capsule talks about ADP, picks and rounds, reaches
+ * and steals, sleepers and busts, letting a player fall or drafting him. `render.ts` states the
+ * sheet's own ADP facts in those words for the same reason it never says "p10", the prompt teaches
+ * the fantasy words and names these as never to write, and this list refuses the paraphrase that
+ * brings the trading floor back. Single words are matched whole with their plain inflections
+ * ("priced", "selling", "fading"); "upside"/"downside" are not here because they are fantasy words
+ * too when tied to an outcome, which the prompt asks for. Held in its own constant so the prompt
+ * can name the group without carrying the words as literals of its own (the repo's source guard,
+ * `src/integrity/copy-rules.ts`, sweeps the prompt module for exactly these words).
+ */
+export const TRADING_TERMS: readonly string[] = [
+  "market",
+  "price",
+  "priced",
+  "buy",
+  "sell",
+  "fade",
+  "trade at",
+  "trades at",
+  "trading at",
+  "undervalued",
+  "overvalued",
+  "premium",
+  "discount",
+  "dividend",
+  "return on",
+];
+
+export const BANNED_VOCABULARY: readonly string[] = [...LAB_REPORT_TERMS, ...ALL_TIME_TERMS, ...TRADING_TERMS];
 
 /** Rival fantasy products — a capsule voices this product's own case, never a comparison to
  *  where else a manager could be reading it. Checked case-insensitively, substring. */

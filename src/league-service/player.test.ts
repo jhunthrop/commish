@@ -570,9 +570,10 @@ describe("playerSeason's season history", () => {
     await upsertCapsule(db, "rb1", "hash-1", {
       compact: { text: "Compact body.", source: "llm", usage: null, fallbackReason: null },
       full: { text: "Full body.", source: "llm", usage: null, fallbackReason: null },
-      narrative: { slots: { call: "He is the whole offense in that backfield." }, usage: null, model: "zai/glm-5.3-flash", rejected: [], failure: null },
+      narrative: { slots: { call: "He is the whole offense in that backfield." }, model: "zai/glm-5.3-flash", rejected: [], failure: null },
       source: "llm",
       model: "zai/glm-5.3-flash",
+      usage: null,
     });
     const withCapsule = (await playerSeason(db, leagueId, "rb1", clock))!;
     expect(withCapsule.capsule).toEqual({

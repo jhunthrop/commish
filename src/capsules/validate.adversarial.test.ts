@@ -137,7 +137,7 @@ describe("probe check — LOW banned-vocab inflection and tension cue", () => {
       ],
     };
     const facts = buildPlayerFacts(withLaw);
-    const r = validateCapsule(pad("Rashad Long anchors the SF offense at board rank 14, our number of 248 season points, though the age curve costs him 1.8 a game, still a buy this season."), facts, "compact");
+    const r = validateCapsule(pad("Rashad Long anchors the SF offense at board rank 14, our number of 248 season points, though the age curve costs him 1.8 a game, still a steal this season."), facts, "compact");
     expect(r.violations.some((v) => v.includes("Mixed evidence"))).toBe(false);
   });
 });
@@ -155,8 +155,8 @@ describe("re-review round 2: honest shorthand passes, fabrication still fails", 
 
   it("sheds a sentence-initial verb from the subject's name, and only from the subject's", () => {
     // First live sweep, 2026-09-05: "Buy Jahmyr Gibbs" extracted as one capitalized run.
-    expect(validateCapsule(pad("Buy Amon-Ra St. Brown for the DET offense, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(true);
-    expect(validateCapsule(pad("Buy Justin Herbert for the DET offense, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(false);
+    expect(validateCapsule(pad("Draft Amon-Ra St. Brown for the DET offense, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(true);
+    expect(validateCapsule(pad("Draft Justin Herbert for the DET offense, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(false);
   });
 
   it("still rejects a fabricated name, possessive or shorthand alike", () => {
@@ -267,14 +267,14 @@ describe("precision fix round 2 — PART A: sentence-boundary tokenization", () 
 describe("precision fix round 2 — PART B: verb + lastname shorthand", () => {
   const mccaffreyFacts = buildPlayerFacts({ ...RASHAD_LONG, identity: { id: "p7", name: "Christian McCaffrey", position: "RB", team: "SF" } });
 
-  it('a verb + lastname pair grounds via the surname suffix rule ("Buy McCaffrey")', () => {
-    const r = validateCapsule(pad("Buy McCaffrey for the SF offense, our number of 248 season points and board rank 14 overall this season."), mccaffreyFacts, "compact");
+  it('a verb + lastname pair grounds via the surname suffix rule ("Draft McCaffrey")', () => {
+    const r = validateCapsule(pad("Draft McCaffrey for the SF offense, our number of 248 season points and board rank 14 overall this season."), mccaffreyFacts, "compact");
     expect(r.violations.some((v) => v.includes("does not trace"))).toBe(false);
   });
 
   it("an unledgered surname after the same verb still fails closed", () => {
-    const r = validateCapsule(pad("Buy Fakename for the SF offense, our number of 248 season points and board rank 14 overall this season."), mccaffreyFacts, "compact");
-    expect(r.violations.some((v) => v.includes("Buy Fakename"))).toBe(true);
+    const r = validateCapsule(pad("Draft Fakename for the SF offense, our number of 248 season points and board rank 14 overall this season."), mccaffreyFacts, "compact");
+    expect(r.violations.some((v) => v.includes("Draft Fakename"))).toBe(true);
   });
 
   it("a plausible given name in that slot (not a sentence verb) still fails, even though the surname matches (Marcus McCaffrey)", () => {

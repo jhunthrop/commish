@@ -23,13 +23,29 @@ import { candidateCopyIn, sourceFilesIn } from "./test-support";
  * `league-room/outlook/verdict.ts`, `draft-room/lib/market-order-note.ts`) are plain modules,
  * and a sweep that skipped them would miss the exact strings the ruling was about.
  *
- * `src/capsules/template.ts` is named by file rather than by directory: it is the one capsule
- * module that renders to a manager without the writer (the template floor). The rest of
- * `src/capsules` is the writer's prompt and fact sheet, swept by its own tests.
+ * `MANAGER_FILES` names the capsule modules by file rather than by directory: the template is the one
+ * that renders to a manager without the writer, and the sheet and prompt modules are what the model
+ * quotes back to one (refrains round, 2026-09-07). The rest of `src/capsules` is machinery.
  */
 const MANAGER_DIRS = ["src/components", "src/app", "src/league-room", "src/draft-room", "src/draft-hq", "src/chat-room", "src/account-room", "src/admin-room", "src/help"];
 
-const MANAGER_FILES = ["src/capsules/template.ts"];
+/**
+ * The capsule modules whose strings a manager reads or a model quotes back to one: the template
+ * floor, the fact sheet (`render.ts`, `render-depth.ts`), the slot briefs (`narrative.ts`), the
+ * writer's instructions (`prompt.ts`), the bundle contract (`bundle.ts`) and the transport
+ * (`write.ts`). Named by file rather than by directory because the rest of `src/capsules` is
+ * config and machinery (the banned-vocabulary list itself holds these words, on purpose). The only
+ * allowlisted literal in any of them is an identifier (`market_unlisted`, a `BoardReason` code).
+ */
+const MANAGER_FILES = [
+  "src/capsules/template.ts",
+  "src/capsules/render.ts",
+  "src/capsules/render-depth.ts",
+  "src/capsules/narrative.ts",
+  "src/capsules/prompt.ts",
+  "src/capsules/bundle.ts",
+  "src/capsules/write.ts",
+];
 
 const REPO_ROOT = process.cwd();
 
@@ -50,6 +66,8 @@ describe("every manager-facing surface speaks fantasy football, never trading", 
     expect(files.some((file) => file.startsWith("src/admin-room"))).toBe(true);
     expect(files.some((file) => file.startsWith("src/help"))).toBe(true);
     expect(files).toContain("src/capsules/template.ts");
+    expect(files).toContain("src/capsules/render.ts");
+    expect(files).toContain("src/capsules/prompt.ts");
     expect(files.some((file) => file.includes(".test."))).toBe(false);
   });
 

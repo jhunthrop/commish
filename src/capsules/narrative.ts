@@ -1,4 +1,4 @@
-import { CAPSULE_CONFIG, CAPSULE_MODEL } from "./config";
+import { CAPSULE_MODEL } from "./config";
 import type { PlayerFacts } from "./facts";
 import {
   ABSENCE_MODULES,
@@ -8,18 +8,17 @@ import {
   whyGroupSlotKey,
   type NarrativeSlots,
 } from "./narrative-slots";
-import { renderFactsForModel } from "./render";
 import { groundingOf, validateNarrativeSlot } from "./validate";
-import { addGatewayUsage, CapsuleGenerationError, postChatCompletion, type CapsuleWriterDeps, type GatewayUsage } from "./write";
 
 /**
  * THE NARRATIVE (founder amendment, 2026-09-07): "use the LLM to make every part of the player peek
  * feel dynamic and alive like a real person is writing it, unless it's simply displaying a stat."
  *
- * ONE CALL, MANY SENTENCES. The two long reads each get their own gateway call because each is one
- * piece of continuous prose. The narrative is a dozen SHORT sentences that must not repeat one
- * another, which is exactly the thing one call can guarantee and twelve cannot: a model writing the
- * trend sentence in the same breath as the call sentence knows what it already said.
+ * ONE CALL FOR THE WHOLE PLAYER (refrains round, 2026-09-07). The slots used to be their own
+ * gateway call beside the two reads' own two. They now come back in the same JSON object as the
+ * reads (`bundle.ts`), written by a model that knows what the reads already said, which is the one
+ * thing three separate calls could never guarantee. This module decides WHICH slots are asked for
+ * and grades what came back; `prompt.ts` asks and `generate.ts` calls.
  *
  * WHICH SLOTS ARE ASKED FOR IS A FUNCTION OF THE FACTS, never a fixed list. A player with no prior
  * season is not asked for a `story` sentence, he is asked for the `absence:story` note that says so
@@ -30,10 +29,8 @@ import { addGatewayUsage, CapsuleGenerationError, postChatCompletion, type Capsu
  * held to (every number and multi-word name traces to the fact sheet, no banned vocabulary, no
  * em-dash, no semicolon, no competitor) plus its own word cap. A slot that fails is DROPPED, and
  * its module renders the deterministic template sentence it always had. One bad sentence costs one
- * sentence, never the page.
- *
- * NOTHING HERE THROWS. A refused gateway, an unparseable body, a JSON array where an object was
- * asked for: all of them return no slots, which is the state every module already renders.
+ * sentence, never the page. A slot is never retried: it is one sentence, and the template sentence
+ * behind it is honest.
  */
 
 /** One slot the model is asked to write, with what it is for and how long it may be. */
@@ -47,16 +44,22 @@ export interface NarrativeSlotRequest {
 
 export interface NarrativeResult {
   readonly slots: NarrativeSlots;
-  readonly usage: GatewayUsage | null;
   readonly model: string | null;
   /** One line per slot the validator refused, for the sweep's own detail lines: an operator
    *  needs to see WHICH sentence the model kept failing to ground, not just a count. */
   readonly rejected: readonly string[];
-  /** Set when no slot survived at all, naming why (a refused gateway, an unparseable body). */
+  /** Set when no slot survived at all, naming why (a refused gateway, a body with no narrative
+   *  object in it). */
   readonly failure: string | null;
 }
 
-const EMPTY_RESULT: NarrativeResult = { slots: {}, usage: null, model: null, rejected: [], failure: null };
+/** No slots, no failure: the state before a call, and the honest one when nothing was asked. */
+export const EMPTY_NARRATIVE: NarrativeResult = { slots: {}, model: null, rejected: [], failure: null };
+
+/** The narrative that a whole-player failure leaves behind, naming why. */
+export function failedNarrative(failure: string): NarrativeResult {
+  return { ...EMPTY_NARRATIVE, failure };
+}
 
 /**
  * THE SLOTS THIS PLAYER'S OWN FACT SHEET SUPPORTS.
@@ -163,123 +166,28 @@ function briefLabelOf(item: PlayerFacts["evidence"][number]): string {
     case "rookie":
       return "he is a rookie";
     case "market_unlisted":
-      return "the market has not listed him";
+      return "nobody is drafting him yet";
   }
 }
 
 /**
- * THE VOICE, FOR SENTENCES RATHER THAN PARAGRAPHS. `write.ts`'s own `VOICE_RULES` govern a whole
- * note. These govern one line at a time, where the failure mode is different: a sentence that could
- * have been written about any player at that position. The two exemplars are voice ONLY, and the
- * prompt says so in the same breath it gives them, because a model handed an example with numbers
- * in it will reach for those numbers.
+ * Every requested slot the model returned as a real string AND the validator accepted. A slot the
+ * model skipped is not a failure: the module renders its template sentence, which is what a
+ * skipped slot means. `raw` is the bundle's own narrative object (`bundle.ts`), or `null` when
+ * the bundle carried none, which is a failure worth naming in the sweep's detail lines.
  */
-const NARRATIVE_RULES = `You are a fantasy football analyst writing the sentences on one player's page. Every sentence is short, specific to THIS player, and sounds like a person who watches football talking to a friend.
-
-Hard rules, no exceptions:
-- Use ONLY the numbers and names in the fact sheet. Never invent a stat, an injury, a teammate, a coach, or any other figure or name not printed there.
-- Quote a number as the sheet gives it, or as a plain rounding of it. Never subtract, add or divide two figures into a third one the sheet does not print.
-- Never say a risk, an injury or a competitor is ABSENT unless the fact sheet says so. Silence in the fact sheet means silence from you.
-- Never write an em-dash and never write a semicolon. Two short sentences beat one stitched one.
-- Never name a rival fantasy product.
-- Never use the words: percentile, projection, evidence, measured, coefficient, "effect size", "standard deviation", p10, p90, implying, implied. Say "our number", "the case", "costs him" or "is worth" instead.
-- Never make an all-time or historical claim. This engine holds no such data.
-- Write from his actual situation: the new play caller, the injury he is coming back from, the tier he sits in, the market disagreeing with our number. Never a frame that would fit any player at his position.
-- Do not repeat yourself between slots. Each sentence earns its place or it is not written.
-- A number the page already displays beside your sentence does not need restating. Say what it MEANS.
-- Where a fact is missing, say it is missing like a person would, and never as an apology or a promise.
-
-The voice, two examples. These are TONE only. Their facts belong to other players and you must never borrow a number or a name from them:
-- "The market wants a second-round pick for him and our number says he is a fourth-rounder. Let somebody else pay that."
-- "Nobody else in that backfield has taken a carry that mattered. He is the offense, and everything behind him falls off."`;
-
-function slotSpecFor(requests: readonly NarrativeSlotRequest[]): string {
-  return requests.map((request) => `- "${request.key}" (at most ${request.maxWords} words): ${request.brief}`).join("\n");
-}
-
-/**
- * The user message: the same fact sheet the two reads are written from, the slot spec, and the
- * stock sentences this board has already been caught repeating (`avoid`), quoted verbatim so the
- * model is refusing a specific sentence rather than a vague instruction to be original.
- */
-export function narrativePromptFor(facts: PlayerFacts, requests: readonly NarrativeSlotRequest[], avoid: readonly string[]): string {
-  const sections = [
-    `Fact sheet:\n${renderFactsForModel(facts)}`,
-    `Write these slots for ${facts.identity.name}. Return ONE JSON object and nothing else: no prose around it, no code fence, no keys other than these.\n${slotSpecFor(requests)}`,
-  ];
-  if (avoid.length > 0) {
-    sections.push(
-      `These sentences are already on too many other players' pages. Do not write them, and do not write a near copy of them:\n${avoid.map((sentence) => `- "${sentence}"`).join("\n")}`,
-    );
-  }
-  return sections.join("\n\n");
-}
-
-/** A JSON object out of a completion that may have fenced it or wrapped it in a sentence. Returns
- *  `null` for anything that is not an object of values. */
-function parseSlotObject(content: string): Record<string, unknown> | null {
-  const fenced = content.replace(/^\s*```(?:json)?/i, "").replace(/```\s*$/, "");
-  const start = fenced.indexOf("{");
-  const end = fenced.lastIndexOf("}");
-  if (start === -1 || end === -1 || end < start) return null;
-  try {
-    const parsed: unknown = JSON.parse(fenced.slice(start, end + 1));
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
-    return parsed as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-/** Every requested slot the model returned as a real string AND the validator accepted. A slot the
- *  model skipped is not a failure: the module renders its template sentence, which is what a
- *  skipped slot means. */
-function validateSlots(
-  parsed: Record<string, unknown>,
-  facts: PlayerFacts,
-  requests: readonly NarrativeSlotRequest[],
-): { readonly slots: NarrativeSlots; readonly rejected: readonly string[] } {
+export function settleNarrative(raw: Readonly<Record<string, unknown>> | null, facts: PlayerFacts, requests: readonly NarrativeSlotRequest[], model: string = CAPSULE_MODEL): NarrativeResult {
+  if (raw === null) return failedNarrative("the answer carried no narrative object");
+  const grounding = groundingOf(facts);
   const slots: Record<string, string> = {};
   const rejected: string[] = [];
   for (const request of requests) {
-    const raw = parsed[request.key];
-    if (typeof raw !== "string" || raw.trim() === "") continue;
-    const text = raw.trim();
-    const result = validateNarrativeSlot(text, groundingOf(facts), request.maxWords);
+    const value = raw[request.key];
+    if (typeof value !== "string" || value.trim() === "") continue;
+    const text = value.trim();
+    const result = validateNarrativeSlot(text, grounding, request.maxWords);
     if (result.ok) slots[request.key] = text;
     else rejected.push(`${request.key}: ${result.violations[0] ?? "unknown violation"}`);
   }
-  return { slots, rejected };
-}
-
-/** A narrative call's own degenerate floor. A JSON object of short sentences is legitimately far
- *  shorter than a read, but a handful of words is still a reasoning model's exhaust rather than an
- *  artifact. */
-const NARRATIVE_MIN_COMPLETION_WORDS = 8;
-
-/**
- * One player's narrative. Never throws — see this module's own docblock. `avoid` is the board's
- * current stock-sentence list (`repetition.ts`), which is empty on a healthy board.
- */
-export async function generateNarrative(facts: PlayerFacts, deps: CapsuleWriterDeps, avoid: readonly string[] = []): Promise<NarrativeResult> {
-  const requests = narrativeRequestsFor(facts);
-  const messages = [
-    { role: "system", content: NARRATIVE_RULES },
-    { role: "user", content: narrativePromptFor(facts, requests, avoid) },
-  ];
-
-  let usage: GatewayUsage | null = null;
-  try {
-    const response = await postChatCompletion(messages, CAPSULE_CONFIG.narrative.maxTokens, deps, NARRATIVE_MIN_COMPLETION_WORDS);
-    usage = addGatewayUsage(usage, response.usage);
-    const parsed = parseSlotObject(response.content);
-    if (parsed === null) {
-      return { ...EMPTY_RESULT, usage, failure: "the narrative completion was not a JSON object" };
-    }
-    const { slots, rejected } = validateSlots(parsed, facts, requests);
-    return { slots, usage, model: Object.keys(slots).length > 0 ? CAPSULE_MODEL : null, rejected, failure: null };
-  } catch (error: unknown) {
-    if (error instanceof CapsuleGenerationError && error.billedUsage !== null) usage = addGatewayUsage(usage, error.billedUsage);
-    return { ...EMPTY_RESULT, usage, failure: error instanceof Error ? error.message : String(error) };
-  }
+  return { slots, model: Object.keys(slots).length > 0 ? model : null, rejected, failure: null };
 }

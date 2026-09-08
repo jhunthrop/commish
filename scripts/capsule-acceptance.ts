@@ -1,11 +1,11 @@
 // THE ACCEPTANCE MEASUREMENT (capsule acceptance round, 2026-09-07) — what share of board players
 // the writer actually gets WRITTEN, and when it fails, why.
 //
-// Run: npm run capsules:acceptance -- [sample size]     (default 30)
+// Run: npm run capsules:acceptance -- [sample size] [--cap=0.60] [--texts=out.json]   (default 30)
 //      npm run capsules:acceptance -- 100 --templates-only
 //
-// THIS SPENDS GATEWAY MONEY. One `generateCapsule` per sampled player is three calls (the two
-// reads plus the narrative), and a run of 100 is roughly a third of a dollar at the measured rate.
+// THIS SPENDS GATEWAY MONEY. One `generateCapsule` per sampled player is one gateway call (plus a
+// correction call for a part that failed), and a run of 100 is a few cents at the measured rate.
 // It is a diagnostic an operator runs deliberately, never part of a test run or a job.
 //
 // WHY IT EXISTS. 446 of 659 players sat on the template and the assumption was a throttled
@@ -22,13 +22,19 @@ import { createDb, type Db } from "@/db/client";
 import { collectBoardFacts } from "@/capsules/collect";
 import { CAPSULE_CONFIG, CAPSULE_MODEL } from "@/capsules/config";
 import type { PlayerFacts } from "@/capsules/facts";
-import { generateCapsule, type CapsuleFallbackReason } from "@/capsules/generate";
+import { generateCapsule, type CapsuleFallbackReason, type CapsuleGenerationResult } from "@/capsules/generate";
+import { measureSameness, samenessOverThreshold, type SamenessReport, type SamenessRow } from "@/capsules/sameness";
 import type { GatewayResponseInfo } from "@/capsules/write";
 import { getStoredCapsulesFor } from "@/capsules/store";
 
 const ARGUMENTS = process.argv.slice(2);
 const TEMPLATES_ONLY = ARGUMENTS.includes("--templates-only");
 const SAMPLE_SIZE = Number(ARGUMENTS.find((argument) => !argument.startsWith("--")) ?? 30);
+/** `--cap=0.60` stops the run once the gateway has billed that many dollars, whatever the sample
+ *  size asked for: a diagnostic's spend is decided before it starts, never discovered after. */
+const COST_CAP_USD = Number(ARGUMENTS.find((argument) => argument.startsWith("--cap="))?.slice("--cap=".length) ?? Number.POSITIVE_INFINITY);
+/** How many opener families the sameness printout lists. */
+const OPENER_FAMILIES_PRINTED = 6;
 
 /** `--model=zai/glm-5.2-fast` puts another model through the identical prompts, validator and rate
  *  limiter, which is the only way a comparison says anything about the MODEL (task 11). */
@@ -36,7 +42,8 @@ const MODEL = ARGUMENTS.find((argument) => argument.startsWith("--model="))?.sli
 /** `--thinking` puts the model's reasoning back on, which is what production ran before task 11
  *  measured it and turned it off. `--no-thinking` is kept as a no-op alias for the default. */
 const THINKING = ARGUMENTS.includes("--thinking");
-/** `--texts=<path>` writes each player's compact read to a file, for the persona read. */
+/** `--texts=<path>` writes every player's parts (both reads, the narrative, each part's own
+ *  source) as JSON, for the persona read and for mining the board's own refrains. */
 const TEXTS_PATH = ARGUMENTS.find((argument) => argument.startsWith("--texts="))?.slice("--texts=".length);
 
 /** The causes an engineer can act on. Ordered most-actionable first; `categoryOf` returns the
@@ -84,6 +91,48 @@ function quantiles(values: readonly number[]): string {
   return `n=${sorted.length} min ${sorted[0]} p10 ${at(0.1)} p50 ${at(0.5)} p90 ${at(0.9)} max ${sorted[sorted.length - 1]}`;
 }
 
+function percent(share: number): string {
+  return `${(share * 100).toFixed(0)}%`;
+}
+
+/** One generated player as the sameness measure reads him: the same shape the sweep builds from
+ *  a stored row, built here from the fresh result so the measure never needs the database. */
+function samenessRowOf(facts: PlayerFacts, result: CapsuleGenerationResult): SamenessRow {
+  return {
+    playerId: facts.identity.id,
+    name: facts.identity.name,
+    bodyCompact: result.compact.text,
+    bodyFull: result.full.text,
+    source: result.source,
+    narrative: Object.keys(result.narrative.slots).length === 0 ? null : result.narrative.slots,
+  };
+}
+
+/**
+ * THE SAMENESS PRINTOUT (refrains round, 2026-09-07) — the three board-level measures over this
+ * run's own written capsules, each beside its configured line, with a verdict a reader can scan.
+ */
+function printSameness(report: SamenessReport): void {
+  const { maxOpenerFamilyShare, maxRefrainShare, maxSheetTouringShare } = CAPSULE_CONFIG.repetition;
+  const over = samenessOverThreshold(report);
+  const verdict = (flag: boolean): string => (flag ? "OVER" : "ok");
+  console.log("");
+  console.log(`Sameness over ${report.capsules} written capsule(s):`);
+  const worstOpener = report.openers[0];
+  console.log(
+    `  opener families: max share ${worstOpener === undefined ? "n/a" : percent(worstOpener.share)} (line ${percent(maxOpenerFamilyShare)}), ` +
+      `${over.openers.length} over the line`,
+  );
+  for (const finding of report.openers.slice(0, OPENER_FAMILIES_PRINTED)) {
+    console.log(`    ${percent(finding.share).padStart(4)}  ${finding.playerIds.length} player(s)  "${finding.key}"  e.g. "${finding.example}"`);
+  }
+  console.log(`  refrains (line ${percent(maxRefrainShare)}):`);
+  for (const finding of report.refrains) {
+    console.log(`    ${percent(finding.share).padStart(4)}  ${String(finding.playerIds.length).padStart(3)} player(s)  ${verdict(finding.share > maxRefrainShare && finding.playerIds.length > 1).padEnd(4)}  "${finding.key}"`);
+  }
+  console.log(`  sheet-touring: ${percent(report.sheetTouring.share)} (${report.sheetTouring.playerIds.length} player(s), line ${percent(maxSheetTouringShare)}) ${verdict(over.sheetTouring)}`);
+}
+
 /**
  * The counts one run accumulates. A script's own running total, mutated in one loop and printed
  * once — the one place in this repo where a plain counter beats rebuilding a record per player.
@@ -106,6 +155,11 @@ class Tally {
   readonly rejectedWords = new Map<string, number[]>();
   /** Every gateway round trip's own milliseconds, for the latency half of a model comparison. */
   readonly latencies: number[] = [];
+  /** Wall-clock milliseconds per PLAYER, calls, retries and pacing included: the number the sweep's
+   *  own budget geometry is built on, and the one a one-call-per-player change should move. */
+  readonly playerLatencies: number[] = [];
+  /** Gateway calls made per player, so "one call per player" is a measured count, not a claim. */
+  readonly callsPerPlayer: number[] = [];
 
   record(violation: string): void {
     const category = categoryOf(violation);
@@ -127,6 +181,7 @@ class Tally {
     console.log(`WRITTEN: ${this.written} of ${answered} answered (${rate.toFixed(0)}%). Throttled: ${this.throttled} of ${this.players}. Spend: $${this.costUsd.toFixed(4)}.`);
     const perPlayer = this.players === 0 ? 0 : this.costUsd / this.players;
     console.log(`Cost a player: $${perPlayer.toFixed(5)}. Call latency: ${quantiles(this.latencies)} (ms).`);
+    console.log(`Player latency: ${quantiles(this.playerLatencies)} (ms). Calls a player: ${quantiles(this.callsPerPlayer)}.`);
     console.log("");
     console.log("Lengths written (the band should be a range the model lands in):");
     for (const size of ["compact", "full"]) {
@@ -167,7 +222,8 @@ async function main(): Promise<void> {
       `model ${MODEL ?? CAPSULE_MODEL}${THINKING ? " thinking" : " not thinking"}, ` +
       `${CAPSULE_CONFIG.gateway.callsPerMinute} calls a minute.`,
   );
-  const texts: string[] = [];
+  const texts: { readonly name: string; readonly result: CapsuleGenerationResult }[] = [];
+  const samenessRows: SamenessRow[] = [];
 
   const tally = new Tally();
   // THE THROTTLE'S OWN WORDS (founder, 2026-09-07) — every 429 verbatim, and one success to
@@ -180,22 +236,33 @@ async function main(): Promise<void> {
   };
   let first = true;
   for (const facts of sample) {
+    if (tally.costUsd >= COST_CAP_USD) {
+      console.log(`  stopped at the $${COST_CAP_USD.toFixed(2)} cap after ${tally.players} player(s).`);
+      break;
+    }
     if (!first) await new Promise((resolve) => setTimeout(resolve, CAPSULE_CONFIG.sweepPacingMs));
     first = false;
 
+    const startedAt = Date.now();
+    let calls = 0;
     const result = await generateCapsule(facts, {
       apiKey,
       ...(MODEL === undefined ? {} : { model: MODEL }),
       ...(THINKING ? { thinking: true } : {}),
-      onCallLatency: (ms) => tally.latencies.push(ms),
+      onCallLatency: (ms) => {
+        calls += 1;
+        tally.latencies.push(ms);
+      },
       onGatewayResponse,
     });
+    tally.playerLatencies.push(Date.now() - startedAt);
+    tally.callsPerPlayer.push(calls);
     const written = result.source === "llm";
     const throttled = [result.compact, result.full].some((size) => size.fallbackReason?.kind === "throttled");
     tally.players += 1;
     if (written) tally.written += 1;
     if (throttled) tally.throttled += 1;
-    tally.costUsd += (result.compact.usage?.costUsd ?? 0) + (result.full.usage?.costUsd ?? 0) + (result.narrative.usage?.costUsd ?? 0);
+    tally.costUsd += result.usage?.costUsd ?? 0;
 
     for (const [name, size] of [["compact", result.compact], ["full", result.full]] as const) {
       const violation = decidingViolation(size.fallbackReason);
@@ -213,10 +280,12 @@ async function main(): Promise<void> {
     console.log(
       `  ${facts.identity.name.padEnd(24)} ${written ? "written" : throttled ? "THROTTLED" : "template"}  narrative slots ${Object.keys(result.narrative.slots).length}`,
     );
-    texts.push(`===== ${facts.identity.name} (${result.compact.source})\n${result.compact.text}\n`);
+    texts.push({ name: facts.identity.name, result });
+    samenessRows.push(samenessRowOf(facts, result));
   }
 
   tally.print();
+  printSameness(measureSameness(samenessRows));
   console.log("");
   console.log(`Pacing in force: ${CAPSULE_CONFIG.gateway.callsPerMinute} calls a minute. Reasoning: ${THINKING ? "on" : "off"}.`);
   console.log(`One successful response's limit headers: ${JSON.stringify(successSamples[0]?.limitHeaders ?? null)}`);
@@ -225,7 +294,16 @@ async function main(): Promise<void> {
     console.log(`  status ${report.status} "${report.statusText}" headers ${JSON.stringify(report.limitHeaders)}`);
     console.log(`  body ${JSON.stringify(report.body ?? "")}`);
   }
-  if (TEXTS_PATH !== undefined) writeFileSync(TEXTS_PATH, texts.join("\n"));
+  if (TEXTS_PATH !== undefined) {
+    const dump = texts.map(({ name, result }) => ({
+      name,
+      source: result.source,
+      compact: { source: result.compact.source, text: result.compact.text },
+      full: { source: result.full.source, text: result.full.text },
+      narrative: result.narrative.slots,
+    }));
+    writeFileSync(TEXTS_PATH, JSON.stringify(dump, null, 2));
+  }
   await db.$client.end();
 }
 

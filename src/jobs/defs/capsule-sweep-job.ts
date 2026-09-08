@@ -34,7 +34,9 @@ import { CAPSULE_CONFIG } from "@/capsules/config";
 import { collectBoardFacts } from "@/capsules/collect";
 import { describeCapsuleFallback, generateCapsule } from "@/capsules/generate";
 import { writeRefresh } from "@/capsules/peek-facts";
+import type { WornPhrases } from "@/capsules/prompt";
 import { playersSayingStock, sentencesToAvoid, stockSentences } from "@/capsules/repetition";
+import { measureSameness, phrasesToAvoid, playersToRegenerateForSameness, samenessOverThreshold, type SamenessRow } from "@/capsules/sameness";
 import { getStoredCapsulesFor, queueCapsuleRegeneration, upsertCapsule, type StoredPlayerCapsule } from "@/capsules/store";
 import type { PlayerFacts } from "@/capsules/facts";
 import { JOBS_CONFIG } from "../config";
@@ -73,6 +75,49 @@ function needsGeneration(facts: PlayerFacts, stored: StoredPlayerCapsule | undef
   return stored === undefined || stored.factsHash !== facts.factsHash || stored.source === "template";
 }
 
+/** The stored board as the sameness measure reads it, each row carrying its player's name so his
+ *  opener can be masked (`sameness.ts`). A stored row with no board player behind it is skipped:
+ *  the measure is over the board the sweep is writing. */
+function samenessRowsOf(stored: ReadonlyMap<string, StoredPlayerCapsule>, facts: readonly PlayerFacts[]): readonly SamenessRow[] {
+  return facts.flatMap((one) => {
+    const row = stored.get(one.identity.id);
+    if (row === undefined) return [];
+    return [{ playerId: row.playerId, name: one.identity.name, bodyCompact: row.bodyCompact, bodyFull: row.bodyFull, source: row.source, narrative: row.narrative }];
+  });
+}
+
+/** What the board is already saying too often, quoted into every prompt this run makes: the whole
+ *  stock sentences (`repetition.ts`) and the flagged stems and openers (`sameness.ts`). */
+function wornPhrasesOf(stored: ReadonlyMap<string, StoredPlayerCapsule>, facts: readonly PlayerFacts[]): WornPhrases {
+  return {
+    sentences: sentencesToAvoid(stockSentences([...stored.values()])),
+    phrases: phrasesToAvoid(measureSameness(samenessRowsOf(stored, facts))),
+  };
+}
+
+/**
+ * THE REPETITION CHECK, over the board as it now stands: the whole-sentence check and the sameness
+ * measure together. Every player still saying a stock sentence, opening in a flagged family,
+ * carrying a flagged refrain, or touring the sheet while touring is over its line has his cache
+ * key stamped stale, which is the one condition `needsGeneration` already treats as "write this
+ * player again". Returns the summary counts and the detail lines an operator reads.
+ */
+async function checkRepetition(db: Db, facts: readonly PlayerFacts[]): Promise<{ readonly stockFound: number; readonly samenessFlags: number; readonly queued: number; readonly detail: readonly string[] }> {
+  const afterRun = await getStoredCapsulesFor(db, facts.map((f) => f.identity.id));
+  const stock = stockSentences([...afterRun.values()]);
+  const report = measureSameness(samenessRowsOf(afterRun, facts));
+  const over = samenessOverThreshold(report);
+  const queued = await queueCapsuleRegeneration(db, [...new Set([...playersSayingStock(stock), ...playersToRegenerateForSameness(report)])]);
+  const percent = (share: number): string => `${(share * 100).toFixed(1)}%`;
+  const detail = [
+    ...stock.slice(0, CAPSULE_CONFIG.repetition.maxQuotedSentences).map((finding) => `stock sentence on ${finding.playerIds.length} players (${percent(finding.share)}): "${finding.example}"`),
+    ...over.openers.map((finding) => `opener family on ${finding.playerIds.length} players (${percent(finding.share)}): "${finding.example}"`),
+    ...over.refrains.map((finding) => `refrain on ${finding.playerIds.length} players (${percent(finding.share)}): "${finding.key}"`),
+    ...(over.sheetTouring ? [`sheet-touring on ${report.sheetTouring.playerIds.length} players (${percent(report.sheetTouring.share)})`] : []),
+  ];
+  return { stockFound: stock.length, samenessFlags: over.openers.length + over.refrains.length + (over.sheetTouring ? 1 : 0), queued, detail };
+}
+
 export interface CapsuleSweepDeps {
   readonly apiKey: string;
   readonly fetch?: typeof globalThis.fetch;
@@ -105,9 +150,11 @@ export interface CapsuleSweepDeps {
  * nothing else, and the next tick finds him still eligible.
  */
 function reservedMsPerPlayer(): number {
-  // Three calls a player, each held to the gateway's own spacing (`write.ts`'s limiter), plus one
-  // gateway timeout for the slowest of them. `sweepPacingMs` rides along for an operator who has
-  // put a pause back on top.
+  // Up to three calls a player (the one bundle call plus a correction call for each read that
+  // failed, refrains round 2026-09-07), each held to the gateway's own spacing (`write.ts`'s
+  // limiter), plus one gateway timeout for the slowest of them. Most players are one call now, but
+  // the reserve is a statement about what a player CAN cost, and the runner's cut is the backstop
+  // either way. `sweepPacingMs` rides along for an operator who has put a pause back on top.
   return CAPSULE_CONFIG.sweepPacingMs + 3 * CAPSULE_CONFIG.gateway.minCallSpacingMs + CAPSULE_CONFIG.gateway.timeoutMs;
 }
 
@@ -129,12 +176,12 @@ export async function runCapsuleSweepStep(
   const eligible = facts.filter((f) => needsGeneration(f, stored.get(f.identity.id)));
   const budget = payload.budget ?? CAPSULE_CONFIG.sweepGenerationBudget;
   const toProcess = eligible.slice(0, budget);
-  // THE STOCK-SENTENCE AVOID LIST (dossier-voice round §3.5) — computed from what the board is
-  // ALREADY saying, before a word of this run is written, and quoted verbatim into every narrative
-  // prompt this run makes. The same check runs again at the end over the updated board and queues
-  // whoever is still repeating, so a flagged sentence is named in the prompt of exactly the run
-  // that rewrites it.
-  const avoid = sentencesToAvoid(stockSentences([...stored.values()]));
+  // THE WORN-LANGUAGE LIST (dossier-voice round §3.5, widened in the refrains round) — computed
+  // from what the board is ALREADY saying, before a word of this run is written, and quoted into
+  // every prompt this run makes. The same checks run again at the end over the updated board and
+  // queue whoever is still repeating, so a flagged sentence or stem is named in the prompt of
+  // exactly the run that rewrites it.
+  const worn = wornPhrasesOf(stored, facts);
 
   let llmCount = 0;
   let templateCount = 0;
@@ -159,12 +206,12 @@ export async function runCapsuleSweepStep(
     const pacingMs = deps.pacingMs ?? CAPSULE_CONFIG.sweepPacingMs;
     if (!first && pacingMs > 0) await new Promise((resolve) => setTimeout(resolve, pacingMs));
     first = false;
-    const result = await generateCapsule(one, { apiKey: deps.apiKey, fetch: deps.fetch }, avoid);
+    const result = await generateCapsule(one, { apiKey: deps.apiKey, fetch: deps.fetch }, worn);
     // Persisted per player as it goes, which is what makes a stop safe: a continuation re-reads
     // the stored rows and finds this player no longer eligible.
     await upsertCapsule(db, one.identity.id, one.factsHash, result);
     processed.push(one.identity.id);
-    const cost = (result.compact.usage?.costUsd ?? 0) + (result.full.usage?.costUsd ?? 0) + (result.narrative.usage?.costUsd ?? 0);
+    const cost = result.usage?.costUsd ?? 0;
     totalCostUsd += cost;
     slotsWritten += Object.keys(result.narrative.slots).length;
     slotsRejected += result.narrative.rejected.length;
@@ -226,20 +273,9 @@ export async function runCapsuleSweepStep(
 
   // THE REPETITION CHECK, over the board as it now stands, and ONLY on the run that finished the
   // night's work: it is a question about the whole board, and a half-swept board would flag
-  // sentences the continuation is about to rewrite anyway. Every player still saying a sentence
-  // more than `repetition.maxShare` of the board says has his cache key stamped stale, which is
-  // the one condition `needsGeneration` above already treats as "write this player again".
-  let stockFound = 0;
-  let queued = 0;
-  if (!willContinue) {
-    const afterRun = await getStoredCapsulesFor(db, facts.map((f) => f.identity.id));
-    const stock = stockSentences([...afterRun.values()]);
-    stockFound = stock.length;
-    queued = await queueCapsuleRegeneration(db, playersSayingStock(stock));
-    for (const finding of stock.slice(0, CAPSULE_CONFIG.repetition.maxQuotedSentences)) {
-      detail.push(`stock sentence on ${finding.playerIds.length} players (${(finding.share * 100).toFixed(1)}%): "${finding.example}"`);
-    }
-  }
+  // sentences the continuation is about to rewrite anyway. See `checkRepetition`.
+  const repetition = willContinue ? null : await checkRepetition(db, facts);
+  if (repetition !== null) detail.push(...repetition.detail);
 
   const remaining = eligible.length - processed.length;
   const summary =
@@ -250,7 +286,9 @@ export async function runCapsuleSweepStep(
     (wroteNothingInTime ? ", WROTE NOTHING: the tick budget was too small for one player, see the detail line" : "") +
     `. Peek facts: ${peekFacts.players} rows built, ${peekFacts.changed} changed, ${peekFacts.withTouchesRank} with a touches rank` +
     `. Narrative: ${slotsWritten} slots written, ${slotsRejected} rejected` +
-    (willContinue ? ", repetition check deferred to the run that finishes the batch" : `, ${stockFound} stock sentence(s) found, ${queued} player(s) queued for regeneration`);
+    (repetition === null
+      ? ", repetition check deferred to the run that finishes the batch"
+      : `, ${repetition.stockFound} stock sentence(s) found, ${repetition.samenessFlags} sameness flag(s), ${repetition.queued} player(s) queued for regeneration`);
 
   return { summary, detail };
 }

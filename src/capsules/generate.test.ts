@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
 import { describeCapsuleFallback, generateCapsule, type CapsuleSizeResult } from "./generate";
+import { validateCapsule } from "./validate";
+
+/**
+ * ONE CALL PER PLAYER (refrains round, 2026-09-07). Every test drives a fake `fetch`: the bundle
+ * request is the one asking for a JSON object, a correction request is the one asking for a single
+ * corrected note, and a fixture routes on that, so a test counting one part's own corrections never
+ * counts the bundle.
+ */
 
 function baseInput(): PlayerFactsInput {
   return {
@@ -21,202 +29,209 @@ function baseInput(): PlayerFactsInput {
   };
 }
 
+const FACTS = buildPlayerFacts(baseInput());
+
 function okResponse(content: string): Response {
   return new Response(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 300, completion_tokens: 80, total_tokens: 380, cost: 0.00005 } }), { status: 200 });
 }
 
-/** The narrative call is a THIRD request per player alongside the two reads, and it is the only
- *  one whose user message asks for a JSON object — every mock below routes on that, so a test
- *  counting a size's own attempts never counts the narrative's. */
-function isNarrativeRequest(init: RequestInit): boolean {
+type RequestKind = "bundle" | "compact" | "full";
+
+function requestKind(init: RequestInit): RequestKind {
   const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
-  return payload.messages[1]!.content.includes("Return ONE JSON object");
+  const content = payload.messages[1]!.content;
+  if (content.includes("Return ONE JSON object")) return "bundle";
+  return content.includes("Return only the corrected short note") ? "compact" : "full";
 }
 
-/** A grounded narrative: one slot, every number and name off the fact sheet. */
-const NARRATIVE_JSON = JSON.stringify({ call: "He is the engine of that SF offense and the price has not caught up." });
+function userMessageOf(init: RequestInit): string {
+  return (JSON.parse(init.body as string) as { messages: { content: string }[] }).messages[1]!.content;
+}
+
+/** Grounded reads for the fixture above: every number and name is on its sheet, and "pick 13" is
+ *  the rounded ADP the sheet itself prints. */
+const GOOD_COMPACT =
+  "Rashad Long is the back this SF offense runs through, and drafters are taking him around pick 13 when our number of 248 season points says he belongs a touch earlier. Board rank 14 overall is the honest read of that gap. The range from 178 to 275 is wide because the low end is the seasons cut short by injury, and he has carried a full load before. Take him a few picks ahead of his ADP and let somebody else worry about the tail.";
+const GOOD_FULL =
+  `${GOOD_COMPACT} There is more to the case than the gap between his ADP and our number, though that gap is where it starts. This is an offense that hands its back the ball on early downs and keeps him on the field when the game plan opens up, and that is the kind of role that turns a good back into a weekly starter you never think about benching. The tails matter too, and they matter in a specific way. The low end of that range is what a season with games missed looks like, not what a healthy season from him looks like, so a drafter who reads 178 as the expectation is reading the wrong number. The middle of the range is the honest picture, and it sits comfortably above what a back going around his pick usually gives you. What would change my mind is a summer where the touches get split, and nothing on the sheet says that is happening. Until it does, he is the kind of pick that quietly wins a league in the fourth quarter of the season, and I would rather be a few picks early on him than a round late.`;
+const GROUNDED_CALL = "He is the engine of that SF offense and the ADP has not caught up.";
 
 /** Twenty-plus words (the degenerate-completion guard retries anything shorter as transport
  *  weather) that still FAIL validation: "999" traces to no supplied fact. */
 const BAD_COMPLETION =
-  "He will score 999 touchdowns this year for this SF offense, an absurd fabricated number that nobody on the fact sheet has ever hit, and the market simply cannot price a season like that.";
+  "He will score 999 touchdowns this year for this SF offense, an absurd fabricated number that nobody on the fact sheet has ever hit, and drafters simply cannot rank a season like that.";
 
-const GOOD_COMPACT =
-  "Rashad Long is a clear buy for this SF offense. Our number says 248 season points against board rank 14 overall, well clear of ADP 12.5. He carries the load for a team leaning on him every week, and the range from 178 to 275 still lands him firmly in the RB6 tier. Draft him with confidence at his current price this season plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly.";
-const GOOD_FULL =
-  `${GOOD_COMPACT} The case only gets stronger once you look at the full picture: our number of 248 season points sits well clear of his ADP of 12.5, and board rank 14 overall backs up the price. He is the workhorse of the SF backfield, the engine of an offense that leans on him on early downs and in the passing game alike, and that workload level is exactly why the range runs from 178 on the low end to 275 on the high end. Nothing in the fact sheet points to a real downside here, so the call is simple: he is a buy at his current market price, full stop, book him with confidence on your board this season and do not look back. plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly.`;
+function bundleJson(over: Partial<{ compact: unknown; full: unknown; narrative: unknown }> = {}): string {
+  return JSON.stringify({ compact: GOOD_COMPACT, full: GOOD_FULL, narrative: { call: GROUNDED_CALL }, ...over });
+}
+
+/** A fixture answering the bundle with `bundle` and any correction with `correction(kind)`. */
+function fetchAnswering(bundle: () => string, correction: (kind: "compact" | "full") => string = () => GOOD_COMPACT) {
+  return vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+    const kind = requestKind(init);
+    return okResponse(kind === "bundle" ? bundle() : correction(kind));
+  });
+}
+
+describe("the fixtures", () => {
+  it("validate on their own facts, so every test below is about the orchestration", () => {
+    expect(validateCapsule(GOOD_COMPACT, FACTS, "compact")).toMatchObject({ ok: true });
+    expect(validateCapsule(GOOD_FULL, FACTS, "full")).toMatchObject({ ok: true });
+  });
+});
 
 describe("generateCapsule", () => {
-  it("returns llm text and provenance for both sizes on a clean generation", async () => {
-    const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-      if (isNarrativeRequest(init)) return okResponse(NARRATIVE_JSON);
-      const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
-      const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
-      return okResponse(isFull ? GOOD_FULL : GOOD_COMPACT);
-    });
+  it("writes both reads and the narrative from ONE call on a clean bundle", async () => {
+    const fetchMock = fetchAnswering(() => bundleJson());
 
-    const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.source).toBe("llm");
     expect(result.model).toBe("zai/glm-5.3-flash");
-    expect(result.compact.source).toBe("llm");
-    expect(result.full.source).toBe("llm");
-    expect(result.compact.text).toBe(GOOD_COMPACT);
-    expect(result.full.text).toBe(GOOD_FULL);
-    expect(result.narrative.slots.call).toBe("He is the engine of that SF offense and the price has not caught up.");
+    expect(result.compact).toMatchObject({ source: "llm", text: GOOD_COMPACT, usage: null, fallbackReason: null });
+    expect(result.full).toMatchObject({ source: "llm", text: GOOD_FULL, usage: null, fallbackReason: null });
+    expect(result.narrative.slots.call).toBe(GROUNDED_CALL);
     expect(result.narrative.rejected).toEqual([]);
+    // The one call's spend sits on the player, not on any one part.
+    expect(result.usage?.costUsd).toBeCloseTo(0.00005, 10);
   });
 
-  it("keeps the narrative independent of the reads: a failed narrative never flips a good pair to template", async () => {
-    const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-      if (isNarrativeRequest(init)) return okResponse("I am afraid I cannot write that for you today, sorry about this one.");
-      const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
-      return okResponse(payload.messages[1]!.content.includes("(1) the volume or role case") ? GOOD_FULL : GOOD_COMPACT);
-    });
-
-    const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+  it("keeps the narrative independent of the reads: a bad narrative object never flips a good pair to template", async () => {
+    const fetchMock = fetchAnswering(() => bundleJson({ narrative: "not an object" }));
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
     expect(result.source).toBe("llm");
     expect(result.narrative.slots).toEqual({});
-    expect(result.narrative.failure).toBe("the narrative completion was not a JSON object");
+    expect(result.narrative.failure).toBe("the answer carried no narrative object");
   });
 
-  it("regenerates once on a validation failure, then succeeds", async () => {
-    const facts = buildPlayerFacts(baseInput());
-    let compactCalls = 0;
-    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-      if (isNarrativeRequest(init)) return okResponse(NARRATIVE_JSON);
-      const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
-      const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
-      if (isFull) return okResponse(GOOD_FULL);
-      compactCalls += 1;
-      return okResponse(compactCalls === 1 ? BAD_COMPLETION : GOOD_COMPACT);
-    });
-
-    const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
-    expect(result.compact.source).toBe("llm");
-    expect(result.compact.text).toBe(GOOD_COMPACT);
-    expect(compactCalls).toBe(2);
-    // Fix round 1, MEDIUM c: usage accumulates across BOTH attempts (the failed one billed too),
-    // never just the winning one.
-    expect(result.compact.usage?.costUsd).toBeCloseTo(0.0001, 10);
+  it("drops a narrative slot that fails grounding and keeps the rest, without a second call", async () => {
+    const fetchMock = fetchAnswering(() => bundleJson({ narrative: { call: GROUNDED_CALL, "absence:usage": "He caught 137 passes a year ago and nobody tracked it." } }));
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.narrative.slots).toEqual({ call: GROUNDED_CALL });
+    expect(result.narrative.rejected.join(" ")).toContain("137");
   });
 
-  it("answers a word-band failure with a LENGTH CORRECTION, not a fresh attempt (capsule acceptance round)", async () => {
-    const facts = buildPlayerFacts(baseInput());
-    // Forty-two words, the shortest compact the coordinator's live sample actually produced: above
-    // `write.ts`'s twenty-word degenerate floor, so it reaches the validator as a real band failure
-    // rather than as transport weather.
-    const tooShort = `He is a clear buy at this price and nothing else about him needs saying today. ${Array.from({ length: 25 }, () => "plainly").join(" ")}.`;
-    const compactPrompts: string[] = [];
-    let compactCalls = 0;
+  it("corrects ONLY the part that failed: a fabricated compact costs one compact call, the full read is kept as written", async () => {
+    const kinds: RequestKind[] = [];
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-      if (isNarrativeRequest(init)) return okResponse(NARRATIVE_JSON);
-      const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
-      if (payload.messages[1]!.content.includes("(1) the volume or role case")) return okResponse(GOOD_FULL);
-      compactCalls += 1;
-      compactPrompts.push(payload.messages[1]!.content);
-      return okResponse(compactCalls === 1 ? tooShort : GOOD_COMPACT);
+      const kind = requestKind(init);
+      kinds.push(kind);
+      return okResponse(kind === "bundle" ? bundleJson({ compact: BAD_COMPLETION }) : GOOD_COMPACT);
     });
 
-    const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
 
-    expect(result.compact.source).toBe("llm");
-    expect(result.compact.text).toBe(GOOD_COMPACT);
-    // The retry hands the SAME text back with a length instruction and no violation list at all:
-    // prose that was already grounded and already in voice is corrected, never thrown away.
-    expect(compactPrompts[1]).toContain("Rewrite it to between 75 and 120 words, changing nothing else");
-    expect(compactPrompts[1]).toContain(tooShort);
-    expect(compactPrompts[1]).not.toContain("violated these rules");
+    expect(kinds).toEqual(["bundle", "compact"]);
+    expect(result.compact).toMatchObject({ source: "llm", text: GOOD_COMPACT });
+    expect(result.full).toMatchObject({ source: "llm", text: GOOD_FULL, usage: null });
+    // The correction's own spend is on the part, and the player's total carries both calls.
+    expect(result.compact.usage?.costUsd).toBeCloseTo(0.00005, 10);
+    expect(result.usage?.costUsd).toBeCloseTo(0.0001, 10);
+  });
+
+  it("answers a word-band failure with a LENGTH CORRECTION of the same text, not a fresh attempt", async () => {
+    // Forty-one words: above the twenty-word degenerate floor, so it reaches the validator as a
+    // real band failure rather than as transport weather.
+    const tooShort = `He is a clear steal at this ADP and nothing else about him needs saying today. ${Array.from({ length: 25 }, () => "plainly").join(" ")}.`;
+    const corrections: string[] = [];
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (requestKind(init) === "bundle") return okResponse(bundleJson({ compact: tooShort }));
+      corrections.push(userMessageOf(init));
+      return okResponse(GOOD_COMPACT);
+    });
+
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+
+    expect(result.compact).toMatchObject({ source: "llm", text: GOOD_COMPACT });
+    expect(corrections).toHaveLength(1);
+    expect(corrections[0]).toContain("It is 41 words. It has to be between 75 and 120 words");
+    expect(corrections[0]).toContain(tooShort);
+    expect(corrections[0]).not.toContain("broke these rules");
+  });
+
+  it("writes a read the bundle left out with one call for that read alone", async () => {
+    const corrections: string[] = [];
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (requestKind(init) === "bundle") return okResponse(JSON.stringify({ compact: GOOD_COMPACT, narrative: { call: GROUNDED_CALL } }));
+      corrections.push(userMessageOf(init));
+      return okResponse(GOOD_FULL);
+    });
+
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(corrections[0]).toContain("had no long note");
+    expect(result.full).toMatchObject({ source: "llm", text: GOOD_FULL });
+    expect(result.source).toBe("llm");
   });
 
   it("waits out a 429 rather than falling to the template on the first throttle of a sweep", async () => {
     vi.useFakeTimers();
     try {
-      const facts = buildPlayerFacts(baseInput());
-      const throttledOnce = new Map<string, number>();
-      const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-        const kind = isNarrativeRequest(init) ? "narrative" : JSON.parse(init.body as string).messages[1].content.includes("(1) the volume or role case") ? "full" : "compact";
-        const seen = throttledOnce.get(kind) ?? 0;
-        throttledOnce.set(kind, seen + 1);
-        if (seen === 0) return new Response("rate limited", { status: 429 });
-        return okResponse(kind === "narrative" ? NARRATIVE_JSON : kind === "full" ? GOOD_FULL : GOOD_COMPACT);
+      let calls = 0;
+      const fetchMock = vi.fn().mockImplementation(async () => {
+        calls += 1;
+        return calls === 1 ? new Response("rate limited", { status: 429 }) : okResponse(bundleJson());
       });
 
-      const promise = generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+      const promise = generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
       await vi.advanceTimersByTimeAsync(20_000);
       const result = await promise;
 
-      // The throttle cost one backoff wait, not a template: `write.ts`'s 429 track owns the wait
-      // and `generate.ts` never sees a failure at all.
+      // The throttle cost one backoff wait inside `write.ts`'s own 429 track, never a template.
       expect(result.source).toBe("llm");
-      expect(result.compact.fallbackReason).toBeNull();
-      expect(result.full.fallbackReason).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("falls back to the deterministic template after two failed attempts, and never blanks the capsule", async () => {
-    const facts = buildPlayerFacts(baseInput());
-    // A fresh Response per call — reusing one `Response` instance across attempts would throw on
-    // its second `.text()` read (the body stream is already consumed), which is a test-harness
-    // bug, not the thing under test.
-    const fetchMock = vi.fn().mockImplementation(async () => okResponse(BAD_COMPLETION));
+  it("gives a body with no object in it one more whole attempt, then falls to the template for both reads with no correction calls", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => okResponse("I am afraid I cannot write that for you today, sorry about this one, it is not going to happen."));
 
-    const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.source).toBe("template");
     expect(result.model).toBeNull();
-    expect(result.compact.source).toBe("template");
-    expect(result.full.source).toBe("template");
+    expect(result.compact.fallbackReason).toEqual({ kind: "failed_validation", firstViolation: "The answer was not a single JSON object." });
+    expect(result.full.fallbackReason).toEqual(result.compact.fallbackReason);
     expect(result.compact.text.length).toBeGreaterThan(0);
-    expect(result.full.text.length).toBeGreaterThan(0);
-    // Fix round 1, MEDIUM c: both failed attempts were genuinely billed by the gateway — that
-    // spend must still be logged even though the row ultimately falls back to template.
-    expect(result.compact.usage?.costUsd).toBeCloseTo(0.0001, 10);
-    expect(result.full.usage?.costUsd).toBeCloseTo(0.0001, 10);
-    // Sweep resilience, color v2, Task 4: the gateway DID respond both times, it was the content
-    // that failed the validator, so the labeled reason is "failed validation", never "throttled".
-    expect(result.compact.fallbackReason).toMatchObject({ kind: "failed_validation" });
-    expect(result.full.fallbackReason).toMatchObject({ kind: "failed_validation" });
+    expect(result.narrative.slots).toEqual({});
+    expect(result.narrative.failure).toBe("The answer was not a single JSON object.");
+    // Both attempts were billed, and both are on the ledger even though the row fell to template.
+    expect(result.usage?.costUsd).toBeCloseTo(0.0001, 10);
   });
 
   it("falls back to the template when the gateway is unreachable throughout, never throwing", async () => {
-    const facts = buildPlayerFacts(baseInput());
     const fetchMock = vi.fn().mockRejectedValue(new Error("network down"));
-    const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
     expect(result.source).toBe("template");
     expect(result.compact.text).toBe(result.full.text);
-    // No attempt ever got back a billable response — nothing to log.
-    expect(result.compact.usage).toBeNull();
-    // A pure transport failure (never even got a response to validate) labels as "throttled",
-    // never "failed validation" — there was nothing to validate.
+    expect(result.usage).toBeNull();
     expect(result.compact.fallbackReason).toEqual({ kind: "throttled" });
     expect(result.full.fallbackReason).toEqual({ kind: "throttled" });
+    expect(result.narrative.failure).toBe("the gateway never returned a usable answer");
   });
 
-  it("marks the whole capsule template-sourced when only one size falls back, never claiming a mixed llm provenance", async () => {
-    const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-      if (isNarrativeRequest(init)) return okResponse(NARRATIVE_JSON);
-      const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
-      const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
-      return isFull ? okResponse(BAD_COMPLETION) : okResponse(GOOD_COMPACT);
-    });
+  it("marks the whole capsule template-sourced when one read fails its correction too, never claiming a mixed provenance", async () => {
+    const fetchMock = fetchAnswering(() => bundleJson({ full: BAD_COMPLETION }), () => BAD_COMPLETION);
 
-    const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.compact.source).toBe("llm");
     expect(result.full.source).toBe("template");
+    expect(result.full.fallbackReason).toMatchObject({ kind: "failed_validation" });
     expect(result.source).toBe("template");
     expect(result.model).toBeNull();
-    expect(result.compact.fallbackReason).toBeNull();
-    expect(result.full.fallbackReason).toMatchObject({ kind: "failed_validation" });
   });
 });
 
-/** THE LABELED DETAIL (sweep resilience, color v2, Task 4) — pure, so the classification rule
- *  itself is tested without a gateway or a database in the loop. `capsule-sweep-job.ts`'s own
- *  detail lines are the one caller. */
+/** THE LABELED DETAIL — pure, so the classification rule itself is tested without a gateway or a
+ *  database in the loop. `capsule-sweep-job.ts`'s own detail lines are the one caller. */
 describe("describeCapsuleFallback", () => {
   function llmResult(): CapsuleSizeResult {
     return { text: "Body.", source: "llm", usage: null, fallbackReason: null };
@@ -228,7 +243,7 @@ describe("describeCapsuleFallback", () => {
     return { text: "Template body.", source: "template", usage: null, fallbackReason: { kind: "failed_validation", firstViolation } };
   }
 
-  it("reports \"llm\" when neither size fell back", () => {
+  it('reports "llm" when neither size fell back', () => {
     expect(describeCapsuleFallback(llmResult(), llmResult())).toBe("llm");
   });
 

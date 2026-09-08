@@ -9,9 +9,10 @@ function llmResult(overrides: Partial<CapsuleGenerationResult> = {}): CapsuleGen
   return {
     compact: { text: "Compact body.", source: "llm", usage: null, fallbackReason: null },
     full: { text: "Full body.", source: "llm", usage: null, fallbackReason: null },
-    narrative: { slots: {}, usage: null, model: null, rejected: [], failure: null },
+    narrative: { slots: {}, model: null, rejected: [], failure: null },
     source: "llm",
     model: "zai/glm-5.3-flash",
+    usage: null,
     ...overrides,
   };
 }

@@ -14,21 +14,25 @@ function okResponse(content: string): Response {
   return new Response(JSON.stringify({ choices: [{ message: { content } }], usage: { cost: 0.00005 } }), { status: 200 });
 }
 
+/** No numbers and no names, so it grounds for any player, in drafting words so it clears the
+ *  banned-vocabulary rule (founder ruling, 2026-09-07). */
 const GOOD_COMPACT =
-  "This player is a clear buy for his offense this season. Our number backs the price against his board rank and market slot, and the range from top to bottom still lands him firmly in his tier. Draft him with confidence at his current price this season, he anchors the offense every single week without fail, and the whole coaching staff plainly builds the game plan around keeping him involved on early downs and on passing downs alike plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further.";
+  "This is the back his offense runs through, and drafters are taking him later than the case says they should. Our number backs the role against his board rank, and the range from top to bottom still lands him firmly in his tier. Draft him with confidence at his current ADP, he anchors the offense every single week without fail, and the whole coaching staff plainly builds the game plan around keeping him involved on early downs and on passing downs alike, which is the whole reason the case holds together from the first week to the last week.";
 const GOOD_FULL =
-  `${GOOD_COMPACT} The case only gets stronger once you look at the full picture: our number sits well clear of his market slot, and his board rank backs up the price plainly. He is the workhorse of his offense, the engine of a unit that leans on him on early downs and in the passing game alike, and that workload level is exactly why the range still lands him firmly in his tier from top to bottom this year. Nothing in the fact sheet points to a real downside here, so the call is simple: he is a buy at his current market price, full stop, book him with confidence on your board this season and do not look back at all, because the whole shape of his offense points the same direction week after week and there is no reason to expect that to change any time soon this fall. plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably.`;
+  `${GOOD_COMPACT} The case only gets stronger once you look at the full picture: our number sits well clear of his ADP, and his board rank backs up the case plainly. He is the workhorse of his offense, the engine of a unit that leans on him on early downs and in the passing game alike, and that workload level is exactly why the range still lands him firmly in his tier from top to bottom this year. Nothing in the fact sheet points to a real downside here, so the call is simple: draft him at his current ADP, full stop, book him with confidence on your board this season and do not look back at all, because the whole shape of his offense points the same direction week after week and there is no reason to expect that to change any time soon this fall. plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably steadily really overall plainly frankly truly clearly simply further notably.`;
 
-/** A fetch fixture size-aware the way a real gateway response is: `write.ts`'s own size
- *  instruction text names the size directly, so a fixture can answer each request with a body
- *  that actually clears that size's own word band. */
-function sizeAwareFetch(): typeof globalThis.fetch {
+/** ONE CALL PER PLAYER (refrains round, 2026-09-07): a fixture answers the bundle request with one
+ *  JSON object carrying both reads and the narrative, exactly as the gateway does. `narrative` is
+ *  the slot object that object carries, empty by default. */
+function bundleFetch(narrative: Readonly<Record<string, string>> = {}, prompts: string[] = []): typeof globalThis.fetch {
   return (async (_url: unknown, init: unknown) => {
     const { messages } = JSON.parse((init as RequestInit).body as string) as { messages: { content: string }[] };
-    const isFull = messages[1]!.content.includes("(1) the volume or role case");
-    return okResponse(isFull ? GOOD_FULL : GOOD_COMPACT);
+    prompts.push(messages[1]!.content);
+    return okResponse(JSON.stringify({ compact: GOOD_COMPACT, full: GOOD_FULL, narrative }));
   }) as typeof globalThis.fetch;
 }
+
+const sizeAwareFetch = (): typeof globalThis.fetch => bundleFetch();
 
 async function seedPlayer(db: Db, input: { readonly id: string; readonly nflId: string; readonly name: string; readonly rank: number; readonly points: number }): Promise<void> {
   await db.insert(nflPlayers).values({ id: input.nflId, name: input.name, position: "RB" });
@@ -112,7 +116,7 @@ describe("runCapsuleSweepStep", () => {
     await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Rashad Long", rank: 1, points: 248 });
     const failingFetch = async () => new Response("bad request", { status: 401 });
     const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: failingFetch }, {});
-    // The narrative is a third call on the same dead gateway and reports its own failure line;
+    // The one call failed on the dead gateway, so the narrative reports its own failure line too;
     // the size label is what this test is about and it still reads "throttled".
     expect(outcome.detail).toContain("Rashad Long: template (throttled)");
   });
@@ -120,8 +124,8 @@ describe("runCapsuleSweepStep", () => {
   it("labels a detail line \"template (failed validation: ...)\" quoting the first violation when the gateway talks but the content fails the validator", async () => {
     await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Rashad Long", rank: 1, points: 248 });
     // Twenty-plus words (the degenerate-completion guard retries anything shorter) that still fail validation: "999" traces to no fact.
-    const fabricatedBody = "He will score 999 touchdowns this year for this offense, an absurd fabricated number that nobody on the fact sheet has ever hit, and the market simply cannot price a season like that.";
-    const fabricatingFetch = async () => okResponse(fabricatedBody);
+    const fabricatedBody = "He will score 999 touchdowns this year for this offense, an absurd fabricated number that nobody on the fact sheet has ever hit, and drafters simply cannot rank a season like that.";
+    const fabricatingFetch = async () => okResponse(JSON.stringify({ compact: fabricatedBody, full: fabricatedBody, narrative: {} }));
     const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: fabricatingFetch }, {});
     const sizeLabel = outcome.detail.find((line) => line.startsWith("Rashad Long: template"))!;
     expect(sizeLabel).toMatch(/^Rashad Long: template \(failed validation: .+\)$/);
@@ -303,15 +307,9 @@ describe("runCapsuleSweepStep — the repetition chain", () => {
    *  every player it touches, which is exactly the stock sentence the check exists to catch. */
   const STOCK = "He is the engine of that offense every single week.";
 
-  /** The size-aware fixture plus a narrative answer, so the run actually stores a narrative. */
+  /** The bundle fixture with a narrative in it, so the run actually stores a narrative. */
   function narrativeFetch(prompts: string[] = []): typeof globalThis.fetch {
-    return (async (_url: unknown, init: unknown) => {
-      const { messages } = JSON.parse((init as RequestInit).body as string) as { messages: { content: string }[] };
-      const prompt = messages[1]!.content;
-      prompts.push(prompt);
-      if (prompt.includes("Return ONE JSON object")) return okResponse(JSON.stringify({ call: STOCK }));
-      return okResponse(prompt.includes("(1) the volume or role case") ? GOOD_FULL : GOOD_COMPACT);
-    }) as typeof globalThis.fetch;
+    return bundleFetch({ call: STOCK }, prompts);
   }
 
   async function seedTwo(): Promise<void> {
@@ -325,10 +323,33 @@ describe("runCapsuleSweepStep — the repetition chain", () => {
 
     const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch(), pacingMs: 0 }, {});
 
-    expect(outcome.summary).toContain("1 stock sentence(s) found, 2 player(s) queued");
+    expect(outcome.summary).toContain("1 stock sentence(s) found");
+    expect(outcome.summary).toContain("2 player(s) queued");
     expect((await getStoredCapsule(db, "p1"))?.narrative).toEqual({ call: STOCK });
     expect((await getStoredCapsule(db, "p1"))?.factsHash).toBe(REGENERATE_FACTS_HASH);
     expect((await getStoredCapsule(db, "p2"))?.factsHash).toBe(REGENERATE_FACTS_HASH);
+  });
+
+  /** THE SAMENESS CHAIN (refrains round, 2026-09-07) — the fixture writes every player the same
+   *  reads, so the whole board shares one opener family and one refrain ("the engine of"): both are
+   *  flagged, both players are queued, and the next run's prompt names the flagged phrases. */
+  it("flags a shared opener family and refrain across the board, queues the players, and quotes the phrases into the next prompt", async () => {
+    await seedTwo();
+
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch(), pacingMs: 0 }, {});
+
+    expect(outcome.summary).toMatch(/[1-9]\d* sameness flag\(s\), 2 player\(s\) queued/);
+    expect(outcome.detail.some((line) => line.startsWith("opener family on 2 players (100.0%)"))).toBe(true);
+    expect(outcome.detail).toContain('refrain on 2 players (100.0%): "the engine of"');
+    expect((await getStoredCapsule(db, "p1"))?.factsHash).toBe(REGENERATE_FACTS_HASH);
+
+    const prompts: string[] = [];
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: bundleFetch({}, prompts), pacingMs: 0 }, {});
+    const bundlePrompt = prompts.find((prompt) => prompt.includes("Return ONE JSON object"))!;
+    expect(bundlePrompt).toContain("already on too many other players' pages");
+    expect(bundlePrompt).toContain("the engine of");
+    // The opener family's example is the first four words, in a player's own words.
+    expect(bundlePrompt).toContain('"This is the back"');
   });
 
   it("quotes the flagged sentence into the next run's own prompt", async () => {
@@ -340,9 +361,9 @@ describe("runCapsuleSweepStep — the repetition chain", () => {
     const prompts: string[] = [];
     await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch(prompts), pacingMs: 0 }, {});
 
-    const narrativePrompt = prompts.find((prompt) => prompt.includes("Return ONE JSON object"));
-    expect(narrativePrompt).toBeDefined();
-    expect(narrativePrompt).toContain("Do not write them");
-    expect(narrativePrompt).toContain(STOCK);
+    const bundlePrompt = prompts.find((prompt) => prompt.includes("Return ONE JSON object"));
+    expect(bundlePrompt).toBeDefined();
+    expect(bundlePrompt).toContain("Do not write them");
+    expect(bundlePrompt).toContain(STOCK);
   });
 });

@@ -267,7 +267,7 @@ describe("the team context line", () => {
       }),
     );
     expect(renderDepthSection(facts)).toBe(
-      "The record:\n- SF in 2025: 28.4 seconds a play, 58% of situation-neutral plays passes, 11.5 wins. The books price their week one game at an implied 24.5 points and a spread of +3.5 in their favour.",
+      "The record:\n- SF in 2025: 28.4 seconds a play, 58% of situation-neutral plays passes, 11.5 wins. The books have their week one game at a total of 24.5 points and a spread of +3.5 in their favour.",
     );
     for (const value of [2025, 28.4, 0.581, 58, 11.5, 24.5, 3.5]) expect(facts.numberLedger).toContain(value);
   });
@@ -276,7 +276,7 @@ describe("the team context line", () => {
     const facts = buildPlayerFacts(
       depthInput({ ...EMPTY_DEPTH, teamContext: { priorSeason: 2025, paceSecondsPerPlay: null, passRate: null, wins: null, weekOneImpliedTotal: 21.5, weekOneSpread: null } }),
     );
-    expect(renderDepthSection(facts)).toBe("The record:\n- The books price their week one game at an implied 21.5 points.");
+    expect(renderDepthSection(facts)).toBe("The record:\n- The books have their week one game at a total of 21.5 points.");
   });
 
   it("renders no team context line when neither store holds a row", () => {
@@ -312,12 +312,12 @@ describe("the schedule line", () => {
   });
 });
 
-describe("the market movement, volatility and career lines", () => {
-  it("dates both ends of the market window and grounds every number", () => {
+describe("the ADP movement, volatility and career lines", () => {
+  it("dates both ends of the ADP window in drafting words and grounds every number", () => {
     const facts = buildPlayerFacts(
       depthInput({ ...EMPTY_DEPTH, marketMovement: { latestAdp: 13, latestAt: "2026-09-07", earlierAdp: 24, earlierAt: "2026-08-08", picks: 11 } }),
     );
-    expect(renderDepthSection(facts)).toBe("The record:\n- The market has moved him up 11 picks, from 24 on 2026-08-08 to 13 on 2026-09-07.");
+    expect(renderDepthSection(facts)).toBe("The record:\n- ADP moved up 11 picks between 2026-08-08 and 2026-09-07, from 24 to 13.");
     for (const value of [13, 24, 11, 2026, 9, 7, 8]) expect(facts.numberLedger).toContain(value);
   });
 
@@ -325,11 +325,18 @@ describe("the market movement, volatility and career lines", () => {
     const facts = buildPlayerFacts(
       depthInput({ ...EMPTY_DEPTH, marketMovement: { latestAdp: 24.5, latestAt: "2026-09-07", earlierAdp: 13, earlierAt: "2026-08-08", picks: -11.5 } }),
     );
-    expect(renderDepthSection(facts)).toBe("The record:\n- The market has moved him down 11.5 picks, from 13 on 2026-08-08 to 24.5 on 2026-09-07.");
+    expect(renderDepthSection(facts)).toBe("The record:\n- ADP moved down 11.5 picks between 2026-08-08 and 2026-09-07, from 13 to 24.5.");
     expect(facts.numberLedger).toContain(11.5);
   });
 
-  it("renders no market movement line when the archive holds one capture", () => {
+  it("says the ADP held when the two captures agree, never that a market did nothing", () => {
+    const facts = buildPlayerFacts(
+      depthInput({ ...EMPTY_DEPTH, marketMovement: { latestAdp: 24, latestAt: "2026-09-07", earlierAdp: 24, earlierAt: "2026-08-08", picks: 0 } }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- ADP held at 24 between 2026-08-08 and 2026-09-07.");
+  });
+
+  it("renders no ADP movement line when the archive holds one capture", () => {
     expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, marketMovement: null })))).toBeNull();
   });
 

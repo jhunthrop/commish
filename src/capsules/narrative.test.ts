@@ -1,14 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
-import { generateNarrative, narrativePromptFor, narrativeRequestsFor } from "./narrative";
+import { narrativeRequestsFor, settleNarrative } from "./narrative";
 import { absenceSlotKey, ABSENCE_MODULES, NARRATIVE_KEYS, narrativeSlot, normalizeSentence, whyGroupSlotKey } from "./narrative-slots";
 import { groundingOf, validateNarrativeSlot } from "./validate";
 
 /**
- * THE NARRATIVE, WITHOUT A GATEWAY. Every test here drives a fake `fetch`: the round's own rule is
- * that nothing in the suite or in a script spends gateway money, and none of the behaviour under
- * test (which slots are asked for, what the validator accepts, what a bad body does) needs a live
- * model to exercise.
+ * THE NARRATIVE, WITHOUT A GATEWAY. The slots come back inside the one-call bundle now (refrains
+ * round, 2026-09-07), so nothing here touches a fetch at all: which slots are asked for, what the
+ * validator accepts and what a bad object does are all pure, and none of it needs a live model.
  */
 
 function baseInput(over: Partial<PlayerFactsInput> = {}): PlayerFactsInput {
@@ -35,14 +34,7 @@ function baseInput(over: Partial<PlayerFactsInput> = {}): PlayerFactsInput {
   };
 }
 
-function okResponse(content: string): Response {
-  return new Response(
-    JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 900, completion_tokens: 240, total_tokens: 1140, cost: 0.00007 } }),
-    { status: 200 },
-  );
-}
-
-const GROUNDED_CALL = "He is the engine of that SF offense and the price has not caught up.";
+const GROUNDED_CALL = "He is the engine of that SF offense and the ADP has not caught up.";
 
 describe("narrativeRequestsFor", () => {
   it("asks for the call always, and for the tier only where the board found a real cliff", () => {
@@ -77,20 +69,6 @@ describe("narrativeRequestsFor", () => {
   });
 });
 
-describe("narrativePromptFor", () => {
-  it("quotes the board's stock sentences as ones not to write", () => {
-    const facts = buildPlayerFacts(baseInput());
-    const prompt = narrativePromptFor(facts, narrativeRequestsFor(facts), ["he is a high floor play with weekly upside"]);
-    expect(prompt).toContain("he is a high floor play with weekly upside");
-    expect(prompt).toContain("Do not write them");
-  });
-
-  it("says nothing about stock sentences on a healthy board", () => {
-    const facts = buildPlayerFacts(baseInput());
-    expect(narrativePromptFor(facts, narrativeRequestsFor(facts), [])).not.toContain("Do not write them");
-  });
-});
-
 describe("validateNarrativeSlot", () => {
   const facts = buildPlayerFacts(baseInput());
 
@@ -113,9 +91,9 @@ describe("validateNarrativeSlot", () => {
 
   it("rejects a fabricated teammate, an em-dash, a semicolon and the lab-report register", () => {
     expect(validateNarrativeSlot("Justin Herbert throws him the ball every week now.", groundingOf(facts), 40).ok).toBe(false);
-    expect(validateNarrativeSlot("He is a buy — the price is wrong.", groundingOf(facts), 40).ok).toBe(false);
-    expect(validateNarrativeSlot("He is a buy; the price is wrong.", groundingOf(facts), 40).ok).toBe(false);
-    expect(validateNarrativeSlot("His projection sits above his price.", groundingOf(facts), 40).ok).toBe(false);
+    expect(validateNarrativeSlot("He is a steal — the ADP is wrong.", groundingOf(facts), 40).ok).toBe(false);
+    expect(validateNarrativeSlot("He is a steal; the ADP is wrong.", groundingOf(facts), 40).ok).toBe(false);
+    expect(validateNarrativeSlot("His projection sits above his ADP.", groundingOf(facts), 40).ok).toBe(false);
   });
 
   it("does not demand the tension citation a whole read has to carry", () => {
@@ -125,50 +103,41 @@ describe("validateNarrativeSlot", () => {
   });
 });
 
-describe("generateNarrative", () => {
-  it("keeps every grounded slot and drops only the ones that fail", async () => {
+describe("settleNarrative", () => {
+  it("keeps every grounded slot and drops only the ones that fail", () => {
     const facts = buildPlayerFacts(baseInput());
-    const body = JSON.stringify({
+    const raw = {
       [NARRATIVE_KEYS.call]: GROUNDED_CALL,
       [NARRATIVE_KEYS.tier]: "Two backs are left in his tier before a 20.9 point drop, so the wait costs you.",
       [absenceSlotKey(ABSENCE_MODULES.usage)]: "Nobody charted his snaps last year, so watch the early-down work in August.",
       unknownKey: "This slot was never asked for.",
       [NARRATIVE_KEYS.perGame]: "He caught 137 passes a year ago and the games question answers itself.",
-    });
-    const fetchMock = vi.fn().mockResolvedValue(okResponse(body));
+    };
 
-    const result = await generateNarrative(facts, { apiKey: "test-key", fetch: fetchMock });
+    const result = settleNarrative(raw, facts, narrativeRequestsFor(facts));
 
     expect(result.slots[NARRATIVE_KEYS.call]).toBe(GROUNDED_CALL);
     expect(result.slots[NARRATIVE_KEYS.tier]).toContain("20.9 point drop");
     expect(result.slots).not.toHaveProperty("unknownKey");
     expect(result.slots).not.toHaveProperty(NARRATIVE_KEYS.perGame);
     expect(result.rejected.join(" ")).toContain("137");
-    expect(result.usage?.costUsd).toBeCloseTo(0.00007, 10);
+    expect(result.model).toBe("zai/glm-5.3-flash");
     expect(result.failure).toBeNull();
   });
 
-  it("reads a fenced JSON object rather than refusing it", async () => {
+  it("reads a skipped or blank slot as absence, never as a rejection", () => {
     const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockResolvedValue(okResponse("```json\n" + JSON.stringify({ call: GROUNDED_CALL }) + "\n```"));
-    const result = await generateNarrative(facts, { apiKey: "test-key", fetch: fetchMock });
-    expect(result.slots[NARRATIVE_KEYS.call]).toBe(GROUNDED_CALL);
+    const result = settleNarrative({ [NARRATIVE_KEYS.call]: "   ", [NARRATIVE_KEYS.tier]: 12 }, facts, narrativeRequestsFor(facts));
+    expect(result.slots).toEqual({});
+    expect(result.rejected).toEqual([]);
+    expect(result.model).toBeNull();
   });
 
-  it("returns no slots, and never throws, when the gateway is unreachable", async () => {
+  it("names the failure when the answer carried no narrative object at all", () => {
     const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockRejectedValue(new Error("network down"));
-    const result = await generateNarrative(facts, { apiKey: "test-key", fetch: fetchMock });
+    const result = settleNarrative(null, facts, narrativeRequestsFor(facts));
     expect(result.slots).toEqual({});
-    expect(result.failure).toContain("network down");
-  });
-
-  it("returns no slots for a body that is not an object of sentences", async () => {
-    const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockResolvedValue(okResponse("[\"a list of things nobody asked for, which is not the object shape\"]"));
-    const result = await generateNarrative(facts, { apiKey: "test-key", fetch: fetchMock });
-    expect(result.slots).toEqual({});
-    expect(result.failure).toBe("the narrative completion was not a JSON object");
+    expect(result.failure).toBe("the answer carried no narrative object");
   });
 });
 
