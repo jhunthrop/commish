@@ -16,6 +16,7 @@ import { loadArchivedPropLines, median, medianPropLinesByPlayer } from "@/projec
 import { statLinesAsOfForLiveSurface } from "@/projections/nflverse/derived-stat-lines";
 import { PARTICIPATION_METRICS } from "@/projections/nflverse/map";
 import { LIVE_ADMITTED_DERIVED_SEASONS } from "@/projections/nflverse/stat-lines";
+import { sourceTeamCode } from "@/projections/nflverse/team-codes";
 import { finalWeekOf } from "@/projections/nflverse/team-eras";
 import { PROP_MARKETS, type PropMarket } from "@/projections/odds/props-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
@@ -534,7 +535,13 @@ export function factsInputFor(
 ): PlayerFactsInput {
   const gsisId = color.gsisIdByPlayerId.get(row.playerId);
   const propsLines = gsisId === undefined ? [] : (color.propsLinesByGsisId.get(gsisId) ?? []);
-  const booksNumbers: PlayerFactsBooksNumbers = { propsLines, teamVegasWinTotal: color.winTotalByTeam.get(row.team) ?? null };
+  // THE WIN TOTAL IS KEYED BY THE NFLVERSE SPELLING, and the board row carries the PRODUCT one
+  // (`nflverse/team-codes.ts`): the product says `LAR` and `WSH` where `team_week_observations`
+  // says `LA` and `WAS`. Reading it by the board's own code silently returned nothing for exactly
+  // those two franchises, which rendered as "the books have posted no win total for the Rams"
+  // rather than as the lookup miss it was. `sourceTeamCode` is the one normalizer for this, and it
+  // leaves every other code untouched.
+  const booksNumbers: PlayerFactsBooksNumbers = { propsLines, teamVegasWinTotal: color.winTotalByTeam.get(sourceTeamCode(row.team)) ?? null };
   return {
     identity: { id: row.playerId, name: row.name, position: row.position, team: row.team },
     productSeason: PRODUCT_SEASON,
