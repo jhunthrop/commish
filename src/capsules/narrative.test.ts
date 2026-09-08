@@ -42,7 +42,7 @@ function okResponse(content: string): Response {
   );
 }
 
-const GROUNDED_CALL = "He is the engine of that SF offense and the price has not caught up.";
+const GROUNDED_CALL = "He is the engine of that SF offense and the ADP has not caught up.";
 
 describe("narrativeRequestsFor", () => {
   it("asks for the call always, and for the tier only where the board found a real cliff", () => {
@@ -113,9 +113,9 @@ describe("validateNarrativeSlot", () => {
 
   it("rejects a fabricated teammate, an em-dash, a semicolon and the lab-report register", () => {
     expect(validateNarrativeSlot("Justin Herbert throws him the ball every week now.", groundingOf(facts), 40).ok).toBe(false);
-    expect(validateNarrativeSlot("He is a buy — the price is wrong.", groundingOf(facts), 40).ok).toBe(false);
-    expect(validateNarrativeSlot("He is a buy; the price is wrong.", groundingOf(facts), 40).ok).toBe(false);
-    expect(validateNarrativeSlot("His projection sits above his price.", groundingOf(facts), 40).ok).toBe(false);
+    expect(validateNarrativeSlot("He is a steal — the ADP is wrong.", groundingOf(facts), 40).ok).toBe(false);
+    expect(validateNarrativeSlot("He is a steal; the ADP is wrong.", groundingOf(facts), 40).ok).toBe(false);
+    expect(validateNarrativeSlot("His projection sits above his ADP.", groundingOf(facts), 40).ok).toBe(false);
   });
 
   it("does not demand the tension citation a whole read has to carry", () => {

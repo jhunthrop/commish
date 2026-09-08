@@ -275,6 +275,28 @@ export const BANNED_VOCABULARY: readonly string[] = [
   "in nfl history",
   "greatest of all time",
   "goat",
+  // THE TRADING REGISTER (founder ruling, 2026-09-07: "we say market everywhere like this is a
+  // stock trading app, it's a fantasy football app"). A capsule talks about ADP, picks and rounds,
+  // reaches and steals, sleepers and busts, letting a player fall or drafting him. `render.ts`
+  // states the sheet's own ADP facts in those words for the same reason it never says "p10", and
+  // this list refuses the paraphrase that brings the trading floor back. Single words are matched
+  // whole with their plain inflections ("priced", "selling", "fading"); "upside"/"downside" are
+  // not here because they are fantasy words too when tied to an outcome, which the prompt asks for.
+  "market",
+  "price",
+  "priced",
+  "buy",
+  "sell",
+  "fade",
+  "trade at",
+  "trades at",
+  "trading at",
+  "undervalued",
+  "overvalued",
+  "premium",
+  "discount",
+  "dividend",
+  "return on",
 ];
 
 /** Rival fantasy products — a capsule voices this product's own case, never a comparison to

@@ -89,9 +89,9 @@ describe("renderTemplateCapsule", () => {
     expect(text).not.toContain("+2.4");
   });
 
-  it("keeps the unpriced-market sentence: the one market fact no other surface states", () => {
+  it("keeps the no-ADP sentence: the one drafting fact no other surface states", () => {
     const facts = buildPlayerFacts({ ...baseInput(), market: { adp: null, positionAdp: null, boardRank: 14 } });
-    expect(renderTemplateCapsule(facts)).toContain("The market has not priced him.");
+    expect(renderTemplateCapsule(facts)).toContain("No ADP on file for him: drafters are not taking him yet.");
   });
 
   it("states a genuinely clean read, dated, distinct from 'never checked'", () => {
@@ -101,10 +101,10 @@ describe("renderTemplateCapsule", () => {
     expect(text).not.toContain("never been checked");
   });
 
-  it("states an unpriced market honestly rather than a fabricated ADP", () => {
+  it("states a missing ADP honestly rather than a fabricated one", () => {
     const facts = buildPlayerFacts(baseInput({ market: { adp: null, positionAdp: null, boardRank: 14 } }));
     const text = renderTemplateCapsule(facts);
-    expect(text).toContain("The market has not priced him.");
+    expect(text).toContain("No ADP on file for him: drafters are not taking him yet.");
   });
 
   it("states the real injury designation when present", () => {

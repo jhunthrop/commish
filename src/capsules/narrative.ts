@@ -163,7 +163,7 @@ function briefLabelOf(item: PlayerFacts["evidence"][number]): string {
     case "rookie":
       return "he is a rookie";
     case "market_unlisted":
-      return "the market has not listed him";
+      return "nobody is drafting him yet";
   }
 }
 

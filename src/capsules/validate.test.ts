@@ -88,7 +88,7 @@ describe("validateCapsule", () => {
   it("leaves a bare \"ever\" alone, which claims nothing at all", () => {
     const facts = buildPlayerFacts(baseInput());
     // a bare "ever" is ordinary English, not an all-time claim.
-    const body = compactWords("Rashad Long is a buy for the SF offense if he ever gets the goal-line work, our number of 248 season points and board rank 14 overall.");
+    const body = compactWords("Rashad Long is a steal for the SF offense if he ever gets the goal-line work, our number of 248 season points and board rank 14 overall.");
     expect(validateCapsule(body, facts, "compact").ok).toBe(true);
   });
 
@@ -161,12 +161,12 @@ describe("validateCapsule", () => {
         ],
       }),
     );
-    const oneSided = compactWords("Rashad Long is a clear buy for the SF offense, our number of 248 season points and board rank 14 overall make him a lock this season.");
+    const oneSided = compactWords("Rashad Long is a clear steal for the SF offense, our number of 248 season points and board rank 14 overall make him a lock this season.");
     const oneSidedResult = validateCapsule(oneSided, facts, "compact");
     expect(oneSidedResult.ok).toBe(false);
     expect(oneSidedResult.violations.some((v) => v.includes("Mixed evidence"))).toBe(true);
 
-    const withHesitation = compactWords("Rashad Long anchors the SF offense at board rank 14 overall, our number of 248 season points, though the age curve costs him -1.8 a game, still a buy this season.");
+    const withHesitation = compactWords("Rashad Long anchors the SF offense at board rank 14 overall, our number of 248 season points, though the age curve costs him -1.8 a game, still a steal this season.");
     const withHesitationResult = validateCapsule(withHesitation, facts, "compact");
     expect(withHesitationResult.violations.some((v) => v.includes("Mixed evidence"))).toBe(false);
   });

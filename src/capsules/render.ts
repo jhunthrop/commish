@@ -65,23 +65,47 @@ function signedPercentOf(fraction: number): string {
   return `${signed(Math.round(fraction * 100), 0)}%`;
 }
 
+/**
+ * THE ADP, IN DRAFTING WORDS (founder ruling, 2026-09-07: "it's a fantasy football app, not a stock
+ * trading app"). The sheet says where drafters take him, never what "the market" "prices" him at,
+ * because the model quotes the sheet and `BANNED_VOCABULARY` now refuses the trading words. The
+ * rounded pick is printed beside the raw ADP so "around pick 100" grounds by construction: it is on
+ * the sheet, and it is a plain rounding of the ADP on the ledger either way.
+ */
+function adpLine(facts: PlayerFacts): string {
+  const { market } = facts;
+  if (market.adp === null) return "No ADP on file: drafters are not taking him.";
+  const byAdp = market.positionAdp === null ? "" : `, ${market.positionAdp} by ADP`;
+  return `ADP ${market.adp} (drafters take him around pick ${Math.round(market.adp)}${byAdp}).`;
+}
+
+/** THE TWO RANGES, STATED AS DATA RATHER THAN AS A SENTENCE (refrains round, 2026-09-07). The prior
+ *  wording ("Most seasons land between", "the injury seasons, not a talent read") came back
+ *  verbatim in the reads, because a sheet that hands the model a finished sentence gets that
+ *  sentence back. Terse labels leave the sentence for the writer to make. */
+function rangesLine(facts: PlayerFacts): string {
+  const { projection } = facts;
+  return (
+    `Middle range, where most outcomes fall: ${Math.round(projection.typicalLow)} to ${Math.round(projection.typicalHigh)} points. ` +
+    `Full tails: ${Math.round(projection.floorPoints)} to ${Math.round(projection.ceilingPoints)}, the low tail from seasons shortened by injury.`
+  );
+}
+
 function boardLine(facts: PlayerFacts): string {
   const { market, projection } = facts;
   const rankBits = [`overall rank ${market.boardRank}`];
   if (market.positionRank !== null) rankBits.push(`position rank ${facts.identity.position}${market.positionRank} by our own board`);
-  const bandLine = `Most seasons land between ${Math.round(projection.typicalLow)} and ${Math.round(projection.typicalHigh)} points. The full tails run ${Math.round(projection.floorPoints)} to ${Math.round(projection.ceilingPoints)}, and the low end of that tail is the injury seasons, not a talent read.`;
-  const line = `Our number: ${Math.round(projection.projectedPoints)} season points. ${bandLine} ${rankBits.join(", ")}.`;
-  const marketBits: string[] = [];
-  marketBits.push(market.adp === null ? "The market has not priced him." : `Market ADP ${market.adp}${market.positionAdp !== null ? ` (${market.positionAdp} by market rank)` : ""}.`);
+  const line = `Our number: ${Math.round(projection.projectedPoints)} season points. ${rangesLine(facts)} ${rankBits.join(", ")}.`;
+  const adpBits: string[] = [adpLine(facts)];
   if (market.marketAnchorPoints !== null) {
-    marketBits.push(
-      `${facts.identity.position}s taken around his draft slot have historically returned about ${market.marketAnchorPoints} points a season (busts and injuries pooled in); our number is ${signed(market.marketAnchorDelta ?? 0)} points from that.`,
+    adpBits.push(
+      `${facts.identity.position}s drafted around his ADP have historically scored about ${market.marketAnchorPoints} points a season, busts and injuries pooled in. Our number is ${signed(market.marketAnchorDelta ?? 0)} points from that.`,
     );
   }
   if (market.playersLeftInTier !== null && market.dropToNextTier !== null) {
-    marketBits.push(`${market.playersLeftInTier} players left in his tier before a ${market.dropToNextTier.toFixed(1)}-point cliff.`);
+    adpBits.push(`${market.playersLeftInTier} players left in his tier before a ${market.dropToNextTier.toFixed(1)}-point cliff.`);
   }
-  return [line, ...marketBits].join(" ");
+  return [line, ...adpBits].join(" ");
 }
 
 function availabilityLine(facts: PlayerFacts): string | null {
@@ -101,12 +125,14 @@ function evidenceLines(facts: PlayerFacts): readonly string[] {
         return `Offseason role shrank: targets ${signedPercentOf(item.targetShareChange)}, carries ${signedPercentOf(item.carryShareChange)}.`;
       case "changed_team":
         return `Changed teams: ${item.from} to ${item.to}.`;
+      // The founder's own words, kept. Split at the semicolon because the sheet is prose the model
+      // reads, and a semicolon on the sheet is a semicolon the validator later refuses in the read.
       case "new_play_caller":
-        return `New play caller at ${item.team}; a new play caller is the honest concern.`;
+        return `New play caller at ${item.team}. A new play caller is the honest concern.`;
       case "rookie":
         return item.overallPick === null ? "A rookie, went undrafted." : `A rookie, drafted at pick ${item.overallPick}.`;
       case "market_unlisted":
-        return "The market has not listed him at all.";
+        return "No ADP at all: nobody is drafting him yet.";
     }
   });
 }

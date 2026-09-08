@@ -214,13 +214,15 @@ function teamContextLine(facts: PlayerFacts): string | null {
     context.passRate === null ? null : `${percent(context.passRate)} of situation-neutral plays passes`,
     context.wins === null ? null : `${context.wins} wins`,
   ].filter((part): part is string => part !== null);
-  const market = [
-    context.weekOneImpliedTotal === null ? null : `an implied ${context.weekOneImpliedTotal} points`,
+  // "A total of", never "an implied total": "implied" is a banned word in the read, and the model
+  // quotes the sheet. "Have their game at", never "price": the trading register is banned too.
+  const books = [
+    context.weekOneImpliedTotal === null ? null : `a total of ${context.weekOneImpliedTotal} points`,
     context.weekOneSpread === null ? null : `a spread of ${context.weekOneSpread > 0 ? `+${context.weekOneSpread}` : context.weekOneSpread} in their favour`,
   ].filter((part): part is string => part !== null);
   const sentences = [
     history.length === 0 ? null : `${team} in ${context.priorSeason}: ${history.join(", ")}.`,
-    market.length === 0 ? null : `The books price their week one game at ${market.join(" and ")}.`,
+    books.length === 0 ? null : `The books have their week one game at ${books.join(" and ")}.`,
   ].filter((sentence): sentence is string => sentence !== null);
   return sentences.length === 0 ? null : sentences.join(" ");
 }
@@ -243,13 +245,15 @@ function scheduleLine(depth: PlayerFactsDepth): string | null {
   return `Schedule: ${sentences.join(" ")}`;
 }
 
-/** WHERE THE MARKET HAS MOVED HIM, with both ends of the window dated so the sentence never claims
- *  a span the archive does not cover. */
+/** WHERE HIS ADP HAS MOVED, with both ends of the window dated so the sentence never claims a span
+ *  the archive does not cover. In drafting words (founder ruling, 2026-09-07): the ADP moved, never
+ *  "the market". */
 function marketMovementLine(depth: PlayerFactsDepth): string | null {
   const movement = depth.marketMovement;
   if (movement === null) return null;
-  const direction = movement.picks === 0 ? "has not moved him" : `has moved him ${movement.picks > 0 ? "up" : "down"} ${Math.abs(movement.picks)} picks`;
-  return `The market ${direction}, from ${movement.earlierAdp} on ${movement.earlierAt} to ${movement.latestAdp} on ${movement.latestAt}.`;
+  const window = `between ${movement.earlierAt} and ${movement.latestAt}`;
+  if (movement.picks === 0) return `ADP held at ${movement.latestAdp} ${window}.`;
+  return `ADP moved ${movement.picks > 0 ? "up" : "down"} ${Math.abs(movement.picks)} picks ${window}, from ${movement.earlierAdp} to ${movement.latestAdp}.`;
 }
 
 /** THE BAD WEEKS, with the bar printed rather than implied. */

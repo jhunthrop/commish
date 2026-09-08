@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { BANNED_VOCABULARY } from "./config";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
 import { renderFactsForModel } from "./render";
+import { bannedTermIn } from "./validate";
 
 function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput {
   return {
@@ -50,32 +50,37 @@ function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput 
 }
 
 describe("renderFactsForModel", () => {
-  it("never emits any banned-vocabulary term", () => {
+  it("never emits any banned-vocabulary term, judged by the validator's own whole-word rule", () => {
     const facts = buildPlayerFacts(baseInput());
-    const rendered = renderFactsForModel(facts).toLowerCase();
-    for (const term of BANNED_VOCABULARY) {
-      expect(rendered.includes(term.toLowerCase())).toBe(false);
-    }
+    expect(bannedTermIn(renderFactsForModel(facts))).toBeNull();
   });
 
-  it("phrases the market anchor as a historically-returned fact, never an implication", () => {
+  it("phrases the ADP anchor as what players drafted there historically scored, never an implication", () => {
     const facts = buildPlayerFacts(baseInput());
     const rendered = renderFactsForModel(facts);
-    expect(rendered).toContain("historically returned about 227 points a season");
+    expect(rendered).toContain("RBs drafted around his ADP have historically scored about 227 points a season");
     expect(rendered).not.toMatch(/impl(y|ying|ied)/i);
   });
 
-  it("attaches real rank context (board's own scarcity rank, market's own ADP rank) without inventing a per-quantity rank", () => {
+  it("states the ADP in drafting words, with the rounded pick and the position rank by ADP (founder ruling, 2026-09-07)", () => {
     const facts = buildPlayerFacts(baseInput());
     const rendered = renderFactsForModel(facts);
     expect(rendered).toContain("position rank RB6 by our own board");
-    expect(rendered).toContain("RB6 by market rank");
+    expect(rendered).toContain("ADP 12.5 (drafters take him around pick 13, RB6 by ADP).");
+    expect(rendered).not.toMatch(/\bmarket\b/i);
   });
 
-  it("renders the new-play-caller beat in the founder's own manager-language phrasing", () => {
+  it("states a missing ADP as nobody drafting him, never as an unpriced market", () => {
+    const rendered = renderFactsForModel(buildPlayerFacts(baseInput({ market: { adp: null, positionAdp: null, boardRank: 14 } })));
+    expect(rendered).toContain("No ADP on file: drafters are not taking him.");
+    expect(rendered).not.toMatch(/\bmarket\b|\bpriced?\b/i);
+  });
+
+  it("renders the new-play-caller beat in the founder's own manager-language phrasing, without the semicolon", () => {
     const facts = buildPlayerFacts(baseInput());
     const rendered = renderFactsForModel(facts);
-    expect(rendered).toContain("New play caller at MIA; a new play caller is the honest concern.");
+    expect(rendered).toContain("New play caller at MIA. A new play caller is the honest concern.");
+    expect(rendered).not.toContain(";");
   });
 
   it("states an honest absence of games played, never a fabricated zero line, when no season data exists", () => {
@@ -84,12 +89,15 @@ describe("renderFactsForModel", () => {
     expect(rendered).toContain("No games played yet this season.");
   });
 
-  it("leads with the most-seasons band and frames the low tail as an availability fact, never a bare floor", () => {
+  it("leads with the middle range and frames the low tail as an availability fact, never a bare floor", () => {
     const facts = buildPlayerFacts(baseInput());
     const rendered = renderFactsForModel(facts);
-    expect(rendered).toContain("Most seasons land between");
-    expect(rendered).toContain("The full tails run 178 to 275");
-    expect(rendered).toContain("injury seasons, not a talent read");
+    expect(rendered).toContain("Middle range, where most outcomes fall:");
+    expect(rendered).toContain("Full tails: 178 to 275, the low tail from seasons shortened by injury.");
+    // The prior wording came back verbatim in the reads (refrains round): the sheet states data now
+    // and leaves the sentence to the writer.
+    expect(rendered).not.toContain("Most seasons land between");
+    expect(rendered).not.toContain("not a talent read");
   });
 
   it("carries the designated state with its own as-of date", () => {
@@ -266,9 +274,6 @@ describe("renderFactsForModel — the color", () => {
         },
       }),
     );
-    const rendered = renderFactsForModel(facts).toLowerCase();
-    for (const term of BANNED_VOCABULARY) {
-      expect(rendered.includes(term.toLowerCase())).toBe(false);
-    }
+    expect(bannedTermIn(renderFactsForModel(facts))).toBeNull();
   });
 });

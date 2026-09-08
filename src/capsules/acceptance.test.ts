@@ -136,7 +136,7 @@ describe("cause 2: the word band is graded first, and alone", () => {
 
 describe("cause 3: name false positives", () => {
   it("reads a contraction plus a position code as words, not as the name 'He QB'", () => {
-    expect(slotResult("He's QB proof that the price and the production have come apart.").ok).toBe(true);
+    expect(slotResult("He's QB proof that the ADP and the production have come apart.").ok).toBe(true);
   });
 
   it("grounds the city of a team the facts name", () => {
@@ -148,7 +148,7 @@ describe("cause 3: name false positives", () => {
   });
 
   it("grounds a possessive of the subject's own name", () => {
-    expect(slotResult("Rashad Long's role is the whole case, and the price has not caught up.").ok).toBe(true);
+    expect(slotResult("Rashad Long's role is the whole case, and the ADP has not caught up.").ok).toBe(true);
   });
 
   it("still fails a fabricated two-word name", () => {
@@ -238,16 +238,64 @@ describe("the injury designation is a word, not a person", () => {
   });
 });
 
+/**
+ * THE TRADING REGISTER IS BANNED (founder ruling, 2026-09-07: "we say market everywhere like this
+ * is a stock trading app, it's a fantasy football app"). The fact sheet now states an ADP as the
+ * pick drafters take him around, and the rounded pick grounds by construction: the sheet prints
+ * it, and it is a plain rounding of the ADP on the ledger either way.
+ */
+describe("the trading register is banned, the drafting register grounds", () => {
+  const facts = buildPlayerFacts(baseInput({ market: { adp: 99.7, positionAdp: "RB34", boardRank: 90 } }));
+
+  it("rejects a sentence that talks about the market", () => {
+    const result = slotResult("The market has him at 99.7 and that is too low for this role.", facts);
+    expect(result.ok).toBe(false);
+    expect(result.violations[0]).toContain('banned term "market"');
+  });
+
+  it("rejects every trading word the ruling named, in the inflections a writer reaches for", () => {
+    for (const sentence of [
+      "He is priced like a backup and plays like a starter.",
+      "Buy him everywhere you can this August.",
+      "I am selling at this ADP, the role is not there.",
+      "Fade him until the depth chart settles.",
+      "He trades at a discount to his role.",
+      "You are paying a premium for last year.",
+      "The return on a pick this early is thin.",
+      "He is undervalued by a round.",
+    ]) {
+      expect({ sentence, ok: slotResult(sentence, facts).ok }).toEqual({ sentence, ok: false });
+    }
+  });
+
+  it("passes the drafting words with the rounded pick, which the sheet itself prints", () => {
+    expect(renderFactsForModel(facts)).toContain("ADP 99.7 (drafters take him around pick 100, RB34 by ADP)");
+    expect(slotResult("Drafters take him around pick 100, and that is a round later than his role says.", facts).ok).toBe(true);
+    expect(slotResult("Let him fall to the ninth and he is a steal there.", facts).ok).toBe(true);
+  });
+
+  it("leaves the words that only look like trading words alone", () => {
+    // "Russell" carries "sell"; "upside" tied to an outcome is allowed; "fading" as a role verb
+    // is not, and that is the price of a whole-word rule with inflections.
+    expect(slotResult("Russell throws him the ball and the upside is a strong season.", buildPlayerFacts(baseInput({ identity: { id: "p1", name: "Russell Long", position: "RB", team: "NYG" } }))).ok).toBe(true);
+  });
+});
+
 describe("the soft rules are corrected before they are refused", () => {
-  it("hands the floor rule back as a correction rather than a rewrite", () => {
+  it("hands the floor rule back as a correction that says what to fix, never a clause to paste", () => {
     const correction = softCorrectionFor(UNFRAMED_FLOOR_VIOLATION);
-    expect(correction).toContain("games missed, not talent");
+    expect(correction).toContain('"floor"');
+    expect(correction).toContain("injury");
+    expect(correction).toContain("in your own words");
+    expect(correction).not.toContain("not a talent read");
+    expect(correction).not.toContain("games missed, not talent");
   });
 
   it("hands the uncited downside back with the number it wants stated", () => {
-    const correction = softCorrectionFor("Mixed evidence: the strongest downside (-1.8 pts/game) must be cited as an honest hesitation before the call.");
+    const correction = softCorrectionFor("Mixed evidence: the strongest downside (-1.8 pts/game) is never cited. It has to appear, with that number, before the call.");
     expect(correction).toContain("-1.8 pts/game");
-    expect(correction).toContain("change nothing else");
+    expect(correction).toContain("in your own words");
+    expect(correction).not.toContain("honest hesitation");
   });
 
   it("does not soften a fabrication: an ungrounded number has no correction at all", () => {

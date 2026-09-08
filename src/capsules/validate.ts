@@ -388,7 +388,7 @@ function isNameGroundedWithShedding(phrase: string, nameLedger: readonly string[
  *  nothing follows "goat" at all. Deliberately narrow (s/d/ed/ing) rather than a general stemmer:
  *  wide enough to catch the realistic case, not so wide it starts matching an unrelated word that
  *  merely shares a prefix. */
-function containsBannedVocabulary(text: string): string | null {
+export function bannedTermIn(text: string): string | null {
   const lower = text.toLowerCase();
   for (const term of BANNED_VOCABULARY) {
     const pattern = /^[a-z]+$/.test(term) ? new RegExp(`\\b${term}(?:s|d|ed|ing)?\\b`, "i") : null;
@@ -550,19 +550,28 @@ export function groundingOf(facts: PlayerFacts): GroundingSource {
  * unchanged, and a second failure still fails.
  */
 export const UNFRAMED_FLOOR_VIOLATION =
-  'The text says "floor" without pairing it with injury/availability context. The low tail is an availability fact, not a talent claim.';
+  'The text says "floor" beside a number without saying that the number comes from seasons shortened by injury.';
 
-/** The correction each soft violation is handed back with, in the words the writer needs. */
+/**
+ * THE CORRECTION EACH SOFT VIOLATION IS HANDED BACK WITH. It says WHAT to fix, never a clause to
+ * paste (refrains round, 2026-09-07): the prior floor correction offered "games missed, not talent"
+ * and a read came back carrying the validator's own rule wording as prose. A correction that names
+ * the sentence and the idea, and asks for the writer's own words, cannot be passed off as a sentence.
+ */
 export const SOFT_CORRECTIONS: Readonly<Record<string, string>> = {
   [UNFRAMED_FLOOR_VIOLATION]:
-    'When you say "floor", say in the same breath what makes it the floor: games missed, not talent. Or drop the word and describe the low end as the injury seasons.',
+    'One sentence uses "floor" beside a number. Rewrite that sentence, in your own words, so a reader knows the number comes from seasons shortened by injury, or take the word "floor" out of it.',
 };
+
+const TENSION_NUMBER_PATTERN = /\((-?\d+(?:\.\d+)?) pts\/game\)/;
 
 /** True for a violation that is a framing note, not a fabrication — see `SOFT_CORRECTIONS`. */
 export function softCorrectionFor(violation: string): string | null {
   if (violation in SOFT_CORRECTIONS) return SOFT_CORRECTIONS[violation] ?? null;
   if (violation.startsWith("Mixed evidence:")) {
-    return `${violation} State it in one honest clause before your call, in your own words, and change nothing else.`;
+    const number = TENSION_NUMBER_PATTERN.exec(violation)?.[1];
+    const downside = number === undefined ? "the strongest downside on the sheet" : `the ${number} pts/game downside`;
+    return `Your text never cites ${downside}. Work that number in somewhere before your last sentence, in your own words, and leave everything else as it is.`;
   }
   return null;
 }
@@ -617,7 +626,7 @@ function validateGrounded(body: string, source: GroundingSource, band: Grounding
     violations.push("The text contains a semicolon. Split it into two sentences instead.");
   }
 
-  const bannedTerm = containsBannedVocabulary(trimmed);
+  const bannedTerm = bannedTermIn(trimmed);
   if (bannedTerm !== null) {
     violations.push(`The text uses the banned term "${bannedTerm}". Rewrite without it.`);
   }
@@ -646,9 +655,9 @@ function validateGrounded(body: string, source: GroundingSource, band: Grounding
 
   const requiredTension = band.requireTension ? source.tension : null;
   if (requiredTension !== null && !citesTensionNumber(trimmed, requiredTension)) {
-    violations.push(
-      `Mixed evidence: the strongest downside (${roundHalfUp(requiredTension, 1)} pts/game) must be cited as an honest hesitation before the call.`,
-    );
+    // Worded as a fact about the text, never as a sentence to write: a model handed "must be cited
+    // as an honest hesitation" wrote "here's the honest worry" on three reads of three.
+    violations.push(`Mixed evidence: the strongest downside (${roundHalfUp(requiredTension, 1)} pts/game) is never cited. It has to appear, with that number, before the call.`);
   }
 
   return { ok: violations.length === 0, violations, bandFailure: null };
