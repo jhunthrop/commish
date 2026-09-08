@@ -163,7 +163,9 @@ function lengthInstruction(size: CapsuleSize, quoted: string, correction: NonNul
   }
   const target = targetOf(size);
   const distance = Math.abs(target - words);
-  const move = words > target ? `cut the sentences that carry the least (about ${distance} words)` : `add ${sentencesFor(distance)} (about ${distance} more words)`;
+  // The added sentences name their own register (written rate round, 2026-09-08): one length
+  // correction added "you paid WR1 prices" to a clean note, another added a bare floor claim.
+  const move = words > target ? `cut the sentences that carry the least (about ${distance} words)` : `add ${sentencesFor(distance)} (about ${distance} more words, with no trading word and no "floor" in them)`;
   return `${quoted}\n\nIt is ${words} words. Bring it to ${target} words: ${move}, and ${SAME_TEXT_OTHERWISE}`;
 }
 

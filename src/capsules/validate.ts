@@ -148,7 +148,15 @@ const COMMON_SENTENCE_STARTERS = new Set([
   // The subordinating openers (acceptance round, task 10: "When Atlanta" failed as a person).
   // None of these is ever a given name, which is the property the whole list turns on.
   "When", "Where", "While", "If", "After", "Before", "Once", "Since", "Because", "Until", "Whenever",
+  // The determiners and question words a call opens on (written rate round, 2026-09-08: "Every
+  // Walker" and "What I" failed as people).
+  "Every", "Each", "What", "Which", "Whether",
 ]);
+
+/** THE FIRST PERSON (written rate round, 2026-09-08): "What I", "If I" and "What I'd" were failing
+ *  as two-word people. "I", in any contraction, is a word a writer says about himself and is never
+ *  half a name, so it breaks a Titlecase run the way a position code does. */
+const FIRST_PERSON_PATTERN = /^I(?:['’][a-z]+)?$/;
 
 function isInNameAbbreviation(bareWord: string): boolean {
   return IN_NAME_ABBREVIATIONS.has(bareWord) || INITIALS_PATTERN.test(bareWord);
@@ -228,7 +236,7 @@ function extractProperNamePhrases(text: string): readonly string[] {
     // The contraction goes before the run is built, and a position code never joins a run at all
     // (see `POSITION_CODES` and `stripTrailingClitic`).
     const bare = stripTrailingClitic(match[0]);
-    if (bare === "" || POSITION_CODES.has(bare.toUpperCase().replace(/\.$/, ""))) continue;
+    if (bare === "" || POSITION_CODES.has(bare.toUpperCase().replace(/\.$/, "")) || FIRST_PERSON_PATTERN.test(bare)) continue;
     words.push({ text: bare, start: match.index, end: match.index + match[0].length });
   }
 

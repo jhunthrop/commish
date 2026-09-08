@@ -167,6 +167,22 @@ describe("cause 3: name false positives", () => {
     expect(slotResult("Rashad Long's role is the whole case, and the ADP has not caught up.").ok).toBe(true);
   });
 
+  /**
+   * THE FIRST PERSON AND A DETERMINER (written rate round, 2026-09-08): "What I", "If I" and
+   * "Every Walker" were three of the 40-player dev run's rejections, a sentence-initial word
+   * merging into the pronoun "I" or into the subject's own ledgered surname. "I" is never half a
+   * name, in any contraction, and "Every" is a determiner like "The".
+   */
+  it("reads the first-person pronoun as a word, never as half a name, in any contraction", () => {
+    expect(slotResult("What I want to see is the early-down work, and the sheet says it is his.").ok).toBe(true);
+    expect(slotResult("If I had to pick a back in this range, it is him.").ok).toBe(true);
+    expect(slotResult("What I'd need first is a healthy August, and then he is the pick.").ok).toBe(true);
+  });
+
+  it("grounds a sentence-initial determiner before the subject's own surname", () => {
+    expect(slotResult("Every Long season has started the same way, and this year should too.").ok).toBe(true);
+  });
+
   it("still fails a fabricated two-word name", () => {
     const result = slotResult("Justin Herbert throws him the ball on every third down these days.");
     expect(result.ok).toBe(false);

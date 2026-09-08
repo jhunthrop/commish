@@ -184,11 +184,24 @@ describe("correctionPromptFor", () => {
   it("sizes an underrun's ask to the deficit: one sentence for a few words, three for forty", () => {
     const { minWords, maxWords } = CAPSULE_CONFIG.sizes.full;
     const at = (words: number) => correctionPromptFor(FACTS, "full", { body: "Short.", violations: ["x"], lengthCorrection: { words, minWords, maxWords } });
-    expect(at(237)).toContain("It is 237 words. Bring it to 270 words: add two sentences of fact from the sheet that sharpen the case (about 33 more words)");
-    expect(at(262)).toContain("Bring it to 270 words: add one sentence of fact from the sheet that sharpens the case (about 8 more words)");
-    expect(at(201)).toContain("Bring it to 270 words: add three sentences of fact from the sheet that sharpen the case (about 69 more words)");
+    expect(at(237)).toContain("It is 237 words. Bring it to 270 words: add two sentences of fact from the sheet that sharpen the case (about 33 more words");
+    expect(at(262)).toContain("Bring it to 270 words: add one sentence of fact from the sheet that sharpens the case (about 8 more words");
+    expect(at(201)).toContain("Bring it to 270 words: add three sentences of fact from the sheet that sharpen the case (about 69 more words");
     expect(at(321)).toContain("It is 321 words. Bring it to 270 words: cut the sentences that carry the least (about 51 words)");
     expect(at(237)).not.toContain("two or three");
+  });
+
+  /**
+   * THE SENTENCES A CORRECTION ADDS KEEP THE REGISTER (written rate round, 2026-09-08). Of the
+   * three banned-word rejections that decided a read in the 40-player dev run, none was the writer
+   * repeating the word after its soft correction (seven of eight landed): one was a length
+   * correction that ADDED "you paid WR1 prices" to a note that had been clean, and the same ask
+   * added a bare floor claim to another. The ask now says what the added sentences may not carry.
+   */
+  it("tells an underrun's added sentences to carry no trading word and no floor, since that is where the word came in", () => {
+    const { minWords, maxWords } = CAPSULE_CONFIG.sizes.full;
+    const prompt = correctionPromptFor(FACTS, "full", { body: "Short.", violations: ["x"], lengthCorrection: { words: 237, minWords, maxWords } });
+    expect(prompt).toContain('with no trading word and no "floor" in them');
   });
 
   it("tells a soft correction the cap, so fixing one sentence cannot grow the note past it (one compact read went 105 to 121)", () => {
