@@ -105,7 +105,19 @@ describe("advisorCore", () => {
     const reachable = shortlist.find((rec) => survivalOf(rec.playerId) >= SURVIVAL_BANDS.reach);
     expect(view.onTheClock).toBe(false);
     expect(view.pick!.playerId).toBe((reachable ?? shortlist[0])!.playerId);
-    expect(survivalOf(view.pick!.playerId)).toBeGreaterThanOrEqual(SURVIVAL_BANDS.reach);
+
+    // A hand-built table in which every run's other seats take the shortlist's first man at
+    // pick 5 and nobody touches the second: the card moves down to the second.
+    const filler = availablePool(state)
+      .map((entry) => entry.playerId)
+      .filter((id) => !shortlist.some((rec) => rec.playerId === id))
+      .slice(0, 11);
+    const run = [shortlist[0]!.playerId, ...filler].map((playerId, index) => ({ pickNumber: 5 + index, teamId: FIXTURE_TEAM_IDS[9]!, playerId }));
+    const handBuilt = { runs: 4, fromPick: 5, throughPick: 16, played: [run, run, run, run] };
+    const moved = advisorCore({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE, table: handBuilt, tiers: {} })!;
+    expect(moved.pick!.playerId).toBe(shortlist[1]!.playerId);
+    expect(moved.odds!.survived[shortlist[0]!.playerId]).toBe(0);
+    expect(moved.pick!.makeItBack).toEqual({ survival: 1, runs: 4 });
   });
 
   it("is reproducible for the same room state, and moves with the room on a new pick", () => {
