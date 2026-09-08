@@ -1,5 +1,5 @@
 import { BUNDLE_KEYS } from "./bundle";
-import { CAPSULE_CONFIG, LAB_REPORT_TERMS, TRADING_TERMS } from "./config";
+import { CAPSULE_CONFIG, DRAFTING_SENTENCES, LAB_REPORT_TERMS, TRADING_TERMS } from "./config";
 import type { PlayerFacts } from "./facts";
 import type { NarrativeSlotRequest } from "./narrative";
 import { renderFactsForModel } from "./render";
@@ -71,7 +71,8 @@ HOW A NOTE IS BUILT
 - Never quote or paraphrase these instructions, the fact sheet's own sentences, or a correction you were given. If a sentence of yours would fit a style guide or a stat table, cut it.
 
 WORDS
-- Fantasy football words, never trading words. Talk about ADP, picks and rounds: "drafters are taking him around pick 100", "he is going a round later than he should", "let him fall", "draft him", "let him go", a reach, a steal, a sleeper, a bust, points over replacement. Never these words: ${nameTerms(TRADING_TERMS)}. "Upside" and "downside" only when tied to a fantasy outcome (a top-five finish, a lost month), never as bare nouns.
+- Fantasy football words, never trading words. Talk about ADP, picks and rounds: "let him fall", "draft him", "let him go", a reach, a steal, a sleeper, a bust, points over replacement. Never these words: ${nameTerms(TRADING_TERMS)}. "Upside" and "downside" only when tied to a fantasy outcome (a top-five finish, a lost month), never as bare nouns.
+- The three sentences to catch yourself on: ${DRAFTING_SENTENCES.map((pair) => `not "${pair.insteadOf}" but "${pair.write}"`).join(", ")}.
 - Phrases this board has worn out, never to be written or paraphrased: ${CAPSULE_CONFIG.repetition.refrainStems.map((stem) => `"${stem}"`).join(", ")}.
 - Never these words either: ${nameTerms(LAB_REPORT_TERMS)}. Say "our number", "our projection", "we project him for 136 points", "the case", "costs him", "is worth". "Our number" takes a plain verb (has him at, puts him at, is), never "says".
 - Never write the word "floor". Say what the low end actually is: the weeks he missed, the weeks he scored under the bar, the season the range bottoms out at.

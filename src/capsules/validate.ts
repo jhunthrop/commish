@@ -1,4 +1,4 @@
-import { BANNED_VOCABULARY, CAPSULE_CONFIG, COMPETITOR_NAMES, EM_DASH, SEMICOLON } from "./config";
+import { BANNED_VOCABULARY, CAPSULE_CONFIG, COMPETITOR_NAMES, EM_DASH, SEMICOLON, TRADING_REPLACEMENTS } from "./config";
 import type { PlayerFacts } from "./facts";
 import { NARRATIVE_MIN_WORDS } from "./narrative-slots";
 import { renderFactsForModel } from "./render";
@@ -398,6 +398,30 @@ export function bannedTermIn(text: string): string | null {
   return null;
 }
 
+/** The drafting phrases a trading word is corrected to, or `null` for a banned word that is not a
+ *  trading word (the lab-report and all-time terms have no one replacement, only the rule). */
+function tradingReplacementFor(term: string): readonly string[] | null {
+  return TRADING_REPLACEMENTS[term] ?? null;
+}
+
+function quoted(phrases: readonly string[]): string {
+  return phrases.map((phrase) => `"${phrase}"`).join(", ");
+}
+
+const BANNED_TERM_VIOLATION_PATTERN = /^The text uses the banned term "([^"]+)"/;
+
+/**
+ * THE REPLACEMENT RIDES WITH THE VIOLATION (production follow-up, 2026-09-08). "Rewrite without it"
+ * is the rule; a trading word's violation also names the drafting phrase for the word it found, so
+ * both correction paths (the soft one below and a from-scratch rewrite quoting the violations) hand
+ * the writer the words to use rather than only the word not to.
+ */
+function bannedTermViolation(term: string): string {
+  const replacement = tradingReplacementFor(term);
+  const remedy = replacement === null ? "Rewrite without it." : `Say it in drafting words instead: ${quoted(replacement)}.`;
+  return `The text uses the banned term "${term}". ${remedy}`;
+}
+
 function containsCompetitorName(text: string): string | null {
   const lower = text.toLowerCase();
   for (const name of COMPETITOR_NAMES) if (lower.includes(name)) return name;
@@ -565,9 +589,22 @@ export const SOFT_CORRECTIONS: Readonly<Record<string, string>> = {
 
 const TENSION_NUMBER_PATTERN = /\((-?\d+(?:\.\d+)?) pts\/game\)/;
 
+/** A trading word is HOW something was said, the way a bare floor is (production follow-up,
+ *  2026-09-08): the prose is kept and the sentence carrying the word is rewritten with the drafting
+ *  phrase named. A lab-report or all-time term has no soft form and still costs a rewrite. */
+function tradingWordCorrectionFor(violation: string): string | null {
+  const term = BANNED_TERM_VIOLATION_PATTERN.exec(violation)?.[1];
+  if (term === undefined) return null;
+  const replacement = tradingReplacementFor(term);
+  if (replacement === null) return null;
+  return `Your text uses the trading word "${term}". Rewrite the sentence carrying it, in your own words, with drafting words instead: ${quoted(replacement)}. Then leave everything else as it is.`;
+}
+
 /** True for a violation that is a framing note, not a fabrication — see `SOFT_CORRECTIONS`. */
 export function softCorrectionFor(violation: string): string | null {
   if (violation in SOFT_CORRECTIONS) return SOFT_CORRECTIONS[violation] ?? null;
+  const tradingWord = tradingWordCorrectionFor(violation);
+  if (tradingWord !== null) return tradingWord;
   if (violation.startsWith("Mixed evidence:")) {
     const number = TENSION_NUMBER_PATTERN.exec(violation)?.[1];
     const downside = number === undefined ? "the strongest downside on the sheet" : `the ${number} pts/game downside`;
@@ -628,7 +665,7 @@ function validateGrounded(body: string, source: GroundingSource, band: Grounding
 
   const bannedTerm = bannedTermIn(trimmed);
   if (bannedTerm !== null) {
-    violations.push(`The text uses the banned term "${bannedTerm}". Rewrite without it.`);
+    violations.push(bannedTermViolation(bannedTerm));
   }
 
   const competitor = containsCompetitorName(trimmed);

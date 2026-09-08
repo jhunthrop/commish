@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { TRADING_REPLACEMENTS, TRADING_TERMS } from "./config";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
-import { bannedTermIn, validateCapsule } from "./validate";
+import { bannedTermIn, softCorrectionFor, validateCapsule } from "./validate";
 
 function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput {
   return {
@@ -182,5 +183,39 @@ describe("validateCapsule", () => {
     const result = validateCapsule("   ", facts, "compact");
     expect(result.ok).toBe(false);
     expect(result.violations[0]).toContain("empty");
+  });
+});
+
+/**
+ * A BANNED TRADING WORD IS HANDED BACK WITH ITS DRAFTING REPLACEMENT (production follow-up,
+ * 2026-09-08). "Rewrite without it" left the writer to guess the replacement, and fourteen players
+ * fell to the template on "price" in one night; the correction now names the phrase for the word
+ * it found, and keeps the prose, the way the floor correction does.
+ */
+describe("a banned trading word is corrected with its drafting replacement", () => {
+  const facts = buildPlayerFacts(baseInput());
+
+  it("names a drafting replacement for every trading word the ruling banned", () => {
+    for (const term of TRADING_TERMS) expect({ term, replacement: TRADING_REPLACEMENTS[term] }).toMatchObject({ term, replacement: expect.any(Array) });
+  });
+
+  it("puts the three drafting sentences in a price violation and hands them back as a soft correction", () => {
+    const body = compactWords("Rashad Long at this price is a steal for the SF offense, our number of 248 season points and board rank 14 overall say so this season.");
+    const violation = validateCapsule(body, facts, "compact").violations.find((v) => v.includes('banned term "price"'));
+    expect(violation).toContain("drafters are taking him around pick 100");
+    expect(violation).toContain("he is going a round later than he should");
+    expect(violation).toContain("a reach at his ADP");
+    expect(violation).not.toContain("Rewrite without it");
+    const correction = softCorrectionFor(violation!);
+    expect(correction).toContain('"price"');
+    expect(correction).toContain("a reach at his ADP");
+    expect(correction).toContain("leave everything else as it is");
+  });
+
+  it("still asks for a rewrite, with no soft correction, on a lab-report word", () => {
+    const body = compactWords("Rashad Long is a p90 season waiting to happen for the SF offense, our number of 248 season points and board rank 14 overall say so this season.");
+    const violation = validateCapsule(body, facts, "compact").violations.find((v) => v.includes('banned term "p90"'));
+    expect(violation).toContain("Rewrite without it.");
+    expect(softCorrectionFor(violation!)).toBeNull();
   });
 });

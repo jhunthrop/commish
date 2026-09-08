@@ -334,6 +334,46 @@ export const TRADING_TERMS: readonly string[] = [
   "return on",
 ];
 
+/**
+ * THE SENTENCES THE WRITER KEEPS REACHING FOR (production follow-up, 2026-09-08: "price" alone put
+ * fourteen players on the template in one night, under a prompt that already named the word as
+ * banned). A ban names the word; this teaches the replacement at the point of use, each trading
+ * sentence beside the drafting sentence to write instead. The prompt prints the pairs as one line
+ * of the writer rules, and a "price" correction hands back the three drafting sentences.
+ */
+export const DRAFTING_SENTENCES: readonly { readonly insteadOf: string; readonly write: string }[] = [
+  { insteadOf: "the price is right", write: "he is going a round later than he should" },
+  { insteadOf: "at this price", write: "drafters are taking him around pick 100" },
+  { insteadOf: "the price is too high", write: "a reach at his ADP" },
+];
+
+const PRICE_REPLACEMENTS: readonly string[] = DRAFTING_SENTENCES.map((pair) => pair.write);
+const ADP_PICK_REPLACEMENT: readonly string[] = ["drafters are taking him around pick 100"];
+
+/**
+ * THE DRAFTING WORDS FOR EACH TRADING WORD, keyed by the `TRADING_TERMS` entry `validate.ts` finds
+ * (production follow-up, 2026-09-08). "Rewrite without it" left the writer to guess the
+ * replacement, and the guess was the same trading word again; a correction that names the phrase
+ * gets the phrase. Every entry of `TRADING_TERMS` has one, and `validate.test.ts` pins that.
+ */
+export const TRADING_REPLACEMENTS: Readonly<Record<string, readonly string[]>> = {
+  market: ["drafters", "where drafters take him"],
+  price: PRICE_REPLACEMENTS,
+  priced: PRICE_REPLACEMENTS,
+  buy: ["draft him", "take him at that pick"],
+  sell: ["let him go"],
+  fade: ["let him fall", "pass on him"],
+  "trade at": ADP_PICK_REPLACEMENT,
+  "trades at": ADP_PICK_REPLACEMENT,
+  "trading at": ADP_PICK_REPLACEMENT,
+  undervalued: ["he is going a round later than he should"],
+  overvalued: ["a reach at his ADP"],
+  premium: ["a reach"],
+  discount: ["a steal"],
+  dividend: ["points over replacement"],
+  "return on": ["what he gives back"],
+};
+
 export const BANNED_VOCABULARY: readonly string[] = [...LAB_REPORT_TERMS, ...ALL_TIME_TERMS, ...TRADING_TERMS];
 
 /** Rival fantasy products — a capsule voices this product's own case, never a comparison to

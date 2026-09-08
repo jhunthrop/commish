@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BANNED_VOCABULARY, CAPSULE_CONFIG } from "./config";
+import { BANNED_VOCABULARY, CAPSULE_CONFIG, DRAFTING_SENTENCES } from "./config";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
 import { narrativeRequestsFor } from "./narrative";
 import { bundlePromptFor, correctionPromptFor, NO_WORN_PHRASES, WRITER_RULES } from "./prompt";
@@ -59,6 +59,12 @@ describe("WRITER_RULES", () => {
     expect(WRITER_RULES).toContain("a round later than he should");
     for (const word of ["market", "price", "buy", "sell", "fade", "undervalued", "premium", "discount"]) expect(WRITER_RULES).toContain(word);
     expect(WRITER_RULES).toContain("points over replacement");
+  });
+
+  it("teaches the drafting sentence at the point of use (production follow-up, 2026-09-08: fourteen players fell on one trading word)", () => {
+    expect(DRAFTING_SENTENCES).toHaveLength(3);
+    for (const { insteadOf, write } of DRAFTING_SENTENCES) expect(WRITER_RULES).toContain(`not "${insteadOf}" but "${write}"`);
+    expect(WRITER_RULES).toContain("a reach at his ADP");
   });
 
   it("keeps every honesty rule: sheet-only facts, no arithmetic, no absence claims, the downside before the call, the two ranges, the books' own numbers", () => {
