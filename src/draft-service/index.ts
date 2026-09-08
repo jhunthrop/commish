@@ -143,6 +143,14 @@ export async function advanceDraftNow(draftId: string): Promise<void> {
  * it to the watching browser. One `setTimeout(0)` lets that relay (and any request already
  * queued) go first. Never throws into the loop; a failed warm costs the next viewer a cold
  * compute, which is the request path as it was.
+ *
+ * THE TRADE-OFF (review of the pace round): the warm shares the one event loop with the pace
+ * itself. A compute that runs longer than the gap to the next bot pick (450 ms at the
+ * tightest; the compute measured 100-260 ms) delays that pick's timer by the overrun — a
+ * slightly late pick, stamped at its own due instant regardless, never a pile-up, because
+ * the memo is keyed by the log sequence and `roomFactsFor` answers a held sequence without
+ * computing: a second warm for the same state, or a viewer's request racing the warm, finds
+ * the entry (or waits behind the synchronous compute) rather than computing again.
  */
 function scheduleAdvisorWarm(draftId: string): void {
   setTimeout(() => {
