@@ -5,8 +5,10 @@ export const ADVISOR_ROOM_CONFIG = {
   voicePollMs: 2_500,
   /** "Changed since": a plan target's odds moving by more than this band is called out. */
   changedOddsBand: 0.15,
-  /** Changed-since lines shown before the rest collapse to a count. */
+  /** Changed-since names shown before the rest collapse to a count. */
   changedSinceMaxLines: 3,
+  /** Signal chips a phone shows before the "More" disclosure. */
+  mobileChipCount: 3,
   /** How many drafts' worth of advisor state the tab remembers across remounts. */
   rememberedDrafts: 5,
 } as const;

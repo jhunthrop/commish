@@ -40,7 +40,16 @@ export function AdvisorPanel({ view, acts, renderName, seatLabel, changedSince, 
   const nameOf = (playerId: string): string => view.names[playerId] ?? playerId;
   return (
     <div data-testid="advisor-panel" aria-label="The advisor" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-      <SignalsStrip signals={view.signals} teamCount={view.teamCount} strategy={strategy.text} strategyVoice={strategy.voice} nameOf={nameOf} seatLabel={seatLabel} notes={notes}>
+      <SignalsStrip
+        signals={view.signals}
+        teamCount={view.teamCount}
+        strategy={strategy.text}
+        strategyVoice={strategy.voice}
+        neededPositions={view.plan.turns.map((turn) => turn.position)}
+        nameOf={nameOf}
+        seatLabel={seatLabel}
+        notes={notes}
+      >
         {beat === null ? null : (
           <p data-testid="assistant-beat" className="rounded-md bg-surface-raised px-2.5 py-1.5 text-sm font-semibold text-text-primary">
             {beat}
