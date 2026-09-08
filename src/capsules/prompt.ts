@@ -120,7 +120,9 @@ function partsSpecFor(facts: PlayerFacts, requests: readonly NarrativeSlotReques
     `Write three parts for ${facts.identity.name}. Return ONE JSON object with exactly the keys "${BUNDLE_KEYS.compact}", "${BUNDLE_KEYS.full}" and "${BUNDLE_KEYS.narrative}", and nothing else: no code fence, no text before or after it. Each note is one JSON string. A paragraph break inside the long note is written as the two characters \\n\\n, never a raw line break.`,
     `"${BUNDLE_KEYS.compact}": the short note for his card, ${lengthOf("compact")}, one paragraph. Two or three facts that decide his case, the real downside if the sheet carries one, and the call in his own terms at the end.`,
     `"${BUNDLE_KEYS.full}": the long note for his page, ${lengthOf("full")}, up to three paragraphs in no fixed order. The same facts as the short note plus the one or two that deepen it, the role behind the numbers, the real downside with its number, and the call. Do not reuse the short note's sentences.`,
-    `"${BUNDLE_KEYS.narrative}": an object holding one sentence per key below. Each sits on his page beside a number a module already prints, so say what the number means rather than restating it. No two sentences alike, and none that repeats a sentence from the notes above.\n${slotSpecFor(requests)}`,
+    // The register restated beside the slots (written rate round, 2026-09-08): a slot has no
+    // correction, and four of forty players lost one to "buy-low", "we price it at", "discount".
+    `"${BUNDLE_KEYS.narrative}": an object holding one sentence per key below. Each sits on his page beside a number a module already prints, so say what the number means rather than restating it. No two sentences alike, and none that repeats a sentence from the notes above. Every sentence keeps the same words as the notes: drafting words, never a trading word, never "floor".\n${slotSpecFor(requests)}`,
   ].join("\n\n");
 }
 

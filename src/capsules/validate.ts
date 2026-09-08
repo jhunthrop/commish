@@ -47,6 +47,18 @@ const CARDINAL_WORDS: Readonly<Record<string, number>> = {
 };
 const CARDINAL_WORD_PATTERN = new RegExp(`\\b(${Object.keys(CARDINAL_WORDS).join("|")})\\b`, "gi");
 
+/** The tens from thirty to ninety, and the compounds they make with a unit ("twenty-eight",
+ *  "forty five") — written rate round, 2026-09-08: "Twenty-eight is the front edge of receiver
+ *  decline" was read as the number 20. A compound is one number and is read before the single
+ *  words are, with its span blanked so its first word cannot be read again on its own. */
+const TENS_WORDS: Readonly<Record<string, number>> = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+const UNIT_WORDS = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"] as const;
+const COMPOUND_CARDINAL_PATTERN = new RegExp(`\\b(${Object.keys(TENS_WORDS).join("|")})(?:[-\\s](${UNIT_WORDS.join("|")}))?\\b`, "gi");
+
+function compoundCardinalValue(tens: string, unit: string | undefined): number {
+  return TENS_WORDS[tens.toLowerCase()]! + (unit === undefined ? 0 : CARDINAL_WORDS[unit.toLowerCase()]!);
+}
+
 /** Ordinals 1st through 30th (fix round 1, HIGH) — "his 3rd season", "in his 21st start". The
  *  leading `\b` already excludes a compound token ("RB21st" has no boundary between "B" and "2"),
  *  so this needs no separate digit-only guard the way `NUMBER_TOKEN_PATTERN` does. */
@@ -58,10 +70,12 @@ function extractNumbers(text: string): readonly { readonly raw: string; readonly
     .map((raw) => ({ raw, value: Number(raw.replace(/,/g, "").replace(/%$/, "")) }))
     .filter((n) => Number.isFinite(n.value));
 
-  const cardinalNumbers = [...text.matchAll(CARDINAL_WORD_PATTERN)].map((match) => ({ raw: match[0], value: CARDINAL_WORDS[match[1]!.toLowerCase()]! }));
+  const compoundNumbers = [...text.matchAll(COMPOUND_CARDINAL_PATTERN)].map((match) => ({ raw: match[0], value: compoundCardinalValue(match[1]!, match[2]) }));
+  const withoutCompounds = text.replace(COMPOUND_CARDINAL_PATTERN, " ");
+  const cardinalNumbers = [...withoutCompounds.matchAll(CARDINAL_WORD_PATTERN)].map((match) => ({ raw: match[0], value: CARDINAL_WORDS[match[1]!.toLowerCase()]! }));
   const ordinalNumbers = [...text.matchAll(ORDINAL_PATTERN)].map((match) => ({ raw: match[0], value: Number(match[1]) }));
 
-  return [...digitNumbers, ...cardinalNumbers, ...ordinalNumbers];
+  return [...digitNumbers, ...compoundNumbers, ...cardinalNumbers, ...ordinalNumbers];
 }
 
 /**
@@ -90,25 +104,36 @@ function roundHalfUp(value: number, decimals: number): number {
  * "25%" and "24.76%" alike. Bounded to |entry| <= 1 so this can only ever turn a FRACTION into a
  * percentage, never license an arbitrary hundred-fold restatement of a points total.
  */
-/** A total this large is stated to the hundred by a person ("1400-plus yards" for 1429), so its
- *  floor and its nearest hundred are readings of it. Never below this: 143 is never "100". */
-const STATED_TO_THE_HUNDRED_FROM = 1000;
-const HUNDRED = 100;
+/**
+ * THE LOOSE READINGS OF A LARGE PRINTED FIGURE (written rate round, 2026-09-08). A person states a
+ * total to the ten from a hundred up ("360-point seasons" for 362.9) and to the hundred from a
+ * thousand up ("1400-plus yards" for 1429), down or to the nearest. Each unit applies only from its
+ * own threshold, so a figure under a hundred is never read loosely: an ADP of 12.5 is never "pick
+ * 10", and 143 is never "100".
+ *
+ * OF WHAT THE SHEET PRINTS ONLY, never of a derived value: the ledger carries every difference and
+ * product of two printed facts, and a loose reading of each of those would blanket three-figure
+ * space (275 minus 178 is 97, and 97 read to the ten is "100"). The 282 a rate-times-games
+ * derivation reaches is quotable as 282; "clears 280" of it still fails, and that is the bound.
+ */
+const LOOSE_READING_UNITS: readonly { readonly from: number; readonly unit: number }[] = [
+  { from: 100, unit: 10 },
+  { from: 1000, unit: 100 },
+];
 
-/** The hundred-rounded readings of a four-figure entry, none for a smaller one. */
-function hundredReadings(entry: number): readonly number[] {
-  if (Math.abs(entry) < STATED_TO_THE_HUNDRED_FROM) return [];
+function looseReadings(entry: number): readonly number[] {
   const magnitude = Math.abs(entry);
-  return [Math.floor(magnitude / HUNDRED) * HUNDRED, Math.round(magnitude / HUNDRED) * HUNDRED];
+  return LOOSE_READING_UNITS.filter(({ from }) => magnitude >= from).flatMap(({ unit }) => [Math.floor(magnitude / unit) * unit, Math.round(magnitude / unit) * unit]);
+}
+
+function isLooseReadingOf(value: number, printed: readonly number[]): boolean {
+  return printed.some((entry) => looseReadings(entry).includes(Math.abs(value)));
 }
 
 function isDerivedFromLedger(value: number, ledger: readonly number[], allowMagnitude = true): boolean {
   for (const entry of ledger) {
     if (value === entry) return true;
     if (Math.trunc(entry) === value || Math.ceil(entry) === value || Math.floor(entry) === value) return true;
-    // THE HUNDRED (written rate round, 2026-09-08): "1400-plus receiving yards" against a ledgered
-    // 1429 was a rounding the tolerance missed, not a fabrication. Bounded to four figures.
-    if (hundredReadings(entry).includes(Math.abs(value))) return true;
     // THE MAGNITUDE OF A SIGNED FACT (acceptance round, task 10): a law worth -10.9 a game is
     // stated by this product's own template as "costs him 10.9 points a game", and the writer is
     // told to use that verb too. The sign lives in the sentence, so an unsigned 10.9 is a reading
@@ -197,6 +222,13 @@ const POSITION_CODES: ReadonlySet<string> = new Set([
   "Q", "O", "D", "IR", "PUP", "NFI", "SUSP", "DNP", "LP", "FP",
 ]);
 
+/** A code, or its plural ("WRs", "RBs" — written rate round, 2026-09-08: "Past WRs" failed as a
+ *  person), with any trailing period stripped. */
+function isPositionCode(bare: string): boolean {
+  const code = bare.toUpperCase().replace(/\.$/, "");
+  return POSITION_CODES.has(code) || (code.endsWith("S") && POSITION_CODES.has(code.slice(0, -1)));
+}
+
 /** The possessive or contraction a Titlecase token may carry ("Herbert's", "He's", "Mahomes’"),
  *  stripped before the token is considered as part of a name — the apostrophe inside a genuine
  *  name ("Ja'Marr", "De'Von") is untouched, since it is never at the end. */
@@ -236,7 +268,7 @@ function extractProperNamePhrases(text: string): readonly string[] {
     // The contraction goes before the run is built, and a position code never joins a run at all
     // (see `POSITION_CODES` and `stripTrailingClitic`).
     const bare = stripTrailingClitic(match[0]);
-    if (bare === "" || POSITION_CODES.has(bare.toUpperCase().replace(/\.$/, "")) || FIRST_PERSON_PATTERN.test(bare)) continue;
+    if (bare === "" || isPositionCode(bare) || FIRST_PERSON_PATTERN.test(bare)) continue;
     words.push({ text: bare, start: match.index, end: match.index + match[0].length });
   }
 
@@ -412,14 +444,24 @@ function isNameGroundedWithShedding(phrase: string, nameLedger: readonly string[
  *  nothing follows "goat" at all. Deliberately narrow (s/d/ed/ing) rather than a general stemmer:
  *  wide enough to catch the realistic case, not so wide it starts matching an unrelated word that
  *  merely shares a prefix. */
+function escapeForPattern(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** A single word is matched whole with its plain inflections; a phrase is matched as written. */
+function bannedTermPattern(term: string): RegExp {
+  return /^[a-z]+$/.test(term) ? new RegExp(`\\b${term}(?:s|d|ed|ing)?\\b`, "i") : new RegExp(escapeForPattern(term), "i");
+}
+
 export function bannedTermIn(text: string): string | null {
-  const lower = text.toLowerCase();
-  for (const term of BANNED_VOCABULARY) {
-    const pattern = /^[a-z]+$/.test(term) ? new RegExp(`\\b${term}(?:s|d|ed|ing)?\\b`, "i") : null;
-    const hit = pattern !== null ? pattern.test(text) : lower.includes(term.toLowerCase());
-    if (hit) return term;
-  }
+  for (const term of BANNED_VOCABULARY) if (bannedTermPattern(term).test(text)) return term;
   return null;
+}
+
+/** The first sentence of `text` carrying `term`, for the violation to quote. */
+function sentenceCarrying(text: string, term: string): string {
+  const pattern = bannedTermPattern(term);
+  return splitSentences(text).find((sentence) => pattern.test(sentence)) ?? text;
 }
 
 /** The drafting phrases a trading word is corrected to, or `null` for a banned word that is not a
@@ -432,18 +474,25 @@ function quoted(phrases: readonly string[]): string {
   return phrases.map((phrase) => `"${phrase}"`).join(", ");
 }
 
-const BANNED_TERM_VIOLATION_PATTERN = /^The text uses the banned term "([^"]+)"/;
+/** The violation's own shape, read back by `tradingWordCorrectionFor`: the term, then the
+ *  sentence it sits in (quoted, up to the remedy that follows the closing quote). */
+const BANNED_TERM_VIOLATION_PATTERN = /^The text uses the banned term "([^"]+)" in the sentence "(.+)"\. (?:Rewrite without it\.|Say it in drafting words instead)/;
 
 /**
  * THE REPLACEMENT RIDES WITH THE VIOLATION (production follow-up, 2026-09-08). "Rewrite without it"
  * is the rule; a trading word's violation also names the drafting phrase for the word it found, so
  * both correction paths (the soft one below and a from-scratch rewrite quoting the violations) hand
  * the writer the words to use rather than only the word not to.
+ *
+ * AND THE SENTENCE RIDES WITH IT TOO (written rate round, 2026-09-08). One soft correction of seven
+ * in the dev run fixed its other point and returned "the wrinkle nobody can price yet" unchanged:
+ * told only that the text used "price", the writer did not find it. The violation quotes the
+ * sentence, so both correction paths point at it.
  */
-function bannedTermViolation(term: string): string {
+function bannedTermViolation(term: string, text: string): string {
   const replacement = tradingReplacementFor(term);
   const remedy = replacement === null ? "Rewrite without it." : `Say it in drafting words instead: ${quoted(replacement)}.`;
-  return `The text uses the banned term "${term}". ${remedy}`;
+  return `The text uses the banned term "${term}" in the sentence "${sentenceCarrying(text, term)}". ${remedy}`;
 }
 
 const PRODUCT_CUE_AFTER = new RegExp(`^(?:['’]s)?\\s+(?:${COMPETITOR_PRODUCT_CUES.join("|")})\\b`, "i");
@@ -652,11 +701,12 @@ const TENSION_NUMBER_PATTERN = /\((-?\d+(?:\.\d+)?) pts\/game\)/;
  *  2026-09-08): the prose is kept and the sentence carrying the word is rewritten with the drafting
  *  phrase named. A lab-report or all-time term has no soft form and still costs a rewrite. */
 function tradingWordCorrectionFor(violation: string): string | null {
-  const term = BANNED_TERM_VIOLATION_PATTERN.exec(violation)?.[1];
-  if (term === undefined) return null;
-  const replacement = tradingReplacementFor(term);
+  const match = BANNED_TERM_VIOLATION_PATTERN.exec(violation);
+  if (match === null) return null;
+  const [, term, sentence] = match;
+  const replacement = tradingReplacementFor(term!);
   if (replacement === null) return null;
-  return `Your text uses the trading word "${term}". Rewrite the sentence carrying it, in your own words, with drafting words instead: ${quoted(replacement)}. Then leave everything else as it is.`;
+  return `Your text uses the trading word "${term}". Rewrite this sentence: "${sentence}". Say it in your own words, with drafting words instead: ${quoted(replacement)}. Then leave everything else as it is.`;
 }
 
 /** True for a violation that is a framing note, not a fabrication — see `SOFT_CORRECTIONS`. */
@@ -724,7 +774,7 @@ function validateGrounded(body: string, source: GroundingSource, band: Grounding
 
   const bannedTerm = bannedTermIn(trimmed);
   if (bannedTerm !== null) {
-    violations.push(bannedTermViolation(bannedTerm));
+    violations.push(bannedTermViolation(bannedTerm, trimmed));
   }
 
   const competitor = containsCompetitorName(trimmed);
@@ -736,9 +786,13 @@ function validateGrounded(body: string, source: GroundingSource, band: Grounding
     violations.push(UNFRAMED_FLOOR_VIOLATION);
   }
 
-  const ledger = [...source.numberLedger, ...promptNumbers(source.promptText)];
+  const printed = promptNumbers(source.promptText);
+  const ledger = [...source.numberLedger, ...printed];
   for (const { raw, value } of extractNumbers(trimmed)) {
-    if (!isDerivedFromLedger(value, ledger)) {
+    // THE TEN AND THE HUNDRED (written rate round, 2026-09-08): "1400-plus receiving yards"
+    // against a printed 1429, "360-point seasons" against 362.9, were roundings the tolerance
+    // missed, not fabrications. Of PRINTED figures only: see `LOOSE_READING_UNITS`.
+    if (!isDerivedFromLedger(value, ledger) && !isLooseReadingOf(value, printed)) {
       violations.push(`The number "${raw}" does not trace to any supplied fact.`);
     }
   }

@@ -144,6 +144,10 @@ describe("bundlePromptFor", () => {
     for (const request of requests) expect(prompt).toContain(`"${request.key}" (about ${Math.round(request.maxWords * 0.75)} words, never more than ${request.maxWords})`);
   });
 
+  it("restates the register beside the slots, which have no correction to fall back on (four slot rejections of forty players carried a trading word)", () => {
+    expect(prompt).toContain("Every sentence keeps the same words as the notes: drafting words, never a trading word, never \"floor\".");
+  });
+
   it("tells the writer there is no fixed order and that the two reads must not share sentences", () => {
     expect(prompt).toContain("no fixed order");
     expect(prompt).toContain("Do not reuse the short note's sentences");

@@ -543,6 +543,17 @@ function colorNumbers(lastSeasonStory: PlayerFactsLastSeasonStory | null, booksN
  *  posture toward the projection engine; the two are the same seventeen and always will be. */
 const GAMES_IN_A_SEASON = 17;
 
+/** A season total is stated to the ten from a hundred up. */
+const STATED_TO_THE_TEN_FROM = 100;
+const TEN = 10;
+
+/** A value with the two ways a person states it to the ten (down and nearest), when it is large
+ *  enough to be stated that way; the value alone otherwise. */
+function statedToTheTen(value: number): readonly number[] {
+  if (Math.abs(value) < STATED_TO_THE_TEN_FROM) return [value];
+  return [value, Math.floor(value / TEN) * TEN, Math.round(value / TEN) * TEN];
+}
+
 /**
  * EVERY NUMBER THE FACT SHEET PRINTS THAT IS NOT A MEASURED QUANTITY (capsule acceptance round) —
  * the dated stamp on the injury line and the figures inside the headlines `render.ts` quotes
@@ -578,27 +589,67 @@ function printedTextNumbers(facts: Omit<PlayerFacts, "numberLedger" | "nameLedge
  *
  * A DERIVATION IS ONLY LISTED WHEN BOTH ITS INPUTS ARE ON THE SHEET. Nothing here invents a third
  * quantity out of one, and a number that is neither on the sheet nor one of these still fails.
+ *
+ * WIDENED BY MEASUREMENT (written rate round, 2026-09-08). A 40-player dev run's ungrounded
+ * numbers, classified by hand, held three honest derivations the ledger did not carry: a per-game
+ * rate times a games figure the sheet prints ("21.7 a game over a 13-game season clears 282"), the
+ * sum of two law effects ("worth a combined 5.6 a game"), and headline figures read against each
+ * other. Every pair below is two printed facts and one operation; the fabrications the same run
+ * held ("300-touch legs", a pick the writer chose) trace to none of them and still fail.
  */
 function derivedNumbers(facts: Omit<PlayerFacts, "numberLedger" | "nameLedger" | "factsHash">): readonly number[] {
-  const { market, projection, availability } = facts;
+  const { market, projection, availability, season, lastSeasonStory } = facts;
   const numbers: number[] = [];
 
-  // What he is worth over the replacement the sheet names ("our number is 20 clear of the man
-  // you would otherwise start"), and the market gap read from either side.
-  if (market.replacementLevel !== null) numbers.push(projection.projectedPoints - market.replacementLevel);
-  if (market.marketAnchorPoints !== null) {
-    numbers.push(projection.projectedPoints - market.marketAnchorPoints, market.marketAnchorPoints - projection.projectedPoints);
-  }
+  // EVERY HEADLINE POINTS FIGURE AGAINST OUR NUMBER, both signs: the replacement the sheet names,
+  // the market anchor, the two tails, last season's total, this season's. Anchored on our number
+  // rather than every pair against every other: eight figures make twenty-eight pairwise
+  // differences, most of them small integers, and that licensed a fabricated "37 touchdowns".
+  const againstOurNumber = [
+    projection.floorPoints,
+    projection.ceilingPoints,
+    ...(market.replacementLevel === null ? [] : [market.replacementLevel]),
+    ...(market.marketAnchorPoints === null ? [] : [market.marketAnchorPoints]),
+    ...(lastSeasonStory === null ? [] : [lastSeasonStory.pointsRank.value]),
+    ...(season === null ? [] : [season.totals.fantasyPoints]),
+  ];
+  for (const figure of againstOurNumber) numbers.push(projection.projectedPoints - figure, figure - projection.projectedPoints);
+
+  // The width of each band, which is how a reader says "a ninety point spread".
+  numbers.push(projection.typicalHigh - projection.typicalLow, projection.ceilingPoints - projection.floorPoints);
+
+  // THE GAMES FIGURES THE SHEET PRINTS, and every per-game rate on it times each of them: a full
+  // season, the games this engine expects, the low and high of that range, the games he has played.
+  const games = [
+    GAMES_IN_A_SEASON,
+    ...(availability === null ? [] : [availability.expectedGames, availability.floorGames, availability.ceilingGames]),
+    ...(season === null ? [] : [season.gamesPlayed]),
+    ...(lastSeasonStory === null ? [] : [lastSeasonStory.gamesPlayed]),
+  ];
+  // A person states the product to the ten ("roughly 140" for 10.7 times 13, "clears 280" for
+  // 21.7 times 13), so each product carries its floor and nearest ten beside it. Here, by
+  // construction on these few products, never as a validator tolerance over every derived value.
+  const rates = [...(season === null ? [] : [season.pointsPerGame]), ...(lastSeasonStory === null ? [] : [lastSeasonStory.pointsPerGame])];
+  for (const rate of rates) for (const played of games) numbers.push(...statedToTheTen(rate * played));
 
   // Per game, both ways a person computes it: over a full season, and over the games this engine
-  // actually expects him to play.
+  // actually expects him to play, plus the games that expectation leaves on the table.
   numbers.push(projection.projectedPoints / GAMES_IN_A_SEASON);
   if (availability !== null && availability.expectedGames > 0) {
     numbers.push(projection.projectedPoints / availability.expectedGames, GAMES_IN_A_SEASON - availability.expectedGames);
   }
 
-  // The width of each band, which is how a reader says "a ninety point spread".
-  numbers.push(projection.typicalHigh - projection.typicalLow, projection.ceilingPoints - projection.floorPoints);
+  // THE LAW EFFECTS COMBINED: any two of them, and all of them ("a combined 5.6 a game").
+  const effects = facts.evidence.flatMap((item) => (item.kind === "law" ? [item.netEffectPoints] : []));
+  for (let i = 0; i < effects.length; i += 1) for (let j = i + 1; j < effects.length; j += 1) numbers.push(effects[i]! + effects[j]!);
+  if (effects.length > 2) numbers.push(effects.reduce((total, effect) => total + effect, 0));
+
+  // A SEASON TOTAL AS THE SUM OF ITS LISTED PARTS: yards from scrimmage, all yards, touches.
+  if (season !== null) {
+    const t = season.totals;
+    numbers.push(t.rushingYards + t.receivingYards, t.rushingYards + t.receivingYards + t.passingYards);
+    if (t.carries !== null) numbers.push(t.carries + t.receptions);
+  }
   return numbers;
 }
 

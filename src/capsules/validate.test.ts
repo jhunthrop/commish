@@ -285,6 +285,21 @@ describe("a banned trading word is corrected with its drafting replacement", () 
     expect(correction).toContain("leave everything else as it is");
   });
 
+  /**
+   * THE OFFENDING SENTENCE IS QUOTED (written rate round, 2026-09-08). One soft correction of seven
+   * in the dev run fixed its floor point and returned "the wrinkle nobody can price yet" word for
+   * word: told only that the text used "price", the writer did not find it. The violation now
+   * carries the sentence, and the correction points at it.
+   */
+  it("quotes the sentence carrying the trading word in the violation and in its correction", () => {
+    const body = compactWords("Rashad Long is the back for the SF offense. The new play caller is the wrinkle nobody can price yet. Our number of 248 season points and board rank 14 overall say so.");
+    const violation = validateCapsule(body, facts, "compact").violations.find((v) => v.includes('banned term "price"'));
+    expect(violation).toContain('in the sentence "The new play caller is the wrinkle nobody can price yet."');
+    const correction = softCorrectionFor(violation!);
+    expect(correction).toContain('Rewrite this sentence: "The new play caller is the wrinkle nobody can price yet."');
+    expect(correction).toContain("a reach at his ADP");
+  });
+
   it("still asks for a rewrite, with no soft correction, on a lab-report word", () => {
     const body = compactWords("Rashad Long is a p90 season waiting to happen for the SF offense, our number of 248 season points and board rank 14 overall say so this season.");
     const violation = validateCapsule(body, facts, "compact").violations.find((v) => v.includes('banned term "p90"'));
