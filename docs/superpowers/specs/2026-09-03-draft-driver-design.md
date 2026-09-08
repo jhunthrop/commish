@@ -39,9 +39,10 @@ Per call:
 2. **Catch-up loop.** While `in_progress` and under the action bound, compute the next due
    action and apply it AT its due instant (see timestamp semantics below):
    - a mock draft with a bot on a running clock: the bot's pick, due at
-     `turnStartedAt + botThinkDelaySeconds(...)` (zero delay for a sim-to-next-pick room) —
-     computed by the driver's own `dueBotPick` (below), applied as the same plain `MAKE_PICK`
-     the live driver submits;
+     `turnStartedAt + botThinkDelayMs(...)` (every room paces, 450–950 ms per pick — the
+     2026-09-08 pace round retired the zero-delay lane) — computed by the driver's own
+     `dueBotPick` (below), applied as the same plain `MAKE_PICK` the live driver submits, one
+     pick per due instant;
    - otherwise: `TIMER_EXPIRE` due at `currentDeadline(state)` — the engine's own selector,
      the identical action shape the ticker submits.
    When neither is due, the moderator gets its window (`nudger.nudge(state, now)`, same
@@ -185,8 +186,9 @@ for the jobs system (see the comment in `instrumentation.ts` pointing at
 
 1. Spec + plan (this file) — commit.
 2. `mock-draft-service/driver.ts`: extract `dueBotPick(state)` onto `MockBotDriver`; refactor
-   `driveBotPick`/`simToHumanTurn` onto it. Tests: due instant arithmetic (paced + sim), and the
-   existing driver suite stays green.
+   `driveBotPick` onto it. Tests: due instant arithmetic, and the existing driver suite stays
+   green. (As built: `simToHumanTurn` existed then and was retired by the 2026-09-08 pace
+   round; `dueBotPick` is the one due computation both the ticker and the funnel read.)
 3. `draft-service/advance.ts` + `DRAFT_ADVANCE_CONFIG`: the advance routine. Tests (new
    `advance.test.ts`): deferred mock start retry; deferred real auto-start (and the private /
    short-room refusals); catch-up chaining (10 abandoned minutes, 60s clocks → ~10 actions in
