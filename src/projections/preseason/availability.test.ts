@@ -169,11 +169,15 @@ describe("expectedGamesPlayed", () => {
     }
   });
 
-  it("weighs age as a bounded correction on the residual, never as a second role table", () => {
-    // The direction of the age term is measured, not pinned: on the fit seasons the residual after
-    // role and the player's own record is within a few percent of one for every cell, and the sign
-    // of a thin over-thirty cell has flipped between two states of the same store. What the fit
-    // does enforce is the bound, so a thin cell can never fade a real starter off a board.
+  it("weighs age: the same back is available no more at twenty-nine than at twenty-four, where the cells are thick", () => {
+    // Under-25 and 28-to-30 are the two thick running-back age cells on the fit seasons (well over
+    // a hundred player-seasons each), and the decline from the first to the second is what the
+    // data supports and this pins. The over-30 cell is THIN (a few dozen player-seasons, shrunk
+    // toward one with forty pseudo-seasons), and its sign has flipped between two states of the
+    // same store, so a 32-year-old is held only to the fit's own bound below, never to a direction.
+    const young = expectedGamesPlayed(player({ age: 24 }), at2024);
+    const prime = expectedGamesPlayed(player({ age: 29 }), at2024);
+    expect(prime.expected).toBeLessThanOrEqual(young.expected);
     for (const position of ["QB", "RB", "WR", "TE"] as const) {
       for (const bracket of AGE_BRACKETS) {
         const multiplier = FITTED_AVAILABILITY_PRIORS.ageMultiplier[position][bracket];
@@ -182,7 +186,6 @@ describe("expectedGamesPlayed", () => {
       }
     }
     const old = expectedGamesPlayed(player({ age: 32 }), at2024);
-    const young = expectedGamesPlayed(player({ age: 23 }), at2024);
     expect(Math.abs(old.expected - young.expected)).toBeLessThan(1);
   });
 
