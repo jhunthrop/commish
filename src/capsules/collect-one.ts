@@ -20,6 +20,7 @@ import {
   type ColorFacts,
   type FactsBoardRowInput,
 } from "./collect";
+import { collectDepthFacts, depthPriorSeasons } from "./facts/collect-depth";
 import { buildPlayerFacts, type PlayerFacts } from "./facts";
 
 /** One product player's own identity row — the fields `factsInputFor` reads off `BoardRow`'s
@@ -177,7 +178,12 @@ export async function collectPlayerFacts(db: Db, playerId: string, asOf: Date = 
   const priorSeason = PRODUCT_SEASON - 1;
   const gsisIdByPlayerId = new Map([[playerId, nflPlayerId]]);
 
-  const [byes, reasonsByNflId, injuries, news, seasons, lastSeasonStoryByGsisId, usageTouchesAndTrend, propsLinesByGsisId, winTotalByTeam] = await Promise.all([
+  // THE DEPTH PASS, narrowed to one man. Its own ranking population is `peerPositions`, the same
+  // narrowing every colour read below already takes, so a rank stays correct (`rankWithinGroups`
+  // buckets by position, and no other position was ever going to enter his bucket).
+  const teamByPlayerId = new Map([[nflPlayerId, identity.team]]);
+
+  const [byes, reasonsByNflId, injuries, news, seasons, lastSeasonStoryByGsisId, usageTouchesAndTrend, propsLinesByGsisId, winTotalByTeam, depthPass] = await Promise.all([
     byeWeeksByTeam(db),
     boardReasons(db, BOARD_SOURCE, PRODUCT_SEASON),
     injurySnapshot(db),
@@ -187,6 +193,7 @@ export async function collectPlayerFacts(db: Db, playerId: string, asOf: Date = 
     usageTouchesAndTrendFactsFor(db, priorSeason, peerPositions, asOf),
     propsLinesByPlayer(db, PRODUCT_SEASON),
     vegasWinTotalsByTeam(db, PRODUCT_SEASON, asOf),
+    collectDepthFacts(db, { productSeason: PRODUCT_SEASON, priorSeasons: depthPriorSeasons(PRODUCT_SEASON), positions: peerPositions, teamByPlayerId, asOf }),
   ]);
 
   const color: ColorFacts = {
@@ -197,6 +204,7 @@ export async function collectPlayerFacts(db: Db, playerId: string, asOf: Date = 
     propsLinesByGsisId,
     winTotalByTeam,
     gsisIdByPlayerId,
+    depthByGsisId: depthPass.byPlayerId,
   };
 
   const row = factsRowFor(playerId, identity, projection, byes.get(identity.team) ?? null, reasonsByNflId.get(nflPlayerId) ?? []);
