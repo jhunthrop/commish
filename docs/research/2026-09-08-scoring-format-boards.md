@@ -112,18 +112,18 @@ nothing simply disagrees with a room that drafts pass catchers as if they scored
 honest statement is narrower: each format's board beats that format's own room on the season the
 model never fit on, and loses nothing beyond noise in any band.
 
-**The PPR row is a check, and it does not match the published record.** `board-store.ts` records
-the v9 confirmatory read on decisive 2024 at +0.0979 [-0.0068, +0.2203] (2026-09-02), which did not
-clear. Today's tree on today's store reads +0.1387 [+0.0273, +0.2603]. The cross-check was run:
-`npm run projections:market-edge:scorecard 2024`, the unchanged script, on the same store, the
-same day, reads the identical blend rho 0.5659, ADP rho 0.4272 and gap +0.1387 (its own bootstrap
-pairing gives [+0.0363, +0.2565], beyond noise). So the PPR arm of this scorecard IS that script's
-blend arm, and the movement is the store's, not this round's: between 2026-09-02 and today the
-benchmark learned to see kickers and team defenses (2026-09-05), the availability and roster
-archives grew, and the crosswalk moved. The v9 verdict on the record stands as the record of the
-store of its day; that a re-read on today's store clears the bar is exactly the like-for-like
-question `board-store.ts` names for the 2025-outcomes round, and it is reported here rather than
-ruled on.
+**A dated observation on the PPR row, recorded and not acted on.**
+
+- 2026-09-02, the v9 confirmatory read (`board-store.ts`'s `BOARD_SOURCE` docblock): decisive 2024,
+  blend vs ADP +0.0979 [-0.0068, +0.2203], within noise, on the store as it stood that day (664
+  stored 2024 v9 rows).
+- 2026-09-08, this round: the unchanged `scripts/market-edge-scorecard.ts 2024` on the dev store
+  as it stands today (664-row 2024 board, 204 PPR ADP rows, n=176 scored) reads blend rho 0.5659,
+  ADP rho 0.4272, gap +0.1387 [+0.0363, +0.2565]; this round's scorecard reads the identical rho
+  and gap ([+0.0273, +0.2603] under its own bootstrap pairing).
+
+The code path is the same in both readings and unchanged by this round; the store differs. Nothing
+is re-fit on this observation.
 
 ## What is not format-clean, named rather than hidden
 
