@@ -74,6 +74,13 @@ describe("simulateRoomOdds", () => {
     expect(simulateRoomOdds({ state: freshState(), seed: 3, runs: 20, excludeFromOnClockSeat: NONE })).toEqual(table);
   });
 
+  it("still plays the on-clock pick when the exclusion covers the whole board, from the whole board", () => {
+    const everyone = new Set(BOARD.map((entry) => entry.playerId));
+    const table = simulateRoomOdds({ state: freshState(), seed: 3, runs: 5, excludeFromOnClockSeat: everyone });
+    expect(table.played).toHaveLength(5);
+    for (const run of table.played) expect(run.map((pick) => pick.pickNumber)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+
   it("plays nothing when no seat has a next turn", () => {
     const state = advance(freshState(), 2, 12);
     const table = simulateRoomOdds({ state, seed: 1, runs: 5, excludeFromOnClockSeat: NONE });

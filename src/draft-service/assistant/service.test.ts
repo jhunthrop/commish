@@ -12,6 +12,7 @@ import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { getDraftStore } from "@/draft-service";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { simulateRoomOdds } from "../sim/room-odds";
+import { ADVISOR_CONFIG } from "./config";
 import { resetAdvisorMemoForTests } from "./memo";
 import { recommendNow } from "./recommend";
 import { advisorFor } from "./service";
@@ -66,6 +67,12 @@ describe("advisorFor", () => {
     expect(first!.odds!.runs).toBeGreaterThan(0);
     expect(second!.odds!.pickNumber).toBe(2);
     expect(first!.pick!.playerId).toMatch(/^p\d$/);
+    // One depth for every seat: the memoised shortlist is the ten the tab's selector can show,
+    // so a selector change never costs a second request.
+    for (const call of recommend.mock.calls) expect(call[0].shortlistSize).toBe(ADVISOR_CONFIG.shortlistSize);
+    expect(first!.candidates[0]!.playerId).toBe(first!.pick!.playerId);
+    expect(first!.candidates.length).toBeGreaterThan(1);
+    expect(first!.signals).toEqual({ run: null, collapses: expect.any(Array) });
   });
 
   it("is null for a member with no seat and before the draft runs", async () => {

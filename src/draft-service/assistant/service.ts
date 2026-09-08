@@ -13,10 +13,11 @@ import { getDraftStore, resolveDraftActor } from "@/draft-service";
 import { evidencePoolFor } from "../sim/evidence";
 import { simulateRoomOdds, type RoomOddsInput, type RoomOddsTable } from "../sim/room-odds";
 import { inferSeatDrivers } from "../sim/seat-model";
-import { advisorCore, seedFor, shortlistSizeFor } from "./advisor";
+import { advisorCore, seedFor } from "./advisor";
 import { ADVISOR_CONFIG } from "./config";
 import { roomFactsFor, seatShortlistFor } from "./memo";
 import { askingWindow, onClockShortlist, recommendNow, valuedEvidence, type RecommendInput } from "./recommend";
+import { tierCollapses } from "./signals";
 import { tierStandings } from "./tiers";
 import type { AdvisorView } from "./view";
 
@@ -46,10 +47,11 @@ export async function advisorFor(db: Db, draftId: string, userId: string, deps: 
   const shape: LeagueShape = { teamCount: state.draftOrder.length, rosterSlots: state.config.slotConfig };
   const { pool } = await evidencePoolFor(db);
   const valued = valuedEvidence(pool, shape);
-  const { table, tiers } = roomFactsFor(draftId, state.sequence, () => ({
+  const { table, tiers, collapses } = roomFactsFor(draftId, state.sequence, () => ({
     table: simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) }),
     tiers: tierStandings(state, valued),
+    collapses: tierCollapses(state, valued),
   }));
-  const shortlist = seatShortlistFor(draftId, state.sequence, teamId, () => recommend({ state, askingTeamId: teamId, valued, shape, shortlistSize: shortlistSizeFor(state, teamId) }));
-  return advisorCore({ state, askingTeamId: teamId, valued, shape, table, tiers, shortlist });
+  const shortlist = seatShortlistFor(draftId, state.sequence, teamId, () => recommend({ state, askingTeamId: teamId, valued, shape, shortlistSize: ADVISOR_CONFIG.shortlistSize }));
+  return advisorCore({ state, askingTeamId: teamId, valued, shape, table, tiers, collapses, shortlist });
 }

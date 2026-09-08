@@ -16,7 +16,7 @@ import { BENCH_SLOT, type RosterSlotType } from "@/domain/roster";
 import type { PickReason } from "@/projections/decide/draft";
 import { shipsProjectedRows } from "@/projections/preseason/kdef-decision";
 import type { SeatTendency } from "../sim/room-odds";
-import type { PositionRun } from "./signals";
+import type { PositionRun } from "./view";
 
 export interface WhyFacts {
   readonly position: Position;
