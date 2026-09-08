@@ -16,6 +16,7 @@ import { loadArchivedPropLines, median, medianPropLinesByPlayer } from "@/projec
 import { statLinesAsOfForLiveSurface } from "@/projections/nflverse/derived-stat-lines";
 import { PARTICIPATION_METRICS } from "@/projections/nflverse/map";
 import { LIVE_ADMITTED_DERIVED_SEASONS } from "@/projections/nflverse/stat-lines";
+import { sourceTeamCode } from "@/projections/nflverse/team-codes";
 import { finalWeekOf } from "@/projections/nflverse/team-eras";
 import { PROP_MARKETS, type PropMarket } from "@/projections/odds/props-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
@@ -38,6 +39,8 @@ import {
 import { activePeersFor } from "./peers";
 import { rankWithinGroups, type RankableStat } from "./rank";
 import { buildTrendMetric } from "./trend";
+import { collectDepthFacts, depthPriorSeasons } from "./facts/collect-depth";
+import { EMPTY_DEPTH, type PlayerFactsDepth } from "./facts/types";
 
 /**
  * THE FACTS COLLECTOR — every database read `buildPlayerFacts` needs, gathered ONCE for every
@@ -500,6 +503,10 @@ export interface ColorFacts {
   readonly propsLinesByGsisId: ReadonlyMap<string, readonly PlayerFactsPropsLine[]>;
   readonly winTotalByTeam: ReadonlyMap<string, number>;
   readonly gsisIdByPlayerId: ReadonlyMap<string, string>;
+  /** THE DEPTH FACTS (spec `2026-09-07-fact-sheet-depth-design.md`), from the one batched pass in
+   *  `facts/collect-depth.ts`. Keyed by nflverse id like every other map here; a player the depth
+   *  stores hold nothing for is simply absent and `factsInputFor` substitutes `EMPTY_DEPTH`. */
+  readonly depthByGsisId: ReadonlyMap<string, PlayerFactsDepth>;
 }
 
 /** The subset of `BoardRow` (`draft-hq/board/service.ts`) `factsInputFor` actually reads — the
@@ -528,7 +535,13 @@ export function factsInputFor(
 ): PlayerFactsInput {
   const gsisId = color.gsisIdByPlayerId.get(row.playerId);
   const propsLines = gsisId === undefined ? [] : (color.propsLinesByGsisId.get(gsisId) ?? []);
-  const booksNumbers: PlayerFactsBooksNumbers = { propsLines, teamVegasWinTotal: color.winTotalByTeam.get(row.team) ?? null };
+  // THE WIN TOTAL IS KEYED BY THE NFLVERSE SPELLING, and the board row carries the PRODUCT one
+  // (`nflverse/team-codes.ts`): the product says `LAR` and `WSH` where `team_week_observations`
+  // says `LA` and `WAS`. Reading it by the board's own code silently returned nothing for exactly
+  // those two franchises, which rendered as "the books have posted no win total for the Rams"
+  // rather than as the lookup miss it was. `sourceTeamCode` is the one normalizer for this, and it
+  // leaves every other code untouched.
+  const booksNumbers: PlayerFactsBooksNumbers = { propsLines, teamVegasWinTotal: color.winTotalByTeam.get(sourceTeamCode(row.team)) ?? null };
   return {
     identity: { id: row.playerId, name: row.name, position: row.position, team: row.team },
     productSeason: PRODUCT_SEASON,
@@ -543,6 +556,7 @@ export function factsInputFor(
     lastSeasonStory: lastSeasonStoryFor(gsisId, color),
     usage: (gsisId === undefined ? undefined : color.usageByGsisId.get(gsisId)) ?? null,
     trend: (gsisId === undefined ? undefined : color.trendByGsisId.get(gsisId)) ?? null,
+    depth: (gsisId === undefined ? undefined : color.depthByGsisId.get(gsisId)) ?? EMPTY_DEPTH,
     booksNumbers,
   };
 }
@@ -603,11 +617,21 @@ export async function collectBoardFacts(db: Db, asOf: Date = new Date()): Promis
     nflPlayerIdsFor(db, rows.map((row) => row.playerId)),
   ]);
 
-  const [lastSeasonStoryByGsisId, usageTouchesAndTrend, propsLinesByGsisId, winTotalByTeam] = await Promise.all([
+  // THE DEPTH PASS'S OWN SUBJECT MAP: every board player's nflverse id against the team the board
+  // has him on today. A board row the crosswalk never placed contributes nothing, exactly as it
+  // already contributes nothing to any other nflverse-keyed colour fact.
+  const teamByPlayerId = new Map<string, string>();
+  for (const row of rows) {
+    const gsisId = gsisIdByPlayerId.get(row.playerId);
+    if (gsisId !== undefined) teamByPlayerId.set(gsisId, row.team);
+  }
+
+  const [lastSeasonStoryByGsisId, usageTouchesAndTrend, propsLinesByGsisId, winTotalByTeam, depthPass] = await Promise.all([
     lastSeasonStoriesFor(db, priorSeason, positions, asOf),
     usageTouchesAndTrendFactsFor(db, priorSeason, positions, asOf),
     propsLinesByPlayer(db, PRODUCT_SEASON),
     vegasWinTotalsByTeam(db, PRODUCT_SEASON, asOf),
+    collectDepthFacts(db, { productSeason: PRODUCT_SEASON, priorSeasons: depthPriorSeasons(PRODUCT_SEASON), positions, teamByPlayerId, asOf }),
   ]);
   const color: ColorFacts = {
     lastSeasonStoryByGsisId,
@@ -617,6 +641,7 @@ export async function collectBoardFacts(db: Db, asOf: Date = new Date()): Promis
     propsLinesByGsisId,
     winTotalByTeam,
     gsisIdByPlayerId,
+    depthByGsisId: depthPass.byPlayerId,
   };
 
   const peerCountByPosition = new Map<Position, number>();
