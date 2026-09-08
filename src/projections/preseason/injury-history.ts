@@ -11,55 +11,64 @@ import type { SeasonAvailability } from "./availability";
  *
  * Age is already `ageAtSeason` in `availability.ts`. The three functions here derive the other
  * ingredients purely from `SeasonAvailability` records a caller has already built from real
- * per-week presence (`player_week_observations`: a player with a stat line played, the schedule
- * says his team played) — nothing here invents history or reads a store. `availability.ts` turns
- * these numbers into brackets and fits a multiplier over each; this module only computes the
- * numbers.
+ * per-week evidence (`player_week_observations` for the weeks he played, `nflverse_injuries` and
+ * `nflverse_roster_weeks` for the weeks he was unavailable) — nothing here invents history or reads
+ * a store. `availability.ts` turns these numbers into brackets and fits a multiplier over each;
+ * this module only computes the numbers. They are not read by the shipped model today (the
+ * 2026-09-05 refit was reverted); they are kept on the same semantics as the shrinkage so a future
+ * round cannot re-open the defect this file used to carry.
+ *
+ * A MISSED GAME IS A GAME HE WAS UNAVAILABLE FOR (founder report 2026-09-08), never a game he did
+ * not play. The first version of this file read "team games minus games played", which charged a
+ * healthy backup for every week he dressed and did not play. `SeasonAvailability.gamesUnavailable`
+ * carries the classified count, and `null` there means the designation stores did not cover the
+ * season — read as silence below, never as a clean season.
  */
 
 /**
- * Games he missed in one specific season: his team's games minus his, floored at zero — a bye or a
- * game he did not dress for either way, exactly as `SeasonAvailability.gamesPlayed` already counts
- * it. `null` where the history carries no record for that season at all, which is "he was not on a
- * roster that year" (a rookie, a man not yet in the league) rather than "he played every game" — an
- * absent record must never be read as a clean season.
+ * Games he missed to unavailability in one specific season, capped at his team's games. `null`
+ * where the history carries no record for that season at all (a rookie, a man not yet in the
+ * league) OR where the designation stores do not cover it — either way an absent record must never
+ * be read as a clean season.
  */
 export function gamesMissedInSeason(history: readonly SeasonAvailability[], season: number): number | null {
   const entry = history.find((row) => row.season === season);
-  if (entry === undefined) return null;
-  return Math.max(0, entry.teamGames - Math.min(entry.gamesPlayed, entry.teamGames));
+  if (entry === undefined || entry.gamesUnavailable === null) return null;
+  return Math.max(0, Math.min(entry.gamesUnavailable, entry.teamGames));
 }
 
 /**
  * PAST INJURIES PREDICT FUTURE ONES: games missed across the two most recent prior seasons,
- * combined. A season absent from the record contributes ZERO rather than a full season's worth of
- * missed games — no record is an absence of evidence, not evidence of a lost year, and treating it
- * as the latter would charge every rookie and every second-year player for seasons that were never
- * his to miss.
+ * combined. A season absent from the record, or one the stores do not cover, contributes ZERO
+ * rather than a full season's worth of missed games — no record is an absence of evidence, not
+ * evidence of a lost year, and treating it as the latter would charge every rookie and every
+ * second-year player for seasons that were never his to miss.
  */
 export function recentGamesMissed(history: readonly SeasonAvailability[], season: number): number {
   return (gamesMissedInSeason(history, season - 1) ?? 0) + (gamesMissedInSeason(history, season - 2) ?? 0);
 }
 
 /**
- * CAREER LONGEVITY IS EVIDENCE OF AVOIDANCE: games played over games his teams played, summed
- * across EVERY season the history carries — not only the seasons `shrunkAvailabilityRate` weighs.
- * A long, largely-complete record is real evidence a body holds up that a three-season window
- * alone would understate; `source.ts` widens the window this function is handed specifically so
- * this number means "career" rather than "recent."
+ * CAREER LONGEVITY IS EVIDENCE OF AVOIDANCE: games he was available for over games his teams
+ * played, summed across EVERY covered season the history carries — not only the seasons
+ * `shrunkAvailabilityRate` weighs. A healthy did-not-play week counts as available: a backup's
+ * career is not a fragile one. A long, largely-complete record is real evidence a body holds up
+ * that a three-season window alone would understate; `source.ts` widens the window this function
+ * is handed specifically so this number means "career" rather than "recent."
  *
- * `null` with no history at all: a man with no NFL seasons behind him has no career to be durable
- * or fragile in, and that is a different claim than "durable" or "fragile" would each make.
+ * `null` with no covered history at all: a man with no NFL seasons behind him has no career to be
+ * durable or fragile in, and that is a different claim than "durable" or "fragile" would each make.
  */
 export function careerAvailabilityRate(history: readonly SeasonAvailability[]): number | null {
-  if (history.length === 0) return null;
-  let played = 0;
+  let available = 0;
   let teamGames = 0;
   for (const row of history) {
-    played += Math.min(row.gamesPlayed, row.teamGames);
+    const missed = gamesMissedInSeason([row], row.season);
+    if (missed === null) continue;
+    available += row.teamGames - missed;
     teamGames += row.teamGames;
   }
-  return teamGames > 0 ? played / teamGames : null;
+  return teamGames > 0 ? available / teamGames : null;
 }
 
 /** How many seasons of real record `careerAvailabilityRate` is measured over — the evidence weight

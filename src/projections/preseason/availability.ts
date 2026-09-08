@@ -24,11 +24,16 @@ import type { RosterStatus } from "../nflverse/rosters";
  * and seventeen, so the whole distribution is eighteen numbers and can be written down exactly
  * rather than approximated by a normal that puts mass on nineteen games and on minus two.
  *
- * WHAT THIS DELIBERATELY DOES NOT SEPARATE. Games missed through injury, through benching and
- * through being cut are one quantity here. They have different causes and the same consequence for
- * a season total, and splitting them would need a designation feed this engine does not have. What
- * it does NOT do is read a game-day inactive list: `rosters.ts` folds INA into `active` precisely
- * so that a Sunday fact cannot reach a stamp claiming late August.
+ * WHAT A SEASON OF RECORD IS EVIDENCE OF (founder report 2026-09-08). The first version of this
+ * model read a player's record as games played over team games, so a healthy backup who dressed
+ * for eleven of seventeen was charged six missed games and a rookie promoted mid-season was faded
+ * for the weeks he spent behind the starter. The record is now evidence of AVAILABILITY only: the
+ * weeks he played against the weeks the store says he was unavailable (`SeasonAvailability`, the
+ * classification in `availability/week-classification.ts`). A week he was rostered and healthy and
+ * did not play is a ROLE fact, and role is the baseline's job through the role bracket; such a week
+ * contributes nothing either way. What this still does NOT do is read a game-day inactive list for
+ * the season being projected: `rosters.ts` folds INA into `active` precisely so that a Sunday fact
+ * cannot reach a stamp claiming late August.
  */
 
 /** Regular-season games a team plays. Seventeen from 2021; sixteen before. */
@@ -116,6 +121,33 @@ export interface SeasonAvailability {
   readonly gamesPlayed: number;
   /** Games his league played that year, the denominator `gamesPlayed` is a share of. */
   readonly teamGames: number;
+  /**
+   * Games the store says he was UNAVAILABLE for: the injury report listed him Out, or Doubtful and
+   * he did not play, or the weekly roster carried him on a reserve, PUP, non-football-injury,
+   * suspended or exempt list that week (`availability/week-classification.ts`). A rostered week he
+   * was healthy and did not play is neither played nor unavailable.
+   *
+   * `null` where neither designation store covers the season: without the designations a missed
+   * week and a did-not-play week are the same row, so the season says nothing about availability.
+   * Never zero in that case, which would read as a clean season the store never observed.
+   */
+  readonly gamesUnavailable: number | null;
+}
+
+/**
+ * What one season of record says about availability, and how loudly.
+ *
+ * The evidence is the games he played over the games he played OR was unavailable for, weighted by
+ * that same count: a starter with a full season speaks with seventeen games, a backup who dressed
+ * three times and was never hurt speaks with three, and a man who spent the year on injured reserve
+ * speaks with seventeen games of zero. `null` where the season carries no such evidence at all: the
+ * designation stores did not cover it, or he was neither played nor unavailable in any week.
+ */
+export function availabilityEvidence(entry: SeasonAvailability): { readonly played: number; readonly games: number } | null {
+  if (entry.gamesUnavailable === null || entry.teamGames <= 0) return null;
+  const played = Math.min(Math.max(0, entry.gamesPlayed), entry.teamGames);
+  const games = Math.min(played + Math.max(0, entry.gamesUnavailable), entry.teamGames);
+  return games > 0 ? { played, games } : null;
 }
 
 /** Everything the model is allowed to know about one player before a season. */
@@ -326,10 +358,11 @@ export function shrunkAvailabilityRate(input: AvailabilityInput, priors: Availab
   let evidenceGames = 0;
   let evidencePlayed = 0;
   history.forEach((entry, index) => {
-    if (entry.teamGames <= 0) return;
+    const evidence = availabilityEvidence(entry);
+    if (evidence === null) return;
     const weight = priors.recencyDecay ** index;
-    evidenceGames += weight * entry.teamGames;
-    evidencePlayed += weight * Math.min(entry.gamesPlayed, entry.teamGames);
+    evidenceGames += weight * evidence.games;
+    evidencePlayed += weight * evidence.played;
   });
 
   return evidenceGames > 0

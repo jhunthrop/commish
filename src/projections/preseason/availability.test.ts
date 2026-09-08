@@ -9,8 +9,10 @@ import {
   seventeenGamesForEveryone,
   teamGamesIn,
   withAvailabilityRecency,
+  shrunkAvailabilityRate,
   type AvailabilityInput,
   type AvailabilityPriors,
+  type SeasonAvailability,
 } from "./availability";
 import { FITTED_AVAILABILITY_PRIORS } from "./fitted";
 
@@ -37,6 +39,12 @@ const FLAT: AvailabilityPriors = {
 
 function player(overrides: Partial<AvailabilityInput> = {}): AvailabilityInput {
   return { position: "RB", age: 26, status: "active", projectedSnapShare: 0.6, history: [], baselineRate: null, ...overrides };
+}
+
+/** A season in which every unplayed game was an absence the store recorded: the record the old
+ *  "team games minus games played" reading assumed for everybody. */
+function absent(season: number, gamesPlayed: number, teamGames: number): SeasonAvailability {
+  return { season, gamesPlayed, teamGames, gamesUnavailable: Math.max(0, teamGames - gamesPlayed) };
 }
 
 const at2024 = { season: 2024, priors: FITTED_AVAILABILITY_PRIORS } as const;
@@ -117,9 +125,9 @@ describe("expectedGamesPlayed", () => {
       player({
         age: 30.5,
         history: [
-          { season: 2023, gamesPlayed: 9, teamGames: 17 },
-          { season: 2022, gamesPlayed: 8, teamGames: 17 },
-          { season: 2021, gamesPlayed: 16, teamGames: 17 },
+          absent(2023, 9, 17),
+          absent(2022, 8, 17),
+          absent(2021, 16, 17),
         ],
       }),
       at2024,
@@ -128,8 +136,8 @@ describe("expectedGamesPlayed", () => {
       player({
         age: 24,
         history: [
-          { season: 2023, gamesPlayed: 17, teamGames: 17 },
-          { season: 2022, gamesPlayed: 17, teamGames: 17 },
+          absent(2023, 17, 17),
+          absent(2022, 17, 17),
         ],
       }),
       at2024,
@@ -162,8 +170,8 @@ describe("expectedGamesPlayed", () => {
   });
 
   it("REGRESSES HARD: one lost season moves the projection by a fraction of the games it lost", () => {
-    const clean = expectedGamesPlayed(player({ history: [{ season: 2023, gamesPlayed: 17, teamGames: 17 }] }), at2024);
-    const hurt = expectedGamesPlayed(player({ history: [{ season: 2023, gamesPlayed: 5, teamGames: 17 }] }), at2024);
+    const clean = expectedGamesPlayed(player({ history: [absent(2023, 17, 17)] }), at2024);
+    const hurt = expectedGamesPlayed(player({ history: [absent(2023, 5, 17)] }), at2024);
     const moved = clean.expected - hurt.expected;
     expect(moved).toBeGreaterThan(0);
     // Twelve games of difference in the record must not become twelve games of difference in the
@@ -175,8 +183,8 @@ describe("expectedGamesPlayed", () => {
     const recentlyHurt = expectedGamesPlayed(
       player({
         history: [
-          { season: 2023, gamesPlayed: 6, teamGames: 17 },
-          { season: 2022, gamesPlayed: 17, teamGames: 17 },
+          absent(2023, 6, 17),
+          absent(2022, 17, 17),
         ],
       }),
       at2024,
@@ -184,8 +192,8 @@ describe("expectedGamesPlayed", () => {
     const oldInjury = expectedGamesPlayed(
       player({
         history: [
-          { season: 2023, gamesPlayed: 17, teamGames: 17 },
-          { season: 2022, gamesPlayed: 6, teamGames: 17 },
+          absent(2023, 17, 17),
+          absent(2022, 6, 17),
         ],
       }),
       at2024,
@@ -211,9 +219,9 @@ describe("expectedGamesPlayed", () => {
     const known = spreadOf(
       player({
         history: [
-          { season: 2023, gamesPlayed: 13.6, teamGames: 17 },
-          { season: 2022, gamesPlayed: 13.6, teamGames: 17 },
-          { season: 2021, gamesPlayed: 13.6, teamGames: 17 },
+          absent(2023, 13.6, 17),
+          absent(2022, 13.6, 17),
+          absent(2021, 13.6, 17),
         ],
       }),
     );
@@ -221,16 +229,55 @@ describe("expectedGamesPlayed", () => {
     expect(unknown).toBeGreaterThan(known);
   });
 
+  describe("what a season of record is evidence OF (founder report 2026-09-08: backup weeks counted as missed games)", () => {
+    const flat = { season: 2024, priors: FLAT } as const;
+    const baseline = FLAT.baseline.RB.committee;
+
+    it("does not charge a healthy backup for the weeks he dressed and did not play", () => {
+      // Eleven games, six healthy active-roster weeks, no designation all season.
+      const backup = shrunkAvailabilityRate(player({ history: [{ season: 2023, gamesPlayed: 11, teamGames: 17, gamesUnavailable: 0 }] }), FLAT);
+      const hurt = shrunkAvailabilityRate(player({ history: [absent(2023, 11, 17)] }), FLAT);
+      expect(backup).toBeGreaterThan(baseline);
+      expect(hurt).toBeLessThan(baseline);
+    });
+
+    it("weighs the record by the weeks that speak to availability, so a small role is weak evidence rather than bad evidence", () => {
+      const backup = shrunkAvailabilityRate(player({ history: [{ season: 2023, gamesPlayed: 3, teamGames: 17, gamesUnavailable: 0 }] }), FLAT);
+      const starter = shrunkAvailabilityRate(player({ history: [{ season: 2023, gamesPlayed: 17, teamGames: 17, gamesUnavailable: 0 }] }), FLAT);
+      expect(backup).toBeGreaterThan(baseline);
+      expect(backup).toBeLessThan(starter);
+    });
+
+    it("hears a man who spent the whole season on a reserve list, who never played and used to leave no record at all", () => {
+      const lost = shrunkAvailabilityRate(player({ history: [{ season: 2023, gamesPlayed: 0, teamGames: 17, gamesUnavailable: 17 }] }), FLAT);
+      expect(lost).toBeLessThan(baseline);
+      expect(lost).toBeCloseTo((FLAT.priorGames * baseline) / (FLAT.priorGames + 17), 10);
+    });
+
+    it("reads a season the designation stores do not cover as no evidence, never as a clean season and never as a lost one", () => {
+      const uncovered = player({ history: [{ season: 2023, gamesPlayed: 11, teamGames: 17, gamesUnavailable: null }] });
+      expect(shrunkAvailabilityRate(uncovered, FLAT)).toBe(baseline);
+      // It still counts as a season of record for the spread, because the games he played are real.
+      expect(expectedGamesPlayed(uncovered, flat).probabilities).not.toEqual(expectedGamesPlayed(player(), flat).probabilities);
+    });
+
+    it("never lets played plus unavailable exceed the games his team played", () => {
+      const glitch = shrunkAvailabilityRate(player({ history: [{ season: 2023, gamesPlayed: 12, teamGames: 17, gamesUnavailable: 9 }] }), FLAT);
+      const capped = shrunkAvailabilityRate(player({ history: [{ season: 2023, gamesPlayed: 12, teamGames: 17, gamesUnavailable: 5 }] }), FLAT);
+      expect(glitch).toBeCloseTo(capped, 10);
+    });
+  });
+
   it("reads only as many prior seasons as the priors allow", () => {
     const withinWindow = player({
       history: [
-        { season: 2023, gamesPlayed: 17, teamGames: 17 },
-        { season: 2022, gamesPlayed: 17, teamGames: 17 },
-        { season: 2021, gamesPlayed: 17, teamGames: 17 },
+        absent(2023, 17, 17),
+        absent(2022, 17, 17),
+        absent(2021, 17, 17),
       ],
     });
     const plusAncientHistory = player({
-      history: [...withinWindow.history, { season: 2018, gamesPlayed: 0, teamGames: 16 }],
+      history: [...withinWindow.history, absent(2018, 0, 16)],
     });
     expect(expectedGamesPlayed(plusAncientHistory, { season: 2024, priors: FLAT }).expected).toBeCloseTo(
       expectedGamesPlayed(withinWindow, { season: 2024, priors: FLAT }).expected,
@@ -276,7 +323,7 @@ describe("the committed fit", () => {
   });
 
   it("PROJECTS A FULL-TIME STARTER LIKE A STARTER, which is the defect the role table exists to fix", () => {
-    const cleanRecord = [2023, 2022, 2021].map((season) => ({ season, gamesPlayed: 17, teamGames: 17 }));
+    const cleanRecord = [2023, 2022, 2021].map((season) => absent(season, 17, 17));
     for (const position of ["QB", "RB", "WR", "TE"] as const) {
       const outlook = expectedGamesPlayed(
         player({ position, projectedSnapShare: 0.8, history: cleanRecord }),
@@ -306,9 +353,9 @@ describe("withAvailabilityRecency — the fitted recency axis", () => {
   /** A record with three seasons in it, deliberately UNEVEN, so the weighting has something to do:
    *  a flat aggregation and a decayed one cannot agree on this player. */
   const uneven = [
-    { season: 2023, gamesPlayed: 17, teamGames: 17 },
-    { season: 2022, gamesPlayed: 4, teamGames: 17 },
-    { season: 2021, gamesPlayed: 2, teamGames: 17 },
+    absent(2023, 17, 17),
+    absent(2022, 4, 17),
+    absent(2021, 2, 17),
   ];
 
   it("NULL CELL: `null` returns the caller's OWN priors object, so today's behaviour is reproduced by construction", () => {
