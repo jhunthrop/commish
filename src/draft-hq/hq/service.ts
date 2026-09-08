@@ -1,7 +1,8 @@
 import type { Db } from "@/db/client";
 import type { Position } from "@/domain/player";
 import { plural } from "@/domain/duration";
-import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
+import { BENCH_SLOT, type RosterSlotConfig } from "@/domain/roster";
+import { GENERIC_BOARD_SHAPE } from "@/draft-hq/board/generic-board";
 import { boardRows, isProjectedRow, type BoardRow } from "@/draft-hq/board/service";
 import { nextDraftingLeague as nextDraftingLeagueRow } from "@/draft-hq/league-context";
 import { defaultSheetFor } from "@/draft-hq/sheet/service";
@@ -96,7 +97,7 @@ async function nextDraftingLeagueContext(db: Db, userId: string): Promise<DraftH
 export async function draftHqBody(db: Db, userId: string): Promise<DraftHqBody> {
   const [nextDraft, board, sheet] = await Promise.all([
     nextDraftingLeagueContext(db, userId),
-    boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } }).catch(
+    boardRows(db, { shape: GENERIC_BOARD_SHAPE }).catch(
       (): readonly BoardRow[] => [],
     ),
     defaultSheetFor(db, userId, null),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareMatches, matchAgainst, withinOneEdit, type MatchFields } from "./match";
+import { compareMatches, matchAgainst, withinOneEdit, type MatchFields, type MatchStrength } from "./match";
 
 const CHASE: MatchFields = { name: "jamarr chase", team: ["cin", "cincinnati", "bengals"], position: "wr" };
 const LIONS_TEAM: MatchFields = { name: "detroit lions det", team: [], position: null };
@@ -79,9 +79,9 @@ describe("matchAgainst", () => {
 
 describe("compareMatches", () => {
   it("orders by tier, then priority, then the caller's own order", () => {
-    const a = { tier: "exact" as const, priority: 1 };
-    const b = { tier: "prefix" as const, priority: 0 };
-    const c = { tier: "exact" as const, priority: 0 };
+    const a: MatchStrength = { tier: "exact", priority: 1 };
+    const b: MatchStrength = { tier: "prefix", priority: 0 };
+    const c: MatchStrength = { tier: "exact", priority: 0 };
     expect(compareMatches(a, b)).toBeLessThan(0);
     expect(compareMatches(c, a)).toBeLessThan(0);
     expect(compareMatches(a, a)).toBe(0);
