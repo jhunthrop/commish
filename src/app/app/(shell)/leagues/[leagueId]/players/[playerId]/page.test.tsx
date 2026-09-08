@@ -304,7 +304,7 @@ describe("PlayerPage — the dossier composition (Task 6)", () => {
     vi.mocked(playerSeason).mockResolvedValue(dossierBody({ capsule: { bodyCompact: "The template's own sentence.", bodyFull: "The template's own sentence.", source: "template", narrative: null } }));
     await renderPage();
     expect(screen.getByText("The template's own sentence.")).toBeInTheDocument();
-    expect(screen.getByText("A summary from the numbers. The written read is on its way.")).toBeInTheDocument();
+    expect(screen.getByText("A summary from the numbers.")).toBeInTheDocument();
   });
 
   it("shows every why group uncapped, never a 'the full case' expander (unlike the peek's own cap)", async () => {
