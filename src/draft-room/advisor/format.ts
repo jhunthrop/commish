@@ -80,7 +80,7 @@ export function changedSinceLines(changes: readonly PlanChange[], name: (playerI
   const ordered = [...changes].sort((a, b) => changeWeight(b) - changeWeight(a));
   const named = ordered.slice(0, ADVISOR_ROOM_CONFIG.changedSinceMaxLines);
   const departed = named.filter((change) => change.kind === "left_plan").map((change) => name(change.playerId));
-  const departures = departed.length === 0 ? [] : [`${listNames(departed)} ${departed.length === 1 ? "came" : "came"} off the plan`];
+  const departures = departed.length === 0 ? [] : [`${listNames(departed)} came off the plan`];
   const moves = named.flatMap((change) => {
     if (change.kind !== "odds_moved") return [];
     const pick = turnPick(change.turn);
