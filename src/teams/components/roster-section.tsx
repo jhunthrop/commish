@@ -3,14 +3,17 @@
 import Link from "next/link";
 import { PlayerRow } from "@/components/ui";
 import { usePlayerPageHref } from "@/components/app-shell/shell-leagues";
+import { tierLetter } from "@/draft-hq/board/copy";
 import type { TeamBoardPlayer } from "../contract";
 import { Section } from "./section";
 
-/** The mono facts after a roster row's name, each only when the board states it. Pure. */
+/** The mono facts after a roster row's name, each only when the board states it. The tier is the
+ *  board's own letter (`tierLetter`: S for the summit, then A onward), never the zero-based
+ *  index the store carries. Pure. */
 export function rosterMetaLine(row: TeamBoardPlayer): string {
   const parts: string[] = [];
   if (row.boardRank !== null) parts.push(`Board ${row.boardRank}`);
-  if (row.tier !== null) parts.push(`Tier ${row.tier}`);
+  if (row.tier !== null) parts.push(`Tier ${tierLetter(row.tier)}`);
   if (row.marketAdp !== null) parts.push(`ADP ${row.marketAdp.toFixed(1)}`);
   if (row.projectedPoints !== null) parts.push(`${row.projectedPoints.toFixed(1)} pts`);
   return parts.join(" · ");

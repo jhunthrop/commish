@@ -42,7 +42,7 @@ describe("TeamPageView", () => {
         expect(screen.getByText("9 of 32")).toBeInTheDocument();
         expect(screen.getByText("58%")).toBeInTheDocument();
         expect(screen.getByText("+2.4")).toBeInTheDocument();
-        expect(screen.getByText("Board 3 · Tier 1 · ADP 4.1 · 312.4 pts")).toBeInTheDocument();
+        expect(screen.getByText("Board 3 · Tier A · ADP 4.1 · 312.4 pts")).toBeInTheDocument();
         expect(screen.getByText("ADP 150.2")).toBeInTheDocument();
         expect(screen.getByText("Week one chart, Aug 28, 2026")).toBeInTheDocument();
         expect(screen.getByText("Current chart, Sep 5, 2026")).toBeInTheDocument();
