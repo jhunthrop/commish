@@ -304,3 +304,43 @@ describe("the schedule line", () => {
     expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, schedule: null })))).toBeNull();
   });
 });
+
+describe("the market movement, volatility and career lines", () => {
+  it("dates both ends of the market window and grounds every number", () => {
+    const facts = buildPlayerFacts(
+      depthInput({ ...EMPTY_DEPTH, marketMovement: { latestAdp: 13, latestAt: "2026-09-07", earlierAdp: 24, earlierAt: "2026-08-08", picks: 11 } }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- The market has moved him up 11 picks, from 24 on 2026-08-08 to 13 on 2026-09-07.");
+    for (const value of [13, 24, 11, 2026, 9, 7, 8]) expect(facts.numberLedger).toContain(value);
+  });
+
+  it("renders no market movement line when the archive holds one capture", () => {
+    expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, marketMovement: null })))).toBeNull();
+  });
+
+  it("prints the bar it counted against and names the worst week", () => {
+    const facts = buildPlayerFacts(
+      depthInput({ ...EMPTY_DEPTH, volatility: { season: 2025, weeksPlayed: 15, weeksAboveThreshold: 9, threshold: 15, worstWeek: { week: 2, points: 4.5 } } }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- He cleared 15 points in 9 of his 15 played weeks in 2025, and his worst was 4.5 in week 2.");
+    for (const value of [2025, 15, 9, 4.5, 2]) expect(facts.numberLedger).toContain(value);
+  });
+
+  it("lists only the seasons the store holds, and grounds each one's rank", () => {
+    const facts = buildPlayerFacts(
+      depthInput({
+        ...EMPTY_DEPTH,
+        priorSeasons: [
+          { season: 2025, points: 248, gamesPlayed: 15, positionRank: 4, qualifierCount: 62 },
+          { season: 2024, points: 190, gamesPlayed: 14, positionRank: 11, qualifierCount: 60 },
+        ],
+      }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- Season by season: 2025, 248 points over 15 games, RB4 among 62. 2024, 190 points over 14 games, RB11 among 60.");
+    for (const value of [248, 15, 4, 62, 190, 14, 11, 60]) expect(facts.numberLedger).toContain(value);
+  });
+
+  it("renders no career line when the store holds no prior season", () => {
+    expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, priorSeasons: [], volatility: null })))).toBeNull();
+  });
+});

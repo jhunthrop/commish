@@ -236,6 +236,34 @@ function scheduleLine(depth: PlayerFactsDepth): string | null {
   return `Schedule: ${sentences.join(" ")}`;
 }
 
+/** WHERE THE MARKET HAS MOVED HIM, with both ends of the window dated so the sentence never claims
+ *  a span the archive does not cover. */
+function marketMovementLine(depth: PlayerFactsDepth): string | null {
+  const movement = depth.marketMovement;
+  if (movement === null) return null;
+  const direction = movement.picks === 0 ? "has not moved him" : `has moved him ${movement.picks > 0 ? "up" : "down"} ${Math.abs(movement.picks)} picks`;
+  return `The market ${direction}, from ${movement.earlierAdp} on ${movement.earlierAt} to ${movement.latestAdp} on ${movement.latestAt}.`;
+}
+
+/** THE BAD WEEKS, with the bar printed rather than implied. */
+function volatilityLine(depth: PlayerFactsDepth): string | null {
+  const volatility = depth.volatility;
+  if (volatility === null) return null;
+  const weekWord = volatility.weeksPlayed === 1 ? "week" : "weeks";
+  return `He cleared ${volatility.threshold} points in ${volatility.weeksAboveThreshold} of his ${volatility.weeksPlayed} played ${weekWord} in ${volatility.season}, and his worst was ${volatility.worstWeek.points} in week ${volatility.worstWeek.week}.`;
+}
+
+/** THE CAREER ARC, one clause per season the store actually holds. */
+function priorSeasonsLine(facts: PlayerFacts): string | null {
+  const seasons = facts.depth.priorSeasons;
+  if (seasons.length === 0) return null;
+  const position = facts.identity.position;
+  const clauses = seasons.map(
+    (season) => `${season.season}, ${season.points} points over ${season.gamesPlayed} games, ${position}${season.positionRank} among ${season.qualifierCount}`,
+  );
+  return `Season by season: ${clauses.join(". ")}.`;
+}
+
 /** Every line of the section, in `PlayerFactsDepth`'s own field order. Takes the whole `PlayerFacts`
  *  rather than the depth group alone because a few of these sentences name his own team and
  *  position, which live on `identity` and must never be restated inside the depth group itself. */
@@ -254,6 +282,9 @@ function depthLines(facts: PlayerFacts): readonly string[] {
     scoringUsageLine(facts),
     teamContextLine(facts),
     scheduleLine(depth),
+    marketMovementLine(depth),
+    volatilityLine(depth),
+    priorSeasonsLine(facts),
   ].filter((line): line is string => line !== null && line !== "");
 }
 
