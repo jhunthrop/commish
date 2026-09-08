@@ -65,13 +65,18 @@ export function printedTextNumbers(facts: FactsContent): readonly number[] {
  * prior season carries 23 derived values.
  */
 export function derivedNumbers(facts: FactsContent): readonly number[] {
-  const { market, projection, availability, season, lastSeasonStory } = facts;
-  const numbers: number[] = [];
+  return [...pointsDifferences(facts), ...rateTimesGamesNumbers(facts), ...perGameNumbers(facts), ...lawEffectTotal(facts), ...seasonTotalSums(facts)];
+}
 
-  // EVERY HEADLINE POINTS FIGURE AGAINST OUR NUMBER, both signs: the replacement the sheet names,
-  // the market anchor, the two tails, last season's total, this season's. Anchored on our number
-  // rather than every pair against every other: eight figures make twenty-eight pairwise
-  // differences, most of them small integers, and that licensed a fabricated "37 touchdowns".
+/**
+ * EVERY HEADLINE POINTS FIGURE AGAINST OUR NUMBER, both signs: the replacement the sheet names,
+ * the market anchor, the two tails, last season's total, this season's. Anchored on our number
+ * rather than every pair against every other: eight figures make twenty-eight pairwise
+ * differences, most of them small integers, and that licensed a fabricated "37 touchdowns". Plus
+ * the width of each band, which is how a reader says "a ninety point spread".
+ */
+export function pointsDifferences(facts: FactsContent): readonly number[] {
+  const { market, projection, season, lastSeasonStory } = facts;
   const againstOurNumber = [
     projection.floorPoints,
     projection.ceilingPoints,
@@ -80,35 +85,47 @@ export function derivedNumbers(facts: FactsContent): readonly number[] {
     ...(lastSeasonStory === null ? [] : [lastSeasonStory.pointsRank.value]),
     ...(season === null ? [] : [season.totals.fantasyPoints]),
   ];
-  for (const figure of againstOurNumber) numbers.push(projection.projectedPoints - figure, figure - projection.projectedPoints);
+  return [
+    ...againstOurNumber.flatMap((figure) => [projection.projectedPoints - figure, figure - projection.projectedPoints]),
+    projection.typicalHigh - projection.typicalLow,
+    projection.ceilingPoints - projection.floorPoints,
+  ];
+}
 
-  // The width of each band, which is how a reader says "a ninety point spread".
-  numbers.push(projection.typicalHigh - projection.typicalLow, projection.ceilingPoints - projection.floorPoints);
+/**
+ * A RATE TIMES GAMES, SAME-SEASON PAIRINGS ONLY (fix round, 2026-09-08, HIGH): this season's
+ * per-game rate times the games this engine expects of him, last season's rate times the games he
+ * played that season. Every rate times every games figure was coincidence space, and the raw
+ * product is pushed once: the validator already reads it at three roundings.
+ */
+export function rateTimesGamesNumbers(facts: FactsContent): readonly number[] {
+  const { availability, season, lastSeasonStory } = facts;
+  return [
+    ...(season !== null && availability !== null ? [season.pointsPerGame * availability.expectedGames] : []),
+    ...(lastSeasonStory === null ? [] : [lastSeasonStory.pointsPerGame * lastSeasonStory.gamesPlayed]),
+  ];
+}
 
-  // A RATE TIMES GAMES, SAME-SEASON PAIRINGS ONLY (fix round, 2026-09-08, HIGH): this season's
-  // per-game rate times the games this engine expects of him, last season's rate times the games
-  // he played that season. Every rate times every games figure was coincidence space, and the raw
-  // product is pushed once: the validator already reads it at three roundings.
-  if (season !== null && availability !== null) numbers.push(season.pointsPerGame * availability.expectedGames);
-  if (lastSeasonStory !== null) numbers.push(lastSeasonStory.pointsPerGame * lastSeasonStory.gamesPlayed);
+/** Per game, both ways a person computes it: over a full season, and over the games this engine
+ *  actually expects him to play, plus the games that expectation leaves on the table. */
+function perGameNumbers(facts: FactsContent): readonly number[] {
+  const { projection, availability } = facts;
+  const overExpected = availability !== null && availability.expectedGames > 0 ? [projection.projectedPoints / availability.expectedGames, GAMES_IN_A_SEASON - availability.expectedGames] : [];
+  return [projection.projectedPoints / GAMES_IN_A_SEASON, ...overExpected];
+}
 
-  // Per game, both ways a person computes it: over a full season, and over the games this engine
-  // actually expects him to play, plus the games that expectation leaves on the table.
-  numbers.push(projection.projectedPoints / GAMES_IN_A_SEASON);
-  if (availability !== null && availability.expectedGames > 0) {
-    numbers.push(projection.projectedPoints / availability.expectedGames, GAMES_IN_A_SEASON - availability.expectedGames);
-  }
-
-  // THE LAW EFFECTS COMBINED: the grand total of all of them, never a pairwise sum (fix round,
-  // 2026-09-08: five effects make ten pairs, and ten small numbers is coincidence space).
+/** THE LAW EFFECTS COMBINED: the grand total of all of them, never a pairwise sum (fix round,
+ *  2026-09-08: five effects make ten pairs, and ten small numbers is coincidence space). Empty for
+ *  a single effect, which is already on the ledger as itself. */
+export function lawEffectTotal(facts: FactsContent): readonly number[] {
   const effects = facts.evidence.flatMap((item) => (item.kind === "law" ? [item.netEffectPoints] : []));
-  if (effects.length > 1) numbers.push(effects.reduce((total, effect) => total + effect, 0));
+  return effects.length > 1 ? [effects.reduce((total, effect) => total + effect, 0)] : [];
+}
 
-  // A SEASON TOTAL AS THE SUM OF ITS LISTED PARTS: yards from scrimmage, all yards, touches.
-  if (season !== null) {
-    const t = season.totals;
-    numbers.push(t.rushingYards + t.receivingYards, t.rushingYards + t.receivingYards + t.passingYards);
-    if (t.carries !== null) numbers.push(t.carries + t.receptions);
-  }
-  return numbers;
+/** A SEASON TOTAL AS THE SUM OF ITS LISTED PARTS: yards from scrimmage, all yards, touches. */
+export function seasonTotalSums(facts: FactsContent): readonly number[] {
+  const season = facts.season;
+  if (season === null) return [];
+  const t = season.totals;
+  return [t.rushingYards + t.receivingYards, t.rushingYards + t.receivingYards + t.passingYards, ...(t.carries === null ? [] : [t.carries + t.receptions])];
 }
