@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { upsertCoachRows } from "@/coaches/store";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { captureSnapshots, nflGames, playerCrosswalk, players, preseasonProjections } from "@/db/schema";
 import { recordTeamDefenseWeekRows } from "@/projections/nflverse/team-defense-weeks";
@@ -13,8 +14,8 @@ import { teamPage, TEAM_PRIOR_SEASON } from "./service";
 /**
  * The service over a REAL database, the way the coordinator asked: one club seeded with every
  * section the store can hold, one with nothing, and a warm read that costs no statement. The
- * play-caller table is the committed CSV itself (it names Detroit's 2026 staff), so the coaching
- * section is real rather than fixtured.
+ * coaching section reads the `coaches` TABLE (coaches-table round, 2026-09-08), seeded here with
+ * Detroit's two most recent tenures as the committed file states them, never the file itself.
  */
 const base = createTestDb();
 
@@ -24,6 +25,10 @@ const CAPTURED = new Date("2026-09-05T11:34:18.000Z");
 const GIBBS_NFL = "00-0039915";
 
 async function seedDetroit(): Promise<void> {
+  await upsertCoachRows(base, [
+    { season: PRIOR, team: "DET", name: "Ben Johnson", role: "OC", startWeek: 1, endWeek: 18, source: "wikipedia", note: "", headCoach: "", headCoachFirstSeason: null },
+    { season: PRODUCT_SEASON, team: "DET", name: "John Morton", role: "OC", startWeek: 1, endWeek: 18, source: "wikipedia", note: "", headCoach: "Dan Campbell", headCoachFirstSeason: 2021 },
+  ]);
   await recordNflPlayers(base, [{ id: GIBBS_NFL, pfrId: null, espnId: "4429795", name: "Jahmyr Gibbs", position: "RB", latestTeam: "DET", rookieSeason: 2023, lastSeason: PRIOR }]);
   await base.insert(players).values([
     { id: "4429795", name: "Jahmyr Gibbs", position: "RB", nflTeam: "DET", adp: 4.1 },
@@ -94,7 +99,7 @@ describe("teamPage", () => {
     expect(page).toMatchObject({ code: "DET", city: "Detroit", nickname: "Lions", byeWeek: 8, season: PRODUCT_SEASON });
     expect(page.lastSeason).toEqual({ season: PRIOR, record: { wins: 1, losses: 1, ties: 0 }, pointsAllowed: { points: 47, games: 2 } });
     expect(page.winTotal).toEqual({ season: PRODUCT_SEASON, line: 10.5, asOf: "2026-08-15" });
-    expect(page.coaching).toMatchObject({ season: PRODUCT_SEASON, headCoach: "Dan Campbell", playCaller: "John Morton" });
+    expect(page.coaching).toEqual({ season: PRODUCT_SEASON, headCoach: "Dan Campbell", headCoachIsNew: false, playCaller: "John Morton", playCallerRole: "OC", playCallerIsNew: true });
     expect(page.offense).toEqual({ season: PRIOR, pace: { value: 27.2, rank: 2, of: 2 }, passRate: { value: 0.58, rank: 2, of: 2 }, passRateOverExpected: { value: 2.4, rank: 2, of: 2 }, neutralPlays: 60 });
     expect(page.players.map((row) => row.player.id)).toEqual(["4429795", "4689936", "DST-DET"]);
     expect(page.players[0]).toMatchObject({ positionRank: 1, boardRank: 1, projectedPoints: 312.4, marketAdp: 4.1 });
@@ -121,6 +126,8 @@ describe("teamPage", () => {
     expect(page.lastSeason).toBeNull();
     expect(page.winTotal).toBeNull();
     expect(page.offense).toBeNull();
+    // The coaches table holds no Tennessee tenure: absence, not a guessed staff.
+    expect(page.coaching).toBeNull();
     expect(page.players).toEqual([]);
     expect(page.depthCharts).toBeNull();
     expect(page.competition).toBeNull();

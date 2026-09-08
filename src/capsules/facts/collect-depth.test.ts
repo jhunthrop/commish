@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { upsertCoachRows } from "@/coaches/store";
 import type { Db } from "@/db/client";
 import { nflGames, nflPlayers, nflverseInjuries, nflverseRosterWeeks, preseasonRosters } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
@@ -32,14 +33,22 @@ describe("collectDepthFacts", () => {
     expect((await collectDepthFacts(db, options(new Map()))).byPlayerId.size).toBe(0);
   });
 
-  it("leaves every group absent for a player the depth stores hold no row for, except the curated coaching table", async () => {
+  it("leaves every group absent for a player the depth stores hold no row for, the coaching table included", async () => {
     const pass = await collectDepthFacts(db, options(new Map([["00-0000001", "SF"]])));
     const depth = pass.byPlayerId.get("00-0000001")!;
-    expect({ ...depth, coaching: null, pedigree: null }).toEqual(EMPTY_DEPTH);
-    // The play-caller table ships in the repo, so it answers for every team without a database row.
-    expect(depth.coaching).toMatchObject({ season: PRODUCT_SEASON, headCoach: "Kyle Shanahan" });
+    expect({ ...depth, pedigree: null }).toEqual(EMPTY_DEPTH);
+    // An empty `coaches` table is an absence, never a staff guessed from anywhere else.
+    expect(depth.coaching).toBeNull();
     // `nfl_players.rookie_season` alone is a real pedigree row, and the rest stays absent.
     expect(depth.pedigree).toMatchObject({ seasonsPlayed: PRODUCT_SEASON - 2023, ageOnOpeningDay: null, draftPick: null });
+  });
+
+  it("names the staff from the coaches table once it holds the team-season", async () => {
+    await upsertCoachRows(db, [
+      { season: PRODUCT_SEASON, team: "SF", name: "Kyle Shanahan", role: "HC", startWeek: 1, endWeek: 18, source: "wikipedia", note: "", headCoach: "Kyle Shanahan", headCoachFirstSeason: 2017 },
+    ]);
+    const depth = (await collectDepthFacts(db, options(new Map([["00-0000001", "SF"]])))).byPlayerId.get("00-0000001")!;
+    expect(depth.coaching).toEqual({ season: PRODUCT_SEASON, headCoach: "Kyle Shanahan", headCoachIsNew: false, playCaller: "Kyle Shanahan", playCallerRole: "HC", playCallerIsNew: null });
   });
 
   it("derives a season-ending absence and a games-missed count from the archived weeks", async () => {

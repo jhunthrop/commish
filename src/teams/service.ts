@@ -1,7 +1,8 @@
 import { desc, eq } from "drizzle-orm";
 import { coachingFor } from "@/capsules/facts/coaching";
-import { namesFor, readPlayCallerTable, scheduledGamesFor, teamMetricRowsFor } from "@/capsules/facts/depth-reads";
+import { namesFor, scheduledGamesFor, teamMetricRowsFor } from "@/capsules/facts/depth-reads";
 import { scheduleFor } from "@/capsules/facts/schedule";
+import { coachRows } from "@/coaches/store";
 import type { Db } from "@/db/client";
 import { captureSnapshots, playerCrosswalk, players } from "@/db/schema";
 import { NFL_TEAM_NAMES } from "@/domain/nfl-team-names";
@@ -34,10 +35,11 @@ import { lastSeasonFor, winTotalFor } from "./record";
  * ruled, from the stores the fact-sheet round already reads, memoized per club at the board's
  * cadence so a page hit on a warm instance costs no statement.
  *
- * READERS ARE REUSED, NEVER DUPLICATED: the team-week rows, the play-caller table, the schedule
- * and the names come through `capsules/facts/depth-reads.ts`; the coaching and schedule facts
- * through their own builders; the defense line through `kdefSeasonLines`; the board through
- * `genericBoardRows`. What is new is the assembly and the four pure builders beside this file.
+ * READERS ARE REUSED, NEVER DUPLICATED: the team-week rows, the schedule and the names come
+ * through `capsules/facts/depth-reads.ts`; the play-caller table through `coaches/store.ts`
+ * (the `coaches` table, never the file); the coaching and schedule facts through their own
+ * builders; the defense line through `kdefSeasonLines`; the board through `genericBoardRows`.
+ * What is new is the assembly and the four pure builders beside this file.
  *
  * THREE SHARED MEMOS BESIDE THE PER-CLUB ONE, because three reads are league-wide by nature: the
  * offense profile (a rank among 32 needs all 32), the prior season's player-team placements (one
@@ -181,7 +183,7 @@ async function readTeamPage(db: Db, code: string): Promise<TeamPageData | null> 
   const asOf = new Date();
   const sourceCode = sourceTeamCode(code);
   const priorWindow = { from: 1, to: LAST_POSSIBLE_WEEK } as const;
-  const [board, byes, roster, profiles, kickoffRows, vegasRows, games, competition] = await Promise.all([
+  const [board, byes, roster, profiles, kickoffRows, vegasRows, games, competition, playCallers] = await Promise.all([
     genericBoardRows(db),
     byeWeeksByTeam(db),
     clubRoster(db, code),
@@ -190,6 +192,7 @@ async function readTeamPage(db: Db, code: string): Promise<TeamPageData | null> 
     teamObservationsAsOf(db, { season: PRODUCT_SEASON, week: 1, asOf, source: VEGAS_SOURCE }),
     scheduledGamesFor(db),
     competitionSection(db, sourceCode, asOf),
+    coachRows(db),
   ]);
   const [depthCharts, defense] = await Promise.all([depthChartsFor(db, code, roster, asOf), defenseSection(db, code, board)]);
   return {
@@ -200,7 +203,7 @@ async function readTeamPage(db: Db, code: string): Promise<TeamPageData | null> 
     season: PRODUCT_SEASON,
     lastSeason: lastSeasonFor(TEAM_PRIOR_SEASON, kickoffRows.get(sourceCode) ?? []),
     winTotal: winTotalFor(PRODUCT_SEASON, vegasRows.filter((row) => row.team === sourceCode), VEGAS_METRICS.winTotal),
-    coaching: coachingFor(sourceCode, PRODUCT_SEASON, readPlayCallerTable()),
+    coaching: coachingFor(sourceCode, PRODUCT_SEASON, playCallers),
     offense: profiles.get(sourceCode) ?? null,
     players: boardPlayersFor(board, code),
     depthCharts,
