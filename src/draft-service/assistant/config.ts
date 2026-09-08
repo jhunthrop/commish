@@ -10,9 +10,13 @@ export const ADVISOR_CONFIG = {
    *  furthest next turn at the worst case a room can pose (14 teams, 16 rounds, pick 1) is the
    *  budget this constant is held to, and the count the card states. */
   runs: 200,
-  /** How many candidates `recommendPick` ranks for a seat: the first is the card's pick, and the
-   *  on-clock seat's whole shortlist is held off its own current pick in the runs (R-3). */
+  /** How many candidates `recommendPick` ranks for a seat on the clock: the first is the card's
+   *  pick, and the on-clock seat's whole shortlist is held off its own current pick in the runs
+   *  (R-3). */
   shortlistSize: 5,
+  /** How deep the card looks off the clock for the first candidate the runs leave on the board
+   *  past the reach floor (persona pass: a pick you cannot make is not one you should make). */
+  offClockShortlistSize: 12,
   signals: {
     /** A run: `runThreshold` of the last `runWindow` picks at one position (spec 3.3). */
     runWindow: 4,

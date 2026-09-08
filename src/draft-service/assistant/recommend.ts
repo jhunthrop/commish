@@ -84,11 +84,13 @@ export interface RecommendInput {
   readonly askingTeamId: string;
   readonly valued: ReadonlyMap<string, ValuedEntry>;
   readonly shape: LeagueShape;
+  /** How many to rank. Default `ADVISOR_CONFIG.shortlistSize`. */
+  readonly shortlistSize?: number;
 }
 
 /** The seat's shortlist for its current-or-next decision, best first; empty when the seat has no
  *  turn left to decide. */
-export function recommendNow({ state, askingTeamId, valued, shape }: RecommendInput): readonly Recommendation[] {
+export function recommendNow({ state, askingTeamId, valued, shape, shortlistSize = ADVISOR_CONFIG.shortlistSize }: RecommendInput): readonly Recommendation[] {
   const window = askingWindow(state, askingTeamId);
   if (window === null) return [];
   const drafted = draftedPlayerIds(state);
@@ -98,7 +100,7 @@ export function recommendNow({ state, askingTeamId, valued, shape }: RecommendIn
     shape,
     pickNumber: window.pickNumber,
     nextPickNumber: window.nextPickNumber,
-    shortlistSize: ADVISOR_CONFIG.shortlistSize,
+    shortlistSize,
   });
 }
 

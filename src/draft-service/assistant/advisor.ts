@@ -12,6 +12,7 @@ import { assignSlot, rosterFor, teamOnClock, type DraftState } from "@/draft-eng
 import type { Recommendation } from "@/projections/decide/draft";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { seatsAheadFor, survivalFor, type RoomOddsTable, type SeatSurvival } from "../sim/room-odds";
+import { ADVISOR_CONFIG } from "./config";
 import { askingWindow, recommendNow, type ValuedEntry } from "./recommend";
 import { detectRun } from "./signals";
 import type { AdvisorView, NextPick, OddsCell, SurvivalOdds, TierStandingView } from "./view";
@@ -81,7 +82,8 @@ export function advisorCore(input: AdvisorCoreInput): AdvisorView | null {
   if (window === null) return null;
   const onTheClock = teamOnClock(state) === askingTeamId;
   const survival = survivalFor(table, state, askingTeamId);
-  const top = pickToName(recommendNow(input), onTheClock, survival);
+  const shortlist = recommendNow({ ...input, shortlistSize: onTheClock ? ADVISOR_CONFIG.shortlistSize : ADVISOR_CONFIG.offClockShortlistSize });
+  const top = pickToName(shortlist, onTheClock, survival);
   return {
     pickNumber: window.pickNumber,
     onTheClock,
