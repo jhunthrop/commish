@@ -131,3 +131,71 @@ describe("continueDraft", () => {
     }
   });
 });
+
+// Draft advisor round, spec 3.1a: the continuation gains a horizon (the asking seat's Nth upcoming
+// turn) and per-seat drivers (the inferred opponent model). Fixture reminder: t1 holds picks 1, 8
+// and 9 of this 12-pick draft, so from a fresh state its UPCOMING turns are pick 8 and pick 9 and
+// a third does not exist.
+describe("continueDraft with a horizon", () => {
+  it("defaults to one horizon, whose snapshot is the same set `undrafted` reports", () => {
+    const state = freshState();
+    const result = continueDraft({ state, askingTeamId: "t1", excludeFromAskingSeat: new Set(), seed: 9 });
+    expect(result.undraftedAtTurn).toHaveLength(1);
+    expect(result.undraftedAtTurn[0]).toEqual(result.undrafted);
+    expect(result.draftEnded).toBe(false);
+  });
+
+  it("tallies a snapshot at every one of the asking seat's upcoming turns it reaches, and reports the draft ending before the horizon", () => {
+    const state = freshState();
+    const result = continueDraft({ state, askingTeamId: "t1", excludeFromAskingSeat: new Set(["wr1"]), seed: 9, horizon: 3 });
+    expect(result.undraftedAtTurn).toHaveLength(2); // pick 8 and pick 9; no third turn exists
+    expect(result.draftEnded).toBe(true);
+    // Each later snapshot is a subset of the earlier one: players only ever leave the board.
+    const [atFirst, atSecond] = result.undraftedAtTurn;
+    for (const id of atSecond!) expect(atFirst!.has(id)).toBe(true);
+    expect(atSecond!.size).toBeLessThan(atFirst!.size);
+    // The excluded id was never taken by the asking seat's own picks (its current pick 1 and its
+    // intermediate picks 8 and 9 all play under the exclusion); it may still have gone to another
+    // seat. Three picks: the horizon was not reached, so the run played out the whole draft.
+    const takenByAsking = result.played.filter((pick) => pick.teamId === "t1").map((pick) => pick.playerId);
+    expect(takenByAsking).not.toContain("wr1");
+    expect(takenByAsking).toHaveLength(3);
+  });
+
+  it("records every pick the run played, in pick order, with the seat that made it", () => {
+    const state = advance(freshState(), 1, 2); // t4 on the clock for pick 3; asking seat t2 holds pick 4
+    const result = continueDraft({ state, askingTeamId: "t2", excludeFromAskingSeat: new Set(), seed: 5, horizon: 2 });
+    expect(result.played[0]).toMatchObject({ teamId: "t4", pickNumber: 3 });
+    const numbers = result.played.map((pick) => pick.pickNumber);
+    expect(numbers).toEqual([...numbers].sort((a, b) => a - b));
+    expect(numbers[0]).toBe(3);
+  });
+
+  it("drives a seat on autopick with the autopick policy itself, so its pick never varies with the seed", () => {
+    const state = advance(freshState(), 1, 2); // t4 is on the clock; the asking seat t2 is not
+    const drivers = Object.fromEntries(TEAM_IDS.map((teamId) => [teamId, { kind: "autopick", picksObserved: 0 }] as const));
+    const a = continueDraft({ state, askingTeamId: "t2", excludeFromAskingSeat: new Set(), seed: 1, drivers });
+    const b = continueDraft({ state, askingTeamId: "t2", excludeFromAskingSeat: new Set(), seed: 2, drivers });
+    expect(a.undrafted).toEqual(b.undrafted);
+    expect(a.played).toEqual(b.played);
+  });
+
+  it("drives a seat with an inferred archetype under that archetype", () => {
+    const state = advance(freshState(), 1, 2);
+    const qbEarly = BOT_ARCHETYPES.find((archetype) => archetype.name === "qb_early")!;
+    const asQbEarly = { t4: { kind: "archetype", archetype: qbEarly, basis: "inferred", picksObserved: 3 } } as const;
+    const asNeutral = { t4: { kind: "archetype", archetype: NEUTRAL, basis: "prior", picksObserved: 0 } } as const;
+    // This fixture's roster has no QB starter, so the need term damps every quarterback for
+    // every brain: count how often t4's pick 3 is a QB under each driver across seeds, and
+    // require the QB-first brain to take one more often than the neutral one.
+    const quarterbacksUnder = (drivers: typeof asQbEarly | typeof asNeutral): number => {
+      let count = 0;
+      for (let seed = 1; seed <= 40; seed++) {
+        const result = continueDraft({ state, askingTeamId: "t2", excludeFromAskingSeat: new Set(), seed, drivers });
+        if (result.played.find((pick) => pick.pickNumber === 3)!.playerId.startsWith("qb")) count += 1;
+      }
+      return count;
+    };
+    expect(quarterbacksUnder(asQbEarly)).toBeGreaterThan(quarterbacksUnder(asNeutral));
+  });
+});
