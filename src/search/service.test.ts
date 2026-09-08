@@ -1,6 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
-import { nflGames, players } from "@/db/schema";
+import { nflGames, playerCrosswalk, players } from "@/db/schema";
+import type { BoardEntry } from "@/projections/preseason/board";
+import { BOARD_SOURCE, writePreseasonBoard } from "@/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { recordNflPlayers } from "@/projections/universe";
 import { siteSearch, siteSearchIndex } from "./service";
 
 /**
@@ -56,6 +60,22 @@ describe("siteSearch", () => {
     await siteSearch(warm.db, "det");
     await siteSearch(warm.db, "bates");
     expect(warm.selectCount()).toBe(0);
+  });
+
+  it("sees a re-persisted board on the next search, not within the hour: the write clears the index memo", async () => {
+    expect((await siteSearch(base, "chase")).results).toEqual([]);
+    const CHASE_NFL = "00-0036900";
+    await recordNflPlayers(base, [{ id: CHASE_NFL, pfrId: null, espnId: "4362628", name: "Ja'Marr Chase", position: "WR", latestTeam: "CIN", rookieSeason: 2021, lastSeason: PRODUCT_SEASON - 1 }]);
+    await base.insert(players).values({ id: "4362628", name: "Ja'Marr Chase", position: "WR", nflTeam: "CIN", adp: 1.2 });
+    await base.insert(playerCrosswalk).values({ playerId: "4362628", nflPlayerId: CHASE_NFL, method: "espn_id", resolvedAt: new Date() });
+    const entry: BoardEntry = {
+      playerId: CHASE_NFL, position: "WR", projectedPoints: 326.4, valueOverReplacement: 141.2, positionRank: 1, replacementLevel: 185.2, rank: 1, valueRank: 1,
+      team: "CIN", expectedGames: 16.2, seasonLine: { playerId: CHASE_NFL, week: 0 } as BoardEntry["seasonLine"], outlook: { floor: 261.1, median: 326.4, ceiling: 359.0 },
+      tier: 0, playersLeftInTier: 4, dropToNextTier: 18.3, reasons: [],
+    };
+    await writePreseasonBoard(base, { season: PRODUCT_SEASON, source: BOARD_SOURCE, asOf: new Date("2026-08-01T00:00:00.000Z"), momentKind: "live" }, [entry]);
+    const found = (await siteSearch(base, "chase")).results;
+    expect(found.map((result) => (result.kind === "player" ? result.player.id : result.code))).toEqual(["4362628"]);
   });
 
   it("reports the index size for the measurement", async () => {

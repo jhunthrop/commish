@@ -1,6 +1,6 @@
 import type { Db } from "@/db/client";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { createTtlMemo } from "@/lib/cache/ttl-memo";
+import { BOARD_MEMO_GROUP, createTtlMemo } from "@/lib/cache/ttl-memo";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { BOARD_REASONS_MEMO_TTL_MS } from "@/projections/preseason/reasons-by-player";
 import { boardRows, type BoardRow } from "./service";
@@ -21,7 +21,7 @@ export const GENERIC_BOARD_SHAPE: LeagueShape = { teamCount: 12, rosterSlots: ST
 
 const GENERIC_BOARD_KEY = "generic";
 
-const memo = createTtlMemo<readonly BoardRow[]>(BOARD_REASONS_MEMO_TTL_MS);
+const memo = createTtlMemo<readonly BoardRow[]>(BOARD_REASONS_MEMO_TTL_MS, undefined, { group: BOARD_MEMO_GROUP });
 
 /** Every served board row under the generic shape, from memory after the first read. */
 export function genericBoardRows(db: Db): Promise<readonly BoardRow[]> {

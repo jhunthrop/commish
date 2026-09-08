@@ -1,6 +1,6 @@
 import type { ReadonlyDb } from "@/db/client";
 import type { Player } from "@/domain/player";
-import { createTtlMemo } from "@/lib/cache/ttl-memo";
+import { BOARD_MEMO_GROUP, createTtlMemo } from "@/lib/cache/ttl-memo";
 import { nflPlayerIdsFor } from "../crosswalk";
 import type { BoardReason } from "./board";
 import { boardReasons } from "./board-store";
@@ -13,7 +13,7 @@ import { boardReasons } from "./board-store";
  */
 export const BOARD_REASONS_MEMO_TTL_MS = 60 * 60_000;
 
-const memo = createTtlMemo<Readonly<Record<string, readonly BoardReason[]>>>(BOARD_REASONS_MEMO_TTL_MS);
+const memo = createTtlMemo<Readonly<Record<string, readonly BoardReason[]>>>(BOARD_REASONS_MEMO_TTL_MS, undefined, { group: BOARD_MEMO_GROUP });
 
 /**
  * The pool's own law-backed reasons, keyed by the LEAGUE's own player id — `boardReasons` keys

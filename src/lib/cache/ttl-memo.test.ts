@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createTtlMemo, invalidateAllTtlMemosForTests } from "./ttl-memo";
+import { createTtlMemo, invalidateAllTtlMemosForTests, invalidateTtlMemoGroup } from "./ttl-memo";
 
 const T0 = Date.parse("2026-09-08T12:00:00.000Z");
 
@@ -56,6 +56,20 @@ describe("createTtlMemo", () => {
     expect(await memo.get("b", async () => 20)).toBe(2);
     memo.invalidate();
     expect(await memo.get("b", async () => 30)).toBe(30);
+  });
+
+  it("clears every memo of a named group on a write, and no memo outside it", async () => {
+    const inGroup = createTtlMemo<number>(1_000, clockAt({ ms: 0 }), { group: "board" });
+    const alsoInGroup = createTtlMemo<number>(1_000, clockAt({ ms: 0 }), { group: "board" });
+    const outside = createTtlMemo<number>(1_000, clockAt({ ms: 0 }));
+    await inGroup.get("k", async () => 1);
+    await alsoInGroup.get("k", async () => 2);
+    await outside.get("k", async () => 3);
+    expect(invalidateTtlMemoGroup("board")).toBeGreaterThanOrEqual(2);
+    expect(await inGroup.get("k", async () => 10)).toBe(10);
+    expect(await alsoInGroup.get("k", async () => 20)).toBe(20);
+    expect(await outside.get("k", async () => 30)).toBe(3);
+    expect(invalidateTtlMemoGroup("nobody-named-this")).toBe(0);
   });
 
   it("the test-only reset empties every memo created in the process", async () => {

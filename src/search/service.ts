@@ -1,7 +1,7 @@
 import type { Db } from "@/db/client";
 import { genericBoardRows } from "@/draft-hq/board/generic-board";
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
-import { createTtlMemo } from "@/lib/cache/ttl-memo";
+import { BOARD_MEMO_GROUP, createTtlMemo } from "@/lib/cache/ttl-memo";
 import { NFL_TEAM_ABBREVIATIONS } from "@/projections/capture-feeds";
 import { BOARD_REASONS_MEMO_TTL_MS } from "@/projections/preseason/reasons-by-player";
 import { SEARCH_CONFIG } from "./config";
@@ -21,7 +21,7 @@ import { buildSearchIndex, searchIndex, type SearchIndex } from "./index";
  */
 const INDEX_KEY = "site-search";
 
-const indexMemo = createTtlMemo<SearchIndex>(BOARD_REASONS_MEMO_TTL_MS);
+const indexMemo = createTtlMemo<SearchIndex>(BOARD_REASONS_MEMO_TTL_MS, undefined, { group: BOARD_MEMO_GROUP });
 
 async function buildIndex(db: Db): Promise<SearchIndex> {
   const [rows, byes] = await Promise.all([genericBoardRows(db), byeWeeksByTeam(db)]);

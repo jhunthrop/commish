@@ -39,6 +39,7 @@ import { playersSayingStock, sentencesToAvoid, stockSentences } from "@/capsules
 import { measureSameness, phrasesToAvoid, playersToRegenerateForSameness, samenessOverThreshold, type SamenessRow } from "@/capsules/sameness";
 import { getStoredCapsulesFor, queueCapsuleRegeneration, upsertCapsule, type StoredPlayerCapsule } from "@/capsules/store";
 import type { PlayerFacts } from "@/capsules/facts";
+import { BOARD_MEMO_GROUP, invalidateTtlMemoGroup } from "@/lib/cache/ttl-memo";
 import { JOBS_CONFIG } from "../config";
 import { defineJob, type AnyJobDefinition, type JobStepContext, type StepOutcome } from "../contract";
 import { enqueueJob } from "../store";
@@ -276,6 +277,13 @@ export async function runCapsuleSweepStep(
   // sentences the continuation is about to rewrite anyway. See `checkRepetition`.
   const repetition = willContinue ? null : await checkRepetition(db, facts);
   if (repetition !== null) detail.push(...repetition.detail);
+
+  // The sweep is the nightly pass that regenerates what the board's readers serve (the reasons,
+  // the peek facts every board row's dossier reads), so every memo built on the served board is
+  // dropped on this instance once the run has written (site search fix round, 2026-09-08). The
+  // board's own persist (`writePreseasonBoard`) does the same; between them, a fresh board
+  // reaches the search index and the team pages on the next request rather than within the hour.
+  invalidateTtlMemoGroup(BOARD_MEMO_GROUP);
 
   const remaining = eligible.length - processed.length;
   const summary =

@@ -10,7 +10,7 @@ import { PPR_SCORING } from "@/domain/scoring";
 import { genericBoardRows } from "@/draft-hq/board/generic-board";
 import type { BoardRow } from "@/draft-hq/board/service";
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
-import { createTtlMemo } from "@/lib/cache/ttl-memo";
+import { BOARD_MEMO_GROUP, createTtlMemo } from "@/lib/cache/ttl-memo";
 import { kdefSeasonLines } from "@/projections/kdef/season-lines";
 import { PBP_PLAYER_SOURCE } from "@/projections/nflverse/pbp-players";
 import { PBP_SOURCE } from "@/projections/nflverse/pbp";
@@ -59,10 +59,10 @@ export const TEAM_PRIOR_SEASON = PRODUCT_SEASON - 1;
 /** The scoring the defense line is measured under, named on the page. */
 const DEFENSE_SCORING_LABEL = "PPR";
 
-const pageMemo = createTtlMemo<TeamPageData | null>(BOARD_REASONS_MEMO_TTL_MS);
-const offenseMemo = createTtlMemo<ReadonlyMap<string, TeamOffenseProfile>>(BOARD_REASONS_MEMO_TTL_MS);
-const placementsMemo = createTtlMemo<ReadonlyMap<string, string>>(BOARD_REASONS_MEMO_TTL_MS);
-const harvestMemo = createTtlMemo<{ readonly capturedAt: Date; readonly payload: unknown } | null>(BOARD_REASONS_MEMO_TTL_MS);
+const pageMemo = createTtlMemo<TeamPageData | null>(BOARD_REASONS_MEMO_TTL_MS, undefined, { group: BOARD_MEMO_GROUP });
+const offenseMemo = createTtlMemo<ReadonlyMap<string, TeamOffenseProfile>>(BOARD_REASONS_MEMO_TTL_MS, undefined, { group: BOARD_MEMO_GROUP });
+const placementsMemo = createTtlMemo<ReadonlyMap<string, string>>(BOARD_REASONS_MEMO_TTL_MS, undefined, { group: BOARD_MEMO_GROUP });
+const harvestMemo = createTtlMemo<{ readonly capturedAt: Date; readonly payload: unknown } | null>(BOARD_REASONS_MEMO_TTL_MS, undefined, { group: BOARD_MEMO_GROUP });
 
 /** The 32 clubs' prior-season profiles, ranked against each other, once per instance. */
 function offenseProfiles(db: Db, asOf: Date): Promise<ReadonlyMap<string, TeamOffenseProfile>> {
