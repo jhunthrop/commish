@@ -27,6 +27,20 @@ function planNumbers(view: LedgerSource): readonly number[] {
   ]);
 }
 
+/**
+ * THE COMPARISONS THE CARD INVITES, COMPUTED BY US (fix round 2): a writer told never to
+ * subtract still wrote "beats Emerson by 16.1", and it grounded only because 16.1 happened to
+ * be another row's drop. The pairwise gap in value over replacement between any two candidates
+ * on the card, and each candidate's own drop to the next tier, are honest numbers a sentence
+ * may compare with, so they go on the ledger explicitly rather than by coincidence.
+ */
+function comparisonNumbers(view: LedgerSource): readonly number[] {
+  const values = view.now.map((candidate) => candidate.valueOverReplacement);
+  const gaps = values.flatMap((a, i) => values.slice(i + 1).map((b) => Math.round(Math.abs(a - b) * 10) / 10));
+  const drops = view.now.flatMap((candidate) => candidate.reasons.flatMap((reason) => (reason.code === "tier_cliff" ? [reason.dropToNextTier] : [])));
+  return [...gaps, ...drops];
+}
+
 function nowNumbers(view: LedgerSource): readonly number[] {
   return view.now.flatMap((candidate) => [
     candidate.valueOverReplacement,
@@ -80,6 +94,7 @@ export function buildTurnLedger(view: LedgerSource): TurnLedger {
     view.plan.horizon,
     ...planNumbers(view),
     ...nowNumbers(view),
+    ...comparisonNumbers(view),
     ...signalNumbers(view),
   ]);
   // The tier letters the card prints ("tier A") in both the forms a writer capitalises them,

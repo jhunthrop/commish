@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { advisorCore } from "../advisor";
+import { ADVISOR_CONFIG } from "../config";
 import { FIXTURE_POOL, FIXTURE_SHAPE, FIXTURE_TEAM_IDS, fixtureAdvance, fixtureStart, fixtureValued } from "../test-fixture";
 import type { AdvisorView } from "../view";
 import { resetVoiceBudgetForTests, voiceWithinBudget } from "./budget";
@@ -44,6 +45,35 @@ describe("groundingFactsFor and gradeSlot", () => {
     expect(gradeSlot(`${name} is the last man in his tier.`, v.ledger, 28).some((line) => /last man/.test(line))).toBe(true);
     expect(gradeSlot(`${name} ${"is very ".repeat(20)} good.`, v.ledger, 28)[0]).toMatch(/Word count/);
     expect(groundingFactsFor(v.ledger).numberLedger).toBe(v.ledger.numbers);
+  });
+
+  it("holds a reason to exactly the configured cap: forty words pass, forty-one fail, and the prompt asks for under thirty", () => {
+    const v = view();
+    const name = v.names[v.now[0]!.playerId]!;
+    // `name` is two words; the filler is one word repeated, so the count is exact.
+    const words = (count: number): string => `${name} ${Array.from({ length: count - 2 }, () => "good").join(" ")}.`;
+    expect(ADVISOR_CONFIG.voice.reasonMaxWords).toBe(40);
+    expect(gradeSlot(words(40), v.ledger, ADVISOR_CONFIG.voice.reasonMaxWords)).toEqual([]);
+    expect(gradeSlot(words(41), v.ledger, ADVISOR_CONFIG.voice.reasonMaxWords)[0]).toMatch(/Word count 41/);
+    expect(voicePromptFor(v)).toContain(`one sentence, under ${ADVISOR_CONFIG.voice.reasonWordsAsked} words`);
+  });
+});
+
+describe("comparisons on the ledger", () => {
+  it("grounds a true value gap between two candidates by construction, and refuses a wrong one", () => {
+    const v = view();
+    const [a, b] = v.now;
+    const nameA = v.names[a!.playerId]!;
+    const nameB = v.names[b!.playerId]!;
+    const gap = Math.round(Math.abs(a!.valueOverReplacement - b!.valueOverReplacement) * 10) / 10;
+    expect(gap).toBeGreaterThan(0);
+    expect(gradeSlot(`${nameA} beats ${nameB} by ${gap.toFixed(1)} points, so he is the pick.`, v.ledger, 40)).toEqual([]);
+    // A wrong gap, and proof it coincides with nothing on the ledger at any rounding, so the
+    // refusal below is the validator's and not luck.
+    const wrong = gap + 0.37;
+    const coincides = v.ledger.numbers.some((entry) => Math.abs(entry - wrong) < 0.05 || Math.abs(entry * 100 - wrong) < 0.05);
+    expect(coincides).toBe(false);
+    expect(gradeSlot(`${nameA} beats ${nameB} by ${wrong.toFixed(2)} points, so he is the pick.`, v.ledger, 40)[0]).toMatch(/does not trace/);
   });
 });
 
