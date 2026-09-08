@@ -187,14 +187,9 @@ export async function GET(request: Request, context: RouteContext) {
             botBadge: MOCK_COPY.botBadge,
             // Task 10, finding 1: the dock's honest practice ETA. A mock's clock schedule is
             // one room-paced tier (Task 4's `loadDraftConfig`), so the schedule's floor IS the
-            // room's own pick clock. A room with exactly one human seat sims (sim-to-next-pick,
-            // the founder's directive — the driver's `simToNextPick`, same seat arithmetic), so
-            // its honest per-bot price is ZERO: `formatYourTurn` then answers "any moment",
-            // which is what a simmed stretch actually feels like.
-            expectedBotPickSeconds:
-              teams.filter((team) => team.isBot !== true).length === 1
-                ? 0
-                : expectedBotThinkDelaySeconds(state.config.clockSchedule[state.config.clockSchedule.length - 1]!.pickSeconds),
+            // room's own pick clock, and every room paces the same way (founder report
+            // 2026-09-08 retired the one-human zero-delay lane).
+            expectedBotPickSeconds: expectedBotThinkDelaySeconds(state.config.clockSchedule[state.config.clockSchedule.length - 1]!.pickSeconds),
             share: view.phase === "scheduled" ? await mockShareInfoFor(getDb(), actor.leagueId, originFor(request)) : null,
             results:
               view.phase === "complete"

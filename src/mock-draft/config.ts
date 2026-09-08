@@ -36,15 +36,15 @@ export const MOCK_CONFIG = {
    *  rehearsal. */
   pickClockSecondsOptions: [30, 60, 90] as const,
   defaultPickClockSeconds: 60,
-  /** Bot think-delay, seeded per pick — the PACED cadence, for rooms with two or more humans:
-   *  a live lobby sees a realistic rhythm, never an eleven-pick burst landing in the same tick.
-   *  A room with exactly ONE human seat skips this entirely and sims (the founder's
-   *  sim-to-next-pick directive — `MockDraftMeta.simToNextPick`, `@/mock-draft-service/driver`):
-   *  realism is for the people sharing the room, and a lone human has no one to share it with.
-   *  Max stays under `maxFractionOfClock` of the fastest offered clock so a bot can never be
-   *  autopicked by its own dawdling and never collides with the moderator's own nudge threshold
-   *  (`DRAFT_NUDGE_CONFIG.thresholdPct`). */
-  botDelay: { minSeconds: 3, maxSeconds: 9, maxFractionOfClock: 0.5 },
+  /** Bot think-delay, seeded per pick: a bot's pick lands uniformly `baseMs` plus or minus
+   *  `jitterMs` after the previous pick (450 to 950 ms — the founder's 2026-09-08 ruling: a
+   *  lifelike pace, never an eleven-pick burst landing in the same tick and never a multi-second
+   *  wait either). EVERY mock room paces, a lone human's included: the older sim-to-next-pick
+   *  lane (zero delay for a one-human room) is what made the board land all at once and let two
+   *  drivers race the same stretch. The upper bound stays under `maxFractionOfClock` of the
+   *  fastest offered clock so a bot can never be autopicked by its own dawdling and never
+   *  collides with the moderator's own nudge threshold (`DRAFT_NUDGE_CONFIG.thresholdPct`). */
+  botDelay: { baseMs: 700, jitterMs: 250, maxFractionOfClock: 0.5 },
   /** Rank-weighted sampling temperature and the hard reach cap (founder ruling: varied bots,
    *  never absurd ones). A bot considers at most `reachDepth` eligible players and samples
    *  softmax-ish by rank, warmed toward a reach when the room is mid-run on a position

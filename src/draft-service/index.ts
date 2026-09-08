@@ -63,34 +63,15 @@ export function getDraftStore(): DraftStore {
  * new to wire here.
  */
 /**
- * The process-wide bot driver — ONE instance, shared by the ticker's own drive lane and
- * `simMockToNextHumanTurn` below, so there is a single per-draft meta cache and the retention
- * sweep's `invalidateDraft` wiring (through the ticker) empties it for both callers.
+ * The process-wide bot driver — ONE instance, shared by the ticker's own drive lane and the
+ * advance funnel below, so there is a single per-draft meta cache and the retention sweep's
+ * `invalidateDraft` wiring (through the ticker) empties it for both callers.
  */
 function getMockBotDriver(): MockBotDriver {
   if (mockDriver === undefined) {
     mockDriver = createMockBotDriver({ db: getDb(), store: getDraftStore() });
   }
   return mockDriver;
-}
-
-/**
- * SIM-TO-NEXT-PICK's request-time trigger (founder directive, 2026-08-26): called by the
- * actions route the moment a human's own pick lands in a MOCK draft, so a solo room's bots
- * answer inside the same request instead of waiting for the ticker's next second. The driver
- * itself decides whether this room sims (`simToNextPick` — exactly one human seat) or keeps the
- * paced cadence (in which case this call lands at most the one due pick, usually none — the
- * think-delay has not elapsed). Never throws: a sim failure must not fail the pick that
- * already landed, and the ticker's own lane retries from the log within a second anyway.
- */
-export async function simMockToNextHumanTurn(draftId: string): Promise<void> {
-  try {
-    const state = await getDraftStore().getDraftState(draftId);
-    if (state === null || state.config.isMock !== true) return;
-    await getMockBotDriver().driveBotPick(state, systemClock.now());
-  } catch (error: unknown) {
-    console.error("[draft] post-pick mock sim failed", { draftId }, error);
-  }
 }
 
 /**

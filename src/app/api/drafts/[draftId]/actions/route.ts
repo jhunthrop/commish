@@ -1,6 +1,6 @@
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { clientDraftActionSchema, draftStateView, toDraftAction } from "@/draft-engine";
-import { getDraftStore, simMockToNextHumanTurn } from "@/draft-service";
+import { getDraftStore } from "@/draft-service";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import { withDraftActor, type RouteContext } from "../_shared";
 
@@ -12,12 +12,11 @@ export const dynamic = "force-dynamic";
  * schema has no teamId, and TIMER_EXPIRE isn't in it either: only the server ticker may
  * expire a clock.
  *
- * For a MOCK draft, a landed pick triggers the sim lane before answering (sim-to-next-pick,
- * the founder's directive — see `simMockToNextHumanTurn`): in a solo room every bot between
- * this pick and the human's next turn picks inside THIS request, and the response body carries
- * the post-sim board, so the lone human is back on the clock the moment their screen updates.
- * The re-read after the sim is what makes that true; a sim that lands nothing (a multi-human
- * room, a finished draft) just answers the same state the pick produced.
+ * Nothing else rides this request (founder report 2026-09-08): a mock room's bots pick at
+ * their own seeded delay after this pick lands, driven by the room's SSE advance loop
+ * (`runDraftAdvanceLoop`, woken by this very pick's frame) and advance-on-read — never inside
+ * the pick's own request, where a second driver of the same stretch raced the loop and a burst
+ * of bot picks landed all at once.
  */
 export async function POST(request: Request, context: RouteContext) {
   return withDraftActor(request, context, async (actor, req) => {
@@ -29,13 +28,6 @@ export async function POST(request: Request, context: RouteContext) {
     const action = toDraftAction(parsed.value, actor.teamId, new Date().toISOString());
     const result = await getDraftStore().applyAction(actor.draftId, action, { actor: { id: actor.userId } });
     if (!result.ok) return fail(result.reason, 409);
-
-    if (result.state.config.isMock === true) {
-      await simMockToNextHumanTurn(actor.draftId);
-      const simmed = await getDraftStore().getDraftState(actor.draftId);
-      if (simmed !== null) return ok({ draft: draftStateView(simmed) });
-    }
-
     return ok({ draft: draftStateView(result.state) });
   });
 }

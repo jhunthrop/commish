@@ -86,18 +86,17 @@ interface TickerDeps {
    */
   readonly startDueMocks?: (db: Db, deps: Pick<MockLifecycleDeps, "store" | "clock" | "newId">) => Promise<readonly MockStartOutcome[]>;
   /**
-   * Task 6's bot driver: one PACED bot pick — or one whole sim stretch (`simToNextPick`, the
-   * founder's sim-to-next-pick directive) — per live MOCK draft per tick, invoked from `tickOne`
+   * Task 6's bot driver: one PACED bot pick per live MOCK draft per tick, invoked from `tickOne`
    * against the very rows the expiry scan already fetched — no second scan. Defaults to
    * `mockDriver`'s own `driveBotPick` (the shared instance below).
    */
   readonly driveMockPick?: MockBotDriveFn;
   /**
    * The ONE `MockBotDriver` this process drives mocks through. `@/draft-service`'s
-   * `getDraftTicker` injects its process-wide instance — the same one the actions route sims
-   * through after a lone human's own pick — so there is a single per-draft meta cache, and the
-   * sweep's `invalidateDraft` wiring below empties it for BOTH callers. Defaults to a fresh
-   * instance for tests that construct tickers directly.
+   * `getDraftTicker` injects its process-wide instance — the same one the advance funnel
+   * prices bot turns through — so there is a single per-draft meta cache, and the sweep's
+   * `invalidateDraft` wiring below empties it for BOTH callers. Defaults to a fresh instance
+   * for tests that construct tickers directly.
    */
   readonly mockDriver?: MockBotDriver;
   /**
@@ -108,14 +107,11 @@ interface TickerDeps {
   readonly sweepMocks?: (db: Db, deps: MockSweepDeps) => Promise<readonly SweptMockRoom[]>;
   /**
    * Tick-wide ceiling on bot picks across ALL mock drafts, defaulting to
-   * `MOCK_CONFIG.maxBotPicksPerTick`. Spent per PICK, not per drive call: a paced drive costs
-   * 1, a sim stretch (`simToNextPick`) costs its whole pick count — up to `2 × (teamCount - 1)`
-   * — so a tick full of sim rooms genuinely can exhaust it. Gated BETWEEN drives (a started
-   * stretch always runs to its natural end, so the ceiling can overshoot by at most one
-   * stretch); once spent, the un-driven rooms' own state is untouched, and the next tick (or
-   * each room's own human-pick sim trigger, the actions route) resumes them from the log. That
-   * is the ceiling working, not failing. Injectable so the
-   * exhausted-budget branch is a test's to reach rather than dead configuration.
+   * `MOCK_CONFIG.maxBotPicksPerTick`; a drive lands at most one pick, so this is spent one per
+   * landed pick. Once spent, the un-driven rooms' own state is untouched, and the next tick (or
+   * each room's own SSE advance loop) resumes them from the log. That is the ceiling working,
+   * not failing. Injectable so the exhausted-budget branch is a test's to reach rather than
+   * dead configuration.
    */
   readonly maxBotPicksPerTick?: number;
 }
@@ -193,9 +189,7 @@ export function createDraftTicker({
         const driven = await driveMock(state, now);
         if (driven !== null) {
           if (driven.picked) {
-            // A sim stretch spends its whole pick count (the budget bounds DB work, not calls);
-            // a paced drive spends exactly 1.
-            botPickBudget = Math.max(0, botPickBudget - driven.picks);
+            botPickBudget -= 1;
             return { draftId, applied: true };
           }
           return { draftId, applied: false, reason: driven.reason };

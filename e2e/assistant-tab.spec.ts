@@ -20,7 +20,8 @@ const BOT_COUNT = TEAM_COUNT - 1;
 /** The widest clock tier (see `mock-draft.spec.ts`'s own `PICK_SECONDS` docblock: the narrow
  *  30s tier measured fragile against a real browser under this repo's own background load). */
 const PICK_SECONDS = 90;
-const ON_CLOCK_TIMEOUT_MS = (BOT_COUNT + 2) * MOCK_CONFIG.botDelay.maxSeconds * 1_000;
+/** Every bot ahead of the host at its slowest seeded delay, padded for scheduler jitter. */
+const ON_CLOCK_TIMEOUT_MS = (BOT_COUNT + 2) * (MOCK_CONFIG.botDelay.baseMs + MOCK_CONFIG.botDelay.jitterMs) + 15_000;
 
 async function setTableChip(page: import("@playwright/test").Page, chip: string, groupLabel: string, optionName: string): Promise<void> {
   await expect(async () => {

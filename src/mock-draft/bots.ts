@@ -6,6 +6,7 @@
  * `bestAvailableFor` uses), never a second rule that could drift from what `reduceDraft` accepts.
  */
 import type { DraftPoolEntry } from "@/domain/draft";
+import { MS_PER_SECOND } from "@/domain/duration";
 import type { Position } from "@/domain/player";
 import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
 import { assignSlot, availablePool, needMultiplier, queuedEntriesFor, rankWeight, rosterFor, type DraftState } from "@/draft-engine";
@@ -131,29 +132,37 @@ export function chooseBotPick(state: DraftState, teamId: string, archetype: BotA
   return candidates[weightedIndex(candidates.map((candidate) => candidate.weight), rng)]!.playerId;
 }
 
-/**
- * A bot's think delay for one pick, in seconds, drawn from that pick's own seeded stream:
- * uniform over `[minSeconds, min(maxSeconds, clock × maxFractionOfClock)]`. The bounds are
- * `MOCK_CONFIG.botDelay`'s, and `config.test.ts` pins `maxSeconds` under the fastest clock's
- * fraction (and `minSeconds` under `maxSeconds`), so the interval is never empty for any
- * offered clock — no branch here has to defend it.
- */
-export function botThinkDelaySeconds(pickClockSeconds: number, rng: Rng): number {
-  const { minSeconds, maxSeconds, maxFractionOfClock } = MOCK_CONFIG.botDelay;
-  const cap = Math.min(maxSeconds, pickClockSeconds * maxFractionOfClock);
-  return minSeconds + rng.next() * (cap - minSeconds);
+/** The delay draw's upper bound for one room's clock: base plus jitter, capped under the clock's
+ *  own safety fraction (`config.test.ts` pins the cap slack for every offered clock). */
+function maxThinkDelayMs(pickClockSeconds: number): number {
+  const { baseMs, jitterMs, maxFractionOfClock } = MOCK_CONFIG.botDelay;
+  return Math.min(baseMs + jitterMs, pickClockSeconds * MS_PER_SECOND * maxFractionOfClock);
 }
 
 /**
- * The expected value of `botThinkDelaySeconds`' uniform draw — the midpoint of the same
- * interval, from the same bounds, never a second literal (Task 10's persona checkpoint,
- * finding 1). The snapshot route carries this to the room
+ * A bot's think delay for one pick, in milliseconds, drawn from that pick's own seeded stream:
+ * uniform over `[baseMs - jitterMs, min(baseMs + jitterMs, clock × maxFractionOfClock)]`. The
+ * bounds are `MOCK_CONFIG.botDelay`'s, and `config.test.ts` pins the jitter under the base and
+ * the top under the fastest clock's fraction, so the interval is never empty for any offered
+ * clock — no branch here has to defend it. Fractional on purpose: the drivers stamp the pick at
+ * the first whole millisecond at or after this instant, so two drivers stamp identically.
+ */
+export function botThinkDelayMs(pickClockSeconds: number, rng: Rng): number {
+  const { baseMs, jitterMs } = MOCK_CONFIG.botDelay;
+  const minMs = baseMs - jitterMs;
+  return minMs + rng.next() * (maxThinkDelayMs(pickClockSeconds) - minMs);
+}
+
+/**
+ * The expected value of `botThinkDelayMs`' uniform draw — the midpoint of the same interval,
+ * from the same bounds, never a second literal (Task 10's persona checkpoint, finding 1) — in
+ * SECONDS, the unit the wire carries. The snapshot route hands this to the room
  * (`MockRoomInfo.expectedBotPickSeconds`) so the dock's wait estimate can price a practice
  * opponent's turn at what it actually costs instead of the full pick clock — the flat
  * clock-per-pick estimate overstated a mock's wait roughly tenfold, and a first-timer who
  * walks away on a wrong "~8m" misses her first pick.
  */
 export function expectedBotThinkDelaySeconds(pickClockSeconds: number): number {
-  const { minSeconds, maxSeconds, maxFractionOfClock } = MOCK_CONFIG.botDelay;
-  return (minSeconds + Math.min(maxSeconds, pickClockSeconds * maxFractionOfClock)) / 2;
+  const { baseMs, jitterMs } = MOCK_CONFIG.botDelay;
+  return (baseMs - jitterMs + maxThinkDelayMs(pickClockSeconds)) / 2 / MS_PER_SECOND;
 }
