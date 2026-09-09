@@ -72,3 +72,4 @@ export { Pill } from "./pill";
 /** The law-backed explanation chip (Task 8): one `BoardReason` rendered as structured copy, plus
  *  the pure ranking helper (`strongestLawReasons`) a compact row uses to pick its top two. */
 export { ReasonChip, strongestLawReasons, type LawReason } from "./reason-chip";
+export { RosterStatusPill } from "./roster-status-pill";

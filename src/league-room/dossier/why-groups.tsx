@@ -5,6 +5,7 @@ import { MICRO_LABEL } from "@/components/ui/config";
 import type { Position } from "@/domain/player";
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
+import { rosterStatusObservation, rosterStatusPhrase } from "@/projections/preseason/roster-status-copy";
 import { narrativeSlot, whyGroupSlotKey, type NarrativeCarrier } from "@/capsules/narrative-slots";
 import { signedPoints } from "@/components/ui/event-feed-row";
 import { countWordCapitalized, formatTenth } from "../lib/format";
@@ -101,6 +102,10 @@ function factSentence(reason: FactReason): { readonly lead: string; readonly exp
         lead: "Takeaways and pressure",
         explanation: `${reason.sacksPerGame.toFixed(1)} sacks and ${reason.takeawaysPerGame.toFixed(1)} takeaways a game, ${signedPoints(reason.tierPointsPerGame)} points from what it allows.`,
       };
+    // The roster-status gate (2026-09-08): the status is the lead, the dated observation behind it
+    // is the explanation. Same words as every other surface (`roster-status-copy.ts`).
+    case "roster_status":
+      return { lead: rosterStatusPhrase(reason.status), explanation: `${rosterStatusObservation(reason)}.` };
     default: {
       // Exhaustiveness guard: a future `BoardReason` variant with no case above fails `tsc` here
       // rather than rendering silently wrong copy.

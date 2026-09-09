@@ -105,6 +105,22 @@ describe("verdictLine", () => {
     expect(verdictLine(reasons, "RB", {})).toBe(verdictLine(reasons, "RB"));
   });
 
+  it("leads with the roster status when the board has him off an active roster, and says he has no projection", () => {
+    const reasons: readonly BoardReason[] = [
+      { code: "roster_status", status: "practice_squad", source: "nflverse_roster_week_1", observedAt: "2026-09-01T00:00:00.000Z", team: "NO" },
+    ];
+    expect(verdictLine(reasons, "RB")).toBe("Practice squad, observed Sep 1 on the week 1 roster. He has no projection while he is off an active roster.");
+  });
+
+  it("keeps the draft sentence for a reserve-list player, whose status is stated as evidence rather than as the verdict", () => {
+    const reasons: readonly BoardReason[] = [
+      { code: "market_anchor", marketPoints: 200, delta: -9.5 },
+      SCARCITY,
+      { code: "roster_status", status: "injured_reserve", source: "tank01_player_list", observedAt: "2026-09-05T22:35:00.000Z", team: "KC" },
+    ];
+    expect(verdictLine(reasons, "RB")).toContain("He is a reach where he is going");
+  });
+
   it("never renders an em-dash", () => {
     const cases: (readonly BoardReason[])[] = [
       [{ code: "market_anchor", marketPoints: 200, delta: 14.2 }, SCARCITY, TIER_CLIFF],

@@ -69,6 +69,15 @@ describe("WhyGroups", () => {
     expect(container.textContent).not.toMatch(/;/);
   });
 
+  it("states a roster status as a bold lead and the dated observation behind it", () => {
+    const reasons: readonly BoardReason[] = [
+      { code: "roster_status", status: "injured_reserve", source: "tank01_player_list", observedAt: "2026-09-05T22:35:00.000Z", team: "KC" },
+    ];
+    render(<WhyGroups reasons={reasons} laws={[]} position="RB" />);
+    expect(screen.getByText("On injured reserve.")).toBeInTheDocument();
+    expect(screen.getByText("Observed Sep 5 on the player list.")).toBeInTheDocument();
+  });
+
   it("renders axe-clean in both themes", async () => {
     const laws: readonly Law[] = [];
     await renderSurface(<WhyGroups reasons={REASONS} laws={laws} position="RB" cap={5} />, async ({ container }) => {

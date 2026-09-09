@@ -5,6 +5,7 @@ import { valueBoard, type LeagueShape, type SeasonProjection, type ValuedPlayer 
 import { isRealTierCliff, tiersOf } from "../decide/tiers";
 import type { GamesPlayedOutlook } from "./availability";
 import { SHIPPED_GAME_VARIANCE } from "./fitted-variance";
+import type { RosterStatusKind, RosterStatusSource } from "./roster-status";
 import { seasonPointsInterval, VARIANCE_POSITIONS, Z90, type GameVariancePriors, type PlayerClass, type VariancePosition } from "./game-variance";
 
 /**
@@ -108,6 +109,25 @@ export type BoardReason =
    * `laws/board-reasons.ts`'s `lawReasonsFor`, the one place a candidate's facts become this variant.
    */
   | { readonly code: "law"; readonly lawId: string; readonly effect: number; readonly magnitude: number }
+  /**
+   * HIS CURRENT ROSTER STATUS, when it is anything other than active (the roster-status gate,
+   * founder report 2026-09-08 — `roster-status.ts`). Carried ONLY for a status that changed the
+   * board's treatment of him: a reserve designation (`injured_reserve`, `pup`, `nfi`, `suspended`,
+   * `exempt`), under which his expected games were capped (`roster-status-gate.ts`), or an
+   * off-roster status (`practice_squad`, `off_active_roster`, `no_roster`, `retired`), under which
+   * he has NO projection row at all and this reason is the only thing the board stores about him —
+   * the "Not on an active roster" band and every status pill read it. `source` names which store
+   * said so and `observedAt` (ISO) when it was captured, because a status is a dated observation
+   * and never an inference from silence: an active player, and a player no source names this
+   * season, carry no reason of this code.
+   */
+  | {
+      readonly code: "roster_status";
+      readonly status: RosterStatusKind;
+      readonly source: RosterStatusSource;
+      readonly observedAt: string;
+      readonly team: string | null;
+    }
   /**
    * A kicker with no kicking history at all in the seasons this board reads — a rookie, or a man
    * who has never held the job. His attempt volume comes from the club he signed with and his make

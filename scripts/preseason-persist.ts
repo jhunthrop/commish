@@ -55,7 +55,9 @@ import type { Position } from "@/domain/player";
 import type { Clock } from "@/domain/timing";
 import { nflPlayers } from "@/db/schema";
 import type { LeagueShape } from "@/projections/decide/replacement";
-import { shippedPreseasonCandidates, type BlendConstants } from "@/projections/market/blend";
+import { shippedPreseasonBoardInputs, type BlendConstants } from "@/projections/market/blend";
+import { rosterStatusReason } from "@/projections/preseason/roster-status";
+import type { ExcludedCandidate } from "@/projections/preseason/roster-status-gate";
 import { FITTED_BLEND_CONSTANTS } from "@/projections/market/blend-fitted";
 import { marketBoard } from "@/projections/market/curve";
 import { propsAnchorForSeason } from "@/projections/market/props-anchor";
@@ -218,20 +220,27 @@ function blendedLeg(format: BoardFormat): BoardLeg {
   return { format, source: boardSourceFor(format) };
 }
 
+/** A built board plus the players the roster-status gate kept off it (`roster-status-gate.ts`),
+ *  which the write below stores beside the board so the product can render them under their band. */
+interface BuiltBoard {
+  readonly board: readonly BoardEntry[];
+  readonly exclusions: readonly ExcludedCandidate[];
+}
+
 async function buildBoard(
   db: Db,
   inputs: PreseasonInputs,
   leg: BoardLeg,
   blendEvidence?: { readonly constants: BlendConstants; readonly propsAnchor: ReadonlyMap<string, number> },
-): Promise<readonly BoardEntry[]> {
+): Promise<BuiltBoard> {
   const raw = leg.format === null;
-  const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS, {
+  const { candidates, exclusions } = await shippedPreseasonBoardInputs(db, inputs, PRIORS, {
     raw,
     ...(leg.format === null ? {} : { format: leg.format }),
     ...(blendEvidence !== undefined ? { constants: blendEvidence.constants, propsAnchor: blendEvidence.propsAnchor } : {}),
   });
   const rules = leg.format === null ? PPR_SCORING : BOARD_FORMAT_SPECS[leg.format].rules;
-  return preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules, shape: SHAPE });
+  return { board: preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules, shape: SHAPE }), exclusions };
 }
 
 /** One reason code's own before-and-after count, over the players the board holds. */
@@ -303,21 +312,22 @@ async function persistBoard(
   leg: BoardLeg,
   unfrozen: boolean,
   blendEvidence?: { readonly constants: BlendConstants; readonly propsAnchor: ReadonlyMap<string, number> },
-): Promise<{ readonly board: readonly BoardEntry[]; readonly write: BoardWriteCounts }> {
-  const board = await buildBoard(db, inputs, leg, blendEvidence);
+): Promise<BuiltBoard & { readonly write: BoardWriteCounts }> {
+  const built = await buildBoard(db, inputs, leg, blendEvidence);
   const write = await writePreseasonBoard(
     db,
     { season: inputs.season, source: leg.source, asOf: inputs.moment, momentKind: inputs.momentKind },
-    board,
-    { unfrozen },
+    built.board,
+    { unfrozen, exclusions: built.exclusions },
   );
-  return { board, write };
+  return { ...built, write };
 }
 
-function printBoardWrite(season: number, label: string, leg: BoardLeg, result: { readonly board: readonly BoardEntry[]; readonly write: BoardWriteCounts }): void {
+function printBoardWrite(season: number, label: string, leg: BoardLeg, result: BuiltBoard & { readonly write: BoardWriteCounts }): void {
   console.log(
     `${season}  [${label}, ${leg.source}]  ${String(result.board.length).padStart(4)} players  ` +
-      `${String(result.write.written).padStart(4)} new projection rows  ${String(result.write.reasonsWritten).padStart(4)} reason rows written` +
+      `${String(result.write.written).padStart(4)} new projection rows  ${String(result.write.reasonsWritten).padStart(4)} reason rows written  ` +
+      `${String(result.exclusions.length).padStart(3)} not on an active roster` +
       describeRetirement(result.write),
   );
 }
@@ -406,7 +416,13 @@ export async function persistSeason(
     for (const [leg, evidence] of legs) {
       const fresh = await buildBoard(db, inputs, leg, evidence);
       const stored = await boardReasons(db, leg.source, season);
-      printReasonDiff(season, leg.source, diffReasons(stored, new Map(fresh.map((entry) => [entry.playerId, entry.reasons] as const))));
+      // The gate's exclusions carry exactly one reason each, and a diff that left them out would
+      // under-count what a persist writes by every player it takes off the board.
+      const freshReasons = new Map<string, readonly BoardReason[]>([
+        ...fresh.board.map((entry) => [entry.playerId, entry.reasons] as const),
+        ...fresh.exclusions.map((excluded) => [excluded.playerId, [rosterStatusReason(excluded.status)]] as const),
+      ]);
+      printReasonDiff(season, leg.source, diffReasons(stored, freshReasons));
     }
     return;
   }

@@ -20,7 +20,7 @@ import { DEPTH_METRIC, DEPTH_SOURCE } from "./depth";
 import { INJURY_METRICS, INJURY_SOURCE } from "../news/retrieve";
 import { FITTED_MODEL } from "../model/source";
 import type { Law } from "../laws/types";
-import { blendBoard, seasonPointsOf, shippedPreseasonCandidates, type BlendConstants } from "../market/blend";
+import { blendBoard, seasonPointsOf, shippedPreseasonBoardInputs, shippedPreseasonCandidates, type BlendConstants } from "../market/blend";
 import type { MarketPriorEntry } from "../market/curve";
 import {
   FITTED_AVAILABILITY_PRIORS,
@@ -720,6 +720,35 @@ describe("shippedPreseasonCandidates's raw flag (M9 fix round)", () => {
     for (const candidate of blended) {
       expect(candidate.reasons).toContainEqual({ code: "market_unlisted" });
     }
+  });
+});
+
+describe("the roster-status gate, through the shipped build (founder report 2026-09-08)", () => {
+  it("takes a practice-squad player off both arms and returns him as an exclusion with his dated status", async () => {
+    await db.insert(nflverseRosterWeeks).values({ season: 2024, week: 1, playerId: VETERAN, team: "BUF", status: "DEV", position: "WR" });
+    const inputs = await loadPreseason(db, 2024);
+    const rosterStamp = inputs.roster.find((row) => row.playerId === VETERAN)?.asOf;
+
+    const blended = await shippedPreseasonBoardInputs(db, inputs, PRIORS);
+    const raw = await shippedPreseasonBoardInputs(db, inputs, PRIORS, { raw: true });
+    for (const arm of [blended, raw]) {
+      expect(arm.candidates.some((candidate) => candidate.playerId === VETERAN)).toBe(false);
+      expect(arm.exclusions).toEqual([
+        { playerId: VETERAN, position: "WR", team: "BUF", status: { kind: "practice_squad", source: "nflverse_roster_week_1", observedAt: rosterStamp, team: "BUF" } },
+      ]);
+    }
+    expect(await shippedPreseasonCandidates(db, inputs, PRIORS)).toEqual(blended.candidates);
+  });
+
+  it("caps a reserve-list player's games at thirteen and carries the status on his row", async () => {
+    await db.insert(nflverseRosterWeeks).values({ season: 2024, week: 1, playerId: VETERAN, team: "BUF", status: "RES", position: "WR" });
+    const inputs = await loadPreseason(db, 2024);
+    const { candidates, exclusions } = await shippedPreseasonBoardInputs(db, inputs, PRIORS, { raw: true });
+    expect(exclusions).toEqual([]);
+    const veteran = candidates.find((candidate) => candidate.playerId === VETERAN);
+    expect(veteran?.games.expected).toBeLessThanOrEqual(13);
+    expect(veteran?.games.distribution.ceiling).toBeLessThanOrEqual(13);
+    expect(veteran?.reasons).toContainEqual({ code: "roster_status", status: "injured_reserve", source: "nflverse_roster_week_1", observedAt: expect.any(String), team: "BUF" });
   });
 });
 

@@ -1,5 +1,6 @@
 import type { Law, PrimaryQuantityUnit } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
+import { rosterStatusSentence } from "@/projections/preseason/roster-status-copy";
 import { Badge } from "./badge";
 import { signedPoints } from "./event-feed-row";
 import { formatTenth } from "./number-format";
@@ -202,6 +203,10 @@ function copyFor(reason: BoardReason, law: Law | undefined): string {
       return "No defensive record in the seasons this board reads, so this uses the league's own rates";
     case "defense_takeaways":
       return `${reason.sacksPerGame.toFixed(1)} sacks and ${reason.takeawaysPerGame.toFixed(1)} takeaways a game, ${signedPoints(reason.tierPointsPerGame)} pts from what it allows`;
+    // The roster-status gate (2026-09-08): a dated observation, source named, one phrasing
+    // product-wide (`roster-status-copy.ts`).
+    case "roster_status":
+      return rosterStatusSentence(reason);
     default: {
       // Exhaustiveness guard: a future `BoardReason` variant with no case above fails `tsc`
       // here rather than rendering silently wrong copy.

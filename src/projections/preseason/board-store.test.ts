@@ -534,4 +534,43 @@ describe("the preseason board store", () => {
       await expect(assertSingleGeneration(db, { season: 2026, source: LIVE_SOURCE, asOf: FINAL })).resolves.toBeUndefined();
     });
   });
+
+  /**
+   * THE GATE'S EXCLUSIONS (roster-status gate, 2026-09-08): a player the gate took off the ranked
+   * board has NO projection row and exactly one reason row, `roster_status`, so the "Not on an
+   * active roster" band and every status pill can read him back from the same store as the board.
+   */
+  describe("exclusions", () => {
+    const GATE_SOURCE = "test_gate_live_ppr_12";
+    const LIVE_2026 = new Date("2026-09-02T12:00:00.000Z");
+    const OBSERVED = new Date("2026-09-01T00:00:00.000Z");
+    const SQUAD = "00-0099999";
+    const exclusion = { playerId: SQUAD, position: "WR" as const, team: "NO", status: { kind: "practice_squad" as const, source: "nflverse_roster_week_1" as const, observedAt: OBSERVED, team: "NO" } };
+
+    beforeEach(async () => {
+      await recordNflPlayers(db, [nflPlayerRow({ id: SQUAD, pfrId: null, espnId: null, name: "Squad Receiver", latestTeam: "NO", rookieSeason: 2026 })]);
+    });
+
+    it("writes one roster_status reason row and no projection row for an excluded player, and reads it back", async () => {
+      const stamp = { season: 2026, source: GATE_SOURCE, asOf: LIVE_2026, momentKind: "live" as const };
+      const counts = await writePreseasonBoard(db, stamp, [entry()], { exclusions: [exclusion] });
+      expect(counts.written).toBe(1);
+      expect(counts.reasonsWritten).toBe(1);
+
+      const projections = await preseasonProjectionsAsOf(db, stamp);
+      expect(projections.map((row) => row.playerId)).toEqual([CHASE]);
+      const reasons = await boardReasons(db, GATE_SOURCE, 2026);
+      expect(reasons.get(SQUAD)).toEqual([
+        { code: "roster_status", status: "practice_squad", source: "nflverse_roster_week_1", observedAt: OBSERVED.toISOString(), team: "NO" },
+      ]);
+    });
+
+    it("retires an exclusion with the live generation it belonged to", async () => {
+      const stamp = { season: 2026, source: GATE_SOURCE, asOf: LIVE_2026, momentKind: "live" as const };
+      await writePreseasonBoard(db, stamp, [entry()], { exclusions: [exclusion] });
+      const next = await writePreseasonBoard(db, { ...stamp, asOf: new Date(LIVE_2026.getTime() + 86_400_000) }, [entry()]);
+      expect(next.retiredReasons).toBe(1);
+      expect((await boardReasons(db, GATE_SOURCE, 2026)).has(SQUAD)).toBe(false);
+    });
+  });
 });

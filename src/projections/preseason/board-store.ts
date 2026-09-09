@@ -6,6 +6,8 @@ import type { JsonObject } from "@/domain/audit";
 import { BOARD_MEMO_GROUP, invalidateTtlMemoGroup } from "@/lib/cache/ttl-memo";
 import type { BoardEntry, BoardReason } from "./board";
 import { boardSourceFor, DEFAULT_BOARD_FORMAT } from "./board-formats";
+import { rosterStatusReason } from "./roster-status";
+import type { ExcludedCandidate } from "./roster-status-gate";
 import type { BoardMoment } from "./source";
 
 /**
@@ -578,6 +580,23 @@ export interface BoardWriteOptions {
   /** Lifts `FROZEN_BOARD_SOURCES` for this one call. The persist script's `--unfreeze` flag is the
    *  only caller that sets it, and it prints a warning when it does. */
   readonly unfrozen?: boolean;
+  /**
+   * THE PLAYERS THE ROSTER-STATUS GATE TOOK OFF THIS BOARD (`roster-status-gate.ts`, founder report
+   * 2026-09-08). Each is written as ONE `roster_status` reason row and NO projection row, under the
+   * same source and season, so the "Not on an active roster" band and every status pill read him
+   * back from the same store as the ranked rows, and a live re-take retires him with the generation
+   * he belonged to. Absent means the caller built a board with no gate (a fit script, a test) and
+   * nothing is written for anyone the board did not rank.
+   */
+  readonly exclusions?: readonly ExcludedCandidate[];
+}
+
+/** An excluded player's one stored row: his status, as a `roster_status` reason. */
+function exclusionReasonRows(exclusions: readonly ExcludedCandidate[], stamp: BoardStamp): readonly PreseasonBoardReasonRow[] {
+  return exclusions.map((excluded) => {
+    const { code, ...payload } = rosterStatusReason(excluded.status);
+    return { season: stamp.season, source: stamp.source, playerId: excluded.playerId, code, detail: "", payload: payload as JsonObject };
+  });
 }
 
 /**
@@ -645,7 +664,7 @@ export async function writePreseasonBoard(
   // FIRST, before a row is built and long before a statement runs: see `FROZEN_BOARD_SOURCES`.
   assertNotFrozen(stamp, options);
   const rows = projectionRows(board, stamp);
-  const reasons = reasonRows(board, stamp);
+  const reasons = [...reasonRows(board, stamp), ...exclusionReasonRows(options.exclusions ?? [], stamp)];
 
   if (stamp.momentKind === "replay") {
     const written = await recordPreseasonProjections(db, rows);
@@ -830,6 +849,7 @@ const KNOWN_REASON_CODES: ReadonlySet<BoardReason["code"]> = new Set([
   "law",
   "market_unlisted",
   "market_anchor",
+  "roster_status",
 ]);
 
 function isKnownReasonCode(code: string): code is BoardReason["code"] {
