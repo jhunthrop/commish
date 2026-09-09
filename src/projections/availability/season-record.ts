@@ -69,11 +69,17 @@ export async function availabilityStoreCoverage(db: ReadonlyDb, seasons: readonl
 export async function rosterWeeksBySeason(db: ReadonlyDb, seasons: readonly number[]): Promise<BySeasonByPlayer<WeeklyRosterStatus>> {
   if (seasons.length === 0) return new Map();
   const rows = await db
-    .select({ season: nflverseRosterWeeks.season, week: nflverseRosterWeeks.week, playerId: nflverseRosterWeeks.playerId, status: nflverseRosterWeeks.status })
+    .select({
+      season: nflverseRosterWeeks.season,
+      week: nflverseRosterWeeks.week,
+      playerId: nflverseRosterWeeks.playerId,
+      status: nflverseRosterWeeks.status,
+      statusDetail: nflverseRosterWeeks.statusDetail,
+    })
     .from(nflverseRosterWeeks)
     .where(and(inArray(nflverseRosterWeeks.season, [...seasons])))
     .orderBy(asc(nflverseRosterWeeks.week));
-  return groupBySeasonAndPlayer(seasons, rows, (row) => ({ week: row.week, status: row.status }));
+  return groupBySeasonAndPlayer(seasons, rows, (row) => ({ week: row.week, status: row.status, statusDetail: row.statusDetail }));
 }
 
 /** Every archived report row for these seasons, same shape and same guarantee. */

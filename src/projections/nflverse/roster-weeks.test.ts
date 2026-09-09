@@ -73,6 +73,20 @@ describe("mapRosterWeekRows", () => {
     expect(byWeek.get(18)).toMatchObject({ status: "RES" });
   });
 
+  it("carries the release's status detail verbatim, blank where the file leaves it blank: the only column that tells a suspension from injured reserve", () => {
+    // Rashee Rice, 2025: RES/R40 weeks 1-6 (a six-game suspension), RES/R01 weeks 17-18 (a knee).
+    expect(mapRosterWeekRows([row({ status: "RES", status_description_abbr: "R40" })])[0]).toMatchObject({ status: "RES", statusDetail: "R40" });
+    expect(mapRosterWeekRows([row({ status: "RES", status_description_abbr: "R01" })])[0]).toMatchObject({ status: "RES", statusDetail: "R01" });
+    expect(mapRosterWeekRows([row({ status: "SUS", status_description_abbr: "" })])[0]).toMatchObject({ status: "SUS", statusDetail: "" });
+    expect(mapRosterWeekRows([row({ status_description_abbr: " A01 " })])[0]).toMatchObject({ statusDetail: "A01" });
+  });
+
+  it("refuses a file without the status detail column: without it every suspended week would archive as an injury week", () => {
+    const withoutDetail: Record<string, string> = { ...row() };
+    delete withoutDetail.status_description_abbr;
+    expect(() => mapRosterWeekRows([withoutDetail as CsvRow])).toThrow(/missing column\(s\) status_description_abbr/);
+  });
+
   it("drops a row whose season type this product does not score", () => {
     expect(mapRosterWeekRows([row({ game_type: "WC" })])).toEqual([]);
   });
@@ -121,6 +135,7 @@ describe("the store", () => {
     playerId: NABERS.id,
     team: "NYG",
     status: "RES",
+    statusDetail: "R01",
     position: "WR",
   };
 
@@ -138,6 +153,13 @@ describe("the store", () => {
       const rows = await rosterWeekRowsFor(db, NABERS.id, 2025);
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ status: "ACT" });
+    });
+
+    it("a changed status detail alone is a change: a re-ingest after the column landed fills it in and reads it back", async () => {
+      await recordRosterWeekRows(db, [{ ...RES_ROW, statusDetail: "" }]);
+      expect(await recordRosterWeekRows(db, [{ ...RES_ROW, statusDetail: "R40" }])).toBe(1);
+      expect(await recordRosterWeekRows(db, [{ ...RES_ROW, statusDetail: "R40" }])).toBe(0);
+      expect((await rosterWeekRowsFor(db, NABERS.id, 2025))[0]).toMatchObject({ status: "RES", statusDetail: "R40" });
     });
 
     it("refuses a player the universe does not hold, rather than orphaning a row", async () => {

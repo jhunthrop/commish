@@ -116,6 +116,10 @@ export interface WeeklyRosterStatus {
   readonly week: number;
   /** The league's own roster-status code, verbatim ("ACT", "RES", "INA", "CUT", "DEV", …). */
   readonly status: string;
+  /** The release's `status_description_abbr`, verbatim ("R01", "R40", …), `""` where blank. The
+   *  derivations in this module never read it; `week-classification.ts` does, to tell a served
+   *  suspension (`R40`) from injured reserve (`R01`) under the same coarse `RES`. */
+  readonly statusDetail: string;
 }
 
 /** The sourced fact a STATUS-based derivation can support: a reserve-list placement, with no body

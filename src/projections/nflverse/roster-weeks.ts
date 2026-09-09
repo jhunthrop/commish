@@ -47,6 +47,10 @@ export interface RosterWeekRow {
   readonly team: string;
   /** The league's own roster-status code, verbatim ("ACT", "RES", "INA", "CUT", "DEV", …). */
   readonly status: string;
+  /** The release's `status_description_abbr`, verbatim ("R01", "R40", "A01", …), `""` where blank.
+   *  The reserve-list detail the coarse code lost from 2021 on: see `schema.ts`'s
+   *  `nflverseRosterWeeks.statusDetail` for the measured vocabulary and why it is archived. */
+  readonly statusDetail: string;
   /** nflverse's own spelling, unnarrowed, exactly as `nfl_players.position` is. */
   readonly position: string;
 }
@@ -62,8 +66,12 @@ export interface RosterWeekRow {
  * outright, matching `mapWeek1Rosters`'s own tolerance: this table is not a biography snapshot, so
  * a new upstream column appearing is never a reason to refuse a file this module can otherwise
  * read in full.
+ *
+ * `status_description_abbr` IS REQUIRED, not tolerated (founder report 2026-09-08): every file
+ * 2013-2025 carries it, and from 2021 it is the only column that tells a suspension from injured
+ * reserve. A file without it would archive every suspended week as an injury week, silently.
  */
-const REQUIRED_COLUMNS: readonly string[] = ["season", "week", "game_type", "team", "gsis_id", "position", "status"];
+const REQUIRED_COLUMNS: readonly string[] = ["season", "week", "game_type", "team", "gsis_id", "position", "status", "status_description_abbr"];
 
 function assertShape(rows: readonly CsvRow[]): void {
   if (rows.length === 0) return;
@@ -123,7 +131,7 @@ export function mapRosterWeekRows(rows: readonly CsvRow[]): readonly RosterWeekR
     if (team === "" || position === "" || status === "") continue;
 
     const key = `${season}|${week}|${playerId}`;
-    byKey.set(key, { season, week, playerId, team, status, position });
+    byKey.set(key, { season, week, playerId, team, status, statusDetail: trimmed(row.status_description_abbr), position });
   }
   return [...byKey.values()].sort((a, b) => a.season - b.season || a.week - b.week || a.playerId.localeCompare(b.playerId));
 }
@@ -223,6 +231,7 @@ export async function rosterWeekRowsFor(db: ReadonlyDb, playerId: string, season
       playerId: nflverseRosterWeeks.playerId,
       team: nflverseRosterWeeks.team,
       status: nflverseRosterWeeks.status,
+      statusDetail: nflverseRosterWeeks.statusDetail,
       position: nflverseRosterWeeks.position,
     })
     .from(nflverseRosterWeeks)

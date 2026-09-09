@@ -60,7 +60,7 @@ describe("classifyWeek", () => {
 });
 
 describe("classifySeasonWeeks", () => {
-  const rosterRows = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18].map((week) => ({ week, status: "ACT" }));
+  const rosterRows = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18].map((week) => ({ week, status: "ACT", statusDetail: "" }));
 
   it("splits a healthy backup's season into played weeks and did-not-play weeks, with nothing unavailable", () => {
     const classes = classifySeasonWeeks({
@@ -78,12 +78,12 @@ describe("classifySeasonWeeks", () => {
   it("dates every unavailable week from the report and the roster together", () => {
     const classes = classifySeasonWeeks({
       rosterRows: [
-        { week: 1, status: "ACT" },
-        { week: 2, status: "ACT" },
-        { week: 3, status: "INA" },
-        { week: 4, status: "RES" },
-        { week: 5, status: "RES" },
-        { week: 6, status: "ACT" },
+        { week: 1, status: "ACT", statusDetail: "" },
+        { week: 2, status: "ACT", statusDetail: "" },
+        { week: 3, status: "INA", statusDetail: "" },
+        { week: 4, status: "RES", statusDetail: "" },
+        { week: 5, status: "RES", statusDetail: "" },
+        { week: 6, status: "ACT", statusDetail: "" },
       ],
       injuryRows: [
         { week: 3, reportStatus: "Out", primaryInjury: "Knee" },
@@ -95,7 +95,7 @@ describe("classifySeasonWeeks", () => {
   });
 
   it("counts a played week the roster file never listed, and never invents a week neither source holds", () => {
-    const classes = classifySeasonWeeks({ rosterRows: [{ week: 2, status: "ACT" }], injuryRows: [], gamesPlayedWeeks: [1, 2] });
+    const classes = classifySeasonWeeks({ rosterRows: [{ week: 2, status: "ACT", statusDetail: "" }], injuryRows: [], gamesPlayedWeeks: [1, 2] });
     expect(classes).toEqual({ playedWeeks: [1, 2], unavailableWeeks: [], didNotPlayWeeks: [] });
   });
 
@@ -109,9 +109,9 @@ describe("classifySeasonWeeks", () => {
   it("returns weeks in ascending order whatever order the rows arrived in", () => {
     const classes = classifySeasonWeeks({
       rosterRows: [
-        { week: 9, status: "RES" },
-        { week: 1, status: "ACT" },
-        { week: 4, status: "PUP" },
+        { week: 9, status: "RES", statusDetail: "" },
+        { week: 1, status: "ACT", statusDetail: "" },
+        { week: 4, status: "PUP", statusDetail: "" },
       ],
       injuryRows: [],
       gamesPlayedWeeks: [1],

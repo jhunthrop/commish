@@ -2365,6 +2365,17 @@ export const nflverseRosterWeeks = pgTable(
      *  coarsened, unlike `preseason_rosters`' `RosterStatus`. See the table docblock for the full
      *  observed vocabulary. */
     status: text("status").notNull(),
+    /**
+     * The release's `status_description_abbr`, verbatim, `""` where the file carries none (the
+     * 2013-2019 files leave it blank or `A01`/`I01` for most rows). THE ONLY PLACE A SUSPENSION IS
+     * VISIBLE FROM 2021 ON (founder report 2026-09-08): the coarse `SUS` code carries suspensions
+     * through 2020 and all but vanishes after; a suspended player since sits under `RES` with the
+     * detail saying why (`R40` suspended by the commissioner for a stated term, `R30` indefinitely,
+     * `R33` by his club; `R01`/`R48` are injured reserve, `R04` PUP, `R05` non-football injury).
+     * `availability/week-classification.ts` reads it to keep a served suspension out of a player's
+     * injury history. Measured on the real 2013-2025 files.
+     */
+    statusDetail: text("status_detail").notNull().default(""),
     /** nflverse's own spelling, unnarrowed, exactly as `nfl_players.position` and
      *  `nfl_draft_picks.position` are. */
     position: text("position").notNull(),

@@ -8,7 +8,7 @@ const SHOUGH = "00-0040743";
 const LOST = "00-0000002";
 
 describe("seasonAvailabilityRecords", () => {
-  const activeWeeks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18].map((week) => ({ week, status: "ACT" }));
+  const activeWeeks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18].map((week) => ({ week, status: "ACT", statusDetail: "" }));
   const shoughWeeks = [3, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18];
 
   it("reads a healthy backup as eleven games played and none unavailable", () => {
@@ -29,7 +29,7 @@ describe("seasonAvailabilityRecords", () => {
       teamGames: 17,
       covered: true,
       playedWeeks: new Map(),
-      rosterRows: new Map([[LOST, Array.from({ length: 18 }, (_, index) => ({ week: index + 1, status: "RES" }))]]),
+      rosterRows: new Map([[LOST, Array.from({ length: 18 }, (_, index) => ({ week: index + 1, status: "RES", statusDetail: "" }))]]),
       injuryRows: new Map(),
     });
     expect(records.get(LOST)).toEqual({ season: 2025, gamesPlayed: 0, teamGames: 17, gamesUnavailable: 17 });
@@ -53,7 +53,7 @@ describe("seasonAvailabilityRecords", () => {
       teamGames: 17,
       covered: true,
       playedWeeks: new Map(),
-      rosterRows: new Map([[LOST, [{ week: 1, status: "DEV" }, { week: 2, status: "DEV" }]]]),
+      rosterRows: new Map([[LOST, [{ week: 1, status: "DEV", statusDetail: "" }, { week: 2, status: "DEV", statusDetail: "" }]]]),
       injuryRows: new Map(),
     });
     expect(records.has(LOST)).toBe(false);
@@ -86,10 +86,10 @@ describe("the designation store reads", () => {
   it("keys every roster week and every report by season, then by player, in week order", async () => {
     const roster = await rosterWeeksBySeason(db, [2024, 2025]);
     expect(roster.get(2025)?.get(SHOUGH)).toEqual([
-      { week: 1, status: "ACT" },
-      { week: 2, status: "ACT" },
+      { week: 1, status: "ACT", statusDetail: "" },
+      { week: 2, status: "ACT", statusDetail: "" },
     ]);
-    expect(roster.get(2024)?.get(LOST)).toEqual([{ week: 1, status: "ACT" }]);
+    expect(roster.get(2024)?.get(LOST)).toEqual([{ week: 1, status: "ACT", statusDetail: "" }]);
     const reports = await injuryReportsBySeason(db, [2025]);
     expect(reports.get(2025)?.get(SHOUGH)).toEqual([{ week: 2, reportStatus: "Questionable", primaryInjury: "Ankle" }]);
     expect(reports.get(2025)?.has(LOST)).toBe(false);

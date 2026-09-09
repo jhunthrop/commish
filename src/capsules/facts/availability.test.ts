@@ -21,8 +21,8 @@ describe("seasonEndingsFor", () => {
           season: 2025,
           injuryRows: [],
           statusRows: [
-            { week: 6, status: "RES" },
-            { week: 7, status: "RES" },
+            { week: 6, status: "RES", statusDetail: "" },
+            { week: 7, status: "RES", statusDetail: "" },
           ],
           gamesPlayedWeeks: [1, 2, 3, 4, 5],
         },
@@ -55,7 +55,7 @@ describe("seasonEndingsFor", () => {
 });
 
 describe("gamesMissedFor", () => {
-  const active = (weeks: readonly number[]) => weeks.map((week) => ({ week, status: "ACT" }));
+  const active = (weeks: readonly number[]) => weeks.map((week) => ({ week, status: "ACT", statusDetail: "" }));
 
   it("reads a healthy backup as games played, a first appearance and NO games missed: his unplayed weeks were a role, not an absence", () => {
     // Tyler Shough, 2025: active every rostered week, no designation all season, eleven games.
@@ -80,7 +80,7 @@ describe("gamesMissedFor", () => {
           season: 2025,
           teamGames: 17,
           covered: true,
-          rosterRows: [...active([1, 2]), { week: 3, status: "INA" }, { week: 4, status: "RES" }, { week: 5, status: "RES" }, ...active([6, 7])],
+          rosterRows: [...active([1, 2]), { week: 3, status: "INA", statusDetail: "" }, { week: 4, status: "RES", statusDetail: "" }, { week: 5, status: "RES", statusDetail: "" }, ...active([6, 7])],
           injuryRows: [{ week: 3, reportStatus: "Out", primaryInjury: "Knee" }],
           gamesPlayedWeeks: [1, 2, 7],
         },
@@ -106,7 +106,7 @@ describe("gamesMissedFor", () => {
   it("carries no first appearance for a man who never played, and every rostered week as unavailable when the roster says so", () => {
     expect(
       gamesMissedFor([
-        { season: 2025, teamGames: 17, covered: true, rosterRows: Array.from({ length: 17 }, (_, index) => ({ week: index + 1, status: "RES" })), injuryRows: [], gamesPlayedWeeks: [] },
+        { season: 2025, teamGames: 17, covered: true, rosterRows: Array.from({ length: 17 }, (_, index) => ({ week: index + 1, status: "RES", statusDetail: "" })), injuryRows: [], gamesPlayedWeeks: [] },
       ]),
     ).toEqual([{ season: 2025, teamGames: 17, gamesPlayed: 0, firstPlayedWeek: null, unavailableWeeks: Array.from({ length: 17 }, (_, index) => index + 1), healthyDidNotPlay: 0 }]);
   });
