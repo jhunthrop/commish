@@ -30,6 +30,17 @@ const poolRows = () =>
 const rowFor = (name: string) => screen.getByText(name).closest("li")!;
 
 describe("PlayerPool", () => {
+  it("prints the board's roster status beside a player, from the same reasons the chips read (the roster-status gate)", () => {
+    const subject = PLAYERS[0]!;
+    const reasons = new Map([
+      [subject.id, [{ code: "roster_status" as const, status: "practice_squad" as const, source: "nflverse_roster_week_1" as const, observedAt: "2026-09-01T00:00:00.000Z", team: subject.nflTeam }]],
+    ]);
+    render(<PlayerPool {...props} reasons={reasons} />);
+    expect(within(rowFor(subject.name)).getByText("Practice squad")).toBeInTheDocument();
+    expect(within(rowFor(subject.name)).getByText("Practice squad, observed Sep 1 on the week 1 roster")).toBeInTheDocument();
+    expect(within(rowFor(PLAYERS[1]!.name)).queryByText("Practice squad")).not.toBeInTheDocument();
+  });
+
   it("lists every player in ranked order and is axe-clean in both themes", async () => {
     await renderSurface(<PlayerPool {...props} />, async ({ container }) => {
       expect(poolRows().map((row) => within(row).getByRole("button", { name: /queue/i }).closest("li")!.textContent)).toHaveLength(4);

@@ -25,6 +25,16 @@ export const DRAFT_ACTION_VERSION = 1;
 export interface DraftPoolEntry {
   readonly playerId: string;
   readonly position: Position;
+  /**
+   * THE ROSTER-STATUS GATE'S MARK (founder report 2026-09-08): `true` when the served board had this
+   * player off an active roster (practice squad, unsigned, retired) at the moment the draft started.
+   * The room's own safety net (`bestAvailableFor`), the auction's auto-nomination and the practice
+   * bots never take him; a manager still can, by hand, because the pool is the whole directory and
+   * he is in it. ABSENT MEANS ELIGIBLE, never "today's status": a log written before this field
+   * existed replays exactly as it was picked, and the mark is snapshotted at START_DRAFT with the
+   * rest of the pool so a later roster move can never change what an expiry already chose.
+   */
+  readonly excludedFromAutopick?: true;
 }
 
 /**

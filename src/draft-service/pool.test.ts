@@ -2,8 +2,11 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { players, playerStatLines, scoringSettings } from "@/db/schema";
+import { nflPlayers, playerCrosswalk, players, playerStatLines, preseasonBoardReasons, scoringSettings } from "@/db/schema";
 import { STANDARD_SCORING } from "@/domain/scoring";
+import { invalidateAllTtlMemosForTests } from "@/lib/cache/ttl-memo";
+import { BOARD_SOURCE } from "@/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { computeFantasyPoints } from "@/scoring";
 import { buildDraftPool, invalidateRankedPlayersCache, rankedPlayers } from "./pool";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
@@ -44,6 +47,36 @@ describe("buildDraftPool", () => {
     const pool = await buildDraftPool(db, leagueId);
     expect(pool.map((p) => p.playerId)).toEqual(["star", "middle", "scrub"]);
     expect(pool.map((p) => p.position)).toEqual(["RB", "WR", "RB"]);
+  });
+
+  it("marks a player the served board has off an active roster, and nobody else, for the room's own hand to skip", async () => {
+    const { leagueId } = await seedDraftFixture(db, {
+      draftId: "draft_g", leagueId: "league_g", format: "snake", teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+    await db.insert(players).values([
+      { id: "star", name: "Star Back", position: "RB", nflTeam: "KC", adp: 1.5 },
+      { id: "squad", name: "Squad Back", position: "RB", nflTeam: "NO", adp: 240.5 },
+    ]);
+    await db.insert(nflPlayers).values([
+      { id: "00-0000001", name: "Star Back", position: "RB" },
+      { id: "00-0000002", name: "Squad Back", position: "RB" },
+    ]);
+    await db.insert(playerCrosswalk).values([
+      { playerId: "star", nflPlayerId: "00-0000001", method: "espn_id", resolvedAt: new Date() },
+      { playerId: "squad", nflPlayerId: "00-0000002", method: "espn_id", resolvedAt: new Date() },
+    ]);
+    await db.insert(preseasonBoardReasons).values([
+      { season: PRODUCT_SEASON, source: BOARD_SOURCE, playerId: "00-0000001", code: "roster_status", detail: "", payload: { status: "injured_reserve", source: "tank01_player_list", observedAt: "2026-09-05T22:35:00.000Z", team: "KC" } },
+      { season: PRODUCT_SEASON, source: BOARD_SOURCE, playerId: "00-0000002", code: "roster_status", detail: "", payload: { status: "practice_squad", source: "nflverse_roster_week_1", observedAt: "2026-09-01T00:00:00.000Z", team: "NO" } },
+    ]);
+    invalidateAllTtlMemosForTests();
+
+    const pool = await buildDraftPool(db, leagueId);
+    expect(pool).toEqual([
+      { playerId: "star", position: "RB" },
+      { playerId: "squad", position: "RB", excludedFromAutopick: true },
+    ]);
   });
 
   it("includes players with no stat lines at all, ranked last and ordered by id", async () => {

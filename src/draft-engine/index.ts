@@ -21,6 +21,7 @@ export {
   hasOwedPicks, catchUpTeamId,
   draftClockView, draftStateView, type DraftClockView, type DraftStateView,
 } from "./selectors";
+export { autopickEligible } from "./selectors";
 export {
   draftActionSchema, clientDraftActionSchema, toDraftAction, type ClientDraftAction,
   clientQueueSchema, toSetQueueAction,

@@ -9,7 +9,7 @@ import type { DraftPoolEntry } from "@/domain/draft";
 import { MS_PER_SECOND } from "@/domain/duration";
 import type { Position } from "@/domain/player";
 import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
-import { assignSlot, availablePool, draftedPlayerIds, needMultiplier, queuedEntriesFor, rankWeight, rosterFor, type DraftState } from "@/draft-engine";
+import { assignSlot, autopickEligible, availablePool, draftedPlayerIds, needMultiplier, queuedEntriesFor, rankWeight, rosterFor, type DraftState } from "@/draft-engine";
 import type { BotArchetype } from "./archetypes";
 import { MOCK_CONFIG } from "./config";
 import type { Rng } from "./rng";
@@ -118,7 +118,10 @@ export function botCandidateWeights(state: DraftState, teamId: string, archetype
   const roster = rosterFor(state, teamId);
   const slotConfig = state.config.slotConfig;
   const canRoster = (entry: DraftPoolEntry): boolean => assignSlot({ position: entry.position, roster, slotConfig }).ok;
-  const candidates = topEligible(availablePool(state), canRoster);
+  // The roster-status gate binds a bot exactly as it binds the room's own autopick
+  // (`autopickEligible`, the engine's one statement of it): a player the served board had off
+  // an active roster is never sampled, and the reach window is counted over eligible men only.
+  const candidates = topEligible(availablePool(state).filter(autopickEligible), canRoster);
   const recentCounts = recentPositionCounts(state);
   return candidates.map((entry, index) => ({
     playerId: entry.playerId,
@@ -142,7 +145,7 @@ function legalQueuedPick(state: DraftState, teamId: string): string | null {
   const roster = rosterFor(state, teamId);
   const drafted = draftedPlayerIds(state);
   const queued = queuedEntriesFor(state, teamId).find(
-    (entry) => !drafted.has(entry.playerId) && assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig }).ok,
+    (entry) => autopickEligible(entry) && !drafted.has(entry.playerId) && assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig }).ok,
   );
   return queued?.playerId ?? null;
 }
