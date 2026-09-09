@@ -122,6 +122,7 @@ export async function loadAvailabilityObservations(
         // A man on the week-one roster with no record in a covered season was neither played nor
         // unavailable in any week: available all year. Uncovered stays null.
         gamesUnavailable: label?.gamesUnavailable ?? (covered.has(season) ? 0 : null),
+        gamesSuspended: label?.gamesSuspended ?? (covered.has(season) ? 0 : null),
       });
     }
   }

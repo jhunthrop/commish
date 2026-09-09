@@ -1,0 +1,1 @@
+ALTER TABLE "nflverse_roster_weeks" ADD COLUMN "status_detail" text DEFAULT '' NOT NULL;

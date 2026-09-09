@@ -21,8 +21,8 @@ describe("seasonEndingsFor", () => {
           season: 2025,
           injuryRows: [],
           statusRows: [
-            { week: 6, status: "RES" },
-            { week: 7, status: "RES" },
+            { week: 6, status: "RES", statusDetail: "" },
+            { week: 7, status: "RES", statusDetail: "" },
           ],
           gamesPlayedWeeks: [1, 2, 3, 4, 5],
         },
@@ -55,7 +55,7 @@ describe("seasonEndingsFor", () => {
 });
 
 describe("gamesMissedFor", () => {
-  const active = (weeks: readonly number[]) => weeks.map((week) => ({ week, status: "ACT" }));
+  const active = (weeks: readonly number[]) => weeks.map((week) => ({ week, status: "ACT", statusDetail: "" }));
 
   it("reads a healthy backup as games played, a first appearance and NO games missed: his unplayed weeks were a role, not an absence", () => {
     // Tyler Shough, 2025: active every rostered week, no designation all season, eleven games.
@@ -70,7 +70,7 @@ describe("gamesMissedFor", () => {
           gamesPlayedWeeks: [3, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18],
         },
       ]),
-    ).toEqual([{ season: 2025, teamGames: 17, gamesPlayed: 11, firstPlayedWeek: 3, unavailableWeeks: [], healthyDidNotPlay: 6 }]);
+    ).toEqual([{ season: 2025, teamGames: 17, gamesPlayed: 11, firstPlayedWeek: 3, unavailableWeeks: [], suspendedWeeks: [], healthyDidNotPlay: 6 }]);
   });
 
   it("dates every week the archives say he was unavailable, and counts the healthy scratches apart", () => {
@@ -80,17 +80,39 @@ describe("gamesMissedFor", () => {
           season: 2025,
           teamGames: 17,
           covered: true,
-          rosterRows: [...active([1, 2]), { week: 3, status: "INA" }, { week: 4, status: "RES" }, { week: 5, status: "RES" }, ...active([6, 7])],
+          rosterRows: [...active([1, 2]), { week: 3, status: "INA", statusDetail: "" }, { week: 4, status: "RES", statusDetail: "" }, { week: 5, status: "RES", statusDetail: "" }, ...active([6, 7])],
           injuryRows: [{ week: 3, reportStatus: "Out", primaryInjury: "Knee" }],
           gamesPlayedWeeks: [1, 2, 7],
         },
       ]),
-    ).toEqual([{ season: 2025, teamGames: 17, gamesPlayed: 3, firstPlayedWeek: 1, unavailableWeeks: [3, 4, 5], healthyDidNotPlay: 1 }]);
+    ).toEqual([{ season: 2025, teamGames: 17, gamesPlayed: 3, firstPlayedWeek: 1, unavailableWeeks: [3, 4, 5], suspendedWeeks: [], healthyDidNotPlay: 1 }]);
+  });
+
+  it("reports a served suspension apart from the injury weeks: Rashee Rice, 2025", () => {
+    // RES/R40 weeks 1-6 (a six-game suspension), active 7-15, INA+Out week 16, RES/R01 17-18 (a knee); bye week 10.
+    expect(
+      gamesMissedFor([
+        {
+          season: 2025,
+          teamGames: 17,
+          covered: true,
+          rosterRows: [
+            ...[1, 2, 3, 4, 5, 6].map((week) => ({ week, status: "RES", statusDetail: "R40" })),
+            ...[7, 8, 9, 11, 12, 13, 14, 15].map((week) => ({ week, status: "ACT", statusDetail: "A01" })),
+            { week: 16, status: "INA", statusDetail: "A01" },
+            { week: 17, status: "RES", statusDetail: "R01" },
+            { week: 18, status: "RES", statusDetail: "R01" },
+          ],
+          injuryRows: [{ week: 16, reportStatus: "Out", primaryInjury: "Knee" }],
+          gamesPlayedWeeks: [7, 8, 9, 11, 12, 13, 14, 15],
+        },
+      ]),
+    ).toEqual([{ season: 2025, teamGames: 17, gamesPlayed: 8, firstPlayedWeek: 7, unavailableWeeks: [16, 17, 18], suspendedWeeks: [1, 2, 3, 4, 5, 6], healthyDidNotPlay: 0 }]);
   });
 
   it("renders an uncovered season as played games with the injury count ABSENT, never zero", () => {
     expect(gamesMissedFor([{ season: 2024, teamGames: 17, covered: false, rosterRows: [], injuryRows: [], gamesPlayedWeeks: [5, 6] }])).toEqual([
-      { season: 2024, teamGames: 17, gamesPlayed: 2, firstPlayedWeek: 5, unavailableWeeks: null, healthyDidNotPlay: null },
+      { season: 2024, teamGames: 17, gamesPlayed: 2, firstPlayedWeek: 5, unavailableWeeks: null, suspendedWeeks: null, healthyDidNotPlay: null },
     ]);
   });
 
@@ -100,14 +122,14 @@ describe("gamesMissedFor", () => {
         { season: 2025, teamGames: 17, covered: true, rosterRows: active([1, 2]), injuryRows: [], gamesPlayedWeeks: [1, 2] },
         { season: 2024, teamGames: 17, covered: true, rosterRows: [], injuryRows: [], gamesPlayedWeeks: [] },
       ]),
-    ).toEqual([{ season: 2025, teamGames: 17, gamesPlayed: 2, firstPlayedWeek: 1, unavailableWeeks: [], healthyDidNotPlay: 0 }]);
+    ).toEqual([{ season: 2025, teamGames: 17, gamesPlayed: 2, firstPlayedWeek: 1, unavailableWeeks: [], suspendedWeeks: [], healthyDidNotPlay: 0 }]);
   });
 
   it("carries no first appearance for a man who never played, and every rostered week as unavailable when the roster says so", () => {
     expect(
       gamesMissedFor([
-        { season: 2025, teamGames: 17, covered: true, rosterRows: Array.from({ length: 17 }, (_, index) => ({ week: index + 1, status: "RES" })), injuryRows: [], gamesPlayedWeeks: [] },
+        { season: 2025, teamGames: 17, covered: true, rosterRows: Array.from({ length: 17 }, (_, index) => ({ week: index + 1, status: "RES", statusDetail: "" })), injuryRows: [], gamesPlayedWeeks: [] },
       ]),
-    ).toEqual([{ season: 2025, teamGames: 17, gamesPlayed: 0, firstPlayedWeek: null, unavailableWeeks: Array.from({ length: 17 }, (_, index) => index + 1), healthyDidNotPlay: 0 }]);
+    ).toEqual([{ season: 2025, teamGames: 17, gamesPlayed: 0, firstPlayedWeek: null, unavailableWeeks: Array.from({ length: 17 }, (_, index) => index + 1), suspendedWeeks: [], healthyDidNotPlay: 0 }]);
   });
 });

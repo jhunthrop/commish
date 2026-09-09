@@ -65,7 +65,7 @@ describe("collectDepthFacts", () => {
       { season: PRIOR_SEASON, lastPlayedWeek: 0, firstMissedWeek: 1, source: "status", reportStatus: null, rosterStatus: "RES", primaryInjury: null },
     ]);
     expect(depth.gamesMissed).toEqual([
-      { season: PRIOR_SEASON, teamGames: 17, gamesPlayed: 0, firstPlayedWeek: null, unavailableWeeks: [1, 2, 3, 4, 5, 6], healthyDidNotPlay: 0 },
+      { season: PRIOR_SEASON, teamGames: 17, gamesPlayed: 0, firstPlayedWeek: null, unavailableWeeks: [1, 2, 3, 4, 5, 6], suspendedWeeks: [], healthyDidNotPlay: 0 },
     ]);
   });
 

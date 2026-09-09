@@ -5,6 +5,7 @@ import type { PlayCallerRow } from "@/projections/nflverse/play-callers";
 import { regularSeasonGamesPerTeam } from "@/projections/nflverse/schedule";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@/projections/nflverse/schedule";
 import { productTeamCode, sourceTeamCode } from "@/projections/nflverse/team-codes";
+import type { WeeklyRosterStatus } from "@/projections/availability/season-end";
 import { availabilityStoreCoverage } from "@/projections/availability/season-record";
 import { firstKickoffFor } from "@/projections/team-store";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
@@ -131,7 +132,7 @@ interface DepthPassData {
   readonly options: DepthCollectOptions;
   readonly names: ReadonlyMap<string, string>;
   readonly injuryReports: ReadonlyMap<string, readonly { readonly week: number; readonly reportStatus: string; readonly primaryInjury: string }[]>;
-  readonly rosterStatuses: ReadonlyMap<string, readonly { readonly week: number; readonly status: string }[]>;
+  readonly rosterStatuses: ReadonlyMap<string, readonly WeeklyRosterStatus[]>;
   /** The prior seasons BOTH designation archives hold rows for (`availabilityStoreCoverage`). */
   readonly coveredSeasons: ReadonlySet<number>;
   readonly weekScoresBySeason: ReadonlyMap<number, ReadonlyMap<string, readonly { readonly week: number; readonly points: number }[]>>;

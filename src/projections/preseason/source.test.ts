@@ -186,7 +186,7 @@ describe("loadPreseason", () => {
     // The fixture seeds no roster weeks and no injury rows, so 2023 is an uncovered season: the
     // veteran's seventeen played games are real and his availability is unclaimed.
     const silent = await loadPreseason(db, 2024);
-    expect(silent.availability.get(2023)?.get(VETERAN)).toEqual({ season: 2023, gamesPlayed: 17, teamGames: 17, gamesUnavailable: null });
+    expect(silent.availability.get(2023)?.get(VETERAN)).toEqual({ season: 2023, gamesPlayed: 17, teamGames: 17, gamesUnavailable: null, gamesSuspended: null });
 
     // Cover 2023: the veteran is active every week; the rookie (no played row) sits on reserve.
     await db.insert(nflverseRosterWeeks).values([
@@ -195,8 +195,8 @@ describe("loadPreseason", () => {
     ]);
     await db.insert(nflverseInjuries).values({ season: 2023, week: 3, playerId: VETERAN, reportStatus: "Questionable", primaryInjury: "Ankle", practiceStatus: "" });
     const covered = await loadPreseason(db, 2024);
-    expect(covered.availability.get(2023)?.get(VETERAN)).toEqual({ season: 2023, gamesPlayed: 17, teamGames: 17, gamesUnavailable: 0 });
-    expect(covered.availability.get(2023)?.get(ROOKIE)).toEqual({ season: 2023, gamesPlayed: 0, teamGames: 17, gamesUnavailable: 17 });
+    expect(covered.availability.get(2023)?.get(VETERAN)).toEqual({ season: 2023, gamesPlayed: 17, teamGames: 17, gamesUnavailable: 0, gamesSuspended: 0 });
+    expect(covered.availability.get(2023)?.get(ROOKIE)).toEqual({ season: 2023, gamesPlayed: 0, teamGames: 17, gamesUnavailable: 17, gamesSuspended: 0 });
     expect(covered.availability.has(2024)).toBe(false);
   });
 

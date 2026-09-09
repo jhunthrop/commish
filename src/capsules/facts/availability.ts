@@ -70,7 +70,9 @@ export interface GamesMissedInput {
  * A MISSED GAME IS A GAME HE WAS UNAVAILABLE FOR (founder report 2026-09-08). The first version of
  * this counted rostered weeks minus played weeks, which printed "missed 6 of a possible 17" for a
  * healthy backup who was simply not the starter yet. The healthy did-not-play weeks are still
- * counted, and printed, as what they are: a role fact.
+ * counted, and printed, as what they are: a role fact. A SERVED SUSPENSION IS ITS OWN FACT (the
+ * same report, second round): the weeks are carried apart in `suspendedWeeks`, so the sheet can say
+ * "6 missed to a suspension" and never fold them into the injury count the projection reads.
  *
  * A SEASON NEITHER STORE KNOWS HIM IN PRODUCES NO ENTRY. A season the archives do not cover at all
  * still carries his played games and his first appearance, with the unavailable weeks and the
@@ -89,6 +91,7 @@ export function gamesMissedFor(inputs: readonly GamesMissedInput[]): readonly Pl
       gamesPlayed: playedWeeks.length,
       firstPlayedWeek: playedWeeks[0] ?? null,
       unavailableWeeks: classes === null ? null : classes.unavailableWeeks,
+      suspendedWeeks: classes === null ? null : classes.suspendedWeeks,
       healthyDidNotPlay: classes === null ? null : classes.didNotPlayWeeks.length,
     });
   }

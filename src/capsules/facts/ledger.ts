@@ -58,6 +58,7 @@ function absenceNumbers(depth: PlayerFactsDepth): readonly number[] {
     numbers.push(record.season, record.teamGames, record.gamesPlayed);
     if (record.firstPlayedWeek !== null) numbers.push(record.firstPlayedWeek);
     if (record.unavailableWeeks !== null) numbers.push(record.unavailableWeeks.length, ...record.unavailableWeeks);
+    if (record.suspendedWeeks !== null) numbers.push(record.suspendedWeeks.length, ...record.suspendedWeeks);
     if (record.healthyDidNotPlay !== null) numbers.push(record.healthyDidNotPlay);
   }
   for (const spell of depth.injuryHistory) {

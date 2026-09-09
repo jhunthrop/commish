@@ -17,6 +17,7 @@ function observation(overrides: Partial<AvailabilityObservation> = {}): Availabi
     baselineRate: null,
     gamesPlayed: 15,
     gamesUnavailable: 1,
+    gamesSuspended: 0,
     ...overrides,
   };
 }
@@ -59,7 +60,13 @@ describe("fitBaseline, the role table", () => {
   });
 
   it("refuses to estimate a role table without the archives", () => {
-    expect(() => fitBaseline(cell(120, { gamesUnavailable: null }))).toThrow(ARCHIVES_REQUIRED);
+    expect(() => fitBaseline(cell(120, { gamesUnavailable: null, gamesSuspended: null }))).toThrow(ARCHIVES_REQUIRED);
+  });
+
+  it("reads a suspended week out of the label season the way the record is read: neither played nor available", () => {
+    // Eleven played of eleven available (six suspended): a full role, not eleven of seventeen.
+    const rows = cell(40, { projectedSnapShare: SHARE_FOR.featured, gamesPlayed: 11, gamesUnavailable: 0, gamesSuspended: 6 });
+    expect(fitBaseline(rows).RB.featured).toBeCloseTo(1, 10);
   });
 });
 
@@ -74,7 +81,14 @@ describe("fitAvailabilityBaseline", () => {
   });
 
   it("throws ARCHIVES_REQUIRED when no observation carries an unavailable count", () => {
-    expect(() => fitAvailabilityBaseline(cell(120, { gamesUnavailable: null }))).toThrow(ARCHIVES_REQUIRED);
+    expect(() => fitAvailabilityBaseline(cell(120, { gamesUnavailable: null, gamesSuspended: null }))).toThrow(ARCHIVES_REQUIRED);
+  });
+
+  it("leaves a suspended week out of the season's available share on both sides of the fraction", () => {
+    // Eleven games not suspended, all available: a full season, not eleven seventeenths of one.
+    expect(fitAvailabilityBaseline(cell(10, { position: "WR", gamesUnavailable: 0, gamesSuspended: 6 })).WR).toBeCloseTo(1, 10);
+    // Six suspended, five hurt: five of eleven unavailable.
+    expect(fitAvailabilityBaseline(cell(10, { position: "TE", gamesUnavailable: 5, gamesSuspended: 6 })).TE).toBeCloseTo(6 / 11, 10);
   });
 });
 
@@ -90,13 +104,13 @@ describe("fitAvailabilityPriors", () => {
   const population: readonly AvailabilityObservation[] = [
     ...cell(60, {
       playerId: "clean",
-      history: [{ season: 2020, gamesPlayed: 16, teamGames: 16, gamesUnavailable: 0 }],
+      history: [{ season: 2020, gamesPlayed: 16, teamGames: 16, gamesUnavailable: 0, gamesSuspended: 0 }],
       gamesPlayed: 17,
       gamesUnavailable: 0,
     }),
     ...cell(60, {
       playerId: "half",
-      history: [{ season: 2020, gamesPlayed: 8, teamGames: 16, gamesUnavailable: 8 }],
+      history: [{ season: 2020, gamesPlayed: 8, teamGames: 16, gamesUnavailable: 8, gamesSuspended: 0 }],
       gamesPlayed: 8,
       gamesUnavailable: 9,
     }),
