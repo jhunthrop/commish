@@ -3,8 +3,8 @@
 //
 // FITS EVERYTHING ON 2023-2024, SCORES ON 2025, 2026 IS NEVER TOUCHED. Every fitted table this
 // calibration round changed (`FITTED_ROOKIE_PRIORS.gameRate`, `FITTED_HISTORICAL_ROOKIE_GAMES_RATE`,
-// `FITTED_ROOKIE_CURVE_EVIDENCE`, `FITTED_GAME_VARIANCE`) is already committed from its own 2023-2024
-// fit; this script does not re-fit anything. It builds the CURRENT (post-fix) 2025 board and a
+// `FITTED_ROOKIE_CURVE_EVIDENCE`, the `preseason/game-variance-skill` artifact) is already committed
+// from its own 2023-2024 fit; this script does not re-fit anything. It builds the CURRENT (post-fix) 2025 board and a
 // RECONSTRUCTED pre-fix 2025 board — the exact defect the founder's own audit diagnosed, replayed
 // against real 2025 outcomes nobody's fit has ever seen — and reports MAE, rank correlation and band
 // coverage for both, plus a small grid search over the thin-evidence shrink's own prior-N.
@@ -32,7 +32,7 @@ import {
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
 } from "@/projections/preseason/fitted";
-import { FITTED_GAME_VARIANCE } from "@/projections/preseason/game-variance-fitted";
+import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
 import type { GameVariancePriors } from "@/projections/preseason/game-variance";
 import { FITTED_MODEL } from "@/projections/model/source";
 import { marketBoard } from "@/projections/market/curve";
@@ -148,6 +148,7 @@ interface RookieRow {
 
 async function main(): Promise<void> {
   const db: ReadonlyDb = createDb(requireEnv("DATABASE_URL"));
+  const gameVariance = await loadShippedGameVariance(db);
 
   const inputs = gradableInputs(await loadPreseason(db, SCORE_SEASON));
   const positions = await allPositions(db);
@@ -157,7 +158,7 @@ async function main(): Promise<void> {
   // THE NEW (POST-FIX) BLENDED BOARD — literally the production path, `shippedPreseasonCandidates`
   // with the committed priors and no overrides.
   const newCandidates = await shippedPreseasonCandidates(db, inputs, PRIORS, {});
-  const newBoard = preseasonBoard(newCandidates, { season: SCORE_SEASON, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
+  const newBoard = preseasonBoard(newCandidates, { season: SCORE_SEASON, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE, gameVariance });
   const newBoardByPlayer = new Map(newBoard.map((entry) => [entry.playerId, entry] as const));
 
   // THE OLD (PRE-FIX) RAW CANDIDATES — the SAME `preseasonCandidates` machinery, fed the pre-fix
@@ -223,7 +224,7 @@ async function main(): Promise<void> {
     asOf: inputs.moment,
     rules: PPR_SCORING,
     shape: SHAPE,
-    gameVariance: FITTED_GAME_VARIANCE,
+    gameVariance,
   });
   const boardWithoutVariance = preseasonBoard(allRawCandidates, {
     season: SCORE_SEASON,

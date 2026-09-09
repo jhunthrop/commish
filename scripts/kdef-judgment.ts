@@ -24,7 +24,7 @@ import { FITTED_MODEL } from "@/projections/model/source";
 import { kickingWeekRowsForSeasons } from "@/projections/nflverse/kicking-weeks";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
-import { SHIPPED_GAME_VARIANCE } from "@/projections/preseason/fitted-variance";
+import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
@@ -195,11 +195,13 @@ async function main(): Promise<void> {
   );
 
   // The four skill positions' board, exactly as `preseason-report.ts` builds the shipped one.
+  const gameVariance = await loadShippedGameVariance(db);
   const skill = preseasonBoard(await shippedPreseasonCandidates(db, inputs, PRIORS), {
     season: SEASON,
     asOf: inputs.moment,
     rules: PPR_SCORING,
     shape: SHAPE,
+    gameVariance,
   });
   const rendered = skillRows(skill);
 
@@ -230,7 +232,7 @@ async function main(): Promise<void> {
     defence: FITTED_DEFENSE_PRIORS,
     rules: PPR_SCORING,
   });
-  const kdefBoard = preseasonBoard(candidates, { season: SEASON, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
+  const kdefBoard = preseasonBoard(candidates, { season: SEASON, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE, gameVariance });
 
   // The p25/p75 interval gate G3 is measured on, composed from the same mean and variance the board
   // bands with. See `Z75`'s own docblock and the preregistration's amendment for why this differs
@@ -239,7 +241,7 @@ async function main(): Promise<void> {
     candidates.map((candidate) => {
       const perGamePoints =
         computeFantasyPoints(candidate.perGame, candidate.position, PPR_SCORING) + (candidate.perGameTierPoints ?? 0);
-      const variance = SHIPPED_GAME_VARIANCE.veteran[candidate.position as "K" | "DEF"] ?? 0;
+      const variance = gameVariance.veteran[candidate.position as "K" | "DEF"] ?? 0;
       const interval = seasonPointsInterval(
         perGamePoints,
         candidate.games,

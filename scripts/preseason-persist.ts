@@ -62,8 +62,11 @@ import type { SweepCoverage } from "@/projections/preseason/roster-status-read";
 import { FITTED_BLEND_CONSTANTS } from "@/projections/market/blend-fitted";
 import { marketBoard } from "@/projections/market/curve";
 import { propsAnchorForSeason } from "@/projections/market/props-anchor";
-import { FITTED_PROPS_ANCHOR_WEIGHT } from "@/projections/market/props-anchor-fitted";
+import { blendConstantsWithPropsAnchor, PROPS_ANCHOR_WEIGHT_ARTIFACT } from "@/projections/market/props-anchor-artifact";
+import { loadModelArtifact } from "@/projections/model/artifacts";
 import { preseasonBoard, type BoardEntry, type BoardReason } from "@/projections/preseason/board";
+import type { GameVariancePriors } from "@/projections/preseason/game-variance";
+import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
 import { boardReasons, BOARD_SOURCE_V1_RAW, writePreseasonBoard, type BoardWriteCounts } from "@/projections/preseason/board-store";
 import {
   FITTED_AVAILABILITY_PRIORS,
@@ -168,14 +171,15 @@ const PRIORS: PreseasonPriors = {
  * `FITTED_BLEND_CONSTANTS` itself carries no `propsAnchorWeight` — `scripts/blend-fit.ts`'s own
  * train window (2013-2021) predates the props archive entirely, so that fit cannot move this axis
  * (see its own header) — `scripts/props-anchor-fit.ts` fits it separately, on the seasons the
- * archive actually covers, and this merges the result onto the committed constants for the BLENDED
- * arm only. `FITTED_PROPS_ANCHOR_WEIGHT` is `null` exactly when that fit's own judge-season gate was
- * not beaten, in which case `FITTED_BLEND_CONSTANTS` is used BY REFERENCE, unchanged — a future
- * re-fit that lands back on the null cell reproduces today's board bit for bit, the same "the null
- * cell renders the incumbent's own shape" discipline `scripts/blend-fit.ts`'s own axes already keep.
+ * archive actually covers, and publishes the verdict to the model artifact store
+ * (`market/props-anchor-weight`, file-sourced data round 2026-09-09). This reads the PINNED version
+ * and merges it onto the committed constants for the BLENDED arm only; a `null` weight (the gate
+ * not beaten) hands `FITTED_BLEND_CONSTANTS` back BY REFERENCE, unchanged, so a re-fit that lands
+ * on the null cell reproduces the incumbent board bit for bit.
  */
-const BLENDED_CONSTANTS: BlendConstants =
-  FITTED_PROPS_ANCHOR_WEIGHT === null ? FITTED_BLEND_CONSTANTS : { ...FITTED_BLEND_CONSTANTS, propsAnchorWeight: FITTED_PROPS_ANCHOR_WEIGHT };
+async function blendedConstants(db: Db): Promise<BlendConstants> {
+  return blendConstantsWithPropsAnchor(FITTED_BLEND_CONSTANTS, await loadModelArtifact(db, PROPS_ANCHOR_WEIGHT_ARTIFACT));
+}
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -241,6 +245,7 @@ async function buildBoard(
   db: Db,
   inputs: PreseasonInputs,
   leg: BoardLeg,
+  gameVariance: GameVariancePriors,
   blendEvidence?: { readonly constants: BlendConstants; readonly propsAnchor: ReadonlyMap<string, number> },
 ): Promise<BuiltBoard> {
   const raw = leg.format === null;
@@ -250,7 +255,7 @@ async function buildBoard(
     ...(blendEvidence !== undefined ? { constants: blendEvidence.constants, propsAnchor: blendEvidence.propsAnchor } : {}),
   });
   const rules = leg.format === null ? PPR_SCORING : BOARD_FORMAT_SPECS[leg.format].rules;
-  return { board: preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules, shape: SHAPE }), exclusions, sweep };
+  return { board: preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules, shape: SHAPE, gameVariance }), exclusions, sweep };
 }
 
 /** One reason code's own before-and-after count, over the players the board holds. */
@@ -320,10 +325,11 @@ async function persistBoard(
   db: Db,
   inputs: PreseasonInputs,
   leg: BoardLeg,
+  gameVariance: GameVariancePriors,
   unfrozen: boolean,
   blendEvidence?: { readonly constants: BlendConstants; readonly propsAnchor: ReadonlyMap<string, number> },
 ): Promise<BuiltBoard & { readonly write: BoardWriteCounts }> {
-  const built = await buildBoard(db, inputs, leg, blendEvidence);
+  const built = await buildBoard(db, inputs, leg, gameVariance, blendEvidence);
   const write = await writePreseasonBoard(
     db,
     { season: inputs.season, source: leg.source, asOf: inputs.moment, momentKind: inputs.momentKind },
@@ -417,7 +423,10 @@ export async function persistSeason(
     console.warn(`props anchor: 0 players anchored for ${season} — resolve has not run or the archive is empty`);
   }
 
-  const blendEvidence = { constants: BLENDED_CONSTANTS, propsAnchor };
+  // Both fitted tables come from the model artifact store, pinned by version; a store that lacks
+  // either throws here, before any leg is built or written.
+  const blendEvidence = { constants: await blendedConstants(db), propsAnchor };
+  const gameVariance = await loadShippedGameVariance(db);
   const legs: readonly (readonly [BoardLeg, typeof blendEvidence | undefined])[] = [
     ...formats.map((format) => [blendedLeg(format), blendEvidence] as const),
     [RAW_LEG, undefined] as const,
@@ -425,7 +434,7 @@ export async function persistSeason(
 
   if (DIFF_REASONS) {
     for (const [leg, evidence] of legs) {
-      const fresh = await buildBoard(db, inputs, leg, evidence);
+      const fresh = await buildBoard(db, inputs, leg, gameVariance, evidence);
       const stored = await boardReasons(db, leg.source, season);
       // The gate's exclusions carry exactly one reason each, and a diff that left them out would
       // under-count what a persist writes by every player it takes off the board.
@@ -442,7 +451,7 @@ export async function persistSeason(
   // (see the docblock above), so a thin live market throws out of the first blended leg before a
   // raw row could land.
   for (const [leg, evidence] of legs) {
-    const result = await persistBoard(db, inputs, leg, unfrozen, evidence);
+    const result = await persistBoard(db, inputs, leg, gameVariance, unfrozen, evidence);
     printBoardWrite(season, leg.format === null ? "v1 raw" : `blend ${BOARD_FORMAT_SPECS[leg.format].label}`, leg, result);
     if (leg.format !== null) printTopRows(result.board, names);
   }

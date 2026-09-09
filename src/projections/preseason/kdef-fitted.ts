@@ -1,4 +1,3 @@
-import type { GameVariancePriors } from "./game-variance";
 import type { KickerPriors } from "./kicker";
 import type { DefensePriors } from "./team-defense";
 
@@ -11,11 +10,9 @@ import type { DefensePriors } from "./team-defense";
  * `docs/research/2026-09-05-kicker-defense-preregistration.md`, and 2026 is never read by any fit
  * or judgment at all.
  *
- * `FITTED_KDEF_GAME_VARIANCE` carries the K and DEF cells ONLY. The four skill positions' cells are
- * generated separately by `npm run projections:game-variance:fit` into
- * `game-variance-fitted.ts`, because that script's observation loader reads
- * `player_week_observations`, which holds neither of these two positions. `fitted-variance.ts`
- * is the one place the two halves are composed.
+ * The K and DEF per-game variance cells this fit also measures are published to the model
+ * artifact store as `preseason/game-variance-kdef` (`game-variance-artifacts.ts`), not written
+ * here; this module carries only the two component priors `market/blend.ts` still imports.
  */
 
 export const FITTED_KICKER_PRIORS: KickerPriors = {
@@ -6310,15 +6307,4 @@ export const FITTED_DEFENSE_PRIORS: DefensePriors = {
     [23, 385],
     [19, 394],
   ],
-};
-
-export const FITTED_KDEF_GAME_VARIANCE: GameVariancePriors = {
-  "rookie": {
-    "K": 13.404605765646949,
-    "DEF": 35.932377550918424
-  },
-  "veteran": {
-    "K": 13.404605765646949,
-    "DEF": 35.932377550918424
-  }
 };

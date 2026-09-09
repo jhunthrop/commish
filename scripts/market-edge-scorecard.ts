@@ -53,6 +53,7 @@ import { FITTED_BLEND_CONSTANTS } from "@/projections/market/blend-fitted";
 import { FITTED_MODEL } from "@/projections/model/source";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
+import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
@@ -123,7 +124,7 @@ async function buildBoard(
   options: Parameters<typeof shippedPreseasonCandidates>[3],
 ): Promise<readonly BoardEntry[]> {
   const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS, options);
-  return preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
+  return preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE, gameVariance: await loadShippedGameVariance(db) });
 }
 
 /** THE NAIVE FLOOR, composed to a season total the same way `decision-report.ts` already does:

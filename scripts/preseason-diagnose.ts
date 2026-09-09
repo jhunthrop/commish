@@ -40,6 +40,8 @@ import { RANK_BANDS, spearman, type Observation, type RankBandName } from "@/pro
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
+import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
+import type { GameVariancePriors } from "@/projections/preseason/game-variance";
 import { gradableInputs } from "@/projections/preseason/scorecard";
 import {
   FITTED_AVAILABILITY_PRIORS,
@@ -158,12 +160,13 @@ async function actualSeasonPoints(
   return { points, games };
 }
 
-function buildBoard(inputs: PreseasonInputs): readonly BoardEntry[] {
+function buildBoard(inputs: PreseasonInputs, gameVariance: GameVariancePriors): readonly BoardEntry[] {
   return preseasonBoard(preseasonCandidates(inputs, SHIPPED_PRESEASON_FEATURES, PRIORS), {
     season: inputs.season,
     asOf: inputs.moment,
     rules: PPR_SCORING,
     shape: SHAPE,
+    gameVariance,
   });
 }
 
@@ -181,7 +184,7 @@ async function subjectsFor(
   const inputs = gradableInputs(await loadPreseason(db, season));
   const positions = await allPositions(db);
   const { points: actual, games: actualGames } = await actualSeasonPoints(db, season, positions);
-  const board = buildBoard(inputs);
+  const board = buildBoard(inputs, await loadShippedGameVariance(db));
   const rosterByPlayer = new Map(inputs.roster.map((row) => [row.playerId, row] as const));
 
   // Last season's outcome, for the "the market is chasing last year" segments. Read through the

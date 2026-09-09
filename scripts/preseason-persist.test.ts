@@ -11,6 +11,7 @@ import { recordPreseasonRankings, recordPreseasonRosters } from "@/projections/p
 import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
 import { recordTeamObservations } from "@/projections/team-store";
 import { recordNflPlayers } from "@/projections/universe";
+import { publishCommittedModelArtifacts } from "./lib/model-artifact-records";
 import { diffReasons, persistSeason } from "./preseason-persist";
 
 /**
@@ -50,6 +51,9 @@ describe("persistSeason — the degeneracy guard fires before ANY write, v1 incl
 
   beforeEach(async () => {
     await truncateAll(db);
+    // The persist reads its fitted tables from the model artifact store, so the committed records
+    // land first, exactly as `npm run artifacts:publish` lands them in production.
+    await publishCommittedModelArtifacts(db);
     await recordNflPlayers(db, [
       { id: VETERAN, espnId: null, pfrId: "Vete01", name: "Vera Veteran", position: "WR", latestTeam: "BUF", rookieSeason: 2020, lastSeason: 2025 },
     ]);
@@ -133,6 +137,9 @@ describe("persistSeason — the props-anchor warning fires on a LIVE board with 
 
   beforeEach(async () => {
     await truncateAll(db);
+    // The persist reads its fitted tables from the model artifact store, so the committed records
+    // land first, exactly as `npm run artifacts:publish` lands them in production.
+    await publishCommittedModelArtifacts(db);
     // VETERAN plus enough OTHER real WRs, listed on the ADP market, to clear
     // `MINIMUM_LISTED_PER_POSITION` (5) at WR — the market side `assertLiveMarketCoverage` checks —
     // with NO `player_prop_observations` archived at all, ever: the props-anchor null cell.
