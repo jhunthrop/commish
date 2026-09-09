@@ -3,15 +3,18 @@
 import Link from "next/link";
 import { PlayerRow } from "@/components/ui";
 import { tierLetter } from "@/draft-hq/board/copy";
+import { rosterStatusLabel } from "@/projections/preseason/roster-status-copy";
 import type { TeamBoardPlayer } from "../contract";
 import { usePlayerLink } from "./player-name-link";
 import { Section } from "./section";
 
-/** The mono facts after a roster row's name, each only when the board states it. The tier is the
- *  board's own letter (`tierLetter`: S for the summit, then A onward), never the zero-based
- *  index the store carries. Pure. */
+/** The mono facts after a roster row's name, each only when the board states it. The roster status
+ *  leads when the board stored one (the roster-status gate, 2026-09-08), in the pill's own short
+ *  word. The tier is the board's own letter (`tierLetter`: S for the summit, then A onward), never
+ *  the zero-based index the store carries. Pure. */
 export function rosterMetaLine(row: TeamBoardPlayer): string {
   const parts: string[] = [];
+  if (row.rosterStatus !== null) parts.push(rosterStatusLabel(row.rosterStatus.status));
   if (row.boardRank !== null) parts.push(`Board ${row.boardRank}`);
   if (row.tier !== null) parts.push(`Tier ${tierLetter(row.tier)}`);
   if (row.marketAdp !== null) parts.push(`ADP ${row.marketAdp.toFixed(1)}`);

@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { PlayerRow } from "@/components/ui/player-row";
 import { TeamRow } from "@/components/ui/team-row";
+import { rosterStatusLabel } from "@/projections/preseason/roster-status-copy";
 import { SEARCH_CONFIG } from "@/search/config";
 import { searchResultKey, type SearchResult } from "@/search/contract";
 import { useSiteSearch } from "@/search/use-site-search";
@@ -35,7 +36,11 @@ export function resultMetaLine(result: SearchResult): string {
   if (result.kind === "team") return [result.code, bye].filter((part) => part !== null).join(" · ");
   const board = result.boardRank === null ? null : `Board ${result.boardRank}`;
   const club = result.player.nflTeam === "" ? null : result.player.nflTeam;
-  return [club, bye, board].filter((part) => part !== null).join(" · ");
+  // The roster status leads (the roster-status gate, 2026-09-08): a man on injured reserve or off
+  // an active roster is a different search answer from the same name a week earlier, and the
+  // short word is the same one the board's pill shows.
+  const status = result.rosterStatus === null ? null : rosterStatusLabel(result.rosterStatus.status);
+  return [status, club, bye, board].filter((part) => part !== null).join(" · ");
 }
 
 function optionId(listboxId: string, result: SearchResult): string {

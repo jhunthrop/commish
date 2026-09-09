@@ -12,6 +12,7 @@ import type { BoardReason } from "@/projections/preseason/board";
 import { DEFAULT_BOARD_FORMAT, type BoardFormat } from "@/projections/preseason/board-formats";
 import { boardReasons, preseasonProjectionsAsOf } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { rosterStatusNoteOf, type RosterStatusNote } from "@/projections/preseason/roster-status";
 import { marketOrderPositions } from "@/projections/preseason/kdef-decision";
 import { boardFormatForLeagueRules, boardFormatResolution, leagueScoringRules, type LeagueBoardFormat } from "@/league-service/board-format";
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
@@ -104,6 +105,14 @@ export interface BoardRow {
   readonly marketPositionAdp: string | null;
   readonly byeWeek: number | null;
   readonly reasons: readonly BoardReason[];
+  /**
+   * HIS CURRENT ROSTER STATUS, when the board stored one (the roster-status gate, 2026-09-08):
+   * read off the board's own `roster_status` reason, so every surface that lists him prints the
+   * same dated, sourced observation. `null` for an active player and for one no source named. A
+   * note with `excluded: true` is a "Not on an active roster" band row (`notOnActiveRosterRows`):
+   * every projection field on it is `null`, it holds no place in the value order and no tier.
+   */
+  readonly rosterStatus: RosterStatusNote | null;
 }
 
 /**
@@ -203,23 +212,11 @@ export async function boardRows(db: Db, { shape, asOf = new Date(), leagueId, fo
   const marketOrder = await marketOrderRows(db, byes, resolved.rules);
   if (projections.length === 0) return marketOrder;
 
-  const nflIds = projections.map((row) => row.playerId);
-  const crosswalkRows = await db
-    .select({
-      nflPlayerId: playerCrosswalk.nflPlayerId,
-      playerId: playersTable.id,
-      name: playersTable.name,
-      position: playersTable.position,
-      team: playersTable.nflTeam,
-      headshotUrl: playersTable.headshotUrl,
-      adp: playersTable.adp,
-      posAdp: playersTable.posAdp,
-    })
-    .from(playerCrosswalk)
-    .innerJoin(playersTable, eq(playersTable.id, playerCrosswalk.playerId))
-    .where(inArray(playerCrosswalk.nflPlayerId, nflIds));
-
-  const byNflId = new Map(crosswalkRows.map((row) => [row.nflPlayerId as string, row]));
+  const projectedIds = new Set(projections.map((row) => row.playerId));
+  // The gate's exclusions: players with a stored `roster_status` reason and no projection row.
+  const excludedIds = [...reasonsByNflId].flatMap(([nflId, reasons]) => (!projectedIds.has(nflId) && rosterStatusNoteOf(reasons)?.excluded === true ? [nflId] : []));
+  const byNflId = await crosswalkIdentities(db, [...projectedIds, ...excludedIds]);
+  const band = notOnActiveRosterRows(excludedIds, byNflId, reasonsByNflId, byes);
 
   // The DRAFT-VALUE overlay: rebuilt from the stored points against the caller's own shape. Every
   // projection resolves a position (it always does — a stored board row was priced under a real
@@ -279,6 +276,7 @@ export async function boardRows(db: Db, { shape, asOf = new Date(), leagueId, fo
         marketPositionAdp: identity.posAdp,
         byeWeek: byes.get(identity.team) ?? null,
         reasons: reasonsByNflId.get(row.playerId) ?? [],
+        rosterStatus: rosterStatusNoteOf(reasonsByNflId.get(row.playerId) ?? []),
       };
     })
     // ONE comparator, shared with the Simulator's own read of this same board
@@ -300,7 +298,91 @@ export async function boardRows(db: Db, { shape, asOf = new Date(), leagueId, fo
         };
       })(),
     )
-    .concat(marketOrder);
+    // The band last of all, behind the market-order rows: not a ranking, a place to find him.
+    .concat(marketOrder, band);
+}
+
+/** One product identity per universe id, through the crosswalk. Shared by the ranked rows and the
+ *  band rows so the two can never disagree about who a gsis id is. */
+async function crosswalkIdentities(db: Db, nflIds: readonly string[]): Promise<ReadonlyMap<string, CrosswalkedIdentity>> {
+  if (nflIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      nflPlayerId: playerCrosswalk.nflPlayerId,
+      playerId: playersTable.id,
+      name: playersTable.name,
+      position: playersTable.position,
+      team: playersTable.nflTeam,
+      headshotUrl: playersTable.headshotUrl,
+      adp: playersTable.adp,
+      posAdp: playersTable.posAdp,
+    })
+    .from(playerCrosswalk)
+    .innerJoin(playersTable, eq(playersTable.id, playerCrosswalk.playerId))
+    .where(inArray(playerCrosswalk.nflPlayerId, [...nflIds]));
+  return new Map(rows.flatMap((row) => (row.nflPlayerId === null ? [] : [[row.nflPlayerId, row] as const])));
+}
+
+interface CrosswalkedIdentity {
+  readonly playerId: string;
+  readonly name: string;
+  readonly position: Position;
+  readonly team: string;
+  readonly headshotUrl: string | null;
+  readonly adp: number | null;
+  readonly posAdp: string | null;
+}
+
+/**
+ * THE "NOT ON AN ACTIVE ROSTER" BAND (the roster-status gate, 2026-09-08): every player the gate
+ * took off the board, so a manager can still find him and read why. Each row carries his identity,
+ * his ADP and his dated status, and NOTHING the board did not measure: every projection field is
+ * `null`, there is no rank in any order and no tier. Ordered by ADP, then id, so the list is stable
+ * and a man the market still prices leads it. A player the crosswalk cannot place is absent, the
+ * same rule the ranked rows keep.
+ */
+function notOnActiveRosterRows(
+  excludedIds: readonly string[],
+  byNflId: ReadonlyMap<string, CrosswalkedIdentity>,
+  reasonsByNflId: ReadonlyMap<string, readonly BoardReason[]>,
+  byes: ReadonlyMap<string, number>,
+): readonly BoardRow[] {
+  return excludedIds
+    .flatMap((nflId) => {
+      const identity = byNflId.get(nflId);
+      const reasons = reasonsByNflId.get(nflId) ?? [];
+      const rosterStatus = rosterStatusNoteOf(reasons);
+      if (identity === undefined || rosterStatus === null) return [];
+      const row: BoardRow = {
+        playerId: identity.playerId,
+        nflPlayerId: nflId,
+        name: identity.name,
+        position: identity.position,
+        team: identity.team,
+        headshotUrl: identity.headshotUrl,
+        rank: null,
+        overallRank: null,
+        marketOrderRank: null,
+        lastSeason: null,
+        projectedPoints: null,
+        floorPoints: null,
+        medianPoints: null,
+        ceilingPoints: null,
+        valueOverReplacement: null,
+        valueRank: null,
+        positionRankInValue: null,
+        tier: null,
+        playersLeftInTier: null,
+        dropToNextTier: null,
+        marketAdp: identity.adp,
+        marketPositionAdp: identity.posAdp,
+        byeWeek: byes.get(identity.team) ?? null,
+        reasons,
+        rosterStatus,
+      };
+      return [row];
+    })
+    .sort((a, b) => (a.marketAdp ?? Infinity) - (b.marketAdp ?? Infinity) || a.playerId.localeCompare(b.playerId));
 }
 
 /** The season `lastSeason` reports: the one before the season being drafted for. */
@@ -412,6 +494,9 @@ async function marketOrderRows(db: Db, byes: ReadonlyMap<string, number>, rules:
         // No reasons: a reason explains a number this row does not carry. The surface says why the
         // whole POSITION has none, once, above the table (`marketOrderNoteFor`).
         reasons: [],
+        // The gate reads the projected board's candidates; a market-order position never passes
+        // through it, so nothing is known here and nothing is claimed.
+        rosterStatus: null,
       };
     });
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { BOARD_LAST_SEASON, type BoardRow } from "./service";
-import { BoardView } from "./board-view";
+import { boardCsvLines, BoardView } from "./board-view";
 
 const SHAPE = { teamCount: 12, rosterSpots: 15, budget: 200 } as const;
 
@@ -31,8 +31,37 @@ function projected(overrides: Partial<BoardRow>): BoardRow {
     marketAdp: 2.4,
     marketPositionAdp: "WR1",
     reasons: [],
+    rosterStatus: null,
     ...overrides,
   } as BoardRow;
+}
+
+/** A row the roster-status gate took off the board: no projection, no rank, a dated status. */
+function notOnActiveRoster(overrides: Partial<BoardRow>): BoardRow {
+  return projected({
+    playerId: "ps1",
+    nflPlayerId: "ps1",
+    name: "Squad Back",
+    position: "RB",
+    team: "NO",
+    rank: null,
+    overallRank: null,
+    marketOrderRank: null,
+    projectedPoints: null,
+    floorPoints: null,
+    medianPoints: null,
+    ceilingPoints: null,
+    valueOverReplacement: null,
+    valueRank: null,
+    positionRankInValue: null,
+    tier: null,
+    playersLeftInTier: null,
+    dropToNextTier: null,
+    marketAdp: 240.5,
+    marketPositionAdp: "RB80",
+    rosterStatus: { status: "practice_squad", source: "nflverse_roster_week_1", observedAt: "2026-09-01T00:00:00.000Z", team: "NO", excluded: true },
+    ...overrides,
+  });
 }
 
 /** A row for a position the engine published nothing for: the market's own order and nothing else. */
@@ -207,5 +236,36 @@ describe("BoardView, a position with no projection", () => {
     const cells = screen.getByText("A Receiver").closest("tr")!;
     expect(within(cells).getByText("280.5")).toBeInTheDocument();
     expect(within(cells).queryByText("No projection for this position")).not.toBeInTheDocument();
+  });
+});
+
+describe("the roster status on the board (the roster-status gate, 2026-09-08)", () => {
+  const IR = { status: "injured_reserve" as const, source: "tank01_player_list" as const, observedAt: "2026-09-05T22:35:00.000Z", team: "BUF", excluded: false };
+
+  it("prints a status pill beside a ranked player's name, with the dated observation for a screen reader", () => {
+    mount([projected({ rosterStatus: IR })]);
+    const row = screen.getByText("A Receiver").closest("tr")!;
+    expect(within(row).getByText("IR")).toBeInTheDocument();
+    expect(within(row).getByText("On injured reserve, observed Sep 5 on the player list")).toBeInTheDocument();
+  });
+
+  it("keeps the players the gate took off the board under their own band at the end, out of the ranking and out of the CSV", () => {
+    mount([notOnActiveRoster({}), projected({}), marketOrder({})]);
+    const rows = screen.getAllByRole("row");
+    const names = rows.map((row) => row.textContent ?? "");
+    const bandAt = names.findIndex((text) => text.includes("Not on an active roster"));
+    const squadAt = names.findIndex((text) => text.includes("Squad Back"));
+    const receiverAt = names.findIndex((text) => text.includes("A Receiver"));
+    const kickerAt = names.findIndex((text) => text.includes("A Kicker"));
+    expect(receiverAt).toBeLessThan(kickerAt);
+    expect(kickerAt).toBeLessThan(bandAt);
+    expect(bandAt).toBeLessThan(squadAt);
+    expect(screen.getByTestId("board-not-on-roster-band")).toHaveTextContent("These players carry no projection while they are off an active roster.");
+    expect(within(rows[squadAt]!).getByText("Practice squad")).toBeInTheDocument();
+    expect(within(rows[squadAt]!).getByText("No projection for this position")).toBeInTheDocument();
+
+    const csv = boardCsvLines([notOnActiveRoster({}), projected({})], SHAPE, "PPR");
+    expect(csv).toHaveLength(2);
+    expect(csv[1]).toContain("A Receiver");
   });
 });

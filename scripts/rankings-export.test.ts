@@ -28,6 +28,7 @@ function row(overrides: Partial<BoardRow>): BoardRow {
     marketAdp: 2.4,
     marketPositionAdp: "WR1",
     reasons: [],
+    rosterStatus: null,
     ...overrides,
   } as BoardRow;
 }
@@ -74,5 +75,20 @@ describe("exportLines", () => {
     expect(lines.slice(1).map((line) => cellOf(lines[0]!, line, "Player"))).toEqual(["Test Player", "Second Man", "A Kicker"]);
     expect(lines.slice(1).map((line) => cellOf(lines[0]!, line, "Rank"))).toEqual(["1", "2", "3"]);
     expect(cellOf(lines[0]!, lines[3]!, "Proj Pts")).toBe("");
+  });
+
+  it("leaves a player the roster-status gate took off the board out of the file entirely", () => {
+    const squad = row({
+      playerId: "ps1",
+      name: "Squad Back",
+      rank: null,
+      overallRank: null,
+      projectedPoints: null,
+      valueRank: null,
+      tier: null,
+      rosterStatus: { status: "practice_squad", source: "nflverse_roster_week_1", observedAt: "2026-09-01T00:00:00.000Z", team: "NO", excluded: true },
+    });
+    const lines = exportLines([squad, row({ playerId: "p1", valueRank: 1 })], "ppr");
+    expect(lines.slice(1).map((line) => cellOf(lines[0]!, line, "Player"))).toEqual(["Test Player"]);
   });
 });

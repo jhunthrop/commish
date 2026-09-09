@@ -30,9 +30,9 @@ export const FULL_TEAM: TeamPageData = {
   coaching: { season: 2026, headCoach: "Dan Campbell", headCoachIsNew: false, playCaller: "John Morton", playCallerRole: "OC", playCallerIsNew: true },
   offense: { season: 2025, pace: { value: 27.1, rank: 9, of: 32 }, passRate: { value: 0.582, rank: 12, of: 32 }, passRateOverExpected: { value: 2.4, rank: 11, of: 32 }, neutralPlays: 512 },
   players: [
-    { player: { id: "4429795", name: "Jahmyr Gibbs", position: "RB", nflTeam: "DET", headshotUrl: null, adp: 4.1 }, positionRank: 2, boardRank: 3, projectedPoints: 312.4, marketAdp: 4.1, tier: 1 },
-    { player: { id: "4374302", name: "Amon-Ra St. Brown", position: "WR", nflTeam: "DET", headshotUrl: null, adp: 8.6 }, positionRank: 3, boardRank: 7, projectedPoints: 288, marketAdp: 8.6, tier: 1 },
-    { player: { id: "DST-DET", name: "Detroit Lions", position: "DEF", nflTeam: "DET", headshotUrl: null, adp: 150.2 }, positionRank: 4, boardRank: null, projectedPoints: null, marketAdp: 150.2, tier: null },
+    { player: { id: "4429795", name: "Jahmyr Gibbs", position: "RB", nflTeam: "DET", headshotUrl: null, adp: 4.1 }, positionRank: 2, boardRank: 3, projectedPoints: 312.4, marketAdp: 4.1, tier: 1, rosterStatus: null },
+    { player: { id: "4374302", name: "Amon-Ra St. Brown", position: "WR", nflTeam: "DET", headshotUrl: null, adp: 8.6 }, positionRank: 3, boardRank: 7, projectedPoints: 288, marketAdp: 8.6, tier: 1, rosterStatus: null },
+    { player: { id: "DST-DET", name: "Detroit Lions", position: "DEF", nflTeam: "DET", headshotUrl: null, adp: 150.2 }, positionRank: 4, boardRank: null, projectedPoints: null, marketAdp: 150.2, tier: null, rosterStatus: null },
   ],
   depthCharts: {
     season: 2026,

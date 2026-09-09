@@ -22,6 +22,7 @@ const GIBBS: SearchResult = {
   positionRank: 2,
   boardRank: 3,
   byeWeek: 8,
+  rosterStatus: null,
 };
 const LIONS: SearchResult = { kind: "team", code: "DET", name: "Detroit Lions", byeWeek: 8 };
 const BATES: SearchResult = {
@@ -30,6 +31,7 @@ const BATES: SearchResult = {
   positionRank: 1,
   boardRank: null,
   byeWeek: null,
+  rosterStatus: null,
 };
 
 function renderSearch(results: readonly SearchResult[], leagueIds: readonly string[] = ["lg_first"]) {
@@ -58,6 +60,12 @@ describe("resultMetaLine", () => {
     expect(resultMetaLine(GIBBS)).toBe("DET · Bye 8 · Board 3");
     expect(resultMetaLine(BATES)).toBe("DET");
     expect(resultMetaLine(LIONS)).toBe("DET · Bye 8");
+  });
+
+  it("leads with the roster status when the board stored one", () => {
+    const status = { status: "injured_reserve" as const, source: "tank01_player_list" as const, observedAt: "2026-09-05T22:35:00.000Z", team: "DET", excluded: false };
+    expect(resultMetaLine({ ...GIBBS, rosterStatus: status })).toBe("IR · DET · Bye 8 · Board 3");
+    expect(resultMetaLine({ ...BATES, rosterStatus: { ...status, status: "practice_squad", excluded: true } })).toBe("Practice squad · DET");
   });
 });
 

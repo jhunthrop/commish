@@ -1,4 +1,5 @@
 import type { Player } from "@/domain/player";
+import type { RosterStatusNote } from "@/projections/preseason/roster-status";
 
 /**
  * WHAT A SEARCH ANSWERS WITH, on the wire and in the overlay. Browser-safe: types only.
@@ -17,6 +18,9 @@ export interface PlayerSearchResult {
   /** The served board's overall rank (`overallRank`). `null` on a market-order row. */
   readonly boardRank: number | null;
   readonly byeWeek: number | null;
+  /** The board's own dated roster status (`BoardRow.rosterStatus`), so a result names it the same
+   *  way the board does; `null` when the board stored none. */
+  readonly rosterStatus: RosterStatusNote | null;
 }
 
 export interface TeamSearchResult {
