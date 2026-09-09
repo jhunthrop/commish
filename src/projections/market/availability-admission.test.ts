@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { StatLine } from "@/domain/player";
 import type { BoardCandidate, BoardReason } from "../preseason/board";
-import type { RosterStatusKind } from "../preseason/roster-status";
-import { admitAvailability, hasObservedReserveDesignation, impliedGamesFor, totalAdmittedDelta } from "./availability-admission";
+import { admitAvailability, clampAbs, impliedGamesFor } from "./availability-admission";
 
 const IMPLIED_GAMES = 12;
 const CONSTANTS = { availabilityCapPoints: 20, impliedGamesByPosition: { QB: IMPLIED_GAMES, RB: IMPLIED_GAMES, WR: IMPLIED_GAMES, TE: IMPLIED_GAMES } } as const;
@@ -28,10 +27,6 @@ function line(): StatLine {
   };
 }
 
-function rosterStatus(status: RosterStatusKind): BoardReason {
-  return { code: "roster_status", status, source: "tank01_player_list", observedAt: "2026-09-05T22:35:00.000Z", team: "GB" };
-}
-
 function candidate(expectedGames: number, reasons: readonly BoardReason[] = []): BoardCandidate {
   return {
     playerId: "player-1",
@@ -43,41 +38,20 @@ function candidate(expectedGames: number, reasons: readonly BoardReason[] = []):
   };
 }
 
-describe("hasObservedReserveDesignation", () => {
-  it.each<RosterStatusKind>(["injured_reserve", "pup", "nfi", "suspended", "exempt"])("is true for a %s reason: a stated minimum absence somebody observed", (status) => {
-    expect(hasObservedReserveDesignation(candidate(13, [rosterStatus(status)]))).toBe(true);
-  });
-
-  it("is false with no roster_status reason at all, and for a status that is not a reserve list", () => {
-    expect(hasObservedReserveDesignation(candidate(13))).toBe(false);
-    expect(hasObservedReserveDesignation(candidate(13, [rosterStatus("active")]))).toBe(false);
-    expect(hasObservedReserveDesignation(candidate(13, [rosterStatus("practice_squad")]))).toBe(false);
-  });
-});
-
 describe("admitAvailability", () => {
-  it("prices the gap between expected and implied games off the anchor's own per-game rate, and caps it, for a player with no designation", () => {
+  it("prices the gap between expected and implied games off the anchor's own per-game rate, and caps it", () => {
     // Three games against twelve implied at a 120-point anchor: (3 - 12) * 120 / 12 = -90, capped at -20.
-    expect(admitAvailability(candidate(3), 120, CONSTANTS)).toEqual({ delta: -20, bounded: true });
+    expect(admitAvailability(candidate(3), 120, CONSTANTS)).toBe(-20);
   });
 
   it("leaves a small gap uncapped either way, positive or negative", () => {
-    expect(admitAvailability(candidate(13), 120, CONSTANTS)).toEqual({ delta: 10, bounded: true });
-    expect(admitAvailability(candidate(11), 120, CONSTANTS)).toEqual({ delta: -10, bounded: true });
+    expect(admitAvailability(candidate(13), 120, CONSTANTS)).toBeCloseTo(10, 10);
+    expect(admitAvailability(candidate(11), 120, CONSTANTS)).toBeCloseTo(-10, 10);
   });
 
-  it("admits the FULL gap for a player carrying an observed reserve designation: anchor scaled to his games", () => {
-    // Jacobs-shaped: 162.9 anchor, 3.0 games, 12.414 implied -> the term is -123.5 and the blended
-    // price is 162.9 * 3 / 12.414 = 39.4, three games' worth of his own market price.
-    const jacobs = { availabilityCapPoints: 20, impliedGamesByPosition: { ...CONSTANTS.impliedGamesByPosition, RB: 12.414048059149723 } };
-    const admitted = admitAvailability(candidate(3, [rosterStatus("injured_reserve")]), 162.9, jacobs);
-    expect(admitted.bounded).toBe(false);
-    expect(admitted.delta).toBeCloseTo(-123.53, 1);
-    expect(162.9 + admitted.delta).toBeCloseTo((162.9 * 3) / 12.414048059149723, 6);
-  });
-
-  it("keeps the cap for a roster_status reason that is not a reserve list", () => {
-    expect(admitAvailability(candidate(3, [rosterStatus("active")]), 120, CONSTANTS)).toEqual({ delta: -20, bounded: true });
+  it("MEASURED PIN (2026-09-08 round): the cap stands for a player carrying an observed reserve designation; lifting it was worse on held-out 2023-2024", () => {
+    const reserve: BoardReason = { code: "roster_status", status: "injured_reserve", source: "tank01_player_list", observedAt: "2026-09-05T22:35:00.000Z", team: "GB" };
+    expect(admitAvailability(candidate(3, [reserve]), 162.9, CONSTANTS)).toBe(-20);
   });
 
   it("throws for a position the implied-games table carries no entry for", () => {
@@ -86,14 +60,10 @@ describe("admitAvailability", () => {
   });
 });
 
-describe("totalAdmittedDelta", () => {
-  it("bounds laws PLUS a bounded availability term at the total cap, exactly as the blend always has", () => {
-    expect(totalAdmittedDelta(30, { delta: -20, bounded: true }, 40)).toBe(10);
-    expect(totalAdmittedDelta(30, { delta: 30, bounded: true }, 40)).toBe(40);
-  });
-
-  it("bounds the law channel alone and adds an UNBOUNDED availability term in full", () => {
-    expect(totalAdmittedDelta(60, { delta: -123.5, bounded: false }, 40)).toBeCloseTo(40 - 123.5, 10);
-    expect(totalAdmittedDelta(0, { delta: -123.5, bounded: false }, 40)).toBeCloseTo(-123.5, 10);
+describe("clampAbs", () => {
+  it("bounds a value symmetrically", () => {
+    expect(clampAbs(30, 20)).toBe(20);
+    expect(clampAbs(-30, 20)).toBe(-20);
+    expect(clampAbs(5, 20)).toBe(5);
   });
 });

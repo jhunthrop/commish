@@ -18,7 +18,7 @@ import { preseasonRostersAsOf } from "../preseason/store";
 import { historicalRookieExpectedGames, rookieCurve, rookieCurveEvidenceN } from "../preseason/rookie-curve";
 import { gateCandidates, type ExcludedCandidate } from "../preseason/roster-status-gate";
 import { rosterStatusesAsOf, type SweepCoverage } from "../preseason/roster-status-read";
-import { admitAvailability, clampAbs, totalAdmittedDelta } from "./availability-admission";
+import { admitAvailability, clampAbs } from "./availability-admission";
 import { shrinkTowardMarket } from "./thin-evidence-shrink";
 import {
   preseasonCandidates,
@@ -364,9 +364,8 @@ function tailCappedUnlistedPoints(candidate: BoardCandidate, context: BlendConte
  *
  * CLAUSE (b), THE AVAILABILITY GAP: `availability-admission.ts`'s `admitAvailability` — the gap
  * between the model's expected games and the market's own implied games at that position, priced
- * at the anchor's own per-game rate and capped at `availabilityCapPoints`, except for a candidate
- * carrying an observed reserve designation, whose term is admitted in full (that module's docblock).
- * `totalAdmittedDelta` composes it with the law channel under `totalCapPoints`.
+ * at the anchor's own per-game rate and capped at `availabilityCapPoints` (that module's docblock,
+ * including why the cap stands for a reserve-designated player too).
  *
  * CLAUSE (c), LISTED ROOKIES: handled directly inside `blendBoard`, before this function is ever
  * called — a full substitution of `marketPoints` by `rookieCurve` for a rookie the ADP board has
@@ -437,7 +436,7 @@ function admittedDelta(candidate: BoardCandidate, anchorPoints: number, context:
   }
   if (constants.playerLawCapPoints !== undefined) lawTotal = clampAbs(lawTotal, constants.playerLawCapPoints);
 
-  return totalAdmittedDelta(lawTotal, admitAvailability(candidate, anchorPoints, constants), constants.totalCapPoints);
+  return clampAbs(lawTotal + admitAvailability(candidate, anchorPoints, constants), constants.totalCapPoints);
 }
 
 /**
