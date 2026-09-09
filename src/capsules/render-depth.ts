@@ -53,29 +53,38 @@ function weekRuns(weeks: readonly number[]): string {
   return `${plural} ${runs.length <= 1 ? runs.join("") : `${runs.slice(0, -1).join(", ")} and ${runs[runs.length - 1]}`}`;
 }
 
-/** The unavailable half of one season's record, or the archives' silence. */
-function missedClauses(record: PlayerFactsGamesMissed): readonly string[] {
-  if (record.unavailableWeeks === null) return ["the injury and roster archives hold nothing for that season"];
-  const missed = record.unavailableWeeks.length;
-  const clauses = [missed === 0 ? "none missed to injury or a reserve list" : `${missed} missed to injury or a reserve list (${weekRuns(record.unavailableWeeks)})`];
-  const scratches = record.healthyDidNotPlay ?? 0;
-  if (scratches > 0) clauses.push(missed === 0 ? `the other ${scratches} were healthy weeks he did not play` : `${scratches} healthy ${scratches === 1 ? "week" : "weeks"} he did not play`);
+const ARCHIVES_SILENT = "the injury and roster archives hold nothing for that season";
+
+/** The designation half of one covered season's record: the injury weeks, the suspension apart. */
+function designationClauses(unavailableWeeks: readonly number[], suspendedWeeks: readonly number[]): readonly string[] {
+  const missed = unavailableWeeks.length;
+  const clauses = [missed === 0 ? "none missed to injury or a reserve list" : `${missed} missed to injury or a reserve list (${weekRuns(unavailableWeeks)})`];
+  if (suspendedWeeks.length > 0) clauses.push(`${suspendedWeeks.length} missed to a suspension (${weekRuns(suspendedWeeks)})`);
   return clauses;
+}
+
+/** The healthy did-not-play weeks, a role fact, or `null` when there were none. */
+function scratchClause(record: PlayerFactsGamesMissed): string | null {
+  const scratches = record.healthyDidNotPlay ?? 0;
+  if (scratches === 0) return null;
+  const nothingMissed = (record.unavailableWeeks?.length ?? 0) === 0;
+  return nothingMissed ? `the other ${scratches} were healthy weeks he did not play` : `${scratches} healthy ${scratches === 1 ? "week" : "weeks"} he did not play`;
 }
 
 /**
  * ONE SEASON'S RECORD, one sentence per season the store knows him in. Games played and his first
- * appearance first, then only the weeks the archives say he was unavailable are called missed;
- * a healthy week he did not play is printed as exactly that, a role fact. A season the archives do
- * not cover states their silence rather than a zero (founder report 2026-09-08).
+ * appearance first, then only the weeks the archives say he was unavailable are called missed; a
+ * served suspension is its own clause ("6 missed to a suspension"), never an injury; a healthy week
+ * he did not play is printed as exactly that, a role fact. A season the archives do not cover states
+ * their silence rather than a zero (founder report 2026-09-08).
  */
 function gamesMissedLine(record: PlayerFactsGamesMissed): string {
   const played = `Played ${record.gamesPlayed} of ${record.teamGames} in ${record.season}`;
   const first = record.firstPlayedWeek === null ? null : `first appearance in week ${record.firstPlayedWeek}`;
-  const [missed, scratches] = missedClauses(record);
-  if (record.unavailableWeeks === null) return `${[played, first].filter((part) => part !== null).join(", ")}; ${missed}.`;
-  const head = [played, first, missed].filter((part) => part !== null).join(", ");
-  if (scratches === undefined) return `${head}.`;
+  if (record.unavailableWeeks === null) return `${[played, first].filter((part) => part !== null).join(", ")}; ${ARCHIVES_SILENT}.`;
+  const head = [played, first, ...designationClauses(record.unavailableWeeks, record.suspendedWeeks ?? [])].filter((part) => part !== null).join(", ");
+  const scratches = scratchClause(record);
+  if (scratches === null) return `${head}.`;
   return record.unavailableWeeks.length === 0 ? `${head}; ${scratches}.` : `${head}, ${scratches}.`;
 }
 

@@ -69,7 +69,7 @@ describe("the season-ending and games-missed lines", () => {
 
   it("reads a healthy backup's season as games played with a first appearance and nothing missed, and grounds every number", () => {
     const facts = buildPlayerFacts(
-      depthInput({ ...EMPTY_DEPTH, gamesMissed: [{ season: 2025, teamGames: 17, gamesPlayed: 11, firstPlayedWeek: 3, unavailableWeeks: [], healthyDidNotPlay: 6 }] }),
+      depthInput({ ...EMPTY_DEPTH, gamesMissed: [{ season: 2025, teamGames: 17, gamesPlayed: 11, firstPlayedWeek: 3, unavailableWeeks: [], suspendedWeeks: [], healthyDidNotPlay: 6 }] }),
     );
     expect(renderDepthSection(facts)).toBe(
       "The record:\n- Played 11 of 17 in 2025, first appearance in week 3, none missed to injury or a reserve list; the other 6 were healthy weeks he did not play.",
@@ -79,7 +79,7 @@ describe("the season-ending and games-missed lines", () => {
 
   it("dates the weeks he was unavailable as runs, and grounds the count and every week", () => {
     const facts = buildPlayerFacts(
-      depthInput({ ...EMPTY_DEPTH, gamesMissed: [{ season: 2025, teamGames: 17, gamesPlayed: 9, firstPlayedWeek: 1, unavailableWeeks: [3, 4, 5, 6, 7, 8, 12], healthyDidNotPlay: 1 }] }),
+      depthInput({ ...EMPTY_DEPTH, gamesMissed: [{ season: 2025, teamGames: 17, gamesPlayed: 9, firstPlayedWeek: 1, unavailableWeeks: [3, 4, 5, 6, 7, 8, 12], suspendedWeeks: [], healthyDidNotPlay: 1 }] }),
     );
     expect(renderDepthSection(facts)).toBe(
       "The record:\n- Played 9 of 17 in 2025, first appearance in week 1, 7 missed to injury or a reserve list (weeks 3 to 8 and 12), 1 healthy week he did not play.",
@@ -87,20 +87,42 @@ describe("the season-ending and games-missed lines", () => {
     for (const value of [2025, 17, 9, 1, 7, 3, 8, 12]) expect(facts.numberLedger).toContain(value);
   });
 
+  it("prints a served suspension as its own clause, never as an injury, and grounds its count and weeks: Rashee Rice, 2025", () => {
+    const facts = buildPlayerFacts(
+      depthInput({
+        ...EMPTY_DEPTH,
+        gamesMissed: [{ season: 2025, teamGames: 17, gamesPlayed: 8, firstPlayedWeek: 7, unavailableWeeks: [16, 17, 18], suspendedWeeks: [1, 2, 3, 4, 5, 6], healthyDidNotPlay: 0 }],
+      }),
+    );
+    expect(renderDepthSection(facts)).toBe(
+      "The record:\n- Played 8 of 17 in 2025, first appearance in week 7, 3 missed to injury or a reserve list (weeks 16 to 18), 6 missed to a suspension (weeks 1 to 6).",
+    );
+    for (const value of [2025, 17, 8, 7, 3, 16, 18, 6, 1]) expect(facts.numberLedger).toContain(value);
+  });
+
+  it("keeps the suspension clause beside a clean injury record and a scratch count", () => {
+    const facts = buildPlayerFacts(
+      depthInput({ ...EMPTY_DEPTH, gamesMissed: [{ season: 2023, teamGames: 17, gamesPlayed: 13, firstPlayedWeek: 4, unavailableWeeks: [], suspendedWeeks: [1, 2, 3], healthyDidNotPlay: 1 }] }),
+    );
+    expect(renderDepthSection(facts)).toBe(
+      "The record:\n- Played 13 of 17 in 2023, first appearance in week 4, none missed to injury or a reserve list, 3 missed to a suspension (weeks 1 to 3); the other 1 were healthy weeks he did not play.",
+    );
+  });
+
   it("says the archives hold nothing for an uncovered season rather than printing a zero", () => {
     const facts = buildPlayerFacts(
-      depthInput({ ...EMPTY_DEPTH, gamesMissed: [{ season: 2024, teamGames: 17, gamesPlayed: 2, firstPlayedWeek: 5, unavailableWeeks: null, healthyDidNotPlay: null }] }),
+      depthInput({ ...EMPTY_DEPTH, gamesMissed: [{ season: 2024, teamGames: 17, gamesPlayed: 2, firstPlayedWeek: 5, unavailableWeeks: null, suspendedWeeks: null, healthyDidNotPlay: null }] }),
     );
     expect(renderDepthSection(facts)).toBe("The record:\n- Played 2 of 17 in 2024, first appearance in week 5; the injury and roster archives hold nothing for that season.");
   });
 
   it("prints a lost season without a first appearance and a full season without a scratch clause", () => {
     const lost = buildPlayerFacts(
-      depthInput({ ...EMPTY_DEPTH, gamesMissed: [{ season: 2025, teamGames: 17, gamesPlayed: 0, firstPlayedWeek: null, unavailableWeeks: Array.from({ length: 17 }, (_, i) => i + 1), healthyDidNotPlay: 0 }] }),
+      depthInput({ ...EMPTY_DEPTH, gamesMissed: [{ season: 2025, teamGames: 17, gamesPlayed: 0, firstPlayedWeek: null, unavailableWeeks: Array.from({ length: 17 }, (_, i) => i + 1), suspendedWeeks: [], healthyDidNotPlay: 0 }] }),
     );
     expect(renderDepthSection(lost)).toBe("The record:\n- Played 0 of 17 in 2025, 17 missed to injury or a reserve list (weeks 1 to 17).");
     const full = buildPlayerFacts(
-      depthInput({ ...EMPTY_DEPTH, gamesMissed: [{ season: 2025, teamGames: 17, gamesPlayed: 17, firstPlayedWeek: 1, unavailableWeeks: [], healthyDidNotPlay: 0 }] }),
+      depthInput({ ...EMPTY_DEPTH, gamesMissed: [{ season: 2025, teamGames: 17, gamesPlayed: 17, firstPlayedWeek: 1, unavailableWeeks: [], suspendedWeeks: [], healthyDidNotPlay: 0 }] }),
     );
     expect(renderDepthSection(full)).toBe("The record:\n- Played 17 of 17 in 2025, first appearance in week 1, none missed to injury or a reserve list.");
   });
