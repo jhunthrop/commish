@@ -1,6 +1,7 @@
 import type { Position } from "@/domain/player";
 import type { ProjectionDistribution } from "../decide/outlook";
 import type { RosterStatus } from "../nflverse/rosters";
+import type { AvailabilityDesignation } from "./availability-status";
 
 /**
  * EXPECTED GAMES PLAYED — the largest driver of season value that published rankings barely model.
@@ -179,8 +180,18 @@ export interface AvailabilityInput {
   readonly position: Position;
   /** Years old at the opener, or null where the release carries no birth date. */
   readonly age: number | null;
-  /** The status his club filed him under at cutdown. */
+  /**
+   * His status at the board's moment, in the cutdown file's four words: the resolution's word
+   * where a dated source names him (`current-status.ts` through `availabilityStatusFor`), the
+   * file's own where none does. `statusMultiplier` keys on it.
+   */
   readonly status: RosterStatus;
+  /**
+   * The finer designation behind `status` (`availabilityDesignationOf`): which reserve list, a
+   * return designation, an Out on an active roster. `null` where there is none. Read ONLY where
+   * the priors carry a fitted cell for it (`designationMultiplier`); otherwise `status` stands.
+   */
+  readonly designation: AvailabilityDesignation | null;
   /**
    * ROLE, read through layer 1's predicted snap share. See `ROLE_BRACKETS` for why this input is
    * not optional and what happens to the model without it.
@@ -258,6 +269,16 @@ export interface AvailabilityPriors {
    * the players a manager is deciding about.
    */
   readonly statusMultiplier: Readonly<Record<RosterStatus, number>>;
+  /**
+   * A FINER CELL FOR A DESIGNATION, where the fit committed one (current-status round,
+   * 2026-09-09): the same kind of ratio as `statusMultiplier`, over the players who carried that
+   * designation at the board's moment, in place of the coarse status's cell for them. The
+   * `reserve` cell is one number over a population that is mostly season-enders, and the listed
+   * reserve players of 2023-2024 played most of the season; whether a split earns its place is a
+   * held-out measurement (`scripts/availability-designation-split.ts`), so the field is ABSENT
+   * unless it did. A designation with no cell here reads its coarse status.
+   */
+  readonly designationMultiplier?: Readonly<Partial<Record<AvailabilityDesignation, number>>>;
   /**
    * HOW HARD THE REGRESSION IS, in team-games of prior. A player with this many games of his own
    * record is weighed half on his record and half on the baseline. Large by design: see the module
@@ -454,6 +475,13 @@ export function shrunkAvailabilityRate(input: AvailabilityInput, priors: Availab
   return clampShare(clampShare(input.baselineRate) * roleRatio * availabilityRatio);
 }
 
+/** The status's multiplier: the designation's own fitted cell where the priors carry one, else the
+ *  coarse status's. Exported because the fit measures its cells against exactly this choice. */
+export function statusMultiplierFor(input: Pick<AvailabilityInput, "status" | "designation">, priors: Pick<AvailabilityPriors, "statusMultiplier" | "designationMultiplier">): number {
+  const cell = input.designation === null ? undefined : priors.designationMultiplier?.[input.designation];
+  return cell ?? priors.statusMultiplier[input.status];
+}
+
 /**
  * EXPECTED GAMES PLAYED, as a distribution.
  *
@@ -479,7 +507,7 @@ export function expectedGamesPlayed(
       0,
       shrunk *
         priors.ageMultiplier[input.position][ageBracketFor(input.age)] *
-        priors.statusMultiplier[input.status],
+        statusMultiplierFor(input, priors),
     ),
   );
   const history = recentHistory(input.history, priors.historySeasons);

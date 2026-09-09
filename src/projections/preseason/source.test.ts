@@ -1,6 +1,8 @@
+import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { nflverseInjuries, nflverseRosterWeeks } from "@/db/schema";
+import { captureSnapshots, nflPlayers, nflverseInjuries, nflverseRosterWeeks, preseasonRosters } from "@/db/schema";
+import { loadAvailabilityObservations } from "./availability-history";
 import type { Clock } from "@/domain/timing";
 import { recordNflPlayers } from "../universe";
 import { PARTICIPATION_METRICS, NFLVERSE_SOURCE } from "../nflverse/map";
@@ -734,7 +736,7 @@ describe("the roster-status gate, through the shipped build (founder report 2026
     for (const arm of [blended, raw]) {
       expect(arm.candidates.some((candidate) => candidate.playerId === VETERAN)).toBe(false);
       expect(arm.exclusions).toEqual([
-        { playerId: VETERAN, position: "WR", team: "BUF", status: { kind: "practice_squad", source: "nflverse_roster_week_1", observedAt: rosterStamp, team: "BUF" } },
+        { playerId: VETERAN, position: "WR", team: "BUF", status: { kind: "practice_squad", source: "nflverse_roster_week_1", observedAt: rosterStamp, team: "BUF", detail: null } },
       ]);
     }
     expect(await shippedPreseasonCandidates(db, inputs, PRIORS)).toEqual(blended.candidates);
@@ -749,6 +751,57 @@ describe("the roster-status gate, through the shipped build (founder report 2026
     expect(veteran?.games.expected).toBeLessThanOrEqual(13);
     expect(veteran?.games.distribution.ceiling).toBeLessThanOrEqual(13);
     expect(veteran?.reasons).toContainEqual({ code: "roster_status", status: "injured_reserve", source: "nflverse_roster_week_1", observedAt: expect.any(String), team: "BUF" });
+  });
+
+  /** The cutdown file files the veteran on a reserve list; the harvest's sweep four days later has
+   *  him on Buffalo's active roster, designated Out. The Jacobs shape (current-status round). */
+  async function fileReserveSweepActive(): Promise<void> {
+    await db.update(preseasonRosters).set({ status: "reserve" }).where(and(eq(preseasonRosters.season, 2024), eq(preseasonRosters.playerId, VETERAN)));
+    await db.update(nflPlayers).set({ espnId: "901" }).where(eq(nflPlayers.id, VETERAN));
+    await db.insert(captureSnapshots).values({
+      source: "tank01_injuries",
+      capturedAt: new Date("2024-09-05T12:45:00.000Z"),
+      digest: "sweep-2024-09-05",
+      payload: [{ team: "BUF", roster: [{ playerID: "901", espnID: "901", injury: { designation: "Out" } }] }],
+    });
+  }
+
+  it("reads the availability model's status from the SAME resolution as the gate: a man the sweep shows active is not a reserve case, whatever the file said", async () => {
+    await fileReserveSweepActive();
+    const inputs = await loadPreseason(db, 2024);
+    expect(inputs.roster.find((row) => row.playerId === VETERAN)?.status).toBe("reserve");
+    expect(inputs.currentStatus).toBeUndefined();
+
+    const { candidates } = await shippedPreseasonBoardInputs(db, inputs, PRIORS, { raw: true });
+    const shipped = candidates.find((candidate) => candidate.playerId === VETERAN)!;
+    // The bare build, with no resolution attached, still reads the file: the number the board
+    // used to serve, a fifth of a season.
+    const bare = preseasonCandidates(inputs, SHIPPED_PRESEASON_FEATURES, PRIORS).find((candidate) => candidate.playerId === VETERAN)!;
+    expect(bare.games.expected).toBeLessThan(shipped.games.expected * 0.5);
+    // The shipped build reads him exactly as the file would have read an active man.
+    const asActive = preseasonCandidates(
+      { ...inputs, roster: inputs.roster.map((row) => (row.playerId === VETERAN ? { ...row, status: "active" as const } : row)) },
+      SHIPPED_PRESEASON_FEATURES,
+      PRIORS,
+    ).find((candidate) => candidate.playerId === VETERAN)!;
+    expect(shipped.games).toEqual(asActive.games);
+    // And the gate agrees: active, so no status reason and no cap.
+    expect(shipped.reasons.some((reason) => reason.code === "roster_status")).toBe(false);
+  });
+
+  it("fits on the same resolution: the observation loader reads the week-one archive's code and detail, not the file", async () => {
+    await db.update(preseasonRosters).set({ status: "reserve" }).where(and(eq(preseasonRosters.season, 2024), eq(preseasonRosters.playerId, VETERAN)));
+    await db.insert(nflverseRosterWeeks).values([
+      { season: 2024, week: 1, playerId: VETERAN, team: "BUF", status: "RES", statusDetail: "R48", position: "WR" },
+      { season: 2024, week: 1, playerId: ROOKIE, team: "BUF", status: "ACT", position: "WR" },
+    ]);
+    const observations = await loadAvailabilityObservations(db, [2024], { model: FITTED_MODEL, depth: FITTED_DEPTH_PRIORS });
+    const veteran = observations.find((observation) => observation.playerId === VETERAN);
+    expect(veteran?.status).toBe("reserve");
+    expect(veteran?.designation).toBe("injured_reserve_return");
+    const rookie = observations.find((observation) => observation.playerId === ROOKIE);
+    expect(rookie?.status).toBe("active");
+    expect(rookie?.designation).toBeNull();
   });
 });
 

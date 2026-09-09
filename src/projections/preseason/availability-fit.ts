@@ -17,6 +17,7 @@ import {
   type RoleBracket,
   type SeasonEvidence,
 } from "./availability";
+import type { AvailabilityDesignation } from "./availability-status";
 import { ALL_POSITIONS, mean } from "./fit";
 
 /**
@@ -59,13 +60,25 @@ const CELL_PRIOR_SEASONS = 40;
  */
 export const AGE_MULTIPLIER_BOUND = { min: 0.6, max: 1.35 } as const;
 
+/**
+ * How many player-seasons of its coarse status's own multiplier a DESIGNATION cell is shrunk toward
+ * (current-status round). The designation cells are thin by nature — a handful of week-one PUP and
+ * suspension rows a season — and a ratio over six rows is an anecdote; twenty pseudo-seasons lets a
+ * cell of sixty (injured reserve) speak almost for itself and holds a cell of six most of the way
+ * to the number it would otherwise have read.
+ */
+export const DESIGNATION_PRIOR_SEASONS = 20;
+
 /** What one player-season contributes to the fit. */
 export interface AvailabilityObservation {
   readonly season: number;
   readonly playerId: string;
   readonly position: Position;
   readonly age: number | null;
+  /** The resolved status at the season's board moment (`availabilityStatusFor`). */
   readonly status: RosterStatus;
+  /** The finer designation behind it (`availabilityDesignationOf`), or `null`. */
+  readonly designation: AvailabilityDesignation | null;
   /** Layer 1's predicted snap share at the preseason moment. Zero where it has no opinion. */
   readonly projectedSnapShare: number;
   /** Prior seasons, as `expectedGamesPlayed` will be given them. */
@@ -93,6 +106,13 @@ export interface AvailabilityFitOptions {
   readonly priorGamesGrid?: readonly number[];
   readonly availabilityPriorGamesGrid?: readonly number[];
   readonly recencyDecayGrid?: readonly number[];
+  /**
+   * The designation cells to fit apart from their coarse status (`designationMultiplier`). EMPTY
+   * by default: one multiplier per coarse status, the shape every committed fit has had. A cell
+   * named here is a ratio over the observations carrying that designation, shrunk toward its
+   * coarse status's multiplier by `DESIGNATION_PRIOR_SEASONS`.
+   */
+  readonly designationCells?: readonly AvailabilityDesignation[];
 }
 
 const DEFAULT_PRIOR_GAMES_GRID = [10, 17, 25, 34, 51, 68] as const;
@@ -290,22 +310,55 @@ function fitStatusMultipliers(
   observations: readonly AvailabilityObservation[],
   priors: Omit<AvailabilityPriors, "concentration" | "concentrationPerSeason">,
 ): AvailabilityPriors["statusMultiplier"] {
-  const expectedFor = (observation: AvailabilityObservation): number =>
-    shrunkFor(observation, priors) * priors.ageMultiplier[observation.position][ageBracketFor(observation.age)];
   const multipliers = {} as Record<RosterStatus, number>;
   for (const status of ROSTER_STATUSES) {
     if (status === "active") {
       multipliers.active = 1;
       continue;
     }
-    const inStatus = observations.filter((observation) => observation.status === status);
-    const actual = mean(inStatus.map(rateOf));
-    const expected = mean(inStatus.map(expectedFor));
     // No rows at a status leaves it at the active baseline rather than at zero: an unobserved
     // designation is unknown, and zeroing it would silently remove every player who carried it.
-    multipliers[status] = actual === null || expected === null || expected <= 0 ? 1 : actual / expected;
+    multipliers[status] = playedOverExpected(observations.filter((observation) => observation.status === status), priors) ?? 1;
   }
   return multipliers;
+}
+
+/** The ratio a multiplier is: what a group played over what the model, shrinkage and age applied,
+ *  expected of it. `null` for an empty group or one the model expected nothing of. */
+function playedOverExpected(
+  group: readonly AvailabilityObservation[],
+  priors: Omit<AvailabilityPriors, "concentration" | "concentrationPerSeason">,
+): number | null {
+  const expectedFor = (observation: AvailabilityObservation): number =>
+    shrunkFor(observation, priors) * priors.ageMultiplier[observation.position][ageBracketFor(observation.age)];
+  const actual = mean(group.map(rateOf));
+  const expected = mean(group.map(expectedFor));
+  return actual === null || expected === null || expected <= 0 ? null : actual / expected;
+}
+
+/**
+ * A DESIGNATION'S OWN CELL, for each cell the caller asked to fit apart (current-status round):
+ * the same ratio as `fitStatusMultipliers`, over the observations carrying that designation,
+ * shrunk toward the coarse status's multiplier those observations would otherwise read by
+ * `DESIGNATION_PRIOR_SEASONS` pseudo-seasons. A cell with no observations is not written: the
+ * coarse status speaks for it, which is exactly what `statusMultiplierFor` does with an absent
+ * cell.
+ */
+function fitDesignationMultipliers(
+  observations: readonly AvailabilityObservation[],
+  priors: Omit<AvailabilityPriors, "concentration" | "concentrationPerSeason">,
+  cells: readonly AvailabilityDesignation[],
+): AvailabilityPriors["designationMultiplier"] {
+  const table: Partial<Record<AvailabilityDesignation, number>> = {};
+  for (const cell of cells) {
+    const inCell = observations.filter((observation) => observation.designation === cell);
+    const raw = playedOverExpected(inCell, priors);
+    if (raw === null) continue;
+    const coarse = priors.statusMultiplier[inCell[0]!.status];
+    const weight = inCell.length / (DESIGNATION_PRIOR_SEASONS + inCell.length);
+    table[cell] = coarse * (1 - weight) + raw * weight;
+  }
+  return table;
 }
 
 /**
@@ -396,6 +449,7 @@ export function fitAvailabilityPriors(
     priorGamesGrid = DEFAULT_PRIOR_GAMES_GRID,
     availabilityPriorGamesGrid = DEFAULT_AVAILABILITY_PRIOR_GAMES_GRID,
     recencyDecayGrid = DEFAULT_RECENCY_DECAY_GRID,
+    designationCells = [],
   }: AvailabilityFitOptions,
 ): AvailabilityPriors {
   const forbidden = new Set(heldOutSeasons);
@@ -429,7 +483,10 @@ export function fitAvailabilityPriors(
     const bare = withoutMultipliers(tables, shrinkage);
     const ageMultiplier = fitAgeMultipliers(fittable, bare);
     const statusMultiplier = fitStatusMultipliers(fittable, { ...bare, ageMultiplier });
-    const candidate = { ...bare, ageMultiplier, statusMultiplier };
+    const withStatus = { ...bare, ageMultiplier, statusMultiplier };
+    // The designation table is written ONLY when cells were asked for, so a fit without them is
+    // the committed shape byte for byte (`fitted.ts` is generated from this object).
+    const candidate = designationCells.length === 0 ? withStatus : { ...withStatus, designationMultiplier: fitDesignationMultipliers(fittable, withStatus, designationCells) };
     const error = rootMeanSquare(fittable, { ...candidate, concentration: 1, concentrationPerSeason: 0 });
     if (error < bestError) {
       bestError = error;

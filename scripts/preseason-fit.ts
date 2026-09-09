@@ -148,6 +148,7 @@ async function main(): Promise<void> {
         position,
         age: 26,
         status: "active",
+        designation: null,
         projectedSnapShare: position === "RB" ? 0.65 : 0.9,
         history: [2023, 2022, 2021].map((season) => ({ season, gamesPlayed: 17, teamGames: 17, gamesUnavailable: 0, gamesSuspended: 0 })),
         baselineRate: null,

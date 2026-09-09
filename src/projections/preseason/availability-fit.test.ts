@@ -12,6 +12,7 @@ function observation(overrides: Partial<AvailabilityObservation> = {}): Availabi
     position: "RB",
     age: 26,
     status: "active",
+    designation: null,
     projectedSnapShare: SHARE_FOR.featured,
     history: [],
     baselineRate: null,
@@ -127,6 +128,36 @@ describe("fitAvailabilityPriors", () => {
     expect(priors.baseline.RB.featured).toBeCloseTo(1, 10);
     expect(priors.availabilityBaseline.RB).toBeCloseTo((1 + 8 / 17) / 2, 10);
     expect(priors.statusMultiplier.active).toBe(1);
+  });
+
+  /** The perfect-persistence population plus a reserve group: sixty men filed on injured reserve
+   *  who played three of seventeen, of whom twenty carried a return designation and played ten. */
+  const withReserve: readonly AvailabilityObservation[] = [
+    ...population,
+    ...cell(40, { playerId: "ir", status: "reserve", designation: "injured_reserve", gamesPlayed: 3, gamesUnavailable: 14 }),
+    ...cell(20, { playerId: "ir-return", status: "reserve", designation: "injured_reserve_return", gamesPlayed: 10, gamesUnavailable: 7 }),
+  ];
+  const grids = { priorGamesGrid: [17], availabilityPriorGamesGrid: [17], recencyDecayGrid: [1] } as const;
+
+  it("writes no designation table unless cells are asked for, and then a cell shrunk toward its coarse status", () => {
+    const pooled = fitAvailabilityPriors(withReserve, { heldOutSeasons: [2023, 2024], ...grids });
+    expect(pooled.designationMultiplier).toBeUndefined();
+    // Sixty reserve rows at a mean of (40 * 3 + 20 * 10) / 60 games: the pooled cell.
+    const pooledReserve = pooled.statusMultiplier.reserve;
+    expect(pooledReserve).toBeGreaterThan(0);
+    expect(pooledReserve).toBeLessThan(1);
+
+    const split = fitAvailabilityPriors(withReserve, { heldOutSeasons: [2023, 2024], ...grids, designationCells: ["injured_reserve_return", "pup"] });
+    expect(split.statusMultiplier.reserve).toBe(pooledReserve);
+    const returning = split.designationMultiplier?.injured_reserve_return;
+    expect(returning).toBeDefined();
+    // The returning group's own ratio is above the pooled cell; shrunk by twenty pseudo-seasons
+    // over twenty rows it lands exactly halfway between the raw ratio and the pooled number.
+    const rawReturning = (10 / 17) / (3 / 60 + 10 * 20 / (60 * 17)) ;
+    expect(returning).toBeGreaterThan(pooledReserve);
+    expect(returning).toBeLessThan(rawReturning);
+    // No PUP observation: no cell, and the coarse status speaks for it.
+    expect(split.designationMultiplier?.pup).toBeUndefined();
   });
 
   it("throws when handed a held-out season, whichever grid it was given", () => {

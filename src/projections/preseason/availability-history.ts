@@ -6,6 +6,8 @@ import { LAST_POSSIBLE_WEEK } from "../store";
 import { usageAsOf } from "../usage";
 import { ageAtSeason, teamGamesIn, type SeasonAvailability } from "./availability";
 import type { AvailabilityObservation } from "./availability-fit";
+import { availabilityDesignationOf, availabilityStatusFor } from "./availability-status";
+import { withCurrentStatus } from "./current-status";
 import { FITTED_DEPTH_PRIORS } from "./fitted";
 import { FINAL_OUTCOME, HISTORY_SEASONS, SHIPPED_PRESEASON_FEATURES, boardOpportunity, loadPreseason, type PreseasonPriors } from "./source";
 import { preseasonRostersAsOf } from "./store";
@@ -96,7 +98,10 @@ export async function loadAvailabilityObservations(
     // depth chart applied (`boardOpportunity`), so the bracket a player is fitted in is the bracket
     // the board will later read him in. The depth priors are the committed ones: the depth fit runs
     // after this one in `scripts/preseason-fit.ts`, the same standing `FITTED_MODEL` has here.
-    const inputs = await loadPreseason(db, season);
+    // THE STATUS IS THE SAME RESOLUTION THE BOARD READS (current-status round): the week-one
+    // archive's code and detail at the season's own moment, through `withCurrentStatus`, so the
+    // cell a man is fitted in is the cell the board will later read him in.
+    const { inputs } = await withCurrentStatus(db, await loadPreseason(db, season));
     const { opportunity } = boardOpportunity(inputs, SHIPPED_PRESEASON_FEATURES, priors);
     for (const row of roster) {
       const position = positions.get(row.playerId);
@@ -107,12 +112,14 @@ export async function loadAvailabilityObservations(
         if (record !== undefined) history.push(record);
       }
       const label = availability.get(season)?.get(row.playerId);
+      const current = inputs.currentStatus.get(row.playerId);
       observations.push({
         season,
         playerId: row.playerId,
         position,
         age: ageAtSeason(row.birthDate, season),
-        status: row.status,
+        status: availabilityStatusFor(current, row.status),
+        designation: availabilityDesignationOf(current),
         projectedSnapShare: opportunity.get(row.playerId)?.snapShare ?? 0,
         history,
         baselineRate: null,

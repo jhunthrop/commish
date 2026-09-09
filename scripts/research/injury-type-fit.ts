@@ -58,6 +58,7 @@ function toAvailabilityInput(row: FeatureRow): AvailabilityInput {
     position: row.position,
     age: row.age,
     status: row.status,
+    designation: null,
     projectedSnapShare: row.projectedSnapShare,
     // THE ROUND'S OWN READING, PRESERVED AS RUN: this research judged its gate (FINAL, 2026-09-05)
     // with every unplayed game read as an absence. The shipped model has since moved to the

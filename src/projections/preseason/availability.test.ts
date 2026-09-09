@@ -13,6 +13,7 @@ import {
   shrunkAvailability,
   shrunkAvailabilityRate,
   shrunkRole,
+  statusMultiplierFor,
   type AvailabilityInput,
   type AvailabilityPriors,
   type SeasonAvailability,
@@ -45,7 +46,7 @@ const FLAT: AvailabilityPriors = {
 };
 
 function player(overrides: Partial<AvailabilityInput> = {}): AvailabilityInput {
-  return { position: "RB", age: 26, status: "active", projectedSnapShare: 0.6, history: [], baselineRate: null, ...overrides };
+  return { position: "RB", age: 26, status: "active", designation: null, projectedSnapShare: 0.6, history: [], baselineRate: null, ...overrides };
 }
 
 /** A season in which every unplayed game was an absence the store recorded: the record the old
@@ -228,6 +229,23 @@ describe("expectedGamesPlayed", () => {
     const off = expectedGamesPlayed(player({ status: "off_roster" }), at2024);
     expect(reserve.expected).toBeLessThan(active.expected);
     expect(off.expected).toBeLessThan(reserve.expected);
+  });
+
+  it("reads a designation's own fitted cell in place of the coarse status where the priors carry one, and the coarse status otherwise", () => {
+    const split: AvailabilityPriors = { ...FLAT, designationMultiplier: { injured_reserve_return: 0.8, out: 0.9 } };
+    const coarse = expectedGamesPlayed(player({ status: "reserve", designation: "injured_reserve" }), { season: 2024, priors: split });
+    const returning = expectedGamesPlayed(player({ status: "reserve", designation: "injured_reserve_return" }), { season: 2024, priors: split });
+    const ruledOut = expectedGamesPlayed(player({ status: "active", designation: "out" }), { season: 2024, priors: split });
+    const active = expectedGamesPlayed(player({ status: "active" }), { season: 2024, priors: split });
+    expect(coarse.rate).toBeCloseTo(active.rate * 0.5, 12);
+    expect(returning.rate).toBeCloseTo(active.rate * 0.8, 12);
+    expect(ruledOut.rate).toBeCloseTo(active.rate * 0.9, 12);
+    // Without the table every designation is its coarse status, byte for byte.
+    expect(expectedGamesPlayed(player({ status: "reserve", designation: "injured_reserve_return" }), { season: 2024, priors: FLAT })).toEqual(
+      expectedGamesPlayed(player({ status: "reserve" }), { season: 2024, priors: FLAT }),
+    );
+    expect(statusMultiplierFor({ status: "active", designation: "out" }, FLAT)).toBe(1);
+    expect(statusMultiplierFor({ status: "active", designation: "out" }, split)).toBe(0.9);
   });
 
   it("is WIDER for a player with no record than for one with three seasons, at the same mean", () => {
