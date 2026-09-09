@@ -105,12 +105,21 @@ export interface SeasonRecordInput {
   readonly injuryRows: ReadonlyMap<string, readonly WeeklyInjuryReport[]>;
 }
 
+/** The two designation counts for one player-season, or both `null` on an uncovered season. */
+function designatedWeeks(input: SeasonRecordInput, playerId: string, gamesPlayedWeeks: readonly number[]): { readonly unavailable: number | null; readonly suspended: number | null } {
+  if (!input.covered) return { unavailable: null, suspended: null };
+  const classes = classifySeasonWeeks({ rosterRows: input.rosterRows.get(playerId) ?? [], injuryRows: input.injuryRows.get(playerId) ?? [], gamesPlayedWeeks });
+  // Capped at the team's games: the census omits bye weeks (32 clubs times 17 team-weeks in the
+  // real 2025 file), but a man traded across two clubs' byes can be rostered for eighteen.
+  return { unavailable: Math.min(classes.unavailableWeeks.length, input.teamGames), suspended: Math.min(classes.suspendedWeeks.length, input.teamGames) };
+}
+
 /**
  * The season's `SeasonAvailability` per player. A player with no played week and no unavailable
- * week has NO record for the season: a practice-squad year or a season on nobody's roster says
- * nothing about his availability, and an empty record would be counted as a season of evidence.
- * On an uncovered season the roster archive is not consulted at all, so only players with a played
- * week appear, each with `gamesUnavailable: null`.
+ * week has NO record for the season: a practice-squad year, a season on nobody's roster or a
+ * season spent entirely suspended says nothing about his availability, and an empty record would
+ * be counted as a season of evidence. On an uncovered season the roster archive is not consulted
+ * at all, so only players with a played week appear, each with both designation counts `null`.
  */
 export function seasonAvailabilityRecords(input: SeasonRecordInput): ReadonlyMap<string, SeasonAvailability> {
   const rosterPlayers = input.covered ? [...input.rosterRows.keys()] : [];
@@ -118,15 +127,10 @@ export function seasonAvailabilityRecords(input: SeasonRecordInput): ReadonlyMap
   const records = new Map<string, SeasonAvailability>();
   for (const playerId of players) {
     const gamesPlayedWeeks = input.playedWeeks.get(playerId) ?? [];
-    const gamesUnavailable = input.covered
-      ? classifySeasonWeeks({ rosterRows: input.rosterRows.get(playerId) ?? [], injuryRows: input.injuryRows.get(playerId) ?? [], gamesPlayedWeeks }).unavailableWeeks.length
-      : null;
+    const designated = designatedWeeks(input, playerId, gamesPlayedWeeks);
     const gamesPlayed = new Set(gamesPlayedWeeks).size;
-    if (gamesPlayed === 0 && (gamesUnavailable ?? 0) === 0) continue;
-    // Capped at the team's games: the census omits bye weeks (32 clubs times 17 team-weeks in the
-    // real 2025 file), but a man traded across two clubs' byes can be rostered for eighteen.
-    const capped = gamesUnavailable === null ? null : Math.min(gamesUnavailable, input.teamGames);
-    records.set(playerId, { season: input.season, gamesPlayed, teamGames: input.teamGames, gamesUnavailable: capped });
+    if (gamesPlayed === 0 && (designated.unavailable ?? 0) === 0) continue;
+    records.set(playerId, { season: input.season, gamesPlayed, teamGames: input.teamGames, gamesUnavailable: designated.unavailable, gamesSuspended: designated.suspended });
   }
   return records;
 }

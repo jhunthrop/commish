@@ -10,7 +10,7 @@ import {
 import type { SeasonAvailability } from "./availability";
 
 function season(overrides: Partial<SeasonAvailability> = {}): SeasonAvailability {
-  return { season: 2023, gamesPlayed: 17, teamGames: 17, gamesUnavailable: 0, ...overrides };
+  return { season: 2023, gamesPlayed: 17, teamGames: 17, gamesUnavailable: 0, gamesSuspended: 0, ...overrides };
 }
 
 describe("gamesMissedInSeason", () => {

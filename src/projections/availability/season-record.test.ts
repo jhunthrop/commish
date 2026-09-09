@@ -20,7 +20,7 @@ describe("seasonAvailabilityRecords", () => {
       rosterRows: new Map([[SHOUGH, activeWeeks]]),
       injuryRows: new Map([[SHOUGH, [{ week: 16, reportStatus: "", primaryInjury: "" }]]]),
     });
-    expect(records.get(SHOUGH)).toEqual({ season: 2025, gamesPlayed: 11, teamGames: 17, gamesUnavailable: 0 });
+    expect(records.get(SHOUGH)).toEqual({ season: 2025, gamesPlayed: 11, teamGames: 17, gamesUnavailable: 0, gamesSuspended: 0 });
   });
 
   it("hears a man who never played because he spent the season on a reserve list", () => {
@@ -32,7 +32,7 @@ describe("seasonAvailabilityRecords", () => {
       rosterRows: new Map([[LOST, Array.from({ length: 18 }, (_, index) => ({ week: index + 1, status: "RES", statusDetail: "" }))]]),
       injuryRows: new Map(),
     });
-    expect(records.get(LOST)).toEqual({ season: 2025, gamesPlayed: 0, teamGames: 17, gamesUnavailable: 17 });
+    expect(records.get(LOST)).toEqual({ season: 2025, gamesPlayed: 0, teamGames: 17, gamesUnavailable: 17, gamesSuspended: 0 });
   });
 
   it("reads an uncovered season as played games with no availability claim, and drops nobody it cannot count", () => {
@@ -44,7 +44,39 @@ describe("seasonAvailabilityRecords", () => {
       rosterRows: new Map(),
       injuryRows: new Map(),
     });
-    expect(records.get(SHOUGH)).toEqual({ season: 2025, gamesPlayed: 11, teamGames: 17, gamesUnavailable: null });
+    expect(records.get(SHOUGH)).toEqual({ season: 2025, gamesPlayed: 11, teamGames: 17, gamesUnavailable: null, gamesSuspended: null });
+  });
+
+  it("counts a suspension apart from the unavailable weeks: Rashee Rice, 2025, six suspended, three to a knee, eight played", () => {
+    const RICE = "00-0039067";
+    const rows = [
+      ...[1, 2, 3, 4, 5, 6].map((week) => ({ week, status: "RES", statusDetail: "R40" })),
+      ...[7, 8, 9, 11, 12, 13, 14, 15].map((week) => ({ week, status: "ACT", statusDetail: "A01" })),
+      { week: 16, status: "INA", statusDetail: "A01" },
+      { week: 17, status: "RES", statusDetail: "R01" },
+      { week: 18, status: "RES", statusDetail: "R01" },
+    ];
+    const records = seasonAvailabilityRecords({
+      season: 2025,
+      teamGames: 17,
+      covered: true,
+      playedWeeks: new Map([[RICE, [7, 8, 9, 11, 12, 13, 14, 15]]]),
+      rosterRows: new Map([[RICE, rows]]),
+      injuryRows: new Map([[RICE, [{ week: 16, reportStatus: "Out", primaryInjury: "Knee" }]]]),
+    });
+    expect(records.get(RICE)).toEqual({ season: 2025, gamesPlayed: 8, teamGames: 17, gamesUnavailable: 3, gamesSuspended: 6 });
+  });
+
+  it("carries no record for a season he only sat suspended: neither played nor unavailable, the season says nothing about his availability", () => {
+    const records = seasonAvailabilityRecords({
+      season: 2025,
+      teamGames: 17,
+      covered: true,
+      playedWeeks: new Map(),
+      rosterRows: new Map([[LOST, Array.from({ length: 17 }, (_, index) => ({ week: index + 1, status: "SUS", statusDetail: "" }))]]),
+      injuryRows: new Map(),
+    });
+    expect(records.has(LOST)).toBe(false);
   });
 
   it("carries no record for a man who was neither played nor unavailable: a practice-squad year says nothing", () => {

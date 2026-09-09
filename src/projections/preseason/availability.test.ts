@@ -4,6 +4,7 @@ import {
   ROLE_BRACKETS,
   ageAtSeason,
   ageBracketFor,
+  availabilityEvidence,
   expectedGamesPlayed,
   gamesPlayedProbabilities,
   seventeenGamesForEveryone,
@@ -50,7 +51,7 @@ function player(overrides: Partial<AvailabilityInput> = {}): AvailabilityInput {
 /** A season in which every unplayed game was an absence the store recorded: the record the old
  *  "team games minus games played" reading assumed for everybody. */
 function absent(season: number, gamesPlayed: number, teamGames: number): SeasonAvailability {
-  return { season, gamesPlayed, teamGames, gamesUnavailable: Math.max(0, teamGames - gamesPlayed) };
+  return { season, gamesPlayed, teamGames, gamesUnavailable: Math.max(0, teamGames - gamesPlayed), gamesSuspended: 0 };
 }
 
 const at2024 = { season: 2024, priors: FITTED_AVAILABILITY_PRIORS } as const;
@@ -252,9 +253,37 @@ describe("expectedGamesPlayed", () => {
   describe("what a season of record is evidence OF (founder report 2026-09-08: backup weeks counted as missed games)", () => {
     const flat = { season: 2024, priors: FLAT } as const;
     const rolePrior = FLAT.baseline.RB.committee;
-    const record = (gamesPlayed: number, gamesUnavailable: number | null): AvailabilityInput =>
-      player({ history: [{ season: 2023, gamesPlayed, teamGames: 17, gamesUnavailable }] });
+    const record = (gamesPlayed: number, gamesUnavailable: number | null, gamesSuspended: number | null = gamesUnavailable === null ? null : 0): AvailabilityInput =>
+      player({ history: [{ season: 2023, gamesPlayed, teamGames: 17, gamesUnavailable, gamesSuspended }] });
     const shrink = (prior: number, priorGames: number, numerator: number, denominator: number): number => (priorGames * prior + numerator) / (priorGames + denominator);
+
+    describe("a served suspension is not an injury (founder report 2026-09-08: Rice at 13.3 expected games)", () => {
+      it("reads the suspended weeks out of BOTH halves: Rice's 2025 is eight played of eight available, of eleven games", () => {
+        const rice = record(8, 3, 6);
+        expect(availabilityEvidence(rice.history[0]!)).toEqual({ played: 8, available: 8, games: 11 });
+        expect(shrunkRole(rice, FLAT)).toBeCloseTo(shrink(rolePrior, FLAT.priorGames, 8, 8), 10);
+        expect(shrunkAvailability(rice, FLAT)).toBeCloseTo(shrink(FLAT_AVAILABILITY, FLAT.availabilityPriorGames, 8, 11), 10);
+      });
+
+      it("charges him less availability than the same season read with the suspension as an absence, and exactly what a healthy eleven-game season would", () => {
+        const asInjury = record(8, 9, 0);
+        const asSuspension = record(8, 3, 6);
+        expect(shrunkAvailability(asSuspension, FLAT)).toBeGreaterThan(shrunkAvailability(asInjury, FLAT));
+        expect(expectedGamesPlayed(asSuspension, flat).expected).toBeGreaterThan(expectedGamesPlayed(asInjury, flat).expected);
+      });
+
+      it("reads a season he only sat suspended as no evidence at all: nothing played, nothing available, no games", () => {
+        const sat = record(0, 0, 17);
+        expect(availabilityEvidence(sat.history[0]!)).toEqual({ played: 0, available: 0, games: 0 });
+        expect(shrunkRole(sat, FLAT)).toBe(rolePrior);
+        expect(shrunkAvailability(sat, FLAT)).toBe(FLAT_AVAILABILITY);
+      });
+
+      it("caps the suspended count at the team's games and never lets available go negative", () => {
+        expect(availabilityEvidence({ season: 2023, gamesPlayed: 0, teamGames: 17, gamesUnavailable: 5, gamesSuspended: 20 })).toEqual({ played: 0, available: 0, games: 0 });
+        expect(availabilityEvidence({ season: 2023, gamesPlayed: 2, teamGames: 17, gamesUnavailable: 12, gamesSuspended: 6 })).toEqual({ played: 0, available: 0, games: 11 });
+      });
+    });
 
     it("reads a healthy backup's did-not-play weeks as ROLE, never as absences: his availability is a starter's", () => {
       // Eleven games, six healthy active-roster weeks, no designation all season.
@@ -300,7 +329,7 @@ describe("expectedGamesPlayed", () => {
     });
 
     it("never exceeds one, however clean and long the record", () => {
-      const spotless = Array.from({ length: 3 }, (_, index) => ({ season: 2023 - index, gamesPlayed: 17, teamGames: 17, gamesUnavailable: 0 }));
+      const spotless = Array.from({ length: 3 }, (_, index) => ({ season: 2023 - index, gamesPlayed: 17, teamGames: 17, gamesUnavailable: 0, gamesSuspended: 0 }));
       const generous: AvailabilityPriors = { ...FLAT, baseline: { ...FLAT.baseline, RB: { bench: 0.99, rotation: 0.99, committee: 0.99, featured: 0.99 } } };
       expect(shrunkAvailabilityRate(player({ history: spotless }), generous)).toBeLessThanOrEqual(1);
     });
