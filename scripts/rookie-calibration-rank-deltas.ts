@@ -23,6 +23,7 @@ import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/doma
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { rookieCurve } from "@/projections/preseason/rookie-curve";
 import { preseasonBoard, type BoardCandidate, type BoardEntry } from "@/projections/preseason/board";
+import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
@@ -135,7 +136,8 @@ async function main(): Promise<void> {
   console.log(`${SEASON} board moment: ${inputs.momentKind}, asOf ${inputs.moment.toISOString()}`);
 
   const newCandidates = await shippedPreseasonCandidates(db, inputs, PRIORS, {});
-  const newBoard = preseasonBoard(newCandidates, { season: SEASON, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
+  const gameVariance = await loadShippedGameVariance(db);
+  const newBoard = preseasonBoard(newCandidates, { season: SEASON, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE, gameVariance });
 
   const oldPriors: PreseasonPriors = { ...PRIORS, rookies: { ...PRIORS.rookies, gameRate: PRE_FIX_ROOKIE_GAME_RATE as never } };
   const oldRawCandidates = preseasonCandidates(inputs, SHIPPED_PRESEASON_FEATURES, oldPriors);

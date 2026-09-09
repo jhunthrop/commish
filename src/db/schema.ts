@@ -3544,3 +3544,45 @@ export const coaches = pgTable(
     check("coaches_head_coach_pair_ck", sql`(${t.headCoach} IS NULL) = (${t.headCoachFirstSeason} IS NULL)`),
   ],
 );
+
+/**
+ * THE MODEL ARTIFACT STORE (file-sourced data round, 2026-09-09): every fitted table the engine
+ * serves, keyed by artifact name and version, so a re-fit is a data write with an audit row and
+ * the code never reads a module for numbers.
+ *
+ * WHY A TABLE AND NOT A GENERATED MODULE. A fitted table committed as TypeScript ships inside the
+ * bundle, which is convenient right up to the moment a fit has to change what production serves
+ * without a deploy, or a reviewer has to answer "which fit produced this board" from the store
+ * that built it. Here a fit script publishes `(name, version)` once, immutably, with the moment the
+ * fit ran and the window it was fit on; the code pins the version it was written against
+ * (`src/projections/model/artifacts.ts`) and throws when the store lacks it, never falling back to
+ * a number compiled into a module.
+ *
+ * THE REVIEWED RECORD STAYS IN THE REPOSITORY, under `data/model-artifacts/<name>/v<version>.json`,
+ * exactly as the coaches CSV is the reviewed input to its ingest: `npm run artifacts:publish`
+ * loads every committed record into whichever database `DATABASE_URL` names, and the server reads
+ * only this table.
+ *
+ * `payload` is whatever shape the artifact's own parser accepts; the loader validates it on every
+ * read rather than trusting the column.
+ */
+export const modelArtifacts = pgTable(
+  "model_artifacts",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    /** `<family>/<artifact>`, the key the code declares beside its pinned version. */
+    name: text("name").notNull(),
+    version: integer("version").notNull(),
+    /** When the fit that produced this payload ran. Provenance, never a filter. */
+    fitStamp: timestamp("fit_stamp", { withTimezone: true }).notNull(),
+    /** The train window in the fit script's own words, for the audit row. */
+    fittedOn: text("fitted_on").notNull(),
+    payload: jsonb("payload").$type<unknown>().notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** A version is immutable: the same name and version is one row, forever. */
+    uniqueIndex("model_artifacts_name_version_idx").on(t.name, t.version),
+    check("model_artifacts_version_ck", sql`${t.version} >= 1`),
+  ],
+);

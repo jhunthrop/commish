@@ -7,6 +7,7 @@ import { isRealTierCliff } from "../decide/tiers";
 import type { LeagueShape } from "../decide/replacement";
 import type { GamesPlayedOutlook } from "./availability";
 import { byValueOverReplacement, overlapTiers, preseasonBoard, scaleStatLine, type BoardCandidate } from "./board";
+import type { GameVariancePriors } from "./game-variance";
 
 const SCORED: readonly Position[] = ["QB", "RB", "WR", "TE"];
 const SLOTS: readonly RosterSlotConfig[] = STANDARD_ROSTER_SLOTS.filter(
@@ -69,7 +70,15 @@ function pool(): BoardCandidate[] {
   return candidates;
 }
 
-const OPTIONS = { season: 2024, asOf: new Date("2024-09-01T00:00:00.000Z"), rules: PPR_SCORING, shape: SHAPE } as const;
+/** A per-game variance table for the band: every position the board bands on carries a cell, so
+ *  no case here quietly falls back to the games-only band. The values are the first published
+ *  artifacts' (`data/model-artifacts/preseason/game-variance-*`), rounded. */
+const VARIANCE: GameVariancePriors = {
+  rookie: { QB: 51.1, RB: 34, WR: 30.8, TE: 22.4, K: 13.4, DEF: 35.9 },
+  veteran: { QB: 50.9, RB: 31.1, WR: 35.8, TE: 21.8, K: 13.4, DEF: 35.9 },
+};
+
+const OPTIONS = { season: 2024, asOf: new Date("2024-09-01T00:00:00.000Z"), rules: PPR_SCORING, shape: SHAPE, gameVariance: VARIANCE } as const;
 
 describe("scaleStatLine", () => {
   it("multiplies every component by the games, and leaves identity alone", () => {
@@ -237,7 +246,7 @@ describe("overlapTiers", () => {
  */
 describe("a candidate whose score is not linear in games", () => {
   const KDEF_SHAPE: LeagueShape = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS };
-  const OPTIONS = { season: 2025, asOf: new Date(0), rules: PPR_SCORING, shape: SHAPE } as const;
+  const OPTIONS = { season: 2025, asOf: new Date(0), rules: PPR_SCORING, shape: SHAPE, gameVariance: VARIANCE } as const;
 
   it("leaves an absent optional field absent when a line is scaled", () => {
     const scaled = scaleStatLine(line("p1", {}), 17);

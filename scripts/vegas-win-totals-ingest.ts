@@ -4,9 +4,10 @@
 // (dotenv -e .env.local -- tsx scripts/vegas-win-totals-ingest.ts)
 //
 // Reads a committed file, not the network — run `npm run projections:win-totals:validate` first if
-// the CSV itself has not been validated since it last changed; this script trusts it.
+// the CSV itself has not been validated since it last changed; this script trusts it. The file read
+// lives in `./lib/win-totals-csv.ts`, shared with the validator; nothing under `src/` reads the file.
 import { createDb } from "@/db/client";
-import { ingestVegasWinTotals } from "@/projections/vegas/ingest";
+import { ingestWinTotalsCsv } from "./lib/win-totals-csv";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -18,7 +19,7 @@ function requireEnv(name: string): string {
 
 async function main(): Promise<void> {
   const db = createDb(requireEnv("DATABASE_URL"));
-  const report = await ingestVegasWinTotals(db);
+  const report = await ingestWinTotalsCsv(db);
 
   console.log(`Read ${report.rowsRead} rows across ${report.seasons.length} seasons (${report.seasons[0]}-${report.seasons.at(-1)}).`);
   console.log("Rows per season:");

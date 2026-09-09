@@ -28,6 +28,7 @@ import type { LeagueShape } from "@/projections/decide/replacement";
 import { shippedPreseasonCandidates } from "@/projections/market/blend";
 import { FITTED_MODEL } from "@/projections/model/source";
 import { preseasonBoard } from "@/projections/preseason/board";
+import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
 import { BOARD_FORMAT_SPECS, BOARD_FORMATS, type BoardFormat } from "@/projections/preseason/board-formats";
 import { FITTED_AVAILABILITY_PRIORS, FITTED_CAREER_PRIORS, FITTED_DEPTH_PRIORS, FITTED_ROOKIE_PRIORS } from "@/projections/preseason/fitted";
 import { actualSeasonPoints, boardPoints, gradableInputs, scoreOrdering } from "@/projections/preseason/scorecard";
@@ -101,7 +102,7 @@ interface FormatArm {
 async function buildArm(db: ReadonlyDb, inputs: PreseasonInputs, positions: ReadonlyMap<string, Position>, format: BoardFormat): Promise<FormatArm> {
   const spec = BOARD_FORMAT_SPECS[format];
   const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS, { format });
-  const board = preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: spec.rules, shape: SHAPE });
+  const board = preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: spec.rules, shape: SHAPE, gameVariance: await loadShippedGameVariance(db) });
   const adpRows = await preseasonRankingsAsOf(db, { season: inputs.season, source: spec.adpSource, asOf: FINAL });
   return {
     format,

@@ -4,7 +4,6 @@ import type { ProjectionDistribution } from "../decide/outlook";
 import { valueBoard, type LeagueShape, type SeasonProjection, type ValuedPlayer } from "../decide/replacement";
 import { isRealTierCliff, tiersOf } from "../decide/tiers";
 import type { GamesPlayedOutlook } from "./availability";
-import { SHIPPED_GAME_VARIANCE } from "./fitted-variance";
 import type { RosterStatusKind, RosterStatusSource } from "./roster-status";
 import { seasonPointsInterval, VARIANCE_POSITIONS, Z90, type GameVariancePriors, type PlayerClass, type VariancePosition } from "./game-variance";
 
@@ -216,13 +215,15 @@ export interface PreseasonBoardOptions {
   readonly rules: ScoringRules;
   readonly shape: LeagueShape;
   /**
-   * PER-GAME PERFORMANCE VARIANCE (calibration fix round, 2026-09-04, Task 4) — defaults to the
-   * committed `SHIPPED_GAME_VARIANCE` (`fitted-variance.ts`, the two generated halves composed), exactly like `rules`/`shape` are the only things a caller
-   * normally has to supply at all. A test (or a future fit script) passes its own to drive the band
-   * with different cells; see `game-variance.ts`'s own module docblock for what this measures and
-   * why it is fit separately from the rest of the model.
+   * PER-GAME PERFORMANCE VARIANCE (calibration fix round, 2026-09-04, Task 4), REQUIRED since the
+   * file-sourced data round (2026-09-09): the table lives in the model artifact store, so a caller
+   * loads it with `loadShippedGameVariance(db)` (`game-variance-artifacts.ts`) and hands it in,
+   * exactly like `rules` and `shape`. There is no default, because a board banded on a table nobody
+   * loaded would be a board built on a number nobody published. A test (or a fit script) passes its
+   * own to drive the band with different cells; see `game-variance.ts`'s own module docblock for
+   * what this measures and why it is fit separately from the rest of the model.
    */
-  readonly gameVariance?: GameVariancePriors;
+  readonly gameVariance: GameVariancePriors;
 }
 
 export interface BoardEntry extends ValuedPlayer {
@@ -388,7 +389,7 @@ function gameVarianceFor(candidate: BoardCandidate, priors: GameVariancePriors):
 
 export function preseasonBoard(
   candidates: readonly BoardCandidate[],
-  { rules, shape, gameVariance = SHIPPED_GAME_VARIANCE }: PreseasonBoardOptions,
+  { rules, shape, gameVariance }: PreseasonBoardOptions,
 ): readonly BoardEntry[] {
   const byPlayer = new Map<string, { candidate: BoardCandidate; seasonLine: StatLine; outlook: ProjectionDistribution }>();
   const projections: SeasonProjection[] = [];

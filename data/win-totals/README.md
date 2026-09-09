@@ -93,6 +93,12 @@ is left empty — never zero, which would claim a winless season nobody played:
   full-season counts for the same market year. Every other 2022 team has all 17 games and a filled
   `actual_wins`.
 
+## Ingesting
+
+`win-totals.csv` is the reviewed input to `npm run projections:vegas:ingest`, which writes every row's
+three metrics to `team_week_observations` under the `vegas_win_totals` source. Nothing in the server
+reads this file: the product reads the table. The file read lives in `scripts/lib/win-totals-csv.ts`.
+
 ## Validating
 
 ```

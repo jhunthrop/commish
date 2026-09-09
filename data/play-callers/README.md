@@ -38,7 +38,15 @@ when convenient; correctness of the COMMON case does not wait on it.
   arrival, not 2026); MIA 2021 co-OC pair collapsed to Godsey pending verification; LV 2022
   span corrected to the 18-week era.
 
+## Ingesting
+
+`play-callers.csv` is the reviewed input to `npm run coaches:ingest`, which validates it exactly as
+`npm run facts:play-callers` does and upserts every row into the `coaches` table. Nothing in the
+server reads this file: the team page and the fact sheet read the table through
+`src/coaches/store.ts`. The file read lives in `scripts/lib/play-callers-csv.ts`.
+
 ## Refreshing
 
 Each offseason: append the new season's rows (roughly 10-15 changes plus holdovers), re-run
-`npm run facts:play-callers`, and verify new rows against PFR before upgrading their `source`.
+`npm run facts:play-callers`, verify new rows against PFR before upgrading their `source`, and run
+`npm run coaches:ingest` against each database that serves them.

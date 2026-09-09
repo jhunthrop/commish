@@ -22,6 +22,8 @@ import type { LeagueShape } from "@/projections/decide/replacement";
 import { shippedPreseasonCandidates } from "@/projections/market/blend";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { overlapTiers, preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
+import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
+import type { GameVariancePriors } from "@/projections/preseason/game-variance";
 import { KDEF_DECISION, marketOrderPositions, shipsProjectedRows } from "@/projections/preseason/kdef-decision";
 import {
   FITTED_AVAILABILITY_PRIORS,
@@ -132,12 +134,13 @@ function draftCapitalOnly(inputs: PreseasonInputs, eligible: ReadonlySet<string>
  *  ablation compared against a market-blended "after" arm would be measuring two changes (the
  *  feature AND the blend) at once; ablations stay on this function's own output, "before" and
  *  "after" alike, so what moved is always the one flag being tested. */
-function build(inputs: PreseasonInputs, features: PreseasonFeatures): readonly BoardEntry[] {
+function build(inputs: PreseasonInputs, features: PreseasonFeatures, gameVariance: GameVariancePriors): readonly BoardEntry[] {
   return preseasonBoard(preseasonCandidates(inputs, features, PRIORS), {
     season: inputs.season,
     asOf: inputs.moment,
     rules: PPR_SCORING,
     shape: SHAPE,
+    gameVariance,
   });
 }
 
@@ -149,9 +152,9 @@ function build(inputs: PreseasonInputs, features: PreseasonFeatures): readonly B
  * The raw model stays reachable, unchanged, as `build`'s own output — every ablation below reads
  * that, never this.
  */
-async function buildShipped(db: ReadonlyDb, inputs: PreseasonInputs): Promise<readonly BoardEntry[]> {
+async function buildShipped(db: ReadonlyDb, inputs: PreseasonInputs, gameVariance: GameVariancePriors): Promise<readonly BoardEntry[]> {
   const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS);
-  return preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
+  return preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE, gameVariance });
 }
 
 function printBands(label: string, banded: ReturnType<typeof scoreOrdering>): void {
@@ -162,6 +165,7 @@ function printBands(label: string, banded: ReturnType<typeof scoreOrdering>): vo
 async function main(): Promise<void> {
   const db = createDb(requireEnv("DATABASE_URL"));
   const positions = await allPositions(db);
+  const gameVariance = await loadShippedGameVariance(db);
   const names = new Map(
     (await db.select({ id: nflPlayers.id, name: nflPlayers.name }).from(nflPlayers)).map((row) => [row.id, row.name] as const),
   );
@@ -189,8 +193,8 @@ async function main(): Promise<void> {
       );
     }
 
-    const rawBoard = build(inputs, SHIPPED_PRESEASON_FEATURES);
-    const board = await buildShipped(db, inputs);
+    const rawBoard = build(inputs, SHIPPED_PRESEASON_FEATURES, gameVariance);
+    const board = await buildShipped(db, inputs, gameVariance);
     console.log(
       `board (shipped, market-blended): ${board.length} players from a ${inputs.roster.length}-man week-one roster, ` +
         `${inputs.usage.length} prior usage rows, ${inputs.teamObservations.length} team facts`,
@@ -255,7 +259,7 @@ async function main(): Promise<void> {
       ["rookies", rookieSegmentFor(inputs)],
     ]);
     for (const ablation of ABLATIONS) {
-      const without = build(inputs, ablation.features);
+      const without = build(inputs, ablation.features, gameVariance);
       const segment = segments.get(ablation.segment)!;
       const eligible = new Set([...segment].filter((playerId) => actual.has(playerId)));
       const before =

@@ -1,5 +1,8 @@
-// Fits the kicker and team-defence component priors and their two per-game variance cells, and
-// generates the committed `src/projections/preseason/kdef-fitted.ts`.
+// Fits the kicker and team-defence component priors and their two per-game variance cells. The
+// component priors regenerate the committed `src/projections/preseason/kdef-fitted.ts` (still read
+// by `market/blend.ts`); the two variance cells publish to the model artifact store as the next
+// version of `preseason/game-variance-kdef`, with the matching record under `data/model-artifacts/`
+// (file-sourced data round, 2026-09-09). This script prints the pin to bump.
 // Run: npm run projections:kdef:fit [season ...]   (defaults to 2013 through 2024)
 //
 // FIT ON 2013 THROUGH 2024 AND ON NOTHING ELSE. 2025 is the single judgment season
@@ -14,11 +17,14 @@
 import { writeFileSync } from "node:fs";
 import { createDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
+import { draftVersionOf } from "@/projections/model/artifacts";
 import { fitGameVariance, type GameVarianceObservation, type GameVariancePriors } from "@/projections/preseason/game-variance";
+import { GAME_VARIANCE_KDEF_ARTIFACT } from "@/projections/preseason/game-variance-artifacts";
 import { loadKdefHistory } from "@/projections/preseason/kdef-history";
 import { fitKickerPriors, kickerWeeklyPoints, type KickerPriors } from "@/projections/preseason/kicker";
 import { kickingWeekRowsForSeasons } from "@/projections/nflverse/kicking-weeks";
 import { defenseWeeklyPoints, fitDefensePriors, type DefensePriors } from "@/projections/preseason/team-defense";
+import { recordAndPublishFit } from "./lib/model-artifact-records";
 
 const OUTPUT = "src/projections/preseason/kdef-fitted.ts";
 const FIRST_FIT_SEASON = 2013;
@@ -60,9 +66,13 @@ function varianceObservations(
   });
 }
 
+/** The train window, for the module header and the artifact's provenance row alike. */
+function fittedOn(): string {
+  return `Fit on ${FIT_SEASONS[0]} through ${FIT_SEASONS[FIT_SEASONS.length - 1]}; ${HELD_OUT_SEASONS.join(" and ")} held out (2025 judged once, 2026 never read)`;
+}
+
 function header(): string {
-  return `import type { GameVariancePriors } from "./game-variance";
-import type { KickerPriors } from "./kicker";
+  return `import type { KickerPriors } from "./kicker";
 import type { DefensePriors } from "./team-defense";
 
 /**
@@ -74,11 +84,9 @@ import type { DefensePriors } from "./team-defense";
  * \`docs/research/2026-09-05-kicker-defense-preregistration.md\`, and 2026 is never read by any fit
  * or judgment at all.
  *
- * \`FITTED_KDEF_GAME_VARIANCE\` carries the K and DEF cells ONLY. The four skill positions' cells are
- * generated separately by \`npm run projections:game-variance:fit\` into
- * \`game-variance-fitted.ts\`, because that script's observation loader reads
- * \`player_week_observations\`, which holds neither of these two positions. \`fitted-variance.ts\`
- * is the one place the two halves are composed.
+ * The K and DEF per-game variance cells this fit also measures are published to the model
+ * artifact store as \`preseason/game-variance-kdef\` (\`game-variance-artifacts.ts\`), not written
+ * here; this module carries only the two component priors \`market/blend.ts\` still imports.
  */
 `;
 }
@@ -100,14 +108,24 @@ function renderDefensePriors(defence: DefensePriors): string {
   return `{\n${body}\n  "leagueAllowed": [\n${allowed}\n  ],\n}`;
 }
 
-function render(kicker: KickerPriors, defence: DefensePriors, variance: GameVariancePriors): string {
+function render(kicker: KickerPriors, defence: DefensePriors): string {
   return `${header()}
 export const FITTED_KICKER_PRIORS: KickerPriors = ${JSON.stringify(kicker, null, 2)};
 
 export const FITTED_DEFENSE_PRIORS: DefensePriors = ${renderDefensePriors(defence)};
-
-export const FITTED_KDEF_GAME_VARIANCE: GameVariancePriors = ${JSON.stringify(variance, null, 2)};
 `;
+}
+
+/** The K and DEF variance cells, published as the next version of their artifact. */
+async function publishVariance(variance: GameVariancePriors): Promise<void> {
+  const db = createDb(requireEnv("DATABASE_URL"));
+  try {
+    const published = await recordAndPublishFit(db, draftVersionOf(GAME_VARIANCE_KDEF_ARTIFACT), variance, { fitStamp: new Date(), fittedOn: fittedOn() });
+    console.log(`\n${published.outcome}: ${published.name} v${published.version} (${published.path})`);
+    console.log(`Pin GAME_VARIANCE_KDEF_ARTIFACT.version = ${published.version} in src/projections/preseason/game-variance-artifacts.ts to serve it.`);
+  } finally {
+    await db.$client.end();
+  }
 }
 
 async function main(): Promise<void> {
@@ -180,8 +198,9 @@ async function main(): Promise<void> {
     console.log(`  ${position.padEnd(34)}${value === undefined ? "not measured" : `${value.toFixed(2)} (sd ${Math.sqrt(value).toFixed(2)})`}`);
   }
 
-  writeFileSync(OUTPUT, render(kicker, defence, variance));
+  writeFileSync(OUTPUT, render(kicker, defence));
   console.log(`\nwrote ${OUTPUT}`);
+  await publishVariance(variance);
 }
 
 main()

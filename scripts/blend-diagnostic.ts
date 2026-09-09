@@ -25,6 +25,7 @@ import { shippedPreseasonCandidates } from "@/projections/market/blend";
 import { FITTED_BLEND_CONSTANTS } from "@/projections/market/blend-fitted";
 import { isCurvePosition } from "@/projections/market/curve";
 import { preseasonBoard, type BoardCandidate, type BoardEntry } from "@/projections/preseason/board";
+import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
@@ -92,8 +93,9 @@ async function main(): Promise<void> {
     const blendedCandidates = await shippedPreseasonCandidates(db, inputs, PRIORS);
     const rawCandidates = await shippedPreseasonCandidates(db, inputs, PRIORS, { raw: true });
 
-    const blendedBoard = preseasonBoard(blendedCandidates, { season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
-    const rawBoard = preseasonBoard(rawCandidates, { season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
+    const gameVariance = await loadShippedGameVariance(db);
+    const blendedBoard = preseasonBoard(blendedCandidates, { season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE, gameVariance });
+    const rawBoard = preseasonBoard(rawCandidates, { season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE, gameVariance });
 
     console.log(`\nMETRIC 1: TOP ${TOP_N} POSITION MIX, blended vs raw:`);
     printPositionMix("blended", positionMix(blendedBoard, TOP_N), Math.min(TOP_N, blendedBoard.length));
