@@ -57,7 +57,7 @@
 //      npm run projections:props-anchor:fit -- --check   (recomputes, exits 1 when the pinned artifact drifts)
 import { writeFileSync } from "node:fs";
 import { createDb } from "@/db/client";
-import type { ReadonlyDb } from "@/db/client";
+import type { Db, ReadonlyDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
 import type { Position } from "@/domain/player";
 import { blendBoard, seasonPointsOf, type BlendConstants } from "@/projections/market/blend";
@@ -82,7 +82,7 @@ import { FITTED_MODEL } from "@/projections/model/source";
 import { loadPreseason, preseasonCandidates, SHIPPED_PRESEASON_FEATURES, type PreseasonPriors } from "@/projections/preseason/source";
 import { gradableInputs } from "@/projections/preseason/scorecard";
 import { spearman, meanAbsoluteError, type Observation } from "@/projections/metrics";
-import { recordAndPublishFit } from "./lib/model-artifact-records";
+import { recordAndPublishFit, type PublishedRecord } from "./lib/model-artifact-records";
 
 const REPORT_PATH = "docs/research/2026-09-05-props-anchor-backtest.md";
 
@@ -433,23 +433,61 @@ async function main(): Promise<void> {
     judgeCoveredMaeWinner: meanAbsoluteError(judgeAtWinner.covered),
   });
 
-  if (check) {
-    const pinned = await loadModelArtifact(db, PROPS_ANCHOR_WEIGHT_ARTIFACT);
-    if (pinned.weight !== verdict.weight) {
-      console.error(
-        `\n${PROPS_ANCHOR_WEIGHT_ARTIFACT.name} v${PROPS_ANCHOR_WEIGHT_ARTIFACT.version} holds weight ${String(pinned.weight)}; this run produced ${String(verdict.weight)}. ` +
-          "Run `npm run projections:props-anchor:fit` to publish the next version, then pin it.",
-      );
-      process.exit(1);
+  // A FRESH CLIENT for the store work: the one above was ended before the grid search, and the
+  // search itself needs no database. Opened here, closed in `finally`, whichever branch runs.
+  const store = createDb(requireEnv("DATABASE_URL"));
+  let drifted = false;
+  try {
+    if (check) {
+      const result = await checkVerdict(store, verdict);
+      drifted = result.drift;
+      if (result.drift) {
+        console.error(
+          `\n${PROPS_ANCHOR_WEIGHT_ARTIFACT.name} v${PROPS_ANCHOR_WEIGHT_ARTIFACT.version} holds weight ${String(result.pinnedWeight)}; this run produced ${String(verdict.weight)}. ` +
+            "Run `npm run projections:props-anchor:fit` to publish the next version, then pin it.",
+        );
+      } else {
+        console.log(`\nThe pinned artifact matches this run. No drift. (${REPORT_PATH} is not diffed by --check; it is a report, not a fitted constant.)`);
+      }
+    } else {
+      writeFileSync(REPORT_PATH, report);
+      console.log(`\nwrote ${REPORT_PATH}`);
+      const { published, pinLine } = await publishVerdict(store, verdict, fittedOn);
+      console.log(`${published.outcome}: ${published.name} v${published.version} (${published.path})`);
+      console.log(pinLine);
     }
-    console.log(`\nThe pinned artifact matches this run. No drift. (${REPORT_PATH} is not diffed by --check; it is a report, not a fitted constant.)`);
-    return;
+  } finally {
+    await store.$client.end();
   }
-  writeFileSync(REPORT_PATH, report);
-  console.log(`\nwrote ${REPORT_PATH}`);
-  const published = await recordAndPublishFit(db, draftVersionOf(PROPS_ANCHOR_WEIGHT_ARTIFACT), verdict, { fitStamp: new Date(), fittedOn });
-  console.log(`${published.outcome}: ${published.name} v${published.version} (${published.path})`);
-  console.log(`Pin PROPS_ANCHOR_WEIGHT_ARTIFACT.version = ${published.version} in src/projections/market/props-anchor-artifact.ts to serve it.`);
+  if (drifted) process.exit(1);
+}
+
+export interface VerdictCheck {
+  /** What the PINNED version holds in the store. */
+  readonly pinnedWeight: number | null;
+  /** True when this run's verdict differs from the pinned weight: publish the next version and pin it. */
+  readonly drift: boolean;
+}
+
+/** `--check`: compares a fresh verdict against the pinned artifact. Throws when the store lacks the pin. */
+export async function checkVerdict(db: ReadonlyDb, verdict: PropsAnchorWeight): Promise<VerdictCheck> {
+  const pinned = await loadModelArtifact(db, PROPS_ANCHOR_WEIGHT_ARTIFACT);
+  return { pinnedWeight: pinned.weight, drift: pinned.weight !== verdict.weight };
+}
+
+export interface VerdictPublish {
+  readonly published: PublishedRecord;
+  /** The operator's next step, printed verbatim. */
+  readonly pinLine: string;
+}
+
+/** Publishes a verdict as the next version, record and store row together, and names the pin to bump. */
+export async function publishVerdict(db: Db, verdict: PropsAnchorWeight, fittedOn: string, recordsDir?: string): Promise<VerdictPublish> {
+  const published = await recordAndPublishFit(db, draftVersionOf(PROPS_ANCHOR_WEIGHT_ARTIFACT), verdict, { fitStamp: new Date(), fittedOn }, recordsDir);
+  return {
+    published,
+    pinLine: `Pin PROPS_ANCHOR_WEIGHT_ARTIFACT.version = ${published.version} in src/projections/market/props-anchor-artifact.ts to serve it.`,
+  };
 }
 
 interface JudgeNumbers {
