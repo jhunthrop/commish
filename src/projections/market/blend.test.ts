@@ -192,6 +192,45 @@ describe("blendBoard", () => {
     expect(seasonPointsOf(blended!)).toBeCloseTo(199, 6);
   });
 
+  describe("an observed reserve designation lifts the cap (founder report 2026-09-08: IR players held up by the availability cap)", () => {
+    const reserve = (status: "injured_reserve" | "suspended" | "active"): BoardReason => ({
+      code: "roster_status",
+      status,
+      source: "tank01_player_list",
+      observedAt: "2026-09-05T22:35:00.000Z",
+      team: "GB",
+    });
+    const threeGames = { expected: 3, rate: 3 / 17, distribution: { floor: 0, median: 3, ceiling: 13 }, probabilities: [] } as const;
+
+    it("admits the availability term IN FULL, past both the availability cap and the total cap: the anchor scaled to his games", () => {
+      const jacobs = candidate({ games: threeGames, reasons: [reserve("injured_reserve")] });
+      const [blended] = blendBoard([market({ marketPoints: 162.9 })], [jacobs], { season: SEASON, constants: CONSTANTS, laws: [] });
+      expect(seasonPointsOf(blended!)).toBeCloseTo((162.9 * 3) / IMPLIED_GAMES, 1);
+      expect(blended!.reasons).toContainEqual({ code: "market_anchor", marketPoints: 162.9, delta: expect.closeTo(-162.9 * (1 - 3 / IMPLIED_GAMES), 4) as number });
+    });
+
+    it("the SAME candidate without the reason is capped as before: the fitted cap stands for everyone else", () => {
+      const model = candidate({ games: threeGames });
+      const [blended] = blendBoard([market({ marketPoints: 162.9 })], [model], { season: SEASON, constants: CONSTANTS, laws: [] });
+      expect(seasonPointsOf(blended!)).toBeCloseTo(162.9 - CONSTANTS.availabilityCapPoints, 6);
+    });
+
+    it("a suspended designation counts too; an active status does not", () => {
+      const [suspended] = blendBoard([market({ marketPoints: 162.9 })], [candidate({ games: threeGames, reasons: [reserve("suspended")] })], { season: SEASON, constants: CONSTANTS, laws: [] });
+      const [active] = blendBoard([market({ marketPoints: 162.9 })], [candidate({ games: threeGames, reasons: [reserve("active")] })], { season: SEASON, constants: CONSTANTS, laws: [] });
+      expect(seasonPointsOf(suspended!)).toBeCloseTo((162.9 * 3) / IMPLIED_GAMES, 1);
+      expect(seasonPointsOf(active!)).toBeCloseTo(162.9 - CONSTANTS.availabilityCapPoints, 6);
+    });
+
+    it("the law channel keeps its own bounds: laws are capped at the total cap, then the full availability term lands on top", () => {
+      const laws = [lawFixture({ trainEffect: 1_000 })];
+      const withLaw = candidate({ games: threeGames, reasons: [lawReason(), reserve("injured_reserve")] });
+      const [blended] = blendBoard([market({ marketPoints: 162.9 })], [withLaw], { season: SEASON, constants: CONSTANTS, laws });
+      // The law's exposure-scaled delta is capped at lawCapPoints (20), which is under totalCapPoints (50).
+      expect(seasonPointsOf(blended!)).toBeCloseTo((162.9 * 3) / IMPLIED_GAMES + CONSTANTS.lawCapPoints, 1);
+    });
+  });
+
   it("throws for a candidate at a position the implied-games table carries no entry for", () => {
     const kicker = candidate({ position: "K" });
     expect(() => blendBoard([market({ position: "K" })], [kicker], { season: SEASON, constants: CONSTANTS, laws: [] })).toThrow(
