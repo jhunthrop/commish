@@ -425,11 +425,22 @@ describe("the committed fit", () => {
   });
 
   it("never rates a reserve or an unrostered man above an active one", () => {
-    const { statusMultiplier } = FITTED_AVAILABILITY_PRIORS;
+    const { statusMultiplier, designationMultiplier } = FITTED_AVAILABILITY_PRIORS;
     expect(statusMultiplier.active).toBe(1);
     expect(statusMultiplier.reserve).toBeLessThan(1);
     expect(statusMultiplier.practice_squad).toBeLessThan(1);
     expect(statusMultiplier.off_roster).toBeLessThan(statusMultiplier.practice_squad);
+    // The committed designation cells (current-status round): an Out on an active roster costs
+    // games but nothing like a reserve list; every reserve cell sits near the pooled reserve number
+    // it was shrunk toward; a return designation has no fit-season rows (the archive's R48 begins
+    // in 2024) and therefore no cell.
+    expect(designationMultiplier?.out).toBeGreaterThan(statusMultiplier.reserve);
+    expect(designationMultiplier?.out).toBeLessThan(1);
+    for (const cell of ["injured_reserve", "pup", "nfi", "suspended", "exempt"] as const) {
+      expect(designationMultiplier?.[cell]).toBeGreaterThan(statusMultiplier.reserve * 0.8);
+      expect(designationMultiplier?.[cell]).toBeLessThan(statusMultiplier.reserve * 1.25);
+    }
+    expect(designationMultiplier?.injured_reserve_return).toBeUndefined();
   });
 });
 

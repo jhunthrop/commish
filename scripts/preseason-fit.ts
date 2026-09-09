@@ -15,6 +15,7 @@ import { createDb } from "@/db/client";
 import { FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
 import { FITTED_MODEL } from "@/projections/model/source";
 import { AGE_BRACKETS, ROLE_BRACKETS, expectedGamesPlayed } from "@/projections/preseason/availability";
+import { AVAILABILITY_DESIGNATIONS } from "@/projections/preseason/availability-status";
 import { fitAvailabilityPriors } from "@/projections/preseason/availability-fit";
 import { loadAvailabilityObservations } from "@/projections/preseason/availability-history";
 import {
@@ -78,7 +79,10 @@ async function main(): Promise<void> {
   // Bracketed on the board's own snap share, which needs the committed depth priors (the depth fit
   // below runs after this one, the same standing `FITTED_MODEL` has throughout this script).
   const availabilityObservations = await loadAvailabilityObservations(db, FIT_SEASONS, { model: FITTED_MODEL, depth: FITTED_DEPTH_PRIORS });
-  const availability = fitAvailabilityPriors(availabilityObservations, { heldOutSeasons: HELD_OUT_SEASONS });
+  // A CELL PER DESIGNATION beside the coarse status (current-status round, 2026-09-09), because the
+  // held-out measurement (`npm run projections:availability:split`, the round's ledger) was not
+  // worse overall and better on the reserve-designated subgroup. `fitted.ts` records the cells.
+  const availability = fitAvailabilityPriors(availabilityObservations, { heldOutSeasons: HELD_OUT_SEASONS, designationCells: [...AVAILABILITY_DESIGNATIONS] });
   const rookieObservations = await loadRookieObservations(db, FIT_SEASONS, FITTED_MODEL);
   const rookiesWithSharesWindowGameRate = fitRookiePriors(rookieObservations, {
     heldOutSeasons: HELD_OUT_SEASONS,
@@ -130,6 +134,11 @@ async function main(): Promise<void> {
   console.log(
     `\n  status multipliers  ${Object.entries(availability.statusMultiplier)
       .map(([status, value]) => `${status} ${value.toFixed(3)}`)
+      .join("  ")}`,
+  );
+  console.log(
+    `  designation cells   ${Object.entries(availability.designationMultiplier ?? {})
+      .map(([designation, value]) => `${designation} ${value.toFixed(3)} (n=${availabilityObservations.filter((observation) => observation.designation === designation && (POSITIONS as readonly string[]).includes(observation.position)).length})`)
       .join("  ")}`,
   );
   console.log(

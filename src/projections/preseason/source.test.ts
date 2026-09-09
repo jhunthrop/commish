@@ -778,13 +778,15 @@ describe("the roster-status gate, through the shipped build (founder report 2026
     // used to serve, a fifth of a season.
     const bare = preseasonCandidates(inputs, SHIPPED_PRESEASON_FEATURES, PRIORS).find((candidate) => candidate.playerId === VETERAN)!;
     expect(bare.games.expected).toBeLessThan(shipped.games.expected * 0.5);
-    // The shipped build reads him exactly as the file would have read an active man.
+    // The shipped build reads him as an active man ruled Out for the opener: the active
+    // computation times the committed `out` cell (a beta-binomial's mean is games times rate, so
+    // the cell scales expected games exactly).
     const asActive = preseasonCandidates(
       { ...inputs, roster: inputs.roster.map((row) => (row.playerId === VETERAN ? { ...row, status: "active" as const } : row)) },
       SHIPPED_PRESEASON_FEATURES,
       PRIORS,
     ).find((candidate) => candidate.playerId === VETERAN)!;
-    expect(shipped.games).toEqual(asActive.games);
+    expect(shipped.games.expected).toBeCloseTo(asActive.games.expected * FITTED_AVAILABILITY_PRIORS.designationMultiplier!.out!, 9);
     // And the gate agrees: active, so no status reason and no cap.
     expect(shipped.reasons.some((reason) => reason.code === "roster_status")).toBe(false);
   });

@@ -51,6 +51,7 @@
     "projections:preseason:ingest": "dotenv -e .env.local -- tsx scripts/preseason-ingest.ts",
     "projections:adp:ingest": "dotenv -e .env.local -- tsx scripts/adp-benchmark-ingest.ts",
     "projections:preseason:fit": "dotenv -e .env.local -- tsx scripts/preseason-fit.ts",
+    "projections:availability:split": "dotenv -e .env.local -- tsx scripts/availability-designation-split.ts",
     "projections:rookie-curve:fit": "dotenv -e .env.local -- tsx scripts/rookie-curve-fit.ts",
     "projections:rookie-historical-games:fit": "dotenv -e .env.local -- tsx scripts/rookie-historical-games-fit.ts",
     "projections:game-variance:fit": "dotenv -e .env.local -- tsx scripts/game-variance-fit.ts",
