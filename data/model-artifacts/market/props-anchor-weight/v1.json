@@ -1,0 +1,9 @@
+{
+  "name": "market/props-anchor-weight",
+  "version": 1,
+  "fitStamp": "2026-09-05T10:06:52-05:00",
+  "fittedOn": "2023 and 2024 pooled; judge season 2025 scored once (gate beaten: rho 0.6278 to 0.6328, MAE 57.8548 to 57.4445)",
+  "payload": {
+    "weight": 0.18
+  }
+}

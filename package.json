@@ -16,6 +16,7 @@
     "tokens:build": "tsx scripts/gen-tokens-css.ts",
     "facts:play-callers": "tsx scripts/validate-play-callers.ts",
     "coaches:ingest": "dotenv -e .env.local -- tsx scripts/coaches-ingest.ts",
+    "artifacts:publish": "dotenv -e .env.local -- tsx scripts/artifacts-publish.ts",
     "stats:generate": "tsx scripts/gen-mock-dataset.ts",
     "stats:tank01:record": "dotenv -e .env.local -- tsx scripts/record-tank01-fixtures.ts",
     "db:generate": "dotenv -e .env.local -- drizzle-kit generate",

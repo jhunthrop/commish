@@ -603,6 +603,13 @@
       "when": 1788887684897,
       "tag": "0085_coaches",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1788916251194,
+      "tag": "0086_model_artifacts",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,20 @@
+{
+  "name": "preseason/game-variance-skill",
+  "version": 1,
+  "fitStamp": "2026-09-04T21:14:06-05:00",
+  "fittedOn": "2023 and 2024 (calibration fix round, Task 4); 2025 and 2026 held out",
+  "payload": {
+    "rookie": {
+      "QB": 51.114734707762516,
+      "RB": 34.02477780887061,
+      "WR": 30.784340365478865,
+      "TE": 22.38546578010151
+    },
+    "veteran": {
+      "QB": 50.89757537429206,
+      "RB": 31.100841365831034,
+      "WR": 35.78356407278128,
+      "TE": 21.754009458064147
+    }
+  }
+}
