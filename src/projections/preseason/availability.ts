@@ -124,40 +124,54 @@ export interface SeasonAvailability {
   readonly teamGames: number;
   /**
    * Games the store says he was UNAVAILABLE for: the injury report listed him Out, or Doubtful and
-   * he did not play, or the weekly roster carried him on a reserve, PUP, non-football-injury,
-   * suspended or exempt list that week (`availability/week-classification.ts`). A rostered week he
-   * was healthy and did not play is neither played nor unavailable.
+   * he did not play, or the weekly roster carried him on a reserve, PUP, non-football-injury or
+   * exempt list that week (`availability/week-classification.ts`). A rostered week he was healthy
+   * and did not play is neither played nor unavailable; a suspended week is counted apart, below.
    *
    * `null` where neither designation store covers the season: without the designations a missed
    * week and a did-not-play week are the same row, so the season says nothing about availability.
    * Never zero in that case, which would read as a clean season the store never observed.
    */
   readonly gamesUnavailable: number | null;
+  /**
+   * Games he sat SUSPENDED (founder report 2026-09-08: a served suspension is not an injury). Read
+   * out of the record entirely by `availabilityEvidence`: a suspended week is neither a game he was
+   * available for nor an absence that says anything about his body, so it leaves both the numerator
+   * and the denominator of the availability half. `null` under the same coverage rule as
+   * `gamesUnavailable`, and always `null` together with it.
+   */
+  readonly gamesSuspended: number | null;
 }
 
 /** One covered season of record, split into the two facts it carries. */
 export interface SeasonEvidence {
   /** Games he played, never more than he was available for. */
   readonly played: number;
-  /** Games he was available for: his team's games less the weeks the store says he was unavailable.
-   *  A healthy week he did not play counts as available, because it was. */
+  /** Games he was available for: the games that count less the weeks the store says he was
+   *  unavailable. A healthy week he did not play counts as available, because it was. */
   readonly available: number;
-  /** Games his team played. */
+  /** Games that count for him: his team's games less the weeks he sat suspended. */
   readonly games: number;
+}
+
+function clampCount(value: number, ceiling: number): number {
+  return Math.min(Math.max(0, value), ceiling);
 }
 
 /**
  * What one season of record says, in the two halves the model reads separately: `played` over
  * `available` is ROLE evidence (how much of the football he could have played he did play);
  * `available` over `games` is AVAILABILITY evidence (how much of the season he could have played at
- * all). `null` where the designation stores do not cover the season, which is silence rather than a
- * clean year.
+ * all). A suspended week is in neither: it comes off `games` before anything else is read, so
+ * Rashee Rice's 2025 (six suspended, three to a knee, eight played) is eight of eight available of
+ * eleven games, not eight of seventeen. `null` where the designation stores do not cover the
+ * season, which is silence rather than a clean year.
  */
 export function availabilityEvidence(entry: SeasonAvailability): SeasonEvidence | null {
-  if (entry.gamesUnavailable === null || entry.teamGames <= 0) return null;
-  const unavailable = Math.min(Math.max(0, entry.gamesUnavailable), entry.teamGames);
-  const available = entry.teamGames - unavailable;
-  return { played: Math.min(Math.max(0, entry.gamesPlayed), available), available, games: entry.teamGames };
+  if (entry.gamesUnavailable === null || entry.gamesSuspended === null || entry.teamGames <= 0) return null;
+  const games = entry.teamGames - clampCount(entry.gamesSuspended, entry.teamGames);
+  const available = games - clampCount(entry.gamesUnavailable, games);
+  return { played: clampCount(entry.gamesPlayed, available), available, games };
 }
 
 /** Everything the model is allowed to know about one player before a season. */

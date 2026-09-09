@@ -192,6 +192,13 @@ describe("blendBoard", () => {
     expect(seasonPointsOf(blended!)).toBeCloseTo(199, 6);
   });
 
+  it("MEASURED PIN (2026-09-08 round): a roster_status reserve reason does NOT lift the availability cap; the uncapped term was worse on held-out 2023-2024 (see availability-admission.ts)", () => {
+    const reserve: BoardReason = { code: "roster_status", status: "injured_reserve", source: "tank01_player_list", observedAt: "2026-09-05T22:35:00.000Z", team: "GB" };
+    const threeGames = { expected: 3, rate: 3 / 17, distribution: { floor: 0, median: 3, ceiling: 13 }, probabilities: [] } as const;
+    const [blended] = blendBoard([market({ marketPoints: 162.9 })], [candidate({ games: threeGames, reasons: [reserve] })], { season: SEASON, constants: CONSTANTS, laws: [] });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(162.9 - CONSTANTS.availabilityCapPoints, 6);
+  });
+
   it("throws for a candidate at a position the implied-games table carries no entry for", () => {
     const kicker = candidate({ position: "K" });
     expect(() => blendBoard([market({ position: "K" })], [kicker], { season: SEASON, constants: CONSTANTS, laws: [] })).toThrow(

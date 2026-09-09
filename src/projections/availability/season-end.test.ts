@@ -84,7 +84,7 @@ describe("deriveSeasonEndingAbsence", () => {
 });
 
 function statusRow(week: number, status: string): WeeklyRosterStatus {
-  return { week, status };
+  return { week, status, statusDetail: "" };
 }
 
 describe("deriveSeasonEndFromStatus", () => {

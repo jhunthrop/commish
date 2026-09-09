@@ -458,12 +458,12 @@ async function main(): Promise<void> {
   // Position lookup: nflverse_roster_weeks' own `position` column, latest row per player-season.
   console.log("Loading roster-week rows (position, status) for all needed seasons...");
   const rosterSeasons = Array.from(new Set(ALL_LABEL_SEASONS.flatMap((s) => [s, s - 1, s - 2]))).sort((a, b) => a - b);
-  const rosterRowsBySeason = new Map<number, readonly { week: number; player_id: string; status: string; position: string }[]>();
+  const rosterRowsBySeason = new Map<number, readonly { week: number; player_id: string; status: string; status_detail: string; position: string }[]>();
   for (const season of rosterSeasons) {
     const rows = await db.execute(sql`
-      select week, player_id, status, position from nflverse_roster_weeks where season = ${season} order by week
+      select week, player_id, status, status_detail, position from nflverse_roster_weeks where season = ${season} order by week
     `);
-    rosterRowsBySeason.set(season, rows as unknown as { week: number; player_id: string; status: string; position: string }[]);
+    rosterRowsBySeason.set(season, rows as unknown as { week: number; player_id: string; status: string; status_detail: string; position: string }[]);
   }
 
   const positionByPlayerSeason = new Map<string, Position>(); // `${season}|${playerId}` -> position
@@ -499,7 +499,7 @@ async function main(): Promise<void> {
     const byPlayer = new Map<string, WeeklyRosterStatus[]>();
     for (const row of rows) {
       const list = byPlayer.get(row.player_id) ?? [];
-      list.push({ week: row.week, status: row.status });
+      list.push({ week: row.week, status: row.status, statusDetail: row.status_detail });
       byPlayer.set(row.player_id, list);
     }
     statusRowsBySeason.set(season, byPlayer);

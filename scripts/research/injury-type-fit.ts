@@ -63,7 +63,7 @@ function toAvailabilityInput(row: FeatureRow): AvailabilityInput {
     // with every unplayed game read as an absence. The shipped model has since moved to the
     // classified count (`availability/week-classification.ts`); restating this script's history
     // under the new rule would change numbers a FINAL results document already reports.
-    history: row.history.map((entry) => ({ ...entry, gamesUnavailable: Math.max(0, entry.teamGames - entry.gamesPlayed) })),
+    history: row.history.map((entry) => ({ ...entry, gamesUnavailable: Math.max(0, entry.teamGames - entry.gamesPlayed), gamesSuspended: 0 })),
     baselineRate: null,
   };
 }

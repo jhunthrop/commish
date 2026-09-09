@@ -607,8 +607,15 @@
     {
       "idx": 86,
       "version": "7",
-      "when": 1788916251194,
-      "tag": "0086_model_artifacts",
+      "when": 1788915939594,
+      "tag": "0086_roster_weeks_status_detail",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1788917617184,
+      "tag": "0087_model_artifacts",
       "breakpoints": true
     }
   ]

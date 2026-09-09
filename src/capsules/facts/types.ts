@@ -49,6 +49,10 @@ export interface PlayerFactsGamesMissed {
   /** Ascending. `null` where the injury and roster archives do not cover the season: absence, never
    *  a zero the store did not observe. */
   readonly unavailableWeeks: readonly number[] | null;
+  /** The weeks he sat SUSPENDED, ascending, apart from the injury weeks: a served suspension is
+   *  reported as what it was, never as a missed game to injury (founder report 2026-09-08). `null`
+   *  under the same coverage rule. */
+  readonly suspendedWeeks: readonly number[] | null;
   /** `null` under the same coverage rule. */
   readonly healthyDidNotPlay: number | null;
 }

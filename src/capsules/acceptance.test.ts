@@ -477,7 +477,7 @@ describe("the depth section, grounded", () => {
     depth: depthWith({
       // Only the groups that carry NUMBERS need to be here: a group with no number cannot break a
       // number rule, and every group's own rendering is pinned by `render-depth.test.ts`.
-      gamesMissed: [{ season: 2025, teamGames: 17, gamesPlayed: 14, firstPlayedWeek: 1, unavailableWeeks: [4, 5, 9], healthyDidNotPlay: 0 }],
+      gamesMissed: [{ season: 2025, teamGames: 17, gamesPlayed: 14, firstPlayedWeek: 1, unavailableWeeks: [4, 5, 9], suspendedWeeks: [], healthyDidNotPlay: 0 }],
       priorSeasons: [{ season: 2024, points: 289.6, gamesPlayed: 16, positionRank: 3, qualifierCount: 48 }],
     }),
   });

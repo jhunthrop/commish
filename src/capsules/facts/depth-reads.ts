@@ -75,10 +75,16 @@ export async function rosterStatusesFor(db: ReadonlyDb, playerIds: readonly stri
   const out = new Map<string, WeeklyRosterStatus[]>();
   if (playerIds.length === 0 || seasons.length === 0) return out;
   const rows = await db
-    .select({ season: nflverseRosterWeeks.season, week: nflverseRosterWeeks.week, playerId: nflverseRosterWeeks.playerId, status: nflverseRosterWeeks.status })
+    .select({
+      season: nflverseRosterWeeks.season,
+      week: nflverseRosterWeeks.week,
+      playerId: nflverseRosterWeeks.playerId,
+      status: nflverseRosterWeeks.status,
+      statusDetail: nflverseRosterWeeks.statusDetail,
+    })
     .from(nflverseRosterWeeks)
     .where(and(inArray(nflverseRosterWeeks.playerId, [...playerIds]), inArray(nflverseRosterWeeks.season, [...seasons])));
-  for (const row of rows) push(out, seasonKey(row.playerId, row.season), { week: row.week, status: row.status });
+  for (const row of rows) push(out, seasonKey(row.playerId, row.season), { week: row.week, status: row.status, statusDetail: row.statusDetail });
   return out;
 }
 

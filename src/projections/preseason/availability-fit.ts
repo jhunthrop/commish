@@ -6,6 +6,7 @@ import {
   AGE_BRACKETS,
   ROLE_BRACKETS,
   ageBracketFor,
+  availabilityEvidence,
   expectedGamesPlayed,
   roleBracketFor,
   shrunkAvailabilityRate,
@@ -14,6 +15,7 @@ import {
   type AvailabilityInput,
   type AvailabilityPriors,
   type RoleBracket,
+  type SeasonEvidence,
 } from "./availability";
 import { ALL_POSITIONS, mean } from "./fit";
 
@@ -80,6 +82,9 @@ export interface AvailabilityObservation {
   /** Games the designation archives say he was unavailable for THAT season, the quantity the
    *  availability prior is a mean of. `null` where the archives do not cover the season. */
   readonly gamesUnavailable: number | null;
+  /** Games he sat suspended THAT season, read out of both baselines the way `availabilityEvidence`
+   *  reads them out of a record (`SeasonAvailability.gamesSuspended`). `null` with the above. */
+  readonly gamesSuspended: number | null;
 }
 
 export interface AvailabilityFitOptions {
@@ -101,12 +106,27 @@ function rateOf(observation: AvailabilityObservation): number {
   return Math.min(1, Math.max(0, observation.gamesPlayed / teamGames));
 }
 
+/**
+ * The label season read as a RECORD: the same `availabilityEvidence` split the model applies to a
+ * prior season, so the two baseline tables the record is later read against are on the record's
+ * own footing. A suspended week is in neither half (founder report 2026-09-08). `null` where the
+ * archives do not cover the season.
+ */
+function labelEvidenceOf(observation: AvailabilityObservation): SeasonEvidence | null {
+  return availabilityEvidence({
+    season: observation.season,
+    gamesPlayed: observation.gamesPlayed,
+    teamGames: teamGamesIn(observation.season),
+    gamesUnavailable: observation.gamesUnavailable,
+    gamesSuspended: observation.gamesSuspended,
+  });
+}
+
 /** Games played per game available for one observation, or `null` where the archives do not cover
  *  the season or he was available for nothing. */
 function playedPerAvailableOf(observation: AvailabilityObservation): number | null {
-  if (observation.gamesUnavailable === null) return null;
-  const available = teamGamesIn(observation.season) - Math.min(observation.gamesUnavailable, teamGamesIn(observation.season));
-  return available > 0 ? Math.min(1, observation.gamesPlayed / available) : null;
+  const evidence = labelEvidenceOf(observation);
+  return evidence !== null && evidence.available > 0 ? evidence.played / evidence.available : null;
 }
 
 /**
@@ -154,12 +174,11 @@ export function fitBaseline(observations: readonly AvailabilityObservation[]): A
 export const ARCHIVES_REQUIRED =
   "The availability fit needs the injury report and weekly roster archives (nflverse_injuries, nflverse_roster_weeks) for the fit seasons; run `npm run projections:context` first.";
 
-/** The share of the season an observation was available for, or `null` where the archives do not
- *  cover it. */
+/** The share of the games that count that an observation was available for, or `null` where the
+ *  archives do not cover the season or (a season spent entirely suspended) no game counts. */
 function availableShareOf(observation: AvailabilityObservation): number | null {
-  if (observation.gamesUnavailable === null) return null;
-  const teamGames = teamGamesIn(observation.season);
-  return Math.min(1, Math.max(0, (teamGames - observation.gamesUnavailable) / teamGames));
+  const evidence = labelEvidenceOf(observation);
+  return evidence !== null && evidence.games > 0 ? evidence.available / evidence.games : null;
 }
 
 /**

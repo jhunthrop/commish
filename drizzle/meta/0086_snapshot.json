@@ -1,5 +1,5 @@
 {
-  "id": "1bd20ee7-b08c-442c-aa3c-27951251d8bb",
+  "id": "dcfd7f34-1b11-44c6-b049-3f45760cae02",
   "prevId": "3aa1cdc4-ff38-4aee-9a3e-a0a62f2a2376",
   "version": "7",
   "dialect": "postgresql",
@@ -3147,89 +3147,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.model_artifacts": {
-      "name": "model_artifacts",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "bigserial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "fit_stamp": {
-          "name": "fit_stamp",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "fitted_on": {
-          "name": "fitted_on",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "payload": {
-          "name": "payload",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "published_at": {
-          "name": "published_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "model_artifacts_name_version_idx": {
-          "name": "model_artifacts_name_version_idx",
-          "columns": [
-            {
-              "expression": "name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "version",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "model_artifacts_version_ck": {
-          "name": "model_artifacts_version_ck",
-          "value": "\"model_artifacts\".\"version\" >= 1"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.money_accounts": {
       "name": "money_accounts",
       "schema": "",
@@ -4194,6 +4111,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "status_detail": {
+          "name": "status_detail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
         },
         "position": {
           "name": "position",

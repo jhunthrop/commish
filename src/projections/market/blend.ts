@@ -18,6 +18,7 @@ import { preseasonRostersAsOf } from "../preseason/store";
 import { historicalRookieExpectedGames, rookieCurve, rookieCurveEvidenceN } from "../preseason/rookie-curve";
 import { gateCandidates, type ExcludedCandidate } from "../preseason/roster-status-gate";
 import { rosterStatusesAsOf, type SweepCoverage } from "../preseason/roster-status-read";
+import { admitAvailability, clampAbs } from "./availability-admission";
 import { shrinkTowardMarket } from "./thin-evidence-shrink";
 import {
   preseasonCandidates,
@@ -302,10 +303,6 @@ export interface BlendEvidenceOptions {
  *  applied magnitude depend on which position happened to have the largest fitted attrition. */
 const FULL_SEASON_GAMES = 17;
 
-function clampAbs(value: number, cap: number): number {
-  return Math.min(cap, Math.max(-cap, value));
-}
-
 function isLawReason(reason: BoardReason): reason is Extract<BoardReason, { code: "law" }> {
   return reason.code === "law";
 }
@@ -314,19 +311,9 @@ function rookieReasonOf(candidate: BoardCandidate): Extract<BoardReason, { code:
   return candidate.reasons.find((reason): reason is Extract<BoardReason, { code: "rookie" }> => reason.code === "rookie") ?? null;
 }
 
-/** `constants.impliedGamesByPosition`, safely narrowed and looked up for one candidate's own
- *  `Position` — throws for a position the table carries no entry for (`K`/`DEF`), which the shipped
- *  pipeline never emits a candidate at (`preseasonCandidates`' own docblock: "the whole preseason
- *  board projects nothing else") but a hand-built test fixture could, and a silent `undefined` divide
- *  would be a worse failure than a clear one. */
-function impliedGamesFor(position: Position, table: ImpliedGamesByPosition): number {
-  if (!isCurvePosition(position)) {
-    throw new Error(`market/blend.ts: no implied-games entry for position "${position}" — the blend only ever runs for QB/RB/WR/TE.`);
-  }
-  return table[position];
-}
-
-/** The identical narrow-and-lookup discipline `impliedGamesFor` uses, for `marketTailByPosition`. */
+/** The identical narrow-and-lookup discipline `availability-admission.ts`'s `impliedGamesFor` uses,
+ *  for `marketTailByPosition`: throws for a position the table carries no entry for (`K`/`DEF`),
+ *  which the shipped pipeline never emits a candidate at but a hand-built fixture could. */
 function marketTailFor(position: Position, table: MarketTailByPosition): number {
   if (!isCurvePosition(position)) {
     throw new Error(`market/blend.ts: no market-tail entry for position "${position}" — the blend only ever runs for QB/RB/WR/TE.`);
@@ -375,18 +362,10 @@ function tailCappedUnlistedPoints(candidate: BoardCandidate, context: BlendConte
  * even engages. That is intentional conservatism, not an approximation error: this board spends
  * disagreement sparingly, and a law's own bootstrap CI is real evidence but not certainty.
  *
- * CLAUSE (b), THE AVAILABILITY GAP (I3+I5 fix round, rewritten): the market's own number is an
- * empirical average over REAL player-seasons at that ADP rank, most of which missed some real games
- * — the curve already prices that attrition in. The gap this clause measures is therefore between
- * the model's own `expectedGames` and `constants.impliedGamesByPosition[position]` — the market
- * curve's OWN train population's mean games played at that position — NEVER a naive
- * `teamGamesIn(season)` full-season assumption, which nearly every real player falls short of and
- * would therefore systematically drag the blend below market for the ordinary case, not only the
- * genuinely injury-flagged one. The gap is converted to season points via the market's OWN implied
- * per-game rate (`marketPoints / impliedGames`) — the only rate available that is anchored to THIS
- * player's own market price rather than a positional average — then capped at `availabilityCapPoints`.
- * Positive when the model expects MORE games than the market's own population typically saw at that
- * position; negative when it expects fewer.
+ * CLAUSE (b), THE AVAILABILITY GAP: `availability-admission.ts`'s `admitAvailability` — the gap
+ * between the model's expected games and the market's own implied games at that position, priced
+ * at the anchor's own per-game rate and capped at `availabilityCapPoints` (that module's docblock,
+ * including why the cap stands for a reserve-designated player too).
  *
  * CLAUSE (c), LISTED ROOKIES: handled directly inside `blendBoard`, before this function is ever
  * called — a full substitution of `marketPoints` by `rookieCurve` for a rookie the ADP board has
@@ -457,11 +436,7 @@ function admittedDelta(candidate: BoardCandidate, anchorPoints: number, context:
   }
   if (constants.playerLawCapPoints !== undefined) lawTotal = clampAbs(lawTotal, constants.playerLawCapPoints);
 
-  const impliedGames = impliedGamesFor(candidate.position, constants.impliedGamesByPosition);
-  const availabilityGap = candidate.games.expected - impliedGames;
-  const availabilityDelta = clampAbs((availabilityGap * anchorPoints) / impliedGames, constants.availabilityCapPoints);
-
-  return clampAbs(lawTotal + availabilityDelta, constants.totalCapPoints);
+  return clampAbs(lawTotal + admitAvailability(candidate, anchorPoints, constants), constants.totalCapPoints);
 }
 
 /**
