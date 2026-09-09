@@ -58,6 +58,7 @@ import type { LeagueShape } from "@/projections/decide/replacement";
 import { shippedPreseasonBoardInputs, type BlendConstants } from "@/projections/market/blend";
 import { rosterStatusReason } from "@/projections/preseason/roster-status";
 import type { ExcludedCandidate } from "@/projections/preseason/roster-status-gate";
+import type { SweepCoverage } from "@/projections/preseason/roster-status-read";
 import { FITTED_BLEND_CONSTANTS } from "@/projections/market/blend-fitted";
 import { marketBoard } from "@/projections/market/curve";
 import { propsAnchorForSeason } from "@/projections/market/props-anchor";
@@ -225,6 +226,15 @@ function blendedLeg(format: BoardFormat): BoardLeg {
 interface BuiltBoard {
   readonly board: readonly BoardEntry[];
   readonly exclusions: readonly ExcludedCandidate[];
+  /** What the roster sweep behind the gate covered; printed when it was incomplete, because an
+   *  incomplete sweep excluded nobody on absence and an operator should know the gate stood down. */
+  readonly sweep: SweepCoverage | null;
+}
+
+/** The sweep's own line in the write summary: nothing when it was complete or absent. */
+function describeSweep(sweep: SweepCoverage | null): string {
+  if (sweep === null || sweep.complete) return "";
+  return `  (roster sweep incomplete: ${sweep.clubCount} clubs, smallest ${sweep.smallestClub ?? 0}, absence not read as a status)`;
 }
 
 async function buildBoard(
@@ -234,13 +244,13 @@ async function buildBoard(
   blendEvidence?: { readonly constants: BlendConstants; readonly propsAnchor: ReadonlyMap<string, number> },
 ): Promise<BuiltBoard> {
   const raw = leg.format === null;
-  const { candidates, exclusions } = await shippedPreseasonBoardInputs(db, inputs, PRIORS, {
+  const { candidates, exclusions, sweep } = await shippedPreseasonBoardInputs(db, inputs, PRIORS, {
     raw,
     ...(leg.format === null ? {} : { format: leg.format }),
     ...(blendEvidence !== undefined ? { constants: blendEvidence.constants, propsAnchor: blendEvidence.propsAnchor } : {}),
   });
   const rules = leg.format === null ? PPR_SCORING : BOARD_FORMAT_SPECS[leg.format].rules;
-  return { board: preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules, shape: SHAPE }), exclusions };
+  return { board: preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules, shape: SHAPE }), exclusions, sweep };
 }
 
 /** One reason code's own before-and-after count, over the players the board holds. */
@@ -328,7 +338,8 @@ function printBoardWrite(season: number, label: string, leg: BoardLeg, result: B
     `${season}  [${label}, ${leg.source}]  ${String(result.board.length).padStart(4)} players  ` +
       `${String(result.write.written).padStart(4)} new projection rows  ${String(result.write.reasonsWritten).padStart(4)} reason rows written  ` +
       `${String(result.exclusions.length).padStart(3)} not on an active roster` +
-      describeRetirement(result.write),
+      describeRetirement(result.write) +
+      describeSweep(result.sweep),
   );
 }
 

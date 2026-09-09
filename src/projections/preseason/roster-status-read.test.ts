@@ -13,7 +13,16 @@ const DEPTH_AT = new Date("2026-09-01T12:20:00.000Z");
 /** The stamp the roster ingest claims for the week-one file (`preseason_rosters.as_of`). */
 const WEEK_ONE_STAMP = new Date("2026-09-01T00:00:00.000Z");
 const AS_OF = new Date("2026-09-08T00:00:00.000Z");
-const READ = { season: SEASON, weekOneStampedAt: WEEK_ONE_STAMP } as const;
+const READ = { season: SEASON, weekOneStampedAt: WEEK_ONE_STAMP, phase: "cutdown" } as const;
+const LISTED_ONLY = "00-0000007";
+
+/** A complete cutdown sweep: 32 clubs of 45, with the two sweep-active men on KC. */
+function completeSweep(): unknown {
+  return Array.from({ length: 32 }, (_, club) => ({
+    team: club === 0 ? "KC" : `C${club}`,
+    roster: Array.from({ length: 45 }, (_, i) => ({ espnID: club === 0 && i === 0 ? "101" : club === 0 && i === 1 ? "106" : `${club}-${i}` })),
+  }));
+}
 
 const ACTIVE = "00-0000001";
 const IR = "00-0000002";
@@ -41,14 +50,10 @@ describe("rosterStatusesAsOf", () => {
     await db.insert(playerCrosswalk).values({ playerId: "106", nflPlayerId: CROSSWALKED, method: "espn_id", resolvedAt: LIST_AT });
   });
 
-  async function captureHarvest(sweepAt: Date, listAt: Date): Promise<void> {
+  /** A one-club sweep by default (INCOMPLETE, so absence from it says nothing), or the complete one. */
+  async function captureHarvest(sweepAt: Date, listAt: Date, sweep: unknown = [{ team: "KC", roster: [{ playerID: "101", espnID: "101" }, { playerID: "106", espnID: "106" }] }]): Promise<void> {
     await db.insert(captureSnapshots).values([
-      {
-        source: "tank01_injuries",
-        capturedAt: sweepAt,
-        digest: `sweep-${sweepAt.toISOString()}`,
-        payload: [{ team: "KC", roster: [{ playerID: "101", espnID: "101" }, { playerID: "106", espnID: "106" }] }],
-      },
+      { source: "tank01_injuries", capturedAt: sweepAt, digest: `sweep-${sweepAt.toISOString()}`, payload: sweep },
       {
         source: "tank01_player_list",
         capturedAt: listAt,
@@ -57,10 +62,31 @@ describe("rosterStatusesAsOf", () => {
           { playerID: "101", espnID: "101", team: "KC", isFreeAgent: "False", injury: { designation: "" } },
           { playerID: "102", espnID: "102", team: "KC", isFreeAgent: "False", injury: { designation: "Injured Reserve" } },
           { playerID: "106", espnID: "106", team: "KC", isFreeAgent: "False", injury: { designation: "" } },
+          { playerID: "107", espnID: "107", team: "NO", isFreeAgent: "False", injury: { designation: "" } },
         ],
       },
     ]);
   }
+
+  it("does not read absence from an incomplete sweep as a status: the listed man falls through to the week-one row, and the summary says so", async () => {
+    await db.insert(nflPlayers).values({ id: LISTED_ONLY, name: "Listed Back", position: "RB", espnId: "107" });
+    await captureHarvest(SWEEP_AT, LIST_AT);
+    await db.insert(nflverseRosterWeeks).values({ season: SEASON, week: 1, playerId: LISTED_ONLY, team: "NO", status: "DEV", position: "RB" });
+    const read = await rosterStatusesAsOf(db, { ...READ, asOf: AS_OF, playerIds: [LISTED_ONLY, ACTIVE] });
+    expect(read.sweep).toEqual({ capturedAt: SWEEP_AT, clubCount: 1, smallestClub: 2, complete: false });
+    expect(read.statuses.get(LISTED_ONLY)?.kind).toBe("practice_squad");
+    expect(read.statuses.get(LISTED_ONLY)?.source).toBe("nflverse_roster_week_1");
+    // Membership of the partial sweep still counts.
+    expect(read.statuses.get(ACTIVE)?.kind).toBe("active");
+  });
+
+  it("reads absence from a complete sweep as off the active roster", async () => {
+    await db.insert(nflPlayers).values({ id: LISTED_ONLY, name: "Listed Back", position: "RB", espnId: "107" });
+    await captureHarvest(SWEEP_AT, LIST_AT, completeSweep());
+    const read = await rosterStatusesAsOf(db, { ...READ, asOf: AS_OF, playerIds: [LISTED_ONLY] });
+    expect(read.sweep?.complete).toBe(true);
+    expect(read.statuses.get(LISTED_ONLY)).toEqual({ kind: "off_active_roster", source: "tank01_player_list", observedAt: LIST_AT, team: "NO" });
+  });
 
   it("reads the harvest first, the week-one roster second, the depth chart third, and stays silent otherwise", async () => {
     await captureHarvest(SWEEP_AT, LIST_AT);
@@ -70,7 +96,7 @@ describe("rosterStatusesAsOf", () => {
     ]);
     await recordObservations(db, [{ season: SEASON, week: 1, playerId: CHARTED, source: DEPTH_SOURCE, metric: DEPTH_METRIC, value: 2, asOf: DEPTH_AT }]);
 
-    const statuses = await rosterStatusesAsOf(db, { ...READ, asOf: AS_OF, playerIds: [ACTIVE, IR, PRACTICE, CHARTED, SILENT, CROSSWALKED] });
+    const { statuses } = await rosterStatusesAsOf(db, { ...READ, asOf: AS_OF, playerIds: [ACTIVE, IR, PRACTICE, CHARTED, SILENT, CROSSWALKED] });
 
     expect(statuses.get(ACTIVE)).toEqual({ kind: "active", source: "tank01_roster_sweep", observedAt: SWEEP_AT, team: "KC" });
     // The harvest's own word outranks a week-one file that still says active.
@@ -92,10 +118,10 @@ describe("rosterStatusesAsOf", () => {
     await captureHarvest(SWEEP_AT, LIST_AT);
 
     const before = await rosterStatusesAsOf(db, { ...READ, asOf: new Date("2026-09-01T00:00:00.000Z"), playerIds: [IR] });
-    expect(before.get(IR)).toEqual({ kind: "no_roster", source: "tank01_player_list", observedAt: earlier, team: null });
+    expect(before.statuses.get(IR)).toEqual({ kind: "no_roster", source: "tank01_player_list", observedAt: earlier, team: null });
 
     const after = await rosterStatusesAsOf(db, { ...READ, asOf: AS_OF, playerIds: [IR] });
-    expect(after.get(IR)?.kind).toBe("injured_reserve");
+    expect(after.statuses.get(IR)?.kind).toBe("injured_reserve");
   });
 
   it("stamps a week-one roster status with the roster ingest's own stamp, and reads a code it does not know as silence", async () => {
@@ -103,12 +129,13 @@ describe("rosterStatusesAsOf", () => {
       { season: SEASON, week: 1, playerId: IR, team: "KC", status: "RES", position: "RB" },
       { season: SEASON, week: 1, playerId: PRACTICE, team: "NO", status: "TRC", position: "RB" },
     ]);
-    const statuses = await rosterStatusesAsOf(db, { ...READ, asOf: AS_OF, playerIds: [IR, PRACTICE] });
+    const { statuses, sweep } = await rosterStatusesAsOf(db, { ...READ, asOf: AS_OF, playerIds: [IR, PRACTICE] });
     expect(statuses.get(IR)).toEqual({ kind: "injured_reserve", source: "nflverse_roster_week_1", observedAt: WEEK_ONE_STAMP, team: "KC" });
     expect(statuses.has(PRACTICE)).toBe(false);
+    expect(sweep).toBeNull();
   });
 
   it("returns nothing for an empty population without touching the store", async () => {
-    expect((await rosterStatusesAsOf(db, { ...READ, asOf: AS_OF, playerIds: [] })).size).toBe(0);
+    expect(await rosterStatusesAsOf(db, { ...READ, asOf: AS_OF, playerIds: [] })).toEqual({ statuses: new Map(), sweep: null });
   });
 });

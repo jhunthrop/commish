@@ -8,6 +8,7 @@ import {
   readPlayerListings,
   rosterStatusFromNflverseCode,
   rosterStatusNoteOf,
+  sweepIsComplete,
   type CurrentRosterStatus,
   type RosterStatusKind,
 } from "./roster-status";
@@ -39,22 +40,24 @@ describe("rosterStatusFromNflverseCode", () => {
 });
 
 describe("the Tank01 payload readers", () => {
-  it("reads the roster sweep as club membership keyed by ESPN id", () => {
+  it("reads the roster sweep as club membership keyed by ESPN id, counting what it enumerated", () => {
     const sweep = readActiveRosterSweep([
       { team: "KC", roster: [{ playerID: "1", espnID: "1", injury: { designation: "Questionable" } }, { playerID: "2", espnID: "2" }] },
       { team: "SF", roster: [{ espnID: "3" }] },
       { team: "BAD" },
       "not a team",
     ]);
-    expect([...sweep.entries()]).toEqual([
+    expect([...sweep.teamByEspnId.entries()]).toEqual([
       ["1", "KC"],
       ["2", "KC"],
       ["3", "SF"],
     ]);
+    expect(sweep.clubCount).toBe(2);
+    expect(sweep.smallestClub).toBe(1);
   });
 
   it("reads an empty sweep from a payload that is not an array", () => {
-    expect(readActiveRosterSweep({ teams: [] }).size).toBe(0);
+    expect(readActiveRosterSweep({ teams: [] })).toEqual({ teamByEspnId: new Map(), clubCount: 0, smallestClub: null });
   });
 
   it("reads the player list's club, free-agent flag and designation, verbatim", () => {
@@ -71,9 +74,51 @@ describe("the Tank01 payload readers", () => {
   });
 });
 
+/** A sweep payload of `clubs` clubs, each `size` players strong, with player "1" on the first club. */
+function sweepPayload(clubs: number, size: number, thinClubSize: number | null = null): unknown {
+  return Array.from({ length: clubs }, (_, club) => ({
+    team: `C${club}`,
+    roster: Array.from({ length: club === 1 && thinClubSize !== null ? thinClubSize : size }, (_, i) => ({ espnID: club === 0 && i === 0 ? "1" : `${club}-${i}` })),
+  }));
+}
+
+describe("sweepIsComplete", () => {
+  it("needs every club present and none thinner than the phase's floor", () => {
+    expect(sweepIsComplete(readActiveRosterSweep(sweepPayload(32, 45)), "cutdown")).toBe(true);
+    expect(sweepIsComplete(readActiveRosterSweep(sweepPayload(31, 45)), "cutdown")).toBe(false);
+    expect(sweepIsComplete(readActiveRosterSweep(sweepPayload(32, 45, 10)), "cutdown")).toBe(false);
+    expect(sweepIsComplete(readActiveRosterSweep(sweepPayload(32, 42)), "cutdown")).toBe(false);
+    expect(sweepIsComplete(readActiveRosterSweep(sweepPayload(32, 42)), "in_season")).toBe(true);
+    expect(sweepIsComplete(readActiveRosterSweep([]), "in_season")).toBe(false);
+  });
+});
+
 describe("currentStatusFromTank01", () => {
-  const sweep = { capturedAt: SWEEP_AT, teamByEspnId: new Map([["1", "KC"]]) };
+  const sweep = { capturedAt: SWEEP_AT, teamByEspnId: new Map([["1", "KC"]]), clubCount: 32, smallestClub: 45, complete: true };
   const listAt = LIST_AT;
+  const listedOnly = { team: "NO", isFreeAgent: false, designation: null };
+
+  it("does not read absence from a 31-club sweep as off the active roster", () => {
+    const partial = { capturedAt: SWEEP_AT, ...readActiveRosterSweep(sweepPayload(31, 45)), complete: false };
+    expect(currentStatusFromTank01({ espnId: "9", sweep: partial, listing: listedOnly, listAt })).toBeNull();
+  });
+
+  it("does not read absence from a 32-club sweep with one club at ten players as off the active roster, for any club", () => {
+    const membership = readActiveRosterSweep(sweepPayload(32, 45, 10));
+    const partial = { capturedAt: SWEEP_AT, ...membership, complete: sweepIsComplete(membership, "cutdown") };
+    expect(partial.complete).toBe(false);
+    expect(currentStatusFromTank01({ espnId: "9", sweep: partial, listing: { ...listedOnly, team: "C1" }, listAt })).toBeNull();
+    expect(currentStatusFromTank01({ espnId: "9", sweep: partial, listing: { ...listedOnly, team: "C7" }, listAt })).toBeNull();
+    // Membership of a partial sweep is still a fact; so are the list's own designation and flag.
+    expect(currentStatusFromTank01({ espnId: "1", sweep: partial, listing: null, listAt })?.kind).toBe("active");
+    expect(currentStatusFromTank01({ espnId: "9", sweep: partial, listing: { ...listedOnly, isFreeAgent: true }, listAt })?.kind).toBe("no_roster");
+  });
+
+  it("reads absence from a complete sweep as off the active roster", () => {
+    const membership = readActiveRosterSweep(sweepPayload(32, 45));
+    const complete = { capturedAt: SWEEP_AT, ...membership, complete: sweepIsComplete(membership, "cutdown") };
+    expect(currentStatusFromTank01({ espnId: "9", sweep: complete, listing: listedOnly, listAt })?.kind).toBe("off_active_roster");
+  });
 
   it("calls a man on his club's active roster active, dated by the sweep", () => {
     const status = currentStatusFromTank01({ espnId: "1", sweep, listing: null, listAt });

@@ -129,10 +129,37 @@ export interface Tank01Listing {
   readonly designation: string | null;
 }
 
-/** The newest roster sweep: when it was taken, and which club each ESPN id was on the active roster of. */
-export interface RosterSweepCapture {
-  readonly capturedAt: Date;
+/** How many clubs a complete sweep enumerates. */
+export const SWEEP_CLUB_COUNT = 32;
+
+/**
+ * THE FLOOR UNDER A CLUB'S SWEEP MEMBERSHIP before absence from it counts as evidence (fix round,
+ * HIGH). A 53-man roster read at the cutdown carries at least 45 names even mid-churn; in season,
+ * with men on injured reserve off the list, at least 40. A club below its floor, or a sweep of
+ * fewer than 32 clubs, is a partial payload, and absence from a partial payload is silence.
+ */
+export const SWEEP_MINIMUM_CLUB_SIZE = { cutdown: 45, in_season: 40 } as const;
+export type SweepPhase = keyof typeof SWEEP_MINIMUM_CLUB_SIZE;
+
+/** What one sweep payload enumerated: membership, and the two numbers completeness is judged on. */
+export interface SweepMembership {
   readonly teamByEspnId: ReadonlyMap<string, string>;
+  readonly clubCount: number;
+  /** The thinnest club's membership, or `null` when the payload named no club at all. */
+  readonly smallestClub: number | null;
+}
+
+/** The newest roster sweep: when it was taken, what it enumerated, and whether that is complete. */
+export interface RosterSweepCapture extends SweepMembership {
+  readonly capturedAt: Date;
+  /** `sweepIsComplete` for the phase the read was taken in. MEMBERSHIP of an incomplete sweep is
+   *  still a fact (he is on that club); ABSENCE from one is not. */
+  readonly complete: boolean;
+}
+
+/** The completeness rule: every club present, none thinner than the phase's floor. */
+export function sweepIsComplete(membership: SweepMembership, phase: SweepPhase): boolean {
+  return membership.clubCount === SWEEP_CLUB_COUNT && membership.smallestClub !== null && membership.smallestClub >= SWEEP_MINIMUM_CLUB_SIZE[phase];
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -153,19 +180,26 @@ function espnIdOf(player: Record<string, unknown>): string | null {
  * Read as membership only — the designation half of this feed is `harvest-captures.ts`'s job. A
  * payload of another shape reads as an empty sweep, never as thirty-two empty rosters.
  */
-export function readActiveRosterSweep(payload: unknown): ReadonlyMap<string, string> {
-  const out = new Map<string, string>();
-  if (!Array.isArray(payload)) return out;
+export function readActiveRosterSweep(payload: unknown): SweepMembership {
+  const teamByEspnId = new Map<string, string>();
+  let clubCount = 0;
+  let smallestClub: number | null = null;
+  if (!Array.isArray(payload)) return { teamByEspnId, clubCount, smallestClub };
   for (const rawTeam of payload) {
     const club = asRecord(rawTeam);
     const team = asText(club.team);
     if (team === null || !Array.isArray(club.roster)) continue;
+    clubCount += 1;
+    let named = 0;
     for (const rawPlayer of club.roster) {
       const espnId = espnIdOf(asRecord(rawPlayer));
-      if (espnId !== null) out.set(espnId, team);
+      if (espnId === null) continue;
+      teamByEspnId.set(espnId, team);
+      named += 1;
     }
+    smallestClub = smallestClub === null ? named : Math.min(smallestClub, named);
   }
-  return out;
+  return { teamByEspnId, clubCount, smallestClub };
 }
 
 /** `tank01_player_list`: every player the provider knows, with `team`, `isFreeAgent` ("True"/"False"
@@ -216,7 +250,10 @@ export interface Tank01StatusInput {
  *    placed on the list after the sweep saw him on the roster.
  * 2. Otherwise membership of a club's roster sweep is active, dated by the sweep.
  * 3. Otherwise the player list alone: its reserve designation, its free-agent flag (`no_roster`),
- *    or a club with none of those (`off_active_roster` — see the module docblock).
+ *    or a club with none of those (`off_active_roster` — see the module docblock), which needs a
+ *    COMPLETE sweep to stand on: it is a claim about his absence from the sweep, and absence from
+ *    a partial sweep is silence (`sweepIsComplete`, fix round HIGH). With no sweep or a partial
+ *    one he falls through to the next source, or stays unknown.
  */
 export function currentStatusFromTank01({ espnId, sweep, listing, listAt }: Tank01StatusInput): CurrentRosterStatus | null {
   const listed = listing !== null && listAt !== null ? { listing, at: listAt } : null;
@@ -233,7 +270,9 @@ export function currentStatusFromTank01({ espnId, sweep, listing, listAt }: Tank
   const { listing: entry, at } = listed;
   if (reserveKind !== null) return { kind: reserveKind, source: "tank01_player_list", observedAt: at, team: entry.team };
   if (entry.isFreeAgent) return { kind: "no_roster", source: "tank01_player_list", observedAt: at, team: null };
-  if (entry.team !== null) return { kind: "off_active_roster", source: "tank01_player_list", observedAt: at, team: entry.team };
+  if (entry.team !== null && sweep !== null && sweep.complete) {
+    return { kind: "off_active_roster", source: "tank01_player_list", observedAt: at, team: entry.team };
+  }
   return null;
 }
 

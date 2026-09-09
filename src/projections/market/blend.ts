@@ -17,7 +17,7 @@ import { kdefHistorySeasonsFor, loadKdefHistory } from "../preseason/kdef-histor
 import { preseasonRostersAsOf } from "../preseason/store";
 import { historicalRookieExpectedGames, rookieCurve, rookieCurveEvidenceN } from "../preseason/rookie-curve";
 import { gateCandidates, type ExcludedCandidate } from "../preseason/roster-status-gate";
-import { rosterStatusesAsOf } from "../preseason/roster-status-read";
+import { rosterStatusesAsOf, type SweepCoverage } from "../preseason/roster-status-read";
 import { shrinkTowardMarket } from "./thin-evidence-shrink";
 import {
   preseasonCandidates,
@@ -988,6 +988,9 @@ export async function shippedPreseasonCandidates(
 export interface ShippedBoardInputs {
   readonly candidates: readonly BoardCandidate[];
   readonly exclusions: readonly ExcludedCandidate[];
+  /** What the roster sweep the gate read actually covered (`SweepCoverage`); `null` with no capture.
+   *  An incomplete sweep excluded nobody on absence alone, and the persist prints it. */
+  readonly sweep: SweepCoverage | null;
 }
 
 /** The stamp the roster ingest claims for this season's week-one file, read off the rows
@@ -1004,13 +1007,16 @@ function weekOneRosterStampOf(inputs: PreseasonInputs): Date {
  * pass through it: a status is a fact about the roster, not a modelling choice one arm may skip.
  */
 async function gated(db: ReadonlyDb, inputs: PreseasonInputs, candidates: readonly BoardCandidate[]): Promise<ShippedBoardInputs> {
-  const statuses = await rosterStatusesAsOf(db, {
+  const { statuses, sweep } = await rosterStatusesAsOf(db, {
     season: inputs.season,
     asOf: inputs.moment,
     playerIds: candidates.map((candidate) => candidate.playerId),
     weekOneStampedAt: weekOneRosterStampOf(inputs),
+    // A LIVE moment is before the season's first kickoff by construction (`liveMomentFor`), so
+    // its sweep is a cutdown roster; a replay moment is a played season's.
+    phase: inputs.momentKind === "live" ? "cutdown" : "in_season",
   });
-  return gateCandidates(candidates, statuses, inputs.season);
+  return { ...gateCandidates(candidates, statuses, inputs.season), sweep };
 }
 
 /** `shippedPreseasonCandidates` with the gate's exclusions beside the candidates — what the persist
@@ -1029,7 +1035,7 @@ export async function shippedPreseasonBoardInputs(
 
   const anchor = formatAnchorFor(format);
   const blendConstants = blendConstantsFor(constants ?? FITTED_BLEND_CONSTANTS, format);
-  const { candidates, exclusions } = await gated(db, inputs, preseasonCandidates(inputs, features, withBlendAvailabilityRecency(priors, blendConstants)));
+  const { candidates, exclusions, sweep } = await gated(db, inputs, preseasonCandidates(inputs, features, withBlendAvailabilityRecency(priors, blendConstants)));
   // `inputs.moment` — never a second, internal `preseasonMomentFor` call — so a LIVE board's market
   // prior is taken at the SAME moment the rest of the board was built at (Task 4, `curve.ts`'s own
   // `marketBoard` docblock: that function used to derive this itself, unconditionally through the
@@ -1047,7 +1053,7 @@ export async function shippedPreseasonBoardInputs(
     );
   }
   const blended = blendBoard(market, candidates, { season: inputs.season, constants: blendConstants, laws, propsAnchor, rules: anchor.rules });
-  return { candidates: [...blended, ...(await kdefCandidatesFor(db, inputs, anchor.rules))], exclusions };
+  return { candidates: [...blended, ...(await kdefCandidatesFor(db, inputs, anchor.rules))], exclusions, sweep };
 }
 
 /**

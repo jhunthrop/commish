@@ -8,8 +8,10 @@ import {
   readActiveRosterSweep,
   readPlayerListings,
   rosterStatusFromNflverseCode,
+  sweepIsComplete,
   type CurrentRosterStatus,
   type RosterSweepCapture,
+  type SweepPhase,
   type Tank01Listing,
 } from "./roster-status";
 
@@ -40,6 +42,22 @@ export interface RosterStatusReadOptions {
   readonly asOf: Date;
   readonly playerIds: readonly string[];
   readonly weekOneStampedAt: Date;
+  /** Which floor a club's sweep membership is judged against (`SWEEP_MINIMUM_CLUB_SIZE`). */
+  readonly phase: SweepPhase;
+}
+
+/** What the sweep the read leaned on actually covered, for the caller's own summary line. */
+export interface SweepCoverage {
+  readonly capturedAt: Date;
+  readonly clubCount: number;
+  readonly smallestClub: number | null;
+  readonly complete: boolean;
+}
+
+export interface RosterStatusRead {
+  readonly statuses: ReadonlyMap<string, CurrentRosterStatus>;
+  /** `null` when no sweep capture at or before `asOf` exists. */
+  readonly sweep: SweepCoverage | null;
 }
 
 interface Capture {
@@ -85,13 +103,21 @@ interface HarvestReads {
   readonly listAt: Date | null;
 }
 
-async function harvestReads(db: ReadonlyDb, asOf: Date): Promise<HarvestReads> {
+async function harvestReads(db: ReadonlyDb, asOf: Date, phase: SweepPhase): Promise<HarvestReads> {
   const [sweepCapture, listCapture] = await Promise.all([newestCaptureAtOrBefore(db, SWEEP_FEED, asOf), newestCaptureAtOrBefore(db, PLAYER_LIST_FEED, asOf)]);
+  const membership = sweepCapture === null ? null : readActiveRosterSweep(sweepCapture.payload);
   return {
-    sweep: sweepCapture === null ? null : { capturedAt: sweepCapture.capturedAt, teamByEspnId: readActiveRosterSweep(sweepCapture.payload) },
+    sweep:
+      sweepCapture === null || membership === null
+        ? null
+        : { capturedAt: sweepCapture.capturedAt, ...membership, complete: sweepIsComplete(membership, phase) },
     listings: listCapture === null ? new Map() : readPlayerListings(listCapture.payload),
     listAt: listCapture?.capturedAt ?? null,
   };
+}
+
+function coverageOf(sweep: RosterSweepCapture | null): SweepCoverage | null {
+  return sweep === null ? null : { capturedAt: sweep.capturedAt, clubCount: sweep.clubCount, smallestClub: sweep.smallestClub, complete: sweep.complete };
 }
 
 function harvestStatusFor(tank01Ids: readonly string[], harvest: HarvestReads): CurrentRosterStatus | null {
@@ -128,18 +154,18 @@ async function depthChartStatuses(db: ReadonlyDb, season: number, asOf: Date, pl
 }
 
 /** The read. See the module docblock for the sources and their precedence. */
-export async function rosterStatusesAsOf(db: ReadonlyDb, { season, asOf, playerIds, weekOneStampedAt }: RosterStatusReadOptions): Promise<ReadonlyMap<string, CurrentRosterStatus>> {
-  if (playerIds.length === 0) return new Map();
+export async function rosterStatusesAsOf(db: ReadonlyDb, { season, asOf, playerIds, weekOneStampedAt, phase }: RosterStatusReadOptions): Promise<RosterStatusRead> {
+  if (playerIds.length === 0) return { statuses: new Map(), sweep: null };
   const [tank01Ids, harvest, weekOne, depth] = await Promise.all([
     tank01IdsFor(db, playerIds),
-    harvestReads(db, asOf),
+    harvestReads(db, asOf, phase),
     weekOneStatuses(db, season, playerIds, weekOneStampedAt),
     depthChartStatuses(db, season, asOf, playerIds),
   ]);
-  const out = new Map<string, CurrentRosterStatus>();
+  const statuses = new Map<string, CurrentRosterStatus>();
   for (const playerId of playerIds) {
     const status = harvestStatusFor(tank01Ids.get(playerId) ?? [], harvest) ?? weekOne.get(playerId) ?? depth.get(playerId);
-    if (status !== undefined && status !== null) out.set(playerId, status);
+    if (status !== undefined && status !== null) statuses.set(playerId, status);
   }
-  return out;
+  return { statuses, sweep: coverageOf(harvest.sweep) };
 }
