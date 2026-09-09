@@ -10,7 +10,6 @@
 // expected-wins map) as plain arguments rather than reaching for the database or the network
 // themselves, so `validate-win-totals.test.ts` can drive them from fixture rows with no I/O at
 // all. `main()` is the only place that touches Postgres or fetches nflverse's schedule file.
-import { readFileSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { createDb, type ReadonlyDb } from "@/db/client";
 import { teamWeekObservations } from "@/db/schema";
@@ -28,16 +27,17 @@ import {
   FIRST_WIN_TOTALS_SEASON,
   LAST_WIN_TOTALS_SEASON,
   parseWinTotalsCsv,
-  WIN_TOTALS_CSV_PATH,
   WIN_TOTALS_SEASONS,
   type WinTotalRow,
 } from "@/projections/vegas/ingest";
+import { readWinTotalsCsv, WIN_TOTALS_CSV_PATH } from "./lib/win-totals-csv";
 
-// The CSV shape (`WinTotalRow`, `parseWinTotalsCsv`) and the path/season-range constants moved to
-// `src/projections/vegas/ingest.ts` in Task 2, which is now the canonical reader of this file inside
-// `src/` — a script importing them from `src/` is this repo's normal direction of dependency (this
-// script already does exactly that for `firstKickoffFor` and `nflTeamsBySeason`). Re-exported here
-// so `validate-win-totals.test.ts`'s existing `from "./validate-win-totals"` import needs no change.
+// The CSV shape (`WinTotalRow`, `parseWinTotalsCsv`) and the season-range constants moved to
+// `src/projections/vegas/ingest.ts` in Task 2 — a script importing them from `src/` is this repo's
+// normal direction of dependency (this script already does exactly that for `firstKickoffFor` and
+// `nflTeamsBySeason`). The file's path and its read live in `./lib/win-totals-csv.ts`, beside the
+// ingest that shares them (file-sourced data round, 2026-09-09). Re-exported here so
+// `validate-win-totals.test.ts`'s existing `from "./validate-win-totals"` import needs no change.
 export { FIRST_WIN_TOTALS_SEASON, LAST_WIN_TOTALS_SEASON, parseWinTotalsCsv, WIN_TOTALS_CSV_PATH, WIN_TOTALS_SEASONS, type WinTotalRow };
 
 export interface Violation {
@@ -205,8 +205,7 @@ function requireEnv(name: string): string {
 }
 
 async function main(): Promise<void> {
-  const text = readFileSync(WIN_TOTALS_CSV_PATH, "utf8");
-  const rows = parseWinTotalsCsv(text);
+  const rows = parseWinTotalsCsv(readWinTotalsCsv(WIN_TOTALS_CSV_PATH));
   console.log(`Loaded ${rows.length} rows from ${WIN_TOTALS_CSV_PATH} across seasons ${WIN_TOTALS_SEASONS[0]} to ${WIN_TOTALS_SEASONS.at(-1)}.`);
 
   const db = createDb(requireEnv("DATABASE_URL"));

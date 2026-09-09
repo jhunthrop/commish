@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import type { Db } from "@/db/client";
 import { parseCsv } from "../nflverse/csv";
 import { nflTeamsBySeason } from "../nflverse/team-eras";
@@ -18,13 +17,18 @@ import { recordTeamObservations, teamObservationsAsOf, type TeamWeekObservation 
  *
  * THE CSV SHAPE LIVES HERE, NOT IN THE VALIDATOR. `scripts/validate-win-totals.ts` (Task 1) defined
  * `WinTotalRow`/`parseWinTotalsCsv`/the season range originally; they move here because this module
- * is now the canonical reader of `data/win-totals/win-totals.csv` inside `src/`, and a script
- * importing from `src/` (as `validate-win-totals.ts` already does for `firstKickoffFor`,
- * `nflTeamsBySeason`, and the rest) is this repo's normal direction of dependency. The validator
- * re-exports these names so nothing else that imports from it has to change.
+ * is the canonical parser of the win-totals shape, and a script importing from `src/` (as
+ * `validate-win-totals.ts` already does for `firstKickoffFor`, `nflTeamsBySeason`, and the rest) is
+ * this repo's normal direction of dependency. The validator re-exports these names so nothing else
+ * that imports from it has to change.
+ *
+ * THE FILE READ DOES NOT LIVE HERE (file-sourced data round, 2026-09-09). This module is imported
+ * by the request path for `VEGAS_SOURCE` and `VEGAS_METRICS`, so a `readFileSync` in it would be
+ * traced into the serverless bundle, the exact shape of the coaches CSV outage. The committed
+ * file's path and its read are `scripts/lib/win-totals-csv.ts`'s; this module parses text it is
+ * handed and writes rows it has verified.
  */
 
-export const WIN_TOTALS_CSV_PATH = "data/win-totals/win-totals.csv";
 export const FIRST_WIN_TOTALS_SEASON = 2003;
 export const LAST_WIN_TOTALS_SEASON = 2026;
 
@@ -133,7 +137,7 @@ export function winTotalObservations(rows: readonly WinTotalRow[]): readonly Tea
  * rules out a recurring manual pull). Provenance and license reasoning: `data/win-totals/README.md`.
  *
  * The committed CSV stays the VALIDATED SEED: `scripts/validate-win-totals.ts` checks it row by row
- * against the store's own schedule, and `ingestVegasWinTotals` still reads it. This fetch only ever
+ * against the store's own schedule, and `ingestWinTotalsCsv` (`scripts/lib/win-totals-csv.ts`) still reads it. This fetch only ever
  * adds a season the committed file does not carry yet.
  */
 export const PUBLISHED_WIN_TOTALS_URL = "https://raw.githubusercontent.com/greerreNFL/nfelosrs/main/nfelosrs/Manual%20Data/win_totals.csv";
@@ -226,12 +230,15 @@ export interface VegasIngestReport {
 }
 
 /**
- * Reads the curated CSV and writes every row's three metrics to the team store.
+ * Writes every row's three metrics to the team store, from EITHER source — the committed CSV
+ * (`scripts/lib/win-totals-csv.ts`'s `ingestWinTotalsCsv`) or the publisher's live file (the
+ * win-totals job). One writer, so a fetched season lands under exactly the same provenance stamp,
+ * the same week-one convention and the same value-by-value verification a committed season does.
  *
  * VERIFIES ITS OWN WRITE RATHER THAN TRUSTING `recordTeamObservations`' RETURN COUNT
  * (`progress.md`'s documented `onConflictDoNothing` shadowing hazard: two different values sharing
  * one conflict key resolve to whichever landed first, silently, for any row NOT caught by
- * `assertFiniteValues`' same-batch check). This ingest's own key
+ * `assertFiniteValues`' same-batch check). This writer's own key
  * (`season|week|team|source|metric|asOf`) can only collide with a PRIOR run of this exact function,
  * because `VEGAS_SOURCE` is unique to it — so a short write count should mean nothing but an
  * ordinary idempotent re-run, every already-landed row unchanged. This function does not assume
@@ -239,16 +246,6 @@ export interface VegasIngestReport {
  * loudly naming every mismatch if a stored value ever disagrees with what this ingest computed,
  * rather than reporting a written-row count that looked plausible while a wrong number sat in the
  * store underneath it.
- */
-export async function ingestVegasWinTotals(db: Db, csvPath: string = WIN_TOTALS_CSV_PATH): Promise<VegasIngestReport> {
-  return writeVerifiedWinTotals(db, parseWinTotalsCsv(readFileSync(csvPath, "utf8")));
-}
-
-/**
- * The write itself, and its own read-back verification, over rows from EITHER source — the
- * committed CSV (`ingestVegasWinTotals` above) or the publisher's live file (the win-totals job).
- * One writer, so a fetched season lands under exactly the same provenance stamp, the same
- * week-one convention and the same value-by-value verification a committed season does.
  */
 export async function writeVerifiedWinTotals(db: Db, rows: readonly WinTotalRow[]): Promise<VegasIngestReport> {
   const observations = winTotalObservations(rows);
@@ -272,7 +269,7 @@ export async function writeVerifiedWinTotals(db: Db, rows: readonly WinTotalRow[
   }
   if (mismatches.length > 0) {
     throw new Error(
-      `ingestVegasWinTotals: ${mismatches.length} observation(s) did not land as computed after the write. ` +
+      `writeVerifiedWinTotals: ${mismatches.length} observation(s) did not land as computed after the write. ` +
         `This is the onConflictDoNothing shadowing hazard (team_week_observations, documented store debt) ` +
         `catching a real collision rather than an ordinary re-run -- ${mismatches.slice(0, 10).join("; ")}` +
         `${mismatches.length > 10 ? "; ..." : ""}`,
