@@ -14,6 +14,9 @@ const dollars = z.number().int().positive();
 const poolEntry = z.object({
   playerId,
   position: z.enum(["QB", "RB", "WR", "TE", "K", "DEF"]),
+  // Optional and only ever `true` (`DraftPoolEntry.excludedFromAutopick`): a row written before the
+  // roster-status gate carries no key and replays as eligible, exactly as it was picked.
+  excludedFromAutopick: z.literal(true).optional(),
 });
 
 /**

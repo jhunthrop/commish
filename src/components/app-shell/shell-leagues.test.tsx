@@ -12,6 +12,7 @@ const GIBBS: SearchResult = {
   positionRank: 2,
   boardRank: 3,
   byeWeek: 8,
+  rosterStatus: null,
 };
 const LIONS: SearchResult = { kind: "team", code: "DET", name: "Detroit Lions", byeWeek: 8 };
 

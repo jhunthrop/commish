@@ -75,6 +75,39 @@ function round8State(): DraftState {
   return midDraftState(SNAKE_CONFIG, ROUND8_POOL, { t1: ROUND8_ROSTER, t2: [] });
 }
 
+describe("the roster-status gate on the room's own hand (founder report 2026-09-08)", () => {
+  /** rb5 is the board's best available in round eight; here the served board has him off an active roster. */
+  const withSquadBack: readonly DraftPoolEntry[] = ROUND8_POOL.map((entry) => (entry.playerId === "rb5" ? { ...entry, excludedFromAutopick: true } : entry));
+
+  it("never autopicks a player the board has off an active roster, under the snapshot policy", () => {
+    const state = midDraftState(SNAKE_CONFIG, withSquadBack, { t1: ROUND8_ROSTER, t2: [] });
+    expect(availablePool(state)[0]?.playerId).toBe("rb5");
+    expect(bestAvailableFor(state, "t2")?.playerId).toBe("te1");
+  });
+
+  it("never autopicks him under the pre-upgrade board-order policy either", () => {
+    const legacy = Object.fromEntries(Object.entries(SNAKE_CONFIG).filter(([key]) => key !== "autopick")) as DraftConfig;
+    const state = midDraftState(legacy, withSquadBack, { t1: ROUND8_ROSTER, t2: [] });
+    expect(bestAvailableFor(state, "t2")?.playerId).toBe("te1");
+  });
+
+  it("skips him on a manager's own queue rather than honouring the queue over the roster", () => {
+    const state: DraftState = { ...midDraftState(SNAKE_CONFIG, withSquadBack, { t1: ROUND8_ROSTER, t2: [] }), queues: { t2: ["rb5", "wr3"] } };
+    expect(bestAvailableFor(state, "t2")?.playerId).toBe("wr3");
+  });
+
+  it("never auto-nominates him", () => {
+    const state = midDraftState(SNAKE_CONFIG, withSquadBack, { t1: ROUND8_ROSTER, t2: [] });
+    expect(bestNominationFor(state, "t2")?.playerId).toBe("te1");
+  });
+
+  it("leaves a pool with no mark exactly as before: the mark is absent, not false", () => {
+    const state = midDraftState(SNAKE_CONFIG, ROUND8_POOL, { t1: ROUND8_ROSTER, t2: [] });
+    expect(bestAvailableFor(state, "t2")?.playerId).toBe("rb5");
+    expect("excludedFromAutopick" in ROUND8_POOL[0]!).toBe(false);
+  });
+});
+
 describe("need-aware autopick (bestAvailableFor fallback)", () => {
   it("takes the board's own top player on a team's first pick, exactly board order", () => {
     // Empty roster => ramp 0 => every multiplier is exactly 1 and the argmax IS the first

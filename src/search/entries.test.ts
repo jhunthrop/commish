@@ -24,6 +24,7 @@ function row(overrides: Partial<BoardRow> & Pick<BoardRow, "playerId" | "name" |
     marketPositionAdp: null,
     byeWeek: null,
     reasons: [],
+    rosterStatus: null,
     ...overrides,
   };
 }
@@ -46,6 +47,7 @@ describe("searchEntriesFor", () => {
       positionRank: 1,
       boardRank: 1,
       byeWeek: 10,
+      rosterStatus: null,
     });
     expect(chase!.fields).toEqual({ name: "jamarr chase", team: ["cin", "cincinnati", "bengals"], position: "wr" });
   });
@@ -72,5 +74,17 @@ describe("searchEntriesFor", () => {
   it("skips a team code the name table does not hold rather than inventing a name", () => {
     const withUnknown = searchEntriesFor([], ["ZZZ", "DET"], new Map());
     expect(withUnknown.map((entry) => entry.result.kind === "team" && entry.result.code)).toEqual(["DET"]);
+  });
+
+  it("carries the board's roster status onto the result, and a band row stays findable with no board rank", () => {
+    const reserve = row({ playerId: "p7", name: "Reserve Back", position: "RB", team: "KC", ...PROJECTED, overallRank: 40, rosterStatus: { status: "injured_reserve", source: "tank01_player_list", observedAt: "2026-09-05T22:35:00.000Z", team: "KC", excluded: false } });
+    const squad = row({ playerId: "p8", name: "Squad Back", position: "RB", team: "NO", rosterStatus: { status: "practice_squad", source: "nflverse_roster_week_1", observedAt: "2026-09-01T00:00:00.000Z", team: "NO", excluded: true } });
+    const entries = searchEntriesFor([reserve, squad], [], new Map());
+    const results = entries.map((entry) => entry.result).filter((result) => result.kind === "player");
+    expect(results.find((result) => result.player.id === "p7")?.rosterStatus).toEqual(reserve.rosterStatus);
+    const band = results.find((result) => result.player.id === "p8");
+    expect(band?.rosterStatus?.excluded).toBe(true);
+    expect(band?.boardRank).toBeNull();
+    expect(band?.positionRank).toBeNull();
   });
 });

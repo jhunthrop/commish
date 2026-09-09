@@ -56,6 +56,33 @@ function archetypeNamed(name: string): BotArchetype {
   return found;
 }
 
+describe("the roster-status gate on the practice bots (founder report 2026-09-08)", () => {
+  /** The board's first two backs, marked as the served board marks a man off an active roster. */
+  const withSquadBacks: readonly DraftPoolEntry[] = (() => {
+    const backs = POOL.filter((entry) => entry.position === "RB").slice(0, 2).map((entry) => entry.playerId);
+    return POOL.map((entry) => (backs.includes(entry.playerId) ? { ...entry, excludedFromAutopick: true } : entry));
+  })();
+  const excludedIds = new Set(withSquadBacks.flatMap((entry) => (entry.excludedFromAutopick === true ? [entry.playerId] : [])));
+
+  it("never weighs a marked player as a candidate, so no seed can ever sample him", () => {
+    const state = apply(initialDraftState(CONFIG), { ...START, pool: withSquadBacks });
+    for (const archetype of BOT_ARCHETYPES) {
+      const weighed = botCandidateWeights(state, TEAMS[0]!, archetype).map((candidate) => candidate.playerId);
+      expect(weighed.some((id) => excludedIds.has(id))).toBe(false);
+      expect(weighed.length).toBe(MOCK_CONFIG.strategy.reachDepth);
+    }
+    for (let seed = 1; seed <= 50; seed += 1) {
+      expect(excludedIds.has(chooseBotPick(state, TEAMS[0]!, BOT_ARCHETYPES[0]!, rngFor(seed, TEAMS[0]!)) ?? "")).toBe(false);
+    }
+  });
+
+  it("skips a marked player on a queue too", () => {
+    const [first] = excludedIds;
+    const state: DraftState = { ...apply(initialDraftState(CONFIG), { ...START, pool: withSquadBacks }), queues: { [TEAMS[0]!]: [first!] } };
+    expect(chooseBotPick(state, TEAMS[0]!, BOT_ARCHETYPES[0]!, rngFor(1, TEAMS[0]!))).not.toBe(first);
+  });
+});
+
 function apply(state: DraftState, action: Parameters<typeof submitCommand>[1]): DraftState {
   const result = submitCommand(state, action);
   if (!result.ok) throw new Error(`${action.type} rejected: ${result.reason}`);

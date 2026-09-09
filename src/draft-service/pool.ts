@@ -5,6 +5,10 @@ import type { DraftPoolEntry } from "@/domain/draft";
 import type { Player } from "@/domain/player";
 import { PPR_SCORING } from "@/domain/scoring";
 import { LEAGUE_CONFIG } from "@/league";
+import { leagueBoardFormat } from "@/league-service/board-format";
+import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { reasonsByLeaguePlayerId } from "@/projections/preseason/reasons-by-player";
+import { rosterStatusNoteOf } from "@/projections/preseason/roster-status";
 import { computeFantasyPoints } from "@/scoring";
 import { seasonStatTotalsByPlayer } from "./season-totals";
 
@@ -100,5 +104,24 @@ export async function rankedPlayers(db: Db | DbTx, leagueId: string): Promise<re
  * `leagueId` alone and reads no transaction state.
  */
 export async function buildDraftPool(db: Db | DbTx, leagueId: string): Promise<readonly DraftPoolEntry[]> {
-  return (await rankedPlayers(db, leagueId)).map((player) => ({ playerId: player.id, position: player.position }));
+  const ranked = await rankedPlayers(db, leagueId);
+  const excluded = await excludedFromAutopick(db, leagueId, ranked);
+  return ranked.map((player) =>
+    excluded.has(player.id) ? { playerId: player.id, position: player.position, excludedFromAutopick: true } : { playerId: player.id, position: player.position },
+  );
+}
+
+/**
+ * THE ROSTER-STATUS GATE'S MARK ON THE POOL (founder report 2026-09-08): every league player the
+ * served board has off an active roster, read off the board's own `roster_status` reason through
+ * the same crosswalk the pool's reason chips use (`reasonsByLeaguePlayerId`, memoized per board).
+ * The LEAGUE'S OWN board decides (`leagueBoardFormat`), the same way its reason chips do; the
+ * gate reads one roster, so every format agrees, but reading the league's board keeps one rule
+ * for which store a room consults. Snapshotted into START_DRAFT with the pool: see
+ * `DraftPoolEntry.excludedFromAutopick`.
+ */
+async function excludedFromAutopick(db: Db | DbTx, leagueId: string, ranked: readonly Player[]): Promise<ReadonlySet<string>> {
+  const board = await leagueBoardFormat(db, leagueId);
+  const reasons = await reasonsByLeaguePlayerId(db, ranked, board.source, PRODUCT_SEASON);
+  return new Set(Object.entries(reasons).flatMap(([playerId, list]) => (rosterStatusNoteOf(list)?.excluded === true ? [playerId] : [])));
 }

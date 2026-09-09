@@ -5,7 +5,8 @@ import type { Player, Position } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
-import { Badge, Button, EmptyState, Input, Movement, PlayerRow, PositionBadge, ReasonChip, TierDivider, strongestLawReasons } from "@/components/ui";
+import { Badge, Button, EmptyState, Input, Movement, PlayerRow, PositionBadge, ReasonChip, RosterStatusPill, TierDivider, strongestLawReasons } from "@/components/ui";
+import { rosterStatusNoteOf } from "@/projections/preseason/roster-status";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { queueButtonLabel } from "../lib/lookups";
 import { marketOrderNoteFor } from "../lib/market-order-note";
@@ -311,6 +312,9 @@ export function PlayerPool({
             // Sunday v5 law 4. `null`/absent `reasons` and an unranked player both resolve to "no
             // chips", which is what leaves this row's height untouched (see `PlayerRow.chips`).
             const lawChips = strongestLawReasons(reasons?.get(row.player.id) ?? []);
+            // The roster-status gate (2026-09-08): the board's own dated status, from the same
+            // reason list the chips read, in the same pill every other surface shows.
+            const rosterStatus = rosterStatusNoteOf(reasons?.get(row.player.id) ?? []);
             return (
               // A fragment, never a wrapper element: an `<ol>` may hold only list items, and a
               // band divider is a sibling `<li>` of the rows it opens rather than a `<div>`
@@ -330,6 +334,7 @@ export function PlayerPool({
                       <>
                         <span data-testid="pool-player-team">{row.player.nflTeam}</span>
                         {adp === null ? null : <span data-testid="pool-player-adp">{` · ${adp}`}</span>}
+                        {rosterStatus === null ? null : <RosterStatusPill note={rosterStatus} className="ml-1.5" />}
                       </>
                     }
                     chips={

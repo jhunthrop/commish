@@ -5,7 +5,8 @@ import type { Player, Position } from "@/domain/player";
 import { auctionValues, type AuctionShape } from "@/projections/auction/value";
 import { quartilesFromSeasonBand } from "@/projections/preseason/band-quartiles";
 import type { BoardReason } from "@/projections/preseason/board";
-import { BottomSheet, Input, NOT_STARTED_DASH, PlayerFace, PositionBadge, ReasonChip, SegmentGroup, TierDivider } from "@/components/ui";
+import { BottomSheet, Input, NOT_STARTED_DASH, PlayerFace, PositionBadge, ReasonChip, RosterStatusPill, SegmentGroup, TierDivider } from "@/components/ui";
+import { NOT_ON_ACTIVE_ROSTER_BAND, NOT_ON_ACTIVE_ROSTER_NOTE } from "@/projections/preseason/roster-status-copy";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { Law } from "@/projections/laws/types";
 import { groupReasons } from "@/league-room/outlook/groups";
@@ -62,8 +63,12 @@ function csvField(value: string): string {
  * column of a downloaded file (re-review round 2's regression, pinned by board-csv.test.ts).
  */
 export function boardCsvLines(orderedRows: readonly BoardRow[], auctionShape: AuctionShape, scoringLabel: string): readonly string[] {
-  const values = auctionValues(orderedRows.map((row) => ({ playerId: row.playerId, valueOverReplacement: row.valueOverReplacement })), auctionShape);
-  return [CSV_HEADER.map(csvField).join(","), ...orderedRows.map((row) => rowToCsv(row, values.get(row.playerId) ?? null, scoringLabel))];
+  // The "Not on an active roster" band stays out of the file: a row with no number in any column
+  // but a name is a row the reader of a spreadsheet will rank by accident. The screen keeps them,
+  // with their status beside them, which the file has no column for.
+  const ranked = orderedRows.filter((row) => row.rosterStatus?.excluded !== true);
+  const values = auctionValues(ranked.map((row) => ({ playerId: row.playerId, valueOverReplacement: row.valueOverReplacement })), auctionShape);
+  return [CSV_HEADER.map(csvField).join(","), ...ranked.map((row) => rowToCsv(row, values.get(row.playerId) ?? null, scoringLabel))];
 }
 
 /** One number for the file, or an EMPTY CELL when the engine has none (the 2026-09-05 kicker and
@@ -293,6 +298,13 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
     return [...filtered].sort((a, b) => (dollarValues.get(b.playerId) ?? 1) - (dollarValues.get(a.playerId) ?? 1));
   }, [filtered, dollarView, dollarValues]);
 
+  // THE BAND (the roster-status gate, 2026-09-08): the players the gate took off the board render
+  // LAST, under their own heading, whatever the sort — they hold no rank, no tier and no dollar
+  // value, so no ordering above can place them. `ranked` is everything else, and is what the CSV
+  // exports (`boardCsvLines` keeps the same split).
+  const notOnRoster = useMemo(() => ordered.filter((row) => row.rosterStatus?.excluded === true), [ordered]);
+  const displayed = useMemo(() => [...ordered.filter((row) => row.rosterStatus?.excluded !== true), ...notOnRoster], [ordered, notOnRoster]);
+
   // Tier bands are computed PER POSITION by the engine (`board.ts`'s own docblock) — a mixed
   // "Overall" list has no single cross-position tier ladder to draw, so a band only renders when
   // exactly one position is selected and the list is in its natural (non-dollar) rank order.
@@ -390,9 +402,20 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
                 </td>
               </tr>
             ) : null}
-            {ordered.map((row) => {
+            {displayed.map((row) => {
+              // The band opens once, on its first row, in place of any tier divider: these rows
+              // carry no tier, and the heading says what they are instead.
+              const bandRow =
+                notOnRoster[0] === row ? (
+                  <tr key={`band-${row.playerId}`} data-testid="board-not-on-roster-band">
+                    <th scope="rowgroup" colSpan={8} className="pt-4 pb-1 text-left font-normal">
+                      <span className={`${MICRO_LABEL} block text-text-faint`}>{NOT_ON_ACTIVE_ROSTER_BAND}</span>
+                      <span className="block text-xs text-text-muted">{NOT_ON_ACTIVE_ROSTER_NOTE}</span>
+                    </th>
+                  </tr>
+                ) : null;
               const tierRow =
-                showTiers && row.tier !== lastTier ? (
+                bandRow === null && showTiers && row.rosterStatus?.excluded !== true && row.tier !== lastTier ? (
                   <tr key={`tier-${row.playerId}`}>
                     <td colSpan={8} className="pt-3 pb-1">
                       <TierDivider
@@ -424,6 +447,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
                 row.marketOrderRank ?? (position === "ALL" ? row.overallRank : (row.positionRankInValue ?? row.overallRank));
               return (
                 <Fragment key={row.playerId}>
+                  {bandRow}
                   {tierRow}
                   <tr className="border-b border-line/50">
                     <td className="px-2 py-2 tabular-nums text-text-faint">
@@ -444,6 +468,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
                           </span>
                         </div>
                         <PositionBadge position={row.position} rank={row.positionRankInValue ?? undefined} size="sm" className="ml-1" />
+                        {row.rosterStatus === null ? null : <RosterStatusPill note={row.rosterStatus} className="ml-1" />}
                       </div>
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums font-medium text-text-primary">

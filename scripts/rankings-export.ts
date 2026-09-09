@@ -44,10 +44,13 @@ function csvField(value: string | number | null): string {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-/** Board order: value order for projected rows, then the ADP-ordered rows behind them. */
+/** Board order: value order for projected rows, then the ADP-ordered rows behind them. A player the
+ *  roster-status gate took off the board (`BoardRow.rosterStatus.excluded`) is left out of the file
+ *  entirely: he holds no rank in either order, and a nameless row in a spreadsheet gets one by accident. */
 function inBoardOrder(rows: readonly BoardRow[]): readonly BoardRow[] {
-  const projected = rows.filter((row) => row.valueRank !== null).sort((a, b) => (a.valueRank ?? 0) - (b.valueRank ?? 0));
-  const byAdp = rows.filter((row) => row.valueRank === null).sort((a, b) => (a.marketOrderRank ?? Infinity) - (b.marketOrderRank ?? Infinity));
+  const ranked = rows.filter((row) => row.rosterStatus?.excluded !== true);
+  const projected = ranked.filter((row) => row.valueRank !== null).sort((a, b) => (a.valueRank ?? 0) - (b.valueRank ?? 0));
+  const byAdp = ranked.filter((row) => row.valueRank === null).sort((a, b) => (a.marketOrderRank ?? Infinity) - (b.marketOrderRank ?? Infinity));
   return [...projected, ...byAdp];
 }
 

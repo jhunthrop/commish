@@ -162,6 +162,17 @@ export function queueFor(state: DraftState, teamId: string): readonly string[] {
  * internally, so a queued entry's availability is checked against the pool it produces rather
  * than a second, separately-computed drafted-ids set.
  */
+/**
+ * Whether the room's own hand may take this player (the roster-status gate, 2026-09-08). A pool
+ * entry the served board had off an active roster at START_DRAFT carries `excludedFromAutopick`
+ * and is skipped by the clock's autopick, the auction's auto-nomination and the practice bots
+ * alike; a manager's own click is not this function's business. Absent means eligible, so every
+ * log written before the mark existed replays as it was picked.
+ */
+export function autopickEligible(entry: DraftPoolEntry): boolean {
+  return entry.excludedFromAutopick !== true;
+}
+
 function autopickContext(state: DraftState, teamId: string): {
   readonly roster: readonly RosterSlot[];
   readonly available: readonly DraftPoolEntry[];
@@ -169,7 +180,9 @@ function autopickContext(state: DraftState, teamId: string): {
   readonly queuedFirst: DraftPoolEntry | null;
 } {
   const roster = rosterFor(state, teamId);
-  const available = availablePool(state);
+  // The gate binds the QUEUE path too: a queued player the board has off an active roster is
+  // still never the room's pick for a manager, however he got onto the list.
+  const available = availablePool(state).filter(autopickEligible);
   const availableIds = new Set(available.map((entry) => entry.playerId));
   const canFill = (entry: DraftPoolEntry): boolean =>
     assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig }).ok;

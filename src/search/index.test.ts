@@ -12,6 +12,7 @@ function player(id: string, name: string, position: "QB" | "RB" | "WR" | "TE" | 
     positionRank: 1,
     boardRank,
     byeWeek: null,
+    rosterStatus: null,
   };
   return { fields, result, order };
 }

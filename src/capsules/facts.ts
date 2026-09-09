@@ -443,6 +443,16 @@ function evidenceFrom(reasons: readonly BoardReason[], laws: readonly Law[]): re
       case "defense_no_history":
       case "defense_takeaways":
         continue;
+      /**
+       * THE ROSTER STATUS, DELIBERATELY NOT AN EVIDENCE ITEM (the roster-status gate, 2026-09-08).
+       * It is a dated observation about his availability, not a piece of the case for his
+       * number, and `availability` is already this sheet's own top-level field rather than a peer
+       * chip. Carrying the status into the sheet means teaching the writer's prompt a new fact
+       * (`prompt.ts`, out of this round's scope), so it stays out here and the product surfaces
+       * read it straight off the board's own reason instead (`roster-status-copy.ts`).
+       */
+      case "roster_status":
+        continue;
       default: {
         // Exhaustiveness guard: a future `FactReason` variant with no case above fails `tsc`.
         const exhaustive: never = reason;

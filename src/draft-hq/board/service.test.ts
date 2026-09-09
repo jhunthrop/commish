@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { leagues, nflPlayers, nflverseTeamDefenseWeeks, playerCrosswalk, players, preseasonProjections, scoringSettings, users } from "@/db/schema";
+import { leagues, nflPlayers, nflverseTeamDefenseWeeks, playerCrosswalk, players, preseasonBoardReasons, preseasonProjections, scoringSettings, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { HALF_PPR_SCORING, PPR_SCORING } from "@/domain/scoring";
 import { roundPoints } from "@/scoring";
@@ -92,6 +92,55 @@ describe("boardRows", () => {
     // Market edge = ADP minus rank; a player with no ADP reads null rather than a fabricated edge.
     const unlisted = rows.find((row) => row.playerId === "p3");
     expect(unlisted?.marketAdp).toBeNull();
+  });
+
+  /** The roster-status gate (2026-09-08): a stored `roster_status` reason, as the board writes it. */
+  async function seedRosterStatus(nflId: string, status: "injured_reserve" | "practice_squad", team: string): Promise<void> {
+    await db.insert(preseasonBoardReasons).values({
+      season: PRODUCT_SEASON,
+      source: BOARD_SOURCE,
+      playerId: nflId,
+      code: "roster_status",
+      detail: "",
+      payload: { status, source: "tank01_player_list", observedAt: "2026-09-05T22:35:00.000Z", team },
+    });
+  }
+
+  it("carries a ranked player's roster status as a note, read off the board's own reason", async () => {
+    await seedPlayer({ id: "p1", nflId: "00-0000001", name: "Top Back", position: "RB", team: "KC", points: 300, rank: 1, adp: 1.2 });
+    await seedRosterStatus("00-0000001", "injured_reserve", "KC");
+
+    const rows = await boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS }, asOf: new Date("2026-09-08T00:00:00Z") });
+    expect(rows.find((row) => row.playerId === "p1")?.rosterStatus).toEqual({
+      status: "injured_reserve",
+      source: "tank01_player_list",
+      observedAt: "2026-09-05T22:35:00.000Z",
+      team: "KC",
+      excluded: false,
+    });
+  });
+
+  it("renders a player the gate took off the board as a band row at the very end, with no projection and no place in the value order", async () => {
+    await seedPlayer({ id: "p1", nflId: "00-0000001", name: "Top Back", position: "RB", team: "KC", points: 300, rank: 1, adp: 1.2 });
+    // The excluded man: a product row and a crosswalk, but NO projection row, only the status reason.
+    await db.insert(nflPlayers).values({ id: "00-0000009", name: "Squad Back", position: "RB" });
+    await db.insert(players).values({ id: "p9", name: "Squad Back", position: "RB", nflTeam: "NO", adp: 240.5 });
+    await db.insert(playerCrosswalk).values({ playerId: "p9", nflPlayerId: "00-0000009", method: "espn_id", resolvedAt: new Date() });
+    await seedRosterStatus("00-0000009", "practice_squad", "NO");
+
+    const rows = await boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS }, asOf: new Date("2026-09-08T00:00:00Z") });
+    const band = rows.at(-1);
+    expect(band?.playerId).toBe("p9");
+    expect(band?.rosterStatus?.excluded).toBe(true);
+    expect(band?.rosterStatus?.status).toBe("practice_squad");
+    expect(isProjectedRow(band!)).toBe(false);
+    expect(band?.valueRank).toBeNull();
+    expect(band?.overallRank).toBeNull();
+    expect(band?.tier).toBeNull();
+    expect(band?.marketAdp).toBe(240.5);
+    expect(band?.team).toBe("NO");
+    // The ranked rows are exactly as they would be without him.
+    expect(rows.filter((row) => row.overallRank !== null).map((row) => row.playerId)).toEqual(["p1"]);
   });
 
   it("breaks an exact value tie by the market's order, and the badges follow the served order", async () => {

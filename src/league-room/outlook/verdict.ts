@@ -1,5 +1,7 @@
 import type { Position } from "@/domain/player";
 import type { BoardReason } from "@/projections/preseason/board";
+import { rosterStatusNoteOf } from "@/projections/preseason/roster-status";
+import { noProjectionSentence } from "@/projections/preseason/roster-status-copy";
 import { countWordCapitalized } from "../lib/format";
 
 /**
@@ -112,6 +114,13 @@ export interface WrittenVerdict {
  */
 export function verdictLine(reasons: readonly BoardReason[], position: Position, written: WrittenVerdict = {}): string | null {
   if (reasons.length === 0) return null;
+
+  // THE GATE'S OWN VERDICT (roster-status gate, 2026-09-08): a player off an active roster has no
+  // projection, so there is no draft call to make and no written call to lead with; the honest
+  // sentence is his dated status and what it means for the board. A reserve-list player keeps the
+  // draft sentence below; his status is stated as evidence by `why-groups.tsx`.
+  const rosterStatus = rosterStatusNoteOf(reasons);
+  if (rosterStatus !== null && rosterStatus.excluded) return noProjectionSentence(rosterStatus);
 
   const marketAnchor = findReason(reasons, "market_anchor");
   const scarcity = findReason(reasons, "scarcity");

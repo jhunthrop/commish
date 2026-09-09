@@ -172,3 +172,11 @@ describe("strongestLawReasons — the two-chip compact surface stays LAW-ONLY (M
     expect(strongestLawReasons(reasons)).toEqual([]);
   });
 });
+
+describe("the roster status chip", () => {
+  it("states the status with the date and source it was observed on", () => {
+    const reason: BoardReason = { code: "roster_status", status: "injured_reserve", source: "tank01_player_list", observedAt: "2026-09-05T22:35:00.000Z", team: "KC" };
+    render(<ReasonChip reason={reason} registry={[]} />);
+    expect(screen.getByText("On injured reserve, observed Sep 5 on the player list")).toBeInTheDocument();
+  });
+});

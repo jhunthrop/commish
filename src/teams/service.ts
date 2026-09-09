@@ -115,6 +115,7 @@ function boardPlayersFor(rows: readonly BoardRow[], code: string): readonly Team
       projectedPoints: row.projectedPoints,
       marketAdp: row.marketAdp,
       tier: row.tier,
+      rosterStatus: row.rosterStatus,
     }));
 }
 

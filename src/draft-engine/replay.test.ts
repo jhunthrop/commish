@@ -31,6 +31,30 @@ const LOG: readonly DraftAction[] = [
   { v: 1, type: "MAKE_PICK", timestamp: T, teamId: "t2", playerId: "rb1" },
 ];
 
+describe("the roster-status gate's mark on a START_DRAFT snapshot (fix round, LOW)", () => {
+  const marked: readonly DraftPoolEntry[] = [POOL[0]!, { ...POOL[1]!, excludedFromAutopick: true }, POOL[2]!, POOL[3]!];
+
+  it("round-trips through the persisted action schema, absent staying absent and true staying true", () => {
+    const parsed = draftActionSchema.parse(JSON.parse(JSON.stringify({ ...START, pool: marked })));
+    expect(parsed.type).toBe("START_DRAFT");
+    if (parsed.type !== "START_DRAFT") throw new Error("unreachable");
+    expect(parsed.pool).toEqual(marked);
+    expect("excludedFromAutopick" in parsed.pool[0]!).toBe(false);
+    expect(parsed.pool[1]!.excludedFromAutopick).toBe(true);
+  });
+
+  it("refuses any value but true for the mark, so a log can never carry a false that reads as eligible", () => {
+    expect(() => draftActionSchema.parse({ ...START, pool: [{ playerId: "rb1", position: "RB", excludedFromAutopick: false }] })).toThrow();
+  });
+
+  it("replays into the state's pool with the mark intact, and a manager's own pick of him still lands", () => {
+    const log: readonly DraftAction[] = [{ ...START, pool: marked }, { v: 1, type: "MAKE_PICK", timestamp: T, teamId: "t1", playerId: "rb1" }];
+    const state = replayDraft(CONFIG, log.map((action) => draftActionSchema.parse(action)));
+    expect(state.pool[1]).toEqual({ playerId: "rb1", position: "RB", excludedFromAutopick: true });
+    expect(state.picks.map((pick) => pick.playerId)).toEqual(["rb1"]);
+  });
+});
+
 describe("replayDraft", () => {
   it("reconstructs exactly the state produced by applying the same actions live", () => {
     let live = initialDraftState(CONFIG);

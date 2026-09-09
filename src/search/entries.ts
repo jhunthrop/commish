@@ -45,6 +45,7 @@ function playerEntry(row: BoardRow, order: number): SearchEntry {
       positionRank: row.positionRankInValue ?? row.marketOrderRank,
       boardRank: row.overallRank,
       byeWeek: row.byeWeek,
+      rosterStatus: row.rosterStatus,
     },
     order,
   };

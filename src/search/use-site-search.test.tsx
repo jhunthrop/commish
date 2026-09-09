@@ -10,6 +10,7 @@ const GIBBS: SearchResult = {
   positionRank: 2,
   boardRank: 3,
   byeWeek: 8,
+  rosterStatus: null,
 };
 
 interface Call {

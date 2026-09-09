@@ -1,6 +1,7 @@
 import type { PlayerFactsCoaching, PlayerFactsSchedule } from "@/capsules/facts/types";
 import type { Player, Position } from "@/domain/player";
 import type { DefenseSeasonFacts } from "@/projections/kdef/season-lines";
+import type { RosterStatusNote } from "@/projections/preseason/roster-status";
 
 /**
  * WHAT THE TEAM PAGE RENDERS (site search round, 2026-09-08). Types only, browser-safe, so the
@@ -60,6 +61,8 @@ export interface TeamBoardPlayer {
   readonly projectedPoints: number | null;
   readonly marketAdp: number | null;
   readonly tier: number | null;
+  /** The board's own dated roster status (`BoardRow.rosterStatus`); `null` when it stored none. */
+  readonly rosterStatus: RosterStatusNote | null;
 }
 
 export interface DepthChartSlot {
