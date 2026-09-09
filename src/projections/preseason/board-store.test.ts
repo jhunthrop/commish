@@ -545,7 +545,7 @@ describe("the preseason board store", () => {
     const LIVE_2026 = new Date("2026-09-02T12:00:00.000Z");
     const OBSERVED = new Date("2026-09-01T00:00:00.000Z");
     const SQUAD = "00-0099999";
-    const exclusion = { playerId: SQUAD, position: "WR" as const, team: "NO", status: { kind: "practice_squad" as const, source: "nflverse_roster_week_1" as const, observedAt: OBSERVED, team: "NO" } };
+    const exclusion = { playerId: SQUAD, position: "WR" as const, team: "NO", status: { kind: "practice_squad" as const, source: "nflverse_roster_week_1" as const, observedAt: OBSERVED, team: "NO", detail: null } };
 
     beforeEach(async () => {
       await recordNflPlayers(db, [nflPlayerRow({ id: SQUAD, pfrId: null, espnId: null, name: "Squad Receiver", latestTeam: "NO", rookieSeason: 2026 })]);

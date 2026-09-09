@@ -28,7 +28,7 @@ function candidate(playerId: string, overrides: Partial<BoardCandidate> = {}): B
 }
 
 function status(kind: CurrentRosterStatus["kind"], team: string | null = "KC"): CurrentRosterStatus {
-  return { kind, source: "tank01_player_list", observedAt: OBSERVED, team };
+  return { kind, source: "tank01_player_list", observedAt: OBSERVED, team, detail: null };
 }
 
 describe("capGamesOutlook", () => {

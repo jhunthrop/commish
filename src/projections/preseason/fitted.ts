@@ -31,6 +31,15 @@ import type { RookiePriors } from "./rookies";
  * a record (`availability/week-classification.ts`, `availabilityEvidence`), so the availability
  * model and the career curve fitted against it were regenerated on the dev store; the rookie and
  * depth tables are byte-for-byte the previous commit's, on the same reasoning as the paragraph above.
+ *
+ * A DESIGNATION CELL BESIDE THE COARSE STATUS (current-status round, 2026-09-09):
+ * `FITTED_AVAILABILITY_PRIORS.designationMultiplier` is new, fitted on the same 2021 and 2022
+ * observations with the status resolved by `current-status.ts` (identical to the cutdown file on
+ * every 2021-2024 row), shipped because the held-out 2023-2024 measurement was not worse overall
+ * and better on the reserve-designated subgroup (`npm run projections:availability:split`, the
+ * round's ledger). The concentration, solved from the residuals of the fitted rates, moved with it
+ * (2.279 -> 2.290); every other availability field is the previous commit's to the last digit, and
+ * the rookie, depth and career tables are byte-for-byte the previous commit's, as above.
  */
 
 export const FITTED_AVAILABILITY_PRIORS: AvailabilityPriors = {
@@ -128,7 +137,15 @@ export const FITTED_AVAILABILITY_PRIORS: AvailabilityPriors = {
     "practice_squad": 0.2396749297015584,
     "off_roster": 0.058086271350482534
   },
-  "concentration": 2.2791675757749195,
+  "designationMultiplier": {
+    "out": 0.9249761474470037,
+    "injured_reserve": 0.2099485768150914,
+    "pup": 0.23573612077548892,
+    "nfi": 0.20775154122469966,
+    "suspended": 0.23628926474447356,
+    "exempt": 0.20425107822674468
+  },
+  "concentration": 2.289732203272399,
   "concentrationPerSeason": 0
 };
 

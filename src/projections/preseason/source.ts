@@ -34,6 +34,8 @@ import type { Law } from "../laws/types";
 import { LIVE_ADMITTED_DERIVED_SEASONS } from "../nflverse/stat-lines";
 import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
 import { availabilityBySeason } from "./availability-history";
+import { availabilityDesignationOf, availabilityStatusFor } from "./availability-status";
+import type { CurrentRosterStatus } from "./roster-status";
 import {
   ageAtSeason,
   expectedGamesPlayed,
@@ -47,16 +49,9 @@ import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints } from "@/scoring/compute";
 import type { CareerObservation, DepthObservation, RookieObservation } from "./fit";
 import { INJURY_SOURCE } from "../news/retrieve";
-import { observationsAsOf } from "../store";
 import { applyCareerStage, experienceBandFor, NEUTRAL_CAREER_PRIORS, type CareerPriors } from "./career";
-import {
-  applyDepthChart,
-  depthRankFor,
-  DEPTH_METRIC,
-  DEPTH_SOURCE,
-  type DepthChart,
-  type DepthPriors,
-} from "./depth";
+import { applyDepthChart, DEPTH_SOURCE, type DepthChart, type DepthPriors } from "./depth";
+import { depthChartAsOf } from "./depth-read";
 import { changedSituationSegment, offseasonDeltas, type OffseasonMove } from "./offseason";
 import {
   capitalGameRate,
@@ -295,6 +290,10 @@ export interface PreseasonInputs {
    *  Keyed by player id; a player absent here has no evidence for any discovered law, not evidence
    *  that every discovered law's condition is false. */
   readonly discoveryFacts: ReadonlyMap<string, DiscoveryFacts>;
+  /** The resolved current status per player (`current-status.ts`, the one resolution the gate and
+   *  the availability model share), attached by `withCurrentStatus` on the shipped build and the
+   *  fit; the model falls back to `roster.status` for a man no source names. Absent on a bare load. */
+  readonly currentStatus?: ReadonlyMap<string, CurrentRosterStatus>;
 }
 
 /** How many prior seasons of usage and outcomes a preseason board reads. */
@@ -752,16 +751,6 @@ export async function loadPreseason(
   };
 }
 
-/** The published week-one ordering, read through the same gate as everything else. */
-async function depthChartAsOf(db: ReadonlyDb, season: number, asOf: Date): Promise<DepthChart> {
-  const rows = await observationsAsOf(db, { season, week: 1, asOf, source: DEPTH_SOURCE });
-  return new Map(
-    rows
-      .filter((row) => row.metric === DEPTH_METRIC)
-      .map((row) => [row.playerId, depthRankFor(row.value)] as const),
-  );
-}
-
 /** The team each player finished the prior season on, from the last week the store holds for him. */
 function lastSeasonTeams(priorPlayerTeams: readonly PlayerWeekTeam[], season: number): ReadonlyMap<string, string> {
   const best = new Map<string, { season: number; week: number }>();
@@ -1041,12 +1030,15 @@ export function preseasonCandidates(
     const perGame: StatLine = features.careerStage
       ? applyCareerStage(composed, position, experienceBandFor(inputs.season, roster.draftYear), priors.career)
       : composed;
+    // The status is the resolution's, not the file's: the same dated word the gate acts on.
+    const current = inputs.currentStatus?.get(playerId);
     const games = features.availability
       ? expectedGamesPlayed(
           {
             position,
             age: ageAtSeason(roster.birthDate, inputs.season),
-            status: roster.status,
+            status: availabilityStatusFor(current, roster.status),
+            designation: availabilityDesignationOf(current),
             projectedSnapShare: predicted.snapShare,
             history: historyFor(playerId),
             baselineRate,
