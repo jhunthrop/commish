@@ -32,7 +32,10 @@ function KeyboardGlyphs() {
     <span data-testid="keyboard-glyphs" className="ml-auto hidden items-center gap-3 lg:flex">
       {SHORTCUTS.map(([key, reaches]) => (
         <span key={key} className="flex items-center gap-1">
-          <kbd className="rounded-sm border border-line px-1.5 py-0.5 font-mono text-xs text-text-muted">{key}</kbd>
+          {/* A FILL, NOT A HAIRLINE (v6's warmth pass). A key cap is a small surface on the
+              elevation ladder, so it takes the step below the chip row it sits in rather than
+              the `border border-line` box the pass retired. */}
+          <kbd className="rounded-sm bg-surface px-1.5 py-0.5 font-mono text-xs text-text-muted">{key}</kbd>
           <span className={`${MICRO_LABEL} text-text-faint`}>{reaches}</span>
         </span>
       ))}
