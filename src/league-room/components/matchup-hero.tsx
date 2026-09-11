@@ -1,6 +1,6 @@
 import type { MatchupSide, MatchupSummary } from "../contract";
 import { Crest, Movement, NOT_STARTED_DASH, Pill, PointsShareBar, Scoreboard } from "@/components/ui";
-import { LiveMarker } from "@/components/ui/live-marker";
+import { LiveChip } from "@/components/ui/live-chip";
 import { formatPoints, formatRecord } from "../lib/format";
 import { benchPoints, remainingToPlay } from "../lib/matchup-facts";
 
@@ -57,7 +57,7 @@ function scoreText(score: number | null): string {
  * SUNDAY v5, THE LIVE CHANNEL. Yet-to-play is the definition of channel three: points that can
  * still arrive are the only thing on a settled-looking screen that is still moving. It used to be
  * `Pill tone="hot"`, which resolved to the `negative` family — the same ink as a failed write —
- * and it is now `LiveMarker`, which is `live` and means nothing else ever. A side with nobody left
+ * and it is now `LiveChip`, which is `live` and means nothing else ever. A side with nobody left
  * to play gets no marker at all rather than "0 to play": the absence IS the fact, and a chip
  * stating zero is noise on the one screen this product cannot afford noise on.
  *
@@ -77,7 +77,7 @@ export function SideChips({ side, mine, weekStatus }: {
   if (left === 0 && bench === null) return null;
   return (
     <span className="flex flex-wrap items-center gap-2">
-      {left === 0 ? null : <LiveMarker mono>{`${left} to play`}</LiveMarker>}
+      {left === 0 ? null : <LiveChip className="tabular-nums">{`${left} to play`}</LiveChip>}
       {bench === null ? null : <Pill>{`${formatPoints(bench)} on your bench`}</Pill>}
     </span>
   );

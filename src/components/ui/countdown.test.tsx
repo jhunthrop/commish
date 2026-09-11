@@ -116,7 +116,10 @@ describe("Countdown", () => {
     const el = screen.getByTestId("countdown");
     expect(el.textContent).toBe("\u00A0");
     // The same classes as the ticking digits — the line box (and so the row's height) is stable.
-    expect(el.className).toMatch(/font-mono/);
+    expect(el.className).toMatch(/font-display/);
+    // And the property that made the mono face worth having in the first place, kept explicitly:
+    // digits of equal width, so a clock counting down never jitters the row beside it.
+    expect(el.className).toMatch(/tabular-nums/);
     expect(screen.queryByText(/left$/)).not.toBeInTheDocument();
   });
 

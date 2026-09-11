@@ -173,7 +173,10 @@ describe("LeagueRow", () => {
       render(row({ ...BASE, draftAtIso: soonIso() }));
       const clock = screen.getByTestId("draft-clock");
       expect(clock.className).toContain("text-negative");
-      expect(clock.className).toContain("font-mono");
+      // The clock is the DISPLAY face with tabular figures (Sideline wave two): equal-width digits
+      // without the monospace, which is the face this system never spends.
+      expect(clock.className).toContain("font-display");
+      expect(clock.className).toContain("tabular-nums");
       expect(screen.queryByText(BASE.draftAt)).not.toBeInTheDocument();
     });
 

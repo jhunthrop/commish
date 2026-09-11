@@ -1,6 +1,6 @@
 import type { WeekStatus } from "@/league";
 import { StatPill } from "@/components/ui";
-import { LiveMarker } from "@/components/ui/live-marker";
+import { LiveChip } from "@/components/ui/live-chip";
 
 const SETTLED_LABEL: Readonly<Record<Exclude<WeekStatus, "in_progress">, string>> = {
   scheduled: "Not started",
@@ -24,10 +24,10 @@ export interface WeekStatusBadgeProps {
  *
  * IT ALSO STOPPED BEING A PILL. A bordered chip is a LABEL — a state a row happens to be in. The
  * two settled states genuinely are labels and keep the chip. A live week is the one thing on the
- * screen still moving, and `LiveMarker` is the tower's answer to that: a breathing dot beside the
+ * screen still moving, and `LiveChip` is the tower's answer to that: a breathing dot beside the
  * word, in the live ink, with nothing boxing it in. The asymmetry is the information.
  */
 export function WeekStatusBadge({ status }: WeekStatusBadgeProps) {
-  if (status === "in_progress") return <LiveMarker>Live</LiveMarker>;
+  if (status === "in_progress") return <LiveChip>Live</LiveChip>;
   return <StatPill tone="neutral" label={SETTLED_LABEL[status]} />;
 }
