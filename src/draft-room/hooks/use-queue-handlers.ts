@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useToast } from "@/components/ui";
 import { addToQueue, removeFromQueue } from "../state/queue";
 import type { DraftRoom as DraftRoomState } from "./use-draft-room";
@@ -19,16 +19,25 @@ export interface QueueHandlers {
  */
 export function useQueueHandlers(room: DraftRoomState): QueueHandlers {
   const { show } = useToast();
-  const queuedPlayerIds = useMemo(() => new Set(room.queue), [room.queue]);
+  const { queue, setQueue } = room;
+  const queuedPlayerIds = useMemo(() => new Set(queue), [queue]);
 
-  const onQueueChange = (playerIds: readonly string[]): void => {
-    void room.setQueue(playerIds).then((outcome) => {
-      if (!outcome.ok) show({ message: outcome.reason, tone: "error" });
-    });
-  };
+  // Stable across renders (fluidity round, 2026-09-10): every drawer row takes these as props,
+  // and a fresh closure per render was one of the things that made sixty rows re-render on a
+  // clock tick. They change only when the queue itself does.
+  const onQueueChange = useCallback(
+    (playerIds: readonly string[]): void => {
+      void setQueue(playerIds).then((outcome) => {
+        if (!outcome.ok) show({ message: outcome.reason, tone: "error" });
+      });
+    },
+    [setQueue, show],
+  );
 
-  const onQueueToggle = (playerId: string): void =>
-    onQueueChange(queuedPlayerIds.has(playerId) ? removeFromQueue(room.queue, playerId) : addToQueue(room.queue, playerId));
+  const onQueueToggle = useCallback(
+    (playerId: string): void => onQueueChange(queuedPlayerIds.has(playerId) ? removeFromQueue(queue, playerId) : addToQueue(queue, playerId)),
+    [onQueueChange, queuedPlayerIds, queue],
+  );
 
-  return { queuedPlayerIds, onQueueChange, onQueueToggle };
+  return useMemo(() => ({ queuedPlayerIds, onQueueChange, onQueueToggle }), [queuedPlayerIds, onQueueChange, onQueueToggle]);
 }

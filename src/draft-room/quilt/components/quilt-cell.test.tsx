@@ -24,11 +24,12 @@ function renderCell(withFace: boolean, rowHeight = 96, cell: QuiltCell = LANDED)
       lens="picks"
       verdict={null}
       byeWeek={null}
-      clockLabel={null}
+      deadlineAt={null}
       onPeek={() => {}}
       peeked={false}
       withFace={withFace}
       rowHeight={rowHeight}
+      settleClass=""
     />,
   );
 }
@@ -84,7 +85,6 @@ describe("QuiltBoard faces", () => {
     lens: "picks" as const,
     byeWeeks: new Map<string, number>(),
     boardRanks: new Map<string, number>(),
-    clockLabel: null,
     onPeek: () => {},
     peekedPlayerId: null,
   };

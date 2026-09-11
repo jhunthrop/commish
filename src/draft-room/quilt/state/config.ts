@@ -23,6 +23,10 @@ export const QUILT_CONFIG = {
   sheetQueueSeedCount: 5,
   /** The half drawer's own height as a fraction of the room, and the full drawer's. */
   drawerHeight: { half: "45dvh", full: "100dvh" },
+  /** Where the room stops inverting: Tailwind's `lg` (64rem), the one breakpoint the desktop
+   *  and phone compositions split on. Only the matching composition mounts (fluidity round,
+   *  2026-09-10); before it, both trees rendered and the hidden one did all the same work. */
+  desktopStageQuery: "(min-width: 64rem)",
   /** The grabber's drag threshold: a pointer that travels less than this is a tap (space's own
    *  toggle), anything longer is one honest step up or down the heights. */
   drawerDragThresholdPx: 12,

@@ -26,6 +26,19 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * The desktop drawer rests collapsed (law 2), and only the composition for the current width
+ * mounts (fluidity round, 2026-09-10 — the phone tree no longer renders hidden beneath the
+ * desk, which is where these tests used to find an always-open pool list). The list lives
+ * behind the drawer's Pool handle, which is present at every height.
+ */
+async function openPool(): Promise<void> {
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Pool" })).toBeInTheDocument());
+  await act(async () => {
+    fireEvent.click(screen.getByRole("tab", { name: "Pool" }));
+  });
+}
+
 function mount(fixture = fixtureDeps(), dismissedAt: string | null = TOUR_DISMISSED) {
   const rendered = renderInRoom(
     <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
@@ -55,8 +68,9 @@ describe("DraftRoom", () => {
         expect(screen.getByText("Loading…")).toBeInTheDocument();
         // The quilt's column heads carry the full team name as each code's <abbr> title.
         await waitFor(() => expect(screen.getAllByTitle("Bay Bandits").length).toBeGreaterThan(0));
-        expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
         expect(screen.getByTestId("quilt-room")).toBeInTheDocument();
+        await openPool();
+        expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
@@ -101,6 +115,7 @@ describe("DraftRoom", () => {
     const fixture = fixtureDeps();
     fixture.postResponse = { ok: false, error: "It's not your turn to pick." };
     mount(fixture);
+    await openPool();
     await waitFor(() => expect(screen.getAllByRole("button", { name: "Draft" })[0]).toBeEnabled());
     await act(async () => {
       fireEvent.click(screen.getAllByRole("button", { name: "Draft" })[0]!);
@@ -114,6 +129,7 @@ describe("DraftRoom", () => {
     const fixture = fixtureDeps();
     fixture.queueResponse = { ok: false, error: "A queue can hold at most 50 players." };
     mount(fixture);
+    await openPool();
     await waitFor(() => expect(screen.getByRole("button", { name: "Add Jalen Croft to your queue" })).toBeInTheDocument());
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Add Jalen Croft to your queue" }));
@@ -157,12 +173,14 @@ describe("DraftRoom", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(fixture.calls).toContain("PATCH /api/preferences");
     // The rest of the room is unaffected — the tour never sat between a manager and the board.
+    await openPool();
     expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
   });
 
   it("never shows the tour once it has already been dismissed", async () => {
     mount();
-    await waitFor(() => expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument());
+    await openPool();
+    expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -170,7 +188,8 @@ describe("DraftRoom", () => {
   // until a name is pressed — a real press reaches all the way to the season peek.
   it("mounts the player-peek host in the live room, reachable from a pool row's name", async () => {
     mount();
-    await waitFor(() => expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument());
+    await openPool();
+    expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
     const name = screen.getByRole("button", { name: "Jalen Croft" });
     await act(async () => {
       fireEvent.click(name);
@@ -190,7 +209,8 @@ describe("DraftRoom", () => {
 describe("DraftRoom — Task 8's mock room dressing", () => {
   it("mounts no practice banner and no share panel for a real draft", async () => {
     mount();
-    await waitFor(() => expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument());
+    await openPool();
+    expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
     expect(screen.queryByTestId("practice-banner")).not.toBeInTheDocument();
     expect(screen.queryByTestId("share-link-panel")).not.toBeInTheDocument();
   });
@@ -201,6 +221,7 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     mount(fixture);
     await waitFor(() => expect(screen.getByTestId("practice-banner")).toHaveTextContent(MOCK_ROOM.practiceBanner));
     // The rest of the room is unaffected — the banner is additive chrome, not a replacement.
+    await openPool();
     expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
   });
 
@@ -347,7 +368,8 @@ describe("DraftRoom — the finale", () => {
   async function mountLive(fixture: FixtureDeps) {
     mount(fixture);
     await waitFor(() => expect(fixture.sources).toHaveLength(1));
-    await waitFor(() => expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument());
+    await openPool();
+    expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
   }
 
   /** Flips the room to complete over the stream, under fake timers, and asserts the beat. */

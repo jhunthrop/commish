@@ -60,7 +60,6 @@ function renderMobileRoom(over: Partial<DraftRoomState> = {}) {
       acts={ACTS}
       pending={null}
       onUndo={vi.fn()}
-      clockLabel={null}
       lens="picks"
       onLens={vi.fn()}
       byeWeeks={new Map()}

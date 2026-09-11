@@ -8,6 +8,15 @@ import { QUILT_CONFIG } from "../quilt/state/config";
 import { LEAGUE_NAME, PLAYERS, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
 import { SnakeRoom } from "./snake-room";
 
+// Only the composition for the current width mounts (fluidity round, 2026-09-10). The test
+// viewport answers the desktop query; the phone case below asks for the other answer.
+vi.mock("@/design/use-media-query", () => ({ useMediaQuery: vi.fn(() => true) }));
+import { useMediaQuery } from "@/design/use-media-query";
+
+afterEach(() => {
+  vi.mocked(useMediaQuery).mockReturnValue(true);
+});
+
 /** A deadline far enough out that the pick-safety window is never squeezed away. */
 const roomyDeadline = (): string => new Date(Date.now() + 60_000).toISOString();
 
@@ -226,8 +235,11 @@ describe("SnakeRoom (the quilt)", () => {
   });
 
   it("inverts on the phone tree: bottom tabs, pool first, two-step picking", () => {
+    vi.mocked(useMediaQuery).mockReturnValue(false);
     const submit = vi.fn(async () => ({ ok: true as const }));
     renderRoom({ submit });
+    // The desktop composition is not mounted alongside it.
+    expect(screen.queryByTestId("quilt-room")).toBeNull();
     const phone = screen.getByRole("navigation", { name: "Draft room tabs" }).parentElement!;
     expect(within(phone).getByTestId("mobile-your-turn")).toBeInTheDocument();
     // A phone DRAFT opens the confirm sheet rather than picking.

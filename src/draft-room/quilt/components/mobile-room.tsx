@@ -5,7 +5,8 @@ import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { BoardReason } from "@/projections/preseason/board";
 import type { Law } from "@/projections/laws/types";
-import { PositionBadge } from "@/components/ui";
+import { CountdownLabel, PositionBadge } from "@/components/ui";
+import type { TierStandingView } from "@/draft-service/assistant/view";
 import type { UseAdvisorResult } from "../../advisor/use-advisor";
 import type { DraftRoom as DraftRoomState } from "../../hooks/use-draft-room";
 import type { CheatSheet } from "../state/sheet";
@@ -28,6 +29,8 @@ import { LensChips } from "./lens-chips";
 import type { RoomActs } from "./room-acts";
 
 const MOBILE_TABS = ["pool", "assistant", "sheet", "roster", "board", "picks"] as const;
+/** One instance, never a fresh `{}` per render: the pool tab memoizes its rows on it. */
+const NO_TIERS: Readonly<Record<string, TierStandingView>> = {};
 type MobileTab = (typeof MOBILE_TABS)[number];
 
 /** Literal caps are the tab bar's own data-register (the sweep bans the CLASS, not acronyms).
@@ -58,7 +61,6 @@ export interface MobileRoomProps {
   readonly acts: RoomActs;
   readonly pending: PendingPick | null;
   readonly onUndo: () => void;
-  readonly clockLabel: string | null;
   readonly lens: Lens;
   readonly onLens: (lens: Lens) => void;
   readonly byeWeeks: ReadonlyMap<string, number>;
@@ -89,7 +91,7 @@ export interface MobileRoomProps {
  * sheet — and then the same undo window desktop gets.
  */
 export function MobileRoom(props: MobileRoomProps) {
-  const { room, view, playersById, myTurn, acts, pending, onUndo, clockLabel, advisor } = props;
+  const { room, view, playersById, myTurn, acts, pending, onUndo, advisor } = props;
   const odds = advisor.view?.odds ?? null;
   const [tab, setTab] = useState<MobileTab>("pool");
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -127,7 +129,7 @@ export function MobileRoom(props: MobileRoomProps) {
       {myTurn ? (
         <div data-testid="mobile-your-turn" className="accent-wash flex flex-col gap-2 border-b-2 border-accent px-4 py-3">
           <div className="flex items-center gap-3">
-            <span className="font-display text-3xl font-bold text-accent tabular-nums">{clockLabel ?? "…"}</span>
+            <CountdownLabel deadlineAt={view.deadlineAt} className="font-display text-3xl font-bold text-accent tabular-nums" />
             <span className="font-display text-md font-bold text-accent">YOUR PICK</span>
           </div>
           {queueTop.length === 0 ? null : (
@@ -154,7 +156,7 @@ export function MobileRoom(props: MobileRoomProps) {
         <div className="flex items-center gap-3 border-b border-line bg-surface-elevated px-4 py-2">
           {view.phase === "in_progress" && onClockTeam !== null ? (
             <span className="flex items-center gap-2 rounded-sm bg-live px-2.5 py-1">
-              <span className="font-display text-md font-bold text-live-text tabular-nums">{clockLabel ?? "…"}</span>
+              <CountdownLabel deadlineAt={view.deadlineAt} className="font-display text-md font-bold text-live-text tabular-nums" />
               <span className="font-display text-xs font-bold text-live-text">{teamCode(onClockTeam.name)}</span>
             </span>
           ) : (
@@ -176,7 +178,7 @@ export function MobileRoom(props: MobileRoomProps) {
             reasons={props.reasons}
             focusSearch={false}
             odds={odds}
-            tiers={advisor.view?.tiers ?? {}}
+            tiers={advisor.view?.tiers ?? NO_TIERS}
             {...mobileActs}
           />
         ) : tab === "assistant" ? (
@@ -221,7 +223,6 @@ export function MobileRoom(props: MobileRoomProps) {
               lens={props.lens}
               byeWeeks={props.byeWeeks}
               boardRanks={props.boardRanks}
-              clockLabel={clockLabel}
               onPeek={mobileActs.onPeek}
               peekedPlayerId={peekId}
               microOnly
