@@ -3,6 +3,7 @@ import { afterEach, expect } from "vitest";
 import { cleanup } from "@testing-library/react";
 import * as axeMatchers from "vitest-axe/matchers";
 import type { AxeMatchers } from "vitest-axe/matchers";
+import { currentLaneSet } from "@/db/test-lane-set";
 import { currentTestDbLane, testDatabaseUrlForLane } from "@/db/test-lanes";
 
 // vitest.config.mts sets `globals: false`, so @testing-library/react's automatic
@@ -32,8 +33,14 @@ afterEach(() => {
 // suffix into `commish_test_2_2`). The sentinel remembers the pristine base URL the first time
 // this file runs in a given worker so every later run in that same worker rewrites from the same
 // origin rather than from its own prior output.
+//
+// AND THE LANE SET (2026-09-11). The lane is which of four databases this WORKER reads; the set is
+// which four databases this WORKTREE owns, so two agent worktrees running vitest at the same time
+// no longer truncate each other's fixtures. `vitest.global-setup.mts` has already resolved it into
+// the environment this worker inherited, so `currentLaneSet()` here is a cache read, not a git
+// call. See `src/db/test-lanes.ts` for the naming contract.
 process.env.__TEST_DATABASE_BASE_URL__ ??= process.env.TEST_DATABASE_URL ?? "postgres://commish:commish@localhost:5433/commish_test";
-process.env.TEST_DATABASE_URL = testDatabaseUrlForLane(process.env.__TEST_DATABASE_BASE_URL__, currentTestDbLane());
+process.env.TEST_DATABASE_URL = testDatabaseUrlForLane(process.env.__TEST_DATABASE_BASE_URL__, currentTestDbLane(), currentLaneSet());
 
 // `npm test` is plain `vitest run` — nothing here loads `.env.local` the way `next dev`/`next
 // build` do or `dotenv -e .env.local --` does for the scripts that need it. `TEST_DATABASE_URL`

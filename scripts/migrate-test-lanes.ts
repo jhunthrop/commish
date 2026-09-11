@@ -3,8 +3,13 @@
 // Run: npm run db:migrate:test [-- --lane=N]   (env TEST_DB_LANE=N does the same as --lane=N)
 //
 // See `src/db/test-lanes.ts` for the lane-naming contract this turns into real databases and real
-// `drizzle-kit migrate` runs: lane 1 is `commish_test` (TEST_DATABASE_URL, unchanged from before
-// lanes existed); lanes 2-4 are `commish_test_2`, `commish_test_3`, `commish_test_4`.
+// `drizzle-kit migrate` runs: in the main checkout lane 1 is `commish_test` (TEST_DATABASE_URL,
+// unchanged from before lanes existed) and lanes 2-4 are `commish_test_2`/`_3`/`_4`. In a linked
+// worktree the same four lanes get that worktree's OWN set — `commish_test_<set>_1` through
+// `_4` — so two agent rounds running vitest at once never share a fixture. The set comes from
+// `currentLaneSet()`, which reads `TEST_DB_LANE_SET` or derives the key from this checkout's
+// path, so this command needs no argument to provision the right set: run it from the worktree
+// that wants lanes. `npm run db:lanes:prune` drops the sets of worktrees that are gone.
 //
 // PROVISIONING LIVES HERE, NOT IN A docker-entrypoint-initdb.d SCRIPT, deliberately. An init script
 // runs only when Postgres initializes an EMPTY data directory, which was every container start while
@@ -16,7 +21,8 @@
 // off one source of truth, whatever state the container is in.
 import { execFileSync } from "node:child_process";
 import postgres from "postgres";
-import { TEST_DB_LANE_COUNT, testDatabaseUrlForLane } from "@/db/test-lanes";
+import { currentLaneSet } from "@/db/test-lane-set";
+import { type LaneSet, TEST_DB_LANE_COUNT, databaseNameFromUrl, testDatabaseUrlForLane } from "@/db/test-lanes";
 
 const DEFAULT_TEST_DATABASE_URL = "postgres://commish:commish@localhost:5433/commish_test";
 
@@ -35,23 +41,18 @@ function requestedLane(argv: readonly string[]): number | null {
   return lane;
 }
 
-/** The database name a lane's URL points at — the path with its leading slash removed. */
-function databaseNameOf(url: string): string {
-  return decodeURIComponent(new URL(url).pathname.replace(/^\//, ""));
-}
-
 /**
  * Creates every lane database that does not exist yet, connected to the server's maintenance
  * database. Idempotent by construction: a lane that already exists is left exactly as it is, schema
  * and rows included, so this is safe to run against a working test database as often as anyone likes.
  */
-async function ensureLaneDatabases(baseUrl: string, lanes: readonly number[]): Promise<void> {
+async function ensureLaneDatabases(baseUrl: string, lanes: readonly number[], laneSet: LaneSet): Promise<void> {
   const maintenanceUrl = new URL(baseUrl);
   maintenanceUrl.pathname = `/${MAINTENANCE_DATABASE}`;
   const sql = postgres(maintenanceUrl.toString(), { max: 1 });
   try {
     for (const lane of lanes) {
-      const name = databaseNameOf(testDatabaseUrlForLane(baseUrl, lane));
+      const name = databaseNameFromUrl(testDatabaseUrlForLane(baseUrl, lane, laneSet));
       const existing = await sql`SELECT 1 FROM pg_database WHERE datname = ${name}`;
       if (existing.length > 0) continue;
       // `sql(name)` is postgres-js's IDENTIFIER interpolation (a quoted name), not a bind parameter
@@ -66,25 +67,29 @@ async function ensureLaneDatabases(baseUrl: string, lanes: readonly number[]): P
 }
 
 /** One lane's `drizzle-kit migrate`, run exactly the way `db:migrate:test` always has -- the
- *  lane's URL as `DATABASE_URL`, which is the one env var `drizzle.config.ts` reads. */
-function migrateLane(baseUrl: string, lane: number): void {
-  const databaseUrl = testDatabaseUrlForLane(baseUrl, lane);
+ *  lane's URL as `DATABASE_URL`, which is the one env var `drizzle.config.ts` reads. Both names
+ *  `migration-url.ts` consults are pinned: an inherited `DATABASE_URL_UNPOOLED` outranks
+ *  `DATABASE_URL` there, and an unpinned one would send a lane's migrations to the dev database. */
+function migrateLane(baseUrl: string, lane: number, laneSet: LaneSet): void {
+  const databaseUrl = testDatabaseUrlForLane(baseUrl, lane, laneSet);
   console.log(`Migrating lane ${lane}: ${databaseUrl}`);
   execFileSync("npx", ["drizzle-kit", "migrate"], {
     stdio: "inherit",
-    env: { ...process.env, DATABASE_URL: databaseUrl },
+    env: { ...process.env, DATABASE_URL: databaseUrl, DATABASE_URL_UNPOOLED: databaseUrl },
   });
 }
 
 async function main(): Promise<void> {
   const baseUrl = process.env.TEST_DATABASE_URL ?? DEFAULT_TEST_DATABASE_URL;
+  const laneSet = currentLaneSet();
   const requested = requestedLane(process.argv.slice(2));
   const lanes =
     requested !== null ? [requested] : Array.from({ length: TEST_DB_LANE_COUNT }, (_, index) => index + 1);
 
-  await ensureLaneDatabases(baseUrl, lanes);
+  console.log(laneSet === null ? "Lane set: primary (this is the main checkout)." : `Lane set: ${laneSet} (this worktree).`);
+  await ensureLaneDatabases(baseUrl, lanes, laneSet);
   for (const lane of lanes) {
-    migrateLane(baseUrl, lane);
+    migrateLane(baseUrl, lane, laneSet);
   }
 }
 

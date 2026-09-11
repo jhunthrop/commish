@@ -145,6 +145,11 @@ export default defineConfig({
     testTimeout: 15_000,
     hookTimeout: 30_000,
     setupFiles: ["./vitest.setup.mts"],
+    // Runs once per `vitest` process, before any worker: resolves THIS worktree's lane set and
+    // provisions/migrates it when a lane is missing or behind, so a fresh checkout's first run
+    // needs no setup command and two worktrees never share a database. See
+    // `vitest.global-setup.mts` and `src/db/test-lanes.ts`.
+    globalSetup: ["./vitest.global-setup.mts"],
     globals: false,
     coverage: {
       provider: "v8",
