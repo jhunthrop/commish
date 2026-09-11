@@ -82,8 +82,18 @@ export default async function Home() {
   // the nav pill may stay loud: the shelf itself computes its own featured row from the same
   // function over the same list, so the two can never point at different rooms.
   const cappedLeagues = leagues.slice(0, UI_CONFIG.frontDoor.shelfCap);
-  const featuredLeague = featuredFillingLeague([...house, ...cappedLeagues]);
+  const shelf = [...house, ...cappedLeagues];
+  const featuredLeague = featuredFillingLeague(shelf);
   const moreRooms = Math.max(0, leagues.length - cappedLeagues.length);
+  // THE PEOPLE ALREADY INSIDE (Sideline, 2026-09-10): summed over the SAME list the shelf
+  // renders, so the hero's figure and the board under it can never disagree — and deduped the
+  // way the shelf dedupes, since a league open on both reads would otherwise be counted twice.
+  const inside = shelf
+    .filter((league, index, all) => all.findIndex((other) => other.id === league.id) === index)
+    .reduce(
+      (total, league) => ({ seatsTaken: total.seatsTaken + league.filledTeams, openRooms: total.openRooms + 1 }),
+      { seatsTaken: 0, openRooms: 0 },
+    );
 
   // The create sheet's defaults ARE the service's (`LEAGUE_CONFIG.defaults`), threaded from the
   // one place a server render may read them — the client boundary bans the import below deck.
@@ -117,7 +127,7 @@ export default async function Home() {
         <section className="floodlight w-full overflow-hidden">
           <div aria-hidden="true" className="yard-lines" />
           <div className="relative px-4 py-10 sm:px-10 sm:py-12">
-            <FrontDoorHero />
+            <FrontDoorHero inside={inside} />
           </div>
         </section>
 

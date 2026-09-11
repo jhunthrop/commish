@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Avatar, Badge, Card } from "@/components/ui";
+import { Badge, Card, Manager } from "@/components/ui";
 import { TIER_COMPOSITION_LABEL, type CompositionCategory } from "@/participation/composition";
 import type { LeagueMemberCard } from "../contract";
 
@@ -42,16 +42,23 @@ export function RoomRoster({ leagueId, teams, teamCount, myTeamId, compositionCa
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Badge tone="neutral">{TIER_COMPOSITION_LABEL[compositionCategory]}</Badge>
       </div>
-      <ul aria-label="Seated managers" className="flex flex-wrap gap-3">
+      {/* P1, SIDELINE (2026-09-10): `Manager` is the only way a manager's face renders — the
+          face beside the name, always, at the row step. Your own seat wears the amber ring
+          (`ring="self"`, the token's own "yours" channel) instead of the "You" badge it used to
+          carry beside it: the ring IS that sentence, and the badge was a second telling. */}
+      <ul aria-label="Seated managers" className="flex flex-wrap gap-x-6 gap-y-3">
         {teams.map((team) => (
           <li key={team.id} className="flex min-w-0 items-center gap-2">
-            <Avatar name={team.ownerDisplayName} avatar={team.ownerAvatarUrl} size="sm" />
-            <span className="truncate text-sm text-text-primary">{team.ownerDisplayName}</span>
-            {team.id === myTeamId ? <Badge tone="neutral">You</Badge> : null}
+            <Manager
+              name={team.ownerDisplayName}
+              avatar={team.ownerAvatarUrl}
+              ring={team.id === myTeamId ? "self" : undefined}
+              meta={team.id === myTeamId ? "You" : undefined}
+            />
           </li>
         ))}
         {Array.from({ length: openSeats }, (_, index) => (
-          <li key={`open-${index}`} className="flex items-center gap-2 rounded-pill border border-dashed border-line px-2 py-1">
+          <li key={`open-${index}`} className="flex items-center gap-2 rounded-pill border border-dashed border-line px-3 py-1">
             <span className="text-sm text-text-muted">Open seat</span>
           </li>
         ))}

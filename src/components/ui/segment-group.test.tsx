@@ -24,11 +24,11 @@ describe("SegmentGroup", () => {
   it("has a compact size for a row inside a card, smaller than the default rail", () => {
     const { rerender } = render(<SegmentGroup label="Show" options={OPTIONS} value="5" onChange={() => {}} labelled={false} />);
     const rail = screen.getByRole("button", { name: "5" }).className;
-    expect(rail).toContain("py-2.5");
+    expect(rail).toContain("py-2");
     rerender(<SegmentGroup label="Show" options={OPTIONS} value="5" onChange={() => {}} labelled={false} size="sm" />);
     const compact = screen.getByRole("button", { name: "5" }).className;
     expect(compact).toContain("py-1");
-    expect(compact).not.toContain("py-2.5");
+    expect(compact).not.toContain("py-2");
     expect(screen.getByRole("group", { name: "Show" }).className).toContain("text-sm");
   });
 });

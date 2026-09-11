@@ -201,9 +201,11 @@ describe("LeagueRail", () => {
       for (const span of Array.from(container.querySelectorAll("span[aria-hidden]"))) {
         expect(span).toHaveAttribute("aria-hidden", "true");
       }
-      // The dots exist, colored by the channel law: amber = yours, red = live.
-      expect(container.querySelector(".bg-accent")).not.toBeNull();
-      expect(container.querySelector(".bg-negative")).not.toBeNull();
+      // The dots exist, coloured by Sideline's channels: amber (`self`) = yours to act on,
+      // live green (`live`) = something is true right now. Court blue is the VERB and rose is
+      // your RIVAL, so neither is a rail dot any more.
+      expect(container.querySelector(".bg-self")).not.toBeNull();
+      expect(container.querySelector(".bg-live")).not.toBeNull();
     });
   });
 });

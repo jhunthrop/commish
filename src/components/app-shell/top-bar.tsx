@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Avatar } from "@/components/ui/avatar";
+import { Manager } from "@/components/ui/manager";
 import { BrandLockup } from "@/components/ui/brand-mark";
 import { RailNav } from "./rail-nav";
 import { Icon } from "@/components/ui/icon";
@@ -79,7 +79,7 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
           can render its OWN band, under this row, still inside the one grid item `AppShell`
           spans across row 1 — "above the content column", never a second header. */}
       <div className="flex w-full items-center justify-between gap-2 border-b border-line px-2 py-3">
-        <div className="flex items-center gap-8">
+        <div className="flex shrink-0 items-center gap-8">
           {/* The whistle beside the wordmark, signing off with the amber full stop, matching
               the storefront rail. `aria-label` pins the accessible name to the word alone —
               `BrandLockup` renders its mark decoratively (`brand-mark.tsx`), so nothing else in
@@ -100,7 +100,7 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
             tightened this once for a font change; a SIXTH real control (the live pill, now
             genuinely present at every width instead of hidden below `sm`) is the second squeeze,
             and `mobile-360.spec.ts`'s own 360px battery is what caught it needing one. */}
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 items-center gap-1">
           {/* THE ONE SEARCH FIELD (site search round, 2026-09-08): first in the right-hand group so
               it reads as the row's field at `sm` and up and as one more icon-only control below,
               the discipline this header's own fix-round-1 history requires of a seventh control.
@@ -130,18 +130,25 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
             </Link>
           )}
           <NoticeInbox />
-          {/* GAMEDAY (2026-08-28): the manager, in ink. *"The manager's own identity present on
-              every screen"* is one of the four things the razor names as REAL aliveness, and this
-              is the one place the product says who you are on every signed-in page — it was the
-              quietest thing in the row. */}
+          {/* SIDELINE (2026-09-10): the manager, through `Manager` — the ONE way a person's
+              face renders in this product, beside their name always (P1). It replaces this
+              row's own hand-rolled `Avatar` + name pair, which was the same composition spelled
+              a second way, and it is what puts a person rather than a menu at the end of every
+              signed-in header. */}
+          {/* `min-w-0`: THE 390px OVERFLOW FIX (round one's annotation — the row ran 5px past a
+              390px viewport and clipped the way out off the right edge). A display name is USER
+              CONTENT and the only item in this row whose width the product does not choose, so
+              it is the one that has to yield; `Manager`'s name already carries `truncate`, and a
+              flex item's default `min-width: auto` was all that stood between the class and its
+              effect. Unconditional, at every width — the fix this header's own history asks for,
+              rather than a breakpoint that hides a control on the device people use most. */}
           <Link
             href="/app/profile"
-            className="flex items-center gap-1.5 rounded-md text-sm font-medium text-text-primary transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="min-w-0 rounded-md transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <Avatar name={displayName} avatar={avatar} size="sm" />
-            {displayName}
+            <Manager name={displayName} avatar={avatar} size="sm" />
           </Link>
-          <form action="/sign-out" method="post">
+          <form action="/sign-out" method="post" className="shrink-0">
             {/* GAMEDAY: quiet, like every other utility in this row. Full ink made the loudest
                 control on every signed-in surface in the product the way OUT of it — law 5's own
                 discipline ("a filter, a toggle, a sort control and a way out are quiet on every

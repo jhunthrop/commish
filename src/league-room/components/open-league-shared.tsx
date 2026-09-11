@@ -1,8 +1,7 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { Badge, buttonClassName } from "@/components/ui";
-import { LiveMarker } from "@/components/ui/live-marker";
+import { Badge, buttonClassName, LiveChip as LiveChipPrimitive } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";
 import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
@@ -56,12 +55,31 @@ function Dot() {
 }
 
 /**
- * The storefront's live marker — now the ONE `LiveMarker` primitive, which the season track
- * built after finding this exact shape hand-rolled here (its own docblock names this file). The
- * label is still DERIVED on every render from facts already on the wire, never a stored flag.
+ * The storefront's live marker — now Sideline's own `LiveChip` primitive (the live-green chip
+ * with the breathing dot), which is where `LiveMarker` retires. The label is still DERIVED on
+ * every render from facts already on the wire, never a stored flag.
  */
 export function LiveChip({ label }: { readonly label: string }) {
-  return <LiveMarker className="shrink-0">{label}</LiveMarker>;
+  return <LiveChipPrimitive className="shrink-0">{label}</LiveChipPrimitive>;
+}
+
+/**
+ * WHO IS ALREADY IN, in people rather than capacity (P1: the person comes before the number).
+ *
+ * This is a COUNT and never a name. `PublicLeagueSummary` is the product's privacy boundary and
+ * discloses nothing about the people in a league it advertises (that interface's own docblock,
+ * and the server-side reduction of `compositionCategory` for exactly this reason), so the row
+ * leads with the true, public fact — how many managers are already seated — and `SeatStack`
+ * draws it. An empty room says so in the second person, because "0 already in" is a number about
+ * an absence and "you would be first in" is an invitation.
+ *
+ * NO HELD CLAUSE HERE, deliberately: `SeatMeter` owns THE seat sentence for the whole product
+ * (F17), held seats included, and the row still speaks it to assistive tech. A second visible
+ * phrasing of the same claim is exactly what that ruling exists to prevent.
+ */
+export function seatedLine(league: PublicLeagueSummary): string {
+  if (league.filledTeams === 0) return "Nobody yet. You would be first in.";
+  return `${league.filledTeams} already in.`;
 }
 
 export interface OpenLeagueLive {

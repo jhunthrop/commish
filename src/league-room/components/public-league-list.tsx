@@ -185,26 +185,25 @@ export function OpenLeagueShelf({
 
       {merged.length > 0 ? (
         <>
-          {/* THE RANKED BOARD (Sunday v5; founder: "boring and stagnant... make it feel alive
-              like the tower"). One list, ranked by the one number that varies — seats remaining
-              — so P1 is the room that fires next, with the leader wearing the amber rail. Two
-              chapter bands (law 5), each carrying its consequence in words: rooms with claims
-              are FILLING, untouched rooms wait below. House-first ordering died with the
-              ranking; a leaderboard has one axis. */}
-          <div data-testid="league-rows" className="hidden lg:block">
+          {/* THE BOARD, SIDELINE (2026-09-10): one paper surface on the chalk ground, rows as
+              12px plates inside it, and the hairlines between them gone — a plate that lifts on
+              hover is already a row boundary, and a rule under every plate read as a table. The
+              ordering is still soonest-draft-first; what left with the position numeral (P1) is
+              the leaderboard's shout, not its order. Two chapter bands, each carrying its
+              consequence in words: rooms with claims are FILLING, untouched rooms wait below. */}
+          <div data-testid="league-rows" className="hidden rounded-xl bg-surface-elevated p-2 shadow-card lg:block">
             <LeagueRowsHeader live={live} />
             {filling.length > 0 ? (
               <ChapterBand name="Filling" consequence="Claimed seats · first to fill is first to draft" tone="live" />
             ) : null}
             <ul className="flex flex-col">
-              {filling.map((league, index) => (
-                <li key={league.id} className="border-t border-hair border-t-line" data-testid={houseIds.has(league.id) ? undefined : "member-league"}>
+              {filling.map((league) => (
+                <li key={league.id} data-testid={houseIds.has(league.id) ? undefined : "member-league"}>
                   <LeagueRow
                     league={league}
                     signedIn={signedIn}
-                    position={index + 1}
-                    // The wash rides the FEATURED row (blueprint law 2), not bare P1: a board
-                    // whose fullest room has rolled, or holds no claims, washes nothing.
+                    // The amber wash rides the FEATURED row (blueprint law 2), not bare P1: a
+                    // board whose fullest room has rolled, or holds no claims, washes nothing.
                     leader={league.id === featuredId}
                     emphasis={league.id === featuredId ? "ink" : "quiet"}
                     headingLevel={headingLevel === 1 ? 2 : 3}
@@ -218,12 +217,12 @@ export function OpenLeagueShelf({
               <ChapterBand name="Fresh" consequence="No claims yet · yours would be the first seat" />
             ) : null}
             <ul className="flex flex-col">
-              {fresh.map((league, index) => (
-                <li key={league.id} className="border-t border-line" data-testid={houseIds.has(league.id) ? undefined : "member-league"}>
+              {fresh.map((league) => (
+                <li key={league.id} data-testid={houseIds.has(league.id) ? undefined : "member-league"}>
                   <LeagueRow
                     league={league}
                     signedIn={signedIn}
-                    position={filling.length + index + 1}
+                    leader={league.id === featuredId}
                     emphasis={league.id === featuredId ? "ink" : "quiet"}
                     headingLevel={headingLevel === 1 ? 2 : 3}
                     live={live}

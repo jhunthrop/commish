@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { PageTitle } from "@/components/ui";
-import { MICRO_LABEL } from "@/components/ui/config";
-import { SeatMeter } from "@/components/ui/seat-meter";
+import { BigNumber, PageTitle, SeatStack } from "@/components/ui";
+import { seatSentence } from "@/components/ui/seat-meter";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { createSheetDefaults, shellData } from "@/components/app-shell/shell-data";
 import { pageTitle } from "@/components/app-shell/page-metadata";
@@ -72,18 +71,23 @@ function SeatMasthead({
             (Sunday v5, law 6): it is a fact the decision rests on, and the strip is where those
             sit. Stating it in both places would be the same fact twice on a screen with one
             decision on it. */}
-        <div className="flex min-w-0 flex-col gap-1">
+        {/* P1: who is in, before the number — the seats themselves on a signed-out surface
+            (`SeatStack`'s docblock on why these are not faces). */}
+        <div className="flex min-w-0 flex-col gap-2">
           <PageTitle>{preview.name}</PageTitle>
-          {timing === null ? null : <p className="font-mono text-xs tabular-nums text-text-muted">{`Drafts ${timing}`}</p>}
+          <SeatStack filled={preview.filledTeams} total={preview.teamCount} heldSeats={preview.heldSeats} />
+          {timing === null ? null : <p className="text-sm tabular-nums text-text-muted">{`Drafts ${timing}`}</p>}
         </div>
-        <div className="flex shrink-0 items-baseline gap-2">
-          <span data-testid="hold-seats-open" className="font-mono text-display-xl font-semibold tabular-nums leading-display text-text-primary">
-            {open}
-          </span>
-          <span className={`${MICRO_LABEL} text-text-faint`}>{open === 1 ? "seat open" : "seats open"}</span>
+        {/* P2: the page's ONE number, with its basis in the same glance — through `BigNumber`,
+            which owns both halves; the hand-rolled figure-plus-micro-label pair it replaces was
+            this composition spelled a second way. */}
+        <div data-testid="hold-seats-open" className="shrink-0">
+          <BigNumber value={String(open)} basis={`${open === 1 ? "seat" : "seats"} open of ${preview.teamCount}`} size="xl" />
         </div>
       </div>
-      <SeatMeter filled={preview.filledTeams} total={preview.teamCount} heldSeats={preview.heldSeats} srOnlySentence />
+      {/* The product's ONE seat sentence (F17), spoken only: `SeatStack` above already draws
+          the same shape, and the meter's bar beside it was that shape twice. */}
+      <span className="sr-only">{seatSentence(preview.filledTeams, preview.teamCount, preview.heldSeats)}</span>
     </div>
   );
 }

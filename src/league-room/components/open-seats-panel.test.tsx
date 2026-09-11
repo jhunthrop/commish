@@ -15,10 +15,11 @@ describe("OpenSeatsPanel", () => {
     await renderSurface(<OpenSeatsPanel leagues={PUBLIC_LEAGUES} />, async ({ container, getByText }) => {
       expect(getByText("The house always has a game.")).toBeInTheDocument();
       expect(getByText("Open leagues")).toBeInTheDocument();
-      // F17: seat counts come through `SeatMeter` (`LeagueRow`'s and `OpenLeagueCard`'s own
-      // renders — both forms exist in the DOM at once, CSS gates which is visible), never a
-      // fourth phrasing written here.
-      expect(container.querySelectorAll('[data-testid="seat-segments"]').length).toBe(PUBLIC_LEAGUES.length * 2);
+      // F17: seat counts come through the seat primitives (`LeagueRow`'s and `OpenLeagueCard`'s
+      // own renders — both forms exist in the DOM at once, CSS gates which is visible), never a
+      // fourth phrasing written here. SIDELINE: the visible shape is `SeatStack` on both forms;
+      // `SeatMeter` still speaks the one sentence, sr-only.
+      expect(container.querySelectorAll('[data-testid="seat-stack"]').length).toBe(PUBLIC_LEAGUES.length * 2);
       expect(await axe(container)).toHaveNoViolations();
     });
   });
@@ -34,9 +35,11 @@ describe("OpenSeatsPanel", () => {
     expect(cards.className).toContain("lg:hidden");
     expect(within(rows).getAllByRole("button", { name: /^Join / })).toHaveLength(PUBLIC_LEAGUES.length);
     expect(within(cards).getAllByRole("button", { name: /^Join / })).toHaveLength(PUBLIC_LEAGUES.length);
-    // Rule 5 + S10: on the home screen the one ink action belongs to the attention queue's top
-    // item, so this panel never features a league — zero ink pills in either rendering.
-    expect(container.querySelectorAll('[class*="bg-text-primary"]')).toHaveLength(0);
+    // P3 + S10: on the home screen the one solid verb belongs to the attention queue's top
+    // item, so this panel never features a league — zero Court blue pills in either rendering.
+    // `shadow-verb-glow` is the verb variant's own marker (`Button`'s VARIANT map), and it is
+    // what to count now that `bg-text-primary` is the seat primitives' TAKEN-seat ink.
+    expect(container.querySelectorAll('[class*="shadow-verb-glow"]')).toHaveLength(0);
   });
 
   it("renders nothing at all when there are no open leagues", () => {

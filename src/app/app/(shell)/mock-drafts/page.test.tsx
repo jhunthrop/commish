@@ -66,7 +66,7 @@ describe("MockDraftsLobbyPage", () => {
   it("leads with one verb and the chip sentence — no settings form, and an empty lobby renders NOTHING", async () => {
     const page = await MockDraftsLobbyPage({ searchParams: searchParams() });
     render(page);
-    expect(screen.getByRole("button", { name: "Draft now" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start mock draft" })).toBeInTheDocument();
     // The remembered table as a sentence of chips (server defaults on first paint).
     expect(screen.getByTestId("table-chip-teams")).toHaveTextContent("12 teams");
     expect(screen.getByTestId("table-chip-seat")).toHaveTextContent("Seat: random");
@@ -76,8 +76,11 @@ describe("MockDraftsLobbyPage", () => {
     // Law 2: the empty lobby is ABSENT — no list, no sentence about absence.
     expect(screen.queryByRole("list", { name: "Open lobby rooms" })).not.toBeInTheDocument();
     expect(screen.queryByText(/No mock drafts are open/)).not.toBeInTheDocument();
-    // The old form is gone entirely.
-    expect(screen.queryByRole("button", { name: "Start mock draft" })).not.toBeInTheDocument();
+    // The old seven-decision setup form is gone entirely — its own labelled selects are what
+    // identify it, not its submit button's words (the lobby's one verb reads "Start mock draft"
+    // since Sideline, which is the same phrase that form's submit once used).
+    expect(screen.queryByLabelText("Draft position")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Pick clock")).not.toBeInTheDocument();
   });
 
   it("self-omits the learning column for a caller with no completed mocks (law 3's empty state)", async () => {

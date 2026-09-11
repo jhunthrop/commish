@@ -52,8 +52,12 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         value={value}
         defaultValue={defaultValue}
         onChange={handleChange}
+        // SIDELINE (2026-09-10): `Input` and `Select` take the 40px pill; a multi-line box
+        // cannot, because a pill's curve eats the first and last line of a paragraph. It takes
+        // the BUBBLE radius instead (`shape.bubble`, 16px) — the step this system already spends
+        // on a block of somebody's words — so the family still reads as one set of fields.
         className={
-          "min-h-28 resize-y rounded-md border bg-surface-elevated px-3 py-2 text-md text-text-primary " +
+          "min-h-28 resize-y rounded-lg border bg-surface-elevated px-4 py-2.5 text-md text-text-primary " +
           "placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
           "disabled:opacity-60 disabled:cursor-not-allowed " +
           // `border-edge`, never `border-line`: a textarea is a control a user must find, not a

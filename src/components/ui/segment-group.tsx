@@ -1,6 +1,5 @@
 "use client";
 
-import { RAIL_LABEL, RAIL_LABEL_LG } from "./config";
 
 export interface SegmentOption {
   readonly value: string;
@@ -24,10 +23,33 @@ export interface SegmentGroupProps {
   readonly className?: string;
 }
 
+/** SIDELINE (2026-09-10): the chip's register is the BODY face, sentence case, semibold — the
+ *  mock's `.chip`. The broadcast rail's tracked small caps left with the direction that asked
+ *  for them; a chip is a thing a person taps, not a network's chrome. */
 const SIZE: Readonly<Record<SegmentGroupSize, { readonly rail: string; readonly segment: string }>> = {
-  md: { rail: RAIL_LABEL_LG, segment: "px-4 py-2.5" },
-  sm: { rail: RAIL_LABEL, segment: "px-3 py-1" },
+  md: { rail: "text-sm font-semibold", segment: "px-4 py-2" },
+  sm: { rail: "text-sm font-semibold", segment: "px-3 py-1" },
 };
+
+/**
+ * THE ONE SPELLING OF A PILL CHIP, and the only file in the product that fills one.
+ *
+ * Three surfaces wear this chip and only one of them can be `SegmentGroup` itself: `/browse`'s
+ * filters are plain `<Link>`s so the URL stays the whole filter state (no JavaScript needed to
+ * read the lobby), and the mock lobby's table chips are DISCLOSURES that each open their own
+ * editor row rather than one mutually exclusive choice. They are different mechanisms wearing
+ * one skin, which is exactly what a class function is for — and it is what keeps
+ * `accent-budget.source.test.ts` honest: the fill is drawn HERE, once, and a call site that
+ * hand-rolls the class string still fails the sweep.
+ *
+ * Amber's old furniture argument is retired with v5: the chosen chip takes Court blue because
+ * Sideline's `accent` IS the chosen-thing pigment, and `self` is now the "yours" channel.
+ */
+export function chipClassName(active: boolean, size: SegmentGroupSize = "md", className = ""): string {
+  const base = `rounded-pill ${SIZE[size].segment} ${SIZE[size].rail} transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
+  const skin = active ? "bg-accent text-accent-text" : "bg-surface-elevated text-text-muted hover:text-text-primary";
+  return `${base} ${skin} ${className}`.trimEnd();
+}
 
 /**
  * THE SEGMENTED RAIL — one strip of flat segments, the active one filled amber on `accentText`
@@ -51,10 +73,9 @@ export function SegmentGroup({ label, options, value, onChange, labelled = true,
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
       {labelled ? <span className="text-sm font-medium text-text-primary">{label}</span> : null}
-      {/* V6 (the warmth pass): the bordered strip becomes a row of PILLS — the mocks' tabs.
-          Inactive segments rest on the elevated fill; the active one keeps the solid amber
-          (furniture channel, verified ink), now pill-shaped. Same options, same one-glance
-          readability, no hairline. */}
+      {/* A row of PILL CHIPS — the mock's tabs. Inactive chips rest on the elevated fill; the
+          chosen one takes Court blue. Same options, same one-glance readability, no hairline.
+          The class comes from `chipClassName` above, which is the one place it is spelled. */}
       <div className={`flex w-fit flex-wrap gap-1.5 ${step.rail}`} role="group" aria-label={label}>
         {options.map((option) => (
           <button
@@ -62,9 +83,7 @@ export function SegmentGroup({ label, options, value, onChange, labelled = true,
             type="button"
             aria-pressed={value === option.value}
             onClick={() => onChange(option.value)}
-            className={`rounded-pill ${step.segment} transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-              value === option.value ? "bg-accent text-accent-text" : "bg-surface-elevated text-text-muted hover:text-text-primary"
-            }`}
+            className={chipClassName(value === option.value, size)}
           >
             {option.label}
           </button>

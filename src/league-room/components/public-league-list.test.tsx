@@ -216,19 +216,21 @@ describe("OpenLeagueShelf", () => {
     expect(cards().className).not.toContain("xl:grid-cols-4");
   });
 
-  it("separates rows by hairline, no boxes (rule 4), under one eyebrow header naming the columns", () => {
+  it("is one paper board of row plates, hairlines gone, under one header naming the columns", () => {
     render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />);
+    // SIDELINE (2026-09-10): the board is the one material — paper at the 20px card radius on
+    // the chalk ground — and each row is a 12px plate inside it. The per-row hairlines are gone:
+    // a plate that lifts on hover is already a boundary, and a rule under every plate read as a
+    // table (P10 forbids a comparison list that looks like a spreadsheet).
+    expect(rows().className).toContain("rounded-xl");
+    expect(rows().className).toContain("bg-surface-elevated");
     for (const item of within(rows()).getAllByRole("listitem")) {
-      expect(item.className).toContain("border-t");
-      // Filling rows spell the hairline as `border-hair border-t-line`; fresh rows as
-      // `border-line` — either way the line token draws it, and no row wears a box.
-      expect(item.className).toMatch(/border(-t)?-line/);
-      expect(item.className).not.toContain("rounded");
+      expect(item.className).not.toContain("border-t");
     }
     // The header is the rows rendering's first element. Free season: no money column at all —
     // the blueprint's money columns exist only behind `moneyIsLive()` (their own tests).
     const header = rows().firstElementChild as HTMLElement;
-    for (const label of ["League", "Format", "Drafts", "Seats"]) {
+    for (const label of ["Who is in", "Format", "Drafts", "Seats"]) {
       expect(within(header).getByText(label)).toBeInTheDocument();
     }
     expect(within(header).queryByText("Buy-in")).not.toBeInTheDocument();

@@ -32,8 +32,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         id={id}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
+        // SIDELINE (2026-09-10): `Input`'s 40px pill, verbatim — a form mixing the two is one
+        // field shape, not two.
         className={
-          "h-10 rounded-md border bg-surface-elevated px-3 text-md text-text-primary " +
+          "h-10 rounded-pill border bg-surface-elevated px-4 text-md text-text-primary " +
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
           "disabled:opacity-60 disabled:cursor-not-allowed " +
           // `border-edge`, never `border-line`: a select is a control a user must find, not a

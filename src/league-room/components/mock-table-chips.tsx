@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Input, SegmentGroup } from "@/components/ui";
-import { MICRO_LABEL } from "@/components/ui/config";
+import { chipClassName } from "@/components/ui/segment-group";
 import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
 import { formatOrdinal } from "@/draft-room/state/format";
 import {
@@ -125,9 +125,7 @@ export function MockTableChips({ table, options, hint, onChange }: MockTableChip
                     type="button"
                     aria-pressed={pressed}
                     onClick={() => change({ ...table, draftSlot: option.value === RANDOM_SEAT ? null : Number(option.value) })}
-                    className={`min-w-9 rounded-md border px-2 py-1.5 font-display text-sm font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                      pressed ? "border-accent text-accent" : "border-line text-text-muted hover:text-text-primary"
-                    }`}
+                    className={chipClassName(pressed, "sm", "min-w-9 font-display tabular-nums")}
                   >
                     {option.label}
                   </button>
@@ -159,7 +157,7 @@ export function MockTableChips({ table, options, hint, onChange }: MockTableChip
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className={`${MICRO_LABEL} text-text-faint`}>Tonight&apos;s table:</span>
+        <span className="text-sm text-text-faint">Tonight&apos;s table</span>
         {tableChips(table, { scoring: SCORING_LABELS, roster: ROSTER_LABELS }).map((chip) => (
           <button
             key={chip.id}
@@ -168,9 +166,11 @@ export function MockTableChips({ table, options, hint, onChange }: MockTableChip
             aria-expanded={openChip === chip.id}
             aria-label={`${CHIP_EDITOR_LABEL[chip.id]}: ${chip.label}`}
             onClick={() => setOpenChip((current) => (current === chip.id ? null : chip.id))}
-            className={`${MICRO_LABEL} rounded-md border bg-surface px-3 py-1.5 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-              openChip === chip.id ? "border-accent text-accent" : "border-line text-text-muted hover:text-text-primary"
-            }`}
+            // SIDELINE: `SegmentGroup`'s own chip skin through `chipClassName` — not the
+            // component, because these chips are DISCLOSURES (each opens its own editor row
+            // beneath the sentence) rather than one mutually exclusive choice, which is the only
+            // thing that primitive is.
+            className={chipClassName(openChip === chip.id)}
           >
             {chip.label}
           </button>

@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { ProofStats } from "@/matchmaking/contract";
 import { moneyIsLive } from "@/money/states";
@@ -42,13 +43,16 @@ export function proofPhrases(stats: ProofStats): readonly string[] {
   return phrases;
 }
 
+/** SIDELINE (2026-09-10): the mock's trust facts are the one material — paper on chalk at the
+ *  20px card radius, the soft shadow — not a well sunk into the page. `Card` is that material's
+ *  one spelling, so the class string here dies with the change. */
 function FactCard({ label, fact, children }: { readonly label: string; readonly fact: string; readonly children?: React.ReactNode }) {
   return (
-    <div className="flex flex-1 basis-64 flex-col gap-1.5 rounded-md bg-surface-inset px-3.5 py-3">
+    <Card className="flex flex-1 basis-64 flex-col gap-1.5">
       <h3 className={`${MICRO_LABEL} text-text-faint`}>{label}</h3>
       <p className="text-sm text-text-muted">{fact}</p>
       {children}
-    </div>
+    </Card>
   );
 }
 

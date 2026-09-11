@@ -46,7 +46,10 @@ const SWEPT_DIRS = ["src/components", "src/league-room", "src/draft-room", "src/
  */
 const ACCENT_FILL_ALLOWLIST: readonly string[] = [
   "src/components/ui/meter.tsx",
-  "src/components/ui/seat-meter.tsx",
+  // SIDELINE, the doors-and-rooms round (2026-09-10): `seat-meter.tsx` LEFT this list. A seat
+  // that is taken is drawn in ink now, not Court blue — `accent` is the one verb (P3), and a
+  // twelve-segment blue bar spent the page's loudest pigment on a row's furniture. Its ink is
+  // accounted for in `INK_PILL_ALLOWLIST` below.
   // SIDELINE (2026-09-10): `celebration.tsx` left this list. Your own moment now wears the amber
   // wash (`self-wash`, the "yours" channel), never the verb's blue. `message-bubble.tsx` joins
   // it: YOUR message is the Court blue bubble (Sideline: "Court blue: the one verb, links, your
@@ -65,7 +68,12 @@ const ACCENT_FILL_ALLOWLIST: readonly string[] = [
   // moved the dot from `league-rail.tsx` into the extracted row model (`RailDot`) — same dot,
   // same reason, still exactly one file drawing it; `league-rail.tsx` itself no longer spells
   // the fill at all.
-  "src/components/app-shell/rail-row.tsx",
+  //
+  // SIDELINE, the doors-and-rooms round (2026-09-10): `rail-row.tsx` LEFT this list too. The
+  // needs-you dot is `bg-self` now — Sideline split "yours" (Streak amber) out of `accent`
+  // precisely so a screen full of other people's rows can point at yours without that reading
+  // as "press this", and a league waiting on your lineup is the textbook case. Its live sibling
+  // moved from rose to `bg-live`, the presence pigment; neither needs an exemption.
   // SUNDAY v5 (2026-08-28), law 4. The lobby's segmented filter rail, earning its entry the way
   // this docblock asks — in review, with a reason. Law 4 spends amber on "furniture and you and
   // the verb", and a filter strip is furniture: the network's own graphics over the board, not a
@@ -73,7 +81,13 @@ const ACCENT_FILL_ALLOWLIST: readonly string[] = [
   // class string); this fill carries no act at all — every segment is a `<Link>` that reorders or
   // narrows the same list. One file draws it, and a call site that hand-rolls the class still
   // fails, which is the property the budget actually protects.
-  "src/league-room/components/browse-filters.tsx",
+  //
+  // SIDELINE, the doors-and-rooms round (2026-09-10): `browse-filters.tsx` LEFT this list. The
+  // three surfaces that wear a pill chip — the segmented group, the lobby's filter links and the
+  // mock lobby's table chips — now take one exported class function (`chipClassName`,
+  // `segment-group.tsx`), so `segment-group.tsx` below is the ONE file that fills a chip and the
+  // other two need no exemption at all. That is the property this budget protects, obtained by
+  // deleting two spellings rather than by granting two more entries.
   // THE QUILT (2026-09-02), law 4, earning both entries the way this docblock asks — in review,
   // with a reason. The clock strip's your-turn plate is the mock's own amber clock chip: it is
   // "furniture and you" in one surface — the network's clock graphic, filled amber precisely
@@ -124,6 +138,18 @@ const INK_PILL_ALLOWLIST: readonly string[] = [
   // the obvious alternative and are not available: `magnitude-budget.source.test.ts` makes `Stat`
   // the only file allowed to name one, and the number above each bar is where they render.
   "src/components/ui/season-bars.tsx",
+  // SIDELINE, the doors-and-rooms round (2026-09-10): the SEAT PRIMITIVES, earning the entry the
+  // way this file's own docblock asks — in review, with a reason, and on exactly the grounds
+  // `season-bars.tsx` above already established.
+  //
+  // The ban's target is a CONTROL wearing the ink fill. `SeatMeter` and `SeatStack` draw no
+  // control: `total` `aria-hidden` rectangles with no text on them, no handler, no focus stop,
+  // decoration for a sentence that is already on screen (their own docblocks). What they need
+  // the role for is that a TAKEN seat has to be separable from an OPEN one and from a HELD one
+  // in both themes, and the ladder that does that with hue switched off is ink / amber / the
+  // well behind `edge`. The fill they left is Court blue, which P3 reserves for the one verb —
+  // this is the budget being SPENT DOWN by the change, not widened.
+  "src/components/ui/seat-meter.tsx",
 ];
 
 const REPO_ROOT = process.cwd();

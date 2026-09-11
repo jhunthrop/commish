@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { RAIL_LABEL } from "@/components/ui/config";
+import { chipClassName } from "@/components/ui/segment-group";
 
 /**
  * Phase 3.6, Task 5, Step 4: the shelf's filter row, replacing the four-`Select` form this
@@ -43,36 +43,24 @@ export interface BrowseFiltersProps {
 }
 
 /**
- * SUNDAY v5 (2026-08-28): the row is a SEGMENTED RAIL, not four floating pills.
+ * SIDELINE (2026-09-10): the row is PILL CHIPS, the shape `SegmentGroup` already wears and the
+ * shape the mock draws — sentence case in the body face, the chosen one filled, the rest resting
+ * on the ground. The joined broadcast strip retires with the register that asked for it: v5's
+ * segmented rail was a network graphic, and Sideline's chips are what a person taps.
  *
- * The approved timing-tower render draws a lens as one joined strip of flat segments with the
- * selected one filled — the shape a broadcast graphic has always used for "which view of the
- * same board am I looking at". Four separate rounded pills say four independent toggles; these
- * are mutually exclusive by construction (`ACTIVE_OPTION`), and the strip is what says so
- * without a sentence.
+ * NOT `SegmentGroup` itself, deliberately: that primitive is a client component built on
+ * `onChange` and `aria-pressed`, and this row is plain `<Link>`s so the URL remains the whole
+ * filter state — linkable, bookmarkable, and working before (and without) any JavaScript, on
+ * whatever device a stranger with no account happens to have. Different mechanism, ONE skin:
+ * the class comes from `chipClassName` (`@/components/ui/segment-group`), the single file in the
+ * product that fills a chip, so this file no longer needs an accent-budget exemption at all.
  *
- * AMBER IS CORRECT HERE, and it is law 4 rather than an exception to it: the amber channel is
- * *"furniture and you and the verb"*, and a filter row is furniture — the network's own graphics,
- * not a verdict about a league and not an act. The `bg-accent` fill therefore earns its
- * `accent-budget.source.test.ts` allowlist entry the way that file asks, in review with a reason.
- * v3's ruling that a lens is "ink-bordered, never filled" was written under the rule where amber
- * (then green) doubled as the one ink action; v5 split those (`accent` for furniture and the
- * verb, the ink pill for the ceremonial act), so a filled segment can no longer be mistaken for
- * this view's primary button.
- *
- * `RAIL_LABEL` is the caps charter's second sanctioned address — the condensed, tracked small
- * caps the rail above this row already speaks in, imported never hand-rolled.
- *
- * Still plain `<Link>`s, still no client component: the URL remains the whole filter state.
+ * `aria-current` rather than `aria-pressed`: these are navigation, and exactly one is the page
+ * the reader is standing on.
  */
-const SEGMENT = "px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent";
-
 export function BrowseFilters({ active }: BrowseFiltersProps) {
   return (
-    <nav
-      aria-label="Filter open leagues"
-      className="flex w-fit max-w-full flex-wrap items-stretch overflow-hidden rounded-sm border border-edge bg-surface-elevated"
-    >
+    <nav aria-label="Filter open leagues" className="flex w-fit max-w-full flex-wrap gap-1.5">
       {OPTIONS.map((option) => {
         const isActive = option.key === active;
         return (
@@ -80,9 +68,7 @@ export function BrowseFilters({ active }: BrowseFiltersProps) {
             key={option.key}
             href={option.href}
             aria-current={isActive ? "true" : undefined}
-            className={`${SEGMENT} ${RAIL_LABEL} border-l border-line first:border-l-0 ${
-              isActive ? "bg-accent text-accent-text" : "text-text-muted hover:bg-surface-raised hover:text-text-primary"
-            }`}
+            className={chipClassName(isActive)}
           >
             {option.label}
           </Link>

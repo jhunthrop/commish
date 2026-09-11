@@ -106,8 +106,15 @@ describe("WaitingRoom", () => {
 
   it("shows a manager who just sat down that they are in, and which seat is theirs", () => {
     render(<WaitingRoom league={{ ...scheduledAndFilling, filledTeams: 10 }} leagueName="Half-PPR #241" justSeated />);
-    expect(screen.getByText("Half-PPR #241 · You're in")).toBeInTheDocument();
+    // SIDELINE (2026-09-10): the moment is P8's `Celebration` frame, so the league's name is
+    // the frame's own header line rather than a prefix glued onto the title with a dot.
+    expect(screen.getByText("You're in")).toBeInTheDocument();
+    expect(screen.getByText("Half-PPR #241")).toBeInTheDocument();
     expect(screen.getByText("You claimed seat 10 of 12 just now.")).toBeInTheDocument();
+    // P8: the frame carries the number that earned it, with its basis.
+    const figure = screen.getByTestId("big-number");
+    expect(figure.textContent).toContain("10");
+    expect(figure.textContent).toContain("of 12 seats");
   });
 
   it("stops being a moment once it stops being true, with nothing stored and nothing to dismiss", () => {
@@ -142,7 +149,7 @@ describe("WaitingRoom", () => {
 
   it("is axe-clean on the just-seated moment", async () => {
     await renderSurface(<WaitingRoom league={scheduledAndFilling} leagueName="Half-PPR #241" justSeated />, async ({ container }) => {
-      expect(screen.getByText("Half-PPR #241 · You're in")).toBeInTheDocument();
+      expect(screen.getByText("You're in")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
   });
@@ -153,7 +160,7 @@ describe("WaitingRoom", () => {
     // the full-seat countdown hero must render together — for the whole grace window this pairing
     // is what that person sees. Pinned at the unit level per this file's axe-per-state convention.
     await renderSurface(<WaitingRoom league={fullSitAndGo} leagueName="Sit and Go #7" justSeated />, async ({ container }) => {
-      expect(screen.getByText("Sit and Go #7 · You're in")).toBeInTheDocument();
+      expect(screen.getByText("You're in")).toBeInTheDocument();
       expect(screen.getByTestId("waiting-room-hero")).toBeInTheDocument();
       expect(screen.getByTestId("waiting-room-countdown")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
