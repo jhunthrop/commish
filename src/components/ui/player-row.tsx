@@ -5,6 +5,15 @@ import { PositionBadge } from "./position-badge";
 
 export interface PlayerRowProps {
   readonly player: Player;
+  /**
+   * HIS PLACE IN A RANKED LIST, before the face (the draft board, a ladder). Body size in the
+   * quiet ink and NEVER display type: P1 rules out "rows that begin with a rank numeral in display
+   * type", and the test it sets is that covering the numbers still leaves a readable list of
+   * people. This is not a fifth region — the ordinal and the face are one identity block, which is
+   * why the board's four data regions (identity, facts, the number, the control) are unchanged.
+   * Omitted by every surface with no ordering of its own.
+   */
+  readonly lead?: ReactNode;
   /** This player's rank among his own position on the board rendering him, printed on the
    *  sticker. Omitted by every surface with no ranked board behind it. */
   readonly positionRank?: number;
@@ -20,6 +29,13 @@ export interface PlayerRowProps {
   readonly figure?: ReactNode;
   /** The one control: `<Button variant="verb" size="sm">Draft</Button>`. The row never builds it. */
   readonly action?: ReactNode;
+  /**
+   * THE RESEARCH DENSITY (`TOKENS.density.denseRowPx`, 44) — the pool, a game log, the draft
+   * board: "research screens go dense to 44px with a face still present". The face steps down to
+   * 32 with the row; nothing else about the row changes, because a dense row that also dropped the
+   * face would be the table this vocabulary replaced.
+   */
+  readonly dense?: boolean;
   /** The row that is yours, or the one the moment is about: the amber wash. */
   readonly highlight?: boolean;
   readonly className?: string;
@@ -36,12 +52,24 @@ const SKIN: Readonly<Record<"plain" | "highlight", string>> = {
 };
 
 /**
- * THE ROW'S SHELL, SHARED with `TeamRow`: 48px tall (`min-h-12`, `TOKENS.density.rowPx`), a
- * 12px plate, the face, then the name column, then the number, then the control. Four regions
- * at most (`TOKENS.density.maxColumns`).
+ * THE ROW'S SHELL, SHARED with `TeamRow`: 48px tall (`min-h-12`, `TOKENS.density.rowPx`) or 44 on
+ * a research surface (`min-h-11`, `TOKENS.density.denseRowPx`), a 12px plate, the face, then the
+ * name column, then the number, then the control. Four regions at most
+ * (`TOKENS.density.maxColumns`).
+ *
+ * THE HEIGHT IS CHOSEN HERE AND NEVER APPENDED BY A CALLER. Two `min-h-*` utilities in one class
+ * string is not a last-one-wins: Tailwind emits them in ITS order, so `min-h-11 min-h-12` renders
+ * 48 and the dense row silently is not dense. One ternary, one utility.
  */
-export function rowShellClass(highlight: boolean, className = ""): string {
-  return `flex min-h-12 items-center gap-3 rounded-md px-2.5 py-1 ${SKIN[highlight ? "highlight" : "plain"]} ${className}`.trimEnd();
+export function rowShellClass(highlight: boolean, className = "", dense = false): string {
+  // The dense row spends its two vertical pixels on content rather than on padding: the name and
+  // the facts line alone are 42px at Sideline's own type sizes, so `py-1` would put a "44px" row at
+  // 50 and the density token would be a number nothing measured.
+  // The dense row also closes its gaps from 12 to 8. Four gaps at 12px is 48 of a 360px row spent
+  // on air, and the column that pays for it is the NAME — measured on the draft board at 360,
+  // where "Puka Nacua" truncated to "Puka Na…" and P1's own test (cover the numbers, can you still
+  // read who is on the list) failed on the product's densest surface.
+  return `flex items-center rounded-md px-2.5 ${dense ? "min-h-11 gap-2 py-0.5" : "min-h-12 gap-3 py-1"} ${SKIN[highlight ? "highlight" : "plain"]} ${className}`.trimEnd();
 }
 
 /** The name: 17px in the display face at 700, the largest thing on the row (P1). */
@@ -59,17 +87,18 @@ export const ROW_META_CLASS = "flex min-w-0 items-center gap-1.5 text-sm text-te
  * TRUNCATION IS LOAD-BEARING AT 360px: the name column is `min-w-0` and the name truncates, or a
  * flex child's automatic minimum size lets one long name push the whole PAGE sideways.
  */
-export function PlayerRow({ player, positionRank, meta, chips, verdict, figure, action, highlight = false, className = "" }: PlayerRowProps) {
+export function PlayerRow({ player, lead, positionRank, meta, chips, verdict, figure, action, dense = false, highlight = false, className = "" }: PlayerRowProps) {
   return (
-    <div data-highlight={highlight ? "true" : undefined} className={rowShellClass(highlight, className)}>
-      <PlayerFace player={player} size="md" />
+    <div data-highlight={highlight ? "true" : undefined} className={rowShellClass(highlight, className, dense)}>
+      {lead === undefined || lead === null ? null : <span className="shrink-0 text-right text-sm tabular-nums text-text-faint">{lead}</span>}
+      <PlayerFace player={player} size={dense ? "sm" : "md"} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {/* `pool-player-name` is a TEST CONTRACT (e2e makeTopPick helpers read the picked name
             through it, never through DOM adjacency). */}
         <span data-testid="pool-player-name" className={ROW_NAME_CLASS}>{player.name}</span>
         <span className={ROW_META_CLASS}>
           <PositionBadge position={player.position} rank={positionRank} size="sm" />
-          {meta === undefined ? null : <span className="truncate">{meta}</span>}
+          {meta === undefined ? null : <span className="min-w-0 truncate">{meta}</span>}
           {verdict === undefined || verdict === null ? null : <span className="ml-auto shrink-0 pl-2">{verdict}</span>}
         </span>
         {chips === undefined || chips === null ? null : <span className="flex flex-wrap items-center gap-1">{chips}</span>}

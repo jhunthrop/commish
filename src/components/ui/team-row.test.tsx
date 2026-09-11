@@ -4,6 +4,7 @@ import { axe } from "vitest-axe";
 import { renderSurface } from "./test-utils";
 import { TeamRow } from "./team-row";
 import { PlayerRow } from "./player-row";
+import { BigNumber } from "./big-number";
 import type { Player } from "@/domain/player";
 
 const GIBBS: Player = { id: "rb1", name: "Jahmyr Gibbs", position: "RB", nflTeam: "DET", headshotUrl: null, adp: 4.1 };
@@ -34,5 +35,17 @@ describe("TeamRow", () => {
     expect(row.tagName).toBe("DIV");
     expect(row).not.toHaveAttribute("role");
     expect(row).not.toHaveAttribute("tabindex");
+  });
+  /** P2 on a club's row: whatever number the surface rendering it has for a club, with its basis
+   *  under it — the same slot, the same contract and the same right edge as `PlayerRow`'s. */
+  it("carries one number at its right when the surface has one", () => {
+    render(<TeamRow code="DET" name="Detroit Lions" figure={<BigNumber value="8" basis="Bye week" size="sm" />} />);
+    expect(screen.getByTestId("big-number")).toBeInTheDocument();
+    expect(screen.getByText("Bye week")).toBeInTheDocument();
+  });
+
+  it("reserves no empty box when it was given none", () => {
+    const { container } = render(<TeamRow code="DET" name="Detroit Lions" />);
+    expect(container.firstElementChild!.children).toHaveLength(2);
   });
 });

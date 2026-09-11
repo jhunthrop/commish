@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useState, type KeyboardEvent } from "react";
 import { useAccountRoomDeps } from "@/account-room/hooks/deps";
+import { BigNumber } from "@/components/ui/big-number";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { PlayerRow } from "@/components/ui/player-row";
@@ -11,6 +12,7 @@ import { rosterStatusLabel } from "@/projections/preseason/roster-status-copy";
 import { SEARCH_CONFIG } from "@/search/config";
 import { searchResultKey, type SearchResult } from "@/search/contract";
 import { useSiteSearch } from "@/search/use-site-search";
+import { openPlayerPeek } from "@/league-room/components/player-peek";
 import { searchResultHref, useLinkLeague } from "./shell-leagues";
 
 /** The keys that open the palette from anywhere on a signed-in page. */
@@ -33,14 +35,35 @@ function shouldOpen(event: globalThis.KeyboardEvent): boolean {
 /** The mono facts after a result's name: club, bye, and the board rank a player carries. Pure. */
 export function resultMetaLine(result: SearchResult): string {
   const bye = result.byeWeek === null ? null : `Bye ${result.byeWeek}`;
-  if (result.kind === "team") return [result.code, bye].filter((part) => part !== null).join(" · ");
-  const board = result.boardRank === null ? null : `Board ${result.boardRank}`;
+  // A CLUB'S ONE NUMBER IS ITS BYE (P2), so the club's facts line does not also print it: the same
+  // fact twice in two sizes is the redundancy the Sideline pass exists to remove.
+  if (result.kind === "team") return result.code;
   const club = result.player.nflTeam === "" ? null : result.player.nflTeam;
   // The roster status leads (the roster-status gate, 2026-09-08): a man on injured reserve or off
   // an active roster is a different search answer from the same name a week earlier, and the
   // short word is the same one the board's pill shows.
   const status = result.rosterStatus === null ? null : rosterStatusLabel(result.rosterStatus.status);
-  return [status, club, bye, board].filter((part) => part !== null).join(" · ");
+  // THE BOARD RANK LEFT THIS LINE (Sideline research round): it is the one number a result carries,
+  // so it is the row's `figure` with its basis under it (P2), not a fourth fact in a mono run where
+  // "Board 12" had to be read as a rank rather than as a score.
+  return [status, club, bye].filter((part) => part !== null).join(" · ");
+}
+
+/**
+ * THE ONE NUMBER ON A RESULT ROW (P2), with the basis that keeps it from being read as a score: a
+ * player's place on the board we serve. A market-order row (a kicker, a team defense) holds no
+ * overall rank at all and prints the dash it earns with the reason beside it — never a zero and
+ * never his positional rank borrowed to fill the slot, which would be a different claim.
+ */
+function ResultFigure({ result }: { readonly result: SearchResult }) {
+  if (result.kind === "team") return <BigNumber value={result.byeWeek === null ? null : String(result.byeWeek)} basis={result.byeWeek === null ? "No bye on record" : "Bye week"} size="sm" />;
+  return (
+    <BigNumber
+      value={result.boardRank === null ? null : String(result.boardRank)}
+      basis={result.boardRank === null ? "Not ranked on our board" : "On our board, overall"}
+      size="sm"
+    />
+  );
 }
 
 function optionId(listboxId: string, result: SearchResult): string {
@@ -92,9 +115,18 @@ export function SiteSearch() {
     setQuery("");
   }, []);
 
+  /**
+   * WHAT PRESSING A RESULT DOES (Sideline research round). A club opens its own page, because a
+   * club is a place. A PLAYER opens the peek — the same sheet his name raises everywhere else in
+   * the product, so a name found by search behaves the way a name found on a roster does — and
+   * only navigates to his full page where no peek host is mounted to take it (`openPlayerPeek`
+   * answers that itself). Either way the palette closes first, so focus is never left inside a
+   * dialog that is about to be replaced by another one.
+   */
   const go = useCallback(
     (result: SearchResult) => {
       close();
+      if (result.kind === "player" && leagueId !== null && openPlayerPeek({ leagueId, playerId: result.player.id, name: result.player.name })) return;
       router.push(searchResultHref(result, leagueId));
     },
     [close, leagueId, router],
@@ -162,9 +194,15 @@ export function SiteSearch() {
               // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- keys are handled on the combobox field per the APG pattern.
               <div key={searchResultKey(result)} id={optionId(listboxId, result)} role="option" tabIndex={-1} aria-selected={index === active} onClick={() => go(result)} onMouseEnter={() => setActive(index)} className="cursor-pointer">
                 {result.kind === "team" ? (
-                  <TeamRow code={result.code} name={result.name} meta={resultMetaLine(result)} highlight={index === active} />
+                  <TeamRow code={result.code} name={result.name} meta={resultMetaLine(result)} figure={<ResultFigure result={result} />} highlight={index === active} />
                 ) : (
-                  <PlayerRow player={result.player} positionRank={result.positionRank ?? undefined} meta={resultMetaLine(result)} highlight={index === active} />
+                  <PlayerRow
+                    player={result.player}
+                    positionRank={result.positionRank ?? undefined}
+                    meta={resultMetaLine(result)}
+                    figure={<ResultFigure result={result} />}
+                    highlight={index === active}
+                  />
                 )}
               </div>
             ))}

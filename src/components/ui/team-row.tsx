@@ -11,6 +11,9 @@ export interface TeamRowProps {
   readonly name: string;
   /** The facts after the name, mono: "DET · Bye 8". */
   readonly meta?: ReactNode;
+  /** THE ONE NUMBER, at the row's right (P2), on the surfaces that have one for a club: a
+   *  `BigNumber size="sm"` with its basis caption. `PlayerRow`'s own slot, same contract. */
+  readonly figure?: ReactNode;
   readonly highlight?: boolean;
   readonly className?: string;
 }
@@ -27,7 +30,7 @@ export interface TeamRowProps {
  * Nothing about that is a claim: the ring is decorative and `aria-hidden` in `PlayerFace` itself,
  * and the code is stated in text beside it.
  */
-export function TeamRow({ code, name, meta, highlight = false, className = "" }: TeamRowProps) {
+export function TeamRow({ code, name, meta, figure, highlight = false, className = "" }: TeamRowProps) {
   const asFace: Player = { id: code, name, position: "DEF", nflTeam: code, headshotUrl: null, adp: null };
   return (
     <div data-highlight={highlight ? "true" : undefined} className={rowShellClass(highlight, className)}>
@@ -39,6 +42,7 @@ export function TeamRow({ code, name, meta, highlight = false, className = "" }:
           {meta === undefined ? null : <span className="truncate">{meta}</span>}
         </span>
       </div>
+      {figure === undefined || figure === null ? null : <div className="shrink-0 text-right">{figure}</div>}
     </div>
   );
 }

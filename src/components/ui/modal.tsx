@@ -11,8 +11,9 @@ const FOCUSABLE =
  *  palette whose list grows downward as the reader types). */
 export type ModalPlacement = "center" | "top";
 
-/** `md` is a decision's width; `lg` is a list's. */
-export type ModalSize = "md" | "lg";
+/** `md` is a decision's width, `lg` a list's, `xl` a research surface's — the player peek, which
+ *  carries the same modules his own page carries and wants the two-column grid to survive. */
+export type ModalSize = "md" | "lg" | "xl";
 
 export interface ModalProps {
   readonly open: boolean;
@@ -36,13 +37,19 @@ export interface ModalProps {
  * above. Both are Sideline's 20px sheet (`rounded-xl`).
  */
 const PLACEMENT: Readonly<Record<ModalPlacement, { readonly scrim: string; readonly panel: string }>> = {
-  center: { scrim: "items-end justify-center p-0 sm:items-center sm:p-4", panel: "rounded-t-xl sm:rounded-xl" },
+  // THE CENTRE PLACEMENT IS A BOTTOM SHEET ON A PHONE AND A CARD ON A DESKTOP, which is Sideline's
+  // one modal geometry and why the peek needs no second component: `items-end` pins it to the foot
+  // of the viewport below `sm` with only its top corners rounded, and centres it above. The height
+  // cap and the scroll are the sheet's ("sheets slide up over a blurred ground", max 85vh on the
+  // phone), so a long body scrolls INSIDE the panel and never takes the page behind it with it.
+  center: { scrim: "items-end justify-center p-0 sm:items-center sm:p-4", panel: "max-h-[85vh] overflow-y-auto rounded-t-xl sm:max-h-[90vh] sm:rounded-xl" },
   top: { scrim: "items-stretch justify-center p-0 sm:items-start sm:p-4 sm:pt-[10vh]", panel: "rounded-none sm:rounded-xl" },
 };
 
 const SIZE: Readonly<Record<ModalSize, string>> = {
   md: "max-w-md",
   lg: "max-w-2xl",
+  xl: "max-w-5xl",
 };
 
 /**

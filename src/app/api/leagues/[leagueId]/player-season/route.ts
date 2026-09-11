@@ -24,7 +24,10 @@ export async function GET(request: Request, context: LeagueRouteContext) {
     const playerId = params.get("playerId") ?? "";
     if (playerId === "") return fail("Say which player.", 400);
     const season = parseSeasonParam(params.get("season"));
-    const body = await playerSeason(getDb(), actor.leagueId, playerId, undefined, season);
+    // The reader is threaded through so the body can say what the manager who HOLDS him is to
+    // this manager (P6: your rival is always in the frame). The peek and the full page are the
+    // same body and must answer the same way, so both pass it.
+    const body = await playerSeason(getDb(), actor.leagueId, playerId, undefined, season, actor.userId);
     if (body === null) return fail("No such player.", 404);
     return ok(body);
   });

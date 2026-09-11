@@ -158,4 +158,34 @@ describe("PlayerRow", () => {
     expect(container.firstElementChild!.className).toContain("mb-1");
     expect(container.firstElementChild!.className).toContain("rounded-md");
   });
+  /**
+   * THE RESEARCH DENSITY (Sideline research round) — the draft board, the pool, a game log go to
+   * 44px "with a face still present", which is the half of the ruling a dense row is most likely to
+   * lose. The height is chosen inside the shell rather than appended by the caller: two `min-h-*`
+   * utilities in one class string resolve in Tailwind's order, not the caller's.
+   */
+  it("goes to 44px with a smaller face and never two heights at once", () => {
+    const { container } = render(<PlayerRow player={CROFT} dense />);
+    const row = container.firstElementChild!;
+    expect(row.className).toContain("min-h-11");
+    expect(row.className).not.toContain("min-h-12");
+    expect(screen.getByTestId("player-face-team").className).toContain("size-8");
+  });
+
+  it("keeps the 48px row and its 36px face by default", () => {
+    const { container } = render(<PlayerRow player={CROFT} />);
+    expect(container.firstElementChild!.className).toContain("min-h-12");
+    expect(screen.getByTestId("player-face-team").className).toContain("size-9");
+  });
+
+  /** P1 rules out a row that begins with a rank numeral in DISPLAY type. The ordinal is body size
+   *  in the quiet ink, and the face is still the first thing the eye lands on. */
+  it("prints a ranked list's ordinal before the face, quiet and never in the display face", () => {
+    const { container } = render(<PlayerRow player={CROFT} lead={4} />);
+    const lead = container.firstElementChild!.firstElementChild!;
+    expect(lead.textContent).toBe("4");
+    expect(lead.className).toContain("text-text-faint");
+    expect(lead.className).not.toContain("font-display");
+    expect(lead.className).toContain("tabular-nums");
+  });
 });

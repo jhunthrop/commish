@@ -32,7 +32,12 @@ const SECTIONS: readonly SectionLink[] = [
 
 export function DraftSubnav({ current }: { readonly current: DraftSection }) {
   return (
-    <nav aria-label="Draft HQ" className={`flex flex-wrap items-center gap-5 border-b border-line pb-3 ${RAIL_LABEL} text-text-muted`}>
+    // ONE ROW THAT SCROLLS, NOT TWO THAT WRAP (Sideline research round, from a measured phone
+    // walk). Seven sections wrapped to two rows at 360px, and on the board — the densest comparison
+    // surface in the product, whose job (P10) is fitting at least eight objects on a phone screen —
+    // every pixel of chrome above the first row is a player the reader cannot see. A nav that
+    // scrolls sideways keeps its own row and gives that one back.
+    <nav aria-label="Draft HQ" className={`flex items-center gap-5 overflow-x-auto border-b border-line pb-3 whitespace-nowrap ${RAIL_LABEL} text-text-muted`}>
       {SECTIONS.map((section) => {
         const active = section.value === current;
         return (
@@ -40,7 +45,7 @@ export function DraftSubnav({ current }: { readonly current: DraftSection }) {
             key={section.value}
             href={section.href}
             aria-current={active ? "page" : undefined}
-            className={`pb-0.5 transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+            className={`shrink-0 pb-0.5 transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
               active ? "text-text-primary shadow-[inset_0_-2px_0_0_var(--commish-color-accent)]" : ""
             }`}
           >

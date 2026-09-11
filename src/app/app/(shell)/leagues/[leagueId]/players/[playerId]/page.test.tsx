@@ -124,7 +124,7 @@ describe("PlayerPage — season label and switcher", () => {
     expect(screen.queryByRole("group", { name: "Season" })).not.toBeInTheDocument();
     // The default read: no `season` query param means the service picks, so the route asks
     // `playerSeason` for its own default (`undefined`), never a fabricated year.
-    expect(playerSeason).toHaveBeenCalledWith({}, "league_1", "rb1", undefined, undefined);
+    expect(playerSeason).toHaveBeenCalledWith({}, "league_1", "rb1", undefined, undefined, USER.id);
   });
 
   it("renders a segmented switcher for a player with more than one season, and navigates on a press", async () => {
@@ -133,7 +133,7 @@ describe("PlayerPage — season label and switcher", () => {
     await renderPage({ season: "2025" });
     expect(screen.getByText("2025 season")).toBeInTheDocument();
     // The requested season reached the service as a real number, not the raw query string.
-    expect(playerSeason).toHaveBeenCalledWith({}, "league_1", "rb1", undefined, 2025);
+    expect(playerSeason).toHaveBeenCalledWith({}, "league_1", "rb1", undefined, 2025, USER.id);
 
     const group = screen.getByRole("group", { name: "Season" });
     expect(within(group).getByRole("button", { name: "2025" })).toHaveAttribute("aria-pressed", "true");
@@ -144,7 +144,7 @@ describe("PlayerPage — season label and switcher", () => {
   it("ignores a malformed season query param rather than passing it through", async () => {
     vi.mocked(playerSeason).mockResolvedValue(bodyFor(2026, [2026]));
     await renderPage({ season: "not-a-year" });
-    expect(playerSeason).toHaveBeenCalledWith({}, "league_1", "rb1", undefined, undefined);
+    expect(playerSeason).toHaveBeenCalledWith({}, "league_1", "rb1", undefined, undefined, USER.id);
   });
 
   it("gives a true rookie one honest sentence in place of the chart", async () => {

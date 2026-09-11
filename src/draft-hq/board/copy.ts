@@ -58,10 +58,20 @@ export function vsMarketLabel(gap: number | null): VsMarketLabel | null {
  * no next drop to name, so the sentence states the count alone rather than inventing a drop.
  */
 export function tierBandSentence(grade: string, position: string, playersLeftInTier: number, dropToNextTier: number): string {
+  return `Tier ${grade} · ${tierBandLabel(position, playersLeftInTier, dropToNextTier)}`;
+}
+
+/**
+ * THE SAME SENTENCE WITHOUT THE GRADE IN FRONT OF IT (Sideline research round) — what the band
+ * PLATE carries, because the plate already prints the tier's own number an inch to its left and
+ * `TierDivider` would otherwise say it twice. `tierBandSentence` above is this string with the
+ * grade restored, so the two can never drift into two ways of counting the same players.
+ */
+export function tierBandLabel(position: string, playersLeftInTier: number, dropToNextTier: number): string {
   const count = playersLeftInTier === 1 ? "one" : String(playersLeftInTier);
   const left = `${count} ${position} left`;
-  if (dropToNextTier <= 0) return `Tier ${grade} · ${left}`;
-  return `Tier ${grade} · ${left} before a ${dropToNextTier.toFixed(1)} point drop`;
+  if (dropToNextTier <= 0) return left;
+  return `${left} before a ${dropToNextTier.toFixed(1)} point drop`;
 }
 
 /** Tier letters, honestly unbounded: S for the summit, then the alphabet from A — never a clamp
@@ -70,4 +80,18 @@ export function tierLetter(tier: number | null): string {
   if (tier === null || tier < 0) return "?";
   if (tier === 0) return "S";
   return String.fromCharCode(64 + Math.min(tier, 26));
+}
+
+/**
+ * TIERS ARE ONE-BASED ON A BOARD A MANAGER READS (the founder-approved draft-room sheet mock says
+ * "Tier 1", "Tier 2"). The engine's ladder is an array index and starts at zero; nobody counts
+ * tiers from zero out loud, and "Tier S" made a reader decode a badge before he could count.
+ *
+ * `tierLetter` above is NOT retired: `src/teams/components/roster-section.tsx` still spells a
+ * rostered player's tier as a letter and that surface belongs to another round. The two converge
+ * when it migrates; until then this file states both and says which is which.
+ */
+export function tierNumber(tier: number | null): string {
+  if (tier === null || tier < 0) return "?";
+  return String(tier + 1);
 }
