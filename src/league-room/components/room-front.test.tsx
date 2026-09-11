@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
-import { HOME, MATCHUP, ROOM_DATA } from "../test-fixtures";
+import { LeagueRoomDepsProvider } from "../hooks/deps";
+import { fixtureLeagueDeps, HOME, MATCHUP, ROOM_DATA } from "../test-fixtures";
 import type { LineupFixPlan } from "../lib/lineup-problems";
 import { RoomFront, type RoomFrontProps } from "./room-front";
 
@@ -27,6 +28,7 @@ function props(overrides: Partial<RoomFrontProps> = {}): RoomFrontProps {
     myMatchupDetail: MATCHUP,
     projectionsByPlayerId: new Map(),
     activityRows: [],
+    eventReactions: new Map(),
     grades: [],
     gradesBasis: "",
     present: new Set(["u1", "u2"]),
@@ -36,8 +38,14 @@ function props(overrides: Partial<RoomFrontProps> = {}): RoomFrontProps {
   };
 }
 
+/** Both dependency contexts: chat's for the messages, the league room's for the stream's own
+ *  reactions. Injected, so the front page opens no socket of its own in a test. */
 function wrap(ui: React.ReactElement) {
-  return <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>{ui}</ChatRoomDepsProvider>;
+  return (
+    <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>{ui}</ChatRoomDepsProvider>
+    </LeagueRoomDepsProvider>
+  );
 }
 
 describe("RoomFront", () => {

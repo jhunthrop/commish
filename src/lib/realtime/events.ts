@@ -25,6 +25,14 @@ export const REALTIME_EVENT_TYPES = [
   "draft.nudge",
   "chat.message",
   "chat.reaction",
+  /**
+   * SIDELINE (P5: "reactions attach to all of them"). Somebody reacted to a PICK, a claim or a
+   * trade in the room's stream — the `chat.reaction` frame's twin, keyed on the audit event id
+   * instead of a message id, carrying the actor so a `Last-Event-ID` replay folds idempotently.
+   * Published to the league stream: who reacted to a pick is a fact the whole room may see, the
+   * same as the pick itself.
+   */
+  "stream.reaction",
   "score.update",
   /**
    * A member-facing integrity notice was created for them (`member_notices`). Delivered on a

@@ -13,20 +13,35 @@ import { ChapterBand } from "@/components/ui/chapter-band";
 import { Icon } from "@/components/ui/icon";
 import type { ActivityFeedRow } from "@/integrity-service/activity";
 import { useReaderClock } from "../hooks/use-reader-clock";
+import { useStreamReactions } from "../hooks/use-stream-reactions";
 import { FALLBACK_TIME_ZONE, byDay, dayMarker } from "../lib/day-chapters";
 import { mergeStream, type StreamItem } from "../lib/stream-items";
+import { isReactableKind, type EventReactionMap } from "../lib/stream-reactions";
 
 export interface RoomStreamProps {
   readonly leagueId: string;
   readonly activityRows: readonly ActivityFeedRow[];
+  /** Every reaction already on those rows, as the server read them. */
+  readonly eventReactions: EventReactionMap;
   /** The page has no other solid button, so the composer's Send becomes the page's act. */
   readonly sendIsTheAct: boolean;
 }
 
-/** Something somebody did, drawn as a person doing it: their face, the sentence, the clock. */
-function StreamEvent({ row }: { readonly row: ActivityFeedRow }) {
+interface StreamEventProps {
+  readonly row: ActivityFeedRow;
+  readonly reactions: readonly { readonly emoji: string; readonly userId: string }[];
+  readonly meUserId: string;
+  readonly onReact: (eventId: string, emoji: string) => void;
+}
+
+/**
+ * Something somebody did, drawn as a person doing it: their face, the sentence, the clock — and,
+ * for the three kinds a person actually did (`isReactableKind`), the same five pills the messages
+ * wear. A pick with a fire on it is the room reacting to the room, which is the whole of P5.
+ */
+function StreamEvent({ row, reactions, meUserId, onReact }: StreamEventProps) {
   return (
-    <div data-testid="stream-event" data-kind={row.kind} className="flex items-start gap-2.5">
+    <div data-testid="stream-event" data-kind={row.kind} className="group/msg flex items-start gap-2.5">
       {row.actor === null ? (
         <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-pill bg-surface text-text-faint">
           <Icon name={row.icon} size={14} />
@@ -40,6 +55,11 @@ function StreamEvent({ row }: { readonly row: ActivityFeedRow }) {
         <time dateTime={row.occurredAt} className="text-xs tabular-nums text-text-faint">
           {formatChatTime(row.occurredAt)}
         </time>
+        {isReactableKind(row.kind) ? (
+          <div className="mt-1">
+            <ReactionBar targetId={row.eventId} reactions={reactions} meUserId={meUserId} disabled={false} onReact={onReact} />
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -63,7 +83,7 @@ function StreamMessage({ message, meUserId, onReact, onReport }: StreamMessagePr
       avatar={message.authorAvatarUrl}
       mine={mine}
       time={formatChatTime(message.createdAt)}
-      reactions={<ReactionBar messageId={message.id} reactions={message.reactions} meUserId={meUserId} disabled={false} onReact={onReact} />}
+      reactions={<ReactionBar targetId={message.id} reactions={message.reactions} meUserId={meUserId} disabled={false} onReact={onReact} />}
       aside={
         mine ? undefined : (
           <button
@@ -93,8 +113,10 @@ function StreamMessage({ message, meUserId, onReact, onReport }: StreamMessagePr
  * `useLeagueChat`, so a message landing or a reaction popping is the same live wire the chat has
  * always had. A room with nothing in it yet says so once and hands you the field.
  */
-export function RoomStream({ leagueId, activityRows, sendIsTheAct }: RoomStreamProps) {
+export function RoomStream({ leagueId, activityRows, eventReactions, sendIsTheAct }: RoomStreamProps) {
   const chat = useLeagueChat(leagueId);
+  // The events half of the stream's reactions, live on the SAME socket the chat already holds.
+  const streamReactions = useStreamReactions(leagueId, eventReactions, chat.meUserId);
   // The reader's own clock and locale, resolved after mount. Before it lands, a day chapter reads
   // as its absolute name rather than "Today": deterministic on the server and on the client's
   // first render, which is what keeps the two from disagreeing across a time zone.
@@ -165,7 +187,13 @@ export function RoomStream({ leagueId, activityRows, sendIsTheAct }: RoomStreamP
                 <ChapterBand name={dayMarker(chapter.rows[0]!.occurredAt, clock)} consequence={`${chapter.rows.length} ${chapter.rows.length === 1 ? "thing" : "things"}`} />
                 {chapter.rows.map((item: StreamItem) =>
                   item.kind === "event" ? (
-                    <StreamEvent key={item.id} row={item.row} />
+                    <StreamEvent
+                      key={item.id}
+                      row={item.row}
+                      reactions={streamReactions.held.get(item.row.eventId) ?? []}
+                      meUserId={chat.meUserId}
+                      onReact={(eventId, emoji) => void streamReactions.react(eventId, emoji)}
+                    />
                   ) : (
                     <StreamMessage key={item.id} message={item.message} meUserId={chat.meUserId} onReact={(id, emoji) => void chat.react(id, emoji)} onReport={setReportingId} />
                   ),

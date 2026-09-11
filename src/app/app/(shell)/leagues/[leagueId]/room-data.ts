@@ -6,6 +6,7 @@ import { listNotices, quoteFor } from "@/integrity-service/notify";
 import { leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId, fixtureLabelsByTeam, gradesForDraft } from "@/league-service";
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 import { pendingWaiverClaims } from "@/league-service/claims";
+import { reactionsForEvents } from "@/league-service/event-reactions";
 import { listTrades } from "@/league-service/trades";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import type { CurrentUser } from "@/lib/auth/current-user";
@@ -91,6 +92,7 @@ export async function loadRoomData(
       trades: null,
       pendingClaims: [],
       activityRows: [],
+      eventReactions: new Map(),
       activityNextBefore: null,
       activityNotices: [],
       presentUserIds: [],
@@ -117,6 +119,15 @@ export async function loadRoomData(
       presentUserIdsFor(leagueId),
     ]);
 
+  // The reactions standing on the page of events just read. Sequential rather than parallel on
+  // purpose: the ids it asks about are that read's own answer, so there is nothing to overlap it
+  // with, and it is one indexed `IN (...)` against a page-sized list.
+  const eventReactions = await reactionsForEvents(
+    db,
+    leagueId,
+    activity.rows.map((row) => row.eventId),
+  );
+
   // The viewer's OWN notices, filtered to this league — the same bounded, cursorless inbox page
   // the header reads, with the quote resolved here so the client band is plain data.
   const activityNotices: readonly PlatformNoticeView[] =
@@ -136,6 +147,7 @@ export async function loadRoomData(
     trades,
     pendingClaims,
     activityRows: activity.rows,
+    eventReactions,
     activityNextBefore: activity.nextBefore,
     activityNotices,
     presentUserIds,

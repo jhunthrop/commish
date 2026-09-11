@@ -85,7 +85,7 @@ const MessageLine = memo(function MessageLine({ message, meUserId, onReact, onRe
         avatar={message.authorAvatarUrl}
         mine={mine}
         time={formatChatTime(message.createdAt)}
-        reactions={<ReactionBar messageId={message.id} reactions={message.reactions} meUserId={meUserId} disabled={false} onReact={onReact} />}
+        reactions={<ReactionBar targetId={message.id} reactions={message.reactions} meUserId={meUserId} disabled={false} onReact={onReact} />}
         aside={
           mine ? undefined : (
             <button type="button" onClick={() => onReport(message.id)} className="text-xs text-text-faint underline hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">

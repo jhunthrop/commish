@@ -5,6 +5,7 @@ import type { ActivityFeedRow } from "@/integrity-service/activity";
 import type { TradeProposalView } from "@/trades/contract";
 import type { LeagueGradeRow, LeagueHomeBody, LineupBody, MatchupDetail, MatchupWeekBody, TradeRoomContext } from "../contract";
 import type { LineupFixPlan } from "../lib/lineup-problems";
+import type { EventReactionMap } from "../lib/stream-reactions";
 import { GradeBoard } from "./grade-board";
 import { MomentVerb, momentFor } from "./moment-verb";
 import { RivalCard } from "./rival-card";
@@ -24,6 +25,8 @@ export interface RoomFrontProps {
   readonly myMatchupDetail: MatchupDetail | null;
   readonly projectionsByPlayerId: ReadonlyMap<string, number>;
   readonly activityRows: readonly ActivityFeedRow[];
+  /** Every reaction already standing on those rows, as the server read them. */
+  readonly eventReactions: EventReactionMap;
   readonly grades: readonly LeagueGradeRow[];
   readonly gradesBasis: string;
   /** Who has a live connection right now (`usePresence`). */
@@ -64,7 +67,7 @@ export function RoomFront(props: RoomFrontProps) {
           <RoomArrivalCard leagueId={home.leagueId} draftId={home.draftId} lineup={lineup} matchup={home.myMatchup} projectedLine={null} />
         ) : null}
         <GradeBoard grades={props.grades} basis={props.gradesBasis} />
-        <RoomStream leagueId={home.leagueId} activityRows={activityRows} sendIsTheAct={sendIsTheAct} />
+        <RoomStream leagueId={home.leagueId} activityRows={activityRows} eventReactions={props.eventReactions} sendIsTheAct={sendIsTheAct} />
       </div>
     </div>
   );

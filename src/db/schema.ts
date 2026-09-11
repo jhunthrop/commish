@@ -1321,6 +1321,39 @@ export const auditEvents = pgTable(
 );
 
 /**
+ * SIDELINE (P5: "reactions attach to all of them"). One row per person per emoji per EVENT, the
+ * identical shape and identical reasoning as `chat_reactions` above: the triple is the identity,
+ * so a reaction is a toggle rather than a counter two writers can disagree about, and no count
+ * column exists anywhere.
+ *
+ * Keyed on `audit_events.event_id` because the stream's events ARE audit events — the row a
+ * member reacts to is the one `listLeagueActivity` rendered, so there is no second id space and
+ * no way to react to something that never happened. NOT `ON DELETE CASCADE`, unlike its chat
+ * twin: an audit event is never deleted (that is the whole point of the chain), so a cascade
+ * would describe a transition that cannot occur, and a plain reference keeps a stray reaction
+ * from ever outliving the fact it is about.
+ *
+ * The league is NOT denormalized onto this row. `audit_events.league_id` already carries it, and
+ * the one read (`reactionsForEvents`) and the one write (`toggleEventReaction`) both join through
+ * it, so a reaction cannot be attached to an event in a league the actor cannot see and there is
+ * no second copy of the scope to drift.
+ */
+export const eventReactions = pgTable(
+  "event_reactions",
+  {
+    eventId: text("event_id")
+      .notNull()
+      .references(() => auditEvents.eventId),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    emoji: text("emoji").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.userId, t.emoji] })],
+);
+
+/**
  * One row per chain: its head, and the lock every append to that chain takes.
  *
  * This IS the rollup `docs/decisions/data-layer-hardening.md` requires. `head_sequence` is the

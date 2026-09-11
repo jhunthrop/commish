@@ -106,7 +106,7 @@ export function MessageList({ leagueId, messages, meUserId, hasMore, loadingEarl
                     />
                   )}
                   <ReactionBar
-                    messageId={message.id}
+                    targetId={message.id}
                     reactions={message.reactions}
                     meUserId={meUserId}
                     disabled={false}

@@ -316,6 +316,7 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
                 myMatchupDetail={myMatchupDetail}
                 projectionsByPlayerId={data.projectionsByPlayerId}
                 activityRows={data.activityRows}
+                eventReactions={data.eventReactions}
                 grades={data.grades}
                 gradesBasis={data.gradesBasis}
                 present={present}
