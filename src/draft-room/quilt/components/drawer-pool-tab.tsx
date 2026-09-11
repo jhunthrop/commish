@@ -1,10 +1,10 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { BoardReason } from "@/projections/preseason/board";
 import type { SurvivalOdds, TierStandingView } from "@/draft-service/assistant/view";
-import { Badge, Button, EmptyState, MotionList, Movement, PositionBadge, type MotionRowProps } from "@/components/ui";
+import { Badge, Button, MotionList, Movement, type MotionRowProps } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { useStableList } from "@/design/use-stable-list";
 import { OddsFigure } from "../../advisor/components/odds-glance";
@@ -14,11 +14,9 @@ import type { NeedFraction } from "../state/lens";
 import { marketOrderNoteFor } from "../../lib/market-order-note";
 import { formatAdp, positionRanks } from "../../lib/tiers";
 import { edgeSummary } from "./peek-sheet";
+import { ALL_POSITIONS, DrawerFilterEmpty, DrawerFilterRow, useDrawerFilter } from "./drawer-filter";
 import { DrawerRow } from "./drawer-row";
 import type { RoomActs } from "./room-acts";
-
-const ALL = "ALL";
-const POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
 export interface DrawerPoolTabProps extends RoomActs {
   readonly leagueId: string;
@@ -151,8 +149,8 @@ const PoolRow = memo(function PoolRow({ leagueId, item, queued, canDraft, submit
  * row's render per pick.
  */
 export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons, focusSearch, needs, odds = null, tiers = {}, canDraft, submitting, queuedPlayerIds, onDraft, onQueueToggle, onPeek }: DrawerPoolTabProps) {
-  const [query, setQuery] = useState("");
-  const [position, setPosition] = useState<string>(ALL);
+  const filter = useDrawerFilter();
+  const { position, matches } = filter;
   const searchRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -160,17 +158,17 @@ export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons,
   }, [focusSearch]);
 
   const ranks = useMemo(() => positionRanks(players), [players]);
-  const rows = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return players
-      .map((player, index) => ({ player, rank: index + 1 }))
-      .filter(({ player }) => available.has(player.id))
-      .filter(({ player }) => (position === ALL || player.position === position) && (needle === "" || player.name.toLowerCase().includes(needle)));
-  }, [players, available, query, position]);
+  const rows = useMemo(
+    () =>
+      players
+        .map((player, index) => ({ player, rank: index + 1 }))
+        .filter(({ player }) => available.has(player.id) && matches(player)),
+    [players, available, matches],
+  );
   const visible = useMemo(() => rows.slice(0, DRAFT_ROOM_CONFIG.poolPageSize), [rows]);
   // Tier headers only over ONE position: a mixed list has no single ladder to group under.
   const built = useMemo((): readonly PoolListItem[] => {
-    const groups = position === ALL ? [{ header: null, rows: visible }] : groupByTier<PoolRowModel>(visible, (row) => row.player.id, tiers);
+    const groups = position === ALL_POSITIONS ? [{ header: null, rows: visible }] : groupByTier<PoolRowModel>(visible, (row) => row.player.id, tiers);
     return groups.flatMap((group, groupIndex) => [
       ...(group.header === null ? [] : [{ kind: "header", header: group.header } as const]),
       ...group.rows.map((row, index) => rowItem(row, groupIndex === 0 && index === 0, ranks, byeWeeks, reasons, odds)),
@@ -179,34 +177,11 @@ export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons,
   const items = useStableList(built, keyOf);
   // Only while a single position is selected: the note is about THAT position, and printing it over
   // the mixed ALL list would be attaching a claim to rows it is not about.
-  const marketOrderNote = position === ALL ? null : marketOrderNoteFor(position as Position);
+  const marketOrderNote = position === ALL_POSITIONS ? null : marketOrderNoteFor(position as Position);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={searchRef}
-          type="search"
-          aria-label="Search players"
-          placeholder="Search · press / anywhere"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="min-w-0 flex-1 rounded-sm border border-edge bg-surface-inset px-3 py-1.5 text-sm text-text-primary placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
-        />
-        <div role="group" aria-label="Filter by position" className="flex items-center gap-1">
-          {POSITIONS.map((candidate) => (
-            <button
-              key={candidate}
-              type="button"
-              aria-pressed={position === candidate}
-              aria-label={`Show ${candidate} only`}
-              onClick={() => setPosition(position === candidate ? ALL : candidate)}
-              className={`rounded-sm p-0.5 focus-visible:outline-2 focus-visible:outline-accent ${position === candidate ? "ring-2 ring-accent" : ""}`}
-            >
-              <PositionBadge position={candidate} size="sm" />
-            </button>
-          ))}
-        </div>
+      <DrawerFilterRow filter={filter} searchRef={searchRef}>
         {/* Need fractions ride the filter chips (WarmQuilt mock): a satisfied position reads
             quiet with its check, an open one carries its number in the negative channel. */}
         {needs === undefined || needs.length === 0 ? null : (
@@ -226,7 +201,7 @@ export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons,
             ))}
           </div>
         )}
-      </div>
+      </DrawerFilterRow>
 
       {/* A position the engine publishes no projection for says so, once, above its own rows. A tab
           of rows with no numbers and no sentence reads as a bug, and a manager who thinks the board
@@ -238,22 +213,7 @@ export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons,
       )}
 
       {visible.length === 0 ? (
-        <EmptyState
-          title="No players match"
-          description="Try a different name or position."
-          icon="search"
-          action={
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setQuery("");
-                setPosition(ALL);
-              }}
-            >
-              Clear filters
-            </Button>
-          }
-        />
+        <DrawerFilterEmpty filter={filter} />
       ) : (
         <ol aria-label="Available players, best first" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
           <MotionList items={items} keyOf={keyOf}>

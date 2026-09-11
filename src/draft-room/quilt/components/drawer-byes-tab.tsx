@@ -8,6 +8,7 @@ import { useStableList } from "@/design/use-stable-list";
 import { formatAdp } from "../../lib/tiers";
 import type { SurvivalOdds } from "@/draft-service/assistant/view";
 import { OddsFigure } from "../../advisor/components/odds-glance";
+import { DrawerFilterEmpty, DrawerFilterRow, useDrawerFilter } from "./drawer-filter";
 import { DrawerRow } from "./drawer-row";
 import { PagedFooter, usePaging } from "./paged-list";
 import type { RoomActs } from "./room-acts";
@@ -83,7 +84,10 @@ const ByeRow = memo(function ByeRow({ leagueId, item, canDraft, submitting, onDr
  * band in place and the band closes up behind him; unchanged rows keep their identity and skip.
  */
 export function DrawerByesTab({ leagueId, players, available, byeWeeks, canDraft, submitting, onDraft, onPeek, odds = null }: DrawerByesTabProps) {
-  const remaining = useMemo(() => players.filter((player) => available.has(player.id)), [players, available]);
+  // The filter runs over everyone still available, then the page is cut: a match is on page one.
+  const filter = useDrawerFilter();
+  const { matches } = filter;
+  const remaining = useMemo(() => players.filter((player) => available.has(player.id) && matches(player)), [players, available, matches]);
   const paging = usePaging(remaining.length);
   const built = useMemo(() => {
     const runs = odds === null || odds.runs === 0 ? null : odds.runs;
@@ -92,12 +96,14 @@ export function DrawerByesTab({ leagueId, players, available, byeWeeks, canDraft
   const rows = useStableList(built, keyOf);
   const bands = useMemo(() => bandsOf(rows), [rows]);
 
-  if (bands.length === 0) {
+  if (bands.length === 0 && !filter.active) {
     return <p className="text-sm text-text-faint">Nobody left to group. The pool is drafted out.</p>;
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+      <DrawerFilterRow filter={filter} />
+      {bands.length === 0 ? <DrawerFilterEmpty filter={filter} /> : null}
       {bands.map((band) => (
         <section key={band.week ?? "none"} aria-label={band.week === null ? "No bye on record" : `Bye week ${band.week}`} className="flex flex-col gap-1">
           <h3 className={`${MICRO_LABEL} text-text-faint`}>

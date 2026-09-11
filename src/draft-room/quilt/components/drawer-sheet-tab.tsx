@@ -9,6 +9,7 @@ import { OddsFigure } from "../../advisor/components/odds-glance";
 import type { CheatSheet } from "../state/sheet";
 import { sheetQueueSeed } from "../state/sheet";
 import { QUILT_CONFIG } from "../state/config";
+import { DrawerFilterEmpty, DrawerFilterRow, useDrawerFilter } from "./drawer-filter";
 import { DrawerRow } from "./drawer-row";
 import { PagedFooter, usePaging } from "./paged-list";
 import type { RoomActs } from "./room-acts";
@@ -48,17 +49,29 @@ interface SheetRowModel {
 
 const keyOf = (row: SheetRowModel): string => row.player.id;
 
-function buildRows(sheet: CheatSheet, count: number, playersById: ReadonlyMap<string, Player>, boardRanks: ReadonlyMap<string, number>, available: ReadonlySet<string>, odds: SurvivalOdds | null): readonly SheetRowModel[] {
+interface SheetEntry {
+  readonly player: Player;
+  /** The player's 0-based place on the FULL sheet — filtering never renumbers a sheet. */
+  readonly index: number;
+}
+
+/** The sheet's players that pass the filter, each with its place on the whole sheet. */
+function filteredEntries(sheet: CheatSheet, playersById: ReadonlyMap<string, Player>, matches: (player: Player) => boolean): readonly SheetEntry[] {
+  return sheet.order.flatMap((playerId, index) => {
+    const player = playersById.get(playerId);
+    return player !== undefined && matches(player) ? [{ player, index }] : [];
+  });
+}
+
+function buildRows(sheet: CheatSheet, entries: readonly SheetEntry[], boardRanks: ReadonlyMap<string, number>, available: ReadonlySet<string>, odds: SurvivalOdds | null): readonly SheetRowModel[] {
   const lastIndex = sheet.order.length - 1;
   let firstAvailableSeen = false;
-  return sheet.order.slice(0, count).flatMap((playerId, index) => {
-    const player = playersById.get(playerId);
-    if (player === undefined) return [];
+  return entries.map(({ player, index }) => {
+    const playerId = player.id;
     const drafted = !available.has(playerId);
     const highlight = !drafted && !firstAvailableSeen;
     if (highlight) firstAvailableSeen = true;
-    return [
-      {
+    return {
         player,
         you: index + 1,
         board: boardRanks.get(playerId) ?? null,
@@ -69,8 +82,7 @@ function buildRows(sheet: CheatSheet, count: number, playersById: ReadonlyMap<st
         last: index === lastIndex,
         survived: odds === null || drafted ? undefined : odds.survived[playerId],
         runs: odds === null || odds.runs === 0 ? null : odds.runs,
-      },
-    ];
+    };
   });
 }
 
@@ -138,8 +150,12 @@ const SheetRow = memo(function SheetRow({ leagueId, item, onMove, canDraft, subm
  */
 export function DrawerSheetTab({ leagueId, sheet, playersById, boardRanks, available, onMove, onSeedQueue, onReset, canDraft, submitting, onDraft, onPeek, hasServerSheet, onStartServerSheet, odds = null }: DrawerSheetTabProps) {
   const seed = useMemo(() => sheetQueueSeed(sheet, available, QUILT_CONFIG.sheetQueueSeedCount), [sheet, available]);
-  const paging = usePaging(sheet.order.length);
-  const built = useMemo(() => buildRows(sheet, paging.shown, playersById, boardRanks, available, odds), [sheet, paging.shown, playersById, boardRanks, available, odds]);
+  // The filter runs over the WHOLE sheet, then the page is cut: a match is always on page one.
+  const filter = useDrawerFilter();
+  const { matches } = filter;
+  const entries = useMemo(() => filteredEntries(sheet, playersById, matches), [sheet, playersById, matches]);
+  const paging = usePaging(entries.length);
+  const built = useMemo(() => buildRows(sheet, entries.slice(0, paging.shown), boardRanks, available, odds), [sheet, entries, paging.shown, boardRanks, available, odds]);
   const rows = useStableList(built, keyOf);
 
   return (
@@ -163,12 +179,17 @@ export function DrawerSheetTab({ leagueId, sheet, playersById, boardRanks, avail
           </Button>
         </span>
       </div>
-      <ol aria-label="Your sheet, your order" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-        <MotionList items={rows} keyOf={keyOf}>
-          {(item, row) => <SheetRow leagueId={leagueId} item={item} onMove={onMove} canDraft={canDraft} submitting={submitting} onDraft={onDraft} onPeek={onPeek} row={row} />}
-        </MotionList>
-        <PagedFooter paging={paging} total={sheet.order.length} />
-      </ol>
+      <DrawerFilterRow filter={filter} />
+      {entries.length === 0 ? (
+        <DrawerFilterEmpty filter={filter} />
+      ) : (
+        <ol aria-label="Your sheet, your order" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+          <MotionList items={rows} keyOf={keyOf}>
+            {(item, row) => <SheetRow leagueId={leagueId} item={item} onMove={onMove} canDraft={canDraft} submitting={submitting} onDraft={onDraft} onPeek={onPeek} row={row} />}
+          </MotionList>
+          <PagedFooter paging={paging} total={entries.length} />
+        </ol>
+      )}
     </div>
   );
 }
