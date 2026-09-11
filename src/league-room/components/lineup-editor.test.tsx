@@ -46,8 +46,10 @@ describe("LineupEditor", () => {
   it("shows the real editor once draftStatus is in_progress or complete, even with an all-empty roster (belt only, never the inference)", () => {
     renderInLeague(<LineupEditor leagueId="l1" lineup={ROSTERLESS_LINEUP} totalWeeks={14} draftStatus="in_progress" />, fixtureLeagueDeps().deps);
     expect(screen.queryByText("Your lineup appears here after the draft.")).not.toBeInTheDocument();
-    expect(screen.getByText("QB")).toBeInTheDocument();
-    expect(screen.getAllByText("Empty").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("QB").length).toBeGreaterThan(0);
+    // ABSENCE RENDERS AS ABSENCE: the slot says who is missing from it, in the room's own words,
+    // rather than the bare word "Empty" beside a grey tile.
+    expect(screen.getAllByText(/^Nobody in your /).length).toBeGreaterThan(0);
   });
 
   it("defaults to pre-draft when draftStatus is absent — the defensive direction only", () => {
@@ -161,7 +163,7 @@ describe("LineupEditor", () => {
     };
     renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} draftStatus="complete" />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Swap Backup Quarterback" }));
-    fireEvent.click(screen.getByRole("button", { name: "Put Backup Quarterback at QB" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Backup Quarterback at QB" }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({
       weekNumber: LINEUP.weekNumber,
@@ -174,7 +176,7 @@ describe("LineupEditor", () => {
     const fixture = fixtureLeagueDeps({ ok: false, error: "RB is not eligible for the QB slot." });
     renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} draftStatus="complete" />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Swap Backup Quarterback" }));
-    fireEvent.click(screen.getByRole("button", { name: "Put Backup Quarterback at QB" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Backup Quarterback at QB" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("RB is not eligible for the QB slot."));
   });
 

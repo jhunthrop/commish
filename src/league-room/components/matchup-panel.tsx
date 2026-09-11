@@ -1,10 +1,11 @@
 import type { Position } from "@/domain/player";
 import type { MedianResult, WeekStatus } from "@/league";
 import type { MatchupDetail, MatchupLineupEntry, MatchupSide } from "../contract";
-import { Card, EYEBROW, PlayerFace, PositionBadge, SlotChip, Stat, Table, type TableColumn } from "@/components/ui";
+import { BigNumber, Card, EYEBROW, Manager, PlayerFace, PositionBadge, SlotChip, Stat, Table, type TableColumn } from "@/components/ui";
 import { PlayerName } from "./player-peek";
 import { formatPoints } from "../lib/format";
 import { playerOf } from "../lib/player";
+import type { ManagerIdentity, ManagersByTeamId } from "../lib/managers";
 import { summaryOf } from "../lib/matchup-facts";
 import { starterComparison } from "../lib/population";
 import { MatchupHero, SideChips, type RecordsByTeamId } from "./matchup-hero";
@@ -172,6 +173,7 @@ function Side({
   median,
   positionPoints,
   weekStatus,
+  manager,
 }: {
   readonly leagueId: string;
   readonly side: MatchupSide;
@@ -179,11 +181,34 @@ function Side({
   readonly weekStatus: WeekStatus;
   readonly median: { readonly score: number; readonly medianScore: number; readonly result: MedianResult } | null;
   readonly positionPoints: PositionPoints | undefined;
+  readonly manager: ManagerIdentity | undefined;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    // `data-team-id` is a TEST CONTRACT, the same one `ScoreBug` carries: the fluidity spec pushes
+    // `score.update` frames keyed on real team ids and has no other way to learn them from the
+    // rendered page. Nothing on screen reads it.
+    <div data-team-id={side.teamId} className="flex min-w-0 flex-col gap-1.5">
+      {/* THE PERSON HEADS THE COLUMN, NOT THE TEAM (P1, Sideline 2026-09-10). This was an
+          all-caps eyebrow carrying a team name, which is the exact shape P1's rules-out list
+          names: a manager row that leads with a team name and no face. It is now a `Manager` pair
+          with this side's own score as a small `BigNumber` at the end of it, so each half of the
+          matchup is a person, their team and one number with its basis. A viewer's own side wears
+          the amber ring and their rival the rose one, which is the only place this panel spends a
+          pigment on who is who. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className={`${EYEBROW} text-text-muted`}>{side.teamName}</h3>
+        {manager === undefined ? (
+          <h3 className={`${EYEBROW} text-text-muted`}>{side.teamName}</h3>
+        ) : (
+          <Manager
+            name={manager.name}
+            avatar={manager.avatar}
+            size="md"
+            ring={isMine ? "self" : "rival"}
+            meta={`${side.teamName} · ${manager.record}`}
+            className="flex-1"
+            trailing={<BigNumber value={side.score === null ? null : formatPoints(side.score)} basis={isMine ? "yours, PPR" : "theirs, PPR"} size="sm" />}
+          />
+        )}
         {/* "Can I still win?", attached to the team it is about — see `SideChips`' own docblock
             for why these do not sit between the two scores. */}
         <SideChips side={side} mine={isMine} weekStatus={weekStatus} />
@@ -219,11 +244,16 @@ export function MatchupLineups({
   matchup,
   myTeamId,
   positionPoints,
+  managers,
 }: {
   readonly leagueId: string;
   readonly matchup: MatchupDetail;
   readonly myTeamId: string | null;
   readonly positionPoints?: PositionPoints;
+  /** Every team's manager, joined by the page from the standings read it already makes
+   *  (`managersFrom`). Omitted, each column falls back to its old team-name eyebrow rather than
+   *  inventing a person. */
+  readonly managers?: ManagersByTeamId;
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
@@ -234,6 +264,7 @@ export function MatchupLineups({
         median={medianLineFor(matchup, "home")}
         positionPoints={positionPoints}
         weekStatus={matchup.weekStatus}
+        manager={managers?.[matchup.home.teamId]}
       />
       <Side
         leagueId={leagueId}
@@ -242,6 +273,7 @@ export function MatchupLineups({
         median={medianLineFor(matchup, "away")}
         positionPoints={positionPoints}
         weekStatus={matchup.weekStatus}
+        manager={managers?.[matchup.away.teamId]}
       />
     </div>
   );
@@ -272,6 +304,7 @@ export function MatchupPanel({
   weekStatus,
   positionPoints,
   records,
+  managers,
   eyebrow = "Matchup",
 }: {
   readonly leagueId: string;
@@ -289,6 +322,8 @@ export function MatchupPanel({
    *  (`MatchupHero`'s own `RecordsByTeamId`). Omit it and the hero prints no record rather than a
    *  fabricated 0-0. */
   readonly records?: RecordsByTeamId;
+  /** Every team's manager (`managersFrom`), for the person at the head of each lineup column. */
+  readonly managers?: ManagersByTeamId;
   /** What the panel calls itself. "Your matchup" for the viewer's own game, which is the one the
    *  page leads with; "Matchup" for everybody else's. A label, never a layout switch. */
   readonly eyebrow?: string;
@@ -310,7 +345,7 @@ export function MatchupPanel({
       </div>
       <MatchupHero matchup={summaryOf(matchup)} myTeamId={myTeamId} records={records} />
       <div className="border-t border-line pt-3">
-        <MatchupLineups leagueId={leagueId} matchup={matchup} myTeamId={myTeamId} positionPoints={positionPoints} />
+        <MatchupLineups leagueId={leagueId} matchup={matchup} myTeamId={myTeamId} positionPoints={positionPoints} managers={managers} />
       </div>
     </Card>
   );

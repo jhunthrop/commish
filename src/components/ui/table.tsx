@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { MICRO_LABEL, UI_CONFIG } from "./config";
+import { TOKENS } from "@/design/tokens";
+import { MICRO_LABEL } from "./config";
 import { comparisonWithin, type HeatDirection } from "./magnitude";
 import { NOT_STARTED_DASH } from "./game-state-chip";
 import { Stat } from "./stat";
@@ -7,21 +8,27 @@ import { Stat } from "./stat";
 export type TableDensity = "comfortable" | "dense";
 
 /**
- * `comfortable` keeps the table's original Tailwind padding class; `dense` is the mocks' own
- * 11px spec (`UI_CONFIG.table.denseRowPaddingPx`), applied as an inline style rather than a
- * templated `py-[…px]` class — the same "a dynamic value has to reach the DOM as a style, not a
- * class" idiom `UI_CONFIG.infoTip.minTargetPx` already uses, since a templated arbitrary-value
- * class is invisible to Tailwind's static content scanner and would silently ship no rule.
+ * A ROW'S HEIGHT IS A TOKEN, NOT A PADDING GUESS (Sideline, 2026-09-10). `TOKENS.density` states
+ * Sideline's row rhythm as numbers so it cannot drift: 48px where a manager is reading
+ * (`comfortable`) and 44px on a research surface where they are comparing (`dense`), the same two
+ * numbers `PlayerRow` and `TeamRow` already stand at. The table used to set a vertical PADDING
+ * instead, which meant its actual row height was whatever the tallest cell's content happened to
+ * make it plus 28px — a standings row with a face in it and a standings row without one were two
+ * different heights for no stated reason, and neither was any number in the token file.
+ *
+ * It reaches the DOM as an inline style rather than a templated `h-[…px]` class for the reason
+ * `UI_CONFIG.infoTip.minTargetPx` already documents: Tailwind's scanner reads source text, and a
+ * class built from a variable ships no rule at all. `height` on a `<td>` is a MINIMUM in the CSS
+ * table model, so a cell whose content genuinely needs more room still gets it and the row simply
+ * grows, which is what keeps a wrapped manager name from being clipped at 360px.
  */
-const ROW_PADDING_CLASS: Readonly<Record<TableDensity, string>> = {
-  comfortable: "py-2",
-  dense: "",
+const ROW_HEIGHT_PX: Readonly<Record<TableDensity, number>> = {
+  comfortable: TOKENS.density.rowPx,
+  dense: TOKENS.density.denseRowPx,
 };
 
-const ROW_PADDING_STYLE: Readonly<Record<TableDensity, { readonly paddingTop?: string; readonly paddingBottom?: string }>> = {
-  comfortable: {},
-  dense: { paddingTop: `${UI_CONFIG.table.denseRowPaddingPx}px`, paddingBottom: `${UI_CONFIG.table.denseRowPaddingPx}px` },
-};
+/** The horizontal breathing room stays a class; only the vertical rhythm is a token. */
+const CELL_PADDING_CLASS = "px-3 py-1.5";
 
 interface TableColumnBase {
   readonly key: string;
@@ -256,8 +263,7 @@ export function Table<T>({
 }: TableProps<T>) {
   if (rows.length === 0) return <>{empty}</>;
 
-  const cellPaddingClass = ROW_PADDING_CLASS[density];
-  const cellPaddingStyle = ROW_PADDING_STYLE[density];
+  const rowHeightStyle = { height: `${ROW_HEIGHT_PX[density]}px` };
   // Each judged column's own population, built ONCE per render rather than once per cell — twelve
   // cells each rebuilding the same twelve-number array is twelve scans of one column. `null` rows
   // are left out rather than folded to zero: a team that has not played is not a team that scored
@@ -278,7 +284,6 @@ export function Table<T>({
               <th
                 key={column.key}
                 scope="col"
-                style={cellPaddingStyle}
                 // `align-top`: NEW-3 (gauntlet fix wave, "reported, not fixed"), the standings
                 // `Record` column's own instance of `open-league-card.tsx`'s guided-`InfoTip`
                 // layout break. A `<th>`'s UA-default `vertical-align` is `middle`; every header
@@ -301,7 +306,7 @@ export function Table<T>({
                 // this file renders, so it had nowhere to hand-roll. The treatment moves here, the
                 // board's own `Head` wrapper is deleted, and a head that carries an `InfoTip`
                 // caption re-normalises the case around it (`standings-table.tsx`).
-                className={`${columnClass(column)}px-3 ${cellPaddingClass} align-top ${MICRO_LABEL} font-normal text-text-faint`}
+                className={`${columnClass(column)}${CELL_PADDING_CLASS} align-top ${MICRO_LABEL} font-normal text-text-faint`}
               >
                 {isJudged(column) ? <JudgedHead column={column} /> : column.header}
               </th>
@@ -310,9 +315,9 @@ export function Table<T>({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)} className={`border-b border-line/50 ${rowClassName?.(row) ?? ""}`} {...rowAttributes?.(row)}>
+            <tr key={rowKey(row)} style={rowHeightStyle} className={`border-b border-line/50 ${rowClassName?.(row) ?? ""}`} {...rowAttributes?.(row)}>
               {columns.map((column) => (
-                <td key={column.key} style={cellPaddingStyle} className={`${columnClass(column)}px-3 ${cellPaddingClass}`}>
+                <td key={column.key} className={`${columnClass(column)}${CELL_PADDING_CLASS}`}>
                   {isJudged(column) ? judgedCell(column, row, populations.get(column.key) ?? []) : column.cell(row)}
                 </td>
               ))}

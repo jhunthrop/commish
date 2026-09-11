@@ -6,6 +6,7 @@ import { Button } from "./button";
 import { EmptyState } from "./empty-state";
 import { renderSurface } from "./test-utils";
 import { UI_CONFIG } from "./config";
+import { TOKENS } from "@/design/tokens";
 
 interface Pick {
   readonly id: string;
@@ -83,29 +84,24 @@ describe("Table", () => {
     expect(screen.getByRole("columnheader", { name: "Team" }).className).toMatch(/hidden/);
   });
 
-  // Task 12 Step 3c (the closeout): every real consumer wants the dense padding, so that is what
-  // a caller gets by saying nothing at all — the same "no consumer left opted out" reasoning
-  // `table.tsx`'s own DENSITY-DEFAULT DECISION docblock records.
-  //
-  // Reads the figure from `UI_CONFIG` rather than restating it. Gameday law 4 moved it from 11px
-  // to 7px and this assertion was the only thing in the repo that disagreed — a test that pins a
-  // spacing VALUE is testing the token, while what earns its keep here is that the default
-  // reaches the DOM as an inline style at all (a templated `py-[Npx]` class ships no rule).
-  it("defaults to dense padding now that every Table consumer in the product wants it", () => {
-    const dense = `${UI_CONFIG.table.denseRowPaddingPx}px`;
+  // A ROW'S HEIGHT IS A TOKEN (Sideline, 2026-09-10). The table used to set a vertical PADDING,
+  // which made its real row height content plus a constant and put that constant in `UI_CONFIG`
+  // rather than in the token file everything else's rhythm comes from. Both heights now come from
+  // `TOKENS.density`, and these two assertions read them from there rather than restating them: a
+  // test that pins a spacing VALUE is testing the token, while what earns its keep is that the
+  // height reaches the DOM as an inline style at all (a templated `h-[Npx]` class ships no rule).
+  it("stands a dense row at the density token's own dense height, by default", () => {
     render(<Table caption="Auction results" columns={columns} rows={rows} rowKey={(r) => r.id} empty={<p>None.</p>} />);
-    const header = screen.getByRole("columnheader", { name: "Player" });
-    expect(header.className).not.toMatch(/py-2/);
-    expect(header).toHaveStyle({ paddingTop: dense, paddingBottom: dense });
-    const cell = screen.getByText("Jalen Croft").closest("td")!;
-    expect(cell).toHaveStyle({ paddingTop: dense, paddingBottom: dense });
+    const row = screen.getByText("Jalen Croft").closest("tr")!;
+    expect(row).toHaveStyle({ height: `${TOKENS.density.denseRowPx}px` });
   });
 
-  it("keeps the original, roomier padding available as an explicit opt-out", () => {
+  it("stands a comfortable row at the density token's own row height", () => {
     render(
       <Table caption="Auction results" columns={columns} rows={rows} rowKey={(r) => r.id} empty={<p>None.</p>} density="comfortable" />,
     );
-    expect(screen.getByRole("columnheader", { name: "Player" }).className).toMatch(/py-2/);
+    const row = screen.getByText("Jalen Croft").closest("tr")!;
+    expect(row).toHaveStyle({ height: `${TOKENS.density.rowPx}px` });
   });
 
   it("spreads rowAttributes directly onto the row, not a second wrapper element", () => {

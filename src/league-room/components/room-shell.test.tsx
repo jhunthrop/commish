@@ -135,8 +135,10 @@ describe("RoomShell", () => {
       week: { ...ROOM_DATA.week!, weekStatus: "in_progress" },
     };
     render(wrap(live));
+    // P1 on Sunday: each lineup column is headed by the person, not by a team name, and the
+    // borrowed score bug is the top of the stage.
+    expect(screen.getByTestId("score-bug")).toBeTruthy();
     expect(screen.getByText("Yours")).toBeTruthy();
-    expect(screen.getByText("Theirs")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Set your lineup" })).toBeNull();
   });
 

@@ -6,6 +6,7 @@ import { ButtonLink, EYEBROW, LowerThird, NOT_STARTED_DASH, signedPoints } from 
 import { useValueChangeHighlight } from "@/design/use-value-change-highlight";
 import type { LeagueAct } from "@/lib/leagues/next-act";
 import type { MatchupDetail, MatchupWeekBody } from "../contract";
+import type { ManagersByTeamId } from "../lib/managers";
 import { useLiveScores } from "../hooks/use-live-scores";
 import { remainingToPlay, signedMargin, summaryOf } from "../lib/matchup-facts";
 import { startedPointsByPosition } from "../lib/population";
@@ -76,9 +77,12 @@ function isMine(matchup: MatchupDetail, myTeamId: string | null): boolean {
  * band. They used to be appended to a sentence inside every scoreboard, which printed "0 of 15
  * games final" six times on one screen for one fact.
  */
-export function LiveMatchupWeek({ leagueId, body, records, act = null }: {
+export function LiveMatchupWeek({ leagueId, body, records, managers, act = null }: {
   readonly leagueId: string;
   readonly body: MatchupWeekBody;
+  /** Every team's manager (`managersFrom`), joined by the page from the standings read it already
+   *  makes. P1: a week surface shows people, and `MatchupSide` carries a team name and nobody. */
+  readonly managers?: ManagersByTeamId;
   /** Every team's win-loss-tie line, joined by the page from the standings read it already makes.
    *  Optional so a test that does not care renders exactly as before — the hero prints no record
    *  rather than a fabricated one. */
@@ -134,7 +138,9 @@ export function LiveMatchupWeek({ leagueId, body, records, act = null }: {
   const leftToPlay = myLeadSide === null ? null : remainingToPlay(myLeadSide, live.status);
 
   return (
-    <>
+    // `data-week` is a TEST CONTRACT: `useLiveScores` refuses a `score.update` frame for any week
+    // but this one, and the fluidity spec has no other way to learn which week this page shows.
+    <div data-testid="matchup-week" data-week={body.weekNumber} className="flex flex-col gap-4">
       {notice === null ? null : <p className="text-sm text-text-muted">{notice}</p>}
 
       <MatchupPanel
@@ -144,6 +150,7 @@ export function LiveMatchupWeek({ leagueId, body, records, act = null }: {
         weekStatus={live.status}
         positionPoints={positionPoints}
         records={records}
+        managers={managers}
         eyebrow={mineIndex === -1 ? "Matchup" : "Your matchup"}
       />
 
@@ -151,7 +158,7 @@ export function LiveMatchupWeek({ leagueId, body, records, act = null }: {
         <section aria-label="Around the league" className="flex flex-col gap-2">
           <h2 className={`${EYEBROW} text-text-muted`}>Around the league</h2>
           <MatchupStrip matchups={rest}>
-            {(matchup) => <MatchupLineups leagueId={leagueId} matchup={matchup} myTeamId={body.myTeamId} positionPoints={positionPoints} />}
+            {(matchup) => <MatchupLineups leagueId={leagueId} matchup={matchup} myTeamId={body.myTeamId} positionPoints={positionPoints} managers={managers} />}
           </MatchupStrip>
         </section>
       )}
@@ -204,7 +211,7 @@ export function LiveMatchupWeek({ leagueId, body, records, act = null }: {
         ]}
         action={act === null ? undefined : <ButtonLink href={act.href} variant="verb" size="sm">{act.label}</ButtonLink>}
       />
-    </>
+    </div>
   );
 }
 

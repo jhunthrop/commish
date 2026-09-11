@@ -1,13 +1,49 @@
-import { describe, it, expect } from "vitest";
-import { byDay, dayKey, dayMarker } from "./day-chapters";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { byDay, dayKey, dayMarker, type ReaderClock } from "./day-chapters";
 
 const NOW = new Date(2026, 8, 10, 15, 0, 0);
+const CLOCK: ReaderClock = { nowMs: NOW.getTime(), locale: "en-US" };
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("dayMarker", () => {
   it("says Today and Yesterday, and names an older day", () => {
-    expect(dayMarker(new Date(2026, 8, 10, 9, 0).toISOString(), NOW)).toBe("Today");
-    expect(dayMarker(new Date(2026, 8, 9, 23, 59).toISOString(), NOW)).toBe("Yesterday");
-    expect(dayMarker(new Date(2026, 8, 2, 12, 0).toISOString(), NOW)).toMatch(/September 2/);
+    expect(dayMarker(new Date(2026, 8, 10, 9, 0).toISOString(), CLOCK)).toBe("Today");
+    expect(dayMarker(new Date(2026, 8, 9, 23, 59).toISOString(), CLOCK)).toBe("Yesterday");
+    expect(dayMarker(new Date(2026, 8, 2, 12, 0).toISOString(), CLOCK)).toMatch(/September 2/);
+  });
+
+  // THE LEDGERED M1 FOLLOW-UP. The marker used to read `new Date()` and an implicit locale at
+  // render, so its output depended on when React drew and on which environment drew it — the two
+  // inputs a server render and a client hydration disagree about. Both are now arguments, and
+  // these three cases are what "deterministic" has to mean for it.
+  it("ignores the wall clock entirely: the same instant and the same reader clock is the same word", () => {
+    const iso = new Date(2026, 8, 10, 9, 0).toISOString();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2030, 0, 1, 4, 0, 0));
+    const drawnInTheFuture = dayMarker(iso, CLOCK);
+    vi.setSystemTime(new Date(2020, 5, 5, 22, 0, 0));
+    const drawnInThePast = dayMarker(iso, CLOCK);
+    expect(drawnInTheFuture).toBe("Today");
+    expect(drawnInThePast).toBe("Today");
+  });
+
+  it("takes the locale from the clock rather than the environment", () => {
+    const iso = new Date(2026, 8, 2, 12, 0).toISOString();
+    expect(dayMarker(iso, { ...CLOCK, locale: "en-US" })).toMatch(/September 2/);
+    expect(dayMarker(iso, { ...CLOCK, locale: "de-DE" })).toMatch(/September 2026|2\. September/);
+  });
+
+  it("makes no relative claim when no clock was passed, and says so the same way every time", () => {
+    const iso = new Date(2026, 8, 10, 9, 0).toISOString();
+    // The day it actually is, never "Today": nothing told this render whose day it is.
+    expect(dayMarker(iso, null)).not.toBe("Today");
+    expect(dayMarker(iso, null)).toMatch(/September 10/);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2030, 0, 1));
+    expect(dayMarker(iso, null)).toMatch(/September 10/);
   });
 });
 
