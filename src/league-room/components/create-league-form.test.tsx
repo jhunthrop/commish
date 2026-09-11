@@ -201,7 +201,7 @@ describe("CreateLeagueForm", () => {
       // constant is proven server-side, where it belongs — `src/app/api/leagues/route.test.ts`
       // asserts the route answers exactly `ENFORCEMENT_REFUSALS.create`. This proves the other half:
       // whatever the server refuses with reaches the person, beside the control that answers it.
-      const refusal = "You have played enough seasons here that you can't open a league reserved for newer players. Open it to everyone instead.";
+      const refusal = "You have played enough seasons here that you cannot open a league reserved for newer players. Open it to everyone instead.";
       const fixture = fixtureLeagueDeps({ ok: false, error: refusal });
       renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixture.deps);
       fireEvent.change(screen.getByLabelText("League name"), { target: { value: "Rookie Room" } });

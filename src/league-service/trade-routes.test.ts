@@ -212,7 +212,7 @@ describe("POST /api/leagues/[leagueId]/trades", () => {
     signedInAs("u_alice");
     const response = await post("lg_1", { ...validProposeBody, counterpartyTeamId: "team_a" });
     expect(response.status).toBe(422);
-    expect((await response.json()).error).toBe("You can't trade with your own team.");
+    expect((await response.json()).error).toBe("You cannot trade with your own team.");
   });
 
   it("answers 429 once the caller is over the trade ceiling", async () => {

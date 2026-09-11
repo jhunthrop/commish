@@ -235,13 +235,13 @@ describe("DraftSchedulePanel", () => {
     fixture.deps = {
       ...fixture.deps,
       fetchJson: async () =>
-        ({ json: async () => ({ ok: false, error: "This draft has already started, so its time can't change." }) }) as unknown as Response,
+        ({ json: async () => ({ ok: false, error: "This draft has already started, so its time cannot change." }) }) as unknown as Response,
     };
     renderInLeague(<DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={SCHEDULED} />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Edit time" }));
     fireEvent.change(screen.getByLabelText("Draft time"), { target: { value: EDITED_LOCAL_VALUE } });
     fireEvent.click(screen.getByRole("button", { name: "Save time" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("This draft has already started, so its time can't change.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("This draft has already started, so its time cannot change.");
   });
 
   it("starts the draft and switches to the live state", async () => {

@@ -77,7 +77,7 @@ describe("useTrades", () => {
     const { result } = renderHook(() => useTrades("l1"), { wrapper: wrapper(fixture.deps) });
     await waitFor(() => expect(result.current.status).toBe("ready"));
 
-    fixture.response = { ok: false, error: "You can't trade with your own team." };
+    fixture.response = { ok: false, error: "You cannot trade with your own team." };
     await act(() =>
       result.current.propose({ counterpartyTeamId: "me", proposerAssets: [{ kind: "player", playerId: "p1" }], counterpartyAssets: [{ kind: "player", playerId: "p2" }], note: null }),
     );
