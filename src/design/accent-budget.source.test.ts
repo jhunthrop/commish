@@ -107,7 +107,13 @@ const ACCENT_FILL_ALLOWLIST: readonly string[] = [
   // already earned: the network's own graphics over a board, carrying no act — every segment
   // re-narrows the same list in place. Each fill is drawn in exactly one file.
   "src/components/ui/chapter-band.tsx",
-  "src/components/ui/segment-group.tsx",
+  // FIX ROUND 3: the chip's fill moved OUT of `segment-group.tsx` into `chip.tsx`, which
+  // carries no `"use client"` directive — `BrowseFilters` is a server component on purpose (the
+  // URL is the whole filter state, no JavaScript needed), and calling a client module's export
+  // during a server render threw at runtime and cost `/browse` its entire filter nav. `chip.tsx`
+  // is a `.tsx` with no JSX in it deliberately: this sweep reads `.tsx`, so a `.ts` module would
+  // have dodged the guard on a file extension instead of earning its entry here.
+  "src/components/ui/chip.tsx",
 ];
 
 /**

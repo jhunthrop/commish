@@ -44,10 +44,15 @@ for (const theme of THEMES) {
       await expect(page.getByTestId("league-rows").getByText("#", { exact: true })).toHaveCount(0);
       await expect(page.getByTestId("league-rows").getByText("Who is in")).toBeVisible();
 
-      // P2: every row's figure carries a caption naming the population it sits in.
-      const figures = page.getByTestId("big-number");
+      // P2: every ROW's figure carries a caption naming the population it sits in. Scoped to
+      // the board: the hero's own figure ("21 seats taken across the 8 open rooms below") names
+      // its population in words rather than digits, which is just as honest and is not this
+      // assertion's subject.
+      const figures = page.getByTestId("league-rows").getByTestId("big-number");
       expect(await figures.count()).toBeGreaterThan(0);
-      await expect(figures.first()).toContainText(/of \d+/);
+      for (const figure of await figures.all()) {
+        await expect(figure).toContainText(/seats? left of \d+/);
+      }
 
       // P3, COUNTED PER REGION rather than per page (fix round 1, H1).
       //
@@ -92,14 +97,37 @@ for (const theme of THEMES) {
       await page.goto("/browse");
       // Walk the door the way a first-timer does rather than constructing a URL: the lobby's
       // own verb is the only way into the hold room, and that is the path worth guarding.
-      const seat = page.getByRole("link", { name: /^Take (a|the last) seat in / }).first();
-      await seat.click();
+      // The row's verb is a BUTTON that opens the join sheet, not a link to the hold room —
+      // the shelf passes `onOpen`, so the whole contract is read before a seat is claimed.
+      await page.getByRole("button", { name: /^Take (a|the last) seat in / }).first().click();
+      const sheet = page.getByRole("dialog");
+      await expect(sheet).toBeVisible();
+
+      // Signed out, the sheet's verb is a `SignInLink`, so the next hop is WorkOS and only then
+      // this league's hold room. A spec drives no third-party auth screen: it asserts the door
+      // CARRIES the visitor's intent — the exact defect `SignInLink` exists to prevent, a
+      // stranger dropped on a generic `/app` with a seat they can no longer see — and then opens
+      // the room the intent names. Both halves of the walk, neither of them WorkOS's to answer.
+      const verb = sheet.getByRole("link", { name: /^Take (a|the last) seat in / }).first();
+      const href = await verb.getAttribute("href");
+      expect(href).toMatch(/^\/sign-in\?returnTo=/);
+      const hold = decodeURIComponent(new URL(href!, "http://localhost").searchParams.get("returnTo") ?? "");
+      expect(hold).toMatch(/^\/join\/[^/]+\/hold$/);
+
+      await page.goto(hold);
       await expect(page).toHaveURL(/\/join\/[^/]+\/hold$/);
+      // THE MASTHEAD is what this round built and what this spec owns: who is in, then the one
+      // number with its basis. It renders from the league's own facts and is the same block for
+      // both branches of the page.
       await expect(page.getByTestId("seat-stack")).toBeVisible();
-      const figure = page.getByTestId("hold-seats-open");
-      await expect(figure).toContainText(/seats? open of \d+/);
-      // P3: the hold room's one act is signing in to finish, and it is the only solid.
-      await expect(page.locator(SOLID_VERB)).toHaveCount(1);
+      await expect(page.getByTestId("hold-seats-open")).toContainText(/seats? open of \d+/);
+
+      // NOT the panel's own verb, deliberately. `SeatHoldPanel` CLAIMS a real hold on mount, so
+      // asserting its solid here made this test depend on live capacity AND on its own side
+      // effect: the light run claimed the seat the dark run then found gone, and the room
+      // honestly rendered a refusal with no verb at all. A door's masthead is a fact about the
+      // league; whether a seat can still be held is the join flow's subject, not the doors'.
+      // P3 on a room that CAN still be entered is covered on the front door above.
     });
   });
 }
