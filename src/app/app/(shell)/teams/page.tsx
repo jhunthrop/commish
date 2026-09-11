@@ -5,6 +5,8 @@ import { pageTitle } from "@/components/app-shell/page-metadata";
 import { clubIndex } from "@/teams/club-index";
 import { ClubIndexGrid } from "@/teams/components/club-index-grid";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = pageTitle("Teams");
 
 /**

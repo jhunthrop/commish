@@ -66,7 +66,7 @@ describe("BidControls", () => {
     expect(screen.getByRole("button", { name: "Bid" })).toBeDisabled();
 
     rerender(<BidControls view={{ ...open, maxBids: { t1: 10, t2: 97 } }} myTeamId="t1" submitting={false} onBid={() => {}} />);
-    expect(screen.getByText("You can't afford the current bid and still fill your roster.")).toBeInTheDocument();
+    expect(screen.getByText("You cannot afford the current bid and still fill your roster.")).toBeInTheDocument();
 
     rerender(<BidControls view={AUCTION_VIEW} myTeamId="t1" submitting={false} onBid={() => {}} />);
     expect(screen.getByText("Nobody is up for bid right now.")).toBeInTheDocument();

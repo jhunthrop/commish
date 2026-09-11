@@ -34,7 +34,7 @@ export function BidControls({ view, myTeamId, submitting, onBid }: BidControlsPr
         : lot.highBidTeamId === myTeamId
           ? "You are the high bidder."
           : maxBid === null || maxBid < minBid
-            ? "You can't afford the current bid and still fill your roster."
+            ? "You cannot afford the current bid and still fill your roster."
             : null;
 
   // One-tap increments for a bid war (review R5): stepping clamps at the server's own

@@ -846,6 +846,12 @@ describe("listPublicLeagues house shelf", () => {
     });
     await seedHouseLeague({ id: "house_open_12_1", rung: "open_12", kickoffAt: kickoffAhead() });
     const body = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    // The EXACT ids on each side, not `every()` alone (review HIGH-1): re-anchoring the kickoff
+    // fixed this test's vacuity through the fixture, which leaves the assertion still able to
+    // pass over an empty shelf the day something else empties it. A membership claim has to name
+    // what it expects to be there.
+    expect(body.house.map((l) => l.id)).toEqual(["house_open_12_1"]);
+    expect(body.leagues.map((l) => l.id)).toEqual(["member"]);
     expect(body.house.every((l) => l.houseRung !== null)).toBe(true);
     expect(body.leagues.every((l) => l.houseRung === null)).toBe(true);
   });

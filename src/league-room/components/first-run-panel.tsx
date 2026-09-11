@@ -52,6 +52,20 @@ function FirstRunPathAction({ path }: { readonly path: FirstRunPath }) {
   return <CreateLeaguePanel />;
 }
 
+/** One path's card. Shared by both branches in `FirstRunPanel` below, so the create path can
+ *  spell its anchor id as a literal without a second copy of the body. */
+function FirstRunPathCard({ path, id }: { readonly path: FirstRunPath; readonly id?: string }) {
+  return (
+    <Card as="section" aria-label={path.title} id={id} className="flex flex-col gap-3">
+      <div>
+        <h3 className="font-medium text-text-primary">{path.title}</h3>
+        <p className="text-sm text-text-muted">{path.detail}</p>
+      </div>
+      <FirstRunPathAction path={path} />
+    </Card>
+  );
+}
+
 /**
  * The zero-leagues fork: `HomeBoard`'s replacement for the old plain `EmptyState`. Renders
  * `plan.paths` in the order `firstRunPlan` chose, each with its real form or link right there —
@@ -87,22 +101,8 @@ function FirstRunPathAction({ path }: { readonly path: FirstRunPath }) {
  * the create sheet's sign-in intent, the open-league shelf) all read as broken. The fix is to
  * make the declaration visible rather than to teach the sweep to parse expressions: an anchor a
  * static reader cannot find is one a person refactoring this file cannot find either. The card
- * body is shared by `FirstRunPathCard` below so the branch costs no duplication.
+ * body is shared by `FirstRunPathCard` above so the branch costs no duplication.
  */
-/** One path's card. Shared by both branches above so the create path can spell its anchor id as
- *  a literal without a second copy of the body. */
-function FirstRunPathCard({ path, id }: { readonly path: FirstRunPath; readonly id?: string }) {
-  return (
-    <Card as="section" aria-label={path.title} id={id} className="flex flex-col gap-3">
-      <div>
-        <h3 className="font-medium text-text-primary">{path.title}</h3>
-        <p className="text-sm text-text-muted">{path.detail}</p>
-      </div>
-      <FirstRunPathAction path={path} />
-    </Card>
-  );
-}
-
 export function FirstRunPanel({ plan, profile }: { readonly plan: FirstRunPlan | null; readonly profile: ProfileBody }) {
   if (plan === null) return null;
 
