@@ -55,8 +55,8 @@ test("the league front page fits a phone, one column, without scrolling sideways
   await managerA.setViewportSize({ width: 360, height: 740 });
   await managerA.goto(`/app/leagues/${E2E_TRADES_LEAGUE_ID}`);
   await expect(managerA.getByRole("region", { name: "Your game this week" })).toBeVisible();
-  // The stream has loaded once the field is there; the picture should show the room, not its skeleton.
-  await expect(managerA.getByLabel("Message")).toBeAttached();
+  // The picture should show the room, not its skeleton: wait for the log or the empty room's line.
+  await expect(managerA.getByRole("log", { name: "What happened" }).or(managerA.getByText("Nothing has happened here yet. Say the first thing."))).toBeAttached();
 
   // P10 at 360px: nothing on the page this round owns (the `main` landmark) sticks out past the
   // viewport. On failure, name what did. The shell's own header is measured separately and

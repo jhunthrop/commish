@@ -21,9 +21,12 @@ export interface BigNumberProps extends Omit<HTMLAttributes<HTMLElement>, "child
   readonly changed?: boolean;
 }
 
+/** The caption's width is capped per step so it wraps under its figure instead of pushing the
+ *  name beside it off a 360px row: the name is the largest thing on the row (P1), the caption the
+ *  smallest. A row figure gets about seven rems, a card figure ten, a hero as much as it likes. */
 const SIZE: Readonly<Record<BigNumberSize, { readonly value: string; readonly basis: string }>> = {
-  sm: { value: "text-display-sm", basis: "text-xs" },
-  md: { value: "text-display-md", basis: "text-xs" },
+  sm: { value: "text-display-sm", basis: "max-w-[6.5rem] text-xs" },
+  md: { value: "text-display-md", basis: "max-w-[10rem] text-xs" },
   lg: { value: "text-display-lg", basis: "text-sm" },
   xl: { value: "text-display-xl", basis: "text-sm" },
 };
@@ -48,7 +51,7 @@ export function BigNumber({ value, basis, size = "md", align = "end", changed = 
       </span>
       {/* The caption wraps inside its own width rather than pushing the name beside it off a
           360px row: the name is the largest thing on the row (P1) and the caption is the smallest. */}
-      <span className={`mt-0.5 max-w-[10rem] leading-tight ${step.basis} text-text-faint`}>{basis}</span>
+      <span className={`mt-0.5 leading-tight ${step.basis} text-text-faint`}>{basis}</span>
     </span>
   );
 }
