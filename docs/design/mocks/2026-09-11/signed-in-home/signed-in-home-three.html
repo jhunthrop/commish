@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sideline · Your leagues (three leagues)</title>
+<!--
+  SIDELINE · the signed-in home, variant B: a manager in THREE leagues. One in season, one
+  drafting Sunday, one still filling. Cards stack in the order of what needs this manager first.
+  The first card wears the amber wash and the page's ONE solid verb (P3). The rest are quiet.
+
+  DATA PROVENANCE (dev database, docker `fantasy-postgres-1`, read 2026-09-11)
+  - "The Blitz Room" is leagues.id = house_open_12_1 (house_rung open_12, 12 of 12 seated,
+    drafts.status complete, 89 matchup rows across 17 weeks). The manager drawn here is that
+    league's teams row 49245993-9a15-4895-b809-9843279932d5, whose real matchups are
+    week 1 won 69.30 to 46.82, week 2 won 115.50 to 94.84, week 3 lost 98.80 to 118.92, so the
+    record after week 3 is 2-1, and week 4's real opponent is f7de1436-37d1-4f84-bf83-17c8c2fc7f95.
+  - "Sharks Only Auction" is dev_public_sharks_auction: 9 of 10 seated, drafts.kickoff_at
+    2026-09-13 13:55 UTC (a Sunday, two days out from the read), format auction,
+    points_per_reception 1.0, which describeScoring() names "PPR".
+  - "Fourth and Long" is house_open_12_2: when_full, 12 teams, points_per_reception 0.5
+    ("Half PPR"). filledTeams in the database is 0, so with this manager seated it is 1.
+  - The "since you were here" line is the dev database's own roster_move with reason "trade"
+    (dev_league_trades, 2026-08-31): players 4595348 Malik Nabers and 4569618 Garrett Wilson,
+    rendered in renderTradeAccepted's own words ("X and Y completed a trade." / "X sent A and
+    got B."). The two team names are The Blitz Room's own seats, per the naming note below.
+  - The lobby rows are leagues.is_public_matchmade = true with drafts.status = 'scheduled':
+    The Rookie Room (house_beginner_12_1, 0 of 12, when_full), First Auction, No Pressure
+    (dev_public_first_auction, 5 of 10, 2026-09-13 13:55 UTC, beginner), Rookie Snake Room
+    (dev_public_rookie_snake, 3 of 12, same kickoff, beginner). "5 more" is the remainder of
+    that same query (8 rows total, less these three).
+  - TEAM AND MANAGER NAMES: The Blitz Room's teams rows are seeded placeholders
+    ("Dev Manager (dev_house_demo_07)"). They are drawn here with team names from the dev
+    database's own dev_league_season rows (Bay Bandits, Iron Owls, Harbor Hawks, Prairie Kings)
+    and the fixture manager names the approved 2026-09-10 mocks already use
+    (src/draft-room/test-fixtures.tsx: Dana Whitfield, Rey Okafor, Coach Parker). The signed-in
+    manager is users.display_name "Justin Hunthrop", a real row. No number is substituted.
+  - COPY: "Set your lineup", "Rank your draft slots", "Run a mock draft", "Preview the room",
+    "Take a seat", "Drafts when full", "Nobody yet. You would be first in.", "Create a league",
+    "See every open league" are verbatim product strings.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Sideline tokens, src/design/tokens.ts verbatim */
+  :root{
+    --chalk:#F6F5F1; --paper:#FFFFFF; --raised:#FBFAF7; --inset:#EFEEE8;
+    --graphite:#17181C; --ink2:#5B5E66; --ink3:#8A8D95; --hair:#E6E5DF; --edge:#D9D8D1;
+    --court:#2457F5; --court-ink:#FFFFFF;
+    --amber:#E39A0E; --amber-ink:#8A5C05; --amber-wash:#FBF1DC; --amber-text:#1A1200;
+    --live:#0E7A49; --live-wash:#E4F4EC; --rose:#B9245A;
+    --shadow:0 4px 16px rgba(23,24,28,.06), 0 1px 2px rgba(23,24,28,.04);
+    --r-card:20px; --r-row:16px; --r-pill:999px;
+    --display:"Bricolage Grotesque", system-ui, sans-serif; --body:"Figtree", system-ui, sans-serif;
+    --spring:cubic-bezier(.2,.9,.3,1.15);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --chalk:#121316; --paper:#1B1C21; --raised:#212228; --inset:#26272D;
+      --graphite:#F2F2EE; --ink2:#A9ACB4; --ink3:#7C7F88; --hair:#2A2B31; --edge:#34353C;
+      --court:#5B85FF; --court-ink:#0B1226;
+      --amber:#F5B341; --amber-ink:#F5B341; --amber-wash:#2A2213; --amber-text:#1A1200;
+      --live:#2ED47F; --live-wash:#12281D; --rose:#FF6B9A;
+      --shadow:0 4px 16px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"]{
+    --chalk:#121316; --paper:#1B1C21; --raised:#212228; --inset:#26272D;
+    --graphite:#F2F2EE; --ink2:#A9ACB4; --ink3:#7C7F88; --hair:#2A2B31; --edge:#34353C;
+    --court:#5B85FF; --court-ink:#0B1226;
+    --amber:#F5B341; --amber-ink:#F5B341; --amber-wash:#2A2213; --amber-text:#1A1200;
+    --live:#2ED47F; --live-wash:#12281D; --rose:#FF6B9A;
+    --shadow:0 4px 16px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--chalk);color:var(--graphite);font:15px/1.45 var(--body)}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 40px 56px}
+  h1,h2,h3{font-family:var(--display);margin:0;font-variation-settings:"opsz" 96}
+  .num{font-family:var(--display);font-variant-numeric:tabular-nums}
+
+  .bar{display:flex;align-items:center;gap:24px;height:60px;border-bottom:1px solid var(--hair)}
+  .brand{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em}
+  .bar a.link{color:var(--ink2);font-weight:500;font-size:14px}
+  .bar .spacer{flex:1}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 20px;border-radius:var(--r-pill);font:600 15px var(--body);border:1px solid transparent;cursor:pointer;transition:transform 120ms var(--spring)}
+  .btn:active{transform:scale(.97)}
+  .btn.verb{background:var(--court);color:var(--court-ink);box-shadow:0 6px 18px rgba(36,87,245,.24)}
+  .btn.quiet{background:transparent;border-color:var(--edge);color:var(--graphite)}
+  .btn.sm{height:38px;padding:0 16px;font-size:14px}
+  .textlink{color:var(--court);font-weight:600;font-size:14px}
+
+  h1.page{font-size:34px;font-weight:800;letter-spacing:-.025em;padding:28px 0 18px}
+  .cards{display:flex;flex-direction:column;gap:16px}
+
+  .faces{display:flex;flex-shrink:0}
+  .face{width:40px;height:40px;border-radius:50%;background:var(--inset);color:var(--ink2);display:grid;place-items:center;font:700 13px var(--display);box-shadow:0 0 0 2px var(--paper);margin-left:-10px}
+  .face:first-child{margin-left:0}
+  .face.self{background:var(--amber-wash);color:var(--amber-ink);box-shadow:0 0 0 2px var(--amber)}
+  .face.rival{box-shadow:0 0 0 2px var(--rose)}
+  .face.open{background:transparent;border:1px dashed var(--edge);box-shadow:0 0 0 2px var(--paper)}
+  .face.more{background:var(--inset);color:var(--ink3);font-size:12px}
+  /* A LOBBY ROW NAMES NOBODY: PublicLeagueSummary discloses a count, never who is in it, so an
+     open room draws taken seats as anonymous faces and open ones as the dashed well. */
+  .face.seat{background:var(--edge);border:none}
+  .stack{display:flex;align-items:center;gap:12px;min-width:0;margin-top:18px}
+  .stack .cap{font-size:14px;color:var(--ink2);min-width:0}
+
+  .league{background:var(--paper);border-radius:var(--r-card);box-shadow:var(--shadow);padding:24px 26px;display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:24px 32px;align-items:start}
+  .league.needs{background:var(--amber-wash)}
+  .league .crest{width:56px;height:56px;border-radius:16px;background:var(--inset);display:grid;place-items:center;font:800 19px var(--display);color:var(--ink2);flex-shrink:0}
+  .league.needs .crest{background:var(--paper);color:var(--amber-ink)}
+  .head{display:flex;align-items:center;gap:16px;min-width:0}
+  .head h2{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.05}
+  .head .fmt{color:var(--ink3);font-size:13px;margin-top:4px}
+  .chip{display:inline-block;padding:3px 10px;border-radius:var(--r-pill);font:600 11px var(--body);background:var(--inset);color:var(--ink2);vertical-align:middle;margin-left:8px;letter-spacing:.02em}
+  .chip.live{background:var(--live-wash);color:var(--live)}
+  .say{font-family:var(--display);font-size:19px;font-weight:600;letter-spacing:-.01em;margin:16px 0 0;line-height:1.3}
+  .since{display:flex;align-items:center;gap:10px;margin-top:10px;color:var(--ink2);font-size:14px}
+  .since .face{width:28px;height:28px;font-size:11px}
+  .since b{color:var(--graphite);font-weight:600}
+
+  .meter{display:flex;gap:4px;margin-top:16px;max-width:360px}
+  .meter i{height:8px;flex:1;border-radius:4px;border:1px solid var(--edge);background:var(--inset)}
+  .meter i.f{background:var(--graphite);border-color:var(--graphite)}
+  .meter i.h{background:var(--amber);border-color:var(--amber)}
+
+  .quietrow{display:flex;flex-wrap:wrap;gap:20px;margin:16px 0 0}
+
+  .fig{display:flex;flex-direction:column;align-items:flex-end;text-align:right}
+  .fig .n{font-family:var(--display);font-variant-numeric:tabular-nums;font-weight:800;font-size:48px;line-height:.95;letter-spacing:-.03em}
+  .league.needs .fig .n{color:var(--amber-ink)}
+  .fig .basis{margin-top:6px;font-size:13px;color:var(--ink3);max-width:11rem}
+  .rail{grid-column:2;display:flex;flex-direction:column;align-items:flex-end;gap:20px}
+  .act{align-self:flex-end}
+  .fig .n.word{font-size:34px;letter-spacing:-.02em}
+
+  .lobby{margin-top:28px;background:var(--paper);border-radius:var(--r-card);box-shadow:var(--shadow);padding:8px 8px 16px}
+  .lobby-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 18px 4px}
+  .lobby-head h2{font-size:22px;font-weight:700;letter-spacing:-.02em}
+  .chapter{padding:12px 18px 4px;font:600 12px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+  .row{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1.2fr) minmax(0,1.2fr) 140px 170px;gap:16px;align-items:center;padding:14px 18px;border-radius:var(--r-row);transition:background 140ms}
+  .row:hover{background:var(--raised)}
+  .row h3{font-size:17px;font-weight:700;letter-spacing:-.01em;line-height:1.15}
+  .row .sub{color:var(--ink2);font-size:13px;margin-top:2px}
+  .row .fmt,.row .when{color:var(--ink2);font-size:14px;min-width:0}
+  .row .when b{display:block;color:var(--graphite);font-weight:600}
+  .row .seats{display:flex;flex-direction:column;gap:8px}
+  .row .seats .n{font-family:var(--display);font-variant-numeric:tabular-nums;font-size:30px;font-weight:800;line-height:1;letter-spacing:-.02em}
+  .row .seats .basis{font-size:12px;color:var(--ink3)}
+  .row .meter{margin-top:0;max-width:none}
+  .row .meter i{height:6px}
+  .row .act{grid-column:auto;justify-self:end}
+  .row .who{display:flex;align-items:center;gap:14px;min-width:0}
+  .row .who .face{width:34px;height:34px;font-size:12px}
+  .lobby-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px 0;color:var(--ink3);font-size:13px;border-top:1px solid var(--hair);margin:8px 10px 0}
+
+  @keyframes breathe{0%,100%{opacity:1}50%{opacity:.5}}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--live);margin-right:7px;vertical-align:middle;animation:breathe 2s ease-in-out infinite}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+  @media (max-width:760px){
+    .wrap{padding:0 16px 40px}
+    .bar{height:54px;gap:14px}.bar a.link{display:none}
+    h1.page{font-size:27px;padding:20px 0 14px}
+    .league{grid-template-columns:1fr;padding:20px 18px;gap:0}
+    .head h2{font-size:22px}
+    .league .fig{align-items:baseline;text-align:left;margin-top:18px;flex-direction:row;gap:12px}
+    .fig .n{font-size:40px}
+    .fig .basis{margin-top:0;max-width:none}
+    .rail{grid-column:1;align-items:stretch;gap:16px;margin-top:18px}
+    .act{align-self:stretch}
+    .act .btn{width:100%}
+    .lobby{padding:4px 4px 12px}
+    .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"who who" "fmt fmt" "when seats" "act act";gap:10px 14px;padding:18px 14px;border-radius:0;border-bottom:1px solid var(--hair)}
+    .row:last-of-type{border-bottom:none}
+    .row .who{grid-area:who}.row .fmt{grid-area:fmt}.row .when{grid-area:when}
+    .row .seats{grid-area:seats;align-items:flex-end;text-align:right;gap:6px}
+    .row .when{align-self:end}
+    .row .act{grid-area:act;justify-self:stretch;margin-top:6px}
+    .row .act .btn{width:100%}
+    .row .meter{width:110px}
+    .lobby-head{flex-direction:column;align-items:flex-start;gap:12px}
+    .lobby-foot{flex-direction:column;align-items:flex-start;gap:12px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="bar" aria-label="App">
+    <a class="brand" href="#">Commish</a>
+    <a class="link" href="#">Your leagues</a>
+    <a class="link" href="#">Open leagues</a>
+    <a class="link" href="#">Players</a>
+    <span class="spacer"></span>
+    <a class="link" href="#">How it works</a>
+    <span class="faces" aria-hidden="true"><span class="face self">JH</span></span>
+  </nav>
+
+  <h1 class="page">Your leagues</h1>
+
+  <div class="cards">
+    <!-- CARD 1 needs you: an empty lineup slot with the week still open outranks everything.
+         The amber wash and the page's one solid verb both live here. -->
+    <article class="league needs" aria-label="The Blitz Room">
+      <div>
+        <div class="head">
+          <span class="crest" aria-hidden="true">BR</span>
+          <div>
+            <h2>The Blitz Room</h2>
+            <div class="fmt">12 teams · Snake · Half PPR</div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <span class="faces" aria-hidden="true"><span class="face self">JH</span><span class="face rival">RO</span><span class="face">DW</span><span class="face">CP</span><span class="face more">+8</span></span>
+          <span class="cap">You, Rey, Dana, Coach Parker and 8 more are in.</span>
+        </div>
+
+        <p class="say">Week 4, you play Rey. Lineups lock when week 4 starts.</p>
+
+        <!-- SINCE YOU WERE HERE: the latest thing that happened in this room, the actor's face
+             first, linking into the league's stream. -->
+        <p class="since">
+          <span class="faces" aria-hidden="true"><span class="face">RO</span></span>
+          <a href="#"><b>Iron Owls and Harbor Hawks completed a trade.</b> Iron Owls sent Malik Nabers and got Garrett Wilson.</a>
+        </p>
+      </div>
+
+      <div class="rail">
+        <div class="fig">
+          <span class="n num">2-1</span>
+          <span class="basis">your record, after week 3</span>
+        </div>
+        <div class="act"><a class="btn verb" href="#">Set your lineup</a></div>
+      </div>
+    </article>
+
+    <!-- CARD 2: drafting Sunday. A one-time task is still open, so that is its verb, quiet. -->
+    <article class="league" aria-label="Sharks Only Auction">
+      <div>
+        <div class="head">
+          <span class="crest" aria-hidden="true">SA</span>
+          <div>
+            <h2>Sharks Only Auction</h2>
+            <div class="fmt">10 teams · Auction · PPR</div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <span class="faces" aria-hidden="true"><span class="face self">JH</span><span class="face">MK</span><span class="face">AL</span><span class="face">SB</span><span class="face more">+5</span></span>
+          <span class="cap">You, Maya, Alex, Sam and 5 more are in.</span>
+        </div>
+
+        <p class="say">Drafts Sunday. Your draft slots are not ranked yet.</p>
+
+        <div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i></div>
+      </div>
+
+      <div class="rail">
+        <div class="fig">
+          <span class="n num word">In 2 days</span>
+          <span class="basis">Sun, Sep 13, 1:55 pm</span>
+        </div>
+        <div class="act"><a class="btn quiet" href="#">Rank your draft slots</a></div>
+      </div>
+    </article>
+
+    <!-- CARD 3: still filling, nothing owed. A mock draft is the verb, quiet. -->
+    <article class="league" aria-label="Fourth and Long">
+      <div>
+        <div class="head">
+          <span class="crest" aria-hidden="true">FL</span>
+          <div>
+            <h2>Fourth and Long <span class="chip live"><span class="dot" aria-hidden="true"></span>Filling</span></h2>
+            <div class="fmt">12 teams · Snake · Half PPR</div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <span class="faces" aria-hidden="true"><span class="face self">JH</span><span class="face open"></span><span class="face open"></span><span class="face open"></span></span>
+          <span class="cap">You are in. Nobody else yet.</span>
+        </div>
+
+        <p class="say">Filling, 1 of 12. Drafts when full.</p>
+
+        <div class="meter" aria-hidden="true"><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+        <p class="quietrow"><a class="textlink" href="#">Preview the room</a></p>
+      </div>
+
+      <div class="rail">
+        <div class="fig">
+          <span class="n num">11</span>
+          <span class="basis">seats to go, of 12</span>
+        </div>
+        <div class="act"><a class="btn quiet" href="#">Run a mock draft</a></div>
+      </div>
+    </article>
+  </div>
+
+  <section class="lobby" aria-label="Open rooms">
+    <div class="lobby-head">
+      <h2>Open rooms</h2>
+      <a class="btn quiet sm" href="#">Create a league</a>
+    </div>
+    <div class="chapter">Soonest draft first</div>
+
+    <article class="row">
+      <div class="who">
+        <span class="faces" aria-hidden="true"><span class="face open"></span><span class="face open"></span><span class="face open"></span></span>
+        <div><h3>The Rookie Room <span class="chip">newer players only</span></h3><div class="sub">Nobody yet. You would be first in.</div></div>
+      </div>
+      <div class="fmt">12 teams · Snake · Half PPR</div>
+      <div class="when"><b>Drafts when full</b>the moment the last seat is taken</div>
+      <div class="seats">
+        <span class="n num">12</span><span class="basis">seats open, of 12</span>
+        <div class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="act"><a class="btn quiet" href="#">Take a seat</a></div>
+    </article>
+
+    <article class="row">
+      <div class="who">
+        <span class="faces" aria-hidden="true"><span class="face seat"></span><span class="face seat"></span><span class="face more">+3</span></span>
+        <div><h3>First Auction, No Pressure <span class="chip">newer players only</span></h3><div class="sub">5 already in.</div></div>
+      </div>
+      <div class="fmt">10 teams · Auction · PPR</div>
+      <div class="when"><b>In 2 days</b>Sun, Sep 13, 1:55 pm</div>
+      <div class="seats">
+        <span class="n num">5</span><span class="basis">seats left, of 10</span>
+        <div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="act"><a class="btn quiet" href="#">Take a seat</a></div>
+    </article>
+
+    <article class="row">
+      <div class="who">
+        <span class="faces" aria-hidden="true"><span class="face seat"></span><span class="face seat"></span><span class="face more">+1</span></span>
+        <div><h3>Rookie Snake Room <span class="chip">newer players only</span></h3><div class="sub">3 already in.</div></div>
+      </div>
+      <div class="fmt">12 teams · Snake · PPR</div>
+      <div class="when"><b>In 2 days</b>Sun, Sep 13, 1:55 pm</div>
+      <div class="seats">
+        <span class="n num">9</span><span class="basis">seats left, of 12</span>
+        <div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="act"><a class="btn quiet" href="#">Take a seat</a></div>
+    </article>
+
+    <div class="lobby-foot">
+      <span>5 more rooms are open right now</span>
+      <a class="btn quiet sm" href="#">See every open league</a>
+    </div>
+  </section>
+</div>
+</body>
+</html>
