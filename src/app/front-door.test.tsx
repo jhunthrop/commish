@@ -192,13 +192,18 @@ describe("the front door (the 2026-09-02 blueprint: two doors, one page)", () =>
     expect(screen.queryByRole("list", { name: "Recent activity" })).not.toBeInTheDocument();
   });
 
-  it("renders the footer's four trust links", async () => {
+  it("renders the footer's three trust links, and leaves /league-rules to the nav", async () => {
     await renderHome();
-    expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/legal/terms");
-    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/legal/privacy");
-    expect(screen.getByRole("link", { name: "Support" })).toHaveAttribute("href", "/support");
     const footer = screen.getByRole("navigation", { name: "Legal and support" });
-    expect(within(footer).getByRole("link", { name: "How it works" })).toHaveAttribute("href", "/league-rules");
+    expect(within(footer).getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/legal/terms");
+    expect(within(footer).getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/legal/privacy");
+    expect(within(footer).getByRole("link", { name: "Support" })).toHaveAttribute("href", "/support");
+    // Fix round 3: the footer used to repeat the nav's own "How it works" at the same target,
+    // so this page offered `/league-rules` twice under one name. The nav owns it; the footer is
+    // the three legal and support links it is named for. One page, one name, one door.
+    expect(within(footer).queryByRole("link", { name: "How it works" })).toBeNull();
+    const nav = screen.getByRole("navigation", { name: "Commish" });
+    expect(within(nav).getByRole("link", { name: "How it works" })).toHaveAttribute("href", "/league-rules");
   });
 });
 

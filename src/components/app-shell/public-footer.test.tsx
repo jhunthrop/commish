@@ -12,14 +12,28 @@ import { renderSurface } from "@/components/ui/test-utils";
 import { PUBLIC_FOOTER_LINKS, PublicFooter } from "./public-footer";
 
 describe("PublicFooter", () => {
-  it("names Terms, Privacy, Support and League rules, in both themes, axe-clean", async () => {
+  it("names Terms, Privacy and Support, in both themes, axe-clean", async () => {
     await renderSurface(<PublicFooter />, async ({ container, getByRole }) => {
       expect(getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/legal/terms");
       expect(getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/legal/privacy");
       expect(getByRole("link", { name: "Support" })).toHaveAttribute("href", "/support");
-      expect(getByRole("link", { name: "League rules" })).toHaveAttribute("href", "/league-rules");
       expect(await axe(container)).toHaveNoViolations();
     });
+  });
+
+  it("leaves /league-rules to the storefront nav — one page, one name, one door per screen", async () => {
+    // Fix round 3's ruling (`PUBLIC_FOOTER_LINKS`' own docblock). This footer carried a fourth
+    // entry at /league-rules with the SAME words the nav above it uses, so every surface with
+    // both offered one page twice — the collision `reading-frame.test.tsx` caught. The footer
+    // yielded rather than the nav because the alternative, relabelling this entry "League
+    // rules", fixes a duplicate door by inventing a second name for one page, which is the
+    // worse defect: /league-rules' own <h1>, the storefront nav and the signed-in shell footer
+    // all already say "How it works".
+    await renderSurface(<PublicFooter />, ({ queryByRole }) => {
+      expect(queryByRole("link", { name: "How it works" })).toBeNull();
+      expect(queryByRole("link", { name: "League rules" })).toBeNull();
+    });
+    expect(PUBLIC_FOOTER_LINKS.some((link) => link.href === "/league-rules")).toBe(false);
   });
 
   /**
@@ -31,7 +45,7 @@ describe("PublicFooter", () => {
    * of "worth arriving at": every link is a real, well-formed, same-origin path, never a
    * placeholder anchor, an external url, or an empty href. That half still holds below.
    */
-  it("names four real internal destinations — no placeholder, no dead anchor, no external link", () => {
+  it("names three real internal destinations — no placeholder, no dead anchor, no external link", () => {
     renderSurface(<PublicFooter />, ({ getAllByRole }) => {
       const links = getAllByRole("link");
       expect(links).toHaveLength(PUBLIC_FOOTER_LINKS.length);
@@ -45,7 +59,7 @@ describe("PublicFooter", () => {
   });
 
   /**
-   * THE OTHER HALF, now that Task 21 has landed: every page these four links name is a real
+   * THE OTHER HALF, now that Task 21 has landed: every page these links name is a real
    * route module that renders. Resolved the same way `src/integrity/rendered-copy.test.tsx`'s
    * own "the four trust stubs" block already proves each page clean of copy — a dynamic import
    * plus a real render — checked here too so a page moved or deleted breaks THIS component's
@@ -59,7 +73,6 @@ describe("PublicFooter", () => {
       "/legal/terms": () => import("@/app/legal/terms/page"),
       "/legal/privacy": () => import("@/app/legal/privacy/page"),
       "/support": () => import("@/app/support/page"),
-      "/league-rules": () => import("@/app/league-rules/page"),
     };
     expect(Object.keys(PAGE_MODULE_BY_HREF).sort()).toEqual(PUBLIC_FOOTER_LINKS.map((link) => link.href).sort());
 

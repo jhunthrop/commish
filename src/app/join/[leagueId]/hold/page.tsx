@@ -7,7 +7,7 @@ import { seatSentence } from "@/components/ui/seat-meter";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { createSheetDefaults, shellData } from "@/components/app-shell/shell-data";
 import { pageTitle } from "@/components/app-shell/page-metadata";
-import { PublicBar } from "@/components/app-shell/public-bar";
+import { PublicBar, STOREFRONT_NAV } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import { resolveLeagueMembership } from "@/lib/leagues/membership";
 import { publicLeaguePreview } from "@/league-service/browse";
@@ -119,7 +119,12 @@ export default async function SeatHoldPage({ params }: PageProps) {
   if (user === null) {
     return (
       <>
-        <PublicBar intent={pageIntent(leagueId)} signedIn={user !== null} />
+        {/* `STOREFRONT_NAV` (fix round 3): this room rendered a nav-less bar over a footer, so
+            a first-timer deciding whether to sign in for a seat had exactly one door back into
+            the product and it was the wordmark — the same defect `ReadingFrame` records fixing
+            on `/support`, on a screen where "How it works" is the question a stranger most has.
+            The hold survives leaving the page: the server holds the seat, not this render. */}
+        <PublicBar intent={pageIntent(leagueId)} signedIn={user !== null} nav={STOREFRONT_NAV} />
         {/* FULL-BLEED FRAME, MEASURED CONTENT (`docs/design-system.md`, "Layout"): the masthead
             spans the page so the seat count sits at the far edge where a manager's eye lands,
             and only the decision card takes a measure. It was a 400px column centred in a
