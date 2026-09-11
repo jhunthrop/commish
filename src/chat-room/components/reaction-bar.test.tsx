@@ -8,7 +8,7 @@ import { ReactionBar } from "./reaction-bar";
 describe("ReactionBar", () => {
   it("offers every configured reaction, in both themes, axe-clean", async () => {
     await renderSurface(
-      <ReactionBar messageId="1" reactions={[]} meUserId="u1" disabled={false} onReact={() => {}} />,
+      <ReactionBar targetId="1" reactions={[]} meUserId="u1" disabled={false} onReact={() => {}} />,
       async ({ container }) => {
         for (const emoji of CHAT_CONFIG.reactions) {
           expect(screen.getByRole("button", { name: `React with ${emoji}` })).toBeInTheDocument();
@@ -21,7 +21,7 @@ describe("ReactionBar", () => {
   it("shows a count and marks the caller's own reaction as pressed", () => {
     render(
       <ReactionBar
-        messageId="1"
+        targetId="1"
         reactions={[{ emoji: "🔥", userId: "u1" }, { emoji: "🔥", userId: "u2" }]}
         meUserId="u1"
         disabled={false}
@@ -36,7 +36,7 @@ describe("ReactionBar", () => {
   it("quiets unused prompts on hover-capable devices, keeps landed reactions always visible (review E10)", () => {
     render(
       <ReactionBar
-        messageId="1"
+        targetId="1"
         reactions={[{ emoji: "\u{1f525}", userId: "u2" }]}
         meUserId="u1"
         disabled={false}
@@ -58,7 +58,7 @@ describe("ReactionBar", () => {
 
   it("reports which emoji was pressed", () => {
     const onReact = vi.fn();
-    render(<ReactionBar messageId="7" reactions={[]} meUserId="u1" disabled={false} onReact={onReact} />);
+    render(<ReactionBar targetId="7" reactions={[]} meUserId="u1" disabled={false} onReact={onReact} />);
     fireEvent.click(screen.getByRole("button", { name: "React with 👏" }));
     expect(onReact).toHaveBeenCalledWith("7", "👏");
   });

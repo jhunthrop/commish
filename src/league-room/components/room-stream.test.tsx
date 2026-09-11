@@ -1,9 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
+import { CHAT_CONFIG } from "@/chat/config";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { CHAT_PAGE, chatMessage, fixtureChatDeps } from "@/chat-room/test-fixtures";
 import type { ActivityFeedRow } from "@/integrity-service/activity";
+import { LeagueRoomDepsProvider } from "../hooks/deps";
+import { fixtureLeagueDeps } from "../test-fixtures";
 import { RoomStream } from "./room-stream";
 
 const PICK: ActivityFeedRow = {
@@ -26,13 +30,50 @@ const CLOCK_PICK: ActivityFeedRow = {
   actor: null,
 };
 
-function wrap(ui: React.ReactElement, deps = fixtureChatDeps()) {
-  return <ChatRoomDepsProvider deps={deps.deps}>{ui}</ChatRoomDepsProvider>;
+const CLAIM: ActivityFeedRow = {
+  eventId: "evt_3",
+  occurredAt: "2026-08-18T11:40:00.000Z",
+  icon: "users",
+  headline: "Dana Kwon claimed Tank Dell.",
+  detail: null,
+  kind: "claim",
+  actor: { userId: "u3", name: "Dana Kwon", avatar: null },
+};
+
+const TRADE: ActivityFeedRow = {
+  eventId: "evt_4",
+  occurredAt: "2026-08-18T11:45:00.000Z",
+  icon: "users",
+  headline: "Jordan Lee traded Kyren Williams to Dana Kwon.",
+  detail: null,
+  kind: "trade",
+  actor: { userId: "u2", name: "Jordan Lee", avatar: null },
+};
+
+/** A kind nobody reacts to: somebody arriving is not a move with an opinion attached. */
+const JOINED: ActivityFeedRow = {
+  eventId: "evt_5",
+  occurredAt: "2026-08-18T11:50:00.000Z",
+  icon: "users",
+  headline: "Dana Kwon joined the league.",
+  detail: null,
+  kind: "join",
+  actor: { userId: "u3", name: "Dana Kwon", avatar: null },
+};
+
+/** The stream now reads BOTH dependency contexts: chat's for the messages, the league room's for
+ *  the reactions on picks, claims and trades. Both are injected, so no test opens a socket. */
+function wrap(ui: React.ReactElement, deps = fixtureChatDeps(), league = fixtureLeagueDeps()) {
+  return (
+    <LeagueRoomDepsProvider deps={league.deps}>
+      <ChatRoomDepsProvider deps={deps.deps}>{ui}</ChatRoomDepsProvider>
+    </LeagueRoomDepsProvider>
+  );
 }
 
 describe("RoomStream", () => {
   it("is one stream: the league's history and its messages in time order, with faces, then the say-something field", async () => {
-    const { container } = render(wrap(<RoomStream leagueId="l1" activityRows={[CLOCK_PICK, PICK]} sendIsTheAct={false} />));
+    const { container } = render(wrap(<RoomStream leagueId="l1" activityRows={[CLOCK_PICK, PICK]} eventReactions={new Map()} sendIsTheAct={false} />));
     await waitFor(() => expect(screen.getByRole("log", { name: "What happened" })).toBeInTheDocument());
     const events = screen.getAllByTestId("stream-event");
     expect(events[0]).toHaveTextContent("Jordan Lee drafted Josh Allen.");
@@ -51,13 +92,13 @@ describe("RoomStream", () => {
   });
 
   it("makes Send the page's one solid act when nothing else needs the manager", async () => {
-    render(wrap(<RoomStream leagueId="l1" activityRows={[]} sendIsTheAct />));
+    render(wrap(<RoomStream leagueId="l1" activityRows={[]} eventReactions={new Map()} sendIsTheAct />));
     await waitFor(() => expect(screen.getByRole("button", { name: "Send" }).className).toContain("bg-accent"));
   });
 
   it("says once that nothing has happened, and still hands you the field", async () => {
     const deps = fixtureChatDeps({ ...CHAT_PAGE, messages: [] });
-    render(wrap(<RoomStream leagueId="l1" activityRows={[]} sendIsTheAct />, deps));
+    render(wrap(<RoomStream leagueId="l1" activityRows={[]} eventReactions={new Map()} sendIsTheAct />, deps));
     await waitFor(() => expect(screen.getByText("Nothing has happened here yet. Say the first thing.")).toBeInTheDocument());
     expect(screen.queryByRole("log")).toBeNull();
     expect(screen.getByLabelText("Message")).toBeInTheDocument();
@@ -65,7 +106,7 @@ describe("RoomStream", () => {
 
   it("carries reactions on every message and lands a new message from the live wire", async () => {
     const deps = fixtureChatDeps();
-    render(wrap(<RoomStream leagueId="l1" activityRows={[]} sendIsTheAct={false} />, deps));
+    render(wrap(<RoomStream leagueId="l1" activityRows={[]} eventReactions={new Map()} sendIsTheAct={false} />, deps));
     await waitFor(() => expect(screen.getAllByTestId("message-bubble")).toHaveLength(2));
     expect(screen.getAllByRole("button", { name: /React with/ }).length).toBeGreaterThanOrEqual(2);
     act(() => deps.emit("chat.message", { message: chatMessage("3", { body: "leave Cook alone", createdAt: "2026-08-18T12:05:00.000Z" }) }));
@@ -79,9 +120,131 @@ describe("RoomStream", () => {
       ...CHAT_PAGE,
       messages: [chatMessage("1", { createdAt: yesterday.toISOString() }), chatMessage("2", { createdAt: today.toISOString() })],
     });
-    render(wrap(<RoomStream leagueId="l1" activityRows={[]} sendIsTheAct={false} />, deps));
+    render(wrap(<RoomStream leagueId="l1" activityRows={[]} eventReactions={new Map()} sendIsTheAct={false} />, deps));
     await waitFor(() => expect(screen.getByRole("region", { name: "Today" })).toBeInTheDocument());
     expect(screen.getByRole("region", { name: "Yesterday" })).toBeInTheDocument();
+  });
+});
+
+describe("RoomStream carries reactions on what people did (Sideline P5)", () => {
+  it("offers the same five on a pick, a claim and a trade, and on nothing the platform did", async () => {
+    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK, CLAIM, TRADE, CLOCK_PICK, JOINED]} eventReactions={new Map()} sendIsTheAct={false} />));
+    await waitFor(() => expect(screen.getAllByTestId("stream-event")).toHaveLength(5));
+    const pillsOn = (kind: string): number =>
+      screen.getAllByTestId("stream-event").filter((node) => node.getAttribute("data-kind") === kind)[0]!.querySelectorAll("[aria-label^='React with']").length;
+    expect(pillsOn("pick")).toBe(CHAT_CONFIG.reactions.length);
+    expect(pillsOn("claim")).toBe(CHAT_CONFIG.reactions.length);
+    expect(pillsOn("trade")).toBe(CHAT_CONFIG.reactions.length);
+    expect(pillsOn("join")).toBe(0);
+  });
+
+  it("draws the reactions the server already read, and marks the viewer's own", async () => {
+    const held = new Map([["evt_1", [{ emoji: "🔥", userId: "u1" }, { emoji: "🔥", userId: "u2" }]]]);
+    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK]} eventReactions={held} sendIsTheAct={false} />));
+    await waitFor(() => expect(screen.getAllByTestId("stream-event")).toHaveLength(1));
+    const pill = within(screen.getByTestId("stream-event")).getByRole("button", { name: "React with 🔥" });
+    expect(pill).toHaveTextContent("2");
+    expect(pill).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("lands a leaguemate's reaction from the live wire", async () => {
+    const league = fixtureLeagueDeps();
+    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK]} eventReactions={new Map()} sendIsTheAct={false} />, fixtureChatDeps(), league));
+    await waitFor(() => expect(screen.getAllByTestId("stream-event")).toHaveLength(1));
+    act(() => league.emit("stream.reaction", { eventId: "evt_1", emoji: "👏", userId: "u2", action: "added" }));
+    const pill = () => within(screen.getByTestId("stream-event")).getByRole("button", { name: "React with 👏" });
+    await waitFor(() => expect(pill()).toHaveTextContent("1"));
+    expect(pill()).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("answers the tap before the wire does, and posts the toggle", async () => {
+    const league = fixtureLeagueDeps({ ok: true, data: { eventId: "evt_1", action: "added" } });
+    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK]} eventReactions={new Map()} sendIsTheAct={false} />, fixtureChatDeps(), league));
+    await waitFor(() => expect(screen.getAllByTestId("stream-event")).toHaveLength(1));
+    const pill = within(screen.getByTestId("stream-event")).getByRole("button", { name: "React with 🔥" });
+    await userEvent.click(pill);
+    await waitFor(() => expect(pill).toHaveTextContent("1"));
+    expect(pill).toHaveAttribute("aria-pressed", "true");
+    expect(league.calls).toContain("POST /api/leagues/l1/activity/evt_1/reactions");
+  });
+
+  it("puts the pill back when the write refuses", async () => {
+    const league = fixtureLeagueDeps({ ok: false, error: "That is no longer here." });
+    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK]} eventReactions={new Map()} sendIsTheAct={false} />, fixtureChatDeps(), league));
+    await waitFor(() => expect(screen.getAllByTestId("stream-event")).toHaveLength(1));
+    const pill = within(screen.getByTestId("stream-event")).getByRole("button", { name: "React with 🔥" });
+    await userEvent.click(pill);
+    await waitFor(() => expect(pill).toHaveAttribute("aria-pressed", "false"));
+    expect(pill).not.toHaveTextContent("1");
+  });
+
+  it("keeps a leaguemate's reaction that landed while the viewer's own write was out", async () => {
+    const league = fixtureLeagueDeps({ ok: false, error: "no" }, { deferred: true });
+    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK]} eventReactions={new Map()} sendIsTheAct={false} />, fixtureChatDeps(), league));
+    await waitFor(() => expect(screen.getAllByTestId("stream-event")).toHaveLength(1));
+    const pill = within(screen.getByTestId("stream-event")).getByRole("button", { name: "React with 🔥" });
+    await userEvent.click(pill);
+    await waitFor(() => expect(pill).toHaveTextContent("1"));
+    act(() => league.emit("stream.reaction", { eventId: "evt_1", emoji: "🔥", userId: "u2", action: "added" }));
+    await waitFor(() => expect(pill).toHaveTextContent("2"));
+    await act(async () => {
+      await league.settle(0, { ok: false, error: "no" });
+    });
+    // The viewer's own optimistic draw is put back; the leaguemate's survives it.
+    await waitFor(() => expect(pill).toHaveTextContent("1"));
+    expect(pill).toHaveAttribute("aria-pressed", "false");
+  });
+});
+
+describe("RoomStream — the newest tap on a pill wins (M3)", () => {
+  it("drops a response older than the latest request for that pill, so a double tap settles where the server did", async () => {
+    const league = fixtureLeagueDeps({ ok: true, data: { eventId: "evt_1", action: "added" } }, { deferred: true });
+    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK]} eventReactions={new Map()} sendIsTheAct={false} />, fixtureChatDeps(), league));
+    await waitFor(() => expect(screen.getAllByTestId("stream-event")).toHaveLength(1));
+    const pill = within(screen.getByTestId("stream-event")).getByRole("button", { name: "React with 🔥" });
+
+    // Two of the viewer's own toggles in flight: on, then off.
+    await userEvent.click(pill);
+    await waitFor(() => expect(pill).toHaveAttribute("aria-pressed", "true"));
+    await userEvent.click(pill);
+    await waitFor(() => expect(pill).toHaveAttribute("aria-pressed", "false"));
+    expect(league.pending()).toBe(2);
+
+    // The SECOND request's response lands first and is the newest, so it decides: removed.
+    await act(async () => {
+      await league.settle(1, { ok: true, data: { eventId: "evt_1", action: "removed" } });
+    });
+    expect(pill).toHaveAttribute("aria-pressed", "false");
+
+    // The FIRST request's response arrives late saying "added". It is strictly older information
+    // about the same pill, and folding it would leave the pill pressed while the server has
+    // nothing — the exact disagreement this guard exists for.
+    await act(async () => {
+      await league.settle(0, { ok: true, data: { eventId: "evt_1", action: "added" } });
+    });
+    expect(pill).toHaveAttribute("aria-pressed", "false");
+    expect(pill).not.toHaveTextContent("1");
+  });
+
+  it("keeps a tap on one emoji clear of a tap on another, since the generation is per pill", async () => {
+    const league = fixtureLeagueDeps({ ok: true, data: { eventId: "evt_1", action: "added" } }, { deferred: true });
+    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK]} eventReactions={new Map()} sendIsTheAct={false} />, fixtureChatDeps(), league));
+    await waitFor(() => expect(screen.getAllByTestId("stream-event")).toHaveLength(1));
+    const row = within(screen.getByTestId("stream-event"));
+    const fire = row.getByRole("button", { name: "React with 🔥" });
+    const clap = row.getByRole("button", { name: "React with 👏" });
+
+    await userEvent.click(fire);
+    await userEvent.click(clap);
+    // The clap's response lands first; the fire's own is still the newest for ITS pill.
+    await act(async () => {
+      await league.settle(1, { ok: true, data: { eventId: "evt_1", action: "added" } });
+    });
+    await act(async () => {
+      await league.settle(0, { ok: true, data: { eventId: "evt_1", action: "added" } });
+    });
+    expect(fire).toHaveAttribute("aria-pressed", "true");
+    expect(clap).toHaveAttribute("aria-pressed", "true");
   });
 });
 
@@ -89,7 +252,7 @@ describe("RoomStream keeps the landing view (H3)", () => {
   it("never scrolls on first paint, so the rival card above it stays in view", async () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
-    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK, CLOCK_PICK]} sendIsTheAct={false} />));
+    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK, CLOCK_PICK]} eventReactions={new Map()} sendIsTheAct={false} />));
     await waitFor(() => expect(screen.getAllByTestId("message-bubble")).toHaveLength(2));
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
@@ -109,7 +272,7 @@ describe("RoomStream keeps the landing view (H3)", () => {
     globalThis.IntersectionObserver = FakeObserver as unknown as typeof IntersectionObserver;
     try {
       const deps = fixtureChatDeps();
-      render(wrap(<RoomStream leagueId="l1" activityRows={[]} sendIsTheAct={false} />, deps));
+      render(wrap(<RoomStream leagueId="l1" activityRows={[]} eventReactions={new Map()} sendIsTheAct={false} />, deps));
       await waitFor(() => expect(screen.getAllByTestId("message-bubble")).toHaveLength(2));
 
       // Scrolled up to read: a landing message does not yank the view.

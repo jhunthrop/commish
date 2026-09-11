@@ -91,4 +91,21 @@ export const LEAGUE_CONFIG = {
   season: {
     startedAt: "2026-08-01T00:00:00.000Z",
   },
+  /**
+   * The rival card's head-to-head read (`headToHeadRecords`), cached per league and week.
+   *
+   * THE WEEK IS IN THE KEY, not a version in the value, which is the opposite of
+   * `STATS_INGESTION_CONFIG.keys.score` and for the opposite reason: a score is invalidated by a
+   * lineup edit that names no week of its own, while this answer changes only when a WEEK settles,
+   * and settlement already knows exactly which week it settled. So the invalidation is a DEL of a
+   * key the settler can name, and the key rolls forward on its own as the league's week advances.
+   *
+   * The TTL is the backstop for the settle path never running (a correction, a restore), not the
+   * mechanism: an hour of staleness on "you are 4 and 1 against Rey" is a record that was true an
+   * hour ago, which is a different kind of wrong from a live score being an hour old.
+   */
+  headToHead: {
+    cacheKey: (leagueId: string, week: number): string => `h2h:${leagueId}:${week}`,
+    cacheTtlSeconds: 3600,
+  },
 } as const;

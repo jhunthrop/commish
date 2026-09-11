@@ -868,6 +868,32 @@ describe("createIngestionWorker", () => {
     await expect(scoreCache.read("lg_cache", 1, week!.version + 1)).resolves.toBeNull();
   });
 
+  it("drops the rival card's head-to-head answer for exactly the league and week it settled", async () => {
+    await seedPlayers(["p1"]);
+    await seedLeagueShell("lg_h2h", [{ teamId: "h2h1", userId: "uh2h1" }, { teamId: "h2h2", userId: "uh2h2" }], "complete", 2);
+    await addRoster("h2h1", "p1");
+    const script: FakeStatsProviderScript = {
+      games: {
+        1: [{ gameId: "g_h2h", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 250 })] }],
+      },
+    };
+    const dropped: string[] = [];
+    const worker = createIngestionWorker({
+      db,
+      provider: fakeStatsProvider(script),
+      redis,
+      publish: publishRecorder().fn,
+      clock,
+      budget,
+      headToHeadCache: { invalidate: async (leagueId, week) => void dropped.push(`${leagueId}:${week}`) },
+    });
+
+    await worker.tick();
+
+    expect(dropped).toContain("lg_h2h:1");
+    expect(dropped.every((entry) => entry.endsWith(":1"))).toBe(true);
+  });
+
   it("the cross-league home shows the worker's live score for a week Postgres has no score for yet", async () => {
     // The read half of the cache had no producer at all: `crossLeagueHome`'s MGET always missed,
     // so on a live Sunday every league's card fell through to `matchups.home_score`, which is null

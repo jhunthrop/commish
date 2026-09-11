@@ -180,6 +180,17 @@ export const setDraftKickoffSchema = z.object({
   kickoffAt: z.iso.datetime({ message: "That does not look like a valid time." }),
 });
 
+/**
+ * The `[eventId]` path param on the stream reaction route. An audit event id is a
+ * `crypto.randomUUID()` in production (`getAuditLogger`) and a short minted string in the test
+ * lanes, so the rule is a bounded, plain-text charset rather than a UUID pattern: it reaches the
+ * database as a text equality against `audit_events.event_id`, and anything that fails this is a
+ * malformed request the route answers 400 for rather than a lookup that could only ever miss.
+ */
+export const streamEventIdSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{1,64}$/, { message: "That is not something we can react to." });
+
 /** `PUT /api/leagues/[leagueId]/settings`'s body (Task 10) — the one league setting today. */
 export const setDraftGradesVisibleSchema = z.object({
   draftGradesVisible: z.boolean(),

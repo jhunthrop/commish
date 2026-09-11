@@ -53,6 +53,17 @@ process.env.TEST_DATABASE_URL = testDatabaseUrlForLane(process.env.__TEST_DATABA
 // real value from the environment untouched if one is ever exported before the run.
 process.env.SESSION_SIGNAL_SALT ??= "vitest-suite-session-signal-salt-not-for-any-real-use";
 
+// `REDIS_URL`, for the same reason and by the same rule, pointed at the same docker-compose
+// service every Redis-backed test already reaches for by hand
+// (`src/stats-pipeline/score-cache.test.ts` and friends open `process.env.REDIS_URL ??
+// "redis://localhost:6379"` themselves). It is here now because the reaction ceiling
+// (`src/app/api/leagues/_reaction-limit.ts`) FAILS CLOSED: a route that cannot reach the ledger
+// refuses rather than guessing, so an unset `REDIS_URL` would make every reaction test a 503
+// about the test environment rather than about the product. Production always has one — the SSE
+// stream cannot run without it — so the suite having one too is the environment matching the
+// shape the code is written for, not a special case for it.
+process.env.REDIS_URL ??= "redis://localhost:6379";
+
 // vitest-axe@0.1.0's own "vitest-axe/extend-expect" entry point ships an empty
 // dist/extend-expect.js (a broken build published to npm — verified against the
 // registry tarball, not an install artifact of this machine) and its .d.ts targets

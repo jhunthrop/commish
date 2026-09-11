@@ -16,7 +16,7 @@ const noop = () => undefined;
 describe("RoomDrawer", () => {
   it("renders the four chips and no panel while collapsed", () => {
     render(
-      <RoomDrawer leagueId="l1" state={at(null, "chip")} onChipTap={noop} onExpand={noop} onEsc={noop}>
+      <RoomDrawer keysShown={false} leagueId="l1" state={at(null, "chip")} onChipTap={noop} onExpand={noop} onEsc={noop}>
         <p>surface content</p>
       </RoomDrawer>,
     );
@@ -28,7 +28,7 @@ describe("RoomDrawer", () => {
 
   it("marks the open surface's chip expanded and shows the panel at half", () => {
     render(
-      <RoomDrawer leagueId="l1" state={at("standings", "half")} onChipTap={noop} onExpand={noop} onEsc={noop}>
+      <RoomDrawer keysShown={false} leagueId="l1" state={at("standings", "half")} onChipTap={noop} onExpand={noop} onEsc={noop}>
         <p>surface content</p>
       </RoomDrawer>,
     );
@@ -39,7 +39,7 @@ describe("RoomDrawer", () => {
 
   it("offers Back to room at full height, never Full height", () => {
     render(
-      <RoomDrawer leagueId="l1" state={at("players", "full")} onChipTap={noop} onExpand={noop} onEsc={noop}>
+      <RoomDrawer keysShown={false} leagueId="l1" state={at("players", "full")} onChipTap={noop} onExpand={noop} onEsc={noop}>
         <p>surface content</p>
       </RoomDrawer>,
     );
@@ -52,7 +52,7 @@ describe("RoomDrawer", () => {
     const onExpand = vi.fn();
     const onEsc = vi.fn();
     render(
-      <RoomDrawer leagueId="l1" state={at("players", "half")} onChipTap={onChipTap} onExpand={onExpand} onEsc={onEsc}>
+      <RoomDrawer keysShown={false} leagueId="l1" state={at("players", "half")} onChipTap={onChipTap} onExpand={onExpand} onEsc={onEsc}>
         <p>surface content</p>
       </RoomDrawer>,
     );
@@ -66,7 +66,7 @@ describe("RoomDrawer", () => {
 
   it("projects the same surfaces as the phone tab bar, with the room first", () => {
     render(
-      <RoomDrawer leagueId="l1" state={at("players", "full")} onChipTap={noop} onExpand={noop} onEsc={noop}>
+      <RoomDrawer keysShown={false} leagueId="l1" state={at("players", "full")} onChipTap={noop} onExpand={noop} onEsc={noop}>
         <p>surface content</p>
       </RoomDrawer>,
     );
@@ -78,9 +78,43 @@ describe("RoomDrawer", () => {
     expect(links[1]?.getAttribute("aria-current")).toBe("page");
   });
 
+  /**
+   * M5: the chip row used to print "space opens the drawer · / searches players · esc collapses
+   * everything" on every visit. That is an explainer under a control, which P7 does not allow.
+   */
+  it("shows no sentence about the shortcuts, ever", () => {
+    render(
+      <RoomDrawer keysShown leagueId="l1" state={at(null, "chip")} onChipTap={noop} onExpand={noop} onEsc={noop}>
+        <p>surface content</p>
+      </RoomDrawer>,
+    );
+    expect(screen.queryByText(/opens the drawer/)).toBeNull();
+    expect(screen.queryByText(/searches players/)).toBeNull();
+    expect(screen.queryByText(/collapses everything/)).toBeNull();
+  });
+
+  it("keeps the keyboard glyphs off screen until somebody asks for them", () => {
+    const { rerender } = render(
+      <RoomDrawer keysShown={false} leagueId="l1" state={at(null, "chip")} onChipTap={noop} onExpand={noop} onEsc={noop}>
+        <p>surface content</p>
+      </RoomDrawer>,
+    );
+    expect(screen.queryByTestId("keyboard-glyphs")).toBeNull();
+
+    rerender(
+      <RoomDrawer keysShown leagueId="l1" state={at(null, "chip")} onChipTap={noop} onExpand={noop} onEsc={noop}>
+        <p>surface content</p>
+      </RoomDrawer>,
+    );
+    const glyphs = screen.getByTestId("keyboard-glyphs");
+    // Glyphs beside the noun each key reaches — a legend, not a sentence.
+    for (const key of ["space", "/", "esc"]) expect(glyphs).toHaveTextContent(key);
+    for (const reaches of ["Drawer", "Players", "Room"]) expect(glyphs).toHaveTextContent(reaches);
+  });
+
   it("has no axe violations in either theme", async () => {
     await renderSurface(
-      <RoomDrawer leagueId="l1" state={at("players", "half")} onChipTap={noop} onExpand={noop} onEsc={noop}>
+      <RoomDrawer keysShown={false} leagueId="l1" state={at("players", "half")} onChipTap={noop} onExpand={noop} onEsc={noop}>
         <p>surface content</p>
       </RoomDrawer>,
       async ({ container }) => {

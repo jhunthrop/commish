@@ -5,7 +5,6 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { fixtureLabelsByTeam, leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId } from "@/league-service";
 import { AdvisorPanel } from "@/league-room/components/advisor-panel";
 import { LineupEditor } from "@/league-room/components/lineup-editor";
-import { PlayerPeekHost } from "@/league-room/components/player-peek";
 import { PageTitle } from "@/components/ui";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 
@@ -55,7 +54,6 @@ export default async function LeagueTeamPage({ params }: { readonly params: Prom
 
   return (
     <>
-      <PlayerPeekHost />
       <div className="flex items-baseline gap-3">
         <PageTitle>My team</PageTitle>
         <Link href={`/app/leagues/${leagueId}`} className="text-sm text-accent">

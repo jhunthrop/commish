@@ -15,8 +15,17 @@ export const CHAT_CONFIG = {
   maxBodyLength: MAX_BODY_LENGTH,
   /** Messages per history page. Every read is paginated — no unbounded chat query exists. */
   pageSize: 50,
-  /** The complete reaction set. */
+  /** The complete reaction set. The stream's events wear the same five (Sideline P5: "reactions
+   *  attach to all of them"), so there is one set to render and one set to validate. */
   reactions: ["🔥", "😂", "😭", "👏", "🤝"],
+  /**
+   * The ceiling on reaction toggles by ONE authenticated caller, shared by the message route and
+   * the stream-event route — a reaction is one act with one budget, the same argument
+   * `chatReportRateLimit` makes for a report. Generous on purpose: tapping five pills across a
+   * screenful of picks is a person enjoying the room, and the bound exists to stop a script
+   * looping a write endpoint, not to ration the gesture.
+   */
+  reactionRateLimit: { maxRequests: 120, windowMs: 60_000 },
   /**
    * Cap applied when LIVE frames land (`mergeMessages` drops the oldest past this). Pages a
    * user explicitly loads via backward pagination prepend without trimming — scrolling into

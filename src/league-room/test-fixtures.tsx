@@ -189,6 +189,8 @@ export const ROOM_DATA: RoomData = {
   trades: null,
   pendingClaims: [],
   activityRows: [],
+  eventReactions: new Map(),
+  headToHead: new Map(),
   activityNextBefore: null,
   activityNotices: [],
   presentUserIds: [],

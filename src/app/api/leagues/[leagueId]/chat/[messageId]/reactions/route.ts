@@ -4,6 +4,7 @@ import { getDb } from "@/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { getPublisher } from "@/lib/realtime/publisher";
 import { withLeagueMemberActor } from "@/app/api/leagues/_shared";
+import { reactionRateLimited } from "@/app/api/leagues/_reaction-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +27,11 @@ export async function POST(request: Request, context: ChatMessageRouteContext) {
     // body — instead of a driver error surfacing as a generic 500.
     const id = chatMessageIdSchema.safeParse(messageId);
     if (!id.success) return fail(`messageId: ${id.error.issues[0]?.message ?? "That isn't a message id."}`, 400);
+
+    // The SAME per-user budget the stream's own reactions spend from — see
+    // `_reaction-limit.ts`: one act, one ceiling, so neither route is a detour around the other.
+    const limited = await reactionRateLimited(actor.userId);
+    if (limited !== null) return limited;
 
     const parsed = await parseJson(req, reactionSchema);
     if (!parsed.ok) return parsed.response;

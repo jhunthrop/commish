@@ -1,5 +1,6 @@
 import { Avatar, PresenceDot } from "@/components/ui";
 import type { LeagueMemberCard } from "../contract";
+import { firstNameOf } from "../lib/format";
 
 export interface WhoIsHereProps {
   readonly teams: readonly LeagueMemberCard[];
@@ -7,10 +8,6 @@ export interface WhoIsHereProps {
   readonly present: ReadonlySet<string>;
   /** The viewer's own user id, or `null` for a commissioner with no team of their own. */
   readonly meUserId: string | null;
-}
-
-function firstName(name: string): string {
-  return name.trim().split(/\s+/)[0] ?? name;
 }
 
 function sentenceFor(names: readonly string[]): string {
@@ -40,7 +37,7 @@ export function WhoIsHere({ teams, present, meUserId }: WhoIsHereProps) {
       )}
       <p className="flex items-center gap-2 text-sm text-text-muted">
         <PresenceDot />
-        <span>{others.length === 0 ? "Just you right now." : sentenceFor(others.map((team) => firstName(team.ownerDisplayName)))}</span>
+        <span>{others.length === 0 ? "Just you right now." : sentenceFor(others.map((team) => firstNameOf(team.ownerDisplayName)))}</span>
       </p>
     </div>
   );

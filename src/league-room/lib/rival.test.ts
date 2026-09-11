@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { HOME, MATCHUP } from "../test-fixtures";
-import { rivalFacts } from "./rival";
+import { headToHeadLine, rivalFacts } from "./rival";
 
 const teams = HOME.teams;
 
@@ -43,5 +43,28 @@ describe("rivalFacts", () => {
     expect(rivalFacts({ matchup: MATCHUP, myTeamId: null, teams, weekStatus: "scheduled", projectionsByPlayerId: new Map() })).toBeNull();
     const facts = rivalFacts({ matchup: MATCHUP, myTeamId: "t1", teams: [], weekStatus: "final", projectionsByPlayerId: new Map() });
     expect(facts?.theirs.owner).toBeNull();
+  });
+});
+
+describe("headToHeadLine", () => {
+  it("says the record the way a manager says it, with the seasons it covers as its basis", () => {
+    expect(headToHeadLine({ wins: 4, losses: 1, ties: 0, seasons: [2026] }, "Rey Moreno")).toEqual({
+      text: "You are 4 and 1 against Rey",
+      basis: "settled games, 2026 season",
+    });
+  });
+
+  it("says the ties out loud rather than hiding them in the two numbers", () => {
+    expect(headToHeadLine({ wins: 2, losses: 2, ties: 1, seasons: [2026] }, "Dana")?.text).toBe("You are 2 and 2 and 1 against Dana");
+  });
+
+  it("names a span once the history covers more than one season", () => {
+    expect(headToHeadLine({ wins: 9, losses: 3, ties: 0, seasons: [2023, 2024, 2025, 2026] }, "Rey")?.basis).toBe("settled games, 2023 to 2026");
+  });
+
+  it("says nothing at all when the two of you have never settled a game", () => {
+    expect(headToHeadLine(null, "Rey")).toBeNull();
+    expect(headToHeadLine({ wins: 0, losses: 0, ties: 0, seasons: [2026] }, "Rey")).toBeNull();
+    expect(headToHeadLine({ wins: 1, losses: 0, ties: 0, seasons: [] }, "Rey")).toBeNull();
   });
 });

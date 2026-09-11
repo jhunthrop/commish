@@ -1,10 +1,12 @@
 "use client";
 
 import type { PendingWaiverClaim } from "@/league-service/claims-contract";
+import type { HeadToHeadRecord } from "@/league";
 import type { ActivityFeedRow } from "@/integrity-service/activity";
 import type { TradeProposalView } from "@/trades/contract";
 import type { LeagueGradeRow, LeagueHomeBody, LineupBody, MatchupDetail, MatchupWeekBody, TradeRoomContext } from "../contract";
 import type { LineupFixPlan } from "../lib/lineup-problems";
+import type { EventReactionMap } from "../lib/stream-reactions";
 import { GradeBoard } from "./grade-board";
 import { MomentVerb, momentFor } from "./moment-verb";
 import { RivalCard } from "./rival-card";
@@ -24,6 +26,10 @@ export interface RoomFrontProps {
   readonly myMatchupDetail: MatchupDetail | null;
   readonly projectionsByPlayerId: ReadonlyMap<string, number>;
   readonly activityRows: readonly ActivityFeedRow[];
+  /** Every reaction already standing on those rows, as the server read them. */
+  readonly eventReactions: EventReactionMap;
+  /** The viewer's settled history against each opponent, for the rival card's own line. */
+  readonly headToHead: ReadonlyMap<string, HeadToHeadRecord>;
   readonly grades: readonly LeagueGradeRow[];
   readonly gradesBasis: string;
   /** Who has a live connection right now (`usePresence`). */
@@ -55,7 +61,7 @@ export function RoomFront(props: RoomFrontProps) {
   return (
     <div data-testid="room-front" className="flex min-h-0 flex-1 flex-col gap-4 p-4 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:overflow-hidden">
       <div className="flex flex-col gap-4 lg:order-2 lg:min-h-0 lg:overflow-y-auto">
-        <RivalCard home={home} week={week} myMatchupDetail={myMatchupDetail} projectionsByPlayerId={projectionsByPlayerId} regularSeasonWeeks={props.regularSeasonWeeks} />
+        <RivalCard home={home} week={week} myMatchupDetail={myMatchupDetail} projectionsByPlayerId={projectionsByPlayerId} regularSeasonWeeks={props.regularSeasonWeeks} headToHead={props.headToHead} />
         <MomentVerb home={home} plans={plans} inboxTrades={inboxTrades} tradeContext={tradeContext} pendingClaims={pendingClaims} onFixLineup={props.onFixLineup} onViewTrade={props.onViewTrade} />
         <WhoIsHere teams={home.teams} present={present} meUserId={meUserId} />
       </div>
@@ -64,7 +70,7 @@ export function RoomFront(props: RoomFrontProps) {
           <RoomArrivalCard leagueId={home.leagueId} draftId={home.draftId} lineup={lineup} matchup={home.myMatchup} projectedLine={null} />
         ) : null}
         <GradeBoard grades={props.grades} basis={props.gradesBasis} />
-        <RoomStream leagueId={home.leagueId} activityRows={activityRows} sendIsTheAct={sendIsTheAct} />
+        <RoomStream leagueId={home.leagueId} activityRows={activityRows} eventReactions={props.eventReactions} sendIsTheAct={sendIsTheAct} />
       </div>
     </div>
   );

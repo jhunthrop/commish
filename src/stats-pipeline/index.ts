@@ -10,6 +10,7 @@ import { DB_POOL_CONFIG } from "@/db/config";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { getPublisher } from "@/lib/realtime/publisher";
 import { getSharedRedis } from "@/lib/realtime/redis";
+import { getHeadToHeadCache } from "@/league-service/head-to-head-cache-instance";
 import { getScoreCache } from "@/league-service/score-cache-instance";
 import type { StatsProvider } from "@/stats/provider";
 import { createStatsProvider } from "@/stats/registry";
@@ -194,6 +195,10 @@ export function getIngestionWorker(): IngestionWorker {
     // singleton `/api/home` and `/app` read through (`getScoreCache`), so the version the worker
     // stamps a value with and the version a read compares against are two ends of one key.
     scoreCache: getScoreCache(),
+    // The one production invalidator of the rival card's head-to-head answer. Same singleton the
+    // room reads through (`getHeadToHeadCache`), so the key a settled week drops and the key a
+    // front page looks up are two ends of one string.
+    headToHeadCache: getHeadToHeadCache(),
     mode: settings.mode,
     intervalMs: settings.pollIntervalMs,
   });

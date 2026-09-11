@@ -9,7 +9,7 @@ import type { HelpLevel } from "@/identity/preferences";
 import type { FixtureLabel } from "@/league-service/nfl-schedule";
 import type { PendingWaiverClaim } from "@/league-service/claims-contract";
 import type { ActivityFeedRow } from "@/integrity-service/activity";
-import type { LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
+import type { HeadToHeadRecord, LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
 import type { LeagueAuthority } from "@/league-service/authority";
 import type { CompositionCategory } from "@/participation/composition";
 import type { TeamGrade } from "@/draft-service/grades/engine";
@@ -18,6 +18,32 @@ import type { TeamGrade } from "@/draft-service/grades/engine";
  * TYPES ONLY, no runtime code. Imported by the `/api/leagues/**` routes as their return shape
  * and by the client components as their prop shape, so the two cannot drift.
  */
+
+/**
+ * One person's one reaction to something that happened (Sideline P5). Deliberately the same two
+ * fields as `ChatReactionView` (`@/chat/contract`) and for the same reason — identity is the
+ * pair, so there is no counter to drift — which is also what lets the stream hand both kinds of
+ * item to the SAME `summarizeReactions` and the same `ReactionBar`.
+ */
+export interface EventReactionView {
+  readonly emoji: string;
+  readonly userId: string;
+}
+
+/** `stream.reaction` payload. Carries the actor so the client fold is idempotent under replay. */
+export interface EventReactionPayload {
+  readonly eventId: string;
+  readonly emoji: string;
+  readonly userId: string;
+  readonly action: "added" | "removed";
+}
+
+/** What a toggle DID, never the resulting set — see `ReactionBody`'s own docblock for why. */
+export interface EventReactionBody {
+  readonly eventId: string;
+  readonly action: "added" | "removed";
+}
+
 export interface LeagueSummary {
   readonly id: string;
   readonly name: string;
@@ -695,6 +721,22 @@ export interface RoomData {
   /** The league's recent history with each row's actor and kind (`ActivityFeedRow`), the events
    *  half of the front page's one stream. */
   readonly activityRows: readonly ActivityFeedRow[];
+  /**
+   * SIDELINE (P5): every reaction already standing on those rows, keyed by audit event id, as the
+   * server read them. An event nobody has reacted to has NO KEY here rather than an empty array —
+   * absence renders as absence, and the stream's own `?? []` is the one place the empty case is
+   * spelled. `useStreamReactions` seeds itself with this and folds live frames onto it.
+   */
+  readonly eventReactions: ReadonlyMap<string, readonly EventReactionView[]>;
+  /**
+   * SIDELINE (P6): the VIEWER'S OWN settled history against each opponent, keyed by that
+   * opponent's team id, so the rival card can say "You are 4 and 1 against Rey" with the seasons
+   * it covers. Computed from a whole-league read the room shares (`headToHeadRecords`) and
+   * narrowed to this viewer by `recordsForTeam` before it crosses the wire. An opponent you have
+   * never settled a game against has NO KEY here rather than a `0 and 0`: absence renders as
+   * absence, and a zero record would render as data.
+   */
+  readonly headToHead: ReadonlyMap<string, HeadToHeadRecord>;
   /**
    * SIDELINE (P5): the members holding a live connection to this league at render time, as the
    * server itself recorded them (`GET /api/leagues/[leagueId]/presence`, the same read). Ids

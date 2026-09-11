@@ -17,6 +17,7 @@ import { diffStatLines } from "./digest";
 import { finalizeWeek, requireScore, scoreTeamsForWeek } from "./finalize";
 import { persistTick } from "./persist";
 import type { RequestBudget, ReservationDenial } from "./budget";
+import { NOOP_HEAD_TO_HEAD_CACHE, type HeadToHeadInvalidator } from "@/league-service/head-to-head-cache";
 import type { ScoreCache } from "./score-cache";
 
 export interface TickOutcome {
@@ -55,6 +56,12 @@ interface WorkerDeps {
    * the cache had no producer at all and every live read missed.
    */
   readonly scoreCache?: Pick<ScoreCache, "write" | "invalidate">;
+  /**
+   * Where the rival card's head-to-head answer is held (`@/league-service/head-to-head-cache`).
+   * The worker never reads or writes it — settling a week is the only event that can change the
+   * answer, so the settler's whole job here is to drop the key it just invalidated.
+   */
+  readonly headToHeadCache?: HeadToHeadInvalidator;
   /** Defaults to `STATS_INGESTION_CONFIG.mode`. Overridable so a test can drive `live` without
    *  mutating shared config, the same reason the draft ticker takes an injected `Clock`. */
   readonly mode?: IngestionMode;
@@ -266,6 +273,7 @@ export function createIngestionWorker({
   clock,
   budget,
   scoreCache = NOOP_SCORE_CACHE,
+  headToHeadCache = NOOP_HEAD_TO_HEAD_CACHE,
   mode = STATS_INGESTION_CONFIG.mode,
   intervalMs = STATS_INGESTION_CONFIG.pollIntervalMs,
   wedgedWeekTicks = STATS_INGESTION_CONFIG.wedgedWeekTicks,
@@ -429,6 +437,13 @@ export function createIngestionWorker({
     // An undrafted league is refused by finalizeWeek's own guard — not a failure of THIS tick,
     // just a league that has not started its season. Nothing to publish for it.
     if (!result.ok) return false;
+
+    // A SETTLED WEEK CHANGES THE RIVAL CARD'S HEAD-TO-HEAD (Sideline P6): "4 and 1 against Rey" is
+    // counted from exactly the scores this call just wrote. Invalidated HERE rather than inside
+    // `finalizeWeek` for the same reason `scoreCache` is a dependency of this worker: the settler
+    // holds no opinion about which caches exist, and the one place that wires Redis is the one
+    // place that wires Redis. Degrades open on its own (see `createHeadToHeadCache`).
+    await headToHeadCache.invalidate(leagueId, week);
 
     const settled = await db.select().from(matchups).where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, week)));
     // Non-null by construction: finalizeWeek (which just returned ok: true) writes both scores

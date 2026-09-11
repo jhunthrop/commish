@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Avatar, BigNumber, ButtonLink, Card, PlayerObject } from "@/components/ui";
 import type { PlayerSeasonBody } from "@/league-service/player";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { firstNameOf } from "../lib/format";
 
 /**
  * THE PLAYER'S OWN HEADER, DRAWN ONCE FOR BOTH SURFACES (Sideline research round) — the page and
@@ -96,8 +97,7 @@ export function verbFor(body: PlayerSeasonBody, leagueId: string, depth: "peek" 
   const owner = body.owner ?? null;
   if (owner === null) return { label: "Add him", href: `/app/leagues/${leagueId}/players` };
   if (owner.relation === "you") return null;
-  const firstName = owner.managerName.trim().split(/\s+/)[0] ?? owner.managerName;
-  return { label: `Offer ${firstName} a trade`, href: `/app/leagues/${leagueId}/trades` };
+  return { label: `Offer ${firstNameOf(owner.managerName)} a trade`, href: `/app/leagues/${leagueId}/trades` };
 }
 
 /**
