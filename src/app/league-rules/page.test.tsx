@@ -17,13 +17,19 @@ vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn(async () => nu
  * that each piece renders in isolation.
  */
 describe("LeagueRulesPage", () => {
+  // Set equality, not a count: the prose names a term wherever the prose needs it, and
+  // "playoffs" earns two mentions (the season chapter and the standings chapter), which a raw
+  // count read as a defect. What actually has to hold is both directions — every link lands on
+  // an anchor this render carries, and every term in the registry is linked at least once, so no
+  // entry sits below the fold with nothing in the prose pointing at it.
   it("wires every TermLink href to a real id rendered on the same page", async () => {
     const { container } = render(await LeagueRulesPage());
     const hrefs = [...container.querySelectorAll("main a[href^='#term-']")].map((a) => a.getAttribute("href"));
-    expect(hrefs).toHaveLength(LEAGUE_RULES_GLOSSARY_TERMS.length);
     for (const href of hrefs) {
       expect(container.querySelector(href!), `no target for ${href}`).not.toBeNull();
     }
+    const linked = new Set(hrefs.map((href) => href!.replace("#term-", "")));
+    expect([...linked].sort()).toEqual([...LEAGUE_RULES_GLOSSARY_TERMS].sort());
   });
 
   it("drops InfoTip from this page's prose — no click-to-reveal trigger left on it", async () => {
@@ -57,19 +63,32 @@ describe("LeagueRulesPage", () => {
     ).toBeInTheDocument();
   });
 
+  // The bridge used to open "Here is how a season goes." Once the page became chapters
+  // (2026-08-28) that sentence sat directly under a heading saying the same words, which is the
+  // system clearing its throat — the chapter itself is the bridge now. What the test was always
+  // about survives: the season is told before any format vocabulary, and it names no week count
+  // of its own, because `LEAGUE_CONFIG` owns those numbers.
   it("says how a season goes before the format detail, with no hardcoded week count", async () => {
-    render(await LeagueRulesPage());
-    expect(screen.getByText(/Here is how a season goes/)).toBeInTheDocument();
+    const { container } = render(await LeagueRulesPage());
+    const season = container.querySelector("#season");
+    expect(season, "no season chapter").not.toBeNull();
+    expect(screen.getByRole("heading", { name: "How a season goes" })).toBeInTheDocument();
+    expect(season!.compareDocumentPosition(container.querySelector("#drafts")!)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(season!.textContent ?? "").not.toMatch(/\d+\s*(regular season\s*)?weeks?/i);
   });
 
   // B4: ends with a way forward, not a list of absences — the page still states the honest
   // limits (the previous test would fail if that paragraph vanished), it just no longer gets
-  // the last word.
+  // the last word. The way forward names the people drafting rather than the category of page
+  // it opens ("See open leagues", the label this pinned before 2026-08-28).
   it("ends with a way forward rather than the list of what this product cannot do yet", async () => {
-    render(await LeagueRulesPage());
-    expect(
-      screen.getByText(/This product does not yet support a waiver wire/),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "See open leagues" })).toHaveAttribute("href", "/browse");
+    const { container } = render(await LeagueRulesPage());
+    const limits = screen.getByText(/This product does not yet support a waiver wire/);
+    const forward = screen.getByRole("link", { name: "See who is drafting soon" });
+    expect(forward).toHaveAttribute("href", "/browse");
+    expect(limits.compareDocumentPosition(forward)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(container.querySelector("#limits")?.contains(forward)).toBe(true);
   });
 });

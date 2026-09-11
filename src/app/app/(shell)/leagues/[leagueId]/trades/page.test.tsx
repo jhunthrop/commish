@@ -1,22 +1,51 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
-import { fixtureAccountDeps } from "@/account-room/test-fixtures";
-import { NoticesProvider } from "@/components/app-shell/notices-provider";
+import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
+import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
 import { fixtureLeagueDeps } from "@/league-room/test-fixtures";
+import type { TradeProposalView } from "@/trades/contract";
+import { resolveServerTree } from "@/lib/test-support";
 
-// Route-level: every read the page makes is mocked, same discipline `activity/page.test.tsx`
-// established for this app tree — `notFound()` is the real `next/navigation` implementation (a
-// plain synchronous throw with a stable digest), so asserting on it is asserting on the real
-// behavior a browser would see.
+// Route-level: every read the route makes (through `loadRoomData`, the room's one server read)
+// is mocked, same discipline `activity/page.test.tsx` established for this app tree —
+// `notFound()` is the real `next/navigation` implementation (a plain synchronous throw with a
+// stable digest), so asserting on it is asserting on the real behavior a browser would see.
+// Only `usePathname`/`useRouter` are stubbed over the real module, so the browser shell opens
+// the surface this route names while `notFound` stays real.
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  usePathname: () => "/app/leagues/league_1/trades",
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), back: vi.fn() }),
+}));
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
-vi.mock("@/league-service", () => ({ leagueHome: vi.fn(), matchupWeek: vi.fn() }));
+vi.mock("@/identity-service/preferences", () => ({ readPreferences: vi.fn() }));
+vi.mock("@/integrity-service/activity", () => ({ listLeagueActivity: vi.fn() }));
+vi.mock("@/integrity-service/notify", () => ({ listNotices: vi.fn(), quoteFor: vi.fn(() => null) }));
+vi.mock("@/league-service", () => ({
+  leagueHome: vi.fn(),
+  lineupView: vi.fn(),
+  matchupWeek: vi.fn(),
+  weeklyProjectionsByPlayerId: vi.fn(),
+  fixtureLabelsByTeam: vi.fn(),
+  gradesForDraft: vi.fn(),
+}));
+vi.mock("@/league-service/nfl-schedule", () => ({ byeWeeksByTeam: vi.fn() }));
+vi.mock("@/league-service/claims", () => ({ pendingWaiverClaims: vi.fn() }));
+vi.mock("@/league-service/trades", () => ({ listTrades: vi.fn() }));
 vi.mock("@/league-service/reference-cache-instance", () => ({ getReferenceCache: () => ({}) }));
+vi.mock("@/lib/realtime/redis", () => ({ getSharedRedis: () => ({}) }));
+vi.mock("@/lib/realtime/presence", () => ({ createPresenceStore: () => ({ listPresent: async () => [] }) }));
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { leagueHome, matchupWeek } from "@/league-service";
+import { readPreferences } from "@/identity-service/preferences";
+import { listLeagueActivity } from "@/integrity-service/activity";
+import { listNotices } from "@/integrity-service/notify";
+import { leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId, fixtureLabelsByTeam, gradesForDraft } from "@/league-service";
+import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
+import { pendingWaiverClaims } from "@/league-service/claims";
+import { listTrades } from "@/league-service/trades";
 import TradesPage from "./page";
 
 const USER = { id: "u1", email: "u1@test.local", displayName: "Ada Lovelace", experienceTier: "beginner" as const, avatarUrl: null, createdAt: "2026-08-01T00:00:00.000Z", isAdmin: false };
@@ -85,34 +114,66 @@ const WEEK_BODY = {
   ],
 };
 
+/** A trade both managers have already agreed, waiting out the league's objection window — the
+ *  one state whose governance the room states in words. */
+const UNDER_REVIEW: TradeProposalView = {
+  id: "trade-1",
+  leagueId: "league_1",
+  weekNumber: 5,
+  status: "under_review",
+  proposedAt: "2026-09-14T12:00:00.000Z",
+  expiresAt: "2026-09-18T21:00:00.000Z",
+  settledAt: null,
+  reversedAt: null,
+  note: null,
+  from: { teamId: "t2", teamName: "Iron Owls", assets: [{ kind: "player", playerId: "p2" }] },
+  to: { teamId: "t1", teamName: "Bay Bandits", assets: [{ kind: "player", playerId: "p1" }] },
+};
+
+/** The route the way the server runs it: `TradesPage` returns `<RoomPage>`, and `RoomPage` is
+ *  where the membership gate lives, so the tree has to be resolved to the browser boundary
+ *  before anything the route decides has happened. */
 function callPage(leagueId = "league_1") {
-  return TradesPage({ params: Promise.resolve({ leagueId }) });
+  return resolveServerTree(TradesPage({ params: Promise.resolve({ leagueId }) }));
 }
 
-async function renderPage(leagueId?: string) {
-  const accountFixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
-  const leagueFixture = fixtureLeagueDeps({ ok: true, data: { leagueId: "league_1", meTeamId: "t1", inbox: [], outbox: [], history: [] } });
+async function renderPage(leagueId?: string, trades: readonly TradeProposalView[] = []) {
+  const leagueFixture = fixtureLeagueDeps({
+    ok: true,
+    data: { leagueId: "league_1", meTeamId: "t1", inbox: [], outbox: [], history: trades },
+  });
   const page = await callPage(leagueId);
   return render(
-    <AccountRoomDepsProvider deps={accountFixture.deps}>
-      <NoticesProvider>
-        <LeagueRoomDepsProvider deps={leagueFixture.deps}>{page}</LeagueRoomDepsProvider>
-      </NoticesProvider>
-    </AccountRoomDepsProvider>,
+    <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+      <LeagueRoomDepsProvider deps={leagueFixture.deps}>{page}</LeagueRoomDepsProvider>
+    </ChatRoomDepsProvider>,
   );
 }
 
 beforeEach(() => {
   vi.mocked(requireCurrentUser).mockReset().mockResolvedValue(USER);
+  vi.mocked(readPreferences).mockReset().mockResolvedValue({ helpLevel: "standard", draftTourDismissedAt: null });
   vi.mocked(leagueHome).mockReset().mockResolvedValue(HOME);
   vi.mocked(matchupWeek).mockReset().mockResolvedValue(WEEK_BODY);
+  vi.mocked(lineupView).mockReset().mockResolvedValue(null);
+  vi.mocked(weeklyProjectionsByPlayerId).mockReset().mockResolvedValue(new Map());
+  vi.mocked(fixtureLabelsByTeam).mockReset().mockResolvedValue(new Map());
+  vi.mocked(byeWeeksByTeam).mockReset().mockResolvedValue(new Map());
+  vi.mocked(pendingWaiverClaims).mockReset().mockResolvedValue([]);
+  vi.mocked(listTrades).mockReset().mockResolvedValue({ leagueId: "league_1", meTeamId: "t1", inbox: [], outbox: [], history: [] });
+  vi.mocked(gradesForDraft).mockReset().mockResolvedValue({ grades: [], boardGeneration: null });
+  vi.mocked(listLeagueActivity).mockReset().mockResolvedValue({ rows: [], nextBefore: null });
+  vi.mocked(listNotices).mockReset().mockResolvedValue({ notices: [], unreadCount: 0 });
 });
 
 describe("TradesPage", () => {
+  // The surface IS the route (law 2): the trades route opens the trades drawer at full height
+  // over the room, which is what "the trades page rendered" means since the room replaced the
+  // tabs. The league it belongs to is named on the room's own week strip above it.
   it("renders the page title and hands the composer a roster built from the matchup week read", async () => {
     await renderPage();
-    expect(await screen.findByRole("heading", { name: "Trades" })).toBeInTheDocument();
-    expect(screen.getByText("Sunday Money")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Trades drawer")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sunday Money" })).toBeInTheDocument();
   });
 
   // Persona panel (commissioner, step 4): no approval step and no veto window is a real
@@ -121,14 +182,17 @@ describe("TradesPage", () => {
   //
   // D7 (competition review): the OLD sentence ("There's no review step, for anyone.") was false
   // the moment a held trade rendered on this same page — Plan D's own fairness-review carve-out
-  // for lopsided public-league trades contradicted it 400px below, on the same screen. The header
-  // now states the rule INCLUDING its one exception, so it can never disagree with
-  // `HeldTradeBanner` again.
+  // for lopsided public-league trades contradicted it 400px below, on the same screen. The
+  // standing header paragraph that replaced it was itself retired when the room landed: a policy
+  // explainer that outlives the thing it explains is exactly how the contradiction happened.
+  // The rule is now stated ON the trade it governs, at the moment it applies, so a card and a
+  // header can never disagree again — this pins that the surface still says it out loud.
   it("states the trade policy including its one exception, so it never contradicts a held trade on the same page", async () => {
-    await renderPage();
+    await renderPage(undefined, [UNDER_REVIEW]);
     expect(
-      await screen.findByText("Trades complete as soon as both sides agree. Public leagues hold back a lopsided trade for a short fairness review first."),
+      await screen.findByText("Both managers agreed. The league has a day to object before the trade goes through."),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/There's no review step/)).not.toBeInTheDocument();
   });
 
   it("404s a league that doesn't exist", async () => {

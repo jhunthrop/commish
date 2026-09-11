@@ -141,7 +141,7 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     term: "a lineup lock",
     short: "Once a week's first game kicks off, that week's lineup cannot change.",
     detail:
-      "A lineup locks for the whole week the moment its first game kicks off, not player by player. Set your lineup before that kickoff, because you can't swap anyone in or out again until the following week opens.",
+      "A lineup locks for the whole week the moment its first game kicks off, not player by player. Set your lineup before that kickoff, because you cannot swap anyone in or out again until the following week opens.",
   },
   "stake-tier": {
     key: "stake-tier",

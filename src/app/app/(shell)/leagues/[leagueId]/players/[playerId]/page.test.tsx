@@ -276,7 +276,12 @@ describe("PlayerPage — the dossier composition (Task 6)", () => {
     expect(screen.getByLabelText("The read")).toBeInTheDocument();
     expect(screen.getByLabelText("The books")).toBeInTheDocument();
     expect(screen.getByLabelText("2025 season")).toBeInTheDocument();
-    expect(screen.getByLabelText("Story")).toBeInTheDocument();
+    // The story cell, which is the news list today: `StoryModule`'s own season-ending sentence
+    // stays unwired on purpose (ruling R-d1, `dossier-composition`), so the cell renders what it
+    // actually has to say rather than an empty card — the same thing `player-peek.test.tsx`
+    // pins from the other side.
+    expect(screen.getByRole("heading", { name: "News" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Story")).not.toBeInTheDocument();
     expect(screen.getByText("Why")).toBeInTheDocument();
   });
 
