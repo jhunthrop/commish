@@ -81,7 +81,7 @@ describe("HoldsControl", () => {
     renderInAdmin(<HoldsControl />, fixture.deps);
 
     const primaryButtonCount = (): number =>
-      screen.getAllByRole("button").filter((button) => !(button as HTMLButtonElement).disabled && button.className.includes("bg-text-primary")).length;
+      screen.getAllByRole("button").filter((button) => !(button as HTMLButtonElement).disabled && button.className.includes("bg-accent")).length;
 
     // Before any dialog: "Release hold" is the page's own primary trigger.
     expect(primaryButtonCount()).toBe(1);
@@ -94,8 +94,8 @@ describe("HoldsControl", () => {
     // hold" trigger has stepped down to secondary — exactly one primary button remains: the
     // modal's own.
     expect(primaryButtonCount()).toBe(1);
-    expect(within(dialog).getByRole("button", { name: "Release Alice's hold" }).className).toContain("bg-text-primary");
-    expect(screen.getByRole("button", { name: "Release hold" }).className).not.toContain("bg-text-primary");
+    expect(within(dialog).getByRole("button", { name: "Release Alice's hold" }).className).toContain("bg-accent");
+    expect(screen.getByRole("button", { name: "Release hold" }).className).not.toContain("bg-accent");
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     // Closed: the trigger returns to its ordinary ink.
@@ -112,9 +112,9 @@ describe("HoldsControl", () => {
 
     const primaryButtons = screen
       .getAllByRole("button")
-      .filter((button) => !(button as HTMLButtonElement).disabled && button.className.includes("bg-text-primary"));
+      .filter((button) => !(button as HTMLButtonElement).disabled && button.className.includes("bg-accent"));
     expect(primaryButtons).toHaveLength(0);
-    expect(screen.getByRole("button", { name: "Release hold" }).className).not.toContain("bg-text-primary");
+    expect(screen.getByRole("button", { name: "Release hold" }).className).not.toContain("bg-accent");
   });
 
   it("refuses before opening a dialog when nothing is held", async () => {

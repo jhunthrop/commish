@@ -96,11 +96,11 @@ describe("LeagueRows", () => {
     expect(second.className).not.toContain("bg-accent");
   });
 
-  it("gives a live row the red channel's outline verb, never a fill, with the copy's own words", () => {
+  it("gives a live row the live green outline verb, never a fill, with the copy's own words", () => {
     render(<LeagueRows leagues={MIXED} />);
     const watch = screen.getByRole("link", { name: "Watch the scores for Monday Maulers" });
-    expect(watch.className).toContain("border-negative");
-    expect(watch.className).toContain("text-negative");
+    expect(watch.className).toContain("border-live");
+    expect(watch.className).toContain("text-live");
     expect(watch.className).not.toContain("bg-negative");
   });
 

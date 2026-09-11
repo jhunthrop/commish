@@ -143,7 +143,7 @@ describe("HeldTradeDetail", () => {
     renderInAdmin(<HeldTradeDetail flagId="flag_1" subject={SUBJECT} trail={[]} decisions={BOTH_DECISIONS} noteMaxLength={500} />, fixture.deps);
 
     const primaryButtonCount = (): number =>
-      screen.getAllByRole("button").filter((button) => !(button as HTMLButtonElement).disabled && button.className.includes("bg-text-primary")).length;
+      screen.getAllByRole("button").filter((button) => !(button as HTMLButtonElement).disabled && button.className.includes("bg-accent")).length;
 
     // Before any dialog: "Release the trade" is the page's own primary trigger.
     expect(primaryButtonCount()).toBe(1);
@@ -168,7 +168,7 @@ describe("HeldTradeDetail", () => {
 
     const primaryButtons = screen
       .getAllByRole("button")
-      .filter((button) => !(button as HTMLButtonElement).disabled && button.className.includes("bg-text-primary"));
+      .filter((button) => !(button as HTMLButtonElement).disabled && button.className.includes("bg-accent"));
     expect(primaryButtons).toHaveLength(0);
   });
 

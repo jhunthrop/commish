@@ -25,12 +25,32 @@ describe("PlayerRow", () => {
     });
   });
 
-  it("renders the meta line as mono, quiet, small — it is data, not prose", () => {
+  it("renders the name largest, in the display face at 700, and the meta line small and quiet under it (P1)", () => {
     render(<PlayerRow player={CROFT} meta="IND · Bye 13 · RB4" />);
+    const name = screen.getByText("Jalen Croft");
+    expect(name.className).toContain("font-display");
+    expect(name.className).toContain("text-lg");
+    expect(name.className).toContain("font-bold");
     const line = screen.getByText("IND · Bye 13 · RB4").parentElement!;
-    expect(line.className).toContain("font-mono");
     expect(line.className).toContain("text-text-muted");
-    expect(line.className).toContain("text-xs");
+    expect(line.className).toContain("text-sm");
+  });
+
+  it("is a 48px row on a 12px plate: Sideline's density, spelled once in the shell", () => {
+    const { container } = render(<PlayerRow player={CROFT} />);
+    expect(container.firstElementChild!.className).toContain("min-h-12");
+    expect(container.firstElementChild!.className).toContain("rounded-md");
+    expect(container.firstElementChild!.className).not.toContain("border");
+  });
+
+  it("carries the one number at its right, before the control (P2)", () => {
+    const { container } = render(<PlayerRow player={CROFT} figure={<span>20.2</span>} action={<Button variant="verb">Draft</Button>} />);
+    const children = Array.from(container.firstElementChild!.children);
+    const figureIndex = children.findIndex((child) => child.textContent === "20.2");
+    const actionIndex = children.findIndex((child) => child.textContent === "Draft");
+    expect(figureIndex).toBe(2);
+    expect(actionIndex).toBe(3);
+    expect(children[figureIndex]!.className).toContain("shrink-0");
   });
 
   /**
@@ -85,25 +105,23 @@ describe("PlayerRow", () => {
    * and the border is `accent` rather than `line`. Both halves are asserted because the wash alone
    * is a soft signal and the border alone is a hard one; the row wants the pair.
    */
-  it("gives the top-of-board row an accent border and a wash, spelled as a whole skin", async () => {
+  it("gives the highlighted row the amber wash (yours, never the verb's blue), spelled as a whole skin, with no border", async () => {
     await renderSurface(<PlayerRow player={CROFT} meta="IND · Bye 13" highlight />, async ({ container }) => {
       const row = container.firstElementChild!;
       expect(row).toHaveAttribute("data-highlight", "true");
-      expect(row.className).toContain("border-accent");
-      expect(row.className).toContain("accent-wash");
-      // The whole skin is chosen by name, so the two border colours never race each other in the
-      // stylesheet the way a base-plus-override would.
-      expect(row.className).not.toContain("border-line");
+      expect(row.className).toContain("self-wash");
+      expect(row.className).not.toContain("accent-wash");
+      expect(row.className).not.toContain("border");
       expect(await axe(container)).toHaveNoViolations();
     });
   });
 
-  it("is a quiet row by default — no wash, no accent, no marker attribute to leak into a selector", () => {
+  it("is a quiet row by default, with a chalk hover plate and no marker attribute to leak into a selector", () => {
     const { container } = render(<PlayerRow player={CROFT} meta="IND · Bye 13" />);
     const row = container.firstElementChild!;
     expect(row).not.toHaveAttribute("data-highlight");
-    expect(row.className).toContain("border-line");
-    expect(row.className).not.toContain("accent-wash");
+    expect(row.className).toContain("hover:bg-surface");
+    expect(row.className).not.toContain("self-wash");
   });
 
   /**
@@ -138,6 +156,6 @@ describe("PlayerRow", () => {
   it("lets the call site place the row without touching its skin", () => {
     const { container } = render(<PlayerRow player={CROFT} className="mb-1" />);
     expect(container.firstElementChild!.className).toContain("mb-1");
-    expect(container.firstElementChild!.className).toContain("bg-surface-elevated");
+    expect(container.firstElementChild!.className).toContain("rounded-md");
   });
 });

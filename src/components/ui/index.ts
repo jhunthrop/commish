@@ -71,6 +71,20 @@ export { PointsShareBar } from "./points-share-bar";
 export { GameStateChip, pointsForGameState, NOT_STARTED_DASH, type GameState } from "./game-state-chip";
 export { EventFeedRow, signedPoints } from "./event-feed-row";
 export { Pill } from "./pill";
+/** SIDELINE (2026-09-10): the primitives the league front page is built from, and the vocabulary
+ *  every later round migrates onto. `Manager` is the only way a manager's face renders (beside a
+ *  name always), `BigNumber` the only big figure (with its basis), `MessageBubble`/`ReactionPill`
+ *  the stream's voice, `PresenceDot`/`LiveChip` the live channel. */
+export { Manager } from "./manager";
+export type { ManagerProps } from "./manager";
+export { BigNumber } from "./big-number";
+export type { BigNumberProps, BigNumberSize } from "./big-number";
+export { MessageBubble } from "./message-bubble";
+export type { MessageBubbleProps } from "./message-bubble";
+export { ReactionPill } from "./reaction-pill";
+export type { ReactionPillProps } from "./reaction-pill";
+export { PresenceDot } from "./presence-dot";
+export { LiveChip } from "./live-chip";
 /** The law-backed explanation chip (Task 8): one `BoardReason` rendered as structured copy, plus
  *  the pure ranking helper (`strongestLawReasons`) a compact row uses to pick its top two. */
 export { ReasonChip, strongestLawReasons, type LawReason } from "./reason-chip";

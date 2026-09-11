@@ -121,7 +121,7 @@ describe("Card", () => {
       </Card>,
       ({ container }) => {
         const card = container.querySelector("[aria-label='Pool row']")!;
-        expect(card.className).toMatch(/(^|\s)px-2(\s|$)/);
+        expect(card.className).toMatch(/(^|\s)px-2\.5(\s|$)/);
         expect(card.className).not.toMatch(/(^|\s)p-4(\s|$)/);
       },
     );

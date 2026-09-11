@@ -31,15 +31,27 @@ describe("Button", () => {
     expect(getByRole("button").className).toMatch(/negative/);
   });
 
-  // v3 rule 5 (Task 4): the primary is the INK PILL — ink fill, ground text, pill radius —
-  // and green is never a button fill again.
-  it("primary is the ink pill: bg-text-primary text-surface, pill radius, no accent fill", () => {
+  // SIDELINE (P3): one solid button, the Court blue pill. `primary` and `verb` are the same pill;
+  // the ink pill is retired.
+  it("primary is the Court blue pill: bg-accent text-accent-text, pill radius, the glow, no ink fill", () => {
     const { getByRole } = render(<Button>Take a seat</Button>);
     const className = getByRole("button").className;
     expect(className).toContain("rounded-pill");
-    expect(className).toContain("bg-text-primary");
-    expect(className).toContain("text-surface");
-    expect(className).not.toContain("bg-accent");
+    expect(className).toContain("bg-accent");
+    expect(className).toContain("text-accent-text");
+    expect(className).toContain("shadow-verb-glow");
+    expect(className).not.toContain("bg-text-primary");
+  });
+
+  it("verb and primary are one pill, so a viewport can never carry two weights of act", () => {
+    const { getAllByRole } = render(
+      <>
+        <Button>Confirm</Button>
+        <Button variant="verb">Draft</Button>
+      </>,
+    );
+    const [primary, verb] = getAllByRole("button");
+    expect(verb!.className).toBe(primary!.className);
   });
 
   it("secondary is the quiet pill: transparent, edge-bordered (a control boundary clears 3:1), pill radius", () => {
@@ -53,12 +65,21 @@ describe("Button", () => {
 
   // V6 (the warmth pass): the verb keeps its solid amber — still the one solid per surface —
   // and gains the soft glow token, the mocks' halo under DRAFT, riding each theme's own accent.
-  it("verb is the glowing solid: accent fill, verb radius, the shadow-verb-glow token", () => {
+  it("verb is the glowing solid pill: Court blue fill, pill radius, the shadow-verb-glow token", () => {
     const { getByRole } = render(<Button variant="verb">Draft</Button>);
     const className = getByRole("button").className;
     expect(className).toContain("bg-accent");
-    expect(className).toContain("rounded-md");
+    expect(className).toContain("rounded-pill");
     expect(className).toContain("shadow-verb-glow");
+  });
+
+  it("live is a quiet outline in the live green, a doorway and not the page's act", () => {
+    const { getByRole } = render(<Button variant="live">Watch live</Button>);
+    const className = getByRole("button").className;
+    expect(className).toContain("border-live");
+    expect(className).toContain("text-live");
+    expect(className).toContain("bg-transparent");
+    expect(className).not.toContain("negative");
   });
 
   it("destructive keeps its negative fill and joins the pill; ghost keeps rounded-md and no pill", () => {

@@ -44,7 +44,7 @@ describe("PickCelebration", () => {
     const panel = screen.getByTestId("pick-celebration");
     expect(panel).toHaveTextContent("You drafted Marcus Reed!");
     expect(panel).toHaveAttribute("data-emphasis", "self");
-    expect(panel.className).toMatch(/border-accent/);
+    expect(panel.className).toMatch(/self-wash/);
   });
 
   // The shared `Celebration` primitive carries the self/peer distinction itself now — one
@@ -52,16 +52,16 @@ describe("PickCelebration", () => {
   it("uses the peer animation for someone else's pick and the self animation for your own", () => {
     stubMatchMedia(false);
     const { rerender } = render(<PickCelebration lastPick={{ pick, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
-    expect(screen.getByTestId("pick-celebration").className).toMatch(/animate-celebrate-peer/);
+    expect(screen.getByTestId("pick-celebration").className).toMatch(/animate-spring-in/);
     rerender(<PickCelebration lastPick={{ pick: { ...pick, pickNumber: 5 }, isMine: true }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
-    expect(screen.getByTestId("pick-celebration").className).toMatch(/animate-celebrate-self/);
+    expect(screen.getByTestId("pick-celebration").className).toMatch(/animate-slap-in/);
   });
 
   it("drops every animation class when the user prefers reduced motion — but still shows the pick", () => {
     stubMatchMedia(true);
     render(<PickCelebration lastPick={{ pick, isMine: true }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
     const panel = screen.getByTestId("pick-celebration");
-    expect(panel.className).not.toMatch(/animate-celebrate/);
+    expect(panel.className).not.toMatch(/animate-/);
     expect(panel).toHaveTextContent("You drafted Marcus Reed!");
   });
 

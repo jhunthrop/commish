@@ -106,9 +106,13 @@ describe("nothing outside the acronym allowlist forces text to uppercase", () =>
     const config = readFileSync(join(REPO_ROOT, "src/components/ui/config.ts"), "utf8");
     expect(config).toContain("export const MICRO_LABEL");
     expect(config).toContain(BANNED);
-    // Mono is half the carve-out's justification — capitals are legible at 11px in a mono face
-    // and muddy in the display face, which is why the exception is narrow to micro-labels.
-    expect(MICRO_LABEL).toContain("font-mono");
+    // SIDELINE (2026-09-10): the carve-out is narrow on SIZE and WEIGHT rather than on the face.
+    // The mock's one all-caps treatment is a 12px chapter label in the body face at 600; capitals
+    // stay legible there and can never become a heading while this pins `text-xs`. Through v5 the
+    // guard asked for `font-mono`, the timing tower's own register, which Sideline retires.
+    expect(MICRO_LABEL).toContain("text-xs");
+    expect(MICRO_LABEL).toContain("font-semibold");
+    expect(MICRO_LABEL).not.toContain("font-display");
     expect(MICRO_LABEL).toContain(BANNED);
   });
 });

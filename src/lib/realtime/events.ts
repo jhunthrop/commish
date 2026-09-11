@@ -35,6 +35,17 @@ export const REALTIME_EVENT_TYPES = [
    * from an authenticated read of `GET /api/notices`. See `src/integrity-service/notify.ts`.
    */
   "notice.created",
+  /**
+   * SIDELINE (P5, the room is a place): a member's live connection to this league opened or
+   * closed. Payload `{ userIds }`, the whole present room, so a reader folds it without a read
+   * (H2). Presence is DERIVED from the SSE connections the server already holds
+   * (`src/lib/realtime/presence.ts`), never from anything a client claims, and the frame carries
+   * ids only: names and faces come from the room's own membership read, and the initial list
+   * from `GET /api/leagues/[leagueId]/presence`, the same membership-gated read every league
+   * route shares. Published to the league stream: who is in the room is a fact the whole room
+   * may see.
+   */
+  "presence.changed",
 ] as const;
 
 export type RealtimeEventType = (typeof REALTIME_EVENT_TYPES)[number];

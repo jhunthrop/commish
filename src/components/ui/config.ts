@@ -214,7 +214,11 @@ export const UI_CONFIG = {
  * color utility rather than a component absorbing a `className` prop for the one thing it
  * varies by.
  */
-export const EYEBROW = "font-mono text-xs tracking-wide";
+// SIDELINE (2026-09-10): the label register moves from mono to the body face. No weight step
+// here on purpose: `Stat` prints its label in this register and a weight step is magnitude's
+// own channel (`stat.test.ts` pins that an uncompared number carries none). Small, quiet,
+// sentence case.
+export const EYEBROW = "font-sans text-xs tracking-[0.04em]";
 
 /**
  * THE MICRO-LABEL — the product's one sanctioned all-caps register, and the ONLY place law 2's
@@ -237,10 +241,11 @@ export const EYEBROW = "font-mono text-xs tracking-wide";
  * micro-label is a shouted key beside data. Both are mono and small; only one is capitals, and
  * collapsing them would put capitals back on the prose labels the charter cleared.
  */
-// V6 (the warmth pass, 2026-09-03): the register survives — a scoreboard still shouts Q3
-// quietly — but the tracking softens from 0.11em to the mocks' own 0.5px-at-micro-size
-// (~0.06em). Mono, xs and the capitals stay; the charter's guard assertions still hold.
-export const MICRO_LABEL = "font-mono text-xs uppercase tracking-[0.06em]";
+// SIDELINE (2026-09-10): the one all-caps register is the mock's chapter label, 12px in the BODY
+// face at 600 with 0.06em tracking, not mono. The carve-out narrows on size and weight instead
+// of on the face: `no-uppercase.source.test.ts` asserts `text-xs` and `font-semibold` here, so
+// capitals can never grow into a heading. Still exactly one address; still banned everywhere else.
+export const MICRO_LABEL = "font-sans text-xs font-semibold uppercase tracking-[0.06em]";
 
 /**
  * THE RAIL REGISTER — the caps charter's second sanctioned address (Sunday v5, 2026-08-28).

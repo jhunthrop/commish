@@ -47,7 +47,11 @@ const SWEPT_DIRS = ["src/components", "src/league-room", "src/draft-room", "src/
 const ACCENT_FILL_ALLOWLIST: readonly string[] = [
   "src/components/ui/meter.tsx",
   "src/components/ui/seat-meter.tsx",
-  "src/components/ui/celebration.tsx",
+  // SIDELINE (2026-09-10): `celebration.tsx` left this list. Your own moment now wears the amber
+  // wash (`self-wash`, the "yours" channel), never the verb's blue. `message-bubble.tsx` joins
+  // it: YOUR message is the Court blue bubble (Sideline: "Court blue: the one verb, links, your
+  // messages"), a fill that means "you said this", drawn in exactly one file.
+  "src/components/ui/message-bubble.tsx",
   "src/components/ui/avatar.tsx",
   "src/components/ui/button.tsx",
   "src/draft-room/components/budget-table.tsx",
@@ -99,8 +103,10 @@ const ACCENT_FILL_ALLOWLIST: readonly string[] = [
  * home, not a violation.
  */
 const INK_PILL_ALLOWLIST: readonly string[] = [
-  "src/components/ui/button.tsx",
-  "src/components/ui/button-link.tsx",
+  // SIDELINE (2026-09-10): the ink pill is RETIRED. There is one solid button in the product and
+  // it is Court blue, so `button.tsx` and `button-link.tsx` left this list and the guard below
+  // now asserts the class map does NOT spell the fill. The ban itself stays: a hand-rolled black
+  // pill is exactly the second loud button P3 forbids.
   // THE SEASON CHART'S LOUDEST BAR (2026-08-28), earning its entry the way this file's own
   // docblock asks — in review, with a reason.
   //
@@ -158,13 +164,13 @@ describe("nothing outside the sanctioned primitives spends the accent budget", (
     }
   });
 
-  it("keeps the ink-pill allowlist honest: both primitives exist, and the class map's home spells the fill", () => {
+  it("keeps the ink-pill allowlist honest: every exempted file exists and still spells the fill, and the button map no longer does", () => {
     for (const file of INK_PILL_ALLOWLIST) {
       expect(files).toContain(file);
+      expect(stripCommentsPreservingLines(readFileSync(join(REPO_ROOT, file), "utf8"))).toContain(INK_FILL);
     }
-    // Only `button.tsx` must carry the literal — it owns the one class map `button-link.tsx`
-    // imports (one source of truth, two elements).
-    expect(stripCommentsPreservingLines(readFileSync(join(REPO_ROOT, "src/components/ui/button.tsx"), "utf8"))).toContain(INK_FILL);
+    // SIDELINE: the one class map spells no ink pill. The solid is Court blue, once.
+    expect(stripCommentsPreservingLines(readFileSync(join(REPO_ROOT, "src/components/ui/button.tsx"), "utf8"))).not.toContain(INK_FILL);
   });
 
   it.each(accentSweptFiles)("%s spends no accent fill", (file) => {

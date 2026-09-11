@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui";
+import { Badge, LiveChip } from "@/components/ui";
 import type { LeagueHomeBody } from "../contract";
 import { formatRecord, formatWeek, ordinal } from "../lib/format";
 
@@ -25,9 +25,7 @@ export function RoomWeekStrip({ home, attentionCount, gamesLive }: RoomWeekStrip
       <h1 className="font-display text-lg font-semibold tracking-tight text-text-primary">{home.name}</h1>
       <Badge tone="neutral">{formatWeek(home.currentWeek)}</Badge>
       {live ? (
-        <Badge tone="warning" glow>
-          {gamesLive === null || gamesLive === 0 ? "Live" : `Live · ${gamesLive} ${gamesLive === 1 ? "game" : "games"}`}
-        </Badge>
+        <LiveChip>{gamesLive === null || gamesLive === 0 ? "Live" : `Live · ${gamesLive} ${gamesLive === 1 ? "game" : "games"}`}</LiveChip>
       ) : (
         <span className="hidden text-xs text-text-faint sm:inline">Lineups lock at each kickoff</span>
       )}
@@ -38,7 +36,7 @@ export function RoomWeekStrip({ home, attentionCount, gamesLive }: RoomWeekStrip
           </span>
         ) : null}
         {attentionCount > 0 && !live ? (
-          <Badge tone="accent" glow>
+          <Badge tone="self" glow>
             {attentionCount === 1 ? "1 thing needs you" : `${attentionCount} things need you`}
           </Badge>
         ) : null}

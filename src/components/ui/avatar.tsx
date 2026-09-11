@@ -4,7 +4,16 @@ import { useEffect, useState } from "react";
 import { parseAvatarRef, type AvatarTone } from "@/identity/avatars";
 import { Icon } from "./icon";
 
-export type AvatarSize = "sm" | "md" | "lg" | "xl";
+/**
+ * SIDELINE'S FACE STEPS. `sm` (28) rides a message bubble, `md` (32) a row or a nav, `lg` (40) a
+ * stack of faces on a card, `xl` (52) sits inside a 56px headshot ring, and `2xl` (128) inside
+ * the 132px ring on a player's own page. `PlayerFace` pairs each ring with one of these; nothing
+ * else reaches for the two largest.
+ */
+export type AvatarSize = "sm" | "md" | "lg" | "xl" | "2xl";
+
+/** Which of Sideline's rings the face wears: amber for you, rose for your opponent this week. */
+export type AvatarRing = "self" | "rival";
 
 export interface AvatarProps {
   /** The person's display name — the source of the initials fallback. */
@@ -14,46 +23,45 @@ export interface AvatarProps {
   readonly size?: AvatarSize;
   /** Provide to make the avatar an accessible image; omit to leave it decorative. */
   readonly label?: string;
+  /** A 2px ring in your colour or your rival's. A club ring is `PlayerFace`'s job, not this one. */
+  readonly ring?: AvatarRing;
   readonly className?: string;
 }
 
-/**
- * `xl` is the ONE step that is not a list row: it is a person's own header, where the face is the
- * subject of the screen rather than a marker beside a name. Nothing else may reach for it — a
- * 96px tile inside a row is how a dense board turns back into a directory of cards.
- */
 const SIZE: Readonly<Record<AvatarSize, string>> = {
-  sm: "size-6 text-xs",
-  md: "size-8 text-sm",
-  lg: "size-12 text-lg",
-  xl: "size-24 text-3xl",
+  sm: "size-7 text-xs",
+  md: "size-8 text-xs",
+  lg: "size-10 text-sm",
+  xl: "size-13 text-lg",
+  "2xl": "size-32 text-3xl",
 };
 
 const ICON_SIZE: Readonly<Record<AvatarSize, number>> = {
   sm: 14,
-  md: 18,
-  lg: 26,
-  xl: 48,
+  md: 16,
+  lg: 20,
+  xl: 26,
+  "2xl": 56,
+};
+
+const RING: Readonly<Record<AvatarRing, string>> = {
+  self: "ring-2 ring-self",
+  rival: "ring-2 ring-negative",
 };
 
 /**
  * Preset tiles reuse the existing token roles rather than inventing a fill for each tone: only
- * `accent` and `negative` have a dedicated `-text` role for a solid fill (see
- * docs/design-system.md, "Semantic-on-fill"), so those two get one; `positive`/`warning`/`info`/
- * `neutral` render their icon in the tone's own text color on the same neutral surface the
- * initials fallback already uses — the same choice `Badge` makes for the tones it does not fill.
- *
- * Exported because `Crest` (`./crest`) fills its own tile from this SAME map — a league's crest
- * and its members' avatars share one palette (Phase 3.6, Task 3, Step 4), which means one map,
- * not two copies that could drift.
+ * `accent` and `negative` have a dedicated `-text` role for a solid fill, so those two get one;
+ * the rest render their icon in the tone's own text color on the chalk ground the initials
+ * fallback already uses. Exported because `Crest` fills its own tile from this SAME map.
  */
 export const AVATAR_TONE_CLASS: Readonly<Record<AvatarTone, string>> = {
   accent: "bg-accent text-accent-text",
   negative: "bg-negative text-negative-text",
-  positive: "bg-surface-elevated text-positive",
-  warning: "bg-surface-elevated text-warning",
-  info: "bg-surface-elevated text-info",
-  neutral: "bg-surface-elevated text-text-muted",
+  positive: "bg-surface text-positive",
+  warning: "bg-surface text-warning",
+  info: "bg-surface text-info",
+  neutral: "bg-surface text-text-muted",
 };
 
 /** First letter of the first and last words, upper-cased. "Ada Byron Lovelace" → "AL". */
@@ -66,17 +74,14 @@ export function initialsFor(name: string): string {
 }
 
 /**
- * Decorative by default — an avatar almost always sits beside the same person's name, and
- * announcing it twice is noise. Pass `label` when the avatar stands alone.
+ * A person's face in a circle: their photo, their chosen preset, or their initials in the display
+ * face on chalk. Decorative by default (it almost always sits beside the same person's name, and
+ * `Manager` guarantees that); pass `label` when it stands alone.
  *
- * A REMOTE IMAGE THAT FAILS TO LOAD FALLS BACK TO THE INITIALS (site search fix round,
- * 2026-09-08). An `<img>` that errors renders nothing, so a headshot the CDN no longer serves left
- * a blank ring where a face or two letters should be. The failure flips one piece of state to the
- * initials branch, keyed on the url so a new ref gets its own chance. That one state is why this is
- * a `"use client"` component now; the server components that render it (the top bar, a roster
- * row) still may.
+ * A remote image that fails to load falls back to the initials, keyed on the url so a new ref
+ * gets its own chance. That one state is why this is a client component.
  */
-export function Avatar({ name, avatar, size = "md", label, className = "" }: AvatarProps) {
+export function Avatar({ name, avatar, size = "md", label, ring, className = "" }: AvatarProps) {
   const ref = parseAvatarRef(avatar ?? null);
   const remoteUrl = ref.kind === "remote" ? ref.url : null;
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
@@ -85,12 +90,14 @@ export function Avatar({ name, avatar, size = "md", label, className = "" }: Ava
   }, [remoteUrl]);
   const showImage = remoteUrl !== null && failedUrl !== remoteUrl;
   const a11y = label === undefined ? { "aria-hidden": true as const } : { role: "img", "aria-label": label };
+  const ringClass = ring === undefined ? "" : ` ${RING[ring]}`;
   return (
     <span
       {...a11y}
+      data-ring={ring}
       className={
         "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-pill " +
-        `border border-line bg-surface-elevated font-semibold text-text-primary ${SIZE[size]} ${className}`
+        `bg-surface font-display font-bold text-text-muted ${SIZE[size]}${ringClass} ${className}`.trimEnd()
       }
     >
       {ref.kind === "preset" ? (
@@ -99,7 +106,7 @@ export function Avatar({ name, avatar, size = "md", label, className = "" }: Ava
         </span>
       ) : showImage ? (
         // eslint-disable-next-line @next/next/no-img-element -- parseAvatarRef already enforces the https-only allowlist; next/image is still not used because that would need a per-host allowlist we do not have
-        <img src={remoteUrl} alt="" className="size-full object-cover" onError={() => setFailedUrl(remoteUrl)} />
+        <img src={remoteUrl} alt="" className="size-full object-cover object-top" onError={() => setFailedUrl(remoteUrl)} />
       ) : (
         <span>{initialsFor(name)}</span>
       )}

@@ -29,6 +29,14 @@
   --color-warning-glow: var(--commish-color-warning-glow);
   --color-info: var(--commish-color-info);
   --color-scrim: var(--commish-color-scrim);
+  /* SIDELINE's fourth chroma, "yours" (2026-09-10): the amber fill and ring (`bg-self`,
+     `ring-self`), the label printed on it (`text-self-text`), amber as text on a surface
+     (`text-self-ink`, darkened in daylight until it clears 4.5:1) and your own row's wash
+     (`bg-self-glow`). Mapped the day the roles were added: an unmapped role ships no CSS. */
+  --color-self: var(--commish-color-self);
+  --color-self-text: var(--commish-color-self-text);
+  --color-self-ink: var(--commish-color-self-ink);
+  --color-self-glow: var(--commish-color-self-glow);
   /* The heat map (rule 1's magnitude amendment, 2026-08-27). Only `Stat` may name one of these,
      and only as text — `magnitude-budget.source.test.ts` is the gate. Magnitude on a control
      would spend the one signal green still has, which is "press this". */
@@ -72,13 +80,13 @@
   --color-tier-b-on: var(--commish-tier-b-label);
   --color-tier-c: var(--commish-tier-c-fill);
   --color-tier-c-on: var(--commish-tier-c-label);
-  /* SUNDAY v5, law 3. The condensed poster face is BACK, and this time it is load-bearing
-     rather than decorative: condensed is what buys ten columns at 18px on a board. v2's ruling 6
-     removed it because nothing was using it; v5 uses it for every name, number and label. */
+  /* SIDELINE's two faces (2026-09-10): Bricolage Grotesque with optical sizing for names,
+     numbers and headers (expressive at display sizes, calm at 17), Figtree for sentences. Both
+     load through `next/font` in `layout.tsx`, which is what fills the two source variables. */
   --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-display), "Saira Condensed", ui-sans-serif, system-ui, sans-serif;
-  /* Saira ships true tabular figures, so the numeric face is the body face with the feature on
-     rather than a third family loaded for digits alone. */
+  --font-display: var(--font-display), "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  /* The numeric register is the body face with tabular figures on (`.font-mono` below), never a
+     third family loaded for digits alone. */
   --font-mono: var(--font-body), ui-monospace, monospace;
   --radius-sm: var(--commish-radius-sm);
   --radius-md: var(--commish-radius-md);
@@ -128,6 +136,10 @@ body {
    applied nowhere. Never set on a paragraph (docs/design-system.md). */
 .font-display {
   letter-spacing: -0.02em;
+  /* Bricolage Grotesque carries an optical-size axis (12 to 96); the browser picks the design
+     for the rendered size when this is on, which is what keeps a 17px name calm and a 58px
+     figure expressive from the one file. */
+  font-optical-sizing: auto;
 }
 
 /* S3 — v3's hero and its display-size kin pull tighter still: -0.028em, but only at the four
@@ -149,40 +161,44 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* The `Celebration` primitive's two moments — a pick landing, a matchup win, a clinched spot.
-   Durations and easings come from the generated token variables, never from a literal — see
-   docs/design-system.md. The reduced-motion block below is the safety net; `Celebration` also
-   drops these classes outright when the user asks for less motion, so nothing merely runs
-   faster.
-
-   `celebrate-peer` is the quiet one — somebody else's moment, an 8px rise and fade.
-   `celebrate-self` is the louder one — your own moment, a small scale bounce. DraftBoard's
-   sticker-slap below is a SEPARATE animation on the grid cell, not the panel. */
-/* The bottom sheet's rise (founder, 2026-08-30): one short ease-out, no bounce. */
-@keyframes commish-sheet-up {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
-}
-.animate-sheet-up {
-  animation: commish-sheet-up 0.22s ease-out;
-}
-@media (prefers-reduced-motion: reduce) {
-  .animate-sheet-up { animation: none; }
+/* SIDELINE MOTION (P4: every live event moves, and nothing else does). Four verbs, each read
+   from the generated token variables, never a literal: an ARRIVAL springs in (`animate-spring-in`,
+   240ms on the spring), a LEAVE eases out (`animate-ease-out`, 180ms), a CHANGED NUMBER slides up
+   and its row washes for 600ms (`animate-score-slide`, `animate-highlight`), and a PRESENCE dot
+   breathes at 2s (`animate-breathe`). The one longer motion per moment is the celebration frame's
+   slap-in (`animate-slap-in`, Tailgate's, at celebration scale only). The reduced-motion block at
+   the foot of this file is the safety net; every primitive also drops its class outright when the
+   reader asked for less, so nothing merely runs faster. */
+@keyframes commish-spring-in {
+  0% { opacity: 0; transform: translateY(10px) scale(0.96); }
+  60% { opacity: 1; transform: translateY(-2px) scale(1.01); }
+  100% { opacity: 1; transform: none; }
 }
 
-@keyframes commish-celebrate-peer {
+@keyframes commish-ease-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(6px); }
+}
+
+@keyframes commish-score-slide {
   from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: none; }
 }
 
-@keyframes commish-celebrate-self {
-  0% { opacity: 0; transform: scale(0.96); }
-  60% { opacity: 1; transform: scale(1.03); }
-  100% { opacity: 1; transform: scale(1); }
+@keyframes commish-highlight {
+  from { background-color: var(--commish-color-accent-glow); }
+  to { background-color: transparent; }
 }
 
-@keyframes commish-sticker-slap {
-  0% { opacity: 0; transform: scale(1.15) rotate(-2.5deg); }
+@keyframes commish-breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+
+/* Tailgate's slap-in, borrowed for the celebration frame alone (first principles, section 5):
+   scale 1.12 to 1 with a two-degree settle, once per moment, never on a research row. */
+@keyframes commish-slap-in {
+  0% { opacity: 0; transform: scale(1.12) rotate(-2deg); }
   70% { opacity: 1; transform: scale(0.99) rotate(0.75deg); }
   100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
@@ -193,26 +209,57 @@ body {
   50% { opacity: 0.45; }
 }
 
-.animate-celebrate-peer {
-  animation: commish-celebrate-peer var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
+.animate-spring-in {
+  animation: commish-spring-in var(--commish-motion-duration-in) var(--commish-motion-easing-spring) both;
 }
 
-.animate-celebrate-self {
-  animation: commish-celebrate-self var(--commish-motion-duration-slow) var(--commish-motion-easing-emphasized) both;
+.animate-ease-out {
+  animation: commish-ease-out var(--commish-motion-duration-out) var(--commish-motion-easing-out) both;
 }
 
+.animate-score-slide {
+  animation: commish-score-slide var(--commish-motion-duration-in) var(--commish-motion-easing-out) both;
+}
+
+.animate-highlight {
+  animation: commish-highlight var(--commish-motion-duration-highlight) var(--commish-motion-easing-out) both;
+}
+
+.animate-breathe {
+  animation: commish-breathe var(--commish-motion-duration-breathe) ease-in-out infinite;
+}
+
+.animate-slap-in {
+  animation: commish-slap-in var(--commish-motion-duration-celebrate) var(--commish-motion-easing-spring) both;
+}
+
+/* The draft board's landed cell keeps the slap (the pick landing is a celebration moment). */
 .animate-sticker-slap {
-  animation: commish-sticker-slap var(--commish-motion-duration-slow) var(--commish-motion-easing-emphasized) both;
+  animation: commish-slap-in var(--commish-motion-duration-celebrate) var(--commish-motion-easing-spring) both;
 }
 
 .animate-spotlight {
-  animation: commish-spotlight calc(var(--commish-motion-duration-slow) * 5) var(--commish-motion-easing-standard) infinite;
+  animation: commish-spotlight calc(var(--commish-motion-duration-highlight) * 2) var(--commish-motion-easing-out) infinite;
 }
 
-/* The wire (Task 8) — real product events streaming under the nav like a broadcast ticker.
-   `--commish-motion-duration-wire` is the token built for exactly this loop; nothing else
-   references it. The track is expected to hold two copies of its content back to back so the
-   halfway translate loops seamlessly. */
+/* Names the older primitives still spell, each an alias of one of the four verbs above so a
+   consumer that has not been migrated yet moves on Sideline's timing today. */
+.animate-sheet-up,
+.animate-celebrate-peer,
+.animate-rise {
+  animation: commish-spring-in var(--commish-motion-duration-in) var(--commish-motion-easing-spring) both;
+}
+
+.animate-celebrate-self {
+  animation: commish-slap-in var(--commish-motion-duration-celebrate) var(--commish-motion-easing-spring) both;
+}
+
+.animate-pulse-live {
+  animation: commish-breathe var(--commish-motion-duration-breathe) ease-in-out infinite;
+}
+
+/* The wire, the one marquee, because it is a live wire. The track holds two copies of its
+   content back to back so the halfway translate loops seamlessly. */
 @keyframes commish-wire {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
@@ -222,32 +269,7 @@ body {
   animation: commish-wire var(--commish-motion-duration-wire) linear infinite;
 }
 
-/* The live chip's dot (Tasks 5 and 8) — a breathing pulse, never a hard blink. */
-@keyframes commish-pulse-live {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-
-.animate-pulse-live {
-  animation: commish-pulse-live var(--commish-motion-duration-pulse) var(--commish-motion-easing-standard) infinite;
-}
-
-/* The front door hero's entrance (Task 7) — the same opacity+translateY idiom as
-   `celebrate-peer` above, just a longer rise (14px) reserved for the one hero on the page.
-   `rise-1..4` stagger consecutive elements by whole multiples of the fast duration, so the
-   spacing between them is a token relationship, never a literal millisecond count. */
-@keyframes commish-rise {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-rise {
-  animation: commish-rise var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
-}
-
-/* The quilt's clock strip swelling amber on YOUR turn (draft room, 2026-09-02) — a grow from
-   the slim ribbon's own height, eased out inside the 250ms ceiling. Amber is yours in color AND
-   motion: this is the one entrance the your-turn state makes, and nothing ever flashes red. */
+/* The quilt's clock strip swelling amber on YOUR turn: an arrival, so it springs in. */
 @keyframes commish-strip-grow {
   from { opacity: 0.4; transform: scaleY(0.6); }
   to { opacity: 1; transform: scaleY(1); }
@@ -255,11 +277,7 @@ body {
 
 .animate-strip-grow {
   transform-origin: top;
-  animation: commish-strip-grow var(--commish-motion-duration-slow) var(--commish-motion-easing-standard) both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-strip-grow { animation: none; }
+  animation: commish-strip-grow var(--commish-motion-duration-in) var(--commish-motion-easing-spring) both;
 }
 
 /* THE DRAFT ROOM'S MOTIONS (founder report 2026-09-10, "fidgety"): named once in
@@ -362,6 +380,12 @@ body {
    this", and the pressable thing in the row is the button the row does not own. */
 .accent-wash {
   background-image: linear-gradient(to right, var(--commish-color-accent-glow), transparent 70%);
+}
+
+/* SIDELINE: your own row. The amber wash, run the same way, so a screen of other people's cards
+   can point at yours without that reading as "press this" (the verb is Court blue). */
+.self-wash {
+  background-image: linear-gradient(to right, var(--commish-color-self-glow), transparent 70%);
 }
 
 /* S5 — the 120px pitch is a plain CSS fact of this one class, exactly like sunday-standard.html's

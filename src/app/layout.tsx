@@ -1,28 +1,30 @@
 import type { Metadata } from "next";
-import { Saira, Saira_Condensed } from "next/font/google";
+import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import { ThemeProvider } from "@/design/theme-provider";
 import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import { TITLE_TEMPLATE, TAGLINE } from "@/components/app-shell/page-metadata";
 import "./globals.css";
 
 /**
- * SUNDAY v5, law 3. Condensed is load-bearing, not decorative: it is what buys ten columns at
- * 18px on a board, which is the whole reason a timing tower reads as sport and a spreadsheet
- * does not. Replacing this with a normal-width face silently breaks the law.
+ * SIDELINE'S TWO FACES (founder chose the direction 2026-09-10). `Bricolage_Grotesque` carries
+ * every name, number and header, loaded as the variable font WITH its optical-size axis: the
+ * same file draws a calm 17px name on a row and an expressive 58px figure on a player's page,
+ * and `globals.css`'s `.font-display` turns optical sizing on. `Figtree` carries sentences and
+ * labels, and doubles as the numeric register with tabular figures on (`.font-mono`).
  *
- * `Saira_Condensed` carries every name, number and label. `Saira` carries the few sentences the
- * product still has, and doubles as the numeric face because it ships true tabular figures.
+ * Weights are the variable range, not a list: the display face is used at 600 to 800 and the
+ * body at 400 to 600, and `weight-cap.source.test.ts` is what keeps a sentence from reaching
+ * for 700.
  */
-const sairaCondensed = Saira_Condensed({
+const bricolage = Bricolage_Grotesque({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
+  axes: ["opsz"],
 });
 
-const saira = Saira({
+const figtree = Figtree({
   variable: "--font-body",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -42,7 +44,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${sairaCondensed.variable} ${saira.variable} antialiased`}>
+      <body className={`${bricolage.variable} ${figtree.variable} antialiased`}>
         <ThemeProvider>
           {/* Plan D Task 9: the notices hook's state moved here so it outlives every
               client-side navigation instead of remounting per page (ruling 19). Renders no UI

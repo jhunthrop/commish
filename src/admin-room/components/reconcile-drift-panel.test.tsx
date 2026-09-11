@@ -47,7 +47,7 @@ describe("ReconcileDriftPanel", () => {
     expect(status).toHaveTextContent("$0.00");
 
     // Three real figures, not one prose sentence — and every value is mono.
-    const monoValues = status.querySelectorAll(".font-mono");
+    const monoValues = status.querySelectorAll(".font-mono, .tabular-nums");
     expect(monoValues.length).toBeGreaterThanOrEqual(3);
   });
 

@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { leagues, players, teams, users } from "@/db/schema";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import type { AuditEventInput } from "@/domain/audit";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { createAuditLogger, type AuditLogger } from "./audit-logger";
-import { buildActivityNames, listLeagueActivity } from "./activity";
+import { actorFor, buildActivityNames, listLeagueActivity } from "./activity";
 
 const db = createTestDb();
 
@@ -153,6 +154,45 @@ describe("listLeagueActivity", () => {
     expect(page.rows).toContainEqual(
       expect.objectContaining({ headline: "The clock ran out, so Alice's Real Team drafted Real Bijan from their queue." }),
     );
+  });
+
+  it("carries each row's kind and its actor's name and face, and no actor for the platform's own pick (Sideline, the stream)", async () => {
+    await seedRealNames();
+    await db.update(users).set({ avatarUrl: "preset:shield" }).where(eq(users.id, "user_real_alice"));
+    await db.transaction((tx) =>
+      league1Logger.record(tx, {
+        eventType: "draft_pick",
+        actorId: "user_real_alice",
+        actorType: "user",
+        leagueId: "league_1",
+        payload: { draftId: "d", teamId: "team_real_1", playerId: "player_real_1", position: "RB", round: 1, pickNumber: 1, slot: "RB", slotIndex: 0, price: null, auto: false },
+        occurredAt: "2026-08-20T17:00:00.000Z",
+      }),
+    );
+    await db.transaction((tx) =>
+      league1Logger.record(tx, {
+        eventType: "draft_pick",
+        actorId: null,
+        actorType: "system",
+        leagueId: "league_1",
+        payload: { draftId: "d", teamId: "team_real_1", playerId: "player_real_1", position: "RB", round: 1, pickNumber: 2, slot: "RB", slotIndex: 0, price: null, auto: true },
+        occurredAt: "2026-08-20T17:01:00.000Z",
+      }),
+    );
+
+    const page = await listLeagueActivity(db, { leagueId: "league_1", viewerUserId: "user_real_alice" });
+    expect(page.rows).toContainEqual(
+      expect.objectContaining({ kind: "pick", actor: { userId: "user_real_alice", name: "Alice Real", avatar: "preset:shield" } }),
+    );
+    expect(page.rows).toContainEqual(expect.objectContaining({ kind: "pick", actor: null, headline: expect.stringContaining("The clock ran out") }));
+  });
+
+  it("actorFor answers null for the platform, for a person whose row is gone, and a face for a member who resolves", () => {
+    const members = new Map([["user_real_alice", { id: "user_real_alice", name: "Alice Real", avatar: null }]]);
+    expect(actorFor({ actorId: null, actorType: "system" }, members)).toBeNull();
+    expect(actorFor({ actorId: "user_real_alice", actorType: "system" }, members)).toBeNull();
+    expect(actorFor({ actorId: "user_ghost", actorType: "user" }, members)).toBeNull();
+    expect(actorFor({ actorId: "user_real_alice", actorType: "user" }, members)).toEqual({ userId: "user_real_alice", name: "Alice Real", avatar: null });
   });
 
   it("resolves real team and player names for a trade — proposerTeamId/counterpartyTeamId and proposerAssetIds/counterpartyAssetIds, never the bare teamId/playerId every other renderer uses", async () => {

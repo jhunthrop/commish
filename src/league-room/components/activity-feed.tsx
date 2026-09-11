@@ -3,6 +3,7 @@ import type { ActivityRow } from "@/integrity/activity-view";
 import { EmptyState } from "@/components/ui";
 import { ChapterBand } from "@/components/ui/chapter-band";
 import { Icon } from "@/components/ui/icon";
+import { byDay, dayMarker } from "../lib/day-chapters";
 
 export interface ActivityFeedProps {
   readonly rows: readonly ActivityRow[];
@@ -17,38 +18,6 @@ export interface ActivityFeedProps {
  *  line is the same fact printed forty times down one column. */
 function formatTimeOfDay(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { timeStyle: "short" });
-}
-
-/** A stable key for the calendar day an event landed on, in the same clock every timestamp on
- *  this page is already rendered against. */
-function dayKey(iso: string): string {
-  return new Date(iso).toDateString();
-}
-
-/**
- * The day, in the words somebody would say out loud. "Today" and "Yesterday" are the two a reader
- * checks for; everything older gets its real name, because "3 days ago" stops being useful the
- * moment a history is more than a week long.
- */
-function dayMarker(iso: string, now: Date): string {
-  const day = new Date(iso);
-  const midnight = (date: Date): number => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const daysBack = Math.round((midnight(now) - midnight(day)) / 86_400_000);
-  if (daysBack === 0) return "Today";
-  if (daysBack === 1) return "Yesterday";
-  return day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
-}
-
-/** The rows, split into one chapter per calendar day, newest first — the order they arrive in. */
-function byDay(rows: readonly ActivityRow[]): readonly { readonly key: string; readonly rows: readonly ActivityRow[] }[] {
-  const chapters: { key: string; rows: ActivityRow[] }[] = [];
-  for (const row of rows) {
-    const key = dayKey(row.occurredAt);
-    const last = chapters[chapters.length - 1];
-    if (last !== undefined && last.key === key) last.rows.push(row);
-    else chapters.push({ key, rows: [row] });
-  }
-  return chapters;
 }
 
 function ActivityRowItem({ row }: { readonly row: ActivityRow }) {

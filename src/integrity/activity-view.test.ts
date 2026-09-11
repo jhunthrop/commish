@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AUDIT_EVENT_TYPES, type AuditEvent, type AuditEventType, type JsonObject } from "@/domain/audit";
-import { ACTIVITY_VISIBILITY, activityRowFor, type ActivityVisibility } from "./activity-view";
+import { ACTIVITY_VISIBILITY, activityKindFor, activityRowFor, type ActivityVisibility } from "./activity-view";
 import { copyViolations } from "./copy-rules";
 import { systemActionSummaryAllowed } from "./system-actions";
 
@@ -609,5 +609,41 @@ describe("activityRowFor — deny paths", () => {
 
   it("denies a lineup_change with no week number, even for the manager who made it", () => {
     expect(activityRowFor(event("lineup_change", { teamId: "team_2", starters: [] }, "user_bob"), viewer, names)).toBeNull();
+  });
+});
+
+/**
+ * SIDELINE (P5): the stream draws each event the way the room talks about it, so every visible
+ * type has a kind. A roster move's kind follows the payload's own `reason`, the same field its
+ * renderer keys on; everything the platform did on its own is `system`, honestly.
+ */
+describe("activityKindFor", () => {
+  it.each([
+    ["league_created", "league"],
+    ["member_joined", "join"],
+    ["draft_pick", "pick"],
+    ["draft_completed", "pick"],
+    ["lineup_change", "lineup"],
+    ["trade_accepted", "trade"],
+    ["entry_fee_collected", "money"],
+    ["entry_fee_refunded", "money"],
+    ["prize_paid", "money"],
+    ["system_action", "system"],
+  ] as const)("%s is a %s", (eventType, kind) => {
+    expect(activityKindFor(event(eventType, {}, null))).toBe(kind);
+  });
+
+  it("reads a roster move's kind off its reason: a claim, a trade, and system for anything else", () => {
+    expect(activityKindFor(event("roster_move", { reason: "claim" }, "user_alice"))).toBe("claim");
+    expect(activityKindFor(event("roster_move", { reason: "claim_reversed" }, null))).toBe("claim");
+    expect(activityKindFor(event("roster_move", { reason: "trade" }, "user_alice"))).toBe("trade");
+    expect(activityKindFor(event("roster_move", { reason: "trade_reversed" }, null))).toBe("trade");
+    expect(activityKindFor(event("roster_move", { reason: "ir_placed" }, "user_alice"))).toBe("system");
+    expect(activityKindFor(event("roster_move", { reason: 7 }, "user_alice"))).toBe("system");
+    expect(activityKindFor(event("roster_move", {}, "user_alice"))).toBe("system");
+  });
+
+  it("buckets a type the stream has no word for as system rather than inventing one", () => {
+    expect(activityKindFor(event("flag_raised", {}, null))).toBe("system");
   });
 });

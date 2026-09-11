@@ -1,5 +1,8 @@
 import { startDraftAdvanceLoopForLeague } from "@/draft-service";
 import { draftEventSequence } from "@/draft-service/advance";
+import { createPresenceStore, presenceLifecycle } from "@/lib/realtime/presence";
+import { getPublisher } from "@/lib/realtime/publisher";
+import { getSharedRedis } from "@/lib/realtime/redis";
 import { createLeagueEventStream } from "@/lib/realtime/sse";
 import { withLeagueMemberActor, type LeagueRouteContext } from "../../_shared";
 
@@ -22,15 +25,23 @@ export const maxDuration = 300;
  *
  * If this league's draft still has work to do soon, the connection also starts the draft
  * advance loop (`startDraftAdvanceLoopForLeague`): on Vercel no long-lived ticker exists, so
- * the watcher's own stream is what moves bot picks and clock expiries in real time. The loop
- * sleeps until the draft's next due instant, is woken by the draft frames this very stream
- * relays (`onEvent`, so another seat's pick resets its timer with no query), never holds a
- * transaction across ticks, and dies with the request's abort signal — see `runDraftAdvanceLoop`.
+ * the watcher's own stream is what moves bot picks and clock expiries in real time.
+ *
+ * SIDELINE (P5): the connection is also the member's PRESENCE. Opening it marks them in the
+ * room, every keepalive refreshes the mark, closing it marks them gone, and each edge publishes
+ * `presence.changed` so every other open room re-reads who is here. Derived from the socket the
+ * server holds, never from a client's claim, and never able to close the stream it rides.
  */
 export async function GET(request: Request, context: LeagueRouteContext) {
   return withLeagueMemberActor(request, context, async (actor) => {
     const loop = await startDraftAdvanceLoopForLeague(actor.leagueId, request.signal);
+    const lifecycle = presenceLifecycle(
+      { store: createPresenceStore(getSharedRedis()), publish: (input) => getPublisher().publish(input), now: () => Date.now() },
+      actor.leagueId,
+      actor.userId,
+    );
     return createLeagueEventStream(request, actor.leagueId, actor.userId, {
+      lifecycle,
       onEvent: (event) => {
         const sequence = draftEventSequence(event);
         if (sequence !== null) loop?.observe(sequence);

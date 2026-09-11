@@ -60,5 +60,8 @@ export function useValueChangeHighlight(value: string | number): boolean {
   // `useTransientVisibility` schedules no timer, so the branch is an absence of behaviour rather
   // than a suppressed one.
   const key = reduced || changeCount === 0 ? null : changeCount;
-  return useTransientVisibility(key, TOKENS.motion.duration.slow);
+  // SIDELINE: the wash on a changed number runs 600ms (`highlight`), the one motion the direction
+  // states longer than its 150 to 400ms transition band, and the row's new figure slides up
+  // under it (`animate-score-slide`, the consumer's own class).
+  return useTransientVisibility(key, TOKENS.motion.duration.highlight);
 }

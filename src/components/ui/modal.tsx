@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEntranceClass } from "@/design/use-motion";
 import { Button } from "./button";
 
 const FOCUSABLE =
@@ -19,26 +20,23 @@ export interface ModalProps {
   readonly title: string;
   readonly onClose: () => void;
   readonly children: ReactNode;
-  /** Replaces the default "Close" button row; `null` renders no footer row at all, for a panel
-   *  whose own control closes it (a search field's Escape). */
+  /** Replaces the default "Close" button row; `null` renders no footer row at all. */
   readonly footer?: ReactNode | null;
   /** @default "center" */
   readonly placement?: ModalPlacement;
   /** @default "md" */
   readonly size?: ModalSize;
-  /** Keeps the title as the accessible name only, for a panel whose first control already says
-   *  what it is (a search field with its placeholder). The heading is still rendered, `sr-only`. */
+  /** Keeps the title as the accessible name only; the heading is still rendered, `sr-only`. */
   readonly titleHidden?: boolean;
 }
 
 /**
- * The two placements, each spelling its own whole geometry (the `PlayerRow` skin argument: two
- * utilities of equal specificity resolve by stylesheet order, so a base plus an override is a bet).
- * `top` is full-screen below `sm` — the phone opens the palette edge to edge, with the field at the
- * top where the keyboard leaves room for it — and a top-anchored panel above.
+ * The two placements, each spelling its own whole geometry. `center` is a sheet from the foot of
+ * a phone and a centred card above `sm`; `top` is full-screen below `sm` and a top-anchored panel
+ * above. Both are Sideline's 20px sheet (`rounded-xl`).
  */
 const PLACEMENT: Readonly<Record<ModalPlacement, { readonly scrim: string; readonly panel: string }>> = {
-  center: { scrim: "items-end justify-center p-4 sm:items-center", panel: "rounded-xl" },
+  center: { scrim: "items-end justify-center p-0 sm:items-center sm:p-4", panel: "rounded-t-xl sm:rounded-xl" },
   top: { scrim: "items-stretch justify-center p-0 sm:items-start sm:p-4 sm:pt-[10vh]", panel: "rounded-none sm:rounded-xl" },
 };
 
@@ -48,14 +46,15 @@ const SIZE: Readonly<Record<ModalSize, string>> = {
 };
 
 /**
- * A focus-trapped dialog. Renders nothing when closed — there is no hidden copy of the panel
- * to tab into. On open it takes focus; on close it hands focus back to whatever had it, so a
- * keyboard user never loses their place.
+ * A focus-trapped dialog over a blurred ground (Sideline: "sheets slide up over a blurred
+ * ground"). Renders nothing when closed. On open it springs in and takes focus; on close it hands
+ * focus back to whatever had it, so a keyboard user never loses their place.
  */
 export function Modal({ open, title, onClose, children, footer, placement = "center", size = "md", titleHidden = false }: ModalProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
+  const entrance = useEntranceClass("in");
 
   useEffect(() => {
     if (!open) return;
@@ -79,8 +78,6 @@ export function Modal({ open, title, onClose, children, footer, placement = "cen
       if (panel === null) return;
       const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
       if (items.length === 0) {
-        // No focusable descendant to cycle to — without this, the browser's default Tab
-        // behavior would carry focus out of the dialog and onto the page behind it.
         event.preventDefault();
         panel.focus();
         return;
@@ -102,7 +99,7 @@ export function Modal({ open, title, onClose, children, footer, placement = "cen
   if (!open) return null;
 
   return (
-    <div className={`fixed inset-0 z-50 flex bg-scrim/50 ${PLACEMENT[placement].scrim}`}>
+    <div className={`fixed inset-0 z-50 flex bg-scrim/40 backdrop-blur-sm ${PLACEMENT[placement].scrim}`}>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the WAI-ARIA
           APG dialog pattern: the keydown handler traps Tab focus inside the panel, which has to
           live on the dialog container itself, not on an individual focusable child. */}
@@ -113,10 +110,9 @@ export function Modal({ open, title, onClose, children, footer, placement = "cen
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        // V6: soft fill + the overlay shadow token; the hairline went with the warmth pass.
-        className={`w-full ${SIZE[size]} ${PLACEMENT[placement].panel} bg-surface-elevated p-4 shadow-overlay focus-visible:outline-none`}
+        className={`w-full ${SIZE[size]} ${PLACEMENT[placement].panel} bg-surface-elevated p-4 shadow-overlay focus-visible:outline-none ${entrance}`.trimEnd()}
       >
-        <h2 id={titleId} className={titleHidden ? "sr-only" : "text-lg font-semibold text-text-primary"}>
+        <h2 id={titleId} className={titleHidden ? "sr-only" : "font-display text-xl font-bold text-text-primary"}>
           {title}
         </h2>
         <div className={`${titleHidden ? "" : "mt-3 "}text-md text-text-primary`}>{children}</div>

@@ -59,6 +59,16 @@ export interface EventStreamOptions {
   readonly onEvent?: (event: RealtimeEvent) => void;
   /** Test seam over `REALTIME_CONFIG.plannedCloseMs`. */
   readonly plannedCloseMs?: number;
+  /**
+   * The connection's three moments, for the presence store (`presence.ts`): the opening bytes
+   * have gone, a keepalive went, the socket closed. Each is awaited nowhere and may never throw
+   * into the stream; `presenceLifecycle` guarantees the second half and this module the first.
+   */
+  readonly lifecycle?: {
+    readonly onOpen: () => Promise<void>;
+    readonly onKeepalive: () => Promise<void>;
+    readonly onClose: () => Promise<void>;
+  };
 }
 
 /**
@@ -114,11 +124,13 @@ function createEventStream(request: Request, userId: string, streamKeys: readonl
       // response head and flip the client to open. Enqueued before `createRedisConnection()`,
       // which can itself take a moment on a cold socket.
       sink.enqueue(OPENING);
+      void options.lifecycle?.onOpen();
       try {
         redis = createRedisConnection();
         keepalive = setInterval(() => {
           try {
             sink.enqueue(KEEPALIVE);
+            void options.lifecycle?.onKeepalive();
           } catch {
             controller.abort();
           }
@@ -134,6 +146,7 @@ function createEventStream(request: Request, userId: string, streamKeys: readonl
         clearTimeout(plannedClose);
         redis?.disconnect();
         release();
+        void options.lifecycle?.onClose();
         try {
           sink.close();
         } catch {

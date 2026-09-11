@@ -6,33 +6,36 @@ const THEMES: readonly ThemeName[] = ["light", "dark"];
 const AA_TEXT = 4.5;
 const AA_LARGE_AND_UI = 3;
 
-// Two colors used for distinct semantic/interactive meanings must not be visually
-// interchangeable, even when both individually clear AA text contrast on a surface.
-// `accent`/`positive` are excluded on purpose: v2 makes them the SAME green in both themes,
-// deliberately (docs/design-system.md, "One pigment, two jobs") — the rule that keeps the
-// doubling safe is context, not hue, so this pair is not checked for distinguishability.
+/**
+ * Two colors used for distinct meanings must not be visually interchangeable, even when both
+ * clear AA text contrast on a surface. SIDELINE spends six pigments and four of them are chroma
+ * that can land beside each other on one row: Court blue (the verb), Streak amber (you), Live
+ * green (live, a good outcome) and Rival rose (your opponent, the swing against you). Every
+ * pair of those four is held apart. Pairs that are the SAME pigment by design (`positive`/`live`,
+ * `negative`/`warning`, `accent`/`info`) are pinned equal below instead, so a palette tune can
+ * neither drift them apart into a seventh pigment nor quietly merge two that must differ.
+ */
 const MIN_DISTINGUISHABLE_CONTRAST = 1.5;
 const MIN_DISTINGUISHABLE_HUE_DEG = 30;
 const DISTINGUISHABLE_PAIRS: readonly (readonly [ColorRole, ColorRole])[] = [
   ["accent", "negative"],
-  ["accent", "warning"],
+  ["accent", "live"],
+  ["accent", "self"],
   ["positive", "negative"],
-  ["positive", "warning"],
-  ["negative", "warning"],
+  ["live", "self"],
+  ["negative", "self"],
 ];
 
 // Every text/foreground role that sits directly on a surface must clear AA text contrast.
-// `scrim` is deliberately absent: it is a translucent modal backdrop overlay, never text or a
-// UI foreground. `accentText`/`negativeText` are checked separately, against the FILL they
-// label, not against a surface.
-const TEXT_ON_SURFACE: readonly ColorRole[] = ["textPrimary", "textMuted", "textFaint", "accent", "positive", "negative", "warning", "info"];
+// `scrim` is absent (a translucent backdrop, never text). The `*Text` roles are checked against
+// the FILL they label, not against a surface. `self` is a fill and a ring, never text: its text
+// form is `selfInk`, which is the role checked here.
+const TEXT_ON_SURFACE: readonly ColorRole[] = ["textPrimary", "textMuted", "textFaint", "accent", "positive", "negative", "live", "warning", "info", "selfInk"];
 const SURFACES: readonly ColorRole[] = ["surface", "surfaceElevated"];
+const ALL_SURFACES = ["surface", "surfaceElevated", "surfaceRaised", "surfaceInset"] as const;
 
 describe("TOKENS.color", () => {
-  it("carries the same nineteen roles in both palettes, so no surface can exist in a theme nobody designed", () => {
-    // REVISED (founder both-themes ruling, 2026-08-23): two palettes, one role set, and every
-    // contrast assertion in this file runs against EACH palette. A role present in one palette
-    // and missing from the other is a color that silently stops responding to the theme.
+  it("carries the same role set in both palettes, so no surface can exist in a theme nobody designed", () => {
     for (const theme of THEMES) {
       expect(Object.keys(TOKENS.color[theme]).sort()).toEqual([...COLOR_ROLES].sort());
     }
@@ -42,14 +45,12 @@ describe("TOKENS.color", () => {
     describe(theme, () => {
       const c = TOKENS.color[theme];
 
-      it("keeps every text role readable on every surface it is used on", () => {
-        // The mock's --faint (#6B7488) is used at 12px for card meta, step captions and table
-        // subs. Against --panel2 (#161920) it measures 3.75:1, below the 4.5:1 WCAG 1.4.3 floor
-        // for normal text. The token moves; the threshold does not. (join-flow-panel.md,
-        // "Accessibility smells".) Both themes carry the same floor.
+      it("keeps every ink role readable on every surface it is used on", () => {
+        // 4.5:1 on all four surfaces, the floor this palette has never relaxed: a faint caption
+        // lands in a well and on a raised row as readily as on the page ground.
         for (const role of ["textPrimary", "textMuted", "textFaint"] as const) {
-          for (const surface of ["surface", "surfaceElevated", "surfaceRaised", "surfaceInset"] as const) {
-            expect(contrastRatio(c[role], c[surface])).toBeGreaterThanOrEqual(4.5);
+          for (const surface of ALL_SURFACES) {
+            expect(contrastRatio(c[role], c[surface])).toBeGreaterThanOrEqual(AA_TEXT);
           }
         }
       });
@@ -63,30 +64,20 @@ describe("TOKENS.color", () => {
       }
 
       it("prints a readable label on every fill that carries one", () => {
-        expect(contrastRatio(c.accentText, c.accent)).toBeGreaterThanOrEqual(4.5);
-        expect(contrastRatio(c.negativeText, c.negative)).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(c.accentText, c.accent)).toBeGreaterThanOrEqual(AA_TEXT);
+        expect(contrastRatio(c.negativeText, c.negative)).toBeGreaterThanOrEqual(AA_TEXT);
+        expect(contrastRatio(c.liveText, c.live)).toBeGreaterThanOrEqual(AA_TEXT);
+        expect(contrastRatio(c.selfText, c.self)).toBeGreaterThanOrEqual(AA_TEXT);
       });
 
       it("gives an interactive boundary its own role, because the hairline cannot carry one", () => {
-        // --line (#20242E) measures 1.26:1 against --bg. That is correct for a DECORATIVE
-        // separator between two panels and is nowhere near WCAG 1.4.11's 3:1 for the boundary
-        // of a control a user must find. v2 therefore ships BOTH: `line` separates, `edge`
-        // bounds — in both themes.
-        //
-        // D1 (mock lobby review, 2026-08-26): the field primitives (`Select`, `Input`,
-        // `Textarea`) drew their own boundary in `line` — 1.17:1 dark / 1.22:1 light, a control
-        // border missing WCAG 1.4.11's 3:1 floor by roughly 2.6x — and never had a test that
-        // would have caught it, because this gate only ever checked THREE of the product's four
-        // surfaces. All four now: a control can sit on the page ground, a panel, a raised row,
-        // or an inset well, and `edge` must clear 3:1 on every one it is asked to bound.
-        expect(contrastRatio(c.line, c.surface)).toBeLessThan(3);
-        for (const surface of ["surface", "surfaceElevated", "surfaceRaised", "surfaceInset"] as const) {
-          expect(contrastRatio(c.edge, c[surface])).toBeGreaterThanOrEqual(3);
-        }
-      });
-
-      it("border against surface is now edge's job, not line's — line stays a decorative hairline", () => {
+        // `line` is decoration between two surfaces; `edge` bounds a control a person must FIND
+        // and is held to WCAG 1.4.11's 3:1 on every one of the four surfaces it can sit on.
+        expect(contrastRatio(c.line, c.surface)).toBeLessThan(AA_LARGE_AND_UI);
         expect(contrastRatio(c.line, c.surfaceElevated)).toBeLessThan(AA_LARGE_AND_UI);
+        for (const surface of ALL_SURFACES) {
+          expect(contrastRatio(c.edge, c[surface])).toBeGreaterThanOrEqual(AA_LARGE_AND_UI);
+        }
       });
 
       for (const [roleA, roleB] of DISTINGUISHABLE_PAIRS) {
@@ -98,58 +89,61 @@ describe("TOKENS.color", () => {
       }
 
       /**
-       * INVERTED FOR SUNDAY v5 (2026-08-28). Through v2, v3 and v4 this asserted that `accent`
-       * and `positive` were the SAME green, on the argument that a live game and a live action
-       * are one energy. v5 repeals that: law 4 gives the act its own channel (amber, which is
-       * also the furniture and you) and the verdict its own pair (cyan against warm red).
-       *
-       * A timing tower has to be able to say "we rate him higher than the room does" without
-       * that reading as "press this", and one pigment cannot carry both. Kept as an assertion
-       * rather than deleted, because the doubling is the thing a careless palette edit would
-       * silently restore.
+       * SIDELINE'S SIX, PINNED. The direction spends exactly six pigments, so three roles that
+       * used to be free to differ are now the same value on purpose: a good outcome IS the live
+       * green (a claim that hit), a clock running out IS the rival rose (the swing against you),
+       * and a link IS the court blue (there is no second blue). The verb and the verdict stay on
+       * different channels: `accent` is never `positive`.
        */
-      it("keeps the act and the verdict on different channels — v5 repealed the doubling", () => {
+      it("keeps the act and the outcome on different channels", () => {
         expect(c.accent).not.toBe(c.positive);
+      });
+
+      it("spends six pigments and no more: positive is live, warning is rose, info is court blue", () => {
+        expect(c.positive).toBe(c.live);
+        expect(c.warning).toBe(c.negative);
+        expect(c.info).toBe(c.accent);
+      });
+
+      it("never uses the amber fill as text: selfInk is the text form, and it differs from the fill wherever the fill fails", () => {
+        // In daylight the amber fill measures about 2.4:1 on paper, so the text form has to be
+        // its own darker value. At night the fill already clears, and the two may coincide.
+        if (contrastRatio(c.self, c.surfaceElevated) < AA_TEXT) expect(c.selfInk).not.toBe(c.self);
+        expect(contrastRatio(c.selfInk, c.surfaceInset)).toBeGreaterThanOrEqual(AA_TEXT);
       });
     });
   }
 });
 
-// A `ColorRole` text sitting directly on a plain `SURFACES` entry is not the only ground it can
-// be painted on: this product tints a plain surface with a translucent 10%-opacity wash of a
-// semantic role in two places — `bg-negative/10` (the draft room's "hot" rail, `room-rail.tsx`'s
-// `MODE_SKIN.hot`, live while a team is on the clock) and `bg-accent/10` (`celebration.tsx`'s
-// "self" emphasis and `budget-table.tsx`'s own-row highlight). The pair matrix above cannot see
-// this: a role can clear 4.5:1 against `surface` itself and still miss the floor once 10% of a
-// saturated hue is mixed into that same ground — exactly what happened to `light.textMuted`,
-// `light.negative` and `light.warning` against `light.negative`'s own 10% tint. Axe-core caught
-// it on the draft room's real, built CSS (`e2e/design-v2.spec.ts`'s color-contrast scan); this
-// block makes the same class of gap a `tokens.test.ts` numbers failure from now on. `blendOver`
-// reproduces the flat sRGB composite a Tailwind `bg-<role>/10` utility paints and the one axe's
-// own color-contrast check measures against.
+/**
+ * A role sitting directly on a plain surface is not the only ground it can be painted on: the
+ * product tints a surface with a translucent 10% wash of a semantic role (`bg-<role>/10`) and
+ * puts text on the composite. A role can clear 4.5:1 against `surface` itself and still miss the
+ * floor once 10% of a saturated hue is mixed into that ground. `blendOver` reproduces the flat
+ * sRGB composite a Tailwind `bg-<role>/10` utility paints and the one axe measures against.
+ */
 const BAND_ALPHA = 0.1;
 
 interface ColorBand {
-  /** The semantic role whose hue tints the ground (`bg-<role>/10`). */
   readonly tint: ColorRole;
-  /** The plain surface the tint is painted on top of. */
   readonly ground: ColorRole;
-  /** Every role this product renders as text directly on this composite today. */
   readonly textRoles: readonly ColorRole[];
 }
 
 const COLOR_BANDS: readonly ColorBand[] = [
-  // room-rail.tsx's MODE_SKIN.hot: the whole rail is `border-negative bg-negative/10` while a
-  // team is on the clock, and its own text sits directly on that composite — the format badge
-  // and InfoTip captions (`textMuted`), the turn label (`textMuted`), the "you're on the clock"
-  // eyebrow (`negative`, swapped in when `turn.mine`), and the "Connecting…" chip (`warning`;
-  // `Badge` carries no fill of its own, so it paints straight onto whatever is behind it).
+  // The rival's wash: your opponent's chip, the swing against you.
   { tint: "negative", ground: "surface", textRoles: ["textMuted", "negative", "warning"] },
-  // celebration.tsx's "self" emphasis (`border-accent bg-accent/10`) and budget-table.tsx's
-  // own-row highlight (`bg-accent/10`) both put `textMuted`/`textPrimary` prose directly on the
-  // tint, and both can land on either the page ground or a card.
+  { tint: "negative", ground: "surfaceElevated", textRoles: ["textMuted", "negative"] },
+  // The verb's wash: the board's "on the clock" tile. Court blue INK never rides its own wash
+  // (4.44:1 in daylight, 4.48:1 at night): the tile's words are ordinary ink.
   { tint: "accent", ground: "surface", textRoles: ["textMuted", "textPrimary"] },
   { tint: "accent", ground: "surfaceElevated", textRoles: ["textMuted", "textPrimary"] },
+  // Your own row's wash, and the amber ink that rides on it.
+  { tint: "self", ground: "surface", textRoles: ["textMuted", "textPrimary", "selfInk"] },
+  { tint: "self", ground: "surfaceElevated", textRoles: ["textMuted", "textPrimary", "selfInk"] },
+  // The live chip: live ink on its own wash.
+  { tint: "live", ground: "surface", textRoles: ["textMuted", "live"] },
+  { tint: "live", ground: "surfaceElevated", textRoles: ["textMuted", "live"] },
 ];
 
 describe("TOKENS.color bands", () => {
@@ -169,35 +163,13 @@ describe("TOKENS.color bands", () => {
   }
 });
 
-// THE MAGNITUDE RAMP — the heat map (docs/design/2026-08-27-fun-pass-spec.md, rule 1's largest
-// amendment). Five steps: four verdicts and the absence of one. Four gates, and the third and
-// fourth are what make this ramp different from the reference product's:
-//
-// 1. Every step clears AA text contrast on ALL FOUR surfaces, not the two `TEXT_ON_SURFACE`
-//    checks the semantic roles against. A heat-coloured number lands in a table row, an inset
-//    well and a raised tile exactly as readily as on the page ground, and unlike `warning` it has
-//    no "demoted usage" story to fall back on — it is the number itself.
-// 2. `neutral` IS `textPrimary`, deliberately, the same way `accent` IS `positive`. A number with
-//    no stated comparison set has to be indistinguishable from ordinary text; give the "no
-//    verdict" step a pigment of its own and every uncompared number in the product starts reading
-//    as a judgement, which is the exact failure the spec forbids ("we do not colour a number
-//    because it looks big").
-// 3. The ramp is strictly ordered by CONTRAST AGAINST THE GROUND, never by hue. Green-versus-red
-//    is the worst available pair for deuteranopia, which affects roughly one man in twelve, and
-//    this product's audience is overwhelmingly men — so hue, the channel `DISTINGUISHABLE_PAIRS`
-//    above is happy to accept, is precisely the channel this ramp may not lean on. Ordering by
-//    contrast-against-`surface` also spares the gate a per-theme direction: "louder" is brighter
-//    at night and darker in daylight, and one assertion covers both.
-// 4. No verdict step may be visually interchangeable with `neutral`. A heat-coloured number and a
-//    plain one have to differ in something a monochrome eye can see, or the tint is doing all the
-//    work.
-//
-// None of this is the whole colourblind gate. Colour is never magnitude's only channel — the
-// value reads plainly as its own number and a judged value carries a caret and a weight step —
-// and THAT gate lives with the component that renders it, `src/components/ui/stat.test.tsx`.
-// This block only proves the pigments are legible and correctly ordered.
-const MAGNITUDE_SURFACES: readonly ColorRole[] = ["surface", "surfaceElevated", "surfaceRaised", "surfaceInset"];
-/** The judged steps, best first. `neutral` sits between `good` and `weak` and is not on the ramp. */
+/**
+ * THE MAGNITUDE RAMP (P11: tint only against a stated population, never as the only channel).
+ * Four gates: every step clears AA on ALL FOUR surfaces; `neutral` IS `textPrimary`; the ramp is
+ * strictly ordered by contrast against the ground, never by hue (green versus red is the pair
+ * that vanishes for one man in twelve); no verdict step is interchangeable with `neutral`.
+ * Colour is never magnitude's only channel: the caret and weight step live with `Stat`.
+ */
 const MAGNITUDE_RAMP: readonly MagnitudeStep[] = ["strong", "good", "weak", "bad"];
 const MIN_ADJACENT_STEP_CONTRAST = 1.15;
 const MIN_RAMP_END_CONTRAST = 1.5;
@@ -216,14 +188,14 @@ describe("TOKENS.magnitude", () => {
       const m = TOKENS.magnitude[theme];
 
       for (const step of MAGNITUDE_STEPS) {
-        for (const surface of MAGNITUDE_SURFACES) {
+        for (const surface of ALL_SURFACES) {
           it(`${step} on ${surface} ≥ ${AA_TEXT}:1`, () => {
             expect(contrastRatio(m[step], c[surface])).toBeGreaterThanOrEqual(AA_TEXT);
           });
         }
       }
 
-      it("makes the no-verdict step the ordinary ink, deliberately — an uncompared number is not a judgement", () => {
+      it("makes the no-verdict step the ordinary ink, deliberately", () => {
         expect(m.neutral).toBe(c.textPrimary);
       });
 
@@ -242,7 +214,7 @@ describe("TOKENS.magnitude", () => {
         });
       }
 
-      it(`puts the ends of the ramp ≥ ${MIN_RAMP_END_CONTRAST}:1 apart, because green and red are the pair that vanishes`, () => {
+      it(`puts the ends of the ramp ≥ ${MIN_RAMP_END_CONTRAST}:1 apart`, () => {
         expect(contrastRatio(m.strong, m.bad)).toBeGreaterThanOrEqual(MIN_RAMP_END_CONTRAST);
       });
 
@@ -255,8 +227,6 @@ describe("TOKENS.magnitude", () => {
   }
 });
 
-// The six position stickers. `def` is the quiet one by design (no hue of its own to speak
-// of), which is exactly why it has to be checked against the five that do have one.
 const POSITION_ROLES: readonly PositionColorRole[] = ["qb", "rb", "wr", "te", "k", "def"];
 
 describe("TOKENS.position", () => {
@@ -281,15 +251,12 @@ describe("TOKENS.position", () => {
         });
       }
 
-      // The whole point of a position sticker is that you read the POSITION off the color
-      // before you read the letters. Two stickers a viewer could mistake for each other
-      // would defeat that, so the same threshold that keeps the semantic roles apart applies
-      // to all fifteen sticker pairs.
+      // A position is read off the colour before the letters, so every pair is held apart.
       for (let i = 0; i < POSITION_ROLES.length; i++) {
         for (let j = i + 1; j < POSITION_ROLES.length; j++) {
           const roleA = POSITION_ROLES[i]!;
           const roleB = POSITION_ROLES[j]!;
-          it(`${roleA} and ${roleB} stickers are distinguishable (contrast ≥ ${MIN_DISTINGUISHABLE_CONTRAST} or hue distance ≥ ${MIN_DISTINGUISHABLE_HUE_DEG}°)`, () => {
+          it(`${roleA} and ${roleB} stickers are distinguishable`, () => {
             const contrast = contrastRatio(p[roleA].sticker, p[roleB].sticker);
             const hueDelta = hueDistance(hueDegrees(p[roleA].sticker), hueDegrees(p[roleB].sticker));
             expect(contrast >= MIN_DISTINGUISHABLE_CONTRAST || hueDelta >= MIN_DISTINGUISHABLE_HUE_DEG).toBe(true);
@@ -301,17 +268,12 @@ describe("TOKENS.position", () => {
 });
 
 /**
- * The tier ladder's own gate. A grade badge is an opaque fill carrying its own dark label, so it
- * has two jobs and this block checks both: the letter has to be readable ON the badge, and the
- * badge has to be findable AGAINST the row it divides — in both themes, because the palette is
- * theme-independent and only one of the two grounds was ever looked at while it was chosen.
- *
- * WHAT BREAKS WITHOUT IT: a band nobody can see is not a divider, it is decoration, and a grade
- * letter that washes into its own fill is a colour-only signal — the exact failure the
- * colourblind rule exists to forbid.
+ * The tier ladder's gate: the letter readable ON the badge, the badge findable AGAINST the row
+ * it divides, in both themes, and the ladder's ends far enough apart in hue that S never reads
+ * as C. Adjacent rungs are close on purpose (the letter is the colourblind channel).
  */
 describe("TOKENS.tier", () => {
-  it("defines the same grades in both themes, so no band can exist in a theme nobody designed", () => {
+  it("defines the same grades in both themes", () => {
     expect(Object.keys(TOKENS.tier.light).sort()).toEqual([...TIER_GRADES].sort());
     expect(Object.keys(TOKENS.tier.dark).sort()).toEqual([...TIER_GRADES].sort());
   });
@@ -325,22 +287,13 @@ describe("TOKENS.tier", () => {
         it(`${grade}'s letter on its own badge ≥ ${AA_TEXT}:1`, () => {
           expect(contrastRatio(t[grade].label, t[grade].fill)).toBeGreaterThanOrEqual(AA_TEXT);
         });
-        // The UI threshold, not the text one: the badge is a shape you have to FIND against the
-        // ground, which is exactly what WCAG 1.4.11 sizes 3:1 for. The letter inside it carries
-        // the text threshold, above. `surfaceElevated` is checked because a band sits between two
-        // pool CARDS, not only on the page ground.
-        for (const surface of ["surface", "surfaceElevated"] as const) {
+        for (const surface of SURFACES) {
           it(`${grade}'s badge is findable on ${surface} ≥ ${AA_LARGE_AND_UI}:1`, () => {
             expect(contrastRatio(t[grade].fill, c[surface])).toBeGreaterThanOrEqual(AA_LARGE_AND_UI);
           });
         }
       }
 
-      // THE RANGE OF THE LADDER, not the separation of its rungs. Adjacent grades are close in hue
-      // on purpose (see `TOKENS.tier`'s docblock) and every badge prints its own letter, so a
-      // pairwise-hue rule would be the position stickers' gate applied to something that is an
-      // ORDER rather than a set of categories. What has to be true is that top and bottom do not
-      // look like the same grade — a ramp with no range is one colour spent four times.
       it(`puts the ends of the ladder ≥ ${MIN_DISTINGUISHABLE_HUE_DEG}° apart in hue, so S never reads as C`, () => {
         const first = t[TIER_GRADES[0]!].fill;
         const last = t[TIER_GRADES[TIER_GRADES.length - 1]!].fill;
@@ -371,18 +324,9 @@ describe("TOKENS scales", () => {
     expect(vals[0]).toBeGreaterThan(TOKENS.font.size.md);
   });
   it("carries roughly ten times the range between the biggest number on a screen and its label", () => {
-    // THE DYNAMIC-RANGE GATE (docs/design/2026-08-27-fun-pass-spec.md, cause 3): "Sports
-    // interfaces live on roughly 10x scale contrast — a huge number, a tiny label. We are at
-    // about 2x. Uniform hierarchy is a document convention, and it is why the eye has nothing to
-    // grab on any page."
-    //
-    // The two ends are real, not notional: the top of the display scale is what a `Stat` renders
-    // its value at, and `xs` is the `EYEBROW` register every label in the product is set in. The
-    // ratio is checked against BOTH emissions, because the dense scale shrinks the label without
-    // shrinking the number and a gate that only saw the phone would be measuring the easy case.
-    //
-    // Range comes from SIZE and only from size — the ≤600 weight cap is rule 2 and does not move
-    // (`weight-cap.source.test.ts` is what keeps it from being reached for instead).
+    // P2's dynamic range: a huge number over a tiny caption. Checked against BOTH emissions,
+    // because the dense scale shrinks the label without shrinking the number. Range comes from
+    // SIZE and only from size; the weight cap (`weight-cap.source.test.ts`) does not move.
     const MIN_DISPLAY_RANGE = 9;
     const largest = Math.max(...Object.values(TOKENS.font.display));
     expect(largest / TOKENS.font.size.xs).toBeGreaterThanOrEqual(MIN_DISPLAY_RANGE);
@@ -391,27 +335,29 @@ describe("TOKENS scales", () => {
   it("display line height is tighter than the tight body line height", () => {
     expect(TOKENS.font.lineHeight.display).toBeLessThan(TOKENS.font.lineHeight.tight);
   });
-
-  /**
-   * LAW 2's OWN NUMBER. The law is not "make it big", it is a stated ratio: *"A score is 84px;
-   * its label is 11px"* — 7.6x. The dynamic-range gate above only asks for ≥9x against the top
-   * of the display scale, which is the TV board's 116px; it would still pass if the scoreboard
-   * step vanished. This pins the two values the law actually names, so the scale cannot drift
-   * out from under the sentence in `docs/design-system.md` that quotes them.
-   */
-  it("puts a score at 84 and its label at 11 — law 2's stated 7.6x, not a nearby ratio", () => {
+  it("puts a score at 84 and its label at 11, the stated 7.6x", () => {
     expect(TOKENS.font.display["2xl"]).toBe(84);
     expect(TOKENS.font.size.xs).toBe(11);
     expect(TOKENS.font.display["2xl"] / TOKENS.font.size.xs).toBeCloseTo(7.64, 1);
   });
 
   /**
-   * LAW 4, MEASURED. "Tight leading, real tables, no decorative whitespace." v3 shipped
-   * 1.06/1.2/1.5 and every surface drifted airy underneath it. The absolute ceilings below are
-   * what "tighter than v3" means in numbers, so the claim survives the next person who nudges a
-   * value for one screen's benefit.
+   * SIDELINE'S DENSITY, pinned by name: a name is 17px on a row in both emissions (a name is the
+   * largest thing on the row and does not shrink with the viewport), rows are 48 with a 36 face,
+   * research rows go to 44, and no object spends more than four columns.
    */
-  it("sets leading tighter than v3 at every step, because density is the law not a preference", () => {
+  it("sets the row name at 17px on the phone and at desktop density alike", () => {
+    expect(TOKENS.font.size.lg).toBe(TOKENS.density.namePx);
+    expect(TOKENS.font.sizeDense.lg).toBe(TOKENS.density.namePx);
+  });
+
+  it("carries Sideline's density constants: 48px rows, 36px faces, 17px names, 44px research rows, four columns", () => {
+    expect(TOKENS.density).toEqual({ rowPx: 48, denseRowPx: 44, facePx: 36, namePx: 17, maxColumns: 4 });
+    expect(TOKENS.density.denseRowPx).toBeLessThan(TOKENS.density.rowPx);
+    expect(TOKENS.density.facePx).toBeLessThan(TOKENS.density.rowPx);
+  });
+
+  it("sets leading no looser than the density it inherited", () => {
     const { display, tight, base } = TOKENS.font.lineHeight;
     expect(display).toBeLessThan(1.0);
     expect(tight).toBeLessThanOrEqual(1.15);
@@ -419,12 +365,11 @@ describe("TOKENS scales", () => {
   });
 
   /**
-   * V6, THE WARMTH PASS (founder 2026-09-03): the straightedge's 3-5px corners are the ruling's
-   * named rigidity source, so the scale is pinned VALUE BY VALUE — judged against the approved
-   * mocks (a card reads ~14-16, a verb ~12, chips full pill), not merely "bigger than before".
-   * A drift back toward the straightedge should fail here by name.
+   * SIDELINE'S RADII, pinned value by value: 20 on a card and a sheet, 16 on a bubble, 12 on a
+   * row plate and the avatar's ring, pills on buttons and chips. `shape` names which step each
+   * object spends so a call site never chooses a corner.
    */
-  it("carries the v6 radius scale the mocks were judged at — sm 8, md 12, lg 16, xl 20, pill", () => {
+  it("carries the radius scale Sideline's primitives are drawn at, sm 8, md 12, lg 16, xl 20, pill", () => {
     expect(TOKENS.radius).toEqual({ sm: 8, md: 12, lg: 16, xl: 20, pill: 999 });
   });
 
@@ -436,48 +381,63 @@ describe("TOKENS scales", () => {
     expect(xl).toBeLessThan(pill);
   });
 
+  it("names every object's radius step from the scale: cards and sheets at 20, bubbles at 16, rows and rings at 12, chips and buttons pills", () => {
+    const steps = Object.keys(TOKENS.radius);
+    for (const step of Object.values(TOKENS.shape)) expect(steps).toContain(step);
+    expect(TOKENS.radius[TOKENS.shape.card]).toBe(20);
+    expect(TOKENS.radius[TOKENS.shape.sheet]).toBe(20);
+    expect(TOKENS.radius[TOKENS.shape.bubble]).toBe(16);
+    expect(TOKENS.radius[TOKENS.shape.row]).toBe(12);
+    expect(TOKENS.radius[TOKENS.shape.avatarRing]).toBe(12);
+    expect(TOKENS.radius[TOKENS.shape.chip]).toBe(999);
+    expect(TOKENS.radius[TOKENS.shape.button]).toBe(999);
+  });
+
   /**
-   * V6's material depth: two designed shadow sets over ONE key set, the same parity contract
-   * `TOKENS.color` keeps — a depth key present in one theme and missing from the other is a
-   * surface whose material silently stops responding to the theme switch.
+   * SIDELINE'S ONE MATERIAL: two designed shadow sets over ONE key set (the parity contract
+   * `TOKENS.color` keeps), a soft drop shadow in both, and no inset top-light in either. The
+   * verb's glow is a tint of each theme's own Court blue.
    */
   it("carries the same shadow keys in both themes", () => {
     expect(Object.keys(TOKENS.shadow.light).sort()).toEqual(Object.keys(TOKENS.shadow.dark).sort());
   });
 
-  it("keeps dark's card material carrying the inset top-light, and only dark's — a white inner hairline vanishes on paper", () => {
-    expect(TOKENS.shadow.dark.card).toContain("inset");
+  it("draws the card as a soft drop shadow with no inset light, in both themes", () => {
     expect(TOKENS.shadow.light.card).not.toContain("inset");
+    expect(TOKENS.shadow.dark.card).not.toContain("inset");
+    expect(TOKENS.shadow.light.card).toContain("4px 16px");
+    expect(TOKENS.shadow.dark.card).toContain("4px 16px");
   });
 
-  it("derives each theme's verb glow from its own accent family, never the other theme's", () => {
-    // Amber at night, the brand blue in daylight: the glow is a tint of the accent that is
-    // actually under it (dark accent #FFB627 → 255,182,39; light accent #1350A8 → 19,80,168).
-    expect(TOKENS.shadow.dark.verbGlow).toContain("255, 182, 39");
-    expect(TOKENS.shadow.light.verbGlow).toContain("19, 80, 168");
-  });
-
-  it("motion durations are strictly increasing", () => {
-    const { fast, base, slow } = TOKENS.motion.duration;
-    expect(fast).toBeLessThan(base);
-    expect(base).toBeLessThan(slow);
+  it("derives each theme's verb glow from its own Court blue", () => {
+    expect(TOKENS.shadow.light.verbGlow).toContain("36, 87, 245");
+    expect(TOKENS.shadow.dark.verbGlow).toContain("91, 133, 255");
   });
 
   /**
-   * LAW 6's CAP, ENFORCED ON THE TOKEN RATHER THAN ON REVIEW. *"Nothing eases longer than
-   * 250ms."* v3's `slow` was 320ms and every celebration in the product read from it, so the law
-   * is only real if the token moves — a rule that lives in prose while the variable says 320 is
-   * a rule the next author overrides by accident.
-   *
-   * `pulse` and `wire` are deliberately exempt, named here so the exemption is a decision rather
-   * than an oversight: neither is an EASE. `pulse` is the live dot's cycle length and `wire` is a
-   * ticker's loop — both are continuous states reporting something still true, not a transition
-   * playing out. Law 6 caps transitions; it does not cap a clock.
+   * P4, MEASURED. Transitions live between 150 and 400ms: a press, a leave, an arrival, and the
+   * one longer celebration per moment. `highlight` (the wash on a changed number) is the one
+   * motion Sideline states longer than the band, at 600ms. `breathe` and `wire` are clocks
+   * reporting something still true, not eases, and are exempt by name.
    */
-  it("keeps every eased duration inside law 6's 250ms ceiling", () => {
-    const LAW_6_CEILING_MS = 250;
-    const { fast, base, slow } = TOKENS.motion.duration;
-    for (const eased of [fast, base, slow]) expect(eased).toBeLessThanOrEqual(LAW_6_CEILING_MS);
-    expect(slow).toBe(LAW_6_CEILING_MS);
+  it("keeps the arrival and the leave inside P4's 150 to 400ms band, the arrival slower than the leave", () => {
+    const { fast, out, in: arrive, celebrate } = TOKENS.motion.duration;
+    expect(out).toBeGreaterThanOrEqual(150);
+    expect(arrive).toBeLessThanOrEqual(400);
+    expect(celebrate).toBeLessThanOrEqual(400 + 80);
+    expect(fast).toBeLessThan(out);
+    expect(out).toBeLessThan(arrive);
+    expect(arrive).toBeLessThan(celebrate);
+  });
+
+  it("names Sideline's durations: 240 in, 180 out, 600 highlight, 2s breathe", () => {
+    expect(TOKENS.motion.duration.in).toBe(240);
+    expect(TOKENS.motion.duration.out).toBe(180);
+    expect(TOKENS.motion.duration.highlight).toBe(600);
+    expect(TOKENS.motion.duration.breathe).toBe(2_000);
+  });
+
+  it("carries the spring for arrivals and the ease-out for leaves, and nothing else", () => {
+    expect(TOKENS.motion.easing).toEqual({ spring: "cubic-bezier(0.2, 0.9, 0.3, 1.15)", out: "cubic-bezier(0.2, 0, 0, 1)" });
   });
 });

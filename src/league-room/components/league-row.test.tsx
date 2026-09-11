@@ -278,7 +278,7 @@ describe("LeagueRowsHeader", () => {
     const { container } = render(<LeagueRowsHeader live={false} />);
     const header = container.firstElementChild as HTMLElement;
     expect(header.getAttribute("aria-hidden")).toBe("true");
-    expect(header.className).toContain("font-mono");
+    expect(header.className).toContain("uppercase");
     expect(header.className).toContain(LEAGUE_ROW_GRID);
     for (const label of ["League", "Format", "Drafts", "Seats"]) {
       expect(screen.getByText(label)).toBeInTheDocument();

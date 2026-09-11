@@ -1,74 +1,62 @@
 import type { HTMLAttributes } from "react";
-
-export type BadgeTone = "neutral" | "accent" | "positive" | "negative" | "warning";
+import { PresenceDot } from "./presence-dot";
 
 /**
- * NEW-5 (Phase 3.6 gauntlet fix wave): `accent` used to be `bg-accent text-accent-text` — a
- * solid green fill, pixel-identical to `Button`'s primary variant. Every caller of this tone is a
- * LABEL (a house rung, a role, a live state, a count), never a control, and `positive`'s own row
- * below already proves the house rule for a Badge: "good outcome, as text/glow/meter fill only —
- * never a solid button fill" (`docs/design-system.md`). Green as a solid block is reserved for the one
- * thing on this product that is actually clickable; a badge that copies it reads as a second,
- * unclickable "Take a seat" button sitting right next to the real one. `glow` (below) still gives
- * a genuinely live/urgent badge its own tinted ring — the outcome-is-a-glow escape hatch stays.
+ * SIDELINE'S CHIP TONES. `neutral` is chalk with muted ink (the mock's `.chip`), `live` is live
+ * ink on a live wash (the mock's `.chip.live`), `self` is amber ink on the amber wash (yours),
+ * `negative` is your rival's rose, `positive` a good outcome, `accent` a link chip in Court blue
+ * on chalk (blue ink never rides the blue wash: 4.44:1). `warning` survives as a name for the
+ * thirteen call sites that spell it and IS the rose.
  */
+export type BadgeTone = "neutral" | "accent" | "positive" | "negative" | "warning" | "live" | "self";
+
 const TONE: Readonly<Record<BadgeTone, string>> = {
-  neutral: "border border-line text-text-muted",
-  accent: "text-accent border border-accent",
-  positive: "text-positive border border-positive",
-  negative: "text-negative border border-negative",
-  warning: "text-warning border border-warning",
+  neutral: "bg-surface text-text-muted",
+  accent: "bg-surface text-accent",
+  positive: "bg-positive/10 text-positive",
+  negative: "bg-negative/10 text-negative",
+  warning: "bg-negative/10 text-negative",
+  live: "bg-live/10 text-live",
+  self: "bg-self-glow text-self-ink",
 };
 
-/** A tinted ring for a live/urgent state, built on `accentGlow`/`warningGlow` — an outcome is a
- *  glow rather than a solid block, which is the palette rule "money is a fill only when it is
- *  money or an action" (`docs/design-system.md`) applied to a chip. Only
- *  `accent` and `warning` carry a glow token; any other tone ignores the prop. */
+/**
+ * A chip that is live RIGHT NOW wears the breathing dot (`glow` on the `live` tone). On the
+ * other tones `glow` is a tinted ring, a real state and never decoration: a caller sets it only
+ * when the thing the chip names is actually happening.
+ */
 const GLOW: Readonly<Partial<Record<BadgeTone, string>>> = {
   accent: "ring-2 ring-accent-glow",
   warning: "ring-2 ring-warning-glow",
-  // The live family's glow (competition review D1, 2026-08-27): an alpha of the existing
-  // negative token rather than a new role — the rail's own hot tint (bg-negative/10) already
-  // set that precedent, and a glow color is a tint of its family, not a fifth pigment.
-  negative: "ring-2 ring-negative/25",
-};
-
-/**
- * THE SOFT FILL (simplification round, coordinator's band ruling): a chip whose ground is a tint
- * of its own tone, so a good outcome reads as good on daylight paper where a hairline alone
- * does not. A tint of the family, never a fifth pigment (the same rule `GLOW` follows), and never
- * `accent`: money is a fill only when it is money or an action, and the accent budget sweep
- * forbids the tint outside the sanctioned primitives.
- */
-const SOFT: Readonly<Partial<Record<BadgeTone, string>>> = {
-  neutral: "bg-surface-raised border-transparent",
-  positive: "bg-positive/10 border-transparent",
-  negative: "bg-negative/10 border-transparent",
-  warning: "bg-warning/10 border-transparent",
+  negative: "ring-2 ring-warning-glow",
+  self: "ring-2 ring-self-glow",
 };
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   readonly tone?: BadgeTone;
-  /** The live pill's tinted ring — a real state, not decoration: a caller sets this only when
-   *  the thing the badge names is actually live right now. */
+  /** The thing this chip names is happening now: the live dot on `live`, a tinted ring elsewhere. */
   readonly glow?: boolean;
-  /** A soft fill of the tone's own tint in place of the hairline (see `SOFT`); `accent` ignores it. */
+  /**
+   * Accepted and ignored: every Sideline chip is the soft wash, so the v6 opt-in is the default.
+   * Kept on the type so the call sites that spell it (the draft room's odds glance among them)
+   * compile unchanged this round; it retires with the next sweep of that tree.
+   */
   readonly soft?: boolean;
 }
 
-export function Badge({ tone = "neutral", glow = false, soft = false, className = "", children, ...rest }: BadgeProps) {
+/**
+ * THE CHIP: a pill of 11px semibold body text on a soft wash of its tone. `whitespace-nowrap`
+ * because a pill is a single glanceable shape, never a paragraph.
+ */
+export function Badge({ tone = "neutral", glow = false, soft: _soft, className = "", children, ...rest }: BadgeProps) {
+  void _soft;
+  const glowClass = glow && tone !== "live" ? (GLOW[tone] ?? "") : "";
   return (
     <span
-      // `whitespace-nowrap` (LED-11): a pill is a single glanceable shape, never a paragraph —
-      // `StatPill`'s two-word labels ("Not started") have no business breaking onto a second
-      // line just because the column beside it is narrow. Without it, a table's automatic
-      // column-width algorithm is free to leave a badge's own cell exactly one glyph too narrow,
-      // wrapping the label — a break the gauntlet caught only in one theme's screenshot because
-      // it sits on a pixel-width knife's edge, not because either theme is doing anything the
-      // other isn't (`week-status-badge.test.tsx`'s regression: the class is unconditional).
-      className={`inline-flex items-center whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-medium ${TONE[tone]} ${soft ? (SOFT[tone] ?? "") : ""} ${glow ? (GLOW[tone] ?? "") : ""} ${className}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${TONE[tone]} ${glowClass} ${className}`.replace(/\s+/g, " ").trimEnd()}
       {...rest}
     >
+      {glow && tone === "live" ? <PresenceDot /> : null}
       {children}
     </span>
   );
