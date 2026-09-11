@@ -66,7 +66,7 @@ const soonIso = () => new Date(Date.now() + UI_CONFIG.openLeagueCard.clockWithin
 const farIso = () => new Date(Date.now() + UI_CONFIG.openLeagueCard.clockWithinMs * 4).toISOString();
 
 const row = (league: PublicLeagueSummary, extra: Partial<Parameters<typeof LeagueRow>[0]> = {}) => (
-  <LeagueRow league={league} signedIn={false} position={1} {...extra} />
+  <LeagueRow league={league} signedIn={false} {...extra} />
 );
 
 /**
@@ -104,10 +104,26 @@ describe("LeagueRow", () => {
     expect(screen.queryByText(GLOSSARY["snake-draft"].short)).not.toBeInTheDocument();
   });
 
-  it("leads with the board position, hidden from assistive tech (the verb carries the spoken name)", () => {
-    const { container } = render(row(BASE, { position: 3 }));
-    const position = container.querySelector('[aria-hidden="true"]');
-    expect(position?.textContent).toBe("3");
+  it("leads with WHO IS IN — the seat stack and the seated line, never a rank numeral (P1)", () => {
+    const { container } = render(row(BASE));
+    // P1 rules out "rows that begin with a rank numeral in display type": what leads the row is
+    // the seat stack, which is decoration for a sentence already on screen and so is hidden.
+    const stack = container.querySelector('[data-testid="seat-stack"]');
+    expect(stack).not.toBeNull();
+    expect(stack?.getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getByText(`${BASE.filledTeams} already in.`)).toBeInTheDocument();
+  });
+
+  it("says so in the second person when nobody is in yet — an invitation, never a zero", () => {
+    render(row({ ...BASE, filledTeams: 0, heldSeats: 0 }));
+    expect(screen.getByText("Nobody yet. You would be first in.")).toBeInTheDocument();
+  });
+
+  it("prints the one number with its basis in the same glance (P2)", () => {
+    render(row(BASE));
+    const figure = screen.getByTestId("big-number");
+    expect(figure.textContent).toContain(String(BASE.teamCount - BASE.filledTeams));
+    expect(figure.textContent).toContain(`of ${BASE.teamCount}`);
   });
 
   describe("the money columns (front door blueprint, both states by injection)", () => {
@@ -136,11 +152,14 @@ describe("LeagueRow", () => {
     });
   });
 
-  it("makes seats-left the row's hero number, tabular, with the segment meter under it", () => {
+  it("makes seats-left the row's one big number, with its basis, over the seat stack", () => {
     const { container } = render(row(BASE));
     expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText(/left of/)).toBeInTheDocument();
-    expect(container.querySelector('[data-testid="seat-segments"]')).not.toBeNull();
+    expect(screen.getByText(/seats left of 12/)).toBeInTheDocument();
+    // The visible shape is the STACK in the who column now: the horizontal meter left with the
+    // second visible telling of one fact (`SeatMeter` still speaks the sentence, sr-only).
+    expect(container.querySelector('[data-testid="seat-stack"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="seat-segments"]')).toBeNull();
   });
 
   it("keeps the seat sentence for screen readers — sr-only, never a second visible seat phrasing", () => {
@@ -172,9 +191,15 @@ describe("LeagueRow", () => {
       expect(screen.queryByText(BASE.draftAt)).not.toBeInTheDocument();
     });
 
-    it("keeps the kickoff-roll disclosure beside a rolled date", () => {
-      render(row({ ...BASE, kickoffRolls: 1 }));
-      expect(screen.getByText(/moved/i)).toBeInTheDocument();
+    it("carries NO per-league roll sentence — the board says the consequence once, on its band", () => {
+      // Fix round 1, M3: the sentence repeated on six of eight rows as a two-line paragraph in
+      // the scheduler's voice, which is P7 failing twice (system voice, repeated explainer).
+      // The board's band carries `rollBandConsequence` in the league's voice, and the
+      // per-league reconciliation stays on the join sheet and the schedule panel, where a
+      // visitor's written-down date is what is actually being corrected.
+      render(row({ ...BASE, kickoffRolls: 3 }));
+      expect(screen.queryByText(/moved/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/because the room was not full/i)).not.toBeInTheDocument();
     });
   });
 
@@ -196,15 +221,17 @@ describe("LeagueRow", () => {
       expect(screen.queryByText("On deck")).not.toBeInTheDocument();
     });
 
-    it("pulses only for a visitor who has not asked for reduced motion", () => {
+    it("breathes only for a visitor who has not asked for reduced motion", () => {
+      // SIDELINE: the chip is `LiveChip`, whose dot is `PresenceDot` on the 2s breath — the one
+      // exemption P4 names, and the same motion the whole product spends on "true right now".
       stubMatchMedia(false);
       const { container, unmount } = render(row({ ...BASE, filledTeams: BASE.teamCount - 1 }));
-      expect(container.querySelector(".animate-pulse-live")).not.toBeNull();
+      expect(container.querySelector(".animate-breathe")).not.toBeNull();
       unmount();
 
       stubMatchMedia(true);
       const reduced = render(row({ ...BASE, filledTeams: BASE.teamCount - 1 }));
-      expect(reduced.container.querySelector(".animate-pulse-live")).toBeNull();
+      expect(reduced.container.querySelector(".animate-breathe")).toBeNull();
     });
   });
 
@@ -280,9 +307,12 @@ describe("LeagueRowsHeader", () => {
     expect(header.getAttribute("aria-hidden")).toBe("true");
     expect(header.className).toContain("uppercase");
     expect(header.className).toContain(LEAGUE_ROW_GRID);
-    for (const label of ["League", "Format", "Drafts", "Seats"]) {
+    // "Who is in" replaces the "#" rank column and "League": the row leads with the people in
+    // the room now (P1), and the league's own name is the largest thing inside that column.
+    for (const label of ["Who is in", "Format", "Drafts", "Seats"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    expect(screen.queryByText("#")).not.toBeInTheDocument();
     expect(screen.queryByText("Buy-in")).not.toBeInTheDocument();
     expect(screen.queryByText("LEAGUE")).not.toBeInTheDocument();
   });

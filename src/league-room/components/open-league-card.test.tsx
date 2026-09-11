@@ -127,19 +127,34 @@ describe("OpenLeagueCard", () => {
     expect(screen.queryByText("newer players only")).not.toBeInTheDocument();
   });
 
-  it("shows the five ledger facts a veteran shops on, in both themes, axe-clean (S7)", async () => {
+  it("shows the ledger facts a veteran shops on, in both themes, axe-clean (S7)", async () => {
     await renderSurface(card(BASE), async ({ container }) => {
       expect(screen.getByText("Drafts")).toBeInTheDocument();
       expect(screen.getByText("Entry")).toBeInTheDocument();
-      expect(screen.getByText("Seats")).toBeInTheDocument();
       expect(screen.getByText("Roster")).toBeInTheDocument();
       expect(screen.getByText("Playoffs")).toBeInTheDocument();
       expect(screen.getByText("Thursday 10 September, 8:00 PM UTC (in 3 days)")).toBeInTheDocument();
-      expect(screen.getByText("3 of 12 open")).toBeInTheDocument();
       expect(screen.getByText("15 slots, 1 flex")).toBeInTheDocument();
       expect(screen.getByText("Weeks 15, 16 and 17")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
+  });
+
+  it("promotes seats out of the ledger into the card's ONE big number with its basis (P2)", () => {
+    render(card(BASE));
+    // The Seats ledger row is gone: it said the same fact at body size among four others, and
+    // P2 asks for exactly one figure larger than body text on an object.
+    expect(screen.queryByText("Seats")).not.toBeInTheDocument();
+    expect(screen.queryByText("3 of 12 open")).not.toBeInTheDocument();
+    const figure = screen.getByTestId("big-number");
+    expect(figure.textContent).toContain("3");
+    expect(figure.textContent).toContain("seats left of 12");
+  });
+
+  it("leads with who is in — the seat stack and the seated line (P1)", () => {
+    const { container } = render(card(BASE));
+    expect(container.querySelector('[data-testid="seat-stack"]')).not.toBeNull();
+    expect(screen.getByText("9 already in.")).toBeInTheDocument();
   });
 
   it("prices the Entry row in ink — a price is a fact, and v5 gave facts no colour", () => {
@@ -209,13 +224,13 @@ describe("OpenLeagueCard", () => {
     it("pulses its dot only for a visitor who has not asked for reduced motion", () => {
       stubMatchMedia(false);
       const { container, unmount } = render(card({ ...BASE, filledTeams: BASE.teamCount - 1 }));
-      expect(container.querySelector(".animate-pulse-live")).not.toBeNull();
+      expect(container.querySelector(".animate-breathe")).not.toBeNull();
       unmount();
 
       stubMatchMedia(true);
       const reduced = render(card({ ...BASE, filledTeams: BASE.teamCount - 1 }));
       expect(screen.getByText("Filling")).toBeInTheDocument();
-      expect(reduced.container.querySelector(".animate-pulse-live")).toBeNull();
+      expect(reduced.container.querySelector(".animate-breathe")).toBeNull();
     });
   });
 

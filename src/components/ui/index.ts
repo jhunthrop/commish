@@ -29,7 +29,7 @@ export { EYEBROW } from "./config";
 export { LedgerRow } from "./ledger-row";
 export { Panel } from "./panel";
 export { Crest, crestTone } from "./crest";
-export { SeatMeter } from "./seat-meter";
+export { SeatMeter, SeatStack } from "./seat-meter";
 export { Meter } from "./meter";
 export { StatPill } from "./stat-pill";
 /** The heat map's one renderer (the fun pass, Task 1). `StatComparison` rides the barrel with it
@@ -77,6 +77,8 @@ export { Pill } from "./pill";
  *  the stream's voice, `PresenceDot`/`LiveChip` the live channel. */
 export { Manager } from "./manager";
 export type { ManagerProps } from "./manager";
+export { ManagerStack } from "./manager-stack";
+export type { ManagerStackProps, StackedManager } from "./manager-stack";
 export { BigNumber } from "./big-number";
 export type { BigNumberProps, BigNumberSize } from "./big-number";
 export { MessageBubble } from "./message-bubble";

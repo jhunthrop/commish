@@ -60,7 +60,7 @@ describe("MockDraftsPage — law 1, one verb", () => {
   it("DRAFT NOW posts the current chips as a solo create and walks into the room", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: { draftId: "d9" } });
     renderInLeague(<MockDraftsPage {...baseProps()} />, fixture.deps);
-    fireEvent.click(screen.getByRole("button", { name: "Draft now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start mock draft" }));
     await waitFor(() => expect(pushed).toEqual(["/app/drafts/d9"]));
     expect(fixture.calls).toContain("POST /api/mock-drafts");
   });
@@ -116,7 +116,7 @@ describe("MockDraftsPage — law 2, people are a door", () => {
     // The amber budget: DRAFT NOW is the page's only solid verb.
     const solids = screen.getAllByRole("button").filter((button) => button.className.includes("bg-accent"));
     expect(solids).toHaveLength(1);
-    expect(solids[0]).toHaveTextContent("Draft now");
+    expect(solids[0]).toHaveTextContent("Start mock draft");
   });
 
   it("shows a re-entry row for a room of the caller's own that is still going", () => {

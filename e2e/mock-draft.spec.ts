@@ -238,7 +238,7 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
   // host drafting last), so this changes nothing about that bound's own margin.
   await setTableChip(managerA, "seat", "Your seat", String(TEAM_COUNT));
   await expect(async () => {
-    await managerA.getByRole("button", { name: "Draft now" }).click();
+    await managerA.getByRole("button", { name: "Start mock draft" }).click();
     await expect(managerA).toHaveURL(/\/app\/drafts\//, { timeout: 5_000 });
   }).toPass({ timeout: 20_000 });
   const draftId = new URL(managerA.url()).pathname.split("/").pop()!;

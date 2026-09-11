@@ -209,8 +209,12 @@ export function MockDraftsPage({ initialOpen, initialMine, options, copy }: Mock
             <p className="text-sm text-text-muted">{copy.soloDetail}</p>
           </div>
           <span className="ml-auto">
+            {/* SIDELINE (2026-09-10): the page's one verb NAMES THE ACT — "Start mock draft",
+                not "Draft now". A lobby whose verb is the same word as the draft room's own
+                Draft button reads as the pick you are about to make rather than the room you
+                are about to open. */}
             <Button variant="verb" size="lg" onClick={() => void create("solo")} loading={busy === "solo"} disabled={busy !== null}>
-              Draft now
+              Start mock draft
             </Button>
           </span>
         </div>

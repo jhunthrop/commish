@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui";
 import { ChapterBand } from "@/components/ui/chapter-band";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { rollBandConsequence } from "@/matchmaking/roll";
 import { featuredFillingLeague, sortBySoonestJoinableDraft } from "@/matchmaking/shelf-order";
 import { moneyIsLive } from "@/money/states";
 import { JoinSheet } from "./join-sheet";
@@ -157,6 +158,17 @@ export function OpenLeagueShelf({
   const filling = sortBySoonestJoinableDraft(merged.filter((league) => league.filledTeams > 0));
   const fresh = sortBySoonestJoinableDraft(merged.filter((league) => league.filledTeams === 0));
   const houseIds = new Set(house.map((league) => league.id));
+  // M3: the roll's consequence, said ONCE on the band that has rolled rooms in it, in the
+  // league's voice — never the per-league scheduler sentence on every row. `null` when nothing
+  // in the band rolled, and the caption is the fill sentence alone.
+  //
+  // FIX ROUND 2: the band's caps slot is a KEY ("Claimed seats"), and the sentences ride the
+  // quiet `caption` below the plate. Pushed through the caps subtitle, this line ran 108
+  // characters of shouting across the top of the board it was introducing — louder than the
+  // rooms. Same words, two registers.
+  const rolled = rollBandConsequence(filling.map((league) => league.kickoffRolls));
+  const fillingCaption =
+    rolled === null ? "First to fill is first to draft." : `First to fill is first to draft. ${rolled}`;
   // The JOIN SHEET's one owner: tapping any row or card opens the whole contract for that
   // league. Stored as the ID and re-resolved so a re-render with fresher props never shows a
   // stale summary inside the sheet.
@@ -185,26 +197,25 @@ export function OpenLeagueShelf({
 
       {merged.length > 0 ? (
         <>
-          {/* THE RANKED BOARD (Sunday v5; founder: "boring and stagnant... make it feel alive
-              like the tower"). One list, ranked by the one number that varies — seats remaining
-              — so P1 is the room that fires next, with the leader wearing the amber rail. Two
-              chapter bands (law 5), each carrying its consequence in words: rooms with claims
-              are FILLING, untouched rooms wait below. House-first ordering died with the
-              ranking; a leaderboard has one axis. */}
-          <div data-testid="league-rows" className="hidden lg:block">
+          {/* THE BOARD, SIDELINE (2026-09-10): one paper surface on the chalk ground, rows as
+              12px plates inside it, and the hairlines between them gone — a plate that lifts on
+              hover is already a row boundary, and a rule under every plate read as a table. The
+              ordering is still soonest-draft-first; what left with the position numeral (P1) is
+              the leaderboard's shout, not its order. Two chapter bands, each carrying its
+              consequence in words: rooms with claims are FILLING, untouched rooms wait below. */}
+          <div data-testid="league-rows" className="hidden rounded-xl bg-surface-elevated p-2 shadow-card lg:block">
             <LeagueRowsHeader live={live} />
             {filling.length > 0 ? (
-              <ChapterBand name="Filling" consequence="Claimed seats · first to fill is first to draft" tone="live" />
+              <ChapterBand name="Filling" consequence="Claimed seats" caption={fillingCaption} tone="live" />
             ) : null}
             <ul className="flex flex-col">
-              {filling.map((league, index) => (
-                <li key={league.id} className="border-t border-hair border-t-line" data-testid={houseIds.has(league.id) ? undefined : "member-league"}>
+              {filling.map((league) => (
+                <li key={league.id} data-testid={houseIds.has(league.id) ? undefined : "member-league"}>
                   <LeagueRow
                     league={league}
                     signedIn={signedIn}
-                    position={index + 1}
-                    // The wash rides the FEATURED row (blueprint law 2), not bare P1: a board
-                    // whose fullest room has rolled, or holds no claims, washes nothing.
+                    // The amber wash rides the FEATURED row (blueprint law 2), not bare P1: a
+                    // board whose fullest room has rolled, or holds no claims, washes nothing.
                     leader={league.id === featuredId}
                     emphasis={league.id === featuredId ? "ink" : "quiet"}
                     headingLevel={headingLevel === 1 ? 2 : 3}
@@ -215,16 +226,18 @@ export function OpenLeagueShelf({
               ))}
             </ul>
             {fresh.length > 0 ? (
-              <ChapterBand name="Fresh" consequence="No claims yet · yours would be the first seat" />
+              <ChapterBand name="Fresh" consequence="No claims yet" caption="Yours would be the first seat." />
             ) : null}
             <ul className="flex flex-col">
-              {fresh.map((league, index) => (
-                <li key={league.id} className="border-t border-line" data-testid={houseIds.has(league.id) ? undefined : "member-league"}>
+              {fresh.map((league) => (
+                <li key={league.id} data-testid={houseIds.has(league.id) ? undefined : "member-league"}>
+                  {/* No `leader` here (fix round 1, L1): `featuredFillingLeague` requires
+                      `filledTeams > 0` and this is the no-claims band, so the amber wash was
+                      unreachable and the prop only read as though a fresh room might win it. */}
                   <LeagueRow
                     league={league}
                     signedIn={signedIn}
-                    position={filling.length + index + 1}
-                    emphasis={league.id === featuredId ? "ink" : "quiet"}
+                    emphasis="quiet"
                     headingLevel={headingLevel === 1 ? 2 : 3}
                     live={live}
                     onOpen={() => setOpenLeagueId(league.id)}

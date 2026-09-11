@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { axe } from "vitest-axe";
 import { renderSurface } from "./test-utils";
-import { SeatMeter } from "./seat-meter";
+import { SeatMeter, SeatStack } from "./seat-meter";
 
 describe("SeatMeter", () => {
   it("names the seats in words beside the bar", () => {
@@ -54,15 +54,19 @@ describe("SeatMeter", () => {
     });
   });
 
-  it("renders one equal segment per total seat, the filled ones in money green", () => {
-    renderSurface(<SeatMeter filled={2} total={5} />, ({ getByTestId }) => {
+  it("renders one equal segment per total seat, taken in ink, held in amber, open in the well", () => {
+    renderSurface(<SeatMeter filled={2} total={5} heldSeats={1} />, ({ getByTestId }) => {
       const bar = getByTestId("seat-segments");
       expect(bar.children).toHaveLength(5);
       const segments = Array.from(bar.children);
-      // Equal flex segments, never sized dots — the v3 mock's seat bar (Task 5, rule 1).
+      // Equal flex segments, never sized dots.
       expect(segments.every((segment) => segment.className.includes("flex-1"))).toBe(true);
-      expect(segments.filter((segment) => segment.className.includes("bg-accent"))).toHaveLength(2);
-      expect(segments.filter((segment) => segment.className.includes("bg-surface-inset"))).toHaveLength(3);
+      // SIDELINE (2026-09-10): taken seats are INK, not Court blue — `accent` is the one verb
+      // (P3) and a twelve-segment blue bar spent the page's loudest pigment on furniture.
+      expect(segments.filter((segment) => segment.className.includes("bg-text-primary"))).toHaveLength(2);
+      expect(segments.filter((segment) => segment.className.includes("bg-self"))).toHaveLength(1);
+      expect(segments.filter((segment) => segment.className.includes("bg-surface-inset"))).toHaveLength(2);
+      expect(segments.some((segment) => segment.className.includes("bg-accent"))).toBe(false);
     });
   });
 
@@ -74,6 +78,39 @@ describe("SeatMeter", () => {
 
   it("is axe-clean in both themes", async () => {
     await renderSurface(<SeatMeter filled={9} total={12} heldSeats={1} />, async ({ container }) => {
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+});
+
+describe("SeatStack", () => {
+  it("stands one token per seat on end, in the meter's own three skins, in both themes", async () => {
+    await renderSurface(<SeatStack filled={9} total={12} heldSeats={1} />, ({ getByTestId }) => {
+      const stack = getByTestId("seat-stack");
+      expect(stack.children).toHaveLength(12);
+      const tokens = Array.from(stack.children);
+      expect(tokens.filter((token) => token.className.includes("bg-text-primary"))).toHaveLength(9);
+      expect(tokens.filter((token) => token.className.includes("bg-self"))).toHaveLength(1);
+      expect(tokens.filter((token) => token.className.includes("bg-surface-inset"))).toHaveLength(2);
+    });
+  });
+
+  it("hides itself from the accessibility tree — the row's seat sentence says everything", async () => {
+    await renderSurface(<SeatStack filled={9} total={12} />, ({ getByTestId }) => {
+      expect(getByTestId("seat-stack")).toHaveAttribute("aria-hidden", "true");
+    });
+  });
+
+  it("draws an untouched room as twelve open seats, never as nothing", async () => {
+    await renderSurface(<SeatStack filled={0} total={12} />, ({ getByTestId }) => {
+      const stack = getByTestId("seat-stack");
+      expect(stack.children).toHaveLength(12);
+      expect(Array.from(stack.children).every((token) => token.className.includes("bg-surface-inset"))).toBe(true);
+    });
+  });
+
+  it("is axe-clean in both themes", async () => {
+    await renderSurface(<SeatStack filled={9} total={12} heldSeats={1} />, async ({ container }) => {
       expect(await axe(container)).toHaveNoViolations();
     });
   });

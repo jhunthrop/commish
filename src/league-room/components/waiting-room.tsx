@@ -3,10 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BigNumber, Celebration, ManagerStack, type StackedManager } from "@/components/ui";
 import { Countdown, formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
 import { UI_CONFIG } from "@/components/ui/config";
-import { Crest } from "@/components/ui/crest";
-import { Icon } from "@/components/ui/icon";
 import { SeatMeter } from "@/components/ui/seat-meter";
 import { StatePanel } from "@/components/ui/state-panel";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
@@ -20,6 +19,7 @@ import { describeStartTiming } from "@/matchmaking/roll";
 import type { CompositionCategory } from "@/participation/composition";
 import type { DraftScheduleBody, LeagueMemberCard } from "../contract";
 import { DraftSchedulePanel, draftTerminalStatePanel } from "./draft-schedule-panel";
+import { alreadyInPhrase } from "./open-league-shared";
 import { ReleaseSeatControl } from "./release-seat-control";
 import { RoomRoster } from "./room-roster";
 import { SlotPreferencePanel } from "./slot-preference-panel";
@@ -284,7 +284,27 @@ export function WaitingRoom({
   // `kickoffAt` yet (`DraftScheduleBody.kickoffAt`'s own docblock).
   const { remainingMs } = useCountdown(league.startTrigger === "when_full" && full ? league.kickoffAt : null);
 
-  const myTeamName = teams?.find((team) => team.id === myTeamId)?.name ?? null;
+  const myTeam = teams?.find((team) => team.id === myTeamId) ?? null;
+  const myTeamName = myTeam?.name ?? null;
+  /**
+   * WHO IS IN THIS ROOM, as people (P1). Unlike the public shelf — where `PublicLeagueSummary`
+   * forbids naming anybody (`SeatStack`'s docblock) — a member reading their own waiting room
+   * already sees this roster below, so the stack at the top is the same fact, faces first.
+   * Your own seat leads and wears the amber ring. `undefined` teams means the caller never paid
+   * for the members read, and an absent stack is absence, never four invented circles.
+   */
+  const seated: readonly StackedManager[] =
+    teams === undefined
+      ? []
+      : [...teams]
+          .sort((a, b) => Number(b.id === myTeamId) - Number(a.id === myTeamId))
+          .map((team) => ({ name: team.ownerDisplayName, avatar: team.ownerAvatarUrl, isSelf: team.id === myTeamId }));
+  // "9 already in.", never "9 of 12 seated": `SeatMeter` owns THE seat sentence for the product
+  // (F17) and says it on this same hero. The stack's caption is about the PEOPLE, through the
+  // one phrase the open-league row also reads (`alreadyInPhrase`, fix round 1's L3 — this file
+  // used to build the same words without the period), so the two never drift or say one fact
+  // twice.
+  const seatedCaption = alreadyInPhrase(league.filledTeams);
   const items = checklistItems({
     leagueId: league.leagueId,
     myTeamName,
@@ -320,9 +340,14 @@ export function WaitingRoom({
   // so no animation is skipped or duplicated by reusing it here.
   const fullSeatHero: ReactNode =
     full && league.startTrigger === "when_full" ? (
-      <div data-testid="waiting-room-hero" className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
-        <Icon name={showCountdownHero ? "bolt" : "users"} size={28} className="text-text-muted" />
-        <SeatMeter filled={league.filledTeams} total={league.teamCount} />
+      <div data-testid="waiting-room-hero" className="flex flex-col items-start gap-3 rounded-xl bg-surface-elevated p-6 shadow-card">
+        {/* P1 then P2: the room's people, then its one number with its basis. */}
+        {seated.length === 0 ? null : <ManagerStack people={seated} caption={seatedCaption} />}
+        {/* `filledTeams`, not `teamCount` (fix round 1, L2): the fact is how many seats are
+            taken, and printing capacity was only ever right while "full" meant exactly filled.
+            The basis names the population, so the two numbers are read together. */}
+        <BigNumber value={String(league.filledTeams)} basis={`of ${league.teamCount} seats taken`} size="lg" align="start" />
+        <SeatMeter filled={league.filledTeams} total={league.teamCount} srOnlySentence className="w-full" />
         {showCountdownHero ? (
           <div className="flex flex-col items-center gap-1">
             {/* `remainingMs` is null on the server and hydrating renders (`useNow`'s hydration
@@ -386,18 +411,25 @@ export function WaitingRoom({
     );
   }
 
-  // D1: the seating moment. Crest at `lg`, the league line as the heading, the seat sentence
-  // under it, and one line of what happens next — the checklist's own first item, promoted, so
-  // the moment ends in an action rather than in applause.
+  // D1: the seating moment — now P8's CELEBRATION FRAME, the primitive, rather than a card this
+  // file drew itself. The frame carries what P8 asks of a moment worth screenshotting: which
+  // league, the person, the number that earned it with its basis, and the date. Tailgate's
+  // slap-in rides it at celebration scale only, which is the borrowing section 5 sanctions, and
+  // `Celebration`'s reduced-motion branch is a real one. The hand-rolled crest-and-heading card
+  // it replaces said the same three facts in three different registers.
   if (justSeated) {
     const next = items[0]!;
     return (
-      <div className="flex flex-col items-center gap-2 rounded-lg bg-surface-elevated p-6 text-center shadow-card">
-        <Crest id={league.leagueId} name={leagueName} size={64} />
-        {/* The one place a contraction is deliberate, per C1's own named exception
-            (`docs/design-system.md`): the mock's own approved wordmark-adjacent line. */}
-        <h2 className="text-lg font-semibold text-text-primary">{`${leagueName} · You're in`}</h2>
-        <p className="text-sm text-text-primary">{`You claimed seat ${league.filledTeams} of ${league.teamCount} just now.`}</p>
+      <div className="flex flex-col gap-3">
+        <Celebration
+          testId="just-seated"
+          emphasis="self"
+          leagueName={leagueName}
+          title="You're in"
+          detail={`You claimed seat ${league.filledTeams} of ${league.teamCount} just now.`}
+          people={myTeam === null ? undefined : [{ name: myTeam.ownerDisplayName, avatar: myTeam.ownerAvatarUrl }]}
+          figure={{ value: String(league.filledTeams), basis: `of ${league.teamCount} seats` }}
+        />
         {holdExpired ? (
           <p className="text-sm text-text-muted">Your hold ran out, so we seated you the ordinary way.</p>
         ) : null}
@@ -432,9 +464,19 @@ export function WaitingRoom({
       </div>
     ) : (
       <div className="flex flex-col gap-2">
-        <div data-testid="waiting-room-hero" className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
-          <Icon name="users" size={28} className="text-text-muted" />
-          <SeatMeter filled={league.filledTeams} total={league.teamCount} />
+        <div data-testid="waiting-room-hero" className="flex flex-col items-start gap-3 rounded-xl bg-surface-elevated p-6 shadow-card">
+          {/* P1 then P2 (SIDELINE, 2026-09-10): the people in this room, then the one number
+              that says what it is waiting for, with its basis. The dashed placeholder box and
+              the decorative `users` glyph both retire: a room with real managers in it is not a
+              placeholder, and an icon above a seat count is a picture of the words under it. */}
+          {seated.length === 0 ? null : <ManagerStack people={seated} caption={seatedCaption} />}
+          <BigNumber
+            value={String(league.teamCount - league.filledTeams)}
+            basis={`${league.teamCount - league.filledTeams === 1 ? "seat" : "seats"} left of ${league.teamCount}`}
+            size="lg"
+            align="start"
+          />
+          <SeatMeter filled={league.filledTeams} total={league.teamCount} srOnlySentence className="w-full" />
           {/* F9/C5: quoted from `describeStartTiming`, never typed here — the browse card, this
               room, the schedule panel and the notice all say this one sentence. */}
           <p className="text-sm text-text-muted">{describeStartTiming({ startTrigger: "when_full", authority: league.authority.kind })}</p>

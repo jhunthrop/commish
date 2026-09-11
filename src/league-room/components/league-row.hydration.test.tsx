@@ -55,7 +55,7 @@ describe("LeagueRow SSR hydration (scheduled league inside the clock window)", (
     const league = soonLeague();
 
     await hydrateSurface(
-      () => <LeagueRow league={league} signedIn={false} position={1} />,
+      () => <LeagueRow league={league} signedIn={false} />,
       ({ recoverableErrors, consoleErrors }) => {
         expect(recoverableErrors).toEqual([]);
         expect(consoleErrors).toEqual([]);
@@ -70,7 +70,7 @@ describe("LeagueRow SSR hydration (scheduled league inside the clock window)", (
     const league = soonLeague();
 
     await hydrateSurface(
-      () => <LeagueRow league={league} signedIn={false} position={1} />,
+      () => <LeagueRow league={league} signedIn={false} />,
       ({ serverHtml }) => {
         // v5's relativeFirst row splits `draftAt` into its two halves — the relative fact leads,
         // the absolute date sits on the faint line. Both are the formatter's own words; no digits
@@ -89,7 +89,7 @@ describe("LeagueRow SSR hydration (scheduled league inside the clock window)", (
     const league = soonLeague();
 
     await hydrateSurface(
-      () => <LeagueRow league={league} signedIn={false} position={1} />,
+      () => <LeagueRow league={league} signedIn={false} />,
       async ({ container }) => {
         // Post-hydration effects have flushed: the clock has snapped and the digits render.
         const clock = container.querySelector('[data-testid="draft-clock"]');

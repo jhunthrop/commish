@@ -1,19 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { Card, LedgerRow, SeatMeter } from "@/components/ui";
+import { BigNumber, Card, LedgerRow, SeatStack } from "@/components/ui";
+import { seatSentence } from "@/components/ui/seat-meter";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { Button } from "@/components/ui";
 import { moneyIsLive } from "@/money/states";
 import {
   ctaAccessibleName,
   ctaVisibleText,
-  DraftTimingNotes,
   FormatLine,
   LiveChip,
   OpenLeagueCta,
   potFacts,
   ScheduledDraftValue,
+  seatedLine,
   entryFeeLabel,
   stakeBadge,
   useOpenLeagueLive,
@@ -79,44 +80,60 @@ export function OpenLeagueCard({ league, signedIn, emphasis = "quiet", live = mo
     // meant to compare and then join sat as still as a page of terms. Depth only — the card takes
     // no role and no tabindex, so `OpenLeagueCta` below stays the only thing on it you can press
     // and rule 5's one-ink-action accounting is untouched.
-    <Card as="article" interactive className="flex h-full flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        {/* `min-w-0 break-words`: the same guard the rail's `league-rows.tsx` name line carries — a grid item's
-            default `min-width: auto` otherwise lets a long league name widen the item past its
-            column at 360px. `text-lg`: the mock's card register (16.5/600), never the old
-            display-2xl shout. */}
-        <h3 className="min-w-0 break-words font-display text-lg font-semibold leading-display text-text-primary">
-          {league.name}
-        </h3>
-        {liveChipLabel === null && badge === null ? null : (
-          <span className="flex shrink-0 items-center gap-2 pt-0.5">
-            {liveChipLabel === null ? null : <LiveChip label={liveChipLabel} />}
-            {badge}
-          </span>
-        )}
+    <Card as="article" interactive className={`flex h-full flex-col gap-3 ${emphasis === "ink" ? "self-wash" : ""}`.trimEnd()}>
+      {/* P1, SIDELINE: WHO IS IN leads the card. The stack sits UNDER the name here rather than
+          beside it (the row's arrangement): at 360px a twelve-token stack beside the title left
+          the name about 150px and broke "Sharks Only Auction" across three lines, and P1 says
+          the name is the largest readable thing on the object. See `SeatStack`'s docblock for
+          why the mock's faces are seats on a public surface. */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-start justify-between gap-2">
+          {/* `min-w-0 break-words`: the same guard the rail's `league-rows.tsx` name line
+              carries — a grid item's default `min-width: auto` otherwise lets a long league
+              name widen the item past its column at 360px. */}
+          <h3 className="min-w-0 break-words font-display text-lg font-bold leading-tight text-text-primary">
+            {league.name}
+          </h3>
+          {liveChipLabel === null && badge === null ? null : (
+            <span className="flex shrink-0 items-center gap-2 pt-0.5">
+              {liveChipLabel === null ? null : <LiveChip label={liveChipLabel} />}
+              {badge}
+            </span>
+          )}
+        </div>
+        {/* Wraps rather than truncates: a card has the vertical room a row does not, and
+            "Nobody yet. You would be first in." is the invitation — clipping it to "You would
+            be first …" throws away the half that invites. */}
+        <div className="flex min-w-0 items-center gap-3">
+          <SeatStack filled={league.filledTeams} total={league.teamCount} heldSeats={league.heldSeats} />
+          <span className="min-w-0 text-sm text-text-muted">{seatedLine(league)}</span>
+        </div>
       </div>
+
+      {/* P2: the card's ONE number, with its basis in the same glance. It replaces the Seats
+          ledger row, which said the same fact at body size among four other rows. */}
+      <BigNumber
+        value={String(remainingSeats)}
+        basis={`${remainingSeats === 1 ? "seat" : "seats"} left of ${league.teamCount}`}
+        size="md"
+        align="start"
+      />
 
       <FormatLine league={league} />
 
-      {/* The five ledger rows (S7): dense, comparable, hairline-topped. */}
+      {/* The ledger rows (S7): dense, comparable, hairline-topped. */}
       <div className="flex flex-col">
-        <div className="border-t border-line py-1.5 text-sm">
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="shrink-0 text-text-muted">Drafts</span>
-            <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} className="text-right" />
-          </div>
-          <DraftTimingNotes league={league} />
-        </div>
+        {/* The per-league roll sentence left this row with the desktop row's (fix round 1, M3):
+            the board says the consequence once on its band, and the reconciliation lives on the
+            join sheet this card's own verb opens. */}
+        <LedgerRow label="Drafts">
+          <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} className="text-right" />
+        </LedgerRow>
         <LedgerRow label="Entry">
           {/* Real, not promotional: `entryFeeLabel` reads the league's REAL entry fee. A price
               is a fact and wears ink (v5 law 1) — money green is gone, and cyan is the verdict
               channel a price has no claim on. */}
           <span className="font-semibold text-text-primary">{entryFeeLabel(league)}</span>
-        </LedgerRow>
-        <LedgerRow label="Seats">
-          <span className="font-medium tabular-nums text-text-primary">
-            {remainingSeats} of {league.teamCount} open
-          </span>
         </LedgerRow>
         {pot === null ? null : (
           <LedgerRow label="The pot">
@@ -133,9 +150,12 @@ export function OpenLeagueCard({ league, signedIn, emphasis = "quiet", live = mo
         </LedgerRow>
       </div>
 
-      {/* F17: the seat sentence is `SeatMeter`'s, everywhere, held seats included — and the
-          segment bar beside it fills money-green, seat by seat (rule 1). */}
-      <SeatMeter filled={league.filledTeams} total={league.teamCount} heldSeats={league.heldSeats} />
+      {/* F17: the product's ONE seat sentence, held seats included — spoken only, and spelled
+          the way the row and the hold room spell it (fix round 1, M4). This used to render a
+          whole `SeatMeter`, twelve segments of dead DOM, hidden from eyes AND from assistive
+          tech. `SeatStack` above already draws the shape and `BigNumber` already prints the
+          count; what is left to say is the sentence, so say only the sentence. */}
+      <span className="sr-only">{seatSentence(league.filledTeams, league.teamCount, league.heldSeats)}</span>
 
       {isBeginnerOnly ? (
         <p className="text-sm text-text-muted">

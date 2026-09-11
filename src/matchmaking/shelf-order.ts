@@ -61,17 +61,45 @@ export const HOUSE_SHELF_SENTENCE =
   "Commish runs some of these leagues itself, and a new league opens as soon as one fills, so there is always a seat.";
 
 /**
- * THE FULLEST FILLING LEAGUE (storefront review R1) — house or member, at least one seat taken,
- * and, for a `scheduled` league, one that has never rolled (E4: a room the shelf already
- * confirmed short of its own promised time is not the one to feature). `null` when nothing
- * qualifies. Pure and clock-free — moved here from `public-league-list.tsx` with
- * `HOUSE_SHELF_SENTENCE` above, for the same client-boundary reason: `src/app/page.tsx` and
- * `/browse` CALL these from server renders.
+ * THE FULLEST FILLING LEAGUE — house or member, with at least one seat taken. `null` when
+ * nothing qualifies, because an untouched lobby is not a room that is filling and the board
+ * features nothing rather than dressing one up. Pure and clock-free — moved here from
+ * `public-league-list.tsx` with `HOUSE_SHELF_SENTENCE` above, for the same client-boundary
+ * reason: `src/app/page.tsx` and `/browse` CALL these from server renders.
+ *
+ * A ROLLED KICKOFF NO LONGER DISQUALIFIES A ROOM (the doors-and-rooms fix round, 2026-09-10),
+ * reversing storefront review R1's E4 clause. A roll is a fact about the DATE, and the row shows
+ * the date current — it is not a reason to withhold the board's one verb. The cost of E4 was
+ * measured on the dev board: every filling room there had rolled (rooms roll until they fill, by
+ * the founder's own "roll until full" ruling), so NOTHING was ever featured, no row wore the
+ * amber wash, and the board rendered as nine identical outline pills while the header pill
+ * carried the page's only solid. The rule that was meant to protect the feature from an unkept
+ * promise had quietly turned the feature off.
+ *
+ * THE TIE-BREAKS, in order: fewest seats remaining, then the sooner chosen draft, then the room
+ * with a claim in flight. `PublicLeagueSummary` carries no claim timestamp and will not get one
+ * (a per-claim instant is a fact about a PERSON acting, which that contract's privacy boundary
+ * refuses), so `heldSeats` — a seat somebody is claiming right now — is the honest reading of
+ * "most recently claimed". List order settles a total tie, so one rendered board has exactly one
+ * deterministic answer.
  */
+function featuredOrder(a: PublicLeagueSummary, b: PublicLeagueSummary): number {
+  const bySeats = seatsRemaining(a) - seatsRemaining(b);
+  if (bySeats !== 0) return bySeats;
+  const aKick = chosenKickoffMs(a);
+  const bKick = chosenKickoffMs(b);
+  if (aKick !== bKick) {
+    if (aKick === Infinity) return 1;
+    if (bKick === Infinity) return -1;
+    return aKick - bKick;
+  }
+  return b.heldSeats - a.heldSeats;
+}
+
 function fullestFillingLeague(leagues: readonly PublicLeagueSummary[]): PublicLeagueSummary | null {
-  const filling = leagues.filter((league) => league.filledTeams > 0 && (league.startTrigger !== "scheduled" || league.kickoffRolls === 0));
+  const filling = leagues.filter((league) => league.filledTeams > 0);
   if (filling.length === 0) return null;
-  return filling.reduce((tightest, league) => (seatsRemaining(league) < seatsRemaining(tightest) ? league : tightest));
+  return filling.reduce((best, league) => (featuredOrder(league, best) < 0 ? league : best));
 }
 
 /**

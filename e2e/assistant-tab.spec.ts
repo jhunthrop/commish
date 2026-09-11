@@ -112,7 +112,7 @@ test("mock room -> the lead card and rows before your pick, Draft above the fold
   await setTableChip(managerA, "teams", "Teams", String(TEAM_COUNT));
   await setTableChip(managerA, "clock", "Pick clock", `${PICK_SECONDS}s`);
   await expect(async () => {
-    await managerA.getByRole("button", { name: "Draft now" }).click();
+    await managerA.getByRole("button", { name: "Start mock draft" }).click();
     await expect(managerA).toHaveURL(/\/app\/drafts\//, { timeout: 5_000 });
   }).toPass({ timeout: 20_000 });
 

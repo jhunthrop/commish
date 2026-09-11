@@ -1,7 +1,8 @@
 "use client";
 
-import { SeatMeter } from "@/components/ui";
-import { MICRO_LABEL, UI_CONFIG } from "@/components/ui/config";
+import { BigNumber, SeatStack } from "@/components/ui";
+import { seatSentence } from "@/components/ui/seat-meter";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { useValueChangeHighlight } from "@/design/use-value-change-highlight";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { Button } from "@/components/ui";
@@ -9,36 +10,40 @@ import { moneyIsLive } from "@/money/states";
 import {
   ctaAccessibleName,
   ctaVisibleText,
-  DraftTimingNotes,
   entryFeeLabel,
   FormatLine,
   LiveChip,
   OpenLeagueCta,
   potFacts,
   ScheduledDraftValue,
+  seatedLine,
   stakeBadge,
   useOpenLeagueLive,
 } from "./open-league-shared";
 
 /**
- * The one grid template the column-header row and every league row share — six columns:
- * position · name+chip · format · drafts · seats · verb. `minmax(0, …)` on every fr column
- * for the same reason the card grid's items carry `min-w-0`: a grid track's default
- * `min-width: auto` otherwise lets a long league name widen its column past its share.
+ * The one grid template the column-header row and every league row share — five columns:
+ * who · format · drafts · seats · verb. `minmax(0, …)` on every fr column for the same reason
+ * the card grid's items carry `min-w-0`: a grid track's default `min-width: auto` otherwise lets
+ * a long league name widen its column past its share. Five columns, inside P10's cap of five
+ * and with the fifth being the verb.
+ *
+ * SIDELINE (2026-09-10): the POSITION numeral is deleted. P1 rules out "rows that begin with a
+ * rank numeral in display type" by name, and the tower's leaderboard reading was the numeral's
+ * whole justification — the ordering is still the ranking, it simply no longer shouts an index
+ * at the reader before it has said whose room this is. What leads the row now is WHO IS IN IT
+ * (`SeatStack` and the seated line, `seatedLine`), which is P1's own instruction.
  *
  * SUNDAY v5 (founder, 2026-08-28: "this table is boring and feels stagnant"): the ENTRY column
- * is deleted — every league is free this season, and a column with zero variance carries no
- * information, which is the tower's own test for a column's existence. The stake disclosure
- * line under the board still says the money fact once. POSITION arrived in its place: the board
- * is ranked by seats remaining, so the room that fires next reads as P1, which is what makes a
- * list a leaderboard.
+ * stays deleted — every league is free this season, and a column with zero variance carries no
+ * information. The stake disclosure line under the board still says the money fact once.
  *
  * The verb track stays 176px: it clears "Take the last seat" (`ctaVisibleText`) at the button's
  * own `md` padding, and a fixed track is what keeps the header aligned over two separate grid
  * containers (storefront review D2 — `max-content` resolves per container).
  */
 export const LEAGUE_ROW_GRID =
-  "grid grid-cols-[44px_minmax(0,2.2fr)_minmax(0,1.7fr)_minmax(0,1.7fr)_minmax(0,2fr)_176px] items-center gap-x-4";
+  "grid grid-cols-[minmax(0,2.3fr)_minmax(0,1.4fr)_minmax(0,1.4fr)_150px_176px] items-center gap-x-4";
 
 /**
  * The LIVE-MONEY template (front door blueprint, 2026-09-02): BUY-IN and THE POT ride between
@@ -47,9 +52,12 @@ export const LEAGUE_ROW_GRID =
  * the derived free-season sentence under the board says the money fact once). Buy-in is a
  * fixed right-aligned track (a price is short and comparison wants a shared right edge); the
  * pot takes a fr share for its split note.
+ *
+ * Seven columns is past P10's cap and the money round owns that reckoning, not this one: the
+ * template is unreachable while `moneyIsLive()` is dark, which is every render today.
  */
 export const LEAGUE_ROW_GRID_LIVE =
-  "grid grid-cols-[44px_minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1.5fr)_minmax(0,1.7fr)_88px_minmax(0,1.5fr)_176px] items-center gap-x-4";
+  "grid grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1.3fr)_140px_88px_minmax(0,1.4fr)_176px] items-center gap-x-4";
 
 /** The one place the live/free template fork happens, for the header and every row alike. */
 export function leagueRowGrid(live: boolean): string {
@@ -64,11 +72,12 @@ export function leagueRowGrid(live: boolean): string {
 export function LeagueRowsHeader({ live = moneyIsLive() }: { readonly live?: boolean }) {
   return (
     <div aria-hidden="true" className={`${leagueRowGrid(live)} pb-2 pl-2 ${MICRO_LABEL} text-text-faint`}>
-      <span>#</span>
-      <span>League</span>
+      <span>Who is in</span>
       <span>Format</span>
       <span>Drafts</span>
-      <span>Seats</span>
+      {/* `text-right`: the seat figure is `items-end` in its own fixed track, so a left-set
+          header floated a label away from the numbers it names (fix round 1, M2). */}
+      <span className="text-right">Seats</span>
       {live ? (
         <>
           <span className="text-right">Buy-in</span>
@@ -83,11 +92,7 @@ export function LeagueRowsHeader({ live = moneyIsLive() }: { readonly live?: boo
 export interface LeagueRowProps {
   readonly league: PublicLeagueSummary;
   readonly signedIn: boolean;
-  /** The board's rank for this room — 1 is the room that fires next. The PARENT computes it
-   *  over the whole ranked list, so a filtered rendering never renumbers. */
-  readonly position: number;
-  /** True on the board's leader — the row that wears the amber rail, the tower's own "your
-   *  row" treatment spent on the room closest to firing. */
+  /** True on the board's featured room — the row that wears the amber wash. */
   readonly leader?: boolean;
   readonly emphasis?: "ink" | "quiet";
   /** The heading level this row's league name renders at — the PARENT's call (page-audit
@@ -107,26 +112,29 @@ export interface LeagueRowProps {
 }
 
 /**
- * THE open-league row as a timing-tower line (Sunday v5; founder, 2026-08-28: "make it feel
- * alive like the tower"). What changed from the ledger row it replaces, law by law:
+ * THE open-league row, SIDELINE (2026-09-10). What changed from the timing-tower line it
+ * replaces, principle by principle:
  *
- * - LAW 1/2 — a POSITION numeral leads the row, and the board is ranked by the one number that
- *   varies: seats remaining. P1 is the room that fires next.
- * - LAW 3 — seats-left is the row's HERO number, display face at 2xl, not a micro caption. The
- *   pips read under it as the shape; the number is the fact.
- * - THE LIVE CHANNEL — a room inside `lowSeatsThreshold` of firing paints its numeral live-red.
- *   That is the real threshold every seat sentence already keys on, not a vibe.
- * - MOTION REPORTS — `useValueChangeHighlight` flashes the numeral amber for a beat when the
- *   live count actually changes (a claim landed while you were looking). Nothing animates on
- *   mount; a row is only ever seen moving because the world moved.
- * - The DRAFTS column leads with the relative fact ("In 2 days" / "When full" / the ticking
- *   countdown) and drops the absolute date to the faint line — the delta is the story, the
- *   date is the record.
+ * - P1 — WHO IS IN leads the row. The position numeral is gone (P1 names it as a thing ruled
+ *   out), and in its place the seats themselves: `SeatStack` draws taken, held and open, and
+ *   `seatedLine` says the count in people. A signed-out stranger may not be told WHICH people
+ *   (`PublicLeagueSummary`'s privacy boundary, and `SeatStack`'s own docblock) — this is the
+ *   most the product can honestly put before the number, and it is still a room rather than a
+ *   capacity figure.
+ * - P2 — one number larger than body text, with its basis in the same glance: `BigNumber` at
+ *   the row step, "3" over "seats left of 12". The old row printed the figure and its caption as
+ *   one hand-rolled span; the primitive owns both now.
+ * - P3 — exactly one solid verb, and the featured row is the one that wears it.
+ * - THE AMBER WASH — the featured room takes `self-wash`, the mock's treatment, replacing the
+ *   blue left rail and blue gradient. Court blue is the VERB (P3): spending it on a row's
+ *   furniture put the page's one loud pigment behind a row that already carries the button.
+ * - P4 — `useValueChangeHighlight` still washes the figure when the live count actually changes
+ *   (a claim landed while you were looking). Nothing animates on mount.
+ * - The DRAFTS column still leads with the relative fact and drops the date to the faint line.
  */
 export function LeagueRow({
   league,
   signedIn,
-  position,
   leader = false,
   emphasis = "quiet",
   headingLevel = 3,
@@ -137,7 +145,6 @@ export function LeagueRow({
   const claimFlash = useValueChangeHighlight(remainingSeats);
   const NameHeading = headingLevel === 2 ? "h2" : "h3";
 
-  const urgent = league.filledTeams > 0 && remainingSeats > 0 && remainingSeats < UI_CONFIG.seatMeter.lowSeatsThreshold;
   const pot = live ? potFacts(league) : null;
 
   return (
@@ -148,46 +155,52 @@ export function LeagueRow({
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div
       onClick={onOpen}
-      className={`${leagueRowGrid(live)} border-l-[3px] py-3 pl-2 transition-colors hover:bg-surface-elevated ${
+      className={`${leagueRowGrid(live)} rounded-md px-2 py-2.5 transition-colors ${
         onOpen === undefined ? "" : "cursor-pointer "
-      }${leader ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent" : "border-l-transparent"}`}
+      }${
+        // L5: the featured row keeps a hover response ON TOP of the wash. It used to trade one
+        // for the other, which left the one row you most want pressed as the only row that did
+        // not answer the pointer. A ring rather than a fill, because the fill is the wash.
+        leader ? "self-wash hover:ring-2 hover:ring-self" : "hover:bg-surface-raised"
+      }`}
     >
-      <span
-        aria-hidden="true"
-        className={`font-display text-2xl font-extrabold tabular-nums ${
-          leader ? "text-accent" : urgent ? "text-live" : "text-text-faint"
-        }`}
-      >
-        {position}
-      </span>
-
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        <NameHeading className="min-w-0 break-words font-display text-lg font-bold leading-display text-text-primary">
-          {league.name}
-        </NameHeading>
-        {liveChipLabel === null ? null : <LiveChip label={liveChipLabel} />}
-        {stakeBadge(league)}
+      <div className="flex min-w-0 items-center gap-3">
+        <SeatStack filled={league.filledTeams} total={league.teamCount} heldSeats={league.heldSeats} />
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <NameHeading className="min-w-0 break-words font-display text-lg font-bold leading-tight text-text-primary">
+              {league.name}
+            </NameHeading>
+            {liveChipLabel === null ? null : <LiveChip label={liveChipLabel} />}
+            {stakeBadge(league)}
+          </span>
+          <span className="truncate text-sm text-text-muted">{seatedLine(league)}</span>
+        </div>
       </div>
 
       <FormatLine league={league} />
 
+      {/* THE DRAFTS VALUE AND NOTHING ELSE (fix round 1, M3). The per-league roll sentence left
+          this column: it repeated on six of eight rows as a two-line paragraph in the
+          scheduler's voice, which is P7 failing twice. The consequence is said once, on the
+          band above (`rollBandConsequence`); the per-league reconciliation lives on the join
+          sheet and the schedule panel, where a visitor's written-down date is what is actually
+          being corrected. */}
       <div className="min-w-0 text-sm">
         <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} relativeFirst />
-        <DraftTimingNotes league={league} />
       </div>
 
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <span
-          className={`font-display text-2xl font-bold leading-none tabular-nums transition-colors duration-500 ${
-            claimFlash ? "text-accent" : urgent ? "text-live" : "text-text-primary"
-          }`}
-        >
-          {remainingSeats}
-          <span className={`${MICRO_LABEL} ml-1.5 align-middle font-sans text-text-faint`}>
-            {remainingSeats === 1 ? "seat left" : "left"} of {league.teamCount}
-          </span>
-        </span>
-        <SeatMeter filled={league.filledTeams} total={league.teamCount} heldSeats={league.heldSeats} srOnlySentence />
+      <div className="flex min-w-0 flex-col items-end">
+        <BigNumber
+          value={String(remainingSeats)}
+          basis={`${remainingSeats === 1 ? "seat" : "seats"} left of ${league.teamCount}`}
+          size="sm"
+          changed={claimFlash}
+        />
+        {/* The product's ONE seat sentence (F17), spoken only — held seats included. The stack
+            in the who column already draws the same shape for eyes, so a second visible
+            phrasing here would be the claim twice. */}
+        <span className="sr-only">{seatSentence(league.filledTeams, league.teamCount, league.heldSeats)}</span>
       </div>
 
       {live ? (

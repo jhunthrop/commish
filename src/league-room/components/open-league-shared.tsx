@@ -1,12 +1,10 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { Badge, buttonClassName } from "@/components/ui";
-import { LiveMarker } from "@/components/ui/live-marker";
+import { Badge, buttonClassName, LiveChip as LiveChipPrimitive } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";
 import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
-import { rollNoticeSentence } from "@/matchmaking/roll";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
 import { formatUsd } from "@/money/config";
@@ -56,12 +54,41 @@ function Dot() {
 }
 
 /**
- * The storefront's live marker — now the ONE `LiveMarker` primitive, which the season track
- * built after finding this exact shape hand-rolled here (its own docblock names this file). The
- * label is still DERIVED on every render from facts already on the wire, never a stored flag.
+ * The storefront's live marker — now Sideline's own `LiveChip` primitive (the live-green chip
+ * with the breathing dot), which is where `LiveMarker` retires. The label is still DERIVED on
+ * every render from facts already on the wire, never a stored flag.
  */
 export function LiveChip({ label }: { readonly label: string }) {
-  return <LiveMarker className="shrink-0">{label}</LiveMarker>;
+  return <LiveChipPrimitive className="shrink-0">{label}</LiveChipPrimitive>;
+}
+
+/**
+ * WHO IS ALREADY IN, in people rather than capacity (P1: the person comes before the number).
+ *
+ * This is a COUNT and never a name. `PublicLeagueSummary` is the product's privacy boundary and
+ * discloses nothing about the people in a league it advertises (that interface's own docblock,
+ * and the server-side reduction of `compositionCategory` for exactly this reason), so the row
+ * leads with the true, public fact — how many managers are already seated — and `SeatStack`
+ * draws it. An empty room says so in the second person, because "0 already in" is a number about
+ * an absence and "you would be first in" is an invitation.
+ *
+ * NO HELD CLAUSE HERE, deliberately: `SeatMeter` owns THE seat sentence for the whole product
+ * (F17), held seats included, and the row still speaks it to assistive tech. A second visible
+ * phrasing of the same claim is exactly what that ruling exists to prevent.
+ */
+export function seatedLine(league: PublicLeagueSummary): string {
+  return alreadyInPhrase(league.filledTeams);
+}
+
+/**
+ * THE ONE SPELLING of "who is already in", punctuation included (fix round 1, L3). The board's
+ * row said "9 already in." and the waiting room's face stack said "9 already in" — one register,
+ * two punctuations, which is how a phrase starts drifting into two. Both callers read this now.
+ * It is a full sentence in both places because the empty case is two of them.
+ */
+export function alreadyInPhrase(filledTeams: number): string {
+  if (filledTeams === 0) return "Nobody yet. You would be first in.";
+  return `${filledTeams} already in.`;
 }
 
 export interface OpenLeagueLive {
@@ -276,20 +303,18 @@ export function ScheduledDraftValue({
 }
 
 /**
- * The Drafts value's one remaining footnote, one source for both forms (storefront review E1
- * retired the when-full paragraph that used to live here — `ScheduledDraftValue` above now
- * carries that fact as the column's own compact value plus an `InfoTip`, never both a value and
- * a footnote saying the same thing twice).
- *
- * F12/F21: `kickoffRolls` is `PublicLeagueSummary`'s own field, read here rather than silently
- * showing a different date than the one a visitor is comparing against their own calendar —
- * only a SCHEDULED league can ever roll, so a `when_full` form never renders this line.
+ * `DraftTimingNotes` IS DELETED (fix round 1, M3, 2026-09-10). It printed
+ * `rollNoticeSentence(league.kickoffRolls)` under the Drafts value on both board forms, and on
+ * a shelf where rooms roll until they fill that meant a two-line paragraph in the scheduler's
+ * voice on six of eight rows — P7 failing twice (system voice, repeated explainer), and the
+ * identical defect storefront review E1 measured and fixed on this same column for
+ * `describeStartTiming`. The BOARD now says the consequence once per band
+ * (`rollBandConsequence`, `@/matchmaking/roll`), in the league's own voice; the PER-LEAGUE
+ * sentence survives untouched where a visitor's written-down date is genuinely being reconciled
+ * — `join-sheet.tsx`'s draft cell (the preview this board's own verb opens) and
+ * `draft-schedule-panel.tsx` inside the room. Nothing about `kickoffRolls` is hidden; it simply
+ * stopped being the loudest text on a board a stranger is scanning.
  */
-export function DraftTimingNotes({ league }: { readonly league: PublicLeagueSummary }) {
-  return league.startTrigger === "scheduled" && league.kickoffRolls > 0 ? (
-    <p className="mt-1 text-xs text-text-muted">{rollNoticeSentence(league.kickoffRolls)}</p>
-  ) : null;
-}
 
 /**
  * The one action, both forms, both auth states. Signed in: the real join button. Signed out:

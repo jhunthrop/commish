@@ -140,7 +140,7 @@ test("the quilt keeps one height per row at every drawer height and viewport", a
   await managerA.getByTestId("table-chip-seat").click();
   await managerA.getByRole("group", { name: "Your seat" }).getByRole("button", { name: String(TEAM_COUNT), exact: true }).click();
   await expect(async () => {
-    await managerA.getByRole("button", { name: "Draft now" }).click();
+    await managerA.getByRole("button", { name: "Start mock draft" }).click();
     await expect(managerA).toHaveURL(/\/app\/drafts\//, { timeout: 5_000 });
   }).toPass({ timeout: 20_000 });
   const gotIt = managerA.getByRole("button", { name: "Got it" });
