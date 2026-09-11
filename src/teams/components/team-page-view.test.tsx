@@ -4,6 +4,7 @@ import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { ShellLeaguesProvider } from "@/components/app-shell/shell-leagues";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
+import { PlayerPeekHost } from "@/league-room/components/player-peek";
 import { fixtureLeagueDeps } from "@/league-room/test-fixtures";
 import { EMPTY_TEAM, FULL_TEAM } from "../test-fixtures";
 import { NOT_HELD } from "./section";
@@ -102,6 +103,10 @@ describe("TeamPageView", () => {
     render(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <ShellLeaguesProvider leagueIds={["lg_first"]}>
+          {/* The shell's host, stood in for here: this page stopped mounting one of its own in
+              the league home completion round, and `AppShell` mounts the one every signed-in
+              page now shares. The press has to reach a host to be worth asserting on. */}
+          <PlayerPeekHost scope="shell" />
           <TeamPageView data={FULL_TEAM} />
         </ShellLeaguesProvider>
       </LeagueRoomDepsProvider>,

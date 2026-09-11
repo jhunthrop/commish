@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Player } from "@/domain/player";
@@ -7,6 +7,7 @@ import type { PlayerSeasonBody } from "@/league-service/player";
 import type { Law } from "@/projections/laws/types";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "../hooks/deps";
 import { openPlayerPeek, PlayerPeekHost } from "./player-peek";
+import { resetPlayerPeekHostsForTests } from "./use-peek-load";
 
 /**
  * THE SEASON WIDENING'S UI COVERAGE (2026-09-04) — the bottom-sheet peek's own season label and
@@ -708,5 +709,77 @@ describe("PlayerPeekHost — while the wire is still out", () => {
 
     await waitFor(() => expect(screen.getByText("We could not load him. Close this and try again.")).toBeInTheDocument());
     expect(container.querySelectorAll('[aria-busy="true"]')).toHaveLength(0);
+  });
+});
+
+describe("PlayerPeekHost — one host for the whole app, and the innermost takes the press", () => {
+  /** One season's body per host, so a test can tell WHICH host answered by whose wire was used. */
+  function hostDeps(): { readonly deps: LeagueRoomDeps; readonly calls: string[] } {
+    const calls: string[] = [];
+    return { deps: fixtureDeps(new Map([[2026, bodyFor(2026, [2026])]]), 2026, calls), calls };
+  }
+
+  beforeEach(() => {
+    resetPlayerPeekHostsForTests();
+  });
+
+  it("takes the press from the shell's own host, with no page-level host mounted anywhere", async () => {
+    const shell = hostDeps();
+    render(
+      <LeagueRoomDepsProvider deps={shell.deps}>
+        <PlayerPeekHost scope="shell" />
+      </LeagueRoomDepsProvider>,
+    );
+    expect(openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" })).toBe(true);
+    await waitFor(() => expect(screen.getByText("2026 season")).toBeInTheDocument());
+    expect(shell.calls).toHaveLength(1);
+  });
+
+  it("hands the press to a surface's own host when both are mounted, whatever order they mounted in", async () => {
+    const shell = hostDeps();
+    const surface = hostDeps();
+    render(
+      <>
+        <LeagueRoomDepsProvider deps={shell.deps}>
+          <PlayerPeekHost scope="shell" />
+        </LeagueRoomDepsProvider>
+        <LeagueRoomDepsProvider deps={surface.deps}>
+          <PlayerPeekHost />
+        </LeagueRoomDepsProvider>
+      </>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+
+    await waitFor(() => expect(surface.calls).toHaveLength(1));
+    // One sheet, and it belongs to the surface: the shell's own wire was never asked.
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(shell.calls).toHaveLength(0);
+  });
+
+  it("falls back to the shell once the surface host leaves", async () => {
+    const shell = hostDeps();
+    const surface = hostDeps();
+    const view = render(
+      <>
+        <LeagueRoomDepsProvider deps={shell.deps}>
+          <PlayerPeekHost scope="shell" />
+        </LeagueRoomDepsProvider>
+        <LeagueRoomDepsProvider deps={surface.deps}>
+          <PlayerPeekHost />
+        </LeagueRoomDepsProvider>
+      </>,
+    );
+    view.rerender(
+      <LeagueRoomDepsProvider deps={shell.deps}>
+        <PlayerPeekHost scope="shell" />
+      </LeagueRoomDepsProvider>,
+    );
+    expect(openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" })).toBe(true);
+    await waitFor(() => expect(shell.calls).toHaveLength(1));
+    expect(surface.calls).toHaveLength(0);
+  });
+
+  it("says it could not take the press when nothing is mounted at all", () => {
+    expect(openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" })).toBe(false);
   });
 });

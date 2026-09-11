@@ -28,7 +28,6 @@ import { LeagueTermsPanel } from "./league-terms-panel";
 import { LineupFixSheet } from "./lineup-fix-sheet";
 import { MatchupCelebration } from "./matchup-celebration";
 import { ModerationSummary } from "./moderation-summary";
-import { PlayerPeekHost } from "./player-peek";
 import { RoomDrawer } from "./room-drawer";
 import { RoomFront } from "./room-front";
 import { RoomSpine } from "./room-spine";
@@ -235,7 +234,6 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
 
   return (
     <>
-      <PlayerPeekHost />
       <MatchupCelebration
         matchup={home.myMatchup}
         myTeamId={home.myTeamId}

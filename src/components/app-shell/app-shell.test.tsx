@@ -1,8 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { renderSurface } from "@/components/ui/test-utils";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
+import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
+import { resetPlayerPeekHostsForTests } from "@/league-room/components/use-peek-load";
+import type { SearchResult } from "@/search/contract";
 import { NoticesProvider } from "./notices-provider";
 import { AppShell, type AppShellProps } from "./app-shell";
 import type { RailLeague } from "./shell-data";
@@ -166,5 +169,58 @@ describe("AppShell", () => {
     mockPathname("/app");
     const { getByText } = renderShell(baseProps());
     expect(getByText("League content")).toBeInTheDocument();
+  });
+});
+
+/**
+ * THE ONE PEEK FOR THE WHOLE SIGNED-IN APP (league home completion round). `/app/wallet` mounted
+ * no `PlayerPeekHost` of its own before this round — nor did five other pages — so a name found by
+ * search there could only ever navigate away from whatever the reader was doing. The receiver is
+ * the shell's now, so this works on every page under `(shell)` rather than on the ones that
+ * remembered to mount one.
+ */
+describe("AppShell — a name found anywhere opens the peek", () => {
+  const GIBBS: SearchResult = {
+    kind: "player",
+    player: { id: "rb1", name: "Jahmyr Gibbs", position: "RB", nflTeam: "DET", headshotUrl: null, adp: 4.1 },
+    positionRank: 2,
+    boardRank: 3,
+    byeWeek: 8,
+    rosterStatus: null,
+  };
+
+  it("opens the peek from a search result on a page that mounts no host of its own", async () => {
+    mockPathname("/app/wallet");
+    resetPlayerPeekHostsForTests();
+    // Routed by url: the header reads notices and the palette reads search through the SAME deps,
+    // and one fixed response would hand the notices provider a results array to count.
+    const deps = {
+      fetchJson: async (url: string) =>
+        ({
+          json: async () =>
+            url.startsWith("/api/notices")
+              ? { ok: true, data: { notices: [], unreadCount: 0 } }
+              : { ok: true, data: { query: "gib", results: [GIBBS] } },
+        }) as unknown as Response,
+      openEventSource: () => ({ addEventListener: () => undefined, close: () => undefined }),
+    };
+    render(
+      <AccountRoomDepsProvider deps={deps}>
+        {/* The peek's own wire never resolves here: this test is about WHICH host takes the
+            press, and the sheet answers with the pressed name before the wire does. */}
+        <NoticesProvider>
+          <LeagueRoomDepsProvider deps={{ fetchJson: () => new Promise(() => undefined), openEventSource: () => ({ addEventListener: () => undefined, close: () => undefined }) }}>
+            <AppShell {...baseProps()} />
+          </LeagueRoomDepsProvider>
+        </NoticesProvider>
+      </AccountRoomDepsProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Search players and teams" }));
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "gib" } });
+    await screen.findByRole("option");
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
+
+    await screen.findByRole("dialog", { name: "Jahmyr Gibbs" });
   });
 });

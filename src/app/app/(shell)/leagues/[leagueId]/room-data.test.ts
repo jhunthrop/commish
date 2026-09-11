@@ -20,6 +20,8 @@ vi.mock("@/league-service/nfl-schedule", () => ({ byeWeeksByTeam: vi.fn() }));
 vi.mock("@/league-service/claims", () => ({ pendingWaiverClaims: vi.fn() }));
 vi.mock("@/league-service/trades", () => ({ listTrades: vi.fn() }));
 vi.mock("@/league-service/reference-cache-instance", () => ({ getReferenceCache: () => ({}) }));
+vi.mock("@/league-service/head-to-head", () => ({ cachedHeadToHeadRecords: vi.fn(), recordsForTeam: () => new Map() }));
+vi.mock("@/league-service/head-to-head-cache-instance", () => ({ getHeadToHeadCache: () => ({}) }));
 
 import { readPreferences } from "@/identity-service/preferences";
 import { listLeagueActivity } from "@/integrity-service/activity";
@@ -27,6 +29,7 @@ import { leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId, fixtu
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 import { pendingWaiverClaims } from "@/league-service/claims";
 import { listTrades } from "@/league-service/trades";
+import { cachedHeadToHeadRecords } from "@/league-service/head-to-head";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import { HOME } from "@/league-room/test-fixtures";
 import { loadRoomData } from "./room-data";
@@ -50,6 +53,7 @@ beforeEach(() => {
   vi.mocked(byeWeeksByTeam).mockResolvedValue(new Map());
   vi.mocked(pendingWaiverClaims).mockResolvedValue([]);
   vi.mocked(listTrades).mockResolvedValue({ leagueId: "l1", meTeamId: "t1", inbox: [], outbox: [], history: [] });
+  vi.mocked(cachedHeadToHeadRecords).mockResolvedValue(new Map());
   vi.mocked(gradesForDraft).mockResolvedValue({ grades: STORED_GRADES, boardGeneration: "2026-08-01T00:00:00.000Z" });
   vi.mocked(gradesForDraft).mockClear();
   vi.mocked(leagueHome).mockReset();

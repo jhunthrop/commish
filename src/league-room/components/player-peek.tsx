@@ -6,7 +6,7 @@ import { Card, Modal, Skeleton } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { DossierComposition } from "../dossier/dossier-composition";
 import { PlayerHeader } from "../dossier/player-header";
-import { openPlayerPeek as openPlayerPeekImpl, usePeekLoad } from "./use-peek-load";
+import { openPlayerPeek as openPlayerPeekImpl, usePeekLoad, type PeekHostScope } from "./use-peek-load";
 import { SeasonSwitcher } from "./season-switcher";
 
 /** Re-exported unchanged (fix round 2 moved the module-scope `host` listener itself into
@@ -72,10 +72,20 @@ function PeekBodySkeleton() {
 }
 
 /**
- * The one mounted receiver for `PlayerName` presses: fetches the player's season under this
- * league's rules (the same body the full page reads, via `usePeekLoad`) and raises the peek.
- * Loading shows the name immediately — the reader pressed a name, the peek answers with it before
- * the wire does.
+ * The mounted receiver for `PlayerName` presses: fetches the player's season under this league's
+ * rules (the same body the full page reads, via `usePeekLoad`) and raises the peek. Loading shows
+ * the name immediately — the reader pressed a name, the peek answers with it before the wire does.
+ *
+ * ONE INSTANCE FOR THE WHOLE SIGNED-IN APP, mounted by `AppShell` as `scope="shell"`. Six places
+ * used to mount one each, which meant a name was pressable on a page that had remembered to do it
+ * and dead on a page that had not — and a search result, reachable from every page, could not rely
+ * on either. The shell mounts it once, for every route under `(shell)`, and nothing below the
+ * shell mounts one.
+ *
+ * A SURFACE MAY STILL OWN ITS OWN, and the draft room does: it lives in `(room)`, outside the
+ * shell's route group, so the shell's instance is not there to take the press. `scope` decides,
+ * never mount order — see `PeekHostScope`'s own docblock for why that distinction is load-bearing.
+ * `scope`, not `role`: `role` on a JSX element is an ARIA role wherever a linter looks.
  *
  * IT RIDES `Modal`, NOT `BottomSheet` (Sideline research round). The sheet component pins itself to
  * the foot of the viewport at every width, which on a 1440 desktop is a strip of research modules
@@ -89,8 +99,8 @@ function PeekBodySkeleton() {
  * face, the name, who has him and the one number are the same four things in the sheet and on his
  * page, and neither surface can quietly lose one.
  */
-export function PlayerPeekHost() {
-  const { target, body, failed, season, setSeason, close } = usePeekLoad();
+export function PlayerPeekHost({ scope = "surface" }: { readonly scope?: PeekHostScope } = {}) {
+  const { target, body, failed, season, setSeason, close } = usePeekLoad(scope);
 
   if (target === null) return null;
   const played = body?.weeks.some((week) => week.points !== null) ?? false;

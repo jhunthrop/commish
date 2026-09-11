@@ -1,5 +1,4 @@
 import { FANTASY_PLAYOFF_WEEKS } from "@/capsules/facts/schedule";
-import { PlayerPeekHost } from "@/league-room/components/player-peek";
 import type { TeamPageData } from "../contract";
 import { CoachesSection } from "./coaches-section";
 import { CompetitionSection } from "./competition-section";
@@ -16,14 +15,13 @@ import { TeamHeader } from "./team-header";
  * defense. Paired sections sit side by side at `lg` and stack on a phone; every section renders
  * its heading, and its data only when the store holds it.
  *
- * `PlayerPeekHost` is mounted here (player-links fix round) exactly as the league's own team and
- * matchup pages mount it: the one receiver for every name's plain click, self-contained (its own
- * loader, the league from the click's target), so no league-room state rides along with it.
+ * No `PlayerPeekHost` here any more (league home completion round): `AppShell` mounts the one
+ * receiver for every signed-in page, so a name on this page is pressable for the same reason a
+ * name in a search result is, rather than because this file remembered to mount a host.
  */
 export function TeamPageView({ data }: { readonly data: TeamPageData }) {
   return (
     <div className="flex flex-col gap-4">
-      <PlayerPeekHost />
       <TeamHeader data={data} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CoachesSection coaching={data.coaching} season={data.season} />

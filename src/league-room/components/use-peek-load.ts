@@ -12,26 +12,48 @@ export interface PeekTarget {
 }
 
 /**
- * ONE listener, module scope: `PlayerName` (`player-peek.tsx`) triggers anywhere in the tree
- * reach the single `PlayerPeekHost` the page mounts, with no context threading through the server
- * components between them. A trigger pressed with no host mounted does nothing, quietly — the
- * failure mode is a dead click, never a crash. Lives here (fix round 2: `PlayerPeekHost`'s own
- * under-fifty-line rule) rather than in `player-peek.tsx`, alongside the hook that is its one
- * real reader; `player-peek.tsx` re-exports `openPlayerPeek` unchanged for every existing caller.
+ * WHICH HOST A PRESS REACHES, when more than one is mounted.
+ *
+ * `"shell"` is the app frame's own host (`AppShell`), mounted once for every signed-in page, which
+ * is why no page mounts one of its own any more. `"surface"` is a host a surface mounts because
+ * the shell's would be wrong for it — today only the draft room, which lives outside the shell's
+ * route group and owns a viewport that must not gain a scrolling child.
+ *
+ * A SURFACE HOST ALWAYS WINS, and that is a precedence rule rather than a mount-order one on
+ * purpose: React runs a child's effects BEFORE its parent's, so "the last one to register wins"
+ * would hand a full page load to the outer host and an in-app navigation to the inner one — the
+ * same tree behaving differently depending on how the reader arrived. Roles cannot do that.
  */
-let host: ((target: PeekTarget) => void) | null = null;
+export type PeekHostScope = "shell" | "surface";
 
 /**
- * Raises the peek, and SAYS WHETHER IT COULD (Sideline research round). Every caller before this
- * round was a player name inside a league surface, which always mounts a host, so a dead click was
- * only ever a bug. Site search is reachable from every signed-in page, including the ones that
- * mount no host at all, and a search result that silently did nothing would be the worst failure on
- * the surface. `false` means nobody took it, and the caller navigates to the full page instead.
+ * The mounted listeners, module scope: `PlayerName` (`player-peek.tsx`) triggers anywhere in the
+ * tree reach them with no context threading through the server components between. A trigger
+ * pressed with no host at all does nothing, quietly — the failure mode is a dead click, never a
+ * crash. Lives here (fix round 2: `PlayerPeekHost`'s own under-fifty-line rule) rather than in
+ * `player-peek.tsx`, alongside the hook that is its one real reader; `player-peek.tsx` re-exports
+ * `openPlayerPeek` unchanged for every existing caller.
+ */
+const hosts = new Map<PeekHostScope, (target: PeekTarget) => void>();
+
+/**
+ * Raises the peek, and SAYS WHETHER IT COULD (Sideline research round). Every caller before that
+ * round was a player name inside a league surface, so a dead click was only ever a bug. Site
+ * search is reachable from every signed-in page, and a search result that silently did nothing
+ * would be the worst failure on the surface. `false` means nobody took it, and the caller
+ * navigates to the full page instead — still the honest answer on a page outside the shell
+ * entirely, such as the public TV board.
  */
 export function openPlayerPeek(target: PeekTarget): boolean {
-  if (host === null) return false;
+  const host = hosts.get("surface") ?? hosts.get("shell");
+  if (host === undefined) return false;
   host(target);
   return true;
+}
+
+/** Test seam: a module-scope registry outlives a single test the way a rate limiter does. */
+export function resetPlayerPeekHostsForTests(): void {
+  hosts.clear();
 }
 
 export interface PeekLoadState {
@@ -56,7 +78,7 @@ export interface PeekLoadState {
  * surviving onto the next name pressed. No behavior change from the version this replaced:
  * byte-identical effects, state and cleanup, just named and returned rather than inlined.
  */
-export function usePeekLoad(): PeekLoadState {
+export function usePeekLoad(scope: PeekHostScope): PeekLoadState {
   const { fetchJson } = useLeagueRoomDeps();
   const [target, setTarget] = useState<PeekTarget | null>(null);
   const [body, setBody] = useState<PlayerSeasonBody | null>(null);
@@ -69,11 +91,14 @@ export function usePeekLoad(): PeekLoadState {
       setSeason(null);
       setTarget(next);
     };
-    host = openTarget;
+    hosts.set(scope, openTarget);
     return () => {
-      if (host === openTarget) host = null;
+      // Only if it is still MINE: the draft room swaps between two hosts of the same role across
+      // a phase change, and React mounts the arriving one before unmounting the departing one, so
+      // an unconditional delete here would leave the role empty and every name dead.
+      if (hosts.get(scope) === openTarget) hosts.delete(scope);
     };
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     if (target === null) return;

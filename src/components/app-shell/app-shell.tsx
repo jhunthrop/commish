@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { CreateLeagueSheetHost } from "@/league-room/components/create-league-sheet";
 import type { CreateSheetDefaults } from "@/league-room/components/create-sheet";
+import { PlayerPeekHost } from "@/league-room/components/player-peek";
 import { AdminConsoleNav } from "./admin-console-nav";
 import { LeagueRail } from "./league-rail";
 import { ShellFooter } from "./shell-footer";
@@ -57,6 +58,13 @@ export function AppShell({ user, rail, liveState, createDefaults, children }: Ap
             host's own hash-arrival handling. Either way, THIS is the one instance every surface
             reaches, never one of its own. */}
         <CreateLeagueSheetHost defaults={createDefaults} />
+        {/* THE ONE PEEK FOR THE WHOLE SIGNED-IN APP (league home completion round). A player's
+            name is pressable wherever it appears — a roster row, a stream sentence, a search
+            result on a page that has nothing to do with a league — because the receiver lives
+            here rather than in six page files that each had to remember to mount one. Inert until
+            a name is pressed: with no target it renders nothing at all. The draft room keeps its
+            own (the default `scope="surface"`), because it lives outside this route group. */}
+        <PlayerPeekHost scope="shell" />
         <TopBar
           className="lg:col-span-2 lg:row-start-1"
           displayName={user.displayName}
