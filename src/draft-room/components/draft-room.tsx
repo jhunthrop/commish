@@ -116,7 +116,7 @@ export function DraftRoom({ draftId, dismissedAt, topBar = null }: DraftRoomProp
     return (
       <div className="p-4">
         <ErrorState
-          title="We couldn't open this draft"
+          title="We could not open this draft"
           description={room.error ?? "Something went wrong on our side."}
           action={<Button onClick={() => void room.refresh()}>Try again</Button>}
         />

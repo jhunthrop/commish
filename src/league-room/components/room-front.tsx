@@ -1,6 +1,6 @@
 "use client";
 
-import type { PendingWaiverClaim } from "@/league-service/claims";
+import type { PendingWaiverClaim } from "@/league-service/claims-contract";
 import type { ActivityFeedRow } from "@/integrity-service/activity";
 import type { TradeProposalView } from "@/trades/contract";
 import type { LeagueGradeRow, LeagueHomeBody, LineupBody, MatchupDetail, MatchupWeekBody, TradeRoomContext } from "../contract";

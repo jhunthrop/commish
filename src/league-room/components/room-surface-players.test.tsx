@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import type { FreeAgentRow } from "@/league-service/claims";
+import type { FreeAgentRow } from "@/league-service/claims-contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "../hooks/deps";
 import { PlayerPeekHost } from "./player-peek";
 import { RoomSurfacePlayers } from "./room-surface-players";

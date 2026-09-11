@@ -266,7 +266,7 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
   // human turn also earns the moderator's own nudge banner ("Commish Lab, you're on the clock
   // with about N seconds left..."), which repeats the identical phrase in a SIBLING `role=
   // "status"` toast — an unscoped locator resolves both once that banner appears.
-  await expect(managerA.getByTestId("room-rail").getByText("You're on the clock")).toBeVisible({ timeout: ON_CLOCK_TIMEOUT_MS });
+  await expect(managerA.getByTestId("room-rail").getByText("You are on the clock")).toBeVisible({ timeout: ON_CLOCK_TIMEOUT_MS });
 
   // --- The room viewport is owned once (founder screenshot, 2026-08-26): with the practice
   // banner mounted, the PAGE itself never scrolls at desktop — a band above the old h-dvh
@@ -322,7 +322,7 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
   // 12-team snake's last seat picks twice in a row, so "back on the clock" covers every seat;
   // the pick number strictly exceeding the human's own pick is what proves other seats (or the
   // wrap's own second turn) genuinely moved without one further action from this page.
-  await expect(managerA.getByTestId("room-rail").getByText("You're on the clock")).toBeVisible({ timeout: ON_CLOCK_TIMEOUT_MS });
+  await expect(managerA.getByTestId("room-rail").getByText("You are on the clock")).toBeVisible({ timeout: ON_CLOCK_TIMEOUT_MS });
   await expect
     .poll(async () => pickNumberFromTurnLabel(await managerA.getByTestId("turn-label").innerText()), { timeout: ON_CLOCK_TIMEOUT_MS })
     .toBeGreaterThan(pickNumberBeforeOurTurn);

@@ -124,12 +124,12 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
 
   // Whoever is on the clock drafts the top available player. The pick button only exists on
   // the page whose turn it is, which is itself the assertion that the room knows whose turn
-  // it is. Identify that page by the rail's "You're on the clock" marker, which only the true
+  // it is. Identify that page by the rail's "You are on the clock" marker, which only the true
   // picker's page renders and only after hydration. Draft buttons are the WRONG discriminator:
   // the server-rendered pool briefly shows them on the waiting page too, so both an
   // instantaneous count() and a count-based poll could crown the waiting page, which then
   // correctly loses its buttons on hydration and hangs the spec to its timeout.
-  const onClock = (page: Page) => page.getByText("You're on the clock").count();
+  const onClock = (page: Page) => page.getByText("You are on the clock").count();
   await expect
     .poll(async () => (await onClock(managerA)) + (await onClock(managerB)), { timeout: 30_000 })
     .toBeGreaterThan(0);

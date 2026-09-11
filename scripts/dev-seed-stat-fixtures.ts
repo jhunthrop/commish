@@ -50,7 +50,7 @@ async function main(): Promise<void> {
     .limit(PLAYER_CAP);
 
   if (roster.length === 0) {
-    console.log("No players in the local database yet — seed players first (see `src/data/seed/seed-players.ts`), then re-run this script.");
+    console.log("No players in the local database yet. Seed players first (see `src/data/seed/seed-players.ts`), then re-run this script.");
     return;
   }
 
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
 
   console.log(
     `Seeded ${rows.length} stat line(s) across ${WEEKS.length} week(s) (${WEEKS.join(", ")}) for ${roster.length} player(s). ` +
-      "Fabricated data, localhost only — never point this script at anything but a disposable local database.",
+      "Fabricated data, localhost only. Never point this script at anything but a disposable local database.",
   );
 }
 

@@ -420,7 +420,7 @@ export async function persistSeason(
   // up), not a reason to refuse a board the way `assertLiveMarketCoverage` refuses a degenerate
   // market.
   if (boardMoment.kind === "live" && propsAnchor.size === 0) {
-    console.warn(`props anchor: 0 players anchored for ${season} — resolve has not run or the archive is empty`);
+    console.warn(`props anchor: 0 players anchored for ${season}. Resolve has not run, or the archive is empty.`);
   }
 
   // Both fitted tables come from the model artifact store, pinned by version; a store that lacks

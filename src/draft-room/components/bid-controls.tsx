@@ -32,7 +32,7 @@ export function BidControls({ view, myTeamId, submitting, onBid }: BidControlsPr
       : lot === null || minBid === null
         ? "Nobody is up for bid right now."
         : lot.highBidTeamId === myTeamId
-          ? "You're the high bidder."
+          ? "You are the high bidder."
           : maxBid === null || maxBid < minBid
             ? "You can't afford the current bid and still fill your roster."
             : null;
