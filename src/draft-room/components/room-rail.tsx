@@ -101,7 +101,7 @@ const MODE_SKIN: Readonly<Record<RoomMode, string>> = {
 };
 
 interface TurnSummary {
-  /** The eyebrow above the subject: "You're on the clock", "Live bid", … */
+  /** The eyebrow above the subject: "You are on the clock", "Live bid", … */
   readonly label: string;
   /** Who or what the turn is about — a team name, or the player up for bid. */
   readonly subject: string;
@@ -181,7 +181,7 @@ export function turnSummary(
     const who = nominatorId === null ? "Nobody" : teamName(byId, nominatorId, "Someone");
     const mine = nominatorId !== null && nominatorId === myTeamId;
     return {
-      label: mine ? "You're nominating" : "Nominating",
+      label: mine ? "You are nominating" : "Nominating",
       subject: who,
       sentence: `${who} is nominating.`,
       mine,
@@ -193,7 +193,7 @@ export function turnSummary(
   const mine = view.onClockTeamId !== null && view.onClockTeamId === myTeamId;
   const clockLength = view.clockSeconds === null ? "" : ` This round's pick clock is ${formatClockLength(view.clockSeconds)}.`;
   return {
-    label: mine ? "You're on the clock" : "On the clock",
+    label: mine ? "You are on the clock" : "On the clock",
     subject: who,
     sentence: `${who} is on the clock.${clockLength}`,
     mine,

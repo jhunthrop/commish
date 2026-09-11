@@ -3,18 +3,22 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
 import { renderSurface } from "@/components/ui/test-utils";
+import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
+import { fixtureChatDeps } from "@/chat-room/test-fixtures";
+import { DraftRoomDepsProvider } from "../hooks/deps";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { QUILT_CONFIG } from "../quilt/state/config";
-import { LEAGUE_NAME, PLAYERS, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
+import { LEAGUE_NAME, PLAYERS, SNAKE_VIEW, TEAMS, fixtureDeps, playersById } from "../test-fixtures";
 import { SnakeRoom } from "./snake-room";
 
-// Only the composition for the current width mounts (fluidity round, 2026-09-10). The test
-// viewport answers the desktop query; the phone case below asks for the other answer.
+// Only the composition for the current width mounts. The test viewport answers the desktop
+// query; the phone cases below ask for the other answer.
 vi.mock("@/design/use-media-query", () => ({ useMediaQuery: vi.fn(() => true) }));
 import { useMediaQuery } from "@/design/use-media-query";
 
 afterEach(() => {
   vi.mocked(useMediaQuery).mockReturnValue(true);
+  window.localStorage.clear();
 });
 
 /** A deadline far enough out that the pick-safety window is never squeezed away. */
@@ -43,53 +47,54 @@ const room: DraftRoomState = {
   setQueue: async () => ({ ok: true }),
 };
 
-function renderRoom(over: Partial<DraftRoomState> = {}) {
-  return render(
-    <ToastProvider>
-      <SnakeRoom room={{ ...room, ...over }} playersById={playersById(PLAYERS)} />
-    </ToastProvider>,
+const PICK_1 = { pickNumber: 1, round: 1, teamId: "t2", playerId: "qb1", slot: "QB" as const, slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false };
+
+function element(over: Partial<DraftRoomState> = {}) {
+  return (
+    <DraftRoomDepsProvider deps={fixtureDeps().deps}>
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <ToastProvider>
+          <SnakeRoom room={{ ...room, ...over }} playersById={playersById(PLAYERS)} />
+        </ToastProvider>
+      </ChatRoomDepsProvider>
+    </DraftRoomDepsProvider>
   );
 }
 
-/** The desktop tree — the mobile inversion renders beside it and CSS hides one of the two. */
+function renderRoom(over: Partial<DraftRoomState> = {}) {
+  return render(element(over));
+}
+
 const desktop = () => within(screen.getByTestId("quilt-room"));
 
-describe("SnakeRoom (the quilt)", () => {
-  afterEach(() => {
-    window.localStorage.clear();
+/** Every solid Court blue pill on stage: P3 allows one per viewport. */
+const solidPills = (container: HTMLElement) => [...container.querySelectorAll("button")].filter((button) => button.className.split(" ").includes("bg-accent"));
+
+describe("SnakeRoom (Sideline)", () => {
+  it("rests as the wall with the rail and a dock that carries no verb, both themes, axe-clean", async () => {
+    await renderSurface(element({ myTeamId: "t2", view: { ...room.view!, onClockTeamId: "t1", upcoming: ["t1", "t2"] } }), async ({ container }) => {
+      const surface = desktop();
+      expect(surface.getByTestId("top-strip")).toHaveAttribute("data-turn", "theirs");
+      expect(surface.getByTestId("turn-chip")).toHaveTextContent("Dana Whitfield");
+      expect(surface.getByTestId("board-region")).toHaveAttribute("data-view", "wall");
+      expect(surface.getByTestId("quilt-board")).toBeInTheDocument();
+      expect(surface.getByTestId("stream-rail")).toBeInTheDocument();
+      expect(surface.getByRole("list", { name: "Available players, best first" })).toBeInTheDocument();
+      // Off your turn the dock carries no solid verb at all (P3).
+      expect(surface.queryByTestId("dock-verb")).toBeNull();
+      expect(solidPills(container)).toHaveLength(0);
+      expect(await axe(container)).toHaveNoViolations();
+    });
   });
 
-  it("rests as the quilt: board on stage, slim strip, collapsed drawer — both themes, axe-clean", async () => {
-    await renderSurface(
-      <ToastProvider>
-        <SnakeRoom
-          room={{ ...room, myTeamId: "t2", view: { ...room.view!, onClockTeamId: "t1", upcoming: ["t1", "t2"] } }}
-          playersById={playersById(PLAYERS)}
-          onAct={() => {}}
-        />
-      </ToastProvider>,
-      async ({ container }) => {
-        const surface = desktop();
-        expect(surface.getByTestId("clock-strip")).toHaveAttribute("data-strip-state", "resting");
-        expect(surface.getByTestId("your-next")).toHaveTextContent("YOU PICK 1.02 · NEXT");
-        expect(surface.getByTestId("quilt-board")).toBeInTheDocument();
-        expect(surface.getByTestId("pool-drawer")).toHaveAttribute("data-drawer-height", "collapsed");
-        // The tab handles ride the collapsed edge (founder addition 2) — opening is never a
-        // mystery gesture, so the handles and the grabber are visible even at rest.
-        expect(surface.getByTestId("drawer-handles")).toBeInTheDocument();
-        expect(surface.getByTestId("drawer-grabber")).toBeInTheDocument();
-        expect(await axe(container)).toHaveNoViolations();
-      },
-    );
-  });
-
-  it("swells amber on your turn with the queue's top picks inline", () => {
-    renderRoom();
-    const strip = desktop().getByTestId("clock-strip");
-    expect(strip).toHaveAttribute("data-strip-state", "your-turn");
-    // rb1 is queued and available, so it leads the strip.
-    expect(within(strip).getByText("M. Reed")).toBeInTheDocument();
-    expect(within(strip).getAllByRole("button", { name: "Draft" }).length).toBeGreaterThan(0);
+  it("on your turn the dock's Draft is the room's one solid pill, naming the call beside it", () => {
+    const { container } = renderRoom();
+    expect(desktop().getByTestId("top-strip")).toHaveAttribute("data-turn", "yours");
+    // No advisor answer in this fixture, so the call falls back to the queue and says so.
+    expect(desktop().getByTestId("dock-call")).toHaveTextContent("Marcus Reed");
+    expect(desktop().getByTestId("dock-call")).toHaveTextContent("top of your queue");
+    expect(desktop().getByTestId("dock-verb")).toHaveTextContent("Draft Marcus Reed");
+    expect(solidPills(container)).toHaveLength(1);
   });
 
   describe("pick safety", () => {
@@ -100,22 +105,20 @@ describe("SnakeRoom (the quilt)", () => {
       vi.useRealTimers();
     });
 
-    it("holds a DRAFT in the undo window and submits only on expiry", () => {
+    it("holds a Draft in the undo window and submits only on expiry", () => {
       const submit = vi.fn(async () => ({ ok: true as const }));
       renderRoom({ submit });
-      const strip = desktop().getByTestId("clock-strip");
-      fireEvent.click(within(strip).getAllByRole("button", { name: "Draft" })[0]!);
+      fireEvent.click(desktop().getByTestId("dock-verb"));
       expect(submit).not.toHaveBeenCalled();
       expect(desktop().getByTestId("undo-pill")).toBeInTheDocument();
       vi.advanceTimersByTime(QUILT_CONFIG.undoWindowMs);
       expect(submit).toHaveBeenCalledWith({ type: "MAKE_PICK", playerId: "rb1" });
     });
 
-    it("UNDO inside the window means nothing was ever sent", () => {
+    it("Undo inside the window means nothing was ever sent", () => {
       const submit = vi.fn(async () => ({ ok: true as const }));
       renderRoom({ submit });
-      const strip = desktop().getByTestId("clock-strip");
-      fireEvent.click(within(strip).getAllByRole("button", { name: "Draft" })[0]!);
+      fireEvent.click(desktop().getByTestId("dock-verb"));
       fireEvent.click(desktop().getByRole("button", { name: "Undo" }));
       vi.advanceTimersByTime(QUILT_CONFIG.undoWindowMs * 2);
       expect(submit).not.toHaveBeenCalled();
@@ -125,8 +128,7 @@ describe("SnakeRoom (the quilt)", () => {
     it("a rejected expiry submit gets the window's own words, not the generic act toast", async () => {
       const submit = vi.fn(async () => ({ ok: false as const, reason: "It's not your turn to pick." }));
       renderRoom({ submit });
-      const strip = desktop().getByTestId("clock-strip");
-      fireEvent.click(within(strip).getAllByRole("button", { name: "Draft" })[0]!);
+      fireEvent.click(desktop().getByTestId("dock-verb"));
       await act(async () => {
         await vi.advanceTimersByTimeAsync(QUILT_CONFIG.undoWindowMs);
       });
@@ -136,148 +138,149 @@ describe("SnakeRoom (the quilt)", () => {
       expect(alert).toHaveTextContent("You are still on the clock.");
     });
 
-    it("a swap relabels the pill and says what it replaced", () => {
+    it("a second Draft from a pool row swaps the pill and says what it replaced", () => {
       const submit = vi.fn(async () => ({ ok: true as const }));
-      renderRoom({ submit, queue: ["rb1", "qb1"] });
-      const strip = desktop().getByTestId("clock-strip");
-      // rb1 (Marcus Reed) leads the queued strip; qb1 (Jalen Croft) rides second.
-      fireEvent.click(within(strip).getAllByRole("button", { name: "Draft" })[0]!);
+      renderRoom({ submit });
+      fireEvent.click(desktop().getByTestId("dock-verb"));
       expect(desktop().getByTestId("undo-pill")).toHaveTextContent("locking in…");
-      fireEvent.click(within(strip).getAllByRole("button", { name: "Draft" })[1]!);
+      fireEvent.click(desktop().getByRole("button", { name: "Draft Jalen Croft" }));
       const pill = desktop().getByTestId("undo-pill");
       expect(pill).toHaveTextContent("swapped from Marcus Reed");
-      // Last word wins, said out loud — and only the last pick ever submits.
       vi.advanceTimersByTime(QUILT_CONFIG.undoWindowMs);
       expect(submit).toHaveBeenCalledTimes(1);
+      expect(submit).toHaveBeenCalledWith({ type: "MAKE_PICK", playerId: "qb1" });
     });
   });
 
-  it("walks the drawer from the keyboard: space to half, slash to search-full, esc collapses", () => {
-    renderRoom();
-    const surface = desktop();
-    fireEvent.keyDown(window, { key: " " });
-    expect(surface.getByTestId("pool-drawer")).toHaveAttribute("data-drawer-height", "half");
-    fireEvent.keyDown(window, { key: "/" });
-    expect(surface.getByTestId("pool-drawer")).toHaveAttribute("data-drawer-height", "full");
-    expect(surface.getByRole("searchbox", { name: "Search players" })).toBeInTheDocument();
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(surface.getByTestId("pool-drawer")).toHaveAttribute("data-drawer-height", "collapsed");
-  });
-
-  it("opens the peek sheet from a quilt cell and dismisses it on close", () => {
-    const picks = [{ pickNumber: 1, round: 1, teamId: "t2", playerId: "qb1", slot: "QB" as const, slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false }];
-    renderRoom({ view: { ...room.view!, picks, pickNumber: 2, availablePlayerIds: ["rb1", "rb2", "wr1"] } });
+  it("opens the peek from a wall cell, closes it on Esc, and jumps to the pool's search on slash", () => {
+    renderRoom({ view: { ...room.view!, picks: [PICK_1], pickNumber: 2, availablePlayerIds: ["rb1", "rb2", "wr1"] } });
     const surface = desktop();
     fireEvent.click(surface.getByRole("button", { name: "Jalen Croft, pick 1.01" }));
     const peek = surface.getByTestId("peek-sheet");
     expect(peek).toHaveTextContent("Jalen Croft");
     expect(peek).toHaveTextContent("Bye 10");
-    // The GENERIC edge line only — never a law's name (founder secrecy ruling).
     expect(surface.getByTestId("peek-edges")).toHaveTextContent("No measured edge on him");
-    fireEvent.click(within(peek).getByRole("button", { name: "Close player card" }));
+    fireEvent.keyDown(window, { key: "Escape" });
     expect(surface.queryByTestId("peek-sheet")).toBeNull();
+    fireEvent.keyDown(window, { key: "/" });
+    expect(surface.getByRole("searchbox", { name: "Search players" })).toHaveFocus();
   });
 
-  it("Esc mid-note saves the words and keeps the peek; the next Esc collapses as always", () => {
-    const picks = [{ pickNumber: 1, round: 1, teamId: "t2", playerId: "qb1", slot: "QB" as const, slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false }];
-    renderRoom({ view: { ...room.view!, picks, pickNumber: 2, availablePlayerIds: ["rb1", "rb2", "wr1"] } });
+  it("Esc mid-note saves the words and keeps the peek; the next Esc closes it", () => {
+    renderRoom({ view: { ...room.view!, picks: [PICK_1], pickNumber: 2, availablePlayerIds: ["rb1", "rb2", "wr1"] } });
     const surface = desktop();
     fireEvent.click(surface.getByRole("button", { name: "Jalen Croft, pick 1.01" }));
     fireEvent.click(within(surface.getByTestId("peek-sheet")).getByRole("button", { name: "Add a note" }));
     const noteField = surface.getByRole("textbox", { name: "Your note on Jalen Croft" });
     fireEvent.change(noteField, { target: { value: "late-round stack" } });
     fireEvent.keyDown(noteField, { key: "Escape" });
-    // Saved and closed the EDITOR, not the peek: the note now reads back on its own button.
     const peek = surface.getByTestId("peek-sheet");
     expect(peek).toBeInTheDocument();
-    expect(surface.queryByRole("textbox", { name: "Your note on Jalen Croft" })).toBeNull();
     expect(within(peek).getByText("late-round stack")).toBeInTheDocument();
-    // With the note closed, Esc means what it always means.
     fireEvent.keyDown(window, { key: "Escape" });
     expect(surface.queryByTestId("peek-sheet")).toBeNull();
   });
 
-  it("recolors in place under the NEEDS lens: the needs row appears, the rounds stay", () => {
-    renderRoom();
-    const surface = desktop();
-    expect(surface.queryByTestId("quilt-needs-row")).toBeNull();
-    fireEvent.click(within(surface.getByTestId("clock-strip")).getByRole("button", { name: "NEEDS" }));
-    expect(surface.getByTestId("quilt-needs-row")).toBeInTheDocument();
-    expect(surface.getByTestId("quilt-round-1")).toBeInTheDocument();
-    expect(surface.getByTestId("quilt-round-3")).toBeInTheDocument();
+  it("a manager head on the wall opens that roster as a sheet; the same head closes it", () => {
+    renderRoom({ view: { ...room.view!, picks: [PICK_1], pickNumber: 2, rosters: { t1: [], t2: [{ slot: "QB", slotIndex: 0, playerId: "qb1" }] } } });
+    fireEvent.click(desktop().getByRole("button", { name: "Iron Owls, Rey Okafor. Open the roster." }));
+    const sheet = screen.getByTestId("roster-sheet");
+    expect(sheet).toHaveTextContent("Rey Okafor");
+    expect(sheet).toHaveTextContent("Jalen Croft");
+    expect(sheet).toHaveTextContent("1.01");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByTestId("roster-sheet")).toBeNull();
   });
 
-  it("carries MY SHEET in the drawer, seeded from the board, with the you-vs-board gap", () => {
-    renderRoom();
+  it("switches the board region to Your sheet: seven columns in your order, struck rows, hide taken", () => {
+    renderRoom({ view: { ...room.view!, picks: [PICK_1], pickNumber: 2, availablePlayerIds: ["rb1", "rb2", "wr1"], rosters: { t1: [], t2: [{ slot: "QB", slotIndex: 0, playerId: "qb1" }] } } });
     const surface = desktop();
-    fireEvent.keyDown(window, { key: " " });
-    fireEvent.click(within(surface.getByTestId("pool-drawer")).getByRole("tab", { name: "My sheet" }));
-    const rows = within(surface.getByTestId("pool-drawer")).getAllByTestId("sheet-vs-board");
-    expect(rows[0]).toHaveTextContent("you 1 · board 1");
+    fireEvent.click(surface.getByRole("tab", { name: "Your sheet" }));
+    expect(surface.getByTestId("board-region")).toHaveAttribute("data-view", "sheet");
+    expect(surface.getByTestId("sheet-basis")).toHaveTextContent("Our board, untouched");
+    const columns = surface.getAllByTestId("sheet-column");
+    expect(columns.map((column) => column.getAttribute("data-column"))).toEqual(["overall", "QB", "RB", "WR", "TE", "K", "DEF"]);
+    const overall = within(columns[0]!);
+    const rows = overall.getAllByTestId("sheet-row");
+    expect(rows[0]).toHaveAttribute("data-taken", "true");
+    expect(rows[0]).toHaveTextContent("Jalen Croft");
+    expect(rows[0]).toHaveTextContent("taken");
+    expect(rows[1]).toHaveTextContent("Marcus Reed");
+    expect(overall.getByText("3 left of 4")).toBeInTheDocument();
+    fireEvent.click(surface.getByTestId("hide-taken"));
+    expect(within(surface.getAllByTestId("sheet-column")[0]!).queryAllByTestId("sheet-row").map((row) => row.getAttribute("data-taken"))).not.toContain("true");
+    // A move says so in the basis line and offers the way back.
+    fireEvent.click(surface.getByRole("button", { name: "Move Devon Marsh up your sheet" }));
+    expect(surface.getByTestId("sheet-basis")).toHaveTextContent("2 of yours moved");
+    fireEvent.click(surface.getByRole("button", { name: "Match our board" }));
+    expect(surface.getByTestId("sheet-basis")).toHaveTextContent("Our board, untouched");
   });
 
-  it("queues from the drawer through room.setQueue", async () => {
+  it("on your turn a sheet row drafts through the same undo window", () => {
+    vi.useFakeTimers();
+    const submit = vi.fn(async () => ({ ok: true as const }));
+    renderRoom({ submit });
+    const surface = desktop();
+    fireEvent.click(surface.getByRole("tab", { name: "Your sheet" }));
+    fireEvent.click(surface.getAllByRole("button", { name: "Draft Jalen Croft" })[0]!);
+    expect(surface.getByTestId("undo-pill")).toHaveTextContent("Jalen Croft");
+    vi.advanceTimersByTime(QUILT_CONFIG.undoWindowMs);
+    expect(submit).toHaveBeenCalledWith({ type: "MAKE_PICK", playerId: "qb1" });
+    vi.useRealTimers();
+  });
+
+  it("the stream opens from the rail, collapses back, hides to a pill on the strip, and remembers", async () => {
+    renderRoom();
+    const surface = desktop();
+    fireEvent.click(surface.getByRole("button", { name: "Open the room" }));
+    await waitFor(() => expect(surface.getByTestId("room-stream")).toHaveAttribute("data-width", "open"));
+    expect(surface.getByLabelText("Message")).toBeInTheDocument();
+    fireEvent.click(surface.getByRole("button", { name: "Collapse the room" }));
+    expect(surface.getByTestId("stream-rail")).toBeInTheDocument();
+    fireEvent.click(surface.getByRole("button", { name: "Hide the room" }));
+    expect(surface.queryByTestId("stream-rail")).toBeNull();
+    expect(surface.getByTestId("stream-hidden-pill")).toBeInTheDocument();
+    expect(window.localStorage.getItem(QUILT_CONFIG.streamWidthStorageKey)).toBe("hidden");
+    fireEvent.click(surface.getByTestId("stream-hidden-pill"));
+    await waitFor(() => expect(surface.getByTestId("room-stream")).toBeInTheDocument());
+  });
+
+  it("queues from a pool row through room.setQueue", async () => {
     const setQueue = vi.fn(async () => ({ ok: true as const }));
-    renderRoom({ queue: [], setQueue });
-    const surface = desktop();
-    fireEvent.keyDown(window, { key: " " });
-    fireEvent.click(within(surface.getByTestId("pool-drawer")).getByRole("button", { name: "Add Jalen Croft to your queue" }));
+    renderRoom({ queue: [], setQueue, view: { ...room.view!, onClockTeamId: "t2", upcoming: ["t2", "t1"] } });
+    const pool = within(desktop().getByRole("list", { name: "Available players, best first" }));
+    fireEvent.click(pool.getByRole("button", { name: "Queue Jalen Croft" }));
     await waitFor(() => expect(setQueue).toHaveBeenCalledWith(["qb1"]));
   });
 
-  it("keeps the loud fills on acts and on nothing else (law 5)", () => {
-    const { container } = renderRoom();
-    expect(container.querySelector(".bg-text-primary")).toBeNull();
-    const loud = [...container.querySelectorAll("button.bg-accent")];
-    for (const pill of loud) {
-      expect(pill.textContent ?? "").toMatch(/Draft|Confirm|PICKS|NEEDS|VALUE|BYES/);
-    }
-  });
-
-  it("inverts on the phone tree: bottom tabs, pool first, two-step picking", () => {
+  it("inverts on the phone: the stream is the page, the call block is pinned, picking is two-step", () => {
     vi.mocked(useMediaQuery).mockReturnValue(false);
     const submit = vi.fn(async () => ({ ok: true as const }));
     renderRoom({ submit });
-    // The desktop composition is not mounted alongside it.
     expect(screen.queryByTestId("quilt-room")).toBeNull();
-    const phone = screen.getByRole("navigation", { name: "Draft room tabs" }).parentElement!;
-    expect(within(phone).getByTestId("mobile-your-turn")).toBeInTheDocument();
-    // A phone DRAFT opens the confirm sheet rather than picking.
-    fireEvent.click(within(phone).getAllByRole("button", { name: "Draft" })[0]!);
+    const phone = within(screen.getByTestId("phone-room"));
+    expect(phone.getByTestId("room-stream")).toHaveAttribute("data-width", "page");
+    expect(phone.getByTestId("phone-call")).toBeInTheDocument();
+    fireEvent.click(phone.getByTestId("dock-verb"));
     expect(submit).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: /Confirm your pick/ })).toBeInTheDocument();
   });
 
-  // Review fix round (HIGH): only the composition for the current width mounts, so a window
-  // crossing 64rem swaps trees. The phone's tab, confirm sheet and peek live in the room, so a
-  // confirmation opened on the phone survives a trip through the desktop composition and back.
-  it("keeps a pending confirmation and the chosen tab across a resize that swaps compositions", () => {
+  it("keeps a pending confirmation across a resize that swaps compositions", () => {
     vi.mocked(useMediaQuery).mockReturnValue(false);
     const submit = vi.fn(async () => ({ ok: true as const }));
-    // A fresh element per render: React skips a subtree handed the identical element object.
-    const element = () => (
-      <ToastProvider>
-        <SnakeRoom room={{ ...room, submit }} playersById={playersById(PLAYERS)} />
-      </ToastProvider>
-    );
-    const { rerender } = render(element());
-    const nav = () => screen.getByRole("navigation", { name: "Draft room tabs" });
-    fireEvent.click(within(nav()).getByRole("button", { name: "SHEET" }));
-    expect(within(nav()).getByRole("button", { name: "SHEET" })).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(within(nav().parentElement!).getAllByRole("button", { name: "Draft" })[0]!);
+    const { rerender } = render(element({ submit }));
+    fireEvent.click(within(screen.getByTestId("phone-room")).getByTestId("dock-verb"));
     expect(screen.getByRole("dialog", { name: /Confirm your pick/ })).toBeInTheDocument();
 
-    // The window widens past the breakpoint: the desktop composition takes over...
     vi.mocked(useMediaQuery).mockReturnValue(true);
-    rerender(element());
+    rerender(element({ submit }));
     expect(screen.getByTestId("quilt-room")).toBeInTheDocument();
-    expect(screen.queryByRole("navigation", { name: "Draft room tabs" })).toBeNull();
+    expect(screen.queryByTestId("phone-room")).toBeNull();
 
-    // ...and narrows again: the confirmation is still open and SHEET is still the tab.
     vi.mocked(useMediaQuery).mockReturnValue(false);
-    rerender(element());
+    rerender(element({ submit }));
     expect(screen.getByRole("dialog", { name: /Confirm your pick/ })).toBeInTheDocument();
-    expect(within(nav()).getByRole("button", { name: "SHEET" })).toHaveAttribute("aria-pressed", "true");
     expect(submit).not.toHaveBeenCalled();
   });
 });

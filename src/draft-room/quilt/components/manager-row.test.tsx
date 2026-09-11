@@ -20,6 +20,8 @@ function renderRow(overrides: Partial<Parameters<typeof ManagerRow>[0]> = {}) {
       myTeamId="t2"
       onClockTeamId="t1"
       columns={COLUMNS}
+      onOpenRoster={() => {}}
+      openRosterTeamId={null}
       {...overrides}
     />,
   );
@@ -39,7 +41,7 @@ describe("ManagerRow", () => {
     const live = heads.find((head) => head.dataset.state === "live");
     expect(live).toBeDefined();
     expect(live!.innerHTML).toContain("ring-live");
-    expect(live!.innerHTML).not.toContain("ring-accent");
+    expect(live!.innerHTML).not.toContain("ring-self");
   });
 
   it("rings YOUR head amber with the soft glow token, and labels it YOU", () => {
@@ -47,9 +49,9 @@ describe("ManagerRow", () => {
     const heads = screen.getAllByTestId("manager-head");
     const you = heads.find((head) => head.dataset.state === "you");
     expect(you).toBeDefined();
-    expect(you!.innerHTML).toContain("ring-accent");
-    expect(you!.innerHTML).toContain("shadow-verb-glow");
-    expect(you!).toHaveTextContent("YOU");
+    expect(you!.innerHTML).toContain("ring-self");
+    expect(you!.innerHTML).toContain("ring-self");
+    expect(you!).toHaveTextContent("You");
   });
 
   it("keeps everyone else quiet: line ring, no glow, the team's code as the label", () => {
@@ -58,7 +60,7 @@ describe("ManagerRow", () => {
     const quiet = heads.find((head) => head.dataset.state === "quiet");
     expect(quiet).toBeDefined();
     expect(quiet!.innerHTML).toContain("ring-line");
-    expect(quiet!.innerHTML).not.toContain("shadow-verb-glow");
+    expect(quiet!.innerHTML).not.toContain("ring-self");
     expect(quiet!).toHaveTextContent("TB");
   });
 
@@ -67,10 +69,10 @@ describe("ManagerRow", () => {
     // the moment the room turns toward you is exactly the moment your head must not go red.
     renderRow({ onClockTeamId: "t2" });
     const heads = screen.getAllByTestId("manager-head");
-    const mine = heads.find((head) => head.textContent?.includes("YOU"));
+    const mine = heads.find((head) => head.textContent?.includes("You"));
     expect(mine).toBeDefined();
     expect(mine!.dataset.state).toBe("you");
-    expect(mine!.innerHTML).toContain("ring-accent");
+    expect(mine!.innerHTML).toContain("ring-self");
     expect(mine!.innerHTML).not.toContain("ring-live");
   });
 

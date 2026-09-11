@@ -42,7 +42,7 @@ describe("PickCelebration", () => {
     stubMatchMedia(false);
     render(<PickCelebration lastPick={{ pick, isMine: true }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
     const panel = screen.getByTestId("pick-celebration");
-    expect(panel).toHaveTextContent("You drafted Marcus Reed!");
+    expect(panel).toHaveTextContent("You drafted Marcus Reed.");
     expect(panel).toHaveAttribute("data-emphasis", "self");
     expect(panel.className).toMatch(/self-wash/);
   });
@@ -62,14 +62,14 @@ describe("PickCelebration", () => {
     render(<PickCelebration lastPick={{ pick, isMine: true }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
     const panel = screen.getByTestId("pick-celebration");
     expect(panel.className).not.toMatch(/animate-/);
-    expect(panel).toHaveTextContent("You drafted Marcus Reed!");
+    expect(panel).toHaveTextContent("You drafted Marcus Reed.");
   });
 
   it("shows the winning price for an auction pick and fades out on its own", () => {
     stubMatchMedia(false);
     vi.useFakeTimers();
     render(<PickCelebration lastPick={{ pick: { ...pick, price: 42 }, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
-    expect(screen.getByText("Won for $42.")).toBeInTheDocument();
+    expect(screen.getByText(/won for \$42/)).toBeInTheDocument();
     act(() => void vi.advanceTimersByTime(DRAFT_ROOM_CONFIG.celebrationMs));
     expect(screen.queryByTestId("pick-celebration")).toBeNull();
   });

@@ -50,11 +50,18 @@ export function reconcileSheet(sheet: CheatSheet, boardIds: readonly string[]): 
 export function moveInSheet(sheet: CheatSheet, playerId: string, delta: number): CheatSheet {
   const from = sheet.order.indexOf(playerId);
   if (from === -1) return sheet;
-  const to = Math.max(0, Math.min(sheet.order.length - 1, from + delta));
-  if (to === from) return sheet;
+  return placeInSheet(sheet, playerId, from + delta);
+}
+
+/** Put a player at a place (0-based, clamped): the drag drop's own verb. A no-op returns the sheet. */
+export function placeInSheet(sheet: CheatSheet, playerId: string, to: number): CheatSheet {
+  const from = sheet.order.indexOf(playerId);
+  if (from === -1) return sheet;
+  const target = Math.max(0, Math.min(sheet.order.length - 1, to));
+  if (target === from) return sheet;
   const order = [...sheet.order];
   order.splice(from, 1);
-  order.splice(to, 0, playerId);
+  order.splice(target, 0, playerId);
   return { ...sheet, order };
 }
 

@@ -20,6 +20,13 @@ export interface PlayerRowProps {
   readonly figure?: ReactNode;
   /** The one control: `<Button variant="verb" size="sm">Draft</Button>`. The row never builds it. */
   readonly action?: ReactNode;
+  /**
+   * The name rendered as the product's pressable name (`PlayerName`, the one season-peek
+   * primitive) where a surface has one. Omitted, the row prints the player's name as text. The
+   * slot sits inside the name column's own span, so the size, the weight and the truncation are
+   * the row's whatever the call site hands in.
+   */
+  readonly name?: ReactNode;
   /** The row that is yours, or the one the moment is about: the amber wash. */
   readonly highlight?: boolean;
   readonly className?: string;
@@ -59,14 +66,14 @@ export const ROW_META_CLASS = "flex min-w-0 items-center gap-1.5 text-sm text-te
  * TRUNCATION IS LOAD-BEARING AT 360px: the name column is `min-w-0` and the name truncates, or a
  * flex child's automatic minimum size lets one long name push the whole PAGE sideways.
  */
-export function PlayerRow({ player, positionRank, meta, chips, verdict, figure, action, highlight = false, className = "" }: PlayerRowProps) {
+export function PlayerRow({ player, positionRank, meta, chips, verdict, figure, action, name, highlight = false, className = "" }: PlayerRowProps) {
   return (
     <div data-highlight={highlight ? "true" : undefined} className={rowShellClass(highlight, className)}>
       <PlayerFace player={player} size="md" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {/* `pool-player-name` is a TEST CONTRACT (e2e makeTopPick helpers read the picked name
             through it, never through DOM adjacency). */}
-        <span data-testid="pool-player-name" className={ROW_NAME_CLASS}>{player.name}</span>
+        <span data-testid="pool-player-name" className={ROW_NAME_CLASS}>{name ?? player.name}</span>
         <span className={ROW_META_CLASS}>
           <PositionBadge position={player.position} rank={positionRank} size="sm" />
           {meta === undefined ? null : <span className="truncate">{meta}</span>}

@@ -153,6 +153,28 @@ describe("PlayerRow", () => {
     expect(container.firstElementChild!.children).toHaveLength(2);
   });
 
+  it("takes a pressable name through the name slot, inside the row's own name span, in both themes", async () => {
+    const onOpen = vi.fn();
+    await renderSurface(
+      <PlayerRow
+        player={CROFT}
+        name={
+          <button type="button" onClick={onOpen}>
+            Jalen Croft
+          </button>
+        }
+      />,
+      async ({ container }) => {
+        const name = screen.getByRole("button", { name: "Jalen Croft" });
+        expect(screen.getByTestId("pool-player-name")).toContainElement(name);
+        expect(screen.getByTestId("pool-player-name").className).toContain("font-display");
+        fireEvent.click(name);
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
+    expect(onOpen).toHaveBeenCalledTimes(2);
+  });
+
   it("lets the call site place the row without touching its skin", () => {
     const { container } = render(<PlayerRow player={CROFT} className="mb-1" />);
     expect(container.firstElementChild!.className).toContain("mb-1");

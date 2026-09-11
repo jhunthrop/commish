@@ -21,15 +21,13 @@ function renderCell(withFace: boolean, rowHeight = 96, cell: QuiltCell = LANDED)
       cell={cell}
       player={cell.pick === null ? null : qb1}
       teamCount={2}
-      lens="picks"
-      verdict={null}
-      byeWeek={null}
       deadlineAt={null}
       onPeek={() => {}}
       peeked={false}
       withFace={withFace}
       rowHeight={rowHeight}
-      settleClass=""
+      mine={false}
+      landingClass=""
     />,
   );
 }
@@ -55,7 +53,7 @@ describe("QuiltCellView height degradation (the one-height-per-row law)", () => 
     const { unmount } = renderCell(true, 32);
     const withCaption = screen.getByTestId("quilt-pick-cell");
     expect(withCaption.querySelector("[data-testid='player-face-team']")).toBeNull();
-    expect(withCaption).toHaveTextContent(`${qb1.position} · ${qb1.nflTeam}`);
+    expect(withCaption).toHaveTextContent(`${qb1.position} · ${qb1.nflTeam} · 1.01`);
     unmount();
     renderCell(true, 28);
     const cell = screen.getByTestId("quilt-pick-cell");
@@ -66,7 +64,7 @@ describe("QuiltCellView height degradation (the one-height-per-row law)", () => 
   it("a dashed YOURS cell keeps both lines only with room, and its border alone when squeezed", () => {
     const { unmount } = renderCell(false, 96, YOURS);
     expect(screen.getByTestId("quilt-your-cell")).toHaveTextContent("2.01");
-    expect(screen.getByTestId("quilt-your-cell")).toHaveTextContent("YOURS");
+    expect(screen.getByTestId("quilt-your-cell")).toHaveTextContent("yours");
     unmount();
     renderCell(false, 12, YOURS);
     const squeezed = screen.getByTestId("quilt-your-cell");
@@ -82,11 +80,10 @@ describe("QuiltBoard faces", () => {
     teams: TEAMS,
     playersById,
     myTeamId: "t2" as string | null,
-    lens: "picks" as const,
-    byeWeeks: new Map<string, number>(),
-    boardRanks: new Map<string, number>(),
     onPeek: () => {},
     peekedPlayerId: null,
+    onOpenRoster: () => {},
+    openRosterTeamId: null,
   };
 
   it("the active round's landed cells carry faces; the micro-only board never does", () => {

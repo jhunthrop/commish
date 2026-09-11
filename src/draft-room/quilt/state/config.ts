@@ -46,6 +46,16 @@ export const QUILT_CONFIG = {
   fullRoundsBehind: 3,
   /** localStorage key prefix for the cheat sheet, suffixed with the draft id. */
   sheetStorageKeyPrefix: "commish.draft-sheet.",
+  /** Where the browser remembers the stream's width (open, rail, hidden). */
+  streamWidthStorageKey: "commish.draft-stream-width",
+  /**
+   * YOUR SHEET (founder ruling 1, 2026-09-10): seven columns of up to `columnSize`, rows at the
+   * research density (`TOKENS.density.denseRowPx`), tier bands at `bandPx`, and a windowed list
+   * per column that renders `overscanRows` beyond the visible band so a scroll never shows a gap.
+   */
+  sheet: { columnSize: 50, rowPx: 44, bandPx: 28, overscanRows: 6 },
+  /** The stream's two desktop widths, px (ruling 2): the rail and the open column. */
+  stream: { railPx: 64, openPx: 320, presenceFaceCap: 4 },
   /** The consistency strip's own bar: a week at or over this many fantasy points counts as a
    *  hit and wears the position's color; under it stays quiet. One constant, stated beside the
    *  caption that quotes it. */
