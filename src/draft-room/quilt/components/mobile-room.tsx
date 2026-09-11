@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { BoardReason } from "@/projections/preseason/board";
@@ -31,7 +31,23 @@ import type { RoomActs } from "./room-acts";
 const MOBILE_TABS = ["pool", "assistant", "sheet", "roster", "board", "picks"] as const;
 /** One instance, never a fresh `{}` per render: the pool tab memoizes its rows on it. */
 const NO_TIERS: Readonly<Record<string, TierStandingView>> = {};
-type MobileTab = (typeof MOBILE_TABS)[number];
+export type MobileTab = (typeof MOBILE_TABS)[number];
+
+/**
+ * THE PHONE COMPOSITION'S OWN SURFACE STATE, held by the room and not by this tree (review fix
+ * round, 2026-09-10): only the composition for the current width mounts, so a window crossing
+ * the breakpoint unmounts this tree — and a pending confirmation, the open peek and the chosen
+ * tab must survive that. Both compositions read and write these through `QuiltRoom`.
+ */
+export interface PhoneSurface {
+  readonly tab: MobileTab;
+  /** The player whose confirm sheet is open, or null. */
+  readonly confirmId: string | null;
+  /** The player whose draft-context peek is open on the phone, or null. */
+  readonly peekId: string | null;
+}
+
+export const RESTING_PHONE: PhoneSurface = { tab: "pool", confirmId: null, peekId: null };
 
 /** Literal caps are the tab bar's own data-register (the sweep bans the CLASS, not acronyms).
  *  Six tabs at 390px: a six-way flex-1 split with no horizontal padding on the row itself leaves
@@ -61,6 +77,9 @@ export interface MobileRoomProps {
   readonly acts: RoomActs;
   readonly pending: PendingPick | null;
   readonly onUndo: () => void;
+  /** The room-held surface state (tab, confirm, peek) and its one patch verb. */
+  readonly phone: PhoneSurface;
+  readonly onPhone: (patch: Partial<PhoneSurface>) => void;
   readonly lens: Lens;
   readonly onLens: (lens: Lens) => void;
   readonly byeWeeks: ReadonlyMap<string, number>;
@@ -91,18 +110,16 @@ export interface MobileRoomProps {
  * sheet — and then the same undo window desktop gets.
  */
 export function MobileRoom(props: MobileRoomProps) {
-  const { room, view, playersById, myTurn, acts, pending, onUndo, advisor } = props;
+  const { room, view, playersById, myTurn, acts, pending, onUndo, advisor, phone, onPhone } = props;
   const odds = advisor.view?.odds ?? null;
-  const [tab, setTab] = useState<MobileTab>("pool");
-  const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [peekId, setPeekId] = useState<string | null>(null);
+  const { tab, confirmId, peekId } = phone;
+  const setTab = useCallback((next: MobileTab) => onPhone({ tab: next }), [onPhone]);
+  const setConfirmId = useCallback((next: string | null) => onPhone({ confirmId: next }), [onPhone]);
+  const setPeekId = useCallback((next: string | null) => onPhone({ peekId: next }), [onPhone]);
 
   // Two-step picking: every DRAFT on this tree opens the confirm sheet; only its CONFIRM hands
   // the pick to the undo window (`acts.onDraft`).
-  const mobileActs: RoomActs = useMemo(
-    () => ({ ...acts, onDraft: (playerId: string) => setConfirmId(playerId), onPeek: (playerId: string) => setPeekId(playerId) }),
-    [acts],
-  );
+  const mobileActs: RoomActs = useMemo(() => ({ ...acts, onDraft: setConfirmId, onPeek: setPeekId }), [acts, setConfirmId, setPeekId]);
 
   const peekHistory = usePlayerHistory(view.draftId, peekId, props.historyCache);
   const onClockTeam = room.teams.find((team) => team.id === view.onClockTeamId) ?? null;

@@ -247,4 +247,37 @@ describe("SnakeRoom (the quilt)", () => {
     expect(submit).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: /Confirm your pick/ })).toBeInTheDocument();
   });
+
+  // Review fix round (HIGH): only the composition for the current width mounts, so a window
+  // crossing 64rem swaps trees. The phone's tab, confirm sheet and peek live in the room, so a
+  // confirmation opened on the phone survives a trip through the desktop composition and back.
+  it("keeps a pending confirmation and the chosen tab across a resize that swaps compositions", () => {
+    vi.mocked(useMediaQuery).mockReturnValue(false);
+    const submit = vi.fn(async () => ({ ok: true as const }));
+    // A fresh element per render: React skips a subtree handed the identical element object.
+    const element = () => (
+      <ToastProvider>
+        <SnakeRoom room={{ ...room, submit }} playersById={playersById(PLAYERS)} />
+      </ToastProvider>
+    );
+    const { rerender } = render(element());
+    const nav = () => screen.getByRole("navigation", { name: "Draft room tabs" });
+    fireEvent.click(within(nav()).getByRole("button", { name: "SHEET" }));
+    expect(within(nav()).getByRole("button", { name: "SHEET" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(within(nav().parentElement!).getAllByRole("button", { name: "Draft" })[0]!);
+    expect(screen.getByRole("dialog", { name: /Confirm your pick/ })).toBeInTheDocument();
+
+    // The window widens past the breakpoint: the desktop composition takes over...
+    vi.mocked(useMediaQuery).mockReturnValue(true);
+    rerender(element());
+    expect(screen.getByTestId("quilt-room")).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Draft room tabs" })).toBeNull();
+
+    // ...and narrows again: the confirmation is still open and SHEET is still the tab.
+    vi.mocked(useMediaQuery).mockReturnValue(false);
+    rerender(element());
+    expect(screen.getByRole("dialog", { name: /Confirm your pick/ })).toBeInTheDocument();
+    expect(within(nav()).getByRole("button", { name: "SHEET" })).toHaveAttribute("aria-pressed", "true");
+    expect(submit).not.toHaveBeenCalled();
+  });
 });

@@ -25,7 +25,7 @@ import { QuiltBoard } from "./components/quilt-board";
 import { PoolDrawer } from "./components/pool-drawer";
 import { PeekSheet } from "./components/peek-sheet";
 import { UndoPill } from "./components/undo-pill";
-import { MobileRoom } from "./components/mobile-room";
+import { MobileRoom, RESTING_PHONE, type PhoneSurface } from "./components/mobile-room";
 import type { RoomActs } from "./components/room-acts";
 
 export interface QuiltRoomProps {
@@ -61,6 +61,10 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   const [lens, setLens] = useState<Lens>("picks");
   useRoomKeys(dispatch);
   const desktop = useMediaQuery(QUILT_CONFIG.desktopStageQuery);
+  // The phone composition's tab, confirm sheet and peek live HERE, so a window crossing the
+  // breakpoint (which swaps the mounted composition) never drops a confirmation mid-resize.
+  const [phone, setPhone] = useState<PhoneSurface>(RESTING_PHONE);
+  const onPhone = useCallback((patch: Partial<PhoneSurface>) => setPhone((held) => ({ ...held, ...patch })), []);
 
   // Affordance only — the server decides. Task 5's owed-pick allowance matches the old pool's.
   const myTurn = view.phase === "in_progress" && room.myTeamId !== null && view.onClockTeamId === room.myTeamId;
@@ -168,6 +172,8 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
             acts={acts}
             pending={pending}
             onUndo={undo}
+            phone={phone}
+            onPhone={onPhone}
             lens={lens}
             onLens={setLens}
             byeWeeks={byeWeeks}
