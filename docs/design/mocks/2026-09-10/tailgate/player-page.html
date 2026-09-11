@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tailgate · Player page</title>
+<!--
+  TAILGATE · player page for James Cook, opened from Sunday Money, where he is on Rey Okafor's
+  Iron Owls. A sticker card for the player, flyer panels below, one mustard verb.
+
+  DATA PROVENANCE: identical to the Sideline player page. Real from nflverse: the three 2024
+  game lines (13.3 / 28.5 / 18.7 PPR), snap share 61/47/50, target share 13/6/17, the bio, the
+  headshot. STAND-INS labelled beside each: the call card and every figure on it, the range
+  rail, expected games, the head-to-head record, the facts-as-of time, the room message.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Rubik:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --canvas:#F5F0E6; --card:#FFFDF8; --asphalt:#24201D; --ink2:#5C554E; --ink3:#8C847B; --line:#E4DCCD;
+    --mustard:#F2C230; --mustard-ink:#24201D; --grill:#E4572E; --cooler:#2A5FCC; --turf:#22894F; --mustard-wash:#FBEFC5; --grill-wash:#FCE3DA; --turf-wash:#DDF0E4; --rb:#23835A; --buf:#00338D;
+    --display:"Unbounded", system-ui, sans-serif; --body:"Rubik", system-ui, sans-serif; --shadow:3px 3px 0 var(--asphalt);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --canvas:#1F1B18; --card:#2A2521; --asphalt:#F4EFE6; --ink2:#C9C1B5; --ink3:#948B80; --line:#3A332D; --grill:#FF6A3D; --cooler:#5F8DFF; --turf:#3DBE76; --mustard-wash:#3D3218; --grill-wash:#43271F; --turf-wash:#1F3A2B; --rb:#35C98A; }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--canvas);color:var(--asphalt);font:15px/1.45 var(--body)}
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.01em}
+  .num{font-family:var(--display);font-variant-numeric:tabular-nums}
+  .wrap{max-width:1440px;margin:0 auto;padding:0 40px 60px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:46px;padding:0 20px;border-radius:999px;font:600 15px var(--body);border:2px solid var(--asphalt);background:var(--card);color:var(--asphalt);cursor:pointer;box-shadow:var(--shadow);transition:transform 80ms,box-shadow 80ms}
+  .btn:active{transform:translate(2px,2px);box-shadow:0 0 0 var(--asphalt)}
+  .btn.verb{background:var(--mustard);color:var(--mustard-ink)}
+  .btn.lg{height:54px;padding:0 26px;font-size:17px;box-shadow:4px 4px 0 var(--asphalt)}
+  .nav{display:flex;align-items:center;gap:20px;height:64px;color:var(--ink2)}
+  .nav .brand{font:800 20px var(--display);color:var(--asphalt);display:inline-flex;align-items:center;gap:8px}
+  .nav .brand i{width:20px;height:20px;border-radius:50%;background:var(--mustard);border:2px solid var(--asphalt)}
+  .nav .spacer{flex:1}
+  .ava{width:32px;height:32px;border-radius:50%;background:var(--card);display:grid;place-items:center;font:700 11px var(--display);border:2px solid var(--asphalt)}
+
+  .hero{display:grid;grid-template-columns:auto 1fr auto;gap:28px;align-items:center;background:var(--card);border:2px solid var(--asphalt);border-radius:26px;box-shadow:5px 5px 0 var(--asphalt);padding:28px 32px;margin-top:8px}
+  .sticker{width:150px;height:150px;border-radius:50%;background:var(--buf);border:5px solid var(--card);outline:2px solid var(--asphalt);object-fit:cover;object-position:top;transform:rotate(-3deg)}
+  .hero h1{font-size:50px;line-height:1;font-weight:800}
+  .hero .line{margin-top:12px;color:var(--ink2);display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+  .pos{display:inline-block;padding:2px 9px;border-radius:999px;font:700 12px var(--body);color:#fff;background:var(--rb);border:1.5px solid var(--asphalt)}
+  .owner{display:inline-flex;align-items:center;gap:8px;background:var(--grill-wash);border:1.5px solid var(--asphalt);border-radius:999px;padding:3px 12px 3px 3px;color:var(--asphalt);font-weight:500}
+  .owner .ava{width:26px;height:26px;font-size:9px;background:var(--grill);color:#fff}
+  .big{text-align:right}
+  .big .n{font:800 66px/1 var(--display)}
+  .big small{display:block;color:var(--ink3);font-size:13px;margin-top:6px;max-width:26ch}
+  .big .btn{margin-top:16px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
+  .card{background:var(--card);border:2px solid var(--asphalt);border-radius:20px;box-shadow:var(--shadow);padding:20px 22px}
+  .card.wide{grid-column:1 / -1}
+  .card h2{font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:10px}
+  .verdict{font:700 20px/1.35 var(--display);color:var(--turf)}
+  .cols{display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:12px;color:var(--ink2);font-size:14px}
+  .cols b{color:var(--asphalt);font-weight:600}.cols .gap{color:var(--turf);font-weight:600}
+  .talent{margin:12px 0 0;color:var(--ink2)}
+  .rail{position:relative;height:12px;border-radius:6px;background:var(--line);border:1.5px solid var(--asphalt);margin:20px 0 8px}
+  .rail .band{position:absolute;top:0;bottom:0;left:32%;width:38%;background:var(--ink3);opacity:.45}
+  .rail .med{position:absolute;top:-8px;left:52%;width:6px;height:24px;background:var(--mustard);border:1.5px solid var(--asphalt);border-radius:3px;transform:translateX(-50%)}
+  .rail-l{display:flex;justify-content:space-between;font-size:12px;color:var(--ink3)}
+  .rail-l b{color:var(--asphalt)}
+  .share{display:grid;grid-template-columns:110px 1fr 150px;gap:12px;align-items:center;padding:8px 0;border-top:2px dashed var(--line);font-size:14px}
+  .share:first-of-type{border-top:none}
+  .share .bars{display:flex;gap:4px;height:10px}
+  .share .bars i{flex:1;border-radius:5px;background:var(--line);border:1.5px solid var(--asphalt);position:relative;overflow:hidden}
+  .share .bars i::after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--w);background:var(--cooler)}
+  .share .v{text-align:right;color:var(--ink2)}.share .v b{color:var(--asphalt)}
+  .strip{display:flex;align-items:flex-end;gap:14px;height:150px;padding-top:10px}
+  .bar{flex:0 0 76px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px}
+  .bar i{width:100%;border-radius:10px;background:var(--mustard);border:2px solid var(--asphalt);box-shadow:2px 2px 0 var(--asphalt)}
+  .bar b{font:700 15px var(--display)}
+  .bar span{font-size:11px;color:var(--ink3)}
+  .basis{margin:10px 0 0;color:var(--ink3);font-size:12px}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  th{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink3);text-align:right;padding:6px 8px;font-weight:600}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:10px 8px;text-align:right;border-top:2px dashed var(--line)}
+  td b{font:700 15px var(--display)}
+  .bio{display:flex;flex-wrap:wrap;gap:8px 22px;color:var(--ink2)}.bio b{color:var(--asphalt);font-weight:600}
+  .room{display:flex;gap:10px;align-items:flex-start}
+  .room .b{background:var(--canvas);border:2px solid var(--asphalt);border-radius:16px;padding:8px 12px;max-width:420px;box-shadow:2px 2px 0 var(--asphalt)}
+  .room .b b{display:block;font-size:12px;color:var(--ink2);font-weight:600}
+  .asof{margin-top:20px;color:var(--ink3);font-size:12px}
+
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+  @media (max-width:720px){
+    .wrap{padding:0 14px 100px}
+    .nav{height:54px}.nav .crumb{display:none}
+    .hero{grid-template-columns:auto 1fr;gap:14px;padding:18px;border-radius:22px}
+    .sticker{width:92px;height:92px}
+    .hero h1{font-size:32px}
+    .big{grid-column:1 / -1;text-align:left;display:flex;align-items:baseline;gap:10px}.big .n{font-size:48px}.big small{margin:0}
+    .big .btn{position:fixed;left:14px;right:14px;bottom:14px;margin:0;z-index:2}
+    .grid{grid-template-columns:1fr}
+    .strip{gap:10px;height:130px}.bar{flex:1}
+    table th:nth-child(4),table td:nth-child(4),table th:nth-child(6),table td:nth-child(6){display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav"><a class="brand" href="#"><i aria-hidden="true"></i>Commish</a><span class="crumb">Sunday Money · Players</span><span class="spacer"></span><span class="ava" aria-hidden="true">You</span></nav>
+
+  <header class="hero">
+    <img class="sticker" alt="" src="https://static.www.nfl.com/image/upload/f_auto,q_auto/league/anjbznqb9i21wzcgrtbs">
+    <div>
+      <h1>James Cook</h1>
+      <div class="line"><span class="pos">RB</span><span>Buffalo · No. 4</span><span class="owner"><span class="ava" aria-hidden="true">RO</span>On Iron Owls, Rey Okafor's team</span></div>
+    </div>
+    <div class="big"><span class="n num">20.2</span><small>PPR a game · 2024 weeks 1 to 3, all this archive holds</small><a class="btn verb lg" href="#">Offer Rey a trade</a></div>
+  </header>
+
+  <div class="grid">
+    <!-- THE CALL: every figure here is a STAND-IN for layout, not the board's read on Cook -->
+    <section class="card wide" aria-label="The call">
+      <h2>The call</h2>
+      <p class="verdict">He is going later than he should. Our projection says he is worth about 18 more points than where he is being drafted. Two left in his tier before a 14.2 point drop.</p>
+      <div class="cols"><span>pick <b>22.4</b> · experts <b>19th</b></span><span><span class="pos">RB8</span> · <b>21st</b> overall · <b>241</b> PPR pts</span><span class="gap">+18 points vs his ADP</span></div>
+      <p class="talent">Per game he projects like a RB6. The question is games: our model expects 16.</p>
+    </section>
+    <section class="card" aria-label="Season range">
+      <h2>Season range</h2>
+      <div class="rail"><div class="band"></div><div class="med"></div></div>
+      <div class="rail-l"><span>an injury year</span><span>most seasons land in the band · <b>241</b> is our number</span><span>the smash case</span></div>
+      <p class="basis">Expected 16 games, 12 to 17</p>
+    </section>
+    <section class="card" aria-label="His role">
+      <h2>His role · 2024 weeks 1 to 3</h2>
+      <div class="share"><span>Snap share</span><div class="bars"><i style="--w:61%"></i><i style="--w:47%"></i><i style="--w:50%"></i></div><span class="v"><b>61 · 47 · 50%</b></span></div>
+      <div class="share"><span>Target share</span><div class="bars"><i style="--w:13%"></i><i style="--w:6%"></i><i style="--w:17%"></i></div><span class="v"><b>13 · 6 · 17%</b></span></div>
+      <div class="share"><span>Red-zone share</span><div class="bars"></div><span class="v">not tracked for him</span></div>
+    </section>
+    <section class="card wide" aria-label="The season">
+      <h2>2024 · PPR · week by week</h2>
+      <div class="strip">
+        <div class="bar"><b class="num">13.3</b><i style="height:44%"></i><span>wk 1 · ARI</span></div>
+        <div class="bar"><b class="num">28.5</b><i style="height:96%"></i><span>wk 2 · MIA</span></div>
+        <div class="bar"><b class="num">18.7</b><i style="height:63%"></i><span>wk 3 · JAX</span></div>
+      </div>
+      <p class="basis">Three weeks is all the archive holds in this mock. Points under this league's scoring, PPR.</p>
+    </section>
+    <section class="card wide" aria-label="Game log">
+      <h2>Game log · under this league's scoring</h2>
+      <table>
+        <thead><tr><th>Week</th><th>Carries</th><th>Rush yd</th><th>Rush TD</th><th>Rec / tgt</th><th>Rec yd</th><th>Rec TD</th><th>PPR</th></tr></thead>
+        <tbody>
+          <tr><td>1 · vs ARI</td><td>19</td><td>71</td><td>0</td><td>3 / 3</td><td>32</td><td>0</td><td><b>13.3</b></td></tr>
+          <tr><td>2 · vs MIA</td><td>11</td><td>78</td><td>2</td><td>1 / 1</td><td>17</td><td>1</td><td><b>28.5</b></td></tr>
+          <tr><td>3 · vs JAX</td><td>11</td><td>39</td><td>1</td><td>4 / 5</td><td>48</td><td>0</td><td><b>18.7</b></td></tr>
+        </tbody>
+      </table>
+    </section>
+    <section class="card" aria-label="About him"><h2>About him</h2><div class="bio"><span><b>5 ft 11</b>, 190</span><span><b>Georgia</b></span><span>Drafted <b>2022</b>, round 2, pick 63</span><span>Number <b>4</b></span></div></section>
+    <section class="card" aria-label="In the room"><h2>In the room</h2><div class="room"><span class="ava" aria-hidden="true">RO</span><div class="b"><b>Rey Okafor · Tuesday</b>Cook is not available. Do not ask.</div></div><p class="basis">You are 1 and 2 against Rey this season.</p></section>
+  </div>
+  <p class="asof">Facts as of Sep 10, 7:42 pm</p>
+</div>
+</body>
+</html>

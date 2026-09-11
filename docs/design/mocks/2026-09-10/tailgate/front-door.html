@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tailgate · Front door</title>
+<!--
+  TAILGATE · front door (signed out). Governing idea: a parking lot before the game. Everyone is
+  in their colours, the grill is on, and the trash talk is affectionate. Sticker faces, mustard
+  and grill red, chunky type, hard offset shadows like a printed flyer.
+
+  DATA PROVENANCE: real, verbatim copy from the product and the house league names. STAND-INS:
+  seat counts, times, manager initials, proof counts, wire timings.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Rubik:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --canvas:#F5F0E6; --card:#FFFDF8; --asphalt:#24201D; --ink2:#5C554E; --ink3:#8C847B; --line:#E4DCCD;
+    --mustard:#F2C230; --mustard-ink:#24201D; --grill:#E4572E; --cooler:#2A5FCC; --turf:#22894F; --turf-wash:#DDF0E4; --grill-wash:#FCE3DA; --mustard-wash:#FBEFC5;
+    --display:"Unbounded", system-ui, sans-serif; --body:"Rubik", system-ui, sans-serif;
+    --slap:cubic-bezier(.34,1.56,.64,1); --shadow:3px 3px 0 var(--asphalt);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --canvas:#1F1B18; --card:#2A2521; --asphalt:#F4EFE6; --ink2:#C9C1B5; --ink3:#948B80; --line:#3A332D;
+      --mustard:#F2C230; --mustard-ink:#24201D; --grill:#FF6A3D; --cooler:#5F8DFF; --turf:#3DBE76; --turf-wash:#1F3A2B; --grill-wash:#43271F; --mustard-wash:#3D3218; --shadow:3px 3px 0 var(--asphalt); }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--canvas);color:var(--asphalt);font:15px/1.45 var(--body)}
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.01em}
+  .num{font-family:var(--display);font-variant-numeric:tabular-nums}
+  .wrap{max-width:1440px;margin:0 auto;padding:0 40px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 18px;border-radius:999px;font:600 15px var(--body);border:2px solid var(--asphalt);background:var(--card);color:var(--asphalt);cursor:pointer;box-shadow:var(--shadow);transition:transform 80ms,box-shadow 80ms}
+  .btn:active{transform:translate(2px,2px);box-shadow:0 0 0 var(--asphalt)}
+  .btn.verb{background:var(--mustard);color:var(--mustard-ink)}
+  .btn.lg{height:52px;padding:0 24px;font-size:16px}
+
+  .nav{display:flex;align-items:center;gap:26px;height:68px}
+  .brand{font:800 22px var(--display);display:inline-flex;align-items:center;gap:8px}
+  .brand i{width:22px;height:22px;border-radius:50%;background:var(--mustard);border:2px solid var(--asphalt);display:inline-block}
+  .nav a.link{color:var(--ink2);font-weight:500}
+  .nav .spacer{flex:1}
+
+  .hero{display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center;padding:44px 0 24px}
+  .hero h1{font-size:64px;line-height:1;font-weight:800;max-width:11ch}
+  .hero h1 mark{background:linear-gradient(transparent 55%,var(--mustard) 55%);color:inherit;padding:0 4px}
+  .hero p{font-size:18px;color:var(--ink2);max-width:46ch;margin:18px 0 0}
+  .hero .money{font-weight:600;color:var(--asphalt);margin-top:14px}
+  /* the people already in the lot, as stickers on a cooler */
+  .lot{justify-self:end;background:var(--card);border:2px solid var(--asphalt);border-radius:20px;box-shadow:var(--shadow);padding:18px 20px;display:flex;align-items:center;gap:16px;transform:rotate(-1deg)}
+  .faces{display:flex}
+  .face{width:44px;height:44px;border-radius:50%;background:var(--cooler);color:#fff;display:grid;place-items:center;font:700 12px var(--display);border:3px solid var(--card);outline:2px solid var(--asphalt);margin-left:-10px}
+  .face:first-child{margin-left:0}
+  .face:nth-child(2){background:var(--grill)}.face:nth-child(3){background:var(--turf)}.face:nth-child(4){background:var(--mustard);color:var(--asphalt)}.face:nth-child(5){background:var(--card);color:var(--asphalt)}
+  .lot b{display:block;font:700 16px var(--display)}
+  .lot span{color:var(--ink2);font-size:13px}
+
+  .board{margin-top:24px;background:var(--card);border:2px solid var(--asphalt);border-radius:24px;box-shadow:4px 4px 0 var(--asphalt);padding:8px 8px 16px}
+  .board-head{display:flex;align-items:baseline;justify-content:space-between;padding:16px 16px 8px}
+  .board-head h2{font-size:26px;font-weight:800}
+  .board-head p{margin:0;color:var(--ink3);font-size:13px}
+  .chapter{display:inline-flex;align-items:center;gap:8px;margin:12px 16px 4px;padding:4px 12px;border-radius:999px;background:var(--asphalt);color:var(--canvas);font:700 12px var(--display)}
+  .chapter.live{background:var(--grill);color:#fff}
+  .chapter em{font:500 12px var(--body);opacity:.85}
+  .row{display:grid;grid-template-columns:minmax(0,2.3fr) minmax(0,1.5fr) minmax(0,1.3fr) 160px 190px;gap:16px;align-items:center;padding:12px 16px;border-radius:18px;border:2px solid transparent}
+  .row:hover{background:var(--canvas)}
+  .row.featured{background:var(--mustard-wash);border-color:var(--asphalt);box-shadow:var(--shadow);margin:6px 8px}
+  .row .who{display:flex;align-items:center;gap:14px;min-width:0}
+  .row .faces .face{width:34px;height:34px;font-size:11px;border-width:2px}
+  .row h3{font-size:18px;font-weight:700;line-height:1.15}
+  .row .sub{color:var(--ink2);font-size:13px;margin-top:2px}
+  .chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;border:1.5px solid var(--asphalt);vertical-align:middle;margin-left:6px;background:var(--card)}
+  .chip.live{background:var(--grill);color:#fff;border-color:var(--grill)}
+  .row .fmt,.row .when{color:var(--ink2);font-size:14px}
+  .row .when b{display:block;color:var(--asphalt);font-weight:600}
+  .seats .n{font:800 30px/1 var(--display)}
+  .seats .n small{font:600 11px var(--body);color:var(--ink3);margin-left:6px}
+  .row.featured .seats .n{color:var(--grill)}
+  .meter{display:flex;gap:3px;margin-top:6px}
+  .meter i{height:8px;flex:1;border-radius:4px;background:var(--line);border:1px solid var(--asphalt)}
+  .meter i.f{background:var(--asphalt)}
+  .meter i.h{background:var(--mustard)}
+  .row .act{justify-self:end}
+  .board-foot{display:flex;justify-content:space-between;align-items:center;padding:16px 16px 0;color:var(--ink3);font-size:13px}
+  .disclose{padding:10px 16px 0;color:var(--ink3);font-size:12px}
+
+  .crew{margin-top:22px;background:var(--turf-wash);border:2px solid var(--asphalt);border-radius:20px;box-shadow:var(--shadow);padding:20px 24px;display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center}
+  .crew h2{font-size:20px;font-weight:800}
+  .crew p{margin:0;color:var(--ink2)}
+  .trust{margin-top:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .fact{background:var(--card);border:2px solid var(--asphalt);border-radius:20px;box-shadow:var(--shadow);padding:18px 20px}
+  .fact:nth-child(2){transform:rotate(.6deg)}.fact:nth-child(3){transform:rotate(-.6deg)}
+  .fact h3{font-size:13px;font-weight:700}
+  .fact p{margin:8px 0 0;color:var(--ink2)}
+  .fact a{color:var(--cooler);font-weight:600;display:inline-block;margin-top:10px;text-decoration:underline;text-decoration-thickness:2px}
+  .proof{margin:14px 0 0;color:var(--ink3);font-size:13px}
+
+  .wire{margin:28px 0 40px;border-top:2px dashed var(--asphalt);border-bottom:2px dashed var(--asphalt);padding:10px 0;overflow:hidden;white-space:nowrap;font-size:13px;color:var(--ink3)}
+  .wire ul{display:inline-block;margin:0;padding:0;list-style:none;animation:ticker 38s linear infinite}
+  .wire li{display:inline;margin:0 28px}
+  .wire b{color:var(--asphalt);font-weight:600}
+  .wire .hot{color:var(--grill);font-weight:600}
+  footer{padding:0 0 40px;color:var(--ink3);font-size:13px;display:flex;gap:20px}
+
+  @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}.wire{white-space:normal}.wire ul{display:block}.wire li{display:block;margin:4px 0}}
+  @media (max-width:720px){
+    .wrap{padding:0 14px}
+    .nav{height:56px;gap:12px}.nav a.link{display:none}
+    .hero{grid-template-columns:1fr;padding:24px 0 12px;gap:20px}.hero h1{font-size:40px}.hero p{font-size:16px}
+    .lot{justify-self:start;width:100%;transform:none}
+    .board{padding:4px 4px 12px}
+    .row{grid-template-columns:1fr auto;grid-template-areas:"who seats" "fmt seats" "act act";gap:6px 12px;padding:14px 12px;border-bottom:2px dashed var(--line);border-radius:0}
+    .row.featured{border-radius:18px;border-bottom:2px solid var(--asphalt);margin:6px 4px}
+    .row .who{grid-area:who}.row .fmt{grid-area:fmt}.row .when{display:none}.row .seats{grid-area:seats;text-align:right}.row .act{grid-area:act;justify-self:stretch;margin-top:6px}.row .act .btn{width:100%}
+    .meter{width:90px;margin-left:auto}
+    .board-foot{flex-direction:column;align-items:flex-start;gap:10px}
+    .crew{grid-template-columns:1fr;gap:12px}
+    .trust{grid-template-columns:1fr}.fact{transform:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav" aria-label="Site">
+    <a class="brand" href="#"><i aria-hidden="true"></i>Commish</a>
+    <a class="link" href="#">Open leagues</a>
+    <a class="link" href="#">How it works</a>
+    <span class="spacer"></span>
+    <a class="link" href="#">Sign in</a>
+    <a class="btn" href="#">Take a seat</a>
+  </nav>
+
+  <section class="hero">
+    <div>
+      <h1>There is <mark>always</mark> a seat.</h1>
+      <p>Season-long leagues that draft this week. We run the draft, the schedule and the scoring, so no brother-in-law has to.</p>
+      <p class="money">Every league is free this season.</p>
+    </div>
+    <div class="lot" aria-label="Managers seated this week">
+      <div class="faces" aria-hidden="true"><span class="face">DW</span><span class="face">RO</span><span class="face">CP</span><span class="face">JT</span><span class="face">+38</span></div>
+      <div><b>42 managers took a seat this week</b><span>Commish runs some of these leagues itself, and a new league opens as soon as one fills, so there is always a seat.</span></div>
+    </div>
+  </section>
+
+  <section class="board" aria-label="Open leagues">
+    <div class="board-head"><h2>Open leagues</h2><p>Seat counts as of 7:42 pm. A seat being claimed is counted.</p></div>
+    <div class="chapter live">Filling <em>· claimed seats · first to fill is first to draft</em></div>
+
+    <article class="row featured">
+      <div class="who"><div class="faces" aria-hidden="true"><span class="face">DW</span><span class="face">RO</span><span class="face">CP</span></div><div><h3>The Blitz Room <span class="chip live">Filling</span></h3><div class="sub">Dana, Rey, Coach Parker and 8 more are in</div></div></div>
+      <div class="fmt">12 teams · Half-PPR · Snake</div>
+      <div class="when"><b>Drafts when full</b>the moment the last seat is taken</div>
+      <div class="seats"><span class="n num">1<small>seat left of 12</small></span><div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i></div></div>
+      <div class="act"><a class="btn verb" href="#">Take the last seat</a></div>
+    </article>
+    <article class="row">
+      <div class="who"><div class="faces" aria-hidden="true"><span class="face">MK</span><span class="face">AL</span></div><div><h3>Kickoff Classic <span class="chip">Newer players only</span></h3><div class="sub">Maya, Alex and 7 more are in</div></div></div>
+      <div class="fmt">12 teams · Half-PPR · Snake</div>
+      <div class="when"><b>Drafts when full</b>the moment the last seat is taken</div>
+      <div class="seats"><span class="n num">3<small>left of 12</small></span><div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="h"></i><i></i><i></i><i></i></div></div>
+      <div class="act"><a class="btn" href="#">Take a seat</a></div>
+    </article>
+    <article class="row">
+      <div class="who"><div class="faces" aria-hidden="true"><span class="face">SB</span><span class="face">TN</span></div><div><h3>Midnight Waivers</h3><div class="sub">Sam, Tessa and 5 more are in</div></div></div>
+      <div class="fmt">12 teams · PPR · Auction</div>
+      <div class="when"><b>In 2 days</b>Thu, Sep 12, 8:00 pm</div>
+      <div class="seats"><span class="n num">5<small>left of 12</small></span><div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="act"><a class="btn" href="#">Take a seat</a></div>
+    </article>
+    <article class="row">
+      <div class="who"><div class="faces" aria-hidden="true"><span class="face">JT</span></div><div><h3>Sit and Go Twelve</h3><div class="sub">Jordan and 4 more are in</div></div></div>
+      <div class="fmt">12 teams · Half-PPR · Snake</div>
+      <div class="when"><b>Drafts when full</b>the moment the last seat is taken</div>
+      <div class="seats"><span class="n num">7<small>left of 12</small></span><div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="act"><a class="btn" href="#">Take a seat</a></div>
+    </article>
+
+    <div class="chapter">Fresh <em>· no claims yet · yours would be the first seat</em></div>
+    <article class="row">
+      <div class="who"><div><h3>Fourth and Long</h3><div class="sub">Nobody yet. You would be first in.</div></div></div>
+      <div class="fmt">12 teams · Half-PPR · Snake</div>
+      <div class="when"><b>Drafts when full</b>the moment the last seat is taken</div>
+      <div class="seats"><span class="n num">12<small>open</small></span></div>
+      <div class="act"><a class="btn" href="#">Take a seat</a></div>
+    </article>
+    <article class="row">
+      <div class="who"><div><h3>The Rookie Room <span class="chip">Newer players only</span></h3><div class="sub">Nobody yet. You would be first in.</div></div></div>
+      <div class="fmt">12 teams · Half-PPR · Snake</div>
+      <div class="when"><b>Drafts when full</b>the moment the last seat is taken</div>
+      <div class="seats"><span class="n num">12<small>open</small></span></div>
+      <div class="act"><a class="btn" href="#">Take a seat</a></div>
+    </article>
+
+    <div class="board-foot"><span>Sorted by soonest draft you can still join · 6 more rooms in the full lobby</span><a class="btn" href="#">See every open league</a></div>
+    <p class="disclose">Stake tiers are labels only in this preview. No money changes hands.</p>
+  </section>
+
+  <section class="crew">
+    <h2>Bringing your own crew?</h2>
+    <p>Be the commissioner without the job. We run the draft, the schedule and the scoring, and referee trades on deadlines. You pick the format and the draft night.</p>
+    <a class="btn" href="#">Start a league</a>
+  </section>
+
+  <section class="trust">
+    <div class="fact"><h3>Who runs it</h3><p>The house runs the league: the draft room, the schedule, the scoring and the trade deadlines. No commissioner's cousin settles disputes.</p></div>
+    <div class="fact"><h3>What it costs</h3><p>Every league is free this season. No buy-ins, no deposits, nothing to chase.</p></div>
+    <div class="fact"><h3>Never played?</h3><p>Run a practice draft against bots first. Nothing counts, nothing costs.</p><a href="#">Run a practice draft</a></div>
+  </section>
+  <p class="proof">14 leagues filled this season · 3 rooms filling right now</p>
+
+  <div class="wire" aria-label="Recent activity"><ul>
+    <li class="hot">A seat was claimed in The Blitz Room · 4 min ago</li><li>Play Action Party filled · drafting now</li><li>A seat was claimed in <b>Midnight Waivers</b> · 12 min ago</li><li><b>14</b> leagues filled this season</li><li>A seat was claimed in <b>Kickoff Classic</b> · 31 min ago</li>
+    <li class="hot">A seat was claimed in The Blitz Room · 4 min ago</li><li>Play Action Party filled · drafting now</li><li>A seat was claimed in <b>Midnight Waivers</b> · 12 min ago</li><li><b>14</b> leagues filled this season</li><li>A seat was claimed in <b>Kickoff Classic</b> · 31 min ago</li>
+  </ul></div>
+
+  <footer><span>Commish</span><a href="#">League rules</a><a href="#">Legal</a><a href="#">Support</a></footer>
+</div>
+</body>
+</html>

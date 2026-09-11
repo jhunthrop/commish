@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Under the Lights · Front door</title>
+<!--
+  UNDER THE LIGHTS · front door (signed out). Governing idea: your league is on television
+  tonight, and you are the one they cut to. Dark is the flagship (a stadium at night), the day
+  game is the light theme.
+
+  DATA PROVENANCE
+  Real, verbatim from the product: every sentence of copy, the nav links, the house league names.
+  STAND-INS: seat counts, times, manager initials, proof counts, wire timings.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#0F1B33; --studio:#1A2A4A; --studio2:#223559; --white:#F4F1E8; --ink2:#B7BFD0; --ink3:#7E8AA6; --rule:#2C4067;
+    --scarlet:#FF4B3A; --gold:#F5B31B; --gold-ink:#1A1400; --bug:#4D9BFF;
+    --display:"Big Shoulders Display", Impact, sans-serif; --body:"Archivo", system-ui, sans-serif;
+    --wipe:cubic-bezier(.2,.8,.2,1);
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --night:#F4F1E8; --studio:#FFFFFF; --studio2:#E6E9F0; --white:#0F1B33; --ink2:#3E4A63; --ink3:#6B778F; --rule:#D5DAE5; --scarlet:#D92D20; --gold:#C48A00; --gold-ink:#fff; --bug:#1E63D6; }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--night);color:var(--white);font:15px/1.45 var(--body)}
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3{font-family:var(--display);margin:0;text-transform:uppercase;letter-spacing:.01em}
+  .num{font-family:var(--display);font-variant-numeric:tabular-nums}
+  .wrap{max-width:1440px;margin:0 auto;padding:0 40px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:42px;padding:0 18px;border-radius:4px;font:700 14px var(--body);letter-spacing:.04em;text-transform:uppercase;border:2px solid var(--rule);cursor:pointer;color:var(--white);background:transparent;transition:transform 100ms}
+  .btn:active{transform:translateY(1px)}
+  .btn.verb{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+  .btn.lg{height:52px;padding:0 26px;font-size:16px}
+
+  .nav{display:flex;align-items:center;gap:26px;height:64px;border-bottom:2px solid var(--rule)}
+  .brand{font-family:var(--display);font-weight:900;font-size:26px;text-transform:uppercase;letter-spacing:.02em}
+  .brand i{display:inline-block;width:10px;height:10px;background:var(--scarlet);margin-right:8px;vertical-align:middle;animation:blink 1.6s steps(1) infinite}
+  .nav a.link{color:var(--ink2);font-weight:500}
+  .nav .spacer{flex:1}
+
+  /* the open: a broadcast title card. the yard lines are the ground. */
+  .open{position:relative;padding:64px 0 40px;overflow:hidden}
+  .open::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 119px,var(--rule) 119px 120px);opacity:.35;pointer-events:none}
+  .open h1{position:relative;font-size:136px;line-height:.86;font-weight:900;max-width:9ch}
+  .open h1 em{font-style:normal;color:var(--gold)}
+  .open p{position:relative;max-width:52ch;font-size:19px;color:var(--ink2);margin:22px 0 0}
+  .open .money{color:var(--white);font-weight:600;font-size:16px;margin-top:12px}
+  .seated{position:relative;margin-top:26px;display:inline-flex;align-items:center;gap:14px;background:var(--studio);padding:10px 16px 10px 10px;border-left:4px solid var(--gold)}
+  .faces{display:flex;gap:3px}
+  .face{width:34px;height:34px;background:var(--studio2);color:var(--ink2);display:grid;place-items:center;font:800 12px var(--display)}
+  .seated b{display:block;font:800 18px var(--display);text-transform:uppercase}
+  .seated span{font-size:12px;color:var(--ink3)}
+
+  /* the rundown */
+  .rundown{margin-top:12px;background:var(--studio);border-top:4px solid var(--gold)}
+  .rd-head{display:flex;align-items:baseline;justify-content:space-between;padding:18px 20px 10px}
+  .rd-head h2{font-size:34px;font-weight:800}
+  .rd-head p{margin:0;color:var(--ink3);font-size:13px}
+  .bumper{display:flex;align-items:center;gap:12px;padding:0 20px;height:36px;background:var(--studio2);font:800 15px var(--display);text-transform:uppercase;letter-spacing:.06em}
+  .bumper.live{background:var(--scarlet);color:#fff}
+  .bumper em{font:500 12px var(--body);text-transform:none;letter-spacing:0;opacity:.85}
+  .row{display:grid;grid-template-columns:56px minmax(0,2.2fr) minmax(0,1.4fr) minmax(0,1.3fr) 170px 150px;gap:16px;align-items:center;height:64px;padding:0 20px 0 0;border-bottom:1px solid var(--rule)}
+  .row:hover{background:var(--studio2)}
+  .row .p{height:100%;display:grid;place-items:center;font:900 26px var(--display);color:var(--ink3);background:rgba(0,0,0,.12)}
+  .row.next .p{background:var(--gold);color:var(--gold-ink)}
+  .row .who{display:flex;align-items:center;gap:12px;min-width:0}
+  .row .faces .face{width:30px;height:30px;font-size:11px}
+  .row h3{font-size:22px;font-weight:800;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .sub{font-size:12px;color:var(--ink3);margin-top:3px}
+  .tag{display:inline-block;padding:1px 6px;font:700 10px var(--body);letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--rule);color:var(--ink2);vertical-align:middle;margin-left:6px}
+  .tag.live{border-color:var(--scarlet);color:var(--scarlet)}
+  .row .fmt,.row .when{font-size:14px;color:var(--ink2)}
+  .row .when b{display:block;color:var(--white);font-weight:600}
+  .seats{display:flex;align-items:center;gap:12px}
+  .seats .n{font:900 40px/1 var(--display)}
+  .row.next .seats .n{color:var(--gold)}
+  .seats small{font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;line-height:1.2}
+  .meter{display:flex;gap:2px;margin-top:4px}
+  .meter i{width:7px;height:5px;background:var(--rule)}
+  .meter i.f{background:var(--white)}
+  .row .act{justify-self:end}
+  .rd-foot{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;color:var(--ink3);font-size:13px}
+  .disclose{padding:0 20px 14px;color:var(--ink3);font-size:12px}
+
+  .crew{margin-top:16px;background:var(--studio);padding:18px 20px;display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;border-left:4px solid var(--bug)}
+  .crew h2{font-size:26px}
+  .crew p{margin:0;color:var(--ink2)}
+  .trust{margin-top:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--rule)}
+  .fact{background:var(--studio);padding:18px 20px}
+  .fact h3{font-size:12px;letter-spacing:.1em;color:var(--gold)}
+  .fact p{margin:8px 0 0;color:var(--ink2)}
+  .fact a{color:var(--bug);font-weight:600;display:inline-block;margin-top:10px}
+  .proof{margin:12px 0 0;color:var(--ink3);font-size:13px}
+
+  /* the lower third: the crawl and the subject, one compact bar at the foot of the broadcast */
+  .third{position:sticky;bottom:0;background:var(--studio);border-top:2px solid var(--rule)}
+  .crawl{display:grid;grid-template-columns:auto 1fr;height:34px}
+  .crawl .tab{background:var(--scarlet);color:#fff;font:800 13px var(--display);text-transform:uppercase;letter-spacing:.08em;padding:0 14px;display:flex;align-items:center}
+  .crawl .track{overflow:hidden;white-space:nowrap;display:flex;align-items:center;font-size:12px;color:var(--ink2)}
+  .crawl ul{display:inline-block;margin:0;padding:0;list-style:none;animation:ticker 40s linear infinite}
+  .crawl li{display:inline;margin:0 30px}
+  .crawl b{color:var(--white);font-weight:600}
+  .crawl .hot{color:var(--scarlet);font-weight:600}
+  .subject{background:var(--studio2);border-top:4px solid var(--gold)}
+  .subject-in{display:flex;align-items:center;gap:14px;height:68px}
+  .subject .eyebrow{font:800 12px var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
+  .subject b{font:800 24px var(--display);text-transform:uppercase}
+  .subject .fact{color:var(--ink2);font-size:14px;flex:1}
+  footer{padding:20px 0 40px;color:var(--ink3);font-size:13px;display:flex;gap:20px}
+
+  @keyframes blink{0%,60%{opacity:1}61%,100%{opacity:.25}}
+  @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  /* with motion off the crawl cannot scroll, so it shows its one live item and stays one line */
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}.crawl li:not(:first-child){display:none}}
+
+  @media (max-width:720px){
+    .wrap{padding:0 14px}
+    .nav{height:56px;gap:14px}.nav a.link{display:none}
+    .open{padding:30px 0 20px}.open h1{font-size:72px}.open p{font-size:16px}
+    .row{grid-template-columns:44px 1fr auto;grid-template-rows:auto auto;grid-template-areas:"p who seats" "p fmt act";height:auto;padding:10px 12px 10px 0;gap:6px 12px}
+    .row .p{grid-area:p;font-size:20px}.row .who{grid-area:who}.row .fmt{grid-area:fmt;font-size:12px}.row .when{display:none}.row .seats{grid-area:seats}.row .act{grid-area:act}
+    .seats .n{font-size:30px}.meter{display:none}
+    .rd-foot{flex-direction:column;align-items:flex-start;gap:10px}
+    .crew{grid-template-columns:1fr;gap:12px}
+    .trust{grid-template-columns:1fr}
+    .crawl .tab{font-size:12px;padding:0 10px}
+    .subject-in{height:auto;flex-wrap:wrap;padding:10px 0;gap:6px 10px}.subject b{font-size:18px}.subject .fact{flex-basis:100%;font-size:12px}.subject .btn{width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav" aria-label="Site">
+    <a class="brand" href="#"><i aria-hidden="true"></i>Commish</a>
+    <a class="link" href="#">Open leagues</a>
+    <a class="link" href="#">How it works</a>
+    <span class="spacer"></span>
+    <a class="link" href="#">Sign in</a>
+    <a class="btn" href="#">Take a seat</a>
+  </nav>
+
+  <section class="open">
+    <h1>There is <em>always</em> a seat.</h1>
+    <p>Season-long leagues that draft this week. We run the draft, the schedule and the scoring, so no brother-in-law has to.</p>
+    <p class="money">Every league is free this season.</p>
+    <!-- initials and count are stand-ins -->
+    <div class="seated"><div class="faces" aria-hidden="true"><span class="face">DW</span><span class="face">RO</span><span class="face">CP</span><span class="face">JT</span></div><div><b>42 managers seated this week</b><span>Commish runs some of these leagues itself, and a new league opens as soon as one fills, so there is always a seat.</span></div></div>
+  </section>
+
+  <section class="rundown" aria-label="Open leagues">
+    <div class="rd-head"><h2>Open leagues</h2><p>Seat counts as of 7:42 pm. A seat being claimed is counted.</p></div>
+
+    <div class="bumper live">Filling <em>claimed seats · first to fill is first to draft</em></div>
+    <!-- the row that fires next is marked, but the page's one solid verb is in the lower third -->
+    <article class="row next">
+      <div class="p num">1</div>
+      <div class="who"><div class="faces" aria-hidden="true"><span class="face">DW</span><span class="face">RO</span><span class="face">CP</span></div><div><h3>The Blitz Room <span class="tag live">Filling</span></h3><div class="sub">Dana, Rey, Coach Parker and 8 more are in</div></div></div>
+      <div class="fmt">12 teams · Half-PPR · Snake</div>
+      <div class="when"><b>Drafts when full</b>the moment the last seat is taken</div>
+      <div class="seats"><span class="n num">1</span><div><small>seat left<br>of 12</small><div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i></div></div></div>
+      <div class="act"><a class="btn" href="#">Take the last seat</a></div>
+    </article>
+    <article class="row">
+      <div class="p num">2</div>
+      <div class="who"><div class="faces" aria-hidden="true"><span class="face">MK</span><span class="face">AL</span></div><div><h3>Kickoff Classic <span class="tag">Newer players only</span></h3><div class="sub">Maya, Alex and 7 more are in</div></div></div>
+      <div class="fmt">12 teams · Half-PPR · Snake</div>
+      <div class="when"><b>Drafts when full</b>the moment the last seat is taken</div>
+      <div class="seats"><span class="n num">3</span><div><small>left<br>of 12</small><div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i></div></div></div>
+      <div class="act"><a class="btn" href="#">Take a seat</a></div>
+    </article>
+    <article class="row">
+      <div class="p num">3</div>
+      <div class="who"><div class="faces" aria-hidden="true"><span class="face">SB</span><span class="face">TN</span></div><div><h3>Midnight Waivers</h3><div class="sub">Sam, Tessa and 5 more are in</div></div></div>
+      <div class="fmt">12 teams · PPR · Auction</div>
+      <div class="when"><b>In 2 days</b>Thu, Sep 12, 8:00 pm</div>
+      <div class="seats"><span class="n num">5</span><div><small>left<br>of 12</small><div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i></div></div></div>
+      <div class="act"><a class="btn" href="#">Take a seat</a></div>
+    </article>
+    <article class="row">
+      <div class="p num">4</div>
+      <div class="who"><div class="faces" aria-hidden="true"><span class="face">JT</span></div><div><h3>Sit and Go Twelve</h3><div class="sub">Jordan and 4 more are in</div></div></div>
+      <div class="fmt">12 teams · Half-PPR · Snake</div>
+      <div class="when"><b>Drafts when full</b>the moment the last seat is taken</div>
+      <div class="seats"><span class="n num">7</span><div><small>left<br>of 12</small><div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div>
+      <div class="act"><a class="btn" href="#">Take a seat</a></div>
+    </article>
+
+    <div class="bumper">Fresh <em>no claims yet · yours would be the first seat</em></div>
+    <article class="row">
+      <div class="p num">5</div>
+      <div class="who"><div><h3>Fourth and Long</h3><div class="sub">Nobody yet. You would be first in.</div></div></div>
+      <div class="fmt">12 teams · Half-PPR · Snake</div>
+      <div class="when"><b>Drafts when full</b>the moment the last seat is taken</div>
+      <div class="seats"><span class="n num">12</span><div><small>open</small></div></div>
+      <div class="act"><a class="btn" href="#">Take a seat</a></div>
+    </article>
+    <article class="row">
+      <div class="p num">6</div>
+      <div class="who"><div><h3>The Rookie Room <span class="tag">Newer players only</span></h3><div class="sub">Nobody yet. You would be first in.</div></div></div>
+      <div class="fmt">12 teams · Half-PPR · Snake</div>
+      <div class="when"><b>Drafts when full</b>the moment the last seat is taken</div>
+      <div class="seats"><span class="n num">12</span><div><small>open</small></div></div>
+      <div class="act"><a class="btn" href="#">Take a seat</a></div>
+    </article>
+
+    <div class="rd-foot"><span>Sorted by soonest draft you can still join · 6 more rooms in the full lobby</span><a class="btn" href="#">See every open league</a></div>
+    <p class="disclose">Stake tiers are labels only in this preview. No money changes hands.</p>
+  </section>
+
+  <section class="crew">
+    <h2>Bringing your own crew?</h2>
+    <p>Be the commissioner without the job. We run the draft, the schedule and the scoring, and referee trades on deadlines. You pick the format and the draft night.</p>
+    <a class="btn" href="#">Start a league</a>
+  </section>
+
+  <section class="trust">
+    <div class="fact"><h3>Who runs it</h3><p>The house runs the league: the draft room, the schedule, the scoring and the trade deadlines. No commissioner's cousin settles disputes.</p></div>
+    <div class="fact"><h3>What it costs</h3><p>Every league is free this season. No buy-ins, no deposits, nothing to chase.</p></div>
+    <div class="fact"><h3>Never played?</h3><p>Run a practice draft against bots first. Nothing counts, nothing costs.</p><a href="#">Run a practice draft</a></div>
+  </section>
+  <p class="proof">14 leagues filled this season · 3 rooms filling right now</p>
+
+  <footer><span>Commish</span><a href="#">League rules</a><a href="#">Legal</a><a href="#">Support</a></footer>
+</div>
+
+<!-- the lower third: one compact bar pinned to the foot of the broadcast, the crawl above the
+     subject and the page's one solid verb. The page leaves room for it at the end. -->
+<div class="third" aria-label="Next to fire">
+  <div class="crawl" aria-label="Recent activity">
+    <div class="tab">Live</div>
+    <div class="track"><ul>
+      <li class="hot">A seat was claimed in The Blitz Room · 4 min ago</li><li>Play Action Party filled · drafting now</li><li>A seat was claimed in <b>Midnight Waivers</b> · 12 min ago</li><li><b>14</b> leagues filled this season</li><li>A seat was claimed in <b>Kickoff Classic</b> · 31 min ago</li>
+      <li class="hot">A seat was claimed in The Blitz Room · 4 min ago</li><li>Play Action Party filled · drafting now</li><li>A seat was claimed in <b>Midnight Waivers</b> · 12 min ago</li><li><b>14</b> leagues filled this season</li><li>A seat was claimed in <b>Kickoff Classic</b> · 31 min ago</li>
+    </ul></div>
+  </div>
+  <div class="subject">
+    <div class="wrap subject-in">
+      <span class="eyebrow">Next to fire</span><b>The Blitz Room</b><span class="fact">1 seat left of 12 · drafts when full</span>
+      <a class="btn verb lg" href="#">Take the last seat</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

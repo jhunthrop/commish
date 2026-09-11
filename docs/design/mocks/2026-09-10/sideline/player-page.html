@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sideline · Player page</title>
+<!--
+  SIDELINE · player page for James Cook, opened from Sunday Money, where he is on Rey Okafor's
+  Iron Owls. The peek's content at full depth: the call, the range, his role, the season strip,
+  the game log, who has him, and the one thing you can do about it from here.
+
+  DATA PROVENANCE
+  Real (nflverse fixtures in src/projections/nflverse/fixtures/):
+  - 2024 weeks 1 to 3 game lines and points (stats_player_week_2024_buf_w1-3.csv):
+      wk1 vs ARI 19 car 71 yd 0 TD, 3 rec on 3 tgt 32 yd, 10.3 std / 13.3 PPR
+      wk2 vs MIA 11 car 78 yd 2 TD, 1 rec on 1 tgt 17 yd 1 TD, 27.5 std / 28.5 PPR
+      wk3 vs JAX 11 car 39 yd 1 TD, 4 rec on 5 tgt 48 yd, 14.7 std / 18.7 PPR
+    Average 20.2 PPR a game over those three.
+  - Snap share (snap_counts_2024_buf_w1-3.csv): 61%, 47%, 50%. Target share from the stats file:
+    13%, 6%, 17%.
+  - Bio (players_slice.csv): number 4, 5 foot 11, 190, Georgia, drafted 2022 round 2 pick 63.
+  - Headshot: the nflverse URL. Club colour BUF #00338D from TOKENS.team.
+  STAND-INS (layout only, labelled again beside each): the call card's verdict, ADP, expert rank,
+  our board's rank and season points, the gap, the range rail's five points, expected games,
+  the head-to-head record, the "facts as of" time, the room's message.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --chalk:#F6F5F1; --paper:#FFFFFF; --graphite:#17181C; --ink2:#5B5E66; --ink3:#8A8D95; --hair:#E6E5DF;
+    --court:#2457F5; --court-ink:#fff; --amber:#E39A0E; --amber-wash:#FBF1DC; --live:#128A52; --live-wash:#E4F4EC; --rose:#D6336C; --rose-wash:#FBE7EE;
+    --rb:#23835A; --buf:#00338D;
+    --shadow:0 4px 16px rgba(23,24,28,.06), 0 1px 2px rgba(23,24,28,.04);
+    --display:"Bricolage Grotesque", system-ui, sans-serif; --body:"Figtree", system-ui, sans-serif;
+    --spring:cubic-bezier(.2,.9,.3,1.15);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --chalk:#121316; --paper:#1B1C21; --graphite:#F2F2EE; --ink2:#A9ACB4; --ink3:#7C7F88; --hair:#2A2B31;
+      --court:#5B85FF; --court-ink:#0B1226; --amber:#F5B341; --amber-wash:#2A2213; --live:#2ED47F; --live-wash:#12281D; --rose:#FF6B9A; --rose-wash:#3A1B27; --rb:#35C98A; --shadow:0 4px 16px rgba(0,0,0,.35); }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--chalk);color:var(--graphite);font:15px/1.45 var(--body)}
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3{font-family:var(--display);margin:0;font-variation-settings:"opsz" 96}
+  .num{font-family:var(--display);font-variant-numeric:tabular-nums}
+  .wrap{max-width:1440px;margin:0 auto;padding:0 40px 60px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 20px;border-radius:999px;font:600 15px var(--body);border:1px solid transparent;cursor:pointer;color:var(--graphite);background:transparent;transition:transform 120ms var(--spring)}
+  .btn:active{transform:scale(.97)}
+  .btn.verb{background:var(--court);color:var(--court-ink);box-shadow:0 6px 18px rgba(36,87,245,.28)}
+  .btn.quiet{border-color:var(--hair)}
+  .btn.lg{height:52px;padding:0 26px;font-size:17px}
+
+  .nav{display:flex;align-items:center;gap:20px;height:60px;color:var(--ink2)}
+  .nav .brand{font-family:var(--display);font-weight:800;font-size:20px;color:var(--graphite)}
+  .nav .crumb b{color:var(--graphite);font-weight:600}
+  .nav .spacer{flex:1}
+  .ava{width:32px;height:32px;border-radius:50%;background:var(--paper);display:grid;place-items:center;font:700 12px var(--display);color:var(--ink2);border:2px solid var(--hair)}
+
+  /* the header: face, name largest, one big number, one verb */
+  .hero{display:grid;grid-template-columns:auto 1fr auto;gap:28px;align-items:center;background:var(--paper);border-radius:24px;box-shadow:var(--shadow);padding:28px 32px;margin-top:8px}
+  .face{width:132px;height:132px;border-radius:50%;background:var(--buf);border:4px solid var(--buf);object-fit:cover;object-position:top}
+  .hero h1{font-size:52px;line-height:.95;letter-spacing:-.03em;font-weight:800}
+  .hero .line{margin-top:10px;color:var(--ink2);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+  .pos{display:inline-block;padding:2px 8px;border-radius:6px;font:700 12px var(--body);color:#fff;background:var(--rb)}
+  /* P6: who has him is a person with a face */
+  .owner{display:inline-flex;align-items:center;gap:8px;background:var(--rose-wash);border-radius:999px;padding:4px 12px 4px 4px;color:var(--graphite);font-weight:500}
+  .owner .ava{width:26px;height:26px;font-size:10px;border-color:var(--rose);color:var(--rose)}
+  .big{text-align:right}
+  .big .n{font:800 64px/1 var(--display);letter-spacing:-.03em}
+  .big small{display:block;color:var(--ink3);font-size:13px;margin-top:6px}
+  .big .btn{margin-top:14px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+  .card{background:var(--paper);border-radius:20px;box-shadow:var(--shadow);padding:20px 22px}
+  .card.wide{grid-column:1 / -1}
+  .card h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);font-family:var(--body);font-weight:600;margin-bottom:10px}
+  .verdict{font-size:19px;font-weight:600;line-height:1.35;color:var(--live)}
+  .cols{display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:12px;color:var(--ink2);font-size:14px}
+  .cols b{color:var(--graphite);font-weight:600}
+  .cols .gap{color:var(--live);font-weight:600}
+  .talent{margin:12px 0 0;color:var(--ink2)}
+  .rail{position:relative;height:10px;border-radius:5px;background:var(--hair);margin:18px 0 8px}
+  .rail .band{position:absolute;top:0;bottom:0;left:32%;width:38%;background:var(--ink3);opacity:.35;border-radius:5px}
+  .rail .med{position:absolute;top:-5px;left:52%;width:3px;height:20px;background:var(--court);border-radius:2px}
+  .rail-l{display:flex;justify-content:space-between;font-size:12px;color:var(--ink3)}
+  .rail-l b{color:var(--court);font-weight:700}
+  .share{display:grid;grid-template-columns:110px 1fr 120px;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--hair);font-size:14px}
+  .share:first-of-type{border-top:none}
+  .share .bars{display:flex;gap:4px;height:8px}
+  .share .bars i{flex:1;border-radius:4px;background:var(--hair);position:relative;overflow:hidden}
+  .share .bars i::after{content:"";position:absolute;left:0;top:0;bottom:0;background:var(--graphite);width:var(--w)}
+  .share .v{text-align:right;color:var(--ink2)}
+  .share .v b{color:var(--graphite)}
+  .strip{display:flex;align-items:flex-end;gap:14px;height:150px;padding-top:10px}
+  .bar{flex:0 0 72px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px}
+  .bar i{width:100%;border-radius:10px 10px 4px 4px;background:var(--court);opacity:.85}
+  .bar b{font:700 15px var(--display)}
+  .bar span{font-size:11px;color:var(--ink3)}
+  .basis{margin:10px 0 0;color:var(--ink3);font-size:12px}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);text-align:right;padding:6px 8px;font-weight:600}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:10px 8px;text-align:right;border-top:1px solid var(--hair)}
+  td b{font-family:var(--display);font-weight:700}
+  .bio{display:flex;flex-wrap:wrap;gap:8px 22px;color:var(--ink2)}
+  .bio b{color:var(--graphite);font-weight:600}
+  .room{display:flex;gap:10px;align-items:flex-start}
+  .room .b{background:var(--chalk);border-radius:16px;padding:8px 12px;max-width:420px}
+  .room .b b{display:block;font-size:12px;color:var(--ink2);font-weight:600}
+  .asof{margin-top:20px;color:var(--ink3);font-size:12px}
+
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+  @media (max-width:720px){
+    .wrap{padding:0 14px 96px}
+    .nav{height:52px;gap:12px}.nav .crumb{display:none}
+    .hero{grid-template-columns:auto 1fr;gap:14px;padding:18px;border-radius:20px}
+    .face{width:84px;height:84px}
+    .hero h1{font-size:34px}
+    .big{grid-column:1 / -1;text-align:left;display:flex;align-items:baseline;gap:10px}
+    .big .n{font-size:48px}.big small{margin:0}
+    .big .btn{position:fixed;left:14px;right:14px;bottom:14px;margin:0;z-index:2}
+    .grid{grid-template-columns:1fr}
+    .strip{gap:10px;height:130px}.bar{flex:1}
+    table th:nth-child(4),table td:nth-child(4),table th:nth-child(6),table td:nth-child(6){display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav">
+    <a class="brand" href="#">Commish</a>
+    <span class="crumb">Sunday Money · <b>Players</b></span>
+    <span class="spacer"></span>
+    <span class="ava" aria-hidden="true">You</span>
+  </nav>
+
+  <header class="hero">
+    <img class="face" alt="" src="https://static.www.nfl.com/image/upload/f_auto,q_auto/league/anjbznqb9i21wzcgrtbs">
+    <div>
+      <h1>James Cook</h1>
+      <div class="line"><span class="pos">RB</span><span>Buffalo · No. 4</span><span class="owner"><span class="ava" aria-hidden="true">RO</span>On Iron Owls, Rey Okafor's team</span></div>
+    </div>
+    <div class="big">
+      <span class="n num">20.2</span>
+      <small>PPR a game · 2024 weeks 1 to 3, all this archive holds</small>
+      <!-- P3: the one thing you can do with him from here -->
+      <a class="btn verb lg" href="#">Offer Rey a trade</a>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- THE CALL. Every figure on this card is a STAND-IN for layout: the board's verdict, ADP,
+         expert rank, our rank, season points and the gap are not the product's read on Cook. -->
+    <section class="card wide" aria-label="The call">
+      <h2>The call</h2>
+      <p class="verdict">He is going later than he should. Our projection says he is worth about 18 more points than where he is being drafted. Two left in his tier before a 14.2 point drop.</p>
+      <div class="cols">
+        <span>pick <b>22.4</b> · experts <b>19th</b></span>
+        <span><span class="pos">RB8</span> · <b>21st</b> overall · <b>241</b> PPR pts</span>
+        <span class="gap">+18 points vs his ADP</span>
+      </div>
+      <p class="talent">Per game he projects like a RB6. The question is games: our model expects 16.</p>
+    </section>
+
+    <!-- range rail: five points are stand-ins -->
+    <section class="card" aria-label="Season range">
+      <h2>Season range</h2>
+      <div class="rail"><div class="band"></div><div class="med"></div></div>
+      <div class="rail-l"><span>an injury year</span><span>most seasons land in the band · <b>241</b> is our number</span><span>the smash case</span></div>
+      <p class="basis">Expected 16 games, 12 to 17</p>
+    </section>
+
+    <section class="card" aria-label="His role">
+      <h2>His role · 2024 weeks 1 to 3</h2>
+      <div class="share"><span>Snap share</span><div class="bars"><i style="--w:61%"></i><i style="--w:47%"></i><i style="--w:50%"></i></div><span class="v"><b>61 · 47 · 50%</b></span></div>
+      <div class="share"><span>Target share</span><div class="bars"><i style="--w:13%"></i><i style="--w:6%"></i><i style="--w:17%"></i></div><span class="v"><b>13 · 6 · 17%</b></span></div>
+      <div class="share"><span>Red-zone share</span><div class="bars"></div><span class="v">not tracked for him</span></div>
+    </section>
+
+    <section class="card wide" aria-label="The season">
+      <h2>2024 · PPR · week by week</h2>
+      <div class="strip">
+        <div class="bar"><b class="num">13.3</b><i style="height:44%"></i><span>wk 1 · ARI</span></div>
+        <div class="bar"><b class="num">28.5</b><i style="height:96%"></i><span>wk 2 · MIA</span></div>
+        <div class="bar"><b class="num">18.7</b><i style="height:63%"></i><span>wk 3 · JAX</span></div>
+      </div>
+      <p class="basis">Three weeks is all the archive holds in this mock. Points under this league's scoring, PPR.</p>
+    </section>
+
+    <section class="card wide" aria-label="Game log">
+      <h2>Game log · under this league's scoring</h2>
+      <table>
+        <thead><tr><th>Week</th><th>Carries</th><th>Rush yd</th><th>Rush TD</th><th>Rec / tgt</th><th>Rec yd</th><th>Rec TD</th><th>PPR</th></tr></thead>
+        <tbody>
+          <tr><td>1 · vs ARI</td><td>19</td><td>71</td><td>0</td><td>3 / 3</td><td>32</td><td>0</td><td><b>13.3</b></td></tr>
+          <tr><td>2 · vs MIA</td><td>11</td><td>78</td><td>2</td><td>1 / 1</td><td>17</td><td>1</td><td><b>28.5</b></td></tr>
+          <tr><td>3 · vs JAX</td><td>11</td><td>39</td><td>1</td><td>4 / 5</td><td>48</td><td>0</td><td><b>18.7</b></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" aria-label="About him">
+      <h2>About him</h2>
+      <div class="bio"><span><b>5 ft 11</b>, 190</span><span><b>Georgia</b></span><span>Drafted <b>2022</b>, round 2, pick 63</span><span>Number <b>4</b></span></div>
+    </section>
+
+    <!-- the room, one tap away, and the rivalry stated (record is a stand-in) -->
+    <section class="card" aria-label="In the room">
+      <h2>In the room</h2>
+      <div class="room"><span class="ava" aria-hidden="true">RO</span><div class="b"><b>Rey Okafor · Tuesday</b>Cook is not available. Do not ask.</div></div>
+      <p class="basis">You are 1 and 2 against Rey this season.</p>
+    </section>
+  </div>
+
+  <p class="asof">Facts as of Sep 10, 7:42 pm</p>
+</div>
+</body>
+</html>

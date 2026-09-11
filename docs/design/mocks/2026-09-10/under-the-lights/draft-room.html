@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Under the Lights · Draft room</title>
+<!--
+  UNDER THE LIGHTS · draft room, your pick at 3.04 in Sunday Money (10 teams, snake).
+  The board is the wall, the pool is the rundown rail, the room is the crawl, and the lower third
+  across the foot carries the clock, the subject and the one gold verb. The last pick wipes in as
+  a broadcast banner.
+
+  DATA PROVENANCE: identical to the Sideline draft room. Real names, clubs and headshots from
+  nflverse; the one big number per pool row is PPR a game across 2024 weeks 1 to 3
+  (stats_player_week_2024_buf_w1-3.csv). League and the first three manager names from
+  src/draft-room/test-fixtures.tsx. STAND-INS: the other teams, every pick, the clock, the pool
+  order, the odds (41 of 100 runs), the roster slots, the messages. Kickers show a dash.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#0F1B33; --studio:#1A2A4A; --studio2:#223559; --white:#F4F1E8; --ink2:#B7BFD0; --ink3:#7E8AA6; --rule:#2C4067;
+    --scarlet:#FF4B3A; --gold:#F5B31B; --gold-ink:#1A1400; --bug:#4D9BFF;
+    --qb:#F2685E; --rb:#35C98A; --wr:#4E9BF0; --te:#E0A340; --k:#B98BF5; --buf:#00338D; --nyg:#0B2265;
+    --display:"Big Shoulders Display", Impact, sans-serif; --body:"Archivo", system-ui, sans-serif; --wipe:cubic-bezier(.2,.8,.2,1);
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --night:#F4F1E8; --studio:#FFFFFF; --studio2:#E6E9F0; --white:#0F1B33; --ink2:#3E4A63; --ink3:#6B778F; --rule:#D5DAE5; --scarlet:#D92D20; --gold:#C48A00; --gold-ink:#fff; --bug:#1E63D6; --qb:#E32012; --rb:#23835A; --wr:#1372DC; --te:#9C6A19; --k:#924BEF; }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--night);color:var(--white);font:14px/1.4 var(--body)}
+  h1,h2,h3{font-family:var(--display);margin:0;text-transform:uppercase;letter-spacing:.01em}
+  .num{font-family:var(--display);font-variant-numeric:tabular-nums}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 16px;border-radius:4px;font:700 13px var(--body);letter-spacing:.04em;text-transform:uppercase;border:2px solid var(--rule);cursor:pointer;color:var(--white);background:transparent}
+  .btn.verb{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+  .btn.sm{height:28px;padding:0 10px;font-size:11px}
+  .btn.lg{height:56px;padding:0 28px;font-size:18px}
+  .pos{display:inline-block;padding:1px 5px;font:800 10px var(--body);letter-spacing:.04em;color:#0F1B33}
+  .pos.rb{background:var(--rb)}.pos.wr{background:var(--wr)}.pos.qb{background:var(--qb)}.pos.te{background:var(--te)}.pos.k{background:var(--k)}
+
+  .room{max-width:1440px;margin:0 auto;height:100vh;min-height:900px;display:grid;grid-template-rows:64px 1fr 120px;grid-template-columns:1fr 380px;grid-template-areas:"top top" "board rail" "third third";gap:0 2px;padding:0 24px}
+
+  /* the score bug across the top */
+  .top{grid-area:top;display:flex;align-items:stretch;border-bottom:2px solid var(--rule)}
+  .top .bug{display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--studio)}
+  .top .league{font:900 24px var(--display);text-transform:uppercase}
+  .top .pick{color:var(--ink2);padding:0 18px;display:flex;align-items:center;gap:8px}
+  .top .pick b{color:var(--white);font-weight:600}
+  .top .spacer{flex:1}
+  .turn{display:flex;align-items:center;gap:12px;padding:0 18px;background:var(--gold);color:var(--gold-ink);font:900 20px var(--display);text-transform:uppercase;letter-spacing:.04em;clip-path:polygon(14px 0,100% 0,100% 100%,0 100%)}
+  .ava{width:30px;height:30px;background:var(--studio2);color:var(--ink2);display:grid;place-items:center;font:800 11px var(--display)}
+  .turn .ava{background:var(--night);color:var(--gold)}
+
+  /* the wall */
+  .board{grid-area:board;overflow:auto;padding:12px 12px 12px 0;background:var(--night)}
+  .wall{display:grid;grid-template-columns:30px repeat(10,minmax(86px,1fr));gap:3px;min-width:900px}
+  .th{display:flex;align-items:center;gap:6px;padding:6px;background:var(--studio);font-size:11px;color:var(--ink2);min-width:0}
+  .th .ava{width:24px;height:24px;font-size:9px;flex:none}
+  .th b{font-weight:600;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .th.me{background:var(--gold);color:var(--gold-ink)}.th.me b{color:var(--gold-ink)}.th.me .ava{background:var(--night);color:var(--gold)}
+  .rn{display:grid;place-items:center;font:900 14px var(--display);color:var(--ink3);background:var(--studio)}
+  .tile{background:var(--studio);padding:6px 8px;min-height:52px;display:flex;flex-direction:column;justify-content:center;gap:2px;border-top:3px solid var(--rule)}
+  .tile b{font:800 14px/1 var(--display);text-transform:uppercase;letter-spacing:.01em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tile span{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em}
+  .tile.qb{border-top-color:var(--qb)}.tile.rb{border-top-color:var(--rb)}.tile.wr{border-top-color:var(--wr)}.tile.te{border-top-color:var(--te)}
+  .tile.me{background:var(--studio2);outline:1px solid var(--gold);outline-offset:-1px}
+  .tile.now{background:var(--gold);color:var(--gold-ink);border-top-color:var(--gold);align-items:center;font:900 13px var(--display);text-transform:uppercase;letter-spacing:.06em;animation:pulse 1s ease-in-out infinite}
+  .tile.empty{background:transparent;border-top-color:var(--rule);opacity:.5}
+  .tile.landed{animation:wipe 380ms var(--wipe)}
+
+  /* the rail: our call, the rundown, the crawl */
+  .rail{grid-area:rail;display:grid;grid-template-rows:auto 1fr auto;background:var(--studio);overflow:hidden}
+  .call{padding:14px 16px;border-bottom:2px solid var(--rule);background:var(--studio2)}
+  .call h2{font-size:12px;letter-spacing:.12em;color:var(--gold)}
+  .call .rec{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;margin-top:8px}
+  .head{width:56px;height:56px;object-fit:cover;object-position:top;background:var(--buf);border-bottom:3px solid var(--gold)}
+  .call h3{font-size:30px;line-height:.9;font-weight:900}
+  .call .meta{font-size:12px;color:var(--ink2);margin-top:4px}
+  .call .big{text-align:right}
+  .call .big .n{font:900 34px/1 var(--display)}
+  .call .big small{display:block;font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+  .call .why{margin:10px 0 0;color:var(--white)}
+  .odds{margin-top:8px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink2)}
+  .odds .bar{flex:1;height:6px;background:var(--rule)}.odds .bar i{display:block;height:100%;width:41%;background:var(--bug)}
+  .odds b{color:var(--white)}
+  .stamp{font-size:10px;color:var(--ink3);margin-top:6px;text-transform:uppercase;letter-spacing:.06em}
+
+  .pool{overflow:auto}
+  .pool-head{display:grid;grid-template-columns:36px 1fr 96px 64px;gap:10px;padding:8px 12px 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+  .pool-head span:nth-child(3){text-align:right}
+  .prow{display:grid;grid-template-columns:36px 1fr 96px 64px;gap:10px;align-items:center;padding:0 12px;height:52px;border-top:1px solid var(--rule)}
+  .prow:hover{background:var(--studio2)}
+  .prow .head{width:36px;height:36px;border-bottom-width:2px;border-bottom-color:var(--buf)}
+  .prow b{display:block;font:800 16px/1 var(--display);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prow .name span{font-size:11px;color:var(--ink3)}
+  .prow .n{font:900 22px/1 var(--display);text-align:right}
+  .prow .n small{display:block;font:500 9px var(--body);color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+  .prow .n.dash{color:var(--ink3)}
+  .prow .q{justify-self:end}
+
+  .crawl{border-top:2px solid var(--rule);padding:10px 12px;display:flex;flex-direction:column;gap:6px;max-height:150px;overflow:auto}
+  .msg{display:flex;gap:8px;font-size:13px;align-items:baseline}
+  .msg b{color:var(--gold);font:800 12px var(--display);text-transform:uppercase;letter-spacing:.06em;flex:none}
+  .msg.me b{color:var(--bug)}
+  .say{display:flex;gap:6px;margin-top:4px}
+  .say input{flex:1;height:34px;background:var(--night);border:1px solid var(--rule);color:var(--white);padding:0 10px;font:13px var(--body)}
+
+  /* the lower third */
+  .third{grid-area:third;position:relative;display:grid;grid-template-columns:1fr auto;align-items:center;background:var(--studio);border-top:4px solid var(--gold);overflow:hidden}
+  .third .cells{display:flex;align-items:stretch;height:100%}
+  .cell{padding:14px 22px;border-right:1px solid var(--rule);display:flex;flex-direction:column;justify-content:center;gap:4px}
+  .cell small{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+  .cell b{font:800 22px/1 var(--display);text-transform:uppercase}
+  .cell.clock b{font-size:56px;color:var(--scarlet);animation:pulse 1s ease-in-out infinite}
+  .cell .queue{display:flex;gap:8px;flex-wrap:wrap}
+  .cell .queue span{font:600 12px var(--body);background:var(--studio2);padding:2px 8px}
+  .third .act{padding:0 22px;display:flex;align-items:center;gap:18px;background:var(--studio2);height:100%;clip-path:polygon(18px 0,100% 0,100% 100%,0 100%)}
+  .fill{display:flex;gap:10px;font-size:11px;color:var(--ink2)}
+  .fill b{color:var(--white)}
+  /* the landing banner wipes across the lower third and settles into the wall */
+  .banner{position:absolute;left:0;right:0;top:-4px;bottom:0;display:flex;align-items:center;gap:16px;padding:0 22px;background:var(--rb);color:#0F1B33;animation:banner 5s var(--wipe) forwards;pointer-events:none}
+  .banner .head{width:44px;height:44px;border:none}
+  .banner b{font:900 30px var(--display);text-transform:uppercase}
+  .banner span{font-size:13px;opacity:.85}
+
+  @keyframes wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0)}}
+  @keyframes banner{0%{clip-path:inset(0 100% 0 0)}8%{clip-path:inset(0)}80%{clip-path:inset(0);opacity:1}100%{clip-path:inset(0);opacity:0;visibility:hidden}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}.banner{display:none}}
+
+  @media (max-width:720px){
+    .room{height:auto;min-height:100vh;grid-template-columns:1fr;grid-template-rows:auto auto auto auto;grid-template-areas:"top" "board" "rail" "third";padding:0 10px}
+    .top{flex-wrap:wrap;height:auto}.top .bug{width:100%;padding:8px 12px}.top .pick{padding:6px 12px;font-size:12px}.top .spacer{display:none}.turn{margin-left:auto;font-size:15px;padding:0 12px;clip-path:none}
+    .board{padding:8px 0;overflow-x:auto}
+    .wall{min-width:0;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:120px}
+    .th,.rn{display:none}.wall .tile:not(.now):not(.landed){display:none}
+    .rail{grid-template-rows:auto auto auto}.pool{max-height:280px}.pool-head{display:none}
+    .prow{grid-template-columns:32px 1fr 72px 40px;gap:8px}.prow .q{font-size:0;width:32px;padding:0}.prow .q::before{content:"+";font-size:16px}
+    .third{grid-template-columns:1fr;position:sticky;bottom:0}
+    .third .cells{flex-wrap:wrap;height:auto}.cell{padding:8px 12px;flex:1}.cell.clock b{font-size:36px}.cell.q{display:none}
+    .third .act{clip-path:none;padding:10px 12px;flex-direction:column;align-items:stretch;gap:8px}.third .act .btn{width:100%}
+    .banner{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="room">
+  <header class="top">
+    <div class="bug"><span class="league">Sunday Money</span></div>
+    <div class="pick">Round 3 · <b>pick 3.04</b> · 10 teams · snake</div>
+    <span class="spacer"></span>
+    <div class="turn"><span class="ava" aria-hidden="true">You</span>Your pick</div>
+  </header>
+
+  <section class="board" aria-label="Draft board">
+    <div class="wall">
+      <div></div>
+      <div class="th"><span class="ava">DW</span><b>Bay Bandits</b></div><div class="th"><span class="ava">RO</span><b>Iron Owls</b></div><div class="th"><span class="ava">CP</span><b>Turf Burners</b></div><div class="th me"><span class="ava">You</span><b>Blue Yonder</b></div><div class="th"><span class="ava">TF</span><b>Table for Twelve</b></div><div class="th"><span class="ava">DB</span><b>Dart Board</b></div><div class="th"><span class="ava">LL</span><b>Late Round Lou</b></div><div class="th"><span class="ava">SK</span><b>The Skattebros</b></div><div class="th"><span class="ava">WE</span><b>Wandale Estate</b></div><div class="th"><span class="ava">HH</span><b>Hollins Hollers</b></div>
+
+      <div class="rn">1</div>
+      <div class="tile wr"><b>Malik Nabers</b><span>WR · NYG · 1.01</span></div><div class="tile qb"><b>Josh Allen</b><span>QB · BUF · 1.02</span></div><div class="tile rb"><b>Cam Skattebo</b><span>RB · NYG · 1.03</span></div><div class="tile rb me"><b>Tyrone Tracy Jr.</b><span>RB · NYG · 1.04</span></div><div class="tile wr"><b>Wan'Dale Robinson</b><span>WR · NYG · 1.05</span></div><div class="tile qb"><b>Jaxson Dart</b><span>QB · NYG · 1.06</span></div><div class="tile te"><b>Theo Johnson</b><span>TE · NYG · 1.07</span></div><div class="tile wr"><b>Darius Slayton</b><span>WR · NYG · 1.08</span></div><div class="tile rb"><b>Devin Singletary</b><span>RB · NYG · 1.09</span></div><div class="tile qb"><b>Russell Wilson</b><span>QB · NYG · 1.10</span></div>
+      <div class="rn">2</div>
+      <div class="tile rb"><b>Eric Gray</b><span>RB · NYG · 2.10</span></div><div class="tile rb"><b>Dante Miller</b><span>RB · NYG · 2.09</span></div><div class="tile wr"><b>Beaux Collins</b><span>WR · NYG · 2.08</span></div><div class="tile wr me"><b>Khalil Shakir</b><span>WR · BUF · 2.07</span></div><div class="tile te"><b>Chris Manhertz</b><span>TE · NYG · 2.06</span></div><div class="tile wr"><b>Gunner Olszewski</b><span>WR · NYG · 2.05</span></div><div class="tile rb"><b>Matt Breida</b><span>RB · NYG · 2.04</span></div><div class="tile qb"><b>Jameis Winston</b><span>QB · NYG · 2.03</span></div><div class="tile te"><b>Daniel Bellinger</b><span>TE · NYG · 2.02</span></div><div class="tile wr"><b>Jalin Hyatt</b><span>WR · NYG · 2.01</span></div>
+      <div class="rn">3</div>
+      <div class="tile rb"><b>Jonathan Ward</b><span>RB · NYG · 3.01</span></div><div class="tile wr"><b>Lil'Jordan Humphrey</b><span>WR · NYG · 3.02</span></div><div class="tile rb landed"><b>Latavius Murray</b><span>RB · BUF · 3.03</span></div><div class="tile now">Your pick</div><div class="tile empty"></div><div class="tile empty"></div><div class="tile empty"></div><div class="tile empty"></div><div class="tile empty"></div><div class="tile empty"></div>
+      <div class="rn">4</div>
+      <div class="tile empty"></div><div class="tile empty"></div><div class="tile empty"></div><div class="tile empty"></div><div class="tile empty"></div><div class="tile empty"></div><div class="tile empty"></div><div class="tile empty"></div><div class="tile empty"></div><div class="tile empty"></div>
+    </div>
+  </section>
+
+  <aside class="rail" aria-label="The pool and the room">
+    <section class="call">
+      <h2>Our call for 3.04</h2>
+      <div class="rec">
+        <img class="head" alt="" src="https://static.www.nfl.com/image/upload/f_auto,q_auto/league/anjbznqb9i21wzcgrtbs">
+        <div><h3>James Cook</h3><div class="meta"><span class="pos rb">RB</span> Buffalo · fills your RB2</div></div>
+        <div class="big"><span class="n num">20.2</span><small>PPR a game · 2024 wk 1 to 3</small></div>
+      </div>
+      <p class="why">3 of the last 4 picks were running backs. He is the last one on the board with a line like that, and your second back is empty.</p>
+      <div class="odds"><span>Still there at your next turn</span><div class="bar"><i></i></div><b class="num">41 of 100 runs</b></div>
+      <div class="stamp">as of pick 3.04 · 100 runs</div>
+    </section>
+
+    <section class="pool" aria-label="Players available">
+      <div class="pool-head"><span></span><span>Rundown</span><span>PPR / gm · 2024 wk 1 to 3</span><span></span></div>
+      <div class="prow"><img class="head" alt="" src="https://static.www.nfl.com/image/upload/f_auto,q_auto/league/anjbznqb9i21wzcgrtbs"><div class="name"><b>James Cook</b><span><span class="pos rb">RB</span> Buffalo</span></div><div class="n num">20.2<small>3 games</small></div><button class="btn sm q">Q1</button></div>
+      <div class="prow"><img class="head" alt="" src="https://static.www.nfl.com/image/upload/f_auto,q_auto/league/rsimqxdfwlb1n9qd4w3g"><div class="name"><b>Dalton Kincaid</b><span><span class="pos te">TE</span> Buffalo</span></div><div class="n num">7.5<small>3 games</small></div><button class="btn sm q">Q2</button></div>
+      <div class="prow"><img class="head" alt="" src="https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ipwpdgb0cm3xy3d8zu1l"><div class="name"><b>Keon Coleman</b><span><span class="pos wr">WR</span> Buffalo</span></div><div class="n num">6.2<small>3 games</small></div><button class="btn sm q">Q3</button></div>
+      <div class="prow"><img class="head" alt="" src="https://static.www.nfl.com/image/upload/f_auto,q_auto/league/zdedn4xqr2jy6mddh5pb"><div class="name"><b>Ty Johnson</b><span><span class="pos rb">RB</span> Buffalo</span></div><div class="n num">6.2<small>3 games</small></div><button class="btn sm q">Queue</button></div>
+      <div class="prow"><img class="head" alt="" src="https://static.www.nfl.com/image/upload/f_auto,q_auto/league/xm8csnleyxsop4pldyby"><div class="name"><b>Ray Davis</b><span><span class="pos rb">RB</span> Buffalo</span></div><div class="n num">5.6<small>3 games</small></div><button class="btn sm q">Queue</button></div>
+      <div class="prow"><img class="head" alt="" src="https://static.www.nfl.com/image/upload/f_auto,q_auto/league/xchw7quzjszgrm6psbyg"><div class="name"><b>Mack Hollins</b><span><span class="pos wr">WR</span> Buffalo</span></div><div class="n num">4.4<small>3 games</small></div><button class="btn sm q">Queue</button></div>
+      <div class="prow"><img class="head" alt="" src="https://static.www.nfl.com/image/upload/f_auto,q_auto/league/mq62ulflifrpjrcyknbj"><div class="name"><b>Curtis Samuel</b><span><span class="pos wr">WR</span> Buffalo</span></div><div class="n num">3.3<small>3 games</small></div><button class="btn sm q">Queue</button></div>
+      <div class="prow"><img class="head" alt="" src="https://static.www.nfl.com/image/upload/f_auto,q_auto/league/yap9hm6h417pspqeadl1"><div class="name"><b>Tyler Bass</b><span><span class="pos k">K</span> Buffalo</span></div><div class="n num dash">–<small>no kicking line</small></div><button class="btn sm q">Queue</button></div>
+    </section>
+
+    <section class="crawl" aria-label="The room">
+      <div class="msg"><b>Rey</b>three backs in a row, are you all reading the same sheet</div>
+      <div class="msg"><b>Dana</b>leave Cook alone</div>
+      <div class="msg me"><b>You</b>no promises</div>
+      <form class="say" onsubmit="return false"><input aria-label="Say something to the room" placeholder="Say something to the room"><button class="btn sm" type="button">Send</button></form>
+    </section>
+  </aside>
+
+  <footer class="third" aria-label="Your pick">
+    <div class="cells">
+      <div class="cell clock"><small>Pick clock</small><b class="num">0:47</b></div>
+      <div class="cell"><small>Drafts next</small><b>James Cook</b></div>
+      <div class="cell"><small>Picks until yours after this</small><b class="num">13</b></div>
+      <div class="cell q"><small>Queue</small><div class="queue"><span>1 James Cook</span><span>2 Dalton Kincaid</span><span>3 Keon Coleman</span></div></div>
+    </div>
+    <div class="act">
+      <div class="fill"><span>QB <b>0/1</b></span><span>RB <b>1/2</b></span><span>WR <b>1/2</b></span><span>TE <b>0/1</b></span><span>FLEX <b>0/1</b></span><span>K <b>0/1</b></span><span>DEF <b>0/1</b></span></div>
+      <button class="btn verb lg">Draft James Cook</button>
+    </div>
+    <!-- the pick landing: wipes in over the lower third, holds, and clears. words stay in the wall. -->
+    <div class="banner" aria-hidden="true">
+      <img class="head" alt="" src="https://static.www.nfl.com/image/private/f_auto,q_auto/league/zepm7ghltyeqydn0qxcg">
+      <b>Turf Burners draft Latavius Murray</b><span>Coach Parker · pick 3.03 · RB · Buffalo · third running back in a row</span>
+    </div>
+  </footer>
+</div>
+</body>
+</html>
