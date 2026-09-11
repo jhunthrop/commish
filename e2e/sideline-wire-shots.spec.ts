@@ -26,6 +26,23 @@ const THEMES = ["light", "dark"] as const;
 
 const SEEDED_TRADE_ID = "e2e_sideline_wire_shot_offer";
 
+/**
+ * FIX ROUND 1, M4. A shot taken mid-entrance-spring shows half-faded elements sitting over each
+ * other, which reads as a collision that is not there — the first `wire-360-light.png` showed the
+ * clinched banner's figure over its own wrapped caption for exactly that reason. Wait for every
+ * animation this document is running to finish (the breathing presence dot never does, so the
+ * wait is bounded) before the shutter.
+ */
+async function settle(page: import("@playwright/test").Page): Promise<void> {
+  await page.evaluate(async () => {
+    const landing = document
+      .getAnimations()
+      .filter((animation) => (animation.effect as KeyframeEffect | null)?.getComputedTiming().iterations !== Infinity);
+    await Promise.all(landing.map((animation) => animation.finished.catch(() => undefined)));
+  });
+  await page.waitForTimeout(250);
+}
+
 async function firstPlayerOn(db: ReturnType<typeof createDb>, teamId: string): Promise<string> {
   const rows = await db
     .select({ playerId: rosterSlots.playerId })
@@ -96,11 +113,13 @@ for (const theme of THEMES) {
       await page.getByRole("radio", { name: theme === "dark" ? "Dark" : "Light" }).click();
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 20_000 });
+      await settle(page);
       await page.screenshot({ path: `${OUT}/account-room-${width}-${theme}.png`, fullPage: true });
 
       await page.goto(`/app/leagues/${E2E_TRADES_LEAGUE_ID}/trades`);
       await expect(page.locator('[aria-label="Trades drawer"]').getByRole("article").first()).toBeVisible({ timeout: 20_000 });
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await settle(page);
       await page.screenshot({ path: `${OUT}/wire-${width}-${theme}.png`, fullPage: width === 1440 });
     });
   }

@@ -170,6 +170,19 @@ function settledCopy(trade: TradeProposalView, meTeamId: string): string | null 
   return "One of these players moved in another trade.";
 }
 
+/**
+ * The line under a party's name: which team they run, and whether they are you.
+ *
+ * FIX ROUND 1, L4: a team whose manager has left the league resolves to no `TradeManager` at all,
+ * and the block then fell back to the TEAM NAME as the person's name — with the same team name
+ * printed again beneath it. One fact, twice, in one block. With nobody to name, the team name is
+ * the whole of what this side is, so the meta line renders nothing.
+ */
+function partyMeta(manager: TradeManager | undefined, teamName: string, isYou: boolean): string | undefined {
+  if (manager === undefined) return isYou ? "you" : undefined;
+  return isYou ? `${teamName} · you` : teamName;
+}
+
 function myAndTheirSides(trade: TradeProposalView, meTeamId: string): { readonly mine: TradeSideView; readonly theirs: TradeSideView } | null {
   if (trade.from.teamId === meTeamId) return { mine: trade.from, theirs: trade.to };
   if (trade.to.teamId === meTeamId) return { mine: trade.to, theirs: trade.from };
@@ -242,8 +255,12 @@ export function TradeCard({
   // given, which is the basis printed beside it (P11). A dead offer HAS NO FIGURE — not a dash
   // with a caption, which would be a slot pretending there is a count to make — it says the day
   // it ran out on and nothing else. A settled trade has nothing to count at all.
-  const showsClock = trade.status === "open" && now !== null && !expired;
-  const daysLeft = showsClock ? daysUntil(trade.expiresAt, new Date(now!)) : 0;
+  // FIX ROUND 1, L2: the clock is narrowed once, in a const, rather than re-asserted with `!`
+  // at the call site — `now` is null for exactly one frame (the server render and the hydrating
+  // render) and a non-null assertion is a claim the type system was already able to check.
+  const clock = trade.status === "open" && !expired ? now : null;
+  const showsClock = clock !== null;
+  const daysLeft = clock === null ? 0 : daysUntil(trade.expiresAt, new Date(clock));
 
   return (
     <article aria-label={cardLabel} className="flex flex-col gap-2.5">
@@ -251,22 +268,35 @@ export function TradeCard({
           You wear the amber ring wherever you are in the pair; the other manager wears the rival
           rose, which is the channel Sideline gives to the person across the table from you. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
-        <Manager
-          name={proposerName}
-          avatar={fromManager?.avatar}
-          ring={iAmProposer ? "self" : "rival"}
-          meta={iAmProposer ? `${trade.from.teamName} · you` : trade.from.teamName}
-        />
+        <Manager name={proposerName} avatar={fromManager?.avatar} ring={iAmProposer ? "self" : "rival"} meta={partyMeta(fromManager, trade.from.teamName, iAmProposer)} />
         <span className="text-sm text-text-faint">and</span>
-        <Manager
-          name={toManager?.name ?? trade.to.teamName}
-          avatar={toManager?.avatar}
-          ring={iAmCounterparty ? "self" : "rival"}
-          meta={iAmCounterparty ? `${trade.to.teamName} · you` : trade.to.teamName}
-        />
+        <Manager name={toManager?.name ?? trade.to.teamName} avatar={toManager?.avatar} ring={iAmCounterparty ? "self" : "rival"} meta={partyMeta(toManager, trade.to.teamName, iAmCounterparty)} />
       </div>
 
-      <MessageBubble wide author={proposerName} avatar={fromManager?.avatar} time={byline === "" ? undefined : byline}>
+      {/* FIX ROUND 1, M3: YOUR OWN OFFER READS AS SENT. In a room whose thesis is that a trade is
+          a conversation, an offer you made has to be your bubble on your side, not a neutral card
+          with your own name stamped on it as though somebody else wrote it.
+
+          FIX ROUND 1, H1: the fairness read is a QUIET TEXT CONTROL on the byline row, beside who
+          said it and when — a question a leaguemate asks, not a third button competing with the
+          one irreversible pair. `aside` renders only on a bubble that is not yours, which is
+          exactly the answerable case: you never ask whether your own offer is fair from here. */}
+      <MessageBubble
+        wide
+        mine={iAmProposer}
+        author={proposerName}
+        avatar={fromManager?.avatar}
+        time={byline === "" ? undefined : byline}
+        aside={
+          isAnswerable && assessmentStatus === "idle" ? (
+            // `whitespace-nowrap`: the byline is a tight three-item run and at 360 this broke to
+            // "Is it / fair", which reads as two controls rather than one question.
+            <button type="button" className="whitespace-nowrap font-normal text-accent underline" onClick={() => onRequestAssessment?.(trade.id)}>
+              Is it fair
+            </button>
+          ) : undefined
+        }
+      >
         {trade.note === null ? null : <p className="mb-2 break-words">{trade.note}</p>}
 
         {/* THE OFFER, INSIDE THE MESSAGE. One plate, two columns of people. */}
@@ -288,7 +318,7 @@ export function TradeCard({
         {isAnswerable && assessmentStatus !== "idle" ? (
           <div className="mt-2">
             {assessmentStatus === "loading" ? (
-              <p className="text-sm text-text-muted">Checking what the platform thinks of this trade.</p>
+              <p className="text-sm text-text-muted">Checking whether it is fair.</p>
             ) : assessmentStatus === "error" ? (
               <p className="text-sm text-text-muted">
                 Advice is unavailable right now.{" "}
@@ -302,14 +332,18 @@ export function TradeCard({
           </div>
         ) : null}
 
-        {/* THE FOOT: the one number on the left with its basis, the verbs on the right. */}
+        {/* THE FOOT: the one number on the left with its basis, the two answers on the right. */}
         <div className="mt-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
           {showsClock ? (
+            // FIX ROUND 1, H2. The basis used to read "days left of the 3 this offer stands",
+            // which is unparseable on first read and says "days" for a single day. The unit rides
+            // the basis so the window can never be read as a count of offers or of players, and
+            // the singular is real.
             <BigNumber
               align="start"
               size="sm"
               value={String(Math.max(0, daysLeft))}
-              basis={`days left of the ${PROPOSAL_TTL_DAYS} this offer stands`}
+              basis={`${daysLeft === 1 ? "day" : "days"} left, of ${PROPOSAL_TTL_DAYS} days`}
             />
           ) : trade.status === "open" && expired ? (
             <p className="text-sm text-text-muted">{formatExpired(trade.expiresAt)}</p>
@@ -318,11 +352,6 @@ export function TradeCard({
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            {isAnswerable && assessmentStatus === "idle" ? (
-              <Button variant="secondary" size="sm" onClick={() => onRequestAssessment?.(trade.id)}>
-                What the platform thinks
-              </Button>
-            ) : null}
             {isAnswerable ? (
               // `gap-4`, never a tighter value: the one irreversible control pair in this product
               // sits side by side, so the gap between them is a deliberate choice rather than

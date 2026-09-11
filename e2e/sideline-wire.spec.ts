@@ -162,7 +162,7 @@ for (const theme of THEMES) {
       const figureCount = await figures.count();
       expect(figureCount).toBeLessThanOrEqual(1);
       if (figureCount === 1) {
-        await expect(figures.first()).toContainText(/days left of the \d+ this offer stands/);
+        await expect(figures.first()).toContainText(/days? left, of \d+ days/);
       }
     });
 

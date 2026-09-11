@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import type { FreeAgentRow, PendingWaiverClaim } from "@/league-service/claims-contract";
@@ -87,13 +87,34 @@ describe("RoomSurfacePlayers", () => {
     expect(screen.getByText(/on waivers · clears/)).toBeVisible();
   });
 
+  // FIX ROUND 1, M2. The old board carried a dedicated ADP column at `sm+`; migrating the row to
+  // `PlayerRow` dropped the field on the floor with no note that it had gone. It rides the facts
+  // line now, in the sanctioned ADP words, and an agent the feed does not rank says so rather
+  // than printing a silent gap where a draft cost used to be.
+  it("keeps the draft cost on the facts line, and names its absence rather than dropping it", async () => {
+    const unranked: FreeAgentRow = { ...KINCAID, id: "p_unranked", name: "Ray Croft", adp: null };
+    const fixture = fixtureLeagueDeps({ ok: true, data: { agents: [SHAKIR, unranked] } });
+    renderInLeague(surface(), fixture.deps);
+    expect(await screen.findByText(/ADP 84/)).toBeVisible();
+    expect(screen.getByText(/no ADP/)).toBeVisible();
+  });
+
   // ABSENCE IS ABSENCE. A wire with nobody on it says so in a sentence a person would say, and
   // draws no rows, no skeleton and no zero-filled placeholder.
   it("renders nothing at all when nobody is on the wire, and says so plainly", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: { agents: [] } });
     renderInLeague(surface(), fixture.deps);
-    expect(await screen.findByText("Nobody on the wire matches that.")).toBeVisible();
+    // Fix round 1, L3: an UNFILTERED empty wire is a fact about the league, so "that" refers to
+    // nothing and the sentence does not use it.
+    expect(await screen.findByText("Nobody is on the wire right now.")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Claim" })).toBeNull();
+  });
+
+  it("says the filter found nobody, rather than that the wire is empty, once something is typed", async () => {
+    const fixture = fixtureLeagueDeps({ ok: true, data: { agents: [] } });
+    renderInLeague(surface(), fixture.deps);
+    fireEvent.change(screen.getByLabelText("Search free agents"), { target: { value: "zzzz" } });
+    expect(await screen.findByText("Nobody on the wire matches that.")).toBeVisible();
   });
 
   it("shows a filed claim's place in line instead of a second Claim on the same player", async () => {

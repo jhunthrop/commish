@@ -258,10 +258,10 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
         // ceremonial ink pill; every Accept below it is a `verb` — see `TradeCard`.
         <div className="flex items-center justify-between gap-3">
           <h2 className={`${EYEBROW} text-text-muted`}>Your trades</h2>
-          {/* QUIET, since law 6 (Sunday v5). The loud act on this page is answering an offer
-              somebody is waiting on, and it lives in the lower third at the foot. Starting a new
-              offer is still one press from the top of the page — it is just no longer competing
-              with the decision the room is actually holding open. */}
+          {/* QUIET. The loud act on this page is answering an offer somebody is waiting on, and
+              it lives on the card that offer is (`TradeCard`'s own Accept). Starting a NEW offer
+              is still one press from the top of the page — it is just no longer competing with
+              the decision the room is actually holding open. */}
           <Button variant="secondary" onClick={() => setComposing(true)}>Put an offer together</Button>
         </div>
       )}
@@ -291,7 +291,7 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
           <Band
             marker="Waiting on them"
             consequence="your offer"
-            caption="Yours until they answer. Withdraw any time before that."
+            caption="Yours until they answer."
             tone="quiet"
             trades={outbox}
             {...bandProps}
@@ -323,8 +323,10 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
             is "Sunday only". Its three counts are said by the three chapter bands above it, in
             words, which is where a count belongs when it is also a heading.
 
-            The primitive stays: `wallet-content.tsx`, `seat-confirm-panel.tsx` and the Sunday
-            stage still render it.
+            The primitive stays. Its surviving consumers are the wallet (`wallet-content.tsx`),
+            the seat-hold confirmation (`seat-confirm-panel.tsx`), the browse shelf
+            (`app/browse/lower-third.tsx`) and the operator queue (`admin-room/components/
+            queue-table.tsx`) — this room was never the only one, and it is no longer one of them.
           */}
         </>
       )}

@@ -144,6 +144,40 @@ shell's own footer line, "space opens the drawer · / searches players · esc co
 That is explainer text under P7, it sits under every drawer surface including this one, and
 `room-shell.tsx` belongs to the league-home round.
 
+## Fix round 1 (whole-branch review, verdict "merge with fixes")
+
+All eight findings taken; each of the six LOWs was under ten lines, so none were deferred.
+
+- **H1** — the fairness read left the verb foot. It was a third button beside the one irreversible
+  pair, and it spoke in institutional third person. It is a quiet text control on the message's own
+  byline row now, labelled **"Is it fair"**, with "Checking whether it is fair." while it loads —
+  same wording in `TradeComposer`. The foot holds Decline and Accept and nothing else, asserted
+  structurally (the fairness control must NOT be inside the foot element) and by a sweep that the
+  card's rendered text never contains "platform".
+- **H2** — the basis reads `"2 days left, of 3 days"` / `"1 day left, of 3 days"`, the window from
+  `PROPOSAL_TTL_DAYS`. Both the plural and the singular are tested.
+- **M1** — "Withdraw any time before that." dropped. The reviewer's ruling that the other two
+  captions survive P7 on merit is taken as written.
+- **M2** — ADP is back, on the free-agent facts line, in the same words `claim-sheet.tsx` already
+  spells (`ADP 84`), and an agent the feed does not rank says `no ADP` rather than leaving a gap.
+- **M3** — `mine={iAmProposer}`, so your own offer in "Waiting on them" is your bubble on your
+  side with no author header stamping your name back at you.
+- **M4** — re-shot with the entrance settled. **The overlap was the spring, not a collision:** the
+  shot spec now waits for every finite animation to finish before the shutter, and
+  `wire-360-light.png` shows the banner fully opaque with "18" clear of "the week you clinched in".
+  No caption wrap was needed.
+- **L1** — both false comments corrected (the loud act lives on the card, not in a lower third;
+  the lower third's real survivors are the wallet, seat-confirm, browse and the operator queue).
+- **L2** — `new Date(now!)` replaced by a narrowed `clock` const.
+- **L3** — an unfiltered empty wire says "Nobody is on the wire right now."; only a filtered one
+  says "matches that". Both tested.
+- **L4** — a team with no manager left prints its name once: `partyMeta` returns nothing rather
+  than repeating the team name under itself.
+- **L5** — noted, unchanged: the two locator corrections are still unverified until a full-suite
+  merge run.
+- **L6** — the `info` glyph had no consumer left with `InfoTip` gone (it is not an avatar preset).
+  Deleted from `ICONS` and its lucide import.
+
 ## Gates
 
 Re-run at `e09dded9` plus the working tree, unless stated.

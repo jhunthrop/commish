@@ -222,7 +222,7 @@ export function TradeComposer({ leagueId, context, onAssess, onPropose, onDone, 
           )}
         </div>
 
-        {assessing ? <p className="text-sm text-text-muted">Checking what the platform thinks of this trade.</p> : null}
+        {assessing ? <p className="text-sm text-text-muted">Checking whether it is fair.</p> : null}
         {assessment === null ? null : <TradeVerdict assessment={assessment} />}
 
         {/* THE SAY LINE (the mock's `.say`): the note you send WITH the offer is the first thing

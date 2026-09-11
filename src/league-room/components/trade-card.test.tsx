@@ -51,7 +51,7 @@ describe("TradeCard", () => {
 
     const recipient = render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} />);
     expect(screen.getByTestId("big-number")).toHaveTextContent("3");
-    expect(screen.getByText("days left of the 3 this offer stands")).toBeInTheDocument();
+    expect(screen.getByText("days left, of 3 days")).toBeInTheDocument();
     recipient.unmount();
 
     render(<TradeCard leagueId="l1" trade={BASE} meTeamId="them" playersById={PLAYERS} />);
@@ -63,6 +63,9 @@ describe("TradeCard", () => {
     vi.setSystemTime(new Date("2026-08-20T00:00:00.000Z")); // exactly 1 day before BASE.expiresAt
     const tomorrow = render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} />);
     expect(screen.getByTestId("big-number")).toHaveTextContent("1");
+    // Fix round 1, H2: one day left is "day", not "days". The unit rides the basis so the "3"
+    // can never be read as a count of offers or of players in the deal.
+    expect(screen.getByText("day left, of 3 days")).toBeInTheDocument();
     tomorrow.unmount();
 
     vi.setSystemTime(new Date("2026-08-20T18:00:00.000Z")); // 6 hours left
@@ -157,15 +160,40 @@ describe("TradeCard states", () => {
     const onRequestAssessment = vi.fn();
     render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} onRequestAssessment={onRequestAssessment} />);
     expect(screen.queryByText(/weekly production/i)).not.toBeInTheDocument();
-    const ask = screen.getByRole("button", { name: "What the platform thinks" });
+    const ask = screen.getByRole("button", { name: "Is it fair" });
     fireEvent.click(ask);
     expect(onRequestAssessment).toHaveBeenCalledWith("t1");
   });
 
+  // FIX ROUND 1, H1. The fairness read used to be a third BUTTON in the foot, beside the one
+  // irreversible pair, and it spoke in institutional third person ("What the platform thinks").
+  // It is a leaguemate's question now, asked quietly on the byline row, and the foot holds
+  // Decline and Accept and nothing else.
+  it("keeps the fairness read off the verb foot, so the foot holds the two answers only", () => {
+    render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} onRequestAssessment={vi.fn()} />);
+    const fair = screen.getByRole("button", { name: "Is it fair" });
+    const accept = screen.getByRole("button", { name: "Accept" });
+    const foot = accept.parentElement!.parentElement!;
+    expect(foot).toContainElement(screen.getByRole("button", { name: "Decline" }));
+    expect(foot).not.toContainElement(fair);
+    // It sits in the message's own byline, beside who said it and when.
+    expect(fair.closest("p")).toHaveTextContent("Iron Owls");
+  });
+
+  it("never calls itself the platform, anywhere a manager can read", () => {
+    const asked = render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} assessmentStatus="loading" />);
+    expect(screen.getByText("Checking whether it is fair.")).toBeInTheDocument();
+    expect(asked.container.textContent).not.toMatch(/platform/i);
+    asked.unmount();
+
+    const idle = render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} onRequestAssessment={vi.fn()} />);
+    expect(idle.container.textContent).not.toMatch(/platform/i);
+  });
+
   it("shows it is checking, not a blank card, while the verdict is in flight", () => {
     render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} assessmentStatus="loading" />);
-    expect(screen.getByText("Checking what the platform thinks of this trade.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "What the platform thinks" })).not.toBeInTheDocument();
+    expect(screen.getByText("Checking whether it is fair.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Is it fair" })).not.toBeInTheDocument();
   });
 
   // Fix round 1, F4 (MEDIUM): a failed verdict fetch used to leave the card silently missing its
@@ -312,6 +340,18 @@ describe("TradeCard states", () => {
     expect(screen.getByText("Waiting for a reply.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
     expect(onWithdraw).toHaveBeenCalledWith("t1");
+  });
+
+  // FIX ROUND 1, M3. In a room whose thesis is "a trade is a conversation", your own sent offer
+  // has to read as sent: your bubble, on your side, in Court blue, with no author header stamping
+  // your own name back at you.
+  it("draws your own outgoing offer as yours, and an inbound one as theirs", () => {
+    const outgoing = render(<TradeCard leagueId="l1" trade={BASE} meTeamId="them" playersById={PLAYERS} />);
+    expect(screen.getByTestId("message-bubble")).toHaveAttribute("data-mine", "true");
+    outgoing.unmount();
+
+    render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    expect(screen.getByTestId("message-bubble")).not.toHaveAttribute("data-mine");
   });
 
   it("renders a superseded offer with what happened, not with a blank status", () => {

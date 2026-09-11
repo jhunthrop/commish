@@ -26,8 +26,14 @@ export interface RoomSurfacePlayersProps {
   readonly onClaim: (agent: FreeAgentRow) => void;
 }
 
-/** The honest why-line: waiver state, injury listing, and this week's real fixture. No scouting
- *  prose — nothing in the platform writes any. */
+/** The honest why-line: waiver state, injury listing, this week's real fixture, and what he cost
+ *  in drafts. No scouting prose — nothing in this product writes any.
+ *
+ *  FIX ROUND 1, M2: THE DRAFT COST IS BACK. The board used to carry a dedicated ADP column at
+ *  `sm+`, and moving the row onto `PlayerRow` dropped the field silently — a manager comparing two
+ *  waiver adds lost the only draft-cost number the wire ever showed. It rides the facts line now,
+ *  in the sanctioned ADP words (`claim-sheet.tsx`'s `candidateLine` spells it identically), and an
+ *  agent the feed does not rank SAYS SO rather than leaving a gap that reads as a rendering fault. */
 function factsLine(agent: FreeAgentRow, fixtures: ReadonlyMap<string, FixtureLabel>): string {
   const parts: string[] = [];
   if (agent.onWaiversUntil !== null && agent.onWaiversUntil !== undefined) {
@@ -39,6 +45,7 @@ function factsLine(agent: FreeAgentRow, fixtures: ReadonlyMap<string, FixtureLab
   if (designation !== null) parts.push(`listed ${designation}`);
   const fixture = fixtures.get(agent.nflTeam);
   parts.push(fixture === undefined ? "on bye this week" : `plays ${fixture.when} ${fixture.opp}`);
+  parts.push(agent.adp === null ? "no ADP" : `ADP ${Math.round(agent.adp)}`);
   return parts.join(" · ");
 }
 
@@ -127,8 +134,13 @@ export function RoomSurfacePlayers(props: RoomSurfacePlayersProps) {
       </div>
 
       {failed ? <p className="text-sm text-negative">The player pool did not load. Try again in a moment.</p> : null}
+      {/* FIX ROUND 1, L3: "that" has to refer to something. A wire nobody has filtered is EMPTY,
+          which is a fact about the league; a wire filtered to nothing is a fact about the filter.
+          Two sentences, because they are two different states and only one of them is a dead end. */}
       {loaded && !failed && agents.length === 0 ? (
-        <p className="text-md text-text-muted">Nobody on the wire matches that.</p>
+        <p className="text-md text-text-muted">
+          {search.trim() === "" && position === "ALL" ? "Nobody is on the wire right now." : "Nobody on the wire matches that."}
+        </p>
       ) : null}
 
       {agents.map((agent) => {
