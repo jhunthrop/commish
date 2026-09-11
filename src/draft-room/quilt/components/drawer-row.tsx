@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { Player } from "@/domain/player";
-import { Button, PositionBadge } from "@/components/ui";
+import { Button, PositionBadge, type MotionRowProps } from "@/components/ui";
 import { PlayerName } from "@/league-room/components/player-peek";
 
 export interface DrawerRowProps {
@@ -30,6 +30,9 @@ export interface DrawerRowProps {
    *  primitive per feature" rule — see `player-peek.tsx`'s docblock — reads as "the name is
    *  ONE thing", not "a name click can only ever mean one product surface"). */
   readonly onPeek: (playerId: string) => void;
+  /** The list's own handle on this row (`MotionList`): the ref it measures, the key it moves by
+   *  and the enter/leave classes. Spread onto the list item, never onto anything inside it. */
+  readonly row?: MotionRowProps;
 }
 
 /**
@@ -51,11 +54,13 @@ export function DrawerRow({
   drafted = false,
   highlight = false,
   onPeek,
+  row,
 }: DrawerRowProps) {
   return (
     <li
+      {...row}
       data-testid="drawer-row"
-      className={`flex items-center gap-2 rounded-sm px-2.5 py-1.5 ${highlight ? "border border-accent bg-surface-raised" : "bg-surface-raised"} ${drafted ? "opacity-45" : ""}`}
+      className={`flex items-center gap-2 rounded-sm px-2.5 py-1.5 ${highlight ? "border border-accent bg-surface-raised" : "bg-surface-raised"} ${drafted ? "opacity-45" : ""} ${row?.className ?? ""}`}
     >
       {rank === undefined ? null : (
         <span className={`w-6 shrink-0 text-right font-display text-sm font-bold tabular-nums ${rankAccent ? "text-accent" : "text-text-faint"}`}>{rank}</span>

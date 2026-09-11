@@ -2,13 +2,16 @@
 
 import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 import type { Player } from "@/domain/player";
+import type { Law } from "@/projections/laws/types";
+import type { BoardReason } from "@/projections/preseason/board";
 import { useToast } from "@/components/ui";
-import { formatCountdown, useCountdown } from "@/components/ui/countdown";
+import { useMediaQuery } from "@/design/use-media-query";
 import { useAdvisor } from "../advisor/use-advisor";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { useQueueHandlers } from "../hooks/use-queue-handlers";
 import { boardRanks } from "../state/pick-review";
 import { RESTING, reduceCollapse } from "./state/collapse";
+import { QUILT_CONFIG } from "./state/config";
 import type { Lens } from "./state/lens";
 import { sheetRanks as sheetRanksOf } from "./state/sheet";
 import { usePendingPick } from "./hooks/use-pending-pick";
@@ -22,13 +25,19 @@ import { QuiltBoard } from "./components/quilt-board";
 import { PoolDrawer } from "./components/pool-drawer";
 import { PeekSheet } from "./components/peek-sheet";
 import { UndoPill } from "./components/undo-pill";
-import { MobileRoom } from "./components/mobile-room";
+import { MobileRoom, RESTING_PHONE, type PhoneSurface } from "./components/mobile-room";
 import type { RoomActs } from "./components/room-acts";
 
 export interface QuiltRoomProps {
   readonly room: DraftRoomState;
   readonly playersById: ReadonlyMap<string, Player>;
 }
+
+// One instance each, never a fresh `new Map()` per render: these reach every memoized row and
+// cell as props, and a new empty map per render is a prop change to all of them.
+const NO_BYE_WEEKS: ReadonlyMap<string, number> = new Map();
+const NO_REASONS: ReadonlyMap<string, readonly BoardReason[]> = new Map();
+const NO_LAWS: readonly Law[] = [];
 
 /**
  * THE QUILT ROOM — the snake draft room, rebuilt to the blueprint mocks. The quilt owns the
@@ -38,12 +47,24 @@ export interface QuiltRoomProps {
  * the width). Desktop and phone are two compositions over the same state: at phone widths the
  * room INVERTS — pool first, the quilt demoted to the BOARD tab — because a 390pt screen drafts
  * from a list, not a grid.
+ *
+ * FLUIDITY ROUND (founder report 2026-09-10): this root no longer ticks. The running clock is a
+ * leaf (`CountdownLabel`) wherever digits show, so a second passing re-renders digits and
+ * nothing else; every object handed down (`acts`, `lensChips`, the empty fallbacks) keeps its
+ * identity between renders so the memoized strip, board and drawer skip work they have no part
+ * in; and only the composition for the current width is mounted — the phone tree used to render
+ * hidden beneath the desktop one, doubling every drawer row on every commit.
  */
 export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   const view = room.view!;
   const [surface, dispatch] = useReducer(reduceCollapse, RESTING);
   const [lens, setLens] = useState<Lens>("picks");
   useRoomKeys(dispatch);
+  const desktop = useMediaQuery(QUILT_CONFIG.desktopStageQuery);
+  // The phone composition's tab, confirm sheet and peek live HERE, so a window crossing the
+  // breakpoint (which swaps the mounted composition) never drops a confirmation mid-resize.
+  const [phone, setPhone] = useState<PhoneSurface>(RESTING_PHONE);
+  const onPhone = useCallback((patch: Partial<PhoneSurface>) => setPhone((held) => ({ ...held, ...patch })), []);
 
   // Affordance only — the server decides. Task 5's owed-pick allowance matches the old pool's.
   const myTurn = view.phase === "in_progress" && room.myTeamId !== null && view.onClockTeamId === room.myTeamId;
@@ -59,15 +80,16 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
    * never in the generic act wrapper.
    */
   const { show } = useToast();
+  const { submit } = room;
   const submitPick = useCallback(
     (playerId: string): void => {
-      void room.submit({ type: "MAKE_PICK", playerId }).then((outcome) => {
+      void submit({ type: "MAKE_PICK", playerId }).then((outcome) => {
         if (outcome.ok) return;
         const name = playersById.get(playerId)?.name ?? "Your pick";
         show({ message: `${name} did not land. ${outcome.reason} You are still on the clock.`, tone: "error" });
       });
     },
-    [room, playersById, show],
+    [submit, playersById, show],
   );
   const { pending, begin, undo } = usePendingPick(submitPick, view.deadlineAt);
   const queueHandlers = useQueueHandlers(room);
@@ -75,23 +97,21 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   // ONE advisor fetch per room (simplification round): the Assistant tab's card and the odds
   // column on every list read the same view, recomputed on every applied action, and shown only
   // for players still on this board (`presentView`, the wrong-people guard).
-  const advisor = useAdvisor({ draftId: view.draftId, sequence: view.sequence, availablePlayerIds: available }, room.myTeamId);
+  const advisorRoom = useMemo(() => ({ draftId: view.draftId, sequence: view.sequence, availablePlayerIds: available }), [view.draftId, view.sequence, available]);
+  const advisor = useAdvisor(advisorRoom, room.myTeamId);
 
   const boardIds = useMemo(() => room.players.map((player) => player.id), [room.players]);
   const { sheet, move, note, reset, hasServerSheet, startServerSheet } = useSheet(view.draftId, boardIds, view.leagueId);
   const ranks = useMemo(() => boardRanks(room.players), [room.players]);
   const mySheetRanks = useMemo(() => sheetRanksOf(sheet), [sheet]);
-  const byeWeeks = room.byeWeeks ?? new Map<string, number>();
-  const reasons = room.reasons ?? new Map();
-  const laws = room.laws ?? [];
+  const byeWeeks = room.byeWeeks ?? NO_BYE_WEEKS;
+  const reasons = room.reasons ?? NO_REASONS;
+  const laws = room.laws ?? NO_LAWS;
 
   // The season-history cache lives for the room, shared by both trees — a player peeked on the
   // phone is already warm on the desktop and vice versa.
   const historyCacheRef = useRef<PlayerHistoryCache>(new Map());
   const peekHistory = usePlayerHistory(view.draftId, surface.kind === "peek" ? surface.playerId : null, historyCacheRef.current);
-
-  const { remainingMs } = useCountdown(view.deadlineAt);
-  const clockLabel = remainingMs === null ? null : formatCountdown(remainingMs);
 
   const onDraft = useCallback(
     (playerId: string): void => {
@@ -101,15 +121,19 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
     [begin],
   );
   const onPeek = useCallback((playerId: string) => dispatch({ type: "OPEN_PEEK", playerId }), []);
+  const onClosePeek = useCallback(() => dispatch({ type: "CLOSE_PEEK" }), []);
 
-  const acts: RoomActs = {
-    canDraft,
-    submitting: room.submitting,
-    queuedPlayerIds: queueHandlers.queuedPlayerIds,
-    onDraft,
-    onQueueToggle: queueHandlers.onQueueToggle,
-    onPeek,
-  };
+  const acts: RoomActs = useMemo(
+    () => ({
+      canDraft,
+      submitting: room.submitting,
+      queuedPlayerIds: queueHandlers.queuedPlayerIds,
+      onDraft,
+      onQueueToggle: queueHandlers.onQueueToggle,
+      onPeek,
+    }),
+    [canDraft, room.submitting, queueHandlers.queuedPlayerIds, queueHandlers.onQueueToggle, onDraft, onPeek],
+  );
 
   const peekFacts =
     surface.kind === "peek"
@@ -125,18 +149,61 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
         })
       : null;
 
-  const seedQueue = useCallback((playerIds: readonly string[]) => queueHandlers.onQueueChange(playerIds), [queueHandlers]);
+  const { onQueueChange } = queueHandlers;
+  const seedQueue = useCallback((playerIds: readonly string[]) => onQueueChange(playerIds), [onQueueChange]);
 
-  const lensChips = { lens, onChange: setLens, hasByes: byeWeeks.size > 0 };
+  const hasByes = byeWeeks.size > 0;
+  const lensChips = useMemo(() => ({ lens, onChange: setLens, hasByes }), [lens, hasByes]);
+
+  if (!desktop) {
+    return (
+      <>
+        <div className="px-4">
+          <ConnectionBanner connection={room.connection} />
+        </div>
+        {/* PHONE: the inversion — pool-first, the quilt as the BOARD tab. */}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <MobileRoom
+            room={room}
+            view={view}
+            historyCache={historyCacheRef.current}
+            playersById={playersById}
+            myTurn={myTurn}
+            acts={acts}
+            pending={pending}
+            onUndo={undo}
+            phone={phone}
+            onPhone={onPhone}
+            lens={lens}
+            onLens={setLens}
+            byeWeeks={byeWeeks}
+            reasons={reasons}
+            laws={laws}
+            boardRanks={ranks}
+            sheetRanks={mySheetRanks}
+            sheet={sheet}
+            onSheetMove={move}
+            onNote={note}
+            onSheetReset={reset}
+            onSeedQueue={seedQueue}
+            available={available}
+            hasServerSheet={hasServerSheet}
+            onStartServerSheet={startServerSheet}
+            advisor={advisor}
+          />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
-      {/* One aria-live connection region for both trees — quiet while live, loud when not. */}
+      {/* One aria-live connection region — quiet while live, loud when not. */}
       <div className="px-4">
         <ConnectionBanner connection={room.connection} />
       </div>
       {/* DESKTOP: the quilt owns the stage. */}
-      <div data-testid="quilt-room" className="hidden min-h-0 flex-1 flex-col lg:flex">
+      <div data-testid="quilt-room" className="flex min-h-0 flex-1 flex-col">
         <ClockStrip
           view={view}
           teams={room.teams}
@@ -146,7 +213,6 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           myTurn={myTurn}
           submitting={room.submitting}
           onDraft={onDraft}
-          clockLabel={clockLabel}
           lensChips={lensChips}
         />
         <div className="relative flex min-h-0 flex-1">
@@ -159,7 +225,6 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
               lens={lens}
               byeWeeks={byeWeeks}
               boardRanks={ranks}
-              clockLabel={clockLabel}
               onPeek={onPeek}
               peekedPlayerId={surface.kind === "peek" ? surface.playerId : null}
             />
@@ -175,7 +240,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
               onDraft={onDraft}
               onQueueToggle={queueHandlers.onQueueToggle}
               onNote={note}
-              onClose={() => dispatch({ type: "CLOSE_PEEK" })}
+              onClose={onClosePeek}
             />
           )}
           {pending === null ? null : (
@@ -210,37 +275,6 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           queue={room.queue}
           advisor={advisor}
           {...acts}
-        />
-      </div>
-
-      {/* PHONE: the inversion — pool-first, the quilt as the BOARD tab. */}
-      <div className="flex min-h-0 flex-1 flex-col lg:hidden">
-        <MobileRoom
-          room={room}
-          view={view}
-          historyCache={historyCacheRef.current}
-          playersById={playersById}
-          myTurn={myTurn}
-          acts={acts}
-          pending={pending}
-          onUndo={undo}
-          clockLabel={clockLabel}
-          lens={lens}
-          onLens={setLens}
-          byeWeeks={byeWeeks}
-          reasons={reasons}
-          laws={laws}
-          boardRanks={ranks}
-          sheetRanks={mySheetRanks}
-          sheet={sheet}
-          onSheetMove={move}
-          onNote={note}
-          onSheetReset={reset}
-          onSeedQueue={seedQueue}
-          available={available}
-          hasServerSheet={hasServerSheet}
-          onStartServerSheet={startServerSheet}
-          advisor={advisor}
         />
       </div>
     </>

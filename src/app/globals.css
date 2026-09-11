@@ -262,6 +262,55 @@ body {
   .animate-strip-grow { animation: none; }
 }
 
+/* THE DRAFT ROOM'S MOTIONS (founder report 2026-09-10, "fidgety"): named once in
+   `src/design/motion.ts`, each tied to an event — a pick landing in its cell, a row entering or
+   leaving a list, a row moving to a new place, a figure that changed. Every duration is a motion
+   token; `motion.test.ts` holds each class to that. Reduced motion: the settle drops its rise and
+   keeps only the fade (opacity is not movement), a real duration rather than the 0.01ms net so the
+   cell still arrives instead of popping; the reorder transition is dropped outright. */
+@keyframes commish-cell-settle {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes commish-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes commish-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes commish-swap {
+  from { opacity: 0.35; }
+  to { opacity: 1; }
+}
+.animate-cell-settle {
+  animation: commish-cell-settle var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
+}
+.animate-cell-fade {
+  animation: commish-fade-in var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
+}
+.animate-row-enter {
+  animation: commish-fade-in var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
+}
+.animate-row-leave {
+  animation: commish-fade-out var(--commish-motion-duration-fast) var(--commish-motion-easing-standard) both;
+}
+.animate-swap {
+  animation: commish-swap var(--commish-motion-duration-fast) var(--commish-motion-easing-standard) both;
+}
+.motion-reorder {
+  transition: transform var(--commish-motion-duration-base) var(--commish-motion-easing-standard);
+}
+.motion-resize {
+  transition: height var(--commish-motion-duration-base) var(--commish-motion-easing-standard);
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-cell-settle { animation-name: commish-fade-in; }
+  .animate-cell-settle, .animate-cell-fade { animation-duration: var(--commish-motion-duration-base) !important; }
+  .motion-reorder, .motion-resize { transition: none; }
+}
+
 .rise-1 { animation-delay: var(--commish-motion-duration-fast); }
 .rise-2 { animation-delay: calc(var(--commish-motion-duration-fast) * 2); }
 .rise-3 { animation-delay: calc(var(--commish-motion-duration-fast) * 3); }

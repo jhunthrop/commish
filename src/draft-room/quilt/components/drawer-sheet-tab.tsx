@@ -1,14 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import type { Player } from "@/domain/player";
 import type { SurvivalOdds } from "@/draft-service/assistant/view";
-import { Button } from "@/components/ui";
-import { OddsGlance } from "../../advisor/components/odds-glance";
+import { Button, MotionList, type MotionRowProps } from "@/components/ui";
+import { useStableList } from "@/design/use-stable-list";
+import { OddsFigure } from "../../advisor/components/odds-glance";
 import type { CheatSheet } from "../state/sheet";
 import { sheetQueueSeed } from "../state/sheet";
 import { QUILT_CONFIG } from "../state/config";
+import { DrawerFilterEmpty, DrawerFilterRow, useDrawerFilter } from "./drawer-filter";
 import { DrawerRow } from "./drawer-row";
+import { PagedFooter, usePaging } from "./paged-list";
 import type { RoomActs } from "./room-acts";
 
 export interface DrawerSheetTabProps extends Pick<RoomActs, "canDraft" | "submitting" | "onDraft" | "onPeek"> {
@@ -30,15 +33,130 @@ export interface DrawerSheetTabProps extends Pick<RoomActs, "canDraft" | "submit
   readonly odds?: SurvivalOdds | null;
 }
 
+/** One sheet row with every printed fact resolved to a primitive (the memo boundary). */
+interface SheetRowModel {
+  readonly player: Player;
+  readonly you: number;
+  readonly board: number | null;
+  readonly drafted: boolean;
+  readonly highlight: boolean;
+  readonly note: string | undefined;
+  readonly first: boolean;
+  readonly last: boolean;
+  readonly survived: number | undefined;
+  readonly runs: number | null;
+}
+
+const keyOf = (row: SheetRowModel): string => row.player.id;
+
+interface SheetEntry {
+  readonly player: Player;
+  /** The player's 0-based place on the FULL sheet — filtering never renumbers a sheet. */
+  readonly index: number;
+}
+
+/** The sheet's players that pass the filter, each with its place on the whole sheet. */
+function filteredEntries(sheet: CheatSheet, playersById: ReadonlyMap<string, Player>, matches: (player: Player) => boolean): readonly SheetEntry[] {
+  return sheet.order.flatMap((playerId, index) => {
+    const player = playersById.get(playerId);
+    return player !== undefined && matches(player) ? [{ player, index }] : [];
+  });
+}
+
+function buildRows(sheet: CheatSheet, entries: readonly SheetEntry[], boardRanks: ReadonlyMap<string, number>, available: ReadonlySet<string>, odds: SurvivalOdds | null): readonly SheetRowModel[] {
+  const lastIndex = sheet.order.length - 1;
+  let firstAvailableSeen = false;
+  return entries.map(({ player, index }) => {
+    const playerId = player.id;
+    const drafted = !available.has(playerId);
+    const highlight = !drafted && !firstAvailableSeen;
+    if (highlight) firstAvailableSeen = true;
+    return {
+        player,
+        you: index + 1,
+        board: boardRanks.get(playerId) ?? null,
+        drafted,
+        highlight,
+        note: sheet.notes[playerId],
+        first: index === 0,
+        last: index === lastIndex,
+        survived: odds === null || drafted ? undefined : odds.survived[playerId],
+        runs: odds === null || odds.runs === 0 ? null : odds.runs,
+    };
+  });
+}
+
+interface SheetRowProps extends Pick<RoomActs, "canDraft" | "submitting" | "onDraft" | "onPeek"> {
+  readonly leagueId: string;
+  readonly item: SheetRowModel;
+  readonly onMove: (playerId: string, delta: number) => void;
+  readonly row: MotionRowProps;
+}
+
+const SheetRow = memo(function SheetRow({ leagueId, item, onMove, canDraft, submitting, onDraft, onPeek, row }: SheetRowProps) {
+  const { player, you, board, drafted, highlight, note, first, last, survived, runs } = item;
+  return (
+    <DrawerRow
+      leagueId={leagueId}
+      player={player}
+      rank={you}
+      rankAccent={highlight}
+      drafted={drafted}
+      highlight={highlight}
+      onPeek={onPeek}
+      row={row}
+      meta={note === undefined ? undefined : <span className="italic">&ldquo;{note}&rdquo;</span>}
+      verdict={
+        <>
+          {board === null ? null : (
+            <span data-testid="sheet-vs-board" className={`font-mono text-xs tabular-nums ${you < board ? "text-positive" : you > board ? "text-negative" : "text-text-faint"}`}>
+              you {you} · board {board}
+            </span>
+          )}
+          {runs === null || survived === undefined ? null : <OddsFigure survived={survived} runs={runs} />}
+        </>
+      }
+      actions={
+        drafted ? null : (
+          <>
+            <Button size="sm" variant="ghost" disabled={first} aria-label={`Move ${player.name} up your sheet`} onClick={() => onMove(player.id, -1)}>
+              <span aria-hidden="true">↑</span>
+            </Button>
+            <Button size="sm" variant="ghost" disabled={last} aria-label={`Move ${player.name} down your sheet`} onClick={() => onMove(player.id, 1)}>
+              <span aria-hidden="true">↓</span>
+            </Button>
+            {canDraft ? (
+              <Button size="sm" variant={highlight ? "verb" : "secondary"} disabled={submitting} onClick={() => onDraft(player.id)}>
+                Draft
+              </Button>
+            ) : null}
+          </>
+        )
+      }
+    />
+  );
+});
+
 /**
  * MY SHEET — the manager's own copy of the board, live in the room (`SheetAndLens` mock).
  * Drafted players strike through in place (the list is prep, not inventory), every row says
  * where the manager and the board disagree, and the sheet's one bridge to the server is the
  * queue seed: the top five undrafted names become the autopick queue in one tap.
+ *
+ * PAGED (fluidity round, 2026-09-10): the sheet used to render every board player — 1,779 rows,
+ * 14,000 components per commit, a 300 ms tab open. It now shows the pool's own page
+ * (`poolPageSize`) and offers the next page on request; a move slides its two rows through
+ * `MotionList` rather than repainting the list.
  */
 export function DrawerSheetTab({ leagueId, sheet, playersById, boardRanks, available, onMove, onSeedQueue, onReset, canDraft, submitting, onDraft, onPeek, hasServerSheet, onStartServerSheet, odds = null }: DrawerSheetTabProps) {
   const seed = useMemo(() => sheetQueueSeed(sheet, available, QUILT_CONFIG.sheetQueueSeedCount), [sheet, available]);
-  let firstAvailableSeen = false;
+  // The filter runs over the WHOLE sheet, then the page is cut: a match is always on page one.
+  const filter = useDrawerFilter();
+  const { matches } = filter;
+  const entries = useMemo(() => filteredEntries(sheet, playersById, matches), [sheet, playersById, matches]);
+  const paging = usePaging(entries.length);
+  const built = useMemo(() => buildRows(sheet, entries.slice(0, paging.shown), boardRanks, available, odds), [sheet, entries, paging.shown, boardRanks, available, odds]);
+  const rows = useStableList(built, keyOf);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -61,63 +179,17 @@ export function DrawerSheetTab({ leagueId, sheet, playersById, boardRanks, avail
           </Button>
         </span>
       </div>
-      <ol aria-label="Your sheet, your order" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-        {sheet.order.map((playerId, index) => {
-          const player = playersById.get(playerId);
-          if (player === undefined) return null;
-          const drafted = !available.has(playerId);
-          const you = index + 1;
-          const board = boardRanks.get(playerId) ?? null;
-          const highlight = !drafted && !firstAvailableSeen;
-          if (highlight) firstAvailableSeen = true;
-          const note = sheet.notes[playerId];
-          return (
-            <DrawerRow
-              key={playerId}
-              leagueId={leagueId}
-              player={player}
-              rank={you}
-              rankAccent={highlight}
-              drafted={drafted}
-              highlight={highlight}
-              onPeek={onPeek}
-              meta={note === undefined ? undefined : <span className="italic">&ldquo;{note}&rdquo;</span>}
-              verdict={
-                <>
-                  {board === null ? null : (
-                    <span
-                      data-testid="sheet-vs-board"
-                      className={`font-mono text-xs tabular-nums ${you < board ? "text-positive" : you > board ? "text-negative" : "text-text-faint"}`}
-                    >
-                      you {you} · board {board}
-                    </span>
-                  )}
-                  {odds === null || drafted ? null : <OddsGlance odds={odds} playerId={playerId} />}
-                </>
-              }
-              actions={
-                <>
-                  {drafted ? null : (
-                    <>
-                      <Button size="sm" variant="ghost" disabled={index === 0} aria-label={`Move ${player.name} up your sheet`} onClick={() => onMove(playerId, -1)}>
-                        <span aria-hidden="true">↑</span>
-                      </Button>
-                      <Button size="sm" variant="ghost" disabled={index === sheet.order.length - 1} aria-label={`Move ${player.name} down your sheet`} onClick={() => onMove(playerId, 1)}>
-                        <span aria-hidden="true">↓</span>
-                      </Button>
-                      {canDraft ? (
-                        <Button size="sm" variant={highlight ? "verb" : "secondary"} disabled={submitting} onClick={() => onDraft(playerId)}>
-                          Draft
-                        </Button>
-                      ) : null}
-                    </>
-                  )}
-                </>
-              }
-            />
-          );
-        })}
-      </ol>
+      <DrawerFilterRow filter={filter} />
+      {entries.length === 0 ? (
+        <DrawerFilterEmpty filter={filter} />
+      ) : (
+        <ol aria-label="Your sheet, your order" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+          <MotionList items={rows} keyOf={keyOf}>
+            {(item, row) => <SheetRow leagueId={leagueId} item={item} onMove={onMove} canDraft={canDraft} submitting={submitting} onDraft={onDraft} onPeek={onPeek} row={row} />}
+          </MotionList>
+          <PagedFooter paging={paging} total={entries.length} />
+        </ol>
+      )}
     </div>
   );
 }

@@ -71,7 +71,6 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
   const { draftId, sequence, availablePlayerIds } = room;
   const deps = useDraftRoomDeps();
   const [held, setHeld] = useState<AdvisorView | null>(() => hydrate(draftId));
-  const [inFlight, setInFlight] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const draftIdRef = useRef<string>(draftId);
   const aliveRef = useRef(true);
@@ -95,20 +94,24 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
     }
   }, [deps, draftId]);
 
+  // NO `inFlight` STATE (fluidity round, 2026-09-10): the hook used to flip a state flag on and
+  // off around every request, and each flip re-rendered the whole room — one pick was four
+  // whole-tree commits (the pick, flag on, the view, flag off), 120 to 170 ms apart. Whether a
+  // fresh view is on its way is already a fact of the data: the held stamp trails the room's
+  // sequence, or nothing has been held yet. `recomputing` below is derived from that, and a
+  // request in flight moves nothing but the ref that coalesces it.
   const recompute = useCallback((): void => {
     if (inFlightRef.current) {
       dirtyRef.current = true;
       return;
     }
     inFlightRef.current = true;
-    setInFlight(true);
     void (async () => {
       do {
         dirtyRef.current = false;
         await fetchOnce();
       } while (aliveRef.current && dirtyRef.current);
       inFlightRef.current = false;
-      if (aliveRef.current) setInFlight(false);
     })();
   }, [fetchOnce]);
 
@@ -135,6 +138,9 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
   }, [draftId, sequence, myTeamId, recompute]);
 
   const view = useMemo(() => (held === null ? null : presentView(held, availablePlayerIds)), [held, availablePlayerIds]);
-  const stale = held !== null && held.stamp.sequence < sequence;
-  return { view, recomputing: inFlight || stale, error };
+  // Recomputing: a seated caller whose held view trails the room, or who holds nothing yet and
+  // has not been refused. Derived, so it changes exactly when the view or the room does.
+  const recomputing = myTeamId !== null && (held === null ? error === null : held.stamp.sequence < sequence);
+  // One object per distinct answer: every drawer tab and every pool row takes this as a prop.
+  return useMemo(() => ({ view, recomputing, error }), [view, recomputing, error]);
 }

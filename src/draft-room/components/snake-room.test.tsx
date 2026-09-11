@@ -8,6 +8,15 @@ import { QUILT_CONFIG } from "../quilt/state/config";
 import { LEAGUE_NAME, PLAYERS, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
 import { SnakeRoom } from "./snake-room";
 
+// Only the composition for the current width mounts (fluidity round, 2026-09-10). The test
+// viewport answers the desktop query; the phone case below asks for the other answer.
+vi.mock("@/design/use-media-query", () => ({ useMediaQuery: vi.fn(() => true) }));
+import { useMediaQuery } from "@/design/use-media-query";
+
+afterEach(() => {
+  vi.mocked(useMediaQuery).mockReturnValue(true);
+});
+
 /** A deadline far enough out that the pick-safety window is never squeezed away. */
 const roomyDeadline = (): string => new Date(Date.now() + 60_000).toISOString();
 
@@ -226,13 +235,49 @@ describe("SnakeRoom (the quilt)", () => {
   });
 
   it("inverts on the phone tree: bottom tabs, pool first, two-step picking", () => {
+    vi.mocked(useMediaQuery).mockReturnValue(false);
     const submit = vi.fn(async () => ({ ok: true as const }));
     renderRoom({ submit });
+    // The desktop composition is not mounted alongside it.
+    expect(screen.queryByTestId("quilt-room")).toBeNull();
     const phone = screen.getByRole("navigation", { name: "Draft room tabs" }).parentElement!;
     expect(within(phone).getByTestId("mobile-your-turn")).toBeInTheDocument();
     // A phone DRAFT opens the confirm sheet rather than picking.
     fireEvent.click(within(phone).getAllByRole("button", { name: "Draft" })[0]!);
     expect(submit).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: /Confirm your pick/ })).toBeInTheDocument();
+  });
+
+  // Review fix round (HIGH): only the composition for the current width mounts, so a window
+  // crossing 64rem swaps trees. The phone's tab, confirm sheet and peek live in the room, so a
+  // confirmation opened on the phone survives a trip through the desktop composition and back.
+  it("keeps a pending confirmation and the chosen tab across a resize that swaps compositions", () => {
+    vi.mocked(useMediaQuery).mockReturnValue(false);
+    const submit = vi.fn(async () => ({ ok: true as const }));
+    // A fresh element per render: React skips a subtree handed the identical element object.
+    const element = () => (
+      <ToastProvider>
+        <SnakeRoom room={{ ...room, submit }} playersById={playersById(PLAYERS)} />
+      </ToastProvider>
+    );
+    const { rerender } = render(element());
+    const nav = () => screen.getByRole("navigation", { name: "Draft room tabs" });
+    fireEvent.click(within(nav()).getByRole("button", { name: "SHEET" }));
+    expect(within(nav()).getByRole("button", { name: "SHEET" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(within(nav().parentElement!).getAllByRole("button", { name: "Draft" })[0]!);
+    expect(screen.getByRole("dialog", { name: /Confirm your pick/ })).toBeInTheDocument();
+
+    // The window widens past the breakpoint: the desktop composition takes over...
+    vi.mocked(useMediaQuery).mockReturnValue(true);
+    rerender(element());
+    expect(screen.getByTestId("quilt-room")).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Draft room tabs" })).toBeNull();
+
+    // ...and narrows again: the confirmation is still open and SHEET is still the tab.
+    vi.mocked(useMediaQuery).mockReturnValue(false);
+    rerender(element());
+    expect(screen.getByRole("dialog", { name: /Confirm your pick/ })).toBeInTheDocument();
+    expect(within(nav()).getByRole("button", { name: "SHEET" })).toHaveAttribute("aria-pressed", "true");
+    expect(submit).not.toHaveBeenCalled();
   });
 });

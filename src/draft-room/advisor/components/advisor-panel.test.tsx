@@ -37,10 +37,11 @@ describe("AdvisorPanel", () => {
     await user.click(screen.getByRole("button", { name: "10" }));
     expect(screen.getAllByTestId("advisor-candidate")).toHaveLength(9);
     await user.click(screen.getByRole("button", { name: "3" }));
-    expect(screen.getAllByTestId("advisor-candidate")).toHaveLength(2);
+    // Rows that leave fade out in place first (`MotionList`), so the count settles a beat later.
+    await waitFor(() => expect(screen.getAllByTestId("advisor-candidate")).toHaveLength(2));
     expect(window.localStorage.getItem(KEY)).toBe("3");
     await user.click(screen.getByRole("button", { name: "5" }));
-    expect(screen.getAllByTestId("advisor-candidate")).toHaveLength(4);
+    await waitFor(() => expect(screen.getAllByTestId("advisor-candidate")).toHaveLength(4));
   });
 
   it("starts from the remembered count on a later visit", async () => {

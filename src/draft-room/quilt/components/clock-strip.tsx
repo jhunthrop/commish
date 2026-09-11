@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
-import { Button } from "@/components/ui";
+import { Button, CountdownLabel } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { pickLabel } from "../state/board";
@@ -27,11 +27,12 @@ export interface ClockStripProps {
   readonly submitting: boolean;
   /** Begins the pick-safety window (never a direct submit) — `usePendingPick.begin`. */
   readonly onDraft: (playerId: string) => void;
-  /** The running clock's own reading ("0:24"), computed ONCE by the room (one ticking interval
-   *  feeds this strip and the quilt's on-clock cell alike); null before the client clock snaps. */
-  readonly clockLabel: string | null;
   readonly lensChips: Pick<LensChipsProps, "lens" | "onChange" | "hasByes">;
 }
+
+/** The strip's clock digits, ticking alone (`CountdownLabel` owns the interval, so a tick
+ *  re-renders the digits and nothing else on the strip). */
+const CLOCK_DIGITS = "font-display font-bold tabular-nums";
 
 /** The mock's own room sentence — the strip's quiet middle while the clock is somebody else's. */
 const ROOM_SENTENCE = "The board is the room. Your pool lives in the drawer below.";
@@ -56,7 +57,7 @@ function yourNext(view: DraftStateView, myTeamId: string | null): { readonly lab
  * 250ms motion ceiling. Amber is yours, red is the room's; nothing here ever flashes red at
  * you, and the needs line never rides the red state.
  */
-export function ClockStrip({ view, teams, playersById, myTeamId, queue, myTurn, submitting, onDraft, clockLabel, lensChips }: ClockStripProps) {
+export const ClockStrip = memo(function ClockStrip({ view, teams, playersById, myTeamId, queue, myTurn, submitting, onDraft, lensChips }: ClockStripProps) {
   const reducedMotion = usePrefersReducedMotion();
   const onClockTeam = teams.find((team) => team.id === view.onClockTeamId) ?? null;
   const next = yourNext(view, myTeamId);
@@ -85,7 +86,7 @@ export function ClockStrip({ view, teams, playersById, myTeamId, queue, myTurn, 
       >
         <div className="flex items-center gap-3">
           <div id="room-clock" className="flex items-center gap-2 rounded-sm bg-accent px-3 py-1.5">
-            <span className="font-display text-2xl font-bold text-accent-text tabular-nums">{clockLabel ?? "…"}</span>
+            <CountdownLabel deadlineAt={view.deadlineAt} className={`${CLOCK_DIGITS} text-2xl text-accent-text`} />
             <span className="font-display text-sm font-bold text-accent-text">YOUR PICK · {currentPlace}</span>
           </div>
           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -119,7 +120,7 @@ export function ClockStrip({ view, teams, playersById, myTeamId, queue, myTurn, 
     <div data-testid="clock-strip" data-strip-state="resting" className="flex items-center gap-4 border-b border-line bg-surface-elevated px-4 py-2">
       {view.phase === "in_progress" && onClockTeam !== null ? (
         <div id="room-clock" className="flex items-center gap-2 rounded-sm bg-live px-3 py-1">
-          <span className="font-display text-lg font-bold text-live-text tabular-nums">{clockLabel ?? "…"}</span>
+          <CountdownLabel deadlineAt={view.deadlineAt} className={`${CLOCK_DIGITS} text-lg text-live-text`} />
           <span className="font-display text-xs font-bold text-live-text">
             {currentPlace} · {teamCode(onClockTeam.name)}
           </span>
@@ -140,4 +141,4 @@ export function ClockStrip({ view, teams, playersById, myTeamId, queue, myTurn, 
       </div>
     </div>
   );
-}
+});

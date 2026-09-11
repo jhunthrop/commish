@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
 import type { BoardReason } from "@/projections/preseason/board";
 import type { Law } from "@/projections/laws/types";
+import type { TierStandingView } from "@/draft-service/assistant/view";
 import type { UseAdvisorResult } from "../../advisor/use-advisor";
 import type { CheatSheet } from "../state/sheet";
 import type { CollapseEvent, ExpandedSurface } from "../state/collapse";
@@ -54,10 +55,12 @@ export interface PoolDrawerProps extends RoomActs {
  * at a time). Space toggles, `/` opens search at full, Esc collapses — the keyboard map lives
  * in `use-room-keys`, and the handles dispatch the identical events.
  */
-export function PoolDrawer(props: PoolDrawerProps) {
+const NO_TIERS: Readonly<Record<string, TierStandingView>> = {};
+
+export const PoolDrawer = memo(function PoolDrawer(props: PoolDrawerProps) {
   const { surface, dispatch, view, myTeamId, byeWeeks, advisor } = props;
   const odds = advisor.view?.odds ?? null;
-  const tiers = advisor.view?.tiers ?? {};
+  const tiers = advisor.view?.tiers ?? NO_TIERS;
   const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
   const open = surface.kind === "drawer";
   const hasByes = byeWeeks.size > 0;
@@ -160,4 +163,4 @@ export function PoolDrawer(props: PoolDrawerProps) {
       </div>
     </div>
   );
-}
+});

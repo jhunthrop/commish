@@ -84,8 +84,13 @@ describe("NextPickCard", () => {
   it("says when there is no next pick to wait for, shows the recomputing state, and the empty line with no pick", () => {
     renderCard({ view: advisorView({ odds: null, pick: nextPick({ makeItBack: null }) }), recomputing: true });
     expect(screen.getByText("Your last turn, so nothing to wait for.")).toBeInTheDocument();
-    expect(screen.getByTestId("advisor-recomputing")).toBeInTheDocument();
+    expect(screen.getByTestId("advisor-recomputing")).toHaveAttribute("data-active", "true");
     renderCard({ view: advisorView({ pick: null }), player: null });
     expect(screen.getByText("Nothing on the board fits your roster right now.")).toBeInTheDocument();
+    // The slot stays in the flow while idle (hidden, not removed), so the stamp never shifts
+    // when a recompute begins — the card does not resize.
+    const idle = screen.getAllByTestId("advisor-recomputing").at(-1)!;
+    expect(idle).toHaveAttribute("data-active", "false");
+    expect(idle).toHaveAttribute("aria-hidden", "true");
   });
 });

@@ -4,7 +4,7 @@ import type { DraftRoom as DraftRoomState } from "../../hooks/use-draft-room";
 import type { RoomActs } from "./room-acts";
 import { PLAYERS, SNAKE_VIEW, playersById } from "../../test-fixtures";
 import { seedSheet } from "../state/sheet";
-import { MobileRoom } from "./mobile-room";
+import { MobileRoom, RESTING_PHONE } from "./mobile-room";
 
 // The tab bar is the only thing under test here (finding 4: the six-tab row's own fit at
 // 390px) — every tab's content beyond POOL (the default) needs its own deps this suite has no
@@ -60,7 +60,8 @@ function renderMobileRoom(over: Partial<DraftRoomState> = {}) {
       acts={ACTS}
       pending={null}
       onUndo={vi.fn()}
-      clockLabel={null}
+      phone={RESTING_PHONE}
+      onPhone={vi.fn()}
       lens="picks"
       onLens={vi.fn()}
       byeWeeks={new Map()}

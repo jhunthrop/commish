@@ -95,3 +95,35 @@ export function buildQuiltRows(view: DraftStateView, myTeamId: string | null): r
 export function pickPlace(pick: CompletedPick, teamCount: number): string {
   return pickLabel(pick.round, pick.pickNumber - (pick.round - 1) * teamCount);
 }
+
+function sameCell(a: QuiltCell, b: QuiltCell): boolean {
+  if (a.teamId !== b.teamId || a.onClock !== b.onClock || a.yourPickLabel !== b.yourPickLabel) return false;
+  if (a.pick === b.pick) return true;
+  if (a.pick === null || b.pick === null) return false;
+  return a.pick.pickNumber === b.pick.pickNumber && a.pick.playerId === b.pick.playerId && a.pick.teamId === b.pick.teamId;
+}
+
+function sameRow(a: QuiltRow, b: QuiltRow): boolean {
+  return a.round === b.round && a.kind === b.kind && a.cells.length === b.cells.length && a.cells.every((cell, index) => sameCell(cell, b.cells[index]!));
+}
+
+/**
+ * STABLE ROW IDENTITY (fluidity round, 2026-09-10): `buildQuiltRows` is pure and rebuilds every
+ * row object on every view, which is right for a derivation and wrong for a memoized row — a
+ * new object per round per pick means every round re-renders when one cell changed. This hands
+ * back the PREVIOUS row object wherever nothing in the round changed (by value, so a snapshot
+ * refetch that re-creates every pick object is still a no-op), and the previous array itself
+ * when no round changed at all. A pick landing then changes exactly the rows it touched: the
+ * landed round, and the round whose clock just started if that is a different one.
+ */
+export function reuseQuiltRows(previous: readonly QuiltRow[] | null, next: readonly QuiltRow[]): readonly QuiltRow[] {
+  if (previous === null) return next;
+  let unchanged = previous.length === next.length;
+  const rows = next.map((row, index) => {
+    const prior = previous[index];
+    if (prior !== undefined && sameRow(prior, row)) return prior;
+    unchanged = false;
+    return row;
+  });
+  return unchanged ? previous : rows;
+}

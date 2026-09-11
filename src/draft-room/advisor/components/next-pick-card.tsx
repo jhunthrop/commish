@@ -18,6 +18,13 @@ export interface NextPickCardProps {
 const EMPTY_COPY = "Nothing on the board fits your roster right now.";
 const LAST_TURN_COPY = "Your last turn, so nothing to wait for.";
 
+/**
+ * The card's frame — one minimum height the lead card and the tab's waiting placeholder share
+ * (fluidity round, 2026-09-10), so "Reading the board." and the card it becomes occupy the same
+ * box and the rows beneath never jump when the advisor answers.
+ */
+export const ADVISOR_CARD_FRAME = "min-h-44";
+
 /** The row's big figure: green at or above the safe band, plain ink otherwise, never red. */
 function BigOdds({ view }: { readonly view: AdvisorView }) {
   const odds = view.pick?.makeItBack ?? null;
@@ -49,13 +56,17 @@ function BigOdds({ view }: { readonly view: AdvisorView }) {
 export function NextPickCard({ view, acts, player, byeWeek, recomputing }: NextPickCardProps) {
   const pick = view.pick;
   return (
-    <Card as="section" data-testid="advisor-card" aria-label="Your next pick" data-on-clock={view.onTheClock ? "true" : "false"} className="flex flex-col gap-2">
+    <Card as="section" data-testid="advisor-card" aria-label="Your next pick" data-on-clock={view.onTheClock ? "true" : "false"} className={`flex flex-col gap-2 ${ADVISOR_CARD_FRAME}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p data-testid="advisor-header" className="font-display text-sm font-semibold text-text-muted">
           {headerLine(view)}
         </p>
         <span className="flex items-center gap-2 font-mono text-xs tabular-nums text-text-faint">
-          {recomputing ? <span data-testid="advisor-recomputing">Recomputing</span> : null}
+          {/* Always in the flow, hidden when idle: the word appearing used to push the stamp
+              sideways on every recompute (a measured layout shift). The card never resizes. */}
+          <span data-testid="advisor-recomputing" data-active={recomputing ? "true" : "false"} aria-hidden={!recomputing} className={recomputing ? "" : "invisible"}>
+            Recomputing
+          </span>
           <span data-testid="advisor-stamp">{stampText(view)}</span>
         </span>
       </div>
@@ -75,7 +86,9 @@ export function NextPickCard({ view, acts, player, byeWeek, recomputing }: NextP
             </div>
             <BigOdds view={view} />
           </div>
-          <p data-testid="advisor-why" className="text-sm leading-snug text-text-primary">
+          {/* Two lines reserved: a shorter why for the next pick must not lift the verb and the
+              rows under it. */}
+          <p data-testid="advisor-why" className="min-h-[2lh] text-sm leading-snug text-text-primary">
             {pick.why}
           </p>
           <div className="sticky bottom-0 -mx-4 -mb-4 rounded-b-lg bg-surface-elevated px-4 pb-4 pt-1">

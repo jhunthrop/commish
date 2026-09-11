@@ -169,7 +169,9 @@ test("mock room -> the lead card and rows before your pick, Draft above the fold
   await expect(desk.getByTestId("advisor-candidate").filter({ hasText: pickedName })).toHaveCount(0);
   await expect(card).toBeVisible({ timeout: 15_000 });
   await expect(card).toHaveAttribute("data-on-clock", "false", { timeout: 15_000 });
-  await expect(desk.getByTestId("advisor-recomputing")).toHaveCount(0, { timeout: 15_000 });
+  // The slot stays in the flow while idle (fluidity round, 2026-09-10: the word appearing used
+  // to shift the stamp on every recompute); `data-active` is the state.
+  await expect(desk.getByTestId("advisor-recomputing")).toHaveAttribute("data-active", "false", { timeout: 15_000 });
   await expect(desk.getByTestId("advisor-name")).not.toHaveText(pickedName);
   await expect(managerA.getByTestId("assistant-beat")).toHaveCount(0);
   await expect(managerA.getByText("Best available.")).toHaveCount(0);
