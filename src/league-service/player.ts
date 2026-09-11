@@ -23,7 +23,7 @@ import type { PeekDocumentRequest } from "@/capsules/peek-document-inputs";
 import { buildPeekDocument, hydratePeekDocument } from "@/capsules/peek-document";
 import type { PeekDocument } from "@/capsules/peek-document-row";
 import type { Db } from "@/db/client";
-import { leagues, matchups, playerCrosswalk, playerPeekDocuments, players, preseasonProjections, rosterSlots, scoringSettings, teams, users } from "@/db/schema";
+import { drafts, leagues, matchups, playerCrosswalk, playerPeekDocuments, players, preseasonProjections, rosterSlots, scoringSettings, teams, users } from "@/db/schema";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { enqueuePeekDocumentRebuildsQuietly } from "@/jobs/defs/peek-document-job";
@@ -74,6 +74,7 @@ interface DocumentRead {
   readonly document: PeekDocument;
   readonly isMockLeague: boolean;
   readonly seasonWeeks: number;
+  readonly hasDrafted: boolean;
   readonly holder: HolderRow | null;
 }
 
@@ -162,6 +163,22 @@ async function ownerFor(db: Db, leagueId: string, row: HolderRow | null, viewerU
  * schedule has not been generated yet, which the caller reads as the configured default, exactly as
  * `seasonProgress` does.
  */
+/**
+ * HAS THIS LEAGUE DRAFTED, as a correlated scalar in the same statement — `drafts.status` reaching
+ * `'complete'` is the product's single definition of it (`commitDraftResults` is what writes it), so
+ * this is a read of that authority and never a second opinion inferred from empty rosters. A league
+ * with no `drafts` row answers `false`, which is the same thing that authority would say.
+ *
+ * The header's one verb turns on it: before a draft every player is un-held, and "Add him" is an act
+ * a pre-draft manager cannot make.
+ */
+const leagueHasDrafted = sql<boolean>`(
+  select exists(
+    select 1 from ${drafts}
+    where ${drafts.leagueId} = ${leagues.id} and ${drafts.status} = 'complete'
+  )
+)`;
+
 const scheduledWeeks = sql<number>`(
   select count(distinct ${matchups.weekNumber})::int
   from ${matchups}
@@ -181,6 +198,7 @@ async function readPeekDocumentForLeague(db: Db, leagueId: string, playerId: str
       document: playerPeekDocuments.document,
       isMock: leagues.isMock,
       seasonWeeks: scheduledWeeks,
+      hasDrafted: leagueHasDrafted,
       holder: holder(playerId),
     })
     .from(leagues)
@@ -201,6 +219,7 @@ async function readPeekDocumentForLeague(db: Db, leagueId: string, playerId: str
     document: row.document,
     isMockLeague: row.isMock,
     seasonWeeks: row.seasonWeeks === 0 ? LEAGUE_CONFIG.regularSeasonWeeks : row.seasonWeeks,
+    hasDrafted: row.hasDrafted,
     holder: row.holder,
   };
 }
@@ -233,6 +252,7 @@ export async function playerSeason(
       ownedBy: owner?.teamName ?? null,
       owner,
       isMockLeague: read.isMockLeague,
+      hasDrafted: read.hasDrafted,
       seasonWeeks: read.seasonWeeks,
       requestedSeason,
     });
@@ -264,12 +284,13 @@ interface LeagueFacts {
   readonly scoringHash: string;
   readonly isMockLeague: boolean;
   readonly seasonWeeks: number;
+  readonly hasDrafted: boolean;
   readonly holder: HolderRow | null;
 }
 
 async function leagueFactsFor(db: Db, leagueId: string, playerId: string): Promise<LeagueFacts | null> {
   const [league] = await db
-    .select({ id: leagues.id, isMock: leagues.isMock, seasonWeeks: scheduledWeeks, holder: holder(playerId) })
+    .select({ id: leagues.id, isMock: leagues.isMock, seasonWeeks: scheduledWeeks, hasDrafted: leagueHasDrafted, holder: holder(playerId) })
     .from(leagues)
     .where(eq(leagues.id, leagueId));
   if (league === undefined) return null;
@@ -283,6 +304,7 @@ async function leagueFactsFor(db: Db, leagueId: string, playerId: string): Promi
     scoringHash: scoringHashOf(rules),
     isMockLeague: league.isMock,
     seasonWeeks: league.seasonWeeks === 0 ? LEAGUE_CONFIG.regularSeasonWeeks : league.seasonWeeks,
+    hasDrafted: league.hasDrafted,
     holder: league.holder,
   };
 }
@@ -364,6 +386,7 @@ function offBoardBody(player: Player, facts: LeagueFacts, now: Date, requestedSe
     ownedBy: owner?.teamName ?? null,
     owner,
     isMockLeague: facts.isMockLeague,
+    hasDrafted: facts.hasDrafted,
     seasonWeeks: facts.seasonWeeks,
     requestedSeason,
   });
@@ -434,6 +457,7 @@ async function playerSeasonOnMiss(
     ownedBy: owner?.teamName ?? null,
     owner,
     isMockLeague: facts.isMockLeague,
+    hasDrafted: facts.hasDrafted,
     seasonWeeks: facts.seasonWeeks,
     requestedSeason,
   });

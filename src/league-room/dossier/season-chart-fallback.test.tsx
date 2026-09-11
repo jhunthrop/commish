@@ -88,13 +88,30 @@ describe("SeasonChartFallback", () => {
       />,
     );
     const basis = screen.getByTestId("season-basis");
-    expect(basis.textContent).toContain("Every 2025 game he played, scored under this league's rules.");
-    expect(basis.textContent).toContain("not a forecast");
+    // The line every chart carries, plus the one sentence only these two positions earn: their bars
+    // are a record of games that were played, never a forecast.
+    expect(basis.textContent).toContain("Each bar is one week of 2025");
+    expect(basis.textContent).toContain("A record of games that were played, not a forecast.");
     expect(basis.textContent).not.toMatch(/[—;]/);
   });
 
-  it("prints no basis line for a position that carries a projection", () => {
+  /**
+   * THE BASIS LINE RENDERS UNCONDITIONALLY (fix round 1, M1). It used to print only for a kicker or
+   * a team defense, so on every other player the chart's bars were a number with no stated basis
+   * anywhere a sighted reader could see it — and the call card two inches above says "our model
+   * expects 15" GAMES, which is exactly what a lone 15.0 bar gets read as. The line names what a bar
+   * IS: one week, in fantasy points, under this league's rules.
+   */
+  it("names what a bar is under every chart, not only a kicker's", () => {
     render(<SeasonChartFallback body={bodyFor()} switcher={undefined} played />);
+    const basis = screen.getByTestId("season-basis");
+    expect(basis.textContent).toContain("Each bar is one week");
+    expect(basis.textContent).toContain("fantasy points under this league's scoring");
+    expect(basis.textContent).not.toMatch(/[—;]/);
+  });
+
+  it("prints no basis line where there is no chart to state a basis for", () => {
+    render(<SeasonChartFallback body={bodyFor({ weeks: [] })} switcher={undefined} played={false} />);
     expect(screen.queryByTestId("season-basis")).not.toBeInTheDocument();
   });
 });

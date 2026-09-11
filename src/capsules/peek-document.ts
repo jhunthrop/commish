@@ -82,6 +82,9 @@ export interface PeekDocumentLiveFacts {
    *  caller with no reader to compare against, which renders as no ring rather than a guess. */
   readonly owner?: PlayerOwner | null;
   readonly isMockLeague: boolean;
+  /** Whether this league's draft has completed — the one fact the header's verb turns on. Omitted
+   *  by a caller that has not read it, which reads as "not yet", never as "go ahead and add him". */
+  readonly hasDrafted?: boolean;
   /**
    * This league's own regular season length. It caps the CURRENT season's week axis and nothing
    * else: a fourteen-week league never draws a week it does not play. A prior season has no future
@@ -121,6 +124,7 @@ export function hydratePeekDocument(document: PeekDocument, live: PeekDocumentLi
     ownedBy: live.ownedBy,
     owner: live.owner ?? null,
     isMockLeague: live.isMockLeague,
+    hasDrafted: live.hasDrafted ?? false,
     injuryDesignation: document.injuryDesignation,
     log: stats.log,
     totals: stats.totals,

@@ -150,6 +150,18 @@ export interface PlayerSeasonBody {
    * exist the way a real league does. Consumers gate that one line on this flag.
    */
   readonly isMockLeague: boolean;
+  /**
+   * WHETHER THIS LEAGUE HAS DRAFTED (`drafts.status = 'complete'`), because the one thing a manager
+   * can do about a player depends on it and nothing else in this body says so. Before a draft EVERY
+   * player is un-held, so "Add him" — the honest verb for a free agent in a running season — is an
+   * act a pre-draft manager cannot make. A league with no `drafts` row has not drafted, which is the
+   * same answer `commitDraftResults` would give.
+   *
+   * Optional on the type, the rule `capsule`, `dossier` and `owner` keep: a hand-built fixture need
+   * not learn about it, and `undefined` reads as "we were not told", which the header treats as the
+   * pre-draft case rather than offering an add it cannot stand behind.
+   */
+  readonly hasDrafted?: boolean;
   /** His current designation from the harvested injuries feed ("Q", "O", "IR"), or `null` when
    *  the feed does not name him — absence means healthy as far as the source says. */
   readonly injuryDesignation: string | null;

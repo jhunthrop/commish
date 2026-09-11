@@ -50,9 +50,19 @@ test("the board is a list of people with one number each, not a table, at deskto
   await expect(first.locator('[data-testid="player-face-team"], [data-testid="avatar"]').first()).toBeVisible();
   await expect(first.getByTestId("pool-player-name")).toBeVisible();
 
-  // P2/P11: exactly one figure per row, and its caption names the rules and the span.
+  // P2/P11, and fix round 1's own H1: exactly one figure per row, it is the quantity the board is
+  // ORDERED by (points over replacement), and its caption names the replacement it is over.
   expect(await first.getByTestId("big-number").count()).toBe(1);
-  await expect(first.getByTestId("big-number")).toContainText("Projected, ");
+  await expect(first.getByTestId("big-number")).toContainText("Over a replacement ");
+
+  // The one number never contradicts the order the rows are in, measured on the rendered board.
+  const figures = await rows.locator('[data-testid="big-number"] > span:first-child').evaluateAll((nodes) => nodes.map((node) => Number(node.textContent)));
+  const ranked = figures.filter((value) => Number.isFinite(value));
+  expect(ranked.length).toBeGreaterThan(20);
+  expect(ranked, "a row shows a larger number than the row above it").toEqual([...ranked].sort((a, b) => b - a));
+
+  // The projection is not lost: it rides the facts line, at body size.
+  await expect(first).toContainText(" projected");
 
   // P10: 44px rows, the research density, with the face still present.
   const height = await first.locator("> div").first().evaluate((node) => Math.round(node.getBoundingClientRect().height));

@@ -138,13 +138,13 @@ describe("BoardView, a position with no projection", () => {
     expect(screen.getByText("A Kicker")).toBeInTheDocument();
   });
 
-  it("leaves the one number honestly absent for a row with nothing measured, and never zero", () => {
-    mount([projected({}), marketOrder({})]);
+  it("leaves the one number honestly absent for a row the drafting room has no opinion about, and never zero", () => {
+    mount([projected({}), marketOrder({ marketAdp: null })]);
     selectPosition("K");
     const row = rowFor("A Kicker");
     // A dash, never a zero, and the caption says WHY there is no number (P2, P11).
     expect(within(row).getByTestId("big-number").querySelector('[data-absent="true"]')).not.toBeNull();
-    expect(within(row).getByText(`No ${BOARD_LAST_SEASON} season`)).toBeInTheDocument();
+    expect(within(row).getByText("No ADP for him")).toBeInTheDocument();
     // The ordering must not be compared against itself, so no vs-ADP verdict is drawn at all.
     expect(row.textContent).not.toContain("drafters");
     expect(row.textContent).not.toContain("even with ADP");
@@ -158,29 +158,29 @@ describe("BoardView, a position with no projection", () => {
    * caption says so — a measured season and a projected one are different claims and never share a
    * caption.
    */
-  it("names last season as the basis of the figure, never a projection, on a market-order tab", () => {
+  it("makes ADP the one number on a market-order tab, because ADP is what orders it", () => {
     mount([projected({}), marketOrder({ lastSeason: { season: 2025, points: 148.5, games: 17, pointsPerGame: 8.7 } })]);
     selectPosition("K");
     const row = rowFor("A Kicker");
-    expect(within(row).getByText("Scored, 2025")).toBeInTheDocument();
-    expect(within(row).queryByText(/^Projected/)).not.toBeInTheDocument();
+    expect(within(row).getByText("ADP, this position's order")).toBeInTheDocument();
+    expect(within(row).queryByText(/^Over a replacement/)).not.toBeInTheDocument();
   });
 
-  it("shows the season total as the one number, with its games in the basis and its rate on the facts line", () => {
+  it("keeps last season on the facts line with its games, now that ADP is the figure", () => {
     mount([projected({}), marketOrder({ lastSeason: { season: 2025, points: 148.5, games: 17, pointsPerGame: 8.7 } })]);
     selectPosition("K");
     const row = rowFor("A Kicker");
-    expect(within(row).getByText("148.5")).toBeInTheDocument();
-    expect(within(row).getByText("Scored, 2025")).toBeInTheDocument();
-    // The caption is one line at this width, so the denominator a season total needs beside it
-    // rides the facts line rather than being dropped.
-    expect(row.textContent).toContain("17 games, 8.7 a game last season");
+    expect(within(row).getByText("130.1")).toBeInTheDocument();
+    expect(within(row).getByText("ADP, this position's order")).toBeInTheDocument();
+    // The measured season is not lost, it is on the facts line with the games it was scored over:
+    // a total without its denominator invites a seventeen-game season to be read beside a nine.
+    expect(row.textContent).toContain("148.5 last season over 17 games, 8.7 a game");
   });
 
   it("leaves the Overall tab honest: no projection for him there, and last season is not borrowed to fill it", () => {
     mount([projected({}), marketOrder({ lastSeason: { season: 2025, points: 148.5, games: 17, pointsPerGame: 8.7 } })]);
     const row = rowFor("A Kicker");
-    expect(within(row).getByText("No projection")).toBeInTheDocument();
+    expect(within(row).getByText("No value without a rank")).toBeInTheDocument();
     expect(row.textContent).not.toContain("148.5");
   });
 
@@ -192,10 +192,13 @@ describe("BoardView, a position with no projection", () => {
     expect(row.textContent).not.toContain("overall");
   });
 
-  it("still shows the ADP, which is the one number the row does carry", () => {
+  it("shows the ADP as the row's one number, and never twice", () => {
     mount([projected({}), marketOrder({})]);
     selectPosition("K");
-    expect(rowFor("A Kicker").textContent).toContain("ADP 130.1");
+    const row = rowFor("A Kicker");
+    expect(within(row).getByText("130.1")).toBeInTheDocument();
+    // Once, as the figure. Repeating it on the facts line would be the same fact in two sizes.
+    expect(row.textContent).not.toContain("ADP 130.1");
   });
 
   /**
@@ -250,13 +253,15 @@ describe("BoardView, a position with no projection", () => {
     expect(within(drawer).getByText(/injury seasons and smash seasons included, runs 210 to 340\./)).toBeInTheDocument();
   });
 
-  it("leaves every projected row with its projection and its stated basis", () => {
+  it("makes points over replacement the one number, named for the position it is over", () => {
     mount([projected({}), marketOrder({})]);
     selectPosition("WR");
     const row = rowFor("A Receiver");
-    expect(within(row).getByText("280.5")).toBeInTheDocument();
-    expect(within(row).getByText("Projected, PPR")).toBeInTheDocument();
-    expect(within(row).queryByText("No projection")).not.toBeInTheDocument();
+    // THE FIGURE IS THE QUANTITY THE BOARD IS ORDERED BY (fix round 1, H1): points over
+    // replacement, named for the position it is over. The projection rides the facts line.
+    expect(within(row).getByText("80.0")).toBeInTheDocument();
+    expect(within(row).getByText("Over a replacement WR, PPR")).toBeInTheDocument();
+    expect(row.textContent).toContain("280.5 projected");
   });
 
   /** TIERS ARE ONE-BASED (the founder-approved draft-room sheet mock: "Tier 1", "Tier 2"). The
@@ -270,6 +275,39 @@ describe("BoardView, a position with no projection", () => {
     expect(plate.dataset.grade).toBe("S");
     expect(within(plate).getByText("1")).toBeInTheDocument();
     expect(within(plate).queryByText("S")).not.toBeInTheDocument();
+  });
+  /**
+   * THE RULING THIS TEST EXISTS FOR (fix round 1, H1). The board is ordered by points over
+   * replacement, and the one number large enough to read from arm's length used to be the
+   * PROJECTION, so row 6 out-projected row 5 and a manager sweeping that column would draft against
+   * the board's own ranking. The figure is now the ordering quantity, which makes the claim
+   * testable on the RENDERED rows rather than argued about: within a position, no row's number is
+   * larger than the row above it.
+   */
+  it("never shows a row a larger number than the row above it, within a position", () => {
+    mount([
+      projected({ playerId: "w1", name: "First Receiver", valueOverReplacement: 80, projectedPoints: 255.5, positionRankInValue: 1, tier: 0 }),
+      projected({ playerId: "w2", name: "Second Receiver", valueOverReplacement: 64.2, projectedPoints: 293.6, positionRankInValue: 2, tier: 0 }),
+      projected({ playerId: "w3", name: "Third Receiver", valueOverReplacement: 51.8, projectedPoints: 240, positionRankInValue: 3, tier: 0 }),
+    ]);
+    selectPosition("WR");
+    const rows = screen.getAllByTestId("board-row");
+    const figures = rows.map((row) => Number(within(row).getByTestId("big-number").firstElementChild!.textContent));
+    expect(figures).toEqual([80, 64.2, 51.8]);
+    expect(figures, "the one number contradicts the order the board is in").toEqual([...figures].sort((a, b) => b - a));
+    // The projection is NOT monotonic in this order, which is exactly why it is on the facts line:
+    // out of order there, it says nothing about the ranking.
+    expect(rows[1]!.textContent).toContain("293.6 projected");
+  });
+
+  it("states the projection and the range in the drawer, both named", () => {
+    mount([projected({})]);
+    act(() => {
+      fireEvent.click(within(rowFor("A Receiver")).getByRole("button", { name: "why" }));
+    });
+    const drawer = screen.getByRole("dialog");
+    expect(within(drawer).getByText(/Our projection is 280.5 points under PPR\./)).toBeInTheDocument();
+    expect(within(drawer).getByText(/Most seasons land between \d+ and \d+ points\./)).toBeInTheDocument();
   });
 });
 
@@ -298,7 +336,7 @@ describe("the roster status on the board (the roster-status gate, 2026-09-08)", 
     expect(band.compareDocumentPosition(screen.getAllByTestId("board-row")[squadAt]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const squadRow = screen.getAllByTestId("board-row")[squadAt]!;
     expect(within(squadRow).getByText("Practice squad")).toBeInTheDocument();
-    expect(within(squadRow).getByText("Off a roster")).toBeInTheDocument();
+    expect(within(squadRow).getByText("No value while he is off a roster")).toBeInTheDocument();
 
     const csv = boardCsvLines([notOnActiveRoster({}), projected({})], SHAPE, "PPR");
     expect(csv).toHaveLength(2);

@@ -168,21 +168,24 @@ function lastSeasonSentence(row: BoardRow): string {
  * than being dropped: it is the second thing a veteran asks after the projection, and the drawer is
  * where the board already answers "why".
  *
- * The convention is the founder's own (2026-09-04): the p25-p75 band leads as "most seasons", the
- * honest p10-p90 rides behind it as the tails. A row with no projection has no band and says so by
+ * IT ALSO STATES THE PROJECTION (fix round 1, H1), because the row's own big number is the board's
+ * ranking key now and the projection had to land somewhere it is named in full. The convention for
+ * the band is the founder's own (2026-09-04): the p25-p75 band leads as "most seasons", the honest
+ * p10-p90 rides behind it as the tails. A row with no projection has no band and says so by
  * rendering nothing at all.
  */
-function RangeSentence({ row }: { readonly row: BoardRow }) {
+function RangeSentence({ row, scoringLabel }: { readonly row: BoardRow; readonly scoringLabel: string }) {
   if (row.medianPoints === null || row.floorPoints === null || row.ceilingPoints === null) return null;
   const { p25, p75 } = quartilesFromSeasonBand(row.medianPoints, row.floorPoints, row.ceilingPoints);
   return (
     <p className="text-sm text-text-muted">
+      {row.projectedPoints === null ? "" : `Our projection is ${row.projectedPoints.toFixed(1)} points under ${scoringLabel}. `}
       {`Most seasons land between ${p25.toFixed(0)} and ${p75.toFixed(0)} points. The full range, injury seasons and smash seasons included, runs ${row.floorPoints.toFixed(0)} to ${row.ceilingPoints.toFixed(0)}.`}
     </p>
   );
 }
 
-function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDrawerState; readonly laws: readonly Law[]; readonly onClose: () => void }) {
+function EvidenceDrawer({ state, laws, scoringLabel, onClose }: { readonly state: EvidenceDrawerState; readonly laws: readonly Law[]; readonly scoringLabel: string; readonly onClose: () => void }) {
   // Fix 3 (board persona review, 2026-09-04): the retired "Strongest law" column's own sentence
   // opens the drawer instead, built from the SAME grouped-outlook machinery the Outlook already
   // renders (`groupReasons`/`lawGroupLabel`) — one voice product-wide, never a second phrasing.
@@ -206,7 +209,7 @@ function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDraw
           </div>
         </div>
         {strongest === null ? null : <p className="text-base font-medium text-text-primary">{strongest}</p>}
-        <RangeSentence row={state.row} />
+        <RangeSentence row={state.row} scoringLabel={scoringLabel} />
         {isMarketOrder ? (
           <MarketOrderBody row={state.row} />
         ) : state.row.reasons.length === 0 ? (
@@ -226,28 +229,29 @@ function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDraw
 }
 
 /**
- * THE ONE NUMBER THIS ROW GETS, AND WHAT IT IS (P2, P11) — a `BigNumber`'s value and its basis
- * caption, decided once here so the row, the CSV and the drawer can never disagree about which
- * claim the figure is making.
+ * THE ONE NUMBER THIS ROW GETS IS THE QUANTITY THE BOARD IS ORDERED BY (P2, P11, and fix round 1's
+ * own H1). It used to be the projection while the list was ordered by points over replacement, so
+ * row six out-projected row five and a manager sweeping the only column large enough to read from
+ * arm's length would draft against the board's own ranking. A ranked list whose big number is not
+ * its ranking key is a list that argues with itself.
  *
- * THREE DIFFERENT CLAIMS, never blended and never sharing a caption:
- * - the **auction value**, while the $ board is on: a dollar figure under a stated league shape;
- * - what he **measurably scored last season**, on the tabs the engine publishes no projection for
- *   (a kicker, a team defense — `KDEF_DECISION`), with the games it was scored over in the caption
- *   because a total without its denominator invites a seventeen-game season to be read beside a
- *   nine-game one;
- * - his **projected season total** everywhere else, under the scoring the selector names.
+ * THREE ORDERINGS, THREE FIGURES, each naming its own basis and never sharing a caption:
+ * - the **auction value** while the $ board is on, because that view re-sorts by dollars;
+ * - the **ADP** on the tabs the engine publishes no projection for (a kicker, a team defense —
+ *   `KDEF_DECISION`), because the drafting room's own order is the only order those rows have;
+ * - **points over replacement** everywhere else, named for the position it is over, because that
+ *   is what `boardRows` ranks by and what makes a receiver comparable to a back at all.
  *
- * A `null` value prints a dash and the caption says why (never a zero, never a borrowed number).
+ * The projection is not lost: it rides the facts line (`BoardMeta`) and the why drawer, where being
+ * out of order says nothing about the ranking. The CSV keeps both columns, unchanged.
  *
  * EVERY CAPTION IS ONE LINE AT THE ROW FIGURE'S OWN WIDTH, and that is a measured constraint, not a
  * preference: `BigNumber size="sm"` caps its caption at 6.5rem, a second line costs 13px, and a
- * 44px research row (`TOKENS.density.denseRowPx`) has none to give. So the caption names the RULES
- * ("Projected, PPR") and the span rides the screen around it — the scoring selector is two inches
- * above the list and the basis card beside it names the board's season. The one number a caption
- * cannot carry alone is a season total's denominator, which is why the games count moved onto the
- * facts line: a total without the games it was scored over invites a seventeen-game season to be
- * compared with a nine-game one.
+ * 44px research row (`TOKENS.density.denseRowPx`) has none to give. So a caption names the RULES
+ * and the span rides the screen around it — the scoring selector is two inches above the list and
+ * the basis line beside it names the board's season.
+ *
+ * A `null` value prints a dash and the caption says why (never a zero, never a borrowed number).
  */
 function figureFor(
   row: BoardRow,
@@ -259,12 +263,13 @@ function figureFor(
       : { value: `$${options.dollarValue}`, basis: "Auction value" };
   }
   if (options.showLastSeason) {
-    const last = row.lastSeason;
-    return last === null ? { value: null, basis: `No ${BOARD_LAST_SEASON} season` } : { value: last.points.toFixed(1), basis: `Scored, ${last.season}` };
+    return row.marketAdp === null
+      ? { value: null, basis: "No ADP for him" }
+      : { value: row.marketAdp.toFixed(1), basis: "ADP, this position's order" };
   }
-  return row.projectedPoints === null
-    ? { value: null, basis: row.rosterStatus?.excluded === true ? "Off a roster" : "No projection" }
-    : { value: row.projectedPoints.toFixed(1), basis: `Projected, ${options.scoringLabel}` };
+  return row.valueOverReplacement === null
+    ? { value: null, basis: row.rosterStatus?.excluded === true ? "No value while he is off a roster" : "No value without a rank" }
+    : { value: row.valueOverReplacement.toFixed(1), basis: `Over a replacement ${row.position}, ${options.scoringLabel}` };
 }
 
 /**
@@ -276,7 +281,7 @@ function figureFor(
  * The reach case is NEVER red. Red implies a bad player and this number never meant that — see
  * `vsMarketLabel`'s own docblock, whose ruling this renders.
  */
-function BoardMeta({ row, showLastSeason }: { readonly row: BoardRow; readonly showLastSeason: boolean }) {
+function BoardMeta({ row, showLastSeason, scoringLabel }: { readonly row: BoardRow; readonly showLastSeason: boolean; readonly scoringLabel: string }) {
   const edge = row.marketAdp === null || row.overallRank === null ? null : row.marketAdp - row.overallRank;
   const vsMarket = vsMarketLabel(edge);
   const last = row.lastSeason;
@@ -284,14 +289,19 @@ function BoardMeta({ row, showLastSeason }: { readonly row: BoardRow; readonly s
     <>
       {row.team}
       {row.byeWeek === null ? "" : ` · bye ${row.byeWeek}`}
-      {showLastSeason && last !== null ? ` · ${last.games} games, ${last.pointsPerGame.toFixed(1)} a game last season` : ""}
-      {row.marketAdp === null ? "" : ` · ADP ${row.marketAdp.toFixed(1)}`}
+      {/* THE PROJECTION LIVES HERE NOW (fix round 1, H1). It is a real fact about the player and it
+          is not the board's ranking key, so it sits at body size on the facts line where being out
+          of order down the list says nothing about the order. */}
+      {showLastSeason || row.projectedPoints === null ? "" : ` · ${row.projectedPoints.toFixed(1)} projected`}
+      {showLastSeason && last !== null ? ` · ${last.points.toFixed(1)} last season over ${last.games} games, ${last.pointsPerGame.toFixed(1)} a game` : ""}
+      {showLastSeason || row.marketAdp === null ? "" : ` · ADP ${row.marketAdp.toFixed(1)}`}
       {vsMarket === null ? null : (
         <>
           {" · "}
           <span className={vsMarket.tone === "positive" ? "font-semibold text-positive" : undefined}>{vsMarket.text}</span>
         </>
       )}
+      <span className="sr-only">{`, ${row.projectedPoints === null ? "no projection" : `projected ${row.projectedPoints.toFixed(1)} points`} under ${scoringLabel}.`}</span>
     </>
   );
 }
@@ -306,6 +316,13 @@ export interface BoardViewProps {
   /** "PPR", "Half PPR" or "Standard": the scoring every projected number on these rows is under,
    *  named in the export's own column (the scoring-formats round). */
   readonly scoringLabel: string;
+  /**
+   * A NAME TO OPEN ON (`?q=`, fix round 1's own M2). The player page's pre-draft verb links here
+   * with the player he was about, and a link that lands a manager at the top of three hundred rows
+   * has not taken him to that player. It seeds the search field's INITIAL value and nothing more:
+   * the field is his from the first keystroke, and no later render pushes this back into it.
+   */
+  readonly openOn?: string;
 }
 
 /**
@@ -315,9 +332,9 @@ export interface BoardViewProps {
  * `?league=`, since that is what changes the recomputed value/tier numbers). CSV export reads the
  * exact rows on screen.
  */
-export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLabel }: BoardViewProps) {
+export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLabel, openOn = "" }: BoardViewProps) {
   const [position, setPosition] = useState("ALL");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(openOn);
   const [rookiesOnly, setRookiesOnly] = useState(false);
   const [dollarView, setDollarView] = useState(false);
   const [drawer, setDrawer] = useState<EvidenceDrawerState | null>(null);
@@ -462,7 +479,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
                 player={toPlayer(row)}
                 lead={leadingRank ?? NOT_STARTED_DASH}
                 positionRank={row.positionRankInValue ?? undefined}
-                meta={<BoardMeta row={row} showLastSeason={showLastSeason} />}
+                meta={<BoardMeta row={row} showLastSeason={showLastSeason} scoringLabel={scoringLabel} />}
                 chips={row.rosterStatus === null ? null : <RosterStatusPill note={row.rosterStatus} />}
                 figure={<BigNumber value={figure.value} basis={figure.basis} size="sm" />}
                 action={
@@ -484,7 +501,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
           sentence, and a legend for columns that no longer exist would be explaining the furniture.
           The market-order note above survives because it is a MEASUREMENT that came back empty, not
           a description of the screen. */}
-      {drawer === null ? null : <EvidenceDrawer state={drawer} laws={laws} onClose={() => setDrawer(null)} />}
+      {drawer === null ? null : <EvidenceDrawer state={drawer} laws={laws} scoringLabel={scoringLabel} onClose={() => setDrawer(null)} />}
     </div>
   );
 }

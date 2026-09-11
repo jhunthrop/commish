@@ -60,16 +60,36 @@ export function heroNumberFor(body: PlayerSeasonBody): { readonly value: string 
 const RING = { you: "self", rival: "rival", other: undefined } as const;
 
 /**
- * THE ONE THING YOU CAN DO WITH HIM FROM HERE (P3) — decided by who holds him, because that is what
- * changes the act. `null` in a mock room, where the roster fact is a bot's and the verbs it would
- * offer are about a room that does not exist the way a real league does (the same gate
- * `identityLine` keeps on the sentence beside it).
+ * THE ONE THING YOU CAN DO WITH HIM FROM HERE (P3) — decided by the league's STATE and by who holds
+ * him, because those two together are what change the act. Four answers and each is the honest one:
+ *
+ * - **before the league has drafted**: the board, with his name already in its search. Every player
+ *   is un-held before a draft, so the first cut of this offered "Add him" to a manager who cannot
+ *   add anybody yet (fix round 1, M2). What he can actually do about a player in August is study
+ *   him against the board, which is the surface this product is proudest of.
+ * - **in season, un-held**: "Add him", to the wire.
+ * - **in season, held by you**: NOTHING SOLID. There is nothing to do about a player you already
+ *   have from HIS own page, and a loud pill that merely navigates elsewhere is the second call to
+ *   action P3 rules out. The header states the fact as a quiet chip instead.
+ * - **in season, held by somebody else**: a trade, offered to him by his own first name.
+ *
+ * `null` in a mock room too, where the roster fact is a seeded bot's and every verb it would offer
+ * is about a room that does not exist the way a real league does (the same gate the roster sentence
+ * beside it keeps).
+ *
+ * `hasDrafted` ABSENT READS AS NOT YET, never as "go ahead": a body nobody told is a body we cannot
+ * stand behind an add for.
  */
 export function verbFor(body: PlayerSeasonBody, leagueId: string): { readonly label: string; readonly href: string } | null {
   if (body.isMockLeague) return null;
+  if (body.hasDrafted !== true) {
+    // `q` seeds the board's own search, so he is on screen when it opens rather than somewhere in
+    // three hundred rows. `league` is this league, so the numbers are computed under its rules.
+    return { label: "Open the board", href: `/app/draft/board?league=${encodeURIComponent(leagueId)}&q=${encodeURIComponent(body.player.name).replace(/%20/g, "+")}` };
+  }
   const owner = body.owner ?? null;
   if (owner === null) return { label: "Add him", href: `/app/leagues/${leagueId}/players` };
-  if (owner.relation === "you") return { label: "Set your lineup", href: `/app/leagues/${leagueId}/team` };
+  if (owner.relation === "you") return null;
   const firstName = owner.managerName.trim().split(/\s+/)[0] ?? owner.managerName;
   return { label: `Offer ${firstName} a trade`, href: `/app/leagues/${leagueId}/trades` };
 }
@@ -143,6 +163,11 @@ export function PlayerHeader({ body, leagueId, depth, trailing }: PlayerHeaderPr
         <BigNumber value={hero.value} basis={hero.basis} size={depth === "peek" ? "lg" : "xl"} align="start" className="sm:items-end sm:text-right" />
         <div className="flex w-full items-center justify-between gap-4 sm:w-auto sm:justify-end">
           {trailing}
+          {/* HE IS ALREADY YOURS, SO THERE IS NO VERB (P3) — the fact, in the amber that means you,
+              at chip size. It is not a control and never pretends to be one. */}
+          {verb === null && (body.owner?.relation ?? null) === "you" ? (
+            <span className="rounded-pill bg-self-glow px-3 py-1 text-sm font-semibold text-self-ink">Your player</span>
+          ) : null}
           {verb === null ? null : (
             // ONE SOLID PILL PER VIEWPORT (P3). It is a navigation to where the act happens, so it
             // is `ButtonLink` — the anchor form of the one class map — never a `Link` wearing a

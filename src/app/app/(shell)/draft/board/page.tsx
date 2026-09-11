@@ -126,13 +126,15 @@ export default async function BoardPage({ searchParams }: PageProps) {
             nothing else: the sentence that used to follow it ("Pick a league above to see it
             computed under that league's exact rules") explained the control an inch to its left,
             which is exactly the explainer text P7 rules out. The control says it by being there. */}
-        <p className="text-sm text-text-muted">
-          {isGeneric
-            ? `${resolved.basisLine}, a 12-team standard roster.`
-            : selected === null
-              ? null
-              : `Under ${selected.leagueName}'s rules: ${selected.teamCount} teams, its own roster shape. ${resolved.basisLine}.${resolved.note === null ? "" : ` ${resolved.note}`}`}
-        </p>
+        {/* One line, or no line at all. An empty paragraph is furniture with nothing inside it, and
+            this one used to render for a reader whose league we could not name (fix round 1, LOW). */}
+        {isGeneric ? (
+          <p className="text-sm text-text-muted">{`${resolved.basisLine}, a 12-team standard roster.`}</p>
+        ) : selected === null ? null : (
+          <p className="text-sm text-text-muted">
+            {`Under ${selected.leagueName}'s rules: ${selected.teamCount} teams, its own roster shape. ${resolved.basisLine}.${resolved.note === null ? "" : ` ${resolved.note}`}`}
+          </p>
+        )}
       </div>
 
       <BoardView
@@ -140,6 +142,7 @@ export default async function BoardPage({ searchParams }: PageProps) {
         laws={laws}
         auctionShape={auctionShape}
         scoringLabel={resolved.label}
+        openOn={typeof params.q === "string" ? params.q : ""}
         exportFilename={`board-${selected?.leagueId ?? `generic-${resolved.format}`}.csv`}
       />
     </div>
