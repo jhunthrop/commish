@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
-import { PublicBar } from "@/components/app-shell/public-bar";
+import { PublicBar, STOREFRONT_NAV } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import { invitePreview } from "@/league-service/invites";
 import { formatUsd } from "@/money/config";
@@ -88,7 +88,10 @@ export default async function JoinPage({ params }: PageProps) {
 
   return (
     <>
-      {user === null ? <PublicBar intent={pageIntent} signedIn={false} /> : null}
+      {/* `STOREFRONT_NAV` (fix round 3), for the same reason the seat-hold room now carries it:
+          this landing rendered a nav-less bar over a footer, so somebody following an invite
+          link had one door into the rest of the product and it was the wordmark. */}
+      {user === null ? <PublicBar intent={pageIntent} signedIn={false} nav={STOREFRONT_NAV} /> : null}
       {/* FULL-BLEED FRAME, MEASURED CONTENT (`docs/design-system.md`, "Layout"): the terms
           ledger keeps its own measure inside `InviteLanding`, and the strip at the foot runs
           edge to edge, the way a lower third is meant to. It was a 672px column centred in a
