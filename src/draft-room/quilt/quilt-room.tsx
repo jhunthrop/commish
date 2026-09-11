@@ -75,6 +75,9 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   const [boardView, setBoardView] = useState<BoardView>("wall");
   useRoomKeys(dispatch);
   const desktop = useMediaQuery(QUILT_CONFIG.desktopStageQuery);
+  // A finger has no hover: on a coarse pointer the rows' Draft shows at rest (the roots carry
+  // `data-pointer`, and the reveal wrappers read it through `group-data`).
+  const coarsePointer = useMediaQuery(QUILT_CONFIG.coarsePointerQuery);
   const [phone, setPhone] = useState<PhoneSurface>(RESTING_PHONE);
   const onPhone = useCallback((patch: Partial<PhoneSurface>) => setPhone((held) => ({ ...held, ...patch })), []);
 
@@ -244,6 +247,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           advisor={advisor}
           nextPickLabel={nextPickLabel}
           available={available}
+          coarsePointer={coarsePointer}
           railCall={railCall}
           rosterSheet={rosterSheet}
         />
@@ -256,7 +260,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
       <div className="px-4">
         <ConnectionBanner connection={room.connection} />
       </div>
-      <div data-testid="quilt-room" className="flex min-h-0 flex-1 flex-col">
+      <div data-testid="quilt-room" data-pointer={coarsePointer ? "coarse" : "fine"} className="group/room flex min-h-0 flex-1 flex-col">
         <TopStrip leagueName={room.leagueName} view={view} teams={room.teams} myTeamId={room.myTeamId} myTurn={myTurn} hiddenNew={hiddenNew} onOpenStream={streamWidth === "hidden" ? () => onStreamWidth("open") : null} />
         <div className="relative flex min-h-0 flex-1 gap-3 px-3 pb-2 pt-3">
           <BoardRegion view={boardView} onView={setBoardView} caption={wallCaption}>

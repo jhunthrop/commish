@@ -7,7 +7,7 @@ import { Button } from "@/components/ui";
 import { useReusedValue } from "@/design/use-stable-list";
 import type { CheatSheet } from "../state/sheet";
 import { buildSheetColumns, movesOffBoard, reuseSheetColumns, type SheetColumnKey } from "../state/sheet-columns";
-import { oddsBasis } from "./dock-call";
+import { oddsBasis } from "../../advisor/format";
 import type { RoomActs } from "./room-acts";
 import { SheetColumn } from "./sheet-column";
 

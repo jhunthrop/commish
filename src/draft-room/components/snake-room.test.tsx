@@ -245,6 +245,19 @@ describe("SnakeRoom (Sideline)", () => {
     await waitFor(() => expect(surface.getByTestId("room-stream")).toBeInTheDocument());
   });
 
+  it("says which pointer the room has, so a finger sees the rows' Draft at rest and a mouse does not", () => {
+    // The two media queries the room asks: the stage width and the pointer kind.
+    vi.mocked(useMediaQuery).mockImplementation((query: string) => query === QUILT_CONFIG.desktopStageQuery || query === QUILT_CONFIG.coarsePointerQuery);
+    const { unmount } = renderRoom();
+    expect(screen.getByTestId("quilt-room")).toHaveAttribute("data-pointer", "coarse");
+    const pool = within(desktop().getByRole("list", { name: "Available players, best first" }));
+    expect(pool.getAllByTestId("pool-draft-reveal")[0]!.className).toContain("group-data-[pointer=coarse]/room:inline-flex");
+    unmount();
+    vi.mocked(useMediaQuery).mockImplementation((query: string) => query === QUILT_CONFIG.desktopStageQuery);
+    renderRoom();
+    expect(screen.getByTestId("quilt-room")).toHaveAttribute("data-pointer", "fine");
+  });
+
   it("queues from a pool row through room.setQueue", async () => {
     const setQueue = vi.fn(async () => ({ ok: true as const }));
     renderRoom({ queue: [], setQueue, view: { ...room.view!, onClockTeamId: "t2", upcoming: ["t2", "t1"] } });

@@ -7,6 +7,7 @@ import type { DraftStateView } from "@/draft-engine";
 import type { AdvisorView } from "@/draft-service/assistant/view";
 import { BigNumber, Button, PlayerFace, PositionBadge } from "@/components/ui";
 import { pickLabel } from "@/domain/pick-label";
+import { oddsBasis } from "../../advisor/format";
 import { rosterFillRows } from "../../state/roster-fill";
 import type { RoomActs } from "./room-acts";
 
@@ -77,11 +78,6 @@ function fillChips(view: DraftStateView, myTeamId: string | null): readonly { re
 }
 
 const SLOT_WORD: Partial<Record<RosterSlotType, string>> = { DEF: "D/ST" };
-
-/** The figure's basis: the runs and the pick they still have him at, or why there is no number. */
-export function oddsBasis(runs: number | null, nextPickLabel: string | null): string {
-  return runs === null || nextPickLabel === null ? "no runs yet" : `of ${runs} runs, still there at ${nextPickLabel}`;
-}
 
 /**
  * OUR CALL BESIDE THE VERB (founder ruling 3, 2026-09-10): the advice sits with the action

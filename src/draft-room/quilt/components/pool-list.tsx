@@ -8,7 +8,7 @@ import { useStableList } from "@/design/use-stable-list";
 import { PlayerName } from "@/league-room/components/player-peek";
 import { DRAFT_ROOM_CONFIG } from "../../state/config";
 import { positionRanks } from "../../lib/tiers";
-import { oddsBasis } from "./dock-call";
+import { oddsBasis, ofRuns } from "../../advisor/format";
 import { PoolFilterEmpty, PoolFilterRow, usePoolFilter } from "./pool-filter";
 import type { RoomActs } from "./room-acts";
 
@@ -69,7 +69,7 @@ const PoolRow = memo(function PoolRow({ leagueId, item, queued, nextPickLabel, c
         }
         figure={
           nextPickLabel === null || runs === null ? null : (
-            <BigNumber size="sm" value={survived === undefined ? null : String(survived)} basis={survived === undefined ? "no runs yet" : oddsBasis(runs, nextPickLabel)} className="group-data-[recomputing=true]/pool:opacity-60" />
+            <BigNumber size="sm" value={survived === undefined ? null : String(survived)} basis={survived === undefined ? "no runs yet" : ofRuns(runs)} className="group-data-[recomputing=true]/pool:opacity-60" />
           )
         }
         action={
@@ -82,7 +82,7 @@ const PoolRow = memo(function PoolRow({ leagueId, item, queued, nextPickLabel, c
             {canDraft ? (
               // The reveal lives on a wrapper: `hidden` on the button itself would lose to the
               // button's own `inline-flex` in the stylesheet's order.
-              <span data-testid="pool-draft-reveal" className="hidden group-focus-within/row:inline-flex group-hover/row:inline-flex">
+              <span data-testid="pool-draft-reveal" className="hidden group-focus-within/row:inline-flex group-hover/row:inline-flex group-data-[pointer=coarse]/room:inline-flex">
                 <Button size="sm" variant="secondary" disabled={submitting} aria-label={`Draft ${player.name}`} onClick={() => onDraft(player.id)}>
                   Draft
                 </Button>
@@ -122,6 +122,13 @@ export function PoolList({ leagueId, players, available, byeWeeks, odds, nextPic
   return (
     <div id="player-pool" data-testid="pool-list" data-recomputing={recomputing ? "true" : "false"} className="group/pool flex min-h-0 flex-1 flex-col gap-1.5">
       <PoolFilterRow filter={filter} searchRef={searchRef}>
+        {/* The figures' basis, stated once for the list so a row's caption stays "of 200" and
+            never wraps inside its column at 360 (fix round 2). */}
+        {runs === null || nextPickLabel === null ? null : (
+          <span data-testid="pool-basis" className="text-xs text-text-faint">
+            {oddsBasis(runs, nextPickLabel)}
+          </span>
+        )}
         <span data-testid="pool-recomputing" data-active={recomputing ? "true" : "false"} aria-hidden={!recomputing} className={`text-xs text-text-faint ${recomputing ? "" : "invisible"}`}>
           updating
         </span>

@@ -34,6 +34,14 @@ async function openSoloRoom(page: Page): Promise<string> {
   return body.data.draftId;
 }
 
+/** The first pool row's caption under its figure stands on one line (fix round 2). */
+async function expectOneLineCaption(page: Page): Promise<void> {
+  const caption = page.getByTestId("pool-row").first().getByTestId("big-number").locator("span").last();
+  const box = (await caption.boundingBox())!;
+  const lineHeight = await caption.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+  expect(box.height, "the pool row's caption wraps").toBeLessThanOrEqual(lineHeight * 1.5);
+}
+
 /** Every visible solid Court blue pill: P3 allows one per viewport. */
 async function solidPillCount(page: Page): Promise<number> {
   return page.evaluate(() =>
@@ -68,6 +76,7 @@ test("the wall, the rail, the dock's one verb, your sheet, and a pick landing as
   await expect(verb).toHaveText(/^Draft .+/);
   expect(await solidPillCount(managerA)).toBe(1);
   await expect(managerA.getByTestId("dock-call").getByTestId("big-number")).toBeVisible();
+  await expectOneLineCaption(managerA);
   // A pool row's Draft reveals on hover only (review H3): at rest the viewport holds one verb.
   const firstPoolRow = managerA.getByTestId("pool-row").first();
   await expect(firstPoolRow.getByRole("button", { name: /^Draft / })).toBeHidden();
@@ -129,6 +138,7 @@ test("the phone keeps the stream as the screen, pins the one verb, and never scr
   // P10: the page never scrolls sideways at the product's minimum viewport.
   const scroll = await managerA.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
   expect(scroll[0], "the phone room scrolls sideways").toBeLessThanOrEqual(scroll[1]! + 1);
+  await expectOneLineCaption(managerA);
   await managerA.waitForTimeout(400);
   await managerA.screenshot({ path: `${OUT_DIR}/draft-room-wall-phone-${theme}.png`, fullPage: false });
 

@@ -27,6 +27,8 @@ export const QUILT_CONFIG = {
    *  and phone compositions split on. Only the matching composition mounts (fluidity round,
    *  2026-09-10); before it, both trees rendered and the hidden one did all the same work. */
   desktopStageQuery: "(min-width: 64rem)",
+  /** A finger has no hover: on a coarse pointer a row's Draft shows at rest (fix round 2). */
+  coarsePointerQuery: "(pointer: coarse)",
   /** The grabber's drag threshold: a pointer that travels less than this is a tap (space's own
    *  toggle), anything longer is one honest step up or down the heights. */
   drawerDragThresholdPx: 12,

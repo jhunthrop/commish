@@ -83,7 +83,7 @@ export const SheetRow = memo(function SheetRow({ row, top, column, onMove, onDra
       ) : (
         <span className="flex items-center justify-end">
           <span className="group-focus-within:hidden group-hover:hidden group-data-[recomputing=true]/sheet:opacity-60">{runs === null || survived === undefined ? <span className="text-[11px] text-text-faint">–</span> : <OddsFigure survived={survived} runs={runs} form="count" />}</span>
-          <span className="hidden items-center gap-0.5 group-focus-within:flex group-hover:flex">
+          <span className="hidden items-center gap-0.5 group-focus-within:flex group-hover:flex group-data-[pointer=coarse]/room:flex">
             {onMove === null ? null : (
               <>
                 <Button size="sm" variant="ghost" disabled={first} aria-label={`Move ${player.name} up your sheet`} onClick={() => onMove(player.id, -1)}>

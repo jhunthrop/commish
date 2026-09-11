@@ -56,6 +56,8 @@ export interface PhoneRoomProps {
   readonly advisor: UseAdvisorResult;
   readonly nextPickLabel: string | null;
   readonly available: ReadonlySet<string>;
+  /** True on a coarse pointer: rows show their Draft at rest, since a finger has no hover. */
+  readonly coarsePointer: boolean;
   readonly railCall: RailCall | null;
   readonly rosterSheet: ReactNode;
 }
@@ -71,7 +73,7 @@ const BOARD_HEIGHT: Readonly<Record<BoardView, string>> = { wall: "h-[24rem]", s
  * the one Draft verb ride a block fixed at the foot, always in reach. Picking is two-step by
  * law (the confirm sheet), then the same undo window the desktop gets.
  */
-export function PhoneRoom({ room, view, playersById, myTurn, acts, pending, onUndo, phone, onPhone, boardView, board, peekFacts, peekHistory, onNote, byeWeeks, sheetRanks, advisor, nextPickLabel, available, railCall, rosterSheet }: PhoneRoomProps) {
+export function PhoneRoom({ room, view, playersById, myTurn, acts, pending, onUndo, phone, onPhone, boardView, board, peekFacts, peekHistory, onNote, byeWeeks, sheetRanks, advisor, nextPickLabel, available, coarsePointer, railCall, rosterSheet }: PhoneRoomProps) {
   const setConfirmId = useCallback((next: string | null) => onPhone({ confirmId: next }), [onPhone]);
   const setPeekId = useCallback((next: string | null) => onPhone({ peekId: next }), [onPhone]);
   // Two-step picking: every Draft on this tree opens the confirm sheet; only its Confirm hands the
@@ -81,7 +83,7 @@ export function PhoneRoom({ room, view, playersById, myTurn, acts, pending, onUn
   const noop = useCallback(() => {}, []);
 
   return (
-    <div data-testid="phone-room" className="relative flex min-h-0 flex-1 flex-col gap-3 pb-44">
+    <div data-testid="phone-room" data-pointer={coarsePointer ? "coarse" : "fine"} className="group/room relative flex min-h-0 flex-1 flex-col gap-3 pb-44">
       <TopStrip leagueName={room.leagueName} view={view} teams={room.teams} myTeamId={room.myTeamId} myTurn={myTurn} hiddenNew={0} onOpenStream={null} />
       <div className={`flex ${BOARD_HEIGHT[boardView]} shrink-0 flex-col px-3`}>{board}</div>
       <div className="px-3">
