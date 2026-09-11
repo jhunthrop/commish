@@ -1,6 +1,7 @@
+import type { HeadToHeadRecord } from "@/league";
 import type { WeekStatus } from "@/league/week-status";
 import type { LeagueMemberCard, MatchupDetail, MatchupSide } from "../contract";
-import { formatPoints, formatWeek } from "./format";
+import { firstNameOf, formatPoints, formatWeek } from "./format";
 
 export interface RivalOwner {
   readonly name: string;
@@ -55,6 +56,43 @@ function figureFor(side: MatchupSide, matchup: MatchupDetail, weekStatus: WeekSt
   const projected = projectedTotal(side, projections);
   if (projected !== null) return { value: formatPoints(projected), basis: `projected, ${week}` };
   return { value: null, basis: `no projection yet, ${week}` };
+}
+
+/** The head-to-head line and what it covers, or `null` when there is nothing true to say. */
+export interface HeadToHeadLine {
+  readonly text: string;
+  readonly basis: string;
+}
+
+/** "4 and 1", and "4 and 1 and 1" when the two of you have tied one. */
+function recordWords({ wins, losses, ties }: HeadToHeadRecord): string {
+  return ties === 0 ? `${wins} and ${losses}` : `${wins} and ${losses} and ${ties}`;
+}
+
+/** "2026 season" for one, "2023 to 2026" for a history that spans several. */
+function seasonsWords(seasons: readonly number[]): string {
+  const first = seasons[0];
+  const last = seasons[seasons.length - 1];
+  if (first === undefined || last === undefined) return "";
+  return first === last ? `${first} season` : `${first} to ${last}`;
+}
+
+/**
+ * WHAT HAS HAPPENED BETWEEN THE TWO OF YOU (P6: "the history between the two of you is one tap
+ * away and stated in plain numbers"). Said the way a manager says it — "You are 4 and 1 against
+ * Rey", his first name, not his row label — with the seasons it covers as its basis, because every
+ * number on this product names its basis in the same view (P11).
+ *
+ * `null` when the two of you have never settled a game, and the card renders NOTHING rather than
+ * "0 and 0": a zero record looks like data and is really the absence of any. Also `null` for a
+ * record whose own season list is empty, which is the same absence arriving by a different route.
+ */
+export function headToHeadLine(record: HeadToHeadRecord | null, opponentName: string): HeadToHeadLine | null {
+  if (record === null) return null;
+  if (record.wins + record.losses + record.ties === 0) return null;
+  const seasons = seasonsWords(record.seasons);
+  if (seasons === "") return null;
+  return { text: `You are ${recordWords(record)} against ${firstNameOf(opponentName)}`, basis: `settled games, ${seasons}` };
 }
 
 /** Your game this week as two people, or `null` when you have no game (a bye, the playoffs

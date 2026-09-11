@@ -190,6 +190,7 @@ export const ROOM_DATA: RoomData = {
   pendingClaims: [],
   activityRows: [],
   eventReactions: new Map(),
+  headToHead: new Map(),
   activityNextBefore: null,
   activityNotices: [],
   presentUserIds: [],

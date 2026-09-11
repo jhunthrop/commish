@@ -29,6 +29,7 @@ function props(overrides: Partial<RoomFrontProps> = {}): RoomFrontProps {
     projectionsByPlayerId: new Map(),
     activityRows: [],
     eventReactions: new Map(),
+    headToHead: new Map(),
     grades: [],
     gradesBasis: "",
     present: new Set(["u1", "u2"]),

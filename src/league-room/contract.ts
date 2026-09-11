@@ -9,7 +9,7 @@ import type { HelpLevel } from "@/identity/preferences";
 import type { FixtureLabel } from "@/league-service/nfl-schedule";
 import type { PendingWaiverClaim } from "@/league-service/claims-contract";
 import type { ActivityFeedRow } from "@/integrity-service/activity";
-import type { LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
+import type { HeadToHeadRecord, LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
 import type { LeagueAuthority } from "@/league-service/authority";
 import type { CompositionCategory } from "@/participation/composition";
 import type { TeamGrade } from "@/draft-service/grades/engine";
@@ -705,6 +705,15 @@ export interface RoomData {
    * spelled. `useStreamReactions` seeds itself with this and folds live frames onto it.
    */
   readonly eventReactions: ReadonlyMap<string, readonly EventReactionView[]>;
+  /**
+   * SIDELINE (P6): the VIEWER'S OWN settled history against each opponent, keyed by that
+   * opponent's team id, so the rival card can say "You are 4 and 1 against Rey" with the seasons
+   * it covers. Computed from a whole-league read the room shares (`headToHeadRecords`) and
+   * narrowed to this viewer by `recordsForTeam` before it crosses the wire. An opponent you have
+   * never settled a game against has NO KEY here rather than a `0 and 0`: absence renders as
+   * absence, and a zero record would render as data.
+   */
+  readonly headToHead: ReadonlyMap<string, HeadToHeadRecord>;
   /**
    * SIDELINE (P5): the members holding a live connection to this league at render time, as the
    * server itself recorded them (`GET /api/leagues/[leagueId]/presence`, the same read). Ids

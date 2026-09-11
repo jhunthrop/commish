@@ -8,6 +8,19 @@ export function formatPoints(points: number): string {
 }
 
 /**
+ * What a leaguemate is called out loud. "Rey Moreno" is a row label; "Rey" is how the room talks
+ * about him ("You are 4 and 1 against Rey", "Rey and Dana are here", "Offer Rey a trade"), which is
+ * P7's whole rule about saying it the way a friend in the group chat would.
+ *
+ * One copy, here, because there were three: `who-is-here.tsx`, `player-header.tsx` and the rival
+ * card's own head-to-head line. A single-word display name is already its own first name, and a
+ * blank one falls back to what it was given rather than to an empty string.
+ */
+export function firstNameOf(name: string): string {
+  return name.trim().split(/\s+/)[0] || name;
+}
+
+/**
  * THE NUMBER FORMATTERS LIVE IN THE UI LAYER (review, MINOR) and are re-exported here: the shared
  * primitives under `components/ui` need them too (a reason chip states a law's effect to one
  * decimal), and they may not import from a feature folder. One definition, both layers, and every

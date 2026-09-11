@@ -7,6 +7,8 @@ import { leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId, fixtu
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 import { pendingWaiverClaims } from "@/league-service/claims";
 import { reactionsForEvents } from "@/league-service/event-reactions";
+import { cachedHeadToHeadRecords, recordsForTeam } from "@/league-service/head-to-head";
+import { getHeadToHeadCache } from "@/league-service/head-to-head-cache-instance";
 import { listTrades } from "@/league-service/trades";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import type { CurrentUser } from "@/lib/auth/current-user";
@@ -93,6 +95,7 @@ export async function loadRoomData(
       pendingClaims: [],
       activityRows: [],
       eventReactions: new Map(),
+      headToHead: new Map(),
       activityNextBefore: null,
       activityNotices: [],
       presentUserIds: [],
@@ -104,7 +107,7 @@ export async function loadRoomData(
   }
 
   const teamId = home.myTeamId;
-  const [lineup, week, projectionsByPlayerId, fixturesByNflTeam, byeWeeksByNflTeam, trades, pendingClaims, activity, notices, gradesRead, presentUserIds] =
+  const [lineup, week, projectionsByPlayerId, fixturesByNflTeam, byeWeeksByNflTeam, trades, pendingClaims, activity, notices, gradesRead, presentUserIds, headToHead] =
     await Promise.all([
       teamId === null ? null : lineupView(db, { leagueId, teamId, weekNumber: home.currentWeek }),
       matchupWeek(db, leagueId, home.currentWeek, user.id, getReferenceCache()),
@@ -117,6 +120,9 @@ export async function loadRoomData(
       options.includeNotices === true ? listNotices(db, user.id) : null,
       gradesFor(db, home),
       presentUserIdsFor(leagueId),
+      // The rival card's "you are 4 and 1 against Rey". One query for the whole league, cached per
+      // league and week and dropped by the settler that changes the answer.
+      cachedHeadToHeadRecords(db, leagueId, home.currentWeek, getHeadToHeadCache()),
     ]);
 
   // The reactions standing on the page of events just read. Sequential rather than parallel on
@@ -148,6 +154,8 @@ export async function loadRoomData(
     pendingClaims,
     activityRows: activity.rows,
     eventReactions,
+    // Narrowed to the viewer's own pairings before it crosses the wire — see `recordsForTeam`.
+    headToHead: recordsForTeam(headToHead, teamId),
     activityNextBefore: activity.nextBefore,
     activityNotices,
     presentUserIds,

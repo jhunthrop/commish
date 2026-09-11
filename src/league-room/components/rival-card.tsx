@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { BigNumber, Card, Manager } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
+import type { HeadToHeadRecord } from "@/league";
 import type { LeagueHomeBody, MatchupDetail, MatchupWeekBody } from "../contract";
 import { formatWeek } from "../lib/format";
-import { rivalFacts, type RivalSide } from "../lib/rival";
+import { headToHeadLine, rivalFacts, type RivalFacts, type RivalSide } from "../lib/rival";
 import { weekStoryFor, type WeekStory } from "../lib/week-story";
 
 export interface RivalCardProps {
@@ -12,6 +13,8 @@ export interface RivalCardProps {
   readonly myMatchupDetail: MatchupDetail | null;
   readonly projectionsByPlayerId: ReadonlyMap<string, number>;
   readonly regularSeasonWeeks: number | null;
+  /** The viewer's own settled history against each opponent, keyed by that opponent's team id. */
+  readonly headToHead: ReadonlyMap<string, HeadToHeadRecord>;
 }
 
 function SideRow({ side, ring }: { readonly side: RivalSide; readonly ring: "self" | "rival" }) {
@@ -48,7 +51,7 @@ function noGameSentence(story: WeekStory, weekNumber: number): string {
  * projected, or a dash that says why). With no game this week the card says so in the league's
  * own words rather than showing an empty pairing.
  */
-export function RivalCard({ home, week, myMatchupDetail, projectionsByPlayerId, regularSeasonWeeks }: RivalCardProps) {
+export function RivalCard({ home, week, myMatchupDetail, projectionsByPlayerId, regularSeasonWeeks, headToHead }: RivalCardProps) {
   const facts = rivalFacts({ matchup: myMatchupDetail, myTeamId: home.myTeamId, teams: home.teams, weekStatus: home.weekStatus, projectionsByPlayerId });
   if (facts === null) {
     const story = weekStoryFor({ week, hasMyMatchup: false, standings: home.standings, regularSeasonWeeks });
@@ -69,6 +72,23 @@ export function RivalCard({ home, week, myMatchupDetail, projectionsByPlayerId, 
       </div>
       <SideRow side={facts.mine} ring="self" />
       <SideRow side={facts.theirs} ring="rival" />
+      <HeadToHead facts={facts} headToHead={headToHead} />
     </Card>
+  );
+}
+
+/**
+ * WHAT HAS HAPPENED BETWEEN THE TWO OF YOU (P6), under the two faces it is about. Renders only
+ * when there is a settled game to count: no line, no rule, no reserved space — a card between two
+ * managers meeting for the first time simply does not have this part.
+ */
+function HeadToHead({ facts, headToHead }: { readonly facts: RivalFacts; readonly headToHead: ReadonlyMap<string, HeadToHeadRecord> }) {
+  const line = headToHeadLine(headToHead.get(facts.theirs.teamId) ?? null, facts.theirs.owner?.name ?? facts.theirs.teamName);
+  if (line === null) return null;
+  return (
+    <div data-testid="head-to-head" className="flex flex-col gap-0.5 border-t border-line pt-3">
+      <p className="text-md font-semibold text-text-primary">{line.text}</p>
+      <p className={`${MICRO_LABEL} text-text-faint`}>{line.basis}</p>
+    </div>
   );
 }
