@@ -8,6 +8,7 @@ import { MICRO_LABEL } from "@/components/ui/config";
 import { positionStickerClass } from "@/components/ui/position-badge";
 import { MOTION } from "@/design/motion";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
+import { useReusedValue } from "@/design/use-stable-list";
 import { buildQuiltRows, pickPlace, reuseQuiltRows, type QuiltRow } from "../state/board";
 import { BOARD_HEIGHTS, planBoardHeights } from "../state/heights";
 import { needsByTeam, pickValueVerdict, type Lens } from "../state/lens";
@@ -69,14 +70,11 @@ function useBoardHeight(): { readonly ref: React.RefObject<HTMLDivElement | null
 /** The rows, with every round the view left untouched keeping its previous object
  *  (`reuseQuiltRows`), so the memoized rows below re-render only where the board changed. */
 function useStableRows(view: DraftStateView, myTeamId: string | null, microOnly: boolean): readonly QuiltRow[] {
-  const previous = useRef<readonly QuiltRow[] | null>(null);
-  return useMemo(() => {
-    const built = buildQuiltRows(view, myTeamId);
-    const shaped = microOnly ? built.map((row): QuiltRow => ({ ...row, kind: "micro" })) : built;
-    const rows = reuseQuiltRows(previous.current, shaped);
-    previous.current = rows;
-    return rows;
+  const built = useMemo(() => {
+    const rows = buildQuiltRows(view, myTeamId);
+    return microOnly ? rows.map((row): QuiltRow => ({ ...row, kind: "micro" })) : rows;
   }, [view, myTeamId, microOnly]);
+  return useReusedValue(built, reuseQuiltRows);
 }
 
 /**
