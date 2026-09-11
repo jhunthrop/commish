@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { BoardReason } from "@/projections/preseason/board";
 import type { SurvivalOdds, TierStandingView } from "@/draft-service/assistant/view";
-import { Badge, Button, EmptyState, Movement, PositionBadge } from "@/components/ui";
+import { Badge, Button, EmptyState, MotionList, Movement, PositionBadge, type MotionRowProps } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { OddsGlance } from "../../advisor/components/odds-glance";
+import { useStableList } from "@/design/use-stable-list";
+import { OddsFigure } from "../../advisor/components/odds-glance";
 import { groupByTier } from "../../advisor/tier-groups";
 import { DRAFT_ROOM_CONFIG } from "../../state/config";
 import type { NeedFraction } from "../state/lens";
@@ -39,16 +40,115 @@ export interface DrawerPoolTabProps extends RoomActs {
   readonly tiers?: Readonly<Record<string, TierStandingView>>;
 }
 
-interface PoolRow {
+interface PoolRowModel {
   readonly player: Player;
   readonly rank: number;
 }
+
+/** One entry of the rendered list: a tier header, or a player row with every fact it prints
+ *  resolved to a primitive, so the memoized `PoolRow` below re-renders only when one changed. */
+type PoolListItem =
+  | { readonly kind: "header"; readonly header: string }
+  | {
+      readonly kind: "row";
+      readonly player: Player;
+      readonly rank: number;
+      readonly positionRank: number | undefined;
+      readonly highlight: boolean;
+      readonly bye: number | undefined;
+      readonly gap: number;
+      readonly edge: string | null;
+      readonly survived: number | undefined;
+      readonly runs: number | null;
+    };
+
+const keyOf = (item: PoolListItem): string => (item.kind === "header" ? `tier:${item.header}` : item.player.id);
+
+function rowItem(row: PoolRowModel, highlight: boolean, ranks: ReadonlyMap<string, number>, byeWeeks: ReadonlyMap<string, number>, reasons: ReadonlyMap<string, readonly BoardReason[]>, odds: SurvivalOdds | null): PoolListItem {
+  const { player, rank } = row;
+  const edges = edgeSummary(reasons.get(player.id) ?? []);
+  return {
+    kind: "row",
+    player,
+    rank,
+    positionRank: ranks.get(player.id),
+    highlight,
+    bye: byeWeeks.get(player.nflTeam),
+    gap: player.adp === null ? 0 : Math.round(player.adp) - rank,
+    edge: edges === null ? null : (edges.split(" · ")[0] ?? null),
+    survived: odds === null ? undefined : odds.survived[player.id],
+    runs: odds === null || odds.runs === 0 ? null : odds.runs,
+  };
+}
+
+interface PoolRowProps extends Pick<RoomActs, "canDraft" | "submitting" | "onDraft" | "onQueueToggle" | "onPeek"> {
+  readonly leagueId: string;
+  readonly item: Extract<PoolListItem, { kind: "row" }>;
+  readonly queued: boolean;
+  readonly row: MotionRowProps;
+}
+
+/** One pool row over primitives: a pick landing re-renders the row that left and nothing else. */
+const PoolRow = memo(function PoolRow({ leagueId, item, queued, canDraft, submitting, onDraft, onQueueToggle, onPeek, row }: PoolRowProps) {
+  const { player, rank, positionRank, highlight, bye, gap, edge, survived, runs } = item;
+  const adp = formatAdp(player.adp);
+  return (
+    <DrawerRow
+      leagueId={leagueId}
+      player={player}
+      rank={rank}
+      positionRank={positionRank}
+      highlight={highlight}
+      onPeek={onPeek}
+      row={row}
+      meta={
+        <>
+          {player.nflTeam}
+          {bye === undefined ? "" : ` · Bye ${bye}`}
+          {adp === null ? "" : ` · ${adp}`}
+        </>
+      }
+      verdict={
+        <>
+          {/* The edge count is a desktop luxury: a 390pt row spends its width on the
+              name, the meta and the verb, and the peek carries the edges. */}
+          {edge === null ? null : (
+            <span className="hidden md:inline">
+              <Badge tone="neutral">{edge}</Badge>
+            </span>
+          )}
+          {gap === 0 ? null : <Movement places={gap} against="ADP" />}
+          {runs === null || survived === undefined ? null : <OddsFigure survived={survived} runs={runs} />}
+        </>
+      }
+      actions={
+        <>
+          <Button size="sm" variant="ghost" disabled={submitting} aria-label={queued ? `Remove ${player.name} from your queue` : `Add ${player.name} to your queue`} onClick={() => onQueueToggle(player.id)}>
+            <span aria-hidden="true" className={queued ? "text-accent" : "text-text-muted"}>
+              {queued ? "★" : "☆"}
+            </span>
+          </Button>
+          {canDraft ? (
+            <Button size="sm" variant="verb" disabled={submitting} onClick={() => onDraft(player.id)}>
+              Draft
+            </Button>
+          ) : null}
+        </>
+      }
+    />
+  );
+});
 
 /**
  * THE POOL TAB — the drawer's default: search, the six position stickers, and the ranked list of
  * who is left. Each row carries the market gap (the one figure with a real comparison behind it)
  * and a GENERIC edge count; the name opens the season peek (`PlayerName`), and the row's own
  * "Card" button opens this room's own draft-context card for everything deeper.
+ *
+ * ROWS MOVE, THEY DO NOT POP (fluidity round, 2026-09-10): the list rides `MotionList`, so the
+ * row a pick took fades out in place, the row that slides into the window fades in, and
+ * everything between glides; each row is memoized over primitives, so sixty rows cost one
+ * row's render per pick.
  */
 export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons, focusSearch, needs, odds = null, tiers = {}, canDraft, submitting, queuedPlayerIds, onDraft, onQueueToggle, onPeek }: DrawerPoolTabProps) {
   const [query, setQuery] = useState("");
@@ -67,9 +167,16 @@ export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons,
       .filter(({ player }) => available.has(player.id))
       .filter(({ player }) => (position === ALL || player.position === position) && (needle === "" || player.name.toLowerCase().includes(needle)));
   }, [players, available, query, position]);
-  const visible = rows.slice(0, DRAFT_ROOM_CONFIG.poolPageSize);
+  const visible = useMemo(() => rows.slice(0, DRAFT_ROOM_CONFIG.poolPageSize), [rows]);
   // Tier headers only over ONE position: a mixed list has no single ladder to group under.
-  const groups = useMemo(() => (position === ALL ? [{ header: null, rows: visible }] : groupByTier<PoolRow>(visible, (row) => row.player.id, tiers)), [position, visible, tiers]);
+  const built = useMemo((): readonly PoolListItem[] => {
+    const groups = position === ALL ? [{ header: null, rows: visible }] : groupByTier<PoolRowModel>(visible, (row) => row.player.id, tiers);
+    return groups.flatMap((group, groupIndex) => [
+      ...(group.header === null ? [] : [{ kind: "header", header: group.header } as const]),
+      ...group.rows.map((row, index) => rowItem(row, groupIndex === 0 && index === 0, ranks, byeWeeks, reasons, odds)),
+    ]);
+  }, [position, visible, tiers, ranks, byeWeeks, reasons, odds]);
+  const items = useStableList(built, keyOf);
   // Only while a single position is selected: the note is about THAT position, and printing it over
   // the mixed ALL list would be attaching a claim to rows it is not about.
   const marketOrderNote = position === ALL ? null : marketOrderNoteFor(position as Position);
@@ -149,67 +256,27 @@ export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons,
         />
       ) : (
         <ol aria-label="Available players, best first" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-          {groups.flatMap((group, groupIndex) => [
-            ...(group.header === null
-              ? []
-              : [
-                  <li key={`tier:${group.header}`} data-testid="advisor-tier-header" className={`${MICRO_LABEL} px-2.5 pt-2 text-text-faint`}>
-                    {group.header}
-                  </li>,
-                ]),
-            ...group.rows.map(({ player, rank }, index) => {
-              const adp = formatAdp(player.adp);
-              const bye = byeWeeks.get(player.nflTeam);
-              const gap = player.adp === null ? 0 : Math.round(player.adp) - rank;
-              const edges = edgeSummary(reasons.get(player.id) ?? []);
-              const queued = queuedPlayerIds.has(player.id);
-              return (
-                <DrawerRow
-                  key={player.id}
+          <MotionList items={items} keyOf={keyOf}>
+            {(item, row) =>
+              item.kind === "header" ? (
+                <li {...row} data-testid="advisor-tier-header" className={`${MICRO_LABEL} px-2.5 pt-2 text-text-faint ${row.className}`}>
+                  {item.header}
+                </li>
+              ) : (
+                <PoolRow
                   leagueId={leagueId}
-                  player={player}
-                  rank={rank}
-                  positionRank={ranks.get(player.id)}
-                  highlight={groupIndex === 0 && index === 0}
+                  item={item}
+                  queued={queuedPlayerIds.has(item.player.id)}
+                  canDraft={canDraft}
+                  submitting={submitting}
+                  onDraft={onDraft}
+                  onQueueToggle={onQueueToggle}
                   onPeek={onPeek}
-                  meta={
-                    <>
-                      {player.nflTeam}
-                      {bye === undefined ? "" : ` · Bye ${bye}`}
-                      {adp === null ? "" : ` · ${adp}`}
-                    </>
-                  }
-                  verdict={
-                    <>
-                      {/* The edge count is a desktop luxury: a 390pt row spends its width on the
-                          name, the meta and the verb, and the peek carries the edges. */}
-                      {edges === null ? null : (
-                        <span className="hidden md:inline">
-                          <Badge tone="neutral">{edges.split(" · ")[0]}</Badge>
-                        </span>
-                      )}
-                      {gap === 0 ? null : <Movement places={gap} against="ADP" />}
-                      {odds === null ? null : <OddsGlance odds={odds} playerId={player.id} />}
-                    </>
-                  }
-                  actions={
-                    <>
-                      <Button size="sm" variant="ghost" disabled={submitting} aria-label={queued ? `Remove ${player.name} from your queue` : `Add ${player.name} to your queue`} onClick={() => onQueueToggle(player.id)}>
-                        <span aria-hidden="true" className={queued ? "text-accent" : "text-text-muted"}>
-                          {queued ? "★" : "☆"}
-                        </span>
-                      </Button>
-                      {canDraft ? (
-                        <Button size="sm" variant="verb" disabled={submitting} onClick={() => onDraft(player.id)}>
-                          Draft
-                        </Button>
-                      ) : null}
-                    </>
-                  }
+                  row={row}
                 />
-              );
-            }),
-          ])}
+              )
+            }
+          </MotionList>
         </ol>
       )}
       {rows.length > visible.length ? (

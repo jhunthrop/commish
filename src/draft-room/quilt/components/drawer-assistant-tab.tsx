@@ -2,7 +2,9 @@
 
 import { useMemo } from "react";
 import type { Player } from "@/domain/player";
+import { Card } from "@/components/ui";
 import { AdvisorPanel } from "../../advisor/components/advisor-panel";
+import { ADVISOR_CARD_FRAME } from "../../advisor/components/next-pick-card";
 import type { UseAdvisorResult } from "../../advisor/use-advisor";
 import type { RoomActs } from "./room-acts";
 
@@ -26,20 +28,28 @@ const FETCH_FAILED_COPY = "We could not reach the advisor. It tries again on the
  * through the pick-safety window on the desk and the confirm sheet on the phone, exactly like a
  * pool row); Queue rides the queue that already exists. The tab is its own scroll area, so the
  * lead card's verb can stick to its bottom edge on a screen too short for the card.
+ *
+ * The waiting line ("Reading the board.") sits in the card's own frame, so the card that
+ * replaces it lands in the same box rather than pushing the tab's content down.
  */
 export function DrawerAssistantTab({ myTeamId, advisor, playersById, queue, byeWeeks, canDraft, submitting, onDraft, onQueueToggle }: DrawerAssistantTabProps) {
   const { view, recomputing, error } = advisor;
   const queueOrder = useMemo(() => new Map(queue.map((playerId, index) => [playerId, index + 1] as const)), [queue]);
+  const acts = useMemo(() => ({ canDraft, submitting, queueOrder, onDraft, onQueueToggle }), [canDraft, submitting, queueOrder, onDraft, onQueueToggle]);
 
   if (myTeamId === null) return <p className="text-sm text-text-faint">{NO_SEAT_COPY}</p>;
   if (view === null) {
     const text = recomputing ? "Reading the board." : error !== null ? FETCH_FAILED_COPY : EMPTY_COPY;
-    return <p className="text-sm text-text-faint">{text}</p>;
+    return (
+      <Card as="section" aria-label="Your next pick" className={`flex flex-col gap-2 ${ADVISOR_CARD_FRAME}`}>
+        <p className="text-sm text-text-faint">{text}</p>
+      </Card>
+    );
   }
 
   return (
     <div data-testid="assistant-tab" className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <AdvisorPanel view={view} acts={{ canDraft, submitting, queueOrder, onDraft, onQueueToggle }} playersById={playersById} byeWeeks={byeWeeks} recomputing={recomputing} />
+      <AdvisorPanel view={view} acts={acts} playersById={playersById} byeWeeks={byeWeeks} recomputing={recomputing} />
     </div>
   );
 }
