@@ -196,6 +196,58 @@ describe("RoomStream carries reactions on what people did (Sideline P5)", () => 
   });
 });
 
+describe("RoomStream — the newest tap on a pill wins (M3)", () => {
+  it("drops a response older than the latest request for that pill, so a double tap settles where the server did", async () => {
+    const league = fixtureLeagueDeps({ ok: true, data: { eventId: "evt_1", action: "added" } }, { deferred: true });
+    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK]} eventReactions={new Map()} sendIsTheAct={false} />, fixtureChatDeps(), league));
+    await waitFor(() => expect(screen.getAllByTestId("stream-event")).toHaveLength(1));
+    const pill = within(screen.getByTestId("stream-event")).getByRole("button", { name: "React with 🔥" });
+
+    // Two of the viewer's own toggles in flight: on, then off.
+    await userEvent.click(pill);
+    await waitFor(() => expect(pill).toHaveAttribute("aria-pressed", "true"));
+    await userEvent.click(pill);
+    await waitFor(() => expect(pill).toHaveAttribute("aria-pressed", "false"));
+    expect(league.pending()).toBe(2);
+
+    // The SECOND request's response lands first and is the newest, so it decides: removed.
+    await act(async () => {
+      await league.settle(1, { ok: true, data: { eventId: "evt_1", action: "removed" } });
+    });
+    expect(pill).toHaveAttribute("aria-pressed", "false");
+
+    // The FIRST request's response arrives late saying "added". It is strictly older information
+    // about the same pill, and folding it would leave the pill pressed while the server has
+    // nothing — the exact disagreement this guard exists for.
+    await act(async () => {
+      await league.settle(0, { ok: true, data: { eventId: "evt_1", action: "added" } });
+    });
+    expect(pill).toHaveAttribute("aria-pressed", "false");
+    expect(pill).not.toHaveTextContent("1");
+  });
+
+  it("keeps a tap on one emoji clear of a tap on another, since the generation is per pill", async () => {
+    const league = fixtureLeagueDeps({ ok: true, data: { eventId: "evt_1", action: "added" } }, { deferred: true });
+    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK]} eventReactions={new Map()} sendIsTheAct={false} />, fixtureChatDeps(), league));
+    await waitFor(() => expect(screen.getAllByTestId("stream-event")).toHaveLength(1));
+    const row = within(screen.getByTestId("stream-event"));
+    const fire = row.getByRole("button", { name: "React with 🔥" });
+    const clap = row.getByRole("button", { name: "React with 👏" });
+
+    await userEvent.click(fire);
+    await userEvent.click(clap);
+    // The clap's response lands first; the fire's own is still the newest for ITS pill.
+    await act(async () => {
+      await league.settle(1, { ok: true, data: { eventId: "evt_1", action: "added" } });
+    });
+    await act(async () => {
+      await league.settle(0, { ok: true, data: { eventId: "evt_1", action: "added" } });
+    });
+    expect(fire).toHaveAttribute("aria-pressed", "true");
+    expect(clap).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
 describe("RoomStream keeps the landing view (H3)", () => {
   it("never scrolls on first paint, so the rival card above it stays in view", async () => {
     const scrollIntoView = vi.fn();

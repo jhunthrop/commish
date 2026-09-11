@@ -13,9 +13,38 @@ export const SURFACE_LABEL: Readonly<Record<DrawerSurface, string>> = {
   activity: "Activity",
 };
 
+/** The keys this room answers to, as glyphs and the noun each one reaches. */
+const SHORTCUTS: readonly (readonly [string, string])[] = [
+  ["space", "Drawer"],
+  ["/", "Players"],
+  ["esc", "Room"],
+];
+
+/**
+ * THE KEYS, ON ASKING ONLY (P7: "UX explains itself, no tips"). This row used to be a sentence
+ * printed under the chip row on every visit — "space opens the drawer · / searches players · esc
+ * collapses everything" — which is an explainer under a control, exactly what this product does
+ * not ship. The shortcuts themselves are untouched; `?` is what puts their glyphs on screen, and
+ * `?` again or `esc` takes them off. A glyph beside a noun is a legend, not a sentence.
+ */
+function KeyboardGlyphs() {
+  return (
+    <span data-testid="keyboard-glyphs" className="ml-auto hidden items-center gap-3 lg:flex">
+      {SHORTCUTS.map(([key, reaches]) => (
+        <span key={key} className="flex items-center gap-1">
+          <kbd className="rounded-sm border border-line px-1.5 py-0.5 font-mono text-xs text-text-muted">{key}</kbd>
+          <span className={`${MICRO_LABEL} text-text-faint`}>{reaches}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export interface RoomDrawerProps {
   readonly leagueId: string;
   readonly state: DrawerState;
+  /** Whether `?` has been pressed. The shell owns the key; this row owns the glyphs. */
+  readonly keysShown: boolean;
   readonly onChipTap: (surface: DrawerSurface) => void;
   readonly onExpand: () => void;
   readonly onEsc: () => void;
@@ -29,7 +58,7 @@ export interface RoomDrawerProps {
  * already made the sub-route URL current). On phones the chip row projects to a bottom tab bar
  * over the same surfaces, with the room itself as the first tab.
  */
-export function RoomDrawer({ leagueId, state, onChipTap, onExpand, onEsc, children }: RoomDrawerProps) {
+export function RoomDrawer({ leagueId, state, keysShown, onChipTap, onExpand, onEsc, children }: RoomDrawerProps) {
   const base = `/app/leagues/${leagueId}`;
   return (
     <>
@@ -77,9 +106,7 @@ export function RoomDrawer({ leagueId, state, onChipTap, onExpand, onEsc, childr
             </button>
           );
         })}
-        <span className="ml-auto hidden font-mono text-xs text-text-faint lg:inline">
-          space opens the drawer · / searches players · esc collapses everything
-        </span>
+        {keysShown ? <KeyboardGlyphs /> : null}
       </div>
 
       {/* Phone projection: the same surfaces as a bottom tab bar, the room first. LAW 2's ONE

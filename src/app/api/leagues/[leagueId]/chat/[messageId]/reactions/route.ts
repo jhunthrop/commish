@@ -30,7 +30,7 @@ export async function POST(request: Request, context: ChatMessageRouteContext) {
 
     // The SAME per-user budget the stream's own reactions spend from — see
     // `_reaction-limit.ts`: one act, one ceiling, so neither route is a detour around the other.
-    const limited = reactionRateLimited(actor.userId);
+    const limited = await reactionRateLimited(actor.userId);
     if (limited !== null) return limited;
 
     const parsed = await parseJson(req, reactionSchema);

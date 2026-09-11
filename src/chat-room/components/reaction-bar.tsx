@@ -1,9 +1,22 @@
 "use client";
 
 import { CHAT_CONFIG } from "@/chat/config";
-import type { ChatReactionView } from "@/chat/contract";
 import { summarizeReactions } from "@/chat/messages";
 import { ReactionPill } from "@/components/ui";
+
+/**
+ * ONE PERSON'S ONE REACTION, as this row needs it — not `ChatReactionView` and not
+ * `EventReactionView`, which are the two domain shapes that happen to satisfy it.
+ *
+ * Declared here because this component serves both (M6): typing the prop as chat's own shape made
+ * the stream's events compile only by structural accident, so a field added to `ChatReactionView`
+ * would silently become a requirement on every pick, claim and trade too. This is the contract the
+ * row actually has — the pair, which is all `summarizeReactions` ever reads.
+ */
+export interface ReactionEntry {
+  readonly emoji: string;
+  readonly userId: string;
+}
 
 export interface ReactionBarProps {
   /**
@@ -14,7 +27,7 @@ export interface ReactionBarProps {
    * this row for events would be a second thing to keep in step.
    */
   readonly targetId: string;
-  readonly reactions: readonly ChatReactionView[];
+  readonly reactions: readonly ReactionEntry[];
   readonly meUserId: string;
   readonly disabled: boolean;
   readonly onReact: (targetId: string, emoji: string) => void;

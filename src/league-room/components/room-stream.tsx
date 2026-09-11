@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMessageView } from "@/chat/contract";
 import { ChatComposer } from "@/chat-room/components/chat-composer";
-import { ReactionBar } from "@/chat-room/components/reaction-bar";
+import { ReactionBar, type ReactionEntry } from "@/chat-room/components/reaction-bar";
 import { RemovedMessage } from "@/chat-room/components/removed-message";
 import { ReportDialog } from "@/chat-room/components/report-dialog";
 import { useLeagueChat } from "@/chat-room/hooks/use-league-chat";
@@ -27,9 +27,16 @@ export interface RoomStreamProps {
   readonly sendIsTheAct: boolean;
 }
 
+/**
+ * THE EMPTY REACTION SET, as one value (H1). `?? []` would mint a fresh array on every render and
+ * hand `memo` a prop that is never equal, which is the whole difference between "one row commits"
+ * and "every row commits" when a frame lands.
+ */
+const NO_REACTIONS: readonly ReactionEntry[] = [];
+
 interface StreamEventProps {
   readonly row: ActivityFeedRow;
-  readonly reactions: readonly { readonly emoji: string; readonly userId: string }[];
+  readonly reactions: readonly ReactionEntry[];
   readonly meUserId: string;
   readonly onReact: (eventId: string, emoji: string) => void;
 }
@@ -38,8 +45,15 @@ interface StreamEventProps {
  * Something somebody did, drawn as a person doing it: their face, the sentence, the clock — and,
  * for the three kinds a person actually did (`isReactableKind`), the same five pills the messages
  * wear. A pick with a fire on it is the room reacting to the room, which is the whole of P5.
+ *
+ * MEMOISED, and that is a live-surface requirement rather than a micro-optimisation (H1). A
+ * `stream.reaction` frame replaces the whole reactions MAP, but `applyEventReaction` copies the
+ * map and rewrites exactly one entry, so every other row's own array keeps its identity — and with
+ * a stable `onReact` and `NO_REACTIONS` above, one frame commits one row instead of all of them.
+ * On a Sunday with a dozen managers reacting, the difference is a 500-item stream re-rendering on
+ * every frame, taking the composer's caret and every hover state with it.
  */
-function StreamEvent({ row, reactions, meUserId, onReact }: StreamEventProps) {
+const StreamEvent = memo(function StreamEvent({ row, reactions, meUserId, onReact }: StreamEventProps) {
   return (
     <div data-testid="stream-event" data-kind={row.kind} className="group/msg flex items-start gap-2.5">
       {row.actor === null ? (
@@ -63,7 +77,7 @@ function StreamEvent({ row, reactions, meUserId, onReact }: StreamEventProps) {
       </div>
     </div>
   );
-}
+});
 
 interface StreamMessageProps {
   readonly message: ChatMessageView;
@@ -72,7 +86,9 @@ interface StreamMessageProps {
   readonly onReport: (messageId: string) => void;
 }
 
-function StreamMessage({ message, meUserId, onReact, onReport }: StreamMessageProps) {
+/** Memoised for the reason `StreamEvent` above states: `mergeMessages`/`applyReaction` keep every
+ *  untouched message's identity, so a landing frame commits the one row it is about. */
+const StreamMessage = memo(function StreamMessage({ message, meUserId, onReact, onReport }: StreamMessageProps) {
   if (message.removal !== null) {
     return <RemovedMessage authorName={message.authorName} authorAvatarUrl={message.authorAvatarUrl} removal={message.removal} />;
   }
@@ -104,7 +120,7 @@ function StreamMessage({ message, meUserId, onReact, onReport }: StreamMessagePr
       )}
     </MessageBubble>
   );
-}
+});
 
 /**
  * THE ONE STREAM (P5, P12): what changed since you were last here, as one column of people doing
@@ -117,6 +133,15 @@ export function RoomStream({ leagueId, activityRows, eventReactions, sendIsTheAc
   const chat = useLeagueChat(leagueId);
   // The events half of the stream's reactions, live on the SAME socket the chat already holds.
   const streamReactions = useStreamReactions(leagueId, eventReactions, chat.meUserId);
+  // STABLE HANDLERS, so the memoised rows above are actually memoised (H1). An inline arrow here
+  // is a new prop on every render and would defeat `memo` completely; `react` on both hooks is
+  // already a `useCallback`, so these two wrappers are stable for as long as those are. Pulled out
+  // of their hooks by name first: the hook RESULTS are fresh objects on every render, and naming
+  // the one function each wrapper actually closes over is what lets the dependency check see that.
+  const { react: reactToEventOnServer } = streamReactions;
+  const { react: reactToMessageOnServer } = chat;
+  const reactToEvent = useCallback((eventId: string, emoji: string) => void reactToEventOnServer(eventId, emoji), [reactToEventOnServer]);
+  const reactToMessage = useCallback((messageId: string, emoji: string) => void reactToMessageOnServer(messageId, emoji), [reactToMessageOnServer]);
   // The reader's own clock and locale, resolved after mount. Before it lands, a day chapter reads
   // as its absolute name rather than "Today": deterministic on the server and on the client's
   // first render, which is what keeps the two from disagreeing across a time zone.
@@ -190,12 +215,12 @@ export function RoomStream({ leagueId, activityRows, eventReactions, sendIsTheAc
                     <StreamEvent
                       key={item.id}
                       row={item.row}
-                      reactions={streamReactions.held.get(item.row.eventId) ?? []}
+                      reactions={streamReactions.held.get(item.row.eventId) ?? NO_REACTIONS}
                       meUserId={chat.meUserId}
-                      onReact={(eventId, emoji) => void streamReactions.react(eventId, emoji)}
+                      onReact={reactToEvent}
                     />
                   ) : (
-                    <StreamMessage key={item.id} message={item.message} meUserId={chat.meUserId} onReact={(id, emoji) => void chat.react(id, emoji)} onReport={setReportingId} />
+                    <StreamMessage key={item.id} message={item.message} meUserId={chat.meUserId} onReact={reactToMessage} onReport={setReportingId} />
                   ),
                 )}
               </section>

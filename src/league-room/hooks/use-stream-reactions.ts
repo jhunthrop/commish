@@ -41,6 +41,8 @@ export function useStreamReactions(leagueId: string, initial: EventReactionMap, 
   const deps = useLeagueRoomDeps();
   const [held, setHeld] = useState<EventReactionMap>(initial);
   const heldRef = useRef<EventReactionMap>(initial);
+  /** The newest request number per `${eventId}|${emoji}` — see `react`'s own note on M3. */
+  const generations = useRef(new Map<string, number>());
 
   const write = useCallback((next: EventReactionMap): void => {
     heldRef.current = next;
@@ -59,6 +61,20 @@ export function useStreamReactions(leagueId: string, initial: EventReactionMap, 
 
   const react = useCallback(
     async (eventId: string, emoji: string): Promise<void> => {
+      // THE NEWEST TAP ON THIS PILL WINS (M3). Two of the viewer's own toggles can be in flight at
+      // once, and HTTP does not promise the responses come back in the order the requests went
+      // out — so without this, whichever RESPONSE lands last decides what the pill shows, while
+      // the server's own state was decided by whichever REQUEST it processed first. Double-tap 🔥
+      // and the row ends absent server-side while a late "added" leaves the pill pressed until a
+      // reload. A generation per (event, emoji) — the pair a tap is actually about, so a tap on
+      // 😂 never invalidates one on 🔥 — and a response older than the latest request for that
+      // pair is dropped whole: it is strictly older information about the same fact, and the
+      // newest request's own response, plus the stream's frames, still carry the truth.
+      const pill = `${eventId}|${emoji}`;
+      const generation = (generations.current.get(pill) ?? 0) + 1;
+      generations.current.set(pill, generation);
+      const isStale = (): boolean => generations.current.get(pill) !== generation;
+
       const mine = (map: EventReactionMap): boolean =>
         meUserId !== "" && (map.get(eventId) ?? []).some((reaction) => reaction.emoji === emoji && reaction.userId === meUserId);
       const optimistic: "added" | "removed" = mine(heldRef.current) ? "removed" : "added";
@@ -80,7 +96,7 @@ export function useStreamReactions(leagueId: string, initial: EventReactionMap, 
           putBack();
           return;
         }
-        if (meUserId === "") return;
+        if (meUserId === "" || isStale()) return;
         write(applyEventReaction(heldRef.current, { eventId, emoji, userId: meUserId, action: envelope.data.action }));
       } catch {
         putBack();

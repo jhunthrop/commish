@@ -132,6 +132,8 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
     requestAnimationFrame(() => document.getElementById("invite-managers")?.scrollIntoView());
   }, [railVisible]);
 
+  /** Whether the keyboard glyphs are on screen. Only `?` puts them there (P7). */
+  const [keysShown, setKeysShown] = useState(false);
   const sheetOpen = sheet !== null;
   useEffect(() => {
     if (home.draftStatus !== "complete") return;
@@ -140,10 +142,20 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
       if (event.key === "Escape") {
         // A dialog above the room (a Modal, a decision sheet) owns its own escape.
         if (event.target instanceof HTMLElement && event.target.closest('[role="dialog"]') !== null) return;
+        setKeysShown(false);
         send({ kind: "esc" });
         return;
       }
       if (isTypingTarget(event.target)) return;
+      if (event.key === "?") {
+        // THE SHORTCUTS, ON ASKING (P7). They used to be a sentence printed under the chip row
+        // whether anybody wanted it or not, which is an explainer, which this product does not
+        // have. `?` is the one key a person presses when they want to know what the keys are, and
+        // it is the only thing that puts them on screen.
+        event.preventDefault();
+        setKeysShown((shown) => !shown);
+        return;
+      }
       if (event.key === " ") {
         event.preventDefault();
         send({ kind: "space" });
@@ -155,7 +167,7 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [send, sheetOpen, home.draftStatus]);
+  }, [send, sheetOpen, home.draftStatus, setKeysShown]);
 
   // The stage decision (law 1), pure and derived from what the page loaded.
   const myMatchupDetail =
@@ -328,6 +340,7 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
               <RoomDrawer
                 leagueId={home.leagueId}
                 state={drawer}
+                keysShown={keysShown}
                 onChipTap={(surface) => send({ kind: "chipTap", surface })}
                 onExpand={() => send({ kind: "expand" })}
                 onEsc={() => send({ kind: "esc" })}

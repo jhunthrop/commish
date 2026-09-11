@@ -189,6 +189,26 @@ describe("RoomShell", () => {
     expect(screen.queryByRole("button", { name: "Full height" })).toBeNull();
   });
 
+  /** M5: the keys are still the keys. Only what is PRINTED about them changed (P7). */
+  it("puts the keyboard glyphs on screen only when somebody presses ?, and takes them off again", () => {
+    render(wrap(ROOM_DATA));
+    expect(screen.queryByTestId("keyboard-glyphs")).toBeNull();
+
+    fireEvent.keyDown(window, { key: "?" });
+    expect(screen.getByTestId("keyboard-glyphs")).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "?" });
+    expect(screen.queryByTestId("keyboard-glyphs")).toBeNull();
+  });
+
+  it("takes the glyphs off with esc, the same key that walks everything else back", () => {
+    render(wrap(ROOM_DATA));
+    fireEvent.keyDown(window, { key: "?" });
+    expect(screen.getByTestId("keyboard-glyphs")).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByTestId("keyboard-glyphs")).toBeNull();
+  });
+
   it("slash opens the players surface with its search", () => {
     render(wrap(ROOM_DATA));
     fireEvent.keyDown(window, { key: "/" });

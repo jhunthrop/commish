@@ -34,7 +34,7 @@ export async function POST(request: Request, context: StreamEventRouteContext) {
     const id = streamEventIdSchema.safeParse(eventId);
     if (!id.success) return fail(`eventId: ${id.error.issues[0]?.message ?? "That is not something we can react to."}`, 400);
 
-    const limited = reactionRateLimited(actor.userId);
+    const limited = await reactionRateLimited(actor.userId);
     if (limited !== null) return limited;
 
     const parsed = await parseJson(req, reactionSchema);
