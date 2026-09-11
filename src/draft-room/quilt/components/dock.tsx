@@ -20,6 +20,8 @@ export interface DockProps extends RoomActs {
   readonly queue: readonly string[];
   readonly advisor: UseAdvisorResult;
   readonly nextPickLabel: string | null;
+  /** The room's one available set, built once by the room (review L11). */
+  readonly available: ReadonlySet<string>;
   /** Phone: the queue and the list ride in the page's flow; the call block is the caller's. */
   readonly withCall: boolean;
 }
@@ -34,9 +36,8 @@ const LIST_LABEL: Readonly<Record<DockList, string>> = { pool: "Pool", calls: "O
  * Draft verb on the right. The queue strip carries no explainer sentence: the league's rules
  * page says what happens when a clock runs out, and a strip is not the place to repeat it (P7).
  */
-export const Dock = memo(function Dock({ view, players, playersById, myTeamId, byeWeeks, queue, advisor, nextPickLabel, withCall, ...acts }: DockProps) {
+export const Dock = memo(function Dock({ view, players, playersById, myTeamId, byeWeeks, queue, advisor, nextPickLabel, available, withCall, ...acts }: DockProps) {
   const [list, setList] = useState<DockList>("pool");
-  const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
   const queued = useMemo(() => queue.flatMap((playerId) => (available.has(playerId) ? [playersById.get(playerId)] : [])).filter((player): player is Player => player !== undefined), [queue, available, playersById]);
   const queueOrder = useMemo(() => new Map(queue.map((playerId, index) => [playerId, index + 1] as const)), [queue]);
   const advisorActs = useMemo(() => ({ canDraft: acts.canDraft, submitting: acts.submitting, queueOrder, onDraft: acts.onDraft, onQueueToggle: acts.onQueueToggle }), [acts.canDraft, acts.submitting, queueOrder, acts.onDraft, acts.onQueueToggle]);
@@ -71,7 +72,7 @@ export const Dock = memo(function Dock({ view, players, playersById, myTeamId, b
       </div>
       <div className="flex min-h-0 min-w-0 flex-col px-2 py-1.5 [grid-area:list]">
         {list === "pool" ? (
-          <PoolList leagueId={view.leagueId} players={players} available={available} byeWeeks={byeWeeks} odds={odds} nextPickLabel={nextPickLabel} {...acts} />
+          <PoolList leagueId={view.leagueId} players={players} available={available} byeWeeks={byeWeeks} odds={odds} nextPickLabel={nextPickLabel} recomputing={advisor.recomputing} {...acts} />
         ) : myTeamId === null ? (
           <p className="p-2 text-sm text-text-faint">You have no seat in this draft, so there is nobody to call for.</p>
         ) : advisor.view === null ? (
@@ -95,6 +96,7 @@ export const Dock = memo(function Dock({ view, players, playersById, myTeamId, b
             queue={queue}
             byeWeeks={byeWeeks}
             nextPickLabel={nextPickLabel}
+            available={available}
             canDraft={acts.canDraft}
             submitting={acts.submitting}
             queuedPlayerIds={acts.queuedPlayerIds}

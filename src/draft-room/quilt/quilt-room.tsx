@@ -196,6 +196,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
         tiers={tiers ?? EMPTY_TIERS}
         odds={odds}
         nextPickLabel={nextPickLabel}
+        recomputing={advisor.recomputing}
         onMove={move}
         onPlace={place}
         onReset={reset}
@@ -242,6 +243,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           sheetRanks={mySheetRanks}
           advisor={advisor}
           nextPickLabel={nextPickLabel}
+          available={available}
           railCall={railCall}
           rosterSheet={rosterSheet}
         />
@@ -271,7 +273,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           )}
         </div>
         <div className="h-[15rem] shrink-0 px-3">
-          <Dock view={view} players={room.players} playersById={playersById} myTeamId={room.myTeamId} byeWeeks={byeWeeks} queue={room.queue} advisor={advisor} nextPickLabel={nextPickLabel} withCall {...acts} />
+          <Dock view={view} players={room.players} playersById={playersById} myTeamId={room.myTeamId} byeWeeks={byeWeeks} queue={room.queue} advisor={advisor} nextPickLabel={nextPickLabel} available={available} withCall {...acts} />
         </div>
         {rosterSheet}
       </div>

@@ -8,6 +8,7 @@ import { useStableList } from "@/design/use-stable-list";
 import { PlayerName } from "@/league-room/components/player-peek";
 import { DRAFT_ROOM_CONFIG } from "../../state/config";
 import { positionRanks } from "../../lib/tiers";
+import { oddsBasis } from "./dock-call";
 import { PoolFilterEmpty, PoolFilterRow, usePoolFilter } from "./pool-filter";
 import type { RoomActs } from "./room-acts";
 
@@ -18,8 +19,10 @@ export interface PoolListProps extends RoomActs {
   readonly available: ReadonlySet<string>;
   readonly byeWeeks: ReadonlyMap<string, number>;
   readonly odds: SurvivalOdds | null;
-  /** "3.07": the odds' basis; null when you have no next turn, and then no row prints one. */
+  /** "3.07": the odds' basis; null when you have no next turn. */
   readonly nextPickLabel: string | null;
+  /** True while a fresh odds table is on its way: every figure dims and the list says so once. */
+  readonly recomputing: boolean;
 }
 
 /** One row with every printed fact resolved to a primitive (the memo boundary). */
@@ -44,14 +47,16 @@ interface PoolRowProps extends Pick<RoomActs, "canDraft" | "submitting" | "onDra
 /**
  * ONE POOL ROW, Sideline's `PlayerRow`: the face on his club's ring, the name largest and
  * pressable (the season peek), the position and club and bye small, ONE number (how many runs
- * still have him at your next pick, with that basis under it), and the controls: the chevron
- * to this room's own card and Queue or a quiet Draft. The dock's big Draft is the room's one
- * solid pill (P3), so a row's Draft is the outlined one.
+ * still have him at your next pick, with that basis under it), the chevron to this room's own
+ * card, and Queue when you are off the clock. On your clock the row's Draft reveals on hover or
+ * focus, exactly as a sheet row's does, so the viewport rests with the dock's one solid (P3,
+ * review H3). The figure dims through the list's `group-data` while the odds are being recomputed,
+ * so a memoized row never re-renders for the word.
  */
 const PoolRow = memo(function PoolRow({ leagueId, item, queued, nextPickLabel, canDraft, submitting, onDraft, onQueueToggle, onPeek, row }: PoolRowProps) {
   const { player, positionRank, bye, survived, runs } = item;
   return (
-    <li {...row} data-testid="pool-row" data-player-id={player.id} className={`list-none ${row.className}`}>
+    <li {...row} data-testid="pool-row" data-player-id={player.id} className={`group/row list-none ${row.className}`}>
       <PlayerRow
         player={player}
         positionRank={positionRank}
@@ -64,7 +69,7 @@ const PoolRow = memo(function PoolRow({ leagueId, item, queued, nextPickLabel, c
         }
         figure={
           nextPickLabel === null || runs === null ? null : (
-            <BigNumber size="sm" value={survived === undefined ? null : String(survived)} basis={survived === undefined ? "no runs yet" : `of ${runs} runs at ${nextPickLabel}`} />
+            <BigNumber size="sm" value={survived === undefined ? null : String(survived)} basis={survived === undefined ? "no runs yet" : oddsBasis(runs, nextPickLabel)} className="group-data-[recomputing=true]/pool:opacity-60" />
           )
         }
         action={
@@ -75,9 +80,13 @@ const PoolRow = memo(function PoolRow({ leagueId, item, queued, nextPickLabel, c
               </span>
             </Button>
             {canDraft ? (
-              <Button size="sm" variant="secondary" disabled={submitting} aria-label={`Draft ${player.name}`} onClick={() => onDraft(player.id)}>
-                Draft
-              </Button>
+              // The reveal lives on a wrapper: `hidden` on the button itself would lose to the
+              // button's own `inline-flex` in the stylesheet's order.
+              <span data-testid="pool-draft-reveal" className="hidden group-focus-within/row:inline-flex group-hover/row:inline-flex">
+                <Button size="sm" variant="secondary" disabled={submitting} aria-label={`Draft ${player.name}`} onClick={() => onDraft(player.id)}>
+                  Draft
+                </Button>
+              </span>
             ) : (
               <Button size="sm" variant="secondary" disabled={submitting} aria-pressed={queued} aria-label={queued ? `Remove ${player.name} from your queue` : `Queue ${player.name}`} onClick={() => onQueueToggle(player.id)}>
                 {queued ? "Queued" : "Queue"}
@@ -96,7 +105,7 @@ const PoolRow = memo(function PoolRow({ leagueId, item, queued, nextPickLabel, c
  * fades out in place and everything below glides up; each row is memoized over primitives, so
  * sixty rows cost one row's render per pick.
  */
-export function PoolList({ leagueId, players, available, byeWeeks, odds, nextPickLabel, canDraft, submitting, queuedPlayerIds, onDraft, onQueueToggle, onPeek }: PoolListProps) {
+export function PoolList({ leagueId, players, available, byeWeeks, odds, nextPickLabel, recomputing, canDraft, submitting, queuedPlayerIds, onDraft, onQueueToggle, onPeek }: PoolListProps) {
   const filter = usePoolFilter();
   const { matches } = filter;
   const searchRef = useRef<HTMLInputElement | null>(null);
@@ -111,8 +120,12 @@ export function PoolList({ leagueId, players, available, byeWeeks, odds, nextPic
   const items = useStableList(built, keyOf);
 
   return (
-    <div id="player-pool" className="flex min-h-0 flex-1 flex-col gap-1.5">
-      <PoolFilterRow filter={filter} searchRef={searchRef} />
+    <div id="player-pool" data-testid="pool-list" data-recomputing={recomputing ? "true" : "false"} className="group/pool flex min-h-0 flex-1 flex-col gap-1.5">
+      <PoolFilterRow filter={filter} searchRef={searchRef}>
+        <span data-testid="pool-recomputing" data-active={recomputing ? "true" : "false"} aria-hidden={!recomputing} className={`text-xs text-text-faint ${recomputing ? "" : "invisible"}`}>
+          updating
+        </span>
+      </PoolFilterRow>
       {visible.length === 0 ? (
         <PoolFilterEmpty filter={filter} />
       ) : (

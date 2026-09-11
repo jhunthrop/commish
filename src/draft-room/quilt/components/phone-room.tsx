@@ -55,6 +55,7 @@ export interface PhoneRoomProps {
   readonly sheetRanks: ReadonlyMap<string, number>;
   readonly advisor: UseAdvisorResult;
   readonly nextPickLabel: string | null;
+  readonly available: ReadonlySet<string>;
   readonly railCall: RailCall | null;
   readonly rosterSheet: ReactNode;
 }
@@ -70,7 +71,7 @@ const BOARD_HEIGHT: Readonly<Record<BoardView, string>> = { wall: "h-[24rem]", s
  * the one Draft verb ride a block fixed at the foot, always in reach. Picking is two-step by
  * law (the confirm sheet), then the same undo window the desktop gets.
  */
-export function PhoneRoom({ room, view, playersById, myTurn, acts, pending, onUndo, phone, onPhone, boardView, board, peekFacts, peekHistory, onNote, byeWeeks, sheetRanks, advisor, nextPickLabel, railCall, rosterSheet }: PhoneRoomProps) {
+export function PhoneRoom({ room, view, playersById, myTurn, acts, pending, onUndo, phone, onPhone, boardView, board, peekFacts, peekHistory, onNote, byeWeeks, sheetRanks, advisor, nextPickLabel, available, railCall, rosterSheet }: PhoneRoomProps) {
   const setConfirmId = useCallback((next: string | null) => onPhone({ confirmId: next }), [onPhone]);
   const setPeekId = useCallback((next: string | null) => onPhone({ peekId: next }), [onPhone]);
   // Two-step picking: every Draft on this tree opens the confirm sheet; only its Confirm hands the
@@ -87,7 +88,7 @@ export function PhoneRoom({ room, view, playersById, myTurn, acts, pending, onUn
         <StreamPanel view={view} leagueName={room.leagueName} teams={room.teams} playersById={playersById} myTeamId={room.myTeamId} width="open" onWidth={noop} asPage call={railCall} onUnread={noop} />
       </div>
       <div className="flex h-[26rem] shrink-0 flex-col px-3">
-        <Dock view={view} players={room.players} playersById={playersById} myTeamId={room.myTeamId} byeWeeks={byeWeeks} queue={room.queue} advisor={advisor} nextPickLabel={nextPickLabel} withCall={false} {...phoneActs} />
+        <Dock view={view} players={room.players} playersById={playersById} myTeamId={room.myTeamId} byeWeeks={byeWeeks} queue={room.queue} advisor={advisor} nextPickLabel={nextPickLabel} available={available} withCall={false} {...phoneActs} />
       </div>
 
       {room.myTeamId === null ? null : (
@@ -101,6 +102,7 @@ export function PhoneRoom({ room, view, playersById, myTurn, acts, pending, onUn
             queue={room.queue}
             byeWeeks={byeWeeks}
             nextPickLabel={nextPickLabel}
+            available={available}
             compact
             canDraft={phoneActs.canDraft}
             submitting={phoneActs.submitting}

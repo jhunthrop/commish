@@ -8,7 +8,7 @@ import { Avatar, type AvatarSize } from "./avatar";
  * advisor's recommendation, a landing frame), and `xl` (132) is a player's OWN screen. The ring
  * is 2px at every step: the club's colour is a ring around the circle, never a plate behind it.
  */
-export type PlayerFaceSize = "sm" | "md" | "lg" | "xl";
+export type PlayerFaceSize = "xs" | "sm" | "md" | "lg" | "xl";
 
 export interface PlayerFaceProps {
   readonly player: Player;
@@ -22,6 +22,8 @@ export interface PlayerFaceProps {
  * Tailwind reads every class literally, so this is never built from a template.
  */
 const SIZE: Readonly<Record<PlayerFaceSize, { readonly ring: string; readonly avatar: AvatarSize }>> = {
+  /** 28: a sheet row at 44px, seven columns wide, where the name needs the width (P1). */
+  xs: { ring: "size-7", avatar: "xs" },
   sm: { ring: "size-8", avatar: "sm" },
   md: { ring: "size-9", avatar: "md" },
   lg: { ring: "size-14", avatar: "xl" },

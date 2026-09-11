@@ -34,6 +34,19 @@ describe("usePendingPick", () => {
     expect(result.current.pending).toBeNull();
   });
 
+  it("keeps begin's identity across a new deadline, and still reads the current one (fix round 1)", () => {
+    const submit = vi.fn();
+    const { result, rerender } = renderHook(({ deadline }) => usePendingPick(submit, deadline), { initialProps: { deadline: farDeadline() } });
+    const first = result.current.begin;
+    // The next turn's deadline is inside the squeeze: begin must submit at once, through the
+    // same function object every row already holds.
+    const soon = new Date(Date.now() + QUILT_CONFIG.undoWindowMs).toISOString();
+    rerender({ deadline: soon });
+    expect(result.current.begin).toBe(first);
+    act(() => result.current.begin("rb1"));
+    expect(submit).toHaveBeenCalledWith("rb1");
+  });
+
   it("submits immediately under the squeeze rule", () => {
     const submit = vi.fn();
     const soon = new Date(Date.now() + 1_000).toISOString();

@@ -139,8 +139,19 @@ function StreamPanelBody({ view, leagueName, teams, playersById, myTeamId, width
   // pill for picks that landed before they arrived), everything whenever the column is open,
   // frozen when it folds.
   const [seen, setSeen] = useState<number | null>(null);
+  const historyCounted = useRef(false);
   useEffect(() => {
-    if (open || (seen === null && chat.status === "ready")) setSeen(items.length);
+    if (open) {
+      setSeen(items.length);
+      return;
+    }
+    // The first paint baselines whatever is already here (the picks, whether or not the chat
+    // ever answers); the chat's first page, when it lands, is history and joins the baseline once.
+    if (seen === null) setSeen(items.length);
+    else if (!historyCounted.current && chat.status === "ready") {
+      historyCounted.current = true;
+      setSeen(items.length);
+    }
   }, [open, seen, chat.status, items.length]);
   const unread = useMemo(() => (open || seen === null ? { count: 0, mentionBy: null } : unreadSince(items, seen, chat.meUserId, me?.ownerDisplayName ?? null)), [open, items, seen, chat.meUserId, me]);
   useEffect(() => {

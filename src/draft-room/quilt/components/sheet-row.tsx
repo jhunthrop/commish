@@ -4,15 +4,17 @@ import { memo, type DragEvent } from "react";
 import { Button, PlayerFace, PositionBadge } from "@/components/ui";
 import { OddsFigure } from "../../advisor/components/odds-glance";
 import { QUILT_CONFIG } from "../state/config";
-import type { SheetRowModel } from "../state/sheet-columns";
+import type { SheetColumnKey, SheetRowModel } from "../state/sheet-columns";
+import { sheetDisplayName } from "../state/sheet-name";
 import type { RoomActs } from "./room-acts";
 
 export interface SheetRowProps extends Pick<RoomActs, "canDraft" | "submitting" | "onDraft" | "onQueueToggle" | "onPeek"> {
   readonly row: SheetRowModel;
   /** The row's top edge inside the column's window, px. */
   readonly top: number;
-  /** The Overall column shows the position and reorders by drag; a position column is a view. */
-  readonly overall: boolean;
+  /** Which column this row sits in: Overall shows the position and reorders by drag, and each
+   *  column has its own name budget (`sheetDisplayName`). */
+  readonly column: SheetColumnKey;
   readonly onMove: ((playerId: string, delta: number) => void) | null;
   readonly onDragStart: ((playerId: string) => void) | null;
   readonly onDropOn: ((playerId: string) => void) | null;
@@ -37,9 +39,10 @@ function allowDrop(event: DragEvent<HTMLElement>): void {
  * MEMOIZED over a row model whose facts are primitives, so a pick landing re-renders the row
  * that was taken and nothing else in the column.
  */
-export const SheetRow = memo(function SheetRow({ row, top, overall, onMove, onDragStart, onDropOn, first, last, canDraft, submitting, onDraft, onQueueToggle, onPeek }: SheetRowProps) {
+export const SheetRow = memo(function SheetRow({ row, top, column, onMove, onDragStart, onDropOn, first, last, canDraft, submitting, onDraft, onQueueToggle, onPeek }: SheetRowProps) {
   const { player, rank, taken, mine, queued, survived, runs } = row;
   const draggable = onDragStart !== null && !taken;
+  const overall = column === "overall";
   return (
     // The drag is a pointer-only extra over the row: the keyboard reorders through the Move up
     // and Move down buttons inside it, so the row itself never needs to be focusable.
@@ -54,16 +57,18 @@ export const SheetRow = memo(function SheetRow({ row, top, overall, onMove, onDr
       onDragOver={onDropOn === null ? undefined : allowDrop}
       onDrop={onDropOn === null ? undefined : () => onDropOn(player.id)}
       style={{ ...ROW_HEIGHT, top }}
-      className={`group absolute inset-x-1 grid grid-cols-[1.25rem_2rem_minmax(0,1fr)_auto] items-center gap-1.5 rounded-md pl-1 pr-1.5 focus-within:bg-surface focus-within:ring-1 focus-within:ring-accent hover:bg-surface hover:ring-1 hover:ring-accent ${
+      className={`group absolute inset-x-1 grid grid-cols-[1.25rem_1.75rem_minmax(0,1fr)_auto] items-center gap-1.5 rounded-md pl-1 pr-1.5 focus-within:bg-surface focus-within:ring-1 focus-within:ring-accent hover:bg-surface hover:ring-1 hover:ring-accent ${
         mine ? "self-wash" : ""
       } ${taken && !mine ? "opacity-45" : ""}`}
     >
       {queued && !taken ? <span aria-hidden="true" className="absolute -left-0.5 top-3 h-5 w-1 rounded-xs bg-self" /> : null}
       <span className="text-right font-display text-xs font-semibold tabular-nums text-text-faint">{rank}</span>
       <button type="button" aria-label={`${player.name}, open the card`} onClick={() => onPeek(player.id)} className="col-span-2 flex min-w-0 items-center gap-1.5 rounded-md text-left focus-visible:outline-2 focus-visible:outline-accent">
-        <PlayerFace player={player} size="sm" />
+        <PlayerFace player={player} size="xs" />
         <span className="flex min-w-0 flex-col leading-tight">
-          <span className={`truncate font-display text-sm font-bold text-text-primary ${taken && !mine ? "line-through decoration-2" : ""}`}>{player.name}</span>
+          <span title={player.name} className={`truncate font-display text-sm font-bold text-text-primary ${taken && !mine ? "line-through decoration-2" : ""}`}>
+            {sheetDisplayName(player.name, column)}
+          </span>
           <span className="flex min-w-0 items-center gap-1 truncate text-[10.5px] text-text-muted">
             {overall ? <PositionBadge position={player.position} size="sm" /> : null}
             <span className="truncate">
@@ -77,7 +82,7 @@ export const SheetRow = memo(function SheetRow({ row, top, overall, onMove, onDr
         <span className="text-[11px] text-text-faint">{mine ? "" : "taken"}</span>
       ) : (
         <span className="flex items-center justify-end">
-          <span className="group-focus-within:hidden group-hover:hidden">{runs === null || survived === undefined ? <span className="text-[11px] text-text-faint">–</span> : <OddsFigure survived={survived} runs={runs} form="count" />}</span>
+          <span className="group-focus-within:hidden group-hover:hidden group-data-[recomputing=true]/sheet:opacity-60">{runs === null || survived === undefined ? <span className="text-[11px] text-text-faint">–</span> : <OddsFigure survived={survived} runs={runs} form="count" />}</span>
           <span className="hidden items-center gap-0.5 group-focus-within:flex group-hover:flex">
             {onMove === null ? null : (
               <>

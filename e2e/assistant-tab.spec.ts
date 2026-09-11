@@ -36,12 +36,14 @@ async function openSoloRoom(page: Page): Promise<void> {
  *  `pool-player-name` contract; the row is re-found by it. */
 async function makeTopPick(page: Page): Promise<string> {
   const pool = page.getByRole("list", { name: AVAILABLE_PLAYERS_LIST });
-  await pool.getByRole("button", { name: /^Draft / }).first().waitFor({ timeout: 15_000 });
   const firstRow = pool.getByTestId("pool-row").first();
+  await firstRow.waitFor({ timeout: 15_000 });
   const pickedName = await firstRow.getByTestId("pool-player-name").innerText();
   const uniqueRow = pool.getByTestId("pool-row").filter({ hasText: pickedName });
   await expect(async () => {
     if ((await uniqueRow.count()) > 0) {
+      // A row's Draft reveals on hover (review H3): point at the row, then press it.
+      await uniqueRow.first().hover();
       await uniqueRow.first().getByRole("button", { name: `Draft ${pickedName}` }).click({ timeout: 5_000 });
     }
     await expect(uniqueRow).toHaveCount(0, { timeout: 5_000 });
@@ -96,6 +98,11 @@ test("mock room -> our call in the dock and the rows in Our calls, Draft above t
   await managerA.setViewportSize(PHONE);
   await expect(managerA.getByTestId("phone-room")).toBeVisible();
   const phoneFold = await measureFold(managerA, PHONE);
+  // The phone's dock has the same Our calls list: Show 5 is the call plus four rows (review M7).
+  const phone = managerA.getByTestId("phone-room");
+  await phone.getByRole("tab", { name: "Our calls" }).click();
+  await expect(phone.getByTestId("advisor-candidate")).toHaveCount(4, { timeout: 15_000 });
+  await phone.getByRole("tab", { name: "Pool" }).click();
   await managerA.screenshot({ path: `${OUT_DIR}/advisor-room-phone.png` });
   writeFileSync(`${OUT_DIR}/advisor-fold.json`, JSON.stringify({ desk: deskFold, phone: phoneFold }, null, 2));
 
@@ -107,6 +114,12 @@ test("mock room -> our call in the dock and the rows in Our calls, Draft above t
   const pickedName = await makeTopPick(managerA);
   await expect(desk.getByTestId("undo-pill")).toBeHidden({ timeout: 10_000 });
   await expect(desk.getByTestId("dock-call-name")).not.toHaveText(pickedName, { timeout: 15_000 });
+  // The call moves on to the next decision. From the last seat the snake hands 2.01 straight
+  // back, so the block is on the clock again (the truth, stated on the block), and the
+  // "updating" word goes quiet once the fresh answer lands (review M4): the element stays in
+  // the flow, `data-active` is the state.
+  await expect(desk.getByTestId("dock-call")).toHaveAttribute("data-on-clock", "true", { timeout: 15_000 });
+  await expect(desk.getByTestId("advisor-recomputing")).toHaveAttribute("data-active", "false", { timeout: 15_000 });
   await desk.getByRole("tab", { name: "Our calls" }).click();
   await expect(desk.getByTestId("advisor-candidate").filter({ hasText: pickedName })).toHaveCount(0);
   await expect(managerA.getByText("Best available.")).toHaveCount(0);

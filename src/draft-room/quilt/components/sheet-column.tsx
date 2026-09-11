@@ -77,7 +77,9 @@ export const SheetColumn = memo(function SheetColumn({ column, onMove, onPlace, 
   // The drop reads the layout through a ref, so the handler keeps its identity across picks and
   // the memoized rows it reaches do not re-render for a layout they are not part of.
   const layoutRef = useRef(layout);
-  layoutRef.current = layout;
+  useEffect(() => {
+    layoutRef.current = layout;
+  }, [layout]);
   const onDropOn = useCallback(
     (targetId: string) => {
       const moved = dragging.current;
@@ -116,7 +118,7 @@ export const SheetColumn = memo(function SheetColumn({ column, onMove, onPlace, 
                 key={item.row.player.id}
                 row={item.row}
                 top={top}
-                overall={column.key === "overall"}
+                column={column.key}
                 onMove={onMove}
                 onDragStart={onPlace === null ? null : onDragStart}
                 onDropOn={onPlace === null ? null : onDropOn}

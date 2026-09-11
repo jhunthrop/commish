@@ -68,6 +68,12 @@ test("the wall, the rail, the dock's one verb, your sheet, and a pick landing as
   await expect(verb).toHaveText(/^Draft .+/);
   expect(await solidPillCount(managerA)).toBe(1);
   await expect(managerA.getByTestId("dock-call").getByTestId("big-number")).toBeVisible();
+  // A pool row's Draft reveals on hover only (review H3): at rest the viewport holds one verb.
+  const firstPoolRow = managerA.getByTestId("pool-row").first();
+  await expect(firstPoolRow.getByRole("button", { name: /^Draft / })).toBeHidden();
+  await firstPoolRow.hover();
+  await expect(firstPoolRow.getByRole("button", { name: /^Draft / })).toBeVisible();
+  await managerA.mouse.move(0, 0);
   await managerA.waitForTimeout(400);
   await managerA.screenshot({ path: `${OUT_DIR}/draft-room-wall-desktop-${theme}.png` });
 

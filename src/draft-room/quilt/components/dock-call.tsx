@@ -15,12 +15,15 @@ export interface DockCallProps extends Pick<RoomActs, "canDraft" | "submitting" 
   readonly myTeamId: string | null;
   readonly playersById: ReadonlyMap<string, Player>;
   readonly advisor: AdvisorView | null;
+  /** True while a fresh answer is on its way: the figure dims and the block says "updating". */
   readonly recomputing: boolean;
   /** The caller's queue, best first. */
   readonly queue: readonly string[];
   readonly byeWeeks: ReadonlyMap<string, number>;
   /** "3.07": your next pick after this one, the odds' basis. */
   readonly nextPickLabel: string | null;
+  /** The room's one available set, built once by the room. */
+  readonly available: ReadonlySet<string>;
   /** Phone: the why hides so the fixed block stays short. */
   readonly compact?: boolean;
 }
@@ -36,18 +39,19 @@ export interface CallModel {
 }
 
 /**
- * Our call, or the honest fallback (ruling 3): the advisor's pick when it has one for this
- * turn; failing that the top of your queue; failing that the best player left on our board.
- * The source is printed beside the name, so a queue pick is never dressed as our call.
+ * Our call, or the honest fallback (ruling 3): the advisor's pick when it has one for the pick
+ * the advice decides (`AdvisorView.pickNumber`, yours, never the room's on-clock pick); failing
+ * that the top of your queue; failing that the best player left on our board. The source is
+ * printed beside the name, so a queue pick is never dressed as our call.
  */
 export function callFor(view: DraftStateView, advisor: AdvisorView | null, queue: readonly string[], available: ReadonlySet<string>, playersById: ReadonlyMap<string, Player>, teamCount: number): CallModel | null {
   const pick = advisor?.pick ?? null;
   const runs = advisor === null || advisor.odds === null || advisor.odds.runs === 0 ? null : advisor.odds.runs;
-  if (pick !== null) {
+  if (pick !== null && advisor !== null) {
     const player = playersById.get(pick.playerId);
     if (player !== undefined && available.has(player.id)) {
-      const survived = runs === null || pick.makeItBack === null ? null : Math.round(pick.makeItBack.survival * pick.makeItBack.runs);
-      return { player, source: `our call for ${pickLabel(view.pickNumber, teamCount)}`, why: pick.why, fills: pick.fillsSlot, survived, runs: pick.makeItBack?.runs ?? null };
+      const survived = pick.makeItBack === null ? null : Math.round(pick.makeItBack.survival * pick.makeItBack.runs);
+      return { player, source: `our call for ${pickLabel(advisor.pickNumber, teamCount)}`, why: pick.why, fills: pick.fillsSlot, survived, runs: pick.makeItBack?.runs ?? null };
     }
   }
   const queued = queue.find((playerId) => available.has(playerId));
@@ -56,7 +60,7 @@ export function callFor(view: DraftStateView, advisor: AdvisorView | null, queue
   const player = playersById.get(fallbackId);
   if (player === undefined) return null;
   const survived = runs === null ? null : (advisor?.odds?.survived[player.id] ?? null);
-  return { player, source: queued !== undefined ? "top of your queue" : "best left on our board", why: null, fills: null, survived, runs };
+  return { player, source: queued !== undefined ? "top of your queue" : "best left on our board", why: null, fills: null, survived: runs === null ? null : survived, runs };
 }
 
 /** "QB 0/1 · RB 1/2 · FLEX 0/1": every starting spot's fill, from the engine's own roster. */
@@ -74,17 +78,22 @@ function fillChips(view: DraftStateView, myTeamId: string | null): readonly { re
 
 const SLOT_WORD: Partial<Record<RosterSlotType, string>> = { DEF: "D/ST" };
 
+/** The figure's basis: the runs and the pick they still have him at, or why there is no number. */
+export function oddsBasis(runs: number | null, nextPickLabel: string | null): string {
+  return runs === null || nextPickLabel === null ? "no runs yet" : `of ${runs} runs, still there at ${nextPickLabel}`;
+}
+
 /**
  * OUR CALL BESIDE THE VERB (founder ruling 3, 2026-09-10): the advice sits with the action
  * whatever the stream's width. His face on the club ring, his name largest, the position, the
  * club, the slot he fills and where the name came from, the why in two lines, and the one big
  * number with its basis (how many of the runs still have him at your next pick). On your clock
  * the room's ONE solid pill drafts him; off it the block carries a quiet Queue and no verb at
- * all (P3: never a verb for a decision you cannot make yet). The fill line under it is your
- * starting roster, spot by spot.
+ * all (P3: never a verb for a decision you cannot make yet). While a fresh answer is on its way
+ * the block says "updating" and the figure dims, so a number from the pick before never passes
+ * as current. The fill line under it is your starting roster, spot by spot.
  */
-export const DockCall = memo(function DockCall({ view, myTeamId, playersById, advisor, recomputing, queue, byeWeeks, nextPickLabel, compact = false, canDraft, submitting, queuedPlayerIds, onDraft, onQueueToggle }: DockCallProps) {
-  const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
+export const DockCall = memo(function DockCall({ view, myTeamId, playersById, advisor, recomputing, queue, byeWeeks, nextPickLabel, available, compact = false, canDraft, submitting, queuedPlayerIds, onDraft, onQueueToggle }: DockCallProps) {
   const teamCount = view.draftOrder.length;
   const call = useMemo(() => (myTeamId === null || teamCount === 0 ? null : callFor(view, advisor, queue, available, playersById, teamCount)), [view, advisor, queue, available, playersById, myTeamId, teamCount]);
   const fills = useMemo(() => fillChips(view, myTeamId), [view, myTeamId]);
@@ -108,7 +117,7 @@ export const DockCall = memo(function DockCall({ view, myTeamId, playersById, ad
   const bye = byeWeeks.get(player.nflTeam);
   const queued = queuedPlayerIds.has(player.id);
   return (
-    <div data-testid="dock-call" className={`grid h-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3`}>
+    <div data-testid="dock-call" data-on-clock={canDraft ? "true" : "false"} className="grid h-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3">
       <div className="flex min-w-0 items-center gap-3">
         <PlayerFace player={player} size={compact ? "md" : "lg"} />
         <div className="min-w-0">
@@ -131,11 +140,14 @@ export const DockCall = memo(function DockCall({ view, myTeamId, playersById, ad
           )}
         </div>
       </div>
-      <BigNumber
-        size={compact ? "sm" : "md"}
-        value={call.survived === null ? null : String(call.survived)}
-        basis={call.runs === null || nextPickLabel === null ? "your last pick, nothing to wait for" : `of ${call.runs} runs still there at ${nextPickLabel}`}
-      />
+      <div className="flex flex-col items-end">
+        <BigNumber size={compact ? "sm" : "md"} value={call.survived === null ? null : String(call.survived)} basis={oddsBasis(call.runs, nextPickLabel)} className={recomputing ? "opacity-60" : ""} />
+        {/* Always in the flow under the figure, silent when idle: a word appearing must never
+            shift the block, and here it takes no width from the name line. */}
+        <span data-testid="advisor-recomputing" data-active={recomputing ? "true" : "false"} aria-hidden={!recomputing} className={`text-xs text-text-faint ${recomputing ? "" : "invisible"}`}>
+          updating
+        </span>
+      </div>
       <div className="col-span-2 flex flex-col gap-1.5">
         {canDraft ? (
           <Button data-testid="dock-verb" variant="verb" size="lg" className="w-full" disabled={submitting} onClick={() => onDraft(player.id)}>

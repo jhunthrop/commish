@@ -16,7 +16,7 @@ const PLAYERS: readonly Player[] = Array.from({ length: 200 }, (_, index) => ({
 
 const available = new Set(PLAYERS.map((player) => player.id));
 
-function renderPool(canDraft = false) {
+function renderPool(canDraft = false, recomputing = false) {
   return render(
     <PoolList
       leagueId="l1"
@@ -25,6 +25,7 @@ function renderPool(canDraft = false) {
       byeWeeks={new Map([["KC", 10]])}
       odds={{ pickNumber: 20, runs: 100, survived: { rb1: 12 } }}
       nextPickLabel="2.07"
+      recomputing={recomputing}
       canDraft={canDraft}
       submitting={false}
       queuedPlayerIds={new Set(["rb2"])}
@@ -48,7 +49,7 @@ describe("PoolList (the pool is the dock)", () => {
     expect(within(first).getByTestId("pool-player-team")).toHaveTextContent("KC");
     expect(first).toHaveTextContent("bye 10");
     expect(within(first).getByTestId("big-number")).toHaveTextContent("12");
-    expect(within(first).getByTestId("big-number")).toHaveTextContent("of 100 runs at 2.07");
+    expect(within(first).getByTestId("big-number")).toHaveTextContent("of 100 runs, still there at 2.07");
     expect(within(first).getByRole("button", { name: "Queue Back 1" })).toBeInTheDocument();
     expect(within(listed[1]!).getByRole("button", { name: "Remove Back 2 from your queue" })).toHaveAttribute("aria-pressed", "true");
     // A player the runs did not reach prints a dash with the reason, never a zero.
@@ -74,10 +75,22 @@ describe("PoolList (the pool is the dock)", () => {
     expect(rows()).toHaveLength(DRAFT_ROOM_CONFIG.poolPageSize);
   });
 
-  it("on your clock every row's Draft is the outlined pill: the dock's big verb is the room's one solid", () => {
+  it("on your clock a row's Draft is the outlined pill and reveals on hover or focus only: the viewport rests with the dock's one solid", () => {
     renderPool(true);
     const draft = within(rows()[0]!).getByRole("button", { name: "Draft Back 1" });
     expect(draft.className).not.toContain("bg-accent");
     expect(draft.className).toContain("border-edge");
+    const reveal = within(rows()[0]!).getByTestId("pool-draft-reveal");
+    expect(reveal).toContainElement(draft);
+    expect(reveal.className).toContain("hidden");
+    expect(reveal.className).toContain("group-hover/row:inline-flex");
+    expect(reveal.className).toContain("group-focus-within/row:inline-flex");
+  });
+
+  it("says updating once and dims every figure while the odds are being recomputed, without touching the rows", () => {
+    renderPool(false, true);
+    expect(screen.getByTestId("pool-recomputing")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("pool-list")).toHaveAttribute("data-recomputing", "true");
+    expect(within(rows()[0]!).getByTestId("big-number").className).toContain("group-data-[recomputing=true]/pool:opacity-60");
   });
 });
