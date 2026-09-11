@@ -4,7 +4,7 @@
 // the screen draws. Neither touches a database, which is what lets the writer, the request path and
 // the tests all run the same assembly.
 import type { Player } from "@/domain/player";
-import type { PlayerOwner, PlayerSeasonBody } from "@/league-service/player-body";
+import type { PlayerLeagueDraftPhase, PlayerOwner, PlayerSeasonBody } from "@/league-service/player-body";
 import {
   pointsPerGameOf,
   totalsFromLog,
@@ -82,9 +82,10 @@ export interface PeekDocumentLiveFacts {
    *  caller with no reader to compare against, which renders as no ring rather than a guess. */
   readonly owner?: PlayerOwner | null;
   readonly isMockLeague: boolean;
-  /** Whether this league's draft has completed — the one fact the header's verb turns on. Omitted
-   *  by a caller that has not read it, which reads as "not yet", never as "go ahead and add him". */
-  readonly hasDrafted?: boolean;
+  /** Where this league's draft stands — the one fact the header's verb turns on. Omitted by a
+   *  caller that has not read it, which reads as `"predraft"`: never an act we cannot stand
+   *  behind, and never a link out of a draft that might be running. */
+  readonly draftPhase?: PlayerLeagueDraftPhase;
   /**
    * This league's own regular season length. It caps the CURRENT season's week axis and nothing
    * else: a fourteen-week league never draws a week it does not play. A prior season has no future
@@ -124,7 +125,7 @@ export function hydratePeekDocument(document: PeekDocument, live: PeekDocumentLi
     ownedBy: live.ownedBy,
     owner: live.owner ?? null,
     isMockLeague: live.isMockLeague,
-    hasDrafted: live.hasDrafted ?? false,
+    draftPhase: live.draftPhase ?? "predraft",
     injuryDesignation: document.injuryDesignation,
     log: stats.log,
     totals: stats.totals,

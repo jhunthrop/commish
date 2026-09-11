@@ -61,43 +61,58 @@ describe("the one big number and its basis", () => {
 });
 
 /**
- * THE VERB FOLLOWS THE LEAGUE'S STATE (fix round 1, M2). It used to read only `isMockLeague`, so a
- * manager standing in a league whose draft has not run was offered "Add him" for every player on
- * earth — before a draft EVERY player is un-held, and an add is an act he cannot make. What he can
- * do is go and study the board.
+ * THE VERB FOLLOWS THE LEAGUE'S DRAFT (fix rounds 1's M2 and 2's H1). It read only `isMockLeague`
+ * at first, so a pre-draft manager was offered an add he cannot make; then only "has it drafted",
+ * which folded a RUNNING draft in with a scheduled one. The peek is mounted inside the draft room,
+ * so that second version put a solid pill linking OUT of a draft into the middle of a live one.
+ * Three phases, and the surface matters in exactly one of them.
  */
-const DRAFTED = { ...BODY, hasDrafted: true };
+const DRAFTED = { ...BODY, draftPhase: "complete" as const };
+const LIVE = { ...BODY, draftPhase: "live" as const };
 
 describe("the one verb", () => {
   it("offers a trade to the manager who has him, by his own first name", () => {
-    expect(verbFor({ ...DRAFTED, owner: OWNER }, "lg1")).toEqual({ label: "Offer Rey a trade", href: "/app/leagues/lg1/trades" });
+    expect(verbFor({ ...DRAFTED, owner: OWNER }, "lg1", "full")).toEqual({ label: "Offer Rey a trade", href: "/app/leagues/lg1/trades" });
   });
 
   /** HELD BY YOU IS NOT A VERB. There is nothing to do about a player you already have from HIS
    *  page, and a solid pill that merely navigates away is the second call to action P3 rules out.
    *  The header states the fact quietly instead (`Your player`, asserted on the render below). */
   it("offers nothing solid when he is already yours", () => {
-    expect(verbFor({ ...DRAFTED, owner: { ...OWNER, relation: "you" } }, "lg1")).toBeNull();
+    expect(verbFor({ ...DRAFTED, owner: { ...OWNER, relation: "you" } }, "lg1", "full")).toBeNull();
   });
 
   it("offers to add a free agent once the league has drafted", () => {
-    expect(verbFor(DRAFTED, "lg1")).toEqual({ label: "Add him", href: "/app/leagues/lg1/players" });
+    expect(verbFor(DRAFTED, "lg1", "full")).toEqual({ label: "Add him", href: "/app/leagues/lg1/players" });
   });
 
   it("sends a pre-draft manager to the board with him in view, never an add he cannot make", () => {
-    expect(verbFor(BODY, "lg1")).toEqual({ label: "Open the board", href: "/app/draft/board?league=lg1&q=James+Cook" });
+    expect(verbFor(BODY, "lg1", "full")).toEqual({ label: "Open the board", href: "/app/draft/board?league=lg1&q=James+Cook" });
+    expect(verbFor(BODY, "lg1", "peek")).toEqual({ label: "Open the board", href: "/app/draft/board?league=lg1&q=James+Cook" });
+  });
+
+  /**
+   * THE PEEK NEVER CARRIES A NAVIGATION VERB WHILE A DRAFT IS LIVE (fix round 2, H1). The room has
+   * its own Draft verb and the peek is raised INSIDE it (`draft-room.tsx`), so a pill that leaves
+   * the room is a way out of a thing the manager is in the middle of. The full page is not inside
+   * the room and keeps the board link.
+   */
+  it("carries no verb in the peek while the draft is live, and keeps the board link on the page", () => {
+    expect(verbFor(LIVE, "lg1", "peek")).toBeNull();
+    expect(verbFor(LIVE, "lg1", "full")).toEqual({ label: "Open the board", href: "/app/draft/board?league=lg1&q=James+Cook" });
   });
 
   /** An absent `hasDrafted` is a body nobody told, and "we were not told" is answered the same way
    *  as "not yet": the board, never an add we cannot stand behind. */
   it("treats a body that was never told as pre-draft", () => {
-    expect(verbFor({ ...BODY, owner: null }, "lg1")?.label).toBe("Open the board");
+    expect(verbFor({ ...BODY, owner: null }, "lg1", "full")?.label).toBe("Open the board");
   });
 
   /** A mock room's roster fact is a seeded bot's, so every verb it would offer is about a room that
    *  does not exist the way a real league does. */
   it("offers nothing at all in a practice room", () => {
-    expect(verbFor({ ...DRAFTED, isMockLeague: true }, "lg1")).toBeNull();
+    expect(verbFor({ ...DRAFTED, isMockLeague: true }, "lg1", "full")).toBeNull();
+    expect(verbFor({ ...DRAFTED, isMockLeague: true }, "lg1", "peek")).toBeNull();
   });
 });
 
@@ -146,16 +161,27 @@ describe("PlayerHeader", () => {
   });
 
   it("carries exactly one solid verb per viewport (P3)", async () => {
-    await renderSurface(<PlayerHeader body={{ ...BODY, hasDrafted: true, owner: OWNER }} leagueId="lg1" depth="full" />, async ({ container }) => {
+    await renderSurface(<PlayerHeader body={{ ...DRAFTED, owner: OWNER }} leagueId="lg1" depth="full" />, async ({ container }) => {
       expect(container.querySelectorAll(".bg-accent")).toHaveLength(1);
       expect(screen.getByRole("link", { name: "Offer Rey a trade" })).toBeInTheDocument();
     });
   });
 
   it("states a player of yours as a quiet chip and draws no solid pill at all", async () => {
-    await renderSurface(<PlayerHeader body={{ ...BODY, hasDrafted: true, owner: { ...OWNER, relation: "you" } }} leagueId="lg1" depth="full" />, async ({ container }) => {
+    await renderSurface(<PlayerHeader body={{ ...DRAFTED, owner: { ...OWNER, relation: "you" } }} leagueId="lg1" depth="full" />, async ({ container }) => {
       expect(screen.getByText("Your player")).toBeInTheDocument();
       expect(container.querySelectorAll(".bg-accent")).toHaveLength(0);
+    });
+  });
+
+  /** The ruling, asserted on the rendered peek rather than on the pure function alone: a peek
+   *  raised inside a live draft draws no solid Court blue pill at all. */
+  it("draws zero solid pills in the peek while a draft is live", async () => {
+    await renderSurface(<PlayerHeader body={{ ...LIVE, owner: OWNER }} leagueId="lg1" depth="peek" trailing={<a href="/x">Full page</a>} />, async ({ container }) => {
+      expect(container.querySelectorAll(".bg-accent")).toHaveLength(0);
+      expect(screen.queryByRole("link", { name: "Open the board" })).not.toBeInTheDocument();
+      // The way through to the full page is still there, quiet, because it is not a verb.
+      expect(screen.getByRole("link", { name: "Full page" })).toBeInTheDocument();
     });
   });
 

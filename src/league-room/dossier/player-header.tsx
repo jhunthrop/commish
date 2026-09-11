@@ -60,29 +60,35 @@ export function heroNumberFor(body: PlayerSeasonBody): { readonly value: string 
 const RING = { you: "self", rival: "rival", other: undefined } as const;
 
 /**
- * THE ONE THING YOU CAN DO WITH HIM FROM HERE (P3) — decided by the league's STATE and by who holds
- * him, because those two together are what change the act. Four answers and each is the honest one:
+ * THE ONE THING YOU CAN DO WITH HIM FROM HERE (P3) — decided by where the league's DRAFT stands, by
+ * who holds him, and in exactly one case by which surface is asking:
  *
- * - **before the league has drafted**: the board, with his name already in its search. Every player
- *   is un-held before a draft, so the first cut of this offered "Add him" to a manager who cannot
- *   add anybody yet (fix round 1, M2). What he can actually do about a player in August is study
- *   him against the board, which is the surface this product is proudest of.
- * - **in season, un-held**: "Add him", to the wire.
- * - **in season, held by you**: NOTHING SOLID. There is nothing to do about a player you already
- *   have from HIS own page, and a loud pill that merely navigates elsewhere is the second call to
- *   action P3 rules out. The header states the fact as a quiet chip instead.
- * - **in season, held by somebody else**: a trade, offered to him by his own first name.
+ * - **pre-draft**: the board, with his name already in its search. Every player is un-held before a
+ *   draft, so the first cut offered "Add him" to a manager who cannot add anybody yet (fix round 1,
+ *   M2). What he can do about a player in August is study him against the board.
+ * - **a LIVE draft, in the peek**: NOTHING. The peek is raised inside the draft room
+ *   (`draft-room.tsx` mounts its own `PlayerPeekHost`), the room's own Draft button is the verb of
+ *   that moment, and a second solid pill there is a link OUT of a draft the manager is in the
+ *   middle of (fix round 2, H1). This is the one branch that reads `depth`, and it is why this
+ *   takes a phase rather than a flag.
+ * - **a live draft, on the full page**: the board keeps its link. The page is not inside the room.
+ * - **after the draft, un-held**: "Add him", to the wire.
+ * - **after the draft, held by you**: NOTHING SOLID. There is nothing to do about a player you
+ *   already have from HIS own page, and a loud pill that merely navigates elsewhere is the second
+ *   call to action P3 rules out. The header states the fact as a quiet chip instead.
+ * - **after the draft, held by somebody else**: a trade, offered to him by his own first name.
  *
  * `null` in a mock room too, where the roster fact is a seeded bot's and every verb it would offer
- * is about a room that does not exist the way a real league does (the same gate the roster sentence
- * beside it keeps).
+ * is about a room that does not exist the way a real league does.
  *
- * `hasDrafted` ABSENT READS AS NOT YET, never as "go ahead": a body nobody told is a body we cannot
- * stand behind an add for.
+ * `draftPhase` ABSENT READS AS PRE-DRAFT: a body nobody told is a body we cannot stand behind an
+ * add for.
  */
-export function verbFor(body: PlayerSeasonBody, leagueId: string): { readonly label: string; readonly href: string } | null {
+export function verbFor(body: PlayerSeasonBody, leagueId: string, depth: "peek" | "full"): { readonly label: string; readonly href: string } | null {
   if (body.isMockLeague) return null;
-  if (body.hasDrafted !== true) {
+  const phase = body.draftPhase ?? "predraft";
+  if (phase !== "complete") {
+    if (phase === "live" && depth === "peek") return null;
     // `q` seeds the board's own search, so he is on screen when it opens rather than somewhere in
     // three hundred rows. `league` is this league, so the numbers are computed under its rules.
     return { label: "Open the board", href: `/app/draft/board?league=${encodeURIComponent(leagueId)}&q=${encodeURIComponent(body.player.name).replace(/%20/g, "+")}` };
@@ -133,7 +139,7 @@ function OwnerChip({ body }: { readonly body: PlayerSeasonBody }) {
 
 export function PlayerHeader({ body, leagueId, depth, trailing }: PlayerHeaderProps) {
   const hero = heroNumberFor(body);
-  const verb = verbFor(body, leagueId);
+  const verb = verbFor(body, leagueId, depth);
   const byeWeek = body.dossier?.byeWeek ?? null;
 
   const inner = (
@@ -165,7 +171,7 @@ export function PlayerHeader({ body, leagueId, depth, trailing }: PlayerHeaderPr
           {trailing}
           {/* HE IS ALREADY YOURS, SO THERE IS NO VERB (P3) — the fact, in the amber that means you,
               at chip size. It is not a control and never pretends to be one. */}
-          {verb === null && (body.owner?.relation ?? null) === "you" ? (
+          {verb === null && (body.draftPhase ?? "predraft") === "complete" && (body.owner?.relation ?? null) === "you" ? (
             <span className="rounded-pill bg-self-glow px-3 py-1 text-sm font-semibold text-self-ink">Your player</span>
           ) : null}
           {verb === null ? null : (

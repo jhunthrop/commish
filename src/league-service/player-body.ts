@@ -79,6 +79,9 @@ import type { PlayerGameLogRow, PlayerSeasonTotals, PlayerWeekView } from "./pla
  * league. It is never a standing grudge, never a division, never a record — those would each be a
  * different claim and the screen states this one.
  */
+/** Where the league this body was read under stands in its own draft — see `draftPhase`. */
+export type PlayerLeagueDraftPhase = "predraft" | "live" | "complete";
+
 export type PlayerOwnerRelation = "you" | "rival" | "other";
 
 /**
@@ -151,17 +154,21 @@ export interface PlayerSeasonBody {
    */
   readonly isMockLeague: boolean;
   /**
-   * WHETHER THIS LEAGUE HAS DRAFTED (`drafts.status = 'complete'`), because the one thing a manager
-   * can do about a player depends on it and nothing else in this body says so. Before a draft EVERY
-   * player is un-held, so "Add him" — the honest verb for a free agent in a running season — is an
-   * act a pre-draft manager cannot make. A league with no `drafts` row has not drafted, which is the
-   * same answer `commitDraftResults` would give.
+   * WHERE THIS LEAGUE'S DRAFT IS, because the one thing a manager can do about a player depends on
+   * it and nothing else in this body says so. Three states, not a boolean (fix round 2, H1): the
+   * middle one is the whole point.
+   *
+   * - `"predraft"` — `drafts.status` is `'scheduled'`, `'dissolved'`, or there is no draft row at
+   *   all. EVERY player is un-held here, so "Add him" is an act this manager cannot make.
+   * - `"live"` — `'in_progress'`. The room is running, it has its own Draft verb, and any other
+   *   solid pill inside it is a link OUT of a draft a manager is in the middle of.
+   * - `"complete"` — the season's own states apply: free agent, yours, or somebody else's.
    *
    * Optional on the type, the rule `capsule`, `dossier` and `owner` keep: a hand-built fixture need
-   * not learn about it, and `undefined` reads as "we were not told", which the header treats as the
-   * pre-draft case rather than offering an add it cannot stand behind.
+   * not learn about it, and `undefined` reads as `"predraft"`, which offers no act we cannot stand
+   * behind.
    */
-  readonly hasDrafted?: boolean;
+  readonly draftPhase?: PlayerLeagueDraftPhase;
   /** His current designation from the harvested injuries feed ("Q", "O", "IR"), or `null` when
    *  the feed does not name him — absence means healthy as far as the source says. */
   readonly injuryDesignation: string | null;

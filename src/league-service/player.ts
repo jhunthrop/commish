@@ -33,11 +33,11 @@ import { boardFormatForRules, boardSourceFor } from "@/projections/preseason/boa
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { type ScoringRules } from "@/scoring";
 import { scoringHashOf } from "@/scoring/hash";
-import type { PlayerOwner, PlayerOwnerRelation, PlayerSeasonBody } from "./player-body";
+import type { PlayerLeagueDraftPhase, PlayerOwner, PlayerOwnerRelation, PlayerSeasonBody } from "./player-body";
 import { currentWeekOf } from "./schedule";
 import { writeLeagueScoringHash } from "./scoring-hash";
 
-export type { PlayerOwner, PlayerOwnerRelation, PlayerSeasonBody } from "./player-body";
+export type { PlayerLeagueDraftPhase, PlayerOwner, PlayerOwnerRelation, PlayerSeasonBody } from "./player-body";
 export type { PlayerGameLogRow, PlayerSeasonTotals, PlayerWeekView } from "./player-season-stats";
 
 /** The outermost edge is the only place a wall clock is allowed, exactly as every other service
@@ -74,7 +74,7 @@ interface DocumentRead {
   readonly document: PeekDocument;
   readonly isMockLeague: boolean;
   readonly seasonWeeks: number;
-  readonly hasDrafted: boolean;
+  readonly draftPhase: PlayerLeagueDraftPhase;
   readonly holder: HolderRow | null;
 }
 
@@ -164,20 +164,28 @@ async function ownerFor(db: Db, leagueId: string, row: HolderRow | null, viewerU
  * `seasonProgress` does.
  */
 /**
- * HAS THIS LEAGUE DRAFTED, as a correlated scalar in the same statement — `drafts.status` reaching
- * `'complete'` is the product's single definition of it (`commitDraftResults` is what writes it), so
+ * WHERE THIS LEAGUE'S DRAFT STANDS, as a correlated scalar in the same statement — `drafts.status`
+ * is the product's single definition of it (`commitDraftResults` is what writes `'complete'`), so
  * this is a read of that authority and never a second opinion inferred from empty rosters. A league
- * with no `drafts` row answers `false`, which is the same thing that authority would say.
+ * with no `drafts` row answers `null`, which `draftPhaseOf` reads as pre-draft, the same thing that
+ * authority would say.
  *
- * The header's one verb turns on it: before a draft every player is un-held, and "Add him" is an act
- * a pre-draft manager cannot make.
+ * THREE STATES, NOT A BOOLEAN (fix round 2, H1). The first cut asked only "has it drafted", which
+ * folded a RUNNING draft in with a scheduled one — and the peek is mounted inside the draft room
+ * (`draft-room.tsx`), so a live room offered a solid pill linking OUT of the draft the manager was
+ * in the middle of. The middle state is the whole reason this is not a flag.
  */
-const leagueHasDrafted = sql<boolean>`(
-  select exists(
-    select 1 from ${drafts}
-    where ${drafts.leagueId} = ${leagues.id} and ${drafts.status} = 'complete'
-  )
+const leagueDraftStatus = sql<string | null>`(
+  select ${drafts.status} from ${drafts} where ${drafts.leagueId} = ${leagues.id} limit 1
 )`;
+
+/** `drafts.status` as the body's own three states. `'dissolved'` and an absent row are pre-draft:
+ *  no draft has happened, so no season verb can be honest. */
+function draftPhaseOf(status: string | null): PlayerLeagueDraftPhase {
+  if (status === "complete") return "complete";
+  if (status === "in_progress") return "live";
+  return "predraft";
+}
 
 const scheduledWeeks = sql<number>`(
   select count(distinct ${matchups.weekNumber})::int
@@ -198,7 +206,7 @@ async function readPeekDocumentForLeague(db: Db, leagueId: string, playerId: str
       document: playerPeekDocuments.document,
       isMock: leagues.isMock,
       seasonWeeks: scheduledWeeks,
-      hasDrafted: leagueHasDrafted,
+      draftStatus: leagueDraftStatus,
       holder: holder(playerId),
     })
     .from(leagues)
@@ -219,7 +227,7 @@ async function readPeekDocumentForLeague(db: Db, leagueId: string, playerId: str
     document: row.document,
     isMockLeague: row.isMock,
     seasonWeeks: row.seasonWeeks === 0 ? LEAGUE_CONFIG.regularSeasonWeeks : row.seasonWeeks,
-    hasDrafted: row.hasDrafted,
+    draftPhase: draftPhaseOf(row.draftStatus),
     holder: row.holder,
   };
 }
@@ -252,7 +260,7 @@ export async function playerSeason(
       ownedBy: owner?.teamName ?? null,
       owner,
       isMockLeague: read.isMockLeague,
-      hasDrafted: read.hasDrafted,
+      draftPhase: read.draftPhase,
       seasonWeeks: read.seasonWeeks,
       requestedSeason,
     });
@@ -284,13 +292,13 @@ interface LeagueFacts {
   readonly scoringHash: string;
   readonly isMockLeague: boolean;
   readonly seasonWeeks: number;
-  readonly hasDrafted: boolean;
+  readonly draftPhase: PlayerLeagueDraftPhase;
   readonly holder: HolderRow | null;
 }
 
 async function leagueFactsFor(db: Db, leagueId: string, playerId: string): Promise<LeagueFacts | null> {
   const [league] = await db
-    .select({ id: leagues.id, isMock: leagues.isMock, seasonWeeks: scheduledWeeks, hasDrafted: leagueHasDrafted, holder: holder(playerId) })
+    .select({ id: leagues.id, isMock: leagues.isMock, seasonWeeks: scheduledWeeks, draftStatus: leagueDraftStatus, holder: holder(playerId) })
     .from(leagues)
     .where(eq(leagues.id, leagueId));
   if (league === undefined) return null;
@@ -304,7 +312,7 @@ async function leagueFactsFor(db: Db, leagueId: string, playerId: string): Promi
     scoringHash: scoringHashOf(rules),
     isMockLeague: league.isMock,
     seasonWeeks: league.seasonWeeks === 0 ? LEAGUE_CONFIG.regularSeasonWeeks : league.seasonWeeks,
-    hasDrafted: league.hasDrafted,
+    draftPhase: draftPhaseOf(league.draftStatus),
     holder: league.holder,
   };
 }
@@ -386,7 +394,7 @@ function offBoardBody(player: Player, facts: LeagueFacts, now: Date, requestedSe
     ownedBy: owner?.teamName ?? null,
     owner,
     isMockLeague: facts.isMockLeague,
-    hasDrafted: facts.hasDrafted,
+    draftPhase: facts.draftPhase,
     seasonWeeks: facts.seasonWeeks,
     requestedSeason,
   });
@@ -457,7 +465,7 @@ async function playerSeasonOnMiss(
     ownedBy: owner?.teamName ?? null,
     owner,
     isMockLeague: facts.isMockLeague,
-    hasDrafted: facts.hasDrafted,
+    draftPhase: facts.draftPhase,
     seasonWeeks: facts.seasonWeeks,
     requestedSeason,
   });

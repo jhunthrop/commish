@@ -38,6 +38,12 @@ const CSV_HEADER = [
   // this screen is exactly where "Projected pts" would otherwise lose its basis.
   "Scoring",
   "Projected pts",
+  // THE ON-SCREEN RANKING KEY (fix round 2). The board's rows are ordered by this and, since the
+  // Sideline round, print it as their one number — so a file read away from the screen needs it or
+  // a reader cannot reproduce the order he was looking at. Beside "Projected pts" and never
+  // instead of it: a value over a replacement player and a season point total are different
+  // claims, and the file states both.
+  "Points over replacement",
   "Floor",
   "Ceiling",
   "ADP",
@@ -90,6 +96,7 @@ function rowToCsv(row: BoardRow, dollarValue: number | null, scoringLabel: strin
     row.byeWeek === null ? "" : String(row.byeWeek),
     scoringLabel,
     csvNumber(row.projectedPoints),
+    csvNumber(row.valueOverReplacement),
     csvNumber(row.floorPoints),
     csvNumber(row.ceilingPoints),
     csvNumber(row.marketAdp),

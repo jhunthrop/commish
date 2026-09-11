@@ -60,8 +60,11 @@ export function SeasonChartFallback({
               bars are read out of their own archive rather than out of this league's live table, and
               the whole point of drawing them is that they are a record of games that were played. */}
           <p className="text-xs text-text-faint" data-testid="season-basis">
-            {`Each bar is one week of ${body.season}, in fantasy points under this league's scoring.`}
-            {body.kdefSeason === null ? "" : " A record of games that were played, not a forecast."}
+            {/* The noun-phrase register every other basis caption on this product uses ("Projected
+                for the season, PPR, 2026"), not a sentence about the chart: a caption names what the
+                figures ARE and stops. */}
+            {`Week by week, ${body.season}, this league's scoring`}
+            {body.kdefSeason === null ? "" : ". A record of games that were played, not a forecast."}
           </p>
         </div>
       ) : (

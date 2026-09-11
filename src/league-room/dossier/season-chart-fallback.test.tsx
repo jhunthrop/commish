@@ -90,7 +90,7 @@ describe("SeasonChartFallback", () => {
     const basis = screen.getByTestId("season-basis");
     // The line every chart carries, plus the one sentence only these two positions earn: their bars
     // are a record of games that were played, never a forecast.
-    expect(basis.textContent).toContain("Each bar is one week of 2025");
+    expect(basis.textContent).toContain("Week by week, 2025, this league's scoring");
     expect(basis.textContent).toContain("A record of games that were played, not a forecast.");
     expect(basis.textContent).not.toMatch(/[—;]/);
   });
@@ -105,8 +105,7 @@ describe("SeasonChartFallback", () => {
   it("names what a bar is under every chart, not only a kicker's", () => {
     render(<SeasonChartFallback body={bodyFor()} switcher={undefined} played />);
     const basis = screen.getByTestId("season-basis");
-    expect(basis.textContent).toContain("Each bar is one week");
-    expect(basis.textContent).toContain("fantasy points under this league's scoring");
+    expect(basis.textContent).toBe("Week by week, 2026, this league's scoring");
     expect(basis.textContent).not.toMatch(/[—;]/);
   });
 
