@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Input, SegmentGroup } from "@/components/ui";
-import { chipClassName } from "@/components/ui/segment-group";
+import { chipClassName } from "@/components/ui/chip";
 import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
 import { formatOrdinal } from "@/draft-room/state/format";
 import {

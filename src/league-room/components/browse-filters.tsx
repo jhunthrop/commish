@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { chipClassName } from "@/components/ui/segment-group";
+import { chipClassName } from "@/components/ui/chip";
 
 /**
  * Phase 3.6, Task 5, Step 4: the shelf's filter row, replacing the four-`Select` form this
@@ -52,7 +52,7 @@ export interface BrowseFiltersProps {
  * `onChange` and `aria-pressed`, and this row is plain `<Link>`s so the URL remains the whole
  * filter state — linkable, bookmarkable, and working before (and without) any JavaScript, on
  * whatever device a stranger with no account happens to have. Different mechanism, ONE skin:
- * the class comes from `chipClassName` (`@/components/ui/segment-group`), the single file in the
+ * the class comes from `chipClassName` (`@/components/ui/chip`), the single file in the
  * product that fills a chip, so this file no longer needs an accent-budget exemption at all.
  *
  * `aria-current` rather than `aria-pressed`: these are navigation, and exactly one is the page
