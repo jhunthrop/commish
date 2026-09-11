@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ChatMessageView } from "@/chat/contract";
-import { Avatar, Button, EmptyState } from "@/components/ui";
+import { Avatar, Button } from "@/components/ui";
 import { formatChatTime } from "../lib/format";
 import { ReactionBar } from "./reaction-bar";
 import { RemovedMessage } from "./removed-message";

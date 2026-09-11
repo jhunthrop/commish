@@ -30,9 +30,15 @@ describe("MessageList", () => {
     );
   });
 
+  // The silence used to be a dashed `EmptyState` whose title was a node of its own, so an exact
+  // match on the first half found it. It is one quiet line in one paragraph now (founder,
+  // 2026-08-30, the scan pass), and the invitation this test is named for rides in the same
+  // sentence, so the sentence is what gets pinned.
   it("offers a way to start talking when there is nothing here yet", () => {
     render(<MessageList leagueId="l1" messages={[]} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
-    expect(screen.getByText("Nobody has said anything yet")).toBeInTheDocument();
+    expect(
+      screen.getByText("Nobody has said anything yet. Say hello, or ask who is actually starting that kicker."),
+    ).toBeInTheDocument();
   });
 
   it("offers earlier messages only when there are some, and asks for them once", () => {

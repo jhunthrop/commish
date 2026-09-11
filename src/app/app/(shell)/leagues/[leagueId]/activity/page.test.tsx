@@ -1,50 +1,87 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
-import { fixtureAccountDeps } from "@/account-room/test-fixtures";
-import { NoticesProvider } from "@/components/app-shell/notices-provider";
+import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
+import { fixtureChatDeps } from "@/chat-room/test-fixtures";
+import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
+import { HOME, fixtureLeagueDeps } from "@/league-room/test-fixtures";
+import { resolveServerTree } from "@/lib/test-support";
 
 // Route-level: proves the page's own 404 branches without a real Postgres connection — every
-// read the page makes is mocked, and `notFound()` is the real `next/navigation` implementation
-// (a plain synchronous throw with a `NEXT_HTTP_ERROR_FALLBACK;404` digest, no request context
-// required), so asserting on that digest is asserting on the real behavior a browser would see.
+// read the route makes (through `loadRoomData`, the room's one server read) is mocked, and
+// `notFound()` is the real `next/navigation` implementation (a plain synchronous throw with a
+// `NEXT_HTTP_ERROR_FALLBACK;404` digest, no request context required), so asserting on that
+// digest is asserting on the real behavior a browser would see.
+//
+// `usePathname`/`useRouter` are the only members stubbed: `RoomShell` is a browser component
+// reading the URL, and the surface it opens must agree with the route under test — the same
+// stub `room-shell.test.tsx` uses, applied here over the real module so `notFound` stays real.
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  usePathname: () => "/app/leagues/league_1/activity",
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), back: vi.fn() }),
+}));
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
-vi.mock("@/lib/leagues/membership", () => ({ resolveLeagueMembership: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
-vi.mock("@/draft-service/teams", () => ({ leagueNameFor: vi.fn() }));
+vi.mock("@/identity-service/preferences", () => ({ readPreferences: vi.fn() }));
 vi.mock("@/integrity-service/activity", () => ({ listLeagueActivity: vi.fn() }));
 vi.mock("@/integrity-service/notify", () => ({ listNotices: vi.fn(), quoteFor: vi.fn(() => null) }));
+vi.mock("@/league-service", () => ({
+  leagueHome: vi.fn(),
+  lineupView: vi.fn(),
+  matchupWeek: vi.fn(),
+  weeklyProjectionsByPlayerId: vi.fn(),
+  fixtureLabelsByTeam: vi.fn(),
+  gradesForDraft: vi.fn(),
+}));
+vi.mock("@/league-service/nfl-schedule", () => ({ byeWeeksByTeam: vi.fn() }));
+vi.mock("@/league-service/claims", () => ({ pendingWaiverClaims: vi.fn() }));
+vi.mock("@/league-service/trades", () => ({ listTrades: vi.fn() }));
+vi.mock("@/league-service/reference-cache-instance", () => ({ getReferenceCache: () => ({}) }));
+vi.mock("@/lib/realtime/redis", () => ({ getSharedRedis: () => ({}) }));
+vi.mock("@/lib/realtime/presence", () => ({ createPresenceStore: () => ({ listPresent: async () => [] }) }));
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { resolveLeagueMembership } from "@/lib/leagues/membership";
-import { leagueNameFor } from "@/draft-service/teams";
+import { readPreferences } from "@/identity-service/preferences";
 import { listLeagueActivity } from "@/integrity-service/activity";
 import { listNotices } from "@/integrity-service/notify";
+import { leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId, fixtureLabelsByTeam, gradesForDraft } from "@/league-service";
+import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
+import { pendingWaiverClaims } from "@/league-service/claims";
+import { listTrades } from "@/league-service/trades";
 import LeagueActivityPage from "./page";
 
 const USER = { id: "u1", email: "u1@test.local", displayName: "Ada Lovelace", experienceTier: "beginner" as const, avatarUrl: null, createdAt: "2026-08-01T00:00:00.000Z", isAdmin: false };
 
+const LEAGUE = { ...HOME, leagueId: "league_1", isCommissioner: false };
+
+/** The route the way the server runs it: `ActivityPage` returns `<RoomPage>`, and `RoomPage` is
+ *  where the membership gate lives, so the tree has to be resolved to the browser boundary
+ *  before anything the route decides has happened. */
 function callPage(leagueId = "league_1") {
-  return LeagueActivityPage({ params: Promise.resolve({ leagueId }), searchParams: Promise.resolve({}) });
+  return resolveServerTree(LeagueActivityPage({ params: Promise.resolve({ leagueId }), searchParams: Promise.resolve({}) }));
 }
 
-/** `TopBar` renders `NoticeInbox` (Task 10), a `"use client"` component that fetches its
- *  own data — wrapped here so it never reaches the real `fetch`, the same discipline
- *  `top-bar.test.tsx` uses. */
 async function renderPage(leagueId?: string) {
-  const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
   const page = await callPage(leagueId);
   return render(
-    <AccountRoomDepsProvider deps={fixture.deps}>
-      <NoticesProvider>{page}</NoticesProvider>
-    </AccountRoomDepsProvider>,
+    <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+      <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>{page}</LeagueRoomDepsProvider>
+    </ChatRoomDepsProvider>,
   );
 }
 
 beforeEach(() => {
   vi.mocked(requireCurrentUser).mockReset().mockResolvedValue(USER);
-  vi.mocked(resolveLeagueMembership).mockReset();
-  vi.mocked(leagueNameFor).mockReset().mockResolvedValue("Sunday Money");
+  vi.mocked(readPreferences).mockReset().mockResolvedValue({ helpLevel: "standard", draftTourDismissedAt: null });
+  vi.mocked(leagueHome).mockReset();
+  vi.mocked(lineupView).mockReset().mockResolvedValue(null);
+  vi.mocked(matchupWeek).mockReset().mockResolvedValue(null);
+  vi.mocked(weeklyProjectionsByPlayerId).mockReset().mockResolvedValue(new Map());
+  vi.mocked(fixtureLabelsByTeam).mockReset().mockResolvedValue(new Map());
+  vi.mocked(byeWeeksByTeam).mockReset().mockResolvedValue(new Map());
+  vi.mocked(pendingWaiverClaims).mockReset().mockResolvedValue([]);
+  vi.mocked(listTrades).mockReset().mockResolvedValue({ leagueId: "league_1", meTeamId: "t1", inbox: [], outbox: [], history: [] });
+  vi.mocked(gradesForDraft).mockReset().mockResolvedValue({ grades: [], boardGeneration: null });
   vi.mocked(listLeagueActivity).mockReset().mockResolvedValue({ rows: [], nextBefore: null });
   vi.mocked(listNotices).mockReset().mockResolvedValue({ notices: [], unreadCount: 0 });
 });
@@ -54,10 +91,7 @@ describe("LeagueActivityPage — membership gate", () => {
   // (`../page.tsx`) has the identical gap today and is left alone; this test covers only the
   // activity page this task owns.
   it("404s a signed-in stranger — no team here and not the commissioner — never 403", async () => {
-    vi.mocked(resolveLeagueMembership).mockResolvedValue({
-      ok: true,
-      membership: { leagueId: "league_1", teamId: null, isCommissioner: false, authority: { kind: "member", userId: "someone_else" } },
-    });
+    vi.mocked(leagueHome).mockResolvedValue({ ...LEAGUE, myTeamId: null, isCommissioner: false });
 
     await expect(callPage()).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
     expect(vi.mocked(listLeagueActivity)).not.toHaveBeenCalled();
@@ -65,35 +99,28 @@ describe("LeagueActivityPage — membership gate", () => {
   });
 
   it("404s a league id that names no real league, the same as a stranger — a non-oracle response", async () => {
-    vi.mocked(resolveLeagueMembership).mockResolvedValue({ ok: false, status: 404, error: "That league does not exist." });
+    vi.mocked(leagueHome).mockResolvedValue(null);
 
     await expect(callPage()).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
     expect(vi.mocked(listLeagueActivity)).not.toHaveBeenCalled();
   });
 
+  // The surface IS the route (law 2): the activity route opens the activity drawer at full
+  // height, which is what "the activity page rendered" means since the room replaced the tabs.
   it("renders for a real member — a team owner — and for the commissioner with no team", async () => {
-    vi.mocked(resolveLeagueMembership).mockResolvedValue({
-      ok: true,
-      membership: { leagueId: "league_1", teamId: "t1", isCommissioner: false, authority: { kind: "member", userId: "someone_else" } },
-    });
+    vi.mocked(leagueHome).mockResolvedValue({ ...LEAGUE, myTeamId: "t1" });
     await renderPage();
-    expect(await screen.findByRole("heading", { name: "League activity" })).toBeInTheDocument();
+    expect(await screen.findByLabelText("Activity drawer")).toBeInTheDocument();
 
-    vi.mocked(resolveLeagueMembership).mockResolvedValue({
-      ok: true,
-      membership: { leagueId: "league_1", teamId: null, isCommissioner: true, authority: { kind: "member", userId: "u1" } },
-    });
+    vi.mocked(leagueHome).mockResolvedValue({ ...LEAGUE, myTeamId: null, isCommissioner: true });
     await renderPage();
-    expect(await screen.findAllByRole("heading", { name: "League activity" })).not.toHaveLength(0);
+    expect(await screen.findAllByLabelText("Activity drawer")).not.toHaveLength(0);
   });
 
   // Fix round 1, FIX 5: the persona panel's high-stakes-veteran question about `lineup_change`
-  // being actor-only — answered plainly on the page itself rather than left implicit.
+  // being actor-only — answered plainly on the surface itself rather than left implicit.
   it("states plainly that lineup changes are private to their own actor", async () => {
-    vi.mocked(resolveLeagueMembership).mockResolvedValue({
-      ok: true,
-      membership: { leagueId: "league_1", teamId: "t1", isCommissioner: false, authority: { kind: "member", userId: "someone_else" } },
-    });
+    vi.mocked(leagueHome).mockResolvedValue({ ...LEAGUE, myTeamId: "t1" });
     await renderPage();
     expect(
       await screen.findByText("Lineup changes appear only in your own history. Nobody else in this league can see them."),
