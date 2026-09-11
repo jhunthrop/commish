@@ -8,7 +8,7 @@ import type { FirstRunPlan } from "@/identity";
 import type { HelpLevel } from "@/identity/preferences";
 import type { FixtureLabel } from "@/league-service/nfl-schedule";
 import type { PendingWaiverClaim } from "@/league-service/claims";
-import type { ActivityRow } from "@/integrity/activity-view";
+import type { ActivityFeedRow } from "@/integrity-service/activity";
 import type { LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
 import type { LeagueAuthority } from "@/league-service/authority";
 import type { CompositionCategory } from "@/participation/composition";
@@ -669,7 +669,16 @@ export interface RoomData {
   /** The viewer's filed waiver claims with their true place in line. */
   readonly pendingClaims: readonly PendingWaiverClaim[];
   /** First page of league activity, for the pulse's "since you left" and the activity surface. */
-  readonly activityRows: readonly ActivityRow[];
+  /** The league's recent history with each row's actor and kind (`ActivityFeedRow`), the events
+   *  half of the front page's one stream. */
+  readonly activityRows: readonly ActivityFeedRow[];
+  /**
+   * SIDELINE (P5): the members holding a live connection to this league at render time, as the
+   * server itself recorded them (`GET /api/leagues/[leagueId]/presence`, the same read). Ids
+   * only: `home.teams` carries every member's name and face. Empty when the presence store could
+   * not be read, which the room renders as no presence claim at all, never as "nobody is here".
+   */
+  readonly presentUserIds: readonly string[];
   readonly activityNextBefore: number | null;
   /** The viewer's own platform notices for this league — the activity surface's "what the
    *  platform did" band. Loaded only when the activity route asked for it; empty elsewhere. */
@@ -711,6 +720,11 @@ export interface LeagueSettingsBody {
 
 /** One platform notice as the activity surface renders it: pre-resolved server-side (the quote
  *  comes from `quoteFor`, a server-only read), so the client band is plain data. */
+/** `GET /api/leagues/[leagueId]/presence`: the member ids with a live connection right now. */
+export interface PresenceBody {
+  readonly userIds: readonly string[];
+}
+
 export interface PlatformNoticeView {
   readonly id: string;
   readonly title: string;

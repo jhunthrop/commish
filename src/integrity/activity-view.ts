@@ -128,6 +128,42 @@ export interface ActivityRow {
   readonly detail: string | null;
 }
 
+/**
+ * SIDELINE (P5: picks, claims, trades, wins and messages are one stream). What KIND of thing a
+ * visible event is, so the stream can draw it the way the room talks about it (a pick wears a
+ * face and a club ring, a claim reads "hit", a trade is two people). Derived from the event type
+ * and, for a roster move, the payload's own `reason`, the same field `renderRosterMove` keys on.
+ * `system` is the honest bucket for everything the platform did on its own.
+ */
+export type ActivityKind = "league" | "join" | "pick" | "lineup" | "claim" | "trade" | "money" | "system";
+
+const ROSTER_MOVE_KIND: Readonly<Record<string, ActivityKind>> = {
+  claim: "claim",
+  claim_reversed: "claim",
+  trade: "trade",
+  trade_reversed: "trade",
+};
+
+const EVENT_KIND: Readonly<Partial<Record<AuditEventType, ActivityKind>>> = {
+  league_created: "league",
+  member_joined: "join",
+  draft_pick: "pick",
+  draft_completed: "pick",
+  lineup_change: "lineup",
+  trade_accepted: "trade",
+  entry_fee_collected: "money",
+  entry_fee_refunded: "money",
+  prize_paid: "money",
+};
+
+export function activityKindFor(event: Pick<AuditEvent, "eventType" | "payload">): ActivityKind {
+  if (event.eventType === "roster_move") {
+    const reason = event.payload.reason;
+    return (typeof reason === "string" ? ROSTER_MOVE_KIND[reason] : undefined) ?? "system";
+  }
+  return EVENT_KIND[event.eventType] ?? "system";
+}
+
 type Rendered = Omit<ActivityRow, "eventId" | "occurredAt">;
 
 /**

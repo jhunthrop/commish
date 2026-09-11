@@ -191,6 +191,7 @@ export const ROOM_DATA: RoomData = {
   activityRows: [],
   activityNextBefore: null,
   activityNotices: [],
+  presentUserIds: [],
   tradeContext: {
     weekNumber: 3,
     myTeamId: "t1",

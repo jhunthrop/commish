@@ -9,6 +9,8 @@ import { pendingWaiverClaims } from "@/league-service/claims";
 import { listTrades } from "@/league-service/trades";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import type { CurrentUser } from "@/lib/auth/current-user";
+import { createPresenceStore } from "@/lib/realtime/presence";
+import { getSharedRedis } from "@/lib/realtime/redis";
 import { formatDate } from "@/league-room/lib/format";
 import type {
   LeagueGradeRow,
@@ -34,6 +36,20 @@ async function gradesFor(
   }
   const { grades, boardGeneration } = await gradesForDraft(db, home.draftId);
   return { grades, gradesBasis: boardGeneration === null ? "" : formatDate(boardGeneration) };
+}
+
+/**
+ * Who is in the room as the page renders (Sideline P5), from the presence store the league
+ * stream writes. A store that cannot be read answers EMPTY, which the room renders as no
+ * presence claim at all: "we do not know" is never spelled "nobody is here", and the browser's
+ * own `usePresence` re-reads the moment its stream opens.
+ */
+async function presentUserIdsFor(leagueId: string): Promise<readonly string[]> {
+  try {
+    return await createPresenceStore(getSharedRedis()).listPresent(leagueId, Date.now());
+  } catch {
+    return [];
+  }
 }
 
 export interface RoomDataOptions {
@@ -77,6 +93,7 @@ export async function loadRoomData(
       activityRows: [],
       activityNextBefore: null,
       activityNotices: [],
+      presentUserIds: [],
       tradeContext: null,
       helpLevel: preferences.helpLevel,
       grades: [],
@@ -85,7 +102,7 @@ export async function loadRoomData(
   }
 
   const teamId = home.myTeamId;
-  const [lineup, week, projectionsByPlayerId, fixturesByNflTeam, byeWeeksByNflTeam, trades, pendingClaims, activity, notices, gradesRead] =
+  const [lineup, week, projectionsByPlayerId, fixturesByNflTeam, byeWeeksByNflTeam, trades, pendingClaims, activity, notices, gradesRead, presentUserIds] =
     await Promise.all([
       teamId === null ? null : lineupView(db, { leagueId, teamId, weekNumber: home.currentWeek }),
       matchupWeek(db, leagueId, home.currentWeek, user.id, getReferenceCache()),
@@ -97,6 +114,7 @@ export async function loadRoomData(
       listLeagueActivity(db, { leagueId, viewerUserId: user.id, before: options.activityBefore }),
       options.includeNotices === true ? listNotices(db, user.id) : null,
       gradesFor(db, home),
+      presentUserIdsFor(leagueId),
     ]);
 
   // The viewer's OWN notices, filtered to this league — the same bounded, cursorless inbox page
@@ -120,6 +138,7 @@ export async function loadRoomData(
     activityRows: activity.rows,
     activityNextBefore: activity.nextBefore,
     activityNotices,
+    presentUserIds,
     tradeContext: teamId === null ? null : tradeContext(home.name, home.currentWeek, teamId, home.teams, week),
     helpLevel: preferences.helpLevel,
     grades: gradesRead.grades,
