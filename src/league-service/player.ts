@@ -23,7 +23,7 @@ import type { PeekDocumentRequest } from "@/capsules/peek-document-inputs";
 import { buildPeekDocument, hydratePeekDocument } from "@/capsules/peek-document";
 import type { PeekDocument } from "@/capsules/peek-document-row";
 import type { Db } from "@/db/client";
-import { drafts, leagues, matchups, playerCrosswalk, playerPeekDocuments, players, preseasonProjections, rosterSlots, scoringSettings, teams, users } from "@/db/schema";
+import { leagues, matchups, playerCrosswalk, playerPeekDocuments, players, preseasonProjections, scoringSettings, teams } from "@/db/schema";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { enqueuePeekDocumentRebuildsQuietly } from "@/jobs/defs/peek-document-job";
@@ -88,6 +88,31 @@ interface HolderRow {
 }
 
 /**
+ * EVERY CORRELATED SCALAR IN THIS FILE WRITES ITS OWN IDENTIFIERS, QUALIFIED, IN LITERAL SQL — and
+ * that is a bug fix, not a style (2026-09-11).
+ *
+ * Drizzle decides whether to qualify a column with its table PER QUERY, not per fragment: a select
+ * with a join renders `"teams"."id"`, and a select from ONE table renders a bare `"id"` because
+ * nothing in that query could be ambiguous. That optimisation is correct for the outer columns and
+ * catastrophic inside a correlated subquery, which brings tables of its own that the optimisation
+ * never looked at. `readPeekDocumentForLeague` joins, so it rendered fine; `leagueFactsFor` — the
+ * MISS path, the one a fresh league always takes — reads `leagues` alone, and the identical
+ * fragments came out as `select "id", "name" ... from "roster_slots" inner join "teams" on "id" =
+ * "team_id"`, which Postgres refuses outright: 42702, "column reference id is ambiguous".
+ *
+ * The two older scalars had the same defect and it was SILENT, which is worse. `where "league_id" =
+ * "id"` inside `from "drafts"` resolves both names against `drafts` itself, so it compared a draft's
+ * league to the draft's own id, matched nothing, and answered `null` — every league on the miss path
+ * would have read as pre-draft forever, with no error anywhere.
+ *
+ * So these three fragments no longer ask Drizzle to render their columns. The inner tables carry
+ * short aliases, every column names one, and the only interpolation left is the BOUND parameter.
+ * `leagues.id` is unqualified-by-alias on purpose: it is the OUTER query's table, and both call
+ * sites select from `leagues` under its own name. The compile-time safety this trades away is paid
+ * back by `player.live-facts.test.ts`, which asserts all three answers against a real database.
+ */
+
+/**
  * WHO HOLDS HIM IN THIS LEAGUE RIGHT NOW, as a correlated scalar inside the one statement rather
  * than as a second round trip. `roster_slots` joined through `teams` and on to the person who runs
  * the team, scoped to this league. A roster move therefore changes no document at all, which is the
@@ -101,15 +126,15 @@ interface HolderRow {
 function holder(playerId: string) {
   return sql<HolderRow | null>`(
     select json_build_object(
-      'teamId', ${teams.id},
-      'teamName', ${teams.name},
-      'managerName', ${users.displayName},
-      'managerAvatar', ${users.avatarUrl}
+      'teamId', h_team.id,
+      'teamName', h_team.name,
+      'managerName', h_user.display_name,
+      'managerAvatar', h_user.avatar_url
     )
-    from ${rosterSlots}
-    inner join ${teams} on ${teams.id} = ${rosterSlots.teamId}
-    inner join ${users} on ${users.id} = ${teams.userId}
-    where ${teams.leagueId} = ${leagues.id} and ${rosterSlots.playerId} = ${playerId}
+    from roster_slots h_slot
+    inner join teams h_team on h_team.id = h_slot.team_id
+    inner join users h_user on h_user.id = h_team.user_id
+    where h_team.league_id = leagues.id and h_slot.player_id = ${playerId}
     limit 1
   )`;
 }
@@ -176,7 +201,7 @@ async function ownerFor(db: Db, leagueId: string, row: HolderRow | null, viewerU
  * in the middle of. The middle state is the whole reason this is not a flag.
  */
 const leagueDraftStatus = sql<string | null>`(
-  select ${drafts.status} from ${drafts} where ${drafts.leagueId} = ${leagues.id} limit 1
+  select d.status from drafts d where d.league_id = leagues.id limit 1
 )`;
 
 /** `drafts.status` as the body's own three states. `'dissolved'` and an absent row are pre-draft:
@@ -188,9 +213,9 @@ function draftPhaseOf(status: string | null): PlayerLeagueDraftPhase {
 }
 
 const scheduledWeeks = sql<number>`(
-  select count(distinct ${matchups.weekNumber})::int
-  from ${matchups}
-  where ${matchups.leagueId} = ${leagues.id}
+  select count(distinct m.week_number)::int
+  from matchups m
+  where m.league_id = leagues.id
 )`;
 
 /**

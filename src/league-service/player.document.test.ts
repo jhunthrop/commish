@@ -101,10 +101,21 @@ async function seedBack(db: Db, input: { readonly id: string; readonly nflId: st
   });
 }
 
-/** The document body as JSON, with the one field this round adds removed. */
+/**
+ * The document body as JSON, with the fields that did not exist when the fixture was recorded
+ * removed. Each one is asserted somewhere of its own, which is the whole bargain: a field may leave
+ * this comparison only by gaining a test that means more than "it is still here".
+ *
+ * - `asOf` — the peek-document round's own stamp (asserted below, `body.asOf === NOW`).
+ * - `owner` and `draftPhase` — the Sideline research round's live league facts, both of which are a
+ *   fact about the READER and the league rather than about the stored document. Asserted against a
+ *   real database in `player.live-facts.test.ts`.
+ */
 function comparable(body: unknown): unknown {
   const parsed = JSON.parse(JSON.stringify(body)) as Record<string, unknown>;
   delete parsed.asOf;
+  delete parsed.owner;
+  delete parsed.draftPhase;
   return parsed;
 }
 
