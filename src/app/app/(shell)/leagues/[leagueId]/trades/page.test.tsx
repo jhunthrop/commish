@@ -35,6 +35,12 @@ vi.mock("@/league-service/nfl-schedule", () => ({ byeWeeksByTeam: vi.fn() }));
 vi.mock("@/league-service/claims", () => ({ pendingWaiverClaims: vi.fn() }));
 vi.mock("@/league-service/trades", () => ({ listTrades: vi.fn() }));
 vi.mock("@/league-service/reference-cache-instance", () => ({ getReferenceCache: () => ({}) }));
+// The front page's own two reads, mocked at their own service seams like every sibling above —
+// `loadRoomData` really runs now that `resolveServerTree` renders `RoomPage` for real, and the
+// `getDb: () => ({})` stub above is not a database either of them can select from.
+vi.mock("@/league-service/head-to-head", () => ({ cachedHeadToHeadRecords: vi.fn(), recordsForTeam: () => new Map() }));
+vi.mock("@/league-service/head-to-head-cache-instance", () => ({ getHeadToHeadCache: () => ({}) }));
+vi.mock("@/league-service/event-reactions", () => ({ reactionsForEvents: vi.fn() }));
 vi.mock("@/lib/realtime/redis", () => ({ getSharedRedis: () => ({}) }));
 vi.mock("@/lib/realtime/presence", () => ({ createPresenceStore: () => ({ listPresent: async () => [] }) }));
 
@@ -46,6 +52,8 @@ import { leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId, fixtu
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 import { pendingWaiverClaims } from "@/league-service/claims";
 import { listTrades } from "@/league-service/trades";
+import { cachedHeadToHeadRecords } from "@/league-service/head-to-head";
+import { reactionsForEvents } from "@/league-service/event-reactions";
 import TradesPage from "./page";
 
 const USER = { id: "u1", email: "u1@test.local", displayName: "Ada Lovelace", experienceTier: "beginner" as const, avatarUrl: null, createdAt: "2026-08-01T00:00:00.000Z", isAdmin: false };
@@ -164,6 +172,8 @@ beforeEach(() => {
   vi.mocked(gradesForDraft).mockReset().mockResolvedValue({ grades: [], boardGeneration: null });
   vi.mocked(listLeagueActivity).mockReset().mockResolvedValue({ rows: [], nextBefore: null });
   vi.mocked(listNotices).mockReset().mockResolvedValue({ notices: [], unreadCount: 0 });
+  vi.mocked(cachedHeadToHeadRecords).mockReset().mockResolvedValue(new Map());
+  vi.mocked(reactionsForEvents).mockReset().mockResolvedValue(new Map());
 });
 
 describe("TradesPage", () => {
