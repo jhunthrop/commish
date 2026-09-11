@@ -93,6 +93,19 @@ function scaleVars(prefix: string, obj: Readonly<Record<string, number | string>
 }
 
 /**
+ * SIDELINE'S DENSITY as custom properties (`--commish-density-row: 48px`), so a row primitive's
+ * `min-height` and a face's box read the SAME numbers `tokens.test.ts` pins, never a Tailwind
+ * literal a call site retypes. Only the pixel constants are emitted: `maxColumns` is a rule for
+ * a reviewer, not a length for a stylesheet.
+ */
+function densityVars(indent: string): string {
+  const { maxColumns: _rule, ...pixels } = TOKENS.density;
+  void _rule;
+  const named = Object.fromEntries(Object.entries(pixels).map(([key, value]) => [key.replace(/Px$/, ""), value]));
+  return scaleVars("density", named, "px", indent);
+}
+
+/**
  * Renders TOKENS as CSS custom properties. Deterministic: same TOKENS → identical text.
  *
  * Both themes are first-class (founder ruling, 2026-08-23 — revised ruling 1): light values on
@@ -113,6 +126,7 @@ export function renderTokensCss(): string {
     scaleVars("font-size", TOKENS.font.size, "px", i),
     scaleVars("display-size", TOKENS.font.display, "px", i),
     scaleVars("line-height", TOKENS.font.lineHeight, "", i),
+    densityVars(i),
     scaleVars("motion-duration", TOKENS.motion.duration, "ms", i),
     scaleVars("motion-easing", TOKENS.motion.easing, "", i),
     "}",

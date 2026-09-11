@@ -57,19 +57,32 @@ describe("renderTokensCss", () => {
     }
   });
 
-  it("emits radius, font-size, display-size and motion vars, namespaced with the token var prefix", () => {
-    // V6 pins: the warmth pass's verb radius (md 12) and the new sheet step (xl 20).
+  it("emits radius, font-size, display-size, density and motion vars, namespaced with the token var prefix", () => {
+    // Sideline pins: the card and sheet step (xl 20), the row plate and avatar ring (md 12),
+    // the named durations and the two easings, and the density constants as lengths.
     expect(css).toContain("--commish-radius-md: 12px;");
     expect(css).toContain("--commish-radius-xl: 20px;");
     expect(css).toContain(`--commish-font-size-md: ${TOKENS.font.size.md}px;`);
     expect(css).toContain(`--commish-display-size-xl: ${TOKENS.font.display.xl}px;`);
     expect(css).toContain(`--commish-line-height-display: ${TOKENS.font.lineHeight.display};`);
-    expect(css).toContain("--commish-motion-duration-base: 200ms;");
+    expect(css).toContain("--commish-motion-duration-in: 240ms;");
+    expect(css).toContain("--commish-motion-duration-out: 180ms;");
+    expect(css).toContain("--commish-motion-duration-highlight: 600ms;");
+    expect(css).toContain("--commish-motion-duration-breathe: 2000ms;");
+    expect(css).toContain(`--commish-motion-easing-spring: ${TOKENS.motion.easing.spring};`);
+    expect(css).toContain(`--commish-density-row: ${TOKENS.density.rowPx}px;`);
+    expect(css).toContain(`--commish-density-face: ${TOKENS.density.facePx}px;`);
+    expect(css).not.toContain("--commish-density-max-columns");
   });
 
-  it("emits the shadow set PER THEME — light values on :root, dark values under the dark selectors — because v6's materials are theme-dependent", () => {
-    // Dark's card carries the inset top-light; on :root (light) the same variable holds light's
-    // own designed value. Same emission contract the colors keep.
+  it("emits the Sideline amber roles per theme, so a self ring repaints with the theme", () => {
+    expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-color-self:\s*${TOKENS.color.light.self}`, "i"));
+    expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-color-self-ink:\s*${TOKENS.color.light.selfInk}`, "i"));
+    expect(css).toMatch(new RegExp(String.raw`:root\[data-theme="dark"\]\s*\{[^}]*--commish-color-self:\s*${TOKENS.color.dark.self}`, "i"));
+  });
+
+  it("emits the shadow set PER THEME — light values on :root, dark values under the dark selectors — because the material deepens at night", () => {
+    // Same emission contract the colors keep.
     expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-shadow-card:\s*${TOKENS.shadow.light.card.replace(/[().]/g, (m) => `\\${m}`)}`, "i"));
     expect(css).toMatch(
       new RegExp(String.raw`:root\[data-theme="dark"\]\s*\{[^}]*--commish-shadow-card:\s*${TOKENS.shadow.dark.card.replace(/[().]/g, (m) => `\\${m}`)}`, "i"),

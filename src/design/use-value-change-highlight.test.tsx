@@ -38,7 +38,7 @@ describe("useValueChangeHighlight", () => {
     const { result } = renderHook(({ value }) => useValueChangeHighlight(value), { initialProps: { value: "118.4" } });
     expect(result.current).toBe(false);
     act(() => {
-      vi.advanceTimersByTime(TOKENS.motion.duration.slow * 4);
+      vi.advanceTimersByTime(TOKENS.motion.duration.highlight * 4);
     });
     expect(result.current).toBe(false);
   });
@@ -49,7 +49,7 @@ describe("useValueChangeHighlight", () => {
     act(() => rerender({ value: "124.4" }));
     expect(result.current).toBe(true);
     act(() => {
-      vi.advanceTimersByTime(TOKENS.motion.duration.slow);
+      vi.advanceTimersByTime(TOKENS.motion.duration.highlight);
     });
     expect(result.current).toBe(false);
   });
@@ -68,7 +68,7 @@ describe("useValueChangeHighlight", () => {
     const { result, rerender } = renderHook(({ value }) => useValueChangeHighlight(value), { initialProps: { value: "118.4" } });
     act(() => rerender({ value: "124.4" }));
     act(() => {
-      vi.advanceTimersByTime(TOKENS.motion.duration.slow);
+      vi.advanceTimersByTime(TOKENS.motion.duration.highlight);
     });
     expect(result.current).toBe(false);
     act(() => rerender({ value: "130.4" }));
@@ -97,7 +97,7 @@ describe("useValueChangeHighlight", () => {
       act(() => rerender({ value }));
       expect(result.current).toBe(false);
       act(() => {
-        vi.advanceTimersByTime(TOKENS.motion.duration.slow / 2);
+        vi.advanceTimersByTime(TOKENS.motion.duration.highlight / 2);
       });
       expect(result.current).toBe(false);
     }
