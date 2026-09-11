@@ -22,6 +22,7 @@
     "db:generate": "dotenv -e .env.local -- drizzle-kit generate",
     "db:migrate": "dotenv -e .env.local -v DATABASE_URL=postgres://commish:commish@localhost:5432/commish -- drizzle-kit migrate",
     "db:migrate:test": "dotenv -e .env.local -- tsx scripts/migrate-test-lanes.ts",
+    "db:lanes:prune": "dotenv -e .env.local -- tsx scripts/prune-test-lane-sets.ts",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
     "seed": "dotenv -e .env.local -- tsx src/data/seed/index.ts",
     "stats:ingest": "dotenv -e .env.local -- tsx scripts/ingest-once.ts",

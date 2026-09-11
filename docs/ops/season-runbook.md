@@ -120,6 +120,41 @@ container). A worker picks its lane from its own `VITEST_POOL_ID`, rewritten int
 call (`TEST_DB_LANE=<n>` or `-- --lane=<n>` does one). It is idempotent, so run it after any
 migration and after any `docker compose down -v`.
 
+### One lane set per worktree
+
+Four lanes were enough while one checkout ran the suite. Two agent worktrees running `vitest` at
+the same time used to resolve the same four database names and interleave their fixtures in one
+database: a duplicate key on `audit_events` `evt_1`, two `TRUNCATE` statements queueing behind each
+other, a lock-order suite measured at 460s against its usual 7s. So the four lanes are a **set**,
+and each checkout gets its own:
+
+| Checkout | Lane databases |
+| --- | --- |
+| main checkout and every plain clone, CI included | `commish_test`, `commish_test_2`, `commish_test_3`, `commish_test_4` |
+| a linked worktree | `commish_test_<set>_1` … `commish_test_<set>_4` |
+
+The set key is the first six hex characters of the SHA-256 of the worktree's absolute root path.
+A checkout counts as the primary one when its `.git` lives inside its own root — true of the main
+checkout and of any `git clone`, false of a `git worktree add`, which shares the main checkout's
+git directory. Nothing about the primary lanes or CI changed. `TEST_DB_LANE` still pins one lane
+within whichever set is resolved; `TEST_DB_LANE_SET=<key>` (1-24 lowercase letters and digits)
+overrides the derivation outright.
+
+**Nothing to configure.** `vitest.global-setup.mts` runs once per `vitest` process, before any
+worker: it resolves this worktree's set, compares each lane's `drizzle.__drizzle_migrations` count
+to `drizzle/meta/_journal.json`, and runs `db:migrate:test` for this set when any lane is missing or
+behind. A fresh worktree's first `npx vitest run` provisions and migrates its own four databases and
+proceeds; later runs pay four short queries. When Postgres is not up, the run stops there naming the
+host and `npm run infra:up` rather than letting 600 files each fail against nothing.
+
+**`npm run db:lanes:prune`** drops the lane sets of worktrees that are gone. A set is live while
+`git worktree list` names a path that is still on disk; everything else is an orphan of a deleted
+checkout. Add `-- --dry-run` to list without dropping. The primary set cannot be reached by it:
+`commish_test` and `commish_test_2..4` carry no set segment, so they never parse as a worktree set.
+
+Naming lives in one place, `src/db/test-lanes.ts` (pure) with `src/db/test-lane-set.ts` beside it
+for the one part that asks git where it is.
+
 Reach for **`npx vitest run --no-file-parallelism`** (exactly lane 1, `commish_test`, the way this
 suite always ran) when debugging a single DB-backed suite step by step, or when narrowing down
 whether a failure is a real regression versus a lane-routing bug — serial mode removes lanes from
