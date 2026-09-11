@@ -591,6 +591,26 @@ export interface TradeRosterPlayer {
   readonly adp: number | null;
 }
 
+/**
+ * THE PERSON BEHIND A TEAM ID (P1: the person comes before the number).
+ *
+ * A stored proposal (`TradeSideView`, `@/trades/contract`) carries a `teamId` and a `teamName` and
+ * no human at all, which is how the trade room came to render a negotiation between two brand
+ * names. Sideline says a trade is a conversation between two PEOPLE, so every trade surface needs
+ * a face and a display name for both sides of it.
+ *
+ * Not added to the wire type: a proposal row is what the trades API stores and answers, and a
+ * manager's avatar is a fact about a USER that changes independently of every trade they ever
+ * made. It is folded into the room's context instead, out of `TeamCard`s the room already holds.
+ */
+export interface TradeManager {
+  readonly teamName: string;
+  /** `TeamCard.ownerDisplayName` — the name `Manager` prints beside the face. */
+  readonly name: string;
+  /** `TeamCard.ownerAvatarUrl`: the STORED avatar ref, as `Avatar` takes it, never a URL. */
+  readonly avatar: string | null;
+}
+
 /** One team a manager could open a trade with: enough to fill the composer's counterparty `Select`. */
 export interface TradeCounterpartyOption {
   readonly teamId: string;
@@ -635,6 +655,9 @@ export interface TradeRoomContext {
   readonly myTeamId: string;
   readonly counterparties: readonly TradeCounterpartyOption[];
   readonly rostersByTeamId: Readonly<Record<string, readonly TradeRosterPlayer[]>>;
+  /** Every team in the league keyed by id, with the PERSON who owns it — see `TradeManager`.
+   *  A team id with no entry renders no face and no name, never a placeholder person. */
+  readonly managersByTeamId: Readonly<Record<string, TradeManager>>;
   /** The league's own name — `held-trade-banner.tsx` (Plan D, Task 5) needs it to say the
    *  identical sentence `trade_held_for_review`'s own notice already says
    *  (`@/integrity/notices`), and a room component may never import that module as a value (the

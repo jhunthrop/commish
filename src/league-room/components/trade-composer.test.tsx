@@ -12,6 +12,10 @@ const CONTEXT: TradeRoomContext = {
   weekNumber: 5,
   myTeamId: "me",
   counterparties: [{ teamId: "them", teamName: "Iron Owls" }],
+  managersByTeamId: {
+    me: { teamName: "Bay Bandits", name: "Dana Whitfield", avatar: null },
+    them: { teamName: "Iron Owls", name: "Rey Okafor", avatar: null },
+  },
   rostersByTeamId: {
     me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB", nflTeam: "ATL", headshotUrl: null, adp: null }],
     them: [{ playerId: "p2", name: "Puka Nacua", position: "WR", nflTeam: "ATL", headshotUrl: null, adp: null }],
@@ -125,7 +129,7 @@ describe("TradeComposer", () => {
     selectCounterparty();
     fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
     fireEvent.click(screen.getByLabelText(/Puka Nacua/));
-    fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Rebuilding TE" } });
+    fireEvent.change(screen.getByLabelText("Say something with it"), { target: { value: "Rebuilding TE" } });
     fireEvent.click(screen.getByRole("button", { name: "Propose trade" }));
 
     await waitFor(() =>
@@ -237,7 +241,7 @@ describe("TradeComposer", () => {
     expect(await screen.findByText(/close to even/i)).toBeInTheDocument();
 
     await user.tab();
-    expect(screen.getByLabelText("Note (optional)")).toHaveFocus();
+    expect(screen.getByLabelText("Say something with it")).toHaveFocus();
 
     await user.tab();
     expect(screen.getByRole("button", { name: "Propose trade" })).toHaveFocus();

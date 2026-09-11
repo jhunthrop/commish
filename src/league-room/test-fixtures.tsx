@@ -197,6 +197,10 @@ export const ROOM_DATA: RoomData = {
     myTeamId: "t1",
     counterparties: [{ teamId: "t2", teamName: "Iron Owls" }],
     rostersByTeamId: {},
+    managersByTeamId: {
+      t1: { teamName: "Bay Bandits", name: "Dana Whitfield", avatar: null },
+      t2: { teamName: "Iron Owls", name: "Rey Okafor", avatar: null },
+    },
     leagueName: "Sunday Money",
   },
   helpLevel: "standard",

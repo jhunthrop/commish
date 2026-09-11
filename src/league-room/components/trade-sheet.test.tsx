@@ -41,6 +41,10 @@ const CONTEXT: TradeRoomContext = {
   weekNumber: 3,
   myTeamId: "t1",
   counterparties: [{ teamId: "t2", teamName: "Iron Owls" }],
+  managersByTeamId: {
+    t1: { teamName: "Bay Bandits", name: "Dana Whitfield", avatar: null },
+    t2: { teamName: "Iron Owls", name: "Rey Okafor", avatar: null },
+  },
   rostersByTeamId: {},
   leagueName: "Sunday Money",
 };

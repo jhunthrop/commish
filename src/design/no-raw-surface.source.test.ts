@@ -48,10 +48,9 @@ const ALLOWLIST: readonly string[] = [
   // v6. Migrating it to the Select primitive is real work with behavior on the line, out of a
   // class-only pass's scope; the entry retires with that migration.
   "src/account-room/components/review-feed.tsx",
-  // The pool search input, same case: a hand-rolled text control whose border is the control's
-  // own affordance (it even swaps to `border-edge` on focus). Retires when the site adopts the
-  // Input primitive.
-  "src/league-room/components/room-surface-players.tsx",
+  // SIDELINE, THE WIRE (2026-09-11): `room-surface-players.tsx` LEFT this list. Its search box is
+  // the mock's 40px pill field now — `border-edge` on the elevated fill, the same control
+  // boundary `Input` itself draws — so there is no hairline box left in the file to exempt.
   // The LEGACY draft board. Its empty-cell hairlines are a founder-reported live-defect fix
   // (2026-08-25: opacity-diluted borders read rounds 3-15 as a void), pinned at full strength by
   // `draft-board.test.tsx`'s own regression suite — softening them here would re-open a ruled

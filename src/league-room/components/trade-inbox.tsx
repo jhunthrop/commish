@@ -72,6 +72,7 @@ function Band({
   meTeamId,
   playersById,
   rosterById,
+  managersByTeamId,
   leagueName,
   assessmentStatusById,
   assessments,
@@ -91,6 +92,7 @@ function Band({
   readonly meTeamId: string;
   readonly playersById: Readonly<Record<string, ValuedPlayer>>;
   readonly rosterById: Readonly<Record<string, TradeRosterPlayer>>;
+  readonly managersByTeamId: TradeRoomContext["managersByTeamId"];
   readonly leagueName: string;
   readonly assessmentStatusById: Readonly<Record<string, AssessmentStatus>>;
   readonly assessments: Readonly<Record<string, TradeAssessmentSummary>>;
@@ -113,6 +115,7 @@ function Band({
             meTeamId={meTeamId}
             playersById={playersById}
             rosterById={rosterById}
+            managersByTeamId={managersByTeamId}
             leagueName={leagueName}
             assessmentStatus={assessmentStatusById[trade.id] ?? "idle"}
             assessment={assessments[trade.id]}
@@ -227,6 +230,7 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
     meTeamId: meTeamId ?? "",
     playersById,
     rosterById,
+    managersByTeamId: context.managersByTeamId,
     leagueName: context.leagueName,
     assessmentStatusById,
     assessments,

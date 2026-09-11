@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, PositionBadge } from "@/components/ui";
+import { BigNumber, Button, Manager, PlayerRow } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { DecisionSheet } from "@/components/ui/decision-sheet";
 import { positionStickerClass } from "@/components/ui/position-badge";
@@ -40,6 +40,12 @@ const DECIDED_COPY: Readonly<Record<string, string>> = {
   withdrawn: "Offer withdrawn.",
 };
 
+/**
+ * ONE SIDE OF THE SHEET, AS PEOPLE (P1). `PlayerRow` at research density: the face on the club's
+ * ring, the name the largest thing on it, the club and the bye small beneath, and the ONE number
+ * at the right — this week's real projection with its basis (P2, P11). A player the projection
+ * read does not cover renders a dash and says why, never a zero.
+ */
 function AssetCard({
   leagueId,
   label,
@@ -54,35 +60,42 @@ function AssetCard({
   readonly value: number | null;
 }) {
   return (
-    <div className="flex flex-1 flex-col gap-2 rounded-md bg-surface-raised p-3 shadow-raised">
-      <p className={`${MICRO_LABEL} ${tone === "positive" ? "text-positive" : "text-negative"}`}>{label}</p>
-      {assets.map((asset) => (
-        <div key={asset.playerId} className="flex items-center gap-2.5">
-          {asset.position === null ? null : <PositionBadge position={asset.position} size="md" />}
-          <div className="flex min-w-0 flex-col">
-            <PlayerName
-              leagueId={leagueId}
-              playerId={asset.playerId}
-              name={asset.name}
-              className="truncate font-display text-md font-semibold text-text-primary"
+    <div className="flex flex-1 flex-col gap-1 rounded-md bg-surface-raised p-2 shadow-raised">
+      <p className={`${MICRO_LABEL} px-1 ${tone === "positive" ? "text-positive" : "text-negative"}`}>{label}</p>
+      {assets.map((asset) =>
+        // A position this read could not resolve is NOT guessed into a sticker: the row needs a
+        // real `Position` and inventing one would print a claim the product cannot stand behind
+        // (P11). That asset is a quiet line in the row's own rhythm instead.
+        asset.position === null ? (
+          <p key={asset.playerId} className="flex min-h-11 items-center px-2.5 text-md text-text-primary">
+            {asset.name}
+          </p>
+        ) : (
+        <PlayerRow
+          key={asset.playerId}
+          dense
+          player={{
+            id: asset.playerId,
+            name: asset.name,
+            position: asset.position,
+            nflTeam: asset.nflTeam ?? "",
+            headshotUrl: null,
+            adp: null,
+          }}
+          name={<PlayerName leagueId={leagueId} playerId={asset.playerId} name={asset.name} className="truncate" />}
+          meta={`${asset.nflTeam ?? ""}${asset.byeWeek === null ? "" : ` · bye week ${asset.byeWeek}`}`}
+          figure={
+            <BigNumber
+              size="sm"
+              value={asset.weekProjection === null ? null : asset.weekProjection.toFixed(1)}
+              basis={asset.weekProjection === null ? "no projection this week" : "projected this week"}
             />
-            <p className="font-mono text-xs text-text-faint">
-              {asset.nflTeam ?? ""}
-              {asset.byeWeek === null ? "" : ` · bye week ${asset.byeWeek}`}
-            </p>
-          </div>
-          {asset.weekProjection === null ? null : (
-            <p className="ml-auto shrink-0 text-right">
-              <span className="font-mono text-md font-medium text-text-primary">{asset.weekProjection.toFixed(1)}</span>
-              <span className="block text-[10px] text-text-faint">projected this week</span>
-            </p>
-          )}
-        </div>
-      ))}
+          }
+        />
+        ),
+      )}
       {value === null ? null : (
-        <p className="mt-auto border-t border-line pt-1.5 font-mono text-sm text-text-muted">
-          side value {Math.round(value)}
-        </p>
+        <p className="mt-auto px-1 pt-1.5 text-sm tabular-nums text-text-muted">{`side value ${Math.round(value)}`}</p>
       )}
     </div>
   );
@@ -135,6 +148,7 @@ export function TradeSheet({ leagueId, trade, context, math, onClose, onCounter,
   const iProposed = trade.from.teamId === context.myTeamId;
   const otherTeamId = iProposed ? trade.to.teamId : trade.from.teamId;
   const otherTeamName = iProposed ? trade.to.teamName : trade.from.teamName;
+  const otherManager = context.managersByTeamId[otherTeamId];
 
   useEffect(() => {
     let cancelled = false;
@@ -196,7 +210,17 @@ export function TradeSheet({ leagueId, trade, context, math, onClose, onCounter,
       open
       size="lg"
       title={iProposed ? `Your offer to ${otherTeamName}` : `${otherTeamName} offer a trade`}
-      meta={`expires ${formatWeekdayClock(trade.expiresAt)}`}
+      // THE OTHER PARTY, AS A PERSON (P1). The sheet's headline names the team because that is
+      // what the offer is between; the meta line names the manager across the table from you,
+      // with their face and the rival ring, and the clock beside them.
+      meta={
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {otherManager === undefined ? null : (
+            <Manager size="sm" ring="rival" name={otherManager.name} avatar={otherManager.avatar} />
+          )}
+          <span>{`expires ${formatWeekdayClock(trade.expiresAt)}`}</span>
+        </span>
+      }
       onClose={onClose}
       footer={
         decided !== null ? (

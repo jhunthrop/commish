@@ -58,4 +58,25 @@ describe("MessageBubble", () => {
     render(<MessageBubble author="Dana Whitfield">hi</MessageBubble>);
     expect(screen.getByTestId("message-bubble").className).toContain("group/msg");
   });
+
+  it("caps a sentence at 78 percent of the stream and drops the cap for a bubble carrying a card", () => {
+    // A one-line reply reads as a one-line reply, so it never fills the column.
+    const sentence = render(<MessageBubble author="Dana Whitfield">deal</MessageBubble>);
+    const narrow = sentence.getByTestId("message-bubble").lastElementChild!;
+    expect(narrow.className).toContain("max-w-[78%]");
+    expect(narrow).not.toHaveAttribute("data-wide");
+    sentence.unmount();
+
+    // A trade offer inside a bubble is a two-column object with faces in it: the cap squeezes it
+    // to 280px on a 360px phone, so `wide` removes it and the bubble fills the column instead.
+    render(
+      <MessageBubble author="Rey Okafor" wide>
+        an offer
+      </MessageBubble>,
+    );
+    const column = screen.getByTestId("message-bubble").lastElementChild!;
+    expect(column).toHaveAttribute("data-wide", "true");
+    expect(column.className).not.toContain("max-w-[78%]");
+    expect(screen.getByText("an offer").parentElement!.className).toContain("w-full");
+  });
 });

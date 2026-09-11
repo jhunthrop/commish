@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, PositionBadge } from "@/components/ui";
+import { Button, PlayerRow } from "@/components/ui";
 import { DecisionSheet } from "@/components/ui/decision-sheet";
 import type { FreeAgentRow } from "@/league-service/claims-contract";
 import type { ApiEnvelope } from "@/lib/api/respond";
@@ -106,13 +106,15 @@ export function ClaimSheet({ leagueId, agent, dropCandidates, rosterFull, onClos
       }
     >
       {rosterFull ? (
-        <p className="text-sm text-text-muted">A claim needs a drop. Your lowest-projected bench player is picked; tap to drop someone else.</p>
+        // No semicolons, and no sentence whose only job is to explain the control under it (P7):
+        // the radio group already says it is a choice, so the copy says only what the product did.
+        <p className="text-sm text-text-muted">A claim needs a drop. Your lowest-projected bench player is picked.</p>
       ) : (
         <p className="text-sm text-text-muted">You have an open roster spot, so no drop is needed.</p>
       )}
 
       {dropCandidates.length === 0 && rosterFull ? (
-        <p className="text-sm text-negative">Your bench is empty; there is nobody to drop.</p>
+        <p className="text-sm text-negative">Your bench is empty, so there is nobody to drop.</p>
       ) : (
         <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Player to drop">
           {!rosterFull ? (
@@ -121,29 +123,41 @@ export function ClaimSheet({ leagueId, agent, dropCandidates, rosterFull, onClos
               role="radio"
               aria-checked={dropId === null}
               onClick={() => setDropId(null)}
-              className={`flex items-center gap-3 rounded-md border px-3 py-2 text-left ${
-                dropId === null ? "border-accent" : "border-line bg-surface-raised hover:border-edge"
+              className={`flex min-h-12 items-center gap-3 rounded-md px-3 text-left ring-inset ${
+                dropId === null ? "ring-2 ring-accent" : "bg-surface-raised hover:bg-surface"
               }`}
             >
-              <span className="text-sm text-text-primary">Keep everyone · use the open spot</span>
+              <span className="text-md text-text-primary">Keep everyone · use the open spot</span>
             </button>
           ) : null}
           {dropCandidates.map((candidate) => (
+            // THE DROP IS A PERSON (P1), so the choice is a `PlayerRow` inside the radio rather
+            // than a position chip beside a string. `PlayerFace` draws its own "we do not know"
+            // fallback for a candidate the bench read carries no headshot for — never a
+            // placeholder standing in for somebody else.
             <button
               key={candidate.playerId}
               type="button"
               role="radio"
               aria-checked={dropId === candidate.playerId}
               onClick={() => setDropId(candidate.playerId)}
-              className={`flex items-center gap-3 rounded-md border px-3 py-2 text-left ${
-                dropId === candidate.playerId ? "border-accent" : "border-line bg-surface-raised hover:border-edge"
+              className={`rounded-md text-left ring-inset ${
+                dropId === candidate.playerId ? "ring-2 ring-accent" : "bg-surface-raised"
               }`}
             >
-              <PositionBadge position={candidate.position} size="sm" />
-              <span className="min-w-0 truncate font-display text-sm font-semibold text-text-primary">
-                Drop {candidate.playerName}
-              </span>
-              <span className="ml-auto shrink-0 font-mono text-xs text-text-faint">{candidateLine(candidate)}</span>
+              <PlayerRow
+                dense
+                player={{
+                  id: candidate.playerId,
+                  name: candidate.playerName,
+                  position: candidate.position,
+                  nflTeam: candidate.nflTeam ?? "",
+                  headshotUrl: null,
+                  adp: candidate.adp,
+                }}
+                name={`Drop ${candidate.playerName}`}
+                meta={candidateLine(candidate)}
+              />
             </button>
           ))}
         </div>

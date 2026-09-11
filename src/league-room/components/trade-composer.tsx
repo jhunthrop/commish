@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button, Card, ErrorState, PositionBadge, Select, Textarea } from "@/components/ui";
+import { Button, Card, ErrorState, PlayerRow, Select, Textarea } from "@/components/ui";
 import type { ProposeTradeBody } from "@/trades/contract";
 import { TRADE_CONFIG } from "@/trades/config";
 import type { TradeRoomContext, TradeRosterPlayer } from "../contract";
@@ -64,10 +64,11 @@ function PlayerPicker({
             const checked = selected.includes(player.playerId);
             const atCap = !checked && selected.length >= TRADE_CONFIG.maxAssetsPerSide;
             return (
-              // E5 (competition review): the picker's own row used to wrap a `Sticker` — the
-              // same full-width slab the trade card carried — around every checkbox label. A
-              // plain row with a `PositionBadge` chip is the treatment the matchup table and
-              // `LineupEditor` already use; the sticker fill stays on the board it was built for.
+              // SIDELINE (the wire, 2026-09-11): the picker's row IS a `PlayerRow`, so the person
+              // you are about to trade away is drawn the same way here as inside the offer the
+              // other manager will read. The checkbox rides the row's `lead` slot (its identity
+              // block, never a fifth region) and a chosen row wears the amber "yours" wash rather
+              // than relying on the checkbox alone to say which people are in the offer.
               //
               // Player-name adoption sweep (task 4): the row used to be one `<label>` wrapping
               // the checkbox AND the name, so a manager's tap anywhere on the name toggled the
@@ -76,21 +77,29 @@ function PlayerPicker({
               // tap, the exact nested-interactive shape the sweep rules out. The checkbox keeps
               // its own accessible name instead (no visible label needed: the row already reads
               // "checkbox, badge, name"), and the name is a plain sibling.
-              <li key={player.playerId} className="flex min-w-0 items-center gap-2">
-                <input
-                  type="checkbox"
-                  aria-label={`${checked ? "Remove" : "Add"} ${player.name} ${checked ? "from" : "to"} the trade`}
-                  checked={checked}
-                  disabled={atCap}
-                  onChange={() => onToggle(player.playerId)}
-                  className="size-4 accent-accent"
-                />
-                <PositionBadge position={player.position} size="sm" />
-                <PlayerName
-                  leagueId={leagueId}
-                  playerId={player.playerId}
-                  name={player.name}
-                  className="min-w-0 break-words text-sm font-medium text-text-primary"
+              <li key={player.playerId} className={checked ? "self-wash rounded-md" : ""}>
+                <PlayerRow
+                  dense
+                  player={{
+                    id: player.playerId,
+                    name: player.name,
+                    position: player.position,
+                    nflTeam: player.nflTeam,
+                    headshotUrl: player.headshotUrl,
+                    adp: player.adp,
+                  }}
+                  meta={player.nflTeam === "" ? undefined : player.nflTeam}
+                  name={<PlayerName leagueId={leagueId} playerId={player.playerId} name={player.name} className="truncate" />}
+                  lead={
+                    <input
+                      type="checkbox"
+                      aria-label={`${checked ? "Remove" : "Add"} ${player.name} ${checked ? "from" : "to"} the trade`}
+                      checked={checked}
+                      disabled={atCap}
+                      onChange={() => onToggle(player.playerId)}
+                      className="size-4 accent-accent"
+                    />
+                  }
                 />
               </li>
             );
@@ -216,12 +225,15 @@ export function TradeComposer({ leagueId, context, onAssess, onPropose, onDone, 
         {assessing ? <p className="text-sm text-text-muted">Checking what the platform thinks of this trade.</p> : null}
         {assessment === null ? null : <TradeVerdict assessment={assessment} />}
 
+        {/* THE SAY LINE (the mock's `.say`): the note you send WITH the offer is the first thing
+            the other manager reads, so it is a message field, not a form field with a hint under
+            it. The hint went with P7 — the placeholder is the whole instruction. */}
         <Textarea
-          label="Note (optional)"
+          label="Say something with it"
           value={note}
           onChange={(event) => setNote(event.target.value)}
           maxLength={TRADE_CONFIG.noteMaxLength}
-          hint="Say why you are offering this, if you want to."
+          placeholder="Why you are offering this"
         />
 
         {error === null ? null : (
@@ -236,8 +248,10 @@ export function TradeComposer({ leagueId, context, onAssess, onPropose, onDone, 
           />
         )}
 
-        <div className="flex flex-wrap gap-3">
-          <Button type="submit" loading={proposing} disabled={!canSend}>
+        {/* ONE VERB (P3). Cancel is quiet and sits after it, because the act this screen exists
+            for is sending the offer. */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" variant="verb" loading={proposing} disabled={!canSend}>
             Propose trade
           </Button>
           <Button type="button" variant="secondary" onClick={onCancel} disabled={proposing}>
