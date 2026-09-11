@@ -324,3 +324,14 @@ Every number in the mocks is either sourced or labelled as a stand-in in an HTML
 - Front-door copy verbatim from the product.
 
 Not sourced, and labelled as stand-ins in every file: ADP, expert rank, season projections, tier drops, make-it-back odds, seat counts and times on the front door, the pick clock's seconds, and the messages in the room. The repo holds no rankings export or ADP fixture. The stand-ins exist to show layout and are never presented as a fact about a real player.
+
+---
+
+## 7. Draft room rulings after the founder's review (2026-09-10)
+
+The founder chose Sideline and, reviewing the draft room, added four rulings. Mock: `docs/design/mocks/2026-09-10/sideline/draft-room-your-sheet.html`, built from the production board export of 2026-09-08.
+
+1. **Your sheet is a view of the board region, not a drawer tab.** A two-position switch, Wall and Your sheet. Your sheet is seven columns (Overall, QB, RB, WR, TE, K, D/ST) of up to fifty, tiers as sticky bands inside each column with the count left, taken players struck in place, your picks in amber, one odds number per row (still there at your next pick, runs over runs, the same bands as the pool), a flag for targets, drag to reorder, Draft on the row when on the clock and Queue off it, a Hide taken toggle and a jump to the next open tier, a column strip with counts. K and D/ST carry no tiers. It starts as our board until the manager moves something and says so. The old six-tab drawer (Pool, Assistant, My sheet, Roster, Byes, Picks) goes: the pool is the drawer, the picks are the stream, byes and stacks are chips on rows and the peek, rosters are sheets from the wall header.
+2. **The stream collapses.** Three widths remembered per browser: open at 320, a 64px rail (faces with presence, an amber mention pill, the last pick as a face and position chip, our call as a face and a number), and hidden with a small "new" pill on the top strip. The rail is the desktop default. The phone keeps the stream as the screen.
+3. **Our call sits in the dock beside the Draft verb** when you are on the clock, so the advice is with the action whatever the stream's width.
+4. **Performance is a requirement, measured.** Seven columns of fifty with a pick landing every 700 ms: no dropped frames, one row re-rendered per pick, virtualized columns, rows keyed by player id. The fluidity round's measurements (re-renders, long tasks, receipt-to-cell, dropped frames) are the harness.
