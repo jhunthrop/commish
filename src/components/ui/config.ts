@@ -214,9 +214,11 @@ export const UI_CONFIG = {
  * color utility rather than a component absorbing a `className` prop for the one thing it
  * varies by.
  */
-// SIDELINE (2026-09-10): the label register moves from mono to the body face at 600, the mock's
-// own `.fact h3`/`.advisor h2` treatment. Still small, still quiet, still sentence case here.
-export const EYEBROW = "font-sans text-xs font-semibold tracking-[0.04em]";
+// SIDELINE (2026-09-10): the label register moves from mono to the body face. No weight step
+// here on purpose: `Stat` prints its label in this register and a weight step is magnitude's
+// own channel (`stat.test.ts` pins that an uncompared number carries none). Small, quiet,
+// sentence case.
+export const EYEBROW = "font-sans text-xs tracking-[0.04em]";
 
 /**
  * THE MICRO-LABEL — the product's one sanctioned all-caps register, and the ONLY place law 2's

@@ -23,13 +23,13 @@ describe("ButtonLink", () => {
     expect(getByRole("link").className).toBe(buttonClassName("secondary", "sm", "w-fit"));
   });
 
-  it("defaults to the ink pill (primary, md)", () => {
+  it("defaults to the Court blue pill (primary, md)", () => {
     const { getByRole } = render(<ButtonLink href="/x">Go</ButtonLink>);
     const className = getByRole("link").className;
     expect(className).toBe(buttonClassName("primary", "md"));
     expect(className).toContain("rounded-pill");
-    expect(className).toContain("bg-text-primary");
-    expect(className).toContain("text-surface");
+    expect(className).toContain("bg-accent");
+    expect(className).toContain("text-accent-text");
   });
 
   it("renders the quiet pill for secondary", () => {

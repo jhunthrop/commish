@@ -49,10 +49,12 @@ describe("PlayerFace", () => {
     // The visible colour IS the gap between tile and face. A caller choosing the two halves
     // separately is how one surface gets a 2px frame and its neighbour a 6px one, so the pairing
     // is the component's and the size prop is a single word.
+    // Sideline: a 2px club ring at every step, so the box is always the face plus four.
     const cases: ReadonlyArray<readonly [PlayerFaceSize, string, string]> = [
-      ["sm", "size-8", "size-6"],
-      ["md", "size-11", "size-8"],
-      ["lg", "size-14", "size-12"],
+      ["sm", "size-8", "size-7"],
+      ["md", "size-9", "size-8"],
+      ["lg", "size-14", "size-13"],
+      ["xl", "size-33", "size-32"],
     ];
     for (const [size, tile, avatar] of cases) {
       const { unmount } = render(<PlayerFace player={CROFT} size={size} />);
@@ -63,13 +65,20 @@ describe("PlayerFace", () => {
     }
   });
 
-  it("defaults to md, the card-and-roster step, so a caller that says nothing gets the middle one", () => {
+  it("defaults to md, the 36px row face, so a caller that says nothing gets Sideline's row", () => {
     render(<PlayerFace player={CROFT} />);
-    expect(screen.getByTestId("player-face-team").className).toContain("size-11");
+    expect(screen.getByTestId("player-face-team").className).toContain("size-9");
+  });
+
+  it("draws the club as a ring around a circle, never a plate", () => {
+    render(<PlayerFace player={CROFT} />);
+    const ring = screen.getByTestId("player-face-team");
+    expect(ring.className).toContain("rounded-full");
+    expect(ring.firstElementChild!.className).toContain("rounded-pill");
   });
 
   it("keeps the size promise on the bare face too — an unknown team changes the colour, not the layout", () => {
     render(<PlayerFace player={FREE_AGENT} size="lg" />);
-    expect(screen.getByText("RV").parentElement!.className).toContain("size-12");
+    expect(screen.getByText("RV").parentElement!.className).toContain("size-13");
   });
 });
