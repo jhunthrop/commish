@@ -46,7 +46,9 @@ export function BigNumber({ value, basis, size = "md", align = "end", changed = 
       >
         {absent ? "–" : value}
       </span>
-      <span className={`mt-0.5 ${step.basis} text-text-faint`}>{basis}</span>
+      {/* The caption wraps inside its own width rather than pushing the name beside it off a
+          360px row: the name is the largest thing on the row (P1) and the caption is the smallest. */}
+      <span className={`mt-0.5 max-w-[10rem] leading-tight ${step.basis} text-text-faint`}>{basis}</span>
     </span>
   );
 }

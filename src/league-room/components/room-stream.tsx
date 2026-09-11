@@ -124,30 +124,34 @@ export function RoomStream({ leagueId, activityRows, sendIsTheAct }: RoomStreamP
           Reconnecting
         </p>
       ) : null}
-      {chat.hasMore ? (
-        <Button variant="secondary" size="sm" className="self-center" loading={chat.loadingEarlier} disabled={chat.loadingEarlier} onClick={() => void chat.loadEarlier()}>
-          Earlier messages
-        </Button>
-      ) : null}
-      {items.length === 0 ? (
-        <p className="py-6 text-center text-sm text-text-faint">Nothing has happened here yet. Say the first thing.</p>
-      ) : (
-        <div role="log" aria-live="polite" aria-label="What happened" className="flex flex-col gap-4">
-          {byDay(items).map((chapter) => (
-            <section key={chapter.key} aria-label={dayMarker(chapter.rows[0]!.occurredAt, now)} className="flex flex-col gap-3">
-              <ChapterBand name={dayMarker(chapter.rows[0]!.occurredAt, now)} consequence={`${chapter.rows.length} ${chapter.rows.length === 1 ? "thing" : "things"}`} />
-              {chapter.rows.map((item: StreamItem) =>
-                item.kind === "event" ? (
-                  <StreamEvent key={item.id} row={item.row} />
-                ) : (
-                  <StreamMessage key={item.id} leagueId={leagueId} message={item.message} meUserId={chat.meUserId} onReact={(id, emoji) => void chat.react(id, emoji)} onReport={setReportingId} />
-                ),
-              )}
-            </section>
-          ))}
-        </div>
-      )}
-      <div ref={footRef} />
+      {/* The log scrolls inside the column where the column has a height (desktop); on a phone
+          it simply grows and the page scrolls. The field below never scrolls away. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:overflow-y-auto">
+        {chat.hasMore ? (
+          <Button variant="secondary" size="sm" className="self-center" loading={chat.loadingEarlier} disabled={chat.loadingEarlier} onClick={() => void chat.loadEarlier()}>
+            Earlier messages
+          </Button>
+        ) : null}
+        {items.length === 0 ? (
+          <p className="py-6 text-center text-sm text-text-faint">Nothing has happened here yet. Say the first thing.</p>
+        ) : (
+          <div role="log" aria-live="polite" aria-label="What happened" className="flex flex-col gap-4">
+            {byDay(items).map((chapter) => (
+              <section key={chapter.key} aria-label={dayMarker(chapter.rows[0]!.occurredAt, now)} className="flex flex-col gap-3">
+                <ChapterBand name={dayMarker(chapter.rows[0]!.occurredAt, now)} consequence={`${chapter.rows.length} ${chapter.rows.length === 1 ? "thing" : "things"}`} />
+                {chapter.rows.map((item: StreamItem) =>
+                  item.kind === "event" ? (
+                    <StreamEvent key={item.id} row={item.row} />
+                  ) : (
+                    <StreamMessage key={item.id} leagueId={leagueId} message={item.message} meUserId={chat.meUserId} onReact={(id, emoji) => void chat.react(id, emoji)} onReport={setReportingId} />
+                  ),
+                )}
+              </section>
+            ))}
+          </div>
+        )}
+        <div ref={footRef} />
+      </div>
       <ChatComposer sending={chat.sending} onSend={chat.send} gifSearchEnabled={chat.gifSearchEnabled} onSearchGifs={chat.searchGifs} sendVariant={sendIsTheAct ? "verb" : "secondary"} />
       <ReportDialog open={reportingId !== null} leagueId={leagueId} messageId={reportingId ?? ""} onClose={() => setReportingId(null)} />
     </section>

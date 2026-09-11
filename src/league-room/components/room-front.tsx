@@ -48,14 +48,18 @@ export function RoomFront(props: RoomFrontProps) {
   const { home, lineup, week, plans, inboxTrades, tradeContext, pendingClaims, myMatchupDetail, projectionsByPlayerId, activityRows, present } = props;
   const meUserId = meUserIdOf(home);
   const sendIsTheAct = momentFor(plans, inboxTrades) === null;
+  // On a wide screen the stage is a fixed-height frame (the shell's own geometry), so the stream
+  // column scrolls inside it and the say-something field stays at its foot; the cards on the
+  // right scroll on their own. On a phone the page scrolls as one column and the field is at
+  // the foot of the page.
   return (
-    <div data-testid="room-front" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-      <div className="flex flex-col gap-4 lg:order-2">
+    <div data-testid="room-front" className="flex min-h-0 flex-1 flex-col gap-4 p-4 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:overflow-hidden">
+      <div className="flex flex-col gap-4 lg:order-2 lg:min-h-0 lg:overflow-y-auto">
         <RivalCard home={home} week={week} myMatchupDetail={myMatchupDetail} projectionsByPlayerId={projectionsByPlayerId} regularSeasonWeeks={props.regularSeasonWeeks} />
         <MomentVerb home={home} plans={plans} inboxTrades={inboxTrades} tradeContext={tradeContext} pendingClaims={pendingClaims} onFixLineup={props.onFixLineup} onViewTrade={props.onViewTrade} />
         <WhoIsHere teams={home.teams} present={present} meUserId={meUserId} />
       </div>
-      <div className="flex min-w-0 flex-col gap-4 lg:order-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 lg:order-1 lg:overflow-hidden">
         {home.draftStatus === "complete" && home.currentWeek === 1 && lineup !== null ? (
           <RoomArrivalCard leagueId={home.leagueId} draftId={home.draftId} lineup={lineup} matchup={home.myMatchup} projectedLine={null} />
         ) : null}

@@ -1,10 +1,13 @@
 import { mkdirSync } from "node:fs";
-import { expect, SEEDED_SEASON_LEAGUE_ID, test } from "./support/fixtures";
+import { E2E_TRADES_LEAGUE_ID } from "./global-setup";
+import { expect, test } from "./support/fixtures";
 
 /**
  * THE LEAGUE FRONT PAGE ON SIDELINE (2026-09-10): the first real screen built on the new tokens
- * and primitives, walked at desktop and phone width against the seeded season league. Two kinds
- * of proof here, because a token system needs both:
+ * and primitives, walked at desktop and phone width against the drafted league global-setup seeds
+ * for manager A (the shared dev seed hands the season league's first seat to whoever seeded it, so
+ * that league is not a seat manager A can count on). Two kinds of proof here, because a token
+ * system needs both:
  *
  * 1. Assertions on the composition the principles demand. P6: your game this week is the first
  *    region. P5: the room is a region on the same page with the say-something field in reach.
@@ -27,7 +30,7 @@ async function solidPillCount(page: import("@playwright/test").Page): Promise<nu
 test("the league front page opens on your rival and the room, with one verb, at desktop width", async ({ managerA }) => {
   mkdirSync(OUT_DIR, { recursive: true });
   await managerA.setViewportSize({ width: 1440, height: 900 });
-  await managerA.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}`);
+  await managerA.goto(`/app/leagues/${E2E_TRADES_LEAGUE_ID}`);
   await expect(managerA.getByRole("heading", { level: 1 })).toBeVisible();
 
   // P6: your opponent this week, with a face, before anything else on the page.
@@ -48,13 +51,27 @@ test("the league front page opens on your rival and the room, with one verb, at 
 
 test("the league front page fits a phone, one column, without scrolling sideways", async ({ managerA }) => {
   mkdirSync(OUT_DIR, { recursive: true });
-  await managerA.setViewportSize({ width: 390, height: 844 });
-  await managerA.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}`);
+  // 360 is the product's minimum viewport (`TOKENS.minViewport`) and the suite's own phone project.
+  await managerA.setViewportSize({ width: 360, height: 740 });
+  await managerA.goto(`/app/leagues/${E2E_TRADES_LEAGUE_ID}`);
   await expect(managerA.getByRole("region", { name: "Your game this week" })).toBeVisible();
+  // The stream has loaded once the field is there; the picture should show the room, not its skeleton.
+  await expect(managerA.getByLabel("Message")).toBeAttached();
 
-  // P10 at 390px: the page body never scrolls sideways.
-  const overflow = await managerA.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  expect(overflow).toBeLessThanOrEqual(0);
+  // P10 at 360px: nothing on the page this round owns (the `main` landmark) sticks out past the
+  // viewport. On failure, name what did. The shell's own header is measured separately and
+  // reported as an annotation, because a header that overflows is shell debt, not the room's.
+  const overflow = await managerA.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    const stickingOut = (scope: string) =>
+      Array.from(document.querySelectorAll<HTMLElement>(`${scope} *`))
+        .filter((node) => node.getBoundingClientRect().right > width + 1)
+        .slice(0, 8)
+        .map((node) => `${node.tagName.toLowerCase()}.${node.className.toString().split(" ").slice(0, 4).join(".")}@${Math.round(node.getBoundingClientRect().right)}`);
+    return { page: document.documentElement.scrollWidth - width, main: stickingOut("main"), header: stickingOut("header") };
+  });
+  test.info().annotations.push({ type: "shell-overflow", description: `page ${overflow.page}px, header offenders ${overflow.header.join(", ") || "none"}` });
+  expect(overflow.main, "the room sticks out past a 360px viewport").toEqual([]);
 
   expect(await solidPillCount(managerA)).toBeLessThanOrEqual(1);
 

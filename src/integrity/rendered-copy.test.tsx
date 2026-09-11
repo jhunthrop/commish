@@ -1117,7 +1117,9 @@ describe("RoomShell says nothing that breaks the house copy rules, including eve
           </LeagueRoomDepsProvider>
         </ChatRoomDepsProvider>,
       );
-      await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
+      // SIDELINE (2026-09-10): the chat is the front page's stream, "The room", not a rail card.
+      await waitFor(() => expect(screen.getByRole("region", { name: "The room" })).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByLabelText("Message")).toBeInTheDocument());
       expectClean(
         container,
         home.name,
