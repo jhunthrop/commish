@@ -3,14 +3,16 @@ import { TOKENS } from "./tokens";
 /**
  * THE ROOM'S MOTIONS, NAMED — one module, no per-component milliseconds (founder report
  * 2026-09-10, the draft room "feels fidgety"). Every figure here is a `TOKENS.motion` value, so
- * law 6's ceiling (*"nothing eases longer than 250ms"*) is enforced once in `tokens.test.ts`
- * and every named motion below inherits it; `motion.test.ts` asserts each one stays under it.
+ * P4's band (*"every live event moves, and nothing else does"*, 150 to 400ms) is enforced once
+ * in `tokens.test.ts` and every named motion below inherits it; `motion.test.ts` asserts none of
+ * them is slower than an arrival.
  *
- * Law 6 also says motion REPORTS and never performs: each entry is tied to something that
- * happened — a pick landed, a row left, a number changed — and nothing here runs on mount, on
- * scroll or on hover. The CSS classes live in `globals.css` and read the same tokens through
- * their generated custom properties (`--commish-motion-duration-*`), so a class and its named
- * motion cannot drift apart.
+ * P4 also says motion REPORTS and never performs: each entry is tied to something that happened
+ * — a pick landed, a row left, a number changed — and nothing here runs on mount, on scroll or
+ * on hover. Sideline's rule of thumb: a spring for anything that appears, an ease-out for
+ * anything that moves or leaves. The CSS classes live in `globals.css` and read the same tokens
+ * through their generated custom properties (`--commish-motion-duration-*`), so a class and its
+ * named motion cannot drift apart.
  */
 export interface NamedMotion {
   /** ms */
@@ -20,21 +22,23 @@ export interface NamedMotion {
   readonly className: string;
 }
 
+const { duration, easing } = TOKENS.motion;
+
 export const MOTION = {
-  /** A pick settling into its board cell: opacity plus a small rise, eased out. */
-  settle: { durationMs: TOKENS.motion.duration.base, easing: TOKENS.motion.easing.standard, className: "animate-cell-settle" },
+  /** A pick settling into its board cell: opacity plus a small rise, on the arrival spring. */
+  settle: { durationMs: duration.in, easing: easing.spring, className: "animate-cell-settle" },
   /** The same settle for a reader who asked for less motion: opacity only, no movement. */
-  settleStill: { durationMs: TOKENS.motion.duration.base, easing: TOKENS.motion.easing.standard, className: "animate-cell-fade" },
-  /** A list row moving to a new place (the FLIP transform). */
-  reorder: { durationMs: TOKENS.motion.duration.base, easing: TOKENS.motion.easing.standard, className: "motion-reorder" },
-  /** A row entering a list: a fade in. */
-  enter: { durationMs: TOKENS.motion.duration.base, easing: TOKENS.motion.easing.standard, className: "animate-row-enter" },
+  settleStill: { durationMs: duration.in, easing: easing.spring, className: "animate-cell-fade" },
+  /** A list row moving to a new place (the FLIP transform): a movement, eased out. */
+  reorder: { durationMs: duration.in, easing: easing.out, className: "motion-reorder" },
+  /** A row entering a list: it appears, so it springs. */
+  enter: { durationMs: duration.in, easing: easing.spring, className: "animate-row-enter" },
   /** A row leaving a list: a fade out, held in the DOM only this long. */
-  leave: { durationMs: TOKENS.motion.duration.fast, easing: TOKENS.motion.easing.standard, className: "animate-row-leave" },
+  leave: { durationMs: duration.out, easing: easing.out, className: "animate-row-leave" },
   /** A figure that just changed (odds, a projection): the new value fades in over the old. */
-  swap: { durationMs: TOKENS.motion.duration.fast, easing: TOKENS.motion.easing.standard, className: "animate-swap" },
+  swap: { durationMs: duration.out, easing: easing.out, className: "animate-swap" },
   /** A board row taking a new height as the active window moves on: the height eases. */
-  resize: { durationMs: TOKENS.motion.duration.base, easing: TOKENS.motion.easing.standard, className: "motion-resize" },
+  resize: { durationMs: duration.in, easing: easing.out, className: "motion-resize" },
 } as const satisfies Readonly<Record<string, NamedMotion>>;
 
 export type MotionName = keyof typeof MOTION;

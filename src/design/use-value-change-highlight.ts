@@ -36,9 +36,9 @@ import { useTransientVisibility } from "./use-transient-visibility";
  * **IT REUSES `useTransientVisibility` RATHER THAN REBUILDING IT.** "Show this for `ms`, keyed on
  * `key`" is precisely the machinery here, timer cleanup and re-trigger semantics included; a
  * second copy would be the same bug surface twice. All this adds is the derivation of a key from
- * a value that changed, and the duration: `TOKENS.motion.duration.slow`, which is law 6's stated
- * 250ms ceiling and the value-change wash's own duration in one token, deliberately not two names
- * for one fact (see the token's docblock).
+ * a value that changed, and the duration: `TOKENS.motion.duration.highlight`, the 600ms wash P4
+ * allows on a row whose value just changed, one token and deliberately not two names for one
+ * fact (see the token's docblock).
  *
  * Consumers render the wash however their surface needs (a background transition, a ring). This
  * hook returns a boolean and paints nothing, so it stays usable from a table cell, a scoreboard

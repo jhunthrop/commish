@@ -7,10 +7,10 @@ import { TOKENS } from "./tokens";
 const GLOBALS_CSS = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf8");
 
 describe("MOTION (the room's named motions)", () => {
-  it("every named motion stays under law 6's ceiling and uses a token duration", () => {
+  it("no named motion is slower than an arrival (P4's band), and each rides a token duration and easing", () => {
     const durations = new Set<number>(Object.values(TOKENS.motion.duration));
     for (const [name, motion] of Object.entries(MOTION)) {
-      expect(motion.durationMs, name).toBeLessThanOrEqual(TOKENS.motion.duration.slow);
+      expect(motion.durationMs, name).toBeLessThanOrEqual(TOKENS.motion.duration.in);
       expect(durations.has(motion.durationMs), `${name} rides a token duration`).toBe(true);
       expect(Object.values(TOKENS.motion.easing), `${name} rides a token easing`).toContain(motion.easing);
     }

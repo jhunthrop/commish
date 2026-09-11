@@ -303,29 +303,29 @@ body {
   to { opacity: 1; }
 }
 .animate-cell-settle {
-  animation: commish-cell-settle var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
+  animation: commish-cell-settle var(--commish-motion-duration-in) var(--commish-motion-easing-spring) both;
 }
 .animate-cell-fade {
-  animation: commish-fade-in var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
+  animation: commish-fade-in var(--commish-motion-duration-in) var(--commish-motion-easing-spring) both;
 }
 .animate-row-enter {
-  animation: commish-fade-in var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
+  animation: commish-fade-in var(--commish-motion-duration-in) var(--commish-motion-easing-spring) both;
 }
 .animate-row-leave {
-  animation: commish-fade-out var(--commish-motion-duration-fast) var(--commish-motion-easing-standard) both;
+  animation: commish-fade-out var(--commish-motion-duration-out) var(--commish-motion-easing-out) both;
 }
 .animate-swap {
-  animation: commish-swap var(--commish-motion-duration-fast) var(--commish-motion-easing-standard) both;
+  animation: commish-swap var(--commish-motion-duration-out) var(--commish-motion-easing-out) both;
 }
 .motion-reorder {
-  transition: transform var(--commish-motion-duration-base) var(--commish-motion-easing-standard);
+  transition: transform var(--commish-motion-duration-in) var(--commish-motion-easing-out);
 }
 .motion-resize {
-  transition: height var(--commish-motion-duration-base) var(--commish-motion-easing-standard);
+  transition: height var(--commish-motion-duration-in) var(--commish-motion-easing-out);
 }
 @media (prefers-reduced-motion: reduce) {
   .animate-cell-settle { animation-name: commish-fade-in; }
-  .animate-cell-settle, .animate-cell-fade { animation-duration: var(--commish-motion-duration-base) !important; }
+  .animate-cell-settle, .animate-cell-fade { animation-duration: var(--commish-motion-duration-in) !important; }
   .motion-reorder, .motion-resize { transition: none; }
 }
 
