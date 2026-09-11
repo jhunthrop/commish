@@ -18,6 +18,12 @@ export interface ChatComposerProps {
    */
   readonly gifSearchEnabled: boolean;
   readonly onSearchGifs: (query: string) => Promise<readonly GifResult[]>;
+  /**
+   * SIDELINE (P3, one action per moment): quiet by default, because the page's one solid pill is
+   * the week's act. The league's front page passes `verb` when nothing needs the manager, so
+   * saying something becomes the page's act rather than the page having none.
+   */
+  readonly sendVariant?: "secondary" | "verb";
 }
 
 /**
@@ -33,7 +39,7 @@ export interface ChatComposerProps {
  * The field's id is fixed (`chat-message-input`) rather than generated, so the empty-state's
  * "Say hello" link (`MessageList`) has a stable anchor to jump to.
  */
-export function ChatComposer({ sending, onSend, gifSearchEnabled, onSearchGifs }: ChatComposerProps) {
+export function ChatComposer({ sending, onSend, gifSearchEnabled, onSearchGifs, sendVariant = "secondary" }: ChatComposerProps) {
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -83,7 +89,7 @@ export function ChatComposer({ sending, onSend, gifSearchEnabled, onSearchGifs }
             onChange={(event) => setBody(event.target.value)}
           />
         </div>
-        <Button type="submit" variant="secondary" size="sm" className="mb-0.5" loading={sending} disabled={sending}>
+        <Button type="submit" variant={sendVariant} size="sm" className="mb-0.5" loading={sending} disabled={sending}>
           Send
         </Button>
       </div>

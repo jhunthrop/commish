@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LeagueChat } from "@/chat-room/components/league-chat";
 import type { FreeAgentRow } from "@/league-service/claims";
 import type { TradeProposalView } from "@/trades/contract";
 import type { RoomData } from "../contract";
@@ -17,6 +16,7 @@ import {
 import { rankDropCandidates } from "../lib/claim-drop";
 import { lineupFixPlans, type LineupFixPlan } from "../lib/lineup-problems";
 import { stageFor } from "../lib/stage-priority";
+import { usePresence } from "../hooks/use-presence";
 import { useRailVisible } from "../hooks/use-rail-visible";
 import { tradeSheetMath } from "../lib/trade-math";
 import { ClaimSheet } from "./claim-sheet";
@@ -29,8 +29,8 @@ import { MatchupCelebration } from "./matchup-celebration";
 import { ModerationSummary } from "./moderation-summary";
 import { PlayerPeekHost } from "./player-peek";
 import { RoomDrawer } from "./room-drawer";
+import { RoomFront } from "./room-front";
 import { RoomSpine } from "./room-spine";
-import { RoomStageAttention } from "./room-stage-attention";
 import { RoomStageLive } from "./room-stage-live";
 import { RoomSurfaceActivity } from "./room-surface-activity";
 import { RoomSurfacePlayers } from "./room-surface-players";
@@ -91,6 +91,8 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
   const [sheet, setSheet] = useState<SheetState>(null);
   const [searchFocusToken, setSearchFocusToken] = useState(0);
   const railVisible = useRailVisible();
+  // Who is in the room (P5), seeded by the server's read and kept live off the league stream.
+  const present = usePresence(home.leagueId, data.presentUserIds);
   const drawerRef = useRef(drawer);
   drawerRef.current = drawer;
 
@@ -284,12 +286,14 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
                 projectionsByPlayerId={data.projectionsByPlayerId}
               />
             ) : (
-              <RoomStageAttention
+              // THE FRONT PAGE (Sideline, 2026-09-10): your rival, the one verb, who is here,
+              // and the stream. It replaced the attention stage and the standings pulse; the
+              // full standings live in the drawer's own surface.
+              <RoomFront
                 home={home}
                 lineup={data.lineup}
                 week={data.week}
                 regularSeasonWeeks={regularSeasonWeeks}
-                playoffTeams={playoffTeams}
                 plans={plans}
                 inboxTrades={inbox}
                 tradeContext={data.tradeContext}
@@ -299,10 +303,9 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
                 activityRows={data.activityRows}
                 grades={data.grades}
                 gradesBasis={data.gradesBasis}
-                drawerOpen={drawer.surface !== null}
+                present={present}
                 onFixLineup={(plan) => setSheet({ kind: "lineup", plan })}
                 onViewTrade={(trade) => setSheet({ kind: "trade", trade })}
-                onOpenSurface={(surface) => send({ kind: "chipTap", surface })}
               />
             )}
 
@@ -319,11 +322,10 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
             ) : null}
           </div>
 
-          {/* The rail: the room's ambient life. The blueprint mocks omit it, but nothing in the
-              room supersedes chat, the terms, the members, or the commissioner's own tools —
-              deleting them would remove function, not noise. Narrow, and only at xl. */}
+          {/* The rail: the terms, the members, and the commissioner's own tools. The chat left
+              it for the front page's stream (P5: the room is not a chat tab), where every league
+              screen can reach it in one tap. Narrow, and only at xl. */}
           <aside className="hidden w-80 shrink-0 flex-col gap-4 overflow-y-auto border-l border-line bg-surface-elevated p-3 xl:flex">
-            <LeagueChat leagueId={home.leagueId} />
             <LeagueTermsPanel terms={home.terms} titleAs="p" draftValue={home.draftStatus === "complete" ? "Complete" : undefined} />
             <LeagueMembersPanel
               teams={home.teams}

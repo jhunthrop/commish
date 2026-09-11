@@ -82,9 +82,10 @@ describe("RoomShell", () => {
     expect(screen.getByRole("link", { name: "See the matchup" }).getAttribute("href")).toBe(
       "/app/leagues/l1/matchups/3",
     );
-    // The stage still deals the lineup card, beneath the arrival.
-    const fix = screen.getByRole("button", { name: "Fix lineup" });
-    expect(arrival.compareDocumentPosition(fix) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The one verb still rides the front page with the rival, and the arrival sits above the stream.
+    expect(screen.getByRole("button", { name: "Set your lineup" })).toBeTruthy();
+    const stream = screen.getByRole("region", { name: "The room" });
+    expect(arrival.compareDocumentPosition(stream) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("keeps the arrival moment off every later week", () => {
@@ -103,27 +104,27 @@ describe("RoomShell", () => {
     expect(screen.getByText("Yours")).toBeTruthy();
   });
 
-  it("rests at the pulse when nothing needs the viewer — and the pulse spends the stage on the full standings", () => {
+  it("rests on the front page when nothing needs the viewer: the rival at the top, the stream, no verb card (Sideline)", () => {
     render(wrap(ROOM_DATA));
-    expect(screen.getByText("The league this week")).toBeTruthy();
-    // No cards dealt, so the pulse is the room: the full standings table, not the compact teaser
-    // (founder defect 2026-09-03, "the league home landing page feels empty").
-    expect(screen.getByRole("heading", { name: "Standings" })).toBeTruthy();
-    expect(screen.queryByText("Standings pulse")).toBeNull();
+    expect(screen.getByRole("region", { name: "Your game this week" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "The room" })).toBeTruthy();
+    expect(screen.queryByTestId("moment-verb")).toBeNull();
     expect(screen.queryByText(/needs you/i)).toBeNull();
+    // The standings table lives in the drawer's own surface, never doubled on the stage.
+    expect(screen.queryByRole("heading", { name: "Standings" })).toBeNull();
   });
 
-  it("deals an attention card for an unlocked lineup problem, and its verb opens the fix sheet", () => {
+  it("deals the lineup problem as the one verb, and it opens the fix sheet", () => {
     render(wrap(ATTENTION_DATA));
     expect(screen.getByText("Your WR1 slot starts a player on bye")).toBeTruthy();
     expect(screen.getByText("1 thing needs you")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Fix lineup" }));
+    fireEvent.click(screen.getByRole("button", { name: "Set your lineup" }));
     expect(screen.getByRole("dialog", { name: "Fix your WR1" })).toBeTruthy();
   });
 
-  it("deals a trade card whose verb opens the trade sheet", () => {
+  it("deals the trade offer as the one verb when the lineup is fine, and it opens the trade sheet", () => {
     render(wrap({ ...ATTENTION_DATA, lineup: ROOM_DATA.lineup, trades: INBOX_TRADE }));
-    fireEvent.click(screen.getByRole("button", { name: "View trade" }));
+    fireEvent.click(screen.getByRole("button", { name: "Respond to the offer" }));
     expect(screen.getByRole("dialog", { name: /Iron Owls offer a trade/ })).toBeTruthy();
   });
 
@@ -136,7 +137,7 @@ describe("RoomShell", () => {
     render(wrap(live));
     expect(screen.getByText("Yours")).toBeTruthy();
     expect(screen.getByText("Theirs")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Fix lineup" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Set your lineup" })).toBeNull();
   });
 
   it("is the waiting room before the league has drafted, with no drawer chips", () => {
@@ -152,7 +153,7 @@ describe("RoomShell", () => {
     };
     render(wrap(waiting));
     expect(screen.queryByRole("button", { name: "Players" })).toBeNull();
-    expect(screen.queryByText("The league this week")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Your game this week" })).toBeNull();
   });
 
   // Task 10: the commissioner's own toggle for `GradeBoard`'s visibility, mounted in the rail.
