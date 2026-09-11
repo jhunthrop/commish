@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
@@ -82,5 +82,49 @@ describe("RoomStream", () => {
     render(wrap(<RoomStream leagueId="l1" activityRows={[]} sendIsTheAct={false} />, deps));
     await waitFor(() => expect(screen.getByRole("region", { name: "Today" })).toBeInTheDocument());
     expect(screen.getByRole("region", { name: "Yesterday" })).toBeInTheDocument();
+  });
+});
+
+describe("RoomStream keeps the landing view (H3)", () => {
+  it("never scrolls on first paint, so the rival card above it stays in view", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    render(wrap(<RoomStream leagueId="l1" activityRows={[PICK, CLOCK_PICK]} sendIsTheAct={false} />));
+    await waitFor(() => expect(screen.getAllByTestId("message-bubble")).toHaveLength(2));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("follows a new item to the foot only when the reader was already at the foot", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    let report: ((entries: readonly { isIntersecting: boolean }[]) => void) | null = null;
+    class FakeObserver {
+      constructor(callback: (entries: readonly { isIntersecting: boolean }[]) => void) {
+        report = callback;
+      }
+      observe() {}
+      disconnect() {}
+    }
+    const previous = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver = FakeObserver as unknown as typeof IntersectionObserver;
+    try {
+      const deps = fixtureChatDeps();
+      render(wrap(<RoomStream leagueId="l1" activityRows={[]} sendIsTheAct={false} />, deps));
+      await waitFor(() => expect(screen.getAllByTestId("message-bubble")).toHaveLength(2));
+
+      // Scrolled up to read: a landing message does not yank the view.
+      act(() => report?.([{ isIntersecting: false }]));
+      act(() => deps.emit("chat.message", { message: chatMessage("3", { body: "one", createdAt: "2026-08-18T12:05:00.000Z" }) }));
+      await waitFor(() => expect(screen.getByText("one")).toBeInTheDocument());
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      // At the foot: the next message pulls the view to itself.
+      act(() => report?.([{ isIntersecting: true }]));
+      act(() => deps.emit("chat.message", { message: chatMessage("4", { body: "two", createdAt: "2026-08-18T12:06:00.000Z" }) }));
+      await waitFor(() => expect(screen.getByText("two")).toBeInTheDocument());
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    } finally {
+      globalThis.IntersectionObserver = previous;
+    }
   });
 });

@@ -45,15 +45,13 @@ function StreamEvent({ row }: { readonly row: ActivityFeedRow }) {
 }
 
 interface StreamMessageProps {
-  readonly leagueId: string;
   readonly message: ChatMessageView;
   readonly meUserId: string;
   readonly onReact: (messageId: string, emoji: string) => void;
   readonly onReport: (messageId: string) => void;
 }
 
-function StreamMessage({ leagueId, message, meUserId, onReact, onReport }: StreamMessageProps) {
-  void leagueId;
+function StreamMessage({ message, meUserId, onReact, onReport }: StreamMessageProps) {
   if (message.removal !== null) {
     return <RemovedMessage authorName={message.authorName} authorAvatarUrl={message.authorAvatarUrl} removal={message.removal} />;
   }
@@ -100,10 +98,32 @@ export function RoomStream({ leagueId, activityRows, sendIsTheAct }: RoomStreamP
   const footRef = useRef<HTMLDivElement | null>(null);
   const items = mergeStream(activityRows, chat.messages);
   const itemCount = items.length;
+  const ready = chat.status === "ready";
+  // THE FOOT FOLLOWS ONLY A READER WHO WAS ALREADY THERE (H3). Nothing scrolls on first paint, at
+  // any width: the page lands on the rival card, and the stream is below it. After that, a new
+  // item pulls the view to the foot only while the foot was already in view, the way a chat
+  // behaves when you are at the bottom and stays put when you have scrolled up to read.
+  const painted = useRef(false);
+  const atFoot = useRef(false);
 
   useEffect(() => {
-    footRef.current?.scrollIntoView({ block: "end" });
-  }, [itemCount]);
+    const foot = footRef.current;
+    if (foot === null || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => {
+      atFoot.current = entry?.isIntersecting ?? false;
+    });
+    observer.observe(foot);
+    return () => observer.disconnect();
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!painted.current) {
+      painted.current = true;
+      return;
+    }
+    if (atFoot.current) footRef.current?.scrollIntoView({ block: "end" });
+  }, [ready, itemCount]);
 
   if (chat.status === "loading") {
     return (
@@ -113,7 +133,7 @@ export function RoomStream({ leagueId, activityRows, sendIsTheAct }: RoomStreamP
     );
   }
   if (chat.status === "error") {
-    return <ErrorState title="We could not open the room" description={chat.error ?? undefined} action={<Button variant="secondary" onClick={() => void chat.refresh()}>Try again</Button>} />;
+    return <ErrorState title="The room would not open" description={chat.error ?? undefined} action={<Button variant="secondary" onClick={() => void chat.refresh()}>Try again</Button>} />;
   }
 
   const now = new Date();
@@ -121,7 +141,7 @@ export function RoomStream({ leagueId, activityRows, sendIsTheAct }: RoomStreamP
     <section aria-label="The room" data-testid="room-stream" className="flex min-h-0 flex-1 flex-col gap-3">
       {chat.connection === "reconnecting" ? (
         <p role="status" className="text-xs text-text-faint">
-          Reconnecting
+          Getting you back into the room
         </p>
       ) : null}
       {/* The log scrolls inside the column where the column has a height (desktop); on a phone
@@ -143,7 +163,7 @@ export function RoomStream({ leagueId, activityRows, sendIsTheAct }: RoomStreamP
                   item.kind === "event" ? (
                     <StreamEvent key={item.id} row={item.row} />
                   ) : (
-                    <StreamMessage key={item.id} leagueId={leagueId} message={item.message} meUserId={chat.meUserId} onReact={(id, emoji) => void chat.react(id, emoji)} onReport={setReportingId} />
+                    <StreamMessage key={item.id} message={item.message} meUserId={chat.meUserId} onReact={(id, emoji) => void chat.react(id, emoji)} onReport={setReportingId} />
                   ),
                 )}
               </section>

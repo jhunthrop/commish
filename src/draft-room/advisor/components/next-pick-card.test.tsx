@@ -40,9 +40,10 @@ describe("NextPickCard", () => {
 
   it("keeps the card compact: a medium face, no display-size figure, a small verb", () => {
     renderCard();
-    expect(screen.getByTestId("player-face-team").className).toContain("size-11");
+    // Sideline: the row face is 36 (`size-9`) and a small verb is 32 (`min-h-8`).
+    expect(screen.getByTestId("player-face-team").className).toContain("size-9");
     expect(screen.getByTestId("advisor-odds").className).not.toContain("display-lg");
-    expect(screen.getByRole("button", { name: "Draft" }).className).toContain("min-h-9");
+    expect(screen.getByRole("button", { name: "Draft" }).className).toContain("min-h-8");
   });
 
   it("colours the big number green only at or above the safe band, never red", () => {

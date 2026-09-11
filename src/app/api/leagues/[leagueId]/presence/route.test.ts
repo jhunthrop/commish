@@ -76,8 +76,8 @@ describe("GET /api/leagues/[leagueId]/presence", () => {
     const member = seeded.userIds[0]!;
     signedInAs(member);
     const now = Date.now();
-    await store.markPresent(LEAGUE_ID, member, now);
-    await store.markPresent(LEAGUE_ID, "user_long_gone", now - PRESENCE_CONFIG.ttlMs - 5_000);
+    await store.markPresent(LEAGUE_ID, member, "conn-1", now);
+    await store.markPresent(LEAGUE_ID, "user_long_gone", "conn-2", now - PRESENCE_CONFIG.ttlMs - 5_000);
     const response = await GET(request(), { params });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, data: { userIds: [member] } });

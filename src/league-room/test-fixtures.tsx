@@ -200,8 +200,8 @@ export const ROOM_DATA: RoomData = {
     leagueName: "Sunday Money",
   },
   helpLevel: "standard",
-  // Task 10: the base fixture carries no grades — `GRADES` below (and the room-stage-attention
-  // / room-shell tests that spread `{ ...ROOM_DATA, grades: GRADES, gradesBasis: ... }`) opt a
+  // Task 10: the base fixture carries no grades — `GRADES` below (and the room-front / room-shell
+  // tests that spread `{ ...ROOM_DATA, grades: GRADES, gradesBasis: ... }`) opt a
   // specific test into the board, so every existing test asserting on the resting room's other
   // content is untouched by this field's addition.
   grades: [],

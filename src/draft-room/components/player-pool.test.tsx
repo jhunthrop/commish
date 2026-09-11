@@ -237,8 +237,10 @@ describe("PlayerPool", () => {
     it("carries the atom's own skin rather than a surface this file spells", () => {
       render(<PlayerPool {...props} />);
       const object = rowFor("Jalen Croft").firstElementChild!;
-      expect(object.className).toMatch(/bg-surface-elevated/);
-      expect(object.className).toMatch(/border-line/);
+      // Sideline's row: a 48px row on a 12px plate with a chalk hover, no hairline of its own.
+      expect(object.className).toMatch(/min-h-12/);
+      expect(object.className).toMatch(/rounded-md/);
+      expect(object.className).not.toMatch(/border-line/);
     });
 
     it("is still a list item, and still not a control of its own", () => {

@@ -54,9 +54,15 @@ test("the league front page fits a phone, one column, without scrolling sideways
   // 360 is the product's minimum viewport (`TOKENS.minViewport`) and the suite's own phone project.
   await managerA.setViewportSize({ width: 360, height: 740 });
   await managerA.goto(`/app/leagues/${E2E_TRADES_LEAGUE_ID}`);
-  await expect(managerA.getByRole("region", { name: "Your game this week" })).toBeVisible();
+  const rival = managerA.getByRole("region", { name: "Your game this week" });
+  await expect(rival).toBeVisible();
   // The picture should show the room, not its skeleton: wait for the log or the empty room's line.
   await expect(managerA.getByRole("log", { name: "What happened" }).or(managerA.getByText("Nothing has happened here yet. Say the first thing."))).toBeAttached();
+  // P6 ON LANDING (H3): the stream loading must never scroll the rival card out of the top of the
+  // page. Asserted after the stream has painted, with no scroll of the test's own.
+  await expect(rival).toBeInViewport({ ratio: 0.9 });
+  const scrolledBy = await managerA.evaluate(() => Math.max(window.scrollY, ...Array.from(document.querySelectorAll<HTMLElement>("main *")).map((node) => node.scrollTop)));
+  expect(scrolledBy, "the page landed scrolled away from the top").toBe(0);
 
   // P10 at 360px: nothing on the page this round owns (the `main` landmark) sticks out past the
   // viewport. On failure, name what did. The shell's own header is measured separately and

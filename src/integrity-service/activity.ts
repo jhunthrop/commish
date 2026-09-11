@@ -99,10 +99,22 @@ function distinctPayloadArrayValues(events: readonly AuditEvent[], key: string):
 
 /**
  * The read side of the member-visible activity feed: one league's chain, newest first, run
- * through `activityRowFor` so a hidden type or a denied `actor_only` row never reaches the page
- * at all. Exactly FOUR queries however many rows the page holds: the page of events, then the
- * distinct actors (name and face), players and teams named in this page's payloads. Paging is by
- * the RAW page of events, so the next call resumes the chain walk where this one left off.
+ * through `activityRowFor` (`@/integrity/activity-view`) so a hidden type or a denied
+ * `actor_only` row never reaches the page at all, never fetched-then-filtered-in-the-browser.
+ *
+ * Exactly FOUR queries, however many rows the page holds or however many of them turn out to be
+ * visible: one for the page of events itself (served by `audit_events_scope_sequence_idx`, the
+ * same index the chain verifier walks by), and three batched name lookups, the distinct actors
+ * (name and face), the distinct players and the distinct teams named in THIS page's payloads,
+ * rather than one lookup per row, which is the N+1 this shape exists to avoid. A page where every
+ * row happens to be hidden or `actor_only`-denied still costs the same four queries: the
+ * visibility filter runs AFTER the fetch, because deciding what to fetch would mean re-deriving
+ * `ACTIVITY_VISIBILITY`'s own logic in the query layer, a second copy of the rule that module
+ * exists to keep singular.
+ *
+ * Paging is by the RAW page of events, not by how many of them turned out visible: `nextBefore`
+ * is the smallest `sequence` this page actually read, so the next call resumes the chain walk
+ * exactly where this one left off rather than skipping or re-reading whatever this page hid.
  */
 export async function listLeagueActivity(db: Db, { leagueId, viewerUserId, before }: ListLeagueActivityInput): Promise<ActivityPage> {
   const pageSize = INTEGRITY_CONFIG.activity.pageSize;
