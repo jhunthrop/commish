@@ -96,14 +96,12 @@ const ACCENT_FILL_ALLOWLIST: readonly string[] = [
   // is the network's own graphics over the board, carrying no act — every chip recolors the same
   // quilt in place. Each fill is drawn in exactly one file, and a call site that hand-rolls the
   // class string still fails, which is the property the budget actually protects.
-  "src/draft-room/quilt/components/clock-strip.tsx",
-  "src/draft-room/quilt/components/lens-chips.tsx",
   // V6 FOUNDATION REPAIR (2026-09-03, the quilt-warm branch): two primitives the warmth pass
   // landed without their entries, caught by this sweep the first time it ran after the merge.
   // `ChapterBand`'s `act` plate is the act channel itself — the primitive exists so a chapter
   // that NEEDS you wears the product's one act pigment from a single class map instead of a
   // call site hand-rolling it (the E8 failure mode this budget exists to prevent).
-  // `SegmentGroup` is the same segmented-filter case `browse-filters.tsx` and `lens-chips.tsx`
+  // `SegmentGroup` is the same segmented-filter case `browse-filters.tsx`
   // already earned: the network's own graphics over a board, carrying no act — every segment
   // re-narrows the same list in place. Each fill is drawn in exactly one file.
   "src/components/ui/chapter-band.tsx",

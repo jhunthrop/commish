@@ -44,6 +44,13 @@ export function usePendingPick(submit: (playerId: string) => void, deadlineAt: s
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submitRef = useRef(submit);
   submitRef.current = submit;
+  // The deadline moves every pick. `begin` reads it through a ref so its identity holds across
+  // picks: it is the `onDraft` every row in the room receives, and a fresh function per pick was
+  // every row re-rendering for a prop that changed nothing they print (fix round 1).
+  const deadlineRef = useRef(deadlineAt);
+  useEffect(() => {
+    deadlineRef.current = deadlineAt;
+  }, [deadlineAt]);
 
   const clearTimer = (): void => {
     if (timerRef.current !== null) clearTimeout(timerRef.current);
@@ -69,7 +76,7 @@ export function usePendingPick(submit: (playerId: string) => void, deadlineAt: s
       clearTimer();
       const previous = pendingRef.current;
       const swappedFrom = previous !== null && previous.playerId !== playerId ? previous.playerId : null;
-      const held = beginPendingPick(playerId, Date.now(), deadlineAt, swappedFrom);
+      const held = beginPendingPick(playerId, Date.now(), deadlineRef.current, swappedFrom);
       hold(held);
       if (held === null) {
         submitRef.current(playerId);
@@ -81,7 +88,7 @@ export function usePendingPick(submit: (playerId: string) => void, deadlineAt: s
         submitRef.current(playerId);
       }, held.commitsAt - Date.now());
     },
-    [deadlineAt],
+    [],
   );
 
   const undo = useCallback((): void => {

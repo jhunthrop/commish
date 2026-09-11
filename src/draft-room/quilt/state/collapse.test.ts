@@ -1,58 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { DRAWER_TABS, RESTING, reduceCollapse, type CollapseEvent, type ExpandedSurface } from "./collapse";
+import { RESTING, reduceCollapse, type ExpandedSurface } from "./collapse";
 
-function run(state: ExpandedSurface, ...events: readonly CollapseEvent[]): ExpandedSurface {
-  return events.reduce(reduceCollapse, state);
-}
-
-describe("reduceCollapse", () => {
-  it("keeps the founder-ruled handle order: pool, assistant, sheet, roster, byes, picks", () => {
-    expect(DRAWER_TABS).toEqual(["pool", "assistant", "sheet", "roster", "byes", "picks"]);
+describe("reduceCollapse (one overlay at a time)", () => {
+  it("opens a peek from rest, and the same player again dismisses it", () => {
+    const peeked = reduceCollapse(RESTING, { type: "OPEN_PEEK", playerId: "qb1" });
+    expect(peeked).toEqual({ kind: "peek", playerId: "qb1" });
+    expect(reduceCollapse(peeked, { type: "OPEN_PEEK", playerId: "qb1" })).toEqual(RESTING);
+    expect(reduceCollapse(peeked, { type: "OPEN_PEEK", playerId: "rb1" })).toEqual({ kind: "peek", playerId: "rb1" });
   });
 
-  it("space walks none → half → none, and steps full back to half", () => {
-    const half = run(RESTING, { type: "TOGGLE_DRAWER" });
-    expect(half).toEqual({ kind: "drawer", height: "half", tab: "pool" });
-    expect(run(half, { type: "TOGGLE_DRAWER" })).toEqual(RESTING);
-    const full = run(half, { type: "SET_HEIGHT", height: "full" });
-    expect(run(full, { type: "TOGGLE_DRAWER" })).toEqual({ kind: "drawer", height: "half", tab: "pool" });
+  it("a roster sheet replaces a peek, never stacks on it", () => {
+    const peeked: ExpandedSurface = { kind: "peek", playerId: "qb1" };
+    const roster = reduceCollapse(peeked, { type: "OPEN_ROSTER", teamId: "t2" });
+    expect(roster).toEqual({ kind: "roster", teamId: "t2" });
+    expect(reduceCollapse(roster, { type: "OPEN_ROSTER", teamId: "t2" })).toEqual(RESTING);
   });
 
-  it("slash opens search: the drawer at full, on the pool tab, from anywhere", () => {
-    for (const from of [RESTING, run(RESTING, { type: "SET_TAB", tab: "roster" }), run(RESTING, { type: "OPEN_PEEK", playerId: "p1" })]) {
-      expect(run(from, { type: "OPEN_SEARCH" })).toEqual({ kind: "drawer", height: "full", tab: "pool" });
-    }
-  });
-
-  it("one expanded surface at a time: opening the peek closes the drawer, and vice versa", () => {
-    const drawer = run(RESTING, { type: "TOGGLE_DRAWER" });
-    const peek = run(drawer, { type: "OPEN_PEEK", playerId: "p1" });
-    expect(peek).toEqual({ kind: "peek", playerId: "p1" });
-    expect(run(peek, { type: "TOGGLE_DRAWER" })).toEqual({ kind: "drawer", height: "half", tab: "pool" });
-  });
-
-  it("peeking the peeked player again dismisses; peeking another swaps", () => {
-    const peek = run(RESTING, { type: "OPEN_PEEK", playerId: "p1" });
-    expect(run(peek, { type: "OPEN_PEEK", playerId: "p1" })).toEqual(RESTING);
-    expect(run(peek, { type: "OPEN_PEEK", playerId: "p2" })).toEqual({ kind: "peek", playerId: "p2" });
-    expect(run(peek, { type: "CLOSE_PEEK" })).toEqual(RESTING);
-  });
-
-  it("a tab names the drawer: from rest it opens the drawer at that tab — roster included, no new machinery", () => {
-    expect(run(RESTING, { type: "SET_TAB", tab: "byes" })).toEqual({ kind: "drawer", height: "half", tab: "byes" });
-    expect(run(RESTING, { type: "SET_TAB", tab: "roster" })).toEqual({ kind: "drawer", height: "half", tab: "roster" });
-    const full = run(RESTING, { type: "OPEN_SEARCH" });
-    expect(run(full, { type: "SET_TAB", tab: "sheet" })).toEqual({ kind: "drawer", height: "full", tab: "sheet" });
-  });
-
-  it("esc collapses everything from every surface", () => {
-    const surfaces: readonly ExpandedSurface[] = [
-      RESTING,
-      run(RESTING, { type: "TOGGLE_DRAWER" }),
-      run(RESTING, { type: "OPEN_SEARCH" }),
-      run(RESTING, { type: "OPEN_PEEK", playerId: "p9" }),
-      run(RESTING, { type: "SET_TAB", tab: "roster" }),
-    ];
-    for (const surface of surfaces) expect(run(surface, { type: "COLLAPSE_ALL" })).toEqual(RESTING);
+  it("CLOSE_PEEK only closes a peek; Esc closes everything", () => {
+    const roster: ExpandedSurface = { kind: "roster", teamId: "t2" };
+    expect(reduceCollapse(roster, { type: "CLOSE_PEEK" })).toBe(roster);
+    expect(reduceCollapse(roster, { type: "COLLAPSE_ALL" })).toEqual(RESTING);
+    expect(reduceCollapse({ kind: "peek", playerId: "qb1" }, { type: "CLOSE_PEEK" })).toEqual(RESTING);
   });
 });

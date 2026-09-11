@@ -10,7 +10,7 @@ import { Icon } from "./icon";
  * the 132px ring on a player's own page. `PlayerFace` pairs each ring with one of these; nothing
  * else reaches for the two largest.
  */
-export type AvatarSize = "sm" | "md" | "lg" | "xl" | "2xl";
+export type AvatarSize = "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
 
 /** Which of Sideline's rings the face wears: amber for you, rose for your opponent this week. */
 export type AvatarRing = "self" | "rival";
@@ -29,6 +29,8 @@ export interface AvatarProps {
 }
 
 const SIZE: Readonly<Record<AvatarSize, string>> = {
+  /** 24, inside the 28px ring a dense sheet row carries (the approved sheet's 26px face). */
+  xs: "size-6 text-[10px]",
   sm: "size-7 text-xs",
   md: "size-8 text-xs",
   lg: "size-10 text-sm",
@@ -37,6 +39,7 @@ const SIZE: Readonly<Record<AvatarSize, string>> = {
 };
 
 const ICON_SIZE: Readonly<Record<AvatarSize, number>> = {
+  xs: 12,
   sm: 14,
   md: 16,
   lg: 20,

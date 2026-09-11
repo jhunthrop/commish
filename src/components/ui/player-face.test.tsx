@@ -26,6 +26,15 @@ describe("PlayerFace", () => {
     });
   });
 
+  it("carries the sheet's 28px step with the 2px ring kept, in both themes, axe-clean", async () => {
+    await renderSurface(<PlayerFace player={CROFT} size="xs" />, async ({ container }) => {
+      const tile = screen.getByTestId("player-face-team");
+      expect(tile.className).toContain("size-7");
+      expect(tile.firstElementChild!.className).toContain("size-6");
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
   it("takes the colour from the one palette allowed to hold it, never a literal of its own", () => {
     render(<PlayerFace player={CROFT} />);
     // The tile's inline style has to BE `TOKENS.team.KC` — this is the assertion that fails if a

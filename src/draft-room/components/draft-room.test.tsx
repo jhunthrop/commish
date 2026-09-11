@@ -27,16 +27,25 @@ afterEach(() => {
 });
 
 /**
- * The desktop drawer rests collapsed (law 2), and only the composition for the current width
- * mounts (fluidity round, 2026-09-10 — the phone tree no longer renders hidden beneath the
- * desk, which is where these tests used to find an always-open pool list). The list lives
- * behind the drawer's Pool handle, which is present at every height.
+ * THE POOL IS THE DOCK (Sideline rulings 2026-09-10): the list is always on stage at desktop
+ * width, and only the composition for the current width mounts. This waits for the room to be
+ * ready, which is when the list exists.
  */
 async function openPool(): Promise<void> {
-  await waitFor(() => expect(screen.getByRole("tab", { name: "Pool" })).toBeInTheDocument());
-  await act(async () => {
-    fireEvent.click(screen.getByRole("tab", { name: "Pool" }));
-  });
+  await waitFor(() => expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument());
+}
+
+/**
+ * The room and the stream's presence each subscribe to the league stream through the deps seam
+ * (one shared `EventSource` in a browser; two fake sources here). A frame is delivered to both,
+ * the way the shared stream would, once both are open.
+ */
+async function awaitSources(fixture: FixtureDeps): Promise<void> {
+  await waitFor(() => expect(fixture.sources).toHaveLength(2));
+}
+
+function emit(fixture: FixtureDeps, type: string, payload?: unknown): void {
+  for (const source of fixture.sources) source.emit(type, payload);
 }
 
 function mount(fixture = fixtureDeps(), dismissedAt: string | null = TOUR_DISMISSED) {
@@ -76,24 +85,27 @@ describe("DraftRoom", () => {
     );
   });
 
-  // THE QUILT (2026-09-02, the blueprint mocks; roster ruling 2026-09-03): the snake room's
-  // right-edge aside is GONE by design law — the quilt owns the stage, the roster lives in the
-  // drawer's own ROSTER tab (the left-edge spine is retired), and the mocks carry no chat
-  // column. League chat stays reachable from the league room, and the auction room still
-  // renders the old shell's band (`auction-room.test.tsx` covers it).
-  it("gives a manager the drawer's Roster tab instead of the old aside — the quilt owns the stage", async () => {
+  // SIDELINE (2026-09-10): the snake room's right-edge aside is GONE. Rosters are sheets from
+  // the wall's manager heads, the stream is the room's own, and the auction room still renders
+  // the old shell's band (`auction-room.test.tsx` covers it).
+  it("opens a roster as a sheet from a manager head on the wall instead of the old aside", async () => {
     mount();
-    await waitFor(() => expect(screen.getByRole("tab", { name: "Roster" })).toBeInTheDocument());
+    await openPool();
     expect(screen.queryByTestId("room-aside")).not.toBeInTheDocument();
     expect(screen.queryByTestId("roster-spine")).not.toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Bay Bandits, you. Open the roster." }));
+    });
+    expect(screen.getByTestId("roster-sheet")).toHaveTextContent("Dana Whitfield");
   });
 
-  it("offers no Roster tab to a commissioner with no team of their own", async () => {
+  it("tells a commissioner with no team of their own that nothing in the dock is theirs to pick", async () => {
     const fixture = fixtureDeps();
     fixture.teamId = null;
     mount(fixture);
     await waitFor(() => expect(screen.getByTestId("quilt-room")).toBeInTheDocument());
-    expect(screen.queryByRole("tab", { name: "Roster" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("dock-call")).toHaveAttribute("data-empty", "true");
+    expect(screen.queryByTestId("dock-verb")).not.toBeInTheDocument();
   });
 
   it("offers a retry when the draft cannot be loaded", async () => {
@@ -116,33 +128,34 @@ describe("DraftRoom", () => {
     fixture.postResponse = { ok: false, error: "It's not your turn to pick." };
     mount(fixture);
     await openPool();
-    await waitFor(() => expect(screen.getAllByRole("button", { name: "Draft" })[0]).toBeEnabled());
+    await waitFor(() => expect(screen.getByTestId("dock-verb")).toBeEnabled());
     await act(async () => {
-      fireEvent.click(screen.getAllByRole("button", { name: "Draft" })[0]!);
+      fireEvent.click(screen.getByTestId("dock-verb"));
     });
     expect(await screen.findByRole("alert")).toHaveTextContent("It's not your turn to pick.");
     // rolled back: the player is available again
-    expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: /available players/i })).getByRole("button", { name: "Jalen Croft" })).toBeInTheDocument();
   });
 
   it("queues a player and shows the reducer's reason in a toast when the queue change is rejected", async () => {
-    const fixture = fixtureDeps();
+    // Off your clock: a pool row's one verb is Queue (on it, the verb is Draft).
+    const fixture = fixtureDeps({ ...SNAKE_VIEW, onClockTeamId: "t2", upcoming: ["t2", "t1"] });
     fixture.queueResponse = { ok: false, error: "A queue can hold at most 50 players." };
     mount(fixture);
     await openPool();
-    await waitFor(() => expect(screen.getByRole("button", { name: "Add Jalen Croft to your queue" })).toBeInTheDocument());
+    await waitFor(() => expect(within(screen.getByRole("list", { name: /available players/i })).getByRole("button", { name: "Queue Jalen Croft" })).toBeInTheDocument());
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add Jalen Croft to your queue" }));
+      fireEvent.click(within(screen.getByRole("list", { name: /available players/i })).getByRole("button", { name: "Queue Jalen Croft" }));
     });
     expect(await screen.findByRole("alert")).toHaveTextContent("A queue can hold at most 50 players.");
     // Rolled back: the pool still offers to queue the player, not to remove them.
-    expect(screen.getByRole("button", { name: "Add Jalen Croft to your queue" })).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: /available players/i })).getByRole("button", { name: "Queue Jalen Croft" })).toBeInTheDocument();
   });
 
   it("tells the user when the connection drops", async () => {
     const { fixture } = mount();
-    await waitFor(() => expect(fixture.sources).toHaveLength(1));
-    act(() => fixture.sources[0]!.emit("error"));
+    await awaitSources(fixture);
+    act(() => emit(fixture, "error"));
     expect(await screen.findByText("Reconnecting…")).toBeInTheDocument();
   });
 
@@ -367,7 +380,7 @@ describe("DraftRoom — the finale", () => {
 
   async function mountLive(fixture: FixtureDeps) {
     mount(fixture);
-    await waitFor(() => expect(fixture.sources).toHaveLength(1));
+    await awaitSources(fixture);
     await openPool();
     expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
   }
@@ -375,7 +388,7 @@ describe("DraftRoom — the finale", () => {
   /** Flips the room to complete over the stream, under fake timers, and asserts the beat. */
   function finish(fixture: FixtureDeps): void {
     vi.useFakeTimers();
-    act(() => fixture.sources[0]!.emit("draft.status", { draftId: "d1", clock: clockOf(COMPLETE_VIEW), phase: "complete" }));
+    act(() => emit(fixture, "draft.status", { draftId: "d1", clock: clockOf(COMPLETE_VIEW), phase: "complete" }));
   }
 
   async function advance(ms: number): Promise<void> {
@@ -430,7 +443,7 @@ describe("DraftRoom — the finale", () => {
     fixture.mock = { ...MOCK_ROOM, results: MOCK_RESULTS_INFO };
     vi.useFakeTimers();
     await act(async () => {
-      fixture.sources[0]!.emit("open");
+      emit(fixture, "open");
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(screen.getByTestId("finale-banner")).toBeInTheDocument();

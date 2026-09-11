@@ -4,7 +4,7 @@ import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { MOTION } from "@/design/motion";
 import { PLAYERS, SNAKE_VIEW, TEAMS } from "../../test-fixtures";
 import { QuiltBoard } from "./quilt-board";
-import { settleClassFor } from "./quilt-cell";
+import { landingClassFor } from "./quilt-cell";
 
 vi.mock("@/design/use-reduced-motion", () => ({ usePrefersReducedMotion: vi.fn(() => false) }));
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
@@ -35,40 +35,43 @@ const view = (picks: readonly CompletedPick[], onClockTeamId: string): DraftStat
 });
 
 function renderBoard(state: DraftStateView) {
-  return render(<QuiltBoard view={state} teams={TEAMS} playersById={playersById} myTeamId="t1" lens="picks" byeWeeks={new Map()} boardRanks={new Map()} onPeek={() => {}} peekedPlayerId={null} />);
+  return render(<QuiltBoard view={state} teams={TEAMS} playersById={playersById} myTeamId="t1" onPeek={() => {}} peekedPlayerId={null} onOpenRoster={() => {}} openRosterTeamId={null} />);
 }
 
-describe("settleClassFor", () => {
-  it("is nothing for a pick already on the board at mount, the settle for a landing, opacity-only under reduced motion", () => {
-    expect(settleClassFor(false, false)).toBe("");
-    expect(settleClassFor(false, true)).toBe("");
-    expect(settleClassFor(true, false)).toBe(MOTION.settle.className);
-    expect(settleClassFor(true, true)).toBe(MOTION.settleStill.className);
+describe("landingClassFor", () => {
+  it("is nothing for a pick already on the board at mount, a spring for a peer's landing, the slap-in for your own, opacity-only under reduced motion", () => {
+    expect(landingClassFor(false, false, false)).toBe("");
+    expect(landingClassFor(false, true, true)).toBe("");
+    expect(landingClassFor(true, false, false)).toBe("animate-spring-in");
+    expect(landingClassFor(true, true, false)).toBe("animate-slap-in");
+    expect(landingClassFor(true, false, true)).toBe(MOTION.settleStill.className);
+    expect(landingClassFor(true, true, true)).toBe(MOTION.settleStill.className);
   });
 });
 
 describe("a pick landing is one cell settling, not a board repaint", () => {
-  it("picks on the board at mount do not animate; the one that lands afterwards settles", () => {
+  it("picks on the board at mount do not animate; the one that lands afterwards springs in", () => {
     const first = pick(1, 1, "t1", "qb1");
     const { rerender } = renderBoard(view([first], "t2"));
-    expect(screen.getByTestId("quilt-pick-cell")).not.toHaveAttribute("data-settle");
+    expect(screen.getByTestId("quilt-pick-cell")).not.toHaveAttribute("data-landing");
 
-    rerender(<QuiltBoard view={view([first, pick(2, 1, "t2", "rb1")], "t2")} teams={TEAMS} playersById={playersById} myTeamId="t1" lens="picks" byeWeeks={new Map()} boardRanks={new Map()} onPeek={() => {}} peekedPlayerId={null} />);
+    rerender(<QuiltBoard view={view([first, pick(2, 1, "t2", "rb1")], "t2")} teams={TEAMS} playersById={playersById} myTeamId="t1" onPeek={() => {}} peekedPlayerId={null} onOpenRoster={() => {}} openRosterTeamId={null} />);
     const cells = screen.getAllByTestId("quilt-pick-cell");
     expect(cells).toHaveLength(2);
-    expect(cells[0]).not.toHaveAttribute("data-settle");
-    expect(cells[1]).toHaveAttribute("data-settle", "landing");
-    expect(cells[1]!.className).toContain(MOTION.settle.className);
+    expect(cells[0]).not.toHaveAttribute("data-landing");
+    // t2's pick is a peer's from t1's seat: it springs.
+    expect(cells[1]).toHaveAttribute("data-landing", "peer");
+    expect(cells[1]!.className).toContain("animate-spring-in");
   });
 
   it("under reduced motion the landing cell fades without moving", () => {
     vi.mocked(usePrefersReducedMotion).mockReturnValue(true);
     const first = pick(1, 1, "t1", "qb1");
     const { rerender } = renderBoard(view([first], "t2"));
-    rerender(<QuiltBoard view={view([first, pick(2, 1, "t2", "rb1")], "t2")} teams={TEAMS} playersById={playersById} myTeamId="t1" lens="picks" byeWeeks={new Map()} boardRanks={new Map()} onPeek={() => {}} peekedPlayerId={null} />);
+    rerender(<QuiltBoard view={view([first, pick(2, 1, "t2", "rb1")], "t2")} teams={TEAMS} playersById={playersById} myTeamId="t1" onPeek={() => {}} peekedPlayerId={null} onOpenRoster={() => {}} openRosterTeamId={null} />);
     const landed = screen.getAllByTestId("quilt-pick-cell")[1]!;
     expect(landed.className).toContain(MOTION.settleStill.className);
-    expect(landed.className).not.toContain(MOTION.settle.className);
+    expect(landed.className).not.toContain("animate-spring-in");
   });
 
   it("a landing pick mutates the DOM only inside the rounds it touched; every other round's subtree is untouched", async () => {
@@ -77,7 +80,7 @@ describe("a pick landing is one cell settling, not a board repaint", () => {
     const records: MutationRecord[] = [];
     const observer = new MutationObserver((delivered) => records.push(...delivered));
     observer.observe(container, { childList: true, subtree: true, attributes: true, characterData: true });
-    rerender(<QuiltBoard view={view([first, pick(2, 1, "t2", "rb1")], "t2")} teams={TEAMS} playersById={playersById} myTeamId="t1" lens="picks" byeWeeks={new Map()} boardRanks={new Map()} onPeek={() => {}} peekedPlayerId={null} />);
+    rerender(<QuiltBoard view={view([first, pick(2, 1, "t2", "rb1")], "t2")} teams={TEAMS} playersById={playersById} myTeamId="t1" onPeek={() => {}} peekedPlayerId={null} onOpenRoster={() => {}} openRosterTeamId={null} />);
     await new Promise((resolve) => setTimeout(resolve, 0));
     records.push(...observer.takeRecords());
     observer.disconnect();

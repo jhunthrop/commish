@@ -4,12 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SheetWithEntries } from "@/draft-hq/sheet/types";
 import { useDraftRoomDeps } from "@/draft-room/hooks/deps";
 import { QUILT_CONFIG } from "../state/config";
-import { decodeSheet, encodeSheet, moveInSheet, reconcileSheet, seedSheet, setSheetNote, type CheatSheet } from "../state/sheet";
+import { decodeSheet, encodeSheet, moveInSheet, placeInSheet, reconcileSheet, seedSheet, setSheetNote, type CheatSheet } from "../state/sheet";
 import { takeSeedSheet } from "../state/sheet-seed";
 
 export interface SheetControls {
   readonly sheet: CheatSheet;
   readonly move: (playerId: string, delta: number) => void;
+  /** Put a player at a place on the sheet (the drag drop). */
+  readonly place: (playerId: string, to: number) => void;
   readonly note: (playerId: string, note: string) => void;
   /** Back to the board's own order; notes survive a reset — words are prep, order is opinion. */
   readonly reset: () => void;
@@ -156,6 +158,16 @@ export function useSheet(draftId: string, boardIds: readonly string[], leagueId?
     },
     [apply, syncServer],
   );
+  const place = useCallback(
+    (playerId: string, to: number) => {
+      apply((current) => {
+        const updated = placeInSheet(current, playerId, to);
+        if (updated !== current) syncServer(updated.order);
+        return updated;
+      });
+    },
+    [apply, syncServer],
+  );
   const note = useCallback(
     (playerId: string, text: string) => {
       apply((current) => setSheetNote(current, playerId, text));
@@ -189,7 +201,7 @@ export function useSheet(draftId: string, boardIds: readonly string[], leagueId?
   }, [leagueId, serverSheetId, fetchJson, sheet]);
 
   return useMemo(
-    () => ({ sheet, move, note, reset, hasServerSheet: serverSheetId !== null, startServerSheet }),
-    [sheet, move, note, reset, serverSheetId, startServerSheet],
+    () => ({ sheet, move, place, note, reset, hasServerSheet: serverSheetId !== null, startServerSheet }),
+    [sheet, move, place, note, reset, serverSheetId, startServerSheet],
   );
 }

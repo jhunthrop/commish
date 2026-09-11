@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bigOddsText, collapseText, factsLine, headerLine, oddsTooltipText, percentText, runText, runsOverRuns, runsText, stampText } from "./format";
+import { bigOddsText, collapseText, factsLine, headerLine, oddsBasis, oddsTooltipText, ofRuns, percentText, runText, runsOverRuns, runsText, stampText } from "./format";
 import { advisorView } from "./test-view";
 
 const BANNED = /[—;]/;
@@ -11,6 +11,14 @@ describe("advisor format", () => {
     expect(runsOverRuns(57, 200)).toBe("57 of 200");
     expect(percentText(0.46)).toBe("46%");
     expect(oddsTooltipText(92, 200)).toBe("still there at your next pick, 92 of 200 runs");
+  });
+
+  it("states a figure's basis as the runs and the pick, a row's short caption as the runs alone, and the absence as no runs yet", () => {
+    expect(oddsBasis(200, "2.01")).toBe("of 200 runs, still there at 2.01");
+    expect(oddsBasis(null, "2.01")).toBe("no runs yet");
+    expect(oddsBasis(200, null)).toBe("no runs yet");
+    expect(ofRuns(200)).toBe("of 200");
+    expect(BANNED.test(oddsBasis(200, "2.01"))).toBe(false);
   });
 
   it("writes the strip's chips in plain words: the run with its window, the collapse with its count and drop", () => {

@@ -46,6 +46,16 @@ export function collapseText(row: TierCollapse): string {
   return `${row.playersLeftInTier} ${positionWord(row.position, true)} left ${drop}`;
 }
 
+/** A figure's basis: "of 200 runs, still there at 2.01", or why there is no number yet. */
+export function oddsBasis(runs: number | null, nextPickLabel: string | null): string {
+  return runs === null || nextPickLabel === null ? "no runs yet" : `of ${runs} runs, still there at ${nextPickLabel}`;
+}
+
+/** A row's short caption under its count, "of 200", where the list above states the rest once. */
+export function ofRuns(runs: number): string {
+  return `of ${runs}`;
+}
+
 /** The pool row's tooltip and screen-reader line. */
 export function oddsTooltipText(survived: number, runs: number): string {
   return `still there at your next pick, ${survived} of ${runs} runs`;

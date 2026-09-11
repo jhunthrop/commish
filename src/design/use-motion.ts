@@ -25,6 +25,12 @@ const ENTRANCE_CLASS: Readonly<Record<EntranceKind, string>> = {
 /** The class an arriving element wears, or nothing at all under reduced motion. */
 export function useEntranceClass(kind: EntranceKind = "in"): string {
   const reduced = usePrefersReducedMotion();
+  return entranceClass(kind, reduced);
+}
+
+/** The same choice as a pure function, for a memoized list or grid that reads the reduced-motion
+ *  answer once at its root and hands each child its class rather than subscribing every cell. */
+export function entranceClass(kind: EntranceKind, reduced: boolean): string {
   return reduced ? "" : ENTRANCE_CLASS[kind];
 }
 

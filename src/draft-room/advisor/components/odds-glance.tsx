@@ -7,8 +7,9 @@ import { MOTION } from "@/design/motion";
 import { useChangeKey } from "@/design/use-change-key";
 import { oddsTooltipText, percentText, runsOverRuns } from "../format";
 
-/** `percent` is a pool row's glance ("46%"), `runs` is the advisor's own row ("57 of 200"). */
-export type OddsGlanceForm = "percent" | "runs";
+/** `percent` is a pool row's glance ("46%"), `runs` is the advisor's own row ("57 of 200"),
+ *  `count` is a sheet row's stacked figure: the survived count large, "of 100" small under it. */
+export type OddsGlanceForm = "percent" | "runs" | "count";
 
 export interface OddsFigureProps {
   /** Runs in which the player was still there at the viewer's next turn. */
@@ -25,7 +26,14 @@ export interface OddsGlanceProps {
   readonly form?: OddsGlanceForm;
 }
 
-const TEST_ID: Readonly<Record<OddsGlanceForm, string>> = { percent: "advisor-odds-pct", runs: "advisor-odds-runs" };
+const TEST_ID: Readonly<Record<OddsGlanceForm, string>> = { percent: "advisor-odds-pct", runs: "advisor-odds-runs", count: "advisor-odds-count" };
+
+/** The three bands as ink, for the stacked form (the chip forms wear the positive chip on safe). */
+const BAND_INK: Readonly<Record<ReturnType<typeof survivalBand>, string>> = {
+  safe: "text-positive",
+  middle: "text-text-muted",
+  reach: "text-negative",
+};
 
 /**
  * The figure itself, from two numbers — the memoizable half (fluidity round, 2026-09-10): a
@@ -41,7 +49,7 @@ export function OddsFigure({ survived, runs, form = "percent" }: OddsFigureProps
   const survival = survived / runs;
   const band = survivalBand(survival);
   const tooltip = oddsTooltipText(survived, runs);
-  const text = form === "percent" ? percentText(survival) : runsOverRuns(survived, runs);
+  const text = form === "percent" ? percentText(survival) : form === "count" ? String(survived) : runsOverRuns(survived, runs);
   const changeKey = useChangeKey(text);
   const shared = { "data-testid": TEST_ID[form], "data-band": band, title: tooltip } as const;
   const label = (
@@ -52,6 +60,16 @@ export function OddsFigure({ survived, runs, form = "percent" }: OddsFigureProps
       <span className="sr-only">{tooltip}</span>
     </>
   );
+  if (form === "count") {
+    return (
+      <span {...shared} className={`flex shrink-0 flex-col items-end leading-none ${BAND_INK[band]}`}>
+        <span className="font-display text-md font-extrabold tabular-nums">{label}</span>
+        <span aria-hidden="true" className="text-[9px] text-text-faint">
+          of {runs}
+        </span>
+      </span>
+    );
+  }
   if (band === "safe") {
     return (
       <Badge tone="positive" soft {...shared} className="font-mono tabular-nums">

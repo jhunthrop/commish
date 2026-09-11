@@ -16,6 +16,13 @@ export interface AdvisorPanelProps {
   readonly playersById: ReadonlyMap<string, Player>;
   readonly byeWeeks: ReadonlyMap<string, number>;
   readonly recomputing: boolean;
+  /**
+   * Whether the lead card renders here. The Sideline draft room (founder ruling 3, 2026-09-10)
+   * seats our call in the dock beside the Draft verb, so its shortlist renders the strip and the
+   * rows without the card; the Draft HQ demo keeps the whole composition.
+   * @default true
+   */
+  readonly withLeadCard?: boolean;
 }
 
 const PICK_COUNT_OPTIONS = ADVISOR_ROOM_CONFIG.pickCount.options.map((count) => ({ value: String(count), label: String(count) }));
@@ -27,13 +34,13 @@ const PICK_COUNT_OPTIONS = ADVISOR_ROOM_CONFIG.pickCount.options.map((count) => 
  * shortlist as compact rows. The selector counts the card as the first pick, so "Show 5" is
  * the card and four rows, and the widest setting is exactly the depth the server already sent.
  */
-export function AdvisorPanel({ view, acts, playersById, byeWeeks, recomputing }: AdvisorPanelProps) {
+export function AdvisorPanel({ view, acts, playersById, byeWeeks, recomputing, withLeadCard = true }: AdvisorPanelProps) {
   const [count, setCount] = usePickCount();
   const player = view.pick === null ? null : (playersById.get(view.pick.playerId) ?? null);
   return (
     <div data-testid="advisor-panel" className="flex flex-col gap-2">
       <SignalsStrip signals={view.signals} />
-      <NextPickCard view={view} acts={acts} player={player} byeWeek={player === null ? null : (byeWeeks.get(player.nflTeam) ?? null)} recomputing={recomputing} />
+      {withLeadCard ? <NextPickCard view={view} acts={acts} player={player} byeWeek={player === null ? null : (byeWeeks.get(player.nflTeam) ?? null)} recomputing={recomputing} /> : null}
       {view.candidates.length > 1 ? (
         <>
           <div className="flex items-center justify-between gap-2 px-1">

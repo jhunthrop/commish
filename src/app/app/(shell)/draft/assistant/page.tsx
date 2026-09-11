@@ -11,7 +11,7 @@ export const metadata: Metadata = pageTitle("Assistant");
 /**
  * Phase 3 (spec §13 item 3): the Assistant's own guided demo — "a guided demo of it with a
  * replayed room" (spec §6's opening line). The real Assistant lives in a live or mock draft
- * room's right rail (`DrawerAssistantTab`); this page exists so a manager who has never seen it
+ * room's dock (`Dock`, the Our calls list); this page exists so a manager who has never seen it
  * can watch it work before their own draft, without a room of their own to watch it in.
  *
  * A SERVER-RENDERED PAGE around a CLIENT component: `ASSISTANT_DEMO_FIXTURE`
