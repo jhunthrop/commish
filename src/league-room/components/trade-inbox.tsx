@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, ButtonLink, EmptyState, ErrorState, EYEBROW, LowerThird, Skeleton } from "@/components/ui";
+import { Button, EmptyState, ErrorState, EYEBROW, Skeleton } from "@/components/ui";
 import { ChapterBand, type ChapterBandTone } from "@/components/ui/chapter-band";
 import type { TradeProposalView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
@@ -59,15 +59,18 @@ function flattenRoster(rostersByTeamId: TradeRoomContext["rostersByTeamId"]): Re
  * differ entirely in who is expected to do something — you, them, or nobody ever again — and that
  * is not recoverable from "Offers you have out".
  *
- * The `act` tone on the first band is amber, which is law 4's furniture-and-you channel spent
- * precisely: this band is the "you" one.
+ * SIDELINE (2026-09-11): THE SENTENCE MOVED OFF THE CAPS LINE. `consequence` is set in the one
+ * sanctioned all-caps register, which is a register for KEYS — "capitals are for keys, and a
+ * sentence set in them shouts" is `ChapterBand`'s own rule and these three bands were breaking it
+ * with 50-character sentences. The key stays beside the marker ("their offer"); the sentence moves
+ * to the `caption` slot the band already carries for exactly this, in sentence case, quiet ink.
  */
 function Band({
   leagueId,
   marker,
   consequence,
+  caption,
   tone,
-  anchorId,
   trades,
   meTeamId,
   playersById,
@@ -85,9 +88,8 @@ function Band({
   readonly leagueId: string;
   readonly marker: string;
   readonly consequence: string;
+  readonly caption: string;
   readonly tone: ChapterBandTone;
-  /** Where the lower third's verb lands when this band is the one waiting on the reader. */
-  readonly anchorId?: string;
   readonly trades: readonly TradeProposalView[];
   readonly meTeamId: string;
   readonly playersById: Readonly<Record<string, ValuedPlayer>>;
@@ -104,9 +106,9 @@ function Band({
 }) {
   if (trades.length === 0) return null;
   return (
-    <section id={anchorId} className="flex flex-col gap-3" aria-label={marker}>
-      <ChapterBand name={marker} consequence={consequence} tone={tone} />
-      <div className="flex flex-col gap-3">
+    <section className="flex flex-col gap-4" aria-label={marker}>
+      <ChapterBand name={marker} consequence={consequence} caption={caption} tone={tone} />
+      <div className="flex flex-col gap-6">
         {trades.map((trade) => (
           <TradeCard
             key={trade.id}
@@ -280,15 +282,16 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
         <>
           <Band
             marker="Needs your answer"
-            consequence="They proposed it · nothing moves until you accept or decline"
+            consequence="their offer"
+            caption="Nothing moves until you accept or decline."
             tone="act"
-            anchorId="trades-to-answer"
             trades={inbox}
             {...bandProps}
           />
           <Band
             marker="Waiting on them"
-            consequence="Yours until they answer · withdraw any time before that"
+            consequence="your offer"
+            caption="Yours until they answer. Withdraw any time before that."
             tone="quiet"
             trades={outbox}
             {...bandProps}
@@ -299,37 +302,30 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
               a trade that fell through keep their own copy of it. "Trade history" covers both. */}
           <Band
             marker="Settled"
-            consequence="Accepted, declined, or run out of time · nothing left to do"
+            consequence="nothing left to do"
+            caption="Accepted, declined, or run out of time."
             tone="quiet"
             trades={history}
             {...bandProps}
           />
 
           {/*
-            LAW 6 — the trade room's lower third. The three counts are the room's own state and the
-            verb is the one thing anybody is waiting on: an offer sitting in your inbox stops both
-            rosters until you answer it.
+            THE LOWER THIRD LEFT THIS ROOM (Sideline, 2026-09-11). Two reasons, and either alone
+            would do it.
 
-            NOTHING PENDING RENDERS NOTHING. With an empty inbox there is no act this page is
-            holding open — an offer you sent is somebody else's decision and a settled trade is
-            nobody's — so the strip carries the facts and no verb at all. That is law 6's own
-            diagnostic rather than a gap in it: a screen with no lower-third verb either needs no
-            decision, or is hiding one, and this is the first case.
+            P3: it carried a second solid Court blue verb ("Answer the offer") whose whole job was
+            to scroll the reader to the FIRST solid verb. With the offer now a conversation whose
+            Accept sits on the card itself, the strip was a button that pointed at a button, and
+            the e2e spec counted two solid verbs on one viewport.
+
+            AND IT WAS NEVER THIS ROOM'S ANYWAY: the lower third is one of Sideline's two bounded
+            borrowings from Under the Lights, and the boundary the first-principles document draws
+            is "Sunday only". Its three counts are said by the three chapter bands above it, in
+            words, which is where a count belongs when it is also a heading.
+
+            The primitive stays: `wallet-content.tsx`, `seat-confirm-panel.tsx` and the Sunday
+            stage still render it.
           */}
-          <LowerThird
-            cells={[
-              { label: "Needs you", value: inbox.length },
-              { label: "Waiting on them", value: outbox.length },
-              { label: "Settled", value: history.length },
-            ]}
-            action={
-              inbox.length === 0 ? undefined : (
-                <ButtonLink href="#trades-to-answer" variant="verb" size="sm">
-                  {inbox.length === 1 ? "Answer the offer" : "Answer the offers"}
-                </ButtonLink>
-              )
-            }
-          />
         </>
       )}
     </div>

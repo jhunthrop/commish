@@ -102,17 +102,21 @@ export function ManagerHeader({ displayName, avatar, email, seasons, tier, verif
         }
       />
 
-      <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end">
-        {/* THE ONE BIG NUMBER AND ITS BASIS (P2, P11). NO COMPARISON, EVER (ruling 30): the
-            population "every manager on Commish" is one this page does not hold and would be
-            inventing, so the figure is a `BigNumber` and not a `Stat` — `BigNumber` has no
-            `comparison` seam to leave empty. The basis names what is being counted and where. */}
-        <BigNumber size="lg" value={String(seasons)} basis="seasons you finished on Commish" />
-        <p className="text-sm text-text-muted lg:text-right">{standingSentence(tier)}</p>
+      {/* THE ONE BIG NUMBER AND ITS BASIS (P2, P11). NO COMPARISON, EVER (ruling 30): the
+          population "every manager on Commish" is one this page does not hold and would be
+          inventing, so the figure is a `BigNumber` and not a `Stat` — `BigNumber` has no
+          `comparison` seam to leave empty. The basis names what is being counted and where.
+
+          START-ALIGNED AT EVERY WIDTH. The block sits at the header's right end on a desktop and
+          under the manager on a phone, but its own text reads left either way: a right-aligned
+          figure over a left-aligned sentence put the "2" in the middle of nothing at 360. */}
+      <div className="flex shrink-0 flex-col items-start gap-2">
+        <BigNumber align="start" size="lg" value={String(seasons)} basis="seasons you finished on Commish" />
+        <p className="text-sm text-text-muted">{standingSentence(tier)}</p>
         {/* The privacy skeptic's disclosure standard: "Verified" is the one fact here that is not
             private, because it is the exact claim `ReviewFeed` already renders publicly beside
             every review this account posts. Say so, rather than leaving the reader to guess. */}
-        {verified ? <p className="text-xs text-text-faint lg:text-right">Shown beside your reviews.</p> : null}
+        {verified ? <p className="text-xs text-text-faint">Shown beside your reviews.</p> : null}
       </div>
     </Card>
   );
