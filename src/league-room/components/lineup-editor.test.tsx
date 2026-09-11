@@ -46,8 +46,10 @@ describe("LineupEditor", () => {
   it("shows the real editor once draftStatus is in_progress or complete, even with an all-empty roster (belt only, never the inference)", () => {
     renderInLeague(<LineupEditor leagueId="l1" lineup={ROSTERLESS_LINEUP} totalWeeks={14} draftStatus="in_progress" />, fixtureLeagueDeps().deps);
     expect(screen.queryByText("Your lineup appears here after the draft.")).not.toBeInTheDocument();
-    expect(screen.getByText("QB")).toBeInTheDocument();
-    expect(screen.getAllByText("Empty").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("QB").length).toBeGreaterThan(0);
+    // ABSENCE RENDERS AS ABSENCE: the slot says who is missing from it, in the room's own words,
+    // rather than the bare word "Empty" beside a grey tile.
+    expect(screen.getAllByText(/^Nobody in your /).length).toBeGreaterThan(0);
   });
 
   it("defaults to pre-draft when draftStatus is absent — the defensive direction only", () => {
@@ -161,7 +163,7 @@ describe("LineupEditor", () => {
     };
     renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} draftStatus="complete" />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Swap Backup Quarterback" }));
-    fireEvent.click(screen.getByRole("button", { name: "Put Backup Quarterback at QB" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Backup Quarterback at QB" }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({
       weekNumber: LINEUP.weekNumber,
@@ -174,7 +176,7 @@ describe("LineupEditor", () => {
     const fixture = fixtureLeagueDeps({ ok: false, error: "RB is not eligible for the QB slot." });
     renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} draftStatus="complete" />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Swap Backup Quarterback" }));
-    fireEvent.click(screen.getByRole("button", { name: "Put Backup Quarterback at QB" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Backup Quarterback at QB" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("RB is not eligible for the QB slot."));
   });
 
@@ -204,5 +206,185 @@ describe("LineupEditor", () => {
     renderInLeague(<LineupEditor leagueId="l1" lineup={{ ...LINEUP, locked: true, weekNumber: 14 }} totalWeeks={14} draftStatus="complete" />, fixture.deps);
     expect(screen.getByText("Week 14 has ended, so its lineup cannot change.")).toBeInTheDocument();
     expect(screen.queryByText(/next week/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * THE HEADLINE'S BASIS, AND THE WINDOW THE OLD ONE WAS FALSE IN (whole-branch review, C1).
+ *
+ * The first pass summed only the starters whose points were non-null and then captioned the sum
+ * "PPR, your starters in week 5". Between Thursday night and Sunday afternoon, the window managers
+ * actually look, that printed one Thursday starter's score under a caption claiming the whole
+ * lineup, beside a foot label reading "Your 2". The number named a basis it did not have.
+ *
+ * The ruling: the headline is the PROJECTED total until every starter has played, then the
+ * measured total. A partial week states what was actually summed on a second line, and the foot
+ * never puts a count beside a partial sum.
+ */
+describe("LineupEditor, the headline number", () => {
+  const PROJECTIONS = new Map([["qb1", 20], ["rb1", 14], ["qb2", 5]]);
+
+  it("holds the projection while the week is partly played, and says how much is in so far", () => {
+    renderInLeague(
+      <LineupEditor
+        leagueId="l1"
+        lineup={LINEUP}
+        totalWeeks={14}
+        draftStatus="complete"
+        projectionsByPlayerId={PROJECTIONS}
+        pointsByPlayerId={new Map([["qb1", 12.4], ["rb1", null]])}
+      />,
+      fixtureLeagueDeps().deps,
+    );
+    // 20 + 14 projected, NOT the 12.40 one man has actually scored.
+    expect(screen.getAllByText("34.00").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("PPR projected, week 5").length).toBeGreaterThan(0);
+    expect(screen.getByText("1 of 2 played, 12.40 so far")).toBeInTheDocument();
+    // The false caption and the false count are both gone.
+    expect(screen.queryByText("PPR, your starters in week 5")).toBeNull();
+    expect(screen.queryByText("Your 2")).toBeNull();
+  });
+
+  it("becomes the measured total, called final, once every starter has played", () => {
+    renderInLeague(
+      <LineupEditor
+        leagueId="l1"
+        lineup={LINEUP}
+        totalWeeks={14}
+        draftStatus="complete"
+        projectionsByPlayerId={PROJECTIONS}
+        pointsByPlayerId={new Map([["qb1", 12.4], ["rb1", 18.6]])}
+      />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getAllByText("31.00").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("PPR, final").length).toBeGreaterThan(0);
+    // Nothing is partial any more, so there is no "so far" line to print.
+    expect(screen.queryByText(/so far$/)).toBeNull();
+  });
+
+  it("says nothing about points before a single starter has played", () => {
+    renderInLeague(
+      <LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} draftStatus="complete" projectionsByPlayerId={PROJECTIONS} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getAllByText("PPR projected, week 5").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/so far$/)).toBeNull();
+  });
+
+  // A projection snapshot that names only some of the starters cannot be captioned as though it
+  // covered them all: the same refusal, one level down.
+  it("names how many starters a partial projection actually covers", () => {
+    renderInLeague(
+      <LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} draftStatus="complete" projectionsByPlayerId={new Map([["qb1", 20]])} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getAllByText("PPR projected, 1 of 2 starters").length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * THE ROW'S CAPTION (whole-branch review, M1). The first pass printed "PPR" under all nine rows
+ * while the header already said it, and suppressed the genuinely per-row fact, the opponent and
+ * kickoff, at 360px. The caption slot now carries the fixture at every width, and the only thing
+ * marked is the EXCEPTION: a number that is a forecast rather than a measurement.
+ */
+describe("LineupEditor, the row caption", () => {
+  const FIXTURES = new Map([["BUF", { opp: "vs MIA", when: "Sun 1:00p", status: "scheduled" as const }]]);
+
+  it("spends the caption on the fixture, and marks only the rows whose number is a forecast", () => {
+    renderInLeague(
+      <LineupEditor
+        leagueId="l1"
+        lineup={LINEUP}
+        totalWeeks={14}
+        draftStatus="complete"
+        fixturesByNflTeam={FIXTURES}
+        projectionsByPlayerId={new Map([["rb1", 14]])}
+        pointsByPlayerId={new Map([["qb1", 12.4]])}
+      />,
+      fixtureLeagueDeps().deps,
+    );
+    // Josh Allen has played: his caption is the fixture alone, with no basis restating the header.
+    expect(screen.getAllByText("vs MIA, Sun 1:00p").length).toBeGreaterThan(0);
+    // Derrick Henry has not: his caption marks the forecast.
+    expect(screen.getByText("projected, vs MIA, Sun 1:00p")).toBeInTheDocument();
+    // The constant the header already carries is not repeated down the column.
+    expect(screen.queryByText("PPR proj")).toBeNull();
+  });
+
+  it("keeps the fixture visible rather than hiding it behind a breakpoint", () => {
+    renderInLeague(
+      <LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} draftStatus="complete" fixturesByNflTeam={FIXTURES} pointsByPlayerId={new Map([["qb1", 12.4]])} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getAllByText("vs MIA, Sun 1:00p")[0]!.className).not.toMatch(/hidden/);
+  });
+
+  it("still shouts a bye in the loss channel, because that is the mistake the line exists to prevent", () => {
+    renderInLeague(
+      <LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} draftStatus="complete" fixturesByNflTeam={new Map()} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getAllByText("Bye")[0]!.className).toMatch(/text-negative/);
+  });
+});
+
+/**
+ * THE EMPTY SLOT SAYS ONE THING (whole-branch review, M2 and the "for Sunday" LOW). The first pass
+ * printed "Tap a bench player to move him in" twice on one screen, and hardcoded "for Sunday" for a
+ * slot whose game may be on a Thursday.
+ */
+describe("LineupEditor, the empty slot", () => {
+  const EMPTY_QB: LineupBody = {
+    ...LINEUP,
+    starters: LINEUP.starters.map((slot) => (slot.slot === "QB" ? { ...slot, playerId: null, playerName: null } : slot)),
+  };
+
+  it("says it once, in the banner, and names no day it cannot know", () => {
+    renderInLeague(<LineupEditor leagueId="l1" lineup={EMPTY_QB} totalWeeks={14} draftStatus="complete" />, fixtureLeagueDeps().deps);
+    expect(screen.getByText("Your qb is empty.")).toBeInTheDocument();
+    expect(screen.queryByText(/for Sunday/)).toBeNull();
+    expect(screen.queryByText(/Tap a bench player/)).toBeNull();
+  });
+});
+
+/**
+ * THE SLOT'S DISABLED SKIN COMES FROM THE PRIMITIVE (whole-branch review, H1). It hand-rolled
+ * `border border-line` on a bare span, which is the raw-surface guard's own failure and shipped a
+ * red design suite.
+ */
+describe("LineupEditor, the locked slot control", () => {
+  it("draws a locked week's slots as disabled buttons rather than hand-rolled spans", () => {
+    renderInLeague(
+      <LineupEditor leagueId="l1" lineup={{ ...LINEUP, locked: true }} totalWeeks={14} draftStatus="complete" />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByRole("button", { name: "Josh Allen plays QB" })).toBeDisabled();
+  });
+});
+
+/**
+ * THE EDITOR RESYNCS WHEN THE SERVER'S STORY CHANGES (whole-branch review, M5). The state
+ * initialiser ran once, so an IR move (which refreshes the server props) left the slot map telling
+ * the old story.
+ */
+describe("LineupEditor, resync", () => {
+  it("takes a new server lineup over its own optimistic map", () => {
+    const deps = fixtureLeagueDeps().deps;
+    const { rerender } = renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} draftStatus="complete" />, deps);
+    expect(screen.getByText("Derrick Henry")).toBeInTheDocument();
+    const moved: LineupBody = {
+      ...LINEUP,
+      starters: LINEUP.starters.map((slot) => (slot.slot === "RB" ? { ...slot, playerId: null, playerName: null } : slot)),
+      bench: [],
+    };
+    rerender(
+      <LeagueRoomDepsProvider deps={deps}>
+        <LineupEditor leagueId="l1" lineup={moved} totalWeeks={14} draftStatus="complete" />
+      </LeagueRoomDepsProvider>,
+    );
+    expect(screen.queryByText("Derrick Henry")).toBeNull();
+    expect(screen.getByText("Nobody in your rb")).toBeInTheDocument();
   });
 });

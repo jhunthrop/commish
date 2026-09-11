@@ -9,6 +9,7 @@ import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import type { TeamStandingsRow } from "@/league-room/contract";
 import type { RecordsByTeamId } from "@/league-room/components/matchup-hero";
 import { LiveMatchupWeek } from "@/league-room/components/live-matchup-week";
+import { managersFrom } from "@/league-room/lib/managers";
 import { PlayerPeekHost } from "@/league-room/components/player-peek";
 import { WeekNav } from "@/league-room/components/week-nav";
 import { formatWeek } from "@/league-room/lib/format";
@@ -78,7 +79,13 @@ export default async function MatchupWeekPage({ params }: PageProps) {
       {body.matchups.length === 0 ? (
         <p className="text-text-muted">There are no matchups in this week yet.</p>
       ) : (
-        <LiveMatchupWeek leagueId={leagueId} body={body} records={recordsFrom(home.standings)} act={leagueAct(home, lineup)} />
+        <LiveMatchupWeek
+          leagueId={leagueId}
+          body={body}
+          records={recordsFrom(home.standings)}
+          managers={managersFrom(home.standings)}
+          act={leagueAct(home, lineup)}
+        />
       )}
     </>
   );

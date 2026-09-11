@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { UI_CONFIG } from "@/components/ui/config";
+import { TOKENS } from "@/design/tokens";
 import { renderSurface } from "@/components/ui/test-utils";
 import { PlayerPeekHost } from "./player-peek";
 import { fixtureLeagueDeps, MATCHUP, MATCHUP_WITH_MEDIAN, renderInLeague } from "../test-fixtures";
@@ -146,15 +146,13 @@ describe("MatchupPanel", () => {
 
   // Step 3c: the last two `Table` consumers to converge dense (the other is `budget-table.tsx`,
   // Task 12) — see `table.tsx`'s own docblock for the density-default decision this leaves.
-  it("renders its starters table dense, at whatever vertical cell padding the density token carries", () => {
+  it("stands its starters table at the density token own dense row height", () => {
     render(<MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
-    const headerCell = screen.getAllByRole("columnheader", { name: "Player" })[0]!;
-    // Gameday law 4, density is respect (2026-08-28): v3 set this at 11px, which was the
-    // Sunday Standard mock's own figure and airier than a fantasy table wants. A manager on a
-    // Sunday reads more rows, not calmer ones. Read from `UI_CONFIG.table` rather than pinned as a
-    // literal twice over.
-    const dense = `${UI_CONFIG.table.denseRowPaddingPx}px`;
-    expect(headerCell).toHaveStyle({ paddingTop: dense, paddingBottom: dense });
+    // A ROW'S HEIGHT IS A TOKEN (Sideline, 2026-09-10): read from `TOKENS.density`, where the
+    // rest of the system's row rhythm lives, rather than pinned as a literal twice over. A
+    // manager on a Sunday reads more rows, not calmer ones, so a starters table stays dense.
+    const row = screen.getAllByText("Josh Allen")[0]!.closest("tr")!;
+    expect(row).toHaveStyle({ height: `${TOKENS.density.denseRowPx}px` });
   });
 
   // Gauntlet fix wave, NEW-10: `Pos` (a `PositionBadge` sticker) used to be its own column here,

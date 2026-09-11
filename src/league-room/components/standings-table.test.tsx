@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { UI_CONFIG } from "@/components/ui/config";
+import { TOKENS } from "@/design/tokens";
 import { renderSurface } from "@/components/ui/test-utils";
 import type { TeamStandingsRow } from "../contract";
 import { ALL_CLINCHED_STANDINGS, STANDINGS } from "../test-fixtures";
@@ -17,12 +17,15 @@ describe("StandingsTable", () => {
     });
   });
 
-  // Step 15's audit: a standings row named the team but never showed a face. `Avatar` falls
-  // back to initials with no `ownerAvatar` on the row, so the owner's initials sit beside the
-  // team name rather than a blank space.
-  it("puts the owner's face beside the team name", () => {
+  // P1: THE PERSON COMES BEFORE THE NUMBER, and a manager row never leads with a team name
+  // alone. The owner's own name is the largest thing in the cell and their face sits beside it;
+  // the team is the small second line. `Avatar` falls back to initials with no `ownerAvatar`.
+  it("leads every row with the owner's name and face, with the team on the line beneath", () => {
     render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
     expect(screen.getByText("AR")).toBeInTheDocument();
+    const own = screen.getByText("Alex Rivera");
+    expect(own).toBeInTheDocument();
+    expect(within(own.closest("tr")!).getByText(/Bay Bandits/)).toBeInTheDocument();
   });
 
   // Sunday v5 (founder ruling 2026-08-28, "the UX should explain itself — we shouldn't need
@@ -44,30 +47,32 @@ describe("StandingsTable", () => {
     expect(screen.getByText("1412.50").className).toContain("tabular-nums");
   });
 
-  it("renders dense, at whatever vertical cell padding the density token carries", () => {
+  it("stands every row at the density token own dense height", () => {
     render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
-    const headerCell = screen.getByRole("columnheader", { name: "Team" });
-    // Gameday law 4, density is respect (2026-08-28): v3 set this at 11px, which was the
-    // Sunday Standard mock's own figure and airier than a fantasy table wants. A manager on a
-    // Sunday reads more rows, not calmer ones. Read from `UI_CONFIG.table` rather than pinned as a
-    // literal twice over.
-    const dense = `${UI_CONFIG.table.denseRowPaddingPx}px`;
-    expect(headerCell).toHaveStyle({ paddingTop: dense, paddingBottom: dense });
+    // A ROW'S HEIGHT IS A TOKEN (Sideline, 2026-09-10): read from `TOKENS.density`, where the
+    // rest of the system's row rhythm lives, rather than pinned as a literal twice over.
+    const row = screen.getByText("Alex Rivera").closest("tr")!;
+    expect(row).toHaveStyle({ height: `${TOKENS.density.denseRowPx}px` });
   });
 
   // Law 3 (the tab loop, 2026-08-30): the sport's own "x-" clinch notation replaces the column
-  // of identical "Clinched" pills, printed inline before the team name.
+  // of identical "Clinched" pills, printed inline before the team name on the manager's own
+  // second line.
   it("marks the clinched teams with the x- notation, and the caller's own row", () => {
     render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
-    expect(screen.getByText("x-")).toBeInTheDocument();
-    expect(screen.getByText("Bay Bandits").closest("tr")).toHaveAttribute("data-own", "true");
+    expect(screen.getByText(/x-Bay Bandits/)).toBeInTheDocument();
+    expect(screen.getByText("Alex Rivera").closest("tr")).toHaveAttribute("data-own", "true");
   });
 
-  // Law 4, the amber rail: the caller's own row carries the accent border, and no other row does.
+  // THE AMBER RAIL, and it is amber rather than blue (Sideline's fourth chroma): `self` means
+  // "yours" and `accent` means "press this", and a whole row washed in the verb's own pigment on
+  // a page with no verb in it was the v5 habit this replaces.
   it("renders the amber rail on the caller's own row only", () => {
     render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
-    expect(screen.getByText("Bay Bandits").closest("tr")!.className).toContain("border-l-accent");
-    expect(screen.getByText("Iron Owls").closest("tr")!.className).not.toContain("border-l-accent");
+    const own = screen.getByText("Alex Rivera").closest("tr")!;
+    expect(own.className).toContain("border-l-self");
+    expect(own.className).not.toContain("border-l-accent");
+    expect(screen.getByText("Jordan Lee").closest("tr")!.className).not.toContain("border-l-self");
   });
 
   // Law 1 and law 2: the rank numeral leads, and the movement column states what happened to it
@@ -82,15 +87,16 @@ describe("StandingsTable", () => {
     expect(within(rows[2]!).getByText("—")).toBeInTheDocument();
   });
 
-  // The tab loop's two new facts, both derived from settled results already in hand: the current
-  // streak and games back of the leader (`t1` is the leader and prints a dash for GB).
-  it("renders each team's streak and games back of the leader", () => {
+  // The tab loop's two facts, both derived from settled results already in hand. They used to be
+  // two columns of their own; four columns is the cap (`TOKENS.density.maxColumns`), so they ride
+  // the manager's second line, which is where a fact about a season belongs when it is not the
+  // thing being compared. The leader prints no games-back clause at all rather than a dash.
+  it("keeps each team's streak and games back on the manager's own line", () => {
     render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
     const rows = screen.getAllByRole("row").slice(1);
-    expect(within(rows[0]!).getByText("W3")).toBeInTheDocument();
-    expect(within(rows[1]!).getByText("L1")).toBeInTheDocument();
+    expect(within(rows[0]!).getByText("x-Bay Bandits · W3")).toBeInTheDocument();
     // t1 (leader, 9-4) vs t3 (5-8): (9-5 + 8-4)/2 = 4 games back.
-    expect(within(rows[2]!).getByText("4")).toBeInTheDocument();
+    expect(within(rows[2]!).getByText("Comet Crew · L2 · 4 back")).toBeInTheDocument();
   });
 
   it("offers a next action before any week has been scored", async () => {
@@ -115,9 +121,9 @@ describe("StandingsTable", () => {
   // `playoffTeams` of 2 draws the cut above the third (`t3`, "Comet Crew").
   it("draws the playoff cut as a border-top hairline above the first team out, when playoffTeams is given", () => {
     render(<StandingsTable rows={STANDINGS} myTeamId="t1" playoffTeams={2} />);
-    const cutRow = screen.getByText("Comet Crew").closest("tr")!;
+    const cutRow = screen.getByText("Sam Patel").closest("tr")!;
     expect(cutRow.className).toContain("border-t-edge");
-    const inRow = screen.getByText("Iron Owls").closest("tr")!;
+    const inRow = screen.getByText("Jordan Lee").closest("tr")!;
     expect(inRow.className).not.toContain("border-t-edge");
   });
 

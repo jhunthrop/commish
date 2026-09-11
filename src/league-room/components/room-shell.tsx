@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { FreeAgentRow } from "@/league-service/claims";
 import type { TradeProposalView } from "@/trades/contract";
@@ -15,6 +15,7 @@ import {
 } from "../lib/drawer-state";
 import { rankDropCandidates } from "../lib/claim-drop";
 import { lineupFixPlans, type LineupFixPlan } from "../lib/lineup-problems";
+import { managersFrom } from "../lib/managers";
 import { stageFor } from "../lib/stage-priority";
 import { usePresence } from "../hooks/use-presence";
 import { useRailVisible } from "../hooks/use-rail-visible";
@@ -189,6 +190,13 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
   const rosterFull =
     data.lineup !== null && [...data.lineup.starters, ...data.lineup.bench].every((slot) => slot.playerId !== null);
   const clinched = home.standings.some((row) => row.teamId === home.myTeamId && row.clinched);
+  /**
+   * EVERY TEAM'S MANAGER, keyed by team (P1: a Sunday screen shows people, and `MatchupSide`
+   * carries a team name with nobody attached). The fact costs no new read: `home.standings` is
+   * already in hand and carries every owner's display name, avatar and record. Joining the two is
+   * work only this component can do, the same join `MatchupWeekPage` makes for its records.
+   */
+  const managersByTeamId = useMemo(() => managersFrom(home.standings), [home.standings]);
 
   const closeAndRefresh = useCallback(() => {
     setSheet(null);
@@ -228,7 +236,13 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
   return (
     <>
       <PlayerPeekHost />
-      <MatchupCelebration matchup={home.myMatchup} myTeamId={home.myTeamId} clinched={clinched} />
+      <MatchupCelebration
+        matchup={home.myMatchup}
+        myTeamId={home.myTeamId}
+        clinched={clinched}
+        leagueName={home.name}
+        managers={managersByTeamId}
+      />
 
       {/* The room is one framed stage: the week strip pins to its top, the chip row to its
           bottom, and the stage scrolls between them (the mock's own geometry). */}
@@ -284,6 +298,7 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
                 myTeamId={home.myTeamId}
                 fixturesByNflTeam={data.fixturesByNflTeam}
                 projectionsByPlayerId={data.projectionsByPlayerId}
+                managers={managersByTeamId}
               />
             ) : (
               // THE FRONT PAGE (Sideline, 2026-09-10): your rival, the one verb, who is here,

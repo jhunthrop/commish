@@ -124,26 +124,6 @@ export const UI_CONFIG = {
      */
     lowSeatsThreshold: 3,
   },
-  table: {
-    /**
-     * `Table`'s `density="dense"` vertical cell padding, px. `comfortable` keeps the table's
-     * original, more generous padding for a context that has not adopted the shell's density.
-     *
-     * LAW 4, DENSITY IS RESPECT: 7px, down from v3's 11. The Gameday mock's Sunday table sets
-     * `padding: 0.45rem 0.6rem` — 7.2px vertical — and that table is the screen the law was
-     * written about: a manager staring at his starters for six hours wants the seventh row on
-     * screen, not air around the sixth. Four pixels a row is roughly one more starter visible
-     * without scrolling on a phone, which is the whole argument.
-     */
-    /**
-     * SUNDAY v5, law 3: a row is ~44px and a name is 18px, because a broadcast graphic stays
-     * readable from the sofa and DROPS A COLUMN rather than shrinking type. This reverses the
-     * v4 pass that took it 11px -> 7px chasing density; that pass was right that our tables read
-     * as spreadsheets and wrong about why. The cause was full-width tables spreading two related
-     * facts 1270px apart, not row height, and that has since been fixed separately.
-     */
-    denseRowPaddingPx: 14,
-  },
   waitingRoom: {
     /**
      * D1, the seating moment (Phase 3.6, Task 9, Step 2b): how long after a manager's own

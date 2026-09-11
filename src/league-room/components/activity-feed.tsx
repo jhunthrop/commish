@@ -3,7 +3,7 @@ import type { ActivityRow } from "@/integrity/activity-view";
 import { EmptyState } from "@/components/ui";
 import { ChapterBand } from "@/components/ui/chapter-band";
 import { Icon } from "@/components/ui/icon";
-import { byDay, dayMarker } from "../lib/day-chapters";
+import { FALLBACK_TIME_ZONE, byDay, dayMarker } from "../lib/day-chapters";
 
 export interface ActivityFeedProps {
   readonly rows: readonly ActivityRow[];
@@ -78,17 +78,13 @@ export function ActivityFeed({ rows, leagueId, nextBefore }: ActivityFeedProps) 
     );
   }
 
-  // ONE clock for the whole render. Reading `new Date()` inside the loop would let a page that
-  // straddles midnight label two rows of the same day differently.
-  const now = new Date();
-
   return (
     <div className="flex flex-col gap-4">
       {rows.length === 0 ? <p className="text-sm text-text-muted">Nothing visible to you on this page.</p> : null}
-      {byDay(rows).map((chapter) => (
-        <section key={chapter.key} aria-label={dayMarker(chapter.rows[0]!.occurredAt, now)} className="flex flex-col">
+      {byDay(rows, FALLBACK_TIME_ZONE).map((chapter) => (
+        <section key={chapter.key} aria-label={dayMarker(chapter.rows[0]!.occurredAt, null)} className="flex flex-col">
           <ChapterBand
-            name={dayMarker(chapter.rows[0]!.occurredAt, now)}
+            name={dayMarker(chapter.rows[0]!.occurredAt, null)}
             consequence={`${chapter.rows.length} ${chapter.rows.length === 1 ? "entry" : "entries"}`}
           />
           <ul className="flex flex-col">

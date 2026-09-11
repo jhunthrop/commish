@@ -12,7 +12,8 @@ import { Avatar, Button, ErrorState, MessageBubble, Skeleton } from "@/component
 import { ChapterBand } from "@/components/ui/chapter-band";
 import { Icon } from "@/components/ui/icon";
 import type { ActivityFeedRow } from "@/integrity-service/activity";
-import { byDay, dayMarker } from "../lib/day-chapters";
+import { useReaderClock } from "../hooks/use-reader-clock";
+import { FALLBACK_TIME_ZONE, byDay, dayMarker } from "../lib/day-chapters";
 import { mergeStream, type StreamItem } from "../lib/stream-items";
 
 export interface RoomStreamProps {
@@ -94,6 +95,10 @@ function StreamMessage({ message, meUserId, onReact, onReport }: StreamMessagePr
  */
 export function RoomStream({ leagueId, activityRows, sendIsTheAct }: RoomStreamProps) {
   const chat = useLeagueChat(leagueId);
+  // The reader's own clock and locale, resolved after mount. Before it lands, a day chapter reads
+  // as its absolute name rather than "Today": deterministic on the server and on the client's
+  // first render, which is what keeps the two from disagreeing across a time zone.
+  const clock = useReaderClock();
   const [reportingId, setReportingId] = useState<string | null>(null);
   const footRef = useRef<HTMLDivElement | null>(null);
   const items = mergeStream(activityRows, chat.messages);
@@ -136,7 +141,6 @@ export function RoomStream({ leagueId, activityRows, sendIsTheAct }: RoomStreamP
     return <ErrorState title="The room would not open" description={chat.error ?? undefined} action={<Button variant="secondary" onClick={() => void chat.refresh()}>Try again</Button>} />;
   }
 
-  const now = new Date();
   return (
     <section aria-label="The room" data-testid="room-stream" className="flex min-h-0 flex-1 flex-col gap-3">
       {chat.connection === "reconnecting" ? (
@@ -156,9 +160,9 @@ export function RoomStream({ leagueId, activityRows, sendIsTheAct }: RoomStreamP
           <p className="py-6 text-center text-sm text-text-faint">Nothing has happened here yet. Say the first thing.</p>
         ) : (
           <div role="log" aria-live="polite" aria-label="What happened" className="flex flex-col gap-4">
-            {byDay(items).map((chapter) => (
-              <section key={chapter.key} aria-label={dayMarker(chapter.rows[0]!.occurredAt, now)} className="flex flex-col gap-3">
-                <ChapterBand name={dayMarker(chapter.rows[0]!.occurredAt, now)} consequence={`${chapter.rows.length} ${chapter.rows.length === 1 ? "thing" : "things"}`} />
+            {byDay(items, clock?.timeZone ?? FALLBACK_TIME_ZONE).map((chapter) => (
+              <section key={chapter.key} aria-label={dayMarker(chapter.rows[0]!.occurredAt, clock)} className="flex flex-col gap-3">
+                <ChapterBand name={dayMarker(chapter.rows[0]!.occurredAt, clock)} consequence={`${chapter.rows.length} ${chapter.rows.length === 1 ? "thing" : "things"}`} />
                 {chapter.rows.map((item: StreamItem) =>
                   item.kind === "event" ? (
                     <StreamEvent key={item.id} row={item.row} />

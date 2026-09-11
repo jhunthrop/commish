@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import type { TeamStandingsRow } from "../contract";
-import { Avatar, Button, EmptyState, Movement, Table, type TableColumn } from "@/components/ui";
+import { BigNumber, Button, EmptyState, Manager, Movement, Table, type TableColumn } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { formatPoints, formatRecord } from "../lib/format";
 
@@ -72,6 +72,23 @@ function firstTeamOutId(rows: readonly TeamStandingsRow[], playoffTeams: number 
  * non-obvious fact ("records include each week's median game") stays in the footnote where it
  * always was.
  */
+/**
+ * THE MANAGER'S SECOND LINE: their team, then the two season facts that used to be columns of
+ * their own. Assembled as one string so the row has one meta line rather than a run of fragments
+ * that each need their own separator rule, and so an absent streak or a leader's own dash simply
+ * does not appear instead of printing an empty chip.
+ */
+function metaLineFor(row: TeamStandingsRow, leader: TeamStandingsRow | undefined, showClinch: boolean): string {
+  const back = gamesBack(row, leader);
+  return [
+    // x-: the sport's own clinch notation, older than every incumbent and read at a glance by
+    // anyone who has ever seen a standings page. The footnote below the table spells it out.
+    `${showClinch && row.clinched ? "x-" : ""}${row.teamName}`,
+    ...(row.streak === null || row.streak === "" ? [] : [row.streak]),
+    ...(back === "—" ? [] : [`${back} back`]),
+  ].join(" · ");
+}
+
 /** Games back of the leader, in the sport's own half-game arithmetic; the leader prints a dash. */
 function gamesBack(row: TeamStandingsRow, leader: TeamStandingsRow | undefined): string {
   if (leader === undefined || row.teamId === leader.teamId) return "\u2014";
@@ -93,97 +110,86 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
   const firstOutId = firstTeamOutId(rows, playoffTeams);
 
 
+  /**
+   * FOUR COLUMNS, AND THE OWNER IS ON EVERY ROW (Sideline, 2026-09-10 — `TOKENS.density.
+   * maxColumns`). The table carried eight: rank, team, move, record, streak, games back, points
+   * for, points against. Eight columns is a spreadsheet, and P1's own rules-out list names the
+   * exact failure the second one was committing, *"owner names hidden behind team names"*, with
+   * the person reduced to a 28px decoration beside a team.
+   *
+   * Nothing measured was deleted; three facts changed altitude. The RANK and its MOVEMENT are one
+   * cell, because the numeral is where a team sits and the arrow is what happened to them, and a
+   * reader takes both in one glance. STREAK and GAMES BACK ride the manager's meta line, which is
+   * where a fact about a season belongs when it is not the thing being compared. POINTS AGAINST
+   * rides the basis under points for, which is the caption that names what the big number is and
+   * therefore the honest place for the number it is weighed against.
+   */
   const columns: readonly TableColumn<TeamStandingsRow>[] = [
     {
-      // THE POSITION NUMERAL. `row.rank` and never the render index: re-sorting by points must not
-      // renumber the league. A seed is a fact about the season; the visible order is a reading aid.
-      // `aria-hidden` — the row already announces its team, and a bare "3" spoken before a name is
-      // noise; the movement cell beside it carries the spoken sentence for both.
+      // THE POSITION NUMERAL AND ITS MOVEMENT, in one cell. `row.rank` and never the render index:
+      // a seed is a fact about the season, and the visible order is a reading aid. `aria-hidden`
+      // on the numeral because the row already announces its manager, and a bare "3" spoken before
+      // a name is noise; the movement beside it carries the spoken sentence for both.
+      // `previousRank - rank` because a SMALLER number is a better place. `null` is a league with
+      // nothing behind it, and `Movement` is not rendered at all, because a zero would read as
+      // "unchanged", which is a claim.
       key: "rank",
       header: "#",
       cell: (row) => (
-        <span
-          aria-hidden="true"
-          className={`font-display text-2xl font-extrabold leading-none tabular-nums ${
-            row.teamId === myTeamId ? "text-accent" : "text-text-faint"
-          }`}
-        >
-          {row.rank}
-        </span>
-      ),
-    },
-    {
-      key: "team",
-      header: "Team",
-      cell: (row) => (
-        <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="flex min-w-0 items-center gap-2">
-            <Avatar name={row.ownerDisplayName} avatar={row.ownerAvatar} size="sm" />
-            <span className="min-w-0 truncate font-display text-lg font-bold leading-display text-text-primary">
-              {/* x-: the sport's own clinch notation, older than every incumbent and read at a
-                  glance by anyone who has ever seen a standings page — replacing six identical
-                  pills that were a column of wallpaper (the persona pass). The footnote below
-                  the table still spells it out for the first-timer. */}
-              {showClinchBadges && row.clinched ? <span className="text-text-faint">x-</span> : null}
-              {row.teamName}
+        <span className="flex flex-col items-start gap-0.5">
+          <span
+            aria-hidden="true"
+            className={`font-display text-xl font-extrabold leading-none tabular-nums ${
+              row.teamId === myTeamId ? "text-self-ink" : "text-text-faint"
+            }`}
+          >
+            {row.rank}
+          </span>
+          {row.previousRank === null ? (
+            <span className="font-display text-xs text-text-faint">
+              <span aria-hidden="true">{"—"}</span>
+              <span className="sr-only">No ranking from {MOVEMENT_AGAINST} to compare against</span>
             </span>
-          </span>
+          ) : (
+            <Movement places={row.previousRank - row.rank} against={MOVEMENT_AGAINST} />
+          )}
         </span>
       ),
     },
     {
-      // LAW 2. `previousRank - rank` because a SMALLER number is a better place: a team that went
-      // from 5th to 3rd rose two, so the subtraction is the previous minus the current and not the
-      // other way round. `null` is a league with nothing behind it — `Movement` is not rendered at
-      // all, because a zero would read as "unchanged", which is a claim.
-      key: "movement",
-      header: "Move",
-      cell: (row) =>
-        row.previousRank === null ? (
-          <span className="font-display text-xs text-text-faint">
-            <span aria-hidden="true">—</span>
-            <span className="sr-only">No ranking from {MOVEMENT_AGAINST} to compare against</span>
-          </span>
-        ) : (
-          <Movement places={row.previousRank - row.rank} against={MOVEMENT_AGAINST} />
-        ),
-      hideOnNarrow: true,
+      // THE PERSON, THEN THE TEAM (P1). `Manager` is the only way a face reaches a Sideline row and
+      // it carries the name with it, so an owner can never be a decoration beside a team name
+      // again. The clinch, the streak and the games back are the meta line under the name.
+      key: "team",
+      header: "Manager",
+      cell: (row) => (
+        <Manager
+          name={row.ownerDisplayName}
+          avatar={row.ownerAvatar}
+          size="md"
+          ring={row.teamId === myTeamId ? "self" : undefined}
+          meta={metaLineFor(row, rows[0], showClinchBadges)}
+        />
+      ),
     },
     {
       // "W-L-T" reads as itself. See this component's docblock for the tip that used to sit here.
       key: "record",
       header: "W-L-T",
       cell: (row) => <span className="font-display text-base font-bold tabular-nums text-text-primary">{formatRecord(row)}</span>,
-    },
-    // The tab loop (2026-08-30, maximize the table): the two facts every incumbent's standings
-    // carry that ours did not. Both derived from settled results already in hand — no new read.
-    {
-      key: "streak",
-      header: "Streak",
-      cell: (row) => <span className="font-display tabular-nums text-text-muted">{row.streak ?? "\u2014"}</span>,
-    },
-    {
-      key: "gamesBack",
-      header: "GB",
-      cell: (row) => <span className="font-display tabular-nums text-text-muted">{gamesBack(row, rows[0])}</span>,
+      numeric: true,
     },
     // PLAIN, ON PURPOSE (the persona pass, 2026-08-30 — the veteran: "two different arrow
-    // systems in adjacent columns", "a 2% spread painted like a blowout"). The heat map put
-    // carets beside MOVE's arrows meaning something different, tinted near-identical
-    // season totals as verdicts, and cost two sub-header sentences to explain itself. A
-    // standings page has a settled grammar older than the web: plain tabular numbers, and the
-    // reader's own eye down the sorted column. The heat lives where a comparison is the
-    // question, not where the sort order already answered it.
+    // systems in adjacent columns", "a 2% spread painted like a blowout"). A standings page has a
+    // settled grammar older than the web: plain tabular numbers, and the reader's own eye down the
+    // sorted column. The heat lives where a comparison is the question, not where the sort order
+    // already answered it. What IS new is that the number states its basis (P2), and the basis is
+    // where points against now lives.
     {
       key: "pointsFor",
       header: "Points for",
-      cell: (row) => <span className="font-display font-semibold tabular-nums text-text-primary">{formatPoints(row.pointsFor)}</span>,
-    },
-    {
-      key: "pointsAgainst",
-      header: "Points against",
-      cell: (row) => <span className="font-display font-semibold tabular-nums text-text-muted">{formatPoints(row.pointsAgainst)}</span>,
-      hideOnNarrow: true,
+      cell: (row) => <BigNumber value={formatPoints(row.pointsFor)} basis={`for, ${formatPoints(row.pointsAgainst)} against`} size="sm" />,
+      numeric: true,
     },
   ];
 
@@ -197,10 +203,12 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
         rows={ordered}
         rowKey={(row) => row.teamId}
         rowClassName={(row) => {
-          // LAW 4, THE AMBER RAIL. The tower's "you" treatment, spelled exactly as `LeagueRow`
-          // spells it on the open-league board: a 3px accent rail down the left edge and an
-          // accent-glow wash falling away to the right. One row of twelve, found at a glance.
-          const own = row.teamId === myTeamId ? "border-l-[3px] border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent " : "";
+          // YOUR ROW IS AMBER, NOT BLUE (Sideline's fourth chroma, `tokens.ts`). Through v5 the
+          // rail was `accent`, which in Sideline is Court blue and means "press this" — a whole
+          // row washed in the verb's own pigment on a page with no verb in it. Amber is "yours"
+          // and nothing else, so the wash is `self-wash` and the rail is `border-l-self`. One row
+          // of twelve, found at a glance, with no promise of a control attached.
+          const own = row.teamId === myTeamId ? "self-wash border-l-[3px] border-l-self " : "";
           // The playoff cut: a shape, never a colour — `border-t-edge` is a real 2px change every
           // reader sees, in either theme, whether or not they perceive colour at all. Its meaning
           // is printed in the Team cell above.

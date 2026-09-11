@@ -66,6 +66,9 @@ export { LowerThird } from "./lower-third";
 export { SegmentGroup } from "./segment-group";
 export type { SegmentGroupProps, SegmentOption } from "./segment-group";
 export type { LowerThirdProps, LowerThirdCell } from "./lower-third";
+// Sunday's borrowed bug (section 5): Under the Lights' shape, Sideline's materials.
+export { ScoreBug } from "./score-bug";
+export type { ScoreBugProps, ScoreBugSide } from "./score-bug";
 export { Scoreboard } from "./scoreboard";
 export { PointsShareBar } from "./points-share-bar";
 export { GameStateChip, pointsForGameState, NOT_STARTED_DASH, type GameState } from "./game-state-chip";
