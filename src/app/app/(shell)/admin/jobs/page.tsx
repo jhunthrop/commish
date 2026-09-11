@@ -20,15 +20,43 @@ function mono(text: string): React.ReactNode {
   return <span className="whitespace-nowrap font-mono text-text-muted">{text}</span>;
 }
 
-const statusTone = (status: string): "negative" | "positive" | "warning" | "neutral" =>
-  status === "failed" || status === "abandoned" ? "negative" : status === "succeeded" ? "positive" : status === "running" ? "warning" : "neutral";
+/**
+ * A JOB'S STATE AS A CHIP TONE, and never a literal colour. `running` is the LIVE channel — the
+ * one thing on the page that is happening right now — where it used to be `warning`, which in
+ * Sideline is the rose a clock running out wears. A job that is merely working is not in trouble.
+ */
+const statusTone = (status: string): "negative" | "positive" | "live" | "neutral" =>
+  status === "failed" || status === "abandoned" ? "negative" : status === "succeeded" ? "positive" : status === "running" ? "live" : "neutral";
+
+/** Two facts in one cell, the identifier over the detail — how this operator surface keeps four
+ *  columns (`TOKENS.density.maxColumns`) without dropping anything an operator reads. */
+function stacked(lead: React.ReactNode, under: React.ReactNode): React.ReactNode {
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span className="font-medium text-text-primary">{lead}</span>
+      <span className="text-xs text-text-muted">{under}</span>
+    </span>
+  );
+}
 
 function deadLetterColumns(): readonly TableColumn<DeadLetterRow>[] {
+  // FOUR COLUMNS. The status chip and the instant it died belong to the job that died, so they
+  // ride its own cell rather than buying two more columns on a six-column table.
   return [
-    { key: "job", header: "Job", cell: (row) => <span className="font-medium text-text-primary">{`${row.name} #${row.jobId}`}</span> },
-    { key: "status", header: "Status", cell: (row) => <Badge tone="negative">{row.status}</Badge> },
+    {
+      key: "job",
+      header: "Job",
+      cell: (row) => (
+        <span className="flex flex-col gap-1">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-text-primary">{`${row.name} #${row.jobId}`}</span>
+            <Badge tone="negative">{row.status}</Badge>
+          </span>
+          <span className="text-xs text-text-muted">{`died ${instant(row.finishedAt)}`}</span>
+        </span>
+      ),
+    },
     { key: "attempts", header: "Attempts", cell: (row) => mono(`${row.attempts}/${row.maxAttempts}`), numeric: true },
-    { key: "finished", header: "Died", cell: (row) => mono(instant(row.finishedAt)), hideOnNarrow: true },
     {
       key: "error",
       header: "Last error",
@@ -43,12 +71,7 @@ function scheduleColumns(): readonly TableColumn<ScheduleStatusRow>[] {
     {
       key: "schedule",
       header: "Schedule",
-      cell: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-medium text-text-primary">{row.name}</span>
-          <span className="text-xs text-text-muted">{row.description}</span>
-        </div>
-      ),
+      cell: (row) => stacked(row.name, row.description),
     },
     { key: "cron", header: "Cron", cell: (row) => mono(`${row.cron} (${row.timezone})`) },
     { key: "cursor", header: "Evaluated to", cell: (row) => mono(instant(row.cursor)), hideOnNarrow: true },
@@ -69,11 +92,11 @@ function scheduleColumns(): readonly TableColumn<ScheduleStatusRow>[] {
 }
 
 function runColumns(): readonly TableColumn<RecentRunRow>[] {
+  // FOUR COLUMNS: a run's start time belongs to the run, so it rides the job's own cell.
   return [
-    { key: "job", header: "Job", cell: (row) => <span className="font-medium text-text-primary">{`${row.name} #${row.jobId}`}</span> },
+    { key: "job", header: "Job", cell: (row) => stacked(`${row.name} #${row.jobId}`, `started ${instant(row.startedAt)}`) },
     { key: "attempt", header: "Attempt", cell: (row) => mono(String(row.attempt)), numeric: true },
     { key: "status", header: "Status", cell: (row) => <Badge tone={statusTone(row.status)}>{row.status}</Badge> },
-    { key: "started", header: "Started", cell: (row) => mono(instant(row.startedAt)), hideOnNarrow: true },
     {
       key: "error",
       header: "Error",
