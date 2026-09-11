@@ -50,6 +50,32 @@ export function useCountdown(deadlineAt: string | null): CountdownState {
   return { remainingMs: deadlineAt === null || now === null ? null : Math.max(0, Date.parse(deadlineAt) - now), now };
 }
 
+export interface CountdownLabelProps {
+  readonly deadlineAt: string | null;
+  readonly className?: string;
+  /** What the label shows before the client clock snaps, and with no deadline at all. */
+  readonly placeholder?: string;
+  readonly "data-testid"?: string;
+}
+
+/**
+ * THE CLOCK TICKS ALONE (draft-room fluidity round, 2026-09-10). The one-second tick used to
+ * live in the draft room's root and travel down as a `clockLabel` prop, so every tick
+ * re-rendered the whole room — measured at 65 commits in 28 s of drafting, up to 14,000
+ * components each. This leaf owns its own `useCountdown`, so a tick re-renders exactly this
+ * span; a parent hands it the deadline, which changes once per turn, and never a ticking label.
+ * Two leaves on one screen mean two cheap intervals, which is the trade this round makes on
+ * purpose: the alternative (one shared tick threaded through props) is the bug.
+ */
+export function CountdownLabel({ deadlineAt, className, placeholder = "…", "data-testid": testId }: CountdownLabelProps) {
+  const { remainingMs } = useCountdown(deadlineAt);
+  return (
+    <span data-testid={testId} className={className}>
+      {remainingMs === null ? placeholder : formatCountdown(remainingMs)}
+    </span>
+  );
+}
+
 function pad(value: number): string {
   return value.toString().padStart(2, "0");
 }

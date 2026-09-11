@@ -21,6 +21,8 @@ export { Modal } from "./modal";
 export { ToastProvider, useToast } from "./toast";
 export { Table, type TableColumn, type TableDensity } from "./table";
 export { Celebration } from "./celebration";
+export { CountdownLabel } from "./countdown";
+export { MotionList, type MotionRowProps } from "./motion-list";
 export { Rise } from "./rise";
 export { InfoTip } from "./info-tip";
 export { EYEBROW } from "./config";
