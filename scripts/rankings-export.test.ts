@@ -91,4 +91,15 @@ describe("exportLines", () => {
     const lines = exportLines([squad, row({ playerId: "p1", valueRank: 1 })], "ppr");
     expect(lines.slice(1).map((line) => cellOf(lines[0]!, line, "Player"))).toEqual(["Test Player"]);
   });
+  /** The board's own ranking key rides the file beside the projection (fix round 2), and a row the
+   *  engine has no value for prints an empty cell rather than a fabricated zero. */
+  it("carries the value over replacement beside the projection, blank where there is none", () => {
+    const [header, first] = exportLines([row({})], "ppr");
+    const columns = header!.split(",");
+    expect(columns).toContain("Over repl");
+    expect(columns.indexOf("Over repl")).toBe(columns.indexOf("Proj Pts") + 1);
+    expect(cellOf(header!, first!, "Over repl")).toBe("80.0");
+    const last = exportLines([row({ valueOverReplacement: null, valueRank: null, marketOrderRank: 1 })], "ppr")[1]!;
+    expect(last.split(",")[columns.indexOf("Over repl")]).toBe("");
+  });
 });

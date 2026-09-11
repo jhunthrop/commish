@@ -4,7 +4,7 @@ import { getDb } from "@/db/client";
 import { drafts } from "@/db/schema";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { pageTitle } from "@/components/app-shell/page-metadata";
-import { Card, PageTitle, type SegmentOption } from "@/components/ui";
+import { PageTitle, type SelectOption } from "@/components/ui";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { registry } from "@/projections/laws/registry";
 import { DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
@@ -27,8 +27,8 @@ function rosterSpotsOf(rosterSlots: readonly RosterSlotConfig[]): number {
 /** The picker's own options: one per real league the caller drafts in, plus the explicit
  *  "generic" default-settings board. `"next"` (the default when no `?league=` is given) is its
  *  own value only when the caller HAS an upcoming draft to default to. */
-function leaguePickerOptions(leagues: readonly DraftLeagueRow[]): readonly SegmentOption[] {
-  const options: SegmentOption[] = [];
+function leaguePickerOptions(leagues: readonly DraftLeagueRow[]): readonly SelectOption[] {
+  const options: SelectOption[] = [];
   if (leagues.length > 0) options.push({ value: "next", label: "Next draft" });
   for (const league of leagues) options.push({ value: league.leagueId, label: league.leagueName });
   options.push({ value: "generic", label: "Generic (12-team)" });
@@ -111,29 +111,38 @@ export default async function BoardPage({ searchParams }: PageProps) {
   return (
     <div className="flex flex-col gap-6">
       <DraftSubnav current="board" />
-      <div className="flex flex-col gap-1">
-        <PageTitle>The Board</PageTitle>
-        <p className="text-sm text-text-muted">Rankings measured from evidence, not averaged from experts. Every row shows its receipts.</p>
+      <PageTitle>The Board</PageTitle>
+
+      {/* THE CONTEXT, IN ONE BAR (Sideline research round). The league and the scoring are the two
+          things that decide what every number below means, so they sit on one line with the basis
+          stated under them in the same breath — not in a card of their own, which on a phone put
+          three bands of chrome between the reader and the first player row. */}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-end gap-4">
+          <LeaguePicker options={leaguePickerOptions(leagues)} value={isGeneric ? "generic" : leagueParam !== undefined ? (selected?.leagueId ?? "next") : "next"} basePath="/app/draft/board" />
+          {isGeneric ? <ScoringFormatPicker value={requested.format} explicit={requested.explicit} basePath="/app/draft/board" extraQuery={{ league: "generic" }} /> : null}
+        </div>
+        {/* THE BASIS, IN ONE LINE. It states what rules produced every number below (P11) and
+            nothing else: the sentence that used to follow it ("Pick a league above to see it
+            computed under that league's exact rules") explained the control an inch to its left,
+            which is exactly the explainer text P7 rules out. The control says it by being there. */}
+        {/* One line, or no line at all. An empty paragraph is furniture with nothing inside it, and
+            this one used to render for a reader whose league we could not name (fix round 1, LOW). */}
+        {isGeneric ? (
+          <p className="text-sm text-text-muted">{`${resolved.basisLine}, a 12-team standard roster.`}</p>
+        ) : selected === null ? null : (
+          <p className="text-sm text-text-muted">
+            {`Under ${selected.leagueName}'s rules: ${selected.teamCount} teams, its own roster shape. ${resolved.basisLine}.${resolved.note === null ? "" : ` ${resolved.note}`}`}
+          </p>
+        )}
       </div>
-
-      <LeaguePicker options={leaguePickerOptions(leagues)} value={isGeneric ? "generic" : leagueParam !== undefined ? (selected?.leagueId ?? "next") : "next"} basePath="/app/draft/board" />
-
-      {isGeneric ? (
-        <Card className="flex flex-col gap-3 text-sm text-text-muted">
-          <ScoringFormatPicker value={requested.format} explicit={requested.explicit} basePath="/app/draft/board" extraQuery={{ league: "generic" }} />
-          <p>{`${resolved.basisLine}, a 12-team standard roster. Pick a league above to see it computed under that league's exact rules.`}</p>
-        </Card>
-      ) : selected !== null ? (
-        <Card className="text-sm text-text-muted">
-          {`Computed under ${selected.leagueName}'s rules: ${selected.teamCount} teams, its own roster shape. ${resolved.basisLine}.${resolved.note === null ? "" : ` ${resolved.note}`}`}
-        </Card>
-      ) : null}
 
       <BoardView
         rows={rows}
         laws={laws}
         auctionShape={auctionShape}
         scoringLabel={resolved.label}
+        openOn={typeof params.q === "string" ? params.q : ""}
         exportFilename={`board-${selected?.leagueId ?? `generic-${resolved.format}`}.csv`}
       />
     </div>

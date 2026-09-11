@@ -21,8 +21,17 @@ export interface PeekTarget {
  */
 let host: ((target: PeekTarget) => void) | null = null;
 
-export function openPlayerPeek(target: PeekTarget): void {
-  host?.(target);
+/**
+ * Raises the peek, and SAYS WHETHER IT COULD (Sideline research round). Every caller before this
+ * round was a player name inside a league surface, which always mounts a host, so a dead click was
+ * only ever a bug. Site search is reachable from every signed-in page, including the ones that
+ * mount no host at all, and a search result that silently did nothing would be the worst failure on
+ * the surface. `false` means nobody took it, and the caller navigates to the full page instead.
+ */
+export function openPlayerPeek(target: PeekTarget): boolean {
+  if (host === null) return false;
+  host(target);
+  return true;
 }
 
 export interface PeekLoadState {

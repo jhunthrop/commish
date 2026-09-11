@@ -133,11 +133,26 @@ describe("boardCsvLines", () => {
     // test stops meaning what it says.
     expect(cellOf(header!, line!, "Rank")).toBe(""); // no overall rank: it is not on the value board
     expect(cellOf(header!, line!, "Projected pts")).toBe("");
+    // THE ON-SCREEN RANKING KEY RIDES THE FILE (fix round 2): a market-order row has no value over
+    // replacement, and the cell is blank rather than a fabricated zero.
+    expect(cellOf(header!, line!, "Points over replacement")).toBe("");
     expect(cellOf(header!, line!, "Floor")).toBe("");
     expect(cellOf(header!, line!, "Ceiling")).toBe("");
     expect(cellOf(header!, line!, "ADP")).toBe("130.1"); // the one number it does carry
     expect(cellOf(header!, line!, "Vs ADP (picks)")).toBe(""); // the ordering must not be compared with itself
     expect(cellOf(header!, line!, "Scoring")).toBe("PPR"); // the basis rides on every row, projection or not
     expect(line).not.toMatch(/(^|,)0\.0(,|$)/);
+  });
+  /**
+   * THE COLUMN THE SCREEN NOW RANKS BY (fix round 2). Points over replacement became the board
+   * row's one number, and a file read away from the screen is exactly where a reader would
+   * otherwise be unable to reproduce the order the rows were in. It sits BESIDE the projection and
+   * never instead of it: they are different claims and both belong in the export.
+   */
+  it("carries points over replacement beside the projection, with one decimal", () => {
+    const [header, line] = boardCsvLines([row({ valueOverReplacement: 80, projectedPoints: 280.5 })], SHAPE, "PPR");
+    expect(header!.split(",")).toContain("Points over replacement");
+    expect(cellOf(header!, line!, "Points over replacement")).toBe("80.0");
+    expect(cellOf(header!, line!, "Projected pts")).toBe("280.5");
   });
 });

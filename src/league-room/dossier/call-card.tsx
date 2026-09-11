@@ -53,13 +53,25 @@ export interface CallCardProps {
   readonly perGameSentence?: string | null;
 }
 
-/** Verdict-channel tone by `gap`'s own sign — `text-positive` (money) above zero, `text-negative`
- *  (coral) below it, `text-text-muted` (no tint at all) for a genuine zero OR an absent gap. A
- *  `null`/zero gap is never colored: a tint is a claim about which side of a real number this
- *  falls on, and there is no honest side to claim for either. */
+/**
+ * Verdict-channel tone by `gap`'s own sign: `text-positive` (Live green, the good outcome) above
+ * zero, and ORDINARY INK everywhere else.
+ *
+ * ROSE IS THE RIVAL'S CHANNEL AND THIS IS NOT A RIVAL (Sideline, fix round 1's own H2). The negative
+ * branch used to return `text-negative`, which in this palette is Rival rose: your opponent, the
+ * swing against you, a clock running out (`TOKENS.color.*.negative`). A player our board rates lower
+ * than the drafting room does is none of those. He is a player we would not reach for, and painting
+ * that in the colour the product reserves for the opponent made a reader read "bad player" — the
+ * identical finding `vsMarketLabel` already rules neutral on the board ("drafters reach N picks
+ * early", `tone: "neutral"`, never red, because red implies a bad player and this number never meant
+ * that). Nothing is lost by dropping it: `gapSentence` prints the sign itself, which is also what
+ * keeps the fact alive for a screen reader and in monochrome.
+ *
+ * A `null`/zero gap was already ink and stays ink: a tint is a claim about which side of a real
+ * number this falls on, and there is no honest side to claim for either.
+ */
 function toneClassFor(roundedGap: number | null): string {
-  if (roundedGap === null || roundedGap === 0) return "text-text-muted";
-  return roundedGap > 0 ? "text-positive" : "text-negative";
+  return roundedGap !== null && roundedGap > 0 ? "text-positive" : "text-text-muted";
 }
 
 /** "+20 points vs his ADP" / "-20 points vs his ADP" / "0 points vs his ADP" / the honest

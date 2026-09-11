@@ -71,6 +71,34 @@ import type { PlayerGameLogRow, PlayerSeasonTotals, PlayerWeekView } from "./pla
  * season-selected: they are this year's draft outlook, which is a fact about the season a manager is
  * drafting for, not about whichever season's game log he happens to be looking at.
  */
+/**
+ * WHAT THE MANAGER WHO HOLDS HIM IS TO THE MANAGER READING THE SCREEN (P6: your rival is always in
+ * the frame). `"you"` wears the amber ring, `"rival"` the rose one, `"other"` no ring at all.
+ *
+ * `"rival"` means one thing exactly: he is held by the team the reader plays THIS WEEK, in this
+ * league. It is never a standing grudge, never a division, never a record — those would each be a
+ * different claim and the screen states this one.
+ */
+/** Where the league this body was read under stands in its own draft — see `draftPhase`. */
+export type PlayerLeagueDraftPhase = "predraft" | "live" | "complete";
+
+export type PlayerOwnerRelation = "you" | "rival" | "other";
+
+/**
+ * WHO HAS HIM, AS A PERSON (P1: the person comes before the number; Sideline: "manager avatars
+ * everywhere, always beside their name"). `ownedBy` beside this carries the same team's NAME and
+ * stays, because the peek's identity line and every existing consumer say "On Iron Owls" and a team
+ * name is the right half of that sentence; this adds the half a face needs.
+ */
+export interface PlayerOwner {
+  readonly teamId: string;
+  readonly teamName: string;
+  readonly managerName: string;
+  /** The stored avatar ref, as `Avatar` takes it, or `null` for a manager who has set none. */
+  readonly managerAvatar: string | null;
+  readonly relation: PlayerOwnerRelation;
+}
+
 export interface PlayerSeasonBody {
   readonly player: Player;
   /** Every season this body could answer for, newest first. Can be empty for a reason `isRookie`
@@ -107,6 +135,17 @@ export interface PlayerSeasonBody {
    *  read (peek document design §3.4): a roster move changes no document. */
   readonly ownedBy: string | null;
   /**
+   * The SAME holder `ownedBy` names, as a person, plus what that person is to the reader (P1, P6).
+   * `null` for a free agent here, and `undefined` on the many hand-built fixtures that predate the
+   * Sideline research round — the same "optional so fixtures need not all learn at once" rule
+   * `capsule` and `dossier` keep. A caller reads `owner ?? null`, never `owner!`.
+   *
+   * The RELATION needs a reader, so it is `"other"` for every read made without one (the peek's own
+   * API route and the page both pass the signed-in manager; a background rebuild does not). Absence
+   * of a ring is the honest render of "we were not asked whose screen this is".
+   */
+  readonly owner?: PlayerOwner | null;
+  /**
    * `leagues.isMock` for THIS league — `true` for a mock draft's own practice room. A roster-status
    * claim built from `ownedBy` ("Free agent in this league" / "On {team}") is a fact about a REAL
    * room; a mock room's teams are the founder-required seeded bot roster, and telling a manager
@@ -114,6 +153,22 @@ export interface PlayerSeasonBody {
    * exist the way a real league does. Consumers gate that one line on this flag.
    */
   readonly isMockLeague: boolean;
+  /**
+   * WHERE THIS LEAGUE'S DRAFT IS, because the one thing a manager can do about a player depends on
+   * it and nothing else in this body says so. Three states, not a boolean (fix round 2, H1): the
+   * middle one is the whole point.
+   *
+   * - `"predraft"` — `drafts.status` is `'scheduled'`, `'dissolved'`, or there is no draft row at
+   *   all. EVERY player is un-held here, so "Add him" is an act this manager cannot make.
+   * - `"live"` — `'in_progress'`. The room is running, it has its own Draft verb, and any other
+   *   solid pill inside it is a link OUT of a draft a manager is in the middle of.
+   * - `"complete"` — the season's own states apply: free agent, yours, or somebody else's.
+   *
+   * Optional on the type, the rule `capsule`, `dossier` and `owner` keep: a hand-built fixture need
+   * not learn about it, and `undefined` reads as `"predraft"`, which offers no act we cannot stand
+   * behind.
+   */
+  readonly draftPhase?: PlayerLeagueDraftPhase;
   /** His current designation from the harvested injuries feed ("Q", "O", "IR"), or `null` when
    *  the feed does not name him — absence means healthy as far as the source says. */
   readonly injuryDesignation: string | null;

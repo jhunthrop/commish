@@ -16,6 +16,7 @@ export { Skeleton } from "./skeleton";
 export { EmptyState } from "./empty-state";
 export { ErrorState } from "./error-state";
 export { Select } from "./select";
+export type { SelectOption, SelectProps } from "./select";
 export { Avatar } from "./avatar";
 export { Modal } from "./modal";
 export { ToastProvider, useToast } from "./toast";

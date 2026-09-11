@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import type { Player } from "@/domain/player";
-import { PlayerFace } from "./player-face";
+import { PlayerFace, type PlayerFaceSize } from "./player-face";
 import { PositionBadge } from "./position-badge";
 
 /**
@@ -22,6 +23,17 @@ export function splitName(name: string): { readonly given: string | null; readon
 
 export interface PlayerObjectProps {
   readonly player: Player;
+  /**
+   * THE HERO FACE'S STEP (Sideline round). `"xl"` is 132 and is a player's OWN screen — the
+   * default, because that is what this object is for. The peek raises the identical header over a
+   * sheet with less vertical room than a page, and `"lg"` (56) is the one thing that differs
+   * between them, which is why it is a prop rather than two headers that will drift.
+   * @default "xl"
+   */
+  readonly faceSize?: PlayerFaceSize;
+  /** Beside the position and club chips: the injury designation, a bye, a roster pill. The object
+   *  itself never invents one — it has no fact it is not handed. */
+  readonly chips?: ReactNode;
   readonly className?: string;
 }
 
@@ -57,11 +69,11 @@ export interface PlayerObjectProps {
  * renders two chips rather than inventing a third. The same ruling `PlayerFace` already makes
  * about the jersey number, for the same reason.
  */
-export function PlayerObject({ player, className = "" }: PlayerObjectProps) {
+export function PlayerObject({ player, faceSize = "xl", chips, className = "" }: PlayerObjectProps) {
   const { given, family } = splitName(player.name);
   return (
     <div className={`flex items-center gap-4 sm:gap-5 ${className}`}>
-      <PlayerFace player={player} size="xl" />
+      <PlayerFace player={player} size={faceSize} />
       <div className="flex min-w-0 flex-col gap-1">
         {/* THE NAME IS THE PAGE'S `<h1>`, which is why this component renders one rather than
             sitting under a `PageTitle` that would print the same name a second time in a smaller
@@ -82,11 +94,14 @@ export function PlayerObject({ player, className = "" }: PlayerObjectProps) {
               to outrank it. 600 is the cap and the range comes from size, never a heavier face. */}
           <span aria-hidden="true" className="font-display text-display-md font-semibold leading-display text-text-primary sm:text-display-lg">{family}</span>
         </h1>
-        <span className="flex items-center gap-2 pt-1">
+        {/* SIDELINE'S CHIP LINE. The club is a word in the body face on the row's own quiet ink,
+            not a mono plate: v5 spelled a club code the way it spelled a stat, and Sideline's chip
+            register is the pill. The position sticker keeps its six hues, which is the one legend
+            every direction carries unchanged. */}
+        <span className="flex flex-wrap items-center gap-2 pt-1">
           <PositionBadge position={player.position} size="sm" />
-          {player.nflTeam === "" ? null : (
-            <span className="rounded-sm bg-surface-raised px-2 py-0.5 font-mono text-xs text-text-muted">{player.nflTeam}</span>
-          )}
+          {player.nflTeam === "" ? null : <span className="text-sm text-text-muted">{player.nflTeam}</span>}
+          {chips === undefined || chips === null ? null : chips}
         </span>
       </div>
     </div>

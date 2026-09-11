@@ -8,6 +8,8 @@ import { SEARCH_CONFIG } from "@/search/config";
 import type { SearchResult } from "@/search/contract";
 import { resultMetaLine, SiteSearch } from "./site-search";
 import { ShellLeaguesProvider } from "./shell-leagues";
+import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
+import { PlayerPeekHost } from "@/league-room/components/player-peek";
 
 const push = vi.fn();
 let pathname = "/app/wallet";
@@ -56,15 +58,17 @@ beforeEach(() => {
 });
 
 describe("resultMetaLine", () => {
-  it("states club, bye and board rank, dropping each one the result lacks", () => {
-    expect(resultMetaLine(GIBBS)).toBe("DET · Bye 8 · Board 3");
+  /** THE BOARD RANK LEFT THIS LINE (Sideline research round): it is the row's one number now, with
+   *  its own basis under it, so the facts line states only what is not already a figure. */
+  it("states club and bye, dropping each one the result lacks, and never the board rank", () => {
+    expect(resultMetaLine(GIBBS)).toBe("DET · Bye 8");
     expect(resultMetaLine(BATES)).toBe("DET");
-    expect(resultMetaLine(LIONS)).toBe("DET · Bye 8");
+    expect(resultMetaLine(LIONS)).toBe("DET");
   });
 
   it("leads with the roster status when the board stored one", () => {
     const status = { status: "injured_reserve" as const, source: "tank01_player_list" as const, observedAt: "2026-09-05T22:35:00.000Z", team: "DET", excluded: false };
-    expect(resultMetaLine({ ...GIBBS, rosterStatus: status })).toBe("IR · DET · Bye 8 · Board 3");
+    expect(resultMetaLine({ ...GIBBS, rosterStatus: status })).toBe("IR · DET · Bye 8");
     expect(resultMetaLine({ ...BATES, rosterStatus: { ...status, status: "practice_squad", excluded: true } })).toBe("Practice squad · DET");
   });
 });
@@ -125,7 +129,12 @@ describe("SiteSearch", () => {
     expect(field()).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Jahmyr Gibbs")).toBeInTheDocument();
     expect(screen.getByText("RB2")).toBeInTheDocument();
-    expect(screen.getByText("DET · Bye 8 · Board 3")).toBeInTheDocument();
+    expect(screen.getByText("DET · Bye 8")).toBeInTheDocument();
+    // P2 on a result row: one number, and its caption says what it is. A player's is his place on
+    // our board; a club's is its bye, which is why the club's facts line no longer repeats it.
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("On our board, overall")).toBeInTheDocument();
+    expect(screen.getByText("Bye week")).toBeInTheDocument();
     expect(screen.getByText("Team")).toBeInTheDocument();
     fireEvent.keyDown(field(), { key: "ArrowDown" });
     expect(options[1]).toHaveAttribute("aria-selected", "true");
@@ -184,5 +193,32 @@ describe("SiteSearch", () => {
     fireEvent.click(trigger());
     expect(field()).toHaveValue("");
     expect(screen.queryAllByRole("option")).toHaveLength(0);
+  });
+  /**
+   * A NAME FOUND BY SEARCH BEHAVES LIKE A NAME FOUND ON A ROSTER (Sideline research round): it
+   * raises the peek, the same sheet every other player name in the product raises, so research
+   * never costs the reader his place. Search is reachable from pages that mount no peek host at
+   * all, and there the result still opens his full page — proven by the two tests above, which
+   * mount no host and assert a navigation.
+   */
+  it("opens the peek for a player when a host is mounted, instead of navigating away", async () => {
+    pathname = "/app/leagues/lg_here/standings";
+    const fixture = fixtureAccountDeps({ ok: true, data: { query: "x", results: [GIBBS] } });
+    render(
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <LeagueRoomDepsProvider deps={{ fetchJson: () => new Promise(() => undefined), openEventSource: () => ({ addEventListener: () => undefined, close: () => undefined }) }}>
+          <ShellLeaguesProvider leagueIds={["lg_here"]}>
+            <SiteSearch />
+            <PlayerPeekHost />
+          </ShellLeaguesProvider>
+        </LeagueRoomDepsProvider>
+      </AccountRoomDepsProvider>,
+    );
+    fireEvent.click(trigger());
+    fireEvent.change(field(), { target: { value: "gib" } });
+    await screen.findByRole("option");
+    fireEvent.keyDown(field(), { key: "Enter" });
+    expect(push).not.toHaveBeenCalled();
+    await screen.findByRole("dialog", { name: "Jahmyr Gibbs" });
   });
 });

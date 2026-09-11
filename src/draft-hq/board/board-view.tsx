@@ -5,13 +5,13 @@ import type { Player, Position } from "@/domain/player";
 import { auctionValues, type AuctionShape } from "@/projections/auction/value";
 import { quartilesFromSeasonBand } from "@/projections/preseason/band-quartiles";
 import type { BoardReason } from "@/projections/preseason/board";
-import { BottomSheet, Input, NOT_STARTED_DASH, PlayerFace, PositionBadge, ReasonChip, RosterStatusPill, SegmentGroup, TierDivider } from "@/components/ui";
+import { BigNumber, BottomSheet, Card, Input, NOT_STARTED_DASH, PlayerFace, PlayerRow, ReasonChip, RosterStatusPill, SegmentGroup, TierDivider } from "@/components/ui";
 import { NOT_ON_ACTIVE_ROSTER_BAND, NOT_ON_ACTIVE_ROSTER_NOTE } from "@/projections/preseason/roster-status-copy";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { Law } from "@/projections/laws/types";
 import { groupReasons } from "@/league-room/outlook/groups";
 import { marketOrderNoteFor } from "@/draft-room/lib/market-order-note";
-import { strongestEvidenceSentence, tierBandSentence, tierLetter, vsMarketLabel } from "./copy";
+import { strongestEvidenceSentence, tierBandLabel, tierNumber, vsMarketLabel } from "./copy";
 import { BOARD_LAST_SEASON, type BoardRow } from "./service";
 
 const POSITION_TABS: readonly { readonly value: string; readonly label: string }[] = [
@@ -38,6 +38,12 @@ const CSV_HEADER = [
   // this screen is exactly where "Projected pts" would otherwise lose its basis.
   "Scoring",
   "Projected pts",
+  // THE ON-SCREEN RANKING KEY (fix round 2). The board's rows are ordered by this and, since the
+  // Sideline round, print it as their one number — so a file read away from the screen needs it or
+  // a reader cannot reproduce the order he was looking at. Beside "Projected pts" and never
+  // instead of it: a value over a replacement player and a season point total are different
+  // claims, and the file states both.
+  "Points over replacement",
   "Floor",
   "Ceiling",
   "ADP",
@@ -90,6 +96,7 @@ function rowToCsv(row: BoardRow, dollarValue: number | null, scoringLabel: strin
     row.byeWeek === null ? "" : String(row.byeWeek),
     scoringLabel,
     csvNumber(row.projectedPoints),
+    csvNumber(row.valueOverReplacement),
     csvNumber(row.floorPoints),
     csvNumber(row.ceilingPoints),
     csvNumber(row.marketAdp),
@@ -161,7 +168,31 @@ function lastSeasonSentence(row: BoardRow): string {
   return `In ${last.season} ${subject} scored ${last.points.toFixed(1)} points over ${last.games} games, ${last.pointsPerGame.toFixed(1)} a game, under this league's scoring.`;
 }
 
-function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDrawerState; readonly laws: readonly Law[]; readonly onClose: () => void }) {
+/**
+ * HIS RANGE, IN THE DRAWER (Sideline research round) — the "most seasons" band and its tails used
+ * to be a column of their own on a seven-column table. P2 allows a row ONE number larger than body
+ * text, and P10 caps a comparison list at four regions, so the band moved one press away rather
+ * than being dropped: it is the second thing a veteran asks after the projection, and the drawer is
+ * where the board already answers "why".
+ *
+ * IT ALSO STATES THE PROJECTION (fix round 1, H1), because the row's own big number is the board's
+ * ranking key now and the projection had to land somewhere it is named in full. The convention for
+ * the band is the founder's own (2026-09-04): the p25-p75 band leads as "most seasons", the honest
+ * p10-p90 rides behind it as the tails. A row with no projection has no band and says so by
+ * rendering nothing at all.
+ */
+function RangeSentence({ row, scoringLabel }: { readonly row: BoardRow; readonly scoringLabel: string }) {
+  if (row.medianPoints === null || row.floorPoints === null || row.ceilingPoints === null) return null;
+  const { p25, p75 } = quartilesFromSeasonBand(row.medianPoints, row.floorPoints, row.ceilingPoints);
+  return (
+    <p className="text-sm text-text-muted">
+      {row.projectedPoints === null ? "" : `Our projection is ${row.projectedPoints.toFixed(1)} points under ${scoringLabel}. `}
+      {`Most seasons land between ${p25.toFixed(0)} and ${p75.toFixed(0)} points. The full range, injury seasons and smash seasons included, runs ${row.floorPoints.toFixed(0)} to ${row.ceilingPoints.toFixed(0)}.`}
+    </p>
+  );
+}
+
+function EvidenceDrawer({ state, laws, scoringLabel, onClose }: { readonly state: EvidenceDrawerState; readonly laws: readonly Law[]; readonly scoringLabel: string; readonly onClose: () => void }) {
   // Fix 3 (board persona review, 2026-09-04): the retired "Strongest law" column's own sentence
   // opens the drawer instead, built from the SAME grouped-outlook machinery the Outlook already
   // renders (`groupReasons`/`lawGroupLabel`) — one voice product-wide, never a second phrasing.
@@ -185,6 +216,7 @@ function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDraw
           </div>
         </div>
         {strongest === null ? null : <p className="text-base font-medium text-text-primary">{strongest}</p>}
+        <RangeSentence row={state.row} scoringLabel={scoringLabel} />
         {isMarketOrder ? (
           <MarketOrderBody row={state.row} />
         ) : state.row.reasons.length === 0 ? (
@@ -203,49 +235,81 @@ function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDraw
   );
 }
 
-/** The dash a cell with nothing measured behind it prints, plus the reason, for a screen reader. */
-function NoLastSeason({ what }: { readonly what: string }) {
-  return (
-    <>
-      <span aria-hidden="true" className="font-normal text-text-faint">
-        {NOT_STARTED_DASH}
-      </span>
-      <span className="sr-only">{what}</span>
-    </>
-  );
+/**
+ * THE ONE NUMBER THIS ROW GETS IS THE QUANTITY THE BOARD IS ORDERED BY (P2, P11, and fix round 1's
+ * own H1). It used to be the projection while the list was ordered by points over replacement, so
+ * row six out-projected row five and a manager sweeping the only column large enough to read from
+ * arm's length would draft against the board's own ranking. A ranked list whose big number is not
+ * its ranking key is a list that argues with itself.
+ *
+ * THREE ORDERINGS, THREE FIGURES, each naming its own basis and never sharing a caption:
+ * - the **auction value** while the $ board is on, because that view re-sorts by dollars;
+ * - the **ADP** on the tabs the engine publishes no projection for (a kicker, a team defense —
+ *   `KDEF_DECISION`), because the drafting room's own order is the only order those rows have;
+ * - **points over replacement** everywhere else, named for the position it is over, because that
+ *   is what `boardRows` ranks by and what makes a receiver comparable to a back at all.
+ *
+ * The projection is not lost: it rides the facts line (`BoardMeta`) and the why drawer, where being
+ * out of order says nothing about the ranking. The CSV keeps both columns, unchanged.
+ *
+ * EVERY CAPTION IS ONE LINE AT THE ROW FIGURE'S OWN WIDTH, and that is a measured constraint, not a
+ * preference: `BigNumber size="sm"` caps its caption at 6.5rem, a second line costs 13px, and a
+ * 44px research row (`TOKENS.density.denseRowPx`) has none to give. So a caption names the RULES
+ * and the span rides the screen around it — the scoring selector is two inches above the list and
+ * the basis line beside it names the board's season.
+ *
+ * A `null` value prints a dash and the caption says why (never a zero, never a borrowed number).
+ */
+function figureFor(
+  row: BoardRow,
+  options: { readonly dollarView: boolean; readonly dollarValue: number | null; readonly showLastSeason: boolean; readonly scoringLabel: string },
+): { readonly value: string | null; readonly basis: string } {
+  if (options.dollarView) {
+    return options.dollarValue === null
+      ? { value: null, basis: "No rank to value" }
+      : { value: `$${options.dollarValue}`, basis: "Auction value" };
+  }
+  if (options.showLastSeason) {
+    return row.marketAdp === null
+      ? { value: null, basis: "No ADP for him" }
+      : { value: row.marketAdp.toFixed(1), basis: "ADP, this position's order" };
+  }
+  return row.valueOverReplacement === null
+    ? { value: null, basis: row.rosterStatus?.excluded === true ? "No value while he is off a roster" : "No value without a rank" }
+    : { value: row.valueOverReplacement.toFixed(1), basis: `Over a replacement ${row.position}, ${options.scoringLabel}` };
 }
 
 /**
- * "148.5 pts · 17 games" — a finished season's total with the games it was scored over, never one
- * without the other. A total on its own invites a reader to compare a seventeen-game season with a
- * nine-game one as though they were the same claim.
+ * THE FACTS AFTER HIS NAME (P10: four regions, and this is one of them). The club and the bye
+ * always; his rate last season on the tabs where last season IS the number; then his ADP and what
+ * the drafting room is doing with it relative to our own rank, which is the one comparison on the
+ * row and therefore the only thing on it with colour (P11).
  *
- * The accessible name states the BASIS in words, because "148.5" beside a market ordering is
- * exactly the number a manager would otherwise read as a projection.
+ * The reach case is NEVER red. Red implies a bad player and this number never meant that — see
+ * `vsMarketLabel`'s own docblock, whose ruling this renders.
  */
-function LastSeasonTotalCell({ row }: { readonly row: BoardRow }) {
+function BoardMeta({ row, showLastSeason, scoringLabel }: { readonly row: BoardRow; readonly showLastSeason: boolean; readonly scoringLabel: string }) {
+  const edge = row.marketAdp === null || row.overallRank === null ? null : row.marketAdp - row.overallRank;
+  const vsMarket = vsMarketLabel(edge);
   const last = row.lastSeason;
-  if (last === null) return <NoLastSeason what={`No ${BOARD_LAST_SEASON} season on record for him`} />;
   return (
-    <span aria-label={`${last.points.toFixed(1)} points over ${last.games} games in ${last.season}, last season, under this league's scoring.`}>
-      <span aria-hidden="true">{last.points.toFixed(1)} pts</span>
-      <span aria-hidden="true" className="block text-xs font-normal text-text-faint">
-        {last.games} games
-      </span>
-    </span>
-  );
-}
-
-/** His rate over the games he actually played, on the same basis and named the same way. */
-function LastSeasonRateCell({ row }: { readonly row: BoardRow }) {
-  const last = row.lastSeason;
-  if (last === null) return <NoLastSeason what={`No rate to state without a ${BOARD_LAST_SEASON} season`} />;
-  return (
-    <span aria-label={`${last.pointsPerGame.toFixed(1)} points a game in ${last.season}, last season, under this league's scoring.`}>
-      <span aria-hidden="true" className="text-text-primary">
-        {last.pointsPerGame.toFixed(1)}
-      </span>
-    </span>
+    <>
+      {row.team}
+      {row.byeWeek === null ? "" : ` · bye ${row.byeWeek}`}
+      {/* THE PROJECTION LIVES HERE NOW (fix round 1, H1). It is a real fact about the player and it
+          is not the board's ranking key, so it sits at body size on the facts line where being out
+          of order down the list says nothing about the order. */}
+      {showLastSeason || row.projectedPoints === null ? "" : ` · ${row.projectedPoints.toFixed(1)} projected`}
+      {showLastSeason && last !== null ? ` · ${last.points.toFixed(1)} last season over ${last.games} games, ${last.pointsPerGame.toFixed(1)} a game` : ""}
+      {showLastSeason || row.marketAdp === null ? "" : ` · ADP ${row.marketAdp.toFixed(1)}`}
+      {vsMarket === null ? null : (
+        <>
+          {" · "}
+          <span className={vsMarket.tone === "positive" ? "font-semibold text-positive" : undefined}>{vsMarket.text}</span>
+        </>
+      )}
+      <span className="sr-only">{`, ${row.projectedPoints === null ? "no projection" : `projected ${row.projectedPoints.toFixed(1)} points`} under ${scoringLabel}.`}</span>
+    </>
   );
 }
 
@@ -259,6 +323,13 @@ export interface BoardViewProps {
   /** "PPR", "Half PPR" or "Standard": the scoring every projected number on these rows is under,
    *  named in the export's own column (the scoring-formats round). */
   readonly scoringLabel: string;
+  /**
+   * A NAME TO OPEN ON (`?q=`, fix round 1's own M2). The player page's pre-draft verb links here
+   * with the player he was about, and a link that lands a manager at the top of three hundred rows
+   * has not taken him to that player. It seeds the search field's INITIAL value and nothing more:
+   * the field is his from the first keystroke, and no later render pushes this back into it.
+   */
+  readonly openOn?: string;
 }
 
 /**
@@ -268,9 +339,9 @@ export interface BoardViewProps {
  * `?league=`, since that is what changes the recomputed value/tier numbers). CSV export reads the
  * exact rows on screen.
  */
-export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLabel }: BoardViewProps) {
+export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLabel, openOn = "" }: BoardViewProps) {
   const [position, setPosition] = useState("ALL");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(openOn);
   const [rookiesOnly, setRookiesOnly] = useState(false);
   const [dollarView, setDollarView] = useState(false);
   const [drawer, setDrawer] = useState<EvidenceDrawerState | null>(null);
@@ -323,17 +394,25 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <SegmentGroup label="Position" options={POSITION_TABS} value={position} onChange={setPosition} labelled={false} />
-        <label className="flex items-center gap-1.5 text-sm text-text-muted">
+      {/* THE FILTER BAR, ONE LINE THAT SCROLLS (Sideline research round, from a measured phone
+          walk). These five controls used to wrap to three rows at 360px and push every player row
+          off the screen, on the one surface whose job (P10) is fitting at least eight objects on a
+          phone. The bar keeps its row and scrolls sideways instead; the search field shrinks with
+          it, because a name is the thing a reader types when he already knows who he is looking
+          for and the position tabs are what he sweeps. */}
+      <div className="flex items-end gap-3 overflow-x-auto pb-1">
+        <div className="shrink-0">
+          <SegmentGroup label="Position" options={POSITION_TABS} value={position} onChange={setPosition} labelled={false} />
+        </div>
+        <label className="flex h-10 shrink-0 items-center gap-1.5 text-sm whitespace-nowrap text-text-muted">
           <input type="checkbox" checked={rookiesOnly} onChange={(event) => setRookiesOnly(event.target.checked)} className="size-4 accent-accent" />
           Rookies only
         </label>
-        <label className="flex items-center gap-1.5 text-sm text-text-muted">
+        <label className="flex h-10 shrink-0 items-center gap-1.5 text-sm whitespace-nowrap text-text-muted">
           <input type="checkbox" checked={dollarView} onChange={(event) => setDollarView(event.target.checked)} className="size-4 accent-accent" />
           $ board
         </label>
-        <div className="w-48">
+        <div className="w-44 shrink-0">
           <Input label="Search" placeholder="Search a name" value={search} onChange={(event) => setSearch(event.target.value)} />
         </div>
         <button
@@ -342,7 +421,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
           // (re-review finding: a CSV column silently blanking on an unrelated view toggle is a
           // silent data drop). Computed at click time, so the render path still skips the pass.
           onClick={() => downloadCsv(exportFilename, boardCsvLines(ordered, auctionShape, scoringLabel))}
-          className="ml-auto rounded-md bg-surface-elevated px-3 py-2 text-sm font-medium text-text-muted hover:text-text-primary"
+          className="h-10 shrink-0 rounded-md bg-surface-elevated px-3 text-sm font-medium whitespace-nowrap text-text-muted hover:text-text-primary sm:ml-auto"
         >
           Export CSV
         </button>
@@ -358,215 +437,78 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
         </p>
       )}
 
-      <div className="w-full overflow-x-auto">
-        <table className="w-full max-w-full border-collapse text-sm">
-          <caption className="sr-only">The evidence board</caption>
-          <thead>
-            <tr className={`border-b border-line text-left ${MICRO_LABEL} text-text-faint`}>
-              <th scope="col" className="px-2 py-2">
-                Rank
-              </th>
-              <th scope="col" className="px-2 py-2">
-                Player
-              </th>
-              {/* THE TWO COLUMNS THAT CHANGE MEANING PER TAB (the 2026-09-06 round). A position
-                  the engine projects gets the projection and its band. A position it does not gets
-                  the two things it CAN state honestly: what each player measurably scored last
-                  season under this league's rules, and his rate. Every other tab, and the mixed
-                  Overall list, is unchanged. */}
-              <th scope="col" className="px-2 py-2 text-right">
-                {showLastSeason ? "Last season" : "Projected"}
-              </th>
-              <th scope="col" className="px-2 py-2 text-right">
-                {showLastSeason ? "Per game" : "Most seasons"}
-              </th>
-              <th scope="col" className="px-2 py-2 text-right">
-                ADP
-              </th>
-              <th scope="col" className="px-2 py-2 text-right">
-                Vs ADP
-              </th>
-              <th scope="col" className="px-2 py-2" />
-              {dollarView ? (
-                <th scope="col" className="px-2 py-2 text-right">
-                  $
-                </th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {ordered.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-2 py-6 text-center text-sm text-text-muted">
-                  No players match this filter.
-                </td>
-              </tr>
-            ) : null}
-            {displayed.map((row) => {
-              // The band opens once, on its first row, in place of any tier divider: these rows
-              // carry no tier, and the heading says what they are instead.
-              const bandRow =
-                notOnRoster[0] === row ? (
-                  <tr key={`band-${row.playerId}`} data-testid="board-not-on-roster-band">
-                    <th scope="rowgroup" colSpan={8} className="pt-4 pb-1 text-left font-normal">
-                      <span className={`${MICRO_LABEL} block text-text-faint`}>{NOT_ON_ACTIVE_ROSTER_BAND}</span>
-                      <span className="block text-xs text-text-muted">{NOT_ON_ACTIVE_ROSTER_NOTE}</span>
-                    </th>
-                  </tr>
-                ) : null;
-              const tierRow =
-                bandRow === null && showTiers && row.rosterStatus?.excluded !== true && row.tier !== lastTier ? (
-                  <tr key={`tier-${row.playerId}`}>
-                    <td colSpan={8} className="pt-3 pb-1">
-                      <TierDivider
-                        grade={row.tier === 0 ? "S" : row.tier === 1 ? "A" : row.tier === 2 ? "B" : "C"}
-                        letter={tierLetter(row.tier)}
-                        label={tierBandSentence(
-                          tierLetter(row.tier),
-                          position,
-                          row.playersLeftInTier ?? 0,
-                          row.dropToNextTier ?? 0,
-                        )}
-                      />
-                    </td>
-                  </tr>
-                ) : null;
-              if (showTiers) lastTier = row.tier;
-              // A MARKET-ORDER ROW IS ORDERED BY THE MARKET, so an edge against the market would be
-              // the ordering compared with itself. `overallRank` is null on exactly those rows, so
-              // this reads null and the cell renders its own honest dash.
-              const edge = row.marketAdp === null || row.overallRank === null ? null : row.marketAdp - row.overallRank;
-              const vsMarket = vsMarketLabel(edge);
-              const dollarValue = dollarValues.get(row.playerId) ?? null;
-              // Fix 1 (board persona review): on a position tab, positional rank leads and the
-              // overall rank becomes the sub-fact — never a bare overall number on its own. On
-              // "Overall" there is no single position context to lead with, so the overall rank
-              // stays the lead, unchanged. A market-order row leads with its place in the MARKET's
-              // order, which is the only ordering it has.
-              const leadingRank =
-                row.marketOrderRank ?? (position === "ALL" ? row.overallRank : (row.positionRankInValue ?? row.overallRank));
-              return (
-                <Fragment key={row.playerId}>
-                  {bandRow}
-                  {tierRow}
-                  <tr className="border-b border-line/50">
-                    <td className="px-2 py-2 tabular-nums text-text-faint">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-text-primary">{leadingRank}</span>
-                        {position === "ALL" || row.overallRank === null ? null : (
-                          <span className="text-xs text-text-faint">{`#${row.overallRank} overall`}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="flex items-center gap-2">
-                        <PlayerFace player={toPlayer(row)} size="sm" />
-                        <div className="flex min-w-0 flex-col">
-                          <span className="truncate font-medium text-text-primary">{row.name}</span>
-                          <span className="text-xs text-text-faint">
-                            {row.team} · bye {row.byeWeek ?? "?"}
-                          </span>
-                        </div>
-                        <PositionBadge position={row.position} rank={row.positionRankInValue ?? undefined} size="sm" className="ml-1" />
-                        {row.rosterStatus === null ? null : <RosterStatusPill note={row.rosterStatus} className="ml-1" />}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 text-right tabular-nums font-medium text-text-primary">
-                      {showLastSeason ? (
-                        <LastSeasonTotalCell row={row} />
-                      ) : row.projectedPoints === null ? (
-                        <>
-                          <span aria-hidden="true" className="font-normal text-text-faint">
-                            {NOT_STARTED_DASH}
-                          </span>
-                          <span className="sr-only">No projection for this position</span>
-                        </>
-                      ) : (
-                        row.projectedPoints.toFixed(1)
-                      )}
-                    </td>
-                    <td className="px-2 py-2 text-right tabular-nums text-text-muted">
-                      {/* The everyday band leads (p25-p75, "most seasons"), the tail band rides
-                          behind it in the accessible name and the faint sub-line — founder,
-                          2026-09-04: the honest p10-p90 stays measured, the TELLING gets kinder.
-                          A row with no projection has no band either, and says so. */}
-                      {(() => {
-                        if (showLastSeason) return <LastSeasonRateCell row={row} />;
-                        if (row.medianPoints === null || row.floorPoints === null || row.ceilingPoints === null) {
-                          return (
-                            <>
-                              <span aria-hidden="true" className="text-text-faint">
-                                {NOT_STARTED_DASH}
-                              </span>
-                              <span className="sr-only">No range for this position</span>
-                            </>
-                          );
-                        }
-                        const { p25, p75 } = quartilesFromSeasonBand(row.medianPoints, row.floorPoints, row.ceilingPoints);
-                        const floor = row.floorPoints;
-                        const ceiling = row.ceilingPoints;
-                        return (
-                          <span aria-label={`Most seasons ${p25.toFixed(0)} to ${p75.toFixed(0)} points; the full range with injury tails runs ${floor.toFixed(0)} to ${ceiling.toFixed(0)}.`}>
-                            <span className="text-text-primary">{p25.toFixed(0)}–{p75.toFixed(0)}</span>
-                            <span aria-hidden="true" className="block text-xs text-text-faint">
-                              tails {floor.toFixed(0)}–{ceiling.toFixed(0)}
-                            </span>
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-2 py-2 text-right tabular-nums text-text-muted">
-                      {row.marketAdp === null ? (
-                        <>
-                          <span aria-hidden="true">{NOT_STARTED_DASH}</span>
-                          <span className="sr-only">No ADP</span>
-                        </>
-                      ) : (
-                        row.marketAdp.toFixed(1)
-                      )}
-                    </td>
-                    <td className="px-2 py-2 text-right text-sm">
-                      {vsMarket === null ? (
-                        <>
-                          <span aria-hidden="true">{NOT_STARTED_DASH}</span>
-                          <span className="sr-only">No comparison against ADP yet</span>
-                        </>
-                      ) : (
-                        <span className={vsMarket.tone === "positive" ? "font-medium text-positive" : "text-text-muted"}>{vsMarket.text}</span>
-                      )}
-                    </td>
-                    <td className="px-2 py-2">
-                      <button type="button" onClick={() => setDrawer({ row })} className="text-sm font-medium text-accent hover:underline">
-                        why
-                      </button>
-                    </td>
-                    {dollarView ? <td className="px-2 py-2 text-right tabular-nums font-medium text-text-primary">${dollarValue}</td> : null}
-                  </tr>
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <Card as="section" aria-label="The evidence board" className="flex flex-col gap-0.5">
+        {ordered.length === 0 ? <p className="px-2 py-6 text-center text-sm text-text-muted">No players match this filter.</p> : null}
+        {displayed.map((row) => {
+          // The band opens once, on its first row, in place of any tier divider: these rows carry
+          // no tier, and the heading says what they are instead. Its own inset ground keeps it
+          // visibly a different KIND of thing from a tier band (2026-09-08's own ruling, now with
+          // a ground that makes it as obvious to the eye as it already was to the copy).
+          const bandRow =
+            notOnRoster[0] === row ? (
+              <div key={`band-${row.playerId}`} data-testid="board-not-on-roster-band" className="mt-5 mb-1 rounded-lg bg-surface-inset px-4 py-3">
+                <span className={`${MICRO_LABEL} block text-text-faint`}>{NOT_ON_ACTIVE_ROSTER_BAND}</span>
+                <span className="block text-sm text-text-muted">{NOT_ON_ACTIVE_ROSTER_NOTE}</span>
+              </div>
+            ) : null;
+          // TIERS ARE ONE-BASED (`tierNumber`): the plate carries the number, the label carries the
+          // count and the drop, and neither says the other's half twice.
+          const tierRow =
+            bandRow === null && showTiers && row.rosterStatus?.excluded !== true && row.tier !== lastTier ? (
+              <div key={`tier-${row.playerId}`} className="px-1 pt-3 pb-1">
+                <TierDivider
+                  grade={row.tier === 0 ? "S" : row.tier === 1 ? "A" : row.tier === 2 ? "B" : "C"}
+                  letter={tierNumber(row.tier)}
+                  label={tierBandLabel(position, row.playersLeftInTier ?? 0, row.dropToNextTier ?? 0)}
+                />
+              </div>
+            ) : null;
+          if (showTiers) lastTier = row.tier;
+          const dollarValue = dollarValues.get(row.playerId) ?? null;
+          const figure = figureFor(row, { dollarView, dollarValue, showLastSeason, scoringLabel });
+          // Fix 1 (board persona review): on a position tab, positional rank leads and the overall
+          // rank becomes the sub-fact. On "Overall" there is no single position context to lead
+          // with, so the overall rank stays the lead. A market-order row leads with its place in
+          // the drafting room's own order, which is the only ordering it has. A row off an active
+          // roster holds no ordering at all and prints the dash it earns.
+          const leadingRank =
+            row.marketOrderRank ?? (position === "ALL" ? row.overallRank : (row.positionRankInValue ?? row.overallRank));
+          return (
+            <Fragment key={row.playerId}>
+              {bandRow}
+              {tierRow}
+              {/* `board-row` is the TEST CONTRACT the table's `<tr>` used to be: a row is a `div`
+                  now, so `closest("tr")` has nothing to find, and a test that walked DOM adjacency
+                  instead would break on the next layout change rather than on a real one. */}
+              <div data-testid="board-row" data-player={row.playerId}>
+              <PlayerRow
+                dense
+                player={toPlayer(row)}
+                lead={leadingRank ?? NOT_STARTED_DASH}
+                positionRank={row.positionRankInValue ?? undefined}
+                meta={<BoardMeta row={row} showLastSeason={showLastSeason} scoringLabel={scoringLabel} />}
+                chips={row.rosterStatus === null ? null : <RosterStatusPill note={row.rosterStatus} />}
+                figure={<BigNumber value={figure.value} basis={figure.basis} size="sm" />}
+                action={
+                  <button type="button" onClick={() => setDrawer({ row })} className="text-sm font-semibold text-accent hover:underline">
+                    why
+                  </button>
+                }
+              />
+              </div>
+            </Fragment>
+          );
+        })}
+      </Card>
 
-      {/* The legend explains the columns actually on screen. On a market-order tab those two
-          columns are a measurement of a season that already happened, which is a different claim
-          from every sentence below it, so it gets its own. */}
-      {showLastSeason ? (
-        <p className="text-xs text-text-faint">
-          Last season is what he scored across the {BOARD_LAST_SEASON} regular season under the scoring selected above, with the games it was scored over
-          beside it, and per game is his rate across those same games. Both are records of games that were played, not forecasts of the season ahead. Why
-          opens the ordering these rows carry and the reason there is no projection beside them.
-        </p>
-      ) : (
-      <p className="text-xs text-text-faint">
-        Projected is his season point total under the scoring selected above, built from the evidence. Most seasons is where the middle half of his
-        measured outcomes land; the faint tails line is the full range, injury seasons and smash seasons included. Both come from the same measured spread of games played and per-game scoring. Why opens the full evidence chain: every
-        law that fired, its measured effect, and the seasons it was tested against. Nothing on this board is an opinion.
-      </p>
-      )}
-
-      {drawer === null ? null : <EvidenceDrawer state={drawer} laws={laws} onClose={() => setDrawer(null)} />}
+      {/* THE LEGEND IS GONE (P7: no explainer text — if a word needs explaining, change the word).
+          It used to spend a paragraph naming what "Projected", "Most seasons" and "Why" meant,
+          under a table whose headers said none of it. Every figure now carries its own basis in the
+          caption under it ("Projected for the season, PPR"), the range moved into the drawer as a
+          sentence, and a legend for columns that no longer exist would be explaining the furniture.
+          The market-order note above survives because it is a MEASUREMENT that came back empty, not
+          a description of the screen. */}
+      {drawer === null ? null : <EvidenceDrawer state={drawer} laws={laws} scoringLabel={scoringLabel} onClose={() => setDrawer(null)} />}
     </div>
   );
 }

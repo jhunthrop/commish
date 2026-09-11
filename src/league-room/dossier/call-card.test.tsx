@@ -25,17 +25,31 @@ describe("CallCard", () => {
     expect(container.textContent).toContain("-20 points vs his ADP");
   });
 
-  it("colors the verdict and the gap column negative when the gap is negative", () => {
-    const { container } = render(<CallCard verdict="Let him go." market={MARKET} ourBoard={OUR_BOARD} gap={-20} />);
-    expect(verdictEl(container)).toHaveClass("text-negative");
-    expect(gapEl(container)).toHaveClass("text-negative");
+  /**
+   * ROSE IS THE RIVAL'S CHANNEL (Sideline, fix round 1 H2). `negative` in this palette is Rival
+   * rose: your opponent, the swing against you. A player our board merely rates lower than the
+   * drafting room does is not that, and painting him in it made a reader read "bad player" — the
+   * same finding `vsMarketLabel` already rules neutral on the board ("drafters reach N picks
+   * early", never red). The negative branch is ordinary ink; the sentence prints its own sign, so
+   * nothing is lost. Asserted in BOTH themes, because ink and rose are different roles in each.
+   */
+  it("leaves a negative gap in ordinary ink, never the rival's rose, in both themes", async () => {
+    await renderSurface(<CallCard verdict="Let him go." market={MARKET} ourBoard={OUR_BOARD} gap={-20} />, async ({ container }) => {
+      expect(verdictEl(container)).toHaveClass("text-text-muted");
+      expect(gapEl(container)).toHaveClass("text-text-muted");
+      expect(verdictEl(container)).not.toHaveClass("text-negative");
+      expect(gapEl(container)).not.toHaveClass("text-negative");
+      // The sign survives without the colour, which is why the colour could go.
+      expect(container.textContent).toContain("-20 points vs his ADP");
+    });
   });
 
-  it("colors the verdict and the gap column positive when the gap is positive", () => {
-    const { container } = render(<CallCard verdict="Draft him." market={MARKET} ourBoard={OUR_BOARD} gap={20} />);
-    expect(verdictEl(container)).toHaveClass("text-positive");
-    expect(gapEl(container)).toHaveClass("text-positive");
-    expect(container.textContent).toContain("+20 points vs his ADP");
+  it("keeps the positive gap in the good-outcome green, in both themes", async () => {
+    await renderSurface(<CallCard verdict="Draft him." market={MARKET} ourBoard={OUR_BOARD} gap={20} />, async ({ container }) => {
+      expect(verdictEl(container)).toHaveClass("text-positive");
+      expect(gapEl(container)).toHaveClass("text-positive");
+      expect(container.textContent).toContain("+20 points vs his ADP");
+    });
   });
 
   it("takes no verdict tint for a genuine zero gap or an absent one", () => {

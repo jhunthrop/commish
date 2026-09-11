@@ -13,7 +13,11 @@ import { boardRows, type BoardRow } from "@/draft-hq/board/service";
 import { BOARD_FORMAT_SPECS, BOARD_FORMATS, DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
 
 const EXPORT_SHAPE = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } as const;
-export const EXPORT_HEADER = ["Rank", "Player", "Team", "Pos", "Bye", "Tier", "Scoring", "Proj Pts", "ADP"] as const;
+/** "Over repl" is the board's own ranking key and the number its rows print on screen (fix round 2):
+ *  a file read away from the board needs it, or a reader cannot reproduce the order the rows are in.
+ *  Beside "Proj Pts" and never instead of it — a value over a replacement player and a season point
+ *  total are different claims, and this file states both. */
+export const EXPORT_HEADER = ["Rank", "Player", "Team", "Pos", "Bye", "Tier", "Scoring", "Proj Pts", "Over repl", "ADP"] as const;
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -65,6 +69,7 @@ function rowToCsv(row: BoardRow, rank: number, scoringLabel: string): string {
     row.tier === null ? null : row.tier + 1,
     scoringLabel,
     row.projectedPoints === null ? null : row.projectedPoints.toFixed(1),
+    row.valueOverReplacement === null ? null : row.valueOverReplacement.toFixed(1),
     row.marketAdp === null ? null : row.marketAdp.toFixed(1),
   ];
   return fields.map(csvField).join(",");

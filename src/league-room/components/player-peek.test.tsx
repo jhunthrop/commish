@@ -449,7 +449,10 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     expect(screen.getByText("The full case (6)")).toBeInTheDocument();
   });
 
-  it("moves the bye week up beside the roster fact in the header", async () => {
+  /** THE BYE IS A CHIP BESIDE THE POSITION NOW (Sideline research round), and who has him is his
+   *  own line with a face on it, so the two facts are no longer joined into one sentence. Both are
+   *  still in the header, which is what this test has always been about. */
+  it("carries the bye week and the roster fact in the header", async () => {
     const bodies = new Map([[2026, dossierBody()]]);
     render(
       <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
@@ -457,8 +460,8 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
       </LeagueRoomDepsProvider>,
     );
     openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
-    await waitFor(() => expect(screen.getByText(/Bye week 8/)).toBeInTheDocument());
-    expect(screen.getByText("Bye week 8 · Free agent in this league")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Bye 8")).toBeInTheDocument());
+    expect(screen.getByText("Free agent in this league")).toBeInTheDocument();
   });
 
   it("wears the designation once, in the header, and draws no story card just to repeat it", async () => {
@@ -661,8 +664,11 @@ describe("PlayerPeekHost — while the wire is still out", () => {
     await waitFor(() => expect(screen.getByText("Pulling his numbers.")).toBeInTheDocument());
     expect(container.querySelector('[data-peek="pending"]')).not.toBeNull();
     expect(container.querySelectorAll('[aria-busy="true"]').length).toBeGreaterThan(0);
-    // The name the manager pressed is already on screen; nothing else claims to be.
-    expect(screen.getByText("Rashad Long")).toBeInTheDocument();
+    // The name the manager pressed is already on screen; nothing else claims to be. It appears
+    // twice on purpose now that the peek rides `Modal`: once as the dialog's own accessible name
+    // (`sr-only`) and once as the visible line, which is what the reader sees while the wire is out.
+    expect(screen.getByRole("dialog", { name: "Rashad Long" })).toBeInTheDocument();
+    expect(screen.getAllByText("Rashad Long").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("The call")).not.toBeInTheDocument();
     // The old bare "Loading…" line is gone from the copy. The `Skeleton` primitive keeps its own
     // screen-reader-only "Loading…", which is its accessible label rather than visible chatter.

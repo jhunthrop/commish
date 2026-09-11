@@ -4,11 +4,12 @@ import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { resolveLeagueMembership } from "@/lib/leagues/membership";
 import Link from "next/link";
-import { Card, PlayerObject } from "@/components/ui";
+import { Card } from "@/components/ui";
 import { parseSeasonParam, playerSeason } from "@/league-service/player";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PlayerPageSeasonSwitcher } from "@/league-room/components/season-switcher";
 import { DossierComposition } from "@/league-room/dossier/dossier-composition";
+import { PlayerHeader } from "@/league-room/dossier/player-header";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,7 @@ export default async function PlayerPage({ params, searchParams }: PageProps) {
   const membership = await resolveLeagueMembership(getDb(), leagueId, user.id);
   if (!membership.ok) notFound();
 
-  const body = await playerSeason(getDb(), leagueId, playerId, undefined, season);
+  const body = await playerSeason(getDb(), leagueId, playerId, undefined, season, user.id);
   if (body === null) notFound();
 
   const played = body.weeks.some((week) => week.points !== null);
@@ -74,14 +75,17 @@ export default async function PlayerPage({ params, searchParams }: PageProps) {
     <div className="flex flex-col gap-4">
       {/* The way back. A player screen is reached from a lineup, a roster or a trade, and until
           now the only route off it was the rail. Quiet, because a way out is never the loud
-          action however loud the verb beside it (law 5's surviving discipline). */}
+          action however loud the verb beside it (P3). */}
       <Link href={`/app/leagues/${leagueId}`} className="text-sm text-accent underline">
         Back to the league
       </Link>
 
-      <Card as="section" className="flex flex-col gap-6">
-        <PlayerObject player={body.player} />
+      {/* THE HERO, SHARED WITH THE PEEK (`PlayerHeader`): the face at 132, his name largest, who
+          has him as a person with the ring that says what that person is to you, one big number
+          with its basis, one verb. */}
+      <PlayerHeader body={body} leagueId={leagueId} depth="full" />
 
+      <Card as="section" className="flex flex-col gap-6">
         <DossierComposition body={body} dossier={dossier} depth="full" switcher={switcher} played={played} readVariant="full" />
       </Card>
     </div>
