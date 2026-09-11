@@ -65,13 +65,20 @@ describe("ReviewFeed", () => {
     expect(screen.queryByText("Verified")).not.toBeInTheDocument();
   });
 
-  it("states the claim behind the verified badge, one click away, through InfoTip — never a title attribute", () => {
+  // P7, AND THE FOUNDER'S NO-TIPS RULING: the badge used to carry an `InfoTip` trigger that
+  // opened "This reviewer finished at least one full season on Commish." There is no tip to open
+  // any more, and none of its scaffolding either: the word on the badge is the whole claim, and
+  // `/league-rules` is where the long version lives for anyone who wants it.
+  it("offers no tip beside the verified badge, and never a title attribute standing in for one", () => {
     const verifiedOnly: ReviewsPage = { reviews: [REVIEW_B], hasMore: false, nextBefore: null };
-    renderInAccount(<ReviewFeed initialPage={verifiedOnly} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
-    const trigger = screen.getByRole("button", { name: "What is a verified reviewer?" });
-    expect(trigger).not.toHaveAttribute("title");
-    fireEvent.click(trigger);
-    expect(screen.getByRole("note")).toHaveTextContent("This reviewer finished at least one full season on Commish.");
+    const { container } = renderInAccount(
+      <ReviewFeed initialPage={verifiedOnly} emptyAction={<span>Write the first review</span>} />,
+      fixtureAccountDeps().deps,
+    );
+    expect(screen.getByText("Verified")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^What is/ })).toBeNull();
+    expect(screen.queryByRole("note")).toBeNull();
+    expect(container.querySelector("[title]")).toBeNull();
   });
 
   it("shows a one-star review in the same list as a five-star one — nothing is hidden by rating", () => {

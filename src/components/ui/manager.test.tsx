@@ -39,4 +39,29 @@ describe("Manager", () => {
     expect(screen.getByTestId("manager").children).toHaveLength(2);
     expect(screen.getByTestId("manager").children[1]!.children).toHaveLength(1);
   });
+
+  // THE ONE SURFACE WHERE A MANAGER IS THE PAGE (the account room). A manager in a list is a
+  // span; a manager who IS the screen is that document's own heading, and the name scales with
+  // the face rather than the call site picking a type size.
+  it("renders the name as a span by default and as the page heading when it is the page", () => {
+    const listed = render(<Manager name="Dana Whitfield" />);
+    expect(listed.queryByRole("heading")).toBeNull();
+    expect(screen.getByText("Dana Whitfield").className).toContain("text-md");
+    listed.unmount();
+
+    render(<Manager name="Dana Whitfield" size="2xl" titleAs="h1" />);
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveTextContent("Dana Whitfield");
+    // P1: at the account room's 96px face the name is the largest thing on the screen.
+    expect(heading.className).toContain("text-display-md");
+  });
+
+  it("lets a hero's meta stack wrap instead of clipping it to one truncated line", () => {
+    const row = render(<Manager name="Dana Whitfield" meta="Bay Bandits" />);
+    expect(screen.getByText("Bay Bandits").className).toContain("truncate");
+    row.unmount();
+
+    render(<Manager size="2xl" name="Dana Whitfield" meta={<span>dana@example.com</span>} />);
+    expect(screen.getByText("dana@example.com").parentElement!.className).not.toContain("truncate");
+  });
 });

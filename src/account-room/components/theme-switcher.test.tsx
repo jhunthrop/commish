@@ -41,13 +41,13 @@ describe("ThemeSwitcher", () => {
     stubMatchMedia(true);
     renderSwitcher();
     expect(screen.getByRole("radio", { name: "System" })).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByText("Matching your device, which is dark right now.")).toBeInTheDocument();
+    expect(screen.getByText("System · dark right now")).toBeInTheDocument();
   });
 
   it("states the device's own resolution in words, light", () => {
     stubMatchMedia(false);
     renderSwitcher();
-    expect(screen.getByText("Matching your device, which is light right now.")).toBeInTheDocument();
+    expect(screen.getByText("System · light right now")).toBeInTheDocument();
   });
 
   it("switches to an explicit choice, persists it, and states it as unconditional", () => {
@@ -57,14 +57,14 @@ describe("ThemeSwitcher", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Light" }));
     expect(screen.getByRole("radio", { name: "Light" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("radio", { name: "System" })).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByText("Always light, regardless of your device.")).toBeInTheDocument();
+    expect(screen.getByText("Always light")).toBeInTheDocument();
     // The same seam `ThemeProvider`'s own test drives directly through `useTheme` — this control
     // adds no persistence of its own.
     expect(window.localStorage.getItem("commish.theme")).toBe("light");
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
 
     fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
-    expect(screen.getByText("Always dark, regardless of your device.")).toBeInTheDocument();
+    expect(screen.getByText("Always dark")).toBeInTheDocument();
     expect(window.localStorage.getItem("commish.theme")).toBe("dark");
   });
 

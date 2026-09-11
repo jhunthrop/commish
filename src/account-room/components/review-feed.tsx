@@ -84,7 +84,10 @@ function ReportControl({ reviewId }: { readonly reviewId: string }) {
           <select
             value={reason}
             onChange={(event) => setReason(event.target.value as ReportReasonValue)}
-            className="h-8 rounded-md border border-line bg-surface-elevated px-2 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            // The mock's pill field, at the height of the `size="sm"` button beside it:
+            // `border-edge`, never `border-line` — a control a user must find is bounded, a
+            // surface is not (WCAG 1.4.11's own distinction, and this system's).
+            className="h-8 rounded-pill border border-edge bg-surface-elevated px-3 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             {REVIEW_CONFIG.reportReasons.map((entry) => (
               <option key={entry.value} value={entry.value}>

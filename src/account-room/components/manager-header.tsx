@@ -1,5 +1,4 @@
-import { Avatar, Badge, Card, PageTitle } from "@/components/ui";
-import { TowerFigure } from "@/components/ui/tower-figure";
+import { Badge, BigNumber, Card, Manager } from "@/components/ui";
 import type { ParticipationTier } from "@/participation/tier";
 import { VERIFIED_BADGE_LABEL } from "@/participation/verified";
 
@@ -72,43 +71,48 @@ function standingSentence(tier: ParticipationTier): string {
  */
 export function ManagerHeader({ displayName, avatar, email, seasons, tier, verified }: ManagerHeaderProps) {
   return (
-    <Card as="header" className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
-      <div className="flex min-w-0 items-center gap-3">
-        <Avatar name={displayName} avatar={avatar} size="lg" />
-        <div className="flex min-w-0 flex-col">
-          <PageTitle>{displayName}</PageTitle>
-          {/* The email is an identifier, not prose: mono, faint, and never a field. It stays OUT
-              of the micro-label register on purpose — an address is data whose own case is part
-              of what it says, and the one shouted register in this product is for keys, never for
-              values. This product cannot change it here (WorkOS owns sign-in), and a disabled
-              input is a control that lies about being one. */}
-          <p className="truncate font-mono text-xs text-text-faint">{email}</p>
-        </div>
-      </div>
+    <Card as="header" className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
+      {/* THE MANAGER AT 96 (P1). One object: the face, the name at the header's largest size, and
+          the two facts that belong to the person rather than to the count beside them.
+          The email is an identifier, not prose: faint, never a field. It stays OUT of the
+          micro-label register on purpose — an address is data whose own case is part of what it
+          says, and the one shouted register in this product is for keys, never for values. This
+          product cannot change it here (WorkOS owns sign-in), and a disabled input is a control
+          that lies about being one. */}
+      <Manager
+        size="2xl"
+        ring="self"
+        titleAs="h1"
+        name={displayName}
+        avatar={avatar}
+        className="min-w-0 gap-4"
+        meta={
+          <span className="flex flex-col gap-1.5">
+            <span className="truncate">{email}</span>
+            <span className="flex flex-wrap items-center gap-1.5">
+              {/* NEUTRAL, not `positive`. Live green is the verdict-and-outcome channel, and a
+                  participation tier is a category rather than a judgement: it names which doors
+                  are open, which the sentence below says in words. */}
+              <Badge>{tier === "veteran" ? "Veteran" : "Newcomer"}</Badge>
+              {/* The reader's own badge (`ReviewFeed` renders the same pair about other people) —
+                  the unverified case renders nothing, matching that precedent exactly. */}
+              {verified ? <Badge tone="self">{VERIFIED_BADGE_LABEL}</Badge> : null}
+            </span>
+          </span>
+        }
+      />
 
-      <div className="flex shrink-0 flex-wrap items-center gap-4 lg:gap-6">
-        <TowerFigure label="Seasons finished" value={String(seasons)} size="xl" />
-        <div className="flex flex-col gap-1 border-l border-line pl-4 lg:pl-6">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {/* NEUTRAL, not `positive` (v5, law 4). Cyan is the VERDICT channel — "we rate him
-                higher than the room does" — and a participation tier is a category, not a
-                judgement: it names which doors are open, which the sentence below says in words.
-                A fact with no comparison set behind it is grey. */}
-            <Badge>{tier === "veteran" ? "Veteran" : "Newcomer"}</Badge>
-            {/* Founder decision #8's badge, about the reader this time rather than another
-                reviewer (`ReviewFeed`'s own use of the same pair) — the unverified case renders
-                nothing, matching that precedent exactly. Amber, because law 4 spends amber on
-                "the network's own furniture, and YOU": this is the one claim on this page that
-                the product makes about its reader in public. */}
-            {verified ? <Badge tone="accent">{VERIFIED_BADGE_LABEL}</Badge> : null}
-          </div>
-          <p className="text-sm text-text-muted">{standingSentence(tier)}</p>
-          {/* Fix round 1, F2 (the privacy skeptic's disclosure standard), kept verbatim from
-              `StandingPanel`: "Verified" is the one fact here that is not private, because it is
-              the exact claim `ReviewFeed` already renders publicly beside every review this
-              account posts. Say so, rather than leaving the reader to guess who else sees it. */}
-          {verified ? <p className="text-xs text-text-faint">Shown beside your reviews.</p> : null}
-        </div>
+      <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end">
+        {/* THE ONE BIG NUMBER AND ITS BASIS (P2, P11). NO COMPARISON, EVER (ruling 30): the
+            population "every manager on Commish" is one this page does not hold and would be
+            inventing, so the figure is a `BigNumber` and not a `Stat` — `BigNumber` has no
+            `comparison` seam to leave empty. The basis names what is being counted and where. */}
+        <BigNumber size="lg" value={String(seasons)} basis="seasons you finished on Commish" />
+        <p className="text-sm text-text-muted lg:text-right">{standingSentence(tier)}</p>
+        {/* The privacy skeptic's disclosure standard: "Verified" is the one fact here that is not
+            private, because it is the exact claim `ReviewFeed` already renders publicly beside
+            every review this account posts. Say so, rather than leaving the reader to guess. */}
+        {verified ? <p className="text-xs text-text-faint lg:text-right">Shown beside your reviews.</p> : null}
       </div>
     </Card>
   );

@@ -27,7 +27,7 @@ const SIZE: Readonly<Record<PlayerFaceSize, { readonly ring: string; readonly av
   sm: { ring: "size-8", avatar: "sm" },
   md: { ring: "size-9", avatar: "md" },
   lg: { ring: "size-14", avatar: "xl" },
-  xl: { ring: "size-33", avatar: "2xl" },
+  xl: { ring: "size-33", avatar: "3xl" },
 };
 
 /**

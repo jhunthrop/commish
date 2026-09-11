@@ -136,17 +136,18 @@ describe("NoticeInbox", () => {
     expect(await screen.findByText(UNREAD.title)).toBeInTheDocument();
   });
 
-  // Fix round 1, FIX 4: the first-timer's question — does "drafted from their queue" explain
-  // autopick to someone who has never seen one? An `InfoTip` beside the notice body is the
-  // answer for the ONE notice type this applies to.
-  it("offers the queue glossary term beside an autopick notice, and not beside any other type", async () => {
+  // P7, AND THE FOUNDER'S NO-TIPS RULING (2026-08-28): an autopick notice used to carry a glossary
+  // tip beside its body ("What is your draft queue?"). The ruling is that if a word needs
+  // explaining the word changes, so the notice says what happened in its own sentence and no
+  // notice type carries a tip trigger any more.
+  it("explains an autopick notice in its own words and offers no tip beside any notice type", async () => {
     const removal: NoticeView = { ...UNREAD, id: "n5", noticeType: "review_removed", title: "We removed your review", quote: "off topic" };
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [UNREAD, removal], unreadCount: 0 } });
     renderInAccount(<NoticeInbox />, fixture.deps);
     fireEvent.click(await screen.findByRole("button", { name: "Notices" }));
 
-    expect(await screen.findByRole("button", { name: "What is your draft queue?" })).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "What is your draft queue?" })).toHaveLength(1);
+    expect(await screen.findByText(UNREAD.title)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^What is/ })).toBeNull();
   });
 
   // Fix round 1, FIX 7: an operator's own words render as a distinct blockquote, not folded

@@ -19,22 +19,22 @@ describe("ManagerHeader", () => {
     });
   });
 
-  it("states the seasons count as a labelled number rather than a caption", async () => {
-    await renderSurface(<ManagerHeader {...ANY_PROPS} />, ({ getByText }) => {
-      expect(getByText("2")).toBeInTheDocument();
-      expect(getByText("Seasons finished")).toBeInTheDocument();
+  it("states the seasons count as the page's one big number, naming what it counts", async () => {
+    await renderSurface(<ManagerHeader {...ANY_PROPS} />, ({ getByTestId, getByText }) => {
+      // P2: one figure larger than body text, and its basis in the same glance (P11) — WHAT is
+      // being counted and WHERE, not a bare label.
+      expect(getByTestId("big-number")).toHaveTextContent("2");
+      expect(getByText("seasons you finished on Commish")).toBeInTheDocument();
     });
   });
 
   it("never tints the seasons count, because it has no population to compare against", async () => {
-    // Ruling 30 and the magnitude amendment together: `Stat` stamps `data-magnitude` with the
-    // step it resolved, and a `Stat` given no `comparison` resolves `neutral` — which IS
-    // `textPrimary`. Asserting the stamp is what stops a future edit passing a percentile this
-    // page would have to invent ("top 12% of every manager on Commish" is arithmetic dressed as
-    // a fact).
+    // RULING 30, MADE STRUCTURAL. The figure is a `BigNumber`, which has no `comparison` seam at
+    // all — where a `Stat` merely resolved `neutral` when given none, this cannot be handed one.
+    // The population "every manager on Commish" is arithmetic this page would have to invent.
     await renderSurface(<ManagerHeader {...ANY_PROPS} />, ({ container }) => {
-      expect(container.querySelectorAll('[data-magnitude]')).toHaveLength(1);
-      expect(container.querySelector('[data-magnitude]')?.getAttribute("data-magnitude")).toBe("neutral");
+      expect(container.querySelectorAll("[data-magnitude]")).toHaveLength(0);
+      expect(container.querySelector('[data-testid="big-number"] span')?.className).toContain("text-text-primary");
     });
   });
 

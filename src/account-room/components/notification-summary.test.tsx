@@ -16,9 +16,14 @@ describe("NotificationSummary", () => {
     });
   });
 
-  it("says today's channel is in the app, once per topic", () => {
+  // A COLUMN WITH ZERO VARIANCE CARRIES NO INFORMATION. Every topic reaches everybody the same
+  // way, so the channel is stated ONCE in the panel's header rather than as an identical chip on
+  // all five rows. It earns its column back the day a topic can reach one member differently.
+  it("says today's channel once, in the panel's header, and never per topic", () => {
     render(<NotificationSummary />);
-    expect(screen.getAllByText("In the app")).toHaveLength(NOTIFICATION_CATALOG.length);
+    expect(screen.getAllByText("In the app")).toHaveLength(1);
+    // Every topic is still listed: what went is the repetition, not the rows.
+    for (const topic of NOTIFICATION_CATALOG) expect(screen.getByText(topic.title)).toBeInTheDocument();
   });
 
   it("states honestly that email isn't connected, with no toggle beside it", () => {
