@@ -65,7 +65,9 @@ export function FrontDoorHero({ live = moneyIsLive(), states = MONEY_STATES, ins
       </div>
       {/* P2: one number with its basis. The basis names the population it was summed over, so
           the figure is checkable against the board directly beneath it. */}
-      <Card className="flex w-full shrink-0 flex-col gap-3 lg:max-w-sm" aria-label="Who is already inside">
+      {/* `as="section"` (fix round 1, L4): the label only reaches the accessibility tree on an
+          element with a role that takes a name. On a bare `div` the `aria-label` was inert. */}
+      <Card as="section" className="flex w-full shrink-0 flex-col gap-3 lg:max-w-sm" aria-label="Who is already inside">
         {rooms === 0 ? null : (
           <BigNumber
             value={String(inside!.seatsTaken)}

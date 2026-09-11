@@ -19,6 +19,7 @@ import { describeStartTiming } from "@/matchmaking/roll";
 import type { CompositionCategory } from "@/participation/composition";
 import type { DraftScheduleBody, LeagueMemberCard } from "../contract";
 import { DraftSchedulePanel, draftTerminalStatePanel } from "./draft-schedule-panel";
+import { alreadyInPhrase } from "./open-league-shared";
 import { ReleaseSeatControl } from "./release-seat-control";
 import { RoomRoster } from "./room-roster";
 import { SlotPreferencePanel } from "./slot-preference-panel";
@@ -298,10 +299,12 @@ export function WaitingRoom({
       : [...teams]
           .sort((a, b) => Number(b.id === myTeamId) - Number(a.id === myTeamId))
           .map((team) => ({ name: team.ownerDisplayName, avatar: team.ownerAvatarUrl, isSelf: team.id === myTeamId }));
-  // "9 already in", never "9 of 12 seated": `SeatMeter` owns THE seat sentence for the product
-  // (F17) and says it on this same hero. The stack's caption is about the PEOPLE, in the same
-  // register the open-league row uses (`seatedLine`), so the two never say one fact twice.
-  const seatedCaption = `${league.filledTeams} already in`;
+  // "9 already in.", never "9 of 12 seated": `SeatMeter` owns THE seat sentence for the product
+  // (F17) and says it on this same hero. The stack's caption is about the PEOPLE, through the
+  // one phrase the open-league row also reads (`alreadyInPhrase`, fix round 1's L3 — this file
+  // used to build the same words without the period), so the two never drift or say one fact
+  // twice.
+  const seatedCaption = alreadyInPhrase(league.filledTeams);
   const items = checklistItems({
     leagueId: league.leagueId,
     myTeamName,
@@ -340,7 +343,10 @@ export function WaitingRoom({
       <div data-testid="waiting-room-hero" className="flex flex-col items-start gap-3 rounded-xl bg-surface-elevated p-6 shadow-card">
         {/* P1 then P2: the room's people, then its one number with its basis. */}
         {seated.length === 0 ? null : <ManagerStack people={seated} caption={seatedCaption} />}
-        <BigNumber value={String(league.teamCount)} basis={`of ${league.teamCount} seats taken`} size="lg" align="start" />
+        {/* `filledTeams`, not `teamCount` (fix round 1, L2): the fact is how many seats are
+            taken, and printing capacity was only ever right while "full" meant exactly filled.
+            The basis names the population, so the two numbers are read together. */}
+        <BigNumber value={String(league.filledTeams)} basis={`of ${league.teamCount} seats taken`} size="lg" align="start" />
         <SeatMeter filled={league.filledTeams} total={league.teamCount} srOnlySentence className="w-full" />
         {showCountdownHero ? (
           <div className="flex flex-col items-center gap-1">

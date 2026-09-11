@@ -152,6 +152,26 @@ export function rollNoticeSentence(kickoffRolls: number): string {
 }
 
 /**
+ * THE ROLL AS A BAND'S CONSEQUENCE, said once (the doors-and-rooms fix round, 2026-09-10, M3).
+ *
+ * `rollNoticeSentence` above is a RECONCILIATION: it exists so a returning visitor who wrote a
+ * date down learns that this particular draft's date moved. On the open board it was neither —
+ * it repeated on six of eight rows as a two-line paragraph, in the scheduler's voice, explaining
+ * the platform's own machinery to a stranger who had never been told a date in the first place.
+ * That is P7 failing twice over (system voice, and a repeated explainer), and it is the identical
+ * defect `describeStartTiming` was measured and fixed for on this same board.
+ *
+ * So the per-league sentence stays where a date is actually being reconciled — the join sheet's
+ * preview and the schedule panel — and the BOARD says the consequence once, in the league's own
+ * voice: what happens to a room, not what the scheduler did to a record. Returns `null` when no
+ * room in the band has rolled, so the band never carries a clause about something that did not
+ * happen.
+ */
+export function rollBandConsequence(kickoffRolls: readonly number[]): string | null {
+  return kickoffRolls.some((rolls) => rolls > 0) ? "a room that is not full on its day waits for the next one" : null;
+}
+
+/**
  * Fix round 1, M5 (controller ruling). The founder's "roll until full" ruling binds the platform
  * door absolutely; this is the SAME ruling restated for the one human door that could otherwise
  * undercut it — a PUBLIC MATCHMADE MEMBER league's commissioner pressing "start" by hand while a

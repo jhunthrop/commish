@@ -78,9 +78,12 @@ describe("featuredLeagueId (D2, repointed by storefront review R1)", () => {
     expect(featuredLeagueId([empty, filling])).toBe("filling");
   });
 
-  it("never lets an already-rolled scheduled league outrank a clean filling one, even if it is fuller (E4)", () => {
+  it("lets a rolled league win on fullness — a roll is a fact about the DATE, not a disqualification", () => {
+    // Reverses storefront review R1's E4 clause (the doors-and-rooms fix round, 2026-09-10).
+    // Rooms roll until they fill, so E4 disqualified every filling room on a real board and the
+    // feature quietly turned itself off. The row shows the date current either way.
     const rolledButFullest: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "rolled", filledTeams: 11, kickoffRolls: 2 };
-    expect(featuredLeagueId([rolledButFullest, filling])).toBe("filling");
+    expect(featuredLeagueId([rolledButFullest, filling])).toBe("rolled");
   });
 
   it("a when_full league's own fill counts exactly like a scheduled one's", () => {
@@ -130,9 +133,9 @@ describe("featuredFillingLeague (2026-08-25 hero finding; repointed by storefron
     expect(featuredFillingLeague([roomier, tighter])).toBeNull();
   });
 
-  it("never features an already-rolled scheduled league, even the fullest one (E4)", () => {
+  it("features an already-rolled scheduled league when it is the fullest one", () => {
     const rolled: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "rolled", filledTeams: 11, kickoffRolls: 1 };
-    expect(featuredFillingLeague([rolled, filling])).toBe(filling);
+    expect(featuredFillingLeague([rolled, filling])).toBe(rolled);
   });
 
   it("agrees with featuredLeagueId's id whenever something is genuinely filling", () => {
@@ -324,9 +327,9 @@ describe("OpenLeagueShelf", () => {
     }
   });
 
-  // Blueprint law 2 (2026-09-02): when nothing GENUINELY fills — every room untouched, or the
-  // fullest one already rolled (E4) — NO row wears the solid; the page-level nav pill stays
-  // loud instead, and two solids on one surface (the dev-render defect) cannot recur.
+  // Blueprint law 2 (2026-09-02): when nothing GENUINELY fills — every room untouched — NO row
+  // wears the solid; the page-level nav pill stays loud instead, and two solids on one surface
+  // (the dev-render defect) cannot recur.
   it("marks NOTHING ink when nothing genuinely fills — the fallback tightest-seats pick never wears the solid", () => {
     const untouched = PUBLIC_LEAGUES.map((league) => ({ ...league, filledTeams: 0 }));
     render(<OpenLeagueShelf house={[]} leagues={untouched} signedIn={false} asOfTime={AS_OF} />);
@@ -335,11 +338,16 @@ describe("OpenLeagueShelf", () => {
     }
   });
 
-  it("marks NOTHING ink when the fullest filling room has rolled (E4) — rolled rooms are not featured", () => {
-    const rolled = { ...PUBLIC_LEAGUES[0]!, id: "rolled", filledTeams: 11, kickoffRolls: 2 };
+  it("features the fullest filling room even when its kickoff has rolled — exactly one solid per rendering", () => {
+    // The fix round's H1: while rolled rooms were disqualified, a board of rolled rooms wore no
+    // solid at all and the round's stated P3 outcome never rendered. One per rendering, not one
+    // per page: both renderings are in the DOM at every width and CSS picks which is seen.
+    const rolled = { ...PUBLIC_LEAGUES[0]!, id: "rolled", name: "Rolled Room", filledTeams: 11, kickoffRolls: 2 };
     render(<OpenLeagueShelf house={[]} leagues={[rolled, { ...PUBLIC_LEAGUES[1]!, filledTeams: 0 }]} signedIn={false} asOfTime={AS_OF} />);
     for (const rendering of [rows(), cards()]) {
-      expect(inkPillCount(rendering)).toBe(0);
+      expect(inkPillCount(rendering)).toBe(1);
+      const ink = rendering.querySelector('a[class*="bg-accent"], button[class*="bg-accent"]');
+      expect(ink?.getAttribute("aria-label")).toContain("Rolled Room");
     }
   });
 

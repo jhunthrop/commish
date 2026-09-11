@@ -191,9 +191,15 @@ describe("LeagueRow", () => {
       expect(screen.queryByText(BASE.draftAt)).not.toBeInTheDocument();
     });
 
-    it("keeps the kickoff-roll disclosure beside a rolled date", () => {
-      render(row({ ...BASE, kickoffRolls: 1 }));
-      expect(screen.getByText(/moved/i)).toBeInTheDocument();
+    it("carries NO per-league roll sentence — the board says the consequence once, on its band", () => {
+      // Fix round 1, M3: the sentence repeated on six of eight rows as a two-line paragraph in
+      // the scheduler's voice, which is P7 failing twice (system voice, repeated explainer).
+      // The board's band carries `rollBandConsequence` in the league's voice, and the
+      // per-league reconciliation stays on the join sheet and the schedule panel, where a
+      // visitor's written-down date is what is actually being corrected.
+      render(row({ ...BASE, kickoffRolls: 3 }));
+      expect(screen.queryByText(/moved/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/because the room was not full/i)).not.toBeInTheDocument();
     });
   });
 

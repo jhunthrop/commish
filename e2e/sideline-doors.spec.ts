@@ -49,8 +49,24 @@ for (const theme of THEMES) {
       expect(await figures.count()).toBeGreaterThan(0);
       await expect(figures.first()).toContainText(/of \d+/);
 
-      // P3: one solid button on the viewport.
-      await expect(page.locator(SOLID_VERB)).toHaveCount(1);
+      // P3, COUNTED PER REGION rather than per page (fix round 1, H1).
+      //
+      // A page-wide count of 1 was green only by accident of seed data, and was going to go red
+      // in CI with no code change: while `featuredFillingLeague` excluded every rolled room,
+      // nothing on the board was featured and the header's standing doorway was the page's only
+      // solid. The moment a fresh filling room exists, the featured room takes a solid in BOTH
+      // renderings of the board — the desktop row and the phone card, which are both in the DOM
+      // at every width with CSS deciding which is visible — and a page-wide count sees two.
+      //
+      // The rule the design actually states is one per region: the header carries at most its
+      // one standing doorway, and each rendering of the board features at most one room.
+      for (const region of [page.getByRole("banner"), page.getByTestId("league-rows"), page.getByTestId("league-cards")]) {
+        expect(await region.locator(SOLID_VERB).count()).toBeLessThanOrEqual(1);
+      }
+      // And the two never shout together: the header pill goes quiet the moment a room is
+      // featured, so the visible viewport carries exactly one solid either way.
+      const featuredRows = await page.getByTestId("league-rows").locator(SOLID_VERB).count();
+      expect(await page.getByRole("banner").locator(SOLID_VERB).count()).toBe(featuredRows === 1 ? 0 : 1);
 
       // P7: no tips and no competitor names anywhere in the door's copy.
       await expect(page.getByRole("button", { name: /^What is/ })).toHaveCount(0);

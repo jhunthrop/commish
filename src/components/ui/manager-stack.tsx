@@ -28,8 +28,8 @@ export interface ManagerStackProps {
  * a room, with one sentence naming them. The mock's lobby row draws this shape; on a signed-out
  * surface the product may not name the people in a league it is advertising
  * (`PublicLeagueSummary`'s privacy boundary, and `SeatStack`'s own docblock), so this renders
- * only where membership is already visible to the reader — the waiting room, the room roster,
- * the invite landing, the arrival frame.
+ * only where membership is already visible to the reader. Its one consumer today is
+ * `waiting-room.tsx`, on both of that room's heroes.
  *
  * The faces are `aria-hidden` and the caption carries the whole announcement: an overlapping
  * stack read one avatar at a time is four unlabelled images, and the sentence is what a screen

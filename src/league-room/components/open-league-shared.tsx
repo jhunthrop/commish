@@ -5,7 +5,6 @@ import { Badge, buttonClassName, LiveChip as LiveChipPrimitive } from "@/compone
 import { UI_CONFIG } from "@/components/ui/config";
 import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
-import { rollNoticeSentence } from "@/matchmaking/roll";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
 import { formatUsd } from "@/money/config";
@@ -78,8 +77,18 @@ export function LiveChip({ label }: { readonly label: string }) {
  * phrasing of the same claim is exactly what that ruling exists to prevent.
  */
 export function seatedLine(league: PublicLeagueSummary): string {
-  if (league.filledTeams === 0) return "Nobody yet. You would be first in.";
-  return `${league.filledTeams} already in.`;
+  return alreadyInPhrase(league.filledTeams);
+}
+
+/**
+ * THE ONE SPELLING of "who is already in", punctuation included (fix round 1, L3). The board's
+ * row said "9 already in." and the waiting room's face stack said "9 already in" — one register,
+ * two punctuations, which is how a phrase starts drifting into two. Both callers read this now.
+ * It is a full sentence in both places because the empty case is two of them.
+ */
+export function alreadyInPhrase(filledTeams: number): string {
+  if (filledTeams === 0) return "Nobody yet. You would be first in.";
+  return `${filledTeams} already in.`;
 }
 
 export interface OpenLeagueLive {
@@ -294,20 +303,18 @@ export function ScheduledDraftValue({
 }
 
 /**
- * The Drafts value's one remaining footnote, one source for both forms (storefront review E1
- * retired the when-full paragraph that used to live here — `ScheduledDraftValue` above now
- * carries that fact as the column's own compact value plus an `InfoTip`, never both a value and
- * a footnote saying the same thing twice).
- *
- * F12/F21: `kickoffRolls` is `PublicLeagueSummary`'s own field, read here rather than silently
- * showing a different date than the one a visitor is comparing against their own calendar —
- * only a SCHEDULED league can ever roll, so a `when_full` form never renders this line.
+ * `DraftTimingNotes` IS DELETED (fix round 1, M3, 2026-09-10). It printed
+ * `rollNoticeSentence(league.kickoffRolls)` under the Drafts value on both board forms, and on
+ * a shelf where rooms roll until they fill that meant a two-line paragraph in the scheduler's
+ * voice on six of eight rows — P7 failing twice (system voice, repeated explainer), and the
+ * identical defect storefront review E1 measured and fixed on this same column for
+ * `describeStartTiming`. The BOARD now says the consequence once per band
+ * (`rollBandConsequence`, `@/matchmaking/roll`), in the league's own voice; the PER-LEAGUE
+ * sentence survives untouched where a visitor's written-down date is genuinely being reconciled
+ * — `join-sheet.tsx`'s draft cell (the preview this board's own verb opens) and
+ * `draft-schedule-panel.tsx` inside the room. Nothing about `kickoffRolls` is hidden; it simply
+ * stopped being the loudest text on a board a stranger is scanning.
  */
-export function DraftTimingNotes({ league }: { readonly league: PublicLeagueSummary }) {
-  return league.startTrigger === "scheduled" && league.kickoffRolls > 0 ? (
-    <p className="mt-1 text-xs text-text-muted">{rollNoticeSentence(league.kickoffRolls)}</p>
-  ) : null;
-}
 
 /**
  * The one action, both forms, both auth states. Signed in: the real join button. Signed out:

@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui";
 import { ChapterBand } from "@/components/ui/chapter-band";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { rollBandConsequence } from "@/matchmaking/roll";
 import { featuredFillingLeague, sortBySoonestJoinableDraft } from "@/matchmaking/shelf-order";
 import { moneyIsLive } from "@/money/states";
 import { JoinSheet } from "./join-sheet";
@@ -157,6 +158,12 @@ export function OpenLeagueShelf({
   const filling = sortBySoonestJoinableDraft(merged.filter((league) => league.filledTeams > 0));
   const fresh = sortBySoonestJoinableDraft(merged.filter((league) => league.filledTeams === 0));
   const houseIds = new Set(house.map((league) => league.id));
+  // M3: the roll's consequence, said ONCE on the band that has rolled rooms in it, in the
+  // league's voice — never the per-league scheduler sentence on every row. `null` when nothing
+  // in the band rolled, and the band keeps its own consequence alone.
+  const rolled = rollBandConsequence(filling.map((league) => league.kickoffRolls));
+  const fillingConsequence =
+    rolled === null ? "Claimed seats · first to fill is first to draft" : `Claimed seats · first to fill is first to draft · ${rolled}`;
   // The JOIN SHEET's one owner: tapping any row or card opens the whole contract for that
   // league. Stored as the ID and re-resolved so a re-render with fresher props never shows a
   // stale summary inside the sheet.
@@ -194,7 +201,7 @@ export function OpenLeagueShelf({
           <div data-testid="league-rows" className="hidden rounded-xl bg-surface-elevated p-2 shadow-card lg:block">
             <LeagueRowsHeader live={live} />
             {filling.length > 0 ? (
-              <ChapterBand name="Filling" consequence="Claimed seats · first to fill is first to draft" tone="live" />
+              <ChapterBand name="Filling" consequence={fillingConsequence} tone="live" />
             ) : null}
             <ul className="flex flex-col">
               {filling.map((league) => (
@@ -219,11 +226,13 @@ export function OpenLeagueShelf({
             <ul className="flex flex-col">
               {fresh.map((league) => (
                 <li key={league.id} data-testid={houseIds.has(league.id) ? undefined : "member-league"}>
+                  {/* No `leader` here (fix round 1, L1): `featuredFillingLeague` requires
+                      `filledTeams > 0` and this is the no-claims band, so the amber wash was
+                      unreachable and the prop only read as though a fresh room might win it. */}
                   <LeagueRow
                     league={league}
                     signedIn={signedIn}
-                    leader={league.id === featuredId}
-                    emphasis={league.id === featuredId ? "ink" : "quiet"}
+                    emphasis="quiet"
                     headingLevel={headingLevel === 1 ? 2 : 3}
                     live={live}
                     onOpen={() => setOpenLeagueId(league.id)}

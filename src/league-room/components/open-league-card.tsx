@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { BigNumber, Card, LedgerRow, SeatMeter, SeatStack } from "@/components/ui";
+import { BigNumber, Card, LedgerRow, SeatStack } from "@/components/ui";
+import { seatSentence } from "@/components/ui/seat-meter";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { Button } from "@/components/ui";
 import { moneyIsLive } from "@/money/states";
 import {
   ctaAccessibleName,
   ctaVisibleText,
-  DraftTimingNotes,
   FormatLine,
   LiveChip,
   OpenLeagueCta,
@@ -123,13 +123,12 @@ export function OpenLeagueCard({ league, signedIn, emphasis = "quiet", live = mo
 
       {/* The ledger rows (S7): dense, comparable, hairline-topped. */}
       <div className="flex flex-col">
-        <div className="border-t border-line py-1.5 text-sm">
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="shrink-0 text-text-muted">Drafts</span>
-            <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} className="text-right" />
-          </div>
-          <DraftTimingNotes league={league} />
-        </div>
+        {/* The per-league roll sentence left this row with the desktop row's (fix round 1, M3):
+            the board says the consequence once on its band, and the reconciliation lives on the
+            join sheet this card's own verb opens. */}
+        <LedgerRow label="Drafts">
+          <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} className="text-right" />
+        </LedgerRow>
         <LedgerRow label="Entry">
           {/* Real, not promotional: `entryFeeLabel` reads the league's REAL entry fee. A price
               is a fact and wears ink (v5 law 1) — money green is gone, and cyan is the verdict
@@ -151,10 +150,12 @@ export function OpenLeagueCard({ league, signedIn, emphasis = "quiet", live = mo
         </LedgerRow>
       </div>
 
-      {/* F17: the product's ONE seat sentence, held seats included — spoken only. `SeatStack`
-          above already draws the same shape for eyes and `BigNumber` already prints the count,
-          so a visible third telling would be the same claim three ways on one card. */}
-      <SeatMeter filled={league.filledTeams} total={league.teamCount} heldSeats={league.heldSeats} srOnlySentence className="sr-only" />
+      {/* F17: the product's ONE seat sentence, held seats included — spoken only, and spelled
+          the way the row and the hold room spell it (fix round 1, M4). This used to render a
+          whole `SeatMeter`, twelve segments of dead DOM, hidden from eyes AND from assistive
+          tech. `SeatStack` above already draws the shape and `BigNumber` already prints the
+          count; what is left to say is the sentence, so say only the sentence. */}
+      <span className="sr-only">{seatSentence(league.filledTeams, league.teamCount, league.heldSeats)}</span>
 
       {isBeginnerOnly ? (
         <p className="text-sm text-text-muted">

@@ -10,7 +10,6 @@ import { moneyIsLive } from "@/money/states";
 import {
   ctaAccessibleName,
   ctaVisibleText,
-  DraftTimingNotes,
   entryFeeLabel,
   FormatLine,
   LiveChip,
@@ -76,7 +75,9 @@ export function LeagueRowsHeader({ live = moneyIsLive() }: { readonly live?: boo
       <span>Who is in</span>
       <span>Format</span>
       <span>Drafts</span>
-      <span>Seats</span>
+      {/* `text-right`: the seat figure is `items-end` in its own fixed track, so a left-set
+          header floated a label away from the numbers it names (fix round 1, M2). */}
+      <span className="text-right">Seats</span>
       {live ? (
         <>
           <span className="text-right">Buy-in</span>
@@ -156,7 +157,12 @@ export function LeagueRow({
       onClick={onOpen}
       className={`${leagueRowGrid(live)} rounded-md px-2 py-2.5 transition-colors ${
         onOpen === undefined ? "" : "cursor-pointer "
-      }${leader ? "self-wash" : "hover:bg-surface-raised"}`}
+      }${
+        // L5: the featured row keeps a hover response ON TOP of the wash. It used to trade one
+        // for the other, which left the one row you most want pressed as the only row that did
+        // not answer the pointer. A ring rather than a fill, because the fill is the wash.
+        leader ? "self-wash hover:ring-2 hover:ring-self" : "hover:bg-surface-raised"
+      }`}
     >
       <div className="flex min-w-0 items-center gap-3">
         <SeatStack filled={league.filledTeams} total={league.teamCount} heldSeats={league.heldSeats} />
@@ -174,9 +180,14 @@ export function LeagueRow({
 
       <FormatLine league={league} />
 
+      {/* THE DRAFTS VALUE AND NOTHING ELSE (fix round 1, M3). The per-league roll sentence left
+          this column: it repeated on six of eight rows as a two-line paragraph in the
+          scheduler's voice, which is P7 failing twice. The consequence is said once, on the
+          band above (`rollBandConsequence`); the per-league reconciliation lives on the join
+          sheet and the schedule panel, where a visitor's written-down date is what is actually
+          being corrected. */}
       <div className="min-w-0 text-sm">
         <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} relativeFirst />
-        <DraftTimingNotes league={league} />
       </div>
 
       <div className="flex min-w-0 flex-col items-end">

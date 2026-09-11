@@ -1,5 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { describeStartTiming, nextKickoffAfter, ROLL_REFUSALS, roomIsFull, rollNoticeSentence } from "./roll";
+import { describeStartTiming, nextKickoffAfter, ROLL_REFUSALS, roomIsFull, rollBandConsequence, rollNoticeSentence } from "./roll";
+
+describe("rollBandConsequence (the board says it once, in the league's voice)", () => {
+  it("is absent when nothing in the band has rolled — a band never says what did not happen", () => {
+    expect(rollBandConsequence([0, 0, 0])).toBeNull();
+    expect(rollBandConsequence([])).toBeNull();
+  });
+
+  it("says the consequence once, however many rooms in the band rolled", () => {
+    const one = rollBandConsequence([3, 0, 0]);
+    expect(one).toBe("a room that is not full on its day waits for the next one");
+    expect(rollBandConsequence([3, 7, 1, 2])).toBe(one);
+  });
+
+  it("speaks about a ROOM, never about the scheduler or this draft (P7, no system voice)", () => {
+    const sentence = rollBandConsequence([3])!;
+    expect(sentence).not.toContain("This draft");
+    expect(sentence).not.toContain("scheduled");
+    expect(sentence).not.toContain("moved");
+  });
+});
 
 describe("describeStartTiming", () => {
   it("phrases the when-full commitment identically for a house league and a member league", () => {
