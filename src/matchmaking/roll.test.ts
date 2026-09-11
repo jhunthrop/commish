@@ -9,8 +9,14 @@ describe("rollBandConsequence (the board says it once, in the league's voice)", 
 
   it("says the consequence once, however many rooms in the band rolled", () => {
     const one = rollBandConsequence([3, 0, 0]);
-    expect(one).toBe("a room that is not full on its day waits for the next one");
+    expect(one).toBe("A room that is not full on its day waits for the next one.");
     expect(rollBandConsequence([3, 7, 1, 2])).toBe(one);
+  });
+
+  it("is a whole sentence — it rides the band's quiet caption, never the caps subtitle", () => {
+    const sentence = rollBandConsequence([3])!;
+    expect(sentence.startsWith("A ")).toBe(true);
+    expect(sentence.endsWith(".")).toBe(true);
   });
 
   it("speaks about a ROOM, never about the scheduler or this draft (P7, no system voice)", () => {

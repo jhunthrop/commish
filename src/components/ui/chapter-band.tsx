@@ -31,10 +31,21 @@ const PLATE_CLASS: Readonly<Record<ChapterBandTone, string>> = {
 export interface ChapterBandProps {
   /** The chapter's name, on the plate. Two or three words at most. */
   readonly name: string;
-  /** What the chapter MEANS, in plain language — "a real drop after this", "both sides said
-   *  yes · these are done" — never a restatement of the name. Law 5's whole point: the letter
-   *  is only its name; the consequence is what a band is for. */
+  /**
+   * The SUBTITLE beside the name, in the same caps register — a short key, five words at most:
+   * "a real drop after this", "both sides said yes", "claimed seats". Never a restatement of the
+   * name, and never a sentence: capitals are for keys, and a sentence set in them shouts.
+   */
   readonly consequence: string;
+  /**
+   * THE CONSEQUENCE AS A SENTENCE (fix round 2), on its own quiet row beneath the plate: body
+   * size, faint ink, sentence case. Law 5's whole point is that the letter is only its name and
+   * the consequence is what a band is for — but a consequence is prose, and the shelf proved
+   * what happens when prose is pushed through the caps slot: a 108-character line became the
+   * loudest thing on the front door, above the board it was introducing. One line at desktop,
+   * wrapping at a phone. Omit it and no element renders at all.
+   */
+  readonly caption?: string;
   readonly tone?: ChapterBandTone;
   readonly className?: string;
 }
@@ -58,15 +69,22 @@ export interface ChapterBandProps {
  * THE PLATE IS NEVER THE ONLY CHANNEL. The name is text on the plate and the consequence is
  * text beside it, so the band survives with the hue channel switched off entirely.
  */
-export function ChapterBand({ name, consequence, tone = "quiet", className = "" }: ChapterBandProps): ReactElement {
+export function ChapterBand({ name, consequence, caption, tone = "quiet", className = "" }: ChapterBandProps): ReactElement {
   return (
     <div
       data-chapter={tone}
-      className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 border-t border-line bg-gradient-to-r from-surface-raised to-transparent px-2 py-1.5 ${className}`}
+      className={`flex flex-col gap-1 border-t border-line bg-gradient-to-r from-surface-raised to-transparent px-2 py-1.5 ${className}`}
     >
-      {/* The one sanctioned all-caps register (caps charter) — imported, never hand-rolled. */}
-      <span className={`${MICRO_LABEL} rounded-sm px-2 py-0.5 font-semibold ${PLATE_CLASS[tone]}`}>{name}</span>
-      <span className={`${MICRO_LABEL} min-w-0 text-text-muted`}>{consequence}</span>
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        {/* The one sanctioned all-caps register (caps charter) — imported, never hand-rolled. */}
+        <span className={`${MICRO_LABEL} rounded-sm px-2 py-0.5 font-semibold ${PLATE_CLASS[tone]}`}>{name}</span>
+        <span className={`${MICRO_LABEL} min-w-0 text-text-muted`}>{consequence}</span>
+      </div>
+      {caption === undefined ? null : (
+        <p data-chapter-caption="" className="min-w-0 text-sm text-text-faint">
+          {caption}
+        </p>
+      )}
     </div>
   );
 }

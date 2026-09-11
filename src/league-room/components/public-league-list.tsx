@@ -160,10 +160,15 @@ export function OpenLeagueShelf({
   const houseIds = new Set(house.map((league) => league.id));
   // M3: the roll's consequence, said ONCE on the band that has rolled rooms in it, in the
   // league's voice — never the per-league scheduler sentence on every row. `null` when nothing
-  // in the band rolled, and the band keeps its own consequence alone.
+  // in the band rolled, and the caption is the fill sentence alone.
+  //
+  // FIX ROUND 2: the band's caps slot is a KEY ("Claimed seats"), and the sentences ride the
+  // quiet `caption` below the plate. Pushed through the caps subtitle, this line ran 108
+  // characters of shouting across the top of the board it was introducing — louder than the
+  // rooms. Same words, two registers.
   const rolled = rollBandConsequence(filling.map((league) => league.kickoffRolls));
-  const fillingConsequence =
-    rolled === null ? "Claimed seats · first to fill is first to draft" : `Claimed seats · first to fill is first to draft · ${rolled}`;
+  const fillingCaption =
+    rolled === null ? "First to fill is first to draft." : `First to fill is first to draft. ${rolled}`;
   // The JOIN SHEET's one owner: tapping any row or card opens the whole contract for that
   // league. Stored as the ID and re-resolved so a re-render with fresher props never shows a
   // stale summary inside the sheet.
@@ -201,7 +206,7 @@ export function OpenLeagueShelf({
           <div data-testid="league-rows" className="hidden rounded-xl bg-surface-elevated p-2 shadow-card lg:block">
             <LeagueRowsHeader live={live} />
             {filling.length > 0 ? (
-              <ChapterBand name="Filling" consequence={fillingConsequence} tone="live" />
+              <ChapterBand name="Filling" consequence="Claimed seats" caption={fillingCaption} tone="live" />
             ) : null}
             <ul className="flex flex-col">
               {filling.map((league) => (
@@ -221,7 +226,7 @@ export function OpenLeagueShelf({
               ))}
             </ul>
             {fresh.length > 0 ? (
-              <ChapterBand name="Fresh" consequence="No claims yet · yours would be the first seat" />
+              <ChapterBand name="Fresh" consequence="No claims yet" caption="Yours would be the first seat." />
             ) : null}
             <ul className="flex flex-col">
               {fresh.map((league) => (

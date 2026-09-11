@@ -166,9 +166,14 @@ export function rollNoticeSentence(kickoffRolls: number): string {
  * voice: what happens to a room, not what the scheduler did to a record. Returns `null` when no
  * room in the band has rolled, so the band never carries a clause about something that did not
  * happen.
+ *
+ * A WHOLE SENTENCE, capital and full stop (fix round 2). It rides `ChapterBand`'s `caption`
+ * slot, which is sentence case and quiet, rather than the caps subtitle beside the plate — a
+ * sentence set in capitals shouted louder than the board it was introducing. A caller composing
+ * it into a longer caption gets a sentence it can simply follow another with.
  */
 export function rollBandConsequence(kickoffRolls: readonly number[]): string | null {
-  return kickoffRolls.some((rolls) => rolls > 0) ? "a room that is not full on its day waits for the next one" : null;
+  return kickoffRolls.some((rolls) => rolls > 0) ? "A room that is not full on its day waits for the next one." : null;
 }
 
 /**
