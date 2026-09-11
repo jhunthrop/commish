@@ -365,7 +365,7 @@ export function TradeCard({
           </>
         }
       >
-        <p>Both rosters change as soon as you accept. You can&apos;t undo it.</p>
+        <p>Both rosters change as soon as you accept. You cannot undo it.</p>
       </Modal>
     </Card>
   );

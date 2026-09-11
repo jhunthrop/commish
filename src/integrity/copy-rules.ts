@@ -57,9 +57,17 @@ const DASHES = /[—–]/g;
  * `who's`, `there's`, `nobody's`, `that'd`, ...). Deliberately NOT `\w+'s` — that would also flag
  * every possessive in the product ("the league's median", "a manager's roster"), which C1 never
  * ruled on and this sweep has no business rewriting.
+ *
+ * `can't` IS SPELLED OUT (integrity cleanup review, MEDIUM-1). This docblock named it from the
+ * day it was written, but the alternation never carried it: `can` is not one of the auxiliaries
+ * in the `…n't` group (its negation elides the `no`, so "cann't" is not a word), and only
+ * `ain't`/`won't`/`shan't` were listed as irregulars. The sweep therefore expanded
+ * "You're the high bidder" one line above "You can't afford the current bid" and flagged only the
+ * first. `won't` is listed; `don't`, `isn't` and `aren't` already fall out of the `(?:do|is|are)n't`
+ * group and need no entry of their own.
  */
 const CONTRACTIONS =
-  /\b(?:ain't|won't|shan't|(?:is|are|was|were|does|do|did|has|have|had|could|would|should|might|must|need|dare)n't|(?:I|you|we|they)'(?:re|ve|ll|d)|I'm|(?:it|that|this|there|here|what|who|where|when|why|how|let|nobody|somebody|everybody|everyone|someone|nothing|one)'(?:s|d)|y'all|ma'am|o'clock)\b/gi;
+  /\b(?:ain't|can't|won't|shan't|(?:is|are|was|were|does|do|did|has|have|had|could|would|should|might|must|need|dare)n't|(?:I|you|we|they)'(?:re|ve|ll|d)|I'm|(?:it|that|this|there|here|what|who|where|when|why|how|let|nobody|somebody|everybody|everyone|someone|nothing|one)'(?:s|d)|y'all|ma'am|o'clock)\b/gi;
 
 /**
  * The exact phrases the contraction sweep never flags. Subtracted from the text before the

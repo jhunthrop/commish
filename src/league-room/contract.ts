@@ -7,7 +7,7 @@ import type { TradesPageBody } from "@/trades/contract";
 import type { FirstRunPlan } from "@/identity";
 import type { HelpLevel } from "@/identity/preferences";
 import type { FixtureLabel } from "@/league-service/nfl-schedule";
-import type { PendingWaiverClaim } from "@/league-service/claims";
+import type { PendingWaiverClaim } from "@/league-service/claims-contract";
 import type { ActivityFeedRow } from "@/integrity-service/activity";
 import type { LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
 import type { LeagueAuthority } from "@/league-service/authority";

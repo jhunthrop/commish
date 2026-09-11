@@ -89,7 +89,7 @@ export const ENFORCED_LEAGUE_SQL = eq(leagues.isPublicMatchmade, true);
  */
 export const ENFORCEMENT_REFUSALS = {
   join: "This league is reserved for newer players so everyone starts on a level footing. Browse the open leagues to find one you can join.",
-  create: "You have played enough seasons here that you can't open a league reserved for newer players. Open it to everyone instead.",
+  create: "You have played enough seasons here that you cannot open a league reserved for newer players. Open it to everyone instead.",
 } as const;
 
 /**

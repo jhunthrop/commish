@@ -259,7 +259,7 @@ describe("TradeCard states", () => {
     const onAccept = vi.fn();
     render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} onAccept={onAccept} />);
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
-    expect(screen.getByRole("dialog")).toHaveTextContent("Both rosters change as soon as you accept. You can't undo it.");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Both rosters change as soon as you accept. You cannot undo it.");
     expect(onAccept).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Confirm trade" }));

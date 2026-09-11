@@ -255,10 +255,10 @@ async function main(): Promise<void> {
 
   const allViolations = [...rowCountViolations, ...rangeViolations, ...sourceDateViolations, ...actualWinsViolations];
   console.log("");
-  console.log(`Row count and team-set check: ${rowCountViolations.length} violation(s).`);
-  console.log(`Win total and price range check: ${rangeViolations.length} violation(s).`);
-  console.log(`source_date precedes kickoff check: ${sourceDateViolations.length} violation(s).`);
-  console.log(`actual_wins matches the store check: ${actualWinsViolations.length} violation(s).`);
+  console.log(`Row count and team-set check: ${rowCountViolations.length} problem(s).`);
+  console.log(`Win total and price range check: ${rangeViolations.length} problem(s).`);
+  console.log(`source_date precedes kickoff check: ${sourceDateViolations.length} problem(s).`);
+  console.log(`actual_wins matches the store check: ${actualWinsViolations.length} problem(s).`);
   console.log("");
 
   if (allViolations.length === 0) {
@@ -266,7 +266,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log(`FAIL: ${allViolations.length} violation(s) found.`);
+  console.log(`FAIL: ${allViolations.length} problem(s) found.`);
   for (const violation of allViolations) {
     console.log(`  [${violation.kind}] ${violation.message}`);
   }

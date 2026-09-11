@@ -289,7 +289,7 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
   const proposerTeamId = proposerTeam.id;
 
   if (proposerTeamId === input.counterpartyTeamId) {
-    return { ok: false, status: 422, reason: "You can't trade with your own team." };
+    return { ok: false, status: 422, reason: "You cannot trade with your own team." };
   }
 
   // THE WEEK, DERIVED — see this function's own docblock. One read, one definition.
@@ -584,7 +584,7 @@ export async function refusalFor(
   // lie; nobody answered anything. Checked before the generic terminal-status message so a held
   // row gets the honest one rather than the one every OTHER non-open row gets.
   if (row.status === "held") {
-    return { ok: false, status: 409, reason: "This trade is waiting on a fairness review, so it can't change right now." };
+    return { ok: false, status: 409, reason: "This trade is waiting on a fairness review, so it cannot change right now." };
   }
   if (row.status !== "open") {
     return { ok: false, status: 409, reason: "Someone already answered that offer." };
@@ -1132,7 +1132,7 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
       }
       const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, weekNumber)).for("share");
       if (isLineupLocked(week?.status ?? "scheduled")) {
-        return { ok: false as const, status: 409, reason: `Week ${weekNumber} has started, so rosters can't change until it ends.` };
+        return { ok: false as const, status: 409, reason: `Week ${weekNumber} has started, so rosters cannot change until it ends.` };
       }
 
       // STEP 3 — both teams' rows, `FOR UPDATE`, in CANONICAL SORTED-BY-ID order — never
@@ -1581,7 +1581,7 @@ export async function releaseHeldTradeInTx(tx: DbTx, input: ReleaseHeldTradeInpu
   const weekNumber = await currentWeekOf(tx, input.leagueId);
   const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, weekNumber)).for("share");
   if (isLineupLocked(week?.status ?? "scheduled")) {
-    return { ok: false, status: 409, reason: `Week ${weekNumber} has started, so rosters can't change until it ends.` };
+    return { ok: false, status: 409, reason: `Week ${weekNumber} has started, so rosters cannot change until it ends.` };
   }
 
   // Both teams' rows, FOR UPDATE, canonical sorted-by-id order — identical to `acceptTrade`'s own

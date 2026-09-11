@@ -563,7 +563,7 @@ describe("proposeTrade", () => {
     // `isBalancedProposal` already answers this and has since Phase 1. The service asks it
     // rather than restating it — the same discipline `removeReview` and `resolveFlag` both keep.
     const result = await proposeTrade(db, await proposeInput(db, { counterparty: "self" }));
-    expect(result).toEqual({ ok: false, status: 422, reason: "You can't trade with your own team." });
+    expect(result).toEqual({ ok: false, status: 422, reason: "You cannot trade with your own team." });
   });
 
   it("refuses an empty side too, via isBalancedProposal, not only via the schema", async () => {
@@ -1401,7 +1401,7 @@ describe("acceptTrade", () => {
     await leagueSeasonThrough(db, 4);
     const trade = await openAcceptTrade(db, { weekNumber: 4 });
     const result = await acceptAs("u_bob", trade.id);
-    expect(result).toEqual({ ok: false, status: 409, reason: "Week 4 has started, so rosters can't change until it ends." });
+    expect(result).toEqual({ ok: false, status: 409, reason: "Week 4 has started, so rosters cannot change until it ends." });
     // Fix round 1, CRITICAL: this is the exact path that used to commit `status='accepted'`
     // with nothing actually moved — the guarded UPDATE ran before this check and a plain
     // `return` after it committed silently. It must now leave no trace at all.
@@ -1655,7 +1655,7 @@ describe("acceptTrade", () => {
     const trade = await openAcceptTrade(db, { weekNumber: 8 });
 
     const result = await acceptAs("u_bob", trade.id);
-    expect(result).toEqual({ ok: false, status: 409, reason: "Week 4 has started, so rosters can't change until it ends." });
+    expect(result).toEqual({ ok: false, status: 409, reason: "Week 4 has started, so rosters cannot change until it ends." });
     await expectNoAcceptanceTookPlace(db, trade.id, [
       { playerId: "p_rb1", teamId: "team_a" },
       { playerId: "p_wr1", teamId: "team_b" },
@@ -1775,13 +1775,13 @@ describe("acceptTrade", () => {
       expect((await tradeRow(db, trade.id)).status).toBe("held");
 
       const withdrawResult = await withdrawTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_alice" });
-      expect(withdrawResult).toEqual({ ok: false, status: 409, reason: "This trade is waiting on a fairness review, so it can't change right now." });
+      expect(withdrawResult).toEqual({ ok: false, status: 409, reason: "This trade is waiting on a fairness review, so it cannot change right now." });
 
       const rejectResult = await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW) });
-      expect(rejectResult).toEqual({ ok: false, status: 409, reason: "This trade is waiting on a fairness review, so it can't change right now." });
+      expect(rejectResult).toEqual({ ok: false, status: 409, reason: "This trade is waiting on a fairness review, so it cannot change right now." });
 
       const acceptResult = await acceptAs("u_bob", trade.id);
-      expect(acceptResult).toEqual({ ok: false, status: 409, reason: "This trade is waiting on a fairness review, so it can't change right now." });
+      expect(acceptResult).toEqual({ ok: false, status: 409, reason: "This trade is waiting on a fairness review, so it cannot change right now." });
 
       // Still held — none of the three attempts changed anything.
       expect((await tradeRow(db, trade.id)).status).toBe("held");
@@ -1941,7 +1941,7 @@ describe("acceptTrade", () => {
       await lockWeek(db, 4);
       const held = await insertHeldTrade();
       const result = await db.transaction((tx) => releaseHeldTradeInTx(tx, { tradeId: held.id, leagueId: "lg_1", operatorUserId: "u_alice" }));
-      expect(result).toEqual({ ok: false, status: 409, reason: "Week 4 has started, so rosters can't change until it ends." });
+      expect(result).toEqual({ ok: false, status: 409, reason: "Week 4 has started, so rosters cannot change until it ends." });
       expect((await tradeRow(db, held.id)).status).toBe("held");
     });
 

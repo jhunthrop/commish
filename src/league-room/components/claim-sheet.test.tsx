@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { FreeAgentRow } from "@/league-service/claims";
+import type { FreeAgentRow } from "@/league-service/claims-contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "../hooks/deps";
 import type { DropCandidate } from "../lib/claim-drop";
 import { ClaimSheet } from "./claim-sheet";

@@ -1,6 +1,6 @@
 import { Button, Card } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import type { PendingWaiverClaim } from "@/league-service/claims";
+import type { PendingWaiverClaim } from "@/league-service/claims-contract";
 import type { TradeProposalView } from "@/trades/contract";
 import type { LeagueHomeBody, TradeRoomContext } from "../contract";
 import { formatWeekdayClock, ordinal } from "../lib/format";

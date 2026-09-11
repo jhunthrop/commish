@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import type { FreeAgentRow } from "@/league-service/claims";
+import type { FreeAgentRow } from "@/league-service/claims-contract";
 import type { TradeProposalView } from "@/trades/contract";
 import type { RoomData } from "../contract";
 import {

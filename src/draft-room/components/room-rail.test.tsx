@@ -279,7 +279,7 @@ describe("RoomRail", () => {
   });
 
   // E9 (2026-08-26 design review): hot-state redundancy — "Your team: Bay Bandits" sat beside
-  // "You're on the clock · Bay Bandits". While the turn is mine the turn line already names my
+  // "You are on the clock · Bay Bandits". While the turn is mine the turn line already names my
   // team; the chip returns the moment the turn moves on.
   it("suppresses the team chip while the turn is mine — the turn line already says it (E9)", () => {
     const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t1" />);

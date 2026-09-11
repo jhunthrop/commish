@@ -29,6 +29,27 @@ async function browseLeagues(...args: Parameters<typeof listPublicLeagues>): Pro
   return (await listPublicLeagues(...args)).leagues;
 }
 
+/**
+ * A kickoff stated RELATIVE TO THE REAL CLOCK, for the shelf tests that let `listPublicLeagues`
+ * read its own `now` (integrity cleanup, 2026-09-10).
+ *
+ * The shelf drops any `scheduled` house league whose kickoff has passed (`houseKickoffStillAhead`,
+ * the F2 predicate two tests below pin deliberately). Every seeder here used to hand it a
+ * hardcoded "2026-09-10T19:00:00Z", which was ahead of the clock on the day these were written
+ * and behind it ever since — so "carries the real catalog rung name" and "ignores every filter
+ * axis" began asserting against an empty shelf and failed, while four more kept PASSING for the
+ * wrong reason (`house` is `[]` because the row went stale, not because the test's own condition
+ * excluded it, and `every()` over an empty list is vacuously true).
+ *
+ * A test that INJECTS a clock (`{ now: () => ... }` — the ordering case, and the two
+ * `AFTER_A_STALE_KICKOFF` cases below) keeps its literal instants: those are deterministic by
+ * construction and are the ones actually testing the staleness boundary, so a relative kickoff
+ * there would only blur what they pin.
+ */
+function kickoffAhead(hours = 48): Date {
+  return new Date(Date.now() + hours * 3_600_000);
+}
+
 /** One open, public, joinable HOUSE league — the shelf's own seeder, parallel to `seed()` above
  *  but for a row `leagues_house_commissioner_ck` requires a NULL `commissionerUserId` for. */
 async function seedHouseLeague(league: {
@@ -823,8 +844,14 @@ describe("listPublicLeagues house shelf", () => {
       id: "member", name: "A Member League", format: "snake", experienceTier: "beginner",
       stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
     });
-    await seedHouseLeague({ id: "house_open_12_1", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z") });
+    await seedHouseLeague({ id: "house_open_12_1", rung: "open_12", kickoffAt: kickoffAhead() });
     const body = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    // The EXACT ids on each side, not `every()` alone (review HIGH-1): re-anchoring the kickoff
+    // fixed this test's vacuity through the fixture, which leaves the assertion still able to
+    // pass over an empty shelf the day something else empties it. A membership claim has to name
+    // what it expects to be there.
+    expect(body.house.map((l) => l.id)).toEqual(["house_open_12_1"]);
+    expect(body.leagues.map((l) => l.id)).toEqual(["member"]);
     expect(body.house.every((l) => l.houseRung !== null)).toBe(true);
     expect(body.leagues.every((l) => l.houseRung === null)).toBe(true);
   });
@@ -870,8 +897,8 @@ describe("listPublicLeagues house shelf", () => {
   });
 
   it("carries the real catalog rung name on a house card, honestly per rung", async () => {
-    await seedHouseLeague({ id: "house_open", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z") });
-    await seedHouseLeague({ id: "house_beg", rung: "beginner_12", kickoffAt: new Date("2026-09-11T19:00:00.000Z") });
+    await seedHouseLeague({ id: "house_open", rung: "open_12", kickoffAt: kickoffAhead(48) });
+    await seedHouseLeague({ id: "house_beg", rung: "beginner_12", kickoffAt: kickoffAhead(72) });
     const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
     const byId = new Map(house.map((l) => [l.id, l.houseRung]));
     expect(byId.get("house_open")).toBe("open_12");
@@ -880,7 +907,7 @@ describe("listPublicLeagues house shelf", () => {
 
   it("never lets a full house league sit on the shelf", async () => {
     await seedHouseLeague({
-      id: "house_full", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z"),
+      id: "house_full", rung: "open_12", kickoffAt: kickoffAhead(),
       teamCount: 2, filled: 2,
     });
     const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
@@ -933,7 +960,7 @@ describe("listPublicLeagues house shelf", () => {
   it("refuses a house league that is not public-matchmade, on the one unauthenticated read", async () => {
     await seedHouseLeague({
       id: "house_private", rung: "open_12",
-      kickoffAt: new Date("2026-09-10T19:00:00.000Z"), isPublicMatchmade: false,
+      kickoffAt: kickoffAhead(), isPublicMatchmade: false,
     });
 
     const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
@@ -946,7 +973,7 @@ describe("listPublicLeagues house shelf", () => {
     // catalog rung shares one canonical format (`HOUSE_CATALOG`'s own `CANON`), so narrowing to
     // the format no house league plays is exactly the case that would empty the shelf if a
     // filter ever reached it.
-    await seedHouseLeague({ id: "house_snake", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z") });
+    await seedHouseLeague({ id: "house_snake", rung: "open_12", kickoffAt: kickoffAhead() });
     const { house } = await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, format: "auction" });
     expect(house.map((l) => l.id)).toEqual(["house_snake"]);
   });
@@ -981,11 +1008,11 @@ describe("listPublicLeagues excludes dev/e2e fixture leagues (D1)", () => {
 
   it("never lists a house-shelf league whose name carries a fixture prefix, while a normal one still appears", async () => {
     await seedHouseLeague({
-      id: "house_fixture", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z"),
+      id: "house_fixture", rung: "open_12", kickoffAt: kickoffAhead(48),
       name: "E2E Held Trade League",
     });
     await seedHouseLeague({
-      id: "house_real", rung: "beginner_12", kickoffAt: new Date("2026-09-11T19:00:00.000Z"),
+      id: "house_real", rung: "beginner_12", kickoffAt: kickoffAhead(72),
     });
 
     const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);

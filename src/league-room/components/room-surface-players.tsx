@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { Position } from "@/domain/player";
-import type { FreeAgentRow, PendingWaiverClaim } from "@/league-service/claims";
+import type { FreeAgentRow, PendingWaiverClaim } from "@/league-service/claims-contract";
 import type { FixtureLabel } from "@/league-service/nfl-schedule";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { useLeagueRoomDeps } from "../hooks/deps";

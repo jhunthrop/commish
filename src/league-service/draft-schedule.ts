@@ -25,7 +25,7 @@ const DRAFT_NOT_FOUND = "That draft does not exist.";
  * so the service and its tests never hand-type a second copy of the same sentence.
  */
 export const KICKOFF_REFUSALS = {
-  alreadyStarted: "This draft has already started, so its time can't change.",
+  alreadyStarted: "This draft has already started, so its time cannot change.",
   /**
    * Phase 3.5, Task 7. A `'when_full'` draft's `kickoff_at` is set by `fireWhenFullInTx`
    * (`@/league-service/fill-trigger`), not by a commissioner — a time nobody chose is not a time

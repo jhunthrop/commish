@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button, PositionBadge } from "@/components/ui";
 import { DecisionSheet } from "@/components/ui/decision-sheet";
-import type { FreeAgentRow } from "@/league-service/claims";
+import type { FreeAgentRow } from "@/league-service/claims-contract";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import type { DropCandidate } from "../lib/claim-drop";

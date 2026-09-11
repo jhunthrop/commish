@@ -4,6 +4,7 @@ import { excludedSetFor } from "@/db/upsert";
 import { leagueWaivers, waiverClaims, injuredReserve, drafts, leagues, lineupSlots, players, rosterSlots, statWeeks, teams } from "@/db/schema";
 import type { Position } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
+import type { FreeAgentRow, PendingWaiverClaim } from "./claims-contract";
 import { assignSlot } from "@/draft-engine";
 import type { Clock } from "@/domain/timing";
 import { defaultLineup, isLineupLocked } from "@/league";
@@ -35,23 +36,6 @@ export const CLAIM_REFUSALS = {
   rosterFull: "Your roster is full. Name a player to drop and the add and the drop happen together.",
   noRoom: "There is no legal slot for that player on your roster, even with the drop.",
 } as const;
-
-export interface FreeAgentRow {
-  readonly id: string;
-  /** Waivers v1: when set, he is ON WAIVERS until this instant — a claim files rather than
-   *  executes, and the board says so. */
-  readonly onWaiversUntil?: string | null;
-  /** His current designation off the harvested injuries feed ("Q", "O"), or null. */
-  readonly injuryDesignation?: string | null;
-  /** The market's position rank as the ADP feed words it ("RB12"), or null. */
-  readonly posAdp?: string | null;
-  readonly name: string;
-  readonly position: Position;
-  readonly nflTeam: string;
-  readonly headshotUrl: string | null;
-  /** The market price, when the feed carries one. `null` renders as a dash, never a zero. */
-  readonly adp: number | null;
-}
 
 export interface FreeAgentsInput {
   readonly leagueId: string;
@@ -122,18 +106,6 @@ export async function freeAgents(db: Db, input: FreeAgentsInput): Promise<{ read
     agents: rows.map((row) => ({ ...row, onWaiversUntil: untilByPlayer.get(row.id) ?? null, injuryDesignation: designations.get(row.id) ?? null })),
     total: count?.total ?? 0,
   };
-}
-
-export interface PendingWaiverClaim {
-  readonly claimId: string;
-  readonly playerId: string;
-  readonly playerName: string;
-  readonly position: Position;
-  /** ISO instant the window closes — `league_waivers.until`, or filed-at plus the standard
-   *  window when the row is already gone (see `pendingWaiverClaims`). */
-  readonly clearsAt: string;
-  /** 1-based rank among ALL pending claims on the same player, in exact award order. */
-  readonly queuePosition: number;
 }
 
 /**

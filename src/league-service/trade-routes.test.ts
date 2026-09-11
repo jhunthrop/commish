@@ -65,9 +65,17 @@ async function seedRouteLeague(): Promise<void> {
   ]);
 }
 
-/** One open, unexpired `team_a` -> `team_b` offer, inserted directly. */
+/** One open, unexpired `team_a` -> `team_b` offer, inserted directly.
+ *
+ *  PROPOSED AT THE REAL NOW, never at a hardcoded instant (integrity cleanup, 2026-09-10): the
+ *  routes under test read the real `Date` to decide whether an offer is still open, so "unexpired"
+ *  is a claim about the wall clock. This used to pin `proposedAt` to "2026-09-01T00:00:00Z", which
+ *  put `expiresAt` at `TRADE_CONFIG.proposalTtlHours` (72) past it — true while that was within
+ *  three days of the day it was written, and false every day after, at which point four tests in
+ *  this file started answering 409 for an offer their own fixture calls open. Anchoring to `now`
+ *  keeps the fixture's stated intent true on any day it runs. */
 async function openTrade(): Promise<{ readonly id: string }> {
-  const proposedAt = new Date("2026-09-01T00:00:00.000Z");
+  const proposedAt = new Date();
   const expiresAt = new Date(proposedAt.getTime() + TRADE_CONFIG.proposalTtlHours * 60 * 60 * 1000);
   const proposerAssets = [{ kind: "player" as const, playerId: "p_rb_a" }];
   const counterpartyAssets = [{ kind: "player" as const, playerId: "p_rb_b" }];
@@ -204,7 +212,7 @@ describe("POST /api/leagues/[leagueId]/trades", () => {
     signedInAs("u_alice");
     const response = await post("lg_1", { ...validProposeBody, counterpartyTeamId: "team_a" });
     expect(response.status).toBe(422);
-    expect((await response.json()).error).toBe("You can't trade with your own team.");
+    expect((await response.json()).error).toBe("You cannot trade with your own team.");
   });
 
   it("answers 429 once the caller is over the trade ceiling", async () => {

@@ -308,7 +308,7 @@ async function main(): Promise<void> {
   const check = process.argv.includes("--check");
   const db = createDb(requireEnv("DATABASE_URL"));
 
-  console.log(`PROPS-ANCHOR FIT — fit evidence ${FIT_SEASONS.join(", ")} (pooled), judge season ${JUDGE_SEASON} (scored once)`);
+  console.log(`PROPS-ANCHOR FIT: fit evidence ${FIT_SEASONS.join(", ")} (pooled), judge season ${JUDGE_SEASON} (scored once)`);
   for (const season of ALL_SEASONS as readonly number[]) {
     if (season >= 2026) throw new Error(`props-anchor-fit: season ${season} may never enter a fit or a score. Refusing to run.`);
   }
@@ -360,7 +360,7 @@ async function main(): Promise<void> {
   console.log(`\nWINNING WEIGHT (fit evidence only, ties go to the incumbent): propsAnchorWeight=${winner.weight}`);
   console.log(
     winner.weight === 0
-      ? "The incumbent (0, ADP only) won. No weight beat it on the fit evidence — nothing is wired, per the gate."
+      ? "The incumbent (0, ADP only) won. No weight beat it on the fit evidence, so nothing is wired, per the gate."
       : `weight=${winner.weight} beat the incumbent on the fit evidence's own props-covered rank correlation.`,
   );
 
@@ -378,7 +378,7 @@ async function main(): Promise<void> {
     return { season: facts.season, coveredN: facts.propsAnchor.size, zeroCovered, winnerCovered };
   });
 
-  console.log(`\n${"=".repeat(88)}\nTHE JUDGE SEASON (${JUDGE_SEASON}) — SCORED EXACTLY ONCE, AFTER THE WEIGHT ABOVE WAS ALREADY FIXED\n${"=".repeat(88)}\n`);
+  console.log(`\n${"=".repeat(88)}\nTHE JUDGE SEASON (${JUDGE_SEASON}): SCORED EXACTLY ONCE, AFTER THE WEIGHT ABOVE WAS ALREADY FIXED\n${"=".repeat(88)}\n`);
   const judgeAtZero = blendedObservations(judgeFacts, constantsAt(0), laws);
   const judgeAtWinner = blendedObservations(judgeFacts, constantsAt(winner.weight), laws);
   console.log("  whole board and props-covered subset:");

@@ -132,7 +132,14 @@ describe("POST /join/[leagueId]/hold/confirm", () => {
   it("redeems a live hold token from the cookie and reports it as consumed, not expired", async () => {
     await seedLeague("lg4");
     await seedUser("u1");
-    await claimSeatHold(db, { leagueId: "lg4", token: "hold_a", now: "2026-09-01T12:00:00.000Z" });
+    // Claimed at the REAL now, for the same reason the expired case below seeds a far-past one:
+    // the route reads the real `Date` for its own `now`, so a hold is live here only if it was
+    // claimed against the same clock. This line used to pass a hardcoded "2026-09-01T12:00:00Z",
+    // which was inside `SEAT_HOLD.minutes` of the wall clock on the day it was written and has
+    // been outside it every day since — the test asserted "live" while seeding a hold that had
+    // expired days earlier, so it reported `holdExpired: true` and failed on a calendar rather
+    // than on a change to the route.
+    await claimSeatHold(db, { leagueId: "lg4", token: "hold_a", now: new Date().toISOString() });
     cookieJar.set(SEAT_HOLD_COOKIE, "hold_a");
     signedInAs("u1");
 
