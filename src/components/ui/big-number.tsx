@@ -1,4 +1,4 @@
-import type { HTMLAttributes } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 /** `sm` is a row's figure (20), `md` a card's (28), `lg` a hero's (44), `xl` a player page's (58). */
 export type BigNumberSize = "sm" | "md" | "lg" | "xl";
@@ -10,8 +10,13 @@ export interface BigNumberProps extends Omit<HTMLAttributes<HTMLElement>, "child
    * WHAT THE NUMBER IS (P2, P11): the rules, the span, the population. "PPR a game, 2024 weeks 1
    * to 3", "of 12 seats", "projected, this week". For a `null` value the caption says why there
    * is no number ("no kicking line in this archive").
+   *
+   * A `ReactNode` and not a `string`, so a caption that is itself a live fact can wear the live
+   * channel (the lineup row spends this slot on the opponent and kickoff, which turns green while
+   * that game is running). It stays the caption either way: small, faint by default, never a
+   * second number.
    */
-  readonly basis: string;
+  readonly basis: ReactNode;
   /** @default "md" */
   readonly size?: BigNumberSize;
   /** @default "end" */

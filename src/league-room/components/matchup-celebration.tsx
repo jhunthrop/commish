@@ -75,7 +75,10 @@ export function MatchupCelebration({ matchup, myTeamId, clinched, leagueName, ma
       leagueName={leagueName}
       people={people.length === 0 ? undefined : people}
       title={won ? `You won in ${formatWeek(matchup.weekNumber)}` : "You are in the playoffs"}
-      detail={won && theirs !== undefined ? `over ${theirs.name}` : won ? undefined : "You clinched a spot"}
+      // ONE LINE PER FACT (whole-branch review, M3). A clinch used to print "You are in the
+      // playoffs" over "You clinched a spot", which is the same sentence twice in two registers.
+      // The clinch's detail is now the thing the title does NOT say: which week earned it.
+      detail={won && theirs !== undefined ? `over ${theirs.name}` : won ? undefined : `Clinched in ${formatWeek(matchup.weekNumber).toLowerCase()}`}
       figure={
         won && mineScore !== null && theirScore !== null
           ? { value: formatPoints(mineScore), basis: `PPR, against ${formatPoints(theirScore)}` }

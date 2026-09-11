@@ -33,29 +33,35 @@ const IR_ELIGIBLE = new Set(["O", "IR", "PUP", "NFI", "SUS", "D"]);
  * and it appears only on the slots the selected player can legally fill. P3 counts distinct verbs
  * rather than instances (see `LowerThird`'s own docblock): every solid pill on the screen at once
  * says Confirm and commits the same move, which is a repeated act and not two competing calls.
+ *
+ * THE THIRD STATE IS THE PRIMITIVE'S OWN (whole-branch review, H1). A slot with nothing to do —
+ * a locked week, an empty slot with nobody selected, a locked player — used to render a bare
+ * `<span>` wearing a hand-rolled `border border-line`, which `no-raw-surface.source.test.ts`
+ * correctly failed: a control's disabled skin is `Button`'s to decide, and a second spelling of it
+ * is how two disabled controls start looking different. It is now the same `Button`, disabled,
+ * which also makes the state real to a screen reader and to the keyboard instead of decorative.
  */
 function SlotControl({
   slot,
   confirm,
   onPress,
   label,
-  disabled = false,
 }: {
   readonly slot: string;
   readonly confirm: boolean;
+  /** Absent means there is nothing this slot can do right now: the control renders disabled. */
   readonly onPress?: () => void;
   readonly label: string;
-  readonly disabled?: boolean;
 }) {
-  if (onPress === undefined || disabled) {
-    return (
-      <span aria-hidden="true" className="flex h-8 w-12 items-center justify-center rounded-pill border border-line font-display text-xs font-bold text-text-faint">
-        {slot}
-      </span>
-    );
-  }
   return (
-    <Button variant={confirm ? "verb" : "secondary"} size="sm" onClick={onPress} aria-label={label} className="min-w-12 rounded-pill px-2.5">
+    <Button
+      variant={confirm ? "verb" : "secondary"}
+      size="sm"
+      disabled={onPress === undefined}
+      onClick={onPress}
+      aria-label={label}
+      className="min-w-12 rounded-pill px-2.5"
+    >
       {confirm ? "Confirm" : slot}
     </Button>
   );
@@ -89,28 +95,48 @@ const FIXTURE_TONE: Readonly<Record<"bye" | "live" | "plain", string>> = {
 };
 
 /**
- * THE ROW'S ONE NUMBER, AND ITS BASIS (P2). A man who has played shows what he scored; a man who
- * has not shows what he is projected for; a man nobody has a number for shows a dash and the
- * caption says why. One figure per row either way, never a projection and a score side by side,
- * because two numbers in one glance is the stat wall P2 rules out.
+ * THE ROW'S ONE NUMBER (P2). A man who has played shows what he scored; a man who has not shows
+ * what he is projected for; a man nobody has a number for shows a dash. One figure per row either
+ * way, never a projection and a score side by side, because two numbers in one glance is the stat
+ * wall P2 rules out.
  *
- * THE CAPTION NAMES THE RULES AND NOT THE SPAN, and that is a width decision made in favour of the
- * name. P2 asks that the basis be readable "in the same glance", not that every row repeat it: the
- * span is stated twice in this same view already, by the heading ("Week 18 lineup") and by the
- * total's own caption ("PPR, your starters in week 18"). Nine rows each restating "this week" cost
- * about 55px of row width at the 360px baseline, and the thing that width was coming out of was the
- * player's NAME, which P1 says is the largest and most legible thing on the row.
+ * THE KIND, NOT A CAPTION. `LineupRow` builds the caption, because what belongs in it depends on
+ * two facts this function cannot see (see `captionFor`).
  */
+type RowFigureKind = "measured" | "projected" | "absent";
+
 function rowFigure(
   playerId: string | null,
   points: ReadonlyMap<string, number | null> | undefined,
   projections: ReadonlyMap<string, number> | undefined,
-): { readonly value: string | null; readonly basis: string } {
+): { readonly value: string | null; readonly kind: RowFigureKind } {
   const scored = playerId === null ? null : (points?.get(playerId) ?? null);
-  if (scored !== null) return { value: formatPoints(scored), basis: "PPR" };
+  if (scored !== null) return { value: formatPoints(scored), kind: "measured" };
   const projected = playerId === null ? undefined : projections?.get(playerId);
-  if (projected !== undefined) return { value: formatPoints(projected), basis: "PPR proj" };
-  return { value: null, basis: "no number" };
+  if (projected !== undefined) return { value: formatPoints(projected), kind: "projected" };
+  return { value: null, kind: "absent" };
+}
+
+/**
+ * THE CAPTION SLOT GOES TO THE VARIABLE, NOT THE CONSTANT (whole-branch review, M1).
+ *
+ * The first pass printed "PPR" under all nine rows while the header already said it, and pushed the
+ * genuinely per-row fact — who he plays and when — off the phone behind a `hidden sm:inline`. That
+ * spends a row's one caption on nine repetitions of a constant and drops the only thing in it that
+ * differs by row.
+ *
+ * So the caption is the FIXTURE, at every width, and the only thing marked is the EXCEPTION: a
+ * number that is a forecast rather than a measurement. A measured row needs no basis at all,
+ * because it collapses to the header's own ("PPR, final" / "PPR projected, week 18") and P2 asks
+ * that the basis be readable in the same glance, not that every row repeat it.
+ *
+ * A BYE is NOT a fixture and stays on the meta line in the loss channel, because starting a
+ * bye-week player is the mistake that line exists to prevent and a caption is too quiet for it.
+ */
+function captionFor(kind: RowFigureKind, fixtureText: string | null): string {
+  if (kind === "absent") return fixtureText === null ? "no number" : `no number, ${fixtureText}`;
+  if (kind === "projected") return fixtureText === null ? "projected" : `projected, ${fixtureText}`;
+  return fixtureText ?? "";
 }
 
 /**
@@ -144,26 +170,29 @@ function LineupRow({
   readonly emptyWord?: string;
   readonly designation?: string | null;
   readonly fixtures: FixtureMap | undefined;
-  readonly figure: { readonly value: string | null; readonly basis: string } | null;
+  readonly figure: { readonly value: string | null; readonly kind: RowFigureKind } | null;
   readonly selected: boolean;
   readonly control: ReactNode;
   readonly action: ReactNode;
 }) {
   const shell = rowShellClass(selected, selected ? "ring-2 ring-accent" : "");
   if (player === null) {
+    // ONE SENTENCE PER EMPTY SLOT (whole-branch review, M2): the banner above says what to do and
+    // the slot pill is the verb's own label, so the row says only what is true of it.
     return (
       <div className={shell}>
         <div className="shrink-0">{control}</div>
         <span aria-hidden="true" className="size-9 shrink-0 rounded-pill border border-dashed border-edge" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className={`${ROW_NAME_CLASS} text-text-muted`}>{emptyWord ?? "Empty"}</span>
-          <span className="truncate text-sm text-text-muted">Tap a bench player to move him in</span>
         </div>
         <BigNumber value={null} basis="no starter yet" size="sm" className="shrink-0" />
       </div>
     );
   }
   const fixture = fixtureMeta(fixtures, player.nflTeam);
+  const onBye = fixture?.tone === "bye";
+  const caption = figure === null ? null : captionFor(figure.kind, onBye || fixture === null ? null : fixture.text);
   return (
     <div className={shell}>
       <div className="shrink-0">{control}</div>
@@ -173,18 +202,18 @@ function LineupRow({
         <span className={ROW_META_CLASS}>
           <PositionBadge position={player.position} size="sm" />
           {player.nflTeam === "" ? null : <span className="shrink-0 font-mono text-xs text-text-faint">{player.nflTeam}</span>}
-          {/* THE FIXTURE STANDS DOWN AT 360px. A truncated "BUF v…" is not a fact a manager can
-              read, and P1 says the NAME is the largest and most legible thing on a row — so the
-              opponent and kickoff, which is the least load-bearing of the four things on the meta
-              line, is the one that yields the width. A bye still shows at every width, because
-              starting a bye-week player is the mistake this line exists to prevent. */}
-          {fixture === null ? null : (
-            <span className={`truncate ${fixture.tone === "bye" ? "" : "hidden sm:inline"} ${FIXTURE_TONE[fixture.tone]}`}>{fixture.text}</span>
-          )}
+          {onBye ? <span className={`shrink-0 ${FIXTURE_TONE.bye}`}>{fixture.text}</span> : null}
           <DesignationChip designation={designation} />
         </span>
       </div>
-      {figure === null ? null : <BigNumber value={figure.value} basis={figure.basis} size="sm" className="shrink-0" />}
+      {figure === null || caption === null ? null : (
+        <BigNumber
+          value={figure.value}
+          basis={fixture?.tone === "live" ? <span className={FIXTURE_TONE.live}>{caption}</span> : caption}
+          size="sm"
+          className="shrink-0"
+        />
+      )}
       {action === null ? null : <div className="shrink-0">{action}</div>}
     </div>
   );
@@ -252,9 +281,39 @@ export function LineupEditor({
       setIrStatus("We could not reach the server. Check your connection and try again.");
     }
   };
-  const [assignments, setAssignments] = useState<Readonly<Record<string, string | null>>>(
+  /**
+   * THE SLOT MAP, DERIVED FROM PROPS WITH A VERSION KEY (whole-branch review, M5).
+   *
+   * It used to be `useState(() => …)`, whose initialiser runs exactly once — so when an IR move
+   * called `router.refresh()` and the server handed down a different roster, the editor kept
+   * rendering the old one. Bounded today because "To IR" only appears on bench rows, but a roster
+   * changed in another tab, a commissioner's move, or any future starter-side write left the screen
+   * telling a story the server had already replaced.
+   *
+   * `serverVersion` is the server's own starter map as a string. When it changes, the state resets
+   * to the server's story during render — React's documented "adjusting state when a prop changes"
+   * pattern, which is cheaper and more correct than an effect (an effect would paint the stale
+   * lineup for a frame first). An optimistic swap does NOT change `serverVersion`, so the manager's
+   * own in-flight move survives every re-render that is not a new server story.
+   */
+  const serverAssignments = useMemo(
     () => Object.fromEntries(lineup.starters.map((slot) => [slotKey(slot), slot.playerId])),
+    [lineup.starters],
   );
+  const serverVersion = useMemo(
+    () => lineup.starters.map((slot) => `${slotKey(slot)}=${slot.playerId ?? ""}`).join("|"),
+    [lineup.starters],
+  );
+  const [slotState, setSlotState] = useState<{ readonly version: string; readonly assignments: Readonly<Record<string, string | null>> }>(
+    () => ({ version: serverVersion, assignments: serverAssignments }),
+  );
+  if (slotState.version !== serverVersion) {
+    setSlotState({ version: serverVersion, assignments: serverAssignments });
+  }
+  const assignments = slotState.version === serverVersion ? slotState.assignments : serverAssignments;
+  const setAssignments = (next: Readonly<Record<string, string | null>>): void => {
+    setSlotState({ version: serverVersion, assignments: next });
+  };
   /** ESPN's selection: a starter slot's key, or `bench:<playerId>`. One at a time, ever. */
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -418,16 +477,45 @@ export function LineupEditor({
   const knownPoints = pointsByPlayerId === undefined ? [] : starterIds.map((id) => pointsByPlayerId.get(id) ?? null).filter((v): v is number => v !== null);
   const startersPointsTotal = knownPoints.length === 0 ? null : knownPoints.reduce((sum, v) => sum + v, 0);
 
-  // THE ONE BIG NUMBER (P2). Points once any starter has played, projection before that, and a
-  // dash when the product holds neither — never both at once, which is the stat wall P2 rules
-  // out. Sums cover only KNOWN numbers: an absent projection or an unplayed man contributes
-  // nothing rather than a fake zero.
-  const headline =
-    startersPointsTotal !== null
-      ? { value: formatPoints(startersPointsTotal), basis: `PPR, your starters in ${formatWeek(lineup.weekNumber).toLowerCase()}` }
-      : startersProjTotal !== null
-        ? { value: formatPoints(startersProjTotal), basis: `projected, PPR, your ${lineup.starters.length} starters` }
-        : { value: null, basis: "no projection for this week yet" };
+  /**
+   * THE ONE BIG NUMBER, AND A BASIS IT ACTUALLY HAS (P2, P11 — whole-branch review, C1).
+   *
+   * The first pass took the measured total the moment ANY starter had played and captioned it "PPR,
+   * your starters in week 18". Between Thursday night and Sunday afternoon — the window a manager
+   * actually opens this screen in — that printed one Thursday starter's 12.40 under a caption
+   * claiming nine contributors, beside a foot reading "Your 9". The number named a basis it did not
+   * have, every single week.
+   *
+   * THE RULING: the headline is the PROJECTED total until every starter has played, then the
+   * MEASURED total, called final. A partial week is not hidden — it is stated separately, on its
+   * own line, as what it is ("3 of 9 played, 41.2 so far"), which is a true sentence about a real
+   * subset rather than a false caption on a total.
+   *
+   * The projection's own caption is honest the same way: a snapshot that names only some of the
+   * starters says so rather than captioning a partial sum as the whole lineup.
+   */
+  const starterCount = lineup.starters.length;
+  const allPlayed =
+    starterCount > 0 &&
+    lineup.starters.every((slot) => {
+      const id = assignments[slotKey(slot)] ?? null;
+      return id !== null && (pointsByPlayerId?.get(id) ?? null) !== null;
+    });
+  const weekWord = formatWeek(lineup.weekNumber).toLowerCase();
+  const headline = allPlayed
+    ? { value: formatPoints(startersPointsTotal ?? 0), basis: "PPR, final" }
+    : startersProjTotal === null
+      ? { value: null, basis: "no projection for this week yet" }
+      : {
+          value: formatPoints(startersProjTotal),
+          basis: knownProj.length === starterCount ? `PPR projected, ${weekWord}` : `PPR projected, ${knownProj.length} of ${starterCount} starters`,
+        };
+  /** What is actually on the board so far, said as the subset it is. `null` before anybody has
+   *  played and once everybody has, because in neither case is there a partial to disclose. */
+  const soFar =
+    allPlayed || startersPointsTotal === null || knownPoints.length === 0
+      ? null
+      : `${knownPoints.length} of ${starterCount} played, ${formatPoints(startersPointsTotal)} so far`;
 
   /** The one thing wrong with this lineup, said the way a friend would say it (P7). */
   const emptySlot = lineup.starters.find((slot) => (assignments[slotKey(slot)] ?? null) === null) ?? null;
@@ -442,14 +530,22 @@ export function LineupEditor({
           {/* Under its heading, not orphaned at the far edge (the persona pass, 2026-08-30). */}
           <p className="text-sm text-text-faint">{subtitle}</p>
         </div>
-        <BigNumber value={headline.value} basis={headline.basis} size="lg" />
+        <div className="flex flex-col items-end gap-1">
+          <BigNumber value={headline.value} basis={headline.basis} size="lg" />
+          {/* WHAT IS ACTUALLY IN, as its own sentence rather than as a caption on a total that is
+              not it. A partial week has two true things to say and this is the second. */}
+          {soFar === null ? null : <p className="text-sm text-text-muted">{soFar}</p>}
+        </div>
       </div>
 
-      {/* THE ONE THING WRONG, with no verb of its own: the slot on the row below IS the verb, and
-          a second solid button up here would be P3's two competing calls to action. */}
+      {/* THE ONE THING WRONG, and only once (whole-branch review, M2). It carries no verb of its
+          own — the slot pill on the row below is the verb's own label, and a second solid button up
+          here would be P3's two competing calls to action — and it names NO DAY, because an empty
+          slot has no player, therefore no club, therefore no fixture to read a kickoff off. The
+          first pass hardcoded "for Sunday" for a slot whose game may be a Thursday or a Monday. */}
       {emptySlot === null || isLocked ? null : (
         <p className="rounded-xl border-l-[3px] border-l-self bg-surface-elevated px-4 py-3 font-display text-md font-bold text-text-primary shadow-raised">
-          {`Your ${slotWord(emptySlot.slot).toLowerCase()} is empty for Sunday. Tap a bench player to move him in.`}
+          {`Your ${slotWord(emptySlot.slot).toLowerCase()} is empty.`}
         </p>
       )}
 
@@ -497,7 +593,12 @@ export function LineupEditor({
                       label={
                         canReceive
                           ? `Confirm ${byId.get(selectedPlayerId!)?.playerName ?? "the selected player"} at ${slot.slot}`
-                          : `Swap ${occupant?.playerName ?? `whoever plays ${slot.slot}`}`
+                          : // A control that cannot be pressed is named for what it IS rather than
+                            // for an act it will not perform: a locked week's slots say who plays
+                            // there, they do not offer a swap nobody can make.
+                            occupantId === null || occupantLocked || isLocked || moving
+                            ? `${occupant?.playerName ?? "Nobody"} plays ${slot.slot}`
+                            : `Swap ${occupant?.playerName ?? `whoever plays ${slot.slot}`}`
                       }
                       onPress={
                         isLocked
@@ -531,9 +632,14 @@ export function LineupEditor({
         </ul>
 
         {/* THE TOTAL, restated at the foot of the column the eye just read down. It is the SAME
-            fact the head's big number carries, at row size, so the screen still shows one. */}
+            fact the head's big number carries, at row size, so the screen still shows one.
+
+            THE LABEL NAMES NO COUNT (whole-branch review, C1). It read "Your 9" beside whatever the
+            head was showing, which on a partly-played week was a claim about nine contributors
+            standing over a sum of one. The head's own caption already says what the figure is and
+            over how many starters, so the label here says only whose it is. */}
         <div className="flex items-center justify-between gap-3 border-t border-line px-2.5 pb-1 pt-3">
-          <span className={`${MICRO_LABEL} text-text-faint`}>{`Your ${lineup.starters.length}`}</span>
+          <span className={`${MICRO_LABEL} text-text-faint`}>Your starters</span>
           <BigNumber value={headline.value} basis={headline.basis} size="sm" />
         </div>
 
@@ -565,7 +671,13 @@ export function LineupEditor({
                       <SlotControl
                         slot="BN"
                         confirm={canReceive}
-                        label={canReceive ? `Confirm ${player.name} into the lineup` : `Swap ${player.name}`}
+                        label={
+                          canReceive
+                            ? `Confirm ${player.name} into the lineup`
+                            : isLocked || benchLocked || moving
+                              ? `${player.name} is on your bench`
+                              : `Swap ${player.name}`
+                        }
                         onPress={
                           isLocked ? undefined : canReceive ? () => swapWithBench(slot.playerId!) : moving || benchLocked ? undefined : () => setSelected(key)
                         }

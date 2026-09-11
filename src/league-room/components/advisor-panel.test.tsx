@@ -22,11 +22,14 @@ describe("AdvisorPanel", () => {
         <AdvisorPanel leagueId="l1" weekNumber={4} />
       </LeagueRoomDepsProvider>,
       async ({ container }) => {
-        // The aside ("Advice only. You make the move.") died in the 2026-08-30 scan pass; the
-        // eyebrow heading and the single quiet button carry the whole identity now.
-        expect(screen.getByRole("heading", { name: "Lineup advisor" })).toBeInTheDocument();
+        // The aside ("Advice only. You make the move.") died in the 2026-08-30 scan pass, and the
+        // EYEBROW died in the Sideline pass (whole-branch review, H5): a heading that repeats the
+        // field's own label is the explainer P7 rules out. The field names the panel, the section
+        // keeps the accessible name, and one verb carries the act.
+        expect(screen.queryByRole("heading", { name: "Lineup advisor" })).toBeNull();
+        expect(screen.getByRole("region", { name: "Lineup advisor" })).toBeInTheDocument();
         expect(screen.getByLabelText("Ask about your lineup")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Get advice" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Ask" })).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
@@ -36,7 +39,7 @@ describe("AdvisorPanel", () => {
     const fixture = fixtureLeagueDeps(ADVICE);
     renderInLeague(<AdvisorPanel leagueId="l1" weekNumber={4} />, fixture.deps);
     fireEvent.change(screen.getByLabelText("Ask about your lineup"), { target: { value: "Who do I start at WR?" } });
-    fireEvent.click(screen.getByRole("button", { name: "Get advice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     await waitFor(() => expect(screen.getByText("Start Volume Slot.")).toBeInTheDocument());
     expect(screen.getByText("Ten catches a week is ten points a week in this league.")).toBeInTheDocument();
@@ -47,7 +50,7 @@ describe("AdvisorPanel", () => {
     const fixture = fixtureLeagueDeps(DEGRADED);
     renderInLeague(<AdvisorPanel leagueId="l1" weekNumber={4} />, fixture.deps);
     fireEvent.change(screen.getByLabelText("Ask about your lineup"), { target: { value: "Who do I start?" } });
-    fireEvent.click(screen.getByRole("button", { name: "Get advice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     await waitFor(() => expect(screen.getByText("Offline advice")).toBeInTheDocument());
     expect(screen.getByText("Start Volume Slot.")).toBeInTheDocument();
@@ -58,7 +61,7 @@ describe("AdvisorPanel", () => {
     const fixture = fixtureLeagueDeps({ ok: false, error: "You do not have a team in this league." });
     renderInLeague(<AdvisorPanel leagueId="l1" weekNumber={4} />, fixture.deps);
     fireEvent.change(screen.getByLabelText("Ask about your lineup"), { target: { value: "Who do I start?" } });
-    fireEvent.click(screen.getByRole("button", { name: "Get advice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("You do not have a team in this league."));
     expect(screen.getByLabelText("Ask about your lineup")).toHaveValue("Who do I start?");
@@ -73,7 +76,7 @@ describe("AdvisorPanel", () => {
   it("does not call the advisor for an empty question", () => {
     const fixture = fixtureLeagueDeps(ADVICE);
     renderInLeague(<AdvisorPanel leagueId="l1" weekNumber={4} />, fixture.deps);
-    fireEvent.click(screen.getByRole("button", { name: "Get advice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
     expect(fixture.calls).toEqual([]);
   });
 
@@ -81,7 +84,7 @@ describe("AdvisorPanel", () => {
     const fixture = fixtureLeagueDeps(ADVICE);
     renderInLeague(<AdvisorPanel leagueId="l1" weekNumber={4} />, fixture.deps);
     fireEvent.change(screen.getByLabelText("Ask about your lineup"), { target: { value: "Who do I start?" } });
-    fireEvent.click(screen.getByRole("button", { name: "Get advice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
     await waitFor(() => expect(screen.getByText("Start Volume Slot.")).toBeInTheDocument());
 
     for (const label of ["Apply", "Set lineup", "Accept", "Do it"]) {

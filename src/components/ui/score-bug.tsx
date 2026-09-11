@@ -98,7 +98,10 @@ function Side({ side, align }: { readonly side: ScoreBugSide; readonly align: "s
         avatar={side.managerAvatar}
         size="lg"
         ring={side.ring}
-        meta={side.record === undefined ? side.teamName : `${side.teamName} · ${side.record}`}
+        // A SEPARATOR NEEDS TWO SIDES (whole-branch review, LOW). A caller with no standings to
+        // join falls back to an empty record, and the old `undefined` test let that through as
+        // "Bay Bandits · " with nothing after it. Anything absent simply does not appear.
+        meta={[side.teamName, side.record].filter((part) => part !== undefined && part !== "").join(" · ")}
         className="flex-1"
       />
       <BigNumber value={side.score} basis={side.basis} size="lg" align={align === "end" ? "start" : "end"} changed={side.changed} className="shrink-0" />

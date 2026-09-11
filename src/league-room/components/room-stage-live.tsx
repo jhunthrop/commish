@@ -10,6 +10,7 @@ import type { FixtureLabel } from "@/league-service/nfl-schedule";
 import type { MatchupDetail, MatchupLineupEntry, MatchupSide, MatchupWeekBody } from "../contract";
 import { useLiveScores } from "../hooks/use-live-scores";
 import { formatPoints } from "../lib/format";
+import { sundaySentence } from "../lib/sunday-sentence";
 import type { ManagersByTeamId } from "../lib/managers";
 import { remainingToPlay } from "../lib/matchup-facts";
 import { playerOf } from "../lib/player";
@@ -48,44 +49,6 @@ function bestLeft(side: MatchupSide, projections: ReadonlyMap<string, number>): 
   return top;
 }
 
-/** A player's surname, which is how anybody in a group chat says his name once the room knows who
- *  he is. "Skattebo", not "Cam Skattebo". */
-function lastName(name: string): string {
-  const parts = name.trim().split(" ");
-  return parts[parts.length - 1] ?? name;
-}
-
-/**
- * THE BORROWED SENTENCE: *"You need 11.4 from Cook"* (section 5 of the first-principles document,
- * Sunday only). It is arithmetic and never a forecast, which is the only reason it is allowed to
- * be this confident: the gap is two numbers already on the board subtracted, and the name is the
- * highest-projected starter on that side who has not played. Both inputs are printed or beside it
- * on the same screen.
- *
- * It speaks to whoever is BEHIND, because that is who has a question. Level with nobody left, or a
- * week with no scores yet, returns `null` and the strip is plain facts and one verb, which is what
- * the lower third is off Sunday anyway.
- */
-function needSentence(
-  mine: MatchupSide,
-  theirs: MatchupSide,
-  myScore: number | null,
-  theirScore: number | null,
-  theirManager: string,
-  projections: ReadonlyMap<string, number>,
-): string | null {
-  if (myScore === null || theirScore === null) return null;
-  const margin = myScore - theirScore;
-  if (margin < 0) {
-    const man = bestLeft(mine, projections);
-    if (man === null || man.playerName === null) return null;
-    return `You need ${formatPoints(Math.abs(margin))} from ${lastName(man.playerName)} to catch ${theirManager}.`;
-  }
-  const man = bestLeft(theirs, projections);
-  if (man === null || man.playerName === null) return null;
-  return `${theirManager} needs ${formatPoints(margin)} from ${lastName(man.playerName)} to catch you.`;
-}
-
 /**
  * ONE STARTER ON SUNDAY: his face, his name, where his game is, and the one number with its basis.
  *
@@ -105,10 +68,15 @@ function StarterRow({
 }) {
   const player = playerOf(entry);
   const live = fixture?.status === "in_progress";
-  const waiting = entry.points === null;
-  const figure = waiting
-    ? { value: projection === null ? null : formatPoints(projection), basis: projection === null ? "no projection" : "projected, PPR" }
-    : { value: formatPoints(entry.points ?? 0), basis: fixture?.status === "final" ? "PPR, final" : "PPR so far" };
+  // `scored` rather than a re-test of `entry.points` at the use site: the narrow is done ONCE, so
+  // the measured branch holds a real number and needs no `?? 0` standing in for a case the branch
+  // has already ruled out (whole-branch review, LOW).
+  const scored = entry.points;
+  const waiting = scored === null;
+  const figure =
+    scored === null
+      ? { value: projection === null ? null : formatPoints(projection), basis: projection === null ? "no projection" : "projected, PPR" }
+      : { value: formatPoints(scored), basis: fixture?.status === "final" ? "PPR, final" : "PPR so far" };
   return (
     <div className={rowShellClass(false, waiting ? "opacity-70" : "")}>
       {player === null ? (
@@ -207,7 +175,15 @@ export function RoomStageLive(props: RoomStageLiveProps) {
     entry.playerId === null ? null : (projectionsByPlayerId.get(entry.playerId) ?? null);
 
   const isLive = live.status === "in_progress";
-  const say = needSentence(mySide, theirSide, myScore, theirScore, theirManager.name, projectionsByPlayerId);
+  const myBestLeft = bestLeft(mySide, projectionsByPlayerId);
+  const say = sundaySentence({
+    myScore,
+    theirScore,
+    myRemaining,
+    theirRemaining,
+    theirManager: theirManager.name,
+    myBestLeftName: myBestLeft?.playerName ?? null,
+  });
 
   return (
     // `data-week` is a TEST CONTRACT: `useLiveScores` refuses a `score.update` frame for any week
@@ -286,10 +262,21 @@ export function RoomStageLive(props: RoomStageLiveProps) {
         cells={[
           ...(live.gamesTotal === 0 ? [] : [{ label: "Games final", value: `${live.gamesFinal}/${live.gamesTotal}` }]),
           { label: "Your margin", value: margin === null ? "–" : `${margin >= 0 ? "+" : "−"}${formatPoints(Math.abs(margin))}` },
-          ...(myRemaining === 0 ? [] : [{ label: "Still to play", value: <span className="text-live">{myRemaining}</span> }]),
+          // BOTH REMAINING COUNTS (whole-branch review, H3). The strip carried only the reader's
+          // own, which is half of what decides the afternoon: a five-point lead over a manager with
+          // four still to play is a different fact from the same lead over one who is finished, and
+          // the sentence above now refuses to claim otherwise. The reader can see the pair it is
+          // reasoning from.
+          ...(myRemaining === 0 ? [] : [{ label: "Yours to play", value: <span className="text-live">{myRemaining}</span> }]),
+          ...(theirRemaining === 0 ? [] : [{ label: "Theirs to play", value: theirRemaining }]),
         ]}
+        // THE VERB GOES QUIET WHILE THE GAMES ARE ON (whole-branch review, M4). This viewport
+        // already spends three chroma channels: amber for you, rose for your rival, live green for
+        // what is happening now. Court blue on a link out would be a fourth, on the one screen
+        // whose whole job is that the live channel is the loudest thing present. Off Sunday the
+        // stage is not live and the verb takes its usual pill.
         action={
-          <ButtonLink href={`/app/leagues/${leagueId}/team`} variant="verb" size="sm">
+          <ButtonLink href={`/app/leagues/${leagueId}/team`} variant={isLive ? "secondary" : "verb"} size="sm">
             Open your team
           </ButtonLink>
         }

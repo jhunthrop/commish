@@ -13,7 +13,7 @@ import { ChapterBand } from "@/components/ui/chapter-band";
 import { Icon } from "@/components/ui/icon";
 import type { ActivityFeedRow } from "@/integrity-service/activity";
 import { useReaderClock } from "../hooks/use-reader-clock";
-import { byDay, dayMarker } from "../lib/day-chapters";
+import { FALLBACK_TIME_ZONE, byDay, dayMarker } from "../lib/day-chapters";
 import { mergeStream, type StreamItem } from "../lib/stream-items";
 
 export interface RoomStreamProps {
@@ -160,7 +160,7 @@ export function RoomStream({ leagueId, activityRows, sendIsTheAct }: RoomStreamP
           <p className="py-6 text-center text-sm text-text-faint">Nothing has happened here yet. Say the first thing.</p>
         ) : (
           <div role="log" aria-live="polite" aria-label="What happened" className="flex flex-col gap-4">
-            {byDay(items).map((chapter) => (
+            {byDay(items, clock?.timeZone ?? FALLBACK_TIME_ZONE).map((chapter) => (
               <section key={chapter.key} aria-label={dayMarker(chapter.rows[0]!.occurredAt, clock)} className="flex flex-col gap-3">
                 <ChapterBand name={dayMarker(chapter.rows[0]!.occurredAt, clock)} consequence={`${chapter.rows.length} ${chapter.rows.length === 1 ? "thing" : "things"}`} />
                 {chapter.rows.map((item: StreamItem) =>

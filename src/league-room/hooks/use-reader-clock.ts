@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FALLBACK_LOCALE, type ReaderClock } from "../lib/day-chapters";
+import { FALLBACK_LOCALE, FALLBACK_TIME_ZONE, type ReaderClock } from "../lib/day-chapters";
 
 /**
  * THE READER'S OWN CLOCK AND LOCALE, resolved after mount and never during a render.
@@ -18,22 +18,26 @@ import { FALLBACK_LOCALE, type ReaderClock } from "../lib/day-chapters";
  * leaves a tab open across midnight sees yesterday's chapter still called "Today" until the page
  * is next touched, which is the same thing every chat client does.
  *
- * `resolvedOptions().locale` rather than `navigator.language`: it is the locale `toLocaleDateString`
- * will ACTUALLY use, so the string a consumer gets is the string the browser would have produced
- * anyway. It throws on nothing in practice, but a browser with `Intl` locked down would, so the
- * fallback is the same constant the null branch uses.
+ * `resolvedOptions()` rather than `navigator.language` and a guess at the offset: it reports the
+ * locale AND the IANA zone `toLocaleDateString` will ACTUALLY use, so the string a consumer gets is
+ * the string the browser would have produced anyway. Both are read in one call. It throws on
+ * nothing in practice, but a browser with `Intl` locked down would, so the fallbacks are the same
+ * constants the null branch uses.
  */
 export function useReaderClock(): ReaderClock | null {
   const [clock, setClock] = useState<ReaderClock | null>(null);
 
   useEffect(() => {
     let locale = FALLBACK_LOCALE;
+    let timeZone = FALLBACK_TIME_ZONE;
     try {
-      locale = new Intl.DateTimeFormat().resolvedOptions().locale;
+      const resolved = new Intl.DateTimeFormat().resolvedOptions();
+      locale = resolved.locale;
+      timeZone = resolved.timeZone;
     } catch {
-      // A browser with Intl locked down keeps the constant, which is a real day name either way.
+      // A browser with Intl locked down keeps the constants, which are a real day name either way.
     }
-    setClock({ nowMs: Date.now(), locale });
+    setClock({ nowMs: Date.now(), locale, timeZone });
   }, []);
 
   return clock;

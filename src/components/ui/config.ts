@@ -124,15 +124,6 @@ export const UI_CONFIG = {
      */
     lowSeatsThreshold: 3,
   },
-  table: {
-    /**
-     * `Table`'s row height no longer lives here. It is `TOKENS.density.rowPx` and
-     * `TOKENS.density.denseRowPx` (Sideline, 2026-09-10), because a row's rhythm is a property of
-     * the design system and not of one primitive's configuration, and `PlayerRow` and `TeamRow`
-     * were already standing at those two numbers while this file held a third. `denseRowPaddingPx`
-     * is deleted rather than deprecated: an option no consumer reads is dead configuration.
-     */
-  },
   waitingRoom: {
     /**
      * D1, the seating moment (Phase 3.6, Task 9, Step 2b): how long after a manager's own
