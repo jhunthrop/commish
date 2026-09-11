@@ -55,7 +55,7 @@ function Dot() {
 
 /**
  * The storefront's live marker — now Sideline's own `LiveChip` primitive (the live-green chip
- * with the breathing dot), which is where `LiveMarker` retires. The label is still DERIVED on
+ * with the breathing dot), which is where the live marker retired. The label is still DERIVED on
  * every render from facts already on the wire, never a stored flag.
  */
 export function LiveChip({ label }: { readonly label: string }) {

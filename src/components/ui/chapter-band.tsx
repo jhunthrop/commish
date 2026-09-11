@@ -73,11 +73,15 @@ export function ChapterBand({ name, consequence, caption, tone = "quiet", classN
   return (
     <div
       data-chapter={tone}
-      className={`flex flex-col gap-1 border-t border-line bg-gradient-to-r from-surface-raised to-transparent px-2 py-1.5 ${className}`}
+      className={`flex flex-col gap-1 px-2 py-1.5 ${className}`}
     >
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        {/* The one sanctioned all-caps register (caps charter) — imported, never hand-rolled. */}
-        <span className={`${MICRO_LABEL} rounded-sm px-2 py-0.5 font-semibold ${PLATE_CLASS[tone]}`}>{name}</span>
+        {/* The one sanctioned all-caps register (caps charter) — imported, never hand-rolled.
+            SIDELINE WAVE TWO: the plate is a PILL (`shape.chip`), and the band lost the top
+            hairline and the left-to-right gradient it carried through v5. Sideline separates a
+            chapter from the rows above it by rhythm, and a gradient is a material this system
+            does not own — the plate alone is the marker. */}
+        <span className={`${MICRO_LABEL} rounded-pill px-2.5 py-0.5 font-semibold ${PLATE_CLASS[tone]}`}>{name}</span>
         <span className={`${MICRO_LABEL} min-w-0 text-text-muted`}>{consequence}</span>
       </div>
       {caption === undefined ? null : (

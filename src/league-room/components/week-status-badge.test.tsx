@@ -23,7 +23,7 @@ describe("WeekStatusBadge", () => {
     await renderSurface(<WeekStatusBadge status="in_progress" />, async ({ container }) => {
       expect(screen.getByText("Live")).toBeInTheDocument();
       // Sunday v5's channel split: `live` is its own ink now, never the negative red, and the
-      // live state is a LiveMarker (dot beside the word) rather than a ringed pill.
+      // live state is a LiveChip (dot inside the chip) rather than a ringed pill.
       expect(screen.getByText("Live").className).toMatch(/text-live/);
       expect(screen.getByText("Live").className).not.toMatch(/ring-/);
       expect(screen.getByText("Live").className).not.toMatch(/negative/);

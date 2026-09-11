@@ -316,7 +316,7 @@ test("a trade past the auto-hold threshold really holds, and the counterparty re
 
       // --- Manager B accepts — and this one holds instead of executing ------------------------
       await pageB.goto(`/app/leagues/${E2E_HELD_TRADE_LEAGUE_ID}/trades`);
-      const inboundCard = pageB.getByRole("region", { name: "Offers to answer" }).getByRole("article", { name: "Trade with E2E Held Trade Team 1" });
+      const inboundCard = pageB.getByRole("region", { name: "Needs your answer" }).getByRole("article", { name: "Trade with E2E Held Trade Team 1" });
       await expect(inboundCard).toBeVisible();
       await inboundCard.getByRole("button", { name: "Accept" }).click();
       await pageB.getByRole("button", { name: "Confirm trade" }).click();

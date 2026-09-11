@@ -39,6 +39,18 @@ const DEAD_ROW = {
   scheduledFor: "2026-09-10T18:00:00.000Z",
 };
 
+const RUN_ROW = {
+  runId: 31,
+  jobId: 7,
+  name: "season-week",
+  attempt: 2,
+  status: "succeeded" as const,
+  startedAt: "2026-09-10T13:59:00.000Z",
+  finishedAt: "2026-09-10T14:00:00.000Z",
+  error: null,
+  errorKind: null,
+};
+
 const SCHEDULE_ROW = {
   name: "season-week-tue-data",
   cron: "0 8 * * 2",
@@ -80,5 +92,35 @@ describe("AdminJobsPage — the states", () => {
     expect(screen.getByText(/week has already begun/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run again" })).toBeInTheDocument();
     expect(screen.getByText("0 8 * * 2 (America/New_York)")).toBeInTheDocument();
+    // The facts that used to buy their own columns still read, stacked under the job they belong
+    // to — nothing an operator needs was dropped to reach four columns.
+    expect(screen.getByText("failed")).toBeInTheDocument();
+    expect(screen.getByText("5/5")).toBeInTheDocument();
+    expect(screen.getByText("died 2026-09-10 14:00Z")).toBeInTheDocument();
+  });
+
+  // FOUR COLUMNS (`TOKENS.density.maxColumns`), on the operator surface too. The jobs tables ran
+  // to six and five, which is the seven-column table the design rules out arriving one column at
+  // a time. Asserted on the rendered <th> count so a new column has to be a deliberate choice.
+  it("keeps every jobs table inside four columns", async () => {
+    vi.mocked(deadLetterJobs).mockResolvedValue([DEAD_ROW]);
+    vi.mocked(scheduleStatuses).mockResolvedValue([SCHEDULE_ROW]);
+    vi.mocked(recentRuns).mockResolvedValue([RUN_ROW]);
+    const { container } = render(await AdminJobsPage());
+
+    const tables = container.querySelectorAll("table");
+    expect(tables.length).toBe(3);
+    for (const table of tables) {
+      expect(table.querySelectorAll("thead th").length).toBeLessThanOrEqual(4);
+    }
+  });
+
+  // A job that is merely WORKING is not in trouble: `running` wears the live channel, not the
+  // rose a clock running out wears. No literal colour anywhere on this surface.
+  it("tones a running job live and a failed one negative, through Badge and never a raw class", async () => {
+    vi.mocked(recentRuns).mockResolvedValue([{ ...RUN_ROW, status: "running" as const, error: null, errorKind: null }]);
+    const { container } = render(await AdminJobsPage());
+    expect(screen.getByText("running").className).toContain("text-live");
+    expect(container.innerHTML).not.toMatch(/#[0-9a-fA-F]{6}/);
   });
 });

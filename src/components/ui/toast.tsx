@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEntranceClass } from "@/design/use-motion";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { UI_CONFIG } from "./config";
 import { Button } from "./button";
@@ -44,6 +45,10 @@ function ToastItem({
   readonly dismissMs: number;
   readonly onDismiss: (id: number) => void;
 }) {
+  // P4's arrival verb: a toast is something that LANDED, so it springs in like every other thing
+  // that appears in this system. Reduced motion returns an empty class, never a shorter spring.
+  const entrance = useEntranceClass();
+
   useEffect(() => {
     const timer = setTimeout(() => onDismiss(toast.id), dismissMs);
     return () => clearTimeout(timer);
@@ -51,7 +56,7 @@ function ToastItem({
 
   const tone = toast.tone ?? "info";
   return (
-    <li className="pointer-events-auto">
+    <li className={`pointer-events-auto ${entrance}`}>
       {/*
        * `role="alert"` lives on this inner div, not the <li>: ARIA-in-HTML forbids overriding
        * an <li>'s implicit `listitem` role with `alert`, and axe's `list` rule then flags the
@@ -60,7 +65,10 @@ function ToastItem({
        */}
       <div
         role={tone === "error" ? "alert" : undefined}
-        className={`flex items-start gap-3 rounded-md border bg-surface-elevated p-3 text-sm text-text-primary shadow-card ${TONE[tone]}`}
+        // SIDELINE WAVE TWO: a toast is a small card, so it takes the card corner (`shape.card`,
+        // 20px) and the overlay shadow it needs to read as floating over the page rather than
+        // sitting in it. The tone stays a 1px boundary and never a fill: a toast is a sentence.
+        className={`flex items-start gap-3 rounded-xl border bg-surface-elevated p-3 text-sm text-text-primary shadow-overlay ${TONE[tone]}`}
       >
         <span className="grow">{toast.message}</span>
         {toast.action ? (

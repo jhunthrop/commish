@@ -29,7 +29,7 @@ export interface SegmentGroupProps {
  * THE SEGMENTED RAIL — one strip of flat segments, the active one filled amber on `accentText`
  * ink, in the rail register. The broadcast answer to "pick one of a few": /browse's filters wore
  * it first, the free-agents board hand-rolled it second, and the mock setup form was about to be
- * the third copy, which is the extraction rule this repo holds (`LiveMarker`'s own history).
+ * the third copy, which is the extraction rule this repo holds (`LiveChip`'s own history).
  *
  * Amber is law 4's furniture channel and a filter or a setting is furniture — this is the one
  * fill that never claims to be a verdict or a verb. Buttons with `aria-pressed`, one per option,

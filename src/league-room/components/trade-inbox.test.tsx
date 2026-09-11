@@ -12,6 +12,10 @@ const CONTEXT: TradeRoomContext = {
   weekNumber: 5,
   myTeamId: "me",
   counterparties: [{ teamId: "them", teamName: "Iron Owls" }],
+  managersByTeamId: {
+    me: { teamName: "Bay Bandits", name: "Dana Whitfield", avatar: null },
+    them: { teamName: "Iron Owls", name: "Rey Okafor", avatar: null },
+  },
   rostersByTeamId: {
     me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB", nflTeam: "ATL", headshotUrl: null, adp: null }],
     them: [{ playerId: "p2", name: "Puka Nacua", position: "WR", nflTeam: "ATL", headshotUrl: null, adp: null }],
@@ -121,8 +125,8 @@ describe("TradeInbox", () => {
     expect(await screen.findByRole("button", { name: "Accept" })).toBeEnabled();
     expect(fixture.calls).toEqual(["GET /api/leagues/l1/trades"]); // no verdict call yet
 
-    fireEvent.click(screen.getByRole("button", { name: "See what the platform thinks of this trade" }));
-    expect(screen.getByText("Checking what the platform thinks of this trade.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Is it fair" }));
+    expect(screen.getByText("Checking whether it is fair.")).toBeInTheDocument();
     await fixture.settle(1, {
       ok: true,
       data: { headline: "Lopsided.", reasoning: "One side gives up far more per week.", degraded: false, verdict: "lopsided", flags: [], givingValue: 5, receivingValue: 40 },
@@ -139,7 +143,7 @@ describe("TradeInbox", () => {
     await fixture.settle(0, { ok: true, data: page });
     await screen.findByRole("button", { name: "Accept" });
 
-    fireEvent.click(screen.getByRole("button", { name: "See what the platform thinks of this trade" }));
+    fireEvent.click(screen.getByRole("button", { name: "Is it fair" }));
     await fixture.settle(1, { ok: false, error: "Too many trade actions in a short time. Give it a minute and try again." });
     expect(await screen.findByText(/Advice is unavailable right now\./)).toBeInTheDocument();
 

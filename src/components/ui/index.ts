@@ -24,8 +24,11 @@ export { Table, type TableColumn, type TableDensity } from "./table";
 export { Celebration } from "./celebration";
 export { CountdownLabel } from "./countdown";
 export { MotionList, type MotionRowProps } from "./motion-list";
-export { Rise } from "./rise";
-export { InfoTip } from "./info-tip";
+/** SIDELINE WAVE TWO (2026-09-11): `Rise`, `InfoTip` and `LiveMarker` left this barrel with their
+ *  files. `Rise`'s stagger is `useEntranceClass` (`@/design/use-motion`), which is the one place a
+ *  spring is spelled; `InfoTip` is ruled out by P7 ("if a word needs explaining, change the word")
+ *  and had no call site left to delete it with; `LiveMarker` retires into `PresenceDot` (the
+ *  breathing dot) and `LiveChip` (the dot inside its chip), both already below. */
 export { EYEBROW } from "./config";
 export { LedgerRow } from "./ledger-row";
 export { Panel } from "./panel";

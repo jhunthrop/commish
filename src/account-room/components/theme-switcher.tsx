@@ -129,7 +129,10 @@ export function ThemeSwitcher() {
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t-[3px] border-accent bg-surface-elevated px-5 py-3">
+    // SIDELINE (2026-09-11): the 3px accent wire across the top went. Sideline has one material —
+    // a layered surface with 20px corners and the soft shadow — and a coloured rule over a panel
+    // is v5 furniture spending the page's loudest pigment on a setting.
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl bg-surface-elevated px-5 py-4 shadow-card">
       <div className="flex min-w-0 flex-col justify-center">
         <span className={`${MICRO_LABEL} text-text-faint`}>Theme</span>
         <span className="font-display text-xl font-bold text-text-primary">{resolutionValue(theme, systemPrefersDark)}</span>

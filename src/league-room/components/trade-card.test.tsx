@@ -41,36 +41,42 @@ afterEach(() => {
 });
 
 describe("TradeCard", () => {
-  // Fix round 1, F2 (HIGH, member panel): neither the recipient nor the sender was ever told
-  // when an open offer stops being answerable, despite `expiresAt` already being on the wire.
-  it("shows a live remaining count on an open offer, for both the recipient and the sender", () => {
+  // SIDELINE (the wire, 2026-09-11): the remaining count is the card's ONE BIG NUMBER (P2) and it
+  // names the window it counts down from in the same glance (P11), where it used to be a sentence
+  // in the muted ink. Both sides of an open offer see it: the recipient deciding whether to
+  // answer now, and the sender waiting on a reply.
+  it("shows the days left as the card's one number, with its basis, for both sides", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-18T00:00:00.000Z")); // 3 full days before BASE.expiresAt
 
     const recipient = render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} />);
-    expect(screen.getByText("Expires in 3 days.")).toBeInTheDocument();
+    expect(screen.getByTestId("big-number")).toHaveTextContent("3");
+    expect(screen.getByText("days left, of 3 days")).toBeInTheDocument();
     recipient.unmount();
 
     render(<TradeCard leagueId="l1" trade={BASE} meTeamId="them" playersById={PLAYERS} />);
-    expect(screen.getByText("Expires in 3 days.")).toBeInTheDocument();
+    expect(screen.getByTestId("big-number")).toHaveTextContent("3");
   });
 
-  it("says today or tomorrow rather than a fraction of a day", () => {
+  it("counts whole days, so the last day reads as none left rather than a fraction", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-20T00:00:00.000Z")); // exactly 1 day before BASE.expiresAt
     const tomorrow = render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} />);
-    expect(screen.getByText("Expires tomorrow.")).toBeInTheDocument();
+    expect(screen.getByTestId("big-number")).toHaveTextContent("1");
+    // Fix round 1, H2: one day left is "day", not "days". The unit rides the basis so the "3"
+    // can never be read as a count of offers or of players in the deal.
+    expect(screen.getByText("day left, of 3 days")).toBeInTheDocument();
     tomorrow.unmount();
 
     vi.setSystemTime(new Date("2026-08-20T18:00:00.000Z")); // 6 hours left
     render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} />);
-    expect(screen.getByText("Expires today.")).toBeInTheDocument();
+    expect(screen.getByTestId("big-number")).toHaveTextContent("0");
   });
 
-  it("shows no expiry line once a trade has settled — there is nothing left to expire", () => {
+  it("shows no clock at all once a trade has settled, because there is nothing left to count", () => {
     const trade: TradeProposalView = { ...BASE, status: "rejected", settledAt: "2026-08-19T00:00:00.000Z" };
     render(<TradeCard leagueId="l1" trade={trade} meTeamId="me" playersById={PLAYERS} />);
-    expect(screen.queryByText(/^Expires/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("big-number")).not.toBeInTheDocument();
   });
 
   /**
@@ -86,7 +92,9 @@ describe("TradeCard", () => {
 
     render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} />);
     expect(screen.getByText("Expired August 21.")).toBeInTheDocument();
-    expect(screen.queryByText("Expires today.")).not.toBeInTheDocument();
+    // A dead offer has NO FIGURE, not a dash with a caption: the slot would be pretending there
+    // is still a count to make (P11, and the house rule that a dash is never a zero).
+    expect(screen.queryByTestId("big-number")).not.toBeInTheDocument();
   });
 
   it("takes the answer controls and the badge off an expired offer, for the party who owes an answer", () => {
@@ -152,15 +160,40 @@ describe("TradeCard states", () => {
     const onRequestAssessment = vi.fn();
     render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} onRequestAssessment={onRequestAssessment} />);
     expect(screen.queryByText(/weekly production/i)).not.toBeInTheDocument();
-    const ask = screen.getByRole("button", { name: "See what the platform thinks of this trade" });
+    const ask = screen.getByRole("button", { name: "Is it fair" });
     fireEvent.click(ask);
     expect(onRequestAssessment).toHaveBeenCalledWith("t1");
   });
 
+  // FIX ROUND 1, H1. The fairness read used to be a third BUTTON in the foot, beside the one
+  // irreversible pair, and it spoke in institutional third person ("What the platform thinks").
+  // It is a leaguemate's question now, asked quietly on the byline row, and the foot holds
+  // Decline and Accept and nothing else.
+  it("keeps the fairness read off the verb foot, so the foot holds the two answers only", () => {
+    render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} onRequestAssessment={vi.fn()} />);
+    const fair = screen.getByRole("button", { name: "Is it fair" });
+    const accept = screen.getByRole("button", { name: "Accept" });
+    const foot = accept.parentElement!.parentElement!;
+    expect(foot).toContainElement(screen.getByRole("button", { name: "Decline" }));
+    expect(foot).not.toContainElement(fair);
+    // It sits in the message's own byline, beside who said it and when.
+    expect(fair.closest("p")).toHaveTextContent("Iron Owls");
+  });
+
+  it("never calls itself the platform, anywhere a manager can read", () => {
+    const asked = render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} assessmentStatus="loading" />);
+    expect(screen.getByText("Checking whether it is fair.")).toBeInTheDocument();
+    expect(asked.container.textContent).not.toMatch(/platform/i);
+    asked.unmount();
+
+    const idle = render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} onRequestAssessment={vi.fn()} />);
+    expect(idle.container.textContent).not.toMatch(/platform/i);
+  });
+
   it("shows it is checking, not a blank card, while the verdict is in flight", () => {
     render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} assessmentStatus="loading" />);
-    expect(screen.getByText("Checking what the platform thinks of this trade.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "See what the platform thinks of this trade" })).not.toBeInTheDocument();
+    expect(screen.getByText("Checking whether it is fair.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Is it fair" })).not.toBeInTheDocument();
   });
 
   // Fix round 1, F4 (MEDIUM): a failed verdict fetch used to leave the card silently missing its
@@ -174,7 +207,7 @@ describe("TradeCard states", () => {
   });
 
   it("renders both sides through PositionBadge and a name, framed as what you give and get", () => {
-    render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} rosterById={ROSTER_BY_ID} />);
     expect(screen.getByText("You give")).toBeInTheDocument();
     expect(screen.getByText("You get")).toBeInTheDocument();
     expect(screen.getByText("Puka Nacua")).toBeInTheDocument();
@@ -216,24 +249,48 @@ describe("TradeCard states", () => {
   // them, 40.4% of the trades page's own ink. It is a plain row with a `PositionBadge` chip now,
   // the same treatment the matchup table and `LineupEditor`'s roster table already use.
   it("renders each asset as a quiet row, never a full sticker slab (E5)", () => {
-    const { container } = render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    const { container } = render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} rosterById={ROSTER_BY_ID} />);
     expect(container.querySelector(".shadow-sticker")).toBeNull();
     expect(screen.getByText("WR").className).toContain("bg-pos-wr");
   });
 
-  // E6 (competition review): `counterpartyName` used to be computed for the `aria-label` alone
-  // — a card never visibly named who you traded with, and neither `proposedAt` nor `settledAt`
-  // was ever rendered despite both being on the wire.
-  it("names the counterparty and the date visibly, not only in the aria-label (E6)", () => {
-    render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} />);
-    expect(screen.getByText(/With Iron Owls/)).toBeInTheDocument();
+  // P1, ON THE SURFACE WHERE TWO PEOPLE NEGOTIATE. Both managers lead the card with a face and a
+  // name; their team names ride the meta line under them, and the date is the message's byline.
+  it("leads with both managers, names which team is which, and dates the message", () => {
+    render(
+      <TradeCard
+        leagueId="l1"
+        trade={BASE}
+        meTeamId="me"
+        playersById={PLAYERS}
+        managersByTeamId={{
+          them: { teamName: "Iron Owls", name: "Rey Okafor", avatar: null },
+          me: { teamName: "Bay Bandits", name: "Dana Whitfield", avatar: null },
+        }}
+      />,
+    );
+    const managers = screen.getAllByTestId("manager");
+    expect(managers).toHaveLength(2);
+    expect(managers[0]).toHaveTextContent("Rey Okafor");
+    expect(managers[0]).toHaveTextContent("Iron Owls");
+    expect(managers[1]).toHaveTextContent("Dana Whitfield");
+    expect(managers[1]).toHaveTextContent("Bay Bandits");
     expect(screen.getByText(/Proposed August 18/)).toBeInTheDocument();
   });
 
-  it("names both sides plainly, and the settled date, for a league-wide history row that is not the viewer's own trade (E6)", () => {
+  it("falls back to the team names when nobody supplied the people behind them", () => {
+    render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    const managers = screen.getAllByTestId("manager");
+    expect(managers[0]).toHaveTextContent("Iron Owls");
+    expect(managers[1]).toHaveTextContent("Bay Bandits");
+  });
+
+  it("names both sides, and the settled date, for a league-wide history row that is not the viewer's own trade (E6)", () => {
     const trade: TradeProposalView = { ...BASE, status: "accepted", settledAt: "2026-08-19T00:00:00.000Z" };
     render(<TradeCard leagueId="l1" trade={trade} meTeamId="somebody_else" playersById={PLAYERS} />);
-    expect(screen.getByText(/Iron Owls and Bay Bandits/)).toBeInTheDocument();
+    const managers = screen.getAllByTestId("manager");
+    expect(managers[0]).toHaveTextContent("Iron Owls");
+    expect(managers[1]).toHaveTextContent("Bay Bandits");
     expect(screen.getByText(/Settled August 19/)).toBeInTheDocument();
   });
 
@@ -278,9 +335,23 @@ describe("TradeCard states", () => {
     const onWithdraw = vi.fn();
     render(<TradeCard leagueId="l1" trade={BASE} meTeamId="them" playersById={PLAYERS} onWithdraw={onWithdraw} />);
     expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
-    expect(screen.getByText("Proposed. Waiting for a reply.")).toBeInTheDocument();
+    // "Proposed" is the byline's job now (the message is stamped with the day it was sent), so
+    // the line beside Withdraw says only the part the byline does not: nobody has answered.
+    expect(screen.getByText("Waiting for a reply.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
     expect(onWithdraw).toHaveBeenCalledWith("t1");
+  });
+
+  // FIX ROUND 1, M3. In a room whose thesis is "a trade is a conversation", your own sent offer
+  // has to read as sent: your bubble, on your side, in Court blue, with no author header stamping
+  // your own name back at you.
+  it("draws your own outgoing offer as yours, and an inbound one as theirs", () => {
+    const outgoing = render(<TradeCard leagueId="l1" trade={BASE} meTeamId="them" playersById={PLAYERS} />);
+    expect(screen.getByTestId("message-bubble")).toHaveAttribute("data-mine", "true");
+    outgoing.unmount();
+
+    render(<TradeCard leagueId="l1" trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    expect(screen.getByTestId("message-bubble")).not.toHaveAttribute("data-mine");
   });
 
   it("renders a superseded offer with what happened, not with a blank status", () => {
@@ -337,10 +408,12 @@ describe("TradeCard states", () => {
     expect(screen.getByText("They took this offer back.")).toBeInTheDocument();
   });
 
-  it("shows the note a proposer attached, quoted", () => {
+  it("shows the note a proposer attached, as their own message", () => {
     const trade: TradeProposalView = { ...BASE, note: "Rebuilding my TE spot, thanks for considering" };
     render(<TradeCard leagueId="l1" trade={trade} meTeamId="me" playersById={PLAYERS} />);
-    expect(screen.getByText('"Rebuilding my TE spot, thanks for considering"')).toBeInTheDocument();
+    // The quote marks went with the card: the note sits INSIDE the proposer's own message bubble
+    // now, which is what a pair of quotation marks was standing in for.
+    expect(screen.getByText("Rebuilding my TE spot, thanks for considering")).toBeInTheDocument();
   });
 
   it("disables its own buttons while an action for this card is in flight", () => {

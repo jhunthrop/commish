@@ -111,13 +111,13 @@ test("propose, accept, notice, a real fairness flag, and an operator's reversal 
 
     // --- Manager B sees the offer, and the notice Plan A built --------------------------------
     await pageB.goto(`/app/leagues/${E2E_TRADES_LEAGUE_ID}/trades`);
-    await expect(pageB.getByRole("heading", { name: "Offers to answer" })).toBeVisible();
+    await expect(pageB.getByRole("region", { name: "Needs your answer" })).toBeVisible();
     // `TradeCard`'s own `aria-label` — "Trade with <counterparty>" — not `hasText`, which
     // filters on rendered text content and would never see an attribute that renders nothing.
     // Scoped to THIS band specifically: a rerun against this same long-lived database leaves a
     // past (already-reversed) trade with the identical counterparty name sitting in "Trade
     // history" too, and an unscoped locator would match both.
-    const inboundCard = pageB.getByRole("region", { name: "Offers to answer" }).getByRole("article", { name: `Trade with ${TEAM_A_NAME}` });
+    const inboundCard = pageB.getByRole("region", { name: "Needs your answer" }).getByRole("article", { name: `Trade with ${TEAM_A_NAME}` });
     await expect(inboundCard).toBeVisible();
     // From B's OWN side of an inbound offer, "You give" is what B would send if they accept —
     // the counterparty's own assets, `fixture.getNames` (what manager A asked FOR).

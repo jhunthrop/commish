@@ -6,11 +6,11 @@ import { Icon } from "./icon";
 
 /**
  * SIDELINE'S FACE STEPS. `sm` (28) rides a message bubble, `md` (32) a row or a nav, `lg` (40) a
- * stack of faces on a card, `xl` (52) sits inside a 56px headshot ring, and `2xl` (128) inside
- * the 132px ring on a player's own page. `PlayerFace` pairs each ring with one of these; nothing
- * else reaches for the two largest.
+ * stack of faces on a card, `xl` (52) sits inside a 56px headshot ring, `2xl` (96) is the account
+ * room's own header face, and `3xl` (128) sits inside the 132px ring on a player's own page.
+ * `PlayerFace` pairs each ring with one of these; nothing else reaches for the two largest.
  */
-export type AvatarSize = "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
+export type AvatarSize = "xs" | "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
 
 /** Which of Sideline's rings the face wears: amber for you, rose for your opponent this week. */
 export type AvatarRing = "self" | "rival";
@@ -35,7 +35,12 @@ const SIZE: Readonly<Record<AvatarSize, string>> = {
   md: "size-8 text-xs",
   lg: "size-10 text-sm",
   xl: "size-13 text-lg",
-  "2xl": "size-32 text-3xl",
+  /** 96 — the account room's own header face (Sideline, 2026-09-11). The scale had no step
+   *  between 52 and 128 and the account room wanted neither: at 128 a face is a hero image, and
+   *  the hero of the account room is the manager's NAME beside their face. */
+  "2xl": "size-24 text-2xl",
+  /** 128 — the player page's own hero, inside `PlayerFace`'s 132px club ring. */
+  "3xl": "size-32 text-3xl",
 };
 
 const ICON_SIZE: Readonly<Record<AvatarSize, number>> = {
@@ -44,7 +49,8 @@ const ICON_SIZE: Readonly<Record<AvatarSize, number>> = {
   md: 16,
   lg: 20,
   xl: 26,
-  "2xl": 56,
+  "2xl": 48,
+  "3xl": 56,
 };
 
 const RING: Readonly<Record<AvatarRing, string>> = {

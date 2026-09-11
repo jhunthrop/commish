@@ -19,6 +19,7 @@ import type {
   PlatformNoticeView,
   RoomData,
   TradeCounterpartyOption,
+  TradeManager,
   TradeRoomContext,
   TradeRosterPlayer,
 } from "@/league-room/contract";
@@ -183,11 +184,20 @@ function tradeContext(
   const counterparties: readonly TradeCounterpartyOption[] = teams
     .filter((team) => team.id !== myTeamId)
     .map((team) => ({ teamId: team.id, teamName: team.name }));
+  // P1, on the surface where two PEOPLE negotiate: the person behind each team id, out of the
+  // `TeamCard`s this function is already handed. No second read and no widened wire type — see
+  // `TradeManager` (`@/league-room/contract`) for why a manager's face does not belong on a
+  // stored proposal row.
+  const managersByTeamId: Record<string, TradeManager> = {};
+  for (const team of teams) {
+    managersByTeamId[team.id] = { teamName: team.name, name: team.ownerDisplayName, avatar: team.ownerAvatarUrl };
+  }
   return {
     weekNumber,
     myTeamId,
     counterparties,
     rostersByTeamId: week === null ? {} : rostersByTeamId(week),
+    managersByTeamId,
     leagueName,
   };
 }

@@ -155,7 +155,12 @@ const TONE: Readonly<Record<CountdownTone, string>> = {
 export function Countdown({ remainingMs, size = "md", tone = "default", "data-testid": testId }: CountdownProps) {
   return (
     <>
-      <span data-testid={testId} aria-hidden="true" className={`font-mono font-semibold tabular-nums ${TONE[tone]} ${SIZE[size]}`}>
+      {/* SIDELINE WAVE TWO (2026-09-11): the digits move from the mono face to the DISPLAY face
+          with tabular figures. Sideline spends two faces and neither of them is a monospace; what
+          the mono face was really buying here was non-jittering digits, and `tabular-nums` on
+          Bricolage buys the identical thing while a ticking clock finally looks like every other
+          number the product prints large. */}
+      <span data-testid={testId} aria-hidden="true" className={`font-display font-bold tabular-nums ${TONE[tone]} ${SIZE[size]}`}>
         {/* Pre-snap (`remainingMs` null, one hydration frame): a non-breaking space holds the
             line box at the digits' own em height — no layout jump, and never "0:00", which
             would be a false time rather than a placeholder. */}

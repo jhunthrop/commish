@@ -755,6 +755,10 @@ const TRADE_CONTEXT: TradeRoomContext = {
   weekNumber: 5,
   myTeamId: "me",
   counterparties: [{ teamId: "them", teamName: "Iron Owls" }],
+  managersByTeamId: {
+    me: { teamName: "Bay Bandits", name: "Dana Whitfield", avatar: null },
+    them: { teamName: "Iron Owls", name: "Rey Okafor", avatar: null },
+  },
   rostersByTeamId: {
     me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB", nflTeam: "ATL", headshotUrl: null, adp: null }],
     them: [{ playerId: "p2", name: "Puka Nacua", position: "WR", nflTeam: "ATL", headshotUrl: null, adp: null }],
@@ -782,7 +786,7 @@ describe("TradeComposer says nothing that breaks the house copy rules, with and 
     await screen.findByText(/close to even/i);
     expectClean(container, ...TRADE_CONTENT, "Close call.", "Both sides give up similar weekly production.");
 
-    fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Rebuilding my TE spot" } });
+    fireEvent.change(screen.getByLabelText("Say something with it"), { target: { value: "Rebuilding my TE spot" } });
     expectClean(container, ...TRADE_CONTENT, "Close call.", "Both sides give up similar weekly production.");
   });
 });

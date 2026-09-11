@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, LedgerRow } from "@/components/ui";
-import { TowerFigure } from "@/components/ui/tower-figure";
+import { Badge, BigNumber, Button, LedgerRow } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { formatUsd } from "@/money/config";
 import { useAdminRoomDeps } from "../hooks/deps";
@@ -98,19 +97,20 @@ export function ReconcileDriftPanel() {
               place the spec's "laws 2 and 6 are spent sparingly here" gets spent on this page —
               one figure, no motion, and the two inputs stay dense rows below it.
 
-              SUNDAY v5: `TowerFigure`, not `Stat`, and the swap makes the refusal structural.
-              `Stat` exists for the heat map and its whole contract is the `comparison` seam; a
-              drift has no population to be judged against, so leaving that seam empty was the
-              correct call made by habit. `TowerFigure` cannot be tinted at all. Green-for-zero
-              would be a verdict the `Badge` beside it already states in a word, which is also the
-              only channel a screen reader gets, where a colour states nothing.
+              SIDELINE (2026-09-11): `BigNumber`, not `Stat`, and the swap makes the refusal
+              structural. `Stat` exists for the heat map and its whole contract is the
+              `comparison` seam; a drift has no population to be judged against, so leaving that
+              seam empty was the correct call made by habit. `BigNumber` cannot be tinted at all,
+              and it carries the one thing this figure was missing: what it is the difference
+              BETWEEN. Green-for-zero would be a verdict the `Badge` beside it already states in a
+              word, which is also the only channel a screen reader gets.
 
               THE ALARM STAYS NEGATIVE, NOT LIVE. A book that disagrees with the bank is a
               FAILURE, and the failure channel is warm red as text; the live channel means
               happening right now and a reconciliation report is a statement about a moment that
               has already passed. */}
           <div className="flex flex-wrap items-center gap-3">
-            <TowerFigure label="Drift" value={formatUsd(state.report.drift)} size="lg" />
+            <BigNumber align="start" size="lg" value={formatUsd(state.report.drift)} basis="drift, the book minus the bank" />
             <Badge tone={state.report.drift === 0 ? "neutral" : "negative"}>{state.report.drift === 0 ? "Agrees" : "Off the bank"}</Badge>
           </div>
 

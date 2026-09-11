@@ -184,7 +184,10 @@ describe("OpenLeagueCard", () => {
       render(card({ ...BASE, draftAtIso: soonIso() }));
       const clock = screen.getByTestId("draft-clock");
       expect(clock.className).toContain("text-negative");
-      expect(clock.className).toContain("font-mono");
+      // The clock is the DISPLAY face with tabular figures (Sideline wave two): equal-width digits
+      // without the monospace, which is the face this system never spends.
+      expect(clock.className).toContain("font-display");
+      expect(clock.className).toContain("tabular-nums");
       // The coarse aria-live sibling `Countdown` always pairs with its digits.
       expect(screen.getByText(/About 3 hours left/)).toHaveAttribute("aria-live", "polite");
       expect(screen.queryByText(BASE.draftAt)).not.toBeInTheDocument();

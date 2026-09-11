@@ -43,7 +43,9 @@ describe("ReconcileDriftPanel", () => {
     expect(status).toHaveTextContent("Ledger pooled balance");
     expect(status).toHaveTextContent("$100.00");
     expect(status).toHaveTextContent("Bank pooled balance");
-    expect(status).toHaveTextContent("Drift");
+    // "Drift" survives as the figure's own caption rather than a bare label beside it: the
+    // caption names the word AND what the number is the difference between (P2, P11).
+    expect(status).toHaveTextContent("drift, the book minus the bank");
     expect(status).toHaveTextContent("$0.00");
 
     // Three real figures, not one prose sentence — and every value is mono.
@@ -61,11 +63,14 @@ describe("ReconcileDriftPanel", () => {
     renderInAdmin(<ReconcileDriftPanel />, fixture.deps);
 
     const status = await screen.findByRole("status");
-    const drift = status.querySelector("[data-magnitude]");
+    const drift = status.querySelector('[data-testid="big-number"]');
     expect(drift?.textContent).toContain("$0.00");
     expect(drift?.querySelector(".text-display-lg")).not.toBeNull();
-    // Never tinted: a drift has no population to be judged against, so `Stat` resolves neutral.
-    expect(drift?.getAttribute("data-magnitude")).toBe("neutral");
+    // P2/P11: the figure names what it is the difference BETWEEN, in the same glance.
+    expect(drift?.textContent).toContain("drift, the book minus the bank");
+    // NOT TINTABLE AT ALL, structurally: `BigNumber` has no `comparison` seam, where a `Stat`
+    // merely resolved `neutral` when handed none.
+    expect(status.querySelector("[data-magnitude]")).toBeNull();
     expect(status).toHaveTextContent("Agrees");
   });
 

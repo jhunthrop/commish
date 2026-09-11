@@ -9,7 +9,6 @@ import {
   Crown,
   Flame,
   Inbox,
-  Info,
   Plus,
   RefreshCw,
   Rocket,
@@ -60,8 +59,6 @@ export const ICONS = {
   // state; `chevron-right` covers the horizontal pair via rotate, this one the vertical pair.
   "chevron-down": ChevronDown,
   search: Search,
-  // `InfoTip`'s trigger glyph — the one place a definition is one click away.
-  info: Info,
   // Avatar presets (src/identity/avatars.ts) — our vocabulary, not lucide's: `bolt` maps to
   // lucide's `Zap` because the map's keys are the product's names for these glyphs, which is
   // the whole point of having a map instead of importing lucide-react everywhere.

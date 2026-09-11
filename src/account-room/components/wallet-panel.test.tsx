@@ -36,9 +36,10 @@ describe("WalletPanel", () => {
   it("never tints a balance, because a balance has no population to be judged against", async () => {
     // A magnitude tint needs a stated population (`Stat`'s own contract). "Top 12% of balances"
     // is a comparison this product does not hold, and it would be a judgement about a person's
-    // money besides. `Stat` stamps the step it resolved; `neutral` IS `textPrimary`.
+    // money besides. The refusal is STRUCTURAL rather than a resolved-to-neutral `Stat`: this
+    // figure is not a `Stat` at all, so there is no `comparison` seam to hand a percentile to.
     await renderSurface(<WalletPanel summary={SUMMARY} />, ({ container }) => {
-      expect(container.querySelector("[data-magnitude]")?.getAttribute("data-magnitude")).toBe("neutral");
+      expect(container.querySelector("[data-magnitude]")).toBeNull();
     });
   });
 

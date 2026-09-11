@@ -31,19 +31,22 @@ describe("DecisionSheet", () => {
   });
 
   it("is a labelled modal dialog wearing the accent attention ring", () => {
-    // V6 (the warmth pass): "the room is asking you to decide" is a soft ring in the accent's
-    // own family, not a solid border wire — the amber signal survives, the hairline does not.
+    // "The room is asking you to decide" is a soft ring in the accent's own family, not a solid
+    // border wire. Sideline wave two spends the accent's own GLOW ROLE for it rather than a
+    // hand-mixed opacity, so the ring is the identical tint `Badge`'s glow already spends.
     render(sheet(true));
     const dialog = screen.getByRole("dialog", { name: "Fix your WR2" });
     expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(dialog.className).toContain("ring-accent/40");
+    expect(dialog.className).toContain("ring-accent-glow");
     expect(dialog.className).not.toContain("border-accent");
   });
 
-  it("states the context and the way out beside the headline", () => {
+  it("states the context beside the headline and explains nothing else", () => {
     render(sheet(true));
     expect(screen.getByText("Zay Flowers is on bye Sunday")).toBeTruthy();
-    expect(screen.getByText("esc backs out")).toBeTruthy();
+    // P7: no explainer text. "esc backs out" was a sentence whose only job was to explain another
+    // element, and the behaviour it described is unchanged (see the escape test below).
+    expect(screen.queryByText("esc backs out")).toBeNull();
   });
 
   it("escape backs out without committing", () => {

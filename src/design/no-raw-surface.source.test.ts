@@ -43,15 +43,12 @@ const SWEPT_DIRS = ["src/components", "src/league-room", "src/draft-room", "src/
  * entry lands here in review, with a sentence, and the guard test keeps it honest.
  */
 const ALLOWLIST: readonly string[] = [
-  // A native <select>'s boundary: a form control the user must FIND, so its border is a control
-  // affordance (WCAG 1.4.11's territory), not surface decoration — controls keep borders under
-  // v6. Migrating it to the Select primitive is real work with behavior on the line, out of a
-  // class-only pass's scope; the entry retires with that migration.
-  "src/account-room/components/review-feed.tsx",
-  // The pool search input, same case: a hand-rolled text control whose border is the control's
-  // own affordance (it even swaps to `border-edge` on focus). Retires when the site adopts the
-  // Input primitive.
-  "src/league-room/components/room-surface-players.tsx",
+  // SIDELINE (2026-09-11): `review-feed.tsx` LEFT this list. Its report-reason select is the
+  // mock's pill field on `border-edge` now — the control boundary, not the decorative hairline —
+  // so there is no `border-line` box left in the file to exempt.
+  // SIDELINE, THE WIRE (2026-09-11): `room-surface-players.tsx` LEFT this list. Its search box is
+  // the mock's 40px pill field now — `border-edge` on the elevated fill, the same control
+  // boundary `Input` itself draws — so there is no hairline box left in the file to exempt.
   // The LEGACY draft board. Its empty-cell hairlines are a founder-reported live-defect fix
   // (2026-08-25: opacity-diluted borders read rounds 3-15 as a void), pinned at full strength by
   // `draft-board.test.tsx`'s own regression suite — softening them here would re-open a ruled

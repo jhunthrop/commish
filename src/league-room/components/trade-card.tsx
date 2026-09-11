@@ -1,18 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card, EYEBROW, Modal, PlayerFace, PositionBadge } from "@/components/ui";
+import { BigNumber, Button, EYEBROW, Manager, MessageBubble, Modal, PlayerRow, PositionBadge } from "@/components/ui";
+import type { Player } from "@/domain/player";
 import { describeAsset, type TradeAsset } from "@/trades/assets";
+import { TRADE_CONFIG } from "@/trades/config";
 import type { TradeProposalView, TradeSideView } from "@/trades/contract";
-import type { TradeRosterPlayer } from "../contract";
+import type { TradeManager, TradeRosterPlayer } from "../contract";
 import type { ValuedPlayer } from "@/trades/fairness";
 import { isExpired } from "@/trades/lifecycle";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useNow } from "../hooks/use-now";
-import { daysUntil, formatDate, formatExpired, formatExpiry, formatWeek } from "../lib/format";
+import { daysUntil, formatDate, formatExpired, formatWeek } from "../lib/format";
 import { HeldTradeBanner } from "./held-trade-banner";
 import { PlayerName } from "./player-peek";
 import { TradeVerdict, type TradeAssessmentSummary } from "./trade-verdict";
+
+/** The full window a fresh offer stands for, in days — the basis every day count on this card
+ *  names, read off `TRADE_CONFIG` rather than restated as a numeral (P2, P11). */
+const PROPOSAL_TTL_DAYS = Math.round(TRADE_CONFIG.proposalTtlHours / 24);
 
 export interface TradeCardProps {
   readonly leagueId: string;
@@ -28,29 +34,25 @@ export interface TradeCardProps {
   /**
    * The same rosters, keyed the same way, keeping the fields `ValuedPlayer` deliberately drops —
    * see `flattenRoster` (`./trade-inbox.tsx`) for why the card takes two lookups over one list
-   * rather than one widened valuation type.
-   *
-   * Optional, defaulting to empty, on the same contract every other optional prop on this card
-   * holds: omit it and the asset rows render exactly as they did before law 3 reached this
-   * surface — a position chip beside a name, no face. The one production caller (`TradeInbox`)
-   * always supplies it. An empty lookup is also the honest render for an asset naming a player no
-   * longer on anybody's roster, which is a real state this card already words, so the missing
-   * case and the omitted case degrade identically rather than one of them drawing a placeholder.
+   * rather than one widened valuation type. Optional, defaulting to empty: an asset naming a
+   * player no longer on anybody's roster resolves to nothing and renders no face, which is the
+   * same "we do not know" branch `PlayerFace` already takes rather than a placeholder person.
    */
   readonly rosterById?: Readonly<Record<string, TradeRosterPlayer>>;
-  /** The league's own name — Plan D's `held-trade-banner.tsx` needs it, and only it: every other
-   *  status renders with no league name at all. Optional so every OTHER existing caller of this
-   *  card is unaffected; `TradeInbox` (the one production caller) always supplies it via
-   *  `TradeRoomContext.leagueName`. */
+  /**
+   * THE PEOPLE ON BOTH SIDES (P1), keyed by team id — `TradeRoomContext.managersByTeamId`. A
+   * trade is a conversation between two managers, and this card used to render it as a
+   * negotiation between two brand names because the stored proposal carries no person at all.
+   * Optional and defaulting to empty for the same reason `rosterById` is: an unknown team id
+   * falls back to its own team name in the byline and draws no face, never an invented one.
+   */
+  readonly managersByTeamId?: Readonly<Record<string, TradeManager>>;
+  /** The league's own name — `held-trade-banner.tsx` needs it, and only it. */
   readonly leagueName?: string;
   /** The viewer's own advisory read on an OPEN, answerable offer. `"idle"` (the default) until
-   *  the manager asks for it — fix round 1, F4: an inbox that fetched every card's verdict on
-   *  mount could burst the shared advisor rate limiter (`ADVISOR_CONFIG`, 20 requests/60s across
-   *  every advisor route a session touches) once it held more than a handful of open offers, and
-   *  the failure mode was a silently missing verdict with no error shown. Lazy per-card, on the
-   *  SAME "ask, then show the answer" shape `AdvisorPanel` already uses, bounds this to at most
-   *  one request per card the manager actually looks at. Either way `TradeCard` renders the
-   *  accept control without waiting on it — the verdict sits BESIDE the decision, never gates it. */
+   *  the manager asks for it: an inbox that fetched every card's verdict on mount could burst the
+   *  shared advisor rate limiter, and the failure mode was a silently missing verdict. The
+   *  verdict sits BESIDE the decision and never gates it. */
   readonly assessmentStatus?: "idle" | "loading" | "ready" | "error";
   readonly assessment?: TradeAssessmentSummary | null;
   /** Fires once, when the manager asks to see the platform's read on an answerable offer. */
@@ -64,14 +66,16 @@ export interface TradeCardProps {
 }
 
 /**
- * E5 (competition review): this used to stretch a `Sticker` — "the Poster Board's signature
- * shape", a board CELL — into a 769px full-width slab per asset, 202 of them summing to 40.4%
- * of the trades page's own ink on a near-monochrome constitution. A quiet row with a
- * `PositionBadge` chip is the SAME treatment the matchup table and `LineupEditor`'s own roster
- * table already use for "this player, and their position" — the sticker fill stays exactly
- * where LED-2 ruled it belongs, on a board cell, never a list row.
+ * ONE SIDE OF THE OFFER, AS PEOPLE (P1). `describeAsset` still owns the LABEL — it is the only
+ * function in this codebase permitted to switch on `TradeAssetKind`, and an asset that is no
+ * longer on a roster says so in its own words — and `PlayerRow` owns the OBJECT: the face on the
+ * club's ring, the name at the row's largest size, the position and club small beneath it.
+ *
+ * No figure and no verb on these rows. The offer's one number is the card's (the days left), and
+ * the offer's one verb is Accept: a row inside a trade is a person being named, not a person you
+ * can act on from here.
  */
-function AssetList({
+function OfferSide({
   leagueId,
   heading,
   assets,
@@ -85,44 +89,50 @@ function AssetList({
   readonly rosterById: Readonly<Record<string, TradeRosterPlayer>>;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-2">
-      <h3 className={`${EYEBROW} text-text-muted`}>{heading}</h3>
-      <ul className="flex flex-col gap-1.5">
+    <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <h3 className={`${EYEBROW} px-1 text-text-faint`}>{heading}</h3>
+      <ul className="flex flex-col">
         {assets.map((asset, index) => {
           const described = describeAsset(asset, playersById);
-          // LAW 3, ON THE ONE SCREEN WHERE A MANAGER IS COMPARING PEOPLE. `describeAsset` still
-          // owns the LABEL — it is the only function in this codebase permitted to switch on
-          // `TradeAssetKind`, and an asset that is no longer on a roster says so in its own
-          // words. What this adds is the OBJECT: the face on its club colour, for the assets that
-          // resolve to a player still on somebody's roster. An asset that resolves to nobody
-          // renders no face, which is the same "we do not know" branch `PlayerFace` already takes
-          // for an unknown club rather than a placeholder standing in for a person.
           const roster = asset.kind === "player" ? rosterById[asset.playerId] : undefined;
-          // Player-name adoption sweep (task 4): `described.label` is a real name only when
-          // `describeAsset`'s OWN lookup (`playersById`) resolved — not merely when `roster`
-          // did. The two maps agree in production (`TradeInbox`'s `flattenPlayers` and
-          // `flattenRoster` both fold the identical roster read), but they are two independent
-          // props here, and gating on the wrong one would turn `describeAsset`'s own prose
-          // fallback ("a player no longer on this roster") into a dead-looking peek button the
-          // moment they diverge.
+          // `described.label` is a real name only when `describeAsset`'s OWN lookup
+          // (`playersById`) resolved, not merely when `roster` did: gating on the wrong one would
+          // turn its prose fallback ("a player no longer on this roster") into a dead-looking peek
+          // button the moment the two maps diverge.
           const isRealName = asset.kind === "player" && playersById[asset.playerId] !== undefined;
+          const key = `${asset.kind}:${asset.kind === "player" ? asset.playerId : index}`;
+          if (roster === undefined) {
+            // No person to draw: an asset nobody holds any more, or a draft pick. A quiet line in
+            // the row's own rhythm rather than a faceless row pretending to be one. The position
+            // still rides it when `describeAsset` knows one — the absent thing is the FACE, not
+            // the fact, and dropping the chip here would lose information the card already had.
+            return (
+              <li key={key} className="flex min-h-11 items-center gap-2 px-2.5 text-md text-text-primary">
+                <span className="min-w-0 break-words">{described.label}</span>
+                {described.position === null ? null : <PositionBadge position={described.position} size="sm" />}
+              </li>
+            );
+          }
+          const player: Player = {
+            id: roster.playerId,
+            name: roster.name,
+            position: roster.position,
+            nflTeam: roster.nflTeam,
+            headshotUrl: roster.headshotUrl,
+            adp: roster.adp,
+          };
           return (
-            <li key={`${asset.kind}:${asset.kind === "player" ? asset.playerId : index}`} className="flex min-w-0 items-center gap-2">
-              {roster === undefined ? null : (
-                <PlayerFace player={{ id: roster.playerId, name: roster.name, position: roster.position, nflTeam: roster.nflTeam, headshotUrl: roster.headshotUrl, adp: roster.adp }} size="sm" />
-              )}
-              {!isRealName ? (
-                <span className="min-w-0 break-words text-sm font-medium text-text-primary">{described.label}</span>
-              ) : (
-                <PlayerName
-                  leagueId={leagueId}
-                  playerId={asset.playerId}
-                  name={described.label}
-                  className="min-w-0 break-words text-sm font-medium text-text-primary"
-                />
-              )}
-              {described.position === null ? null : <PositionBadge position={described.position} size="sm" />}
-              {roster === undefined || roster.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{roster.nflTeam}</span>}
+            <li key={key}>
+              <PlayerRow
+                dense
+                player={player}
+                meta={roster.nflTeam === "" ? undefined : roster.nflTeam}
+                name={
+                  isRealName ? (
+                    <PlayerName leagueId={leagueId} playerId={asset.playerId} name={described.label} className="truncate" />
+                  ) : undefined
+                }
+              />
             </li>
           );
         })}
@@ -131,12 +141,10 @@ function AssetList({
   );
 }
 
-/** What the card says about a trade that is no longer answerable, and whether "Accept"/"Decline"
- *  belong on it at all. `null` copy means the open, answerable band below renders instead — the
- *  SAME `null` a `held` trade returns, deliberately (Plan D, Task 5): a held trade is neither
- *  "open, answerable" nor "settled" (`TRADE_STATUSES.held`'s own docblock, `@/trades/lifecycle`),
- *  and its own words come from `HeldTradeBanner` instead, rendered directly by `TradeCard` rather
- *  than folded into this settled-state sentence. */
+/** What the card says about a trade that is no longer answerable. `null` copy means the open,
+ *  answerable band below renders instead — the SAME `null` a `held` trade returns, deliberately:
+ *  a held trade is neither "open, answerable" nor "settled", and its own words come from
+ *  `HeldTradeBanner`. */
 function settledCopy(trade: TradeProposalView, meTeamId: string): string | null {
   if (trade.status === "open" || trade.status === "held") return null;
   if (trade.status === "under_review") {
@@ -149,10 +157,6 @@ function settledCopy(trade: TradeProposalView, meTeamId: string): string | null 
     return "After a fairness review, this trade was blocked. Both rosters stayed exactly as they were.";
   }
   if (trade.status === "accepted") {
-    // "Reversed", never "put back" — the one action verb Task 7's own panel fixed everywhere
-    // else in this arc (the notice title/body, the operator queue trail). Fix round 1, F3: this
-    // card was the one surface that fix round missed. The action verb leads; "moved back" stays
-    // an effect phrase in the second sentence, never the headline word.
     return trade.reversedAt === null
       ? "Both rosters changed when this trade was accepted."
       : "An operator reversed this trade. Both rosters moved back to how they were.";
@@ -166,6 +170,19 @@ function settledCopy(trade: TradeProposalView, meTeamId: string): string | null 
   return "One of these players moved in another trade.";
 }
 
+/**
+ * The line under a party's name: which team they run, and whether they are you.
+ *
+ * FIX ROUND 1, L4: a team whose manager has left the league resolves to no `TradeManager` at all,
+ * and the block then fell back to the TEAM NAME as the person's name — with the same team name
+ * printed again beneath it. One fact, twice, in one block. With nobody to name, the team name is
+ * the whole of what this side is, so the meta line renders nothing.
+ */
+function partyMeta(manager: TradeManager | undefined, teamName: string, isYou: boolean): string | undefined {
+  if (manager === undefined) return isYou ? "you" : undefined;
+  return isYou ? `${teamName} · you` : teamName;
+}
+
 function myAndTheirSides(trade: TradeProposalView, meTeamId: string): { readonly mine: TradeSideView; readonly theirs: TradeSideView } | null {
   if (trade.from.teamId === meTeamId) return { mine: trade.from, theirs: trade.to };
   if (trade.to.teamId === meTeamId) return { mine: trade.to, theirs: trade.from };
@@ -173,11 +190,18 @@ function myAndTheirSides(trade: TradeProposalView, meTeamId: string): { readonly
 }
 
 /**
- * One stored proposal, in whatever state it's in. Two asset lists framed as "you give"/"you get"
- * when the viewer is a party to the trade, or plainly by team name in the league's shared history
- * when they aren't. The accept/decline pair is the one irreversible control pair in this product
- * (`Modal` confirms Accept, never Decline), so it renders ONLY for the counterparty of an OPEN
- * offer — everyone else sees a settled state's own sentence instead.
+ * A TRADE AS A CONVERSATION WITH THE OFFER INSIDE IT (Sideline, the wire).
+ *
+ * The two managers face each other at the top, with their faces and their names — you wear the
+ * amber ring, the other side wears the rival rose (P1, P6). Under them the proposal is a
+ * `MessageBubble` from whoever sent it: their note is the message, and the offer itself is a card
+ * inside the same bubble, two columns of `PlayerRow`. The card's ONE number is how long the offer
+ * still stands, with the window it is counting down from named beside it (P2, P11), and its ONE
+ * verb is Accept (P3) — everything else on it is quiet.
+ *
+ * The accept/decline pair is the one irreversible control pair in this product (`Modal` confirms
+ * Accept, never Decline), so it renders ONLY for the counterparty of an OPEN offer; everyone else
+ * sees a settled state's own sentence instead.
  */
 export function TradeCard({
   leagueId,
@@ -185,6 +209,7 @@ export function TradeCard({
   meTeamId,
   playersById,
   rosterById = {},
+  managersByTeamId = {},
   leagueName,
   assessmentStatus = "idle",
   assessment,
@@ -195,28 +220,16 @@ export function TradeCard({
   busy = false,
 }: TradeCardProps) {
   const [confirmingAccept, setConfirmingAccept] = useState(false);
-  // Fix round 2, F1: the wall clock is read in exactly ONE place in this room (`useNow`, the
-  // same idiom `useCountdown` uses in `src/draft-room`), never inline as `new Date()` here —
-  // `docs/conventions.md`'s "no ambient clock" rule, and what keeps this value mockable in a
-  // test without patching the global clock.
-  // Null on the server render and the hydrating render (`useNow`'s hydration contract): until
-  // the clock snaps, the card treats an open offer as not-yet-expired and holds the expiry line
-  // back for that one frame — display-only optimism the server ticker corrects nothing by,
-  // since no write path reads this (`isExpired` is re-asked on the server for every action).
+  // The wall clock is read in exactly ONE place in this room (`useNow`), never inline as `new
+  // Date()` here. Null on the server render and the hydrating render: until the clock snaps, the
+  // card treats an open offer as not-yet-expired and holds the day count back for that one frame.
   const now = useNow(LEAGUE_ROOM_CONFIG.expiryTickMs);
   const sides = myAndTheirSides(trade, meTeamId);
   const iAmProposer = trade.from.teamId === meTeamId;
   const iAmCounterparty = trade.to.teamId === meTeamId;
-  // FINAL REVIEW, HIGH 3: `isExpired` (`@/trades/lifecycle`) had zero production consumers, so a
-  // dead offer still wore "Needs your answer" and a live Accept button whose 409 was the only
-  // thing that ever told the member it had run out. The pure function both halves of the product
-  // share is asked here, against `useNow`'s tick, so an offer that ages out while the page is
-  // open loses its controls without a refetch — and nothing writes `status = 'expired'`, because
-  // there is no event moment to write one at (expiry stays DERIVED).
   const expired = now !== null && isExpired(trade, new Date(now).toISOString());
   const isAnswerable = trade.status === "open" && !expired && iAmCounterparty;
-  // Withdraw survives expiry: clearing your own dead offer is housekeeping, not answering it, and
-  // `withdrawTrade` (`@/league-service/trades`) accepts it — the server and this card agree.
+  // Withdraw survives expiry: clearing your own dead offer is housekeeping, not answering it.
   const isMineWaiting = trade.status === "open" && iAmProposer;
   const settled = settledCopy(trade, meTeamId);
 
@@ -224,72 +237,88 @@ export function TradeCard({
   const gettingSide = sides?.theirs ?? trade.to;
   const givingHeading = sides === null ? `${trade.from.teamName} gives` : "You give";
   const gettingHeading = sides === null ? `${trade.to.teamName} gives` : "You get";
+
+  // WHO IS TALKING. The sender speaks the bubble; the other manager is the one they are talking
+  // to. A league-wide history card belongs to neither of them, and then the proposer is simply
+  // the first of the two named people rather than "them".
+  const fromManager = managersByTeamId[trade.from.teamId];
+  const toManager = managersByTeamId[trade.to.teamId];
+  const proposerName = fromManager?.name ?? trade.from.teamName;
   const counterpartyName = sides === null ? null : sides.theirs.teamName;
   const cardLabel = counterpartyName === null ? `Trade between ${trade.from.teamName} and ${trade.to.teamName}` : `Trade with ${counterpartyName}`;
-  // E6 (competition review): `counterpartyName` used to be computed for the `aria-label` alone
-  // — a card never visibly named who you traded with. Visible now, in the same line as the
-  // week and the date, for a party and for a league-wide history row alike.
-  const counterpartyLabel = counterpartyName === null ? `${trade.from.teamName} and ${trade.to.teamName}` : `With ${counterpartyName}`;
-  // E6: `proposedAt`/`settledAt` were both on the wire and neither was rendered — twenty
-  // identical history cards with no date on any of them. `settledAt` once the trade has one
-  // (every terminal state writes it in the same transaction that settles); `proposedAt`
-  // otherwise, for a still-open offer.
-  // The verb only appears when the date does (see `formatDate`'s own guard): "Settled " with an
-  // empty date is worse than saying nothing at all.
+
   const dateText = trade.settledAt === null ? formatDate(trade.proposedAt) : formatDate(trade.settledAt);
   const dateLabel = dateText === "" ? "" : `${trade.settledAt === null ? "Proposed" : "Settled"} ${dateText}`;
+  const byline = [formatWeek(trade.weekNumber), dateLabel].filter((part) => part !== "").join(" · ");
+
+  // THE ONE NUMBER (P2): how many whole days this offer still stands, against the window it was
+  // given, which is the basis printed beside it (P11). A dead offer HAS NO FIGURE — not a dash
+  // with a caption, which would be a slot pretending there is a count to make — it says the day
+  // it ran out on and nothing else. A settled trade has nothing to count at all.
+  // FIX ROUND 1, L2: the clock is narrowed once, in a const, rather than re-asserted with `!`
+  // at the call site — `now` is null for exactly one frame (the server render and the hydrating
+  // render) and a non-null assertion is a claim the type system was already able to check.
+  const clock = trade.status === "open" && !expired ? now : null;
+  const showsClock = clock !== null;
+  const daysLeft = clock === null ? 0 : daysUntil(trade.expiresAt, new Date(clock));
 
   return (
-    <Card as="article" aria-label={cardLabel}>
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* SUBTRACTION (Sunday v5): the "Needs your answer" badge is gone. Every answerable
-              card sits under a chapter band saying exactly that, in the same amber, one row above
-              — the control the band opens teaches it, and a badge repeating its own section
-              heading on every card is the prose law 5's bands exist to replace. */}
-          <p className="text-sm text-text-muted">{`${formatWeek(trade.weekNumber)} · ${counterpartyLabel} · ${dateLabel}`}</p>
+    <article aria-label={cardLabel} className="flex flex-col gap-2.5">
+      {/* BOTH PARTIES, AS PEOPLE (P1). The proposer first, because they are the one who spoke.
+          You wear the amber ring wherever you are in the pair; the other manager wears the rival
+          rose, which is the channel Sideline gives to the person across the table from you. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
+        <Manager name={proposerName} avatar={fromManager?.avatar} ring={iAmProposer ? "self" : "rival"} meta={partyMeta(fromManager, trade.from.teamName, iAmProposer)} />
+        <span className="text-sm text-text-faint">and</span>
+        <Manager name={toManager?.name ?? trade.to.teamName} avatar={toManager?.avatar} ring={iAmCounterparty ? "self" : "rival"} meta={partyMeta(toManager, trade.to.teamName, iAmCounterparty)} />
+      </div>
+
+      {/* FIX ROUND 1, M3: YOUR OWN OFFER READS AS SENT. In a room whose thesis is that a trade is
+          a conversation, an offer you made has to be your bubble on your side, not a neutral card
+          with your own name stamped on it as though somebody else wrote it.
+
+          FIX ROUND 1, H1: the fairness read is a QUIET TEXT CONTROL on the byline row, beside who
+          said it and when — a question a leaguemate asks, not a third button competing with the
+          one irreversible pair. `aside` renders only on a bubble that is not yours, which is
+          exactly the answerable case: you never ask whether your own offer is fair from here. */}
+      <MessageBubble
+        wide
+        mine={iAmProposer}
+        author={proposerName}
+        avatar={fromManager?.avatar}
+        time={byline === "" ? undefined : byline}
+        aside={
+          isAnswerable && assessmentStatus === "idle" ? (
+            // `whitespace-nowrap`: the byline is a tight three-item run and at 360 this broke to
+            // "Is it / fair", which reads as two controls rather than one question.
+            <button type="button" className="whitespace-nowrap font-normal text-accent underline" onClick={() => onRequestAssessment?.(trade.id)}>
+              Is it fair
+            </button>
+          ) : undefined
+        }
+      >
+        {trade.note === null ? null : <p className="mb-2 break-words">{trade.note}</p>}
+
+        {/* THE OFFER, INSIDE THE MESSAGE. One plate, two columns of people. */}
+        <div className="flex flex-col gap-1 rounded-md bg-surface-raised p-1.5 sm:flex-row sm:gap-2">
+          <OfferSide leagueId={leagueId} heading={givingHeading} assets={givingSide.assets} playersById={playersById} rosterById={rosterById} />
+          <OfferSide leagueId={leagueId} heading={gettingHeading} assets={gettingSide.assets} playersById={playersById} rosterById={rosterById} />
         </div>
 
-        {/* Fix round 1, F2 (HIGH, member panel): neither side of an open offer was ever told
-            when it stops being answerable. Read straight off the stored `expiresAt` — the SAME
-            wire field the panel found unused — so this is a live remaining count, not a static
-            "three days" restated from `TRADE_CONFIG` on every render regardless of how long the
-            offer has actually been sitting. Shown to whichever side an open offer belongs to:
-            the recipient deciding whether to answer now, and the sender waiting on a reply.
-            Final review, HIGH 3: a past-due offer says "Expired August 18." — the state and the
-            day — rather than "Expires today." forever, which is what the old `Math.max(0, …)`
-            clamp produced for an offer that died three days ago. */}
-        {trade.status === "open" && now !== null ? (
-          <p className="text-sm text-text-muted">{expired ? formatExpired(trade.expiresAt) : formatExpiry(daysUntil(trade.expiresAt, new Date(now)))}</p>
-        ) : null}
+        {settled === null ? null : <p className="mt-2 text-md text-text-primary">{settled}</p>}
 
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <AssetList leagueId={leagueId} heading={givingHeading} assets={givingSide.assets} playersById={playersById} rosterById={rosterById} />
-          <AssetList leagueId={leagueId} heading={gettingHeading} assets={gettingSide.assets} playersById={playersById} rosterById={rosterById} />
-        </div>
-
-        {trade.note === null ? null : <p className="break-words text-sm italic text-text-muted">{`"${trade.note}"`}</p>}
-
-        {settled === null ? null : <p className="text-sm text-text-primary">{settled}</p>}
-
-        {/* Plan D, Task 5: the ONE place a held trade's own words live — the two managers see it
-            honestly (`counterpartyName` is always resolvable here, since a held trade is only
-            ever visible to its own two parties, `tradesQuery`'s own privacy rule), and nobody
-            else in the league ever renders this card in a `held` state at all. */}
+        {/* The ONE place a held trade's own words live — the two managers see it honestly, and
+            nobody else in the league ever renders this card in a `held` state at all. */}
         {trade.status === "held" ? (
-          <HeldTradeBanner leagueName={leagueName ?? ""} counterpartyTeamName={counterpartyName ?? "your counterparty"} />
+          <div className="mt-2">
+            <HeldTradeBanner leagueName={leagueName ?? ""} counterpartyTeamName={counterpartyName ?? "your counterparty"} />
+          </div>
         ) : null}
 
-        {isAnswerable ? (
-          <div className="flex flex-col gap-3">
-            {assessmentStatus === "idle" ? (
-              <div>
-                <Button variant="secondary" onClick={() => onRequestAssessment?.(trade.id)}>
-                  See what the platform thinks of this trade
-                </Button>
-              </div>
-            ) : assessmentStatus === "loading" ? (
-              <p className="text-sm text-text-muted">Checking what the platform thinks of this trade.</p>
+        {isAnswerable && assessmentStatus !== "idle" ? (
+          <div className="mt-2">
+            {assessmentStatus === "loading" ? (
+              <p className="text-sm text-text-muted">Checking whether it is fair.</p>
             ) : assessmentStatus === "error" ? (
               <p className="text-sm text-text-muted">
                 Advice is unavailable right now.{" "}
@@ -300,48 +329,56 @@ export function TradeCard({
             ) : assessment !== null && assessment !== undefined ? (
               <TradeVerdict assessment={assessment} />
             ) : null}
-            {/* `gap-4`, never a tighter value: the one irreversible button pair in this product
-                sits side by side, so the gap between them is a deliberate choice rather than
-                whatever a flex row defaults to. */}
-            <div className="flex flex-wrap gap-4">
-              {/* LAW 5, AND THE DISTINCTION `Button`'s own docblock draws: *"`primary` is
-                  ceremonial, one per view, the thing a page exists to do ONCE; `verb` is the thing
-                  a board does forty times."* Answering an offer is the second kind — an inbox with
-                  six open trades has six of these — while "Put an offer together" is the one
-                  ceremonial act at the top of the page. Both were ink pills, which is two
-                  competing verbs in ink on one screen, and that is the defect law 5 names rather
-                  than the repetition it permits. `verb` is money-filled and `rounded-md`, so it is
-                  unmistakably the act without being a second `primary`.
-
-                  It stays paired with a `Modal` confirm: this is the one irreversible control pair
-                  in the product, and making the verb obvious is not the same as making it easy to
-                  press by accident. */}
-              <Button variant="verb" onClick={() => setConfirmingAccept(true)} disabled={busy}>
-                Accept
-              </Button>
-              <Button variant="secondary" onClick={() => onDecline?.(trade.id)} disabled={busy}>
-                Decline
-              </Button>
-            </div>
           </div>
         ) : null}
 
-        {isMineWaiting ? (
-          <div className="flex flex-col gap-2">
-            {/* Fix round 1, F6 (LOW), converged fully in fix round 2, F2: one completion name
-                for this event throughout — the composer's own confirmation now says "Trade
-                proposed." too, so this card and that screen agree on the word. Final review,
-                HIGH 3: an offer that ran out is not still waiting for a reply, and saying so was
-                the second half of the same lie the expiry line told. */}
-            <p className="text-sm text-text-muted">{expired ? "Nobody answered before this ran out." : "Proposed. Waiting for a reply."}</p>
-            <div>
-              <Button variant="secondary" onClick={() => onWithdraw?.(trade.id)} disabled={busy}>
-                Withdraw
-              </Button>
-            </div>
+        {/* THE FOOT: the one number on the left with its basis, the two answers on the right. */}
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          {showsClock ? (
+            // FIX ROUND 1, H2. The basis used to read "days left of the 3 this offer stands",
+            // which is unparseable on first read and says "days" for a single day. The unit rides
+            // the basis so the window can never be read as a count of offers or of players, and
+            // the singular is real.
+            <BigNumber
+              align="start"
+              size="sm"
+              value={String(Math.max(0, daysLeft))}
+              basis={`${daysLeft === 1 ? "day" : "days"} left, of ${PROPOSAL_TTL_DAYS} days`}
+            />
+          ) : trade.status === "open" && expired ? (
+            <p className="text-sm text-text-muted">{formatExpired(trade.expiresAt)}</p>
+          ) : (
+            <span />
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            {isAnswerable ? (
+              // `gap-4`, never a tighter value: the one irreversible control pair in this product
+              // sits side by side, so the gap between them is a deliberate choice rather than
+              // whatever a flex row defaults to.
+              <span className="flex flex-wrap items-center gap-4">
+                <Button variant="secondary" size="sm" onClick={() => onDecline?.(trade.id)} disabled={busy}>
+                  Decline
+                </Button>
+                {/* THE ONE VERB (P3). It stays paired with a `Modal` confirm: this is the one
+                    irreversible control pair in the product, and making the verb obvious is not
+                    the same as making it easy to press by accident. */}
+                <Button variant="verb" onClick={() => setConfirmingAccept(true)} disabled={busy}>
+                  Accept
+                </Button>
+              </span>
+            ) : null}
+            {isMineWaiting ? (
+              <>
+                <span className="text-sm text-text-muted">{expired ? "Nobody answered before this ran out." : "Waiting for a reply."}</span>
+                <Button variant="secondary" size="sm" onClick={() => onWithdraw?.(trade.id)} disabled={busy}>
+                  Withdraw
+                </Button>
+              </>
+            ) : null}
           </div>
-        ) : null}
-      </div>
+        </div>
+      </MessageBubble>
 
       <Modal
         open={confirmingAccept}
@@ -367,6 +404,6 @@ export function TradeCard({
       >
         <p>Both rosters change as soon as you accept. You cannot undo it.</p>
       </Modal>
-    </Card>
+    </article>
   );
 }

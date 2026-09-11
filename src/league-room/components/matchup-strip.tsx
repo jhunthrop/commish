@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { MatchupDetail, MatchupSide } from "../contract";
 import { Crest, NOT_STARTED_DASH } from "@/components/ui";
-import { LiveMarker } from "@/components/ui/live-marker";
+import { LiveChip } from "@/components/ui/live-chip";
 import { Icon } from "@/components/ui/icon";
 import { formatPoints } from "../lib/format";
 import { remainingToPlay } from "../lib/matchup-facts";
@@ -98,7 +98,7 @@ export function MatchupStrip({ matchups, children }: {
                   <span className="hidden shrink-0 font-mono text-xs text-text-faint sm:inline">vs</span>
                   <StripSide side={away} align="right" leading={decided && (away.score ?? 0) >= (home.score ?? 0)} />
                 </span>
-                {left === 0 ? null : <LiveMarker mono>{`${left} to play`}</LiveMarker>}
+                {left === 0 ? null : <LiveChip className="tabular-nums">{`${left} to play`}</LiveChip>}
               </summary>
               <div className="border-t border-line px-3 pb-3 pt-2">{children(matchup)}</div>
             </details>

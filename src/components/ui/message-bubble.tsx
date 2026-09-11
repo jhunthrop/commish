@@ -15,6 +15,14 @@ export interface MessageBubbleProps {
   readonly reactions?: ReactNode;
   /** A quiet control that reveals on the row's intent (report, for instance). */
   readonly aside?: ReactNode;
+  /**
+   * THE BUBBLE IS CARRYING A CARD, NOT A SENTENCE (the wire, 2026-09-11). A message caps at 78%
+   * of the stream's width so a one-line reply reads as a one-line reply; a trade offer inside a
+   * bubble is a two-column object with faces in it, and the cap squeezes it to 280px on a phone.
+   * `wide` drops the cap for that case and nothing else — the bubble, the face beside it and the
+   * reaction row are otherwise identical, because the offer IS a message in this room.
+   */
+  readonly wide?: boolean;
   readonly className?: string;
 }
 
@@ -24,12 +32,12 @@ export interface MessageBubbleProps {
  * thing on the screen that is yours to press again. The face rides beside it at 28px. The row is
  * a `group/msg` so quiet controls can reveal on its hover or focus.
  */
-export function MessageBubble({ author, avatar, mine = false, time, children, reactions, aside, className = "" }: MessageBubbleProps) {
+export function MessageBubble({ author, avatar, mine = false, time, children, reactions, aside, wide = false, className = "" }: MessageBubbleProps) {
   return (
     <div data-testid="message-bubble" data-mine={mine ? "true" : undefined} className={`group/msg flex items-start gap-2.5 ${mine ? "flex-row-reverse" : ""} ${className}`.replace(/\s+/g, " ").trimEnd()}>
       <Avatar name={author} avatar={avatar} size="sm" />
-      <div className={`flex min-w-0 max-w-[78%] flex-col gap-1 ${mine ? "items-end" : "items-start"}`}>
-        <div className={`rounded-lg px-3 py-2 shadow-card ${mine ? "bg-accent text-accent-text" : "bg-surface-elevated text-text-primary"}`}>
+      <div data-wide={wide ? "true" : undefined} className={`flex min-w-0 flex-col gap-1 ${wide ? "flex-1" : "max-w-[78%]"} ${mine ? "items-end" : "items-start"}`}>
+        <div className={`min-w-0 rounded-lg px-3 py-2 shadow-card ${wide ? "w-full" : ""} ${mine ? "bg-accent text-accent-text" : "bg-surface-elevated text-text-primary"}`.replace(/\s+/g, " ")}>
           {mine ? null : (
             <p className="mb-0.5 flex items-baseline gap-2 text-xs font-semibold text-text-muted">
               <span>{author}</span>
