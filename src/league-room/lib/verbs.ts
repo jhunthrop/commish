@@ -34,4 +34,4 @@ export const LEAGUE_VERB = {
 /** `DraftRoom`'s own "Run it again" contract (`@/draft-room/components/draft-room.tsx`'s
  *  `MOCK_LOBBY_PATH` docblock): immediate solo creation, straight into the room, never the lobby
  *  first. */
-export const MOCK_DRAFT_HREF = "/app/mock-drafts?create=solo";
+export const MOCK_DRAFT_HREF = "/app/draft/mock-drafts?create=solo";

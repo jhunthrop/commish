@@ -1653,14 +1653,14 @@ describe("ShareLinkPanel says nothing that breaks the house copy rules", () => {
   it("is clean with a share code, a partial seat count and a live countdown", () => {
     const { container } = render(
       <ShareLinkPanel
-        url="https://commish.football/app/mock-drafts/ABC123"
+        url="https://commish.football/app/draft/mock-drafts/ABC123"
         shareCode="ABC123"
         seatsFilled={3}
         seatsTotal={8}
         startsAt={new Date(Date.now() + 3 * 60_000).toISOString()}
       />,
     );
-    expectClean(container, "ABC123", "https://commish.football/app/mock-drafts/ABC123");
+    expectClean(container, "ABC123", "https://commish.football/app/draft/mock-drafts/ABC123");
   });
 });
 
@@ -1716,7 +1716,7 @@ describe("PracticeEntryLink says nothing that breaks the house copy rules", () =
   });
 });
 
-const MOCK_LOBBY_OPEN_ROOM = { leagueId: "l1", shareCode: "OPEN01", teamCount: 10, seatsOpen: 3, pickSeconds: 60, startsInMs: 90_000 };
+const MOCK_LOBBY_OPEN_ROOM = { leagueId: "l1", shareCode: "OPEN01", teamCount: 10, seatsOpen: 3, pickSeconds: 60, startsInMs: 90_000, startsAtIso: "2026-09-12T18:00:00.000Z" };
 const MOCK_LOBBY_MINE_ROOM = {
   leagueId: "l2",
   draftId: "d2",
@@ -1725,6 +1725,7 @@ const MOCK_LOBBY_MINE_ROOM = {
   seatsOpen: 0,
   pickSeconds: 30,
   startsInMs: -5_000,
+  startsAtIso: "2026-09-12T18:00:00.000Z",
   mode: "solo" as const,
   status: "in_progress" as const,
   teamName: "Mock Squad",
@@ -1787,6 +1788,7 @@ const MOCK_SHARE_SUMMARY: MockRoomSummary = {
   seatsOpen: 3,
   pickSeconds: 60,
   startsInMs: 90_000,
+  startsAtIso: "2026-09-12T18:00:00.000Z",
   mode: "link",
   started: false,
   alreadySeated: false,

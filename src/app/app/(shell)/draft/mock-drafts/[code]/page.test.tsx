@@ -21,7 +21,7 @@ describe("MockDraftLandingPage", () => {
   it("renders the room's own summary when the share code resolves", async () => {
     vi.mocked(mockRoomSummary).mockResolvedValue({
       ok: true,
-      summary: { leagueId: "l1", shareCode: "ABC123", teamCount: 8, seatsOpen: 3, pickSeconds: 60, startsInMs: 90_000, mode: "link", started: false, alreadySeated: false },
+      summary: { leagueId: "l1", shareCode: "ABC123", teamCount: 8, seatsOpen: 3, pickSeconds: 60, startsInMs: 90_000, startsAtIso: "2026-09-12T18:00:00.000Z", mode: "link", started: false, alreadySeated: false },
     });
     const page = await MockDraftLandingPage({ params: Promise.resolve({ code: "ABC123" }) });
     render(page);
@@ -36,6 +36,6 @@ describe("MockDraftLandingPage", () => {
     render(page);
     expect(screen.getByText("We could not find that mock draft")).toBeInTheDocument();
     expect(screen.getByText(/does not exist/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open the mock draft lobby" })).toHaveAttribute("href", "/app/mock-drafts");
+    expect(screen.getByRole("link", { name: "Open the mock draft lobby" })).toHaveAttribute("href", "/app/draft/mock-drafts");
   });
 });

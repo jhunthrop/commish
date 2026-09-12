@@ -338,6 +338,6 @@ describe("WaitingRoom", () => {
   // side by side — `?create=solo` is `DraftRoom`'s own immediate-solo contract.
   it("also offers a real mock draft beside the room tour", () => {
     render(<WaitingRoom league={whenFullAndFilling} />);
-    expect(screen.getByRole("link", { name: "Run a mock draft" })).toHaveAttribute("href", "/app/mock-drafts?create=solo");
+    expect(screen.getByRole("link", { name: "Run a mock draft" })).toHaveAttribute("href", "/app/draft/mock-drafts?create=solo");
   });
 });

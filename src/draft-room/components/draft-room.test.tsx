@@ -242,11 +242,11 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     const fixture = fixtureDeps({ ...SNAKE_VIEW, phase: "scheduled", onClockTeamId: null });
     fixture.mock = {
       ...MOCK_ROOM,
-      share: { shareCode: "ABC123", path: "/app/mock-drafts/ABC123", url: "https://commish.football/app/mock-drafts/ABC123", teamCount: 8, seatsFilled: 3, startsAt: "2026-09-01T00:10:00.000Z" },
+      share: { shareCode: "ABC123", path: "/app/draft/mock-drafts/ABC123", url: "https://commish.football/app/draft/mock-drafts/ABC123", teamCount: 8, seatsFilled: 3, startsAt: "2026-09-01T00:10:00.000Z" },
     };
     mount(fixture);
     await waitFor(() => expect(screen.getByTestId("share-link-panel")).toBeInTheDocument());
-    expect(screen.getByLabelText("Share link")).toHaveValue("https://commish.football/app/mock-drafts/ABC123");
+    expect(screen.getByLabelText("Share link")).toHaveValue("https://commish.football/app/draft/mock-drafts/ABC123");
   });
 
   // Task 1 (player-name adoption sweep): the host is mounted in the settled debrief branch too
@@ -303,7 +303,7 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     const fixture = fixtureDeps({ ...SNAKE_VIEW, phase: "scheduled", onClockTeamId: null });
     fixture.mock = {
       ...MOCK_ROOM,
-      share: { shareCode: "ABC123", path: "/app/mock-drafts/ABC123", url: "https://commish.football/app/mock-drafts/ABC123", teamCount: 8, seatsFilled: 3, startsAt: "2026-09-01T00:10:00.000Z" },
+      share: { shareCode: "ABC123", path: "/app/draft/mock-drafts/ABC123", url: "https://commish.football/app/draft/mock-drafts/ABC123", teamCount: 8, seatsFilled: 3, startsAt: "2026-09-01T00:10:00.000Z" },
     };
     await renderSurface(
       <DraftRoomDepsProvider deps={fixture.deps}>

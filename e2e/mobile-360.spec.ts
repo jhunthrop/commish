@@ -85,7 +85,7 @@ test.beforeAll(async () => {
     const deps = mockLifecycleDepsForE2e();
     const linkRoom = await createMockRoom(db, { hostUserId, mode: "link", teamCount: 8, pickSeconds: 60, scoringPreset: "half_ppr", rosterShape: "standard" }, deps);
     if (!linkRoom.ok) throw new Error(`[e2e] mobile-360: could not create the link-mode fixture room: ${linkRoom.reason}`);
-    mobile360LinkRoomPath = `/app/mock-drafts/${linkRoom.shareCode}`;
+    mobile360LinkRoomPath = `/app/draft/mock-drafts/${linkRoom.shareCode}`;
 
     const soloRoom = await createMockRoom(db, { hostUserId, mode: "solo", teamCount: 8, pickSeconds: 60, scoringPreset: "half_ppr", rosterShape: "standard" }, deps);
     if (!soloRoom.ok) throw new Error(`[e2e] mobile-360: could not create the solo-mode fixture room: ${soloRoom.reason}`);
@@ -449,7 +449,7 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await expectNoHorizontalScroll(page, "a trade flag's detail page");
 
     // --- Phase 4.5, Task 11: the mock draft lobby --------------------------------------------
-    await page.goto("/app/mock-drafts");
+    await page.goto("/app/draft/mock-drafts");
     await expect(page.getByRole("heading", { name: "Mock drafts", level: 1 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Start a mock draft" })).toBeVisible();
     await expectNoHorizontalScroll(page, "the mock draft lobby");

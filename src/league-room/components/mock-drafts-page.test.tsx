@@ -33,7 +33,7 @@ const COPY = {
   sheetTieIn: "Your mock picks can seed your cheat sheet.",
 };
 
-const OPEN_ROOM: MockLobbyRoomSummary = { leagueId: "l1", shareCode: "OPEN01", teamCount: 12, seatsOpen: 5, pickSeconds: 60, startsInMs: 90_000 };
+const OPEN_ROOM: MockLobbyRoomSummary = { leagueId: "l1", shareCode: "OPEN01", teamCount: 12, seatsOpen: 5, pickSeconds: 60, startsInMs: 90_000, startsAtIso: "2026-09-12T18:00:00.000Z" };
 const MINE_LIVE: MyMockRoomSummary = {
   leagueId: "l2",
   draftId: "d2",
@@ -42,6 +42,7 @@ const MINE_LIVE: MyMockRoomSummary = {
   seatsOpen: 0,
   pickSeconds: 30,
   startsInMs: -5_000,
+  startsAtIso: "2026-09-12T18:00:00.000Z",
   mode: "solo",
   status: "in_progress",
   teamName: "Mock Squad",
@@ -93,17 +94,29 @@ describe("MockDraftsPage — law 1, one verb", () => {
 describe("MockDraftsPage — law 2, people are a door", () => {
   it("renders NOTHING for an empty lobby — no list, no box, no sentence about absence", () => {
     renderInLeague(<MockDraftsPage {...baseProps()} />, fixtureLeagueDeps().deps);
-    expect(screen.queryByRole("list", { name: "Open lobby rooms" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Rooms filling now" })).not.toBeInTheDocument();
     expect(screen.queryByText(/no mock drafts/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/nothing.*open/i)).not.toBeInTheDocument();
   });
 
-  it("lists open rooms with seat counts and TAKE A SEAT, and joins through the claim door", async () => {
+  /**
+   * THE ROW NAMES NOBODY (the Draft area round, 2026-09-12). `MockRoomSummary`'s own contract
+   * forbids naming another member on this surface, so the row leads with anonymous seats and a
+   * count of the people waiting — and this pins that no face and no initial reaches it.
+   */
+  it("lists rooms filling now as anonymous seats, and takes a seat through the claim door", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: { draftId: "d7" } });
     renderInLeague(<MockDraftsPage {...baseProps({ initialOpen: [OPEN_ROOM] })} />, fixture.deps);
-    const rooms = screen.getByRole("list", { name: "Open lobby rooms" });
-    expect(within(rooms).getByText("7 of 12 seated · fires when full")).toBeInTheDocument();
-    fireEvent.click(within(rooms).getByRole("button", { name: "Take a seat" }));
+    const rooms = screen.getByRole("region", { name: "Rooms filling now" });
+    const row = within(rooms).getByTestId("filling-row");
+    expect(within(row).getByRole("heading", { name: "7 waiting" })).toBeInTheDocument();
+    expect(within(row).getByText("12 teams · 60 seconds a pick")).toBeInTheDocument();
+    expect(within(row).getByText("or sooner if it fills")).toBeInTheDocument();
+    // The one big number on the row, with its basis beside it.
+    expect(within(row).getByTestId("big-number")).toHaveTextContent("5seats left, of 12");
+    expect(within(row).getByTestId("seat-stack")).toBeInTheDocument();
+    expect(within(row).queryByTestId("manager-stack")).toBeNull();
+    fireEvent.click(within(row).getByRole("button", { name: "Take a seat" }));
     await waitFor(() => expect(pushed).toEqual(["/app/drafts/d7"]));
     expect(fixture.calls).toContain("POST /api/mock-drafts/OPEN01");
   });

@@ -39,7 +39,7 @@ export const MOCK_SHARE_LANDING_PRACTICE_SENTENCE = "This mock draft is practice
 
 /**
  * The share-link landing (Task 9, Step 1's other carry): `ShareLinkPanel`'s own predicted path,
- * `/app/mock-drafts/${shareCode}` (`@/app/api/drafts/[draftId]/route.ts`), made real. A signed-in
+ * `/app/draft/mock-drafts/${shareCode}` (`@/app/api/drafts/[draftId]/route.ts`), made real. A signed-in
  * caller only (the founder's sign-in-first ruling — every mock route already requires one), so
  * this never needs its own anonymous preview.
  *
@@ -137,7 +137,7 @@ export function MockShareLanding({ code, summary }: MockShareLandingProps) {
           action={
             strangerAfterStart ? (
               // A room that started without you has one honest act left, and it is not this one.
-              <ButtonLink href="/app/mock-drafts" variant="secondary" size="lg">
+              <ButtonLink href="/app/draft/mock-drafts" variant="secondary" size="lg">
                 Start a new one
               </ButtonLink>
             ) : (

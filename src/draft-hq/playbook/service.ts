@@ -14,7 +14,7 @@ import { requestSimRun } from "@/draft-service/sim/service";
 import type { BuildOutcome, SimSummary } from "@/draft-service/sim/types";
 import { SIM_CONFIG, SIM_SHARPNESS } from "@/draft-service/sim/config";
 import { totalRosterSlots } from "@/draft-engine";
-import { wilsonInterval } from "@/draft-hq/simulator/confidence";
+import { wilsonInterval } from "./confidence";
 
 export interface CanonicalSimResult {
   readonly outcome: "ready" | "no_evidence_board" | "over_budget" | "league_not_found";
@@ -49,7 +49,7 @@ export async function canonicalSimFor(db: Db, userId: string, params: { readonly
  * runs, and a build's own label routinely fires in only 20-40 of those (`runsWithLabel`, the five
  * labels are not a partition — `classify.ts`'s own docblock). A bare "36%, above the 25% baseline"
  * at that sample size reads as settled when a real 95% interval (`wilsonInterval`,
- * `@/draft-hq/simulator/confidence.ts` — reused, never duplicated, the same interval the Simulator
+ * `./confidence.ts` — the Wilson interval, kept beside its one consumer when the Simulator
  * page itself shows at 100 runs) routinely straddles the baseline. Every sentence now STATES its
  * own interval, so the card carries the honest margin whether the reading is a clear verdict or
  * not; when the interval straddles the baseline the sentence explicitly REFUSES the above/below

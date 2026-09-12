@@ -114,7 +114,7 @@ interface AuditedRoute {
 /** The signed-in surfaces whose remediation has landed. Grows as the campaign closes. */
 const SIGNED_IN_ROUTES: readonly AuditedRoute[] = [
   { path: "/app", name: "the app home" },
-  { path: "/app/mock-drafts", name: "the mock draft lobby" },
+  { path: "/app/draft/mock-drafts", name: "the mock draft lobby" },
   { path: "/app/profile", name: "the account room" },
   { path: "/app/wallet", name: "the wallet" },
   // The season surfaces, added when the Gameday conversion landed (2026-08-28). The matchup is

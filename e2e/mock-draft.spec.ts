@@ -382,7 +382,7 @@ test("a link room's share code, claimed by a second seeded identity, moves the s
   const teamCount = 8;
 
   // --- managerB hosts a private link room -----------------------------------------------------
-  await managerB.goto("/app/mock-drafts");
+  await managerB.goto("/app/draft/mock-drafts");
   await expect(managerB.getByRole("heading", { name: "Mock drafts", level: 1 })).toBeVisible();
   // Law 2: people are a door — the crew room is minted from the same chip sentence.
   await setTableChip(managerB, "teams", "Teams", String(teamCount));

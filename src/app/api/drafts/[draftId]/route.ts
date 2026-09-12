@@ -34,7 +34,7 @@ async function mockShareInfoFor(db: Db, leagueId: string, origin: string): Promi
   if (room === undefined || room.mode !== "link") return null;
 
   const seated = await db.select({ id: teamsTable.id }).from(teamsTable).where(eq(teamsTable.leagueId, leagueId));
-  const path = `/app/mock-drafts/${room.shareCode}`;
+  const path = `/app/draft/mock-drafts/${room.shareCode}`;
   return {
     shareCode: room.shareCode,
     path,

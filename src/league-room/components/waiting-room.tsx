@@ -115,7 +115,7 @@ export function checklistItems(params: {
     body: "The clock, the queue and a pick, before any of it counts.",
     // Task 9, Step 1 (row 18's ask): a guided preview of THIS room, and a real mock draft
     // against seeded bots, side by side — the tour describes the room, the practice link lets a
-    // manager actually run one before it counts. `/app/mock-drafts?create=solo` is `DraftRoom`'s
+    // manager actually run one before it counts. `/app/draft/mock-drafts?create=solo` is `DraftRoom`'s
     // own "Run it again" contract (`@/draft-room/components/draft-room.tsx`'s `MOCK_LOBBY_PATH`
     // docblock): immediate solo creation, straight into the room, never the lobby first.
     content: (
@@ -123,7 +123,7 @@ export function checklistItems(params: {
         <button type="button" className="text-sm font-medium text-accent underline" onClick={params.onOpenTour}>
           Preview the room
         </button>
-        <Link href="/app/mock-drafts?create=solo" className="text-sm font-medium text-accent underline">
+        <Link href="/app/draft/mock-drafts?create=solo" className="text-sm font-medium text-accent underline">
           Run a mock draft
         </Link>
       </div>

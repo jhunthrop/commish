@@ -77,7 +77,7 @@ describe("verbFor gives an open one-time task ahead of Open the room", () => {
   it("offers a mock draft when a pre-draft league owes nothing", () => {
     expect(verbFor(homeCard({ draftStatus: "scheduled", slotsRanked: true }))).toEqual({
       label: "Run a mock draft",
-      href: "/app/mock-drafts?create=solo",
+      href: "/app/draft/mock-drafts?create=solo",
     });
   });
 

@@ -232,7 +232,7 @@ const NOT_ROUTES: ReadonlyMap<string, string> = new Map([
   ],
   [
     "src/components/app-shell/rail-nav.tsx: /app/drafts",
-    "RAIL_LINKS' `also` field: an active-state pathname prefix for the draft rooms living under /app/drafts/[draftId] — the row's own href is /app/mock-drafts.",
+    "RAIL_LINKS' `also` field: an active-state pathname prefix for the draft rooms living under /app/drafts/[draftId] — the row's own href is /app/draft/mock-drafts.",
   ],
 ]);
 

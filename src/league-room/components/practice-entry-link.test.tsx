@@ -5,7 +5,7 @@ import { PracticeEntryLink } from "./practice-entry-link";
 describe("PracticeEntryLink", () => {
   it("goes straight to the practice lobby when signed in", () => {
     const { getByRole } = render(<PracticeEntryLink signedIn={true} />);
-    expect(getByRole("link", { name: "Try a mock draft" })).toHaveAttribute("href", "/app/mock-drafts");
+    expect(getByRole("link", { name: "Try a mock draft" })).toHaveAttribute("href", "/app/draft/mock-drafts");
   });
 
   // B2 (flow analysis): signed out, the label states the truth (an account is required) before
@@ -15,7 +15,7 @@ describe("PracticeEntryLink", () => {
     const { getByRole, queryByRole } = render(<PracticeEntryLink signedIn={false} />);
     expect(getByRole("link", { name: "Sign up and try a mock draft" })).toHaveAttribute(
       "href",
-      "/sign-up?returnTo=%2Fapp%2Fmock-drafts",
+      "/sign-up?returnTo=%2Fapp%2Fdraft%2Fmock-drafts",
     );
     expect(queryByRole("link", { name: "Try a mock draft" })).not.toBeInTheDocument();
   });
