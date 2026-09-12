@@ -73,6 +73,9 @@ describe("renderTokensCss", () => {
     expect(css).toContain(`--commish-density-row: ${TOKENS.density.rowPx}px;`);
     expect(css).toContain(`--commish-density-face: ${TOKENS.density.facePx}px;`);
     expect(css).not.toContain("--commish-density-max-columns");
+    // The reading column, the one length a layout spends (founder ruling, 2026-09-11): named in
+    // `tokens.ts`, emitted here, spent by `.reading-column` in `globals.css`.
+    expect(css).toContain(`--commish-layout-reading-column: ${TOKENS.layout.readingColumnPx}px;`);
   });
 
   it("emits the Sideline amber roles per theme, so a self ring repaints with the theme", () => {

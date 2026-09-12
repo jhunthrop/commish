@@ -86,6 +86,7 @@
   --commish-density-dense-row: 44px;
   --commish-density-face: 36px;
   --commish-density-name: 17px;
+  --commish-layout-reading-column: 1120px;
   --commish-motion-duration-fast: 120ms;
   --commish-motion-duration-out: 180ms;
   --commish-motion-duration-in: 240ms;

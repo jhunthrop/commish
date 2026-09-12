@@ -106,6 +106,17 @@ function densityVars(indent: string): string {
 }
 
 /**
+ * SIDELINE'S READING COLUMN as a custom property (`--commish-layout-reading-column: 1120px`), so
+ * the `.reading-column` utility in `globals.css` spends the number `TOKENS.layout` states and no
+ * surface retypes a Tailwind literal for it. Same shape as `densityVars` above, and the `Px`
+ * suffix is stripped the same way: a CSS length carries its own unit.
+ */
+function layoutVars(indent: string): string {
+  const named = Object.fromEntries(Object.entries(TOKENS.layout).map(([key, value]) => [key.replace(/Px$/, ""), value]));
+  return scaleVars("layout", named, "px", indent);
+}
+
+/**
  * Renders TOKENS as CSS custom properties. Deterministic: same TOKENS → identical text.
  *
  * Both themes are first-class (founder ruling, 2026-08-23 — revised ruling 1): light values on
@@ -127,6 +138,7 @@ export function renderTokensCss(): string {
     scaleVars("display-size", TOKENS.font.display, "px", i),
     scaleVars("line-height", TOKENS.font.lineHeight, "", i),
     densityVars(i),
+    layoutVars(i),
     scaleVars("motion-duration", TOKENS.motion.duration, "ms", i),
     scaleVars("motion-easing", TOKENS.motion.easing, "", i),
     "}",

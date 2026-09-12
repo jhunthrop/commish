@@ -222,6 +222,40 @@ describe("a filling room draws its seats, its people and its two quiet doors", (
  * (`/browse`, the lobby's empty state, the league rail's `+`, the create sheet's signed-out
  * intent) always land, and `link-integrity.source.test.ts` stays green either way.
  */
+/**
+ * THE READING COLUMN (founder ruling, 2026-09-11, from his production screenshot at a wide
+ * window): the signed-in home ran edge to edge, so a card's name sat at the far left of the
+ * display and the number and verb it belongs to sat at the far right. P1 and P2 both assume a
+ * reader takes a card in at one glance.
+ */
+describe("the signed-in home sits in a centered column", () => {
+  it("caps the heading, the cards and the lobby together, with one class off the token", () => {
+    const { container } = renderInLeague(
+      <HomeBoard initial={body([homeCard()])} openLeagues={PUBLIC_LEAGUES} />,
+      fixtureLeagueDeps().deps,
+    );
+    const column = container.querySelector(".reading-column");
+    expect(column).not.toBeNull();
+    // One column around all three, not three caps that could drift apart.
+    expect(column!.querySelector("h1")).not.toBeNull();
+    expect(column!.querySelector("[data-testid='home-league-cards']")).not.toBeNull();
+    expect(column!.querySelector("[data-testid='open-rooms']")).not.toBeNull();
+  });
+
+  it("caps the zero-league state too, where the lobby IS the page", () => {
+    const { container } = renderInLeague(<HomeBoard initial={body([])} openLeagues={PUBLIC_LEAGUES} />, fixtureLeagueDeps().deps);
+    expect(container.querySelector(".reading-column [data-testid='open-rooms']")).not.toBeNull();
+  });
+
+  it("spends the token, never a literal width at the call site", () => {
+    const { container } = renderInLeague(<HomeBoard initial={body([homeCard()])} />, fixtureLeagueDeps().deps);
+    // jsdom applies no stylesheet, so the assertion is that the surface asks for the named
+    // column rather than hand-rolling a `max-w-[1120px]`. `generate-css.test.ts` pins the number
+    // the class resolves to.
+    expect(container.querySelector(".reading-column")?.className).not.toMatch(/max-w-\[/);
+  });
+});
+
 describe("the create door renders exactly once, wherever it belongs", () => {
   const doors = (container: HTMLElement) => container.querySelectorAll("#create-league");
 

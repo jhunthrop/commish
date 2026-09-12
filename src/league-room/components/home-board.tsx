@@ -98,7 +98,7 @@ export function HomeBoard({
   const solidIndex = ordered.findIndex((league) => isOwed(needFor(league)));
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="reading-column flex flex-col gap-7">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <PageTitle>Your leagues</PageTitle>
         {openRooms.length === 0 ? <CreateLeagueDoor /> : null}
