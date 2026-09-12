@@ -23,8 +23,20 @@ export const SHEET_COLUMN_LABEL: Readonly<Record<SheetColumnKey, string>> = {
   DEF: "D/ST",
 };
 
-/** K and D/ST carry no tiers (ruling 1): a kicker ladder would be a rung per name. */
-const TIERLESS: ReadonlySet<SheetColumnKey> = new Set(["overall", "K", "DEF"]);
+/** K and D/ST carry no tiers (ruling 1): a kicker ladder would be a rung per name. Overall
+ *  joins them unless the caller hands over a ladder that actually spans positions — in a room
+ *  the only standings on the wire are a player's place in his OWN position, and a mixed column
+ *  banded by those would put a receiver's tier 1 over a back's. */
+const TIERLESS: ReadonlySet<SheetColumnKey> = new Set(["K", "DEF"]);
+
+/**
+ * A standing with the DROP behind its tier, when the caller knows it (the Draft area round,
+ * 2026-09-12). A room's band says how many of a tier are still on the board, which is the live
+ * fact there; outside a room nothing is taken and that count would be the tier's own size
+ * repeated, so the band names the drop the tier ends on instead — the same sentence the board's
+ * own bands carry. `TierStandingView` (the room's wire type) satisfies this without the field.
+ */
+export type SheetTierStanding = TierStandingView & { readonly drop?: number };
 
 export interface SheetRowModel {
   readonly player: Player;
@@ -36,6 +48,14 @@ export interface SheetRowModel {
   /** Runs in which he was still there at your next turn; undefined for a taken player or before odds arrive. */
   readonly survived: number | undefined;
   readonly runs: number | null;
+  /**
+   * HIS ONE NUMBER WHEN THERE IS NO NEXT PICK (the Draft area round, 2026-09-12) — points over a
+   * replacement at his position, the key the board is ordered by. Outside a room nothing is taken
+   * and no turn is coming, so the odds a row leads with in a room have no meaning at all; the
+   * board's own ranking key takes the cell instead. Null inside a room, where the odds ARE the
+   * number, and null for a player the board holds no value for.
+   */
+  readonly value: number | null;
 }
 
 export interface SheetBand {
@@ -45,6 +65,9 @@ export interface SheetBand {
   /** Available rows in the band, and rows in the band: "3 of 5 left" from what the column shows. */
   readonly left: number;
   readonly size: number;
+  /** How far the ladder falls after this tier is gone, when the caller supplied it. Null in a
+   *  room, and on the last tier of any ladder, which has no next drop to name. */
+  readonly drop: number | null;
   readonly rows: readonly SheetRowModel[];
 }
 
@@ -55,6 +78,9 @@ export interface SheetColumnModel {
   /** Available players among the column's rows, and the column's row count. */
   readonly left: number;
   readonly total: number;
+  /** How many of the order fall in this column BEFORE the depth cap — "top 50 of 203". Equal to
+   *  `total` for a column the cap never reached. */
+  readonly pool: number;
 }
 
 export interface SheetColumnsInput {
@@ -65,10 +91,16 @@ export interface SheetColumnsInput {
   readonly myPlayerIds: ReadonlySet<string>;
   readonly queuedPlayerIds: ReadonlySet<string>;
   /** Tier standings for players still on the board, plus every standing this room has seen. */
-  readonly tiers: Readonly<Record<string, TierStandingView>>;
+  readonly tiers: Readonly<Record<string, SheetTierStanding>>;
+  /** The ladder that spans POSITIONS, for the Overall column. Omitted in a room, where the only
+   *  standings that exist are within a position and the Overall column stays unbanded. */
+  readonly overallTiers?: Readonly<Record<string, SheetTierStanding>>;
   readonly odds: SurvivalOdds | null;
   readonly hideTaken: boolean;
   readonly columnSize?: number;
+  /** Points over replacement per player, for a sheet read outside a room (`SheetRowModel.value`).
+   *  Omitted in a room, where the odds are the row's number. */
+  readonly values?: ReadonlyMap<string, number>;
 }
 
 function rowOf(player: Player, rank: number, input: SheetColumnsInput): SheetRowModel {
@@ -82,6 +114,7 @@ function rowOf(player: Player, rank: number, input: SheetColumnsInput): SheetRow
     queued: input.queuedPlayerIds.has(player.id),
     survived: taken || input.odds === null ? undefined : input.odds.survived[player.id],
     runs,
+    value: input.values?.get(player.id) ?? null,
   };
 }
 
@@ -91,7 +124,7 @@ function rowOf(player: Player, rank: number, input: SheetColumnsInput): SheetRow
  * row below it, because tiers run contiguously down a position's order. Rows after the last
  * ranked one are the unranked tail.
  */
-function tierByRow(rows: readonly SheetRowModel[], tiers: Readonly<Record<string, TierStandingView>>): readonly (number | null)[] {
+function tierByRow(rows: readonly SheetRowModel[], tiers: Readonly<Record<string, SheetTierStanding>>): readonly (number | null)[] {
   const known = rows.map((row) => tiers[row.player.id]?.tier ?? null);
   const assigned: (number | null)[] = new Array<number | null>(rows.length).fill(null);
   let next: number | null = null;
@@ -109,8 +142,8 @@ function tierByRow(rows: readonly SheetRowModel[], tiers: Readonly<Record<string
  * is still his place in the manager's order, so a disagreement between the order and the tiers
  * stays visible. The unranked tail (no tier) closes the column.
  */
-function bandsOf(key: SheetColumnKey, rows: readonly SheetRowModel[], tiers: Readonly<Record<string, TierStandingView>>): readonly SheetBand[] {
-  const tiersOfRows = TIERLESS.has(key) ? rows.map(() => null) : tierByRow(rows, tiers);
+function bandsOf(key: SheetColumnKey, rows: readonly SheetRowModel[], tiers: Readonly<Record<string, SheetTierStanding>> | undefined): readonly SheetBand[] {
+  const tiersOfRows = TIERLESS.has(key) || tiers === undefined ? rows.map(() => null) : tierByRow(rows, tiers);
   const byTier = new Map<number | null, SheetRowModel[]>();
   rows.forEach((row, index) => {
     const tier = tiersOfRows[index] ?? null;
@@ -122,27 +155,31 @@ function bandsOf(key: SheetColumnKey, rows: readonly SheetRowModel[], tiers: Rea
     tier: band.tier,
     left: band.rows.filter((row) => !row.taken).length,
     size: band.rows.length,
+    // Every man in a tier shares its drop, so the first row that carries one speaks for the band.
+    drop: band.rows.map((row) => tiers?.[row.player.id]?.drop).find((drop) => drop !== undefined) ?? null,
     rows: band.rows,
   }));
 }
 
-function columnRows(key: SheetColumnKey, input: SheetColumnsInput, size: number): readonly SheetRowModel[] {
+function columnRows(key: SheetColumnKey, input: SheetColumnsInput, size: number): { readonly rows: readonly SheetRowModel[]; readonly pool: number } {
   const rows: SheetRowModel[] = [];
+  let pool = 0;
   for (const playerId of input.order) {
-    if (rows.length >= size) break;
     const player = input.playersById.get(playerId);
     if (player === undefined) continue;
     if (key !== "overall" && player.position !== (key as Position)) continue;
+    pool += 1;
+    if (rows.length >= size) continue;
     rows.push(rowOf(player, rows.length + 1, input));
   }
-  return rows;
+  return { rows, pool };
 }
 
 export function buildSheetColumns(input: SheetColumnsInput): readonly SheetColumnModel[] {
   const size = input.columnSize ?? QUILT_CONFIG.sheet.columnSize;
   return SHEET_COLUMNS.map((key) => {
-    const rows = columnRows(key, input, size);
-    const bands = bandsOf(key, rows, input.tiers);
+    const { rows, pool } = columnRows(key, input, size);
+    const bands = bandsOf(key, rows, key === "overall" ? input.overallTiers : input.tiers);
     const shown = input.hideTaken ? bands.map((band) => ({ ...band, rows: band.rows.filter((row) => !row.taken) })).filter((band) => band.rows.length > 0) : bands;
     return {
       key,
@@ -150,6 +187,7 @@ export function buildSheetColumns(input: SheetColumnsInput): readonly SheetColum
       bands: shown,
       left: rows.filter((row) => !row.taken).length,
       total: rows.length,
+      pool,
     };
   });
 }
@@ -180,14 +218,14 @@ export function reuseSheetColumns(previous: readonly SheetColumnModel[] | null, 
     const bands = column.bands.map((band, bandIndex) => {
       const priorBand = priorBands.get(band.key);
       const rows = reuseListItems(priorBand?.rows ?? null, band.rows, rowKey);
-      if (priorBand !== undefined && rows === priorBand.rows && priorBand.tier === band.tier && priorBand.left === band.left && priorBand.size === band.size) {
+      if (priorBand !== undefined && rows === priorBand.rows && priorBand.tier === band.tier && priorBand.left === band.left && priorBand.size === band.size && priorBand.drop === band.drop) {
         if (prior.bands[bandIndex] !== priorBand) bandsUnchanged = false;
         return priorBand;
       }
       bandsUnchanged = false;
       return rows === band.rows ? band : { ...band, rows };
     });
-    if (bandsUnchanged && prior.left === column.left && prior.total === column.total && prior.label === column.label) {
+    if (bandsUnchanged && prior.left === column.left && prior.total === column.total && prior.pool === column.pool && prior.label === column.label) {
       if (previous[index] !== prior) columnsUnchanged = false;
       return prior;
     }

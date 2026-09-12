@@ -144,7 +144,14 @@ export function boardFormatForRules(rules: ScoringRules): ResolvedBoardFormat {
   };
 }
 
+/** "2026 board, 12-team half PPR": WHICH board a number came from, with no claim about the order
+ *  it is printed in. The sheet names itself with this, because a sheet is in the MANAGER's order
+ *  and "in board order" would be false the moment he moved somebody. */
+export function boardScoringLine(format: BoardFormat, season: number): string {
+  return `${season} board, ${BOARD_TEAM_COUNT}-team ${BOARD_FORMAT_SPECS[format].basisLabel}`;
+}
+
 /** "2026 board, 12-team half PPR, in board order": the sentence every board surface names itself with. */
 export function boardBasisLine(format: BoardFormat, season: number): string {
-  return `${season} board, ${BOARD_TEAM_COUNT}-team ${BOARD_FORMAT_SPECS[format].basisLabel}, in board order`;
+  return `${boardScoringLine(format, season)}, in board order`;
 }

@@ -8,7 +8,11 @@ import type { SheetColumnKey, SheetRowModel } from "../state/sheet-columns";
 import { sheetDisplayName } from "../state/sheet-name";
 import type { RoomActs } from "./room-acts";
 
-export interface SheetRowProps extends Pick<RoomActs, "canDraft" | "submitting" | "onDraft" | "onQueueToggle" | "onPeek"> {
+export interface SheetRowProps extends Pick<RoomActs, "canDraft" | "submitting" | "onDraft"> {
+  /** Null outside a room, where there is no queue to put a man in. */
+  readonly onQueueToggle: RoomActs["onQueueToggle"] | null;
+  /** Null where no card exists to open: the name is then text, not a button that does nothing. */
+  readonly onPeek: RoomActs["onPeek"] | null;
   readonly row: SheetRowModel;
   /** The row's top edge inside the column's window, px. */
   readonly top: number;
@@ -23,6 +27,12 @@ export interface SheetRowProps extends Pick<RoomActs, "canDraft" | "submitting" 
 }
 
 const ROW_HEIGHT = { height: QUILT_CONFIG.sheet.rowPx } as const;
+
+/** The name and face: a button where a card can open, plain text where none can. One element
+ *  either way, so the row's grid is the same shape on both surfaces. */
+function Identity({ as: Tag, ...rest }: { readonly as: "span" | "button" } & React.ComponentPropsWithoutRef<"button">) {
+  return <Tag {...rest} />;
+}
 
 function allowDrop(event: DragEvent<HTMLElement>): void {
   event.preventDefault();
@@ -40,7 +50,7 @@ function allowDrop(event: DragEvent<HTMLElement>): void {
  * that was taken and nothing else in the column.
  */
 export const SheetRow = memo(function SheetRow({ row, top, column, onMove, onDragStart, onDropOn, first, last, canDraft, submitting, onDraft, onQueueToggle, onPeek }: SheetRowProps) {
-  const { player, rank, taken, mine, queued, survived, runs } = row;
+  const { player, rank, taken, mine, queued, survived, runs, value } = row;
   const draggable = onDragStart !== null && !taken;
   const overall = column === "overall";
   return (
@@ -63,7 +73,7 @@ export const SheetRow = memo(function SheetRow({ row, top, column, onMove, onDra
     >
       {queued && !taken ? <span aria-hidden="true" className="absolute -left-0.5 top-3 h-5 w-1 rounded-xs bg-self" /> : null}
       <span className="text-right font-display text-xs font-semibold tabular-nums text-text-faint">{rank}</span>
-      <button type="button" aria-label={`${player.name}, open the card`} onClick={() => onPeek(player.id)} className="col-span-2 flex min-w-0 items-center gap-1.5 rounded-md text-left focus-visible:outline-2 focus-visible:outline-accent">
+      <Identity as={onPeek === null ? "span" : "button"} type={onPeek === null ? undefined : "button"} aria-label={onPeek === null ? undefined : `${player.name}, open the card`} onClick={onPeek === null ? undefined : () => onPeek(player.id)} className="col-span-2 flex min-w-0 items-center gap-1.5 rounded-md text-left focus-visible:outline-2 focus-visible:outline-accent">
         <PlayerFace player={player} size="xs" />
         <span className="flex min-w-0 flex-col leading-tight">
           <span title={player.name} className={`truncate font-display text-sm font-bold text-text-primary ${taken && !mine ? "line-through decoration-2" : ""}`}>
@@ -77,12 +87,25 @@ export const SheetRow = memo(function SheetRow({ row, top, column, onMove, onDra
             </span>
           </span>
         </span>
-      </button>
+      </Identity>
       {taken ? (
         <span className="text-[11px] text-text-faint">{mine ? "" : "taken"}</span>
       ) : (
         <span className="flex items-center justify-end">
-          <span className="group-focus-within:hidden group-hover:hidden group-data-[recomputing=true]/sheet:opacity-60">{runs === null || survived === undefined ? <span className="text-[11px] text-text-faint">–</span> : <OddsFigure survived={survived} runs={runs} form="count" />}</span>
+          {/* THE ODDS, OR THE BOARD'S OWN KEY (the Draft area round, 2026-09-12). In a room the
+              number is how many runs he survived to your next pick. Outside one there is no next
+              pick, so the row leads with points over replacement instead — the quantity the board
+              is ordered by, with its basis named once above the columns. Neither, and the row
+              prints the dash it earns rather than a zero. */}
+          <span className="group-focus-within:hidden group-hover:hidden group-data-[recomputing=true]/sheet:opacity-60">
+            {runs !== null && survived !== undefined ? (
+              <OddsFigure survived={survived} runs={runs} form="count" />
+            ) : value !== null ? (
+              <span className="font-display text-sm font-bold tabular-nums text-text-primary">{value.toFixed(1)}</span>
+            ) : (
+              <span className="text-[11px] text-text-faint">–</span>
+            )}
+          </span>
           <span className="hidden items-center gap-0.5 group-focus-within:flex group-hover:flex group-data-[pointer=coarse]/room:flex">
             {onMove === null ? null : (
               <>
@@ -94,11 +117,14 @@ export const SheetRow = memo(function SheetRow({ row, top, column, onMove, onDra
                 </Button>
               </>
             )}
+            {/* No verb outside a room (`onQueueToggle` null): there is nothing to draft and no
+                queue to hold him in, and a pill that did nothing would be the loudest thing on a
+                sheet whose one act is reordering. */}
             {canDraft ? (
               <Button size="sm" variant="verb" disabled={submitting} aria-label={`Draft ${player.name}`} onClick={() => onDraft(player.id)}>
                 Draft
               </Button>
-            ) : (
+            ) : onQueueToggle === null ? null : (
               <Button size="sm" variant="secondary" disabled={submitting} aria-pressed={queued} aria-label={queued ? `Remove ${player.name} from your queue` : `Queue ${player.name}`} onClick={() => onQueueToggle(player.id)}>
                 {queued ? "Queued" : "Queue"}
               </Button>

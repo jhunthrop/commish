@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import type { Player, Position } from "@/domain/player";
 import { auctionValues, type AuctionShape } from "@/projections/auction/value";
 import { quartilesFromSeasonBand } from "@/projections/preseason/band-quartiles";
@@ -315,6 +315,21 @@ function BoardMeta({ row, showLastSeason, scoringLabel }: { readonly row: BoardR
 
 export interface BoardViewProps {
   readonly rows: readonly BoardRow[];
+  /**
+   * THE CONTEXT CONTROLS, INSIDE THE FILTER BAR (the Draft area round, 2026-09-12). The league
+   * and the scoring decide what every number below MEANS, and they used to sit on a line of their
+   * own above this one — three bands of chrome between a phone reader and the first player row on
+   * the product's densest comparison surface. They ride the same scrolling row as the position
+   * tabs now. Rendered by the page because both are server-resolved navigations, not view state.
+   */
+  readonly context?: ReactNode;
+  /**
+   * THE BASIS, IN ONE LINE, UNDER THE CONTROLS THAT SET IT (P11). What rules produced every
+   * number below and nothing else — the sentence that used to follow it explained the control an
+   * inch to its left, which is the explainer text P7 rules out. `null` renders no line at all: an
+   * empty paragraph is furniture with nothing inside it.
+   */
+  readonly basis?: string | null;
   readonly laws: readonly Law[];
   /** Always available — the generic default carries a 12-team standard shape too, so the $
    *  toggle works with or without a real league selected. */
@@ -339,7 +354,7 @@ export interface BoardViewProps {
  * `?league=`, since that is what changes the recomputed value/tier numbers). CSV export reads the
  * exact rows on screen.
  */
-export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLabel, openOn = "" }: BoardViewProps) {
+export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLabel, openOn = "", context = null, basis = null }: BoardViewProps) {
   const [position, setPosition] = useState("ALL");
   const [search, setSearch] = useState(openOn);
   const [rookiesOnly, setRookiesOnly] = useState(false);
@@ -409,6 +424,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
         <div className="shrink-0">
           <SegmentGroup label="Position" options={POSITION_TABS} value={position} onChange={setPosition} labelled={false} />
         </div>
+        {context}
         <label className="flex h-10 shrink-0 items-center gap-1.5 text-sm whitespace-nowrap text-text-muted">
           <input type="checkbox" checked={rookiesOnly} onChange={(event) => setRookiesOnly(event.target.checked)} className="size-4 accent-accent" />
           Rookies only
@@ -431,6 +447,8 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
           Export CSV
         </button>
       </div>
+
+      {basis === null ? null : <p className="text-sm text-text-muted">{basis}</p>}
 
       {/* A position the engine publishes no projection for says so, once, above its own table. The
           rows below it are real players in the market's own order with honestly blank projection

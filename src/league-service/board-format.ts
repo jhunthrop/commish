@@ -6,6 +6,7 @@ import type { ScoringRules } from "@/scoring/compute";
 import {
   BOARD_FORMAT_SPECS,
   boardBasisLine,
+  boardScoringLine,
   boardFormatForRules,
   boardSourceFor,
   type BoardFormat,
@@ -29,6 +30,9 @@ export interface LeagueBoardFormat extends ResolvedBoardFormat {
   readonly source: string;
   /** The board's own basis sentence, "2026 board, 12-team half PPR, in board order". */
   readonly basisLine: string;
+  /** The same sentence without the order clause — what a surface in the MANAGER's own order
+   *  (the sheet) names its numbers with. */
+  readonly scoringLine: string;
   /** "Half PPR", for a column or a caption. */
   readonly label: string;
 }
@@ -49,6 +53,7 @@ function resolutionFor(resolved: ResolvedBoardFormat, rules: ScoringRules, seaso
     rules,
     source: boardSourceFor(resolved.format),
     basisLine: boardBasisLine(resolved.format, season),
+    scoringLine: boardScoringLine(resolved.format, season),
     label: BOARD_FORMAT_SPECS[resolved.format].label,
   };
 }

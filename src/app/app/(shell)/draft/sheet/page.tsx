@@ -5,16 +5,18 @@ import { leagues, players } from "@/db/schema";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
+import { resolveBoardFormat } from "@/draft-hq/board/service";
 import { getSheet, listSheets } from "@/draft-hq/sheet/service";
 import { boardOptionsFrom, sheetEntryViews } from "@/draft-hq/sheet/view";
+import { sheetColumnsPayload } from "@/draft-hq/sheet/columns-payload";
 import { byeStackWarning, mockHistoryInsights } from "@/draft-hq/sheet/insights";
 import { sheetHealth } from "@/draft-hq/sheet/health";
 import { canonicalSimFor } from "@/draft-hq/playbook/service";
 import { MySheetClient } from "@/draft-hq/sheet/my-sheet-client";
-import { DraftSubnav } from "@/draft-hq/subnav";
+import { draftDoorFor } from "@/draft-hq/league-context";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = pageTitle("My Sheet");
+export const metadata: Metadata = pageTitle("Draft");
 
 interface PageProps {
   readonly searchParams: Promise<Record<string, string | readonly string[] | undefined>>;
@@ -48,9 +50,10 @@ export default async function MySheetPage({ searchParams }: PageProps) {
   const selectedId = sheetParam ?? sheets[0]?.id ?? null;
   const selected = selectedId === null ? null : await getSheet(db, user.id, selectedId);
 
-  const [{ entries, board }, mockHistory] = await Promise.all([
+  const [{ entries, board }, mockHistory, door] = await Promise.all([
     selected === null ? Promise.resolve({ entries: [], board: [] }) : sheetEntryViews(db, selected, null),
     mockHistoryInsights(db, user.id),
+    draftDoorFor(db, user.id),
   ]);
   const byeStack = entries.length === 0 ? null : await byeStackWarning(db, entries);
 
@@ -76,17 +79,22 @@ export default async function MySheetPage({ searchParams }: PageProps) {
       : new Map((await db.select({ id: players.id, name: players.name }).from(players).where(inArray(players.id, mostDraftedIds))).map((row) => [row.id, row.name]));
   const mostDraftedWithNames = mockHistory.mostDrafted.map((row) => ({ ...row, name: mostDraftedNames.get(row.playerId) ?? "Unknown player" }));
 
+  // `sheetEntryViews` reads the board under the caller's own shape with no league named, so the
+  // basis every row's number is under is the same league-free resolution the Board's generic view
+  // states. One sentence, off the one resolver, never a second spelling of the same rules.
+  const resolved = await resolveBoardFormat(db, {});
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="print:hidden">
-        <DraftSubnav current="sheet" />
-      </div>
+    <div className="flex flex-col gap-4">
       <MySheetClient
         sheets={sheets}
         selectedSheetId={selected?.id ?? null}
         selectedSheetName={selected?.name ?? null}
         entries={entries}
         boardOptions={boardOptionsFrom(board)}
+        columns={sheetColumnsPayload(entries, board)}
+        basis={resolved.scoringLine}
+        scheduled={door}
         insights={{ mockHistory: { ...mockHistory, mostDrafted: mostDraftedWithNames }, byeStack, sheetHealth: health }}
       />
     </div>

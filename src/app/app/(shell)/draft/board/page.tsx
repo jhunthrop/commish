@@ -4,7 +4,7 @@ import { getDb } from "@/db/client";
 import { drafts } from "@/db/schema";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { pageTitle } from "@/components/app-shell/page-metadata";
-import { PageTitle, type SelectOption } from "@/components/ui";
+import type { SelectOption } from "@/components/ui";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { registry } from "@/projections/laws/registry";
 import { DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
@@ -12,11 +12,12 @@ import { boardRows, resolveBoardFormat } from "@/draft-hq/board/service";
 import { BoardView } from "@/draft-hq/board/board-view";
 import { BOARD_FORMAT_QUERY_KEY, ScoringFormatPicker } from "@/draft-hq/board/scoring-format-picker";
 import { LeaguePicker } from "@/draft-hq/league-picker";
-import { myDraftLeagues, nextDraftingLeague, type DraftLeagueRow } from "@/draft-hq/league-context";
-import { DraftSubnav } from "@/draft-hq/subnav";
+import { draftDoorFor, myDraftLeagues, nextDraftingLeague, type DraftLeagueRow } from "@/draft-hq/league-context";
+import { DraftHeader } from "@/draft-hq/draft-header";
+import { ScheduledLine } from "@/draft-hq/scheduled-line";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = pageTitle("The Board");
+export const metadata: Metadata = pageTitle("Draft");
 
 const GENERIC_BUDGET = 200;
 
@@ -68,7 +69,7 @@ export default async function BoardPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const leagueParam = typeof params.league === "string" ? params.league : undefined;
 
-  const leagues = await myDraftLeagues(db, user.id);
+  const [leagues, door] = await Promise.all([myDraftLeagues(db, user.id), draftDoorFor(db, user.id)]);
 
   let selected: DraftLeagueRow | null = null;
   let isGeneric = leagueParam === "generic";
@@ -108,42 +109,41 @@ export default async function BoardPage({ searchParams }: PageProps) {
 
   const laws = registry();
 
-  return (
-    <div className="flex flex-col gap-6">
-      <DraftSubnav current="board" />
-      <PageTitle>The Board</PageTitle>
-
-      {/* THE CONTEXT, IN ONE BAR (Sideline research round). The league and the scoring are the two
-          things that decide what every number below means, so they sit on one line with the basis
-          stated under them in the same breath — not in a card of their own, which on a phone put
-          three bands of chrome between the reader and the first player row. */}
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-end gap-4">
-          <LeaguePicker options={leaguePickerOptions(leagues)} value={isGeneric ? "generic" : leagueParam !== undefined ? (selected?.leagueId ?? "next") : "next"} basePath="/app/draft/board" />
-          {isGeneric ? <ScoringFormatPicker value={requested.format} explicit={requested.explicit} basePath="/app/draft/board" extraQuery={{ league: "generic" }} /> : null}
+  // THE CONTEXT CONTROLS RIDE THE FILTER BAR (the Draft area round, 2026-09-12): the league and
+  // the scoring decide what every number below means, so they sweep with the position tabs rather
+  // than standing on a row of their own above them. Both are server navigations, which is why the
+  // page builds them and the client view only places them.
+  const context = (
+    <>
+      <LeaguePicker options={leaguePickerOptions(leagues)} value={isGeneric ? "generic" : leagueParam !== undefined ? (selected?.leagueId ?? "next") : "next"} basePath="/app/draft/board" />
+      {isGeneric ? (
+        <div className="shrink-0 pb-2">
+          <ScoringFormatPicker value={requested.format} explicit={requested.explicit} basePath="/app/draft/board" extraQuery={{ league: "generic" }} />
         </div>
-        {/* THE BASIS, IN ONE LINE. It states what rules produced every number below (P11) and
-            nothing else: the sentence that used to follow it ("Pick a league above to see it
-            computed under that league's exact rules") explained the control an inch to its left,
-            which is exactly the explainer text P7 rules out. The control says it by being there. */}
-        {/* One line, or no line at all. An empty paragraph is furniture with nothing inside it, and
-            this one used to render for a reader whose league we could not name (fix round 1, LOW). */}
-        {isGeneric ? (
-          <p className="text-sm text-text-muted">{`${resolved.basisLine}, a 12-team standard roster.`}</p>
-        ) : selected === null ? null : (
-          <p className="text-sm text-text-muted">
-            {`Under ${selected.leagueName}'s rules: ${selected.teamCount} teams, its own roster shape. ${resolved.basisLine}.${resolved.note === null ? "" : ` ${resolved.note}`}`}
-          </p>
-        )}
-      </div>
+      ) : null}
+    </>
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <DraftHeader stop="board" />
+      <ScheduledLine draft={door} />
 
       <BoardView
         rows={rows}
         laws={laws}
         auctionShape={auctionShape}
+        context={context}
         scoringLabel={resolved.label}
         openOn={typeof params.q === "string" ? params.q : ""}
         exportFilename={`board-${selected?.leagueId ?? `generic-${resolved.format}`}.csv`}
+        basis={
+          isGeneric
+            ? `${resolved.basisLine}, a 12-team standard roster.`
+            : selected === null
+              ? null
+              : `Under ${selected.leagueName}'s rules: ${selected.teamCount} teams, its own roster shape. ${resolved.basisLine}.${resolved.note === null ? "" : ` ${resolved.note}`}`
+        }
       />
     </div>
   );
