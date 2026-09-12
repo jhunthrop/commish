@@ -101,8 +101,8 @@ describe("PlayerRow", () => {
   /**
    * THE TOP-OF-BOARD SKIN. `bg-accent/10` is unavailable by design — `accent-budget.source.test.ts`
    * bans the `bg-accent` substring outside its allowlist, tints included — so the wash is a named
-   * `globals.css` utility over the same per-theme `accentGlow` role the hero's `.floodlight` uses,
-   * and the border is `accent` rather than `line`. Both halves are asserted because the wash alone
+   * `globals.css` utility over the per-theme `accentGlow` role, and the border is `accent` rather
+   * than `line`. Both halves are asserted because the wash alone
    * is a soft signal and the border alone is a hard one; the row wants the pair.
    */
   it("gives the highlighted row the amber wash (yours, never the verb's blue), spelled as a whole skin, with no border", async () => {
