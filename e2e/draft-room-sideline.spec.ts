@@ -99,6 +99,13 @@ test("the wall, the rail, the dock's one verb, your sheet, and a pick landing as
   await expect(managerA.getByTestId("sheet-basis")).toContainText("Our board, untouched");
   await expect(managerA.getByTestId("sheet-basis")).toContainText(/share of \d+ replays with him still there at/);
   await expect(managerA.getByTestId("advisor-odds-share").first()).toContainText(/^\d+%/);
+  // No surname is cut at 1440 (review M5): every visible sheet name fits its own box.
+  const clipped = await managerA.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-testid="sheet-row"] [title]'))
+      .filter((el) => el.getBoundingClientRect().width > 0 && el.scrollWidth > el.clientWidth + 1)
+      .map((el) => el.textContent),
+  );
+  expect(clipped, "sheet names cut at 1440").toEqual([]);
   await managerA.waitForTimeout(400);
   await managerA.screenshot({ path: `${OUT_DIR}/draft-room-sheet-desktop-${theme}.png` });
   await managerA.getByTestId("hide-taken").check();

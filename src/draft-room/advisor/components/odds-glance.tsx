@@ -69,10 +69,10 @@ export function OddsFigure({ survived, runs, form = "percent", pickLabel = null 
   if (form === "share") {
     return (
       <span {...shared} className={`flex shrink-0 flex-col items-end leading-none ${BAND_INK[band]}`}>
-        <span className="font-display text-md font-extrabold tabular-nums">{label}</span>
+        <span className="font-display text-sm font-extrabold tabular-nums">{label}</span>
         {/* The basis wraps inside its own three rems under the figure ("still there" over
             "at 2.01"), so a 12.5rem column keeps the name's width (P1). */}
-        <span aria-hidden="true" className="max-w-12 text-right text-[9px] leading-[1.1] text-text-faint">
+        <span aria-hidden="true" className="max-w-11 text-right text-[9px] leading-[1.1] text-text-faint">
           {basis}
         </span>
       </span>
