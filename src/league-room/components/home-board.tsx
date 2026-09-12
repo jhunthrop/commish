@@ -99,7 +99,7 @@ export function HomeBoard({
           ))}
         </ul>
       )}
-      <OpenRooms leagues={openLeagues} featured={ordered.length === 0} />
+      <OpenRooms leagues={openLeagues} alreadyIn={ordered.map((league) => league.id)} featured={ordered.length === 0} />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { buttonClassName } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";
 import { GLOSSARY } from "@/help/glossary";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { ctaAccessibleName } from "./open-league-shared";
 import { LEAGUE_ROW_GRID, LEAGUE_ROW_GRID_LIVE, LeagueRow, LeagueRowsHeader } from "./league-row";
 
 vi.mock("next/navigation", () => ({
@@ -271,7 +272,8 @@ describe("LeagueRow", () => {
 
     it("gives a signed-in visitor the real join button", () => {
       render(row(BASE, { signedIn: true }));
-      expect(screen.getByRole("button", { name: `Join ${BASE.name}` })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: ctaAccessibleName(BASE) })).toBeInTheDocument();
+      // The row is a BUTTON signed in and a LINK signed out; both say the same sentence now.
       expect(screen.queryByRole("link", { name: /Take/ })).not.toBeInTheDocument();
     });
   });
@@ -284,6 +286,7 @@ describe("LeagueRow", () => {
       expect(verb).toHaveAttribute("aria-haspopup", "dialog");
       fireEvent.click(verb);
       expect(onOpen).toHaveBeenCalledTimes(1);
+      // The row is a BUTTON signed in and a LINK signed out; both say the same sentence now.
       expect(screen.queryByRole("link", { name: /Take/ })).not.toBeInTheDocument();
     });
 

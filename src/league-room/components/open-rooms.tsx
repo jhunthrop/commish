@@ -30,6 +30,8 @@ export function bySoonestDraft(leagues: readonly PublicLeagueSummary[]): readonl
 
 export interface OpenRoomsProps {
   readonly leagues: readonly PublicLeagueSummary[];
+  /** League ids this manager already has a seat in — never offered a seat they are sitting in. */
+  readonly alreadyIn?: readonly string[];
   /**
    * True when this section carries the PAGE's one solid verb (P3) — which happens on exactly one
    * page state, a manager with no leagues at all, where the lobby IS the page and the featured
@@ -51,9 +53,14 @@ export interface OpenRoomsProps {
  * "Take a seat". A signed-in reader is still a stranger to these rooms, so nothing here names
  * anybody: `PublicLeagueSummary` discloses a count and never a member.
  */
-export function OpenRooms({ leagues, featured = false }: OpenRoomsProps) {
-  if (leagues.length === 0) return null;
-  const ordered = bySoonestDraft(leagues);
+export function OpenRooms({ leagues, alreadyIn = [], featured = false }: OpenRoomsProps) {
+  // A ROOM THIS MANAGER IS ALREADY IN IS NOT AN OPEN ROOM (persona walk, 2026-09-11). A house
+  // league with seats left is public and still filling, so the same room would otherwise appear
+  // once as this manager's own card and again below it offering them a seat they are sitting in.
+  const mine = new Set(alreadyIn);
+  const open = leagues.filter((league) => !mine.has(league.id));
+  if (open.length === 0) return null;
+  const ordered = bySoonestDraft(open);
   const shown = ordered.slice(0, ROOMS_SHOWN);
   const more = ordered.length - shown.length;
   const emphasisFor = (index: number) => (featured && index === 0 ? ("ink" as const) : ("quiet" as const));

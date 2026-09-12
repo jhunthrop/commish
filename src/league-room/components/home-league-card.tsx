@@ -52,8 +52,11 @@ export function HomeLeagueCard({ league, solid }: HomeLeagueCardProps) {
       data-solid={solid ? "" : undefined}
       // The amber wash is "this one is yours to deal with", never "press this" — Court blue is
       // the verb (P3), and spending it on the card's own furniture would put the page's loudest
-      // pigment behind a surface that is not a control.
-      className={`grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_13rem] sm:gap-x-8 ${solid ? "bg-self-glow" : ""}`.trimEnd()}
+      // pigment behind a surface that is not a control. `self-wash` is a background IMAGE, which
+      // composes over `Card`'s own `bg-surface-elevated`; a second background-COLOR utility here
+      // would be a bet on Tailwind's emission order (the bet `Card`'s docblock warns about) and
+      // lost it the first time this was built.
+      className={`grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_13rem] sm:gap-x-8 ${solid ? "self-wash" : ""}`.trimEnd()}
     >
       <div className="flex min-w-0 flex-col">
         <div className="flex min-w-0 items-center gap-4">
@@ -73,7 +76,10 @@ export function HomeLeagueCard({ league, solid }: HomeLeagueCardProps) {
 
         <p className="mt-4 font-display text-lg font-semibold leading-display text-text-primary">{momentLine(league)}</p>
 
-        {league.since === null ? null : (
+        {/* SINCE YOU WERE HERE, on an in-season card only. Before a draft has run, the newest
+            thing in a room is the room filling, which the card's own sentence and seat meter
+            already say better than a second line under them would. */}
+        {league.since === null || league.draftStatus !== "complete" ? null : (
           <p className="mt-2 flex min-w-0 items-center gap-2.5 text-sm text-text-muted">
             {league.since.actor === null ? null : (
               <Avatar name={league.since.actor.name} avatar={league.since.actor.avatar} size="sm" aria-hidden="true" />
@@ -104,6 +110,10 @@ export function HomeLeagueCard({ league, solid }: HomeLeagueCardProps) {
       </div>
 
       <div className="flex flex-col items-stretch gap-5 sm:items-end">
+        {/* The one figure on the card. It keeps the ordinary ink on every card, the owed one
+            included: `BigNumber` colours its own value span, so a colour handed down through this
+            wrapper's `className` would be inert anyway, and the wash behind the card already says
+            whose card this is without a second pigment competing with the verb. */}
         <BigNumber value={figure.value} basis={figure.basis} size="lg" align="start" className="sm:items-end sm:text-right" />
         <ButtonLink
           href={verb.href}

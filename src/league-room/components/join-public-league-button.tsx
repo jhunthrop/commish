@@ -19,12 +19,26 @@ export function JoinPublicLeagueButton({
   leagueId,
   leagueName,
   variant = "secondary",
+  label = "Join",
+  accessibleName,
 }: {
   readonly leagueId: string;
   readonly leagueName: string;
   /** Rule 5: quiet pill unless the PARENT grants this card the view's one ink action —
    *  `OpenLeagueCard` maps its own `emphasis` prop here, and Task 6 decides which card gets it. */
   readonly variant?: "primary" | "secondary" | "verb";
+  /**
+   * The visible words (2026-09-11). `ctaVisibleText` (`./open-league-shared`) has always owned
+   * this row's verb for a signed-OUT visitor ("Take a seat", "Take the last seat") while this
+   * button said "Join", so one row said two different things depending on who was reading it.
+   * `OpenLeagueCta` passes the same sentence for both states now. The default keeps any caller
+   * that builds this button directly working unchanged.
+   */
+  readonly label?: string;
+  /** The spoken sentence. `OpenLeagueCta` passes `ctaAccessibleName(league)`, the SAME sentence
+   *  the signed-out link announces, so the two auth states of one row read identically to a
+   *  screen reader as well as to an eye. */
+  readonly accessibleName?: string;
 }) {
   const { fetchJson } = useLeagueRoomDeps();
   const router = useRouter();
@@ -55,8 +69,8 @@ export function JoinPublicLeagueButton({
 
   return (
     <div className="flex flex-col gap-1">
-      <Button variant={variant} onClick={() => void join()} loading={submitting} disabled={submitting} aria-label={`Join ${leagueName}`}>
-        Join
+      <Button variant={variant} onClick={() => void join()} loading={submitting} disabled={submitting} aria-label={accessibleName ?? `Join ${leagueName}`}>
+        {label}
       </Button>
       {error === null ? null : (
         /* `max-w-56` (Task 12, persona checkpoint): inside `LeagueRow`'s `max-content` action

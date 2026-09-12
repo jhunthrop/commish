@@ -362,7 +362,7 @@ export function OpenLeagueCta({
 }) {
   const variant = emphasis === "ink" ? ("verb" as const) : ("secondary" as const);
   return signedIn ? (
-    <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} variant={variant} />
+    <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} variant={variant} label={ctaVisibleText(league)} accessibleName={ctaAccessibleName(league)} />
   ) : (
     <SignInLink intent={`/join/${league.id}/hold`} aria-label={ctaAccessibleName(league)} className={buttonClassName(variant, "md")}>
       {suffix === undefined ? ctaVisibleText(league) : `${ctaVisibleText(league)} ${suffix}`}

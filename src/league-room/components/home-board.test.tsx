@@ -149,6 +149,25 @@ describe("HomeBoard with no leagues makes the lobby the page", () => {
   });
 });
 
+describe("HomeBoard never offers a seat this manager is already sitting in", () => {
+  it("drops a room from the lobby when it is one of this manager's own leagues", () => {
+    const mine = homeCard({ id: PUBLIC_LEAGUES[0]!.id, name: PUBLIC_LEAGUES[0]!.name, draftStatus: "scheduled", startTrigger: "when_full", slotsRanked: true });
+    renderInLeague(<HomeBoard initial={body([mine])} openLeagues={PUBLIC_LEAGUES} />, fixtureLeagueDeps().deps);
+    const lobby = screen.getByTestId("open-rooms");
+    expect(within(lobby).queryByText(PUBLIC_LEAGUES[0]!.name)).toBeNull();
+    expect(within(lobby).getAllByText(PUBLIC_LEAGUES[1]!.name).length).toBeGreaterThan(0);
+  });
+
+  it("renders no lobby at all when the only open room is one this manager already holds a seat in", () => {
+    const mine = homeCard({ id: PUBLIC_LEAGUES[0]!.id, name: PUBLIC_LEAGUES[0]!.name });
+    const { container } = renderInLeague(
+      <HomeBoard initial={body([mine])} openLeagues={[PUBLIC_LEAGUES[0]!]} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(container.querySelector("[data-testid='open-rooms']")).toBeNull();
+  });
+});
+
 describe("HomeBoard's background refresh", () => {
   it("asks only while a week is in progress and the tab is visible", async () => {
     vi.useFakeTimers();
