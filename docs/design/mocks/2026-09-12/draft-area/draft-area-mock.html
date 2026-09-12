@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draft · Mock drafts</title>
+<!--
+  THE DRAFT AREA, stop three of three: MOCK DRAFTS. The lobby moves under the Draft tab.
+  Top nav is Leagues, Draft, Wallet. Rooms is gone. The HQ landing, the simulator, the
+  assistant, the playbook and the ADP tiles are gone with it.
+
+  DATA PROVENANCE
+  Real, read from the product's own source:
+  - The room record is `MockLobbyRoomSummary` (src/mock-draft-service/lobby.ts): leagueId,
+    shareCode, teamCount, seatsOpen, pickSeconds, startsInMs. Nothing else. That is every
+    field the lobby read returns.
+  - Table options are MOCK_CONFIG.teamCountOptions [8,10,12] and
+    MOCK_CONFIG.pickClockSecondsOptions [30,60,90], default 60 (src/mock-draft/config.ts).
+  - Bots fill open seats at the fill window: MOCK_CONFIG.fillWindowSeconds 180.
+  - "Bot" is MOCK_COPY.botBadge, verbatim.
+  - Bot owner handles on the solo door are MOCK_CONFIG.botRoster verbatim (Coach Parker,
+    Dana Q., Marty the Commish, Coach Bee). Team names from MOCK_BOT_TEAM_NAME_POOL.
+
+  STAND-INS, layout only, and labelled here because the refusal list requires it: the three
+  rooms' share codes, seat counts, clocks and countdowns. The dev database has no live mock
+  room right now. Every number below is a shape, not a claim about a real room.
+
+  THE DESIGN DID NOT SURVIVE THE DATA IN ONE PLACE, and this file draws the honest version:
+  the founder asked for these rows faces first, as a Manager stack, "these are members of the
+  room so faces are honest". They are not honest HERE. `MockLobbyRoomSummary` carries no member
+  at all, and `MockRoomSummary`'s own docblock states the rule: "no other member's name or seat
+  is ever named on this surface". So a taken seat draws as an anonymous seat face and an open
+  one as the dashed well, which is the exact treatment the approved signed-in-home mock already
+  invented for the same boundary. Faces with names arrive one tap later, in the waiting room,
+  where `ManagerStack` already draws them. See progress.md.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Sideline tokens, src/design/tokens.ts verbatim. Shared by the three Draft stops.
+   Inlined into each file at build time of the mock (these are static files). */
+:root{
+  --chalk:#F6F5F1; --paper:#FFFFFF; --raised:#FBFAF7; --inset:#EFEEE8;
+  --graphite:#17181C; --ink2:#5B5E66; --ink3:#8A8D95; --hair:#E6E5DF; --edge:#D9D8D1;
+  --court:#2457F5; --court-ink:#FFFFFF;
+  --amber:#E39A0E; --amber-ink:#8A5C05; --amber-wash:#FBF1DC; --amber-text:#1A1200;
+  --live:#0E7A49; --live-wash:#E4F4EC; --rose:#B9245A;
+  --shadow:0 4px 16px rgba(23,24,28,.06), 0 1px 2px rgba(23,24,28,.04);
+  --r-card:20px; --r-row:16px; --r-pill:999px;
+  --display:"Bricolage Grotesque", system-ui, sans-serif; --body:"Figtree", system-ui, sans-serif;
+  --spring:cubic-bezier(.2,.9,.3,1.15);
+  /* position stickers, TOKENS.position.light */
+  --qb:#A78BE0; --rb:#3FB79A; --wr:#E36AA0; --te:#6FB4E0; --k:#7A828F; --def:#3E4756;
+  --sticker-ink:#14181F; --def-ink:#FFFFFF;
+  /* tier badges, TOKENS.tier.light */
+  --tier-S:#9D5707; --tier-S-ink:#FFFFFF; --tier-A:#495465; --tier-A-ink:#FFFFFF;
+  --tier-B:#6E7D91; --tier-B-ink:#0A0D12; --tier-C:#7F8C9F; --tier-C-ink:#0A0D12;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --chalk:#121316; --paper:#1B1C21; --raised:#212228; --inset:#26272D;
+    --graphite:#F2F2EE; --ink2:#A9ACB4; --ink3:#7C7F88; --hair:#2A2B31; --edge:#34353C;
+    --court:#5B85FF; --court-ink:#0B1226;
+    --amber:#F5B341; --amber-ink:#F5B341; --amber-wash:#2A2213; --amber-text:#1A1200;
+    --live:#2ED47F; --live-wash:#12281D; --rose:#FF6B9A;
+    --shadow:0 4px 16px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
+    --qb:#2A1D3B; --rb:#0E3B32; --wr:#3B0E28; --te:#184362; --k:#60656C; --def:#14161A;
+    --sticker-ink:#E4E8EE; --def-ink:#8E9BAD;
+    --tier-S:#FFB627; --tier-S-ink:#1A1200; --tier-A:#B9C2D0; --tier-A-ink:#14181F;
+    --tier-B:#7F8C9F; --tier-B-ink:#0A0D12; --tier-C:#5E6773; --tier-C-ink:#FFFFFF;
+  }
+}
+:root[data-theme="dark"]{
+  --chalk:#121316; --paper:#1B1C21; --raised:#212228; --inset:#26272D;
+  --graphite:#F2F2EE; --ink2:#A9ACB4; --ink3:#7C7F88; --hair:#2A2B31; --edge:#34353C;
+  --court:#5B85FF; --court-ink:#0B1226;
+  --amber:#F5B341; --amber-ink:#F5B341; --amber-wash:#2A2213; --amber-text:#1A1200;
+  --live:#2ED47F; --live-wash:#12281D; --rose:#FF6B9A;
+  --shadow:0 4px 16px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
+  --qb:#2A1D3B; --rb:#0E3B32; --wr:#3B0E28; --te:#184362; --k:#60656C; --def:#14161A;
+  --sticker-ink:#E4E8EE; --def-ink:#8E9BAD;
+  --tier-S:#FFB627; --tier-S-ink:#1A1200; --tier-A:#B9C2D0; --tier-A-ink:#14181F;
+  --tier-B:#7F8C9F; --tier-B-ink:#0A0D12; --tier-C:#5E6773; --tier-C-ink:#FFFFFF;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--chalk);color:var(--graphite);font:15px/1.45 var(--body)}
+a{color:inherit;text-decoration:none}
+h1,h2,h3{font-family:var(--display);margin:0;font-variation-settings:"opsz" 96}
+.num{font-family:var(--display);font-variant-numeric:tabular-nums}
+.wrap{max-width:1200px;margin:0 auto;padding:0 40px 56px}
+
+/* top bar: Leagues, Draft, Wallet. Rooms is gone. */
+.bar{display:flex;align-items:center;gap:24px;height:60px;border-bottom:1px solid var(--hair)}
+.brand{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em}
+.bar a.link{color:var(--ink2);font-weight:500;font-size:14px}
+.bar a.link.on{color:var(--graphite);font-weight:600}
+.bar .spacer{flex:1}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 20px;border-radius:var(--r-pill);font:600 15px var(--body);border:1px solid transparent;cursor:pointer;transition:transform 120ms var(--spring)}
+.btn:active{transform:scale(.97)}
+.btn.verb{background:var(--court);color:var(--court-ink);box-shadow:0 6px 18px rgba(36,87,245,.24)}
+.btn.quiet{background:transparent;border-color:var(--edge);color:var(--graphite)}
+.btn.sm{height:38px;padding:0 16px;font-size:14px}
+.textlink{color:var(--court);font-weight:600;font-size:14px}
+
+/* the title row: the name, the switch with three stops, the one verb */
+.title{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:28px 0 14px}
+h1.page{font-size:34px;font-weight:800;letter-spacing:-.025em}
+.switch{display:inline-flex;background:var(--paper);border-radius:var(--r-pill);padding:3px;box-shadow:var(--shadow)}
+.switch a{padding:7px 15px;border-radius:var(--r-pill);font-weight:600;font-size:13px;color:var(--ink2)}
+.switch a.on{background:var(--graphite);color:var(--paper)}
+.title .spacer{flex:1}
+
+/* the quiet scheduled-draft line, absent when no league has one */
+.scheduled{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--paper);border-radius:var(--r-row);box-shadow:var(--shadow);margin-bottom:16px;font-size:14px;color:var(--ink2)}
+.scheduled .crest{width:34px;height:34px;border-radius:11px;background:var(--inset);display:grid;place-items:center;font:800 12px var(--display);color:var(--ink2);flex:none}
+.scheduled b{color:var(--graphite);font-weight:600}
+.scheduled .go{margin-left:auto;color:var(--court);font-weight:600;font-size:14px;white-space:nowrap}
+
+/* faces */
+.faces{display:flex;flex-shrink:0}
+.face{width:40px;height:40px;border-radius:50%;background:var(--inset);color:var(--ink2);display:grid;place-items:center;font:700 13px var(--display);box-shadow:0 0 0 2px var(--paper);margin-left:-10px}
+.face:first-child{margin-left:0}
+.face.self{background:var(--amber-wash);color:var(--amber-ink);box-shadow:0 0 0 2px var(--amber)}
+.face.open{background:transparent;border:1px dashed var(--edge);box-shadow:0 0 0 2px var(--paper)}
+.face.more{background:var(--inset);color:var(--ink3);font-size:12px}
+.face.here{position:relative}
+.face.here::after{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:var(--live);box-shadow:0 0 0 2px var(--paper);animation:breathe 2s ease-in-out infinite}
+
+/* position stickers */
+.pos{display:inline-block;padding:1px 5px;border-radius:6px;font:700 10px var(--body);color:var(--sticker-ink);vertical-align:1px;letter-spacing:.02em}
+.pos.qb{background:var(--qb)}.pos.rb{background:var(--rb)}.pos.wr{background:var(--wr)}
+.pos.te{background:var(--te)}.pos.k{background:var(--k)}.pos.def{background:var(--def);color:var(--def-ink)}
+
+.chip{display:inline-block;padding:3px 10px;border-radius:var(--r-pill);font:600 11px var(--body);background:var(--inset);color:var(--ink2);letter-spacing:.02em}
+.chip.live{background:var(--live-wash);color:var(--live)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--live);margin-right:7px;vertical-align:middle;animation:breathe 2s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.5}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* MOCK STOP */
+.lobby{background:var(--paper);border-radius:var(--r-card);box-shadow:var(--shadow);padding:8px 8px 16px}
+.lobby-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 18px 4px}
+.lobby-head h2{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.chapter{padding:12px 18px 4px;font:600 12px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+.row{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.1fr) minmax(0,1.2fr) 150px 120px;gap:16px;align-items:center;padding:14px 18px;border-radius:var(--r-row);transition:background 140ms}
+.row:hover{background:var(--raised)}
+.row h3{font-size:17px;font-weight:700;letter-spacing:-.01em;line-height:1.15}
+.row .sub{color:var(--ink2);font-size:13px;margin-top:2px}
+.row .fmt,.row .when{color:var(--ink2);font-size:14px;min-width:0}
+.row .when b{display:block;color:var(--graphite);font-weight:600}
+.row .who{display:flex;align-items:center;gap:14px;min-width:0}
+.row .who .face{width:34px;height:34px;font-size:12px;margin-left:-8px}
+.row .who .face:first-child{margin-left:0}
+.face.seat{background:var(--edge);border:none;box-shadow:0 0 0 2px var(--paper)}
+.row .seats{display:flex;flex-direction:column;gap:8px}
+.row .seats .n{font-family:var(--display);font-variant-numeric:tabular-nums;font-size:30px;font-weight:800;line-height:1;letter-spacing:-.02em}
+.row .seats .basis{font-size:12px;color:var(--ink3)}
+.row .act{justify-self:end}
+.meter{display:flex;gap:4px}
+.meter i{height:6px;flex:1;border-radius:4px;border:1px solid var(--edge);background:var(--inset)}
+.meter i.f{background:var(--graphite);border-color:var(--graphite)}
+.lobby-foot{display:flex;align-items:center;gap:16px;padding:16px 18px 0;color:var(--ink3);font-size:13px;border-top:1px solid var(--hair);margin:8px 10px 0}
+
+/* the second door: against bots, the table as chips */
+.door{margin-top:20px;background:var(--paper);border-radius:var(--r-card);box-shadow:var(--shadow);padding:22px 26px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px 32px;align-items:center}
+.door h2{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.door .groups{display:flex;flex-wrap:wrap;gap:22px;margin-top:14px}
+.group{display:flex;align-items:center;gap:8px}
+.group .lab{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);font-weight:600}
+.opt{display:inline-flex;align-items:center;height:34px;padding:0 14px;border-radius:var(--r-pill);border:1px solid var(--edge);background:transparent;color:var(--ink2);font:600 14px var(--body);cursor:pointer}
+.opt.on{background:var(--graphite);color:var(--paper);border-color:var(--graphite)}
+.door .seated{display:flex;align-items:center;gap:12px;margin-top:18px}
+.door .seated .face{margin-left:-8px}
+.door .seated .cap{font-size:14px;color:var(--ink2)}
+.botchip{font:600 10px var(--body);background:var(--inset);color:var(--ink2);border-radius:var(--r-pill);padding:2px 7px;letter-spacing:.02em}
+
+@media (max-width:760px){
+  .wrap{padding:0 16px 120px}
+  .bar{height:54px;gap:14px}
+  h1.page{font-size:27px}
+  .title{padding:20px 0 12px;gap:12px}
+  .title .spacer{display:none}
+  .switch{order:3;width:100%;overflow:auto}
+  .switch a{flex:1;text-align:center}
+  .lobby{padding:4px 4px 12px}
+  .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"who who" "fmt fmt" "when seats" "act act";gap:10px 14px;padding:18px 14px;border-radius:0;border-bottom:1px solid var(--hair)}
+  .row:last-of-type{border-bottom:none}
+  .row .who{grid-area:who}.row .fmt{grid-area:fmt}.row .when{grid-area:when;align-self:end}
+  .row .seats{grid-area:seats;align-items:flex-end;text-align:right;gap:6px}
+  .row .meter{width:110px}
+  .row .act{grid-area:act;justify-self:stretch;margin-top:6px}
+  .row .act .btn{width:100%}
+  .door{grid-template-columns:1fr;padding:20px 18px}
+  .door .act{position:fixed;left:16px;right:16px;bottom:16px;z-index:3}
+  .door .act .btn{width:100%;box-shadow:0 -6px 24px rgba(23,24,28,.14),0 6px 18px rgba(36,87,245,.24)}
+  .lobby-foot{flex-direction:column;align-items:flex-start;gap:10px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="bar" aria-label="App">
+    <a class="brand" href="#">Commish</a>
+    <a class="link" href="#">Leagues</a>
+    <a class="link on" href="#" aria-current="page">Draft</a>
+    <a class="link" href="#">Wallet</a>
+    <span class="spacer"></span>
+    <span class="faces" aria-hidden="true"><span class="face self">JH</span></span>
+  </nav>
+
+  <div class="title">
+    <h1 class="page">Draft</h1>
+    <!-- one switch, three stops. The URL is /draft, /draft/sheet, /draft/mock-drafts. -->
+    <nav class="switch" aria-label="Draft view">
+      <a href="/draft">Board</a>
+      <a href="/draft/sheet">Your sheet</a>
+      <a href="/draft/mock-drafts" class="on" aria-current="page">Mock drafts</a>
+    </nav>
+    <span class="spacer"></span>
+  </div>
+
+  <section class="lobby" aria-label="Rooms filling now">
+    <div class="lobby-head">
+      <h2>Rooms filling now</h2>
+    </div>
+    <div class="chapter">Soonest start first</div>
+
+    <article class="row">
+      <div class="who">
+        <span class="faces" aria-hidden="true"><span class="face seat"></span><span class="face seat"></span><span class="face seat"></span><span class="face more">+4</span></span>
+        <div><h3>7 waiting</h3></div>
+      </div>
+      <div class="fmt">10 teams · 60 seconds a pick</div>
+      <div class="when"><b>Starts in 0:42</b>or sooner if it fills</div>
+      <div class="seats">
+        <span class="n num">3</span><span class="basis">seats left, of 10</span>
+        <div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="act"><a class="btn quiet" href="#">Join</a></div>
+    </article>
+
+    <article class="row">
+      <div class="who">
+        <span class="faces" aria-hidden="true"><span class="face seat"></span><span class="face seat"></span><span class="face open"></span><span class="face more">+9</span></span>
+        <div><h3>2 waiting</h3></div>
+      </div>
+      <div class="fmt">12 teams · 30 seconds a pick</div>
+      <div class="when"><b>Starts in 1:58</b>or sooner if it fills</div>
+      <div class="seats">
+        <span class="n num">10</span><span class="basis">seats left, of 12</span>
+        <div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="act"><a class="btn quiet" href="#">Join</a></div>
+    </article>
+
+    <article class="row">
+      <div class="who">
+        <span class="faces" aria-hidden="true"><span class="face seat"></span><span class="face seat"></span><span class="face seat"></span><span class="face more">+5</span></span>
+        <div><h3>6 waiting</h3></div>
+      </div>
+      <div class="fmt">8 teams · 90 seconds a pick</div>
+      <div class="when"><b>Starts in 2:31</b>or sooner if it fills</div>
+      <div class="seats">
+        <span class="n num">2</span><span class="basis">seats left, of 8</span>
+        <div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i></div>
+      </div>
+      <div class="act"><a class="btn quiet" href="#">Join</a></div>
+    </article>
+
+    <div class="lobby-foot">
+      <span><span class="dot" aria-hidden="true"></span>3 rooms are filling right now. Bots fill any seat still open at the start.</span>
+    </div>
+  </section>
+
+  <!-- THE SECOND DOOR, quiet: nobody to wait for. The table is chips, and the page's one solid
+       verb sits beside them, which is where the room puts its verb, beside the table facts. -->
+  <section class="door" aria-label="Against bots">
+    <div>
+      <h2>Against bots</h2>
+      <div class="groups">
+        <div class="group">
+          <span class="lab">Teams</span>
+          <button class="opt" type="button">8</button>
+          <button class="opt on" type="button" aria-pressed="true">10</button>
+          <button class="opt" type="button">12</button>
+        </div>
+        <div class="group">
+          <span class="lab">A pick</span>
+          <button class="opt" type="button">30s</button>
+          <button class="opt on" type="button" aria-pressed="true">60s</button>
+          <button class="opt" type="button">90s</button>
+        </div>
+      </div>
+      <div class="seated">
+        <span class="faces" aria-hidden="true"><span class="face self">JH</span><span class="face">CP</span><span class="face">DQ</span><span class="face">MC</span><span class="face more">+6</span></span>
+        <span class="cap">You, Coach Parker, Dana Q. and Marty the Commish. <span class="botchip">Bot</span></span>
+      </div>
+    </div>
+    <div class="act"><button class="btn verb" type="button">Start mock draft</button></div>
+  </section>
+</div>
+</body>
+</html>

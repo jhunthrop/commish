@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draft · Board</title>
+<!--
+  THE DRAFT AREA, stop one of three: THE BOARD. The Draft tab opens here.
+  Top nav is Leagues, Draft, Wallet. Rooms is gone. The HQ landing ("Draft HQ", "Everything
+  between you and a roster you do not apologize for.") is gone, and with it the simulator,
+  assistant, playbook and ADP tiles.
+
+  DATA PROVENANCE. Every row, number, tier and basis on this page is the product's own 2026 PPR
+  board, exported from the dev database (docker `fantasy-postgres-1`) on 2026-09-12 by
+  `scripts/rankings-export.ts --format=ppr`: 586 ranked players, 12-team standard shape.
+  The file is beside this one as board-ppr.csv. Columns used: Rank, Player, Team, Pos, Bye,
+  Scoring, Proj Pts, Over repl, ADP.
+  The "Not on an active roster" rows are the same board's own band, read through `boardRows()`:
+  19 rows, every one carrying `roster_status` observed 2026-09-05 on the player list.
+  Copy is the product's own, verbatim: the basis line (`boardBasisLine`), the figure caption
+  ("Over a replacement RB, PPR", `figureFor`), the vs-ADP clause (`vsMarketLabel`), the band
+  heading and note (`NOT_ON_ACTIVE_ROSTER_BAND`, `NOT_ON_ACTIVE_ROSTER_NOTE`), the roster-status
+  sentence (`rosterStatusSentence`), the tabs, the two checkboxes, "Search a name", "Export CSV"
+  and "why".
+  STAND-INS, layout only: the vs-ADP clause is rounded here with Math.round of (ADP minus rank);
+  faces are initials on the club's ring, where the product draws the headshot store.
+
+  THE SCHEDULED LINE is real and it is the honest variant: "Sharks Only Auction"
+  (dev_public_sharks_auction) has drafts.kickoff_at 2026-09-13 13:55 UTC, a Sunday. It carries
+  NO pick slot, and neither does any other scheduled league in the database: the `teams` table
+  has no draft_slot column and no scheduled draft has drawn its order yet, so "you pick 4th"
+  has no source before a draft starts. See progress.md, finding 3.
+
+  NO TIERS ON THIS SCREEN, and that is the product, not an omission: `showTiers` is
+  `position !== "ALL" && !dollarView` (board-view.tsx:382), so the Overall landing the Draft tab
+  opens on has no tier bands. They are on the position tabs, and on Your sheet, where this mock
+  set draws them. See progress.md, finding 2.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Sideline tokens, src/design/tokens.ts verbatim. Shared by the three Draft stops.
+   Inlined into each file at build time of the mock (these are static files). */
+:root{
+  --chalk:#F6F5F1; --paper:#FFFFFF; --raised:#FBFAF7; --inset:#EFEEE8;
+  --graphite:#17181C; --ink2:#5B5E66; --ink3:#8A8D95; --hair:#E6E5DF; --edge:#D9D8D1;
+  --court:#2457F5; --court-ink:#FFFFFF;
+  --amber:#E39A0E; --amber-ink:#8A5C05; --amber-wash:#FBF1DC; --amber-text:#1A1200;
+  --live:#0E7A49; --live-wash:#E4F4EC; --rose:#B9245A;
+  --shadow:0 4px 16px rgba(23,24,28,.06), 0 1px 2px rgba(23,24,28,.04);
+  --r-card:20px; --r-row:16px; --r-pill:999px;
+  --display:"Bricolage Grotesque", system-ui, sans-serif; --body:"Figtree", system-ui, sans-serif;
+  --spring:cubic-bezier(.2,.9,.3,1.15);
+  /* position stickers, TOKENS.position.light */
+  --qb:#A78BE0; --rb:#3FB79A; --wr:#E36AA0; --te:#6FB4E0; --k:#7A828F; --def:#3E4756;
+  --sticker-ink:#14181F; --def-ink:#FFFFFF;
+  /* tier badges, TOKENS.tier.light */
+  --tier-S:#9D5707; --tier-S-ink:#FFFFFF; --tier-A:#495465; --tier-A-ink:#FFFFFF;
+  --tier-B:#6E7D91; --tier-B-ink:#0A0D12; --tier-C:#7F8C9F; --tier-C-ink:#0A0D12;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --chalk:#121316; --paper:#1B1C21; --raised:#212228; --inset:#26272D;
+    --graphite:#F2F2EE; --ink2:#A9ACB4; --ink3:#7C7F88; --hair:#2A2B31; --edge:#34353C;
+    --court:#5B85FF; --court-ink:#0B1226;
+    --amber:#F5B341; --amber-ink:#F5B341; --amber-wash:#2A2213; --amber-text:#1A1200;
+    --live:#2ED47F; --live-wash:#12281D; --rose:#FF6B9A;
+    --shadow:0 4px 16px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
+    --qb:#2A1D3B; --rb:#0E3B32; --wr:#3B0E28; --te:#184362; --k:#60656C; --def:#14161A;
+    --sticker-ink:#E4E8EE; --def-ink:#8E9BAD;
+    --tier-S:#FFB627; --tier-S-ink:#1A1200; --tier-A:#B9C2D0; --tier-A-ink:#14181F;
+    --tier-B:#7F8C9F; --tier-B-ink:#0A0D12; --tier-C:#5E6773; --tier-C-ink:#FFFFFF;
+  }
+}
+:root[data-theme="dark"]{
+  --chalk:#121316; --paper:#1B1C21; --raised:#212228; --inset:#26272D;
+  --graphite:#F2F2EE; --ink2:#A9ACB4; --ink3:#7C7F88; --hair:#2A2B31; --edge:#34353C;
+  --court:#5B85FF; --court-ink:#0B1226;
+  --amber:#F5B341; --amber-ink:#F5B341; --amber-wash:#2A2213; --amber-text:#1A1200;
+  --live:#2ED47F; --live-wash:#12281D; --rose:#FF6B9A;
+  --shadow:0 4px 16px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
+  --qb:#2A1D3B; --rb:#0E3B32; --wr:#3B0E28; --te:#184362; --k:#60656C; --def:#14161A;
+  --sticker-ink:#E4E8EE; --def-ink:#8E9BAD;
+  --tier-S:#FFB627; --tier-S-ink:#1A1200; --tier-A:#B9C2D0; --tier-A-ink:#14181F;
+  --tier-B:#7F8C9F; --tier-B-ink:#0A0D12; --tier-C:#5E6773; --tier-C-ink:#FFFFFF;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--chalk);color:var(--graphite);font:15px/1.45 var(--body)}
+a{color:inherit;text-decoration:none}
+h1,h2,h3{font-family:var(--display);margin:0;font-variation-settings:"opsz" 96}
+.num{font-family:var(--display);font-variant-numeric:tabular-nums}
+.wrap{max-width:1200px;margin:0 auto;padding:0 40px 56px}
+
+/* top bar: Leagues, Draft, Wallet. Rooms is gone. */
+.bar{display:flex;align-items:center;gap:24px;height:60px;border-bottom:1px solid var(--hair)}
+.brand{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em}
+.bar a.link{color:var(--ink2);font-weight:500;font-size:14px}
+.bar a.link.on{color:var(--graphite);font-weight:600}
+.bar .spacer{flex:1}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 20px;border-radius:var(--r-pill);font:600 15px var(--body);border:1px solid transparent;cursor:pointer;transition:transform 120ms var(--spring)}
+.btn:active{transform:scale(.97)}
+.btn.verb{background:var(--court);color:var(--court-ink);box-shadow:0 6px 18px rgba(36,87,245,.24)}
+.btn.quiet{background:transparent;border-color:var(--edge);color:var(--graphite)}
+.btn.sm{height:38px;padding:0 16px;font-size:14px}
+.textlink{color:var(--court);font-weight:600;font-size:14px}
+
+/* the title row: the name, the switch with three stops, the one verb */
+.title{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:28px 0 14px}
+h1.page{font-size:34px;font-weight:800;letter-spacing:-.025em}
+.switch{display:inline-flex;background:var(--paper);border-radius:var(--r-pill);padding:3px;box-shadow:var(--shadow)}
+.switch a{padding:7px 15px;border-radius:var(--r-pill);font-weight:600;font-size:13px;color:var(--ink2)}
+.switch a.on{background:var(--graphite);color:var(--paper)}
+.title .spacer{flex:1}
+
+/* the quiet scheduled-draft line, absent when no league has one */
+.scheduled{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--paper);border-radius:var(--r-row);box-shadow:var(--shadow);margin-bottom:16px;font-size:14px;color:var(--ink2)}
+.scheduled .crest{width:34px;height:34px;border-radius:11px;background:var(--inset);display:grid;place-items:center;font:800 12px var(--display);color:var(--ink2);flex:none}
+.scheduled b{color:var(--graphite);font-weight:600}
+.scheduled .go{margin-left:auto;color:var(--court);font-weight:600;font-size:14px;white-space:nowrap}
+
+/* faces */
+.faces{display:flex;flex-shrink:0}
+.face{width:40px;height:40px;border-radius:50%;background:var(--inset);color:var(--ink2);display:grid;place-items:center;font:700 13px var(--display);box-shadow:0 0 0 2px var(--paper);margin-left:-10px}
+.face:first-child{margin-left:0}
+.face.self{background:var(--amber-wash);color:var(--amber-ink);box-shadow:0 0 0 2px var(--amber)}
+.face.open{background:transparent;border:1px dashed var(--edge);box-shadow:0 0 0 2px var(--paper)}
+.face.more{background:var(--inset);color:var(--ink3);font-size:12px}
+.face.here{position:relative}
+.face.here::after{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:var(--live);box-shadow:0 0 0 2px var(--paper);animation:breathe 2s ease-in-out infinite}
+
+/* position stickers */
+.pos{display:inline-block;padding:1px 5px;border-radius:6px;font:700 10px var(--body);color:var(--sticker-ink);vertical-align:1px;letter-spacing:.02em}
+.pos.qb{background:var(--qb)}.pos.rb{background:var(--rb)}.pos.wr{background:var(--wr)}
+.pos.te{background:var(--te)}.pos.k{background:var(--k)}.pos.def{background:var(--def);color:var(--def-ink)}
+
+.chip{display:inline-block;padding:3px 10px;border-radius:var(--r-pill);font:600 11px var(--body);background:var(--inset);color:var(--ink2);letter-spacing:.02em}
+.chip.live{background:var(--live-wash);color:var(--live)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--live);margin-right:7px;vertical-align:middle;animation:breathe 2s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.5}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* BOARD STOP */
+.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 0 12px}
+.tabs{display:inline-flex;background:var(--paper);border-radius:var(--r-pill);padding:3px;box-shadow:var(--shadow)}
+.tabs a{white-space:nowrap;padding:6px 13px;border-radius:var(--r-pill);font-weight:600;font-size:13px;color:var(--ink2)}
+.tabs a.on{background:var(--graphite);color:var(--paper)}
+.seg{display:inline-flex;background:var(--paper);border-radius:var(--r-pill);padding:3px;box-shadow:var(--shadow)}
+.seg a{white-space:nowrap;padding:6px 13px;border-radius:var(--r-pill);font-weight:600;font-size:13px;color:var(--ink2)}
+.seg a.on{background:var(--graphite);color:var(--paper)}
+.check{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--ink2);font-weight:500}
+.check i{width:16px;height:16px;border-radius:5px;border:1px solid var(--edge);background:var(--paper);display:inline-block}
+.search{height:36px;border-radius:var(--r-pill);border:1px solid var(--edge);background:var(--paper);padding:0 15px;font:14px var(--body);color:var(--graphite);min-width:180px}
+.controls .spacer{flex:1}
+.basisline{color:var(--ink3);font-size:13px;padding:0 2px 14px}
+
+.board{background:var(--paper);border-radius:var(--r-card);box-shadow:var(--shadow);padding:8px}
+/* the dense research row: 44px, face at 32, four regions */
+.prow{display:flex;align-items:center;gap:8px;min-height:44px;padding:2px 10px;border-radius:12px}
+.prow:hover{background:var(--raised)}
+.prow .lead{width:26px;flex:none;text-align:right;font-size:13px;font-variant-numeric:tabular-nums;color:var(--ink3)}
+.pface{width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;font:700 11px var(--display);color:var(--ink2);background:var(--inset);box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--ring,transparent)}
+.prow .idy{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.prow .idy b{font:700 17px/1.15 var(--display);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .meta{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink3);min-width:0}
+.prow .meta .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vs{font-weight:600;white-space:nowrap}
+.vs::before{content:"· ";color:var(--ink3);font-weight:400}
+.vs.later{color:var(--live)}
+.vs.early{color:var(--ink2)}
+.vs.even{color:var(--ink2);font-weight:500}
+.fig{flex:none;text-align:right;width:170px}
+.fig .n{font-family:var(--display);font-variant-numeric:tabular-nums;font-weight:800;font-size:22px;line-height:1;letter-spacing:-.02em;display:block}
+.fig .b{display:block;white-space:nowrap;font-size:11px;color:var(--ink3);margin-top:3px;line-height:1.2}
+.fig .n.dash{color:var(--ink3);font-size:20px}
+.why{flex:none;height:30px;padding:0 12px;border-radius:var(--r-pill);border:1px solid var(--edge);background:transparent;color:var(--ink2);font:600 13px var(--body);cursor:pointer}
+
+.band{margin:18px 6px 6px;background:var(--inset);border-radius:var(--r-row);padding:12px 14px}
+.band h2{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.band p{margin:4px 0 0;font-size:13px;color:var(--ink2);max-width:62ch}
+.prow .status{font-size:12px;color:var(--ink3)}
+.statuspill{display:inline-block;padding:2px 8px;border-radius:var(--r-pill);background:var(--inset);color:var(--ink2);font:600 11px var(--body)}
+
+@media (max-width:760px){
+  .wrap{padding:0 16px 110px}
+  .bar{height:54px;gap:14px}
+  h1.page{font-size:27px}
+  .title{padding:20px 0 12px;gap:12px}
+  .title .spacer{display:none}
+  .switch{order:3;width:100%}
+  .switch a{flex:1;text-align:center}
+  .title .act{position:fixed;left:16px;right:16px;bottom:16px;z-index:3;order:9}
+  .title .act .btn{width:100%;box-shadow:0 -6px 24px rgba(23,24,28,.14),0 6px 18px rgba(36,87,245,.24)}
+  .controls{gap:8px}
+  .tabs,.seg{overflow:auto;max-width:100%}
+  .search{flex:1;min-width:0}
+  .controls .spacer,.check,.csv{display:none}
+  .scheduled{font-size:13px}
+  .scheduled .go{font-size:13px}
+  .board{padding:4px}
+  .prow{gap:8px;padding:4px 8px}
+  .fig{width:104px}
+  .fig .b{font-size:10px}
+  .opt{display:none}
+  .controls{flex-wrap:nowrap;overflow:auto;padding-bottom:10px}
+  .search{display:none}
+  .prow{min-height:58px}
+  .prow .meta{flex-wrap:wrap;row-gap:1px}
+  .prow .meta .t{flex:none;max-width:100%;text-overflow:clip}
+  .prow .vs::before{content:none}
+  .prow .vs{flex-basis:100%;font-size:12px}
+  .fig .n{font-size:19px}
+  .why{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="bar" aria-label="App">
+    <a class="brand" href="#">Commish</a>
+    <a class="link" href="#">Leagues</a>
+    <a class="link on" href="#" aria-current="page">Draft</a>
+    <a class="link" href="#">Wallet</a>
+    <span class="spacer"></span>
+    <span class="faces" aria-hidden="true"><span class="face self">JH</span></span>
+  </nav>
+
+  <div class="title">
+    <h1 class="page">Draft</h1>
+    <nav class="switch" aria-label="Draft view">
+      <a href="/draft" class="on" aria-current="page">Board</a>
+      <a href="/draft/sheet">Your sheet</a>
+      <a href="/draft/mock-drafts">Mock drafts</a>
+    </nav>
+    <span class="spacer"></span>
+    <div class="act"><a class="btn verb" href="/draft/mock-drafts">Run a mock draft</a></div>
+  </div>
+
+  <!-- The quiet line. Absent when no league of yours has a draft scheduled. -->
+  <a class="scheduled" href="#">
+    <span class="crest" aria-hidden="true">SA</span>
+    <span><b>Sharks Only Auction</b> drafts Sunday</span>
+    <span class="go">Open the room</span>
+  </a>
+
+  <div class="controls">
+    <nav class="tabs" aria-label="Position">
+      <a href="#" class="on" aria-current="page">Overall</a>
+      <a href="#">QB</a><a href="#">RB</a><a href="#">WR</a><a href="#">TE</a><a href="#">K</a><a href="#">DEF</a>
+    </nav>
+    <nav class="seg" aria-label="Scoring">
+      <a href="#" class="on" aria-current="page">PPR</a><a href="#">Half PPR</a><a href="#">Standard</a>
+    </nav>
+    <label class="check"><i aria-hidden="true"></i>Rookies only</label>
+    <label class="check"><i aria-hidden="true"></i>$ board</label>
+    <span class="spacer"></span>
+    <input class="search" aria-label="Search" placeholder="Search a name">
+    <button class="btn quiet sm csv" type="button">Export CSV</button>
+  </div>
+
+  <p class="basisline">2026 board, 12-team PPR, in board order.</p>
+
+  <section class="board" aria-label="The board">
+    <div class="prow">
+      <span class="lead">1</span>
+      <span class="pface" style="--ring:#003594">PN</span>
+      <span class="idy"><b>Puka Nacua</b><span class="meta"><span class="pos wr">WR1</span><span class="t">LAR · bye 11</span><span class="opt">· 344.3 projected · 3.3 ADP</span><span class="vs later">drafters take him 2 picks later</span></span></span>
+      <span class="fig"><span class="n num">162.8</span><span class="b">Over a replacement WR<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">2</span>
+      <span class="pface" style="--ring:#FB4F14">JC</span>
+      <span class="idy"><b>Ja'Marr Chase</b><span class="meta"><span class="pos wr">WR2</span><span class="t">CIN · bye 6</span><span class="opt">· 329.4 projected · 1.4 ADP</span><span class="vs early">drafters reach 1 pick early</span></span></span>
+      <span class="fig"><span class="n num">147.9</span><span class="b">Over a replacement WR<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">3</span>
+      <span class="pface" style="--ring:#002244">JS</span>
+      <span class="idy"><b>Jaxon Smith-Njigba</b><span class="meta"><span class="pos wr">WR3</span><span class="t">SEA · bye 11</span><span class="opt">· 310.1 projected · 4.7 ADP</span><span class="vs later">drafters take him 2 picks later</span></span></span>
+      <span class="fig"><span class="n num">128.6</span><span class="b">Over a replacement WR<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">4</span>
+      <span class="pface" style="--ring:#0076B6">JG</span>
+      <span class="idy"><b>Jahmyr Gibbs</b><span class="meta"><span class="pos rb">RB1</span><span class="t">DET · bye 6</span><span class="opt">· 257.2 projected · 2.5 ADP</span><span class="vs early">drafters reach 2 picks early</span></span></span>
+      <span class="fig"><span class="n num">115.1</span><span class="b">Over a replacement RB<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">5</span>
+      <span class="pface" style="--ring:#A71930">BR</span>
+      <span class="idy"><b>Bijan Robinson</b><span class="meta"><span class="pos rb">RB2</span><span class="t">ATL · bye 11</span><span class="opt">· 255.5 projected · 4.2 ADP</span><span class="vs early">drafters reach 1 pick early</span></span></span>
+      <span class="fig"><span class="n num">113.3</span><span class="b">Over a replacement RB<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">6</span>
+      <span class="pface" style="--ring:#0076B6">AS</span>
+      <span class="idy"><b>Amon-Ra St. Brown</b><span class="meta"><span class="pos wr">WR4</span><span class="t">DET · bye 6</span><span class="opt">· 293.6 projected · 5.4 ADP</span><span class="vs early">drafters reach 1 pick early</span></span></span>
+      <span class="fig"><span class="n num">112.1</span><span class="b">Over a replacement WR<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">7</span>
+      <span class="pface" style="--ring:#003594">CL</span>
+      <span class="idy"><b>CeeDee Lamb</b><span class="meta"><span class="pos wr">WR5</span><span class="t">DAL · bye 14</span><span class="opt">· 289.5 projected · 9.0 ADP</span><span class="vs later">drafters take him 2 picks later</span></span></span>
+      <span class="fig"><span class="n num">108.0</span><span class="b">Over a replacement WR<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">8</span>
+      <span class="pface" style="--ring:#008E97">DA</span>
+      <span class="idy"><b>De'Von Achane</b><span class="meta"><span class="pos rb">RB3</span><span class="t">MIA · bye 6</span><span class="opt">· 240.0 projected · 21.2 ADP</span><span class="vs later">drafters take him 13 picks later</span></span></span>
+      <span class="fig"><span class="n num">97.8</span><span class="b">Over a replacement RB<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">9</span>
+      <span class="pface" style="--ring:#D3BC8D">CO</span>
+      <span class="idy"><b>Chris Olave</b><span class="meta"><span class="pos wr">WR6</span><span class="t">NO · bye 8</span><span class="opt">· 275.2 projected · 18.1 ADP</span><span class="vs later">drafters take him 9 picks later</span></span></span>
+      <span class="fig"><span class="n num">93.7</span><span class="b">Over a replacement WR<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">10</span>
+      <span class="pface" style="--ring:#003594">GP</span>
+      <span class="idy"><b>George Pickens</b><span class="meta"><span class="pos wr">WR7</span><span class="t">DAL · bye 14</span><span class="opt">· 270.0 projected · 20.6 ADP</span><span class="vs later">drafters take him 11 picks later</span></span></span>
+      <span class="fig"><span class="n num">88.5</span><span class="b">Over a replacement WR<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">11</span>
+      <span class="pface" style="--ring:#4F2683">JJ</span>
+      <span class="idy"><b>Justin Jefferson</b><span class="meta"><span class="pos wr">WR8</span><span class="t">MIN · bye 6</span><span class="opt">· 269.8 projected · 9.2 ADP</span><span class="vs early">drafters reach 2 picks early</span></span></span>
+      <span class="fig"><span class="n num">88.3</span><span class="b">Over a replacement WR<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">12</span>
+      <span class="pface" style="--ring:#00338D">JC</span>
+      <span class="idy"><b>James Cook III</b><span class="meta"><span class="pos rb">RB4</span><span class="t">BUF · bye 7</span><span class="opt">· 230.3 projected · 15.9 ADP</span><span class="vs later">drafters take him 4 picks later</span></span></span>
+      <span class="fig"><span class="n num">88.1</span><span class="b">Over a replacement RB<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">13</span>
+      <span class="pface" style="--ring:#A71930">DL</span>
+      <span class="idy"><b>Drake London</b><span class="meta"><span class="pos wr">WR9</span><span class="t">ATL · bye 11</span><span class="opt">· 268.5 projected · 13.0 ADP</span><span class="vs even">even with ADP</span></span></span>
+      <span class="fig"><span class="n num">87.1</span><span class="b">Over a replacement WR<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">14</span>
+      <span class="pface" style="--ring:#002C5F">JT</span>
+      <span class="idy"><b>Jonathan Taylor</b><span class="meta"><span class="pos rb">RB5</span><span class="t">IND · bye 13</span><span class="opt">· 225.7 projected · 11.9 ADP</span><span class="vs early">drafters reach 2 picks early</span></span></span>
+      <span class="fig"><span class="n num">83.5</span><span class="b">Over a replacement RB<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">15</span>
+      <span class="pface" style="--ring:#000000">AJ</span>
+      <span class="idy"><b>Ashton Jeanty</b><span class="meta"><span class="pos rb">RB6</span><span class="t">LV · bye 13</span><span class="opt">· 217.3 projected · 26.8 ADP</span><span class="vs later">drafters take him 12 picks later</span></span></span>
+      <span class="fig"><span class="n num">75.2</span><span class="b">Over a replacement RB<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">16</span>
+      <span class="pface" style="--ring:#97233F">TM</span>
+      <span class="idy"><b>Trey McBride</b><span class="meta"><span class="pos te">TE1</span><span class="t">ARI · bye 14</span><span class="opt">· 214.3 projected · 20.6 ADP</span><span class="vs later">drafters take him 5 picks later</span></span></span>
+      <span class="fig"><span class="n num">74.4</span><span class="b">Over a replacement TE<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">17</span>
+      <span class="pface" style="--ring:#000000">BB</span>
+      <span class="idy"><b>Brock Bowers</b><span class="meta"><span class="pos te">TE2</span><span class="t">LV · bye 13</span><span class="opt">· 212.8 projected · 19.8 ADP</span><span class="vs later">drafters take him 3 picks later</span></span></span>
+      <span class="fig"><span class="n num">72.9</span><span class="b">Over a replacement TE<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead">18</span>
+      <span class="pface" style="--ring:#002244">AB</span>
+      <span class="idy"><b>A.J. Brown</b><span class="meta"><span class="pos wr">WR10</span><span class="t">NE · bye 11</span><span class="opt">· 254.3 projected · 13.9 ADP</span><span class="vs early">drafters reach 4 picks early</span></span></span>
+      <span class="fig"><span class="n num">72.9</span><span class="b">Over a replacement WR<span class="opt">, PPR</span></span></span>
+      <button class="why" type="button">why</button>
+    </div>
+
+    <!-- The band opens once, at the end, in place of a tier divider. Its own inset ground makes
+         it visibly a different kind of thing. 19 rows in the board this was read from. -->
+    <div class="band">
+      <h2>Not on an active roster</h2>
+      <p>These players carry no projection while they are off an active roster. Each row names where that was observed and when.</p>
+    </div>
+    <div class="prow">
+      <span class="lead"></span>
+      <span class="pface" style="--ring:#D3BC8D">DN</span>
+      <span class="idy"><b>Devin Neal</b><span class="meta"><span class="pos rb">RB</span><span class="t">NO · bye 8 · <span class="statuspill">Free agent</span> Not on any roster, observed Sep 5 on the player list</span></span></span>
+      <span class="fig"><span class="n dash num">–</span><span class="b">No value while he is off a roster</span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead"></span>
+      <span class="pface" style="--ring:#4B92DB">XR</span>
+      <span class="idy"><b>Xavier Restrepo</b><span class="meta"><span class="pos wr">WR</span><span class="t">TEN · bye 9 · <span class="statuspill">Not on active roster</span> Not on the active roster, observed Sep 5 on the player list</span></span></span>
+      <span class="fig"><span class="n dash num">–</span><span class="b">No value while he is off a roster</span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead"></span>
+      <span class="pface" style="--ring:#203731">LM</span>
+      <span class="idy"><b>Luke Musgrave</b><span class="meta"><span class="pos te">TE</span><span class="t">GB · bye 11 · <span class="statuspill">Not on active roster</span> Not on the active roster, observed Sep 5 on the player list</span></span></span>
+      <span class="fig"><span class="n dash num">–</span><span class="b">No value while he is off a roster</span></span>
+      <button class="why" type="button">why</button>
+    </div>
+    <div class="prow">
+      <span class="lead"></span>
+      <span class="pface" style="--ring:#003594">JM</span>
+      <span class="idy"><b>Joe Milton III</b><span class="meta"><span class="pos qb">QB</span><span class="t">DAL · bye 14 · <span class="statuspill">Not on active roster</span> Not on the active roster, observed Sep 5 on the player list</span></span></span>
+      <span class="fig"><span class="n dash num">–</span><span class="b">No value while he is off a roster</span></span>
+      <button class="why" type="button">why</button>
+    </div>
+  </section>
+</div>
+</body>
+</html>
