@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bigOddsText, collapseText, factsLine, headerLine, oddsBasis, oddsTooltipText, ofRuns, percentText, runText, runsOverRuns, runsText, stampText } from "./format";
+import { bigOddsText, collapseText, factsLine, headerLine, oddsBasis, oddsTooltipText, percentText, runText, runsOverRuns, runsText, sharePercent, stampText, stillThereAt } from "./format";
 import { advisorView } from "./test-view";
 
 const BANNED = /[—;]/;
@@ -13,11 +13,18 @@ describe("advisor format", () => {
     expect(oddsTooltipText(92, 200)).toBe("still there at your next pick, 92 of 200 runs");
   });
 
-  it("states a figure's basis as the runs and the pick, a row's short caption as the runs alone, and the absence as no runs yet", () => {
-    expect(oddsBasis(200, "2.01")).toBe("of 200 runs, still there at 2.01");
+  it("states a survival as a whole percentage with the pick beneath it, and the replays only in the sheet's basis line (founder ruling 2026-09-12)", () => {
+    expect(sharePercent(200, 200)).toBe("100%");
+    expect(sharePercent(157, 200)).toBe("79%");
+    expect(sharePercent(34, 200)).toBe("17%");
+    expect(sharePercent(0, 200)).toBe("0%");
+    expect(sharePercent(null, 200)).toBeNull();
+    expect(sharePercent(12, null)).toBeNull();
+    expect(stillThereAt("2.01")).toBe("still there at 2.01");
+    expect(stillThereAt(null)).toBe("no runs yet");
+    expect(oddsBasis(200, "2.01")).toBe("share of 200 replays with him still there at 2.01");
     expect(oddsBasis(null, "2.01")).toBe("no runs yet");
     expect(oddsBasis(200, null)).toBe("no runs yet");
-    expect(ofRuns(200)).toBe("of 200");
     expect(BANNED.test(oddsBasis(200, "2.01"))).toBe(false);
   });
 

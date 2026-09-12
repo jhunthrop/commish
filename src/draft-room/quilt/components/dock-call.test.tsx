@@ -41,10 +41,11 @@ describe("DockCall (our call beside the verb)", () => {
     expect(screen.getByTestId("dock-queue-verb")).toHaveTextContent("Queue Marcus Reed");
   });
 
-  it("says the figure's basis as runs still there at your next pick", () => {
+  it("says the figure as a whole percentage with the pick it is measured at beneath, never the replay count", () => {
     renderCall();
-    expect(screen.getByTestId("big-number")).toHaveTextContent("92");
-    expect(screen.getByTestId("big-number")).toHaveTextContent("of 200 runs, still there at 2.01");
+    expect(screen.getByTestId("big-number")).toHaveTextContent("46%");
+    expect(screen.getByTestId("big-number")).toHaveTextContent("still there at 2.01");
+    expect(screen.getByTestId("big-number")).not.toHaveTextContent("200");
   });
 
   it("falls back to the top of your queue with no runs yet, and the basis says so under a dash", () => {

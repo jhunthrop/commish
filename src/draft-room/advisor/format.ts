@@ -46,14 +46,24 @@ export function collapseText(row: TierCollapse): string {
   return `${row.playersLeftInTier} ${positionWord(row.position, true)} left ${drop}`;
 }
 
-/** A figure's basis: "of 200 runs, still there at 2.01", or why there is no number yet. */
-export function oddsBasis(runs: number | null, nextPickLabel: string | null): string {
-  return runs === null || nextPickLabel === null ? "no runs yet" : `of ${runs} runs, still there at ${nextPickLabel}`;
+/**
+ * A SURVIVAL FIGURE IS A WHOLE PERCENTAGE (founder ruling 2026-09-12: "157 of 200" did not explain
+ * itself). "79%" on every row and call, with the basis "still there at 2.01" beneath it; the replay
+ * count leaves the rows and lives only in the why and the sheet's one basis line. `null` when
+ * there are no runs yet, which prints as a dash.
+ */
+export function sharePercent(survived: number | null, runs: number | null): string | null {
+  return survived === null || runs === null || runs === 0 ? null : percentText(survived / runs);
 }
 
-/** A row's short caption under its count, "of 200", where the list above states the rest once. */
-export function ofRuns(runs: number): string {
-  return `of ${runs}`;
+/** The basis under a figure: the pick he is still there at, or why there is no figure yet. */
+export function stillThereAt(nextPickLabel: string | null): string {
+  return nextPickLabel === null ? "no runs yet" : `still there at ${nextPickLabel}`;
+}
+
+/** The sheet's one basis line, the only place a row's surface names the replays. */
+export function oddsBasis(runs: number | null, nextPickLabel: string | null): string {
+  return runs === null || nextPickLabel === null ? "no runs yet" : `share of ${runs} replays with him still there at ${nextPickLabel}`;
 }
 
 /** The pool row's tooltip and screen-reader line. */

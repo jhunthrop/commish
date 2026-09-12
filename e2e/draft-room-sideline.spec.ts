@@ -77,6 +77,10 @@ test("the wall, the rail, the dock's one verb, your sheet, and a pick landing as
   expect(await solidPillCount(managerA)).toBe(1);
   await expect(managerA.getByTestId("dock-call").getByTestId("big-number")).toBeVisible();
   await expectOneLineCaption(managerA);
+  // Every survival figure is a whole percentage with the pick beneath it (founder ruling
+  // 2026-09-12); the replay count is nowhere on a row.
+  await expect(managerA.getByTestId("pool-row").first().getByTestId("big-number")).toHaveText(/^\d+%still there at \d+\.\d\d$/);
+  await expect(managerA.getByTestId("dock-call").getByTestId("big-number")).toHaveText(/^\d+%still there at \d+\.\d\d$/);
   // A pool row's Draft reveals on hover only (review H3): at rest the viewport holds one verb.
   const firstPoolRow = managerA.getByTestId("pool-row").first();
   await expect(firstPoolRow.getByRole("button", { name: /^Draft / })).toBeHidden();
@@ -93,6 +97,8 @@ test("the wall, the rail, the dock's one verb, your sheet, and a pick landing as
   const overall = managerA.getByTestId("sheet-column").filter({ has: managerA.getByRole("heading", { name: /^Overall/ }) });
   await expect(overall.getByTestId("sheet-row").and(managerA.locator("[data-taken='true']")).first()).toBeVisible();
   await expect(managerA.getByTestId("sheet-basis")).toContainText("Our board, untouched");
+  await expect(managerA.getByTestId("sheet-basis")).toContainText(/share of \d+ replays with him still there at/);
+  await expect(managerA.getByTestId("advisor-odds-share").first()).toContainText(/^\d+%/);
   await managerA.waitForTimeout(400);
   await managerA.screenshot({ path: `${OUT_DIR}/draft-room-sheet-desktop-${theme}.png` });
   await managerA.getByTestId("hide-taken").check();
