@@ -56,7 +56,7 @@ type CreatedState = {
  * podium split, which `prizeTableInvariant` accepts by construction.
  *
  * Signed out, the sheet still shows the four questions (they are the pitch), and the one verb
- * is a `SignInLink` riding intent `/app#create-league` — choices do not pretend to survive the
+ * is a `SignInLink` riding intent `/app` — choices do not pretend to survive the
  * trip through sign-in.
  */
 export function CreateSheet({
@@ -273,9 +273,10 @@ export function CreateSheet({
               Create the league
             </Button>
           ) : (
-            // Sign-in rides the verb; `/app#create-league` is the existing auth-gated create
-            // surface, so a signed-in return lands somewhere that can actually create.
-            <SignInLink intent="/app#create-league" className={buttonClassName("verb", "md")}>
+            // Sign-in rides the verb; `/app` is the auth-gated surface that carries the create
+            // door (a button beside the lobby's heading since 2026-09-11, no longer a fragment),
+            // so a signed-in return lands somewhere that can actually create.
+            <SignInLink intent="/app" className={buttonClassName("verb", "md")}>
               Sign in to start your league
             </SignInLink>
           )}

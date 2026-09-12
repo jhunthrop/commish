@@ -120,6 +120,19 @@ export function formatDraftAbsolute(iso: string): string {
   return `${WEEKDAY_FORMAT.format(instant)} ${DAY_FORMAT.format(instant)} ${MONTH_FORMAT.format(instant)}, ${CLOCK_FORMAT.format(instant)} UTC`;
 }
 
+/**
+ * "Sunday" — the day a draft falls on, in the product's one timezone convention (UTC, the same
+ * `WEEKDAY_FORMAT` `formatDraftAbsolute` above reads). A pure function of the instant with no
+ * clock of its own, so a client component may call it without hydrating differently than it
+ * rendered: the DISTANCE to that day is the server's business (`HomeLeagueCard.kickoffRelative`),
+ * and the card prints it as the figure's own caption right beside this word.
+ */
+export function formatDraftWeekday(iso: string): string {
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime())) return "";
+  return WEEKDAY_FORMAT.format(instant);
+}
+
 /** "1st", "2nd", "3rd", "4th" … with the 11th-13th exception — the week strip's standings seat. */
 export function ordinal(n: number): string {
   const tens = n % 100;

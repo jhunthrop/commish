@@ -214,8 +214,14 @@ const CLOCK_FORMAT = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute:
 /** "in 3 days" / "in 5 hours" / "in 20 minutes" / "starting now" — never negative: a draft this
  *  function is ever asked to describe is either still ahead of `nowMs` or, once Task 7's own
  *  auto-start has run, no longer `scheduled` at all, so there is no "3 days ago" a caller here
- *  needs worded. */
-function relativeDraftTime(kickoffMs: number, nowMs: number): string {
+ *  needs worded.
+ *
+ *  EXPORTED (2026-09-11) for the signed-in home's own card, which spends its one big number on
+ *  the RELATIVE half alone and its caption on the absolute one — the reverse of `formatDraftTime`'s
+ *  ordering, and the reason it needs the half rather than a regex over the whole sentence. Server
+ *  side only, like every other caller: a clock read in a `.tsx` would hydrate differently than it
+ *  rendered. */
+export function relativeDraftTime(kickoffMs: number, nowMs: number): string {
   const diffMs = kickoffMs - nowMs;
   if (diffMs <= 0) return "starting now";
   if (diffMs < MS_PER_HOUR) {

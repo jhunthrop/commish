@@ -8,5 +8,5 @@ export { defaultLineup, setSlotPlayer, startersOf, benchOf, deriveBenchSlots } f
 export { generateInviteCode } from "./invite-code";
 export { weekStatusFromGames, isLineupLocked, type WeekStatus } from "./week-status";
 export { nextAction, COPY as NEXT_ACTION_COPY, type NextAction, type NextActionKind, type NextActionInput } from "./next-action";
-export { leagueTerms, formatDraftTime, formatAbsoluteTime, type LeagueTerms, type LeagueTermsInput } from "./terms";
+export { leagueTerms, formatDraftTime, formatAbsoluteTime, relativeDraftTime, type LeagueTerms, type LeagueTermsInput } from "./terms";
 export { headToHeadKey, type HeadToHeadRecord } from "./head-to-head";

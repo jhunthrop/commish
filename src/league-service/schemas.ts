@@ -191,6 +191,14 @@ export const streamEventIdSchema = z
   .string()
   .regex(/^[A-Za-z0-9_-]{1,64}$/, { message: "That is not something we can react to." });
 
+/**
+ * `PUT /api/leagues/[leagueId]/team-name`'s body (2026-09-11) — the SAME `name` rule a league's
+ * own name is held to, for the same reason stated above: a team name is interpolated into copy
+ * the platform writes in its own voice (the draft's own pick sentences, the activity chain's
+ * rendered headlines) and ruling 12 stores those verbatim.
+ */
+export const renameMyTeamSchema = z.object({ name });
+
 /** `PUT /api/leagues/[leagueId]/settings`'s body (Task 10) — the one league setting today. */
 export const setDraftGradesVisibleSchema = z.object({
   draftGradesVisible: z.boolean(),

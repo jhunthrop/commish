@@ -287,7 +287,7 @@ export function OpenLeagueShelf({
               </Link>
               {/* /app is auth-gated by middleware.ts, so a signed-out visitor lands at sign-in
                   first rather than an error, exactly like every other /app link on a public page. */}
-              <Link href="/app#create-league" className="text-sm font-medium text-accent underline">
+              <Link href="/app" className="text-sm font-medium text-accent underline">
                 Start your own league
               </Link>
             </div>

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { leagues, users } from "@/db/schema";
+import { leagues, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { createLeague } from "./creation";
-import { setDraftGradesVisible } from "./settings";
+import { renameMyTeam, setDraftGradesVisible } from "./settings";
 
 const db = createTestDb();
 const clock = { now: () => "2026-09-05T12:00:00.000Z" };
@@ -47,5 +47,41 @@ describe("setDraftGradesVisible", () => {
     await setDraftGradesVisible(db, { leagueId, visible: true });
     [row] = await db.select({ draftGradesVisible: leagues.draftGradesVisible }).from(leagues).where(eq(leagues.id, leagueId));
     expect(row?.draftGradesVisible).toBe(true);
+  });
+});
+
+describe("renameMyTeam", () => {
+  it("renames the caller's own team and answers the stored name", async () => {
+    const { leagueId } = await league();
+    const result = await renameMyTeam(db, { leagueId, userId: "u1", name: "Bay Bandits" });
+    expect(result).toEqual({ ok: true, name: "Bay Bandits" });
+
+    const [row] = await db.select({ name: teams.name }).from(teams).where(eq(teams.leagueId, leagueId));
+    expect(row?.name).toBe("Bay Bandits");
+  });
+
+  it("cannot touch anybody else's seat, and says so without disclosing that the league exists", async () => {
+    const { leagueId } = await league();
+    await db.insert(users).values({ id: "u2", email: "u2@test.local", displayName: "Manager 2" });
+
+    const result = await renameMyTeam(db, { leagueId, userId: "u2", name: "Hostile Takeover" });
+    expect(result).toEqual({ ok: false, reason: "That league does not exist.", status: 404 });
+
+    const [row] = await db.select({ name: teams.name }).from(teams).where(eq(teams.leagueId, leagueId));
+    expect(row?.name).toBe("Team One");
+  });
+
+  it("leaves a seat in a DIFFERENT league alone, even for the same manager", async () => {
+    const first = await league();
+    const second = await createLeague({ db, clock, newId }, {
+      name: "Second Money", format: "snake", teamCount: 12, scoringPreset: "ppr",
+      auctionBudget: null, rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "u1", teamName: "Team Two" },
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
+    });
+    if (!second.ok) throw new Error(second.reason);
+
+    await renameMyTeam(db, { leagueId: first.leagueId, userId: "u1", name: "Renamed" });
+    const [other] = await db.select({ name: teams.name }).from(teams).where(eq(teams.leagueId, second.leagueId));
+    expect(other?.name).toBe("Team Two");
   });
 });

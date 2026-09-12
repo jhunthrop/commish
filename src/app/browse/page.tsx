@@ -112,8 +112,10 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           <p className="max-w-prose text-text-muted">
             {HOUSE_SHELF_SENTENCE} Or{" "}
             {/* /app is auth-gated by middleware.ts, so a signed-out visitor lands at sign-in
-                first rather than an error, exactly like the empty state's identical link. */}
-            <Link href="/app#create-league" className="font-medium text-accent underline">
+                first rather than an error, exactly like the empty state's identical link. The
+                `#create-league` fragment left with `StartOrJoinDisclosure` (2026-09-11): the
+                create door is a button beside the lobby's own heading there now, not an anchor. */}
+            <Link href="/app" className="font-medium text-accent underline">
               start your own league
             </Link>
             .

@@ -2,12 +2,16 @@ import { desc, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { lineupSlots, matchups, statWeeks, weeks } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
-import { computeStandings, LEAGUE_CONFIG, nextAction, seasonProgress, type WeekStatus } from "@/league";
-import type { HomeBody, HomeLeagueCard, LiveState, MatchupSummary } from "@/league-room/contract";
+import { computeStandings, LEAGUE_CONFIG, nextAction, relativeDraftTime, seasonProgress, type WeekStatus } from "@/league";
+import type { HomeBody, HomeLeagueCard, LeagueMemberFace, LiveState, MatchupSummary } from "@/league-room/contract";
 import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
 import type { ScoreCache, ScoreCacheBatchRequest } from "@/stats-pipeline/score-cache";
+import { describeScoring } from "@/scoring";
 import { isCommissionerOf } from "./authority";
+import { scoringWeightsByLeagueId } from "./browse";
+import { draftSlotsForSeats, slotFactsFor } from "./draft-slots-overview";
 import { myLeaguesOverview, toSummary } from "./read";
+import { latestActivityByLeague } from "./since-you-were-here";
 
 /** The outermost edge is the only place a wall clock is allowed — see `read.ts`'s identical
  *  constant. Only used for `liveStateFor`'s weekday, below. */
@@ -85,25 +89,31 @@ function cachedPoints(scores: readonly { readonly teamId: string; readonly point
  * shared across leagues), and (Phase 3.6, Task 10, Step 1b) ONE grouped `lineup_slots` read over
  * every caller's own team ids, answering `HomeLeagueCard.lineupSet` for every league in one round
  * trip regardless of how many different "current weeks" they are each on. That is eight queries
- * total — `myLeaguesOverview`'s four (membership, leagues, teams, drafts), plus these four —
+ * total — `myLeaguesOverview`'s four (membership, leagues, teams+users, drafts), plus these four —
  * however many leagues the caller is in, ten or fifty: the query-count discipline
  * `listLeaguesForUser`'s own docblock commits to, extended rather than re-earned.
+ *
+ * SIDELINE (2026-09-11) adds six more, on the same terms: `draftSlotsForSeats` (two `IN`s over
+ * the caller's own seats — the stored ranking, and each draw's `START_DRAFT` snapshot) and
+ * `latestActivityByLeague` (one `row_number() over (partition by chain_scope)` window plus its
+ * three batched name lookups). Fourteen, flat in the number of leagues. The manager stack and the
+ * opponent's NAME cost nothing at all: they ride the `users` join `myLeaguesOverview` already
+ * folded into its one `teams` statement.
  *
  * The one live read is a single `MGET` (`ScoreCache.readMany`) across every league whose current
  * week is `in_progress` — never one `GET` per league. A cache miss (including "never written",
  * which is every non-live week) simply leaves the matchup's own Postgres score in place, so the
  * numbers are always correct whether or not the cache has anything to say.
  *
- * Returns `HomeBody` minus `firstRun`, on purpose: the first-run fork (`firstRunPlan`,
- * `@/identity`) needs the caller's preferences, and this function's signature is deliberately
- * just a db and a user id. Both callers (`AppHome` and `/api/home`) compute `firstRun` themselves
- * and spread it onto this result before it reaches the wire.
+ * Returns the whole `HomeBody`. The first-run fork each caller used to spread on is deleted with
+ * the two panels it chose between (`HomeBoard`'s own docblock, 2026-09-11): the lobby answers a
+ * manager with no leagues, so there is no second shape of this page to pick.
  */
 export async function crossLeagueHome(
   db: Db,
   userId: string,
   deps: CrossLeagueHomeDeps = DEFAULT_DEPS,
-): Promise<Omit<HomeBody, "firstRun">> {
+): Promise<HomeBody> {
   const { leagueRows, teamRows, draftRows, myTeamByLeague } = await myLeaguesOverview(db, userId);
   if (leagueRows.length === 0) return { leagues: [], liveState: null };
   const ids = leagueRows.map((league) => league.id);
@@ -132,6 +142,17 @@ export async function crossLeagueHome(
     const bucket = medianByWeekByLeague.get(row.leagueId) ?? new Map<number, number>();
     bucket.set(row.weekNumber, row.medianScore);
     medianByWeekByLeague.set(row.leagueId, bucket);
+  }
+
+  // WHO IS IN EACH LEAGUE, folded once out of the grouped `teams`+`users` read above (P1) —
+  // the reader's own seat marked here rather than at every call site that draws the stack.
+  const membersByLeague = new Map<string, LeagueMemberFace[]>();
+  const managerByTeamId = new Map<string, string>();
+  for (const row of teamRows) {
+    managerByTeamId.set(row.id, row.managerName);
+    const bucket = membersByLeague.get(row.leagueId) ?? [];
+    bucket.push({ userId: row.userId, name: row.managerName, avatar: row.managerAvatar, isSelf: row.userId === userId });
+    membersByLeague.set(row.leagueId, bucket);
   }
 
   interface LeaguePhase {
@@ -196,7 +217,8 @@ export async function crossLeagueHome(
 
   // Step 3: the top bar's one live fact, from the SAME `statWeekRows` read above — zero extra
   // queries. See `liveStateFor`'s own docblock for the coarseness this accepts.
-  const liveState = liveStateFor(statWeekRows, new Date((deps.clock ?? systemClock).now()));
+  const now = new Date((deps.clock ?? systemClock).now());
+  const liveState = liveStateFor(statWeekRows, now);
 
   // Batch every league whose current week is actually live: a scheduled or final week never
   // wrote anything fresher than Postgres already has, so asking the cache for it would be a
@@ -209,7 +231,25 @@ export async function crossLeagueHome(
       cacheRequests.push({ leagueId: league.id, week: phase.currentWeek, version: statWeek.version });
     }
   }
-  const cacheHits = await (deps.scoreCache ?? NOOP_SCORE_CACHE).readMany(cacheRequests);
+  // The two grouped reads the Sideline card needs beyond the eight above (2026-09-11), both
+  // bounded by the caller's own seats rather than by league count: the draft's one pre-draft
+  // question and the draw's result (`draftSlotsForSeats`, two statements), and the newest thing
+  // this reader may see in each room (`latestActivityByLeague`, one window statement plus its
+  // three batched name lookups). Run beside the score-cache `MGET`, not after it.
+  const seats = leagueRows.flatMap((league) => {
+    const draftId = draftByLeague.get(league.id)?.id ?? null;
+    const teamId = phaseByLeague.get(league.id)!.myTeamId;
+    return draftId === null || teamId === null ? [] : [{ draftId, teamId }];
+  });
+  const [cacheHits, slotFacts, sinceByLeague, scoringByLeague] = await Promise.all([
+    (deps.scoreCache ?? NOOP_SCORE_CACHE).readMany(cacheRequests),
+    draftSlotsForSeats(db, seats),
+    latestActivityByLeague(db, { leagueIds: ids, viewerUserId: userId }),
+    // The card's format line says what this league PLAYS, the same three facts the open-league
+    // row says (`FormatLine`) — the identical batched `IN` the browse shelf already uses for it,
+    // imported rather than written a second way.
+    scoringWeightsByLeagueId(db, ids),
+  ]);
 
   const leagues: HomeLeagueCard[] = leagueRows.map((league) => {
     const phase = phaseByLeague.get(league.id)!;
@@ -229,6 +269,11 @@ export async function crossLeagueHome(
       };
     }
 
+    // The PERSON across the table (P6), not the team name at them — the same `users` join the
+    // stack reads, so no extra query and no second way of naming the same seat.
+    const opponentTeamId = matchup === null ? null : (matchup.homeTeamId === phase.myTeamId ? matchup.awayTeamId : matchup.homeTeamId);
+    const slots = slotFactsFor(slotFacts, draft?.id ?? null);
+
     return {
       id: league.id,
       name: league.name,
@@ -247,10 +292,24 @@ export async function crossLeagueHome(
       medianGame: league.medianGame,
       medianScore: medianByWeekByLeague.get(league.id)?.get(phase.currentWeek) ?? null,
       kickoffAt: draft?.kickoffAt.toISOString() ?? null,
+      // A `when_full` draft's stored kickoff is a placeholder, never a chosen time — the same
+      // gate every reader of `kickoffAt` holds (`LeagueTerms.draftAt`'s own branch).
+      kickoffRelative: draft === undefined || draft.startTrigger === "when_full" ? null : relativeDraftTime(draft.kickoffAt.getTime(), now.getTime()),
       startTrigger: draft?.startTrigger ?? null,
       kickoffRolls: draft?.kickoffRolls ?? 0,
       myTeamName: phase.myTeamId === null ? null : (phase.nameById.get(phase.myTeamId) ?? null),
       myRank: phase.myRank,
+      // Absent weights mean a league whose settings row has not landed, never a silent default:
+      // `describeScoring` is only asked about rules that actually exist.
+      scoringLabel: (() => {
+        const rules = scoringByLeague.get(league.id);
+        return rules === undefined ? null : describeScoring(rules);
+      })(),
+      members: membersByLeague.get(league.id) ?? [],
+      opponentManagerName: opponentTeamId === null ? null : (managerByTeamId.get(opponentTeamId) ?? null),
+      slotsRanked: slots.ranked,
+      assignedSlot: slots.assignedSlot,
+      since: sinceByLeague.get(league.id) ?? null,
       nextAction: nextAction({
         isCommissioner: isCommissionerOf(league, userId),
         filledTeams,
