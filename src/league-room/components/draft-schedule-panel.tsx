@@ -9,25 +9,34 @@ import { Button, Input, SeatMeter } from "@/components/ui";
 import { StatePanel } from "@/components/ui/state-panel";
 import { Countdown, formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
 import { PUBLIC_ROOM_SHORT_REFUSAL, rollNoticeSentence } from "@/matchmaking/roll";
-import { formatDraftAbsolute } from "../lib/format";
 import { useLeagueRoomDeps } from "../hooks/deps";
+import { useReaderClock } from "../hooks/use-reader-clock";
+import { absoluteInstant, type ReaderClock } from "../lib/day-chapters";
 import { ReleaseSeatControl } from "./release-seat-control";
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 
 /**
- * "Saturday 12 September, 7:00 PM UTC" — flow analysis C-02's fix. Used to read the browser's
- * OWN local clock (`toLocaleString`, no zone label) while `LeagueTerms.draftAt` — the exact
- * string the league's terms panel and the invite landing a stranger reads both already render —
- * used the fixed, zone-labelled UTC convention: one league, two different calendar days on one
- * screen. `formatDraftAbsolute` (`../lib/format`) is the SAME formatting rule
- * `formatAbsoluteTime` (`@/league/terms.ts`) already applies server-side, so this hero now says
- * the identical sentence every other surface that names this draft's time does. `new Date(iso)`
- * parses a real, GIVEN instant — never the ambient clock.
+ * "Saturday 12 September, 7:00 PM UTC" — flow analysis C-02's fix, still standing. Used to read
+ * the browser's OWN local clock (`toLocaleString`, no zone label) while `LeagueTerms.draftAt` —
+ * the exact string the league's terms panel and the invite landing a stranger reads both already
+ * render — used the fixed, zone-labelled UTC convention: one league, two different calendar days
+ * on one screen.
+ *
+ * 2026-09-11 fix round: routed through `absoluteInstant`/`useReaderClock` (`../lib/day-chapters`,
+ * `../hooks/use-reader-clock`) rather than the client-boundary's own duplicated
+ * `formatDraftAbsolute` (`../lib/format`) — UTC-fixed forever, on every visitor's screen. This
+ * hero now says the SAME sentence every other draft-date surface does, UTC until the reader's own
+ * clock resolves and their own zone after, weekday and time off the one `formatToParts` call so
+ * the two can never disagree. `new Date(iso)` inside `absoluteInstant` parses a real, GIVEN
+ * instant — never the ambient clock. The unparseable-instant guard `formatDraftAbsolute` carried
+ * comes along with the rule: `Intl` throws on an invalid Date, and a kickoff this panel cannot
+ * read renders as absence rather than a crash.
  */
-function formatLocal(iso: string): string {
-  return formatDraftAbsolute(iso);
+function formatLocal(iso: string, clock: ReaderClock | null): string {
+  if (Number.isNaN(Date.parse(iso))) return "";
+  return absoluteInstant(iso, clock);
 }
 
 /**
@@ -212,6 +221,8 @@ export function DraftSchedulePanel({
   // to (Phase 3.5, Task 8: refactored onto the shared `useCountdown`, `@/components/ui/countdown`,
   // rather than this panel's own `useNow` + `Date.parse` arithmetic).
   const { remainingMs } = useCountdown(schedule.status === "scheduled" ? schedule.kickoffAt : null);
+  // Also unconditional, same rule: the hero's local-time line below reads it.
+  const clock = useReaderClock();
 
   const openEditor = (): void => {
     setDraftValue(toDatetimeLocalValue(schedule.kickoffAt));
@@ -336,7 +347,7 @@ export function DraftSchedulePanel({
       <Countdown remainingMs={remainingMs} size="xl" data-testid="waiting-room-countdown" />
       <SeatMeter filled={schedule.filledTeams} total={teamCount} />
       <p className="text-sm text-text-muted">
-        {remainingMs === null ? formatLocal(schedule.kickoffAt) : `${formatLocal(schedule.kickoffAt)} (${formatRelativeCountdown(remainingMs)})`}
+        {remainingMs === null ? formatLocal(schedule.kickoffAt, clock) : `${formatLocal(schedule.kickoffAt, clock)} (${formatRelativeCountdown(remainingMs)})`}
       </p>
       {/* Gauntlet fix wave, item 11 (JF-H4): C3's safety-net sentence, quoted verbatim, reaching
           a SCHEDULED league's waiting room — this product's most common waiting state, and the

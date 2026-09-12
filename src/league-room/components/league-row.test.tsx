@@ -7,12 +7,21 @@ import { buttonClassName } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";
 import { GLOSSARY } from "@/help/glossary";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { absoluteInstant, type ReaderClock } from "../lib/day-chapters";
+import { useReaderClock } from "../hooks/use-reader-clock";
 import { ctaAccessibleName } from "./open-league-shared";
 import { LEAGUE_ROW_GRID, LEAGUE_ROW_GRID_LIVE, LeagueRow, LeagueRowsHeader } from "./league-row";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
+
+// The Drafts value's absolute half now resolves through `useReaderClock` (SIDELINE fix round,
+// 2026-09-11) — mocked to the same fixed `null` every other draft-date suite pins it to, so a
+// test asserting the fallback UTC/en-US text never depends on the machine's own zone (the
+// `public-league-list.test.tsx` precedent for `absoluteInstant`'s identical contract). Individual
+// tests below override it with `mockReturnValueOnce` to exercise a real reader zone.
+vi.mock("../hooks/use-reader-clock", () => ({ useReaderClock: vi.fn(() => null) }));
 
 function stubMatchMedia(reduced: boolean) {
   vi.stubGlobal("matchMedia", (query: string) => ({
@@ -25,6 +34,9 @@ function stubMatchMedia(reduced: boolean) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // Restores the module-level default (`null`) after a test overrides it with `mockReturnValue`
+  // — a persistent stub, unlike `...Once`, that would otherwise leak into every test after it.
+  vi.mocked(useReaderClock).mockReturnValue(null);
 });
 
 const BASE: PublicLeagueSummary = {
@@ -185,7 +197,43 @@ describe("LeagueRow", () => {
       render(row({ ...BASE, draftAtIso: farIso() }));
       expect(screen.queryByTestId("draft-clock")).not.toBeInTheDocument();
       expect(screen.getByText("in 3 days")).toBeInTheDocument();
+      // No clock has resolved here (the mocked `null`), so the faint line is the server's own
+      // baked half of `draftAt`, character for character — the hydration-safe pre-mount state.
       expect(screen.getByText("Thursday 10 September, 8:00 PM UTC")).toBeInTheDocument();
+    });
+
+    /**
+     * THE WEEKDAY AND THE TIME MUST NAME THE SAME ZONE (2026-09-11 fix round). One instant near
+     * midnight UTC falls on a DIFFERENT calendar day in a zone behind it — the exact case that
+     * exposes a formatter naming the weekday off one zone and the clock off another. Both halves
+     * come off the SAME `absoluteInstant` call (`../lib/day-chapters`), so this asserts they can
+     * never disagree in either of two real, different reader zones on the one row.
+     */
+    it("never lets the weekday and the time disagree — one instant near midnight, in two reader zones", () => {
+      const midnightIso = "2027-01-04T00:30:00.000Z"; // Monday 12:30 AM UTC.
+      const losAngeles: ReaderClock = { nowMs: 0, locale: "en-US", timeZone: "America/Los_Angeles" };
+      const auckland: ReaderClock = { nowMs: 0, locale: "en-US", timeZone: "Pacific/Auckland" };
+
+      // `mockReturnValue` (not `...Once`): the row's own `useCountdown` resolves its clock in an
+      // effect and re-renders once after mount, which calls `useReaderClock` a second time —
+      // a `...Once` stub would answer that second call with the module's default `null` and the
+      // assertion below would see the pre-mount UTC text instead of the zone this test sets.
+      vi.mocked(useReaderClock).mockReturnValue(losAngeles);
+      const laRender = render(row({ ...BASE, draftAtIso: midnightIso }));
+      const expectedLa = absoluteInstant(midnightIso, losAngeles);
+      // The same UTC instant lands on the PREVIOUS calendar day in Los Angeles.
+      expect(expectedLa.startsWith("Sunday 3 January")).toBe(true);
+      expect(laRender.getByText(expectedLa)).toBeInTheDocument();
+      laRender.unmount();
+
+      vi.mocked(useReaderClock).mockReturnValue(auckland);
+      const aucklandRender = render(row({ ...BASE, draftAtIso: midnightIso }));
+      const expectedAuckland = absoluteInstant(midnightIso, auckland);
+      // The same instant lands on the SAME calendar day, ahead in the day, in Auckland — a
+      // different day than Los Angeles read for the identical instant.
+      expect(expectedAuckland.startsWith("Monday 4 January")).toBe(true);
+      expect(expectedAuckland).not.toBe(expectedLa);
+      expect(aucklandRender.getByText(expectedAuckland)).toBeInTheDocument();
     });
 
     it("prints a compact 'Drafts when full' value, never a placeholder date (storefront review E1)", () => {

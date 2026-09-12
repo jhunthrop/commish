@@ -625,6 +625,14 @@ export interface PublicLeaguePreview {
   readonly filledTeams: number;
   readonly heldSeats: number;
   readonly draftAt: string;
+  /**
+   * 2026-09-11 fix round: the SAME instant `draftAt` is formatted from, as a raw ISO string —
+   * `PublicLeagueSummary.draftAtIso`'s own precedent, so the hold room's masthead can upgrade to
+   * the reader's own zone (`LocalDraftTime`) instead of showing `draftAt`'s server-baked UTC
+   * forever. Carries the `when_full` placeholder kickoff exactly as `draftAt` does; every reader
+   * gates on `startTrigger === "scheduled"` first, same as `draftAt`.
+   */
+  readonly draftAtIso: string;
   readonly startTrigger: "scheduled" | "when_full";
   readonly houseRung: HouseRungName | null;
 }
@@ -665,6 +673,7 @@ export async function publicLeaguePreview(db: Db, leagueId: string, clock: Clock
     filledTeams: filled.length,
     heldSeats: heldByLeagueId.get(row.id) ?? 0,
     draftAt: formatDraftTime(row.kickoffAt.toISOString(), now),
+    draftAtIso: row.kickoffAt.toISOString(),
     startTrigger: row.startTrigger,
     houseRung: row.houseRung as HouseRungName | null,
   };
