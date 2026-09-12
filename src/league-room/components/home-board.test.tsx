@@ -214,6 +214,62 @@ describe("a filling room draws its seats, its people and its two quiet doors", (
   });
 });
 
+/**
+ * ONE CREATE DOOR PER PAGE (founder ruling, fix round 3). The page showed "Create a league" twice,
+ * beside its own heading and again beside "Open rooms". The lobby's heading owns it whenever the
+ * lobby renders; the page's heading takes it only when there is no lobby at all. The literal
+ * `#create-league` anchor rides whichever one renders, so the four links that point at it
+ * (`/browse`, the lobby's empty state, the league rail's `+`, the create sheet's signed-out
+ * intent) always land, and `link-integrity.source.test.ts` stays green either way.
+ */
+describe("the create door renders exactly once, wherever it belongs", () => {
+  const doors = (container: HTMLElement) => container.querySelectorAll("#create-league");
+
+  it("gives it to the lobby's heading, and to nothing else, when the lobby renders", () => {
+    const { container } = renderInLeague(
+      <HomeBoard initial={body([homeCard()])} openLeagues={PUBLIC_LEAGUES} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(doors(container)).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Create a league" })).toHaveLength(1);
+    // Inside the lobby, not beside the page title.
+    expect(screen.getByTestId("open-rooms").querySelector("#create-league")).not.toBeNull();
+  });
+
+  it("gives it to the page's heading when the house shelf is empty", () => {
+    const { container } = renderInLeague(<HomeBoard initial={body([homeCard()])} openLeagues={[]} />, fixtureLeagueDeps().deps);
+    expect(container.querySelector("[data-testid='open-rooms']")).toBeNull();
+    expect(doors(container)).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Create a league" })).toBeInTheDocument();
+  });
+
+  it("gives it to the page's heading when every open room is one this manager already joined", () => {
+    const mine = homeCard({ id: PUBLIC_LEAGUES[0]!.id, name: PUBLIC_LEAGUES[0]!.name });
+    const { container } = renderInLeague(
+      <HomeBoard initial={body([mine])} openLeagues={[PUBLIC_LEAGUES[0]!]} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(container.querySelector("[data-testid='open-rooms']")).toBeNull();
+    expect(doors(container)).toHaveLength(1);
+  });
+
+  it("keeps it quiet in both places, so it never competes with the page's one solid verb", () => {
+    for (const open of [PUBLIC_LEAGUES, []]) {
+      const view = renderInLeague(<HomeBoard initial={body([homeCard()])} openLeagues={open} />, fixtureLeagueDeps().deps);
+      expect(view.container.querySelector("#create-league")?.className).not.toContain("shadow-verb-glow");
+      view.unmount();
+    }
+  });
+
+  it("renders the page's own heading whichever door is showing", () => {
+    for (const open of [PUBLIC_LEAGUES, []]) {
+      const view = renderInLeague(<HomeBoard initial={body([homeCard()])} openLeagues={open} />, fixtureLeagueDeps().deps);
+      expect(view.getByRole("heading", { level: 1, name: "Your leagues" })).toBeInTheDocument();
+      view.unmount();
+    }
+  });
+});
+
 describe("HomeBoard never offers a seat this manager is already sitting in", () => {
   it("drops a room from the lobby when it is one of this manager's own leagues", () => {
     const mine = homeCard({ id: PUBLIC_LEAGUES[0]!.id, name: PUBLIC_LEAGUES[0]!.name, draftStatus: "scheduled", startTrigger: "when_full", slotsRanked: true });

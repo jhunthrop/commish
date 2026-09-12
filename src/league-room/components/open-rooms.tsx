@@ -1,9 +1,9 @@
 "use client";
 
-import { Button, ButtonLink } from "@/components/ui";
+import { ButtonLink } from "@/components/ui";
 import { ChapterBand } from "@/components/ui/chapter-band";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import { openCreateLeagueSheet } from "./create-league-sheet";
+import { CreateLeagueDoor } from "./create-league-door";
 import { LeagueRow, LeagueRowsHeader } from "./league-row";
 import { OpenLeagueCard } from "./open-league-card";
 
@@ -28,10 +28,23 @@ export function bySoonestDraft(leagues: readonly PublicLeagueSummary[]): readonl
   });
 }
 
+/**
+ * THE ROOMS THIS MANAGER COULD ACTUALLY TAKE A SEAT IN. A house league with seats left is public
+ * and still filling, so without this filter the same room appears once as the manager's own card
+ * and again below it offering them a seat they are already sitting in.
+ *
+ * PURE AND EXPORTED, because TWO decisions read it: whether the lobby draws at all, and — since a
+ * page carries exactly one create door (founder ruling, fix round 3) — whether that door belongs
+ * to this section's heading or to the page's. One answer, read twice, never computed two ways.
+ */
+export function roomsOpenTo(leagues: readonly PublicLeagueSummary[], alreadyIn: readonly string[]): readonly PublicLeagueSummary[] {
+  const mine = new Set(alreadyIn);
+  return leagues.filter((league) => !mine.has(league.id));
+}
+
 export interface OpenRoomsProps {
+  /** Already narrowed by `roomsOpenTo` — this component filters nothing of its own. */
   readonly leagues: readonly PublicLeagueSummary[];
-  /** League ids this manager already has a seat in — never offered a seat they are sitting in. */
-  readonly alreadyIn?: readonly string[];
   /**
    * True when this section carries the PAGE's one solid verb (P3) — which happens on exactly one
    * page state, a manager with no leagues at all, where the lobby IS the page and the featured
@@ -53,14 +66,9 @@ export interface OpenRoomsProps {
  * "Take a seat". A signed-in reader is still a stranger to these rooms, so nothing here names
  * anybody: `PublicLeagueSummary` discloses a count and never a member.
  */
-export function OpenRooms({ leagues, alreadyIn = [], featured = false }: OpenRoomsProps) {
-  // A ROOM THIS MANAGER IS ALREADY IN IS NOT AN OPEN ROOM (persona walk, 2026-09-11). A house
-  // league with seats left is public and still filling, so the same room would otherwise appear
-  // once as this manager's own card and again below it offering them a seat they are sitting in.
-  const mine = new Set(alreadyIn);
-  const open = leagues.filter((league) => !mine.has(league.id));
-  if (open.length === 0) return null;
-  const ordered = bySoonestDraft(open);
+export function OpenRooms({ leagues, featured = false }: OpenRoomsProps) {
+  if (leagues.length === 0) return null;
+  const ordered = bySoonestDraft(leagues);
   const shown = ordered.slice(0, ROOMS_SHOWN);
   const more = ordered.length - shown.length;
   const emphasisFor = (index: number) => (featured && index === 0 ? ("ink" as const) : ("quiet" as const));
@@ -69,11 +77,11 @@ export function OpenRooms({ leagues, alreadyIn = [], featured = false }: OpenRoo
     <section aria-label="Open rooms" data-testid="open-rooms" className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="font-display text-xl font-bold leading-display text-text-primary">Open rooms</h2>
-        {/* The create door, quiet, beside the rooms it makes one of (the founder's own placement
-            in the mock) rather than standing above the manager's own leagues. */}
-        <Button variant="secondary" size="sm" onClick={() => openCreateLeagueSheet()}>
-          Create a league
-        </Button>
+        {/* THE PAGE'S ONE CREATE DOOR, whenever this section renders (founder ruling, fix round 3:
+            one door per page). Beside the rooms it makes one of, which is the founder's own
+            placement in the mock. When this section is absent the identical door renders beside
+            the page's heading instead, carrying the same `#create-league` anchor with it. */}
+        <CreateLeagueDoor />
       </div>
       <ChapterBand name="Next up" consequence="soonest draft first" />
 

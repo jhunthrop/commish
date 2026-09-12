@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { PageTitle } from "@/components/ui";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { crossLeagueHome } from "@/league-service";
 import { listPublicLeagues } from "@/league-service/browse";
 import { getScoreCache } from "@/league-service/score-cache-instance";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
-import { CreateLeagueDoor } from "@/league-room/components/create-league-door";
 import { HomeBoard } from "@/league-room/components/home-board";
 
 export const dynamic = "force-dynamic";
@@ -54,17 +52,8 @@ export default async function AppHome() {
     listPublicLeagues(db, normalizeBrowseFilter({})),
   ]);
 
-  return (
-    <>
-      {/* THE CREATE DOOR IS ALWAYS REACHABLE (fix round 1, HIGH 2): beside the page's own
-       *  heading, at every state, including the one where there are no leagues AND no open house
-       *  rooms and `OpenRooms` renders nothing at all. It is the quiet door here and quiet again
-       *  beside the lobby's heading, so it never competes with the page's one solid verb. */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <PageTitle>Your leagues</PageTitle>
-        <CreateLeagueDoor />
-      </div>
-      <HomeBoard initial={home} openLeagues={openLeagues.house} />
-    </>
-  );
+  // The heading and the create door both live inside `HomeBoard` (fix round 3): ONE door per
+  // page, owned by the lobby's heading whenever the lobby renders and by the page's heading when
+  // it does not, and only the component that holds both halves can decide that once.
+  return <HomeBoard initial={home} openLeagues={openLeagues.house} />;
 }

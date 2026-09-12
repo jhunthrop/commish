@@ -99,30 +99,37 @@ describe("AppHome renders the leagues and the lobby", () => {
 });
 
 /**
- * FIX ROUND 1, HIGH 2. The create door used to live only inside `OpenRooms`, which renders
- * nothing when the lobby is empty — so a manager with no leagues AND no open house rooms landed
- * on `/app`, saw the title and nothing else, and had no route anywhere in the product to create
- * one. Three links across the app promise exactly that and delivered them to that blank page.
+ * FIX ROUNDS 1 AND 3. The door used to live only inside `OpenRooms`, which renders nothing when
+ * the lobby is empty, so a manager with no leagues AND no open rooms had no route anywhere in the
+ * product to create one (round 1). Round 1's fix then put a second door beside the page heading
+ * and the page showed "Create a league" twice (round 3). The ruling is one door per page, and
+ * `HomeBoard` decides which: the lobby's heading owns it whenever the lobby renders, the page's
+ * heading when it does not. Either way the literal `#create-league` anchor rides the one that
+ * renders, which is what keeps `link-integrity.source.test.ts` green.
  */
-describe("AppHome always offers the create door", () => {
-  it("renders it beside the heading in the state where the lobby renders nothing at all", async () => {
+describe("AppHome offers exactly one create door", () => {
+  it("renders one, beside the heading, in the state where the lobby renders nothing at all", async () => {
     vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [], house: [] });
-    const page = await AppHome();
-    const { container } = renderPage(page);
+    const { container } = renderPage(await AppHome());
     expect(container.querySelector("[data-testid='open-rooms']")).toBeNull();
+    expect(container.querySelectorAll("#create-league")).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Create a league" })).toBeInTheDocument();
   });
 
-  it("carries the #create-league anchor every start-your-own-league link in the app points at", async () => {
-    vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [], house: [] });
+  it("renders one, inside the lobby, when the lobby has rooms to show", async () => {
     const { container } = renderPage(await AppHome());
-    expect(container.querySelector("#create-league")).toBeInstanceOf(HTMLButtonElement);
+    expect(container.querySelectorAll("#create-league")).toHaveLength(1);
+    expect(screen.getByTestId("open-rooms").querySelector("#create-league")).not.toBeNull();
   });
 
-  it("is quiet at every state, so it never competes with the page's one solid verb", async () => {
+  it("carries the anchor on a real control, whichever door renders", async () => {
+    vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [], house: [] });
+    expect(renderPage(await AppHome()).container.querySelector("#create-league")).toBeInstanceOf(HTMLButtonElement);
+  });
+
+  it("is quiet, so it never competes with the page's one solid verb", async () => {
     vi.mocked(crossLeagueHome).mockResolvedValue(ONE_LEAGUE);
     const { container } = renderPage(await AppHome());
-    const door = container.querySelector("#create-league");
-    expect(door?.className).not.toContain("shadow-verb-glow");
+    expect(container.querySelector("#create-league")?.className).not.toContain("shadow-verb-glow");
   });
 });
