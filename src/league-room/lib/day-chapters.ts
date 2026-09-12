@@ -132,11 +132,27 @@ function absoluteInstantFormatter(locale: string, timeZone: string): Intl.DateTi
  * (`timeZoneName: "short"`) rather than appended.
  */
 export function absoluteInstant(iso: string, clock: ReaderClock | null): string {
+  const value = instantParts(iso, clock);
+  return `${value("weekday")} ${value("day")} ${value("month")}, ${value("hour")}:${value("minute")} ${value("dayPeriod")} ${value("timeZoneName")}`;
+}
+
+/**
+ * "Saturday" — the weekday of the SAME formatted instant `absoluteInstant` prints, off the SAME
+ * `formatToParts` call shape (fix round 1, HIGH 3). The signed-in home's league card says the
+ * draft's day in a sentence and its date in the figure's caption beside it; deriving the word
+ * from anything but this could put "Drafts Sunday" next to a Saturday date for a reader whose
+ * zone crosses midnight, which is precisely the defect that fix exists to close.
+ */
+export function instantWeekday(iso: string, clock: ReaderClock | null): string {
+  return instantParts(iso, clock)("weekday");
+}
+
+/** One formatter, one `formatToParts`, read by both spellings above. */
+function instantParts(iso: string, clock: ReaderClock | null): (type: Intl.DateTimeFormatPartTypes) => string {
   const locale = clock?.locale ?? FALLBACK_LOCALE;
   const timeZone = clock?.timeZone ?? FALLBACK_TIME_ZONE;
   const parts = absoluteInstantFormatter(locale, timeZone).formatToParts(new Date(iso));
-  const value = (type: Intl.DateTimeFormatPartTypes): string => parts.find((part) => part.type === type)?.value ?? "";
-  return `${value("weekday")} ${value("day")} ${value("month")}, ${value("hour")}:${value("minute")} ${value("dayPeriod")} ${value("timeZoneName")}`;
+  return (type) => parts.find((part) => part.type === type)?.value ?? "";
 }
 
 /** Midnight of a civil day as a UTC instant, so two civil days can be subtracted without either

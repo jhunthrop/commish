@@ -1,5 +1,3 @@
-import { FALLBACK_LOCALE, FALLBACK_TIME_ZONE, type ReaderClock } from "./day-chapters";
-
 /** Display only. Every number here was already computed and rounded on the server. */
 export function formatRecord({ wins, losses, ties }: { readonly wins: number; readonly losses: number; readonly ties: number }): string {
   return ties === 0 ? `${wins}-${losses}` : `${wins}-${losses}-${ties}`;
@@ -120,55 +118,6 @@ export function formatDraftAbsolute(iso: string): string {
   // the more prominent surface of the two.
   if (Number.isNaN(instant.getTime())) return "";
   return `${WEEKDAY_FORMAT.format(instant)} ${DAY_FORMAT.format(instant)} ${MONTH_FORMAT.format(instant)}, ${CLOCK_FORMAT.format(instant)} UTC`;
-}
-
-/**
- * THE DRAFT DAY AND THE DRAFT MOMENT, IN THE READER'S OWN ZONE (fix round 1, HIGH 3).
- *
- * A UTC weekday is wrong for half the people reading it: a draft at 01:55 UTC on Sunday begins
- * Saturday evening on the American west coast, and a card that says "Drafts Sunday" beside a date
- * stamped in a zone the reader does not live in has told them the wrong day. Both halves take the
- * SAME `ReaderClock`, so the weekday and the date are derived from one zone and can never
- * disagree with each other.
- *
- * `clock === null` is the server render AND the client's first, hydrating render (`useReaderClock`
- * returns `null` in both, the same contract `useNow` documents), and it resolves to
- * `FALLBACK_LOCALE`/`FALLBACK_TIME_ZONE` — en-US and UTC, stated in the words themselves by
- * `timeZoneName`. The two renders therefore agree byte for byte, and the reader's own zone is a
- * post-mount upgrade rather than a hydration hazard.
- *
- * The zone is NAMED in every branch ("UTC", "PDT", "BST") — P11: a time is a number and a number
- * states its basis. The locale decides the order of the parts, which is the whole point of
- * spending the reader's locale rather than hand-composing an en-US shape for everybody.
- */
-function readerZone(clock: ReaderClock | null): { readonly locale: string; readonly timeZone: string } {
-  return clock === null ? { locale: FALLBACK_LOCALE, timeZone: FALLBACK_TIME_ZONE } : { locale: clock.locale, timeZone: clock.timeZone };
-}
-
-/** "Sunday" for a UTC reader, "Saturday" for a Pacific one, from the one zone `draftMoment`
- *  below also reads. Empty for an unparseable instant, the same guard the formatters above hold. */
-export function draftWeekday(iso: string, clock: ReaderClock | null): string {
-  const instant = new Date(iso);
-  if (Number.isNaN(instant.getTime())) return "";
-  const { locale, timeZone } = readerZone(clock);
-  return instant.toLocaleDateString(locale, { timeZone, weekday: "long" });
-}
-
-/** "Sunday, September 13 at 1:55 AM UTC" / "Saturday, September 12 at 6:55 PM PDT" — the same
- *  instant, the same zone as `draftWeekday`, with that zone named. */
-export function draftMoment(iso: string, clock: ReaderClock | null): string {
-  const instant = new Date(iso);
-  if (Number.isNaN(instant.getTime())) return "";
-  const { locale, timeZone } = readerZone(clock);
-  return instant.toLocaleString(locale, {
-    timeZone,
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
 }
 
 /** "1st", "2nd", "3rd", "4th" … with the 11th-13th exception — the week strip's standings seat. */

@@ -139,7 +139,7 @@ describe("figureFor prints one number and what it is", () => {
   it("prints the distance to a scheduled draft over the exact instant it is measured to", () => {
     expect(
       figureFor(homeCard({ draftStatus: "scheduled", startTrigger: "scheduled", kickoffAt: "2026-09-13T13:55:00.000Z", kickoffRelative: "in 2 days" }), null),
-    ).toEqual({ value: "In 2 days", basis: "Sunday, September 13 at 1:55 PM UTC" });
+    ).toEqual({ value: "In 2 days", basis: "Sunday 13 September, 1:55 PM UTC" });
   });
 });
 
@@ -168,8 +168,8 @@ describe("the draft day and date are the READER's, and always name their zone", 
   });
 
   it("names the zone in the figure's basis in every branch, never an unlabelled time", () => {
-    expect(figureFor(card, null).basis).toBe("Sunday, September 13 at 1:55 AM UTC");
-    expect(figureFor(card, pacific).basis).toBe("Saturday, September 12 at 6:55 PM PDT");
+    expect(figureFor(card, null).basis).toBe("Sunday 13 September, 1:55 AM UTC");
+    expect(figureFor(card, pacific).basis).toBe("Saturday 12 September, 6:55 PM PDT");
     expect(figureFor(card, london).basis).toContain("BST");
   });
 

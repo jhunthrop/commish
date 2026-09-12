@@ -73,10 +73,11 @@ for (const theme of THEMES) {
       // population or the span it belongs to.
       const figures = cards.first().getByTestId("big-number");
       await expect(figures).toHaveCount(1);
-      // The basis names its population or its SPAN, and a draft's span names the reader's own
-      // zone ("... at 6:55 PM PDT") rather than a bare time — `useReaderClock` supplies it after
-      // mount, so this is the upgraded render, not the UTC server pass.
-      await expect(figures.first()).toContainText(/of \d+|after week \d+|no games played yet|at .+ [A-Z]{2,5}$/);
+      // The basis names its population or its SPAN, and a draft's span ends in the reader's own
+      // zone ("Saturday 12 September, 6:55 PM PDT") rather than a bare time — `absoluteInstant`
+      // reads it from `useReaderClock` after mount, so this is the upgraded render, not the UTC
+      // server pass.
+      await expect(figures.first()).toContainText(/of \d+|after week \d+|no games played yet|\d{2} (?:[AP]M )?[A-Z]{2,5}$/);
 
       // P3, counted over the whole viewport: one verb, or none when nothing is owed. Never two.
       expect(await managerD.locator(SOLID_VERB).count()).toBeLessThanOrEqual(1);
