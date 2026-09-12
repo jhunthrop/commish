@@ -18,6 +18,8 @@ import { hasOpenSeat } from "@/matchmaking/filter";
 import { describeStartTiming } from "@/matchmaking/roll";
 import type { CompositionCategory } from "@/participation/composition";
 import type { DraftScheduleBody, LeagueMemberCard } from "../contract";
+import { useReaderClock } from "../hooks/use-reader-clock";
+import { instantWeekday, type ReaderClock } from "../lib/day-chapters";
 import { DraftSchedulePanel, draftTerminalStatePanel } from "./draft-schedule-panel";
 import { alreadyInPhrase } from "./open-league-shared";
 import { ReleaseSeatControl } from "./release-seat-control";
@@ -52,18 +54,25 @@ export interface WaitingRoomLeague extends DraftScheduleBody {
   readonly totalWeeks?: number;
 }
 
-/** "Thursday" from a real, given instant — never the ambient clock, and never the READER's own
- *  zone either (flow-remediation review D-1): `toLocaleDateString(undefined, …)` rendered this
- *  weekday in the browser's timezone while the terms panel one screen away rendered the SAME
- *  instant in UTC, so a reader east of UTC could see two different days for one draft — C-02's
- *  own defect, on the surface the sweep missed. UTC here too, matching `formatDraftAbsolute`
- *  (`../lib/format`) and the product's one convention. */
-const WAITING_WEEKDAY_FORMAT = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" });
-
-function weekdayOf(iso: string): string {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return "";
-  return WAITING_WEEKDAY_FORMAT.format(at);
+/**
+ * "Thursday" from a real, given instant — never the ambient clock (flow-remediation review D-1:
+ * `toLocaleDateString(undefined, …)` used to render this weekday in the browser's timezone while
+ * the terms panel one screen away rendered the same instant in UTC, so a reader east of UTC could
+ * see two different days for one draft — C-02's own defect, on the surface the sweep missed).
+ *
+ * 2026-09-11 fix round: routed through `instantWeekday` (`../lib/day-chapters`), the SAME
+ * `formatToParts` call `absoluteInstant` reads for every other draft-date surface, off the SAME
+ * `useReaderClock` this room's own `DraftSchedulePanel` hero now reads — UTC (D-1's fixed
+ * convention) until the reader's clock resolves, their own zone after, so this sentence's day and
+ * `DraftSchedulePanel`'s time can never name two different zones for the one instant again.
+ *
+ * The unparseable-instant guard survives the move: `instantWeekday` formats whatever it is given
+ * and an invalid date throws inside `Intl`, so a kickoff this room could not read renders as
+ * absence (the empty string it always rendered), never as a crashed panel.
+ */
+function weekdayOf(iso: string, clock: ReaderClock | null): string {
+  if (Number.isNaN(Date.parse(iso))) return "";
+  return instantWeekday(iso, clock);
 }
 
 /**
@@ -283,6 +292,8 @@ export function WaitingRoom({
   // there's nothing left to count down to: a `when_full` league still filling has no real
   // `kickoffAt` yet (`DraftScheduleBody.kickoffAt`'s own docblock).
   const { remainingMs } = useCountdown(league.startTrigger === "when_full" && full ? league.kickoffAt : null);
+  // Also unconditional, same rule: the missed-draft sentence below reads it for `instantWeekday`.
+  const clock = useReaderClock();
 
   const myTeam = teams?.find((team) => team.id === myTeamId) ?? null;
   const myTeamName = myTeam?.name ?? null;
@@ -399,7 +410,7 @@ export function WaitingRoom({
           tone="neutral"
           icon="check"
           title="Draft complete"
-          description={`The draft ran on ${weekdayOf(league.kickoffAt)} and the room picked for you: your queue first, then the best player your roster needed.`}
+          description={`The draft ran on ${weekdayOf(league.kickoffAt, clock)} and the room picked for you: your queue first, then the best player your roster needed.`}
           action={
             <Link href={`/app/drafts/${league.draftId}`} className="text-sm font-medium text-accent underline">
               See your roster

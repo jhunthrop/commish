@@ -10,6 +10,8 @@ import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
 import { formatUsd } from "@/money/config";
 import { prizePotCents } from "@/money/prize-table";
+import { useReaderClock } from "../hooks/use-reader-clock";
+import { absoluteInstant } from "../lib/day-chapters";
 import { JoinPublicLeagueButton } from "./join-public-league-button";
 
 /**
@@ -270,6 +272,20 @@ export function FormatLine({ league }: { readonly league: FormatFacts }) {
  * existing callers — and is threaded straight to `Countdown` for a caller that needs the SAME
  * gated clock at a larger register (the front door hero's "Next draft" module, `size="lg"`)
  * rather than forking a second ticking clock with its own onDeck gate.
+ *
+ * THE ABSOLUTE HALF'S OWN CLOCK (2026-09-11 fix round). `league.draftAt` is still the server's
+ * UTC-labelled bake (`formatDraftTime`, `@/league/terms`) — the honest SSR truth with no visitor
+ * to read a zone from — but this component now upgrades the ABSOLUTE half to the reader's own
+ * zone and locale once `useReaderClock` resolves one, through the SAME `absoluteInstant`
+ * (`../lib/day-chapters`) every other draft-date surface reads. Before this, a row printed
+ * `draftAt`'s baked UTC text forever, on every visitor's screen regardless of their own zone —
+ * the front door's "Seat counts as of" line had already been fixed this way (SIDELINE,
+ * 2026-09-10); this was the sibling defect on the same board, one section down. `draftAtIso` is
+ * the raw instant `draftAt` was formatted from (`PublicLeagueSummary`'s own docblock); a summary
+ * that omits it, and every render before the reader's clock resolves, keeps the exact text this
+ * component always showed. The RELATIVE clause ("in 2 days") is a
+ * plain duration, not a zone fact — `relativeDraftTime`'s own reasoning holds regardless of
+ * whose clock reads it — so it stays read off the server's own bake.
  */
 export function ScheduledDraftValue({
   relativeFirst = false,
@@ -287,6 +303,8 @@ export function ScheduledDraftValue({
   /** Lead with the relative fact and drop the date to the faint line — the tower rows' mode. */
   readonly relativeFirst?: boolean;
 }) {
+  // Called unconditionally, before any early return — React's Rules of Hooks.
+  const clock = useReaderClock();
   if (league.startTrigger === "when_full") {
     return (
       // "Drafts when full" is the self-explaining register the no-tips ruling asks for: the
@@ -297,28 +315,36 @@ export function ScheduledDraftValue({
   if (onDeck && remainingMs !== null) {
     return <Countdown remainingMs={remainingMs} size={size} tone="hot" data-testid="draft-clock" />;
   }
-  if (relativeFirst) {
+  // `draftAt` arrives preformatted ("Sunday 30 August, 8:52 PM UTC (in 2 days)"); the split is
+  // on the parenthetical the formatter itself appends, and a string without one has no relative
+  // clause to carry (law 7, never restate a fact this component does not own) — its whole text
+  // is the fallback absolute half.
+  const match = /^(.*?)\s*\((in [^)]+)\)$/.exec(league.draftAt);
+  const absoluteFallback = match !== null ? match[1]! : league.draftAt;
+  const relative = match !== null ? match[2]! : null;
+  // THE SERVER PASS IS THE SERVER'S OWN WORDS, byte for byte (`LocalDraftTime`'s identical
+  // contract). Before a clock resolves this renders `draftAt`'s absolute half exactly as the
+  // server baked it, so the SSR HTML and the client's first (hydrating) render cannot differ by
+  // so much as a character; only the effect that resolves the reader's clock ever changes it.
+  const absolute = clock !== null && league.draftAtIso != null ? absoluteInstant(league.draftAtIso, clock) : absoluteFallback;
+  if (relativeFirst && relative !== null) {
     // The tower's reading order (Sunday v5, law 1): the RELATIVE fact leads, because "in 2
-    // days" is the delta a visitor decides on, and the absolute date is the record. `draftAt`
-    // arrives preformatted ("Sunday 30 August, 8:52 PM UTC (in 2 days)"); the split is on the
-    // parenthetical the formatter itself appends, and a string without one renders whole
-    // rather than being reformatted here — law 7, never restate a fact this component does
-    // not own.
-    const match = /^(.*?)\s*\((in [^)]+)\)$/.exec(league.draftAt);
-    if (match !== null) {
-      const [, absolute, relative] = match;
-      return (
-        <span className={`flex min-w-0 flex-col ${className}`}>
-          {/* The relative clause renders as the formatter wrote it ("in 2 days") — no styled
-              capitalisation: the caps charter routes every shout through MICRO_LABEL, and this
-              is body prose, not a micro-label. */}
-          <span className="font-medium text-text-primary">{relative}</span>
-          <span className="text-xs text-text-faint">{absolute}</span>
-        </span>
-      );
-    }
+    // days" is the delta a visitor decides on, and the absolute date is the record.
+    return (
+      <span className={`flex min-w-0 flex-col ${className}`}>
+        {/* The relative clause renders as the formatter wrote it ("in 2 days") — no styled
+            capitalisation: the caps charter routes every shout through MICRO_LABEL, and this
+            is body prose, not a micro-label. */}
+        <span className="font-medium text-text-primary">{relative}</span>
+        <span className="text-xs text-text-faint">{absolute}</span>
+      </span>
+    );
   }
-  return <span className={`min-w-0 font-medium tabular-nums text-text-primary ${className}`}>{league.draftAt}</span>;
+  // The card's own reading order keeps both halves on one line, exactly as `draftAt` always
+  // printed it ("Thursday 10 September, 8:00 PM UTC (in 3 days)") — only the absolute half is
+  // now the reader's own zone; the relative half rejoins it unchanged.
+  const plain = relative === null ? absolute : `${absolute} (${relative})`;
+  return <span className={`min-w-0 font-medium tabular-nums text-text-primary ${className}`}>{plain}</span>;
 }
 
 /**

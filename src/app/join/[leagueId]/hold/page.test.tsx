@@ -56,7 +56,8 @@ const USER = { id: "u1", email: "u1@test.local", displayName: "Ada", experienceT
 
 const PREVIEW = {
   id: "lg1", name: "Rookie Snake Room", teamCount: 12, filledTeams: 9, heldSeats: 1,
-  draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)", startTrigger: "scheduled" as const, houseRung: null,
+  draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)", draftAtIso: "2026-09-12T19:00:00.000Z",
+  startTrigger: "scheduled" as const, houseRung: null,
 };
 
 async function renderPage(deps: Parameters<typeof LeagueRoomDepsProvider>[0]["deps"]) {

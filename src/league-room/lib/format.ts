@@ -1,3 +1,5 @@
+import { absoluteInstant } from "./day-chapters";
+
 /** Display only. Every number here was already computed and rounded on the server. */
 export function formatRecord({ wins, losses, ties }: { readonly wins: number; readonly losses: number; readonly ties: number }): string {
   return ties === 0 ? `${wins}-${losses}` : `${wins}-${losses}-${ties}`;
@@ -103,22 +105,26 @@ export function formatDate(iso: string): string {
  * different timezone treatments for the same instant is the defect (finding C-02), not UTC
  * itself — UTC is the convention this product already commits to everywhere it has no per-visitor
  * timezone signal to read (`formatAbsoluteTime`'s own docblock: no timezone beacon exists), so
- * this function joins that convention rather than inventing a third one. `DraftSchedulePanel`'s
- * own hero (`../components/draft-schedule-panel.tsx`) is this function's one caller.
+ * this function joins that convention rather than inventing a third one.
+ *
+ * ONE IMPLEMENTATION, NOT TWO (2026-09-11 fix round). Every draft-date SURFACE now renders
+ * through `absoluteInstant`/`useReaderClock` (`./day-chapters`, `../hooks/use-reader-clock`):
+ * the server's UTC words until the reader's own clock resolves, their own zone and locale after.
+ * This function is what is left for a caller with no clock to read — the app shell's rail bakes
+ * its one line server-side (`railStateLine`, `./rail-line.ts`) and hands the renderer a finished
+ * string, so there is no reader to upgrade for. It delegates to `absoluteInstant`'s null branch
+ * rather than keeping a second set of formatters that spell the same rule: two copies of one
+ * convention is exactly the drift C-02 was.
  */
-const WEEKDAY_FORMAT = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" });
-const DAY_FORMAT = new Intl.DateTimeFormat("en-US", { day: "numeric", timeZone: "UTC" });
-const MONTH_FORMAT = new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" });
-const CLOCK_FORMAT = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" });
-
 export function formatDraftAbsolute(iso: string): string {
-  const instant = new Date(iso);
   // The same guard `formatDate` above carries, for the same reason (flow-remediation review
-  // D-2): four `Intl.format` calls on an invalid Date throw `RangeError`, and this one feeds
-  // the more prominent surface of the two.
-  if (Number.isNaN(instant.getTime())) return "";
-  return `${WEEKDAY_FORMAT.format(instant)} ${DAY_FORMAT.format(instant)} ${MONTH_FORMAT.format(instant)}, ${CLOCK_FORMAT.format(instant)} UTC`;
+  // D-2): `Intl` throws `RangeError` on an invalid Date, and absence must render as absence.
+  if (Number.isNaN(Date.parse(iso))) return "";
+  return absoluteInstant(iso, null);
 }
+
+const WEEKDAY_FORMAT = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" });
+const CLOCK_FORMAT = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" });
 
 /** "1st", "2nd", "3rd", "4th" … with the 11th-13th exception — the week strip's standings seat. */
 export function ordinal(n: number): string {

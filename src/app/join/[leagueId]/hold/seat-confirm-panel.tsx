@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ApiEnvelope } from "@/lib/api/respond";
@@ -15,8 +15,9 @@ export interface SeatConfirmPanelProps {
   readonly leagueId: string;
   readonly leagueName: string;
   /** When this league drafts, in `publicLeaguePreview`'s own words — the one fact this strip
-   *  carries that the masthead above it does not. */
-  readonly draftLine: string;
+   *  carries that the masthead above it does not. `ReactNode` (2026-09-11): a scheduled league's
+   *  value is `LocalDraftTime`, which upgrades to the reader's own zone after mount. */
+  readonly draftLine: ReactNode;
   /** The race loser's own next destination (Task 6 Step 4, F15) — read once, server-side, off
    *  the SAME `publicLeaguePreview` row the page's own read-only render already fetched. */
   readonly houseRung: HouseRungName | null;

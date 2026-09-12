@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -11,6 +12,7 @@ import { PublicBar, STOREFRONT_NAV } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import { resolveLeagueMembership } from "@/lib/leagues/membership";
 import { publicLeaguePreview } from "@/league-service/browse";
+import { LocalDraftTime } from "@/league-room/components/local-draft-time";
 import { SeatHoldPanel } from "@/league-room/components/seat-hold-panel";
 import { SeatConfirmPanel } from "./seat-confirm-panel";
 
@@ -28,10 +30,18 @@ function pageIntent(leagueId: string): string {
   return `/join/${leagueId}/hold`;
 }
 
-/** When this league drafts, in one line — read once, spent by the masthead's own signed-out
- *  branch and by the signed-in strip's "Drafts" cell, never written twice. */
-function draftLine(preview: NonNullable<Awaited<ReturnType<typeof publicLeaguePreview>>>): string {
-  return preview.startTrigger === "when_full" ? "As soon as it fills" : preview.draftAt;
+/**
+ * When this league drafts, in one line — read once, spent by the masthead's own signed-out
+ * branch and by the signed-in strip's "Drafts" cell, never written twice.
+ *
+ * 2026-09-11 fix round: a scheduled league's kickoff now renders through `LocalDraftTime`, the
+ * SAME reader-zone upgrade every other draft-date surface carries — `preview.draftAt` used to
+ * print here forever, the server's UTC bake, no matter which zone the visitor actually held a
+ * seat from. `preview.draftAtIso` is the raw instant `draftAt` was formatted from.
+ */
+function draftLine(preview: NonNullable<Awaited<ReturnType<typeof publicLeaguePreview>>>): ReactNode {
+  if (preview.startTrigger === "when_full") return "As soon as it fills";
+  return <LocalDraftTime iso={preview.draftAtIso} fallback={preview.draftAt} />;
 }
 
 /**
@@ -60,8 +70,10 @@ function SeatMasthead({
   readonly preview: NonNullable<Awaited<ReturnType<typeof publicLeaguePreview>>>;
   /** The draft-timing line, or null when the page's own lower third is carrying it instead
    *  (the signed-in branch). The signed-out interstitial has no strip of its own — its action
-   *  is `SeatHoldPanel`'s hold-and-sign-in flow — so it keeps the line here. */
-  readonly timing: string | null;
+   *  is `SeatHoldPanel`'s hold-and-sign-in flow — so it keeps the line here. `ReactNode` (not
+   *  `string`) since 2026-09-11: a scheduled league's value is `LocalDraftTime`, which upgrades
+   *  itself to the reader's own zone after mount. */
+  readonly timing: ReactNode | null;
 }) {
   const open = Math.max(0, preview.teamCount - preview.filledTeams - preview.heldSeats);
   return (
@@ -76,7 +88,7 @@ function SeatMasthead({
         <div className="flex min-w-0 flex-col gap-2">
           <PageTitle>{preview.name}</PageTitle>
           <SeatStack filled={preview.filledTeams} total={preview.teamCount} heldSeats={preview.heldSeats} />
-          {timing === null ? null : <p className="text-sm tabular-nums text-text-muted">{`Drafts ${timing}`}</p>}
+          {timing === null ? null : <p className="text-sm tabular-nums text-text-muted">Drafts {timing}</p>}
         </div>
         {/* P2: the page's ONE number, with its basis in the same glance — through `BigNumber`,
             which owns both halves; the hand-rolled figure-plus-micro-label pair it replaces was

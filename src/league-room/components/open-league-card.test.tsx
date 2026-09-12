@@ -7,12 +7,21 @@ import { buttonClassName } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";
 import { GLOSSARY } from "@/help/glossary";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { absoluteInstant } from "../lib/day-chapters";
+import { useReaderClock } from "../hooks/use-reader-clock";
 import { ctaAccessibleName, potFacts } from "./open-league-shared";
 import { OpenLeagueCard } from "./open-league-card";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
+
+// The Drafts value's absolute half now resolves through `useReaderClock` (SIDELINE fix round,
+// 2026-09-11) — mocked to the same fixed `null` every other draft-date suite pins it to, so a
+// test asserting the fallback UTC/en-US text never depends on the machine's own zone (the
+// `public-league-list.test.tsx` precedent for `absoluteInstant`'s identical contract). One test
+// below overrides it with `mockReturnValue` to exercise a real reader zone.
+vi.mock("../hooks/use-reader-clock", () => ({ useReaderClock: vi.fn(() => null) }));
 
 function stubMatchMedia(reduced: boolean) {
   vi.stubGlobal("matchMedia", (query: string) => ({
@@ -25,6 +34,9 @@ function stubMatchMedia(reduced: boolean) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // Restores the module-level default (`null`) after a test overrides it with `mockReturnValue`
+  // — a persistent stub that would otherwise leak into every test after it.
+  vi.mocked(useReaderClock).mockReturnValue(null);
 });
 
 const BASE: PublicLeagueSummary = {
@@ -196,7 +208,23 @@ describe("OpenLeagueCard", () => {
     it("keeps the absolute sentence when the draft is scheduled but not yet close", () => {
       render(card({ ...BASE, draftAtIso: farIso() }));
       expect(screen.queryByTestId("draft-clock")).not.toBeInTheDocument();
+      // No clock has resolved here (the mocked `null`), so both halves are the server's own
+      // `draftAt`, rejoined character for character — the hydration-safe pre-mount state.
       expect(screen.getByText(BASE.draftAt)).toBeInTheDocument();
+    });
+
+    /**
+     * THE READER'S OWN ZONE, ONCE A CLOCK RESOLVES. The same card, the same instant, a real
+     * reader clock instead of the pre-mount `null`: the absolute half is now that zone's words
+     * and the relative clause rejoins unchanged, because a duration is not a zone fact.
+     */
+    it("upgrades the absolute half to the reader's own zone once a clock resolves", () => {
+      const iso = farIso();
+      vi.mocked(useReaderClock).mockReturnValue({ nowMs: Date.now(), locale: "en-US", timeZone: "Asia/Tokyo" });
+      render(card({ ...BASE, draftAtIso: iso }));
+      const tokyo = absoluteInstant(iso, { nowMs: Date.now(), locale: "en-US", timeZone: "Asia/Tokyo" });
+      expect(tokyo).not.toBe("Thursday 10 September, 8:00 PM UTC");
+      expect(screen.getByText(`${tokyo} (in 3 days)`)).toBeInTheDocument();
     });
 
     it("keeps the absolute sentence when the summary carries no instant at all", () => {

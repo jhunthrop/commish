@@ -1081,7 +1081,12 @@ describe("publicLeaguePreview", () => {
     await claimSeatHold(db, { leagueId: "preview_open", token: "hold_preview", now: "2026-08-17T12:00:00.000Z" });
 
     const preview = await publicLeaguePreview(db, "preview_open", { now: () => "2026-08-17T12:00:00.000Z" });
-    expect(preview).toMatchObject({ id: "preview_open", name: "Preview League", teamCount: 12, filledTeams: 9, heldSeats: 1, houseRung: null });
+    // `draftAtIso` (2026-09-11 fix round): the same raw instant `draftAt` is formatted from, so
+    // the hold room's masthead can upgrade to the reader's own zone (`LocalDraftTime`).
+    expect(preview).toMatchObject({
+      id: "preview_open", name: "Preview League", teamCount: 12, filledTeams: 9, heldSeats: 1, houseRung: null,
+      draftAtIso: "2026-09-10T17:00:00.000Z",
+    });
   });
 
   it("answers null for a private league, byte-identically to a missing one", async () => {
