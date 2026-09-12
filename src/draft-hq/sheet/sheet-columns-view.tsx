@@ -76,8 +76,8 @@ export function SheetColumnsView({ payload, basis, onMove, onPlace, onMatchBoard
   return (
     <div data-testid="draft-area-sheet" className="group/sheet flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-0.5">
-        {/* ONE LINE ON A PHONE (fix round 1, H4), the whole sentence from `sm:` up. */}
-        <p data-testid="sheet-basis" className="max-w-[78ch] truncate text-sm text-text-muted sm:whitespace-normal">
+        {/* A BASIS IS NEVER CUT (fix round 2): it wraps at every width, here as on the board. */}
+        <p data-testid="sheet-basis" className="max-w-[78ch] text-sm leading-snug text-text-muted">
           {moved === 0 ? (
             <>
               <span className="font-semibold text-text-primary">Our board, untouched</span>.{" "}

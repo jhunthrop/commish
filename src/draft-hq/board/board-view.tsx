@@ -448,10 +448,12 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
         </button>
       </div>
 
-      {/* ONE LINE ON A PHONE (fix round 1, H4): the basis is a sentence a reader checks once,
-          and three lines of it at 360 cost three player rows on the densest list in the product.
-          It truncates on a phone and wraps from `sm:` up, where there is room for all of it. */}
-      {basis === null ? null : <p className="truncate text-sm text-text-muted sm:whitespace-normal">{basis}</p>}
+      {/* A BASIS IS NEVER CUT (fix round 2). It wraps, at every width. The first pass truncated it
+          at 360 to buy back rows, which trades the one sentence that says what every number below
+          MEANS for a row of the list it explains — P11 does not have a phone exception. The rows
+          come from the header instead: the verb shares the title's line (`DraftHeader`), which is
+          where the space actually was. */}
+      {basis === null ? null : <p className="text-sm leading-snug text-text-muted">{basis}</p>}
 
       {/* A position the engine publishes no projection for says so, once, above its own table. The
           rows below it are real players in the market's own order with honestly blank projection

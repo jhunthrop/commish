@@ -23,6 +23,16 @@ function theme(): string {
   return process.env.E2E_COLOR_SCHEME ?? "light";
 }
 
+/**
+ * Player rows inside a 360 by 780 screen on the board, measured on this layout rather than wished
+ * for: with the header's verb on the title's line, one row of switch, the scheduled line, the
+ * filter bar and the basis wrapped whole onto two lines, FOUR rows land fully inside the screen
+ * (measured 2026-09-12; the fifth is cut by the fold). Four is also the floor P10 asks of a
+ * comparison list on a phone, so this is both the measurement and the bar — a regression that
+ * costs one row fails here rather than quietly spending a margin that does not exist.
+ */
+const MEASURED_ROWS_AT_360 = 4;
+
 async function shoot(page: Page, name: string): Promise<void> {
   mkdirSync(OUT_DIR, { recursive: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -71,13 +81,17 @@ test("the Draft tab opens on the board, one switch with three stops, one solid v
   await managerA.goBack();
   await expect(managerA.locator('[data-testid="board-row"]').first()).toBeVisible({ timeout: 30_000 });
 
-  // P10 ON A PHONE (fix round 1, H4). The verb rides the switch row and the basis keeps one line,
-  // so the list starts inside the first screen instead of below it. Four rows is the floor this
-  // asserts; the old layout put ONE above the fold at this size.
+  // P10 ON A PHONE (fix round 1, H4; measured again in fix round 2 with the basis wrapping in
+  // full). The verb shares the title's row instead of taking one of its own, and the list starts
+  // inside the first screen rather than below it: MEASURED_ROWS_AT_360 is what this layout
+  // actually puts above the fold at 360 by 780, and the old layout put ONE.
   await managerA.setViewportSize({ width: 360, height: 780 });
   await expect(managerA.locator('[data-testid="board-row"]').first()).toBeVisible({ timeout: 30_000 });
   const aboveFold = await managerA.locator('[data-testid="board-row"]').evaluateAll((rows) => rows.filter((row) => row.getBoundingClientRect().bottom <= 780).length);
-  expect(aboveFold, "player rows inside the first phone screen").toBeGreaterThanOrEqual(4);
+  expect(aboveFold, "player rows inside the first phone screen").toBeGreaterThanOrEqual(MEASURED_ROWS_AT_360);
+  // And the basis is whole: a sentence that says what every number below means is never cut.
+  const basisCut = await managerA.locator("main p").filter({ hasText: "roster shape" }).first().evaluate((node) => node.scrollWidth > node.clientWidth + 1);
+  expect(basisCut, "the basis is truncated at 360").toBe(false);
   // The verb shares the title's row rather than taking one of its own: three things do not fit
   // 328px, so the two short ones pair and the switch takes the width under them.
   const titleTop = await managerA.getByRole("heading", { level: 1, name: "Draft" }).evaluate((node) => node.getBoundingClientRect().top);
