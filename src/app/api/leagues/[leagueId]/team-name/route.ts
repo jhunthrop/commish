@@ -4,6 +4,7 @@ import { renameMyTeam } from "@/league-service/settings";
 import { renameMyTeamSchema } from "@/league-service/schemas";
 import type { TeamNameBody } from "@/league-room/contract";
 import { withLeagueActor, type LeagueRouteContext } from "@/app/api/leagues/_shared";
+import { teamNameRateLimited } from "./_shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,11 @@ export const dynamic = "force-dynamic";
  */
 export async function PUT(request: Request, context: LeagueRouteContext) {
   return withLeagueActor(request, context, async (actor, req) => {
+    // Before the body is even read: a name lands verbatim in rendered activity copy that is never
+    // re-rendered (ruling 12), so the ceiling is the same one the display name carries.
+    const limited = teamNameRateLimited(actor.userId);
+    if (limited !== null) return limited;
+
     const parsed = await parseJson(req, renameMyTeamSchema);
     if (!parsed.ok) return parsed.response;
 

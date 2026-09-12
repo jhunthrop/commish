@@ -1,5 +1,6 @@
 import type { HomeLeagueCard } from "../contract";
-import { firstNameOf, formatDraftAbsolute, formatRecord, formatDraftWeekday, ordinal } from "./format";
+import type { ReaderClock } from "./day-chapters";
+import { draftMoment, draftWeekday, firstNameOf, formatRecord, ordinal } from "./format";
 import { LEAGUE_VERB, MOCK_DRAFT_HREF } from "./verbs";
 
 /**
@@ -116,7 +117,7 @@ function gamesPlayed(league: HomeLeagueCard): number {
  * status.ts`: "Lineups lock when the week starts, not when it ends"). There is no per-kickoff
  * lock time to promise, so none is promised.
  */
-export function momentLine(league: HomeLeagueCard): string {
+export function momentLine(league: HomeLeagueCard, clock: ReaderClock | null): string {
   const need = needFor(league);
   if (need === "draft-running") {
     const slot = league.assignedSlot === null ? "" : ` You pick ${ordinal(league.assignedSlot)}.`;
@@ -128,7 +129,7 @@ export function momentLine(league: HomeLeagueCard): string {
         ? `Filling, ${league.filledTeams} of ${league.teamCount}. Drafts when full.`
         : league.kickoffAt === null
           ? "A draft is scheduled."
-          : `Drafts ${formatDraftWeekday(league.kickoffAt)}.`;
+          : `Drafts ${draftWeekday(league.kickoffAt, clock)}.`;
     return league.slotsRanked || league.myTeamId === null ? when : `${when} Your draft slots are not ranked yet.`;
   }
   if (league.draftStatus === "complete") {
@@ -151,7 +152,7 @@ export interface HomeCardFigure {
   readonly basis: string;
 }
 
-export function figureFor(league: HomeLeagueCard): HomeCardFigure {
+export function figureFor(league: HomeLeagueCard, clock: ReaderClock | null): HomeCardFigure {
   if (league.draftStatus === "complete") {
     const played = gamesPlayed(league);
     if (league.record === null || played === 0) return { value: null, basis: "no games played yet" };
@@ -163,7 +164,7 @@ export function figureFor(league: HomeLeagueCard): HomeCardFigure {
   if (league.draftStatus === "scheduled" && league.startTrigger === "scheduled" && league.kickoffRelative !== null && league.kickoffAt !== null) {
     // "in 2 days" becomes "In 2 days" at the head of its own figure. Sentence case, not the caps
     // register: the caps charter routes every shout through `MICRO_LABEL`, and this is not one.
-    return { value: `${league.kickoffRelative.charAt(0).toUpperCase()}${league.kickoffRelative.slice(1)}`, basis: formatDraftAbsolute(league.kickoffAt) };
+    return { value: `${league.kickoffRelative.charAt(0).toUpperCase()}${league.kickoffRelative.slice(1)}`, basis: draftMoment(league.kickoffAt, clock) };
   }
   const toGo = league.teamCount - league.filledTeams;
   return { value: String(toGo), basis: `${toGo === 1 ? "seat" : "seats"} to go, of ${league.teamCount}` };

@@ -10,6 +10,15 @@ export interface TeamNameFieldProps {
   readonly leagueId: string;
   /** The name this manager's team carries right now, server-read. */
   readonly initialName: string;
+  /**
+   * `LEAGUE_CONFIG.maxNameLength`, THREADED from the server page (fix round 1, MEDIUM 6). The
+   * client boundary forbids a value import of `@/league` from a room directory, so the one
+   * constant `renameMyTeamSchema` already enforces travels as a prop rather than being retyped
+   * here — the same threading `CreateSheetDefaults` does for the service's own defaults. Without
+   * it an over-length name only failed on the round trip, which is a refusal the field could have
+   * made before the manager finished typing.
+   */
+  readonly maxLength: number;
 }
 
 /**
@@ -26,7 +35,7 @@ export interface TeamNameFieldProps {
  * fetched — the same shape `SlotPreferencePanel` beside it keeps. The confirmation says the name
  * it saved, because a save that does not name what it saved is a save you have to go and check.
  */
-export function TeamNameField({ leagueId, initialName }: TeamNameFieldProps) {
+export function TeamNameField({ leagueId, initialName, maxLength }: TeamNameFieldProps) {
   const deps = useLeagueRoomDeps();
   const [name, setName] = useState(initialName);
   const [saved, setSaved] = useState<string | null>(null);
@@ -61,11 +70,12 @@ export function TeamNameField({ leagueId, initialName }: TeamNameFieldProps) {
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-2" aria-label="Team name">
+    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-2" aria-label="Name your team">
       <div className="flex flex-wrap items-end gap-2">
         <Input
           label="Team name"
           value={name}
+          maxLength={maxLength}
           error={error ?? undefined}
           onChange={(event) => {
             setName(event.target.value);

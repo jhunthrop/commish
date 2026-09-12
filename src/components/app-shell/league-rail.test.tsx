@@ -84,7 +84,7 @@ describe("LeagueRail", () => {
   it("gives the + row words and a full accessible name", () => {
     render(<LeagueRail leagues={LEAGUES} />);
     const plus = screen.getByRole("link", { name: "Find or start a league" });
-    expect(plus).toHaveAttribute("href", "/app");
+    expect(plus).toHaveAttribute("href", "/app#create-league");
     expect(plus.textContent).toContain("Find or start a league");
   });
 

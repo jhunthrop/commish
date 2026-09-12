@@ -31,9 +31,18 @@ test("every addendum surface renders its own chrome and its own first heading", 
     await expect(page.getByRole("banner").getByRole("link", { name: "Sign in" }), `${where}: sign-in entry`).toBeVisible();
     const footer = page.getByRole("navigation", { name: "Legal and support" });
     await expect(footer, `${where}: trust footer`).toBeVisible();
-    for (const target of ["Terms", "Privacy", "Support", "League rules"]) {
+    // THE THREE `PUBLIC_FOOTER_LINKS` ACTUALLY NAMES. This loop carried a fourth, "League rules",
+    // which `public-footer.tsx` dropped on 2026-09-10 when `/league-rules` moved to the storefront
+    // nav under its own page's name ("How it works") — so the spec had been asserting a link
+    // nothing renders since before this branch began (pre-existing at 33aaa732, and
+    // `public-footer.test.tsx` asserts the old name is gone). Spelled out rather than imported
+    // from the component: the Playwright loader cannot resolve `next/link` out of a `.tsx`, so
+    // the unit test beside the component is where that list stays honest.
+    for (const target of ["Terms", "Privacy", "Support"]) {
       await expect(footer.getByRole("link", { name: target }), `${where}: footer target ${target}`).toBeVisible();
     }
+    // The page it lost is still one tap away, in the nav that owns it now.
+    await expect(page.getByRole("link", { name: "How it works" }).first(), `${where}: how it works`).toBeVisible();
   };
 
   await page.goto("/reviews");
@@ -79,7 +88,11 @@ test("every addendum surface renders its own chrome and its own first heading", 
   };
 
   await managerA.goto("/app/profile");
-  await expect(managerA.getByRole("heading", { name: "Your profile" })).toBeVisible();
+  // THE TAB TITLE, not an `<h1>` reading "Your profile". This page's own heading is the MANAGER'S
+  // NAME (`ManagerHeader`, Gameday law 2) and has been since before this branch; the words
+  // "Your profile" live only in `pageTitle(...)`. Pre-existing stale assertion at 33aaa732, in
+  // the same walk this round rewrites.
+  await expect(managerA).toHaveTitle(/Your profile/);
   await shellChrome(managerA, "/app/profile");
   // The account room's own six components answer, not a second bespoke frame (Task 18): the
   // email renders as TEXT with its statement, never a field.
@@ -98,15 +111,21 @@ test("every addendum surface renders its own chrome and its own first heading", 
   await expect(managerA.getByRole("heading", { name: "What managers are saying" })).toBeVisible();
   await shellChrome(managerA, "/reviews signed in");
 
-  // --- First run (Task 17): the zero-league fork under the shell, identity card first -------
+  // --- Zero leagues (Sideline, 2026-09-11): the lobby IS the page, under the same shell -----
+  // The first-run fork this leg used to assert (an identity card above three explained paths) is
+  // deleted with `firstRunPlan`. What the shell wraps now is the lobby and the create door.
   await managerZero.goto("/app");
   await expect(managerZero.getByRole("heading", { name: "Your leagues" })).toBeVisible();
-  await shellChrome(managerZero, "/app first run");
-  await expect(managerZero.getByRole("heading", { name: "Set up your manager profile" })).toBeVisible();
-  // Scoped to `main`: the fork streams, and an unscoped `getByLabel` can catch the App
-  // Router's hidden streaming buffer (`div#S:*[hidden]`) mid-swap and strict-fail on two
-  // copies — see onboarding.spec.ts's fork walk for the full diagnosis (Task 12).
-  await expect(managerZero.getByRole("main").getByLabel("Display name")).toBeVisible();
+  // THE TOP BAR ONLY, not `shellChrome`. `/app` IS the league rail's own full-page form, so the
+  // rail yields the whole edge there rather than repeating itself (`railHiddenOn`, law 3) — which
+  // has been true since the rail redesign and long before this branch, so the `shellChrome` call
+  // this leg used to make was a third stale assertion in this walk (pre-existing at 33aaa732).
+  await expect(managerZero.getByRole("banner"), "/app zero leagues: top bar").toBeVisible();
+  await expect(managerZero.getByTestId("home-league-card")).toHaveCount(0);
+  await expect(managerZero.getByTestId("open-rooms")).toBeVisible();
+  // The create door is reachable from this state too, and carries the anchor `/browse`, the
+  // league rail and the lobby's own empty state all point at.
+  await expect(managerZero.locator("#create-league")).toBeVisible();
 });
 
 test("a 404 walk reaches /browse without an account", async ({ page }) => {

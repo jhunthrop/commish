@@ -97,3 +97,32 @@ describe("AppHome renders the leagues and the lobby", () => {
     expect(vi.mocked(listPublicLeagues)).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * FIX ROUND 1, HIGH 2. The create door used to live only inside `OpenRooms`, which renders
+ * nothing when the lobby is empty — so a manager with no leagues AND no open house rooms landed
+ * on `/app`, saw the title and nothing else, and had no route anywhere in the product to create
+ * one. Three links across the app promise exactly that and delivered them to that blank page.
+ */
+describe("AppHome always offers the create door", () => {
+  it("renders it beside the heading in the state where the lobby renders nothing at all", async () => {
+    vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [], house: [] });
+    const page = await AppHome();
+    const { container } = renderPage(page);
+    expect(container.querySelector("[data-testid='open-rooms']")).toBeNull();
+    expect(screen.getByRole("button", { name: "Create a league" })).toBeInTheDocument();
+  });
+
+  it("carries the #create-league anchor every start-your-own-league link in the app points at", async () => {
+    vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [], house: [] });
+    const { container } = renderPage(await AppHome());
+    expect(container.querySelector("#create-league")).toBeInstanceOf(HTMLButtonElement);
+  });
+
+  it("is quiet at every state, so it never competes with the page's one solid verb", async () => {
+    vi.mocked(crossLeagueHome).mockResolvedValue(ONE_LEAGUE);
+    const { container } = renderPage(await AppHome());
+    const door = container.querySelector("#create-league");
+    expect(door?.className).not.toContain("shadow-verb-glow");
+  });
+});

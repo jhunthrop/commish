@@ -122,7 +122,7 @@ describe("CreateSheet (the crew door's four questions)", () => {
   it("puts sign-in on the verb for a signed-out visitor, riding the create surface's own intent", () => {
     render(<CreateSheet signedIn={false} defaults={DEFAULTS} live={false} onClose={() => undefined} />);
     const verb = screen.getByRole("link", { name: "Sign in to start your league" });
-    expect(verb.getAttribute("href")).toContain(encodeURIComponent("/app"));
+    expect(verb.getAttribute("href")).toContain(encodeURIComponent("/app#create-league"));
     expect(screen.queryByRole("button", { name: "Create the league" })).not.toBeInTheDocument();
   });
 });

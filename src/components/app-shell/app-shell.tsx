@@ -52,11 +52,12 @@ export function AppShell({ user, rail, liveState, createDefaults, children }: Ap
     <ShellLeaguesProvider leagueIds={rail.map((league) => league.id)}>
       <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] lg:grid-rows-[auto_1fr_auto]">
         {/* One mounted receiver for the whole shell (the `PlayerPeekHost`/`NoticesProvider`
-            singleton shape): every in-app "Create a league" trigger — the home board's CTA and
-            the returning-manager disclosure's own button call `openCreateLeagueSheet()` directly;
-            the league rail's `/app#create-league` link still reaches it too, through this same
-            host's own hash-arrival handling. Either way, THIS is the one instance every surface
-            reaches, never one of its own. */}
+            singleton shape): every in-app "Create a league" trigger — the door beside `/app`'s own
+            heading (`CreateLeagueDoor`, which carries the `#create-league` anchor itself) and the
+            lobby's own copy beside "Open rooms" — calls `openCreateLeagueSheet()` directly; the
+            league rail's `/app#create-league` link still reaches it too, through this same host's
+            own hash-arrival handling. Either way, THIS is the one instance every surface reaches,
+            never one of its own. */}
         <CreateLeagueSheetHost defaults={createDefaults} />
         {/* THE ONE PEEK FOR THE WHOLE SIGNED-IN APP (league home completion round). A player's
             name is pressable wherever it appears — a roster row, a stream sentence, a search

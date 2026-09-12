@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { RoomTour } from "@/draft-room/components/room-tour";
 import { actionLabelFor } from "@/draft-room/lib/lookups";
 import type { HomeLeagueCard as HomeLeagueCardData } from "../contract";
+import { useReaderClock } from "../hooks/use-reader-clock";
 import { figureFor, momentLine, needFor, stackCaption, verbFor } from "../lib/home-card";
 import { LEAGUE_VERB, MOCK_DRAFT_HREF } from "../lib/verbs";
 import { FormatLine } from "./open-league-shared";
@@ -38,9 +39,13 @@ export interface HomeLeagueCardProps {
 
 export function HomeLeagueCard({ league, solid }: HomeLeagueCardProps) {
   const [tourOpen, setTourOpen] = useState(false);
+  // THE READER'S OWN ZONE, after mount (fix round 1, HIGH 3). `null` on the server render and on
+  // the hydrating render, so the two agree byte for byte and the draft's day and date arrive in
+  // this manager's own calendar a frame later, both derived from the one zone.
+  const clock = useReaderClock();
   const need = needFor(league);
   const verb = verbFor(league);
-  const figure = figureFor(league);
+  const figure = figureFor(league, clock);
   const preDraft = league.draftStatus === "scheduled";
   const seatsOpen = league.filledTeams < league.teamCount;
 
@@ -74,7 +79,7 @@ export function HomeLeagueCard({ league, solid }: HomeLeagueCardProps) {
 
         <ManagerStack people={league.members} caption={stackCaption(league)} className="mt-4" />
 
-        <p className="mt-4 font-display text-lg font-semibold leading-display text-text-primary">{momentLine(league)}</p>
+        <p className="mt-4 font-display text-lg font-semibold leading-display text-text-primary">{momentLine(league, clock)}</p>
 
         {/* SINCE YOU WERE HERE, on an in-season card only. Before a draft has run, the newest
             thing in a room is the room filling, which the card's own sentence and seat meter

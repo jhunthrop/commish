@@ -425,7 +425,7 @@ describe("OpenLeagueShelf", () => {
       async ({ container }) => {
         expect(screen.getByText("No open leagues match")).toBeInTheDocument();
         expect(screen.getByRole("link", { name: "Clear the filters" })).toHaveAttribute("href", "/browse");
-        expect(screen.getByRole("link", { name: "Start your own league" })).toHaveAttribute("href", "/app");
+        expect(screen.getByRole("link", { name: "Start your own league" })).toHaveAttribute("href", "/app#create-league");
         // No cards, nothing to press: the legend has no ⓘ to point at.
         expect(await axe(container)).toHaveNoViolations();
       },

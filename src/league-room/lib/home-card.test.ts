@@ -88,7 +88,7 @@ describe("verbFor gives an open one-time task ahead of Open the room", () => {
 
 describe("momentLine speaks in the league's voice", () => {
   it("names the opponent and states the only lock clock this product owns", () => {
-    const line = momentLine(homeCard({ weekNumber: 4, matchup: MATCHUP, opponentManagerName: "Rey Okafor" }));
+    const line = momentLine(homeCard({ weekNumber: 4, matchup: MATCHUP, opponentManagerName: "Rey Okafor" }), null);
     expect(line).toBe("Week 4, you play Rey. Lineups lock when week 4 starts.");
   });
 
@@ -97,40 +97,40 @@ describe("momentLine speaks in the league's voice", () => {
   });
 
   it("omits the opponent clause entirely on a bye", () => {
-    expect(momentLine(homeCard({ weekNumber: 6 }))).toBe("Week 6. Lineups lock when week 6 starts.");
+    expect(momentLine(homeCard({ weekNumber: 6 }), null)).toBe("Week 6. Lineups lock when week 6 starts.");
   });
 
   it("says a filling room's own count and its fill trigger", () => {
-    const line = momentLine(homeCard({ draftStatus: "scheduled", startTrigger: "when_full", teamCount: 12, filledTeams: 1, slotsRanked: true }));
+    const line = momentLine(homeCard({ draftStatus: "scheduled", startTrigger: "when_full", teamCount: 12, filledTeams: 1, slotsRanked: true }), null);
     expect(line).toBe("Filling, 1 of 12. Drafts when full.");
   });
 
   it("names the draft's day and, when they are unranked, says the slots are not ranked yet", () => {
-    const line = momentLine(homeCard({ draftStatus: "scheduled", startTrigger: "scheduled", kickoffAt: "2026-09-13T13:55:00.000Z" }));
+    const line = momentLine(homeCard({ draftStatus: "scheduled", startTrigger: "scheduled", kickoffAt: "2026-09-13T13:55:00.000Z" }), null);
     expect(line).toBe("Drafts Sunday. Your draft slots are not ranked yet.");
   });
 
   it("says you pick Nth only once the draw has actually given a slot", () => {
-    expect(momentLine(homeCard({ draftStatus: "in_progress" }))).toBe("Your draft is running.");
-    expect(momentLine(homeCard({ draftStatus: "in_progress", assignedSlot: 4 }))).toBe("Your draft is running. You pick 4th.");
+    expect(momentLine(homeCard({ draftStatus: "in_progress" }), null)).toBe("Your draft is running.");
+    expect(momentLine(homeCard({ draftStatus: "in_progress", assignedSlot: 4 }), null)).toBe("Your draft is running. You pick 4th.");
   });
 });
 
 describe("figureFor prints one number and what it is", () => {
   it("prints the record and the week it is after", () => {
-    expect(figureFor(homeCard({ record: { wins: 2, losses: 1, ties: 0 } }))).toEqual({ value: "2-1", basis: "your record, after week 3" });
+    expect(figureFor(homeCard({ record: { wins: 2, losses: 1, ties: 0 } }), null)).toEqual({ value: "2-1", basis: "your record, after week 3" });
   });
 
   it("holds a dash, with the reason, before a league has played anything", () => {
-    expect(figureFor(homeCard({ record: { wins: 0, losses: 0, ties: 0 } }))).toEqual({ value: null, basis: "no games played yet" });
+    expect(figureFor(homeCard({ record: { wins: 0, losses: 0, ties: 0 } }), null)).toEqual({ value: null, basis: "no games played yet" });
   });
 
   it("prints the seats to go for a filling room, singular at one", () => {
-    expect(figureFor(homeCard({ draftStatus: "scheduled", startTrigger: "when_full", teamCount: 12, filledTeams: 1 }))).toEqual({
+    expect(figureFor(homeCard({ draftStatus: "scheduled", startTrigger: "when_full", teamCount: 12, filledTeams: 1 }), null)).toEqual({
       value: "11",
       basis: "seats to go, of 12",
     });
-    expect(figureFor(homeCard({ draftStatus: "scheduled", startTrigger: "when_full", teamCount: 12, filledTeams: 11 }))).toEqual({
+    expect(figureFor(homeCard({ draftStatus: "scheduled", startTrigger: "when_full", teamCount: 12, filledTeams: 11 }), null)).toEqual({
       value: "1",
       basis: "seat to go, of 12",
     });
@@ -138,8 +138,53 @@ describe("figureFor prints one number and what it is", () => {
 
   it("prints the distance to a scheduled draft over the exact instant it is measured to", () => {
     expect(
-      figureFor(homeCard({ draftStatus: "scheduled", startTrigger: "scheduled", kickoffAt: "2026-09-13T13:55:00.000Z", kickoffRelative: "in 2 days" })),
-    ).toEqual({ value: "In 2 days", basis: "Sunday 13 September, 1:55 PM UTC" });
+      figureFor(homeCard({ draftStatus: "scheduled", startTrigger: "scheduled", kickoffAt: "2026-09-13T13:55:00.000Z", kickoffRelative: "in 2 days" }), null),
+    ).toEqual({ value: "In 2 days", basis: "Sunday, September 13 at 1:55 PM UTC" });
+  });
+});
+
+/**
+ * FIX ROUND 1, HIGH 3. A kickoff at 01:55 UTC on Sunday the 13th begins Saturday EVENING on the
+ * American west coast. The card used to print a UTC weekday with no zone word beside a UTC-
+ * labelled date, so a Pacific manager read "Drafts Sunday" for a draft that starts on their
+ * Saturday. Both halves take the same clock now, so the day and the date are derived from one
+ * zone and can never disagree with each other.
+ */
+describe("the draft day and date are the READER's, and always name their zone", () => {
+  const NEAR_MIDNIGHT = "2026-09-13T01:55:00.000Z";
+  const card = homeCard({
+    draftStatus: "scheduled",
+    startTrigger: "scheduled",
+    kickoffAt: NEAR_MIDNIGHT,
+    kickoffRelative: "in 2 days",
+    slotsRanked: true,
+  });
+  const pacific = { nowMs: Date.parse("2026-09-11T00:00:00.000Z"), locale: "en-US", timeZone: "America/Los_Angeles" };
+  const london = { nowMs: Date.parse("2026-09-11T00:00:00.000Z"), locale: "en-GB", timeZone: "Europe/London" };
+
+  it("says Sunday in UTC and Saturday on the Pacific coast, for the one instant", () => {
+    expect(momentLine(card, null)).toBe("Drafts Sunday.");
+    expect(momentLine(card, pacific)).toBe("Drafts Saturday.");
+  });
+
+  it("names the zone in the figure's basis in every branch, never an unlabelled time", () => {
+    expect(figureFor(card, null).basis).toBe("Sunday, September 13 at 1:55 AM UTC");
+    expect(figureFor(card, pacific).basis).toBe("Saturday, September 12 at 6:55 PM PDT");
+    expect(figureFor(card, london).basis).toContain("BST");
+  });
+
+  it("never lets the weekday and the date disagree, in either zone", () => {
+    for (const clock of [null, pacific, london]) {
+      const day = momentLine(card, clock).replace(/^Drafts /, "").replace(/\.$/, "");
+      expect(figureFor(card, clock).basis).toContain(day);
+    }
+  });
+
+  it("holds the server render and the hydrating render to one string: both pass a null clock", () => {
+    // `useReaderClock` returns `null` on the server AND on the client's first render, so this IS
+    // the hydration contract, asserted rather than assumed.
+    expect(momentLine(card, null)).toBe(momentLine(card, null));
+    expect(figureFor(card, null).basis).toBe(figureFor(card, null).basis);
   });
 });
 

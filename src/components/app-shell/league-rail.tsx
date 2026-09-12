@@ -176,7 +176,7 @@ export function LeagueRail({ leagues, className = "" }: LeagueRailProps) {
           );
         })}
         <Link
-          href="/app"
+          href="/app#create-league"
           aria-label="Find or start a league"
           className="flex shrink-0 items-center gap-2.5 rounded-md text-text-muted transition-colors hover:text-text-primary lg:mt-auto lg:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >

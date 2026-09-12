@@ -7,6 +7,7 @@ import { crossLeagueHome } from "@/league-service";
 import { listPublicLeagues } from "@/league-service/browse";
 import { getScoreCache } from "@/league-service/score-cache-instance";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
+import { CreateLeagueDoor } from "@/league-room/components/create-league-door";
 import { HomeBoard } from "@/league-room/components/home-board";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +56,14 @@ export default async function AppHome() {
 
   return (
     <>
-      <PageTitle>Your leagues</PageTitle>
+      {/* THE CREATE DOOR IS ALWAYS REACHABLE (fix round 1, HIGH 2): beside the page's own
+       *  heading, at every state, including the one where there are no leagues AND no open house
+       *  rooms and `OpenRooms` renders nothing at all. It is the quiet door here and quiet again
+       *  beside the lobby's heading, so it never competes with the page's one solid verb. */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <PageTitle>Your leagues</PageTitle>
+        <CreateLeagueDoor />
+      </div>
       <HomeBoard initial={home} openLeagues={openLeagues.house} />
     </>
   );
