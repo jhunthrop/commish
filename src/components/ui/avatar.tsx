@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { parseAvatarRef, type AvatarTone } from "@/identity/avatars";
+import { parseAvatarRef } from "@/identity/avatars";
+import { AVATAR_TONE_CLASS } from "./avatar-tone";
 import { Icon } from "./icon";
 
 /**
@@ -56,21 +57,6 @@ const ICON_SIZE: Readonly<Record<AvatarSize, number>> = {
 const RING: Readonly<Record<AvatarRing, string>> = {
   self: "ring-2 ring-self",
   rival: "ring-2 ring-negative",
-};
-
-/**
- * Preset tiles reuse the existing token roles rather than inventing a fill for each tone: only
- * `accent` and `negative` have a dedicated `-text` role for a solid fill, so those two get one;
- * the rest render their icon in the tone's own text color on the chalk ground the initials
- * fallback already uses. Exported because `Crest` fills its own tile from this SAME map.
- */
-export const AVATAR_TONE_CLASS: Readonly<Record<AvatarTone, string>> = {
-  accent: "bg-accent text-accent-text",
-  negative: "bg-negative text-negative-text",
-  positive: "bg-surface text-positive",
-  warning: "bg-surface text-warning",
-  info: "bg-surface text-info",
-  neutral: "bg-surface text-text-muted",
 };
 
 /** First letter of the first and last words, upper-cased. "Ada Byron Lovelace" → "AL". */
