@@ -1,10 +1,9 @@
 import type { Db } from "@/db/client";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import { DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
+import { BOARD_FORMAT_QUERY_KEY, DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
 import type { LeagueBoardFormat } from "@/league-service/board-format";
 import { myDraftLeagues, nextDraftingLeague, type DraftLeagueRow } from "@/draft-hq/league-context";
 import { resolveBoardFormat } from "./service";
-import { BOARD_FORMAT_QUERY_KEY } from "./scoring-format-picker";
 
 /**
  * WHOSE RULES THE DRAFT AREA'S NUMBERS ARE UNDER — resolved ONCE, read by the Board and by Your

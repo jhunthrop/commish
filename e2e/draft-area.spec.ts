@@ -151,6 +151,62 @@ test("Overall carries tier bands counted in players, and the $ board carries non
   await expect(managerA.locator("[data-grade]").first()).toContainText("RB left");
 });
 
+/**
+ * THE SCORING PILLS ACTUALLY MOVE THE BOARD (founder report, 2026-09-12).
+ *
+ * They looked live and were inert: the pills pushed `?format=`, the URL changed, and the server
+ * dropped the parameter on the floor, so every press answered PPR. Nothing below the pills moved,
+ * which is the only way a reader can tell. This asserts the whole path — the URL, the sentence
+ * that names the rules, and a real player's own number — because any one of the three alone would
+ * have passed while the bug was live.
+ */
+test("the scoring pills move the board: the URL, the basis and the number", async ({ managerA }) => {
+  await managerA.setViewportSize({ width: 1440, height: 1000 });
+  await managerA.goto(`${BOARD}?league=generic`);
+  const lead = managerA.locator('[data-testid="board-row"]').first();
+  await expect(lead).toBeVisible({ timeout: 30_000 });
+
+  const basis = managerA.locator("main p").filter({ hasText: "projections" }).first();
+  await expect(basis).toContainText("PPR, 2026 projections.");
+
+  // ONE NAMED PLAYER, followed by name rather than by place: half a point a reception reorders
+  // the board itself, which is the change being real.
+  const name = (await lead.getByTestId("pool-player-name").textContent())?.trim() ?? "";
+  const rowFor = (who: string) => managerA.locator('[data-testid="board-row"]').filter({ has: managerA.getByTestId("pool-player-name").filter({ hasText: who }) }).first();
+  const underPpr = (await rowFor(name).getByTestId("big-number").locator("> span").first().textContent())?.trim();
+
+  await managerA.getByRole("button", { name: "Half PPR", exact: true }).click();
+  await expect(managerA).toHaveURL(/format=half/);
+  await expect(basis).toContainText("Half PPR, 2026 projections.", { timeout: 30_000 });
+  await expect(rowFor(name)).toBeVisible();
+  await expect(rowFor(name).getByTestId("big-number").locator("> span").first()).not.toHaveText(underPpr ?? "");
+
+  // And the choice survives being linked to, rather than only being client state.
+  await managerA.goto(`${BOARD}?league=generic&format=std`);
+  await expect(managerA.locator("main p").filter({ hasText: "projections" }).first()).toContainText("Standard, 2026 projections.", { timeout: 30_000 });
+});
+
+test("a chosen league decides the scoring, and then there is nothing to select", async ({ managerA }) => {
+  // The standing rule: the selector is the LEAGUE-FREE board's control. Inside a league the
+  // league's own rules decide and the basis says whose they are.
+  await managerA.setViewportSize({ width: 1440, height: 1000 });
+  await managerA.goto(BOARD);
+  await expect(managerA.locator('[data-testid="board-row"]').first()).toBeVisible({ timeout: 30_000 });
+  const basis = managerA.locator("main p").filter({ hasText: "projections" }).first();
+
+  if ((await managerA.getByRole("button", { name: "Half PPR", exact: true }).count()) === 0) {
+    // A league is selected: its name leads the basis, and no pill offers a choice it does not have.
+    await expect(basis).not.toContainText("Generic board");
+    await expect(basis).toContainText("its own roster shape");
+  } else {
+    // This account has no league to default to, so the board IS the generic one and says so.
+    await expect(basis).toContainText("Generic board");
+  }
+
+  await managerA.goto(`${BOARD}?league=generic`);
+  await expect(managerA.getByRole("button", { name: "Half PPR", exact: true })).toBeVisible();
+});
+
 test("Your sheet is the room's own seven columns, and a keyboard reorder is written to the server", async ({ managerA }) => {
   test.setTimeout(120_000);
   await managerA.setViewportSize({ width: 1440, height: 1000 });

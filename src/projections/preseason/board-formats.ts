@@ -144,6 +144,23 @@ export function boardFormatForRules(rules: ScoringRules): ResolvedBoardFormat {
   };
 }
 
+/**
+ * THE URL KEY A LEAGUE-FREE BOARD IS ASKED FOR A SCORING FORMAT UNDER.
+ *
+ * IT LIVES HERE, NOT ON THE PICKER, AND THAT IS THE WHOLE BUG IT FIXES (2026-09-12). It used to
+ * be exported from `scoring-format-picker.tsx`, a `"use client"` module — so the server component
+ * that read `searchParams[BOARD_FORMAT_QUERY_KEY]` did not get the string `"format"` at all: a
+ * client module's exports reach the server as reference PROXIES, and the key arrived as an
+ * anonymous function. `params[<function>]` is `undefined`, every `?format=` was silently dropped,
+ * and the board answered PPR whichever pill a reader pressed. The URL changed, the pills moved,
+ * and nothing else did.
+ *
+ * NO UNIT TEST COULD SEE IT — vitest has no server/client boundary, so the same read passes there
+ * and fails in a real build. The identical scar `chip.tsx` carries, for the identical reason. A
+ * constant a server reads belongs in a module with no directive on it.
+ */
+export const BOARD_FORMAT_QUERY_KEY = "format";
+
 /** "2026 board, 12-team half PPR": WHICH board a number came from, with no claim about the order
  *  it is printed in. The sheet names itself with this, because a sheet is in the MANAGER's order
  *  and "in board order" would be false the moment he moved somebody. */

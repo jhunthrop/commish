@@ -3,11 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { SegmentGroup, type SegmentOption } from "@/components/ui";
-import { BOARD_FORMAT_SPECS, BOARD_FORMATS, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
+import { BOARD_FORMAT_QUERY_KEY, BOARD_FORMAT_SPECS, BOARD_FORMATS, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
 import { readStoredBoardFormat, storeBoardFormat } from "./scoring-format-preference";
-
-/** The URL key a league-free board is asked for a format under. */
-export const BOARD_FORMAT_QUERY_KEY = "format";
 
 /** The picker's three segments, in the order the formats are defined. */
 export const SCORING_FORMAT_OPTIONS: readonly SegmentOption[] = BOARD_FORMATS.map((format) => ({ value: format, label: BOARD_FORMAT_SPECS[format].label }));
