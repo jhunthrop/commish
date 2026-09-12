@@ -3,6 +3,7 @@ import type { Db } from "@/db/client";
 import { users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { User } from "@/domain/user";
+import { isProviderPlaceholder } from "@/identity/avatars";
 import { stripHiddenCharacters } from "@/identity/display-name";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { recordSessionSignals } from "@/integrity-service/session-signals";
@@ -75,6 +76,14 @@ export function displayNameFrom(u: Pick<WorkOSUserLike, "firstName" | "lastName"
   return stripHiddenCharacters(u.email.split("@")[0] ?? u.email);
 }
 
+/** The provider's picture, or `null` when what it answered is its own generated placeholder —
+ *  `isProviderPlaceholder` (`@/identity/avatars`) is the one rule, shared with the read side so
+ *  the two can never disagree about what counts as a face. */
+function placeholderFreeAvatar(profilePictureUrl: string | null | undefined): string | null {
+  const value = profilePictureUrl ?? null;
+  return value === null || isProviderPlaceholder(value) ? null : value;
+}
+
 type UserRow = Pick<typeof users.$inferSelect, "id" | "displayName" | "experienceTier" | "avatarUrl" | "createdAt">;
 
 function toUser(row: UserRow): User {
@@ -126,14 +135,12 @@ export async function syncUserFromWorkOS(
         id: wu.id,
         email: wu.email.toLowerCase(),
         displayName: displayNameFrom(wu),
-        // NOT `wu.profilePictureUrl` (fix round 2). WorkOS answers a GENERATED PLACEHOLDER for
-        // every account that never uploaded a photo, so storing it dressed a stock image as a
-        // face the manager had chosen — on every surface at once, and with no way to get rid of
-        // it short of picking a preset. A manager's face is theirs to choose in the account room
-        // (presets today, uploads when Plan D flips `IDENTITY_CONFIG.avatar.uploads`), and until
-        // they do, their initials are a real and correct face. `parseAvatarRef` covers the rows
-        // already written this way.
-        avatarUrl: null,
+        // THE PROVIDER'S PICTURE, UNLESS IT IS THE GENERATED PLACEHOLDER. WorkOS answers a
+        // `profilePictureUrl` for every account, including the ones that never uploaded a photo,
+        // and storing that stock image dressed a face nobody chose as the manager's own on every
+        // surface at once. A manager who genuinely uploaded one keeps it. `parseAvatarRef` holds
+        // the same line for the rows written before this.
+        avatarUrl: placeholderFreeAvatar(wu.profilePictureUrl),
         createdAt: now,
         lastSeenAt: now,
       })

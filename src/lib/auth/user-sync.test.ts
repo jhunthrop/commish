@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { auditEvents, sessionSignals, users } from "@/db/schema";
+import { IDENTITY_CONFIG } from "@/identity";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { syncUserFromWorkOS, displayNameFrom } from "./user-sync";
 
@@ -72,12 +73,29 @@ describe("syncUserFromWorkOS", () => {
     const [row] = await db.select().from(users).where(eq(users.id, "user_01HXYZ"));
     expect(row?.email).toBe("jane@example.com");
     expect(row?.displayName).toBe("Jane Doe");
-    // NOT the provider's picture (fix round 2): WorkOS answers a generated placeholder for every
-    // account that never uploaded one, so storing it dressed a stock image as a chosen face on
-    // every surface. A manager picks their own in the account room; until then, their initials.
-    expect(row?.avatarUrl).toBeNull();
+    // A picture the manager genuinely has is kept; only the provider's own generated placeholder
+    // is dropped (`isProviderPlaceholder`), so storing it can never dress a stock image as a face
+    // somebody chose.
+    expect(row?.avatarUrl).toBe("https://img.example/jane.png");
     expect(row?.experienceTier).toBe("beginner");
     expect(row?.createdAt.toISOString()).toBe(T0);
+  });
+
+  /**
+   * THE HOTFIX'S WRITE SIDE. WorkOS answers a `profilePictureUrl` for every account, including
+   * the ones that never uploaded a photo: a generated stock image under its own prefix. Stored,
+   * it dressed a face nobody chose as the manager's own on every surface at once (the founder's
+   * ring on production `/app`). Dropped here, and only this prefix — a real picture survives.
+   */
+  it("drops the provider's generated placeholder and keeps a real picture", async () => {
+    const placeholder = `${IDENTITY_CONFIG.avatar.providerPlaceholderPrefix}lzLc4KQcSglIhS1RTT2QiOjSf8noPd5XN0MBrmhZwmo`;
+    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, via: "callback" }, { ...workosUser, id: "user_placeholder", profilePictureUrl: placeholder });
+    const [stock] = await db.select().from(users).where(eq(users.id, "user_placeholder"));
+    expect(stock?.avatarUrl).toBeNull();
+
+    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, via: "callback" }, { ...workosUser, id: "user_real", email: "real@example.com" });
+    const [real] = await db.select().from(users).where(eq(users.id, "user_real"));
+    expect(real?.avatarUrl).toBe("https://img.example/jane.png");
   });
 
   it("is idempotent — a second sign-in updates lastSeenAt/email but preserves createdAt and app-owned fields", async () => {
