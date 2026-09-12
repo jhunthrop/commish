@@ -122,13 +122,14 @@ export default async function Home() {
         }
       />
       <main className="flex flex-col gap-8 bg-surface">
-        {/* The hero band keeps its one floodlit ground (Task 7; Task 2's overflow carry) — but
-            the hero itself is two lines and the money fact now: the board below is the landing. */}
-        <section className="floodlight w-full overflow-hidden">
-          <div aria-hidden="true" className="yard-lines" />
-          <div className="relative px-4 py-10 sm:px-10 sm:py-12">
-            <FrontDoorHero inside={inside} />
-          </div>
+        {/* SIDELINE ruling (2026-09-11): the hero sits on the page's own ground (Chalk/Graphite,
+            `body`'s `--commish-color-surface`) — no wash, no yard lines, no decorative
+            background of any kind. The headline, the paragraph and the "who is already inside"
+            card carry the band; energy on this surface comes only from a live event, and there
+            is none here. Retires the floodlight/yard-lines ground from the retired
+            timing-tower direction (Task 7, superseded). */}
+        <section className="w-full px-4 py-10 sm:px-10 sm:py-12">
+          <FrontDoorHero inside={inside} />
         </section>
 
         <section className="flex w-full flex-col gap-3 border-t border-line px-4 pt-8 sm:px-10">

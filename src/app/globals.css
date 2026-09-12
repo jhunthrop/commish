@@ -334,48 +334,17 @@ body {
 .rise-3 { animation-delay: calc(var(--commish-motion-duration-fast) * 3); }
 .rise-4 { animation-delay: calc(var(--commish-motion-duration-fast) * 4); }
 
-/* Ground vocabulary for Task 7's front door hero — a floodlight wash and yard lines at whisper
-   opacity, both from sunday-standard.html's `.m-heroband`/`.yards` blocks. `.floodlight` goes on
-   the hero's container (it establishes the `position: relative` its own wash and any nested
-   `.yard-lines` overlay anchor to); `.yard-lines` goes on a full-bleed child. */
-.floodlight {
-  position: relative;
-}
-
-.floodlight::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(90% 130% at 78% -20%, var(--commish-color-accent-glow), transparent 55%);
-}
-
-:root[data-theme="dark"] .floodlight::before {
-  background:
-    radial-gradient(90% 140% at 78% -20%, var(--commish-color-accent-glow), transparent 55%),
-    radial-gradient(60% 90% at 15% 110%, var(--commish-color-accent-glow), transparent 60%);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .floodlight::before {
-    background:
-      radial-gradient(90% 140% at 78% -20%, var(--commish-color-accent-glow), transparent 55%),
-      radial-gradient(60% 90% at 15% 110%, var(--commish-color-accent-glow), transparent 60%);
-  }
-}
-
-/* The top-of-board row's wash (law 5, "the verb is obvious") — `PlayerRow`'s `highlight` skin,
-   and `.floodlight`'s small sibling: the same `accentGlow` role, run left-to-right across one row
-   instead of radially across a hero, because the mock's board reads left-to-right and the row's
-   own action sits at its right end where the wash has faded out.
+/* The top-of-board row's wash (law 5, "the verb is obvious") — `PlayerRow`'s `highlight` skin:
+   the `accentGlow` role, run left-to-right across one row, because the mock's board reads
+   left-to-right and the row's own action sits at its right end where the wash has faded out.
 
    WHY IT IS A CSS UTILITY AND NOT `bg-accent/10`. `accent-budget.source.test.ts` bans the
    substring `bg-accent` from every `.tsx` outside a six-file allowlist, and that ban is
    deliberately blunt enough to catch the tint spellings too. The budget's real target was eleven
    hand-rolled copies of one CTA class string drifting apart (E8), so the fix it wants is ONE
-   address, not an allowlist entry per surface: the wash is named once, here, beside the
-   floodlight it is a variant of, and a component asks for it by name. `accentGlow` is a tint role
-   the palette already designed per theme (it is `rgba(...)` in both, never opaque), so this can
+   address, not an allowlist entry per surface: the wash is named once, here, and a component
+   asks for it by name. `accentGlow` is a tint role the palette already designed per theme (it is
+   `rgba(...)` in both, never opaque), so this can
    never become the accent FILL the budget exists to keep off controls — green still means "press
    this", and the pressable thing in the row is the button the row does not own. */
 .accent-wash {
@@ -407,26 +376,6 @@ body {
    can point at yours without that reading as "press this" (the verb is Court blue). */
 .self-wash {
   background-image: linear-gradient(to right, var(--commish-color-self-glow), transparent 70%);
-}
-
-/* S5 — the 120px pitch is a plain CSS fact of this one class, exactly like sunday-standard.html's
-   `.yards`, not feature code; it does not route through the generated token variables. */
-.yard-lines {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.5;
-  background: repeating-linear-gradient(to right, transparent 0 119px, var(--commish-color-line) 119px 120px);
-}
-
-:root[data-theme="dark"] .yard-lines {
-  opacity: 0.35;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .yard-lines {
-    opacity: 0.35;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

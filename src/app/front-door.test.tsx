@@ -83,13 +83,14 @@ describe("the front door (the 2026-09-02 blueprint: two doors, one page)", () =>
     expect(within(header).getByRole("link", { name: "Take a seat" })).toHaveAttribute("href", "/browse");
   });
 
-  it("keeps the hero band's ground and its compressed register: headline, sub, money fact, nothing that acts (Task 7 carry)", async () => {
+  it("sits the hero on the page's own ground, no decorative background, compressed register: headline, sub, money fact, nothing that acts (SIDELINE, 2026-09-11)", async () => {
     const { container } = await renderHome();
-    const band = container.querySelector(".floodlight");
+    const heading = screen.getByRole("heading", { level: 1, name: "There is always a seat." });
+    const band = heading.closest("section");
     expect(band).not.toBeNull();
-    expect(band?.className).toContain("overflow-hidden");
-    expect(band?.querySelector(".yard-lines")).toHaveAttribute("aria-hidden", "true");
-    expect(within(band as HTMLElement).getByRole("heading", { level: 1, name: "There is always a seat." })).toBeInTheDocument();
+    // No leftover timing-tower ground: no yard-line stripes, no gradient wash element of any kind.
+    expect(container.querySelector(".floodlight")).toBeNull();
+    expect(container.querySelector(".yard-lines")).toBeNull();
     expect(within(band as HTMLElement).queryAllByRole("link")).toHaveLength(0);
   });
 
