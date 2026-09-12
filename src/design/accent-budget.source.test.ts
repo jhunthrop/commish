@@ -55,7 +55,12 @@ const ACCENT_FILL_ALLOWLIST: readonly string[] = [
   // it: YOUR message is the Court blue bubble (Sideline: "Court blue: the one verb, links, your
   // messages"), a fill that means "you said this", drawn in exactly one file.
   "src/components/ui/message-bubble.tsx",
-  "src/components/ui/avatar.tsx",
+  // THE CLIENT-BOUNDARY ROUND (2026-09-12): the tone map moved OUT of `avatar.tsx` into
+  // `avatar-tone.tsx`, so `avatar.tsx` left this list and its successor takes the entry. Same
+  // scar as `chip.tsx` below: `avatar.tsx` carries `"use client"`, `crest.tsx` does not, and a
+  // constant exported across that boundary reaches a server render as a client-reference proxy.
+  // `client-boundary.source.test.ts` found it. Still exactly one file filling a tone tile.
+  "src/components/ui/avatar-tone.tsx",
   "src/components/ui/button.tsx",
   "src/draft-room/components/budget-table.tsx",
   // GAMEDAY (2026-08-28), law 1. The rail's needs-you dot, earning its entry the way this

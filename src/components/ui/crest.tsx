@@ -1,5 +1,5 @@
 import { avatarTone } from "@/identity/avatars";
-import { AVATAR_TONE_CLASS } from "./avatar";
+import { AVATAR_TONE_CLASS } from "./avatar-tone";
 import { UI_CONFIG } from "./config";
 
 /**
