@@ -1,6 +1,5 @@
 import type { Player } from "@/domain/player";
 import type { BoardRow } from "@/draft-hq/board/service";
-import { isProjectedRow } from "@/draft-hq/board/service";
 import type { SheetEntryView } from "./view";
 
 /**
@@ -29,7 +28,18 @@ export interface SheetStanding {
 export interface SheetColumnsPayload {
   /** The manager's own order, best first. */
   readonly order: readonly string[];
-  /** The board's own order, for "N of yours moved" and Match our board. */
+  /**
+   * THE BOARD'S ORDER FOR THE MEN ON THIS SHEET — what "N of yours moved" counts against and
+   * what Match our board restores.
+   *
+   * RESTRICTED TO THE SHEET, and that restriction is the whole correctness of the pair. A sheet
+   * is a SUBSET of the board (a manager drops the men he will never draft, and the board holds
+   * hundreds), and comparing a subset position-by-position against the full board counts every
+   * row below the first gap as "moved" — a number nothing a manager could do would ever bring to
+   * zero, on a button whose whole promise is that it does. Market-order kickers and defenses
+   * ride along, because a seeded sheet holds them; the "Not on an active roster" band does not,
+   * because it holds no ordering at all and a sheet never seeds from it.
+   */
   readonly boardIds: readonly string[];
   readonly players: readonly Player[];
   /** Points over replacement, per player the board prices. */
@@ -64,6 +74,7 @@ function standingOf(tier: number | null, left: number | null, drop: number | nul
  */
 export function sheetColumnsPayload(entries: readonly SheetEntryView[], board: readonly BoardRow[]): SheetColumnsPayload {
   const byId = new Map(board.map((row) => [row.playerId, row] as const));
+  const onSheet = new Set(entries.map((entry) => entry.playerId));
   const players: Player[] = [];
   const values: (readonly [string, number])[] = [];
   const tiers: Record<string, SheetStanding> = {};
@@ -86,7 +97,7 @@ export function sheetColumnsPayload(entries: readonly SheetEntryView[], board: r
 
   return {
     order: entries.map((entry) => entry.playerId),
-    boardIds: board.filter(isProjectedRow).map((row) => row.playerId),
+    boardIds: board.filter((row) => row.rosterStatus?.excluded !== true && onSheet.has(row.playerId)).map((row) => row.playerId),
     players,
     values,
     tiers,

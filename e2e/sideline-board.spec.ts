@@ -35,7 +35,7 @@ test("the board is a list of people with one number each, not a table, at deskto
   mkdirSync(OUT_DIR, { recursive: true });
   await managerA.setViewportSize({ width: 1440, height: 1000 });
   await managerA.goto(BOARD);
-  await expect(managerA.getByRole("heading", { level: 1, name: "The Board" })).toBeVisible();
+  await expect(managerA.getByRole("heading", { level: 1, name: "Draft" })).toBeVisible();
 
   const rows = managerA.locator('[data-testid="board-row"]');
   await expect(rows.first()).toBeVisible({ timeout: 30_000 });

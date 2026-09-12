@@ -49,16 +49,18 @@ const DEFAULT_VIEWPORT_PX = 640;
  * board's own sentence there instead — the same words, off the same ladder, as the tier divider
  * two taps away on the Board.
  */
-function BandHeader({ band, top, pinned, noun }: { readonly band: SheetBand; readonly top: number; readonly pinned: boolean; readonly noun: string | null }) {
+function BandHeader({ band, top, pinned, noun, heightPx }: { readonly band: SheetBand; readonly top: number; readonly pinned: boolean; readonly noun: string | null; readonly heightPx: number }) {
   const tone = band.left === 0 ? "bg-surface text-text-faint opacity-60" : band.left === 1 ? "self-wash text-self-ink" : "bg-surface text-text-muted";
   return (
     <div
       data-testid={pinned ? "sheet-band-pinned" : "sheet-band"}
-      style={{ height: QUILT_CONFIG.sheet.bandPx, top }}
-      className={`${pinned ? "sticky z-10" : "absolute"} inset-x-1 flex items-center gap-2 rounded-pill px-2.5 text-[11px] font-semibold ring-[3px] ring-surface-elevated ${tone}`}
+      style={{ height: heightPx, top }}
+      className={`${pinned ? "sticky z-10" : "absolute"} inset-x-1 flex items-center gap-2 rounded-xl px-2.5 text-[11px] font-semibold ring-[3px] ring-surface-elevated ${tone}`}
     >
       <span className="shrink-0">Tier {band.tier}</span>
-      <span className={`min-w-0 truncate text-right ${noun === null ? "ml-auto font-display tabular-nums" : "ml-auto"}`}>
+      {/* The room's count is one short figure and stays on its line; the board's sentence wraps
+          to the band's second line rather than losing the unit off the end of its own number. */}
+      <span className={`ml-auto min-w-0 text-right leading-tight ${noun === null ? "truncate font-display tabular-nums" : ""}`}>
         {noun === null ? `${band.left} of ${band.size} left` : tierBandLabel(noun, band.left, band.drop ?? 0)}
       </span>
     </div>
@@ -73,7 +75,8 @@ function BandHeader({ band, top, pinned, noun }: { readonly band: SheetBand; rea
  * you always know which tier you are in; the jump at the foot scrolls to the next open one.
  */
 export const SheetColumn = memo(function SheetColumn({ column, onMove, onPlace, canDraft, submitting, onDraft, onQueueToggle, onPeek, head = "left", jumpToOpenTier = true, bandNoun = null }: SheetColumnProps) {
-  const layout = useMemo(() => layoutColumn(column), [column]);
+  const bandPx = bandNoun === null ? QUILT_CONFIG.sheet.bandPx : QUILT_CONFIG.sheet.bandTallPx;
+  const layout = useMemo(() => layoutColumn(column, bandPx), [column, bandPx]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportPx, setViewportPx] = useState(DEFAULT_VIEWPORT_PX);
@@ -100,8 +103,8 @@ export const SheetColumn = memo(function SheetColumn({ column, onMove, onPlace, 
   }, [layout, scrollTop]);
   // The jump offers only a tier that is below what the column shows right now.
   const nextOpen = useMemo(
-    () => (jumpToOpenTier ? nextOpenTierOffset(layout, scrollTop + viewportPx - QUILT_CONFIG.sheet.bandPx) : null),
-    [jumpToOpenTier, layout, scrollTop, viewportPx],
+    () => (jumpToOpenTier ? nextOpenTierOffset(layout, scrollTop + viewportPx - bandPx) : null),
+    [jumpToOpenTier, layout, scrollTop, viewportPx, bandPx],
   );
   const rowCount = column.bands.reduce((sum, band) => sum + band.rows.length, 0);
 
@@ -140,13 +143,13 @@ export const SheetColumn = memo(function SheetColumn({ column, onMove, onPlace, 
         </span>
       </h2>
       <div ref={scrollRef} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} className="relative min-h-0 flex-1 overflow-y-auto">
-        {pinned === null ? null : <BandHeader band={pinned} top={0} pinned noun={bandNoun} />}
+        {pinned === null ? null : <BandHeader band={pinned} top={0} pinned noun={bandNoun} heightPx={bandPx} />}
         <ol aria-label={`${column.label}, your order`} className="relative mb-10" style={{ height: layout.height }}>
           {rowCount === 0 ? <li className="px-3 py-4 text-sm text-text-faint">Nobody left here.</li> : null}
           {layout.items.slice(window.start, window.end).map((item, offset) => {
             const index = window.start + offset;
             const top = layout.offsets[index]!;
-            if (item.kind === "band") return <BandHeader key={item.band.key} band={item.band} top={top} pinned={false} noun={bandNoun} />;
+            if (item.kind === "band") return <BandHeader key={item.band.key} band={item.band} top={top} pinned={false} noun={bandNoun} heightPx={bandPx} />;
             return (
               <SheetRow
                 key={item.row.player.id}

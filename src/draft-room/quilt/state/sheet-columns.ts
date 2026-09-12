@@ -245,8 +245,10 @@ export interface SheetListLayout {
   readonly height: number;
 }
 
-/** The column flattened for the window, a header only where a band has a tier to name. */
-export function layoutColumn(column: SheetColumnModel): SheetListLayout {
+/** The column flattened for the window, a header only where a band has a tier to name.
+ *  `bandPx` is the height the caller actually renders a band at, so the offsets and the paint
+ *  can never disagree about where a row starts. */
+export function layoutColumn(column: SheetColumnModel, bandPx: number = QUILT_CONFIG.sheet.bandPx): SheetListLayout {
   const items: SheetListItem[] = [];
   const offsets: number[] = [];
   let top = 0;
@@ -254,7 +256,7 @@ export function layoutColumn(column: SheetColumnModel): SheetListLayout {
     if (band.tier !== null) {
       items.push({ kind: "band", band });
       offsets.push(top);
-      top += QUILT_CONFIG.sheet.bandPx;
+      top += bandPx;
     }
     for (const row of band.rows) {
       items.push({ kind: "row", row, band });

@@ -450,7 +450,7 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
 
     // --- Phase 4.5, Task 11: the mock draft lobby --------------------------------------------
     await page.goto("/app/draft/mock-drafts");
-    await expect(page.getByRole("heading", { name: "Mock drafts", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Draft", level: 1 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Start a mock draft" })).toBeVisible();
     await expectNoHorizontalScroll(page, "the mock draft lobby");
 

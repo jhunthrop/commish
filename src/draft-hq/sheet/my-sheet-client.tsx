@@ -178,29 +178,13 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
       <div className="print:hidden">
         <ScheduledLine draft={scheduled} />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-2 print:hidden">
-          <Button variant="secondary" size="sm" onClick={() => setModal("create")}>
-            New sheet
-          </Button>
-          {selectedSheetId === null ? null : (
-            <>
-              <Button variant="secondary" size="sm" onClick={() => setModal("duplicate")}>
-                Duplicate
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => setModal("rename")}>
-                Rename
-              </Button>
-              <Button variant="destructive" size="sm" onClick={deleteSheet}>
-                Delete
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {sheets.length === 0 ? null : (
-        <SegmentGroup label="Sheet" labelled={false} value={selectedSheetId ?? ""} onChange={goTo} options={sheets.map((sheet) => ({ value: sheet.id, label: sheet.name }))} />
+      {/* WHICH SHEET, and what you can do to the sheet itself. One quiet row, and it sits BELOW
+          the acts you take on the rows — a manager with one sheet (nearly everyone) never looks
+          at it, and a red Delete above the board was the loudest thing on a page whose one verb
+          is somewhere else entirely. `sheets.length < 2` hides the picker: a strip of one chip is
+          a choice with nothing to choose. */}
+      {sheets.length < 2 ? null : (
+        <SegmentGroup label="Sheet" labelled={false} size="sm" value={selectedSheetId ?? ""} onChange={goTo} options={sheets.map((sheet) => ({ value: sheet.id, label: sheet.name }))} />
       )}
 
       {selectedSheetId === null ? (
@@ -238,6 +222,18 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
             />
             <Button variant="secondary" size="sm" onClick={() => window.print()}>
               Print
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setModal("create")}>
+              New sheet
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setModal("duplicate")}>
+              Duplicate
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setModal("rename")}>
+              Rename
+            </Button>
+            <Button variant="ghost" size="sm" onClick={deleteSheet}>
+              Delete
             </Button>
             <div className="w-52">
               <Input label="Add a player" placeholder="Search a name to add" value={search} onChange={(event) => setSearch(event.target.value)} />
