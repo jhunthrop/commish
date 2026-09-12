@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { groupReasons } from "@/league-room/outlook/groups";
 import type { BoardReason } from "@/projections/preseason/board";
-import { strongestEvidenceSentence, tierBandSentence, vsMarketLabel } from "./copy";
+import { strongestEvidenceSentence, tierBandLabel, tierBandSentence, vsMarketLabel } from "./copy";
 
 describe("vsMarketLabel", () => {
   it("returns null for no market data", () => {
@@ -38,6 +38,14 @@ describe("tierBandSentence", () => {
 
   it("states the count alone when there is no next-tier drop to name", () => {
     expect(tierBandSentence("C", "K", 3, 0)).toBe("Tier C · 3 K left");
+  });
+
+  /** The Overall ladder (the Draft area round, 2026-09-12): a band across positions counts
+   *  players, since "3 ALL left" is not a sentence anyone would say out loud. */
+  it("counts players, not a position, on the band across the whole board", () => {
+    expect(tierBandLabel("ALL", 5, 19.3)).toBe("5 players left before a 19.3 point drop");
+    expect(tierBandLabel("ALL", 1, 19.3)).toBe("one player left before a 19.3 point drop");
+    expect(tierBandLabel("ALL", 21, 0)).toBe("21 players left");
   });
 });
 

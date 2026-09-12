@@ -67,9 +67,15 @@ export function tierBandSentence(grade: string, position: string, playersLeftInT
  * `TierDivider` would otherwise say it twice. `tierBandSentence` above is this string with the
  * grade restored, so the two can never drift into two ways of counting the same players.
  */
+/** The Overall ladder's own noun (the Draft area round, 2026-09-12): a band across every position
+ *  counts PLAYERS, since "3 ALL left" is not a sentence and the band over a mixed list is not
+ *  about a position at all. Everywhere else the position speaks for itself. */
+const OVERALL_POSITION = "ALL";
+
 export function tierBandLabel(position: string, playersLeftInTier: number, dropToNextTier: number): string {
   const count = playersLeftInTier === 1 ? "one" : String(playersLeftInTier);
-  const left = `${count} ${position} left`;
+  const noun = position !== OVERALL_POSITION ? position : playersLeftInTier === 1 ? "player" : "players";
+  const left = `${count} ${noun} left`;
   if (dropToNextTier <= 0) return left;
   return `${left} before a ${dropToNextTier.toFixed(1)} point drop`;
 }

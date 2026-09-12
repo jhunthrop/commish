@@ -376,10 +376,15 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
   const notOnRoster = useMemo(() => ordered.filter((row) => row.rosterStatus?.excluded === true), [ordered]);
   const displayed = useMemo(() => [...ordered.filter((row) => row.rosterStatus?.excluded !== true), ...notOnRoster], [ordered, notOnRoster]);
 
-  // Tier bands are computed PER POSITION by the engine (`board.ts`'s own docblock) — a mixed
-  // "Overall" list has no single cross-position tier ladder to draw, so a band only renders when
-  // exactly one position is selected and the list is in its natural (non-dollar) rank order.
-  const showTiers = position !== "ALL" && !dollarView;
+  // TIER BANDS RENDER ON EVERY TAB (the Draft area round, 2026-09-12, founder amendment 1). The
+  // engine draws two ladders now: the position ladder inside a position's own pool, and the
+  // OVERALL ladder across the whole draft-relevant board on the key the list is ordered by
+  // (`boardRows`). So the Overall landing carries bands too, and a reader who opens the Draft tab
+  // sees where the board falls off without first picking a position. The $ board re-sorts by
+  // dollars, and a band drawn over an order it was not computed in would be a lie, so it keeps
+  // none — the one condition left.
+  const showTiers = !dollarView;
+  const overall = position === "ALL";
 
   // Only while a single position is selected: the note is about THAT position, and printing it over
   // the mixed "Overall" list would attach a claim to rows it is not about.
@@ -453,17 +458,18 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
             ) : null;
           // TIERS ARE ONE-BASED (`tierNumber`): the plate carries the number, the label carries the
           // count and the drop, and neither says the other's half twice.
+          const rowTier = overall ? row.overallTier : row.tier;
           const tierRow =
-            bandRow === null && showTiers && row.rosterStatus?.excluded !== true && row.tier !== lastTier ? (
+            bandRow === null && showTiers && rowTier !== null && row.rosterStatus?.excluded !== true && rowTier !== lastTier ? (
               <div key={`tier-${row.playerId}`} className="px-1 pt-3 pb-1">
                 <TierDivider
-                  grade={row.tier === 0 ? "S" : row.tier === 1 ? "A" : row.tier === 2 ? "B" : "C"}
-                  letter={tierNumber(row.tier)}
-                  label={tierBandLabel(position, row.playersLeftInTier ?? 0, row.dropToNextTier ?? 0)}
+                  grade={rowTier === 0 ? "S" : rowTier === 1 ? "A" : rowTier === 2 ? "B" : "C"}
+                  letter={tierNumber(rowTier)}
+                  label={tierBandLabel(position, overall ? (row.overallPlayersLeftInTier ?? 0) : (row.playersLeftInTier ?? 0), overall ? (row.overallDropToNextTier ?? 0) : (row.dropToNextTier ?? 0))}
                 />
               </div>
             ) : null;
-          if (showTiers) lastTier = row.tier;
+          if (showTiers) lastTier = rowTier;
           const dollarValue = dollarValues.get(row.playerId) ?? null;
           const figure = figureFor(row, { dollarView, dollarValue, showLastSeason, scoringLabel });
           // Fix 1 (board persona review): on a position tab, positional rank leads and the overall

@@ -101,6 +101,21 @@ export interface BoardRow {
   readonly tier: number | null;
   readonly playersLeftInTier: number | null;
   readonly dropToNextTier: number | null;
+  /**
+   * HIS PLACE IN THE BOARD'S OWN OVERALL LADDER (the Draft area round, 2026-09-12) — the same
+   * triad as the three fields above, computed once across every draft-relevant player instead of
+   * inside his position. The three fields above answer "how many receivers are left before the
+   * drop"; these three answer "how many PLAYERS are left before the board drops", which is the
+   * question the Overall list is in front of a reader to settle.
+   *
+   * The ladder runs on the key the board is ORDERED by, points over replacement, with the break
+   * still measured as a share of real production (`tiersOf`'s own docblock). `null` on every row
+   * the board holds no value for: a market-order row, a row off an active roster, a position the
+   * shape never starts.
+   */
+  readonly overallTier: number | null;
+  readonly overallPlayersLeftInTier: number | null;
+  readonly overallDropToNextTier: number | null;
   readonly marketAdp: number | null;
   readonly marketPositionAdp: string | null;
   readonly byeWeek: number | null;
@@ -182,8 +197,8 @@ export async function resolveBoardFormat(db: Db, { leagueId, format }: Pick<Boar
  *  `board.ts`'s own (private) `tierStandings` computes, kept local here since that function is
  *  not exported and this reader's whole job is a SECOND, per-league pass over stored points
  *  rather than a first build of the board. */
-function tierStandingsOf(valuesDescending: readonly number[]): readonly { readonly tier: number; readonly playersLeftInTier: number; readonly dropToNextTier: number }[] {
-  const tiers = tiersOf(valuesDescending);
+function tierStandingsOf(valuesDescending: readonly number[], productionByRow: readonly number[] = valuesDescending): readonly { readonly tier: number; readonly playersLeftInTier: number; readonly dropToNextTier: number }[] {
+  const tiers = tiersOf(valuesDescending, productionByRow);
   return tiers.map((tier, index) => {
     const lastOfTier = tiers.lastIndexOf(tier);
     const firstOfNext = tiers.indexOf(tier + 1);
@@ -245,10 +260,25 @@ export async function boardRows(db: Db, { shape, asOf = new Date(), leagueId, fo
     relevant.forEach((entry, index) => standingsByPlayer.set(entry.playerId, standings[index]!));
   }
 
+  // THE OVERALL LADDER (the Draft area round, 2026-09-12): the same rule over one pool, the
+  // draft-relevant board in its own order. `valued` is already sorted by points over replacement,
+  // which IS the order the list is served in (`compareBoardOrder` differs only on ties, and two
+  // players tied on value fall in the same tier under any tiebreak). The same above-replacement
+  // filter the position pools keep: below it the isotonic plateaus pack players a hair apart, and
+  // a band drawn over that texture would be a cliff nobody would name out loud.
+  const overallByPlayer = new Map<string, { readonly tier: number; readonly playersLeftInTier: number; readonly dropToNextTier: number }>();
+  const overallRelevant = valued.filter((entry) => entry.valueOverReplacement > 0);
+  const overallStandings = tierStandingsOf(
+    overallRelevant.map((entry) => entry.valueOverReplacement),
+    overallRelevant.map((entry) => entry.projectedPoints),
+  );
+  overallRelevant.forEach((entry, index) => overallByPlayer.set(entry.playerId, overallStandings[index]!));
+
   return withPosition
     .map(({ row, identity }): ProjectedBoardRow => {
       const inValue = valuedByPlayer.get(row.playerId);
       const standing = standingsByPlayer.get(row.playerId);
+      const overall = overallByPlayer.get(row.playerId);
       return {
         playerId: identity.playerId,
         nflPlayerId: row.playerId,
@@ -272,6 +302,9 @@ export async function boardRows(db: Db, { shape, asOf = new Date(), leagueId, fo
         tier: standing?.tier ?? null,
         playersLeftInTier: standing?.playersLeftInTier ?? null,
         dropToNextTier: standing?.dropToNextTier ?? null,
+        overallTier: overall?.tier ?? null,
+        overallPlayersLeftInTier: overall?.playersLeftInTier ?? null,
+        overallDropToNextTier: overall?.dropToNextTier ?? null,
         marketAdp: identity.adp,
         marketPositionAdp: identity.posAdp,
         byeWeek: byes.get(identity.team) ?? null,
@@ -374,6 +407,9 @@ function notOnActiveRosterRows(
         tier: null,
         playersLeftInTier: null,
         dropToNextTier: null,
+        overallTier: null,
+        overallPlayersLeftInTier: null,
+        overallDropToNextTier: null,
         marketAdp: identity.adp,
         marketPositionAdp: identity.posAdp,
         byeWeek: byes.get(identity.team) ?? null,
@@ -488,6 +524,9 @@ async function marketOrderRows(db: Db, byes: ReadonlyMap<string, number>, rules:
         tier: null,
         playersLeftInTier: null,
         dropToNextTier: null,
+        overallTier: null,
+        overallPlayersLeftInTier: null,
+        overallDropToNextTier: null,
         marketAdp: row.adp,
         marketPositionAdp: row.posAdp,
         byeWeek: byes.get(row.team) ?? null,

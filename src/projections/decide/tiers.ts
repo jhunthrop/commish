@@ -42,12 +42,22 @@ export const TIER_SPAN_POINTS_PER_GAME = 2;
 const TIER_SPAN_POINTS = TIER_SPAN_POINTS_PER_GAME * GAMES_PER_SEASON;
 
 /**
- * Whether the step from `above` down to `below` is at least a game's worth of `above`. Written as a
- * cross-multiplication so a non-positive projection above reads as "no break" rather than a
- * division by nothing.
+ * Whether the step from one player down to the next is at least a game's worth of what the man
+ * above is projected to produce. Written as a cross-multiplication so a non-positive projection
+ * above reads as "no break" rather than a division by nothing.
+ *
+ * THE STEP AND THE DENOMINATOR ARE TWO QUANTITIES, not one (the Overall bands, 2026-09-12). The
+ * step is measured on whatever key the ladder is ORDERED by; the denominator is always the man
+ * above's own SEASON PRODUCTION, because "a game's worth" is only a unit at all when it is a
+ * share of what he actually scores. Inside one position the two coincide — a drop of eight points
+ * of value is a drop of eight points, and `aboveProduction === aboveKey` — which is why a position
+ * pool passes one array and gets exactly the rule it always had. Across positions they do not: a
+ * board ordered by points over replacement has a key that runs to zero at the bottom, and a share
+ * OF THE KEY would call an ordinary two point step near the tail a cliff and cut the whole board
+ * into tiers of one.
  */
-function isTierBreak(above: number, below: number): boolean {
-  return above > 0 && (above - below) * GAMES_PER_SEASON >= above * TIER_BREAK_GAMES;
+function isTierBreak(aboveProduction: number, aboveKey: number, belowKey: number): boolean {
+  return aboveProduction > 0 && (aboveKey - belowKey) * GAMES_PER_SEASON >= aboveProduction * TIER_BREAK_GAMES;
 }
 
 /**
@@ -73,9 +83,9 @@ export function isRealTierCliff(ownProjectedPoints: number, dropToNextTier: numb
 }
 
 /** Indices at which a new run starts under rule 1, always beginning with zero. */
-function runStarts(pointsDescending: readonly number[]): readonly number[] {
-  return pointsDescending.flatMap((points, index) =>
-    index === 0 || isTierBreak(pointsDescending[index - 1]!, points) ? [index] : [],
+function runStarts(keyDescending: readonly number[], productionByRow: readonly number[]): readonly number[] {
+  return keyDescending.flatMap((key, index) =>
+    index === 0 || isTierBreak(productionByRow[index - 1]!, keyDescending[index - 1]!, key) ? [index] : [],
   );
 }
 
@@ -139,13 +149,21 @@ function naturalSplitWithinSpan(run: readonly number[]): readonly number[] {
   return run.map((_, index) => index);
 }
 
-/** Tier index per player, 0-based, for one position's PROJECTED POINTS sorted DESCENDING. */
-export function tiersOf(pointsDescending: readonly number[]): readonly number[] {
-  const starts = runStarts(pointsDescending);
+/**
+ * Tier index per player, 0-based, for a ladder's RANKING KEY sorted DESCENDING.
+ *
+ * One position's pool passes its projected points and gets the rule exactly as it has always
+ * stood. A CROSS-POSITION ladder (the board's own Overall order) passes points over replacement
+ * as the key and each player's projected points as `productionByRow`, so rule 1's "a game's
+ * worth" stays a share of real production — see `isTierBreak`. Rule 2's span cap is measured on
+ * the key either way, because the key is what the reader sees the tier stretch across.
+ */
+export function tiersOf(keyDescending: readonly number[], productionByRow: readonly number[] = keyDescending): readonly number[] {
+  const starts = runStarts(keyDescending, productionByRow);
   return starts.reduce<{ readonly tiers: readonly number[]; readonly nextTier: number }>(
     (state, start, runIndex) => {
-      const end = starts[runIndex + 1] ?? pointsDescending.length;
-      const groups = naturalSplitWithinSpan(pointsDescending.slice(start, end));
+      const end = starts[runIndex + 1] ?? keyDescending.length;
+      const groups = naturalSplitWithinSpan(keyDescending.slice(start, end));
       return {
         tiers: [...state.tiers, ...groups.map((group) => state.nextTier + group)],
         nextTier: state.nextTier + Math.max(-1, ...groups) + 1,
