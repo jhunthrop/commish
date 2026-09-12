@@ -1,10 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { ViewSwitch } from "@/components/ui";
 
 export type BoardView = "wall" | "sheet";
 
-const VIEW_LABEL: Readonly<Record<BoardView, string>> = { wall: "Wall", sheet: "Your sheet" };
+const STOPS = [
+  { value: "wall", label: "Wall" },
+  { value: "sheet", label: "Your sheet" },
+] as const;
 
 export interface BoardRegionProps {
   readonly view: BoardView;
@@ -16,27 +20,15 @@ export interface BoardRegionProps {
 
 /**
  * THE BOARD REGION (ruling 1): a two-position switch, Wall and Your sheet, over whichever view
- * is on. The switch is a chalk track with a paper thumb rather than the mock's ink pill: round
- * one retired the black button, and a view switch is neither a verb (blue) nor yours (amber).
+ * is on. The switch is `ViewSwitch` (`@/components/ui`), the one spelling of this gesture in the
+ * product — round one retired the black button, and a view switch is neither a verb (blue) nor
+ * yours (amber). The Draft area's three stops wear the same track one stop wider.
  */
 export function BoardRegion({ view, onView, caption, children }: BoardRegionProps) {
   return (
     <section aria-label="The board" data-testid="board-region" data-view={view} className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3">
-        <div role="tablist" aria-label="Board view" data-testid="board-switch" className="inline-flex gap-0.5 rounded-pill bg-surface-inset p-0.5">
-          {(Object.keys(VIEW_LABEL) as BoardView[]).map((candidate) => (
-            <button
-              key={candidate}
-              type="button"
-              role="tab"
-              aria-selected={view === candidate}
-              onClick={() => onView(candidate)}
-              className={`rounded-pill px-3.5 py-1.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${view === candidate ? "bg-surface-elevated text-text-primary shadow-card" : "text-text-muted hover:text-text-primary"}`}
-            >
-              {VIEW_LABEL[candidate]}
-            </button>
-          ))}
-        </div>
+        <ViewSwitch label="Board view" stops={STOPS} value={view} onChange={(next) => onView(next as BoardView)} />
         {caption}
       </div>
       {children}

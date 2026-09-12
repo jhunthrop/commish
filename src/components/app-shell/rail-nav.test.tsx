@@ -19,10 +19,10 @@ function hereLabel(): string | null {
 }
 
 describe("RailNav", () => {
-  it("lists Leagues, Draft, Rooms and Wallet, in that order", () => {
+  it("lists Leagues, Draft and Wallet, in that order", () => {
     render(<RailNav />);
     const links = screen.getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(["Leagues", "Draft", "Rooms", "Wallet"]);
+    expect(links.map((link) => link.textContent)).toEqual(["Leagues", "Draft", "Wallet"]);
     expect(links[1]).toHaveAttribute("href", "/app/draft");
   });
 
@@ -38,30 +38,32 @@ describe("RailNav", () => {
     expect(hereLabel()).toBe("Leagues");
   });
 
-  it("marks Draft on the HQ page and never Rooms", () => {
+  it("marks Draft on the segment's own path", () => {
     mockPathname("/app/draft");
     render(<RailNav />);
     expect(hereLabel()).toBe("Draft");
   });
 
-  it("marks Draft only on /app/draft/board — the exact HIGH-1 regression case", () => {
+  it("marks Draft on the board — the exact HIGH-1 regression case", () => {
     mockPathname("/app/draft/board");
     render(<RailNav />);
     expect(hereLabel()).toBe("Draft");
-    expect(screen.getByRole("link", { name: "Rooms" })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: "Leagues" })).not.toHaveAttribute("aria-current");
   });
 
-  it("marks Rooms, never Draft, on a live draft room — /app/drafts/[id] must not collide with /app/draft", () => {
+  /** Rooms left the rail (the Draft area round, 2026-09-12) and `/app/drafts/[id]` is still a
+   *  literal character-prefix away from `/app/draft` — the collision `pathIsUnder` exists for.
+   *  It rides Draft's own `also` now, so a live room marks exactly one destination, not zero. */
+  it("marks Draft, and only Draft, inside a live draft room", () => {
     mockPathname("/app/drafts/abc123");
     render(<RailNav />);
-    expect(hereLabel()).toBe("Rooms");
-    expect(screen.getByRole("link", { name: "Draft" })).not.toHaveAttribute("aria-current");
+    expect(hereLabel()).toBe("Draft");
   });
 
-  it("marks Rooms on the mock lobby", () => {
-    mockPathname("/app/mock-drafts");
+  it("marks Draft on the mock lobby, which is a stop under it now", () => {
+    mockPathname("/app/draft/mock-drafts");
     render(<RailNav />);
-    expect(hereLabel()).toBe("Rooms");
+    expect(hereLabel()).toBe("Draft");
   });
 
   it("marks Wallet on its own subpath", () => {
@@ -71,7 +73,7 @@ describe("RailNav", () => {
   });
 
   it("marks exactly one destination here, never zero or two, across every real route", () => {
-    for (const path of ["/app", "/app/leagues/lg1", "/app/draft", "/app/draft/board", "/app/draft/sheet", "/app/drafts/xyz", "/app/mock-drafts", "/app/wallet"]) {
+    for (const path of ["/app", "/app/leagues/lg1", "/app/draft", "/app/draft/board", "/app/draft/sheet", "/app/drafts/xyz", "/app/draft/mock-drafts", "/app/wallet"]) {
       mockPathname(path);
       const { unmount } = render(<RailNav />);
       expect(screen.getAllByRole("link", { current: "page" })).toHaveLength(1);

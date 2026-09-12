@@ -37,6 +37,9 @@ export interface MockLobbyRoomSummary {
    *  `formatRelativeCountdown` (`@/league-room/components/draft-schedule-panel`) already keeps
    *  for a real league's own countdown. */
   readonly startsInMs: number;
+  /** The same instant as an absolute reading, for a ticking countdown that must not drift from a
+   *  number computed once at request time (`CountdownLabel` owns its own clock). */
+  readonly startsAtIso: string;
 }
 
 export interface MyMockRoomSummary extends MockLobbyRoomSummary {
@@ -107,6 +110,7 @@ export async function listOpenMockRooms(db: Db, clock: Clock = systemClock): Pro
     seatsOpen: row.teamCount - row.filledTeams,
     pickSeconds: row.pickSeconds,
     startsInMs: row.startsAt.getTime() - nowMs,
+    startsAtIso: row.startsAt.toISOString(),
   }));
 }
 
@@ -167,6 +171,7 @@ export async function myMockRooms(db: Db, userId: string, clock: Clock = systemC
     seatsOpen: row.teamCount - row.filledTeams,
     pickSeconds: row.pickSeconds,
     startsInMs: row.startsAt.getTime() - nowMs,
+    startsAtIso: row.startsAt.toISOString(),
   }));
 }
 
@@ -212,6 +217,7 @@ export async function mockRoomSummary(db: Db, code: string, userId: string, cloc
       seatsOpen: room.teamCount - seats.length,
       pickSeconds: room.pickSeconds,
       startsInMs: room.startsAt.getTime() - Date.parse(clock.now()),
+      startsAtIso: room.startsAt.toISOString(),
       started: room.status !== "scheduled",
       alreadySeated: seats.some((seat) => seat.userId === userId),
     },

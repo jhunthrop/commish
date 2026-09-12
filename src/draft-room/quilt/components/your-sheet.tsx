@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Player } from "@/domain/player";
 import type { SurvivalOdds, TierStandingView } from "@/draft-service/assistant/view";
 import { Button } from "@/components/ui";
 import { useReusedValue } from "@/design/use-stable-list";
 import type { CheatSheet } from "../state/sheet";
-import { buildSheetColumns, movesOffBoard, reuseSheetColumns, type SheetColumnKey } from "../state/sheet-columns";
+import { buildSheetColumns, movesOffBoard, reuseSheetColumns } from "../state/sheet-columns";
 import { oddsBasis } from "../../advisor/format";
 import type { RoomActs } from "./room-acts";
 import { SheetColumn } from "./sheet-column";
+import { SheetScroller } from "./sheet-scroller";
 
 export interface YourSheetProps extends Pick<RoomActs, "canDraft" | "submitting" | "queuedPlayerIds" | "onDraft" | "onQueueToggle" | "onPeek"> {
   readonly sheet: CheatSheet;
@@ -44,9 +45,6 @@ function useRememberedTiers(tiers: Readonly<Record<string, TierStandingView>>): 
   return useReusedValue(tiers, (previous, next) => (previous === null ? next : { ...previous, ...next }));
 }
 
-/** The right-edge fade that says more columns lie to the right (review L10). */
-const SCROLL_CUE = "[mask-image:linear-gradient(to_right,black_calc(100%-3rem),transparent)]";
-
 /**
  * YOUR SHEET (founder ruling 1, 2026-09-10): a view of the board region, not a drawer tab.
  * Seven columns of up to fifty in your own order, tiers as bands inside each position column,
@@ -67,28 +65,6 @@ export function YourSheet({ sheet, boardIds, playersById, available, myPlayerIds
   const columns = useReusedValue(built, reuseSheetColumns);
   const moved = useMemo(() => movesOffBoard(sheet.order, boardIds), [sheet.order, boardIds]);
   const runs = odds === null || odds.runs === 0 ? null : odds.runs;
-
-  // The columns scroll sideways; the cue at the right edge shows while more lie beyond it, and a
-  // strip chip scrolls its column into view.
-  const scrollerRef = useRef<HTMLDivElement | null>(null);
-  const columnRefs = useRef(new Map<SheetColumnKey, HTMLDivElement>());
-  const [moreToRight, setMoreToRight] = useState(false);
-  const measureCue = (): void => {
-    const element = scrollerRef.current;
-    if (element === null) return;
-    setMoreToRight(element.scrollLeft + element.clientWidth < element.scrollWidth - 1);
-  };
-  useEffect(() => {
-    measureCue();
-    const element = scrollerRef.current;
-    if (element === null || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(measureCue);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [columns.length]);
-  const showColumn = (key: SheetColumnKey): void => {
-    columnRefs.current.get(key)?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
-  };
 
   return (
     <div data-testid="your-sheet" data-recomputing={recomputing ? "true" : "false"} className="group/sheet flex min-h-0 flex-1 flex-col gap-2">
@@ -124,50 +100,26 @@ export function YourSheet({ sheet, boardIds, playersById, available, myPlayerIds
           Hide taken
         </label>
       </div>
-      <div role="group" aria-label="Columns" data-testid="column-strip" className="flex gap-1.5 overflow-x-auto px-0.5 pb-1">
-        {columns.map((column) => (
-          <button
-            key={column.key}
-            type="button"
-            onClick={() => showColumn(column.key)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-surface-elevated px-3 py-1 text-xs font-semibold text-text-primary shadow-card hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            {column.label}
-            <span className="font-display tabular-nums">{column.left}</span>
-          </button>
-        ))}
-      </div>
-      {/* One explicit first track (Overall, wider at desktop) and fixed implicit tracks after it:
-          a fixed width, never a minmax, or seven tracks shrink to share a phone's 336px. */}
-      <div
-        ref={scrollerRef}
-        data-testid="sheet-scroller"
-        data-more-right={moreToRight ? "true" : "false"}
-        onScroll={measureCue}
-        className={`grid min-h-0 flex-1 grid-flow-col grid-cols-[100%] auto-cols-[100%] gap-3 overflow-x-auto pb-1 [scroll-snap-type:x_mandatory] lg:grid-cols-[15rem] lg:auto-cols-[12.5rem] lg:[scroll-snap-type:x_proximity] ${moreToRight ? SCROLL_CUE : ""}`}
-      >
-        {columns.map((column) => (
-          <div
-            key={column.key}
-            ref={(node) => {
-              if (node === null) columnRefs.current.delete(column.key);
-              else columnRefs.current.set(column.key, node);
-            }}
-            className="flex min-h-0 min-w-0 [scroll-snap-align:start]"
-          >
-            <SheetColumn
-              column={column}
-              onMove={column.key === "overall" ? onMove : null}
-              onPlace={column.key === "overall" ? onPlace : null}
-              canDraft={canDraft}
-              submitting={submitting}
-              onDraft={onDraft}
-              onQueueToggle={onQueueToggle}
-              onPeek={onPeek}
-            />
-          </div>
-        ))}
-      </div>
+      <SheetScroller
+        columns={columns}
+        countOf={(column) => column.left}
+        renderColumn={(column) => (
+          <SheetColumn
+            column={column}
+            onMove={column.key === "overall" ? onMove : null}
+            onPlace={column.key === "overall" ? onPlace : null}
+            canDraft={canDraft}
+            submitting={submitting}
+            onDraft={onDraft}
+            onQueueToggle={onQueueToggle}
+            onPeek={onPeek}
+            onNote={null}
+            onTag={null}
+            onTierLabel={null}
+            onRemove={null}
+          />
+        )}
+      />
     </div>
   );
 }

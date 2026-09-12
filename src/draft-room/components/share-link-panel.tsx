@@ -6,7 +6,7 @@ import { Countdown, useCountdown } from "@/components/ui/countdown";
 export interface ShareLinkPanelProps {
   /** The absolute URL — `MockShareInfo.url` (link audit, 2026-09-04): this panel used to show
    *  the bare `path`, the exact C-01 defect the invite panel fixed on 2026-08-27 — a member
-   *  texted their crew `/app/mock-drafts/ABC123`, a string that opens nothing. */
+   *  texted their crew `/app/draft/mock-drafts/ABC123`, a string that opens nothing. */
   readonly url: string;
   readonly shareCode: string;
   readonly seatsFilled: number;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import type { Player, Position } from "@/domain/player";
 import { auctionValues, type AuctionShape } from "@/projections/auction/value";
 import { quartilesFromSeasonBand } from "@/projections/preseason/band-quartiles";
@@ -315,6 +315,21 @@ function BoardMeta({ row, showLastSeason, scoringLabel }: { readonly row: BoardR
 
 export interface BoardViewProps {
   readonly rows: readonly BoardRow[];
+  /**
+   * THE CONTEXT CONTROLS, INSIDE THE FILTER BAR (the Draft area round, 2026-09-12). The league
+   * and the scoring decide what every number below MEANS, and they used to sit on a line of their
+   * own above this one — three bands of chrome between a phone reader and the first player row on
+   * the product's densest comparison surface. They ride the same scrolling row as the position
+   * tabs now. Rendered by the page because both are server-resolved navigations, not view state.
+   */
+  readonly context?: ReactNode;
+  /**
+   * THE BASIS, IN ONE LINE, UNDER THE CONTROLS THAT SET IT (P11). What rules produced every
+   * number below and nothing else — the sentence that used to follow it explained the control an
+   * inch to its left, which is the explainer text P7 rules out. `null` renders no line at all: an
+   * empty paragraph is furniture with nothing inside it.
+   */
+  readonly basis?: string | null;
   readonly laws: readonly Law[];
   /** Always available — the generic default carries a 12-team standard shape too, so the $
    *  toggle works with or without a real league selected. */
@@ -339,7 +354,7 @@ export interface BoardViewProps {
  * `?league=`, since that is what changes the recomputed value/tier numbers). CSV export reads the
  * exact rows on screen.
  */
-export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLabel, openOn = "" }: BoardViewProps) {
+export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLabel, openOn = "", context = null, basis = null }: BoardViewProps) {
   const [position, setPosition] = useState("ALL");
   const [search, setSearch] = useState(openOn);
   const [rookiesOnly, setRookiesOnly] = useState(false);
@@ -376,10 +391,15 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
   const notOnRoster = useMemo(() => ordered.filter((row) => row.rosterStatus?.excluded === true), [ordered]);
   const displayed = useMemo(() => [...ordered.filter((row) => row.rosterStatus?.excluded !== true), ...notOnRoster], [ordered, notOnRoster]);
 
-  // Tier bands are computed PER POSITION by the engine (`board.ts`'s own docblock) — a mixed
-  // "Overall" list has no single cross-position tier ladder to draw, so a band only renders when
-  // exactly one position is selected and the list is in its natural (non-dollar) rank order.
-  const showTiers = position !== "ALL" && !dollarView;
+  // TIER BANDS RENDER ON EVERY TAB (the Draft area round, 2026-09-12, founder amendment 1). The
+  // engine draws two ladders now: the position ladder inside a position's own pool, and the
+  // OVERALL ladder across the whole draft-relevant board on the key the list is ordered by
+  // (`boardRows`). So the Overall landing carries bands too, and a reader who opens the Draft tab
+  // sees where the board falls off without first picking a position. The $ board re-sorts by
+  // dollars, and a band drawn over an order it was not computed in would be a lie, so it keeps
+  // none — the one condition left.
+  const showTiers = !dollarView;
+  const overall = position === "ALL";
 
   // Only while a single position is selected: the note is about THAT position, and printing it over
   // the mixed "Overall" list would attach a claim to rows it is not about.
@@ -404,6 +424,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
         <div className="shrink-0">
           <SegmentGroup label="Position" options={POSITION_TABS} value={position} onChange={setPosition} labelled={false} />
         </div>
+        {context}
         <label className="flex h-10 shrink-0 items-center gap-1.5 text-sm whitespace-nowrap text-text-muted">
           <input type="checkbox" checked={rookiesOnly} onChange={(event) => setRookiesOnly(event.target.checked)} className="size-4 accent-accent" />
           Rookies only
@@ -426,6 +447,13 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
           Export CSV
         </button>
       </div>
+
+      {/* A BASIS IS NEVER CUT (fix round 2). It wraps, at every width. The first pass truncated it
+          at 360 to buy back rows, which trades the one sentence that says what every number below
+          MEANS for a row of the list it explains — P11 does not have a phone exception. The rows
+          come from the header instead: the verb shares the title's line (`DraftHeader`), which is
+          where the space actually was. */}
+      {basis === null ? null : <p className="text-sm leading-snug text-text-muted">{basis}</p>}
 
       {/* A position the engine publishes no projection for says so, once, above its own table. The
           rows below it are real players in the market's own order with honestly blank projection
@@ -453,17 +481,18 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
             ) : null;
           // TIERS ARE ONE-BASED (`tierNumber`): the plate carries the number, the label carries the
           // count and the drop, and neither says the other's half twice.
+          const rowTier = overall ? row.overallTier : row.tier;
           const tierRow =
-            bandRow === null && showTiers && row.rosterStatus?.excluded !== true && row.tier !== lastTier ? (
+            bandRow === null && showTiers && rowTier !== null && row.rosterStatus?.excluded !== true && rowTier !== lastTier ? (
               <div key={`tier-${row.playerId}`} className="px-1 pt-3 pb-1">
                 <TierDivider
-                  grade={row.tier === 0 ? "S" : row.tier === 1 ? "A" : row.tier === 2 ? "B" : "C"}
-                  letter={tierNumber(row.tier)}
-                  label={tierBandLabel(position, row.playersLeftInTier ?? 0, row.dropToNextTier ?? 0)}
+                  grade={rowTier === 0 ? "S" : rowTier === 1 ? "A" : rowTier === 2 ? "B" : "C"}
+                  letter={tierNumber(rowTier)}
+                  label={tierBandLabel(position, overall ? (row.overallPlayersLeftInTier ?? 0) : (row.playersLeftInTier ?? 0), overall ? (row.overallDropToNextTier ?? 0) : (row.dropToNextTier ?? 0))}
                 />
               </div>
             ) : null;
-          if (showTiers) lastTier = row.tier;
+          if (showTiers) lastTier = rowTier;
           const dollarValue = dollarValues.get(row.playerId) ?? null;
           const figure = figureFor(row, { dollarView, dollarValue, showLastSeason, scoringLabel });
           // Fix 1 (board persona review): on a position tab, positional rank leads and the overall
@@ -490,7 +519,15 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
                 chips={row.rosterStatus === null ? null : <RosterStatusPill note={row.rosterStatus} />}
                 figure={<BigNumber value={figure.value} basis={figure.basis} size="sm" />}
                 action={
-                  <button type="button" onClick={() => setDrawer({ row })} className="text-sm font-semibold text-accent hover:underline">
+                  // THE QUIET PILL THE MOCK DREW (fix round 1, M3). A bare blue word set flush
+                  // against the figure and its caption read as a third line of the number rather
+                  // than as a control; the pill gives it its own edge and its own gap, and takes
+                  // the accent off a word that is not the page's verb.
+                  <button
+                    type="button"
+                    onClick={() => setDrawer({ row })}
+                    className="ml-3 rounded-pill border border-edge px-2.5 py-1 text-sm font-medium text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
                     why
                   </button>
                 }

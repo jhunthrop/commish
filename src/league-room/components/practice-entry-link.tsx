@@ -8,7 +8,7 @@ import { buttonClassName } from "@/components/ui";
  * importing from the other, and one shared route literal is not a reason to open that door.
  * Task 9 is what makes this path a real page.
  */
-const MOCK_LOBBY_PATH = "/app/mock-drafts";
+const MOCK_LOBBY_PATH = "/app/draft/mock-drafts";
 
 export interface PracticeEntryLinkProps {
   readonly signedIn: boolean;

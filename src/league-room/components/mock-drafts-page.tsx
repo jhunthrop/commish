@@ -7,7 +7,7 @@ import type { MockLobbyBody, CreateMockRoomBody } from "@/app/api/mock-drafts/ro
 import type { ClaimMockSeatBody } from "@/app/api/mock-drafts/[code]/route";
 import type { MockLobbyRoomSummary, MyMockRoomSummary } from "@/mock-draft-service/lobby";
 import type { MockMode } from "@/mock-draft/config";
-import { Button, ButtonLink, StatPill } from "@/components/ui";
+import { BigNumber, Button, ButtonLink, CountdownLabel, SeatStack, StatPill } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useLeagueRoomDeps } from "../hooks/deps";
@@ -41,6 +41,10 @@ import { MockTableChips } from "./mock-table-chips";
 
 /** This surface's own control words — labels, never `MOCK_COPY`'s pre-vetted sentences (the
  *  client boundary split `MODE_ROW_LABEL` recorded for this directory). */
+/** The share of a room that has to be seated before the seat stack adds anything to the count
+ *  beside it (fix round 1, M4). */
+const MOCK_LOBBY_STACK_FROM = 0.25;
+
 const STATUS_ROW_LABEL: Readonly<Record<string, string>> = {
   scheduled: "Waiting to start",
   in_progress: "Drafting now",
@@ -48,7 +52,6 @@ const STATUS_ROW_LABEL: Readonly<Record<string, string>> = {
 
 export interface MockDraftsPageCopy {
   readonly soloDetail: string;
-  readonly tableHint: string;
   readonly openLobbyDetail: string;
   readonly crewDetail: string;
   readonly sheetTieIn: string;
@@ -61,6 +64,54 @@ export interface MockDraftsPageProps {
   readonly initialMine: readonly MyMockRoomSummary[];
   readonly options: MockTableOptions;
   readonly copy: MockDraftsPageCopy;
+}
+
+/**
+ * ONE ROOM FILLING NOW (the Draft area round, 2026-09-12) — an anonymous seat stack, how many
+ * people are waiting in it, the table, when it goes, and how many seats are left.
+ *
+ * NOBODY IS NAMED HERE, and that is a contract rather than a layout choice. `MockRoomSummary`'s
+ * own docblock states it: no other member's name or seat is ever named on this surface, the same
+ * disclosure discipline `listPublicLeagues` holds for a real league's browse card. So the row
+ * leads with the seats themselves (`SeatStack`, whose docblock argues the identical case) and
+ * with a count of people, never with initials the reader could not have been shown. Faces with
+ * names arrive one tap later, inside the room, where membership is already visible.
+ *
+ * TWO CLOCKS, ONE SENTENCE. A lobby room fires at its time OR the moment its last seat fills,
+ * whichever comes first, and a countdown alone would be a promise the room does not make.
+ */
+function FillingRow({ room, onJoin, joining, busy }: { readonly room: MockLobbyRoomSummary; readonly onJoin: (code: string) => void; readonly joining: boolean; readonly busy: boolean }) {
+  const seated = room.teamCount - room.seatsOpen;
+  // THE STACK EARNS ITS PLACE OR IT IS NOT DRAWN (fix round 1, M4). At one of twelve it is a
+  // single solid bar against eleven identical hairlines — a barcode that says nothing "11 seats
+  // left, of 12" does not already say two inches to its right. Past a quarter full the shape
+  // starts carrying the fact, and it draws.
+  const stackEarnsIt = seated / room.teamCount >= MOCK_LOBBY_STACK_FROM;
+  return (
+    <article data-testid="filling-row" className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-line py-3 first:border-t-0">
+      <div className="flex min-w-0 items-center gap-3">
+        {stackEarnsIt ? <SeatStack filled={seated} total={room.teamCount} /> : null}
+        <h3 className="font-display text-lg font-bold text-text-primary">
+          {seated} waiting
+        </h3>
+      </div>
+      <span className="text-sm text-text-muted">
+        {room.teamCount} teams · {room.pickSeconds} seconds a pick
+      </span>
+      <span className="flex flex-col text-sm leading-tight">
+        <span className="font-semibold text-text-primary">
+          Starts in <CountdownLabel deadlineAt={room.startsAtIso} data-testid="filling-countdown" />
+        </span>
+        <span className="text-text-muted">or sooner if it fills</span>
+      </span>
+      <span className="ml-auto flex items-center gap-5">
+        <BigNumber value={String(room.seatsOpen)} basis={`seats left, of ${room.teamCount}`} size="sm" />
+        <Button variant="secondary" size="sm" onClick={() => onJoin(room.shareCode)} loading={joining} disabled={busy}>
+          Take a seat
+        </Button>
+      </span>
+    </article>
+  );
 }
 
 /** A room of the caller's own still waiting or drafting — re-entry is an honest necessity the
@@ -196,16 +247,31 @@ export function MockDraftsPage({ initialOpen, initialMine, options, copy }: Mock
         </ul>
       )}
 
-      {/* LAW 1: the verb. The card carries the accent as furniture (the border, and the same
-          gradient tint the lobby's leader row wore — never a `bg-accent` fill, which the accent
-          budget reserves for the button primitive); the ONE solid is the button. */}
+      {/* ROOMS FILLING NOW LEAD (the Draft area round): people are the reason to be on this stop,
+          and a room that fires in ninety seconds is the most perishable thing on the page. An
+          EMPTY lobby renders NOTHING — null is absent, not a sentence about absence. */}
+      {open.length === 0 ? null : (
+        <section aria-label="Rooms filling now" className="flex flex-col gap-1 rounded-lg bg-surface-elevated p-4 shadow-card">
+          <h2 className="font-display text-xl font-bold text-text-primary">Rooms filling now</h2>
+          <span className={`${MICRO_LABEL} pb-1 text-text-faint`}>Soonest start first</span>
+          {[...open]
+            .sort((a, b) => a.startsInMs - b.startsInMs)
+            .map((room) => (
+              <FillingRow key={room.shareCode} room={room} onJoin={(code) => void join(code)} joining={joiningCode === room.shareCode} busy={busy !== null} />
+            ))}
+        </section>
+      )}
+
+      {/* THE SECOND DOOR, quiet: nobody to wait for. The page's one solid verb sits beside the
+          chips it acts on, which is where the draft room puts its verb too — a verb separated
+          from the facts it uses is the ambiguity the dock solved. */}
       <section
-        aria-label="Draft against the bots"
+        aria-label="Against bots"
         className="flex flex-col gap-3 rounded-lg bg-surface-elevated bg-gradient-to-r from-accent-glow via-transparent to-transparent p-4 shadow-card ring-2 ring-accent/40"
       >
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <h2 className="font-display text-xl font-bold text-text-primary">Draft against the bots</h2>
+            <h2 className="font-display text-xl font-bold text-text-primary">Against bots</h2>
             <p className="text-sm text-text-muted">{copy.soloDetail}</p>
           </div>
           <span className="ml-auto">
@@ -218,10 +284,11 @@ export function MockDraftsPage({ initialOpen, initialMine, options, copy }: Mock
             </Button>
           </span>
         </div>
-        <MockTableChips table={table} options={options} hint={copy.tableHint} onChange={rememberTable} />
+        <MockTableChips table={table} options={options} onChange={rememberTable} />
       </section>
 
-      {/* LAW 2: people are a door. Outline verbs, and the lobby list only when it has rows. */}
+      {/* The two doors that MAKE the rooms above: without them the lobby could never have a row
+          in it. Quiet outline verbs, never the solid. */}
       <section aria-label="Draft with people" className="flex flex-col gap-2 rounded-lg bg-surface-elevated p-4 shadow-card">
         <h2 className={`${MICRO_LABEL} text-text-faint`}>Draft with people</h2>
         <div className="flex flex-wrap items-center gap-3 rounded-md bg-surface-raised px-3 py-2.5">
@@ -246,34 +313,6 @@ export function MockDraftsPage({ initialOpen, initialMine, options, copy }: Mock
             </Button>
           </span>
         </div>
-        {/* An EMPTY lobby renders NOTHING here — null is absent, not a sentence about absence. */}
-        {open.length === 0 ? null : (
-          <ul aria-label="Open lobby rooms" className="flex flex-col gap-1.5">
-            {[...open]
-              .sort((a, b) => a.seatsOpen - b.seatsOpen)
-              .map((room) => (
-                <li key={room.shareCode} className="flex flex-wrap items-center gap-3 rounded-md bg-surface-raised px-3 py-2">
-                  <span className="font-mono text-xs tabular-nums text-text-muted" data-testid="lobby-seats">
-                    {room.teamCount - room.seatsOpen} of {room.teamCount} seated · fires when full
-                  </span>
-                  <span className="font-mono text-xs tabular-nums text-text-faint">
-                    {room.teamCount} teams · {room.pickSeconds}s
-                  </span>
-                  <span className="ml-auto">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => void join(room.shareCode)}
-                      loading={joiningCode === room.shareCode}
-                      disabled={busy !== null}
-                    >
-                      Take a seat
-                    </Button>
-                  </span>
-                </li>
-              ))}
-          </ul>
-        )}
       </section>
 
       {/* The practice loop's tie-in to the real room — a sentence, not a control. */}

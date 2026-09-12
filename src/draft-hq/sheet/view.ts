@@ -2,8 +2,7 @@ import { inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { players as playersTable } from "@/db/schema";
 import type { Position } from "@/domain/player";
-import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import { boardRows, isProjectedRow, type BoardRow } from "@/draft-hq/board/service";
+import { boardRows, isProjectedRow, type BoardOptions, type BoardRow } from "@/draft-hq/board/service";
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 import type { SheetEntry, SheetWithEntries } from "./types";
 
@@ -32,10 +31,6 @@ export interface BoardOption {
 
 const BOARD_OPTIONS_LIMIT = 300;
 
-function shapeFor(rosterSlots: readonly RosterSlotConfig[] | null, teamCount: number | null): { readonly teamCount: number; readonly rosterSlots: readonly RosterSlotConfig[] } {
-  return { teamCount: teamCount ?? 12, rosterSlots: rosterSlots ?? STANDARD_ROSTER_SLOTS };
-}
-
 /**
  * Every entry on a sheet, with real identity and the board's own rank layered on — a player the
  * board never ranked (a deep sleeper, an unresolved crosswalk) still gets his real name and team
@@ -44,10 +39,12 @@ function shapeFor(rosterSlots: readonly RosterSlotConfig[] | null, teamCount: nu
 export async function sheetEntryViews(
   db: Db,
   sheet: SheetWithEntries,
-  leagueShape: { readonly rosterSlots: readonly RosterSlotConfig[] | null; readonly teamCount: number | null } | null,
+  // THE SHEET READS THE BOARD THE PAGE'S OWN CONTEXT NAMES (fix round 1, H3): the same
+  // `{shape, leagueId, format}` triple the Board stop hands `boardRows`, so a player's number is
+  // the same number on both stops. It used to be a shape alone, which silently meant "league-free".
+  options: BoardOptions,
 ): Promise<{ readonly entries: readonly SheetEntryView[]; readonly board: readonly BoardRow[] }> {
-  const shape = shapeFor(leagueShape?.rosterSlots ?? null, leagueShape?.teamCount ?? null);
-  const board = await boardRows(db, { shape });
+  const board = await boardRows(db, options);
   const boardById = new Map(board.map((row) => [row.playerId, row]));
 
   const missingIds = sheet.entries.map((entry) => entry.playerId).filter((id) => !boardById.has(id));

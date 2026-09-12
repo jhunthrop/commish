@@ -12,28 +12,27 @@ interface RailDestination {
 }
 
 /**
- * The signed-in rail's destinations (Sunday v5, founder-set 2026-08-28): LEAGUES, ROOMS,
- * WALLET. Three real places, in the rail register, with the amber underline marking the page
- * under the reader's feet.
+ * The signed-in rail's destinations: LEAGUES, DRAFT, WALLET. Three real places, in the rail
+ * register, with the amber underline marking the page under the reader's feet. Profile is
+ * deliberately absent: a broadcast rail lists destinations, not settings, and the avatar beside
+ * this nav is the door to who you are.
  *
- * THE BOARD joins this list the day the public rankings page ships and not before — the nav
- * never advertises an empty room (the D3 rule Reviews already follows). Profile is deliberately
- * absent: a broadcast rail lists destinations, not settings, and the avatar beside this nav is
- * the door to who you are.
+ * ROOMS LEFT (the Draft area round, 2026-09-12). It named the practice lobby and, through its
+ * `also`, live draft rooms — two different things under one word, and the lobby is now the Draft
+ * area's own third stop, where practice belongs: beside the board and the sheet a manager
+ * practices with. Draft opens on the board, which is what a reader who taps that word wants.
  *
- * THE BOARD JOINED THIS LIST (Draft HQ phase 1, 2026-09-04): `DRAFT` sits between Leagues and
- * Rooms — prepare in Draft, perform in Rooms — and the day named above has come. It is not an
- * empty room: HQ, The Board and My Sheet are real, league-aware surfaces from the day this
- * lands (`docs/superpowers/specs/2026-09-04-draft-hq-design.md`); the Simulator/Assistant/
- * Market/Playbook links behind it render an honest "arriving soon" state rather than fabricated
- * content, which is what keeps this addition inside the D3 rule rather than breaking it.
+ * THE DOOR INTO A LIVE ROOM IS NOT LOST WITH IT: `ScheduledLine` (`@/draft-hq/scheduled-line`)
+ * sits on both board stops and widens to "is drafting now" for a league of yours already under
+ * way, which is the reason that line widened at all.
  *
- * ROOMS names where drafting happens — the practice lobby now, live rooms when you are in one.
+ * `/app/drafts/[draftId]` stays OFF this list on purpose: a draft room is a place you are IN,
+ * reached from the league or the line that announces it, never a standing destination — and it
+ * is a literal prefix away from `/app/draft`, which is the collision `pathIsUnder` exists for.
  */
 const DESTINATIONS: readonly RailDestination[] = [
   { href: "/app", label: "Leagues", also: ["/app/leagues"] },
-  { href: "/app/draft", label: "Draft" },
-  { href: "/app/mock-drafts", label: "Rooms", also: ["/app/drafts"] },
+  { href: "/app/draft", label: "Draft", also: ["/app/drafts"] },
   { href: "/app/wallet", label: "Wallet" },
 ];
 

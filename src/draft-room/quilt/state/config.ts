@@ -59,6 +59,11 @@ export const QUILT_CONFIG = {
     columnSize: 50,
     rowPx: 44,
     bandPx: 28,
+    /** A band that carries the board's own sentence instead of the room's live count needs two
+     *  lines at a column's width ("3 QB left before a 9.6 point drop" does not fit 12.5rem on
+     *  one). The approved Draft area mock draws it wrapped; a one-line band truncated the unit
+     *  off the end of a number, which is the one thing a basis may never lose. */
+    bandTallPx: 40,
     overscanRows: 6,
     /** Characters a row's name column holds whole beside the 28px face, the rank and the figure,
      *  in the approved widths (15rem Overall, 12.5rem a position) at the display face's 13px

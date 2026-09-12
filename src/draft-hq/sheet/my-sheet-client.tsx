@@ -2,12 +2,15 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Input, Modal, PageTitle, SegmentGroup } from "@/components/ui";
+import { Button, Card, Input, Modal } from "@/components/ui";
+import { DraftHeader } from "@/draft-hq/draft-header";
+import { ScheduledLine, type ScheduledDraft } from "@/draft-hq/scheduled-line";
 import type { SheetSummary, SheetTag } from "./types";
 import type { BoardOption, SheetEntryView } from "./view";
 import type { ByeStackWarning, MockHistoryInsights, MostDraftedPlayerView } from "./insights";
 import type { SheetHealthReport } from "./health";
-import { SheetTable } from "./sheet-table";
+import type { SheetColumnsPayload } from "./columns-payload";
+import { SheetColumnsView } from "./sheet-columns-view";
 import { InsightsRail } from "./insights-rail";
 import { parseSheetCsv, sheetToCsv } from "./csv";
 
@@ -17,6 +20,14 @@ export interface MySheetClientProps {
   readonly selectedSheetName: string | null;
   readonly entries: readonly SheetEntryView[];
   readonly boardOptions: readonly BoardOption[];
+  /** The seven columns' own facts, assembled server-side (`columns-payload.ts`). */
+  readonly columns: SheetColumnsPayload;
+  /** One sentence: whose rules every number on a row is under (`basisSentence`). */
+  readonly basis: string;
+  /** `?league=`/`?format=` as the switch must carry them, so a stop change moves the view and
+   *  not the numbers (fix round 1, H3). */
+  readonly headerQuery: Readonly<Record<string, string>>;
+  readonly scheduled: ScheduledDraft | null;
   readonly insights: {
     readonly mockHistory: Omit<MockHistoryInsights, "mostDrafted"> & { readonly mostDrafted: readonly MostDraftedPlayerView[] };
     readonly byeStack: ByeStackWarning | null;
@@ -37,12 +48,13 @@ async function api(input: string, init?: RequestInit): Promise<Response> {
  * separate client cache, so what it shows can never drift from what the room's SHEET tab reads
  * off the same store.
  */
-export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entries, boardOptions, insights }: MySheetClientProps) {
+export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entries, boardOptions, columns, basis, headerQuery, scheduled, insights }: MySheetClientProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [modal, setModal] = useState<ModalKind>(null);
   const [nameDraft, setNameDraft] = useState("");
   const [search, setSearch] = useState("");
+  const [sheetsOpen, setSheetsOpen] = useState(false);
   const [unresolved, setUnresolved] = useState<{ readonly unresolvedNames: readonly string[]; readonly duplicateNames: readonly string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,10 +115,26 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
     refresh();
   }
 
-  async function removeEntry(playerId: string): Promise<void> {
+  /** THE ROW'S OWN MARKS (fix round 1, H2) — the same three POSTs and one DELETE the retired
+   *  table held, reached from the row itself now rather than from a second list. */
+  function setNote(playerId: string, note: string): void {
     if (selectedSheetId === null) return;
-    await api(`/api/draft/sheets/${selectedSheetId}/entries?playerId=${encodeURIComponent(playerId)}`, { method: "DELETE" });
-    refresh();
+    void api(`/api/draft/sheets/${selectedSheetId}/entries`, { method: "POST", body: JSON.stringify({ playerId, note }) }).then(refresh);
+  }
+
+  function setTag(playerId: string, tag: SheetTag | null): void {
+    if (selectedSheetId === null) return;
+    void api(`/api/draft/sheets/${selectedSheetId}/entries`, { method: "POST", body: JSON.stringify({ playerId, tag }) }).then(refresh);
+  }
+
+  function setTierLabel(playerId: string, tierLabel: string | null): void {
+    if (selectedSheetId === null) return;
+    void api(`/api/draft/sheets/${selectedSheetId}/entries`, { method: "POST", body: JSON.stringify({ playerId, tierLabel }) }).then(refresh);
+  }
+
+  function removeEntry(playerId: string): void {
+    if (selectedSheetId === null) return;
+    void api(`/api/draft/sheets/${selectedSheetId}/entries?playerId=${encodeURIComponent(playerId)}`, { method: "DELETE" }).then(refresh);
   }
 
   async function reorder(order: readonly string[]): Promise<void> {
@@ -115,22 +143,28 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
     refresh();
   }
 
-  async function setNote(playerId: string, note: string): Promise<void> {
-    if (selectedSheetId === null) return;
-    await api(`/api/draft/sheets/${selectedSheetId}/entries`, { method: "POST", body: JSON.stringify({ playerId, note }) });
-    refresh();
+  /** One player from where he is to `to`, and the whole order posted — the same PUT a drag and an
+   *  arrow press both land on, so the two gestures can never write two different orders. */
+  function place(playerId: string, to: number): void {
+    const from = columns.order.indexOf(playerId);
+    if (from === -1) return;
+    const target = Math.max(0, Math.min(columns.order.length - 1, to));
+    if (target === from) return;
+    const without = columns.order.filter((id) => id !== playerId);
+    void reorder([...without.slice(0, target), playerId, ...without.slice(target)]);
   }
 
-  async function setTag(playerId: string, tag: SheetTag | null): Promise<void> {
-    if (selectedSheetId === null) return;
-    await api(`/api/draft/sheets/${selectedSheetId}/entries`, { method: "POST", body: JSON.stringify({ playerId, tag }) });
-    refresh();
+  function move(playerId: string, delta: number): void {
+    place(playerId, columns.order.indexOf(playerId) + delta);
   }
 
-  async function setTierLabel(playerId: string, tierLabel: string | null): Promise<void> {
-    if (selectedSheetId === null) return;
-    await api(`/api/draft/sheets/${selectedSheetId}/entries`, { method: "POST", body: JSON.stringify({ playerId, tierLabel }) });
-    refresh();
+  /** Back to the board's own order, keeping every man the sheet holds that the board never
+   *  ranked — a sheet is allowed to carry a sleeper, and matching the board must not drop him. */
+  function matchBoard(): void {
+    const onSheet = new Set(columns.order);
+    const fromBoard = columns.boardIds.filter((id) => onSheet.has(id));
+    const rest = columns.order.filter((id) => !fromBoard.includes(id));
+    void reorder([...fromBoard, ...rest]);
   }
 
   function exportCsv(): void {
@@ -163,33 +197,11 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
   const onSheetIds = new Set(entries.map((entry) => entry.playerId));
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <PageTitle>My Sheet</PageTitle>
-        <div className="flex flex-wrap items-center gap-2 print:hidden">
-          <Button variant="secondary" size="sm" onClick={() => setModal("create")}>
-            New sheet
-          </Button>
-          {selectedSheetId === null ? null : (
-            <>
-              <Button variant="secondary" size="sm" onClick={() => setModal("duplicate")}>
-                Duplicate
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => setModal("rename")}>
-                Rename
-              </Button>
-              <Button variant="destructive" size="sm" onClick={deleteSheet}>
-                Delete
-              </Button>
-            </>
-          )}
-        </div>
+    <div className="flex flex-col gap-4">
+      <div className="print:hidden">
+        <DraftHeader stop="sheet" query={headerQuery} />
       </div>
-
-      {sheets.length === 0 ? null : (
-        <SegmentGroup label="Sheet" labelled={false} value={selectedSheetId ?? ""} onChange={goTo} options={sheets.map((sheet) => ({ value: sheet.id, label: sheet.name }))} />
-      )}
-
+      <ScheduledLine draft={scheduled} />
       {selectedSheetId === null ? (
         <Card className="flex flex-col gap-3 text-sm text-text-muted">
           <p>You have not started a sheet yet.</p>
@@ -226,7 +238,57 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
             <Button variant="secondary" size="sm" onClick={() => window.print()}>
               Print
             </Button>
+            {/* SHEETS FOLDS BEHIND ONE CONTROL (fix round 1, M5). Holding more than one sheet is
+                real and stays; naming four ways to manage a thing beside five ways to use it was
+                ten controls on a line the mock drew five on. The word names the noun, the panel
+                under it names the acts, and a manager with one sheet reads one word. */}
+            <Button variant="ghost" size="sm" aria-expanded={sheetsOpen} onClick={() => setSheetsOpen((was) => !was)}>
+              {`Sheets (${sheets.length})`}
+            </Button>
+            <div className="w-52">
+              <Input label="Add a player" labelHidden placeholder="Search a name to add" value={search} onChange={(event) => setSearch(event.target.value)} />
+              {matches.length > 0 ? (
+                <ul className="absolute z-20 mt-1 flex w-52 flex-col rounded-md border border-edge bg-surface-elevated">
+                  {matches.map((option) => (
+                    <li key={option.playerId}>
+                      <button
+                        type="button"
+                        disabled={onSheetIds.has(option.playerId)}
+                        onClick={() => addPlayer(option.playerId)}
+                        className="flex w-full items-center justify-between px-2 py-1.5 text-left text-sm hover:bg-surface-raised disabled:opacity-40"
+                      >
+                        <span>{option.name}</span>
+                        <span className="text-text-faint">{onSheetIds.has(option.playerId) ? "On sheet" : "Add"}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           </div>
+
+          {!sheetsOpen ? null : (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-elevated p-3 shadow-card print:hidden">
+              {sheets.map((sheet) => (
+                <Button key={sheet.id} size="sm" variant={sheet.id === selectedSheetId ? "secondary" : "ghost"} aria-current={sheet.id === selectedSheetId ? "true" : undefined} onClick={() => goTo(sheet.id)}>
+                  {`${sheet.name} · ${sheet.entryCount}`}
+                </Button>
+              ))}
+              <span className="flex-1" />
+              <Button variant="ghost" size="sm" onClick={() => setModal("create")}>
+                New sheet
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setModal("duplicate")}>
+                Duplicate
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setModal("rename")}>
+                Rename
+              </Button>
+              <Button variant="ghost" size="sm" onClick={deleteSheet}>
+                Delete
+              </Button>
+            </div>
+          )}
 
           {unresolved === null ? null : (
             <Card className="flex flex-col gap-1 text-sm text-warning">
@@ -239,29 +301,26 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
             </Card>
           )}
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
-            <div className="flex flex-col gap-3">
-              <div className="w-64 print:hidden">
-                <Input label="Add a player" placeholder="Search a name to add" value={search} onChange={(event) => setSearch(event.target.value)} />
-                {matches.length > 0 ? (
-                  <ul className="mt-1 flex flex-col rounded-md border border-edge bg-surface-elevated">
-                    {matches.map((option) => (
-                      <li key={option.playerId}>
-                        <button
-                          type="button"
-                          disabled={onSheetIds.has(option.playerId)}
-                          onClick={() => addPlayer(option.playerId)}
-                          className="flex w-full items-center justify-between px-2 py-1.5 text-left text-sm hover:bg-surface-raised disabled:opacity-40"
-                        >
-                          <span>{option.name}</span>
-                          <span className="text-text-faint">{onSheetIds.has(option.playerId) ? "On sheet" : "Add"}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-              <SheetTable entries={entries} onReorder={reorder} onRemove={removeEntry} onNote={setNote} onTag={setTag} onTierLabel={setTierLabel} />
+          {/* THE SEVEN COLUMNS (founder amendment 2): the draft room's own sheet component, with
+              the room-only affordances absent by prop.
+
+              THE RAIL SITS BESIDE THEM ON A DESKTOP (fix round 1, M6). Under the columns it was
+              below a 70vh scroller and nobody ever reached it, which is the same as deleting it —
+              and bye stacks and sheet health are real measured facts. On a narrower screen the
+              columns need every pixel and it goes back underneath, where a scroll does reach it. */}
+          <div className="grid min-h-[70vh] grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_17rem]">
+            <div className="flex min-h-[70vh] min-w-0 flex-col">
+              <SheetColumnsView
+                payload={columns}
+                basis={basis}
+                onMove={move}
+                onPlace={place}
+                onMatchBoard={matchBoard}
+                onNote={setNote}
+                onTag={setTag}
+                onTierLabel={setTierLabel}
+                onRemove={removeEntry}
+              />
             </div>
             <div className="print:hidden">
               <InsightsRail

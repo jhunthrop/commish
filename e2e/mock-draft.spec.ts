@@ -222,7 +222,7 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
   await expect(managerA.getByRole("heading", { name: "There is always a seat." })).toBeVisible();
   await managerA.getByRole("link", { name: "Try a mock draft" }).click();
   await expect(managerA).toHaveURL(/\/app\/mock-drafts$/);
-  await expect(managerA.getByRole("heading", { name: "Mock drafts", level: 1 })).toBeVisible();
+  await expect(managerA.getByRole("heading", { name: "Draft", level: 1 })).toBeVisible();
 
   // --- Setup (the workflow pass, law 1): the chip sentence edited in place — the widest room,
   // a fast clock (see `PICK_SECONDS`'s own docblock for why this is the 90s tier, not the 30s
@@ -382,8 +382,8 @@ test("a link room's share code, claimed by a second seeded identity, moves the s
   const teamCount = 8;
 
   // --- managerB hosts a private link room -----------------------------------------------------
-  await managerB.goto("/app/mock-drafts");
-  await expect(managerB.getByRole("heading", { name: "Mock drafts", level: 1 })).toBeVisible();
+  await managerB.goto("/app/draft/mock-drafts");
+  await expect(managerB.getByRole("heading", { name: "Draft", level: 1 })).toBeVisible();
   // Law 2: people are a door — the crew room is minted from the same chip sentence.
   await setTableChip(managerB, "teams", "Teams", String(teamCount));
   await expect(async () => {

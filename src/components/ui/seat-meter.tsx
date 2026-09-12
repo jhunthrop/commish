@@ -93,6 +93,7 @@ export interface SeatStackProps {
   readonly className?: string;
 }
 
+
 /**
  * THE SEAT STACK — the open-league row's who-column, stood on end (SIDELINE, 2026-09-10).
  *

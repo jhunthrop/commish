@@ -269,8 +269,8 @@ export const MOCK_COPY = {
    */
   soloDetail: "In the room in five seconds. The bots pick the way real rooms do.",
   tableHint: "Tap any chip to change it. Your last table is remembered.",
-  openLobbyDetail: "Anyone can take a seat; bots fill whoever does not show.",
-  crewDetail: "A private link seats your league mates; practice the real draft together.",
+  openLobbyDetail: "Anyone can take a seat. Bots fill whoever does not show.",
+  crewDetail: "A private link seats your league mates for the real draft's rehearsal.",
   sheetTieIn:
     "Drafting for real soon? Your mock picks can seed your cheat sheet, so practice walks into the real room with you.",
   pageFootnote: "Practice rooms clear themselves after a day. Nothing here touches a real league.",

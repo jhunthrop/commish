@@ -18,6 +18,7 @@ const SUMMARY: MockRoomSummary = {
   seatsOpen: 3,
   pickSeconds: 60,
   startsInMs: 90_000,
+  startsAtIso: "2026-09-12T18:00:00.000Z",
   mode: "link",
   started: false,
   alreadySeated: false,
@@ -86,7 +87,7 @@ describe("MockShareLanding", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockShareLanding code="ABC123" summary={{ ...SUMMARY, started: true, alreadySeated: false }} />, fixture.deps);
     expect(screen.queryByRole("button", { name: /mock draft/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Start a new one" })).toHaveAttribute("href", "/app/mock-drafts");
+    expect(screen.getByRole("link", { name: "Start a new one" })).toHaveAttribute("href", "/app/draft/mock-drafts");
   });
 
   it("still lets an already-seated member re-enter a started room", () => {

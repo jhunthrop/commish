@@ -27,6 +27,9 @@ function projected(overrides: Partial<BoardRow>): BoardRow {
     tier: 0,
     playersLeftInTier: 3,
     dropToNextTier: 2.2,
+    overallTier: 0,
+    overallPlayersLeftInTier: 2,
+    overallDropToNextTier: 14.9,
     byeWeek: 10,
     marketAdp: 2.4,
     marketPositionAdp: "WR1",
@@ -57,6 +60,9 @@ function notOnActiveRoster(overrides: Partial<BoardRow>): BoardRow {
     tier: null,
     playersLeftInTier: null,
     dropToNextTier: null,
+    overallTier: null,
+    overallPlayersLeftInTier: null,
+    overallDropToNextTier: null,
     marketAdp: 240.5,
     marketPositionAdp: "RB80",
     rosterStatus: { status: "practice_squad", source: "nflverse_roster_week_1", observedAt: "2026-09-01T00:00:00.000Z", team: "NO", excluded: true },
@@ -85,6 +91,9 @@ function marketOrder(overrides: Partial<BoardRow>): BoardRow {
     tier: null,
     playersLeftInTier: null,
     dropToNextTier: null,
+    overallTier: null,
+    overallPlayersLeftInTier: null,
+    overallDropToNextTier: null,
     marketAdp: 130.1,
     marketPositionAdp: "K1",
     ...overrides,
@@ -275,6 +284,39 @@ describe("BoardView, a position with no projection", () => {
     expect(plate.dataset.grade).toBe("S");
     expect(within(plate).getByText("1")).toBeInTheDocument();
     expect(within(plate).queryByText("S")).not.toBeInTheDocument();
+  });
+
+  /**
+   * OVERALL CARRIES BANDS TOO (the Draft area round, 2026-09-12, founder amendment 1). The Draft
+   * tab opens on this list, and it used to be the one view of the board with no ladder on it at
+   * all. The band counts PLAYERS here, because a band across positions is not about a position.
+   */
+  it("bands the Overall list on the board's own ladder, counting players", () => {
+    mount([
+      projected({ playerId: "w1", name: "First Receiver", valueOverReplacement: 162.8, overallRank: 1, overallTier: 0, overallPlayersLeftInTier: 2, overallDropToNextTier: 19.3 }),
+      projected({ playerId: "w2", name: "Second Receiver", valueOverReplacement: 147.9, overallRank: 2, overallTier: 0, overallPlayersLeftInTier: 1, overallDropToNextTier: 19.3 }),
+      projected({ playerId: "r1", name: "First Back", position: "RB", valueOverReplacement: 115.1, overallRank: 3, overallTier: 1, overallPlayersLeftInTier: 1, overallDropToNextTier: 17.3 }),
+    ]);
+    const plates = screen.getAllByText(/left before a/).map((node) => node.closest("[data-grade]") as HTMLElement);
+    expect(plates).toHaveLength(2);
+    expect(plates[0]!.textContent).toContain("2 players left before a 19.3 point drop");
+    expect(plates[1]!.textContent).toContain("one player left before a 17.3 point drop");
+    expect(plates[0]!.dataset.grade).toBe("S");
+  });
+
+  it("draws no band over a list the $ board has re-sorted, on Overall or on a position", () => {
+    mount([projected({})]);
+    fireEvent.click(screen.getByLabelText("$ board"));
+    expect(screen.queryByText(/left before a/)).toBeNull();
+    selectPosition("WR");
+    expect(screen.queryByText(/left before a/)).toBeNull();
+  });
+
+  it("opens no band for a row the board holds no ladder place for", () => {
+    mount([projected({ playerId: "w1", name: "First Receiver" }), marketOrder({})]);
+    // The kicker rides the Overall list with no value and no tier, and a band with a "?" on it
+    // used to open above him the moment the tier beside him changed.
+    expect(screen.queryByText("?")).toBeNull();
   });
   /**
    * THE RULING THIS TEST EXISTS FOR (fix round 1, H1). The board is ordered by points over

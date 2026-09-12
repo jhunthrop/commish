@@ -44,8 +44,9 @@ const CHIP_EDITOR_LABEL: Readonly<Record<MockTableChipId, string>> = {
 export interface MockTableChipsProps {
   readonly table: MockTable;
   readonly options: MockTableOptions;
-  /** `MOCK_COPY.tableHint`, threaded from the server page (ruling 8). */
-  readonly hint: string;
+  /** An optional line under the chips. Absent on the Draft area's mock lobby, where it was a
+   *  tip about a control that already looks like what it is (fix round 1, L5). */
+  readonly hint?: string;
   readonly onChange: (table: MockTable) => void;
 }
 
@@ -176,7 +177,7 @@ export function MockTableChips({ table, options, hint, onChange }: MockTableChip
           </button>
         ))}
       </div>
-      <p className="text-xs text-text-faint">{hint}</p>
+      {hint === undefined ? null : <p className="text-xs text-text-faint">{hint}</p>}
       {editor}
       <span className="sr-only" aria-live="polite">
         {rolledAnnouncement}

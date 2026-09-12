@@ -1,19 +1,14 @@
-import type { Metadata } from "next";
-import { pageTitle } from "@/components/app-shell/page-metadata";
-import { ArrivingSoonPage } from "@/draft-hq/arriving-soon";
+import { permanentRedirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = pageTitle("ADP");
 
-/** Phase 4 (spec §13 item 4): ADP snapshots, where our projection differs from ADP, value
- *  windows, alerts, the weekly brief. Not built yet. Named for what the screen will show (ADP over
- *  time), never "Market": fantasy words, not trading words (founder, 2026-09-07). */
-export default function DraftAdpPage() {
-  return (
-    <ArrivingSoonPage
-      section="adp"
-      title="ADP"
-      sentence="ADP over time is not built yet. It arrives once we are snapshotting ADP week to week. The Board already shows where our projection differs from ADP on every ranked player."
-    />
-  );
+/**
+ * ADP IS NOT A SURFACE ANY MORE (the Draft area round, 2026-09-12). It carried an honest
+ * "arriving soon" card and nothing else; the Draft area is the board, the sheet and the mock
+ * lobby. The route stays as a redirect rather than a 404 (fix round 1, M1): this address has been
+ * in the product's own nav, in a browser history and very possibly in somebody's bookmarks, and
+ * the place that answers the question it was asked is the board.
+ */
+export default function AdpMoved() {
+  permanentRedirect("/app/draft/board");
 }

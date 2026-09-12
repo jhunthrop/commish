@@ -393,7 +393,7 @@ export function MockResults({ view, teams, board, players, byeWeeks, myTeamId, r
         {/* Law 4 + the amber budget: RUN IT BACK is this page's ONE solid; the lobby stays the
             quiet way out ("never a dead end", Task 8's rule, kept). */}
         <div className="flex shrink-0 flex-wrap items-center gap-3">
-          <ButtonLink href="/app/mock-drafts" variant="secondary">
+          <ButtonLink href="/app/draft/mock-drafts" variant="secondary">
             {copy.openLobbyLabel}
           </ButtonLink>
           {table === null ? null : (

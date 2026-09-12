@@ -23,7 +23,7 @@ import { AuctionRoom } from "./auction-room";
 
 /**
  * Task 9's own contract with this one (recorded here since it created no page of its own yet):
- * the practice lobby lives at `/app/mock-drafts`, and `?create=solo` is this room's own request
+ * the practice lobby lives at `/app/draft/mock-drafts`, and `?create=solo` is this room's own request
  * to open straight into creating another one rather than browsing first — "Run it again" below
  * hands the lobby that query param; "Open the lobby" hands it none.
  */

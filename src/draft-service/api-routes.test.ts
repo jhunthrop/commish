@@ -253,10 +253,10 @@ describe("GET /api/drafts/[draftId] — Task 8's mock room info", () => {
 
     expect(body.data.mock.share).toEqual({
       shareCode: "league_api_mock_code",
-      path: "/app/mock-drafts/league_api_mock_code",
+      path: "/app/draft/mock-drafts/league_api_mock_code",
       // ABSOLUTE, from this request's own origin (link audit 2026-09-04, the C-01 idiom the
       // invite mint keeps): the value the panel shows has to open when pasted anywhere.
-      url: "http://test/app/mock-drafts/league_api_mock_code",
+      url: "http://test/app/draft/mock-drafts/league_api_mock_code",
       teamCount: 2,
       seatsFilled: 2,
       startsAt: "2026-09-10T17:00:00.000Z",

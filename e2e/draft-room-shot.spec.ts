@@ -18,7 +18,7 @@ import { expect, test } from "./support/fixtures";
  * (build first — `npm run e2e:build` — or you are photographing the past; see
  * `playwright.config.ts`'s own note on `next start` serving whatever is already on disk.)
  *
- * The journey is `mock-draft.spec.ts`'s own opening, deliberately: front door -> `/app/mock-drafts`
+ * The journey is `mock-draft.spec.ts`'s own opening, deliberately: front door -> `/app/draft/mock-drafts`
  * -> a twelve-team solo room on the LAST draft slot -> wait for the human's turn. The last slot is
  * what makes the shot worth taking — eleven bot picks land before the human's first turn, so the
  * board, the pick wire and the run callout all have real history in them, and the rail is in its

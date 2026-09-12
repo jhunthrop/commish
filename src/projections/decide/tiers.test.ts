@@ -81,6 +81,76 @@ describe("tiersOf", () => {
   });
 });
 
+/**
+ * THE OVERALL LADDER (the Draft area round, 2026-09-12, founder amendment 1) — the same rule run
+ * across positions, on the key the board is ordered by rather than inside one pool. The fixture is
+ * the product's own 2026 PPR board, 12-team standard shape, exported from the dev database on
+ * 2026-09-12 (`scripts/rankings-export.ts --format=ppr`): every player it prices above replacement,
+ * in board order, his points over replacement and his projected points.
+ */
+const OVERALL_VALUE_2026 = [
+  162.8, 147.9, 128.6, 115.1, 113.3, 112.1, 108, 97.8, 93.7, 88.5, 88.3, 88.1, 87.1, 83.5, 75.2, 74.4, 72.9, 72.9,
+  70.7, 69.9, 69.8, 69.5, 68.6, 66, 64.3, 59.9, 56.1, 53.1, 47.9, 47.7, 47.4, 45.3, 45.1, 44.2, 43.3, 42.9, 40.9,
+  37, 35.4, 34, 27.4, 26.5, 25.2, 24.6, 24, 22.6, 22.5, 21, 19.9, 19.1, 19, 18.6, 18.5, 18.1, 18, 16.9, 15.3, 15.2,
+  13.9, 10.3, 9.5, 9.4, 8.1, 7.6, 7.4, 6.8, 6.4, 6.1, 3.6, 3, 2.9, 2.6, 2.2, 2, 1.6, 1.5, 1.3, 1.3, 0.4, 0.2,
+];
+const OVERALL_POINTS_2026 = [
+  344.3, 329.4, 310.1, 257.2, 255.5, 293.6, 289.5, 240, 275.2, 270, 269.8, 230.3, 268.5, 225.7, 217.3, 214.3,
+  212.8, 254.3, 252.2, 251.3, 211.9, 211.7, 210.8, 208.1, 245.8, 241.4, 306.8, 234.6, 298.5, 189.9, 228.9, 187.5,
+  187.3, 225.7, 224.8, 224.4, 222.4, 287.6, 216.9, 176.1, 278, 208, 275.8, 164.5, 205.4, 162.5, 204, 163.2, 201.4,
+  269.7, 161.2, 160.8, 160.7, 268.7, 199.4, 267.5, 196.8, 157.3, 156.1, 152.4, 149.4, 190.9, 148, 189.1, 258,
+  146.6, 257, 146, 185.1, 145.2, 184.4, 142.4, 252.9, 183.5, 183.1, 141.4, 141.2, 143.4, 181.9, 181.7,
+];
+
+describe("tiersOf across positions, on the real 2026 board", () => {
+  it("draws no tier of one, which is the whole reason the denominator is production", () => {
+    const sizes = tierSizes(tiersOf(OVERALL_VALUE_2026, OVERALL_POINTS_2026));
+    expect(sizes).toHaveLength(7);
+    expect(sizes.filter((size) => size === 1)).toEqual([]);
+    // Nacua and Chase alone at the top, then the five behind them, and the ladder widens as the
+    // board flattens: the shape a manager draws on paper.
+    expect(sizes).toEqual([2, 5, 7, 12, 14, 19, 21]);
+  });
+
+  it("cuts the whole board into tiers of one when the break is read against the key instead", () => {
+    // The rule the position pools keep, applied to the ranking key with no production behind it:
+    // points over replacement runs to nothing at the tail, so an ordinary step near the bottom
+    // reads as a cliff. This is the failure the second argument exists to prevent, pinned so a
+    // later reader cannot quietly collapse the two.
+    const sizes = tierSizes(tiersOf(OVERALL_VALUE_2026));
+    expect(sizes.filter((size) => size === 1).length).toBeGreaterThan(10);
+  });
+
+  /**
+   * L1 (fix round 1): the old version of this test asserted `tiersOf(x, x) === tiersOf(x)`, which
+   * is true by the parameter's own default and proved nothing. What actually needs pinning is
+   * that the SECOND argument is the denominator and the FIRST is the step — so the same key can
+   * tier two ways depending on what the men behind it are projected to produce.
+   */
+  it("reads the break against production, so the same key tiers two ways", () => {
+    // A ten point step. Behind a 170 point season that is a game's worth (10 >= 170/17) and the
+    // tier breaks; behind a 340 point season it is half of one (10 < 20) and it does not.
+    expect(tiersOf([100, 90], [170, 170])).toEqual([0, 1]);
+    expect(tiersOf([100, 90], [340, 340])).toEqual([0, 0]);
+  });
+
+  it("defaults the denominator to the key, which is what a position pool passes", () => {
+    // Stated once, here, rather than asserted at every position fixture above: a pool hands over
+    // its projected points and gets the rule it has always had.
+    expect(tiersOf(RB_2026)).toEqual(tiersOf(RB_2026, RB_2026));
+  });
+
+  it("keeps the span cap on the key the reader is looking at", () => {
+    const tiers = tiersOf(OVERALL_VALUE_2026, OVERALL_POINTS_2026);
+    expect(widestSpan(OVERALL_VALUE_2026, tiers)).toBeLessThanOrEqual(TIER_SPAN_POINTS_PER_GAME * GAMES_PER_SEASON);
+  });
+
+  it("runs the tiers contiguously down the order, so a band never reopens below itself", () => {
+    const tiers = tiersOf(OVERALL_VALUE_2026, OVERALL_POINTS_2026);
+    expect(tiers).toEqual([...tiers].sort((a, b) => a - b));
+  });
+});
+
 describe("tierStanding", () => {
   const pool = [100, 98, 96, 94, 60, 58, 56];
 
