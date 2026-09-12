@@ -14,6 +14,18 @@ export interface ManagerStackProps {
   /** How many faces before the overflow chip. @default 4 */
   readonly max?: number;
   /**
+   * SEATS NOBODY IS IN YET, drawn as hollow rings after the faces (fix round 2, the founder's
+   * screenshot: a room filling at 1 of 12 drew one face and nothing else, so the stack said
+   * "somebody is here" and never "and there is room"). At most `OPEN_SEATS_SHOWN` rings, whatever
+   * the number — a row of twelve dashed circles is a capacity diagram, and `SeatMeter` beneath
+   * the stack is already the product's one seat figure. The overflow chip counts whatever the
+   * faces and the rings together did not show, so the stack's arithmetic always adds up.
+   *
+   * A hollow ring is an ABSENCE drawn as an absence: never a face with an invented name in it,
+   * which is the placeholder-dressed-as-data the refusal list rules out.
+   */
+  readonly openSeats?: number;
+  /**
    * THE SENTENCE BESIDE THE FACES, and the reason this is not a bare row of avatars: P1 says a
    * face never stands alone, so the stack states who it is showing. The caller composes it,
    * because only the caller knows whether it is "Dana, Rey and 8 more are in" or "3 of 12
@@ -39,12 +51,18 @@ export interface ManagerStackProps {
  * docblock). No prop for it: the overflow chip has to match the faces it follows, and a size
  * prop is the seam where those two drift apart.
  */
-export function ManagerStack({ people, max = 4, caption, className = "" }: ManagerStackProps) {
+/** At most three hollow rings, whatever the room's real gap. See `openSeats`. */
+const OPEN_SEATS_SHOWN = 3;
+
+export function ManagerStack({ people, max = 4, caption, openSeats = 0, className = "" }: ManagerStackProps) {
   const shown = people.slice(0, max);
-  const overflow = people.length - shown.length;
+  const rings = Math.max(0, Math.min(openSeats, OPEN_SEATS_SHOWN));
+  // Everything the stack did NOT draw, people and empty seats alike, counted once.
+  const overflow = people.length - shown.length + (openSeats - rings);
+  const anything = shown.length > 0 || rings > 0;
   return (
     <span data-testid="manager-stack" className={`flex min-w-0 items-center gap-3 ${className}`.trimEnd()}>
-      {shown.length === 0 ? null : (
+      {!anything ? null : (
         <span className="flex shrink-0" aria-hidden="true">
           {shown.map((person, index) => (
             <Avatar
@@ -57,6 +75,17 @@ export function ManagerStack({ people, max = 4, caption, className = "" }: Manag
               // separates one overlapping circle from the next. Never both: two ring utilities
               // on one element resolve by stylesheet order, and the loser would be silent.
               className={`${index === 0 ? "" : "-ml-2.5 "}${person.isSelf === true ? "" : "ring-2 ring-surface-elevated"}`.trimEnd()}
+            />
+          ))}
+          {Array.from({ length: rings }, (_, index) => (
+            // A dashed well, the same shape the approved mock draws: the size of a face, in the
+            // place a face would be, visibly empty.
+            <span
+              key={`open-${index}`}
+              data-testid="open-seat"
+              className={`inline-flex size-10 shrink-0 rounded-pill border border-dashed border-edge ring-2 ring-surface-elevated ${
+                shown.length === 0 && index === 0 ? "" : "-ml-2.5"
+              }`.trimEnd()}
             />
           ))}
           {overflow > 0 ? (

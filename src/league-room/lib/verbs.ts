@@ -17,6 +17,14 @@ export const LEAGUE_VERB = {
    * disagree — the guard C2 asks for, at the one seam the boundary forces open.
    */
   setLineup: "Set your lineup",
+  /**
+   * The word for a FULL room whose chosen kickoff has arrived (fix round 2). `nextAction` still
+   * reads `open-draft-room` in that moment, because the draft row does not flip to `in_progress`
+   * until the start door actually runs, and "Open the draft room" is the weaker word for
+   * something this urgent. The same `NEXT_ACTION_COPY` string `join-draft` carries, held to it by
+   * `verbs-drift.test.ts`.
+   */
+  joinDraft: "Join the draft",
   rankSlots: "Rank your draft slots",
   mockDraft: "Run a mock draft",
   previewRoom: "Preview the room",

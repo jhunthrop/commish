@@ -77,7 +77,14 @@ export function HomeLeagueCard({ league, solid }: HomeLeagueCardProps) {
           </div>
         </div>
 
-        <ManagerStack people={league.members} caption={stackCaption(league)} className="mt-4" />
+        {/* The seats nobody is in yet, as hollow rings after the faces (fix round 2): a room at 1
+            of 12 has to look like a room with room, not like a room of one. */}
+        <ManagerStack
+          people={league.members}
+          openSeats={Math.max(0, league.teamCount - league.filledTeams)}
+          caption={stackCaption(league)}
+          className="mt-4"
+        />
 
         <p className="mt-4 font-display text-lg font-semibold leading-display text-text-primary">{momentLine(league, clock)}</p>
 
@@ -98,10 +105,14 @@ export function HomeLeagueCard({ league, solid }: HomeLeagueCardProps) {
 
         {preDraft ? <SeatMeter filled={league.filledTeams} total={league.teamCount} srOnlySentence className="mt-4 max-w-sm" /> : null}
 
-        {preDraft ? (
+        {/* THE TWO QUIET DOORS, ON A FILLING ROOM ONLY — where the approved mock draws them, and
+            only there (fix round 2's confirmation). A room still waiting on seats is the one
+            pre-draft state with time to kill and nothing owed; a room whose draft has a date two
+            days out gets its clock and its verb, and a full room that is starting gets neither. */}
+        {preDraft && seatsOpen ? (
           <p className="mt-4 flex flex-wrap items-center gap-5">
-            {/* Whichever of the two pre-draft doors the verb did not take stays as a quiet link,
-                on the card of the league it belongs to, never as a standing panel. */}
+            {/* Whichever of the two doors the verb did not take stays as a quiet link, on the card
+                of the league it belongs to, never as a standing panel. */}
             {verb.href === MOCK_DRAFT_HREF ? null : (
               <Link href={MOCK_DRAFT_HREF} className="text-sm font-semibold text-accent">
                 {LEAGUE_VERB.mockDraft}

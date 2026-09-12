@@ -149,6 +149,71 @@ describe("HomeBoard with no leagues makes the lobby the page", () => {
   });
 });
 
+/**
+ * FIX ROUND 2, the founder's screenshot. Three defects on one card, asserted where they render.
+ */
+describe("a filling room draws its seats, its people and its two quiet doors", () => {
+  const filling = homeCard({
+    id: "l_fill_now",
+    name: "Fourth and Long",
+    teamCount: 12,
+    filledTeams: 1,
+    draftStatus: "scheduled",
+    startTrigger: "scheduled",
+    // A kickoff already in the past: the room rolled rather than drafting.
+    kickoffAt: "2026-09-01T00:00:00.000Z",
+    kickoffRelative: "starting now",
+    slotsRanked: true,
+    record: null,
+    myRank: null,
+    members: [{ userId: "u1", name: "Justin Hunthrop", avatar: null, isSelf: true }],
+  });
+
+  it("says the seats, never the abandoned clock, and draws the empty seats as rings", () => {
+    renderInLeague(<HomeBoard initial={body([filling])} />, fixtureLeagueDeps().deps);
+    expect(screen.getByText("Filling, 1 of 12. Drafts when full.")).toBeInTheDocument();
+    expect(screen.queryByText(/Starting now/)).toBeNull();
+    expect(screen.getByTestId("big-number")).toHaveTextContent("11seats to go, of 12");
+    // Three hollow rings after the one face, and the chip counting the other eight seats.
+    expect(screen.getAllByTestId("open-seat")).toHaveLength(3);
+    expect(screen.getByTestId("manager-stack")).toHaveTextContent("+8");
+  });
+
+  it("wears the manager's initials in the ring, not a glyph and not a stock image", () => {
+    const { container } = renderInLeague(<HomeBoard initial={body([filling])} />, fixtureLeagueDeps().deps);
+    const stack = container.querySelector("[data-testid='manager-stack']")!;
+    expect(stack.querySelector("img")).toBeNull();
+    expect(stack).toHaveTextContent("JH");
+  });
+
+  it("carries the door the verb did not take while a seat is open", () => {
+    // This room owes nothing, so "Run a mock draft" IS the verb and only the other door stays a
+    // link — exactly the pairing the mock draws on its own filling card.
+    renderInLeague(<HomeBoard initial={body([filling])} />, fixtureLeagueDeps().deps);
+    expect(screen.getByRole("link", { name: `Run a mock draft for ${filling.name}` })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Run a mock draft" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Preview the room" })).toBeInTheDocument();
+  });
+
+  it("keeps the mock-draft door as a quiet link when the verb is something else", () => {
+    const owed = { ...filling, slotsRanked: false };
+    renderInLeague(<HomeBoard initial={body([owed])} />, fixtureLeagueDeps().deps);
+    expect(screen.getByRole("link", { name: "Run a mock draft" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview the room" })).toBeInTheDocument();
+  });
+
+  it("carries neither door once the room is full, which is where the mock draws neither", () => {
+    const fullAhead = { ...filling, filledTeams: 12, kickoffRelative: "in 2 days", kickoffAt: "2026-09-15T01:55:00.000Z" };
+    renderInLeague(<HomeBoard initial={body([fullAhead])} />, fixtureLeagueDeps().deps);
+    expect(screen.queryByRole("link", { name: "Run a mock draft" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Preview the room" })).toBeNull();
+    // What a full, dated room says instead: its day. WHICH day is the reader's own (H3 resolves
+    // the zone after mount), so the shape is what this asserts and `home-card.test.ts` pins the
+    // two-zone arithmetic.
+    expect(screen.getByText(/^Drafts [A-Za-z]+\.$/)).toBeInTheDocument();
+  });
+});
+
 describe("HomeBoard never offers a seat this manager is already sitting in", () => {
   it("drops a room from the lobby when it is one of this manager's own leagues", () => {
     const mine = homeCard({ id: PUBLIC_LEAGUES[0]!.id, name: PUBLIC_LEAGUES[0]!.name, draftStatus: "scheduled", startTrigger: "when_full", slotsRanked: true });

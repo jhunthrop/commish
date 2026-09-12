@@ -72,7 +72,10 @@ describe("syncUserFromWorkOS", () => {
     const [row] = await db.select().from(users).where(eq(users.id, "user_01HXYZ"));
     expect(row?.email).toBe("jane@example.com");
     expect(row?.displayName).toBe("Jane Doe");
-    expect(row?.avatarUrl).toBe("https://img.example/jane.png");
+    // NOT the provider's picture (fix round 2): WorkOS answers a generated placeholder for every
+    // account that never uploaded one, so storing it dressed a stock image as a chosen face on
+    // every surface. A manager picks their own in the account room; until then, their initials.
+    expect(row?.avatarUrl).toBeNull();
     expect(row?.experienceTier).toBe("beginner");
     expect(row?.createdAt.toISOString()).toBe(T0);
   });

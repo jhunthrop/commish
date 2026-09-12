@@ -126,7 +126,14 @@ export async function syncUserFromWorkOS(
         id: wu.id,
         email: wu.email.toLowerCase(),
         displayName: displayNameFrom(wu),
-        avatarUrl: wu.profilePictureUrl ?? null,
+        // NOT `wu.profilePictureUrl` (fix round 2). WorkOS answers a GENERATED PLACEHOLDER for
+        // every account that never uploaded a photo, so storing it dressed a stock image as a
+        // face the manager had chosen — on every surface at once, and with no way to get rid of
+        // it short of picking a preset. A manager's face is theirs to choose in the account room
+        // (presets today, uploads when Plan D flips `IDENTITY_CONFIG.avatar.uploads`), and until
+        // they do, their initials are a real and correct face. `parseAvatarRef` covers the rows
+        // already written this way.
+        avatarUrl: null,
         createdAt: now,
         lastSeenAt: now,
       })
