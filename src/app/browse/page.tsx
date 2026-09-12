@@ -7,7 +7,6 @@ import { createSheetDefaults, shellData } from "@/components/app-shell/shell-dat
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PublicBar, STOREFRONT_NAV } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
-import { formatAbsoluteTime } from "@/league";
 import { listPublicLeagues } from "@/league-service/browse";
 import { listWireItems } from "@/league-service/wire";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
@@ -94,7 +93,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
         house={house}
         leagues={leagues}
         signedIn={user !== null}
-        asOfTime={formatAbsoluteTime(nowIso)}
+        asOfIso={nowIso}
         headingLevel={1}
         // Task 9's quiet practice invitation, moved INSIDE the shelf head (Gameday). It used to
         // render as a sibling above the shelf, which put an interactive element ahead of this

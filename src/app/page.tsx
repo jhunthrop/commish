@@ -4,7 +4,7 @@ import { ButtonLink } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";
 import { PublicBar, STOREFRONT_NAV, type NavLink } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
-import { formatAbsoluteTime, LEAGUE_CONFIG } from "@/league";
+import { LEAGUE_CONFIG } from "@/league";
 import { listPublicLeagues } from "@/league-service/browse";
 import { proofStats } from "@/league-service/proof";
 import { getProofCache } from "@/league-service/proof-cache-instance";
@@ -136,7 +136,7 @@ export default async function Home() {
             house={house}
             leagues={cappedLeagues}
             signedIn={user !== null}
-            asOfTime={formatAbsoluteTime(nowIso)}
+            asOfIso={nowIso}
           />
           {/* The sorting sentence and the one quiet way out of the capped teaser (D3), on the
               shelf's own foot line. The count is the honest remainder the cap held back. */}
