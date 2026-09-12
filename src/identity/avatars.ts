@@ -93,22 +93,30 @@ export function parseAvatarRef(stored: string | null): AvatarRef {
     const preset = presetByKey(value.slice(IDENTITY_CONFIG.avatar.presetPrefix.length));
     return preset === undefined ? { kind: "initials" } : { kind: "preset", preset };
   }
-  // A REMOTE URL IS NOT A FACE ANYBODY CHOSE, while uploads are off (fix round 2, founder's
-  // screenshot of production `/app`: his own ring rendered a generic glyph instead of his
-  // initials). `uploads: false` means no in-product path writes this column a URL at all, so the
-  // only way one gets here is `syncUserFromWorkOS` persisting the identity provider's
-  // `profilePictureUrl` — which is a GENERATED PLACEHOLDER for every account that never uploaded
-  // a photo, not a picture of the manager. Measured in the dev database: 97 rows `null`, one row
-  // a `workoscdn.com/images/v1/…` placeholder, and that one row is why a real manager's card
-  // showed a stock image where his initials belong.
-  //
+  // THE PROVIDER'S GENERATED PLACEHOLDER IS AN ABSENCE, and every other image is an image.
   // Resolved HERE, the one place a stored value becomes something renderable, so every surface
-  // agrees at once rather than each deciding for itself. The write side stopped persisting these
-  // in the same change (`user-sync.ts`); this is what covers the rows already written. When Plan
-  // D lands real uploads, `uploads` flips and the remote branch is live again for values a
-  // manager genuinely chose.
+  // agrees at once rather than each deciding for itself — and narrowed to the one prefix that is
+  // actually a placeholder, because the first cut of this gated ALL remote URLs and took player
+  // headshots down with it (see `isProviderPlaceholder`).
   if (value.startsWith(IDENTITY_CONFIG.avatar.allowedUrlPrefix)) {
-    return IDENTITY_CONFIG.avatar.uploads ? { kind: "remote", url: value } : { kind: "initials" };
+    return isProviderPlaceholder(value) ? { kind: "initials" } : { kind: "remote", url: value };
   }
   return { kind: "initials" };
+}
+
+/**
+ * Whether a stored image URL is the identity provider's GENERATED placeholder rather than a
+ * picture anybody chose (`IDENTITY_CONFIG.avatar.providerPlaceholderPrefix`).
+ *
+ * Exported because two sides read it and must agree: `parseAvatarRef` above, which covers the
+ * rows already written, and `syncUserFromWorkOS` (`@/lib/auth/user-sync`), which stops writing new
+ * ones. A manager who DID upload a photo to the provider keeps it through both.
+ *
+ * DELIBERATELY NARROW. Whatever else is in this column — a player's headshot from the stats feed
+ * on its way through `PlayerFace`, a real uploaded avatar when Plan D lands — is a real image and
+ * renders. The regression this shape exists to prevent is the one the blanket version caused:
+ * every face in the draft room and the pool fell back to initials in production.
+ */
+export function isProviderPlaceholder(url: string): boolean {
+  return url.startsWith(IDENTITY_CONFIG.avatar.providerPlaceholderPrefix);
 }

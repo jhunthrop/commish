@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AVATAR_PRESETS, avatarRefValue, avatarTone, parseAvatarRef, presetByKey } from "./avatars";
+import { AVATAR_PRESETS, avatarRefValue, avatarTone, isProviderPlaceholder, parseAvatarRef, presetByKey } from "./avatars";
 import { IDENTITY_CONFIG } from "./config";
 
 describe("avatarTone", () => {
@@ -31,19 +31,41 @@ describe("parseAvatarRef", () => {
     expect(parseAvatarRef("preset:unicorn")).toEqual({ kind: "initials" });
   });
 
+  it("accepts the https URL WorkOS supplies", () => {
+    expect(parseAvatarRef("https://workoscdn.com/u/abc.png")).toEqual({
+      kind: "remote",
+      url: "https://workoscdn.com/u/abc.png",
+    });
+  });
+
   /**
-   * FIX ROUND 2 (the founder's screenshot of production `/app`). This used to assert the reverse:
-   * that the identity provider's https URL became a `remote` face. It did, and that is the defect
-   * — WorkOS answers a GENERATED PLACEHOLDER for every account that never uploaded a photo, so a
-   * real manager's ring showed a stock image where his initials belong, on every surface at once.
-   * While `IDENTITY_CONFIG.avatar.uploads` is false there is no in-product path that writes this
-   * column a URL at all, so a remote value can only have come from that sync and can only be a
-   * face nobody chose.
+   * THE HOTFIX. Fix round 2 gated EVERY remote URL behind `IDENTITY_CONFIG.avatar.uploads` to keep
+   * the identity provider's generated placeholder off a manager's ring. That swallowed player
+   * headshots with it — `PlayerFace` sends `players.headshot_url` through this same function — and
+   * the draft wall and the pool went to initials in production. The rule names the one prefix that
+   * is actually a placeholder and leaves every other image alone.
    */
-  it("falls back to initials for a provider URL while uploads are off, rather than showing a face nobody chose", () => {
+  it("tells a player's headshot apart from the provider's generated placeholder", () => {
+    const headshot = "https://a.espncdn.com/i/headshots/nfl/players/full/qb1.png";
+    expect(parseAvatarRef(headshot)).toEqual({ kind: "remote", url: headshot });
+    expect(isProviderPlaceholder(headshot)).toBe(false);
+
+    const placeholder = `${IDENTITY_CONFIG.avatar.providerPlaceholderPrefix}lzLc4KQcSglIhS1RTT2QiOjSf8noPd5XN0MBrmhZwmo`;
+    expect(parseAvatarRef(placeholder)).toEqual({ kind: "initials" });
+    expect(isProviderPlaceholder(placeholder)).toBe(true);
+  });
+
+  it("leaves a real picture on the provider's own CDN alone — only the placeholder path falls back", () => {
+    // The rule is host AND path. A photo a manager genuinely uploaded is still a face.
+    expect(parseAvatarRef("https://workoscdn.com/u/abc.png").kind).toBe("remote");
+    expect(isProviderPlaceholder("https://workoscdn.com/u/abc.png")).toBe(false);
+  });
+
+  it("never gates a face on the uploads flag, which is what took the headshots down", () => {
+    // Pinned so the blanket rule cannot come back by accident: `uploads` governs whether the
+    // product offers an upload CONTROL, never whether a stored image renders.
     expect(IDENTITY_CONFIG.avatar.uploads).toBe(false);
-    expect(parseAvatarRef("https://workoscdn.com/u/abc.png")).toEqual({ kind: "initials" });
-    expect(parseAvatarRef("https://workoscdn.com/images/v1/lzLc4KQcSglIhS1RTT2QiOjSf8noPd5XN0MBrmhZwmo")).toEqual({ kind: "initials" });
+    expect(parseAvatarRef("https://a.espncdn.com/i/headshots/nfl/players/full/qb1.png").kind).toBe("remote");
   });
 
   it("refuses every scheme that is not https", () => {

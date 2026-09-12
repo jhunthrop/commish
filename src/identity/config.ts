@@ -14,6 +14,22 @@ export const IDENTITY_CONFIG = {
     uploads: false,
     /** The only URL scheme ever rendered into an `<img src>`. See `parseAvatarRef`. */
     allowedUrlPrefix: "https://",
+    /**
+     * THE IDENTITY PROVIDER'S GENERATED PLACEHOLDER, and nothing else.
+     *
+     * WorkOS answers a `profilePictureUrl` for every account, including the ones that never
+     * uploaded a photo: a generated stock image under this exact prefix. Stored by the sign-in
+     * sync, it dressed a picture nobody chose as a manager's face on every surface at once (the
+     * founder's own ring on production `/app`).
+     *
+     * HOST AND PATH, NOT JUST THE HOST, and never a blanket rule about remote URLs. The first fix
+     * for this gated every `https://` value behind the uploads flag and swallowed player headshots
+     * with it — `PlayerFace` sends `players.headshot_url` (the stats feed's own
+     * `a.espncdn.com/…` images) through the same `parseAvatarRef`, so the wall and the pool went
+     * to initials in production. The rule has to name the one thing that is actually a
+     * placeholder and leave every other image alone.
+     */
+    providerPlaceholderPrefix: "https://workoscdn.com/images/v1/",
   },
   /** `PATCH /api/profile`'s ceiling — keyed per user id, see `profileRateLimited`. */
   profileRateLimit: { maxRequests: 10, windowMs: 60_000 },
