@@ -188,6 +188,64 @@ describe("the draft day and date are the READER's, and always name their zone", 
   });
 });
 
+/**
+ * FIX ROUND 2, the founder's screenshot of production `/app` with three of his own filling
+ * leagues: every one of them printed "Starting now" as its big number for a draft that was not
+ * starting. A room that is not full does not draft at its scheduled instant — it ROLLS
+ * (`nextKickoffAfter`, and the front door says so out loud in `rollBandConsequence`), so a
+ * filling room's stored kickoff is a time already abandoned once per roll.
+ */
+describe("a filling room says seats, never a clock", () => {
+  const PAST = "2026-09-01T00:00:00.000Z";
+  const filling = homeCard({
+    draftStatus: "scheduled",
+    startTrigger: "scheduled",
+    teamCount: 12,
+    filledTeams: 3,
+    kickoffAt: PAST,
+    kickoffRelative: "starting now",
+    slotsRanked: true,
+    record: null,
+    myRank: null,
+  });
+  const full = { ...filling, filledTeams: 12 };
+  const fullAhead = { ...full, kickoffRelative: "in 2 days", kickoffAt: "2026-09-15T01:55:00.000Z" };
+
+  it("ignores a PAST kickoff entirely while a seat is open", () => {
+    expect(momentLine(filling, null)).toBe("Filling, 3 of 12. Drafts when full.");
+    expect(figureFor(filling, null)).toEqual({ value: "9", basis: "seats to go, of 12" });
+    // The defect, named: a past instant must never reach the card as a time.
+    expect(figureFor(filling, null).value).not.toBe("Starting now");
+    expect(momentLine(filling, null)).not.toContain("Starting now");
+  });
+
+  it("says Starting now, and offers the draft, only once the room is FULL", () => {
+    expect(needFor(full)).toBe("draft-starting");
+    expect(isOwed(needFor(full))).toBe(true);
+    expect(momentLine(full, null)).toBe("Starting now.");
+    // The one true number for a room whose seats stopped mattering: how full it is.
+    expect(figureFor(full, null)).toEqual({ value: "12", basis: "seats filled, of 12" });
+    expect(verbFor(full)).toEqual({ label: "Join the draft", href: "/app/drafts/d1" });
+  });
+
+  it("names the day, with the date as the number, for a full room whose time is still ahead", () => {
+    expect(momentLine(fullAhead, null)).toBe("Drafts Tuesday.");
+    expect(figureFor(fullAhead, null)).toEqual({ value: "In 2 days", basis: "Tuesday 15 September, 1:55 AM UTC" });
+    // Not the starting-now verb: the room is full but its clock has not come.
+    expect(verbFor(fullAhead).label).toBe("Run a mock draft");
+  });
+
+  it("puts a room that is starting above every other open task but a draft already running", () => {
+    const ordered = orderByNeed([homeCard({ id: "lineup", lineupSet: false }), { ...full, id: "starting" }]);
+    expect(ordered.map((card) => card.id)).toEqual(["starting", "lineup"]);
+  });
+
+  it("says the room is full without naming a clock it does not have, for a when_full room", () => {
+    const whenFull = { ...full, startTrigger: "when_full" as const, kickoffRelative: null };
+    expect(momentLine(whenFull, null)).toBe("The room is full. Drafts any minute.");
+  });
+});
+
 describe("stackCaption names the people beside the faces", () => {
   it("puts the reader first and counts the rest", () => {
     const members = [

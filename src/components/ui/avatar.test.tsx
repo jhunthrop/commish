@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { Avatar } from "./avatar";
 import { renderSurface } from "./test-utils";
@@ -25,26 +25,23 @@ describe("Avatar", () => {
     expect(screen.getByText("?")).toBeInTheDocument();
   });
 
-  it("renders the image when a remote https avatar ref is given, with an empty alt while decorative", () => {
+  /**
+   * FIX ROUND 2. These two used to assert that a stored https ref rendered as an `<img>` and that
+   * a failed load fell back to initials. Neither state is reachable now: `parseAvatarRef` resolves
+   * every remote value to `initials` while `IDENTITY_CONFIG.avatar.uploads` is false, because the
+   * only writer of a URL was the identity sync and what it wrote was a GENERATED PLACEHOLDER, not
+   * a picture of the manager (the founder's own ring on production `/app`). The `<img>` and its
+   * `onError` fallback stay in the component for Plan D, which is the plan that flips the flag and
+   * brings a test of them back with real uploaded refs to point at.
+   */
+  it("never renders a provider URL as a face while uploads are off", () => {
     const { container } = render(<Avatar name="Dana Whitfield" avatar="https://workoscdn.com/u/a.png" />);
-    const img = container.querySelector("img");
-    expect(img).toHaveAttribute("src", "https://workoscdn.com/u/a.png");
-    expect(img).toHaveAttribute("alt", "");
-  });
-
-  it("falls back to the initials when the remote image fails to load, and tries again for a new ref", () => {
-    const view = render(<Avatar name="Dana Whitfield" avatar="https://workoscdn.com/u/a.png" />);
-    fireEvent.error(view.container.querySelector("img")!);
-    expect(view.container.querySelector("img")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
     expect(screen.getByText("DW")).toBeInTheDocument();
-    view.rerender(<Avatar name="Dana Whitfield" avatar="https://workoscdn.com/u/b.png" />);
-    expect(view.container.querySelector("img")).toHaveAttribute("src", "https://workoscdn.com/u/b.png");
   });
 
   it("becomes an accessible image when labelled", async () => {
-    const { container } = render(
-      <Avatar name="Dana Whitfield" label="Dana Whitfield" avatar="https://workoscdn.com/u/a.png" />,
-    );
+    const { container } = render(<Avatar name="Dana Whitfield" label="Dana Whitfield" />);
     expect(screen.getByRole("img", { name: "Dana Whitfield" })).toBeInTheDocument();
     expect(await axe(container)).toHaveNoViolations();
   });

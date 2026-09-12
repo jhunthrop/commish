@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AVATAR_PRESETS, avatarRefValue, avatarTone, parseAvatarRef, presetByKey } from "./avatars";
+import { IDENTITY_CONFIG } from "./config";
 
 describe("avatarTone", () => {
   it("gives the same id the same tone forever", () => {
@@ -30,11 +31,19 @@ describe("parseAvatarRef", () => {
     expect(parseAvatarRef("preset:unicorn")).toEqual({ kind: "initials" });
   });
 
-  it("accepts the https URL WorkOS supplies", () => {
-    expect(parseAvatarRef("https://workoscdn.com/u/abc.png")).toEqual({
-      kind: "remote",
-      url: "https://workoscdn.com/u/abc.png",
-    });
+  /**
+   * FIX ROUND 2 (the founder's screenshot of production `/app`). This used to assert the reverse:
+   * that the identity provider's https URL became a `remote` face. It did, and that is the defect
+   * — WorkOS answers a GENERATED PLACEHOLDER for every account that never uploaded a photo, so a
+   * real manager's ring showed a stock image where his initials belong, on every surface at once.
+   * While `IDENTITY_CONFIG.avatar.uploads` is false there is no in-product path that writes this
+   * column a URL at all, so a remote value can only have come from that sync and can only be a
+   * face nobody chose.
+   */
+  it("falls back to initials for a provider URL while uploads are off, rather than showing a face nobody chose", () => {
+    expect(IDENTITY_CONFIG.avatar.uploads).toBe(false);
+    expect(parseAvatarRef("https://workoscdn.com/u/abc.png")).toEqual({ kind: "initials" });
+    expect(parseAvatarRef("https://workoscdn.com/images/v1/lzLc4KQcSglIhS1RTT2QiOjSf8noPd5XN0MBrmhZwmo")).toEqual({ kind: "initials" });
   });
 
   it("refuses every scheme that is not https", () => {

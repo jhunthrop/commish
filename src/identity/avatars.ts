@@ -93,6 +93,22 @@ export function parseAvatarRef(stored: string | null): AvatarRef {
     const preset = presetByKey(value.slice(IDENTITY_CONFIG.avatar.presetPrefix.length));
     return preset === undefined ? { kind: "initials" } : { kind: "preset", preset };
   }
-  if (value.startsWith(IDENTITY_CONFIG.avatar.allowedUrlPrefix)) return { kind: "remote", url: value };
+  // A REMOTE URL IS NOT A FACE ANYBODY CHOSE, while uploads are off (fix round 2, founder's
+  // screenshot of production `/app`: his own ring rendered a generic glyph instead of his
+  // initials). `uploads: false` means no in-product path writes this column a URL at all, so the
+  // only way one gets here is `syncUserFromWorkOS` persisting the identity provider's
+  // `profilePictureUrl` — which is a GENERATED PLACEHOLDER for every account that never uploaded
+  // a photo, not a picture of the manager. Measured in the dev database: 97 rows `null`, one row
+  // a `workoscdn.com/images/v1/…` placeholder, and that one row is why a real manager's card
+  // showed a stock image where his initials belong.
+  //
+  // Resolved HERE, the one place a stored value becomes something renderable, so every surface
+  // agrees at once rather than each deciding for itself. The write side stopped persisting these
+  // in the same change (`user-sync.ts`); this is what covers the rows already written. When Plan
+  // D lands real uploads, `uploads` flips and the remote branch is live again for values a
+  // manager genuinely chose.
+  if (value.startsWith(IDENTITY_CONFIG.avatar.allowedUrlPrefix)) {
+    return IDENTITY_CONFIG.avatar.uploads ? { kind: "remote", url: value } : { kind: "initials" };
+  }
   return { kind: "initials" };
 }

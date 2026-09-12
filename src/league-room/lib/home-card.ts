@@ -23,25 +23,60 @@ import { LEAGUE_VERB, MOCK_DRAFT_HREF } from "./verbs";
  * one-time tasks: something this manager, and only this manager, can close. `live` and `idle` are
  * states of the world rather than things owed.
  */
-export type HomeCardNeed = "draft-running" | "lineup-unset" | "slots-unranked" | "live" | "idle";
+export type HomeCardNeed = "draft-running" | "draft-starting" | "lineup-unset" | "slots-unranked" | "live" | "idle";
 
 /** An open one-time task outranks a live week, and a live week outranks a quiet league. Ties keep
  *  the input order, which every caller passes as the home read's own stable league order
  *  (`myLeaguesOverview`: `createdAt` asc), so a quiet league never shuffles under a sibling. */
 const NEED_RANK: Readonly<Record<HomeCardNeed, number>> = {
   "draft-running": 0,
-  "lineup-unset": 1,
-  "slots-unranked": 2,
-  live: 3,
-  idle: 4,
+  "draft-starting": 1,
+  "lineup-unset": 2,
+  "slots-unranked": 3,
+  live: 4,
+  idle: 5,
 };
 
 /** The three needs that are an open one-time task, and therefore may wear the amber wash and the
  *  page's one solid verb (P3). */
-const OWED: ReadonlySet<HomeCardNeed> = new Set<HomeCardNeed>(["draft-running", "lineup-unset", "slots-unranked"]);
+const OWED: ReadonlySet<HomeCardNeed> = new Set<HomeCardNeed>(["draft-running", "draft-starting", "lineup-unset", "slots-unranked"]);
+
+/**
+ * WHETHER THE ROOM IS FULL, which is the only thing that makes a scheduled kickoff mean anything
+ * (fix round 2, the founder's screenshot of production `/app`).
+ *
+ * A league that is not full DOES NOT DRAFT at its scheduled instant. It ROLLS: `nextKickoffAfter`
+ * (`@/matchmaking/roll`) pushes the time forward a whole day and asks the room again, and the
+ * front door says the consequence out loud ("A room that is not full on its day waits for the
+ * next one", `rollBandConsequence`). So a filling room's stored `kickoffAt` is a time that has
+ * already been abandoned once for every roll it has taken, and the card printed it anyway — three
+ * of the founder's own filling leagues read "Starting now" as their one big number for a draft
+ * that was not starting and could not start.
+ *
+ * The rule this enforces: WHILE FILLING, the card says the seats and nothing about a clock,
+ * whatever `kickoffAt` and `kickoffRelative` hold.
+ */
+function isFull(league: HomeLeagueCard): boolean {
+  return league.filledTeams >= league.teamCount;
+}
+
+/**
+ * `relativeDraftTime`'s own zero branch (`@/league/terms`), which is what the server puts on the
+ * wire the moment a chosen kickoff arrives. Spelled here because the client boundary forbids a
+ * value import of `@/league` from a room directory, and `verbs-drift.test.ts` (outside that
+ * boundary) fails if the two spellings ever disagree.
+ */
+export const STARTING_NOW = "starting now";
+
+/** A FULL room whose chosen kickoff has arrived: the one pre-draft state that is genuinely about
+ *  a clock rather than about seats. Never true while a seat is open, by construction. */
+function isStartingNow(league: HomeLeagueCard): boolean {
+  return isFull(league) && league.startTrigger === "scheduled" && league.kickoffRelative === STARTING_NOW;
+}
 
 export function needFor(league: HomeLeagueCard): HomeCardNeed {
   if (league.draftStatus === "in_progress" && league.myTeamId !== null) return "draft-running";
+  if (league.draftStatus === "scheduled" && league.myTeamId !== null && isStartingNow(league)) return "draft-starting";
   // The one-time task ladder, in the order a manager can act on them. A lineup with an empty slot
   // while the week is still open is the most perishable thing on the page: once the week starts
   // it cannot be closed at all.
@@ -72,6 +107,13 @@ export interface HomeCardVerb {
  */
 export function verbFor(league: HomeLeagueCard): HomeCardVerb {
   const need = needFor(league);
+  if (need === "draft-starting" && league.draftId !== null) {
+    // The room is full and its chosen time has come, so the honest verb is the one the draft room
+    // itself offers. `nextAction` still reads `open-draft-room` here (the draft row has not
+    // flipped to `in_progress` until the start door actually runs), which is the weaker word for
+    // a moment this urgent.
+    return { label: LEAGUE_VERB.joinDraft, href: `/app/drafts/${league.draftId}` };
+  }
   if (need === "draft-running" && league.draftId !== null && league.nextAction !== null) {
     // The label off the WIRE, not retyped: `nextAction`'s own first rule is this exact condition
     // (a draft in progress and a seat in it), so the server has already said "Join the draft" in
@@ -124,11 +166,15 @@ export function momentLine(league: HomeLeagueCard, clock: ReaderClock | null): s
     return `Your draft is running.${slot}`;
   }
   if (league.draftStatus === "scheduled") {
-    const when =
-      league.startTrigger === "when_full"
-        ? `Filling, ${league.filledTeams} of ${league.teamCount}. Drafts when full.`
-        : league.kickoffAt === null
-          ? "A draft is scheduled."
+    // THE SEATS COME FIRST. A room with an open seat is filling whatever its stored kickoff says,
+    // because an unfilled room rolls rather than drafting (see `isFull`). Only a full room has a
+    // clock worth naming.
+    const when = !isFull(league)
+      ? `Filling, ${league.filledTeams} of ${league.teamCount}. Drafts when full.`
+      : isStartingNow(league)
+        ? "Starting now."
+        : league.startTrigger === "when_full" || league.kickoffAt === null
+          ? "The room is full. Drafts any minute."
           : `Drafts ${instantWeekday(league.kickoffAt, clock)}.`;
     return league.slotsRanked || league.myTeamId === null ? when : `${when} Your draft slots are not ranked yet.`;
   }
@@ -161,7 +207,13 @@ export function figureFor(league: HomeLeagueCard, clock: ReaderClock | null): Ho
   if (league.draftStatus === "in_progress" && league.assignedSlot !== null) {
     return { value: ordinal(league.assignedSlot), basis: `your slot, of ${league.teamCount}` };
   }
-  if (league.draftStatus === "scheduled" && league.startTrigger === "scheduled" && league.kickoffRelative !== null && league.kickoffAt !== null) {
+  // A DATE IS THE NUMBER ONLY FOR A FULL ROOM WITH A TIME STILL AHEAD OF IT. A filling room falls
+  // through to the seat count below, and a full room whose time has come says how full it is —
+  // "0 seats to go" would be arithmetic about an absence nobody is waiting on any more.
+  if (league.draftStatus === "scheduled" && isFull(league) && isStartingNow(league)) {
+    return { value: String(league.filledTeams), basis: `seats filled, of ${league.teamCount}` };
+  }
+  if (league.draftStatus === "scheduled" && isFull(league) && league.startTrigger === "scheduled" && league.kickoffRelative !== null && league.kickoffAt !== null) {
     // "in 2 days" becomes "In 2 days" at the head of its own figure. Sentence case, not the caps
     // register: the caps charter routes every shout through `MICRO_LABEL`, and this is not one.
     return { value: `${league.kickoffRelative.charAt(0).toUpperCase()}${league.kickoffRelative.slice(1)}`, basis: absoluteInstant(league.kickoffAt, clock) };

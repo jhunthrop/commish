@@ -2,14 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
+import { PageTitle } from "@/components/ui";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import type { HomeBody } from "../contract";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { isHomeBody } from "../lib/home-body";
 import { isOwed, needFor, orderByNeed } from "../lib/home-card";
+import { CreateLeagueDoor } from "./create-league-door";
 import { HomeLeagueCard } from "./home-league-card";
-import { OpenRooms } from "./open-rooms";
+import { OpenRooms, roomsOpenTo } from "./open-rooms";
 
 /**
  * THE SIGNED-IN HOME (Sideline, 2026-09-11), built to the founder-approved mock at
@@ -84,12 +86,23 @@ export function HomeBoard({
   }, [deps]);
 
   const ordered = orderByNeed(body.leagues);
+  // ONE CREATE DOOR PER PAGE (founder ruling, fix round 3). The lobby's heading owns it whenever
+  // the lobby renders, because that is where the mock puts it and where a commissioner scanning
+  // rooms already is. When there is no lobby — an empty house shelf, or every open room already
+  // joined — the page's own heading takes it, so the door and its `#create-league` anchor are
+  // never both absent and never both present. Decided HERE because this is the one place that
+  // knows the manager's leagues and the open rooms at the same time.
+  const openRooms = roomsOpenTo(openLeagues, ordered.map((league) => league.id));
   // The ONE card that may be solid: the first one that is genuinely owed something. `-1` when
   // nothing is owed, and then no card is solid at all.
   const solidIndex = ordered.findIndex((league) => isOwed(needFor(league)));
 
   return (
     <div className="flex flex-col gap-7">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <PageTitle>Your leagues</PageTitle>
+        {openRooms.length === 0 ? <CreateLeagueDoor /> : null}
+      </div>
       {ordered.length === 0 ? null : (
         <ul aria-label="Your leagues" data-testid="home-league-cards" className="flex flex-col gap-4">
           {ordered.map((league, index) => (
@@ -99,7 +112,7 @@ export function HomeBoard({
           ))}
         </ul>
       )}
-      <OpenRooms leagues={openLeagues} alreadyIn={ordered.map((league) => league.id)} featured={ordered.length === 0} />
+      <OpenRooms leagues={openRooms} featured={ordered.length === 0} />
     </div>
   );
 }
