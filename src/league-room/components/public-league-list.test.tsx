@@ -6,6 +6,8 @@ import { renderSurface } from "@/components/ui/test-utils";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { PUBLIC_LEAGUES, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
+import { absoluteInstant, type ReaderClock } from "../lib/day-chapters";
+import { useReaderClock } from "../hooks/use-reader-clock";
 import {
   HOUSE_SHELF_SENTENCE,
   OpenLeagueShelf,
@@ -21,7 +23,19 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
-const AS_OF = "Saturday 12 September, 7:42 PM UTC";
+// The reader's own clock resolves in an EFFECT (`useReaderClock`'s hydration-safe contract), and
+// `render()` flushes effects before returning — so an unmocked test would read whatever zone the
+// machine actually running the suite happens to sit in, never the deterministic fixed UTC/en-US
+// text every other assertion in this file was written against. Pinned to `null` (the pre-mount,
+// server-matching state) for every test but the one below that deliberately exercises the
+// upgrade, the same stub-the-hook idiom `next/navigation` above already uses.
+vi.mock("../hooks/use-reader-clock", () => ({ useReaderClock: vi.fn(() => null) }));
+
+const AS_OF_ISO = "2026-09-12T19:42:00.000Z";
+/** "Saturday 12 September, 7:42 PM UTC" — what `AS_OF_ISO` renders as before the reader's own
+ *  clock resolves (`useReaderClock`'s mocked `null` above), byte-identical to the old fixed
+ *  `formatAbsoluteTime` text this constant used to hold directly. */
+const AS_OF_TEXT = absoluteInstant(AS_OF_ISO, null);
 
 const HOUSE_LEAGUE: PublicLeagueSummary = {
   id: "house_1",
@@ -153,7 +167,7 @@ const cards = () => screen.getByTestId("league-cards");
 describe("OpenLeagueShelf", () => {
   it("renders the merged shelf twice: RANKED rows for lg+ viewports (soonest joinable first), house-first cards below lg", async () => {
     await renderSurface(
-      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />,
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} />,
       async ({ container }) => {
         for (const rendering of [rows(), cards()]) {
           const items = within(rendering).getAllByRole("listitem");
@@ -184,7 +198,7 @@ describe("OpenLeagueShelf", () => {
       ...HOUSE_LEAGUE, id: "sooner", name: "Sooner Twin", houseRung: null, filledTeams: 6,
       draftAtIso: "2026-09-05T20:00:00.000Z",
     };
-    render(<OpenLeagueShelf house={[]} leagues={[later, sooner]} signedIn={false} asOfTime={AS_OF} />);
+    render(<OpenLeagueShelf house={[]} leagues={[later, sooner]} signedIn={false} asOfIso={AS_OF_ISO} />);
     const items = within(rows()).getAllByRole("listitem");
     expect(items[0]!.textContent).toContain("Sooner Twin");
     expect(items[1]!.textContent).toContain("Later Twin");
@@ -194,19 +208,19 @@ describe("OpenLeagueShelf", () => {
   // Entry column once `moneyIsLive()` is true, rather than re-asserting "no money changes hands"
   // for a merged list that can now hold a real fee.
   it("defers to the Entry column once live, and never claims 'no money changes hands' for a mixed list (live prop, injected)", () => {
-    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} live />);
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} live />);
     expect(screen.getByText(MATCHMAKING_CONFIG.liveShelfStakeDisclosure)).toBeInTheDocument();
     expect(screen.queryByText(MATCHMAKING_CONFIG.stakeDisclosure)).not.toBeInTheDocument();
   });
 
   it("keeps the dark disclosure byte-identical when `live` is left at its default (moneyIsLive() false today)", () => {
-    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />);
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} />);
     expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
     expect(screen.queryByText(MATCHMAKING_CONFIG.liveShelfStakeDisclosure)).not.toBeInTheDocument();
   });
 
   it("shows rows at lg and up, cards below — the lg boundary, spelled as classes (Task 13)", () => {
-    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />);
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} />);
     // The row stack exists only at lg+ — the six-column row cannot fit 360px; the card IS the
     // mobile form.
     expect(rows().className).toContain("hidden");
@@ -220,7 +234,7 @@ describe("OpenLeagueShelf", () => {
   });
 
   it("is one paper board of row plates, hairlines gone, under one header naming the columns", () => {
-    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />);
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} />);
     // SIDELINE (2026-09-10): the board is the one material — paper at the 20px card radius on
     // the chalk ground — and each row is a 12px plate inside it. The per-row hairlines are gone:
     // a plate that lifts on hover is already a boundary, and a rule under every plate read as a
@@ -247,7 +261,7 @@ describe("OpenLeagueShelf", () => {
    * -transparency sentence survives on /browse through the `intro` slot (that page's own test).
    */
   it("renders no tips and no guided captions in either rendering, whatever the caller's helpLevel", () => {
-    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />);
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} />);
     expect(screen.queryAllByRole("button", { name: /What is/ })).toHaveLength(0);
     expect(screen.queryByText(GLOSSARY["snake-draft"].short)).not.toBeInTheDocument();
     expect(screen.queryByText(GLOSSARY["house-league"].short)).not.toBeInTheDocument();
@@ -255,19 +269,19 @@ describe("OpenLeagueShelf", () => {
 
   it("renders ONE shelf head: the title at the caller's heading level, the freshness sentence as its quiet sub", () => {
     const { unmount } = render(
-      <OpenLeagueShelf house={[]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />,
+      <OpenLeagueShelf house={[]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} />,
     );
     expect(screen.getByRole("heading", { level: 2, name: "Open leagues" })).toBeInTheDocument();
-    expect(screen.getByText(seatCountsAsOfSentence(AS_OF))).toBeInTheDocument();
+    expect(screen.getByText(seatCountsAsOfSentence(AS_OF_TEXT))).toBeInTheDocument();
     unmount();
 
-    render(<OpenLeagueShelf house={[]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} headingLevel={1} />);
+    render(<OpenLeagueShelf house={[]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} headingLevel={1} />);
     expect(screen.getByRole("heading", { level: 1, name: "Open leagues" })).toBeInTheDocument();
   });
 
   it("prints no explainer prose between the head and the first league — the board explains itself", () => {
     const { container } = render(
-      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />,
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} />,
     );
     expect(occurrences(container, HOUSE_SHELF_SENTENCE)).toBe(0);
     expect(screen.queryByText(/Press any/)).not.toBeInTheDocument();
@@ -283,7 +297,7 @@ describe("OpenLeagueShelf", () => {
         leagues={PUBLIC_LEAGUES}
         signedIn
        
-        asOfTime={AS_OF}
+        asOfIso={AS_OF_ISO}
         headingLevel={1}
         aside={<button type="button">Try a mock draft</button>}
       />,
@@ -305,7 +319,7 @@ describe("OpenLeagueShelf", () => {
     ];
     for (const { house, leagues } of shelves) {
       const { unmount } = render(
-        <OpenLeagueShelf house={house} leagues={leagues} signedIn={false} asOfTime={AS_OF} />,
+        <OpenLeagueShelf house={house} leagues={leagues} signedIn={false} asOfIso={AS_OF_ISO} />,
       );
       // Only one rendering is ever on screen (the lg boundary), so one ink pill in each IS
       // rule 5's one ink action per view.
@@ -319,7 +333,7 @@ describe("OpenLeagueShelf", () => {
     // 11 of 12 seated — tighter than HOUSE_LEAGUE (5 of 12) and PUBLIC_LEAGUES[1] (9 of 10).
     const soon: PublicLeagueSummary = { ...PUBLIC_LEAGUES[0]!, id: "soonest", name: "Fullest Draft Room", filledTeams: 11 };
     render(
-      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={[soon, PUBLIC_LEAGUES[1]!]} signedIn={false} asOfTime={AS_OF} />,
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={[soon, PUBLIC_LEAGUES[1]!]} signedIn={false} asOfIso={AS_OF_ISO} />,
     );
     for (const rendering of [rows(), cards()]) {
       const ink = rendering.querySelector('a[class*="bg-accent"], button[class*="bg-accent"]');
@@ -332,7 +346,7 @@ describe("OpenLeagueShelf", () => {
   // (the dev-render defect) cannot recur.
   it("marks NOTHING ink when nothing genuinely fills — the fallback tightest-seats pick never wears the solid", () => {
     const untouched = PUBLIC_LEAGUES.map((league) => ({ ...league, filledTeams: 0 }));
-    render(<OpenLeagueShelf house={[]} leagues={untouched} signedIn={false} asOfTime={AS_OF} />);
+    render(<OpenLeagueShelf house={[]} leagues={untouched} signedIn={false} asOfIso={AS_OF_ISO} />);
     for (const rendering of [rows(), cards()]) {
       expect(inkPillCount(rendering)).toBe(0);
     }
@@ -343,7 +357,7 @@ describe("OpenLeagueShelf", () => {
     // solid at all and the round's stated P3 outcome never rendered. One per rendering, not one
     // per page: both renderings are in the DOM at every width and CSS picks which is seen.
     const rolled = { ...PUBLIC_LEAGUES[0]!, id: "rolled", name: "Rolled Room", filledTeams: 11, kickoffRolls: 2 };
-    render(<OpenLeagueShelf house={[]} leagues={[rolled, { ...PUBLIC_LEAGUES[1]!, filledTeams: 0 }]} signedIn={false} asOfTime={AS_OF} />);
+    render(<OpenLeagueShelf house={[]} leagues={[rolled, { ...PUBLIC_LEAGUES[1]!, filledTeams: 0 }]} signedIn={false} asOfIso={AS_OF_ISO} />);
     for (const rendering of [rows(), cards()]) {
       expect(inkPillCount(rendering)).toBe(1);
       const ink = rendering.querySelector('a[class*="bg-accent"], button[class*="bg-accent"]');
@@ -361,7 +375,7 @@ describe("OpenLeagueShelf", () => {
         leagues={[soon, PUBLIC_LEAGUES[1]!]}
         signedIn={false}
        
-        asOfTime={AS_OF}
+        asOfIso={AS_OF_ISO}
         featuredInHero
       />,
     );
@@ -372,7 +386,7 @@ describe("OpenLeagueShelf", () => {
 
   it("marks every member league, and only member leagues, for e2e scoping in both renderings (data-testid='member-league')", () => {
     render(
-      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />,
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} />,
     );
     for (const rendering of [rows(), cards()]) {
       const members = rendering.querySelectorAll('[data-testid="member-league"]');
@@ -385,7 +399,7 @@ describe("OpenLeagueShelf", () => {
   // sheet's own verb is what joins (signed in) or rides the hold interstitial (signed out).
   it("opens the join sheet from a verb, and the sheet carries the real join button signed in", () => {
     renderInLeague(
-      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />,
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} />,
       fixtureLeagueDeps().deps,
     );
     for (const rendering of [rows(), cards()]) {
@@ -400,7 +414,7 @@ describe("OpenLeagueShelf", () => {
   });
 
   it("opens the join sheet signed out too, whose verb rides the hold interstitial for THAT league", () => {
-    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn={false} asOfTime={AS_OF} />);
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn={false} asOfIso={AS_OF_ISO} />);
     expect(screen.queryByRole("button", { name: /^Join / })).not.toBeInTheDocument();
     fireEvent.click(within(rows()).getByRole("button", { name: "Take the last seat in Sharks Only Auction." }));
     const sheet = screen.getByRole("dialog", { name: "Join Sharks Only Auction" });
@@ -411,7 +425,7 @@ describe("OpenLeagueShelf", () => {
   });
 
   it("closes the sheet and returns to the board", () => {
-    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn={false} asOfTime={AS_OF} />);
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn={false} asOfIso={AS_OF_ISO} />);
     fireEvent.click(within(rows()).getByRole("button", { name: `Take a seat in ${HOUSE_LEAGUE.name}.` }));
     expect(screen.getByRole("dialog", { name: `Join ${HOUSE_LEAGUE.name}` })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
@@ -420,7 +434,7 @@ describe("OpenLeagueShelf", () => {
 
   it("offers a next action when no member league matches, rather than a dead end", async () => {
     await renderSurface(
-      <OpenLeagueShelf house={[]} leagues={[]} signedIn asOfTime={AS_OF} />,
+      <OpenLeagueShelf house={[]} leagues={[]} signedIn asOfIso={AS_OF_ISO} />,
       async ({ container }) => {
         expect(screen.getByText("No open leagues match")).toBeInTheDocument();
         expect(screen.getByRole("link", { name: "Clear the filters" })).toHaveAttribute("href", "/browse");
@@ -431,18 +445,68 @@ describe("OpenLeagueShelf", () => {
     );
   });
 
-  it("keeps the house leagues standing beside the empty state when only the member list runs dry", () => {
-    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={[]} signedIn asOfTime={AS_OF} />);
+  // Fix round (SIDELINE, 2026-09-10): the front door passes no `filters`, so a capped-to-zero
+  // member list under a board that is already showing house rooms used to render a SECOND,
+  // contradictory section — "No open leagues match" directly beneath a shelf of open leagues.
+  // The section earns its place only when it says something the board above does not; with the
+  // house shelf already standing, it says nothing, so it renders nothing at all — no card, no
+  // heading, no link.
+  it("hides the redundant empty state when the board already shows house leagues (no filters, front door shape)", () => {
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={[]} signedIn asOfIso={AS_OF_ISO} />);
+    // The house league itself still stands — only the second, redundant section is gone.
     // One heading per rendering — jsdom sees both; a browser shows exactly one (the lg boundary).
     expect(screen.getAllByRole("heading", { name: HOUSE_LEAGUE.name })).toHaveLength(2);
+    expect(screen.queryByText("No open leagues match")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Clear the filters" })).not.toBeInTheDocument();
+  });
+
+  // `/browse` passes `filters` (`BrowseFilters`) — a real filter selection that narrows the
+  // MEMBER list to zero is genuine information the house rows above it do not carry, so the
+  // empty state still earns its place there even while the house shelf stands.
+  it("still shows the empty state when a real filter narrows the member list to zero, even beside house leagues", () => {
+    render(
+      <OpenLeagueShelf
+        house={[HOUSE_LEAGUE]}
+        leagues={[]}
+        signedIn
+        asOfIso={AS_OF_ISO}
+        filters={<div>Filter pills</div>}
+      />,
+    );
     expect(screen.getByText("No open leagues match")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Clear the filters" })).toBeInTheDocument();
   });
 
   it("renders no progress bar", () => {
     const { container } = render(
-      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />,
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} />,
     );
     expect(container.querySelector("[role='progressbar']")).not.toBeInTheDocument();
+  });
+
+  /**
+   * The seat-counts sentence's own hydration-safety fix (SIDELINE, 2026-09-10): it used to render
+   * `@/league`'s UTC-fixed `formatAbsoluteTime` forever, on the server AND on every client no
+   * matter whose browser it was. `useReaderClock` (mocked at the top of this file, per test below)
+   * and `absoluteInstant` (`../lib/day-chapters`) now decide it instead — `null` renders the exact
+   * same fixed UTC/en-US words, and a resolved clock upgrades it in place.
+   */
+  describe("the seat-counts sentence's own clock (fix round, SIDELINE 2026-09-10)", () => {
+    it("renders the fixed UTC/en-US shape before the reader's clock resolves — the server-matching state", () => {
+      render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} />);
+      expect(screen.getByText(seatCountsAsOfSentence(AS_OF_TEXT))).toBeInTheDocument();
+      expect(AS_OF_TEXT).toBe("Saturday 12 September, 7:42 PM UTC");
+    });
+
+    it("upgrades to the reader's own zone and locale once useReaderClock resolves one", () => {
+      const pacific: ReaderClock = { nowMs: 0, locale: "en-US", timeZone: "America/Los_Angeles" };
+      vi.mocked(useReaderClock).mockReturnValueOnce(pacific);
+      render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfIso={AS_OF_ISO} />);
+      const expected = absoluteInstant(AS_OF_ISO, pacific);
+      expect(expected).not.toBe(AS_OF_TEXT);
+      expect(screen.getByText(seatCountsAsOfSentence(expected))).toBeInTheDocument();
+      expect(screen.queryByText(seatCountsAsOfSentence(AS_OF_TEXT))).not.toBeInTheDocument();
+    });
   });
 });
 

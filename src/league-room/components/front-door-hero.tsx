@@ -69,9 +69,12 @@ export function FrontDoorHero({ live = moneyIsLive(), states = MONEY_STATES, ins
           element with a role that takes a name. On a bare `div` the `aria-label` was inert. */}
       <Card as="section" className="flex w-full shrink-0 flex-col gap-3 lg:max-w-sm" aria-label="Who is already inside">
         {rooms === 0 ? null : (
+          // Both nouns agree with their own count (fix round, SIDELINE 2026-09-10): "seat"
+          // reads against the big digit above it, "room"/"rooms" against `rooms` right here —
+          // the two were never the same number, so one ternary can't cover both.
           <BigNumber
             value={String(inside!.seatsTaken)}
-            basis={`seats taken across the ${rooms} open ${rooms === 1 ? "room" : "rooms"} below`}
+            basis={`${inside!.seatsTaken === 1 ? "seat" : "seats"} taken across the ${rooms} open ${rooms === 1 ? "room" : "rooms"} below`}
             size="lg"
             align="start"
           />

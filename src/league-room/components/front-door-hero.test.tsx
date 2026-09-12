@@ -62,4 +62,30 @@ describe("FrontDoorHero", () => {
       expect(await axe(container)).toHaveNoViolations();
     });
   });
+
+  describe("the who-is-inside card's basis (fix round, SIDELINE 2026-09-10)", () => {
+    it("says nothing, no card at all, when there are no open rooms to sum", async () => {
+      await renderSurface(<FrontDoorHero inside={{ seatsTaken: 0, openRooms: 0 }} />, ({ queryByText }) => {
+        expect(queryByText(/taken across/)).not.toBeInTheDocument();
+      });
+    });
+
+    it("singularizes seat and pluralizes room independently — they are never the same count", async () => {
+      await renderSurface(<FrontDoorHero inside={{ seatsTaken: 1, openRooms: 2 }} />, ({ getByText }) => {
+        expect(getByText("seat taken across the 2 open rooms below")).toBeInTheDocument();
+      });
+    });
+
+    it("pluralizes seats and singularizes room independently, the other way round", async () => {
+      await renderSurface(<FrontDoorHero inside={{ seatsTaken: 4, openRooms: 1 }} />, ({ getByText }) => {
+        expect(getByText("seats taken across the 1 open room below")).toBeInTheDocument();
+      });
+    });
+
+    it("singularizes both when a single seat is taken in the one open room", async () => {
+      await renderSurface(<FrontDoorHero inside={{ seatsTaken: 1, openRooms: 1 }} />, ({ getByText }) => {
+        expect(getByText("seat taken across the 1 open room below")).toBeInTheDocument();
+      });
+    });
+  });
 });

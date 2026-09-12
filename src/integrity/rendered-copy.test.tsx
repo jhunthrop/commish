@@ -816,15 +816,15 @@ describe("OpenLeagueShelf says nothing that breaks the house copy rules, includi
   // `seatCountsAsOfSentence` all render here and are all swept here, left IN the scanned text
   // rather than subtracted. Task 13's `LeagueRow` rendering (the lg+ form, column header
   // included) is part of this same render, so its copy is swept here too.
-  const AS_OF = "Saturday 12 September, 7:42 PM UTC";
+  const AS_OF_ISO = "2026-09-12T19:42:00.000Z"; // "Saturday 12 September, 7:42 PM UTC"
   // "The Longshot League" is `houseLeagueName("open_12", 3)`'s real output (founder directive
   // 2026-08-26's fun-name pass) — not the retired "Open 12-team League 3" shape.
   const HOUSE = { ...PUBLIC_LEAGUES[0]!, id: "house_sweep", name: "The Longshot League", houseRung: "open_12" as const };
   it("is clean signed in, signed out, house-shelved, and empty", () => {
     for (const element of [
-      <OpenLeagueShelf key="signed-in" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={true} asOfTime={AS_OF} />,
-      <OpenLeagueShelf key="signed-out" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={false} asOfTime={AS_OF} />,
-      <OpenLeagueShelf key="empty" house={[]} leagues={[]} signedIn={true} asOfTime={AS_OF} />,
+      <OpenLeagueShelf key="signed-in" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={true} asOfIso={AS_OF_ISO} />,
+      <OpenLeagueShelf key="signed-out" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={false} asOfIso={AS_OF_ISO} />,
+      <OpenLeagueShelf key="empty" house={[]} leagues={[]} signedIn={true} asOfIso={AS_OF_ISO} />,
     ]) {
       const { container, unmount } = render(element);
       expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name), HOUSE.name);
@@ -839,7 +839,7 @@ describe("OpenLeagueShelf says nothing that breaks the house copy rules, includi
   it("is clean live, with a real entry fee on one listed league", () => {
     const PAID: PublicLeagueSummary = { ...PUBLIC_LEAGUES[0]!, id: "live_paid_sweep", name: "Real Stakes Sweep League", entryFeeCents: 5000 };
     const { container } = render(
-      <OpenLeagueShelf house={[HOUSE]} leagues={[PAID, ...PUBLIC_LEAGUES]} signedIn={false} asOfTime={AS_OF} live />,
+      <OpenLeagueShelf house={[HOUSE]} leagues={[PAID, ...PUBLIC_LEAGUES]} signedIn={false} asOfIso={AS_OF_ISO} live />,
     );
     expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name), HOUSE.name, PAID.name);
   });
