@@ -423,6 +423,27 @@ export const TOKENS = {
    * 44px with the face still present. Read by the row primitives, pinned by `tokens.test.ts`.
    */
   density: { rowPx: 48, denseRowPx: 44, facePx: 36, namePx: 17, maxColumns: 4 },
+  /**
+   * HOW WIDE A READING SURFACE GETS BEFORE IT STOPS GROWING, px.
+   *
+   * 1120 is the approved mock's own column (`docs/design/mocks/2026-09-11/signed-in-home/
+   * signed-in-home.html`: a 1200px wrap with 40px of padding a side). The founder's production
+   * screenshot at a wide window is what named this: the signed-in home ran edge to edge, so a
+   * card's name sat at the far left of a 2560px display and the number and verb it belongs to sat
+   * at the far right, a foot of empty ground between a fact and its own basis. P1 and P2 both
+   * assume a reader can take a card in at one glance.
+   *
+   * A READING surface only. The working surfaces stay full-bleed on purpose and are not to be
+   * capped with this: the draft board wants every column it can get, the wire and the game log
+   * are comparisons, and `AppShell`'s own `<main>` stays `max-w-*`-free (its Step 2 brief) so
+   * each surface makes its own choice. The page's padding lives on that `<main>` (`px-4 py-4`)
+   * and sits outside this cap, which is why the utility only sets a width and a centre.
+   *
+   * One name, so the next reading surface shares the number rather than inventing a neighbour:
+   * emitted as `--commish-layout-reading-column` and spent through the `.reading-column` utility
+   * in `globals.css`.
+   */
+  layout: { readingColumnPx: 1120 },
   /** Minimum supported viewport width, px (mobile-first baseline). */
   minViewport: 360,
 } as const;

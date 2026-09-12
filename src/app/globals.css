@@ -382,6 +382,27 @@ body {
   background-image: linear-gradient(to right, var(--commish-color-accent-glow), transparent 70%);
 }
 
+/* THE READING COLUMN (founder ruling, 2026-09-11, from his production screenshot at a wide
+   window): a reading surface stops growing at `TOKENS.layout.readingColumnPx` and centres. The
+   signed-in home ran edge to edge before this, so on a wide display a card's name sat at the far
+   left and the number and verb it belongs to sat at the far right — P1 and P2 both assume a
+   reader takes a card in at one glance.
+
+   A CSS UTILITY RATHER THAN `max-w-[1120px]` AT A CALL SITE, the same reasoning `.accent-wash`
+   above records for its own class: the number is named ONCE, in `tokens.ts`, emitted by
+   `generate-css.ts`, and spent here — so the next reading surface shares this column instead of
+   retyping a literal that drifts. WIDTH AND CENTRE ONLY: the page's own padding belongs to
+   `AppShell`'s `<main>` (`px-4 py-4`) and stays outside the cap.
+
+   WORKING SURFACES DO NOT TAKE THIS. The draft board wants every column it can get, and the wire
+   and the game log are comparisons that get wider and better — `<main>` is deliberately
+   `max-w-*`-free so each surface chooses, and this is one surface's choice. */
+.reading-column {
+  width: 100%;
+  max-width: var(--commish-layout-reading-column);
+  margin-inline: auto;
+}
+
 /* SIDELINE: your own row. The amber wash, run the same way, so a screen of other people's cards
    can point at yours without that reading as "press this" (the verb is Court blue). */
 .self-wash {

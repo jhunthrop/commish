@@ -44,7 +44,12 @@ async function stampTheme(page: Page, theme: "light" | "dark"): Promise<void> {
 
 const OUT_DIR = ".superpowers/mocks/screenshots";
 const DESK = { width: 1440, height: 1000 };
+/** The founder's own window, and the width at which the missing column was visible. */
+const WIDE = { width: 1920, height: 1080 };
 const PHONE = { width: 360, height: 800 };
+/** `TOKENS.layout.readingColumnPx`. Spelled here because a Playwright spec runs outside the app's
+ *  module graph; `generate-css.test.ts` pins the same number against the token itself. */
+const READING_COLUMN_PX = 1120;
 const THEMES = ["light", "dark"] as const;
 
 /** The one solid verb, by the class only `Button`'s `verb`/`primary` variant carries. */
@@ -92,8 +97,23 @@ for (const theme of THEMES) {
       expect(await lobby.getByTestId("league-rows").locator("li").count()).toBeLessThanOrEqual(3);
 
       await managerD.screenshot({ path: `${OUT_DIR}/signed-in-home-one-1440-${theme}.png` });
+
+      // THE READING COLUMN, at the width that exposed its absence (the founder's own window).
+      // Measured rather than eyeballed: the column stops at the token's number and centres, so
+      // the ground either side of it is real and equal.
+      await managerD.setViewportSize(WIDE);
+      const column = managerD.locator(".reading-column").first();
+      const box = await column.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.width).toBeLessThanOrEqual(READING_COLUMN_PX);
+      // Centred: the gap to the left edge equals the gap to the right, within a pixel.
+      expect(Math.abs(box!.x - (WIDE.width - box!.width - box!.x))).toBeLessThanOrEqual(1);
+      await managerD.screenshot({ path: `${OUT_DIR}/signed-in-home-one-1920-${theme}.png` });
+
       await managerD.setViewportSize(PHONE);
       await expect(cards).toHaveCount(1);
+      // At a phone the column is the viewport less the page's own padding: a cap, never a floor.
+      expect((await column.boundingBox())!.width).toBeLessThan(PHONE.width);
       await managerD.screenshot({ path: `${OUT_DIR}/signed-in-home-one-360-${theme}.png` });
     });
 
