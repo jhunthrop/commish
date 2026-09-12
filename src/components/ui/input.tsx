@@ -6,15 +6,17 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   readonly error?: string;
   readonly hint?: string;
   readonly id?: string;
+  /** Label to assistive tech only — see `FieldShellProps.labelHidden` for when that is allowed. */
+  readonly labelHidden?: boolean;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, error, hint, id: givenId, className = "", ...rest },
+  { label, error, hint, id: givenId, labelHidden = false, className = "", ...rest },
   ref,
 ) {
   const { id, hintId, errorId, describedBy } = useFieldIds(givenId, hint, error);
   return (
-    <FieldShell id={id} label={label} hint={hint} hintId={hintId} error={error} errorId={errorId}>
+    <FieldShell id={id} label={label} labelHidden={labelHidden} hint={hint} hintId={hintId} error={error} errorId={errorId}>
       <input
         ref={ref}
         id={id}

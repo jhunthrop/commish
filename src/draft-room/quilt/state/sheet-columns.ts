@@ -1,4 +1,5 @@
 import type { Player, Position } from "@/domain/player";
+import type { SheetTag } from "@/draft-hq/sheet/types";
 import type { SurvivalOdds, TierStandingView } from "@/draft-service/assistant/view";
 import { reuseListItems } from "@/design/reuse-list-items";
 import { QUILT_CONFIG } from "./config";
@@ -56,6 +57,21 @@ export interface SheetRowModel {
    * number, and null for a player the board holds no value for.
    */
   readonly value: number | null;
+  /**
+   * WHAT THE MANAGER WROTE ON HIM (fix round 1, H2) — his note, his tag and his own tier label,
+   * carried on the row so the one place he reads a player is the one place he marks him. All
+   * three are null in a draft room, whose sheet is an order and nothing else.
+   */
+  readonly note: string | null;
+  readonly tag: SheetTag | null;
+  readonly tierLabel: string | null;
+}
+
+/** A manager's own marks on one player, as the sheet stores them. */
+export interface SheetMark {
+  readonly note: string | null;
+  readonly tag: SheetTag | null;
+  readonly tierLabel: string | null;
 }
 
 export interface SheetBand {
@@ -101,6 +117,8 @@ export interface SheetColumnsInput {
   /** Points over replacement per player, for a sheet read outside a room (`SheetRowModel.value`).
    *  Omitted in a room, where the odds are the row's number. */
   readonly values?: ReadonlyMap<string, number>;
+  /** The manager's own notes, tags and tier labels. Omitted in a room, which stores none. */
+  readonly marks?: ReadonlyMap<string, SheetMark>;
 }
 
 function rowOf(player: Player, rank: number, input: SheetColumnsInput): SheetRowModel {
@@ -115,6 +133,9 @@ function rowOf(player: Player, rank: number, input: SheetColumnsInput): SheetRow
     survived: taken || input.odds === null ? undefined : input.odds.survived[player.id],
     runs,
     value: input.values?.get(player.id) ?? null,
+    note: input.marks?.get(player.id)?.note ?? null,
+    tag: input.marks?.get(player.id)?.tag ?? null,
+    tierLabel: input.marks?.get(player.id)?.tierLabel ?? null,
   };
 }
 

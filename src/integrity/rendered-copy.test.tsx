@@ -120,8 +120,32 @@ const ROW: ActivityRow = {
 };
 
 /** The component's OWN copy: everything on screen minus the content handed to it as props. */
+/**
+ * The surface's own words, with the caller's data pieces taken out.
+ *
+ * ELEMENT BOUNDARIES BECOME A LINE BREAK (fix round 1). `Node.textContent` runs every
+ * descendant's text together with no separator, so two unrelated ELEMENTS sitting next to each
+ * other manufacture a phrase nobody's screen shows: a chip reading "Name: auto" beside a heading
+ * reading "Draft with people" produced "auto draft", and this sweep reported a forbidden term the
+ * product does not say. A break, not a space, because a space still lets two elements compose one
+ * two-word term across a boundary a reader never sees. A guard that fails on adjacency teaches a
+ * reader to route around it, which is worse than not having it.
+ *
+ * TEXT nodes are still joined with NOTHING, and that half matters just as much: React splits one
+ * interpolated sentence into several adjacent text nodes, so spacing those apart would break
+ * every real sentence in the product into fragments and stop the caller's own data pieces from
+ * subtracting at all.
+ */
+function renderedText(node: Node): string {
+  if (node.nodeType === node.TEXT_NODE) return node.textContent ?? "";
+  return [...node.childNodes].map((child) => (child.nodeType === child.ELEMENT_NODE ? `\n${renderedText(child)}\n` : renderedText(child))).join("");
+}
+
+/** Spaces and tabs collapse, line breaks stay: the breaks are the element boundaries above. */
+const flatten = (text: string): string => text.replace(/[ \t]+/g, " ");
+
 function chromeOf(container: HTMLElement, ...content: readonly string[]): string {
-  return content.reduce((text, piece) => text.replace(piece, ""), container.textContent ?? "");
+  return content.reduce((rest, piece) => rest.replace(flatten(piece), ""), flatten(renderedText(container)));
 }
 
 function ariaLabelsOf(container: HTMLElement): readonly string[] {
@@ -1087,6 +1111,9 @@ describe("WaitingRoom says nothing that breaks the house copy rules, across its 
   });
 });
 
+/** Every message body `fixtureChatDeps` seeds the room's stream with. */
+const CHAT_FIXTURE_BODIES: readonly string[] = ["wheels up", "let's go"];
+
 describe("RoomShell says nothing that breaks the house copy rules, including every composed line it renders", () => {
   it("is clean for the commissioner and for an ordinary member", async () => {
     for (const home of [ROOM_DATA.home, { ...ROOM_DATA.home, isCommissioner: false }]) {
@@ -1106,6 +1133,9 @@ describe("RoomShell says nothing that breaks the house copy rules, including eve
         home.terms.commissionerName,
         ...home.teams.map((team) => team.name),
         ...home.teams.map((team) => team.ownerDisplayName),
+        // The chat fixture's own message bodies: what a member typed is data on this surface, the
+        // same as a team name, and this sweep is about the words the PRODUCT says.
+        ...CHAT_FIXTURE_BODIES,
         // The absence-of-a-number glyphs data columns print (`game-state-chip.tsx`'s ruling):
         // data, not copy, exactly as the old LeagueHome sweep subtracted them.
         NOT_STARTED_DASH,

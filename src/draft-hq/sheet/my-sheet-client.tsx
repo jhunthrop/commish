@@ -2,10 +2,10 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Input, Modal, SegmentGroup } from "@/components/ui";
+import { Button, Card, Input, Modal } from "@/components/ui";
 import { DraftHeader } from "@/draft-hq/draft-header";
 import { ScheduledLine, type ScheduledDraft } from "@/draft-hq/scheduled-line";
-import type { SheetSummary } from "./types";
+import type { SheetSummary, SheetTag } from "./types";
 import type { BoardOption, SheetEntryView } from "./view";
 import type { ByeStackWarning, MockHistoryInsights, MostDraftedPlayerView } from "./insights";
 import type { SheetHealthReport } from "./health";
@@ -22,8 +22,11 @@ export interface MySheetClientProps {
   readonly boardOptions: readonly BoardOption[];
   /** The seven columns' own facts, assembled server-side (`columns-payload.ts`). */
   readonly columns: SheetColumnsPayload;
-  /** "2026 board, 12-team PPR" — what every number on a row is under. */
+  /** One sentence: whose rules every number on a row is under (`basisSentence`). */
   readonly basis: string;
+  /** `?league=`/`?format=` as the switch must carry them, so a stop change moves the view and
+   *  not the numbers (fix round 1, H3). */
+  readonly headerQuery: Readonly<Record<string, string>>;
   readonly scheduled: ScheduledDraft | null;
   readonly insights: {
     readonly mockHistory: Omit<MockHistoryInsights, "mostDrafted"> & { readonly mostDrafted: readonly MostDraftedPlayerView[] };
@@ -45,12 +48,13 @@ async function api(input: string, init?: RequestInit): Promise<Response> {
  * separate client cache, so what it shows can never drift from what the room's SHEET tab reads
  * off the same store.
  */
-export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entries, boardOptions, columns, basis, scheduled, insights }: MySheetClientProps) {
+export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entries, boardOptions, columns, basis, headerQuery, scheduled, insights }: MySheetClientProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [modal, setModal] = useState<ModalKind>(null);
   const [nameDraft, setNameDraft] = useState("");
   const [search, setSearch] = useState("");
+  const [sheetsOpen, setSheetsOpen] = useState(false);
   const [unresolved, setUnresolved] = useState<{ readonly unresolvedNames: readonly string[]; readonly duplicateNames: readonly string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -109,6 +113,28 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
     await api(`/api/draft/sheets/${selectedSheetId}/entries`, { method: "POST", body: JSON.stringify({ playerId }) });
     setSearch("");
     refresh();
+  }
+
+  /** THE ROW'S OWN MARKS (fix round 1, H2) — the same three POSTs and one DELETE the retired
+   *  table held, reached from the row itself now rather than from a second list. */
+  function setNote(playerId: string, note: string): void {
+    if (selectedSheetId === null) return;
+    void api(`/api/draft/sheets/${selectedSheetId}/entries`, { method: "POST", body: JSON.stringify({ playerId, note }) }).then(refresh);
+  }
+
+  function setTag(playerId: string, tag: SheetTag | null): void {
+    if (selectedSheetId === null) return;
+    void api(`/api/draft/sheets/${selectedSheetId}/entries`, { method: "POST", body: JSON.stringify({ playerId, tag }) }).then(refresh);
+  }
+
+  function setTierLabel(playerId: string, tierLabel: string | null): void {
+    if (selectedSheetId === null) return;
+    void api(`/api/draft/sheets/${selectedSheetId}/entries`, { method: "POST", body: JSON.stringify({ playerId, tierLabel }) }).then(refresh);
+  }
+
+  function removeEntry(playerId: string): void {
+    if (selectedSheetId === null) return;
+    void api(`/api/draft/sheets/${selectedSheetId}/entries?playerId=${encodeURIComponent(playerId)}`, { method: "DELETE" }).then(refresh);
   }
 
   async function reorder(order: readonly string[]): Promise<void> {
@@ -173,20 +199,9 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
   return (
     <div className="flex flex-col gap-4">
       <div className="print:hidden">
-        <DraftHeader stop="sheet" />
+        <DraftHeader stop="sheet" query={headerQuery} />
       </div>
-      <div className="print:hidden">
-        <ScheduledLine draft={scheduled} />
-      </div>
-      {/* WHICH SHEET, and what you can do to the sheet itself. One quiet row, and it sits BELOW
-          the acts you take on the rows — a manager with one sheet (nearly everyone) never looks
-          at it, and a red Delete above the board was the loudest thing on a page whose one verb
-          is somewhere else entirely. `sheets.length < 2` hides the picker: a strip of one chip is
-          a choice with nothing to choose. */}
-      {sheets.length < 2 ? null : (
-        <SegmentGroup label="Sheet" labelled={false} size="sm" value={selectedSheetId ?? ""} onChange={goTo} options={sheets.map((sheet) => ({ value: sheet.id, label: sheet.name }))} />
-      )}
-
+      <ScheduledLine draft={scheduled} />
       {selectedSheetId === null ? (
         <Card className="flex flex-col gap-3 text-sm text-text-muted">
           <p>You have not started a sheet yet.</p>
@@ -223,20 +238,15 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
             <Button variant="secondary" size="sm" onClick={() => window.print()}>
               Print
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setModal("create")}>
-              New sheet
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setModal("duplicate")}>
-              Duplicate
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setModal("rename")}>
-              Rename
-            </Button>
-            <Button variant="ghost" size="sm" onClick={deleteSheet}>
-              Delete
+            {/* SHEETS FOLDS BEHIND ONE CONTROL (fix round 1, M5). Holding more than one sheet is
+                real and stays; naming four ways to manage a thing beside five ways to use it was
+                ten controls on a line the mock drew five on. The word names the noun, the panel
+                under it names the acts, and a manager with one sheet reads one word. */}
+            <Button variant="ghost" size="sm" aria-expanded={sheetsOpen} onClick={() => setSheetsOpen((was) => !was)}>
+              {`Sheets (${sheets.length})`}
             </Button>
             <div className="w-52">
-              <Input label="Add a player" placeholder="Search a name to add" value={search} onChange={(event) => setSearch(event.target.value)} />
+              <Input label="Add a player" labelHidden placeholder="Search a name to add" value={search} onChange={(event) => setSearch(event.target.value)} />
               {matches.length > 0 ? (
                 <ul className="absolute z-20 mt-1 flex w-52 flex-col rounded-md border border-edge bg-surface-elevated">
                   {matches.map((option) => (
@@ -257,6 +267,29 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
             </div>
           </div>
 
+          {!sheetsOpen ? null : (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-elevated p-3 shadow-card print:hidden">
+              {sheets.map((sheet) => (
+                <Button key={sheet.id} size="sm" variant={sheet.id === selectedSheetId ? "secondary" : "ghost"} aria-current={sheet.id === selectedSheetId ? "true" : undefined} onClick={() => goTo(sheet.id)}>
+                  {`${sheet.name} · ${sheet.entryCount}`}
+                </Button>
+              ))}
+              <span className="flex-1" />
+              <Button variant="ghost" size="sm" onClick={() => setModal("create")}>
+                New sheet
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setModal("duplicate")}>
+                Duplicate
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setModal("rename")}>
+                Rename
+              </Button>
+              <Button variant="ghost" size="sm" onClick={deleteSheet}>
+                Delete
+              </Button>
+            </div>
+          )}
+
           {unresolved === null ? null : (
             <Card className="flex flex-col gap-1 text-sm text-warning">
               {unresolved.unresolvedNames.length === 0 ? null : (
@@ -269,18 +302,34 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
           )}
 
           {/* THE SEVEN COLUMNS (founder amendment 2): the draft room's own sheet component, with
-              the room-only affordances absent by prop. The columns take the whole width — they
-              are the page. */}
-          <div className="flex min-h-[70vh] flex-col">
-            <SheetColumnsView payload={columns} basis={basis} onMove={move} onPlace={place} onMatchBoard={matchBoard} />
-          </div>
-          <div className="print:hidden">
-            <InsightsRail
-              mockHistory={insights.mockHistory}
-              byeStack={insights.byeStack}
-              sheetHealth={insights.sheetHealth}
-              entryNamesByPlayerId={new Map(entries.map((entry) => [entry.playerId, entry.name]))}
-            />
+              the room-only affordances absent by prop.
+
+              THE RAIL SITS BESIDE THEM ON A DESKTOP (fix round 1, M6). Under the columns it was
+              below a 70vh scroller and nobody ever reached it, which is the same as deleting it —
+              and bye stacks and sheet health are real measured facts. On a narrower screen the
+              columns need every pixel and it goes back underneath, where a scroll does reach it. */}
+          <div className="grid min-h-[70vh] grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_17rem]">
+            <div className="flex min-h-[70vh] min-w-0 flex-col">
+              <SheetColumnsView
+                payload={columns}
+                basis={basis}
+                onMove={move}
+                onPlace={place}
+                onMatchBoard={matchBoard}
+                onNote={setNote}
+                onTag={setTag}
+                onTierLabel={setTierLabel}
+                onRemove={removeEntry}
+              />
+            </div>
+            <div className="print:hidden">
+              <InsightsRail
+                mockHistory={insights.mockHistory}
+                byeStack={insights.byeStack}
+                sheetHealth={insights.sheetHealth}
+                entryNamesByPlayerId={new Map(entries.map((entry) => [entry.playerId, entry.name]))}
+              />
+            </div>
           </div>
         </>
       )}

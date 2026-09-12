@@ -24,8 +24,16 @@ export function useFieldIds(id: string | undefined, hint: string | undefined, er
 
 export interface FieldShellProps {
   readonly id: string;
-  /** Required: every control in this product has a visible label. */
+  /** Required: every control in this product is labelled. */
   readonly label: string;
+  /**
+   * Keep the label for assistive tech and take it off the screen. NOT a licence to leave a
+   * control unnamed: the visible name has to come from something ELSE the reader can see — a
+   * placeholder inside a one-field row, or the heading the control sits under. Added for the
+   * sheet row's own note and tier fields, which open inside a 44px row that has no line to give
+   * a label and whose panel is titled by the player's name above it.
+   */
+  readonly labelHidden?: boolean;
   readonly hint?: string;
   readonly hintId?: string;
   readonly error?: string;
@@ -38,10 +46,10 @@ export interface FieldShellProps {
  * the label, the control itself (as `children`), and then the hint and/or error text,
  * matching `Input`'s original layout exactly so extracting this changed no behavior.
  */
-export function FieldShell({ id, label, hint, hintId, error, errorId, children }: FieldShellProps) {
+export function FieldShell({ id, label, labelHidden = false, hint, hintId, error, errorId, children }: FieldShellProps) {
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-text-primary">
+      <label htmlFor={id} className={labelHidden ? "sr-only" : "text-sm font-medium text-text-primary"}>
         {label}
       </label>
       {children}

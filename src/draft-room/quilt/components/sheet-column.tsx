@@ -6,7 +6,7 @@ import { tierBandLabel } from "@/draft-hq/board/copy";
 import { QUILT_CONFIG } from "../state/config";
 import { bandAt, layoutColumn, nextOpenTierOffset, windowFor, type SheetBand, type SheetColumnModel } from "../state/sheet-columns";
 import type { RoomActs } from "./room-acts";
-import { SheetRow } from "./sheet-row";
+import { SheetRow, type SheetRowProps } from "./sheet-row";
 
 export interface SheetColumnProps extends Pick<RoomActs, "canDraft" | "submitting" | "onDraft"> {
   /** Null where no player card exists to open (outside a room). */
@@ -17,6 +17,11 @@ export interface SheetColumnProps extends Pick<RoomActs, "canDraft" | "submittin
   readonly onPlace: ((playerId: string, to: number) => void) | null;
   /** Null outside a room: no queue exists, so no row offers to hold a man in one. */
   readonly onQueueToggle: RoomActs["onQueueToggle"] | null;
+  /** The manager's own marks, forwarded to every row. All null in a room (`SheetRowProps`). */
+  readonly onNote: SheetRowProps["onNote"];
+  readonly onTag: SheetRowProps["onTag"];
+  readonly onTierLabel: SheetRowProps["onTierLabel"];
+  readonly onRemove: SheetRowProps["onRemove"];
   /**
    * THE TWO HEADS THIS COLUMN CAN WEAR (the Draft area round, 2026-09-12). In a room the count
    * that matters is how many of these men are still on the board ("8 left of 50"). Outside one
@@ -74,7 +79,7 @@ function BandHeader({ band, top, pinned, noun, heightPx }: { readonly band: Shee
  * absolutely placed at its offset. The band the scroll is inside stays pinned at the top, so
  * you always know which tier you are in; the jump at the foot scrolls to the next open one.
  */
-export const SheetColumn = memo(function SheetColumn({ column, onMove, onPlace, canDraft, submitting, onDraft, onQueueToggle, onPeek, head = "left", jumpToOpenTier = true, bandNoun = null }: SheetColumnProps) {
+export const SheetColumn = memo(function SheetColumn({ column, onMove, onPlace, canDraft, submitting, onDraft, onQueueToggle, onPeek, onNote, onTag, onTierLabel, onRemove, head = "left", jumpToOpenTier = true, bandNoun = null }: SheetColumnProps) {
   const bandPx = bandNoun === null ? QUILT_CONFIG.sheet.bandPx : QUILT_CONFIG.sheet.bandTallPx;
   const layout = useMemo(() => layoutColumn(column, bandPx), [column, bandPx]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -166,6 +171,10 @@ export const SheetColumn = memo(function SheetColumn({ column, onMove, onPlace, 
                 onDraft={onDraft}
                 onQueueToggle={onQueueToggle}
                 onPeek={onPeek}
+                onNote={onNote}
+                onTag={onTag}
+                onTierLabel={onTierLabel}
+                onRemove={onRemove}
               />
             );
           })}

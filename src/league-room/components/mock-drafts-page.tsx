@@ -41,6 +41,10 @@ import { MockTableChips } from "./mock-table-chips";
 
 /** This surface's own control words — labels, never `MOCK_COPY`'s pre-vetted sentences (the
  *  client boundary split `MODE_ROW_LABEL` recorded for this directory). */
+/** The share of a room that has to be seated before the seat stack adds anything to the count
+ *  beside it (fix round 1, M4). */
+const MOCK_LOBBY_STACK_FROM = 0.25;
+
 const STATUS_ROW_LABEL: Readonly<Record<string, string>> = {
   scheduled: "Waiting to start",
   in_progress: "Drafting now",
@@ -48,7 +52,6 @@ const STATUS_ROW_LABEL: Readonly<Record<string, string>> = {
 
 export interface MockDraftsPageCopy {
   readonly soloDetail: string;
-  readonly tableHint: string;
   readonly openLobbyDetail: string;
   readonly crewDetail: string;
   readonly sheetTieIn: string;
@@ -79,10 +82,15 @@ export interface MockDraftsPageProps {
  */
 function FillingRow({ room, onJoin, joining, busy }: { readonly room: MockLobbyRoomSummary; readonly onJoin: (code: string) => void; readonly joining: boolean; readonly busy: boolean }) {
   const seated = room.teamCount - room.seatsOpen;
+  // THE STACK EARNS ITS PLACE OR IT IS NOT DRAWN (fix round 1, M4). At one of twelve it is a
+  // single solid bar against eleven identical hairlines — a barcode that says nothing "11 seats
+  // left, of 12" does not already say two inches to its right. Past a quarter full the shape
+  // starts carrying the fact, and it draws.
+  const stackEarnsIt = seated / room.teamCount >= MOCK_LOBBY_STACK_FROM;
   return (
     <article data-testid="filling-row" className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-line py-3 first:border-t-0">
       <div className="flex min-w-0 items-center gap-3">
-        <SeatStack filled={seated} total={room.teamCount} />
+        {stackEarnsIt ? <SeatStack filled={seated} total={room.teamCount} /> : null}
         <h3 className="font-display text-lg font-bold text-text-primary">
           {seated} waiting
         </h3>
@@ -276,7 +284,7 @@ export function MockDraftsPage({ initialOpen, initialMine, options, copy }: Mock
             </Button>
           </span>
         </div>
-        <MockTableChips table={table} options={options} hint={copy.tableHint} onChange={rememberTable} />
+        <MockTableChips table={table} options={options} onChange={rememberTable} />
       </section>
 
       {/* The two doors that MAKE the rooms above: without them the lobby could never have a row

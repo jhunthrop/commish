@@ -121,9 +121,23 @@ describe("tiersOf across positions, on the real 2026 board", () => {
     expect(sizes.filter((size) => size === 1).length).toBeGreaterThan(10);
   });
 
-  it("is exactly the old rule when the key and the production are the same quantity", () => {
-    expect(tiersOf(RB_2026, RB_2026)).toEqual(tiersOf(RB_2026));
-    expect(tiersOf(WR_2026, WR_2026)).toEqual(tiersOf(WR_2026));
+  /**
+   * L1 (fix round 1): the old version of this test asserted `tiersOf(x, x) === tiersOf(x)`, which
+   * is true by the parameter's own default and proved nothing. What actually needs pinning is
+   * that the SECOND argument is the denominator and the FIRST is the step — so the same key can
+   * tier two ways depending on what the men behind it are projected to produce.
+   */
+  it("reads the break against production, so the same key tiers two ways", () => {
+    // A ten point step. Behind a 170 point season that is a game's worth (10 >= 170/17) and the
+    // tier breaks; behind a 340 point season it is half of one (10 < 20) and it does not.
+    expect(tiersOf([100, 90], [170, 170])).toEqual([0, 1]);
+    expect(tiersOf([100, 90], [340, 340])).toEqual([0, 0]);
+  });
+
+  it("defaults the denominator to the key, which is what a position pool passes", () => {
+    // Stated once, here, rather than asserted at every position fixture above: a pool hands over
+    // its projected points and gets the rule it has always had.
+    expect(tiersOf(RB_2026)).toEqual(tiersOf(RB_2026, RB_2026));
   });
 
   it("keeps the span cap on the key the reader is looking at", () => {

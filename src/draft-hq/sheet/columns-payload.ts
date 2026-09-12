@@ -1,5 +1,6 @@
 import type { Player } from "@/domain/player";
 import type { BoardRow } from "@/draft-hq/board/service";
+import type { SheetMark } from "@/draft-room/quilt/state/sheet-columns";
 import type { SheetEntryView } from "./view";
 
 /**
@@ -50,6 +51,9 @@ export interface SheetColumnsPayload {
   /** The men this sheet calls targets. They wear the row's amber edge flag, the same mark a
    *  queued player wears in a room — one channel for "yours", never a second colour. */
   readonly targets: readonly string[];
+  /** What the manager wrote on each man he wrote anything on: his note, his tag, his own tier
+   *  label. Only the rows that carry one, so an untouched sheet ships an empty list. */
+  readonly marks: readonly (readonly [string, SheetMark])[];
 }
 
 function playerOf(row: BoardRow): Player {
@@ -103,5 +107,8 @@ export function sheetColumnsPayload(entries: readonly SheetEntryView[], board: r
     tiers,
     overallTiers,
     targets: entries.filter((entry) => entry.tag === "target").map((entry) => entry.playerId),
+    marks: entries
+      .filter((entry) => entry.note !== null || entry.tag !== null || entry.tierLabel !== null)
+      .map((entry) => [entry.playerId, { note: entry.note, tag: entry.tag, tierLabel: entry.tierLabel }] as const),
   };
 }

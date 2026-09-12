@@ -70,7 +70,48 @@ test("the Draft tab opens on the board, one switch with three stops, one solid v
   await expect(managerA).toHaveURL(/\/app\/draft\/sheet/);
   await managerA.goBack();
   await expect(managerA.locator('[data-testid="board-row"]').first()).toBeVisible({ timeout: 30_000 });
+
+  // P10 ON A PHONE (fix round 1, H4). The verb rides the switch row and the basis keeps one line,
+  // so the list starts inside the first screen instead of below it. Four rows is the floor this
+  // asserts; the old layout put ONE above the fold at this size.
+  await managerA.setViewportSize({ width: 360, height: 780 });
+  await expect(managerA.locator('[data-testid="board-row"]').first()).toBeVisible({ timeout: 30_000 });
+  const aboveFold = await managerA.locator('[data-testid="board-row"]').evaluateAll((rows) => rows.filter((row) => row.getBoundingClientRect().bottom <= 780).length);
+  expect(aboveFold, "player rows inside the first phone screen").toBeGreaterThanOrEqual(4);
+  // The verb shares the title's row rather than taking one of its own: three things do not fit
+  // 328px, so the two short ones pair and the switch takes the width under them.
+  const titleTop = await managerA.getByRole("heading", { level: 1, name: "Draft" }).evaluate((node) => node.getBoundingClientRect().top);
+  const verbTop = await managerA.getByRole("link", { name: "Run a mock draft" }).evaluate((node) => node.getBoundingClientRect().top);
+  expect(Math.abs(verbTop - titleTop), "the verb takes a row of its own").toBeLessThan(24);
+  await managerA.setViewportSize({ width: 1440, height: 1000 });
+
   await shoot(managerA, "board");
+});
+
+test("the four retired surfaces still answer, and they answer with the board", async ({ managerA }) => {
+  // M1: these addresses were in the product's own nav and are in browser histories. A 404 is not
+  // what a manager who kept one deserves.
+  for (const gone of ["/app/draft/simulator", "/app/draft/assistant", "/app/draft/adp", "/app/draft/playbook"]) {
+    await managerA.goto(gone);
+    await expect(managerA, `${gone} should land on the board`).toHaveURL(/\/app\/draft\/board/);
+  }
+});
+
+test("one player reads one number on both stops, under one league", async ({ managerA }) => {
+  // H3: the two stops compute the same named quantity, and used to compute it under different
+  // rules with no control on the sheet — one tap on the switch changed every number on screen.
+  await managerA.setViewportSize({ width: 1440, height: 1000 });
+  await managerA.goto(BOARD);
+  const firstRow = managerA.locator('[data-testid="board-row"]').first();
+  await expect(firstRow).toBeVisible({ timeout: 30_000 });
+  const name = (await firstRow.getByTestId("pool-player-name").textContent())?.trim() ?? "";
+  const onBoard = (await firstRow.getByTestId("big-number").locator("> span").first().textContent())?.trim() ?? "";
+  expect(name).not.toBe("");
+
+  await managerA.getByTestId("view-switch").getByRole("link", { name: "Your sheet" }).click();
+  await expect(managerA.locator('[data-testid="sheet-row"]').first()).toBeVisible({ timeout: 60_000 });
+  const onSheet = managerA.locator('[data-testid="sheet-column"][data-column="overall"] [data-testid="sheet-row"]').filter({ hasText: name.split(" ")[0]! }).first();
+  await expect(onSheet).toContainText(onBoard);
 });
 
 test("Overall carries tier bands counted in players, and the $ board carries none", async ({ managerA }) => {
@@ -176,6 +217,25 @@ test("Your sheet is the room's own seven columns, and a keyboard reorder is writ
   await expect(managerA.getByRole("button", { name: "Match our board" })).toBeVisible();
 
   expect(await solidVerbs(managerA)).toEqual(["Run a mock draft"]);
+
+  // H2: the note, the tag and taking a man off are back, on the row they are about, and they are
+  // server writes like every other edit on this sheet.
+  const top = overall.locator('[data-testid="sheet-row"]').first();
+  const topName = (await top.locator("span[title]").first().getAttribute("title")) ?? "";
+  await top.hover();
+  await top.getByRole("button", { name: `Notes and tags for ${topName}` }).click();
+  const panel = top.getByTestId("sheet-row-marks");
+  await expect(panel).toBeVisible();
+  const note = panel.getByLabel(`Note on ${topName}`);
+  await note.fill("Taking him at 1.01");
+  const [noteWritten] = await Promise.all([
+    managerA.waitForResponse((response) => response.url().includes("/entries") && response.request().method() === "POST", { timeout: 30_000 }),
+    note.blur(),
+  ]);
+  expect(noteWritten.ok()).toBe(true);
+  await managerA.reload();
+  await expect(managerA.locator('[data-testid="sheet-row"]').first()).toContainText("Taking him at 1.01", { timeout: 60_000 });
+
   await shoot(managerA, "sheet");
 });
 
@@ -207,7 +267,9 @@ test("Mock drafts is the third stop, names nobody, and its verb sits with the ta
   await expect(row).toContainText("waiting");
   await expect(row).toContainText("seconds a pick");
   await expect(row).toContainText("or sooner if it fills");
-  await expect(row.getByTestId("seat-stack")).toBeVisible();
+  // M4: at one of twelve the stack is a barcode that says nothing the count does not, so it is
+  // not drawn at all. The number carries the fact and names its own basis.
+  expect(await row.getByTestId("seat-stack").count()).toBe(0);
   await expect(row.getByTestId("big-number")).toContainText("seats left, of ");
   await expect(row.getByRole("button", { name: "Take a seat" })).toBeVisible();
   expect(await managerA.getByTestId("manager-stack").count()).toBe(0);

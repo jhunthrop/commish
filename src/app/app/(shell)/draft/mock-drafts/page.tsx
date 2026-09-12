@@ -127,7 +127,6 @@ export default async function MockDraftsLobbyPage({ searchParams }: PageProps) {
           options={options}
           copy={{
             soloDetail: MOCK_COPY.soloDetail,
-            tableHint: MOCK_COPY.tableHint,
             openLobbyDetail: MOCK_COPY.openLobbyDetail,
             crewDetail: MOCK_COPY.crewDetail,
             sheetTieIn: MOCK_COPY.sheetTieIn,

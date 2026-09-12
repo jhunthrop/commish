@@ -17,10 +17,9 @@ import { Select, type SelectOption } from "@/components/ui";
  * least eight objects on a phone screen. A league is a CONTEXT you set once and forget, not a
  * filter you sweep, so it collapses to one 40px control and gives the rows their screen back.
  *
- * `basePath` is the one thing that varies per surface (`/app/draft/board`, `/app/draft/simulator`,
- * `/app/draft/playbook`, …). `extraQuery` (the Playbook's own `?slot=`) carries every OTHER query
- * param the current page depends on through a league change, so switching leagues never silently
- * resets the slot the reader had picked.
+ * `basePath` is the one thing that varies per surface; the Board is its one caller today.
+ * `extraQuery` carries every OTHER query param the current page depends on through a league
+ * change, so switching leagues never silently resets something the reader had already chosen.
  */
 export function LeaguePicker({
   options,

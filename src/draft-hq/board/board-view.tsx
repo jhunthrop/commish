@@ -448,7 +448,10 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
         </button>
       </div>
 
-      {basis === null ? null : <p className="text-sm text-text-muted">{basis}</p>}
+      {/* ONE LINE ON A PHONE (fix round 1, H4): the basis is a sentence a reader checks once,
+          and three lines of it at 360 cost three player rows on the densest list in the product.
+          It truncates on a phone and wraps from `sm:` up, where there is room for all of it. */}
+      {basis === null ? null : <p className="truncate text-sm text-text-muted sm:whitespace-normal">{basis}</p>}
 
       {/* A position the engine publishes no projection for says so, once, above its own table. The
           rows below it are real players in the market's own order with honestly blank projection
@@ -514,7 +517,15 @@ export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLab
                 chips={row.rosterStatus === null ? null : <RosterStatusPill note={row.rosterStatus} />}
                 figure={<BigNumber value={figure.value} basis={figure.basis} size="sm" />}
                 action={
-                  <button type="button" onClick={() => setDrawer({ row })} className="text-sm font-semibold text-accent hover:underline">
+                  // THE QUIET PILL THE MOCK DREW (fix round 1, M3). A bare blue word set flush
+                  // against the figure and its caption read as a third line of the number rather
+                  // than as a control; the pill gives it its own edge and its own gap, and takes
+                  // the accent off a word that is not the page's verb.
+                  <button
+                    type="button"
+                    onClick={() => setDrawer({ row })}
+                    className="ml-3 rounded-pill border border-edge px-2.5 py-1 text-sm font-medium text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
                     why
                   </button>
                 }

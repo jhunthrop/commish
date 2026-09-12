@@ -58,7 +58,7 @@ export function ScheduledLine({ draft }: { readonly draft: ScheduledDraft | null
       href={`/app/drafts/${draft.draftId}`}
       data-testid="scheduled-line"
       data-drafting={draft.drafting ? "true" : undefined}
-      className="flex items-center gap-3 rounded-lg bg-surface-elevated px-4 py-3 text-sm text-text-muted shadow-card hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      className="flex items-center gap-3 rounded-lg bg-surface-elevated px-4 py-3 text-sm text-text-muted shadow-card hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent print:hidden"
     >
       <Crest id={draft.leagueId} name={draft.leagueName} size={34} />
       <span className="min-w-0">

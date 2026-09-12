@@ -6,6 +6,7 @@ import { useReusedValue } from "@/design/use-stable-list";
 import { SheetColumn } from "@/draft-room/quilt/components/sheet-column";
 import { SheetScroller } from "@/draft-room/quilt/components/sheet-scroller";
 import { buildSheetColumns, movesOffBoard, reuseSheetColumns, SHEET_COLUMN_LABEL } from "@/draft-room/quilt/state/sheet-columns";
+import type { SheetTag } from "./types";
 import type { SheetColumnsPayload } from "./columns-payload";
 
 /**
@@ -26,11 +27,17 @@ import type { SheetColumnsPayload } from "./columns-payload";
  */
 export interface SheetColumnsViewProps {
   readonly payload: SheetColumnsPayload;
-  /** The scoring and shape every number on these rows is under ("2026 board, 12-team PPR"). */
+  /** Whose rules every number on these rows is under, as one finished sentence
+   *  (`basisSentence`) — the same sentence the Board prints, because it is the same board. */
   readonly basis: string;
   readonly onMove: (playerId: string, delta: number) => void;
   readonly onPlace: (playerId: string, to: number) => void;
   readonly onMatchBoard: () => void;
+  /** The manager's own marks on a row, written straight through to the sheet's API. */
+  readonly onNote: (playerId: string, note: string) => void;
+  readonly onTag: (playerId: string, tag: SheetTag | null) => void;
+  readonly onTierLabel: (playerId: string, tierLabel: string | null) => void;
+  readonly onRemove: (playerId: string) => void;
 }
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
@@ -40,11 +47,12 @@ function bandNounFor(key: string): string {
   return key === "overall" ? "ALL" : SHEET_COLUMN_LABEL[key as keyof typeof SHEET_COLUMN_LABEL];
 }
 
-export function SheetColumnsView({ payload, basis, onMove, onPlace, onMatchBoard }: SheetColumnsViewProps) {
+export function SheetColumnsView({ payload, basis, onMove, onPlace, onMatchBoard, onNote, onTag, onTierLabel, onRemove }: SheetColumnsViewProps) {
   const playersById = useMemo(() => new Map(payload.players.map((player) => [player.id, player] as const)), [payload.players]);
   const available = useMemo(() => new Set(payload.players.map((player) => player.id)), [payload.players]);
   const values = useMemo(() => new Map(payload.values), [payload.values]);
   const targets = useMemo(() => new Set(payload.targets), [payload.targets]);
+  const marks = useMemo(() => new Map(payload.marks), [payload.marks]);
   const built = useMemo(
     () =>
       buildSheetColumns({
@@ -58,8 +66,9 @@ export function SheetColumnsView({ payload, basis, onMove, onPlace, onMatchBoard
         odds: null,
         hideTaken: false,
         values,
+        marks,
       }),
-    [payload.order, payload.tiers, payload.overallTiers, playersById, available, values, targets],
+    [payload.order, payload.tiers, payload.overallTiers, playersById, available, values, targets, marks],
   );
   const columns = useReusedValue(built, reuseSheetColumns);
   const moved = useMemo(() => movesOffBoard(payload.order, payload.boardIds), [payload.order, payload.boardIds]);
@@ -67,7 +76,8 @@ export function SheetColumnsView({ payload, basis, onMove, onPlace, onMatchBoard
   return (
     <div data-testid="draft-area-sheet" className="group/sheet flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-0.5">
-        <p data-testid="sheet-basis" className="max-w-[78ch] text-sm text-text-muted">
+        {/* ONE LINE ON A PHONE (fix round 1, H4), the whole sentence from `sm:` up. */}
+        <p data-testid="sheet-basis" className="max-w-[78ch] truncate text-sm text-text-muted sm:whitespace-normal">
           {moved === 0 ? (
             <>
               <span className="font-semibold text-text-primary">Our board, untouched</span>.{" "}
@@ -77,7 +87,7 @@ export function SheetColumnsView({ payload, basis, onMove, onPlace, onMatchBoard
               Started from our board, <span className="font-semibold text-text-primary">{moved} of yours moved</span>.{" "}
             </>
           )}
-          {`The number is points over a replacement at his position, ${basis}. K and D/ST are in ADP order.`}
+          {`The number is points over a replacement at his position. ${basis} K and D/ST are in ADP order.`}
         </p>
         <span className="flex-1" />
         {moved === 0 ? null : (
@@ -102,6 +112,10 @@ export function SheetColumnsView({ payload, basis, onMove, onPlace, onMatchBoard
             onDraft={() => {}}
             onQueueToggle={null}
             onPeek={null}
+            onNote={onNote}
+            onTag={onTag}
+            onTierLabel={onTierLabel}
+            onRemove={onRemove}
           />
         )}
       />

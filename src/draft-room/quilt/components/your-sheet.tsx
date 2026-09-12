@@ -113,6 +113,10 @@ export function YourSheet({ sheet, boardIds, playersById, available, myPlayerIds
             onDraft={onDraft}
             onQueueToggle={onQueueToggle}
             onPeek={onPeek}
+            onNote={null}
+            onTag={null}
+            onTierLabel={null}
+            onRemove={null}
           />
         )}
       />
