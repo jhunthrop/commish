@@ -34,6 +34,8 @@ export interface SheetColumnProps extends Pick<RoomActs, "canDraft" | "submittin
    * positions. Null keeps the room's own live count ("3 of 5 left").
    */
   readonly bandNoun?: string | null;
+  /** "2.01": the pick every row's share is measured at; null where there is no next pick (HQ). */
+  readonly nextPickLabel?: string | null;
   /**
    * The jump to the next open tier at the column's foot. Room-only by prop, not by accident: with
    * nothing taken every tier below is open, so the button would offer to scroll to the very next
@@ -79,7 +81,7 @@ function BandHeader({ band, top, pinned, noun, heightPx }: { readonly band: Shee
  * absolutely placed at its offset. The band the scroll is inside stays pinned at the top, so
  * you always know which tier you are in; the jump at the foot scrolls to the next open one.
  */
-export const SheetColumn = memo(function SheetColumn({ column, onMove, onPlace, canDraft, submitting, onDraft, onQueueToggle, onPeek, onNote, onTag, onTierLabel, onRemove, head = "left", jumpToOpenTier = true, bandNoun = null }: SheetColumnProps) {
+export const SheetColumn = memo(function SheetColumn({ column, onMove, onPlace, canDraft, submitting, onDraft, onQueueToggle, onPeek, onNote, onTag, onTierLabel, onRemove, head = "left", jumpToOpenTier = true, bandNoun = null, nextPickLabel = null }: SheetColumnProps) {
   const bandPx = bandNoun === null ? QUILT_CONFIG.sheet.bandPx : QUILT_CONFIG.sheet.bandTallPx;
   const layout = useMemo(() => layoutColumn(column, bandPx), [column, bandPx]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -161,6 +163,7 @@ export const SheetColumn = memo(function SheetColumn({ column, onMove, onPlace, 
                 row={item.row}
                 top={top}
                 column={column.key}
+                nextPickLabel={nextPickLabel}
                 onMove={onMove}
                 onDragStart={onPlace === null ? null : onDragStart}
                 onDropOn={onPlace === null ? null : onDropOn}

@@ -44,18 +44,18 @@ function renderPool({ canDraft = false, recomputing = false, coarse = false, onD
 const rows = () => within(screen.getByRole("list", { name: "Available players, best first" })).getAllByTestId("pool-row").filter((row) => row.getAttribute("aria-hidden") !== "true");
 
 describe("PoolList (the pool is the dock)", () => {
-  it("shows one page, best first, each row a face, a name, the club and bye, one number with a short caption, and one quiet control; the basis is stated once above", () => {
+  it("shows one page, best first, each row a face, a name, the club and bye, one whole percentage with the pick beneath it, and one quiet control", () => {
     renderPool();
     const listed = rows();
     expect(listed).toHaveLength(DRAFT_ROOM_CONFIG.poolPageSize);
-    expect(screen.getByTestId("pool-basis")).toHaveTextContent("of 100 runs, still there at 2.07");
+    expect(screen.queryByTestId("pool-basis")).toBeNull();
     const first = listed[0]!;
     expect(within(first).getByTestId("pool-player-name")).toHaveTextContent("Back 1");
     expect(within(first).getByTestId("pool-player-team")).toHaveTextContent("KC");
     expect(first).toHaveTextContent("bye 10");
-    expect(within(first).getByTestId("big-number")).toHaveTextContent("12");
-    expect(within(first).getByTestId("big-number")).toHaveTextContent("of 100");
-    expect(within(first).getByTestId("big-number")).not.toHaveTextContent("still there");
+    expect(within(first).getByTestId("big-number")).toHaveTextContent("12%");
+    expect(within(first).getByTestId("big-number")).toHaveTextContent("still there at 2.07");
+    expect(within(first).getByTestId("big-number")).not.toHaveTextContent("100");
     expect(within(first).getByRole("button", { name: "Queue Back 1" })).toBeInTheDocument();
     expect(within(listed[1]!).getByRole("button", { name: "Remove Back 2 from your queue" })).toHaveAttribute("aria-pressed", "true");
     // A player the runs did not reach prints a dash with the reason, never a zero.

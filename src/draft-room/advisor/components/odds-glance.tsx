@@ -5,11 +5,12 @@ import { Badge } from "@/components/ui";
 import type { SurvivalOdds } from "@/draft-service/assistant/view";
 import { MOTION } from "@/design/motion";
 import { useChangeKey } from "@/design/use-change-key";
-import { oddsTooltipText, percentText, runsOverRuns } from "../format";
+import { oddsTooltipText, percentText, runsOverRuns, stillThereAt } from "../format";
 
-/** `percent` is a pool row's glance ("46%"), `runs` is the advisor's own row ("57 of 200"),
- *  `count` is a sheet row's stacked figure: the survived count large, "of 100" small under it. */
-export type OddsGlanceForm = "percent" | "runs" | "count";
+/** `percent` is a chip ("46%"), `runs` is the advisor's own shortlist row ("57 of 200"), `share`
+ *  is a sheet row's stacked figure: the whole percentage large, "still there at 2.01" beneath
+ *  (founder ruling 2026-09-12: the replay count leaves every row). */
+export type OddsGlanceForm = "percent" | "runs" | "share";
 
 export interface OddsFigureProps {
   /** Runs in which the player was still there at the viewer's next turn. */
@@ -17,6 +18,8 @@ export interface OddsFigureProps {
   readonly runs: number;
   /** @default "percent" */
   readonly form?: OddsGlanceForm;
+  /** The pick the share is measured at, for the `share` form's basis ("still there at 2.01"). */
+  readonly pickLabel?: string | null;
 }
 
 export interface OddsGlanceProps {
@@ -26,7 +29,7 @@ export interface OddsGlanceProps {
   readonly form?: OddsGlanceForm;
 }
 
-const TEST_ID: Readonly<Record<OddsGlanceForm, string>> = { percent: "advisor-odds-pct", runs: "advisor-odds-runs", count: "advisor-odds-count" };
+const TEST_ID: Readonly<Record<OddsGlanceForm, string>> = { percent: "advisor-odds-pct", runs: "advisor-odds-runs", share: "advisor-odds-share" };
 
 /** The three bands as ink, for the stacked form (the chip forms wear the positive chip on safe). */
 const BAND_INK: Readonly<Record<ReturnType<typeof survivalBand>, string>> = {
@@ -45,11 +48,14 @@ const BAND_INK: Readonly<Record<ReturnType<typeof survivalBand>, string>> = {
  * ink (never the warning or live roles, which are the clock's alarm channel), and a reach keeps
  * the critical ink.
  */
-export function OddsFigure({ survived, runs, form = "percent" }: OddsFigureProps) {
+export function OddsFigure({ survived, runs, form = "percent", pickLabel = null }: OddsFigureProps) {
   const survival = survived / runs;
   const band = survivalBand(survival);
-  const tooltip = oddsTooltipText(survived, runs);
-  const text = form === "percent" ? percentText(survival) : form === "count" ? String(survived) : runsOverRuns(survived, runs);
+  const text = form === "runs" ? runsOverRuns(survived, runs) : percentText(survival);
+  const basis = pickLabel === null ? "at your next pick" : stillThereAt(pickLabel);
+  // The share form's tooltip and screen-reader line say what its face says: the replay count
+  // leaves every row (founder ruling 2026-09-12); the chip forms keep the runs in the tooltip.
+  const tooltip = form === "share" ? `${text}, ${basis}` : oddsTooltipText(survived, runs);
   const changeKey = useChangeKey(text);
   const shared = { "data-testid": TEST_ID[form], "data-band": band, title: tooltip } as const;
   const label = (
@@ -60,12 +66,14 @@ export function OddsFigure({ survived, runs, form = "percent" }: OddsFigureProps
       <span className="sr-only">{tooltip}</span>
     </>
   );
-  if (form === "count") {
+  if (form === "share") {
     return (
       <span {...shared} className={`flex shrink-0 flex-col items-end leading-none ${BAND_INK[band]}`}>
-        <span className="font-display text-md font-extrabold tabular-nums">{label}</span>
-        <span aria-hidden="true" className="text-[9px] text-text-faint">
-          of {runs}
+        <span className="font-display text-sm font-extrabold tabular-nums">{label}</span>
+        {/* The basis wraps inside its own three rems under the figure ("still there" over
+            "at 2.01"), so a 12.5rem column keeps the name's width (P1). */}
+        <span aria-hidden="true" className="max-w-11 text-right text-[9px] leading-[1.1] text-text-faint">
+          {basis}
         </span>
       </span>
     );

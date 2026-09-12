@@ -106,6 +106,7 @@ export function YourSheet({ sheet, boardIds, playersById, available, myPlayerIds
         renderColumn={(column) => (
           <SheetColumn
             column={column}
+            nextPickLabel={nextPickLabel}
             onMove={column.key === "overall" ? onMove : null}
             onPlace={column.key === "overall" ? onPlace : null}
             canDraft={canDraft}

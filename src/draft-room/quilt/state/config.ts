@@ -65,11 +65,11 @@ export const QUILT_CONFIG = {
      *  off the end of a number, which is the one thing a basis may never lose. */
     bandTallPx: 40,
     overscanRows: 6,
-    /** Characters a row's name column holds whole beside the 28px face, the rank and the figure,
-     *  in the approved widths (15rem Overall, 12.5rem a position) at the display face's 13px
-     *  bold, about 7px a character: 126px and 86px of name. Past it, `sheetDisplayName`.
-     *  Measured on the 2026 board at 1440: thirteen characters ("De'Von Achane") still clipped. */
-    nameChars: { overall: 18, position: 12 },
+    /** Pixels a row's name column holds beside the 28px face, the rank and the share's figure,
+     *  in the approved widths (15rem Overall, 12.5rem a position): the name's width is
+     *  estimated per glyph (`estimateNameWidthPx`) and the spec measures the truth at 1440.
+     *  A character count misjudged wide names ("Chase Brown" at eleven still clipped). */
+    nameWidthPx: { overall: 118, position: 72 },
   },
   /** The stream's two desktop widths, px (ruling 2): the rail and the open column. */
   stream: { railPx: 64, openPx: 320, presenceFaceCap: 4 },

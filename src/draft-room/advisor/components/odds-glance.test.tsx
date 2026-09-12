@@ -6,6 +6,22 @@ import { OddsGlance } from "./odds-glance";
 const ODDS = { pickNumber: 20, runs: 200, survived: { safe: 140, middle: 100, reach: 49, edge: 50 } };
 
 describe("OddsGlance", () => {
+  it("stacks a sheet row's share as a whole percentage over the pick it is measured at, in the same bands", () => {
+    render(
+      <>
+        <OddsGlance odds={ODDS} playerId="safe" form="share" />
+        <OddsGlance odds={ODDS} playerId="reach" form="share" />
+      </>,
+    );
+    const cells = screen.getAllByTestId("advisor-odds-share");
+    expect(cells[0]).toHaveTextContent("70%");
+    expect(cells[0]).toHaveTextContent("at your next pick");
+    expect(cells[0]).not.toHaveTextContent("of 200");
+    expect(cells[0]!.className).toContain("text-positive");
+    expect(cells[1]).toHaveTextContent("25%");
+    expect(cells[1]!.className).toContain("text-negative");
+  });
+
   it("prints the percent with the runs in the tooltip, banded at the shared thresholds: a soft positive chip, secondary ink, critical ink", () => {
     render(
       <>

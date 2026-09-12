@@ -11,7 +11,8 @@ import type { Unread } from "../state/stream-items";
 
 export interface RailCall {
   readonly player: Player;
-  readonly survived: number | null;
+  /** "79%": the share of replays with him still there at your next pick, or null with no runs. */
+  readonly share: string | null;
 }
 
 export interface StreamRailProps {
@@ -76,10 +77,10 @@ export function StreamRail({ unread, present, lastPick, lastPickTeam, lastPickPl
       )}
       <span className="flex-1" />
       {call === null ? null : (
-        <div data-testid="rail-call" aria-label={`Our call, ${call.player.name}${call.survived === null ? "" : `, ${call.survived} runs still have him`}`} className="flex flex-col items-center gap-0.5">
+        <div data-testid="rail-call" aria-label={`Our call, ${call.player.name}${call.share === null ? "" : `, ${call.share} still there at your next pick`}`} className="flex flex-col items-center gap-0.5">
           <span className={`${MICRO_LABEL} text-[9px] text-text-faint`}>Our call</span>
           <PlayerFace player={call.player} size="sm" />
-          {call.survived === null ? null : <span className="font-display text-sm font-extrabold tabular-nums text-text-primary">{call.survived}</span>}
+          {call.share === null ? null : <span className="font-display text-sm font-extrabold tabular-nums text-text-primary">{call.share}</span>}
         </div>
       )}
       <button type="button" aria-label="Hide the room" onClick={onHide} className="text-[10px] font-semibold text-text-faint hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">

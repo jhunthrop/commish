@@ -30,6 +30,8 @@ export interface SheetRowProps extends Pick<RoomActs, "canDraft" | "submitting" 
   /** Which column this row sits in: Overall shows the position and reorders by drag, and each
    *  column has its own name budget (`sheetDisplayName`). */
   readonly column: SheetColumnKey;
+  /** "2.01": the pick the share is measured at, for the figure's basis; null outside a room. */
+  readonly nextPickLabel: string | null;
   readonly onMove: ((playerId: string, delta: number) => void) | null;
   readonly onDragStart: ((playerId: string) => void) | null;
   readonly onDropOn: ((playerId: string) => void) | null;
@@ -70,7 +72,7 @@ function allowDrop(event: DragEvent<HTMLElement>): void {
  * MEMOIZED over a row model whose facts are primitives, so a pick landing re-renders the row
  * that was taken and nothing else in the column.
  */
-export const SheetRow = memo(function SheetRow({ row, top, column, onMove, onDragStart, onDropOn, first, last, canDraft, submitting, onDraft, onQueueToggle, onPeek, onNote, onTag, onTierLabel, onRemove }: SheetRowProps) {
+export const SheetRow = memo(function SheetRow({ row, top, column, nextPickLabel, onMove, onDragStart, onDropOn, first, last, canDraft, submitting, onDraft, onQueueToggle, onPeek, onNote, onTag, onTierLabel, onRemove }: SheetRowProps) {
   const { player, rank, taken, mine, queued, survived, runs, value, note, tag, tierLabel } = row;
   const draggable = onDragStart !== null && !taken;
   const overall = column === "overall";
@@ -131,7 +133,7 @@ export const SheetRow = memo(function SheetRow({ row, top, column, onMove, onDra
               prints the dash it earns rather than a zero. */}
           <span className="group-focus-within:hidden group-hover:hidden group-data-[recomputing=true]/sheet:opacity-60">
             {runs !== null && survived !== undefined ? (
-              <OddsFigure survived={survived} runs={runs} form="count" />
+              <OddsFigure survived={survived} runs={runs} form="share" pickLabel={nextPickLabel} />
             ) : value !== null ? (
               <span className="font-display text-sm font-bold tabular-nums text-text-primary">{value.toFixed(1)}</span>
             ) : (

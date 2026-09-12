@@ -7,7 +7,7 @@ import type { DraftStateView } from "@/draft-engine";
 import type { AdvisorView } from "@/draft-service/assistant/view";
 import { BigNumber, Button, PlayerFace, PositionBadge } from "@/components/ui";
 import { pickLabel } from "@/domain/pick-label";
-import { oddsBasis } from "../../advisor/format";
+import { sharePercent, stillThereAt } from "../../advisor/format";
 import { rosterFillRows } from "../../state/roster-fill";
 import type { RoomActs } from "./room-acts";
 
@@ -137,7 +137,7 @@ export const DockCall = memo(function DockCall({ view, myTeamId, playersById, ad
         </div>
       </div>
       <div className="flex flex-col items-end">
-        <BigNumber size={compact ? "sm" : "md"} value={call.survived === null ? null : String(call.survived)} basis={oddsBasis(call.runs, nextPickLabel)} className={recomputing ? "opacity-60" : ""} />
+        <BigNumber size={compact ? "sm" : "md"} value={sharePercent(call.survived, call.runs)} basis={call.runs === null ? "no runs yet" : stillThereAt(nextPickLabel)} className={recomputing ? "opacity-60" : ""} />
         {/* Always in the flow under the figure, silent when idle: a word appearing must never
             shift the block, and here it takes no width from the name line. */}
         <span data-testid="advisor-recomputing" data-active={recomputing ? "true" : "false"} aria-hidden={!recomputing} className={`text-xs text-text-faint ${recomputing ? "" : "invisible"}`}>

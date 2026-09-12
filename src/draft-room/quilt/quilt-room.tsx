@@ -5,6 +5,7 @@ import type { Player } from "@/domain/player";
 import type { BoardReason } from "@/projections/preseason/board";
 import { useToast } from "@/components/ui";
 import { useMediaQuery } from "@/design/use-media-query";
+import { sharePercent } from "../advisor/format";
 import { useAdvisor } from "../advisor/use-advisor";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { useQueueHandlers } from "../hooks/use-queue-handlers";
@@ -168,7 +169,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
     if (pick === null) return null;
     const player = playersById.get(pick.playerId);
     if (player === undefined) return null;
-    return { player, survived: pick.makeItBack === null ? null : Math.round(pick.makeItBack.survival * pick.makeItBack.runs) };
+    return { player, share: pick.makeItBack === null ? null : sharePercent(Math.round(pick.makeItBack.survival * pick.makeItBack.runs), pick.makeItBack.runs) };
   }, [advisor.view, playersById]);
 
   const tiers = advisor.view?.tiers;
