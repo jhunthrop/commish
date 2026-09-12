@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { FALLBACK_TIME_ZONE, byDay, dayKey, dayMarker, type ReaderClock } from "./day-chapters";
+import { FALLBACK_LOCALE, FALLBACK_TIME_ZONE, absoluteInstant, byDay, dayKey, dayMarker, type ReaderClock } from "./day-chapters";
 
 const NOW = new Date(2026, 8, 10, 15, 0, 0);
 const CLOCK: ReaderClock = { nowMs: NOW.getTime(), locale: "en-US", timeZone: "America/Los_Angeles" };
@@ -80,6 +80,47 @@ describe("dayMarker", () => {
   it("falls back to UTC when nothing has told it the reader's zone", () => {
     expect(FALLBACK_TIME_ZONE).toBe("UTC");
     expect(dayMarker(NEAR_MIDNIGHT, null)).toMatch(/September 11/);
+  });
+});
+
+describe("absoluteInstant", () => {
+  // The seat-count sentence's own instant (`seatCountsAsOfSentence`,
+  // `../components/public-league-list.tsx`): the day AND the clock, checkable against the zone
+  // that produced them.
+  const INSTANT = new Date(Date.UTC(2026, 8, 12, 0, 15)).toISOString();
+
+  it("matches formatAbsoluteTime's fixed UTC shape when no clock has resolved yet", () => {
+    expect(FALLBACK_LOCALE).toBe("en-US");
+    expect(FALLBACK_TIME_ZONE).toBe("UTC");
+    expect(absoluteInstant(INSTANT, null)).toBe("Saturday 12 September, 12:15 AM UTC");
+  });
+
+  it("prints the identical shape for a clock that happens to resolve to the fallback", () => {
+    const clock: ReaderClock = { nowMs: 0, locale: FALLBACK_LOCALE, timeZone: FALLBACK_TIME_ZONE };
+    expect(absoluteInstant(INSTANT, clock)).toBe(absoluteInstant(INSTANT, null));
+  });
+
+  it("upgrades to the reader's own zone and locale once resolved, named zone included", () => {
+    const pacific: ReaderClock = { nowMs: 0, locale: "en-US", timeZone: "America/Los_Angeles" };
+    // 00:15 UTC on the 12th is still the evening of the 11th on the US west coast.
+    expect(absoluteInstant(INSTANT, pacific)).toBe("Friday 11 September, 5:15 PM PDT");
+  });
+
+  it("takes the locale from the clock, not the environment, for the weekday and month names", () => {
+    const german: ReaderClock = { nowMs: 0, locale: "de-DE", timeZone: "UTC" };
+    const rendered = absoluteInstant(INSTANT, german);
+    expect(rendered).toMatch(/Samstag/);
+    expect(rendered).toMatch(/September/);
+  });
+
+  it("ignores the wall clock entirely: the same instant and the same reader clock is the same string", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2030, 0, 1));
+    const pacific: ReaderClock = { nowMs: 0, locale: "en-US", timeZone: "America/Los_Angeles" };
+    const drawnInTheFuture = absoluteInstant(INSTANT, pacific);
+    vi.setSystemTime(new Date(2020, 5, 5));
+    const drawnInThePast = absoluteInstant(INSTANT, pacific);
+    expect(drawnInTheFuture).toBe(drawnInThePast);
   });
 });
 

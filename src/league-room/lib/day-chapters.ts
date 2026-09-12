@@ -92,6 +92,53 @@ function absoluteDay(iso: string, locale: string, timeZone: string): string {
   return new Date(iso).toLocaleDateString(locale, { timeZone, weekday: "long", month: "long", day: "numeric" });
 }
 
+/** One `Intl.DateTimeFormat` per (locale, zone) pair — mirrors `dayPartsFormatter`'s cache, for
+ *  a shelf whose head reads `absoluteInstant` once per render rather than minting a formatter
+ *  each time. */
+const ABSOLUTE_INSTANT_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+
+function absoluteInstantFormatter(locale: string, timeZone: string): Intl.DateTimeFormat {
+  const key = `${locale} ${timeZone}`;
+  const cached = ABSOLUTE_INSTANT_FORMATTERS.get(key);
+  if (cached !== undefined) return cached;
+  const made = new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZoneName: "short",
+    timeZone,
+  });
+  ABSOLUTE_INSTANT_FORMATTERS.set(key, made);
+  return made;
+}
+
+/**
+ * "Saturday 12 September, 7:00 PM UTC" — the day AND the clock, in the reader's own zone and
+ * locale once `useReaderClock` resolves them, and in the identical fixed shape
+ * (`FALLBACK_LOCALE`/`FALLBACK_TIME_ZONE`) before it does. The front door's "Seat counts as of
+ * {…}" line (`seatCountsAsOfSentence`, `../components/public-league-list.tsx`) used to always
+ * render `@/league`'s UTC-fixed `formatAbsoluteTime` — honest on the server render, where there
+ * is no visitor to read a zone from, but wrong FOREVER on the client, where a real zone has been
+ * sitting in the browser the whole time. `null` renders the exact words `formatAbsoluteTime`
+ * would (same locale, same zone), so the server pass and the client's first (hydrating) render
+ * agree byte for byte — only the effect that resolves the reader's own clock ever changes what
+ * this prints, the same hydration-safe contract `dayMarker` above already holds.
+ *
+ * Built from `formatToParts` rather than `formatAbsoluteTime`'s four separate formatters: the
+ * zone name is no longer the fixed literal "UTC", so it has to be READ off the formatter
+ * (`timeZoneName: "short"`) rather than appended.
+ */
+export function absoluteInstant(iso: string, clock: ReaderClock | null): string {
+  const locale = clock?.locale ?? FALLBACK_LOCALE;
+  const timeZone = clock?.timeZone ?? FALLBACK_TIME_ZONE;
+  const parts = absoluteInstantFormatter(locale, timeZone).formatToParts(new Date(iso));
+  const value = (type: Intl.DateTimeFormatPartTypes): string => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("weekday")} ${value("day")} ${value("month")}, ${value("hour")}:${value("minute")} ${value("dayPeriod")} ${value("timeZoneName")}`;
+}
+
 /** Midnight of a civil day as a UTC instant, so two civil days can be subtracted without either
  *  one's own offset (or a daylight-saving jump inside it) reaching the arithmetic. */
 function civilMidnightMs(iso: string, timeZone: string): number {

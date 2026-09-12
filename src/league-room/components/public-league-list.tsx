@@ -9,6 +9,8 @@ import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { rollBandConsequence } from "@/matchmaking/roll";
 import { featuredFillingLeague, sortBySoonestJoinableDraft } from "@/matchmaking/shelf-order";
 import { moneyIsLive } from "@/money/states";
+import { useReaderClock } from "../hooks/use-reader-clock";
+import { absoluteInstant } from "../lib/day-chapters";
 import { JoinSheet } from "./join-sheet";
 import { LeagueRow, LeagueRowsHeader } from "./league-row";
 import { OpenLeagueCard } from "./open-league-card";
@@ -26,9 +28,9 @@ export { featuredFillingLeague, featuredLeagueId, HOUSE_SHELF_SENTENCE } from "@
 /**
  * The shelf header's own freshness disclosure (Phase 3.6, Task 5, F20 and the honest half of
  * deferral D4) — VERBATIM: "Seat counts as of {time}. A seat being claimed is counted." Takes
- * the time already formatted (`formatAbsoluteTime`, `@/league`) rather than an instant itself,
- * because the page rendering this is the one place that owns a server clock and this component
- * may not value-import `@/league` at all (the client boundary).
+ * the time already formatted (`absoluteInstant`, `../lib/day-chapters`) rather than an instant
+ * itself: this stays a pure string-composition function, and the caller owns the clock decision
+ * (server UTC before mount, the reader's own zone after — see `OpenLeagueShelfProps.asOfIso`).
  *
  * The mock's "Live seat counts · updated just now" is REFUSED: there is no anonymous SSE
  * fan-out for signed-out visitors (deferral D4), and "just now" ages badly on a cached page.
@@ -47,17 +49,36 @@ export interface OpenLeagueShelfProps {
    *  (`UI_CONFIG.frontDoor.shelfCap` on the front door; `/browse` passes it whole). */
   readonly leagues: readonly PublicLeagueSummary[];
   readonly signedIn: boolean;
-  /** The already-formatted render instant (`formatAbsoluteTime(nowIso)`), interpolated into
-   *  `seatCountsAsOfSentence` — see that function's docblock for why the time arrives formatted. */
-  readonly asOfTime: string;
+  /**
+   * THE RAW RENDER INSTANT (SIDELINE, 2026-09-10 fix round), not a pre-formatted string — the
+   * caller's server clock (`new Date().toISOString()`), threaded through unformatted so this
+   * component can print it in the READER'S OWN zone once one resolves.
+   *
+   * It used to arrive already rendered in UTC (`formatAbsoluteTime(nowIso)`, `@/league`), which
+   * was honest on the server (no visitor to read a zone from) but stayed wrong forever on the
+   * client — a signed-out visitor in any zone but UTC read a seat-freshness time that was never
+   * theirs. `useReaderClock` (the same hook `RoomStream`'s day chapters resolve after mount) and
+   * `absoluteInstant` (`../lib/day-chapters`) do the printing now: `null` before mount renders
+   * the identical fixed UTC/en-US words `formatAbsoluteTime` always did (so the server render and
+   * the client's first, hydrating render still agree byte for byte), and the effect that resolves
+   * the reader's real zone upgrades it in place.
+   */
+  readonly asOfIso: string;
   /** `/browse` passes 1 (this band's title IS that page's title); the front door keeps its hero
    *  `h1` and passes the default 2. */
   readonly headingLevel?: 1 | 2;
   /** `/browse`'s own lede (the commissioner-recruiting paragraph), rendered under the head —
    *  page copy stays the page's, the shelf just keeps it inside the one band. */
   readonly intro?: ReactNode;
-  /** `/browse`'s `BrowseFilters` row. The front door renders none: it is the capped teaser (D3)
-   *  and `/browse` is the full, filterable lobby. */
+  /**
+   * `/browse`'s `BrowseFilters` row. The front door renders none: it is the capped teaser (D3)
+   * and `/browse` is the full, filterable lobby.
+   *
+   * ALSO THE "NO OPEN LEAGUES MATCH" EMPTY STATE'S GATE (fix round, SIDELINE 2026-09-10): that
+   * section names a FILTER selection that came up empty, so it only earns a place when a filter
+   * could have produced it — presence of this slot is the one signal this component already has
+   * for "the page rendering me offers filters" (see `showNoMatchesEmptyState` below).
+   */
   readonly filters?: ReactNode;
   /**
    * A quiet control that belongs on the shelf's own head line — `/browse`'s practice invitation
@@ -128,7 +149,7 @@ export function OpenLeagueShelf({
   house,
   leagues,
   signedIn,
-  asOfTime,
+  asOfIso,
   headingLevel = 2,
   intro,
   filters,
@@ -136,6 +157,11 @@ export function OpenLeagueShelf({
   featuredInHero = false,
   live = moneyIsLive(),
 }: OpenLeagueShelfProps) {
+  // The reader's own zone and locale, resolved after mount (`useReaderClock`'s hydration-safe
+  // contract — `null` on the server render and the client's first, hydrating render, real values
+  // only once an effect has run). `asOfIso` prints in the fixed UTC/en-US shape until then.
+  const clock = useReaderClock();
+  const asOfTime = absoluteInstant(asOfIso, clock);
   // DEDUPED BY ID (page-audit harness, 2026-08-27): a league that satisfies both reads — the
   // house shelf and the open-league list — was rendered TWICE, which showed up first as two ink
   // pills carrying the identical href (rule 5) and is a duplicate row either way. The house
@@ -158,6 +184,16 @@ export function OpenLeagueShelf({
   const filling = sortBySoonestJoinableDraft(merged.filter((league) => league.filledTeams > 0));
   const fresh = sortBySoonestJoinableDraft(merged.filter((league) => league.filledTeams === 0));
   const houseIds = new Set(house.map((league) => league.id));
+  // FIX ROUND (SIDELINE, 2026-09-10): "No open leagues match" used to fire whenever the MEMBER
+  // list alone was empty, with no regard for whether the board above it had already rendered the
+  // house shelf. On the front door — which passes no `filters` at all, D3's capped teaser — that
+  // showed a second, contradictory section directly under a board that was actively showing
+  // rooms: "no open leagues match" beneath a shelf of open leagues. The section earns its place
+  // only when it says something the board does not: either `filters` are in play (`/browse`,
+  // where a real filter selection narrowing the MEMBER list to zero is genuine information the
+  // house rows above it do not carry), or the board is showing nothing at all (`house` is also
+  // empty, so there is no shelf for this to contradict).
+  const showNoMatchesEmptyState = leagues.length === 0 && (filters !== undefined || house.length === 0);
   // M3: the roll's consequence, said ONCE on the band that has rolled rooms in it, in the
   // league's voice — never the per-league scheduler sentence on every row. `null` when nothing
   // in the band rolled, and the caption is the fill sentence alone.
@@ -275,7 +311,7 @@ export function OpenLeagueShelf({
         <JoinSheet league={openLeague} signedIn={signedIn} live={live} onClose={() => setOpenLeagueId(null)} />
       )}
 
-      {leagues.length === 0 ? (
+      {showNoMatchesEmptyState ? (
         <EmptyState
           title="No open leagues match"
           description="Widen the filters, or start your own league and invite your group."
