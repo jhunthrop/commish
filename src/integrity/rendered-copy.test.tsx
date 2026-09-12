@@ -15,19 +15,17 @@ import { noLongerHeldExplanationFor } from "@/integrity/queue-view";
 import type { TradeProposalView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
-import { DRAFT_SCHEDULE, PUBLIC_LEAGUES, ROOM_DATA, TERMS, fixtureLeagueDeps } from "@/league-room/test-fixtures";
+import { DRAFT_SCHEDULE, PUBLIC_LEAGUES, ROOM_DATA, TERMS, fixtureLeagueDeps, homeCard } from "@/league-room/test-fixtures";
 import { DraftSchedulePanel } from "@/league-room/components/draft-schedule-panel";
-import { FirstRunPanel } from "@/league-room/components/first-run-panel";
-import { firstRunPlan } from "@/identity";
 import { WaitingRoom, type WaitingRoomLeague } from "@/league-room/components/waiting-room";
 import { FrontDoorHero } from "@/league-room/components/front-door-hero";
-import { LeagueRows } from "@/league-room/components/league-rows";
+import { HomeLeagueCard as HomeLeagueCardView } from "@/league-room/components/home-league-card";
 import { RoomShell } from "@/league-room/components/room-shell";
 import { LeagueTermsPanel } from "@/league-room/components/league-terms-panel";
 import { LiveStatePill } from "@/league-room/components/live-state-pill";
 import { ModerationSummary } from "@/league-room/components/moderation-summary";
 import { OpenLeagueCard } from "@/league-room/components/open-league-card";
-import { OpenSeatsPanel } from "@/league-room/components/open-seats-panel";
+import { OpenRooms } from "@/league-room/components/open-rooms";
 import { Wire } from "@/league-room/components/wire";
 import type { PublicLeagueSummary, WireItem } from "@/matchmaking/contract";
 import { TrustFacts } from "@/league-room/components/trust-facts";
@@ -1020,28 +1018,6 @@ describe("InviteLanding says nothing that breaks the house copy rules, across ev
   });
 });
 
-/**
- * Task 17: the identity card (`ProfileForm`, `variant="first-run"`) is new composed copy inside
- * an existing component — `src/account-room/**` is not itself in `room-copy.source.test.ts`'s
- * `ROOM_DIRS`, so this rendered sweep is the one thing that catches its two new sentences.
- */
-describe("FirstRunPanel says nothing that breaks the house copy rules, guided and standard", () => {
-  it("is clean for a beginner (explainer + identity card) and an experienced manager (no explainer)", async () => {
-    const guidedBeginner = firstRunPlan({ experienceTier: "beginner", helpLevel: "guided", leagueCount: 0 })!;
-    const standardExperienced = firstRunPlan({ experienceTier: "experienced", helpLevel: "standard", leagueCount: 0 })!;
-    for (const plan of [guidedBeginner, standardExperienced]) {
-      const fixture = fixtureLeagueDeps({ ok: true, data: {} });
-      const { container, unmount } = render(
-        <LeagueRoomDepsProvider deps={fixture.deps}>
-          <FirstRunPanel plan={plan} profile={PROFILE} />
-        </LeagueRoomDepsProvider>,
-      );
-      expectClean(container, PROFILE.displayName);
-      unmount();
-    }
-  });
-});
-
 describe("DraftSchedulePanel says nothing that breaks the house copy rules, including its own composed countdown", () => {
   it("is clean scheduled, starting soon, in progress, complete, and with the edit form open", () => {
     const fixture = fixtureLeagueDeps();
@@ -1426,76 +1402,61 @@ describe("SessionNotice says nothing that breaks the house copy rules, quiet and
  * Phase 3.6, Task 10: the locker room's four new components join the roster the same commit
  * that creates them, per this file's own "one place to add" point.
  */
-const SWEEP_LEAGUE: HomeLeagueCard = {
+const SWEEP_LEAGUE: HomeLeagueCard = homeCard({
   id: "l_sweep",
   name: "Sunday Money",
-  format: "snake",
-  teamCount: 10,
-  filledTeams: 10,
-  isCommissioner: false,
-  myTeamId: "t1",
-  draftId: "d1",
-  draftStatus: "complete",
-  record: { wins: 5, losses: 2, ties: 0 },
-  weekNumber: 4,
-  weekStatus: "scheduled",
-  matchup: null,
   nextAction: { kind: "fix-lineup", label: "Fix your lineup" },
   lineupSet: false,
   medianGame: true,
   medianScore: 121.4,
-  kickoffAt: null,
-  startTrigger: null,
-  kickoffRolls: 0,
+  weekNumber: 4,
   myTeamName: "Sunday Money Team",
   myRank: null,
-};
+  members: [
+    { userId: "u1", name: "Ada Lovelace", avatar: null, isSelf: true },
+    { userId: "u2", name: "Rey Okafor", avatar: null, isSelf: false },
+  ],
+  opponentManagerName: "Rey Okafor",
+  since: { headline: "Rey Okafor and Dana Whitfield completed a trade.", detail: "Iron Owls sent Malik Nabers and got Garrett Wilson.", occurredAt: "2026-08-31T00:00:00.000Z", kind: "trade", actor: { userId: "u2", name: "Rey Okafor", avatar: null } },
+});
 
-describe("LeagueRows says nothing that breaks the house copy rules", () => {
-  it("is clean with a mix of leagues, urgent, live and quiet at once", () => {
-    const { container } = render(
-      <LeagueRows
-        leagues={[
-          SWEEP_LEAGUE,
-          {
-            ...SWEEP_LEAGUE,
-            id: "l_sweep_fix",
-            name: "Backyard Bandits",
-            nextAction: { kind: "fix-lineup", label: "Fix your lineup" },
-            lineupSet: false,
-          },
-          {
-            ...SWEEP_LEAGUE,
-            id: "l_sweep_live",
-            name: "Auction Night",
-            weekStatus: "in_progress",
-            nextAction: { kind: "watch-scores", label: "Watch the scores" },
-            lineupSet: true,
-            matchup: {
-              weekNumber: 4,
-              homeTeamId: "t1",
-              awayTeamId: "t2",
-              homeTeamName: "Bay Bandits",
-              awayTeamName: "Iron Owls",
-              homeScore: 112.5,
-              awayScore: 98.25,
-              final: false,
-              weekStatus: "in_progress",
-            },
-          },
-        ]}
-      />,
-    );
-    expectClean(container, "Sunday Money", "Backyard Bandits", "Auction Night", "Bay Bandits", "Iron Owls");
+describe("the signed-in home's league card says nothing that breaks the house copy rules", () => {
+  it("is clean solid and quiet, in season, pre-draft and drafting", () => {
+    const fixture = fixtureLeagueDeps();
+    const cards: readonly HomeLeagueCard[] = [
+      SWEEP_LEAGUE,
+      homeCard({ id: "l_sweep_pre", name: "Backyard Bandits", draftStatus: "scheduled", startTrigger: "when_full", filledTeams: 1, weekStatus: "scheduled", record: null, myRank: null }),
+      homeCard({
+        id: "l_sweep_sched",
+        name: "Auction Night",
+        draftStatus: "scheduled",
+        startTrigger: "scheduled",
+        kickoffAt: "2026-09-13T13:55:00.000Z",
+        kickoffRelative: "in 2 days",
+        slotsRanked: true,
+        record: null,
+        myRank: null,
+      }),
+      homeCard({ id: "l_sweep_live", name: "Iron Owls Invitational", weekStatus: "in_progress", opponentManagerName: "Dana Whitfield", matchup: { weekNumber: 8, homeTeamId: "t1", awayTeamId: "t2", homeTeamName: "Bay Bandits", awayTeamName: "Iron Owls", homeScore: 112.5, awayScore: 98.25, final: false, weekStatus: "in_progress" } }),
+    ];
+    for (const [index, league] of cards.entries()) {
+      const { container, unmount } = render(
+        <LeagueRoomDepsProvider deps={fixture.deps}>
+          <HomeLeagueCardView league={league} solid={index === 0} />
+        </LeagueRoomDepsProvider>,
+      );
+      expectClean(container, "Sunday Money", "Backyard Bandits", "Auction Night", "Iron Owls Invitational", "Bay Bandits", "Iron Owls", "Ada Lovelace", "Rey Okafor", "Dana Whitfield", "Malik Nabers", "Garrett Wilson");
+      unmount();
+    }
   });
 });
 
-describe("OpenSeatsPanel says nothing that breaks the house copy rules", () => {
-  it("is clean populated, empty, and quiet", () => {
+describe("OpenRooms says nothing that breaks the house copy rules", () => {
+  it("is clean featured, quiet, and empty", () => {
     for (const element of [
-      <OpenSeatsPanel key="populated" leagues={PUBLIC_LEAGUES} />,
-      <OpenSeatsPanel key="quiet" leagues={PUBLIC_LEAGUES} quiet />,
-      <OpenSeatsPanel key="empty" leagues={[]} />,
+      <OpenRooms key="featured" leagues={PUBLIC_LEAGUES} featured />,
+      <OpenRooms key="quiet" leagues={PUBLIC_LEAGUES} />,
+      <OpenRooms key="empty" leagues={[]} />,
     ]) {
       const { container, unmount } = render(element);
       expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name));

@@ -469,7 +469,7 @@ export function houseShelfQuery(db: Db, nowIso: string) {
  * against the page `browseQuery` already narrowed to `maxResults` rows is one extra, trivially
  * indexed query, not a second scan of `leagues`.
  */
-async function scoringWeightsByLeagueId(db: Db, leagueIds: readonly string[]): Promise<ReadonlyMap<string, ScoringRules>> {
+export async function scoringWeightsByLeagueId(db: Db, leagueIds: readonly string[]): Promise<ReadonlyMap<string, ScoringRules>> {
   if (leagueIds.length === 0) return new Map();
   const rows = await db
     .select({

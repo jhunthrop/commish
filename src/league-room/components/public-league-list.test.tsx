@@ -15,6 +15,7 @@ import {
   featuredFillingLeague,
   seatCountsAsOfSentence,
 } from "./public-league-list";
+import { ctaAccessibleName } from "./open-league-shared";
 
 // A signed-in shelf renders `JoinPublicLeagueButton` per card, which navigates via
 // `next/navigation`'s `useRouter` and throws outside a mounted App Router. Stubbing the hook
@@ -410,7 +411,7 @@ describe("OpenLeagueShelf", () => {
     }
     fireEvent.click(within(rows()).getByRole("button", { name: `Take a seat in ${HOUSE_LEAGUE.name}.` }));
     const sheet = screen.getByRole("dialog", { name: `Join ${HOUSE_LEAGUE.name}` });
-    expect(within(sheet).getByRole("button", { name: `Join ${HOUSE_LEAGUE.name}` })).toBeInTheDocument();
+    expect(within(sheet).getByRole("button", { name: ctaAccessibleName(HOUSE_LEAGUE) })).toBeInTheDocument();
   });
 
   it("opens the join sheet signed out too, whose verb rides the hold interstitial for THAT league", () => {

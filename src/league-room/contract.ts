@@ -4,11 +4,11 @@ import type { Position } from "@/domain/player";
 import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import type { TradeFlag, TradeVerdict } from "@/trades/fairness";
 import type { TradesPageBody } from "@/trades/contract";
-import type { FirstRunPlan } from "@/identity";
 import type { HelpLevel } from "@/identity/preferences";
 import type { FixtureLabel } from "@/league-service/nfl-schedule";
 import type { PendingWaiverClaim } from "@/league-service/claims-contract";
-import type { ActivityFeedRow } from "@/integrity-service/activity";
+import type { ActivityActor, ActivityFeedRow } from "@/integrity-service/activity";
+import type { ActivityKind } from "@/integrity/activity-view";
 import type { HeadToHeadRecord, LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
 import type { LeagueAuthority } from "@/league-service/authority";
 import type { CompositionCategory } from "@/participation/composition";
@@ -266,6 +266,38 @@ export interface MatchupSummary {
 }
 
 /**
+ * One person in a league the reader is also in (Sideline P1, 2026-09-11). A face may be named
+ * HERE and never on a public shelf: `PublicLeagueSummary` is the privacy boundary and discloses
+ * a seated count to a stranger, never who is in it, while a member reading their own leagues is
+ * already entitled to see who they are playing with.
+ */
+export interface LeagueMemberFace {
+  readonly userId: string;
+  readonly name: string;
+  /** The stored avatar ref, as `Avatar` takes it. `null` renders initials, never a stock face. */
+  readonly avatar: string | null;
+  /** True for the reader's own seat — the one amber ring on the stack. */
+  readonly isSelf: boolean;
+}
+
+/**
+ * "Since you were here": the newest thing in one league that this reader is allowed to see
+ * (`latestActivityByLeague`, `@/league-service/since-you-were-here`), in the league's own words.
+ * `null`/absent when nothing visible has happened, which is a real state and renders as no line
+ * rather than as a placeholder.
+ */
+export interface SinceYouWereHere {
+  /** `ActivityRow.headline`, already rendered by `activityRowFor` — never re-worded downstream. */
+  readonly headline: string;
+  readonly detail: string | null;
+  readonly occurredAt: string;
+  readonly kind: ActivityKind;
+  /** Who did it, for the face that leads the line — `null` when the platform acted or the
+   *  person is gone (the headline already says "A former member"), never a placeholder face. */
+  readonly actor: ActivityActor | null;
+}
+
+/**
  * One league, as the cross-league home renders it: everything `LeagueSummary` already carries,
  * plus the record, this week's matchup, and the one next action — the three things `/app`
  * exists to answer per league (Task 9, Spec Step 8).
@@ -307,6 +339,15 @@ export interface HomeLeagueCard extends LeagueSummary {
    * (the same never-true defensive case `draftId`/`draftStatus` already carry).
    */
   readonly kickoffAt: string | null;
+  /**
+   * "in 2 days" / "in 5 hours" / "starting now" — `relativeDraftTime` (`@/league`), computed on
+   * the SERVER against `crossLeagueHome`'s own clock, because the card spends its one big number
+   * on this phrase and a `.tsx` that read `Date.now()` would hydrate differently than it rendered
+   * (the identical reasoning `LeagueTerms.draftAt` records). `null` for a `when_full` league,
+   * whose stored kickoff is a placeholder rather than a chosen time, and for a league with no
+   * draft row.
+   */
+  readonly kickoffRelative: string | null;
   readonly startTrigger: "scheduled" | "when_full" | null;
   readonly kickoffRolls: number;
   /** This manager's own team name in this league, off the SAME `teamRows`/`nameById` fold
@@ -323,6 +364,33 @@ export interface HomeLeagueCard extends LeagueSummary {
    * has no place to report.
    */
   readonly myRank: number | null;
+  /**
+   * Everyone seated in this league, the reader included, in seating order (Sideline P1) — off
+   * the SAME grouped `teams`+`users` statement `myLeaguesOverview` already runs
+   * (`TeamMembershipRow`, `@/league-service/read.ts`), never a lookup per league. Members only:
+   * an empty seat is the absence of an entry here, and the card counts the gap
+   * (`teamCount - filledTeams`) rather than drawing a face with nobody behind it.
+   */
+  readonly members: readonly LeagueMemberFace[];
+  /** What this league plays, from its stored weights (`describeScoring`) — never the raw weights,
+   *  the same fact and the same words `PublicLeagueSummary.scoringLabel` carries. `null` for a
+   *  league whose settings row has not landed, which renders as absence rather than a guess. */
+  readonly scoringLabel: string | null;
+  /** The manager on the other side of `matchup`, by name — the same `users` join, so the moment
+   *  line can say "you play Rey" rather than naming a team at a person. `null` on a bye, before
+   *  a schedule exists, or when the opponent's seat no longer resolves. */
+  readonly opponentManagerName: string | null;
+  /**
+   * Whether this manager has answered the draft's one pre-draft question (`DraftSlotFacts.ranked`,
+   * `@/league-service/draft-slots-overview`). `false` for a league with no draft or no seat, which
+   * is also the state in which the card never offers the ranking verb.
+   */
+  readonly slotsRanked: boolean;
+  /** The slot the draw gave this manager, 1-based, or `null` before it has run — the card says
+   *  "you pick 4th" only when this is a real number (`DraftSlotFacts.assignedSlot`). */
+  readonly assignedSlot: number | null;
+  /** The newest thing in this league this reader may see, or `null` when there is none. */
+  readonly since: SinceYouWereHere | null;
 }
 
 /**
@@ -345,13 +413,6 @@ export interface LiveState {
 
 export interface HomeBody {
   readonly leagues: readonly HomeLeagueCard[];
-  /**
-   * The zero-leagues fork (`firstRunPlan`, `@/identity`), or `null` once the caller has at
-   * least one league. Computed by the ROUTE, not `crossLeagueHome` (`@/league-service/home.ts`):
-   * the plan needs the caller's preferences, and the service only ever takes a db and a user id.
-   * `HomeBoard` reads this field, not `leagues.length`, to decide which empty treatment to show.
-   */
-  readonly firstRun: FirstRunPlan | null;
   /**
    * Phase 3.6, Task 10, Step 3: the SAME fact `shellData` (`@/components/app-shell/shell-data`)
    * threads into `TopBar` — computed once, in `crossLeagueHome`, from the `stat_weeks` rows it
@@ -781,6 +842,12 @@ export interface LeagueGradeRow extends TeamGrade {
  *  ships. Grows a field per future toggle rather than becoming a second `LeagueHomeBody`. */
 export interface LeagueSettingsBody {
   readonly draftGradesVisible: boolean;
+}
+
+/** `PUT /api/leagues/[leagueId]/team-name`'s whole response: the name as it was stored, trimmed
+ *  by the schema, so the field renders what the database holds rather than what was typed. */
+export interface TeamNameBody {
+  readonly name: string;
 }
 
 /** One platform notice as the activity surface renders it: pre-resolved server-side (the quote

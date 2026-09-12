@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, statWeeks, teams, weeks } from "@/db/schema";
+import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, statWeeks, teams, users, weeks } from "@/db/schema";
 import { UI_CONFIG } from "@/components/ui/config";
 import type { DraftStatus } from "@/domain/draft";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
@@ -61,9 +61,29 @@ export interface DraftMembershipRow {
   readonly kickoffRolls: number;
 }
 
+/**
+ * One seat in one league, with the PERSON in it (Sideline P1, 2026-09-11): the manager stack on
+ * the signed-in home draws faces, and a face needs a name and an avatar ref. The `users` join
+ * rides the SAME grouped `teams` select this read already paid for — one more join on one
+ * statement, never a lookup per league, which is the N+1 this whole read exists to refuse.
+ *
+ * Members only, by construction rather than by filter: `teams.user_id` is `NOT NULL` with a
+ * foreign key, so the inner join drops nothing and can never invent a seat with nobody in it.
+ * An empty seat is the absence of a row here, and the surfaces that draw open seats count them
+ * (`teamCount - filledTeams`) rather than reading a face with no person behind it.
+ */
+export interface TeamMembershipRow {
+  readonly id: string;
+  readonly leagueId: string;
+  readonly name: string;
+  readonly userId: string;
+  readonly managerName: string;
+  readonly managerAvatar: string | null;
+}
+
 export interface LeagueMembershipRows {
   readonly leagueRows: readonly LeagueRow[];
-  readonly teamRows: readonly { readonly id: string; readonly leagueId: string; readonly name: string }[];
+  readonly teamRows: readonly TeamMembershipRow[];
   readonly draftRows: readonly DraftMembershipRow[];
   /** This user's own team in each league they're in. */
   readonly myTeamByLeague: ReadonlyMap<string, string>;
@@ -99,7 +119,21 @@ export async function myLeaguesOverview(db: Db, userId: string): Promise<LeagueM
   if (leagueRows.length === 0) return { leagueRows: [], teamRows: [], draftRows: [], myTeamByLeague: new Map() };
   const ids = leagueRows.map((row) => row.id);
 
-  const teamRows = await db.select({ id: teams.id, leagueId: teams.leagueId, name: teams.name }).from(teams).where(inArray(teams.leagueId, ids));
+  const teamRows = await db
+    .select({
+      id: teams.id,
+      leagueId: teams.leagueId,
+      name: teams.name,
+      userId: teams.userId,
+      managerName: users.displayName,
+      managerAvatar: users.avatarUrl,
+    })
+    .from(teams)
+    // See `TeamMembershipRow`: the person in the seat, on the statement that already reads the
+    // seats. `innerJoin` rather than `leftJoin` because `teams.user_id` is `NOT NULL` with a
+    // foreign key, so the two are the same row set and the inner form says so in the type.
+    .innerJoin(users, eq(teams.userId, users.id))
+    .where(inArray(teams.leagueId, ids));
   const draftRows = await db
     .select({
       id: drafts.id,

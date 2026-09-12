@@ -2,9 +2,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
+import { LEAGUE_CONFIG } from "@/league";
 import { fixtureLabelsByTeam, leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId } from "@/league-service";
 import { AdvisorPanel } from "@/league-room/components/advisor-panel";
 import { LineupEditor } from "@/league-room/components/lineup-editor";
+import { TeamNameField } from "@/league-room/components/team-name-field";
 import { PageTitle } from "@/components/ui";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 
@@ -32,6 +34,8 @@ export default async function LeagueTeamPage({ params }: { readonly params: Prom
     weeklyProjectionsByPlayerId(getDb(), home.currentWeek),
   ]);
   if (lineup === null) notFound();
+  // Off the league read already in hand — the team cards carry every seat's owner and name.
+  const myTeamName = home.teams.find((team) => team.id === home.myTeamId)?.name ?? "";
 
   const myMatchupDetail =
     week === null
@@ -60,6 +64,10 @@ export default async function LeagueTeamPage({ params }: { readonly params: Prom
           Back to the room
         </Link>
       </div>
+      {/* THE FIELD THE PANEL BECAME (2026-09-11): the signed-in home's standing "Team name" panel
+          stated a name with no control behind it and is deleted. The control lives here, on the
+          page a manager already opens to change something about their team. */}
+      <TeamNameField leagueId={home.leagueId} initialName={myTeamName} maxLength={LEAGUE_CONFIG.maxNameLength} />
       <LineupEditor
         leagueId={home.leagueId}
         lineup={lineup}

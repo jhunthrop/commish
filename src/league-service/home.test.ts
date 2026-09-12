@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { inArray } from "drizzle-orm";
 import type { DraftFormat } from "@/domain/league";
 import type { DraftStatus } from "@/domain/draft";
-import { drafts, leagues, lineupSlots, matchups, statWeeks, teams, users, weeks } from "@/db/schema";
+import { draftActions, draftSlotPreferences, drafts, leagues, lineupSlots, matchups, statWeeks, teams, users, weeks } from "@/db/schema";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
 import type { ScoreCache, ScoreCacheBatchRequest } from "@/stats-pipeline/score-cache";
@@ -298,10 +298,106 @@ describe("crossLeagueHome", () => {
     const counting = countingDb(db);
     const result = await crossLeagueHome(counting.db, "uMany");
     expect(result.leagues).toHaveLength(10);
-    // `myLeaguesOverview`'s four queries (membership, leagues, teams, drafts) plus this
+    // `myLeaguesOverview`'s four queries (membership, leagues, teams+users, drafts) plus this
     // function's own matchups, weeks (medians), stat_weeks and (Task 10, Step 1b) lineup_slots
-    // reads: eight total, bounded regardless of league count, never one query per league.
-    expect(counting.selectCount()).toBeLessThanOrEqual(8);
+    // reads: eight. Sideline (2026-09-11) adds six more, each of them also flat in league count:
+    // `draftSlotsForSeats`' two, `latestActivityByLeague`'s window plus its three batched name
+    // lookups, and the batched scoring weights. Fourteen, and never one query per league.
+    expect(counting.selectCount()).toBeLessThanOrEqual(14);
+  });
+
+  it("reads who is in every league on the same statement as the seats, never one lookup per league", async () => {
+    for (let i = 1; i <= 5; i++) {
+      await seedLeague({
+        leagueId: `lgWho${i}`,
+        commissionerUserId: `whoOwner${i}`,
+        teamCount: 2,
+        teams: [{ teamId: `who${i}_t1`, userId: "uWho" }, { teamId: `who${i}_t2`, userId: `whoOwner${i}` }],
+      });
+    }
+
+    const counting = countingDb(db);
+    const result = await crossLeagueHome(counting.db, "uWho");
+    // TWO `teams` statements for the whole set, and only two however many leagues there are:
+    // `myLeaguesOverview`'s own membership scan (which seats does this caller hold), and the one
+    // grouped seats read with `users` joined into it. Never a lookup per league.
+    expect(counting.queriesMatching(/from "teams"/)).toBe(2);
+    for (const league of result.leagues) {
+      expect(league.members).toHaveLength(2);
+      expect(league.members.filter((member) => member.isSelf).map((member) => member.userId)).toEqual(["uWho"]);
+      // MEMBERS ONLY: an open seat is the absence of an entry, never a face with no person.
+      expect(league.members.every((member) => member.name.length > 0)).toBe(true);
+    }
+  });
+
+  it("names the opponent's MANAGER, not their team, off the same join", async () => {
+    await seedLeague({
+      leagueId: "lgRival",
+      commissionerUserId: "uRivalOwner",
+      teamCount: 2,
+      teams: [{ teamId: "rival_t1", userId: "uRival" }, { teamId: "rival_t2", userId: "uRivalOwner", name: "Iron Owls" }],
+    });
+    await seedMatchup("lgRival", 1, "rival_t1", "rival_t2", null, null);
+
+    const [card] = (await crossLeagueHome(db, "uRival")).leagues;
+    expect(card?.opponentManagerName).toBe("uRivalOwner");
+    expect(card?.matchup?.awayTeamName).toBe("Iron Owls");
+  });
+
+  it("reports an unranked draft and no assigned slot for a scheduled draft", async () => {
+    await seedLeague({
+      leagueId: "lgSlots",
+      commissionerUserId: "uSlotsOwner",
+      teamCount: 2,
+      teams: [{ teamId: "slots_t1", userId: "uSlots" }, { teamId: "slots_t2", userId: "uSlotsOwner" }],
+      draftStatus: "scheduled",
+    });
+
+    const [card] = (await crossLeagueHome(db, "uSlots")).leagues;
+    expect(card?.slotsRanked).toBe(false);
+    // Nothing has been drawn, so there is no slot to claim this manager picks from.
+    expect(card?.assignedSlot).toBeNull();
+    // A `when_full` placeholder never reaches the wire as a relative clock either.
+    expect(card?.kickoffRelative).not.toBeNull();
+  });
+
+  it("reports a stored ranking as ranked, even when the stored ranking is the empty answer", async () => {
+    await seedLeague({
+      leagueId: "lgRanked",
+      commissionerUserId: "uRankedOwner",
+      teamCount: 2,
+      teams: [{ teamId: "ranked_t1", userId: "uRanked" }, { teamId: "ranked_t2", userId: "uRankedOwner" }],
+      draftStatus: "scheduled",
+    });
+    await db.insert(draftSlotPreferences).values({ draftId: "lgRanked_draft", teamId: "ranked_t1", ranking: [] });
+
+    const [card] = (await crossLeagueHome(db, "uRanked")).leagues;
+    expect(card?.slotsRanked).toBe(true);
+  });
+
+  it("carries the slot the draw gave this manager once START_DRAFT has run", async () => {
+    await seedLeague({
+      leagueId: "lgDrawn",
+      commissionerUserId: "uDrawnOwner",
+      teamCount: 2,
+      teams: [{ teamId: "drawn_t1", userId: "uDrawn" }, { teamId: "drawn_t2", userId: "uDrawnOwner" }],
+      draftStatus: "in_progress",
+    });
+    await db.insert(draftActions).values({
+      draftId: "lgDrawn_draft",
+      sequence: 1,
+      action: {
+        v: 1,
+        type: "START_DRAFT",
+        timestamp: "2026-09-01T00:00:00.000Z",
+        draftOrder: ["drawn_t2", "drawn_t1"],
+        pool: [{ playerId: "p1", position: "QB" }],
+      },
+      timestamp: new Date("2026-09-01T00:00:00.000Z"),
+    });
+
+    const [card] = (await crossLeagueHome(db, "uDrawn")).leagues;
+    expect(card?.assignedSlot).toBe(2);
   });
 
   it("reads every league's medians in one query, however many leagues a manager is in", async () => {
@@ -381,12 +477,19 @@ describe("crossLeagueHome", () => {
       then(resolve: (value: readonly unknown[]) => void): void;
       where(): Thenable;
       orderBy(): Thenable;
+      innerJoin(): Thenable;
+      as(): Thenable;
     }
     function thenableChain(data: readonly unknown[]): Thenable {
       const chain: Thenable = {
         then: (resolve) => resolve(data),
         where: () => chain,
         orderBy: () => chain,
+        // The `users` join on the SAME `teams` statement (2026-09-11) — one more link in the
+        // chain, the same held response.
+        innerJoin: () => chain,
+        // `latestActivityByLeague`'s window subquery names itself before it is selected from.
+        as: () => chain,
       };
       return chain;
     }
@@ -397,7 +500,7 @@ describe("crossLeagueHome", () => {
         // A league Postgres could never actually return here — its id is absent from `ids`.
         { id: "lg_phantom", name: "Phantom League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", houseRung: null, rosterSlots: [], createdAt: new Date() },
       ], // leagueRows
-      [{ id: "team_real", leagueId: "lg_real", name: "Real Team" }], // teamRows — none for lg_phantom
+      [{ id: "team_real", leagueId: "lg_real", name: "Real Team", userId: "u1", managerName: "Manager One", managerAvatar: null }], // teamRows — none for lg_phantom
       [], // draftRows — none for either league
       [], // allMatchups
       [], // statWeekRows

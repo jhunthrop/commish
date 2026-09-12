@@ -1,63 +1,65 @@
 import { expect, test } from "./support/fixtures";
 
 /**
- * Task 5's first-run fork, against a manager who genuinely has zero leagues — `managerZero`
- * (`e2e/support/fixtures.ts`), a stable identity `global-setup` mints and warms but neither the
- * seed script nor any other spec ever joins or creates a league for.
+ * THE ZERO-LEAGUE STATE, SIDELINE (2026-09-11). The first-run fork this spec used to walk — a
+ * three-path panel explaining create, join and browse, with an identity card above it — is
+ * deleted along with the `firstRunPlan` that chose it. The lobby answers a manager with no
+ * leagues better than an explainer ever did: it is full of real rooms with real seat counts, its
+ * featured room carries the page's single solid verb, and the create door sits beside the page's
+ * own heading where a commissioner will look for it.
  *
- * `managerZero` syncs with the default `experienceTier` (`beginner`, `syncUserFromWorkOS`'s own
- * default), which seeds `helpLevel: "guided"` (`defaultPreferences`, `@/identity/preferences.ts`)
- * on first read. `firstRunPlan` (`@/identity/first-run.ts`) orders a beginner's paths
- * browse-join-create and shows the explainer — this is what proves that, end to end, through a
- * real signed-in session and the real production build, not just the pure function's own tests.
+ * `managerZero` (`e2e/support/fixtures.ts`) is the stable identity `global-setup` mints and warms
+ * but neither the seed script nor any other spec ever joins or creates a league for, so this is
+ * the real zero-league page through a real signed-in session and the real production build.
  */
-test("a manager with zero leagues sees the fork, ordered and explained, and browsing reaches open leagues", async ({
+test("a manager with zero leagues gets the lobby as the page, with one solid verb and a create door", async ({
   managerZero,
 }) => {
   await managerZero.goto("/app");
   await expect(managerZero.getByRole("heading", { name: "Your leagues" })).toBeVisible();
 
-  // The fork itself: a headline, the plain-language explainer (guided help only), and all four
-  // paths present, in the beginner order browse leads. Task 17 puts the identity card
-  // (`ProfileForm`, `variant="first-run"`) first — "Set up your manager profile" now leads the
-  // level-3 heading list, ahead of the paths it used to open with; this is a deliberate
-  // structure move, not a loosened assertion, so the array still asserts the exact order.
-  // Phase 4.5, Task 9: "Try a mock draft" leads ALL of create/join/browse, unconditionally —
-  // it is not one of the tier-ordered three (`firstRunPlan`'s own docblock).
-  //
-  // Text/label assertions here are scoped to `main` because this content streams: the App
-  // Router flushes the panel into a hidden buffer (`div#S:1[hidden]`, a direct child of
-  // `<body>`) an instant before the inline swap script moves it into the Suspense boundary,
-  // and `getByText`/`getByLabel` strict resolution counts hidden elements — an unscoped
-  // locator polling inside that window sees two copies and throws a strict-mode violation
-  // (diagnosed with a MutationObserver, Task 12; the ledger's earlier "Display name" flake
-  // was the same race). Role queries (`getByRole`) are immune — a hidden subtree is not in
-  // the accessibility tree — which is why the heading assertions stay unscoped.
-  const fork = managerZero.getByRole("main");
-  await expect(fork.getByText(/A league is a group of managers/)).toBeVisible();
-  const headings = managerZero.getByRole("heading", { level: 3 });
-  await expect(headings).toHaveText([
-    "Set up your manager profile",
-    "Try a mock draft",
-    "Find an open league",
-    "Join with an invite",
-    "Start a league",
-  ]);
-  await expect(fork.getByLabel("Display name")).toBeVisible();
+  // No cards, because there are no leagues — and no explainer panel standing in their place.
+  await expect(managerZero.getByTestId("home-league-card")).toHaveCount(0);
+  await expect(managerZero.getByText(/A league is a group of managers/)).toHaveCount(0);
+  await expect(managerZero.getByRole("heading", { name: "Set up your manager profile" })).toHaveCount(0);
 
-  // Guidance is ordering, never removal — the other two paths' real controls are on the page
-  // too, not hidden behind the one this test follows.
-  await expect(fork.getByLabel("Invite link or code")).toBeVisible();
-  await expect(fork.getByLabel("League name")).toBeVisible();
+  // The create door, always reachable, carrying the anchor every "start your own league" link in
+  // the product points at (`/app#create-league`).
+  const door = managerZero.locator("#create-league");
+  await expect(door).toBeVisible();
+  await expect(door).toHaveText("Create a league");
 
-  // The old always-on wall (its own "Invited by a friend?" / "No group to play with yet?"
-  // section headings) is gone for a zero-leagues manager — the fork already is those sections.
-  await expect(managerZero.getByRole("heading", { name: "Invited by a friend?" })).toHaveCount(0);
-  await expect(managerZero.getByText("Start or join another league")).toHaveCount(0);
+  // THE LOBBY IS THE PAGE: named, ordered, with its own way through to the whole of it.
+  const lobby = managerZero.getByTestId("open-rooms");
+  await expect(lobby).toBeVisible();
+  await expect(lobby.getByRole("heading", { name: "Open rooms" })).toBeVisible();
 
-  await managerZero.getByRole("link", { name: "Browse open leagues" }).click();
+  // P3, counted over what is actually ON SCREEN: the lobby renders each room twice, once as an
+  // lg+ row and once as a sub-lg card, and only one of the two is ever visible at a given width.
+  // `:visible` is the honest count of "solid buttons a reader can see".
+  const solid = managerZero.locator('[class*="shadow-verb-glow"]:visible');
+  await expect(solid).toHaveCount(1);
+  await expect(solid).toHaveText(/Take a seat|Take the last seat/);
+
+  await managerZero.getByRole("link", { name: "See every open league" }).click();
   await expect(managerZero).toHaveURL(/\/browse$/);
   await expect(managerZero.getByRole("heading", { name: "Open leagues" })).toBeVisible();
+});
+
+/**
+ * The other half of the fork, and the reason it could be deleted: a manager WITH a seat gets
+ * their league as a card with the people in it named, not a panel about how leagues work.
+ */
+test("a seated manager gets their league as a card, with the people in it named", async ({ managerD }) => {
+  await managerD.goto("/app");
+  const cards = managerD.getByTestId("home-league-card");
+  await expect(cards).toHaveCount(1);
+  // P1: the faces, with a sentence naming who is in — the thing the panel never said.
+  await expect(cards.first().getByTestId("manager-stack")).toContainText(/are in\.|You are in\./);
+  // P2: one figure on the card, and its caption names what it is.
+  await expect(cards.first().getByTestId("big-number")).toHaveCount(1);
+  // The create door is still there for a manager who already has one.
+  await expect(managerD.locator("#create-league")).toBeVisible();
 });
 
 /**

@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sideline · Your leagues (one filling league)</title>
+<!--
+  SIDELINE · the signed-in home, variant A: a manager in ONE filling house league.
+  Governing idea: this page is where you are in your leagues, right now. One card per league,
+  the league as its moment, the lobby underneath so the page is never empty.
+
+  DATA PROVENANCE (dev database, docker `fantasy-postgres-1`, read 2026-09-11)
+  - "Fourth and Long" is leagues.id = house_open_12_2 (house_rung open_12, start_trigger
+    when_full, team_count 12, experience_tier experienced). Its scoring_settings row carries
+    points_per_reception 0.5, which describeScoring() names "Half PPR". filledTeams in the
+    database is 0, so with this manager seated it is 1.
+  - The lobby rows are leagues.is_public_matchmade = true with drafts.status = 'scheduled':
+    The Rookie Room (house_beginner_12_1, 0 of 12, when_full, Half PPR),
+    Sharks Only Auction (dev_public_sharks_auction, 9 of 10, kickoff_at 2026-09-13 13:55 UTC,
+    auction, points_per_reception 1.0 = "PPR"),
+    First Auction, No Pressure (dev_public_first_auction, 5 of 10, same kickoff, auction,
+    beginner tier). "6 more" is the remaining count of that same query (8 rows total).
+  - The signed-in manager is users.display_name "Justin Hunthrop" (a real row, with a real
+    avatar_url this mock draws as its initials monogram, the Avatar primitive's own fallback).
+  - MANAGER NAMES: the dev seed stores every other manager as a placeholder string
+    ("Dev Manager 02"). They are drawn here with the fixture manager names the approved
+    2026-09-10 mocks already use (src/draft-room/test-fixtures.tsx: Dana Whitfield, Rey Okafor,
+    Coach Parker), same substitution, stated the same way. No number is substituted.
+  - COPY: "Rank your draft slots", "Run a mock draft", "Preview the room", "Take a seat",
+    "Take the last seat", "Drafts when full", "Nobody yet. You would be first in.",
+    "Create a league", "See every open league" are all verbatim product strings.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Sideline tokens, src/design/tokens.ts verbatim */
+  :root{
+    --chalk:#F6F5F1; --paper:#FFFFFF; --raised:#FBFAF7; --inset:#EFEEE8;
+    --graphite:#17181C; --ink2:#5B5E66; --ink3:#8A8D95; --hair:#E6E5DF; --edge:#D9D8D1;
+    --court:#2457F5; --court-ink:#FFFFFF;
+    --amber:#E39A0E; --amber-ink:#8A5C05; --amber-wash:#FBF1DC; --amber-text:#1A1200;
+    --live:#0E7A49; --live-wash:#E4F4EC; --rose:#B9245A;
+    --shadow:0 4px 16px rgba(23,24,28,.06), 0 1px 2px rgba(23,24,28,.04);
+    --r-card:20px; --r-row:16px; --r-pill:999px;
+    --display:"Bricolage Grotesque", system-ui, sans-serif; --body:"Figtree", system-ui, sans-serif;
+    --spring:cubic-bezier(.2,.9,.3,1.15);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --chalk:#121316; --paper:#1B1C21; --raised:#212228; --inset:#26272D;
+      --graphite:#F2F2EE; --ink2:#A9ACB4; --ink3:#7C7F88; --hair:#2A2B31; --edge:#34353C;
+      --court:#5B85FF; --court-ink:#0B1226;
+      --amber:#F5B341; --amber-ink:#F5B341; --amber-wash:#2A2213; --amber-text:#1A1200;
+      --live:#2ED47F; --live-wash:#12281D; --rose:#FF6B9A;
+      --shadow:0 4px 16px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"]{
+    --chalk:#121316; --paper:#1B1C21; --raised:#212228; --inset:#26272D;
+    --graphite:#F2F2EE; --ink2:#A9ACB4; --ink3:#7C7F88; --hair:#2A2B31; --edge:#34353C;
+    --court:#5B85FF; --court-ink:#0B1226;
+    --amber:#F5B341; --amber-ink:#F5B341; --amber-wash:#2A2213; --amber-text:#1A1200;
+    --live:#2ED47F; --live-wash:#12281D; --rose:#FF6B9A;
+    --shadow:0 4px 16px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--chalk);color:var(--graphite);font:15px/1.45 var(--body)}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 40px 56px}
+  h1,h2,h3{font-family:var(--display);margin:0;font-variation-settings:"opsz" 96}
+  .num{font-family:var(--display);font-variant-numeric:tabular-nums}
+
+  /* the app's own bar, drawn thin so the page under it is the subject */
+  .bar{display:flex;align-items:center;gap:24px;height:60px;border-bottom:1px solid var(--hair)}
+  .brand{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em}
+  .bar a.link{color:var(--ink2);font-weight:500;font-size:14px}
+  .bar .spacer{flex:1}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 20px;border-radius:var(--r-pill);font:600 15px var(--body);border:1px solid transparent;cursor:pointer;transition:transform 120ms var(--spring)}
+  .btn:active{transform:scale(.97)}
+  .btn.verb{background:var(--court);color:var(--court-ink);box-shadow:0 6px 18px rgba(36,87,245,.24)}
+  .btn.quiet{background:transparent;border-color:var(--edge);color:var(--graphite)}
+  .btn.sm{height:38px;padding:0 16px;font-size:14px}
+  .textlink{color:var(--court);font-weight:600;font-size:14px}
+
+  h1.page{font-size:34px;font-weight:800;letter-spacing:-.025em;padding:28px 0 18px}
+
+  /* faces */
+  .faces{display:flex;flex-shrink:0}
+  .face{width:40px;height:40px;border-radius:50%;background:var(--inset);color:var(--ink2);display:grid;place-items:center;font:700 13px var(--display);box-shadow:0 0 0 2px var(--paper);margin-left:-10px}
+  .face:first-child{margin-left:0}
+  .face.self{background:var(--amber-wash);color:var(--amber-ink);box-shadow:0 0 0 2px var(--amber)}
+  .face.open{background:transparent;border:1px dashed var(--edge);box-shadow:0 0 0 2px var(--paper)}
+  .face.more{background:var(--inset);color:var(--ink3);font-size:12px}
+  /* A LOBBY ROW NAMES NOBODY: PublicLeagueSummary discloses a count, never who is in it, so an
+     open room draws taken seats as anonymous faces and open ones as the dashed well. */
+  .face.seat{background:var(--edge);border:none}
+  .stack{display:flex;align-items:center;gap:12px;min-width:0}
+  .stack .cap{font-size:14px;color:var(--ink2);min-width:0}
+
+  /* the league card: one per league, the league as its moment */
+  .league{background:var(--paper);border-radius:var(--r-card);box-shadow:var(--shadow);padding:24px 26px;display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:24px 32px;align-items:start}
+  .league.needs{background:var(--amber-wash)}
+  .league .crest{width:56px;height:56px;border-radius:16px;background:var(--inset);display:grid;place-items:center;font:800 19px var(--display);color:var(--ink2);flex-shrink:0}
+  .league.needs .crest{background:var(--paper);color:var(--amber-ink)}
+  .head{display:flex;align-items:center;gap:16px;min-width:0}
+  .head h2{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.05}
+  .head .fmt{color:var(--ink3);font-size:13px;margin-top:4px}
+  .chip{display:inline-block;padding:3px 10px;border-radius:var(--r-pill);font:600 11px var(--body);background:var(--inset);color:var(--ink2);vertical-align:middle;margin-left:8px;letter-spacing:.02em}
+  .chip.live{background:var(--live-wash);color:var(--live)}
+  .say{font-family:var(--display);font-size:19px;font-weight:600;letter-spacing:-.01em;margin:18px 0 0;line-height:1.3}
+  .since{display:flex;align-items:center;gap:10px;margin-top:10px;color:var(--ink2);font-size:14px}
+  .since .face{width:28px;height:28px;font-size:11px}
+  .since b{color:var(--graphite);font-weight:600}
+
+  /* the seat meter, segmented, three skins (taken / held / open) */
+  .meter{display:flex;gap:4px;margin-top:16px;max-width:360px}
+  .meter i{height:8px;flex:1;border-radius:4px;border:1px solid var(--edge);background:var(--inset)}
+  .meter i.f{background:var(--graphite);border-color:var(--graphite)}
+  .meter i.h{background:var(--amber);border-color:var(--amber)}
+
+  .quietrow{display:flex;flex-wrap:wrap;gap:20px;margin:18px 0 0}
+
+  /* the one big number and its basis */
+  .fig{display:flex;flex-direction:column;align-items:flex-end;text-align:right}
+  .fig .n{font-family:var(--display);font-variant-numeric:tabular-nums;font-weight:800;font-size:52px;line-height:.95;letter-spacing:-.03em}
+  .league.needs .fig .n{color:var(--amber-ink)}
+  .fig .basis{margin-top:6px;font-size:13px;color:var(--ink3);max-width:11rem}
+  .rail{grid-column:2;display:flex;flex-direction:column;align-items:flex-end;gap:20px}
+  .act{align-self:flex-end}
+  .fig .n.word{font-size:34px;letter-spacing:-.02em}
+
+  /* the lobby: never empty */
+  .lobby{margin-top:28px;background:var(--paper);border-radius:var(--r-card);box-shadow:var(--shadow);padding:8px 8px 16px}
+  .lobby-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 18px 4px}
+  .lobby-head h2{font-size:22px;font-weight:700;letter-spacing:-.02em}
+  .chapter{padding:12px 18px 4px;font:600 12px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+  .row{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1.2fr) minmax(0,1.2fr) 140px 170px;gap:16px;align-items:center;padding:14px 18px;border-radius:var(--r-row);transition:background 140ms}
+  .row:hover{background:var(--raised)}
+  .row h3{font-size:17px;font-weight:700;letter-spacing:-.01em;line-height:1.15}
+  .row .sub{color:var(--ink2);font-size:13px;margin-top:2px}
+  .row .fmt,.row .when{color:var(--ink2);font-size:14px;min-width:0}
+  .row .when b{display:block;color:var(--graphite);font-weight:600}
+  .row .seats{display:flex;flex-direction:column;gap:8px}
+  .row .seats .n{font-family:var(--display);font-variant-numeric:tabular-nums;font-size:30px;font-weight:800;line-height:1;letter-spacing:-.02em}
+  .row .seats .basis{font-size:12px;color:var(--ink3)}
+  .row .meter{margin-top:0;max-width:none}
+  .row .meter i{height:6px}
+  .row .act{grid-column:auto;justify-self:end}
+  .row .who{display:flex;align-items:center;gap:14px;min-width:0}
+  .row .who .face{width:34px;height:34px;font-size:12px}
+  .lobby-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px 0;color:var(--ink3);font-size:13px;border-top:1px solid var(--hair);margin:8px 10px 0}
+
+  @keyframes breathe{0%,100%{opacity:1}50%{opacity:.5}}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--live);margin-right:7px;vertical-align:middle;animation:breathe 2s ease-in-out infinite}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+  @media (max-width:760px){
+    .wrap{padding:0 16px 40px}
+    .bar{height:54px;gap:14px}.bar a.link{display:none}
+    h1.page{font-size:27px;padding:20px 0 14px}
+    .league{grid-template-columns:1fr;padding:20px 18px;gap:0}
+    .head h2{font-size:23px}
+    .league .fig{align-items:flex-start;text-align:left;margin-top:20px;flex-direction:row;align-items:baseline;gap:12px}
+    .fig .basis{margin-top:0;max-width:none}
+    .rail{grid-column:1;align-items:stretch;gap:16px;margin-top:18px}
+    .act{align-self:stretch}
+    .act .btn{width:100%}
+    .lobby{padding:4px 4px 12px}
+    .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"who who" "fmt fmt" "when seats" "act act";gap:10px 14px;padding:18px 14px;border-radius:0;border-bottom:1px solid var(--hair)}
+    .row:last-of-type{border-bottom:none}
+    .row .who{grid-area:who}.row .fmt{grid-area:fmt}.row .when{grid-area:when}
+    .row .seats{grid-area:seats;align-items:flex-end;text-align:right;gap:6px}
+    .row .when{align-self:end}
+    .row .act{grid-area:act;justify-self:stretch;margin-top:6px}
+    .row .act .btn{width:100%}
+    .row .meter{width:110px}
+    .lobby-head{flex-direction:column;align-items:flex-start;gap:12px}
+    .lobby-foot{flex-direction:column;align-items:flex-start;gap:12px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="bar" aria-label="App">
+    <a class="brand" href="#">Commish</a>
+    <a class="link" href="#">Your leagues</a>
+    <a class="link" href="#">Open leagues</a>
+    <a class="link" href="#">Players</a>
+    <span class="spacer"></span>
+    <a class="link" href="#">How it works</a>
+    <span class="faces" aria-hidden="true"><span class="face self">JH</span></span>
+  </nav>
+
+  <h1 class="page">Your leagues</h1>
+
+  <!-- ONE LEAGUE FILLS THE PAGE. The hero card carries the seat stack, the seat meter and the
+       one verb. P3: this is the page's only solid button, so every lobby row below is quiet. -->
+  <article class="league needs" aria-label="Fourth and Long">
+    <div>
+      <div class="head">
+        <span class="crest" aria-hidden="true">FL</span>
+        <div>
+          <h2>Fourth and Long <span class="chip live"><span class="dot" aria-hidden="true"></span>Filling</span></h2>
+          <div class="fmt">12 teams · Snake · Half PPR</div>
+        </div>
+      </div>
+
+      <!-- P1: the people, because a house league's members are visible to its members. -->
+      <div class="stack" style="margin-top:18px">
+        <span class="faces" aria-hidden="true"><span class="face self">JH</span><span class="face open"></span><span class="face open"></span><span class="face open"></span></span>
+        <span class="cap">You are in. Nobody else yet.</span>
+      </div>
+
+      <p class="say">Filling, 1 of 12. Drafts when full.</p>
+
+      <div class="meter" aria-hidden="true"><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+      <p class="quietrow">
+        <a class="textlink" href="#">Run a mock draft</a>
+        <a class="textlink" href="#">Preview the room</a>
+      </p>
+    </div>
+
+    <div class="rail">
+      <div class="fig">
+        <span class="n num">11</span>
+        <span class="basis">seats to go, of 12</span>
+      </div>
+      <div class="act"><a class="btn verb" href="#">Rank your draft slots</a></div>
+    </div>
+  </article>
+
+  <!-- THE LOBBY, NEVER EMPTY. Strangers stay anonymous, so these rows carry a seat stack
+       (how many are seated) rather than faces with names. Sorted soonest draft first: a
+       when_full room can start the moment its last seat lands, so it leads. -->
+  <section class="lobby" aria-label="Open rooms">
+    <div class="lobby-head">
+      <h2>Open rooms</h2>
+      <a class="btn quiet sm" href="#">Create a league</a>
+    </div>
+    <div class="chapter">Soonest draft first</div>
+
+    <article class="row">
+      <div class="who">
+        <span class="faces" aria-hidden="true"><span class="face open"></span><span class="face open"></span><span class="face open"></span></span>
+        <div><h3>The Rookie Room <span class="chip">newer players only</span></h3><div class="sub">Nobody yet. You would be first in.</div></div>
+      </div>
+      <div class="fmt">12 teams · Snake · Half PPR</div>
+      <div class="when"><b>Drafts when full</b>the moment the last seat is taken</div>
+      <div class="seats">
+        <span class="n num">12</span><span class="basis">seats open, of 12</span>
+        <div class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="act"><a class="btn quiet" href="#">Take a seat</a></div>
+    </article>
+
+    <article class="row">
+      <div class="who">
+        <span class="faces" aria-hidden="true"><span class="face seat"></span><span class="face seat"></span><span class="face seat"></span><span class="face more">+6</span></span>
+        <div><h3>Sharks Only Auction</h3><div class="sub">9 already in.</div></div>
+      </div>
+      <div class="fmt">10 teams · Auction · PPR</div>
+      <div class="when"><b>In 2 days</b>Sun, Sep 13, 1:55 pm</div>
+      <div class="seats">
+        <span class="n num">1</span><span class="basis">seat left, of 10</span>
+        <div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i></div>
+      </div>
+      <div class="act"><a class="btn quiet" href="#">Take the last seat</a></div>
+    </article>
+
+    <article class="row">
+      <div class="who">
+        <span class="faces" aria-hidden="true"><span class="face seat"></span><span class="face seat"></span><span class="face more">+3</span></span>
+        <div><h3>First Auction, No Pressure <span class="chip">newer players only</span></h3><div class="sub">5 already in.</div></div>
+      </div>
+      <div class="fmt">10 teams · Auction · PPR</div>
+      <div class="when"><b>In 2 days</b>Sun, Sep 13, 1:55 pm</div>
+      <div class="seats">
+        <span class="n num">5</span><span class="basis">seats left, of 10</span>
+        <div class="meter" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="act"><a class="btn quiet" href="#">Take a seat</a></div>
+    </article>
+
+    <div class="lobby-foot">
+      <span>6 more rooms are open right now</span>
+      <a class="btn quiet sm" href="#">See every open league</a>
+    </div>
+  </section>
+</div>
+</body>
+</html>

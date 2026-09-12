@@ -5,6 +5,7 @@ import { Badge, buttonClassName, LiveChip as LiveChipPrimitive } from "@/compone
 import { UI_CONFIG } from "@/components/ui/config";
 import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
+import type { ExperienceTier } from "@/domain/user";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
 import { formatUsd } from "@/money/config";
@@ -200,7 +201,23 @@ export function potFacts(league: PublicLeagueSummary): PotFacts | null {
  * survive at `/league-rules`, one press away behind the nav's How it works, which is where a
  * curious reader goes and an uncurious one never has to.
  */
-export function FormatLine({ league }: { readonly league: PublicLeagueSummary }) {
+/**
+ * The four facts a format line needs, as a STRUCTURAL subset (2026-09-11) rather than the whole
+ * `PublicLeagueSummary`: the signed-in home's league card says the same sentence about a league
+ * the reader is already in, and that read produces `HomeLeagueCard`, not a public summary.
+ * `PublicLeagueSummary` satisfies this shape as it stands, so every existing call site is
+ * unchanged. `scoringLabel` may be absent where a league's settings row has not landed, and the
+ * line then says the facts it has rather than a guessed default.
+ */
+export interface FormatFacts {
+  readonly teamCount: number;
+  readonly format: string;
+  readonly scoringLabel: string | null;
+  readonly medianGame: boolean;
+  readonly experienceTier?: ExperienceTier;
+}
+
+export function FormatLine({ league }: { readonly league: FormatFacts }) {
   // Each separator lives INSIDE the span of the word it introduces, so a wrap can never leave a
   // dot dangling at the end of a line (visible on every beginner row at 1440 before this).
   return (
@@ -209,9 +226,11 @@ export function FormatLine({ league }: { readonly league: PublicLeagueSummary })
       <span className="whitespace-nowrap">
         <Dot /> {FORMAT_LABEL[league.format] ?? league.format}
       </span>
-      <span className="whitespace-nowrap">
-        <Dot /> {league.scoringLabel}
-      </span>
+      {league.scoringLabel === null ? null : (
+        <span className="whitespace-nowrap">
+          <Dot /> {league.scoringLabel}
+        </span>
+      )}
       {/* Deciding a week is a fact about the league, not about anyone in it — the same
           reasoning `PublicLeagueSummary.medianGame`'s own docblock carries. */}
       {league.medianGame ? (
@@ -343,7 +362,7 @@ export function OpenLeagueCta({
 }) {
   const variant = emphasis === "ink" ? ("verb" as const) : ("secondary" as const);
   return signedIn ? (
-    <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} variant={variant} />
+    <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} variant={variant} label={ctaVisibleText(league)} accessibleName={ctaAccessibleName(league)} />
   ) : (
     <SignInLink intent={`/join/${league.id}/hold`} aria-label={ctaAccessibleName(league)} className={buttonClassName(variant, "md")}>
       {suffix === undefined ? ctaVisibleText(league) : `${ctaVisibleText(league)} ${suffix}`}

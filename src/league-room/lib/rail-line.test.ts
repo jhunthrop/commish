@@ -1,31 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { HomeLeagueCard, MatchupSummary } from "../contract";
+import { homeCard } from "../test-fixtures";
 import { orderByUrgency, railPageLine, railStateFor, railStateLine, needsYouKindFor } from "./rail-line";
 
-const BASE: HomeLeagueCard = {
-  id: "l1",
+const BASE: HomeLeagueCard = homeCard({
   name: "Sunday Money",
-  format: "snake",
   teamCount: 12,
   filledTeams: 12,
-  isCommissioner: false,
-  myTeamId: "t1",
-  draftId: "d1",
-  draftStatus: "complete",
   record: { wins: 8, losses: 6, ties: 0 },
   weekNumber: 4,
-  weekStatus: "scheduled",
-  matchup: null,
-  nextAction: null,
-  lineupSet: true,
-  medianGame: false,
-  medianScore: null,
-  kickoffAt: null,
-  startTrigger: null,
-  kickoffRolls: 0,
   myTeamName: "Bay Bandits Team",
   myRank: 4,
-};
+});
 
 function matchup(overrides: Partial<MatchupSummary> = {}): MatchupSummary {
   return {

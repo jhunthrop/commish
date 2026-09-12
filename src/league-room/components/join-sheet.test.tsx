@@ -5,6 +5,7 @@ import { SIT_AND_GO_GRACE_MINUTES } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { PUBLIC_LEAGUES, renderInLeague } from "@/league-room/test-fixtures";
 import type { LeagueRoomDeps } from "@/league-room/hooks/deps";
+import { ctaAccessibleName } from "./open-league-shared";
 import { JoinSheet, lobbyJoinFacts } from "./join-sheet";
 
 // `OpenLeagueCta`'s signed-in branch renders `JoinPublicLeagueButton`, which calls `useRouter()`.
@@ -91,7 +92,7 @@ describe("JoinSheet (the lobby door)", () => {
   it("gives a signed-in member the real join button, with no hold sentence to claim", () => {
     const deps: LeagueRoomDeps = { fetchJson: vi.fn() } as unknown as LeagueRoomDeps;
     renderInLeague(<JoinSheet league={FREE_LEAGUE} signedIn live={false} onClose={() => undefined} />, deps);
-    expect(screen.getByRole("button", { name: `Join ${FREE_LEAGUE.name}` })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: ctaAccessibleName(FREE_LEAGUE) })).toBeInTheDocument();
     expect(screen.queryByText(/Sign-in rides this tap/)).not.toBeInTheDocument();
   });
 

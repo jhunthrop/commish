@@ -7,7 +7,7 @@ import { buttonClassName } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";
 import { GLOSSARY } from "@/help/glossary";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import { potFacts } from "./open-league-shared";
+import { ctaAccessibleName, potFacts } from "./open-league-shared";
 import { OpenLeagueCard } from "./open-league-card";
 
 vi.mock("next/navigation", () => ({
@@ -267,8 +267,9 @@ describe("OpenLeagueCard", () => {
 
   it("gives a signed-in visitor a real join button, quiet by default", () => {
     render(card(BASE, { signedIn: true }));
-    expect(screen.getByRole("button", { name: `Join ${BASE.name}` })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Take/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: ctaAccessibleName(BASE) })).toBeInTheDocument();
+    // The row is a BUTTON signed in and a LINK signed out; both say the same sentence now.
+      expect(screen.queryByRole("link", { name: /Take/ })).not.toBeInTheDocument();
   });
 
   it("renders the CTA through the pill map, quiet unless the parent grants ink (rule 5)", () => {
@@ -379,6 +380,7 @@ describe("OpenLeagueCard", () => {
       render(card(BASE, { onOpen }));
       const opener = screen.getByRole("button", { name: "Take a seat in Half-PPR #241." });
       expect(opener).toHaveAttribute("aria-haspopup", "dialog");
+      // The row is a BUTTON signed in and a LINK signed out; both say the same sentence now.
       expect(screen.queryByRole("link", { name: /Take/ })).not.toBeInTheDocument();
       fireEvent.click(opener);
       expect(onOpen).toHaveBeenCalledTimes(1);

@@ -150,12 +150,16 @@ describe("GET /api/leagues", () => {
       then(resolve: (value: readonly unknown[]) => void): void;
       where(): Thenable;
       orderBy(): Thenable;
+      innerJoin(): Thenable;
     }
     function thenableChain(data: readonly unknown[]): Thenable {
       const chain: Thenable = {
         then: (resolve) => resolve(data),
         where: () => chain,
         orderBy: () => chain,
+        // The `users` join on the SAME `teams` statement (2026-09-11) — one more link in the
+        // chain, the same held response.
+        innerJoin: () => chain,
       };
       return chain;
     }
@@ -166,7 +170,7 @@ describe("GET /api/leagues", () => {
         // A league Postgres could never actually return here — its id is absent from `ids`.
         { id: "lg_phantom", name: "Phantom League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", houseRung: null, rosterSlots: [], createdAt: new Date() },
       ], // leagueRows
-      [{ id: "team_real", leagueId: "lg_real", name: "Real Team" }], // teamRows — none for lg_phantom
+      [{ id: "team_real", leagueId: "lg_real", name: "Real Team", userId: "u1", managerName: "Manager One", managerAvatar: null }], // teamRows — none for lg_phantom
       [], // draftRows — none for either league
     ];
     let call = 0;

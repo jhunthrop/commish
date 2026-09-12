@@ -97,6 +97,37 @@ function distinctPayloadArrayValues(events: readonly AuditEvent[], key: string):
   return [...new Set(values)];
 }
 
+/** Everything a page of events needs before its rows can be rendered as sentences: the printable
+ *  names, and the actor rows those names came from (the stream wants the face too). */
+export interface ResolvedActivityNames {
+  readonly names: ActivityNames;
+  readonly members: ReadonlyMap<string, MemberRow>;
+}
+
+/**
+ * THE THREE BATCHED NAME LOOKUPS, once (extracted 2026-09-11 for the cross-league read on the
+ * signed-in home, `@/league-service/since-you-were-here`): the distinct actors, players and teams
+ * named across a set of events, in three `IN` queries rather than one lookup per row. Both
+ * callers run the same three, so a payload field one of them learns to resolve is resolved for
+ * the other in the same edit rather than in a second copy that drifts.
+ */
+export async function resolveActivityNames(db: Db, events: readonly AuditEvent[]): Promise<ResolvedActivityNames> {
+  const actorIds = [...new Set(events.map((event) => event.actorId).filter((id): id is string => id !== null))];
+  // `trade_accepted` and `roster_move`'s trade reason name their teams/players under
+  // `proposerTeamId`/`counterpartyTeamId` and `proposerAssetIds`/`counterpartyAssetIds`, never
+  // the bare `teamId`/`playerId` every other renderer uses. Gathered here too, batched alike.
+  const playerIds = [...new Set([...distinctPayloadValues(events, "playerId"), ...distinctPayloadArrayValues(events, "proposerAssetIds"), ...distinctPayloadArrayValues(events, "counterpartyAssetIds")])];
+  const teamIds = [...new Set([...distinctPayloadValues(events, "teamId"), ...distinctPayloadValues(events, "proposerTeamId"), ...distinctPayloadValues(events, "counterpartyTeamId")])];
+
+  const [memberRows, playerRows, teamRows] = await Promise.all([
+    actorIds.length === 0 ? [] : db.select({ id: users.id, name: users.displayName, avatar: users.avatarUrl }).from(users).where(inArray(users.id, actorIds)),
+    playerIds.length === 0 ? [] : db.select({ id: players.id, name: players.name }).from(players).where(inArray(players.id, playerIds)),
+    teamIds.length === 0 ? [] : db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, teamIds)),
+  ]);
+
+  return { names: buildActivityNames(memberRows, playerRows, teamRows), members: new Map(memberRows.map((row) => [row.id, row])) };
+}
+
 /**
  * The read side of the member-visible activity feed: one league's chain, newest first, run
  * through `activityRowFor` (`@/integrity/activity-view`) so a hidden type or a denied
@@ -127,21 +158,7 @@ export async function listLeagueActivity(db: Db, { leagueId, viewerUserId, befor
 
   const events = rows.map(toEvent);
 
-  const actorIds = [...new Set(events.map((event) => event.actorId).filter((id): id is string => id !== null))];
-  // `trade_accepted` and `roster_move`'s trade reason name their teams/players under
-  // `proposerTeamId`/`counterpartyTeamId` and `proposerAssetIds`/`counterpartyAssetIds`, never
-  // the bare `teamId`/`playerId` every other renderer uses. Gathered here too, batched alike.
-  const playerIds = [...new Set([...distinctPayloadValues(events, "playerId"), ...distinctPayloadArrayValues(events, "proposerAssetIds"), ...distinctPayloadArrayValues(events, "counterpartyAssetIds")])];
-  const teamIds = [...new Set([...distinctPayloadValues(events, "teamId"), ...distinctPayloadValues(events, "proposerTeamId"), ...distinctPayloadValues(events, "counterpartyTeamId")])];
-
-  const [memberRows, playerRows, teamRows] = await Promise.all([
-    actorIds.length === 0 ? [] : db.select({ id: users.id, name: users.displayName, avatar: users.avatarUrl }).from(users).where(inArray(users.id, actorIds)),
-    playerIds.length === 0 ? [] : db.select({ id: players.id, name: players.name }).from(players).where(inArray(players.id, playerIds)),
-    teamIds.length === 0 ? [] : db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, teamIds)),
-  ]);
-
-  const names = buildActivityNames(memberRows, playerRows, teamRows);
-  const members = new Map(memberRows.map((row) => [row.id, row]));
+  const { names, members } = await resolveActivityNames(db, events);
 
   const visibleRows: ActivityFeedRow[] = [];
   for (const activityEvent of events) {

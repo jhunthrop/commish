@@ -1,4 +1,4 @@
-import { GAME_DEFINITION } from "@/league-room/components/first-run-panel";
+import { GAME_DEFINITION } from "@/league-room/lib/game-definition";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import type { Metadata } from "next";
 import Link from "next/link";

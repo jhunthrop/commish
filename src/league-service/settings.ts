@@ -2,11 +2,11 @@
 // and (peek document design §3.4, 2026-09-07) the one write path for a league's scoring rules.
 // A future toggle joins this module rather than growing a second settings file, the same
 // "one write module per concern" shape `draft-schedule.ts` and `invites.ts` each hold.
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import type { Clock } from "@/domain/timing";
 import { enqueuePeekDocumentRebuildsQuietly } from "@/jobs/defs/peek-document-job";
-import { leagues, scoringSettings } from "@/db/schema";
+import { leagues, scoringSettings, teams } from "@/db/schema";
 import { excludedSetFor } from "@/db/upsert";
 import type { ScoringRules } from "@/scoring";
 import { writeLeagueScoringHash } from "./scoring-hash";
@@ -26,6 +26,38 @@ export interface SetDraftGradesVisibleInput {
  */
 export async function setDraftGradesVisible(db: Db, input: SetDraftGradesVisibleInput): Promise<void> {
   await db.update(leagues).set({ draftGradesVisible: input.visible }).where(eq(leagues.id, input.leagueId));
+}
+
+export interface RenameMyTeamInput {
+  readonly leagueId: string;
+  readonly userId: string;
+  /** Already trimmed and length-checked by `renameMyTeamSchema` (`./schemas.ts`). */
+  readonly name: string;
+}
+
+export type RenameMyTeamResult = { readonly ok: true; readonly name: string } | { readonly ok: false; readonly reason: string; readonly status: 404 };
+
+/**
+ * A MANAGER NAMES THEIR OWN TEAM (2026-09-11). Until now nothing in this codebase could: the
+ * waiting room's "Team name" panel stated the name a seat was given and had no control behind it,
+ * which is an instruction with no verb, and the signed-in home's redesign deleted that panel. The
+ * field it moves to is the league room's own My team page, which is where a manager already goes
+ * to change something about their team, so the fact and the control are finally in one place.
+ *
+ * OWN TEAM ONLY, structurally: the `WHERE` is `league_id AND user_id`, so this function has no
+ * way to express "somebody else's team" whatever a caller passes, the same shape
+ * `setSlotPreference` (`@/draft-service/slot-preference`) keeps for the identical reason. A caller
+ * with no seat here updates nothing and gets the non-oracle 404 a stranger to the league would.
+ */
+export async function renameMyTeam(db: Db, input: RenameMyTeamInput): Promise<RenameMyTeamResult> {
+  const updated = await db
+    .update(teams)
+    .set({ name: input.name })
+    .where(and(eq(teams.leagueId, input.leagueId), eq(teams.userId, input.userId)))
+    .returning({ name: teams.name });
+  const row = updated[0];
+  if (row === undefined) return { ok: false, reason: "That league does not exist.", status: 404 };
+  return { ok: true, name: row.name };
 }
 
 export interface WriteLeagueScoringInput {

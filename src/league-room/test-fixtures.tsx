@@ -4,7 +4,7 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import type { LeagueTerms } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import type { DraftScheduleBody, LeagueGradeRow, LeagueHomeBody, LeagueMemberCard, LineupBody, MatchupDetail, MatchupSummary, RoomData, TeamStandingsRow } from "./contract";
+import type { DraftScheduleBody, HomeLeagueCard, LeagueGradeRow, LeagueHomeBody, LeagueMemberCard, LineupBody, MatchupDetail, MatchupSummary, RoomData, TeamStandingsRow } from "./contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "./hooks/deps";
 
 /** Server rank order (wins, then points for, then team id) — never re-derived in a test. */
@@ -318,3 +318,46 @@ export const PUBLIC_LEAGUES: readonly PublicLeagueSummary[] = [
   { id: "p1", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, entryFeeCents: 0, teamCount: 12, filledTeams: 3, scoringLabel: "Standard", compositionCategory: "all_newcomers", draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)", medianGame: false, startTrigger: "scheduled", houseRung: null, heldSeats: 0, rosterSummary: "15 slots, 1 flex", playoffWeeks: [15, 16, 17], kickoffRolls: 0 },
   { id: "p2", name: "Sharks Only Auction", format: "auction", experienceTier: "experienced", stakeTier: 3, entryFeeCents: 0, teamCount: 10, filledTeams: 9, scoringLabel: "PPR", compositionCategory: "open", draftAt: "Sunday 13 September, 1:00 PM UTC (in 4 days)", medianGame: false, startTrigger: "scheduled", houseRung: null, heldSeats: 0, rosterSummary: "15 slots, 1 flex", playoffWeeks: [15, 16, 17], kickoffRolls: 0 },
 ];
+
+/**
+ * ONE `HomeLeagueCard`, with every field a real default and the caller overriding only what its
+ * own assertion is about. Four test files each grew their own copy of this literal and each had
+ * to be edited by hand every time the read learned a field. This is the one they share now.
+ *
+ * The defaults describe a QUIET in-season league: drafted, a week still open, a lineup already
+ * set, nothing owed. A test about a need states that need.
+ */
+export function homeCard(overrides: Partial<HomeLeagueCard> = {}): HomeLeagueCard {
+  return {
+    id: "l1",
+    name: "Bay Bandits",
+    format: "snake",
+    teamCount: 10,
+    filledTeams: 10,
+    isCommissioner: false,
+    myTeamId: "t1",
+    draftId: "d1",
+    draftStatus: "complete",
+    record: { wins: 5, losses: 2, ties: 0 },
+    weekNumber: 8,
+    weekStatus: "scheduled",
+    matchup: null,
+    nextAction: null,
+    lineupSet: true,
+    medianGame: false,
+    medianScore: null,
+    kickoffAt: null,
+    kickoffRelative: null,
+    startTrigger: null,
+    kickoffRolls: 0,
+    myTeamName: "Bay Bandits",
+    myRank: 3,
+    scoringLabel: "PPR",
+    members: [{ userId: "u1", name: "Ada Lovelace", avatar: null, isSelf: true }],
+    opponentManagerName: null,
+    slotsRanked: false,
+    assignedSlot: null,
+    since: null,
+    ...overrides,
+  };
+}

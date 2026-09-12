@@ -1,46 +1,33 @@
 import type { Metadata } from "next";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { readPreferences } from "@/identity-service/preferences";
-import { readProfile } from "@/identity-service/profile";
-import { firstRunPlan } from "@/identity";
 import { PageTitle } from "@/components/ui";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { crossLeagueHome } from "@/league-service";
 import { listPublicLeagues } from "@/league-service/browse";
 import { getScoreCache } from "@/league-service/score-cache-instance";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
-import type { HomeBody } from "@/league-room/contract";
+import { CreateLeagueDoor } from "@/league-room/components/create-league-door";
 import { HomeBoard } from "@/league-room/components/home-board";
-import { StartOrJoinDisclosure } from "@/league-room/components/start-or-join-disclosure";
 
 export const dynamic = "force-dynamic";
 // A5: matches this page's own <h1>.
 export const metadata: Metadata = pageTitle("Your leagues");
 
 /**
- * The signed-in home answers what needs this manager right now, in every league they're in: a
- * record, this week's matchup, and one next action per card (`HomeBoard`) — not just a list of
- * names. A Server Component reading through the service layer directly (idiomatic Next.js,
- * explicitly outside the client-boundary lint rule, which covers `src/league-room/**`), and
- * `HomeBoard` renders this exact same `HomeBody` shape when it refreshes from `/api/home`.
+ * The signed-in home answers what needs this manager right now, in every league they are in, as
+ * one card per league ordered by what is owed (`HomeBoard`) with the lobby beneath it. A Server
+ * Component reading through the service layer directly (idiomatic Next.js, explicitly outside the
+ * client-boundary lint rule, which covers `src/league-room/**`), and `HomeBoard` renders this
+ * exact same `HomeBody` shape when it refreshes from `/api/home`.
  *
- * `firstRun` (Task 5's fork, `firstRunPlan` in `@/identity`) is computed HERE, not inside
- * `crossLeagueHome`: it needs this manager's preferences, and the service's own signature is
- * deliberately just a db and a user id. `/api/home/route.ts` computes the exact same thing the
- * exact same way, so `HomeBoard`'s background refresh never disagrees with what this page
- * server-rendered.
- *
- * The old always-on wall of join/browse/create underneath the board — the same three sections
- * whether this manager had zero leagues or ten — is gone. `firstRun !== null` means `HomeBoard`
- * already rendered those three paths, ordered and explained, as `FirstRunPanel`; adding them
- * again here would just be the wall back under a different name. `firstRun === null` means this
- * manager already has a board full of leagues, so the same three paths collapse behind one
- * disclosure (`StartOrJoinDisclosure`) instead of standing at full weight on every visit.
- *
- * Renders no `TopBar` and no `<main>` of its own (Task 2 Step 5) — `(shell)/layout.tsx` is now
- * the thing that renders `AppShell`, which supplies both, once, for every page in this route
- * group. This page returns its content alone.
+ * THE FIRST-RUN FORK IS GONE (Sideline, 2026-09-11). A manager with zero leagues used to get a
+ * three-path panel (`FirstRunPanel`) explaining create, join and browse, and a manager WITH
+ * leagues got the same three paths again behind a disclosure (`StartOrJoinDisclosure`). Both are
+ * deleted, and so is the `firstRunPlan` fork that chose between them: the lobby answers the
+ * zero-league case better than an explainer ever did, because it is full of real rooms with real
+ * seat counts and a real verb, and the create door now sits beside that lobby's heading where a
+ * manager who wants to start one will look for it.
  *
  * Takes NO arguments — no `searchParams`, no cookie read, nothing that could carry a visitor's
  * intent (Task 17, Step 3). That is the seat-hold arrival guard, made structural rather than a
@@ -52,35 +39,32 @@ export const metadata: Metadata = pageTitle("Your leagues");
  * page's race-winner or race-loser screen — so its own test (`page.test.tsx`) pins the zero-
  * argument signature that makes that impossible to reach for by reading a query string here.
  *
- * `profile` (Task 17, Step 2) is read ONLY when `firstRun !== null` — the identity card
- * (`FirstRunPanel`'s first section, `ProfileForm` itself, `variant="first-run"`) is the only
- * consumer, and a manager who already has a league costs this page nothing extra to render.
+ * Renders no `TopBar` and no `<main>` of its own (Task 2 Step 5) — `(shell)/layout.tsx` is now
+ * the thing that renders `AppShell`, which supplies both, once, for every page in this route
+ * group. This page returns its content alone.
  */
 export default async function AppHome() {
   const user = await requireCurrentUser();
   const db = getDb();
-  const [leaguesHome, preferences, openLeagues] = await Promise.all([
+  const [home, openLeagues] = await Promise.all([
     crossLeagueHome(db, user.id, { scoreCache: getScoreCache() }),
-    readPreferences(db, user),
-    // Task 10, Step 4: the house shelf on the home screen — the SAME `listPublicLeagues` read
-    // `/browse` and the front door already make, filtered down to the house's own leagues
-    // (`.house`) rather than the whole member list, since "the house always has a game" is the
-    // promise this panel exists to keep visible.
+    // The SAME `listPublicLeagues` read `/browse` and the front door already make, filtered down
+    // to the house's own rooms (`.house`) rather than the whole member list, since "the house
+    // always has a game" is the promise this lobby exists to keep visible.
     listPublicLeagues(db, normalizeBrowseFilter({})),
   ]);
-  const firstRun = firstRunPlan({
-    experienceTier: user.experienceTier,
-    helpLevel: preferences.helpLevel,
-    leagueCount: leaguesHome.leagues.length,
-  });
-  const home: HomeBody = { ...leaguesHome, firstRun };
-  const profile = firstRun === null ? null : await readProfile(db, user.id);
 
   return (
     <>
-      <PageTitle>Your leagues</PageTitle>
-      <HomeBoard initial={home} openLeagues={openLeagues.house} helpLevel={preferences.helpLevel} profile={profile} />
-      {firstRun === null ? <StartOrJoinDisclosure experienceTier={user.experienceTier} /> : null}
+      {/* THE CREATE DOOR IS ALWAYS REACHABLE (fix round 1, HIGH 2): beside the page's own
+       *  heading, at every state, including the one where there are no leagues AND no open house
+       *  rooms and `OpenRooms` renders nothing at all. It is the quiet door here and quiet again
+       *  beside the lobby's heading, so it never competes with the page's one solid verb. */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <PageTitle>Your leagues</PageTitle>
+        <CreateLeagueDoor />
+      </div>
+      <HomeBoard initial={home} openLeagues={openLeagues.house} />
     </>
   );
 }
