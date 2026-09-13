@@ -60,6 +60,11 @@ export const MOCK_CONFIG = {
     reachDepth: 8,
     needPerOpenStartingSlot: 0.4,
     startersFilledDamp: 0.6,
+    /** In a room whose START_DRAFT snapshot carries the roster-need ceilings (founder ruling
+     *  2026-09-12, `DraftAutopickPolicy.rosterCeilings`): a bench body cools by this again per
+     *  body already sitting at his position. The bots' OWN dial, the same value as the clock's
+     *  `surplusDamp` by choice, never by import. */
+    benchBodyDamp: 0.25,
     runReaction: { window: 4, threshold: 3, needBoost: 2.0, baseBoost: 1.3 },
   },
   /** Lobby and link rooms start this long after creation, bots topping up whatever seat is

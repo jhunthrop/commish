@@ -76,6 +76,10 @@ describe("needMultiplier's surplusDamp (the 2026-09-05 QB-stacking fix, correcte
     // either: absent stays absent, exactly like every historical snapshot (none carries this field).
     expect(needMultiplier("RB", [slot("RB", 0), slot("RB", 1)], SLOTS, opts)).toBe(0.6);
     expect(needMultiplier("QB", oneFilledDedicated, SLOTS, opts)).toBe(0.6);
+    // Over capacity by the slot labels (three "RB"-labelled spots against two starters): the
+    // pre-fix arithmetic ran the boost NEGATIVE, 1 + boost x open, and a historical snapshot
+    // without surplusDamp must keep replaying that number rather than the damp.
+    expect(needMultiplier("RB", [slot("RB", 0), slot("RB", 1), slot("RB", 2)], SLOTS, { openSlotBoost: 0.5, filledDamp: 0.6 })).toBeCloseTo(0.5, 12);
   });
 
   it("compounds filledDamp by surplusDamp^1 for the 2nd body overall (the 1st surplus)", () => {

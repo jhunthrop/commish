@@ -3,8 +3,9 @@ import {
   eligibleSlotsForPosition,
   validateRosterAdd,
   validateLineup,
+  restrictedPositions,
 } from "./roster-eligibility";
-import type { RosterSlotConfig } from "./roster";
+import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "./roster";
 
 const STANDARD_SLOTS: readonly RosterSlotConfig[] = [
   { slot: "QB", count: 1, eligiblePositions: ["QB"] },
@@ -145,5 +146,36 @@ describe("validateLineup", () => {
       valid: false,
       reason: "The QB slot is empty.",
     });
+  });
+});
+
+describe("restrictedPositions", () => {
+  const filled = (spots: readonly (readonly [RosterSlotType, number])[]): readonly RosterSlot[] =>
+    spots.map(([slot, slotIndex], i) => ({ slot, slotIndex, playerId: `p${i}` }));
+  const everyStarter: readonly (readonly [RosterSlotType, number])[] = [["QB", 0], ["RB", 0], ["RB", 1], ["WR", 0], ["WR", 1], ["TE", 0], ["FLEX", 0]];
+  const fullBench: readonly (readonly [RosterSlotType, number])[] = [["BENCH", 0], ["BENCH", 1], ["BENCH", 2], ["BENCH", 3], ["BENCH", 4], ["BENCH", 5]];
+
+  it("is null while a bench spot is open, because any position still fits", () => {
+    expect(restrictedPositions(STANDARD_SLOTS, filled([...everyStarter, ["K", 0], ["DEF", 0], ...fullBench.slice(1)]))).toBeNull();
+  });
+
+  it("names the open starting slots' positions, in slot order, once the bench is full", () => {
+    expect(restrictedPositions(STANDARD_SLOTS, filled([...everyStarter, ...fullBench]))).toEqual(["K", "DEF"]);
+    expect(restrictedPositions(STANDARD_SLOTS, filled([...everyStarter.filter(([slot]) => slot !== "TE"), ["K", 0], ...fullBench]))).toEqual(["TE", "DEF"]);
+  });
+
+  it("lists a flex spot's positions once each, never a repeat", () => {
+    const noFlex = everyStarter.filter(([slot]) => slot !== "FLEX");
+    expect(restrictedPositions(STANDARD_SLOTS, filled([...noFlex, ["K", 0], ["DEF", 0], ...fullBench]))).toEqual(["RB", "WR", "TE"]);
+  });
+
+  it("is null while every position the league rosters still fits, bench or no bench", () => {
+    const benchless: readonly RosterSlotConfig[] = STANDARD_SLOTS.filter((config) => config.slot !== "BENCH");
+    expect(restrictedPositions(benchless, [])).toBeNull();
+    expect(restrictedPositions(benchless, filled([["QB", 0]]))).toEqual(["RB", "WR", "TE", "K", "DEF"]);
+  });
+
+  it("is empty for a full roster: nothing is owed and nothing fits", () => {
+    expect(restrictedPositions(STANDARD_SLOTS, filled([...everyStarter, ["K", 0], ["DEF", 0], ...fullBench]))).toEqual([]);
   });
 });

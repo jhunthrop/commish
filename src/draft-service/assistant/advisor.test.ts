@@ -8,7 +8,7 @@ import { ADVISOR_CONFIG } from "./config";
 import { SURVIVAL_BANDS } from "@/domain/draft-odds";
 import { onClockShortlist, recommendNow } from "./recommend";
 import { tierCollapses } from "./signals";
-import { FIXTURE_SHAPE, FIXTURE_TEAM_IDS, fixtureAdvance, fixtureStart, fixtureValued } from "./test-fixture";
+import { FIXTURE_SHAPE, FIXTURE_TEAM_IDS, fixtureAdvance, fixtureHolding, fixtureStart, fixtureValued } from "./test-fixture";
 import { tierStandings } from "./tiers";
 import type { AdvisorView } from "./view";
 
@@ -67,6 +67,22 @@ describe("advisorCore", () => {
       expect(pick.why).not.toMatch(/tier [A-Z]\b|prior|infer|last man|one of 1\b/i);
       expect(pick.why).toMatch(/in our 30 runs|Nobody picks/);
     }
+  });
+
+  it("names a kicker or a defence, with the league's own line, once the bench is full and only those slots remain", () => {
+    // Production's valued board carries neither position (the K and D/ST market-order ruling), so
+    // the card used to go dark here and the dock fell back to a skill player the room refused.
+    const held = ["qb1", "rb1", "rb2", "wr1", "wr2", "te1", "rb3", "qb2", "rb4", "wr3", "te2", "rb5", "wr4"];
+    const state = fixtureHolding(fixtureStart(), ASKING, held);
+    const valued = new Map([...fixtureValued()].filter(([, entry]) => entry.position !== "K" && entry.position !== "DEF"));
+    const table = simulateRoomOdds({ state, seed: seedFor("advisor-test", state.sequence), runs: RUNS, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, FIXTURE_SHAPE) });
+    const view = advisorCore({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE, table, tiers: tierStandings(state, valued), collapses: tierCollapses(state, valued) });
+    const pick = view!.pick!;
+    expect(["K", "DEF"]).toContain(pick.position);
+    expect(pick.fillsSlot).toBe(pick.position);
+    expect(pick.why.startsWith("Your next pick must be a K or a D/ST.")).toBe(true);
+    expect(pick.whyShape).toBe("must:0");
+    expect(view!.candidates.every((candidate) => candidate.position === "K" || candidate.position === "DEF")).toBe(true);
   });
 
   it("rotates the why's shape across consecutive turns of the same family", () => {

@@ -1,4 +1,5 @@
 import type { Player, Position } from "@/domain/player";
+import { positionLabel } from "@/domain/position-words";
 import type { SheetTag } from "@/draft-hq/sheet/types";
 import type { SurvivalOdds, TierStandingView } from "@/draft-service/assistant/view";
 import { reuseListItems } from "@/design/reuse-list-items";
@@ -21,7 +22,7 @@ export const SHEET_COLUMN_LABEL: Readonly<Record<SheetColumnKey, string>> = {
   WR: "WR",
   TE: "TE",
   K: "K",
-  DEF: "D/ST",
+  DEF: positionLabel("DEF"),
 };
 
 /** K and D/ST carry no tiers (ruling 1): a kicker ladder would be a rung per name. Overall

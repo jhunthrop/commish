@@ -3,6 +3,7 @@ import type { Db, DbTx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
 import { draftActions, drafts, leagues, players, teams } from "@/db/schema";
 import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
+import { restrictedPositions } from "@/domain/roster-eligibility";
 import type { Clock } from "@/domain/timing";
 import {
   admitCommand,
@@ -509,11 +510,16 @@ export function createDraftStore({
               const context = await autopickNoticeContext(tx, newPick.teamId, newPick.playerId);
               const position = positionOf.get(newPick.playerId);
               if (context === undefined || position === undefined) continue;
+              // What the roster could still take the instant BEFORE this pick (the league's line
+              // in the notice, `mustPickLine`): the team's roster as this transition began plus
+              // any earlier new pick of its own in the same transition.
+              const rosterBefore = [...(state.rosters[newPick.teamId] ?? []), ...newPicks.slice(0, i).filter((pick) => pick.teamId === newPick.teamId).map((pick) => ({ slot: pick.slot, slotIndex: pick.slotIndex, playerId: pick.playerId }))];
+              const mustPick = restrictedPositions(result.state.config.slotConfig, rosterBefore) ?? undefined;
               const notice = await notifyAffectedMember(tx, {
                 leagueId: result.state.config.leagueId,
                 userId: context.userId,
                 noticeType: "draft_auto_picked",
-                context: { leagueName: context.leagueName, pickNumber: newPick.pickNumber, playerName: context.playerName, position },
+                context: { leagueName: context.leagueName, pickNumber: newPick.pickNumber, playerName: context.playerName, position, ...(mustPick === undefined ? {} : { mustPick }) },
                 // The PICK's own timestamp, which is also what `auditEventsForPicks` stamps its
                 // event with — the same instant, read from the same place, before either row
                 // exists. Reading it back off the minted event would mean minting the event first.

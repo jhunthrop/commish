@@ -1,5 +1,5 @@
 import type { Position } from "./player";
-import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "./roster";
+import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig, type RosterSlotType } from "./roster";
 
 export type ValidationResult = { readonly valid: true } | { readonly valid: false; readonly reason: string };
 
@@ -37,6 +37,28 @@ export function validateRosterAdd(input: ValidateRosterAddInput): ValidationResu
     };
   }
   return { valid: true };
+}
+
+function openCount(config: RosterSlotConfig, roster: readonly RosterSlot[]): number {
+  return config.count - roster.filter((spot) => spot.slot === config.slot && spot.playerId !== null).length;
+}
+
+/**
+ * THE POSITIONS A ROSTER CAN STILL TAKE, once they are fewer than the positions the league
+ * rosters at all: the eligible positions of every open non-bench slot, in slot-config order, each
+ * named once. `null` while a bench spot is open, or while every position the league rosters
+ * anywhere still fits (a bench-less league on its first pick owes nothing in particular), because
+ * then there is no restriction to state; an empty list for a full roster. The engine's refusal,
+ * the advisor's card, the clock's notice and the dock all read this one rule (`mustPickLine`,
+ * `./must-pick`).
+ */
+export function restrictedPositions(slotConfig: readonly RosterSlotConfig[], roster: readonly RosterSlot[]): readonly Position[] | null {
+  if (slotConfig.some((config) => config.slot === BENCH_SLOT && openCount(config, roster) > 0)) return null;
+  const openStarters = slotConfig.filter((config) => config.slot !== BENCH_SLOT && openCount(config, roster) > 0);
+  // A Set keeps first-seen order, so the list reads in slot-config order with each position once.
+  const open = [...new Set(openStarters.flatMap((config) => config.eligiblePositions))];
+  const rostered = new Set(slotConfig.flatMap((config) => config.eligiblePositions));
+  return open.length === rostered.size ? null : open;
 }
 
 interface ValidateLineupInput {

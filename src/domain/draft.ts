@@ -101,6 +101,17 @@ export interface StartDraftAction {
      * picks the live draft actually made.
      */
     readonly surplusDamp?: number;
+    /** The 2026-09-05 kicker and team defence deferral (`DraftAutopickPolicy.lateRoundOnlyRoundsFromEnd`). Optional for the same reason. */
+    readonly lateRoundOnlyRoundsFromEnd?: number;
+    /**
+     * The 2026-09-12 roster-need ceilings (`DraftAutopickPolicy.rosterCeilings`,
+     * `@/draft-engine/config`): starters plus a bench allowance per position, read off the
+     * league's own slot config. Optional for the same F3 reason: a log written before the
+     * ceilings existed must keep replaying under the surplus-damp scoring it was made with.
+     */
+    readonly rosterCeilings?: {
+      readonly backupsAtSingleStarterPosition: number;
+    };
   };
 }
 

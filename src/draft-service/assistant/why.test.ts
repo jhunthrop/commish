@@ -16,6 +16,7 @@ const BASE: WhyFacts = {
   run: null,
   ahead: [seat(5, "RB"), seat(6, "WR"), seat(7, "RB")],
   runs: 200,
+  mustPick: null,
 };
 
 describe("buildWhy", () => {
@@ -40,6 +41,19 @@ describe("buildWhy", () => {
     expect(buildWhy({ ...BASE, fillsSlot: "BENCH", ahead: [seat(5, "RB")] }, 0).text).toBe("He is the No. 4 back on our board, and he takes a bench spot. The seat before you takes a back most often in our 200 runs.");
     expect(buildWhy({ ...BASE, fillsSlot: null, ahead: [seat(5, "WR")] }, 0).text).toBe("He is the No. 4 back on our board, and he has no open slot on your roster. The seat before you most often takes something other than a back in our 200 runs.");
     expect(buildWhy({ ...BASE, ahead: [] }, 0).text).toBe("He is the No. 4 back on our board, and he fills your RB slot. Nobody picks between now and your next turn.");
+  });
+
+  it("never argues a drop for a man who would sit: a bench body is argued by rank and spot (the 2026-09-12 round)", () => {
+    const why = buildWhy({ ...BASE, fillsSlot: "BENCH", reasons: [{ code: "tier_cliff", position: "RB", dropToNextTier: 20.55, playersLeftInTier: 1 }] }, 0);
+    expect(why.shape).toBe("value:0");
+    expect(why.text).toBe("He is the No. 4 back on our board, and he takes a bench spot. 2 of the 3 seats before you take a back most often in our 200 runs.");
+  });
+
+  it("leads with the league's own line when the bench is full and only some slots remain", () => {
+    const why = buildWhy({ ...BASE, position: "K", positionRank: 0, fillsSlot: "K", mustPick: ["K", "DEF"], ahead: [seat(5, "WR")] }, 1);
+    expect(why.text).toBe("Your next pick must be a K or a D/ST. The seat before you most often takes something other than a kicker in our 200 runs.");
+    expect(why.shape).toBe("must:0");
+    expect(why.text).not.toMatch(BANNED);
   });
 
   it("never argues a drop for a market-order position", () => {

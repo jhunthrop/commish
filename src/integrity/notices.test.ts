@@ -37,6 +37,13 @@ describe("NOTICE_TEMPLATES", () => {
       "The clock ran out on pick 24 in Sunday Money, so we picked for you: your queue first, then the best player your roster needs. You drafted Bijan Robinson (RB). Set your queue before your next draft so this does not happen again.",
     );
 
+    // The bench was full and only a kicker or a defence fit: the league's own line, the same
+    // sentence the room and the advisor's card say (the 2026-09-12 round).
+    const owed = renderNotice("draft_auto_picked", { ...NOTICE_SAMPLES.draft_auto_picked, pickNumber: 170, playerName: "Justin Tucker", position: "K", mustPick: ["K", "DEF"] });
+    expect(owed.body).toBe(
+      "The clock ran out on pick 170 in Sunday Money. Your next pick must be a K or a D/ST. So we picked for you: your queue first, then the first one on the board. You drafted Justin Tucker (K). Set your queue before your next draft so this does not happen again.",
+    );
+
     const removed = renderNotice("review_removed", NOTICE_SAMPLES.review_removed);
     expect(removed.title).toBe("We removed your review");
     // Fix round 1 (panel HIGH): states there is no appeal, the same founder decision #4

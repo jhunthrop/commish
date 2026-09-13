@@ -1,8 +1,11 @@
 "use client";
 
 import { memo, useMemo } from "react";
+import { mustPickLine } from "@/domain/must-pick";
 import type { Player } from "@/domain/player";
+import { positionLabel } from "@/domain/position-words";
 import type { RosterSlotType } from "@/domain/roster";
+import { restrictedPositions } from "@/domain/roster-eligibility";
 import type { DraftStateView } from "@/draft-engine";
 import type { AdvisorView } from "@/draft-service/assistant/view";
 import { BigNumber, Button, PlayerFace, PositionBadge } from "@/components/ui";
@@ -44,8 +47,13 @@ export interface CallModel {
  * the advice decides (`AdvisorView.pickNumber`, yours, never the room's on-clock pick); failing
  * that the top of your queue; failing that the best player left on our board. The source is
  * printed beside the name, so a queue pick is never dressed as our call.
+ *
+ * THE FALLBACK ONLY EVER NAMES A MAN THE ROSTER CAN TAKE (the 2026-09-12 round, founder report
+ * 3): with the bench full, only the positions of the open starting slots qualify
+ * (`restrictedPositions`, the same rule the engine refuses by), and the line under the name is
+ * the league's own sentence about what the roster still owes.
  */
-export function callFor(view: DraftStateView, advisor: AdvisorView | null, queue: readonly string[], available: ReadonlySet<string>, playersById: ReadonlyMap<string, Player>, teamCount: number): CallModel | null {
+export function callFor(view: DraftStateView, myTeamId: string, advisor: AdvisorView | null, queue: readonly string[], available: ReadonlySet<string>, playersById: ReadonlyMap<string, Player>, teamCount: number): CallModel | null {
   const pick = advisor?.pick ?? null;
   const runs = advisor === null || advisor.odds === null || advisor.odds.runs === 0 ? null : advisor.odds.runs;
   if (pick !== null && advisor !== null) {
@@ -55,13 +63,20 @@ export function callFor(view: DraftStateView, advisor: AdvisorView | null, queue
       return { player, source: `our call for ${pickLabel(advisor.pickNumber, teamCount)}`, why: pick.why, fills: pick.fillsSlot, survived, runs: pick.makeItBack?.runs ?? null };
     }
   }
-  const queued = queue.find((playerId) => available.has(playerId));
-  const fallbackId = queued ?? view.availablePlayerIds[0] ?? null;
+  const owed = restrictedPositions(view.slotConfig, view.rosters[myTeamId] ?? []);
+  const fits = (playerId: string): boolean => {
+    if (!available.has(playerId)) return false;
+    const position = playersById.get(playerId)?.position;
+    return position !== undefined && (owed === null || owed.includes(position));
+  };
+  const queued = queue.find(fits);
+  const fallbackId = queued ?? view.availablePlayerIds.find(fits) ?? null;
   if (fallbackId === null) return null;
   const player = playersById.get(fallbackId);
   if (player === undefined) return null;
   const survived = runs === null ? null : (advisor?.odds?.survived[player.id] ?? null);
-  return { player, source: queued !== undefined ? "top of your queue" : "best left on our board", why: null, fills: null, survived: runs === null ? null : survived, runs };
+  const why = owed === null || owed.length === 0 ? null : mustPickLine(owed);
+  return { player, source: queued !== undefined ? "top of your queue" : "best left on our board", why, fills: null, survived: runs === null ? null : survived, runs };
 }
 
 /** "QB 0/1 · RB 1/2 · FLEX 0/1": every starting spot's fill, from the engine's own roster. */
@@ -77,7 +92,8 @@ function fillChips(view: DraftStateView, myTeamId: string | null): readonly { re
   return [...bySlot].map(([slot, counts]) => ({ slot, ...counts }));
 }
 
-const SLOT_WORD: Partial<Record<RosterSlotType, string>> = { DEF: "D/ST" };
+/** A slot's printed name: the position's own badge word where the slot is a position's. */
+const SLOT_WORD: Partial<Record<RosterSlotType, string>> = { DEF: positionLabel("DEF") };
 
 /**
  * OUR CALL BESIDE THE VERB (founder ruling 3, 2026-09-10): the advice sits with the action
@@ -91,7 +107,7 @@ const SLOT_WORD: Partial<Record<RosterSlotType, string>> = { DEF: "D/ST" };
  */
 export const DockCall = memo(function DockCall({ view, myTeamId, playersById, advisor, recomputing, queue, byeWeeks, nextPickLabel, available, compact = false, canDraft, submitting, queuedPlayerIds, onDraft, onQueueToggle }: DockCallProps) {
   const teamCount = view.draftOrder.length;
-  const call = useMemo(() => (myTeamId === null || teamCount === 0 ? null : callFor(view, advisor, queue, available, playersById, teamCount)), [view, advisor, queue, available, playersById, myTeamId, teamCount]);
+  const call = useMemo(() => (myTeamId === null || teamCount === 0 ? null : callFor(view, myTeamId, advisor, queue, available, playersById, teamCount)), [view, advisor, queue, available, playersById, myTeamId, teamCount]);
   const fills = useMemo(() => fillChips(view, myTeamId), [view, myTeamId]);
 
   if (myTeamId === null) {
