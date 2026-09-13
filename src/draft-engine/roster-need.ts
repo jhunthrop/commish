@@ -57,14 +57,39 @@ function benchSlots(slotConfig: readonly RosterSlotConfig[]): number {
   return slotConfig.filter((config) => config.slot === BENCH_SLOT).reduce((sum, config) => sum + config.count, 0);
 }
 
-/** A position the league starts exactly one of, the late-round two excepted: the quarterback and the tight end in the standard shape. */
-export function isSingleStarterPosition(position: Position, slotConfig: readonly RosterSlotConfig[]): boolean {
-  return !LATE_ROUND_ONLY_POSITIONS.includes(position) && dedicatedSlots(position, slotConfig) === 1;
-}
-
-/** Starting slots a multi-starter position can fill: its dedicated ones and the shared ones it is eligible for. */
+/** Starting slots a position can fill: its dedicated ones and the shared ones it is eligible for. */
 function startingDemand(position: Position, slotConfig: readonly RosterSlotConfig[]): number {
   return dedicatedSlots(position, slotConfig) + sharedSlotsEligible(position, slotConfig);
+}
+
+/**
+ * Which position a shared slot is, in practice: the eligible position that scores the most over
+ * a season, the ordering every projection in this product carries (a quarterback out-scores a
+ * back, a back a receiver, a receiver a tight end). A SUPERFLEX that admits the quarterback is a
+ * second quarterback slot; a FLEX that admits the tight end beside backs and receivers is not a
+ * tight-end slot. The late two never share.
+ */
+const SHARED_SLOT_CLAIMANT_ORDER: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
+
+function claimsSharedSlot(position: Position, config: RosterSlotConfig): boolean {
+  return SHARED_SLOT_CLAIMANT_ORDER.find((candidate) => config.eligiblePositions.includes(candidate)) === position;
+}
+
+/** Shared slots that are `position`'s in practice (`SHARED_SLOT_CLAIMANT_ORDER`). */
+function sharedSlotsClaimed(position: Position, slotConfig: readonly RosterSlotConfig[]): number {
+  return slotConfig.filter((config) => isSharedSlot(config) && claimsSharedSlot(position, config)).reduce((sum, config) => sum + config.count, 0);
+}
+
+/**
+ * A position with exactly ONE startable slot, counting the shared slots that are its in practice
+ * (the review ruling of 2026-09-13, read against the founder's: a team holds at most two of a
+ * position the league starts one of), the late-round two excepted. The quarterback in a 1-QB
+ * league and the tight end in the standard shape (its flex belongs to the backs and receivers)
+ * are single-starter positions; a superflex or two-QB league gives the quarterback two startable
+ * slots, so he is not one and takes the ordinary bench allowance, the third after the starters.
+ */
+export function isSingleStarterPosition(position: Position, slotConfig: readonly RosterSlotConfig[]): boolean {
+  return !LATE_ROUND_ONLY_POSITIONS.includes(position) && dedicatedSlots(position, slotConfig) + sharedSlotsClaimed(position, slotConfig) === 1;
 }
 
 /**
@@ -165,7 +190,9 @@ export function candidateRoleReader(
       openStartingSlots: starts ? openStartingSlotsEligible(position, roster, slotConfig) : 0,
       benchBodies: bench.get(position) ?? 0,
       capped: (rostered.get(position) ?? 0) + 1 > positionCeiling(position, slotConfig, policy),
-      waitsForStarters: !starts && starterOpen && isSingleStarterPosition(position, slotConfig),
+      // Depth after the lineup, at every position (the review ruling: "the third only after the
+      // starters" for a superflex quarterback is the same sentence as the founder's for the second).
+      waitsForStarters: !starts && starterOpen,
     };
   };
 }

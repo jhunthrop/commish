@@ -69,15 +69,20 @@ export function askingWindow(state: DraftState, askingTeamId: string): AskingWin
 }
 
 /** The asking seat's own committed picks, in draft order, priced through the one valuation this
- *  call already built. A picked player absent from the evidence pool is left out rather than
- *  priced at a made-up value. */
+ *  call already built. A picked player absent from the evidence pool keeps his seat and his
+ *  position (the pool's own) at zero value, never a made-up one: the roster's counts against the
+ *  ceilings must be the roster's (review fix round, M4), so an unvalued QB1 still makes the next
+ *  quarterback the second. */
 function rosterSoFar(state: DraftState, askingTeamId: string, valued: ReadonlyMap<string, ValuedEntry>): readonly RosteredPlayer[] {
+  const positionOf = new Map(state.pool.map((entry) => [entry.playerId, entry.position] as const));
   return state.picks
     .filter((pick) => pick.teamId === askingTeamId)
     .sort((a, b) => a.pickNumber - b.pickNumber)
     .flatMap((pick) => {
       const entry = valued.get(pick.playerId);
-      return entry === undefined ? [] : [{ playerId: pick.playerId, position: entry.position, valueOverReplacement: entry.valueOverReplacement }];
+      if (entry !== undefined) return [{ playerId: pick.playerId, position: entry.position, valueOverReplacement: entry.valueOverReplacement }];
+      const position = positionOf.get(pick.playerId);
+      return position === undefined ? [] : [{ playerId: pick.playerId, position, valueOverReplacement: 0 }];
     });
 }
 

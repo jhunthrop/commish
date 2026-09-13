@@ -144,28 +144,25 @@ describe("recommendPick", () => {
     const fifthBack = candidate("fifthBack", "RB", 60, 50);
     const firstTightEnd = candidate("firstTightEnd", "TE", 60, 50);
     const board = [fifthBack, firstTightEnd, ...filler("WR", 30, 60, 30)];
+    const rankedFor = (own: readonly RosteredPlayer[]) => recommendPick({ board, roster: own, shape: SHAPE, pickNumber: 37, nextPickNumber: 60, shortlistSize: board.length });
 
-    // A long shortlist on purpose: the point is where the fifth back lands, not that he is cut.
-    const ranked = recommendPick({
-      board,
-      roster,
-      shape: SHAPE,
-      pickNumber: 37,
-      nextPickNumber: 60,
-      shortlistSize: board.length,
-    });
-    const rankOf = (playerId: string): number => ranked.findIndex((r) => r.playerId === playerId);
-    expect(rankOf("fifthBack")).toBeGreaterThan(-1);
+    // Starters still open: the fifth back would sit, so he waits (depth after the lineup, the
+    // 2026-09-12 round) and is not on the list at all; the tight end fills an empty slot, so all
+    // sixty points of him count, and he leads.
+    const open = rankedFor(roster);
+    expect(open.some((r) => r.playerId === "fifthBack")).toBe(false);
+    expect(open[0]!.playerId).toBe("firstTightEnd");
+    expect(open[0]!.rosterAdjustedValue).toBeGreaterThan(60);
+    expect(codesOf(open[0]!.reasons)).toContain("fills_starting_slot");
 
-    expect(rankOf("firstTightEnd")).toBeLessThan(rankOf("fifthBack"));
-    // The tight end fills an empty slot, so all sixty points of him count. The fifth back adds
-    // nothing to any lineup this roster can field, and only his insurance value survives.
-    expect(ranked.find((r) => r.playerId === "firstTightEnd")!.rosterAdjustedValue).toBeGreaterThan(60);
-    expect(ranked.find((r) => r.playerId === "fifthBack")!.rosterAdjustedValue).toBeLessThan(10);
-    expect(codesOf(ranked.find((r) => r.playerId === "fifthBack")!.reasons)).toContain("roster_saturated");
-    expect(codesOf(ranked.find((r) => r.playerId === "firstTightEnd")!.reasons)).toContain(
-      "fills_starting_slot",
-    );
+    // Lineup built: the fifth back adds nothing to any lineup this roster can field, and only
+    // his insurance value survives. A long shortlist on purpose: the point is where he lands.
+    const built = [...roster, { playerId: "own-qb", position: "QB" as Position, valueOverReplacement: 40 }, { playerId: "own-wr-0", position: "WR" as Position, valueOverReplacement: 90 }, { playerId: "own-wr-1", position: "WR" as Position, valueOverReplacement: 80 }, { playerId: "own-te", position: "TE" as Position, valueOverReplacement: 70 }];
+    const ranked = rankedFor(built);
+    const fifth = ranked.find((r) => r.playerId === "fifthBack")!;
+    expect(fifth).toBeDefined();
+    expect(fifth.rosterAdjustedValue).toBeLessThan(10);
+    expect(codesOf(fifth.reasons)).toContain("roster_saturated");
   });
 
   it("stops looking ahead at the last pick of the draft, and says so", () => {

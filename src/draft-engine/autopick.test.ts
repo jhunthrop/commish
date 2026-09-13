@@ -6,6 +6,7 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { initialDraftState, totalRosterSlots, type CompletedPick, type DraftConfig, type DraftState } from "./state";
 import { AUTOPICK_CONFIG, DRAFT_CLOCK_SCHEDULE, type DraftAutopickPolicy } from "./config";
 import { positionCeiling } from "./roster-need";
+import { PIN_POOL, PIN_SURPLUS_CLOCK_PICKS, PIN_TEAMS } from "./replay-pins.fixture";
 import { assignSlot } from "./slotting";
 import { needMultiplier } from "./scoring";
 import { reduceDraft } from "./reduce";
@@ -385,6 +386,25 @@ describe("endgame regression: a full 15-round all-autopick draft", () => {
   });
 });
 
+describe("the 2026-09-05 snapshot replays its recorded picks byte for byte (the literal pin, review fix round)", () => {
+  it("sixty clock picks on the real board under the surplus-damp snapshot come out exactly as recorded", () => {
+    // `replay-pins.fixture.ts`: recorded through the 2026-09-13 code and never regenerated. Every
+    // TIMER_EXPIRE a room logged between 2026-09-05 and the ceilings folds through this branch.
+    const start: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: PIN_TEAMS, pool: PIN_POOL, autopick: SURPLUS_SNAPSHOT };
+    const started = submitCommand(initialDraftState(SNAKE_CONFIG), start);
+    if (!started.ok) throw new Error(started.reason);
+    let state = started.state;
+    const replayed: string[] = [];
+    for (let i = 0; i < PIN_SURPLUS_CLOCK_PICKS.length; i += 1) {
+      const next = submitCommand(state, expireAt(state));
+      if (!next.ok) throw new Error(next.reason);
+      state = next.state;
+      replayed.push(state.picks[state.picks.length - 1]!.playerId);
+    }
+    expect(replayed).toEqual(PIN_SURPLUS_CLOCK_PICKS);
+  });
+});
+
 describe("roster-need ceilings (the 2026-09-12 round: the founder's mock rooms took three quarterbacks)", () => {
   // t1 has built its whole lineup: every dedicated starter plus a third back in the flex.
   const LINEUP = ["qb1", "rb1", "rb2", "rb3", "wr1", "wr2", "te1"];
@@ -411,16 +431,16 @@ describe("roster-need ceilings (the 2026-09-12 round: the founder's mock rooms t
     expect(bestAvailableFor(state, "t1")?.playerId).toBe("qb3");
   });
 
-  it("makes the second quarterback wait while a starter is open, and takes the bench receiver instead", () => {
-    // TE open (te1 not yet drafted), flex held by rb3: qb2 tops the board but sits, so he waits;
-    // wr3 would sit too but is not a backup-only position, and te1 is too deep to warm past him.
+  it("makes every bench body wait while a starter is open: the deep tight end who fills the lineup goes before the second quarterback and the bench receiver", () => {
+    // TE open (te1 not yet drafted), flex held by rb3: qb2 tops the board and wr3 sits behind
+    // him, but both would sit, so both wait, and te1 goes though he is eleven ranks down.
     const pool: readonly DraftPoolEntry[] = [
       ...players("QB", 2), ...players("RB", 3), ...players("WR", 2),
       { playerId: "wr3", position: "WR" }, ...players("RB", 8, 4), { playerId: "te1", position: "TE" },
       ...players("K", 2), ...players("DEF", 2),
     ];
     const state = midDraftState(SNAKE_CONFIG, pool, { t1: ["qb1", "rb1", "rb2", "rb3", "wr1", "wr2"], t2: [] });
-    expect(bestAvailableFor(state, "t1")?.playerId).toBe("wr3");
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("te1");
   });
 
   it("takes the second quarterback once the lineup is built and the board ranks him above the bench back", () => {

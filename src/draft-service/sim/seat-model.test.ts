@@ -124,10 +124,11 @@ describe("the read under the roster-need ceilings (founder ruling 2026-09-12: th
 
   it("reads the bots' own dealt brains back from full seeded drafts at least as well as the ledger measured, and errs toward the prior rather than another brain", () => {
     // Measured on the real board, 200 seeded drafts, at the end of the draft (the 2026-09-12
-    // ledger): read correctly 17.1%, still on the prior 45.8%, read as another brain 37.1%. The
-    // fixture board is flatter than the real one and reads a little worse, so the pins below are
-    // a floor and a ceiling with room, never the exact numbers: a dial that made the read worse
-    // than this fails, one that improves it passes.
+    // ledger, after the review's superflex ruling made every bench body wait for the starters):
+    // read correctly 13.7%, still on the prior 40.8%, read as another brain 45.5%. The fixture
+    // board is flatter than the real one and reads a little worse, so the pins below are a floor
+    // and a ceiling with room, never the exact numbers: a dial that made the read worse than
+    // this fails, one that improves it passes.
     let correct = 0;
     let wrong = 0;
     let seats = 0;
@@ -149,7 +150,7 @@ describe("the read under the roster-need ceilings (founder ruling 2026-09-12: th
       }
     }
     expect(seats).toBe(20 * TEAMS.length);
-    expect(correct / seats).toBeGreaterThanOrEqual(0.1);
-    expect(wrong / seats).toBeLessThanOrEqual(0.5);
+    expect(correct / seats).toBeGreaterThanOrEqual(0.08);
+    expect(wrong / seats).toBeLessThanOrEqual(0.6);
   });
 });

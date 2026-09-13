@@ -13,9 +13,11 @@ import {
   rosterFor,
   teamOnClock,
   totalRosterSlots,
+  type DraftAutopickPolicy,
   type DraftConfig,
   type DraftState,
 } from "@/draft-engine";
+import { PIN_LEGACY_BOT_PICKS, PIN_POOL, PIN_SEED, PIN_TEAMS } from "@/draft-engine/replay-pins.fixture";
 import { submitCommand } from "@/draft-engine/test-support";
 import { MS_PER_SECOND } from "@/domain/duration";
 import { BOT_ARCHETYPES, assignArchetypes, type BotArchetype } from "./archetypes";
@@ -214,13 +216,26 @@ describe("the roster-need ceilings under the room's snapshot (founder ruling 202
     }
   });
 
-  it("a room started before the ruling samples exactly as it always did: the same weights as the brain with the ceilings set aside", () => {
-    const legacy = startedUnder(START);
-    const current = startedUnder(CURRENT_START);
-    expect(legacy.config.autopick).toBeUndefined();
-    for (const archetype of BOT_ARCHETYPES) {
-      expect(botCandidateWeights(legacy, TEAMS[0]!, archetype)).toEqual(botCandidateWeights(current, TEAMS[0]!, archetype, { ceilings: null }));
+  it("a room started before the ruling replays its recorded picks byte for byte: the real board, sixty seeded bot picks under a snapshot without ceilings (the literal pin)", () => {
+    // `replay-pins.fixture.ts`: recorded through the 2026-09-13 code and never regenerated. A
+    // regression in the legacy branch of `botCandidateWeights` re-deals every mock room in
+    // flight at deploy, and this is the test that fails when it does.
+    const legacy: DraftAutopickPolicy = Object.fromEntries(Object.entries(AUTOPICK_CONFIG).filter(([key]) => key !== "rosterCeilings")) as DraftAutopickPolicy;
+    const dealt = assignArchetypes(PIN_SEED, PIN_TEAMS);
+    let state = startedUnder({ v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: PIN_TEAMS, pool: PIN_POOL, autopick: legacy });
+    expect(state.config.autopick?.rosterCeilings).toBeUndefined();
+    const replayed: string[] = [];
+    for (let i = 0; i < PIN_LEGACY_BOT_PICKS.length; i += 1) {
+      const teamId = teamOnClock(state)!;
+      const playerId = chooseBotPick(state, teamId, dealt[teamId]!, rngFor(PIN_SEED, `${teamId}:pin:${state.pickNumber}`));
+      if (playerId === null) throw new Error(`no pick at ${state.pickNumber}`);
+      replayed.push(playerId);
+      const next = submitCommand(state, { v: 1, type: "MAKE_PICK", timestamp: T, teamId, playerId });
+      if (!next.ok) throw new Error(next.reason);
+      state = next.state;
     }
+    expect(replayed).toEqual(PIN_LEGACY_BOT_PICKS);
+    // And the same seed under the current snapshot draws differently, so the pin is not vacuous.
     expect(botDraft(31, START).picks.map((p) => p.playerId)).not.toEqual(botDraft(31, CURRENT_START).picks.map((p) => p.playerId));
   });
 

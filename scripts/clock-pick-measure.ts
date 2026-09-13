@@ -379,11 +379,15 @@ async function main(): Promise<void> {
       const botSeats = teamIds.filter((teamId) => teamId !== autoSeat);
       midTally = tallyInference(record.midState, archetypes, botSeats, midTally);
       finalTally = tallyInference(record.finalState, archetypes, botSeats, finalTally);
-      incident.push({ ...record, picks: record.picks.map((pick) => ({ ...pick, teamId: pick.teamId === autoSeat ? "clock_seat" : pick.teamId })) });
+      // Seats renamed by role so every run's clock seat and its eleven bots fold into the same
+      // columns: `clock_seat`, then `bot_1..bot_11` in draft order (review fix round, M2: the old
+      // rename left the rotating seat's own id as a phantom zero-pick bot in every run).
+      const roleOf = new Map<string, string>([[autoSeat, "clock_seat"], ...botSeats.map((teamId, i) => [teamId, `bot_${i + 1}`] as const)]);
+      incident.push({ ...record, picks: record.picks.map((pick) => ({ ...pick, teamId: roleOf.get(pick.teamId)! })) });
     }
     console.log("\n## Shape 2: the incident shape, eleven practice bots and one clock-picked seat (rotating)");
     printShape("Shape 2, the clock-picked seat only", incident, ["clock_seat"], "clock_seat");
-    printShape("Shape 2, the eleven practice bots", incident, teamIds, null);
+    printShape("Shape 2, the eleven practice bots", incident, Array.from({ length: TEAM_COUNT - 1 }, (_, i) => `bot_${i + 1}`), null);
     console.log(`\nOpponent model, the bots' dealt archetypes read back from their own picks (\`inferSeatDrivers\`):\n- ${describeTally(`entering round ${INFERENCE_ROUND}`, midTally)}\n- ${describeTally("at the end of the draft", finalTally)}`);
 
     const advisorSeat = teamIds[ADVISOR_SEAT_INDEX]!;
