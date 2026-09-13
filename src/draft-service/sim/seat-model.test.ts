@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { DraftPoolEntry, MakePickAction, StartDraftAction, TimerExpireAction } from "@/domain/draft";
 import type { Position } from "@/domain/player";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { availablePool, DRAFT_CLOCK_SCHEDULE, initialDraftState, teamOnClock, type DraftConfig, type DraftState } from "@/draft-engine";
-import { BOT_ARCHETYPES } from "@/mock-draft/archetypes";
+import { AUTOPICK_CONFIG, availablePool, DRAFT_CLOCK_SCHEDULE, initialDraftState, teamOnClock, type DraftConfig, type DraftState } from "@/draft-engine";
+import { assignArchetypes, BOT_ARCHETYPES } from "@/mock-draft/archetypes";
 import { chooseBotPick } from "@/mock-draft/bots";
 import { rngFor } from "@/mock-draft/rng";
 import { SIM_INSTANT, submit } from "./run";
@@ -108,5 +108,48 @@ describe("inferSeatDriver", () => {
   it("inferSeatDrivers names every seat in the draft order", () => {
     const state = submit(initialDraftState(CONFIG), START);
     expect(Object.keys(inferSeatDrivers(state)).sort()).toEqual([...TEAMS].sort());
+  });
+});
+
+describe("the read under the roster-need ceilings (founder ruling 2026-09-12: the bots draft under the clock's snapshot)", () => {
+  const CURRENT_START: StartDraftAction = { ...START, autopick: AUTOPICK_CONFIG };
+
+  it("still reads a human who opened with two quarterbacks as the qb_early brain, though no bot would take the second one that early", () => {
+    const state = play(submit(initialDraftState(CONFIG), CURRENT_START), "t01", ["QB", "QB"], 24);
+    const driver = inferSeatDriver(state, "t01");
+    if (driver.kind !== "archetype") throw new Error("expected an archetype driver");
+    expect(driver.basis).toBe("inferred");
+    expect(driver.archetype.name).toBe("qb_early");
+  });
+
+  it("reads the bots' own dealt brains back from full seeded drafts at least as well as the ledger measured, and errs toward the prior rather than another brain", () => {
+    // Measured on the real board, 200 seeded drafts, at the end of the draft (the 2026-09-12
+    // ledger): read correctly 17.1%, still on the prior 45.8%, read as another brain 37.1%. The
+    // fixture board is flatter than the real one and reads a little worse, so the pins below are
+    // a floor and a ceiling with room, never the exact numbers: a dial that made the read worse
+    // than this fails, one that improves it passes.
+    let correct = 0;
+    let wrong = 0;
+    let seats = 0;
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const dealt = assignArchetypes(seed, TEAMS);
+      let state = submit(initialDraftState(CONFIG), CURRENT_START);
+      while (state.phase !== "complete") {
+        const teamId = teamOnClock(state)!;
+        state = pick(state, teamId, chooseBotPick(state, teamId, dealt[teamId]!, rngFor(seed, `${teamId}:pin:${state.pickNumber}`))!);
+      }
+      const drivers = inferSeatDrivers(state);
+      for (const teamId of TEAMS) {
+        const driver = drivers[teamId]!;
+        if (driver.kind !== "archetype") continue;
+        seats += 1;
+        if (driver.basis === "prior") continue;
+        if (driver.archetype.name === dealt[teamId]!.name) correct += 1;
+        else wrong += 1;
+      }
+    }
+    expect(seats).toBe(20 * TEAMS.length);
+    expect(correct / seats).toBeGreaterThanOrEqual(0.1);
+    expect(wrong / seats).toBeLessThanOrEqual(0.5);
   });
 });

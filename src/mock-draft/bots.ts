@@ -9,7 +9,7 @@ import type { DraftPoolEntry } from "@/domain/draft";
 import { MS_PER_SECOND } from "@/domain/duration";
 import type { Position } from "@/domain/player";
 import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
-import { assignSlot, autopickEligible, availablePool, draftedPlayerIds, needMultiplier, queuedEntriesFor, rankWeight, rosterFor, type DraftState } from "@/draft-engine";
+import { assignSlot, autopickEligible, availablePool, candidateRoleReader, draftedPlayerIds, needMultiplier, queuedEntriesFor, rankWeight, rosterFor, type CandidateRole, type DraftState, type RosterCeilingPolicy } from "@/draft-engine";
 import type { BotArchetype } from "./archetypes";
 import { MOCK_CONFIG } from "./config";
 import type { Rng } from "./rng";
@@ -106,6 +106,29 @@ export interface BotCandidateWeight {
   readonly weight: number;
 }
 
+export interface BotWeightOptions {
+  /**
+   * The roster-need ceilings the sampler draws under. Omitted, the room's own START_DRAFT snapshot
+   * (`state.config.autopick.rosterCeilings`, the founder ruling of 2026-09-12: the bots draft under
+   * the same ceilings and the same wait-for-starters rule as the clock; a room started before the
+   * ruling carries none and samples exactly as it always did). `null` asks for the BRAIN alone,
+   * the room's cap and deferral set aside: what the opponent model (`sim/seat-model.ts`) needs
+   * when it asks how likely a HUMAN's pick was under each archetype, since a human may take a
+   * second quarterback before his starters are filled and the question is still which brain he
+   * most resembles.
+   */
+  readonly ceilings?: RosterCeilingPolicy | null;
+  /**
+   * Whether the cap and the wait-for-starters rule REMOVE candidates from the window (the room's
+   * own draw, the default) or merely weigh them as the bench bodies they are (`false`: the
+   * opponent model's read, `sim/seat-model.ts`). A human may take a second quarterback before his
+   * starters are filled; scored at his bench-body weight he still tells the qb_early brain from
+   * the rest, while a bot's picks, drawn from the enforced window, keep the need shape they were
+   * drawn under.
+   */
+  readonly enforce?: boolean;
+}
+
 /**
  * THE SAMPLER'S OWN WEIGHTS, exposed (draft advisor round, spec 3.1a). Every legal candidate
  * inside the reach window, in board order, each scored `rankWeight × posBias × needMultiplier ×
@@ -113,24 +136,55 @@ export interface BotCandidateWeight {
  * advisor's opponent model can ask "how likely was this seat's observed pick under each brain"
  * against the ONE sampler rather than a second scoring rule that could drift from it. Empty when
  * the roster can take nothing that remains.
+ *
+ * UNDER THE ROSTER-NEED CEILINGS (`BotWeightOptions.ceilings`): a candidate over his position's
+ * ceiling is never in the window at all, a candidate who would start warms per open starting slot
+ * he could fill (the flex included, scaled by the brain's own need weight), a candidate who would
+ * sit cools to `startersFilledDamp` and again by `benchBodyDamp` per body already sitting at his
+ * position, and the one backup at a single-starter position is left out while any starter is
+ * open, unless he is all the window holds. A bot never holds three of a position the league
+ * starts one of.
  */
-export function botCandidateWeights(state: DraftState, teamId: string, archetype: BotArchetype): readonly BotCandidateWeight[] {
+export function botCandidateWeights(state: DraftState, teamId: string, archetype: BotArchetype, options: BotWeightOptions = {}): readonly BotCandidateWeight[] {
   const roster = rosterFor(state, teamId);
   const slotConfig = state.config.slotConfig;
-  const canRoster = (entry: DraftPoolEntry): boolean => assignSlot({ position: entry.position, roster, slotConfig }).ok;
+  const ceilings = options.ceilings === undefined ? state.config.autopick?.rosterCeilings : options.ceilings;
+  const roleOf = ceilings === undefined || ceilings === null ? null : candidateRoleReader(roster, slotConfig, state.pool, ceilings);
+  const enforce = options.enforce ?? true;
+  const placement = (entry: DraftPoolEntry): { readonly ok: boolean; readonly role: CandidateRole | null } => {
+    const assignment = assignSlot({ position: entry.position, roster, slotConfig });
+    if (!assignment.ok) return { ok: false, role: null };
+    const role = roleOf === null ? null : roleOf(entry.position, assignment.slot);
+    return { ok: role === null || !enforce || !role.capped, role };
+  };
   // The roster-status gate binds a bot exactly as it binds the room's own autopick
   // (`autopickEligible`, the engine's one statement of it): a player the served board had off
   // an active roster is never sampled, and the reach window is counted over eligible men only.
-  const candidates = topEligible(availablePool(state).filter(autopickEligible), canRoster);
+  const eligible = availablePool(state).filter(autopickEligible);
+  // A board that holds nothing under the ceilings (a depleted pool, a small-room fixture) still
+  // has to be drafted from: the cap is a preference, exactly as it is for the clock's own pick,
+  // and a bot that returned nobody would stall a real room.
+  const underCeilings = topEligible(eligible, (entry) => placement(entry).ok);
+  const window = underCeilings.length > 0 ? underCeilings : topEligible(eligible, (entry) => assignSlot({ position: entry.position, roster, slotConfig }).ok);
+  const withRoles = window.map((entry, index) => ({ entry, index, role: placement(entry).role }));
+  const waits = (row: { readonly role: CandidateRole | null }): boolean => enforce && (row.role?.waitsForStarters ?? false);
+  const candidates = withRoles.some((row) => !waits(row)) ? withRoles.filter((row) => !waits(row)) : withRoles;
   const recentCounts = recentPositionCounts(state);
-  return candidates.map((entry, index) => ({
+  return candidates.map(({ entry, index, role }) => ({
     playerId: entry.playerId,
     weight:
       rankWeight(index, MOCK_CONFIG.strategy.temperature) *
       (archetype.posBias[entry.position] ?? 1) *
-      botNeedMultiplier(entry.position, roster, slotConfig, archetype) *
+      (role === null ? botNeedMultiplier(entry.position, roster, slotConfig, archetype) : roleNeedMultiplier(role, archetype)) *
       runMultiplier(entry.position, recentCounts, archetype),
   }));
+}
+
+/** The need term under the ceilings: warm per open starting slot he could fill, scaled by the
+ *  brain's need weight; a bench body cooled once, and again per body already sitting there. */
+function roleNeedMultiplier(role: CandidateRole, archetype: BotArchetype): number {
+  const { needPerOpenStartingSlot, startersFilledDamp, benchBodyDamp } = MOCK_CONFIG.strategy;
+  return role.starts ? 1 + archetype.needWeight * needPerOpenStartingSlot * role.openStartingSlots : startersFilledDamp * benchBodyDamp ** role.benchBodies;
 }
 
 /**

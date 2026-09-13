@@ -111,12 +111,61 @@ export function anyStarterOpen(roster: readonly RosterSlot[], slotConfig: readon
 
 /** How many of the roster's BENCH bodies sit at each position, read off the pool's own positions. */
 export function benchBodiesByPosition(roster: readonly RosterSlot[], pool: readonly DraftPoolEntry[]): ReadonlyMap<Position, number> {
+  return countByPosition(roster.filter((spot) => spot.slot === BENCH_SLOT), pool);
+}
+
+/** How many of the roster's players sit at each position, read off the pool's own positions. */
+export function rosteredByPosition(roster: readonly RosterSlot[], pool: readonly DraftPoolEntry[]): ReadonlyMap<Position, number> {
+  return countByPosition(roster, pool);
+}
+
+function countByPosition(spots: readonly RosterSlot[], pool: readonly DraftPoolEntry[]): ReadonlyMap<Position, number> {
   const positionOf = new Map(pool.map((entry) => [entry.playerId, entry.position] as const));
   const counts = new Map<Position, number>();
-  for (const spot of roster) {
-    if (spot.slot !== BENCH_SLOT || spot.playerId === null) continue;
-    const position = positionOf.get(spot.playerId);
+  for (const spot of spots) {
+    const position = spot.playerId === null ? undefined : positionOf.get(spot.playerId);
     if (position !== undefined) counts.set(position, (counts.get(position) ?? 0) + 1);
   }
   return counts;
+}
+
+/** What one legal candidate is to this roster under the rule above. */
+export interface CandidateRole {
+  /** He would fill a starting slot (dedicated or shared) rather than sit. */
+  readonly starts: boolean;
+  /** Open starting slots he could fill, the flex included; 0 when he sits. */
+  readonly openStartingSlots: number;
+  /** Bodies already sitting at his position. */
+  readonly benchBodies: number;
+  /** Taking him would push his position past its ceiling. */
+  readonly capped: boolean;
+  /** He is the one backup at a single-starter position and a starter is still open. */
+  readonly waitsForStarters: boolean;
+}
+
+/**
+ * THE ONE READER of a candidate's role, built once per roster and asked per candidate: the clock's
+ * pick (`selectors.ts`), the practice bots (`@/mock-draft/bots`) and the advisor all classify a
+ * man the same way, so no surface can hold a third quarterback another one refuses. `landsIn` is
+ * the slot `assignSlot` says he would take, the engine's one legality oracle.
+ */
+export function candidateRoleReader(
+  roster: readonly RosterSlot[],
+  slotConfig: readonly RosterSlotConfig[],
+  pool: readonly DraftPoolEntry[],
+  policy: RosterCeilingPolicy,
+): (position: Position, landsIn: RosterSlot["slot"]) => CandidateRole {
+  const rostered = rosteredByPosition(roster, pool);
+  const bench = benchBodiesByPosition(roster, pool);
+  const starterOpen = anyStarterOpen(roster, slotConfig);
+  return (position, landsIn) => {
+    const starts = landsIn !== BENCH_SLOT;
+    return {
+      starts,
+      openStartingSlots: starts ? openStartingSlotsEligible(position, roster, slotConfig) : 0,
+      benchBodies: bench.get(position) ?? 0,
+      capped: (rostered.get(position) ?? 0) + 1 > positionCeiling(position, slotConfig, policy),
+      waitsForStarters: !starts && starterOpen && isSingleStarterPosition(position, slotConfig),
+    };
+  };
 }

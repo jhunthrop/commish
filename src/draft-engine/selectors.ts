@@ -1,12 +1,12 @@
 import type { DraftPoolEntry, DraftStatus } from "@/domain/draft";
 import type { DraftFormat } from "@/domain/league";
 import type { Position } from "@/domain/player";
-import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig, type RosterSlotType } from "@/domain/roster";
+import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import { auctionOf, rosterFor, totalPickCount, totalRosterSlots, type AuctionState, type CompletedPick, type DraftState } from "./state";
 import { snakeTeamForPick } from "./order";
 import { assignSlot, type SlotAssignment } from "./slotting";
 import { deferredLateRoundPosition, needMultiplier, rankWeight } from "./scoring";
-import { anyStarterOpen, benchBodiesByPosition, isSingleStarterPosition, openStartingSlotsEligible, positionCeiling } from "./roster-need";
+import { candidateRoleReader } from "./roster-need";
 import { AUCTION_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier, type DraftAutopickPolicy, type PauseWindow } from "./config";
 import { MS_PER_SECOND, clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
 import { deadlineAfter, pausedUntil as pauseWindowEndAt } from "./pause";
@@ -332,22 +332,17 @@ function surplusDampScorer(state: DraftState, roster: readonly RosterSlot[], pol
  * board order.
  */
 function rosterCeilingScorer(state: DraftState, roster: readonly RosterSlot[], policy: DraftAutopickPolicy, ramp: number): CandidateScorer {
-  const ceilings = policy.rosterCeilings!;
   const slotConfig = state.config.slotConfig;
   const openSlotBoost = ramp * policy.needPerOpenStartingSlot;
   const benchDamp = 1 - ramp * (1 - policy.startersFilledDamp);
   const depthDamp = 1 - ramp * (1 - (policy.surplusDamp ?? 1));
-  const rosteredCounts = rosteredCountsByPosition(roster, state.pool);
-  const benchBodies = benchBodiesByPosition(roster, state.pool);
-  const starterOpen = anyStarterOpen(roster, slotConfig);
+  // The one role reader the practice bots and the advisor classify by too (`roster-need.ts`).
+  const roleOf = candidateRoleReader(roster, slotConfig, state.pool, policy.rosterCeilings!);
   return (entry, landsIn) => {
-    const starts = landsIn !== BENCH_SLOT;
-    const need = starts
-      ? 1 + openSlotBoost * openStartingSlotsEligible(entry.position, roster, slotConfig)
-      : benchDamp * depthDamp ** (benchBodies.get(entry.position) ?? 0);
-    if ((rosteredCounts.get(entry.position) ?? 0) + 1 > positionCeiling(entry.position, slotConfig, ceilings)) return { need, bucket: "capped" };
-    const waitsForStarters = !starts && starterOpen && isSingleStarterPosition(entry.position, slotConfig);
-    const deferred = waitsForStarters || deferredLateRoundPosition(entry.position, roster, slotConfig, policy.lateRoundOnlyRoundsFromEnd);
+    const role = roleOf(entry.position, landsIn);
+    const need = role.starts ? 1 + openSlotBoost * role.openStartingSlots : benchDamp * depthDamp ** role.benchBodies;
+    if (role.capped) return { need, bucket: "capped" };
+    const deferred = role.waitsForStarters || deferredLateRoundPosition(entry.position, roster, slotConfig, policy.lateRoundOnlyRoundsFromEnd);
     return { need, bucket: deferred ? "deferred" : "now" };
   };
 }

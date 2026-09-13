@@ -29,6 +29,7 @@ import {
   teamOnClock,
   totalRosterSlots,
   type CompletedPick,
+  type DraftAutopickPolicy,
   type DraftConfig,
   type DraftState,
 } from "@/draft-engine";
@@ -36,7 +37,8 @@ import { recommendNow, valuedEvidence, type ValuedEntry } from "@/draft-service/
 import { simBoardOrder, type SimRankableEntry } from "@/draft-service/sim/board-order";
 import { evidencePoolFor } from "@/draft-service/sim/evidence";
 import { SIM_INSTANT, submit } from "@/draft-service/sim/run";
-import { assignArchetypes } from "@/mock-draft/archetypes";
+import { assignArchetypes, type BotArchetype } from "@/mock-draft/archetypes";
+import { inferSeatDrivers } from "@/draft-service/sim/seat-model";
 import { chooseBotPick } from "@/mock-draft/bots";
 import { rngFor } from "@/mock-draft/rng";
 import type { Recommendation } from "@/projections/decide/draft";
@@ -53,6 +55,7 @@ interface Flags {
   readonly sharpness: number;
   readonly advisorRuns: number;
   readonly bench: number;
+  readonly snapshot: DraftAutopickPolicy;
 }
 
 function flag(name: string, fallback: number): number {
@@ -63,8 +66,18 @@ function flag(name: string, fallback: number): number {
   return value;
 }
 
+/** `--snapshot legacy` starts every draft under the 2026-09-05 snapshot (surplus damp, no roster
+ *  ceilings): the clock and the bots behave as a room opened before the 2026-09-12 ruling did. */
+function snapshotFlag(): DraftAutopickPolicy {
+  const index = process.argv.indexOf("--snapshot");
+  const value = index === -1 ? "current" : process.argv[index + 1];
+  if (value === "current") return AUTOPICK_CONFIG;
+  if (value === "legacy") return Object.fromEntries(Object.entries(AUTOPICK_CONFIG).filter(([key]) => key !== "rosterCeilings")) as DraftAutopickPolicy;
+  throw new Error(`--snapshot must be current or legacy, got ${value}`);
+}
+
 function readFlags(): Flags {
-  return { runs: flag("runs", 200), seed: flag("seed", 20260912), sharpness: flag("sharpness", 0.5), advisorRuns: flag("advisor-runs", 50), bench: flag("bench", 6) };
+  return { runs: flag("runs", 200), seed: flag("seed", 20260912), sharpness: flag("sharpness", 0.5), advisorRuns: flag("advisor-runs", 50), bench: flag("bench", 6), snapshot: snapshotFlag() };
 }
 
 function requireEnv(name: string): string {
@@ -96,9 +109,15 @@ interface RunRecord {
   readonly picks: readonly PickRecord[];
   /** Position -> round its first player sits in on this run's board. */
   readonly adpRoundByPosition: ReadonlyMap<Position, number>;
+  /** The room as it stood entering round `INFERENCE_ROUND`, and at the end. */
+  readonly midState: DraftState | null;
+  readonly finalState: DraftState;
 }
 
 type Picker = (state: DraftState, teamId: string) => string | null;
+
+/** The archetype inference is read entering this round (five rounds of picks per seat) and at the end. */
+const INFERENCE_ROUND = 6;
 
 function rosterSlotsWithBench(bench: number): readonly RosterSlotConfig[] {
   return STANDARD_ROSTER_SLOTS.map((slot) => (slot.slot === BENCH_SLOT ? { ...slot, count: bench } : slot));
@@ -117,16 +136,18 @@ function adpRounds(board: readonly DraftPoolEntry[]): ReadonlyMap<Position, numb
   return rounds;
 }
 
-function runDraft(board: readonly DraftPoolEntry[], rosterSlots: readonly RosterSlotConfig[], teamIds: readonly string[], pickerFor: (teamId: string) => Picker, seed: number): RunRecord {
+function runDraft(board: readonly DraftPoolEntry[], rosterSlots: readonly RosterSlotConfig[], teamIds: readonly string[], pickerFor: (teamId: string) => Picker, seed: number, snapshot: DraftAutopickPolicy): RunRecord {
   const config: DraftConfig = { draftId: `measure_${seed}`, leagueId: "measure", format: "snake", kickoffAt: SIM_INSTANT, auctionBudget: null, slotConfig: rosterSlots, clockSchedule: [] };
-  const start: StartDraftAction = { v: 1, type: "START_DRAFT", timestamp: SIM_INSTANT, draftOrder: teamIds, pool: board, minBid: 1, autopick: AUTOPICK_CONFIG };
+  const start: StartDraftAction = { v: 1, type: "START_DRAFT", timestamp: SIM_INSTANT, draftOrder: teamIds, pool: board, minBid: 1, autopick: snapshot };
   let state = submit(initialDraftState(config), start);
   const indexOf = new Map(board.map((entry, index) => [entry.playerId, index] as const));
   const positionOf = new Map(board.map((entry) => [entry.playerId, entry.position] as const));
   const picks: PickRecord[] = [];
+  let midState: DraftState | null = null;
   while (!isComplete(state)) {
     const teamId = teamOnClock(state);
     if (teamId === null) break;
+    if (midState === null && roundForPick(teamIds.length, state.pickNumber) === INFERENCE_ROUND) midState = state;
     const playerId = pickerFor(teamId)(state, teamId);
     if (playerId === null) break;
     const boardFirst = firstLegalOnBoard(state, teamId);
@@ -135,7 +156,32 @@ function runDraft(board: readonly DraftPoolEntry[], rosterSlots: readonly Roster
     const pick: CompletedPick = state.picks[state.picks.length - 1]!;
     picks.push({ pickNumber: pick.pickNumber, round: pick.round, teamId, playerId, position: positionOf.get(playerId)!, boardIndex: indexOf.get(playerId)!, offBoardOrder: boardFirst !== playerId });
   }
-  return { picks, adpRoundByPosition: adpRounds(board) };
+  return { picks, adpRoundByPosition: adpRounds(board), midState, finalState: state };
+}
+
+interface InferenceTally {
+  readonly seats: number;
+  readonly correct: number;
+  readonly prior: number;
+  readonly wrong: number;
+}
+
+/** How the opponent model reads the bots' dealt archetypes from their own picks, at one state. */
+function tallyInference(state: DraftState | null, dealt: Readonly<Record<string, BotArchetype>>, botSeats: readonly string[], into: InferenceTally): InferenceTally {
+  if (state === null) return into;
+  const drivers = inferSeatDrivers(state);
+  return botSeats.reduce((tally, teamId) => {
+    const driver = drivers[teamId];
+    if (driver === undefined || driver.kind !== "archetype") return tally;
+    if (driver.basis === "prior") return { ...tally, seats: tally.seats + 1, prior: tally.prior + 1 };
+    return driver.archetype.name === dealt[teamId]!.name ? { ...tally, seats: tally.seats + 1, correct: tally.correct + 1 } : { ...tally, seats: tally.seats + 1, wrong: tally.wrong + 1 };
+  }, into);
+}
+
+const EMPTY_TALLY: InferenceTally = { seats: 0, correct: 0, prior: 0, wrong: 0 };
+
+function describeTally(label: string, tally: InferenceTally): string {
+  return `${label}: ${tally.seats} bot seats, read correctly ${pct(tally.correct, tally.seats)}, still on the prior ${pct(tally.prior, tally.seats)}, read as another brain ${pct(tally.wrong, tally.seats)}`;
 }
 
 function mean(values: readonly number[]): number {
@@ -309,12 +355,12 @@ async function main(): Promise<void> {
     console.log(`Board: ${board.length} players with an ADP (players.adp ascending), positions ${POSITIONS.map((position) => `${position} ${board.filter((player) => player.position === position).length}`).join(", ")}.`);
     console.log(`Evidence board: ${pool.length} projected rows, generation ${boardGeneration}, valued positions ${[...new Set([...valued.values()].map((entry) => entry.position))].join("/")}.`);
     console.log(`Shape: ${TEAM_COUNT} teams, ${totalRosterSlots(rosterSlots)} rounds (bench ${flags.bench}). Seed ${flags.seed}, sharpness ${flags.sharpness}, runs ${flags.runs}, advisor runs ${flags.advisorRuns}.`);
-    console.log(`Policy: ${JSON.stringify(AUTOPICK_CONFIG)}`);
+    console.log(`Snapshot on every START_DRAFT (${flags.snapshot.rosterCeilings === undefined ? "legacy, no roster ceilings" : "current"}): ${JSON.stringify(flags.snapshot)}`);
 
     const autopick: Picker = (state, teamId) => bestAvailableFor(state, teamId)?.playerId ?? null;
 
     const allAutopick: RunRecord[] = [];
-    for (let run = 0; run <= flags.runs; run += 1) allAutopick.push(runDraft(boardFor(run), rosterSlots, teamIds, () => autopick, flags.seed + run));
+    for (let run = 0; run <= flags.runs; run += 1) allAutopick.push(runDraft(boardFor(run), rosterSlots, teamIds, () => autopick, flags.seed + run, flags.snapshot));
     console.log("\n## Shape 1: every seat picked by the clock policy");
     console.log("\nRun 0, the exact board:");
     printRosterSheet(allAutopick[0]!, teamIds, names);
@@ -322,16 +368,23 @@ async function main(): Promise<void> {
     console.log("\nTier-drop flips in the clock pick: 0 of every pick by construction. `bestAvailableFor` (src/draft-engine/selectors.ts) scores rankWeight x needMultiplier and carries no tier term; the last column above is the share of picks the NEED term moved off plain board order.");
 
     const incident: RunRecord[] = [];
+    let midTally = EMPTY_TALLY;
+    let finalTally = EMPTY_TALLY;
     for (let run = 0; run <= flags.runs; run += 1) {
       const seed = flags.seed + run;
       const autoSeat = teamIds[run % TEAM_COUNT]!;
       const archetypes = assignArchetypes(seed, teamIds);
       const pickerFor = (teamId: string): Picker => (teamId === autoSeat ? autopick : (state, id) => chooseBotPick(state, id, archetypes[id]!, rngFor(seed, `${id}:pick:${state.pickNumber}`)));
-      const record = runDraft(boardFor(run), rosterSlots, teamIds, pickerFor, seed);
+      const record = runDraft(boardFor(run), rosterSlots, teamIds, pickerFor, seed, flags.snapshot);
+      const botSeats = teamIds.filter((teamId) => teamId !== autoSeat);
+      midTally = tallyInference(record.midState, archetypes, botSeats, midTally);
+      finalTally = tallyInference(record.finalState, archetypes, botSeats, finalTally);
       incident.push({ ...record, picks: record.picks.map((pick) => ({ ...pick, teamId: pick.teamId === autoSeat ? "clock_seat" : pick.teamId })) });
     }
     console.log("\n## Shape 2: the incident shape, eleven practice bots and one clock-picked seat (rotating)");
     printShape("Shape 2, the clock-picked seat only", incident, ["clock_seat"], "clock_seat");
+    printShape("Shape 2, the eleven practice bots", incident, teamIds, null);
+    console.log(`\nOpponent model, the bots' dealt archetypes read back from their own picks (\`inferSeatDrivers\`):\n- ${describeTally(`entering round ${INFERENCE_ROUND}`, midTally)}\n- ${describeTally("at the end of the draft", finalTally)}`);
 
     const advisorSeat = teamIds[ADVISOR_SEAT_INDEX]!;
     const measureAdvisor = (label: string, othersFor: (run: number) => (teamId: string) => Picker): void => {
@@ -346,7 +399,7 @@ async function main(): Promise<void> {
           return turn.top?.playerId ?? autopick(state, teamId);
         };
         const others = othersFor(run);
-        advisorRuns.push(runDraft(boardFor(run), rosterSlots, teamIds, (teamId) => (teamId === advisorSeat ? follow : others(teamId)), flags.seed + run));
+        advisorRuns.push(runDraft(boardFor(run), rosterSlots, teamIds, (teamId) => (teamId === advisorSeat ? follow : others(teamId)), flags.seed + run, flags.snapshot));
         if (run === 0) {
           console.log(`\n## ${label}\n\nRun 0, the exact board, ${advisorSeat}'s turns:\n`);
           console.log("| Rd | advisor's call | highest roster-fit value | highest VOR | flip | tier flip |");

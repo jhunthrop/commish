@@ -65,7 +65,12 @@ function shadowStateBefore(state: DraftState, ordered: readonly CompletedPick[],
 
 /** ln P(observed pick | archetype) at one turn — see the module docblock. */
 function pickLogLikelihood(shadow: DraftState, teamId: string, playerId: string, archetype: BotArchetype): number {
-  const weights = botCandidateWeights(shadow, teamId, archetype);
+  // The room's own need shape, the policy's exclusions set aside (`enforce: false`): the cap and
+  // the wait-for-starters rule are policy, not character. A human seat that opened with two
+  // quarterbacks is scored at the second one's bench-body weight and still resembles the qb_early
+  // brain more than any other; a bot's picks keep the need shape they were drawn under. Measured
+  // on the same 200 seeded drafts before and after the ruling (the 2026-09-12 ledger).
+  const weights = botCandidateWeights(shadow, teamId, archetype, { enforce: false });
   const total = weights.reduce((sum, row) => sum + row.weight, 0);
   const own = weights.find((row) => row.playerId === playerId);
   if (own === undefined || total <= 0) return Math.log(SEAT_MODEL_CONFIG.outsideWindowLikelihood);

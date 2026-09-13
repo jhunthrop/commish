@@ -30,6 +30,7 @@
 import type { DraftPoolEntry, MakePickAction, StartDraftAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
 import {
+  AUTOPICK_CONFIG,
   admitCommand,
   initialDraftState,
   isComplete,
@@ -102,6 +103,9 @@ export function runOneDraft(input: RunOneDraftInput): RunOneDraftResult {
     slotConfig: input.rosterSlots,
     clockSchedule: [],
   };
+  // The clock's snapshot, stamped the way `draft-service/store.ts` stamps a real room's START:
+  // a headless sim is a room opened today, so its bots draft under today's roster-need ceilings
+  // (founder ruling 2026-09-12) exactly as a mock room opened after the deploy does.
   const start: StartDraftAction = {
     v: 1,
     type: "START_DRAFT",
@@ -109,6 +113,7 @@ export function runOneDraft(input: RunOneDraftInput): RunOneDraftResult {
     draftOrder: input.teamIds,
     pool: input.board,
     minBid: 1,
+    autopick: AUTOPICK_CONFIG,
   };
   let state = submit(initialDraftState(config), start);
 

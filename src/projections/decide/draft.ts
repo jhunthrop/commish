@@ -259,7 +259,7 @@ function fitFor(
   const alreadyBenched = placements.filter(
     (placement) => placement.position === candidate.position && placement.slot === BENCH_SLOT,
   ).length;
-  if (alreadyRostered + 1 > positionCeiling(candidate.position, slotConfig, ceilings)) {
+  if (alreadyRostered + 1 > ceilingFor(candidate.position, slotConfig, ceilings)) {
     return { ...UNPLACEABLE, alreadyRostered, alreadyBenched };
   }
   const filled = filledSlots(placements);
@@ -267,8 +267,12 @@ function fitFor(
   if (!assignment.ok) return { ...UNPLACEABLE, alreadyRostered, alreadyBenched };
   const marginalStartingValue =
     startingValue([...roster, candidate], slotConfig) - startingValue(roster, slotConfig);
-  const insurance = BENCH_INSURANCE_SHARE * coverValue(candidate, roster, slotConfig);
   const sits = assignment.slot === BENCH_SLOT;
+  // A man who would start insures at his own surplus, as the flat share always read him: with
+  // the best man at his position out he starts all the same, so the marginal cover below would
+  // only re-solve the lineup twice to reach the number he already carries. The cover is for the
+  // bench body, where it is the whole question.
+  const insurance = BENCH_INSURANCE_SHARE * (sits ? coverValue(candidate, roster, slotConfig) : surplus(candidate));
   return {
     marginalStartingValue,
     insurance,
@@ -290,7 +294,40 @@ function coverValue(candidate: RosteredPlayer, roster: readonly RosteredPlayer[]
   if (atPosition.length === 0) return surplus(candidate);
   const best = atPosition.reduce((top, player) => (player.valueOverReplacement > top.valueOverReplacement ? player : top));
   const without = roster.filter((player) => player !== best);
-  return startingValue([...without, candidate], slotConfig) - startingValue(without, slotConfig);
+  return startingValue([...without, candidate], slotConfig) - startingValueWithout(roster, best, slotConfig);
+}
+
+/**
+ * `startingValue(roster minus one man)`, remembered per roster array and man (the immutability
+ * rule's sanctioned memo: a WeakMap keyed by an object that never changes). One recommendation
+ * asks this for every bench candidate at a position, and the answer depends on the roster and
+ * the man taken out, never on the candidate.
+ */
+const startingValueWithoutByRoster = new WeakMap<readonly RosteredPlayer[], Map<string, number>>();
+
+function startingValueWithout(roster: readonly RosteredPlayer[], removed: RosteredPlayer, slotConfig: readonly RosterSlotConfig[]): number {
+  const held = startingValueWithoutByRoster.get(roster) ?? new Map<string, number>();
+  startingValueWithoutByRoster.set(roster, held);
+  const known = held.get(removed.playerId);
+  if (known !== undefined) return known;
+  const value = startingValue(roster.filter((player) => player !== removed), slotConfig);
+  held.set(removed.playerId, value);
+  return value;
+}
+
+/** `positionCeiling` per slot config and policy, remembered the same way: the rule reads only those two. */
+const ceilingsBySlotConfig = new WeakMap<readonly RosterSlotConfig[], WeakMap<RosterCeilingPolicy, Map<Position, number>>>();
+
+function ceilingFor(position: Position, slotConfig: readonly RosterSlotConfig[], policy: RosterCeilingPolicy): number {
+  const byPolicy = ceilingsBySlotConfig.get(slotConfig) ?? new WeakMap<RosterCeilingPolicy, Map<Position, number>>();
+  ceilingsBySlotConfig.set(slotConfig, byPolicy);
+  const byPosition = byPolicy.get(policy) ?? new Map<Position, number>();
+  byPolicy.set(policy, byPosition);
+  const known = byPosition.get(position);
+  if (known !== undefined) return known;
+  const ceiling = positionCeiling(position, slotConfig, policy);
+  byPosition.set(position, ceiling);
+  return ceiling;
 }
 
 /**

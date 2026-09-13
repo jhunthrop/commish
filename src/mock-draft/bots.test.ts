@@ -3,8 +3,10 @@ import type { DraftPoolEntry, StartDraftAction } from "@/domain/draft";
 import type { Position } from "@/domain/player";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import {
+  AUTOPICK_CONFIG,
   DRAFT_CLOCK_SCHEDULE,
   assignSlot,
+  positionCeiling,
   availablePool,
   initialDraftState,
   isComplete,
@@ -171,6 +173,72 @@ describe("chooseBotPick over whole drafts (the property harness)", () => {
         expect(index).toBeLessThan(MOCK_CONFIG.strategy.reachDepth);
       });
     }
+  });
+});
+
+describe("the roster-need ceilings under the room's snapshot (founder ruling 2026-09-12)", () => {
+  const CURRENT_START: StartDraftAction = { ...START, autopick: AUTOPICK_CONFIG };
+  const CEILINGS = AUTOPICK_CONFIG.rosterCeilings!;
+
+  function startedUnder(start: StartDraftAction): DraftState {
+    const started = submitCommand(initialDraftState(CONFIG), start);
+    if (!started.ok) throw new Error(started.reason);
+    return started.state;
+  }
+
+  function botDraft(seed: number, start: StartDraftAction): DraftState {
+    const dealt = assignArchetypes(seed, TEAMS);
+    let state = startedUnder(start);
+    while (!isComplete(state)) {
+      const teamId = teamOnClock(state)!;
+      const playerId = chooseBotPick(state, teamId, dealt[teamId]!, rngFor(seed, `${teamId}:ceil:${state.pickNumber}`));
+      if (playerId === null) throw new Error(`no pick for ${teamId} at ${state.pickNumber}`);
+      const next = submitCommand(state, { v: 1, type: "MAKE_PICK", timestamp: T, teamId, playerId });
+      if (!next.ok) throw new Error(next.reason);
+      state = next.state;
+    }
+    return state;
+  }
+
+  it("no bot ever holds three of a position the league starts one of, nor two kickers or defenses, over seeded full drafts", () => {
+    for (const seed of [21, 22, 23, 24, 25]) {
+      const state = botDraft(seed, CURRENT_START);
+      expect(state.phase).toBe("complete");
+      for (const teamId of TEAMS) {
+        const counts = new Map<Position, number>();
+        for (const spot of rosterFor(state, teamId)) counts.set(POSITION_OF.get(spot.playerId!)!, (counts.get(POSITION_OF.get(spot.playerId!)!) ?? 0) + 1);
+        for (const [position, count] of counts) expect(count).toBeLessThanOrEqual(positionCeiling(position, STANDARD_ROSTER_SLOTS, CEILINGS));
+        expect(counts.get("QB") ?? 0).toBeLessThanOrEqual(2);
+        expect(counts.get("TE") ?? 0).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+
+  it("a room started before the ruling samples exactly as it always did: the same weights as the brain with the ceilings set aside", () => {
+    const legacy = startedUnder(START);
+    const current = startedUnder(CURRENT_START);
+    expect(legacy.config.autopick).toBeUndefined();
+    for (const archetype of BOT_ARCHETYPES) {
+      expect(botCandidateWeights(legacy, TEAMS[0]!, archetype)).toEqual(botCandidateWeights(current, TEAMS[0]!, archetype, { ceilings: null }));
+    }
+    expect(botDraft(31, START).picks.map((p) => p.playerId)).not.toEqual(botDraft(31, CURRENT_START).picks.map((p) => p.playerId));
+  });
+
+  it("keeps the second quarterback out of the window while a starter is open, and lets him in once the lineup is built", () => {
+    // qb2 tops the board, so he sits inside the reach window on rank alone; with qb1 rostered
+    // and every other starter open he would sit, and the room's draw leaves him out.
+    const qb2First = [POOL.find((entry) => entry.playerId === "qb2")!, ...POOL.filter((entry) => entry.playerId !== "qb2")];
+    const withStarterOpen = { ...startedUnder({ ...CURRENT_START, pool: qb2First }), rosters: { bot01: [{ slot: "QB" as const, slotIndex: 0, playerId: "qb1" }] }, picks: [] };
+    const qbEarly = archetypeNamed("qb_early");
+    expect(botCandidateWeights(withStarterOpen, "bot01", qbEarly).some((row) => row.playerId === "qb2")).toBe(false);
+    // The brain without enforcement still weighs him, cooled as a bench body.
+    expect(botCandidateWeights(withStarterOpen, "bot01", qbEarly, { enforce: false }).some((row) => row.playerId === "qb2")).toBe(true);
+  });
+
+  it("still returns a pick when everything left is over a ceiling, rather than stalling the room", () => {
+    const started = startedUnder(CURRENT_START);
+    const onlyQuarterbacksLeft = { ...started, pool: POOL.filter((entry) => entry.position === "QB"), rosters: { bot01: [{ slot: "QB" as const, slotIndex: 0, playerId: "qb1" }, { slot: "BENCH" as const, slotIndex: 0, playerId: "qb2" }] }, picks: [] };
+    expect(chooseBotPick(onlyQuarterbacksLeft, "bot01", archetypeNamed("best_available"), rngFor(1, "capped"))).not.toBeNull();
   });
 });
 
