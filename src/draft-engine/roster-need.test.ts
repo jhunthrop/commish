@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Position } from "@/domain/player";
 import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlot, type RosterSlotConfig } from "@/domain/roster";
-import { anyStarterOpen, benchBodiesByPosition, isBackupOnlyPosition, openStartingSlotsEligible, positionCeiling, type RosterCeilingPolicy } from "./roster-need";
+import { anyStarterOpen, benchBodiesByPosition, isSingleStarterPosition, openStartingSlotsEligible, positionCeiling, type RosterCeilingPolicy } from "./roster-need";
 
-const POLICY: RosterCeilingPolicy = { backupsAtNonFlexPosition: 1 };
+const POLICY: RosterCeilingPolicy = { backupsAtSingleStarterPosition: 1 };
 const POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
 const SUPERFLEX_SLOTS: readonly RosterSlotConfig[] = [
@@ -20,38 +20,44 @@ function spots(...entries: readonly (readonly [RosterSlot["slot"], number])[]): 
   return entries.map(([slot, slotIndex], i) => ({ slot, slotIndex, playerId: `p${i}` }));
 }
 
-describe("positionCeiling: starters plus a bench allowance, from the league's own roster shape", () => {
-  it("holds a 1-QB league to two quarterbacks and one of each late position", () => {
+describe("positionCeiling: starters plus a bench allowance, from the league's own roster shape (founder ruling 2026-09-12)", () => {
+  it("standard shape: at most two of a position the league starts one of, one of each late position", () => {
     expect(positionCeiling("QB", STANDARD_ROSTER_SLOTS, POLICY)).toBe(2);
+    expect(positionCeiling("TE", STANDARD_ROSTER_SLOTS, POLICY)).toBe(2);
     expect(positionCeiling("K", STANDARD_ROSTER_SLOTS, POLICY)).toBe(1);
     expect(positionCeiling("DEF", STANDARD_ROSTER_SLOTS, POLICY)).toBe(1);
   });
 
-  it("shares the bench among the flex positions in proportion to their dedicated starters", () => {
-    // Six bench spots over RB 2, WR 2, TE 1 dedicated starters: 2.4, 2.4 and 1.2, rounded.
+  it("standard shape: the rest of the bench goes to the backs and receivers by starting demand, flex included", () => {
+    // Six bench spots, one each to QB and TE, four left over RB 3 and WR 3: two each.
     expect(positionCeiling("RB", STANDARD_ROSTER_SLOTS, POLICY)).toBe(2 + 1 + 2);
     expect(positionCeiling("WR", STANDARD_ROSTER_SLOTS, POLICY)).toBe(2 + 1 + 2);
-    expect(positionCeiling("TE", STANDARD_ROSTER_SLOTS, POLICY)).toBe(1 + 1 + 1);
   });
 
-  it("widens with the bench: a seven-man bench gives the backs and receivers a third body", () => {
+  it("sixteen-round shape: a seven-man bench gives the backs and receivers a third body and the tight end still one", () => {
     expect(positionCeiling("RB", withBench(7), POLICY)).toBe(6);
-    expect(positionCeiling("TE", withBench(7), POLICY)).toBe(3);
+    expect(positionCeiling("WR", withBench(7), POLICY)).toBe(6);
+    expect(positionCeiling("TE", withBench(7), POLICY)).toBe(2);
+    expect(positionCeiling("QB", withBench(7), POLICY)).toBe(2);
   });
 
-  it("treats a superflex quarterback as a flex position, never as a one-backup one", () => {
-    expect(positionCeiling("QB", SUPERFLEX_SLOTS, POLICY)).toBe(1 + 1 + 1);
+  it("superflex shape: the quarterback is still a position the league starts one of, so two at most", () => {
+    expect(positionCeiling("QB", SUPERFLEX_SLOTS, POLICY)).toBe(2);
+    expect(positionCeiling("TE", SUPERFLEX_SLOTS, POLICY)).toBe(2);
     expect(positionCeiling("RB", SUPERFLEX_SLOTS, POLICY)).toBe(2 + 2 + 2);
+    expect(positionCeiling("WR", SUPERFLEX_SLOTS, POLICY)).toBe(2 + 2 + 2);
   });
 
-  it("shares the bench equally among flex positions when no flex position has a dedicated starter", () => {
+  it("flex-only shape: shares the remaining bench by shared-slot demand when no flex position has a dedicated starter", () => {
     const flexOnly: readonly RosterSlotConfig[] = [
       { slot: "QB", count: 1, eligiblePositions: ["QB"] },
       { slot: "FLEX", count: 3, eligiblePositions: ["RB", "WR", "TE"] },
       { slot: BENCH_SLOT, count: 6, eligiblePositions: ["QB", "RB", "WR", "TE"] },
     ];
+    // Five bench spots after the quarterback's one, over three positions of demand 3 each: 1.67, rounded up.
     expect(positionCeiling("RB", flexOnly, POLICY)).toBe(0 + 3 + 2);
     expect(positionCeiling("TE", flexOnly, POLICY)).toBe(0 + 3 + 2);
+    expect(positionCeiling("QB", flexOnly, POLICY)).toBe(2);
   });
 
   it("is zero for a position the league rosters nowhere", () => {
@@ -77,9 +83,9 @@ describe("the roster reads the engine needs", () => {
     expect(openStartingSlotsEligible("QB", roster, STANDARD_ROSTER_SLOTS)).toBe(0);
   });
 
-  it("names the quarterback as backup-only in a 1-QB league and nobody else", () => {
-    expect(POSITIONS.filter((position) => isBackupOnlyPosition(position, STANDARD_ROSTER_SLOTS))).toEqual(["QB"]);
-    expect(isBackupOnlyPosition("QB", SUPERFLEX_SLOTS)).toBe(false);
+  it("names the quarterback and the tight end as the single-starter positions, never the late two", () => {
+    expect(POSITIONS.filter((position) => isSingleStarterPosition(position, STANDARD_ROSTER_SLOTS))).toEqual(["QB", "TE"]);
+    expect(isSingleStarterPosition("QB", SUPERFLEX_SLOTS)).toBe(true);
   });
 
   it("sees a starter open until every non-late starting slot, the flex included, is filled", () => {

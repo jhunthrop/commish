@@ -6,7 +6,7 @@ import { auctionOf, rosterFor, totalPickCount, totalRosterSlots, type AuctionSta
 import { snakeTeamForPick } from "./order";
 import { assignSlot, type SlotAssignment } from "./slotting";
 import { deferredLateRoundPosition, needMultiplier, rankWeight } from "./scoring";
-import { anyStarterOpen, benchBodiesByPosition, isBackupOnlyPosition, openStartingSlotsEligible, positionCeiling } from "./roster-need";
+import { anyStarterOpen, benchBodiesByPosition, isSingleStarterPosition, openStartingSlotsEligible, positionCeiling } from "./roster-need";
 import { AUCTION_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier, type DraftAutopickPolicy, type PauseWindow } from "./config";
 import { MS_PER_SECOND, clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
 import { deadlineAfter, pausedUntil as pauseWindowEndAt } from "./pause";
@@ -346,7 +346,7 @@ function rosterCeilingScorer(state: DraftState, roster: readonly RosterSlot[], p
       ? 1 + openSlotBoost * openStartingSlotsEligible(entry.position, roster, slotConfig)
       : benchDamp * depthDamp ** (benchBodies.get(entry.position) ?? 0);
     if ((rosteredCounts.get(entry.position) ?? 0) + 1 > positionCeiling(entry.position, slotConfig, ceilings)) return { need, bucket: "capped" };
-    const waitsForStarters = !starts && starterOpen && isBackupOnlyPosition(entry.position, slotConfig);
+    const waitsForStarters = !starts && starterOpen && isSingleStarterPosition(entry.position, slotConfig);
     const deferred = waitsForStarters || deferredLateRoundPosition(entry.position, roster, slotConfig, policy.lateRoundOnlyRoundsFromEnd);
     return { need, bucket: deferred ? "deferred" : "now" };
   };

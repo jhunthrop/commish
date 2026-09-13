@@ -1,6 +1,6 @@
 import type { Position } from "@/domain/player";
 import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig, type RosterSlotType } from "@/domain/roster";
-import { AUTOPICK_CONFIG, anyStarterOpen, assignSlot, isBackupOnlyPosition, positionCeiling, type RosterCeilingPolicy } from "@/draft-engine";
+import { AUTOPICK_CONFIG, anyStarterOpen, assignSlot, isSingleStarterPosition, positionCeiling, type RosterCeilingPolicy } from "@/draft-engine";
 import { bestStartingTotal } from "./slots";
 import type { LeagueShape, ValuedPlayer } from "./replacement";
 import { survivalProbabilities, type RoomTendency } from "./survival";
@@ -274,7 +274,7 @@ function fitFor(
     insurance,
     value: marginalStartingValue + insurance,
     slot: assignment.slot,
-    waitsForStarters: sits && isBackupOnlyPosition(candidate.position, slotConfig) && anyStarterOpen(filled, slotConfig),
+    waitsForStarters: sits && isSingleStarterPosition(candidate.position, slotConfig) && anyStarterOpen(filled, slotConfig),
     alreadyRostered,
     alreadyBenched,
   };

@@ -15,13 +15,14 @@
  *     warm, one boost per open starting slot he could fill;
  *   - a candidate who would SIT is a bench body, cooled once, and cooled again for every body
  *     already sitting at his position;
- *   - a position is CAPPED at its starters, the shared slots it may fill, and its share of the
- *     bench: the whole bench split among the flex positions in proportion to their dedicated
- *     starters, one backup at a position no flex takes (the quarterback in a 1-QB league), none
- *     at a late-round position (the kicker and the team defense);
- *   - a backup at a backup-only position is DEFERRED while any starter is still open: the second
- *     quarterback comes after the lineup is built, and then only when the board says he is worth
- *     more than the bench back or receiver beside him.
+ *   - a position is CAPPED (founder ruling, 2026-09-12): a position the league starts ONE of
+ *     (the quarterback, the tight end) holds at most one bench body, so a team holds at most two
+ *     of it whatever the shape; a late-round position (the kicker, the team defense) holds none;
+ *     the rest of the bench goes to the multi-starter positions (the backs and receivers) in
+ *     proportion to their starting slots, the flex included;
+ *   - the one backup at a single-starter position is DEFERRED while any starter is still open:
+ *     the second quarterback and the second tight end come after the lineup is built, and then
+ *     only when the board says he is worth more than the bench back or receiver beside him.
  * Pure over roster and slot config, so the autopick and the advisor read one rule.
  */
 import type { DraftPoolEntry } from "@/domain/draft";
@@ -31,8 +32,13 @@ import { LATE_ROUND_ONLY_POSITIONS } from "./scoring";
 
 /** The one dial the ceiling rule carries; it rides the START_DRAFT snapshot (`DraftAutopickPolicy.rosterCeilings`). */
 export interface RosterCeilingPolicy {
-  /** Backups allowed at a position with dedicated starters that no shared slot takes. */
-  readonly backupsAtNonFlexPosition: number;
+  /** Bench bodies allowed at a position the league starts exactly one of (one: a team holds at most two). */
+  readonly backupsAtSingleStarterPosition: number;
+}
+
+/** Every position some slot in the league takes. */
+function rosteredPositions(slotConfig: readonly RosterSlotConfig[]): readonly Position[] {
+  return [...new Set(slotConfig.flatMap((config) => config.eligiblePositions))];
 }
 
 function isSharedSlot(config: RosterSlotConfig): boolean {
@@ -51,31 +57,38 @@ function benchSlots(slotConfig: readonly RosterSlotConfig[]): number {
   return slotConfig.filter((config) => config.slot === BENCH_SLOT).reduce((sum, config) => sum + config.count, 0);
 }
 
-function flexPositions(slotConfig: readonly RosterSlotConfig[]): readonly Position[] {
-  return [...new Set(slotConfig.filter(isSharedSlot).flatMap((config) => config.eligiblePositions))];
+/** A position the league starts exactly one of, the late-round two excepted: the quarterback and the tight end in the standard shape. */
+export function isSingleStarterPosition(position: Position, slotConfig: readonly RosterSlotConfig[]): boolean {
+  return !LATE_ROUND_ONLY_POSITIONS.includes(position) && dedicatedSlots(position, slotConfig) === 1;
 }
 
-/** A position with dedicated starters that no shared slot takes and that is not a late-round one. */
-export function isBackupOnlyPosition(position: Position, slotConfig: readonly RosterSlotConfig[]): boolean {
-  return !LATE_ROUND_ONLY_POSITIONS.includes(position) && dedicatedSlots(position, slotConfig) > 0 && sharedSlotsEligible(position, slotConfig) === 0;
+/** Starting slots a multi-starter position can fill: its dedicated ones and the shared ones it is eligible for. */
+function startingDemand(position: Position, slotConfig: readonly RosterSlotConfig[]): number {
+  return dedicatedSlots(position, slotConfig) + sharedSlotsEligible(position, slotConfig);
 }
 
 /**
- * The most players a roster should hold at `position`: starters, the shared slots he may fill,
- * and the bench allowance. The bench is split among the flex positions in proportion to their
- * dedicated starters (six bench spots over RB 2, WR 2, TE 1 give 2, 2 and 1), rounded; a flex
- * position with no dedicated starter shares equally. Zero for a position nothing rosters.
+ * The most players a roster should hold at `position` (the founder's ruling, 2026-09-12). A
+ * single-starter position: its one starter plus `backupsAtSingleStarterPosition`, the shared
+ * slots it might fill counted for nothing, so a team holds at most two whatever the shape. A
+ * late-round position: its starters, no bench. Every other position: its starters, the shared
+ * slots it may fill, and its share of what the bench has left after the single-starter backups,
+ * split in proportion to starting demand with the flex included (six bench spots in the standard
+ * shape: one each to QB and TE, then four over RB 3 and WR 3, two each), rounded. Zero for a
+ * position nothing rosters.
  */
 export function positionCeiling(position: Position, slotConfig: readonly RosterSlotConfig[], policy: RosterCeilingPolicy): number {
   const dedicated = dedicatedSlots(position, slotConfig);
   const shared = sharedSlotsEligible(position, slotConfig);
   if (dedicated === 0 && shared === 0) return 0;
   if (LATE_ROUND_ONLY_POSITIONS.includes(position)) return dedicated;
-  if (shared === 0) return dedicated + policy.backupsAtNonFlexPosition;
-  const flex = flexPositions(slotConfig);
-  const demand = flex.reduce((sum, flexPosition) => sum + dedicatedSlots(flexPosition, slotConfig), 0);
-  const share = demand === 0 ? 1 / flex.length : dedicated / demand;
-  return dedicated + shared + Math.round(benchSlots(slotConfig) * share);
+  if (isSingleStarterPosition(position, slotConfig)) return dedicated + policy.backupsAtSingleStarterPosition;
+  const positions = rosteredPositions(slotConfig);
+  const singleStarters = positions.filter((candidate) => isSingleStarterPosition(candidate, slotConfig)).length;
+  const remaining = Math.max(0, benchSlots(slotConfig) - singleStarters * policy.backupsAtSingleStarterPosition);
+  const multiStarters = positions.filter((candidate) => !LATE_ROUND_ONLY_POSITIONS.includes(candidate) && !isSingleStarterPosition(candidate, slotConfig));
+  const demand = multiStarters.reduce((sum, candidate) => sum + startingDemand(candidate, slotConfig), 0);
+  return dedicated + shared + Math.round(remaining * (startingDemand(position, slotConfig) / demand));
 }
 
 function openSpots(config: RosterSlotConfig, roster: readonly RosterSlot[]): number {

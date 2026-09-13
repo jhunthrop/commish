@@ -377,6 +377,7 @@ describe("endgame regression: a full 15-round all-autopick draft", () => {
         counts.set(position, (counts.get(position) ?? 0) + 1);
       }
       expect(counts.get("QB") ?? 0).toBeLessThanOrEqual(2);
+      expect(counts.get("TE") ?? 0).toBeLessThanOrEqual(2);
       expect(counts.get("K") ?? 0).toBe(1);
       expect(counts.get("DEF") ?? 0).toBe(1);
       for (const [position, count] of counts) expect(count).toBeLessThanOrEqual(positionCeiling(position, STANDARD_ROSTER_SLOTS, AUTOPICK_CONFIG.rosterCeilings!));
@@ -434,6 +435,20 @@ describe("roster-need ceilings (the 2026-09-12 round: the founder's mock rooms t
     ];
     const state = midDraftState(SNAKE_CONFIG, pool, { t1: LINEUP, t2: [] });
     expect(bestAvailableFor(state, "t1")?.playerId).toBe("rb4");
+  });
+
+  it("never takes a third tight end, and makes the second one wait for the starters like the second quarterback", () => {
+    // Lineup built: te2 tops the board, would sit, and is the one backup allowed, so he goes.
+    // With the flex held by rb3 and a starter (WR2) still open, te2 would sit: he waits, and the
+    // late receiver who fills the open slot goes first (the surplus-damp scoring took te2 here:
+    // 0.6 against the receiver's 1.4 x e^-1). With two rostered, a third tight end is capped.
+    const pool: readonly DraftPoolEntry[] = [
+      ...players("QB", 1), ...players("RB", 3), { playerId: "wr1", position: "WR" }, ...players("TE", 3),
+      { playerId: "rb4", position: "RB" }, ...players("WR", 12, 10), { playerId: "wr2", position: "WR" }, ...players("K", 2), ...players("DEF", 2),
+    ];
+    expect(bestAvailableFor(midDraftState(SNAKE_CONFIG, pool, { t1: LINEUP, t2: [] }), "t1")?.playerId).toBe("te2");
+    expect(bestAvailableFor(midDraftState(SNAKE_CONFIG, pool, { t1: ["qb1", "rb1", "rb2", "rb3", "wr1", "te1"], t2: [] }), "t1")?.playerId).toBe("wr10");
+    expect(bestAvailableFor(midDraftState(SNAKE_CONFIG, pool, { t1: [...LINEUP, "te2"], t2: [] }), "t1")?.playerId).toBe("rb4");
   });
 
   it("never takes a second defence, even when the board is topped by one", () => {

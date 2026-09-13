@@ -75,7 +75,7 @@ const autopickPolicy = z
     // Optional for the identical F3 reason: a log written before the ceilings existed carries
     // none, and absent must mean the surplus-damp scoring it was made with, never today's rule.
     // A whole number of backups, zero allowed (a league that wants no second quarterback at all).
-    rosterCeilings: z.object({ backupsAtNonFlexPosition: z.number().int().nonnegative() }).optional(),
+    rosterCeilings: z.object({ backupsAtSingleStarterPosition: z.number().int().nonnegative() }).optional(),
   })
   .optional();
 

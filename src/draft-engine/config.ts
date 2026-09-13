@@ -229,11 +229,12 @@ export interface DraftAutopickPolicy {
  * for the whole argument and for the three ways the deferral lifts.
  */
 /**
- * `rosterCeilings: { backupsAtNonFlexPosition: 1 }` — one backup quarterback in a 1-QB league,
- * the founder's own number ("a team should hold at most two, and the second comes late"). The
- * flex positions' allowances are not dials: `positionCeiling` derives them from the bench size
- * and the dedicated starters (six bench spots over RB 2, WR 2, TE 1 give 2, 2 and 1), so a
- * league with a longer bench widens them on its own.
+ * `rosterCeilings: { backupsAtSingleStarterPosition: 1 }` — one bench body at a position the
+ * league starts one of (the quarterback, the tight end), the founder's ruling of 2026-09-12: "a
+ * team holds at most two of any of them regardless of shape". The backs' and receivers'
+ * allowances are not dials: `positionCeiling` derives them from what the bench has left, by
+ * starting demand with the flex included (four over RB 3 and WR 3 in the standard shape, two
+ * each), so a league with a longer bench widens them on its own.
  */
 export const AUTOPICK_CONFIG: DraftAutopickPolicy = {
   temperature: 3.0,
@@ -242,7 +243,7 @@ export const AUTOPICK_CONFIG: DraftAutopickPolicy = {
   rampFullAtRosterFraction: 0.5,
   surplusDamp: 0.25,
   lateRoundOnlyRoundsFromEnd: 2,
-  rosterCeilings: { backupsAtNonFlexPosition: 1 },
+  rosterCeilings: { backupsAtSingleStarterPosition: 1 },
 };
 
 export const AUCTION_CONFIG = {

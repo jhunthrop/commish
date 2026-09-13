@@ -230,12 +230,21 @@ describe("recommendPick", () => {
       expect(query(board, LINEUP)[0]!.playerId).toBe("backupQuarterback");
     });
 
-    it("insures nothing with a third tight end who could not start even with the first one out: the bench back ranks ahead", () => {
-      const roster = [...LINEUP, own("te2", "TE", 20)];
-      const ranked = query([candidate("thirdTightEnd", "TE", 15, 150), candidate("fourthBack", "RB", 0, 140), ...filler("WR", 12, 160, -5)], roster);
-      const thirdTightEnd = ranked.find((rec) => rec.playerId === "thirdTightEnd")!;
-      expect(thirdTightEnd.rosterAdjustedValue).toBe(0);
-      expect(ranked.findIndex((rec) => rec.playerId === "fourthBack")).toBeLessThan(ranked.findIndex((rec) => rec.playerId === "thirdTightEnd"));
+    it("never recommends a third tight end, and makes the second wait for the starters", () => {
+      expect(query([candidate("thirdTightEnd", "TE", 15, 150), ...filler("WR", 12, 160, -5)], [...LINEUP, own("te2", "TE", 20)]).some((rec) => rec.playerId === "thirdTightEnd")).toBe(false);
+      const openReceiver = LINEUP.filter((player) => player.playerId !== "wr2");
+      const board = [candidate("backupTightEnd", "TE", 30, 60), candidate("receiver", "WR", 5, 160), ...filler("RB", 12, 170, -5)];
+      expect(query(board, openReceiver).some((rec) => rec.playerId === "backupTightEnd")).toBe(false);
+      expect(query(board, LINEUP)[0]!.playerId).toBe("backupTightEnd");
+    });
+
+    it("insures nothing with a second bench body who could not start even with the starter out: the bench back ranks ahead", () => {
+      // wr3 already sits behind wr1 and wr2; with wr1 out, wr3 starts and a fourth receiver adds nothing.
+      const roster = [...LINEUP, own("wr3", "WR", 20)];
+      const ranked = query([candidate("fourthReceiver", "WR", 15, 150), candidate("fourthBack", "RB", 0, 140), ...filler("TE", 12, 160, -5)], roster);
+      const fourthReceiver = ranked.find((rec) => rec.playerId === "fourthReceiver")!;
+      expect(fourthReceiver.rosterAdjustedValue).toBe(0);
+      expect(ranked.findIndex((rec) => rec.playerId === "fourthBack")).toBeLessThan(ranked.findIndex((rec) => rec.playerId === "fourthReceiver"));
     });
 
     it("still insures the first backup by what he covers when the starter is out", () => {

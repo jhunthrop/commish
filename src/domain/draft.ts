@@ -110,7 +110,7 @@ export interface StartDraftAction {
      * ceilings existed must keep replaying under the surplus-damp scoring it was made with.
      */
     readonly rosterCeilings?: {
-      readonly backupsAtNonFlexPosition: number;
+      readonly backupsAtSingleStarterPosition: number;
     };
   };
 }
