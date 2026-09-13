@@ -1,4 +1,6 @@
 import { formatOrdinal } from "@/domain/format";
+import { mustPickLine } from "@/domain/must-pick";
+import type { Position } from "@/domain/player";
 import { formatUsd } from "@/money/config";
 
 /**
@@ -20,6 +22,10 @@ export interface NoticeContexts {
     readonly pickNumber: number;
     readonly playerName: string;
     readonly position: string;
+    /** The positions the roster could still take when the clock picked, once its bench was full
+     *  (`restrictedPositions`); absent or empty when any position fit. The body then carries the
+     *  league's own line (`mustPickLine`), the same sentence the room and the advisor's card say. */
+    readonly mustPick?: readonly Position[];
   };
   readonly review_removed: {
     /**
@@ -437,9 +443,12 @@ export interface RenderedNotice {
 type NoticeTemplate<T extends NoticeType> = (context: NoticeContexts[T]) => RenderedNotice;
 
 export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> } = {
-  draft_auto_picked: ({ leagueName, pickNumber, playerName, position }) => ({
+  draft_auto_picked: ({ leagueName, pickNumber, playerName, position, mustPick }) => ({
     title: "We made your pick for you",
-    body: `The clock ran out on pick ${pickNumber} in ${leagueName}, so we picked for you: your queue first, then the best player your roster needs. You drafted ${playerName} (${position}). Set your queue before your next draft so this does not happen again.`,
+    body:
+      mustPick === undefined || mustPick.length === 0
+        ? `The clock ran out on pick ${pickNumber} in ${leagueName}, so we picked for you: your queue first, then the best player your roster needs. You drafted ${playerName} (${position}). Set your queue before your next draft so this does not happen again.`
+        : `The clock ran out on pick ${pickNumber} in ${leagueName}. ${mustPickLine(mustPick)} So we picked for you: your queue first, then the first one on the board. You drafted ${playerName} (${position}). Set your queue before your next draft so this does not happen again.`,
   }),
   // `reason` is stored on the row (`context.reason`) but deliberately unused HERE: its
   // author-facing phrase travels as its own field on the wire (`NoticeView.quote`, `GET

@@ -59,6 +59,18 @@ describe("DockCall (our call beside the verb)", () => {
     expect(screen.getByTestId("dock-verb")).toHaveTextContent("Draft Jalen Croft");
   });
 
+  it("never falls back to a man the roster cannot take, and says what the roster still owes (the 2026-09-12 round)", () => {
+    // QB and one RB filled in a room with no bench: only an RB fits. The queue's receiver and the
+    // board's own top name are both skipped for the first back left, under the league's line.
+    const view = { ...VIEW, rosters: { t1: [{ slot: "QB" as const, slotIndex: 0, playerId: "qb1" }, { slot: "RB" as const, slotIndex: 0, playerId: "rb1" }], t2: [] }, availablePlayerIds: ["wr1", "rb2"] };
+    renderCall({ view, advisor: null, queue: ["wr1"], available: new Set(["wr1", "rb2"]), canDraft: true, nextPickLabel: null });
+    const call = screen.getByTestId("dock-call");
+    expect(call).toHaveTextContent("Devon Marsh");
+    expect(call).not.toHaveTextContent("Andre Salas");
+    expect(screen.getByTestId("dock-call-why")).toHaveTextContent("Your next pick must be an RB.");
+    expect(screen.getByTestId("dock-verb")).toHaveTextContent("Draft Devon Marsh");
+  });
+
   it("says it is updating, in one quiet word, while the advice is being recomputed", () => {
     renderCall({ recomputing: true });
     const word = screen.getByTestId("advisor-recomputing");
