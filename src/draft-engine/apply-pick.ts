@@ -1,7 +1,22 @@
+import { mustPickLine } from "@/domain/must-pick";
+import type { RosterSlot } from "@/domain/roster";
+import { restrictedPositions } from "@/domain/roster-eligibility";
 import { rosterFor, type CompletedPick, type DraftReduceResult, type DraftState } from "./state";
 import { roundForPick } from "./order";
 import { assignSlot } from "./slotting";
 import { draftedPlayerIds } from "./selectors";
+
+/**
+ * The room's line when a pick does not fit (the 2026-09-12 round, founder report: a bench-full
+ * roster read "no room on your bench" when the honest sentence names what it CAN still take).
+ * With the bench full and starters open, the league says which positions are owed
+ * (`mustPickLine`, one sentence shared with the advisor's card and the clock's notice); any other
+ * refusal keeps the slotting oracle's own words.
+ */
+function refusalFor(state: DraftState, roster: readonly RosterSlot[], slottingReason: string): string {
+  const owed = restrictedPositions(state.config.slotConfig, roster);
+  return owed === null || owed.length === 0 ? slottingReason : mustPickLine(owed);
+}
 
 export interface ApplyPickInput {
   readonly teamId: string;
@@ -47,7 +62,7 @@ export function applyPick(state: DraftState, input: ApplyPickInput): ApplyPickRe
 
   const roster = rosterFor(state, input.teamId);
   const assignment = assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig });
-  if (!assignment.ok) return { ok: false, reason: assignment.reason };
+  if (!assignment.ok) return { ok: false, reason: refusalFor(state, roster, assignment.reason) };
 
   const pickNumber = input.pickNumber ?? state.pickNumber;
   const round =

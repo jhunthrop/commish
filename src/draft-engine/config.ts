@@ -1,3 +1,5 @@
+import type { RosterCeilingPolicy } from "./roster-need";
+
 /**
  * One tier of the auto-tightening pick clock. A tier applies while the draft is more than
  * `untilHoursBeforeKickoff` hours from kickoff; tiers are ordered farthest-out first, and
@@ -168,6 +170,22 @@ export interface DraftAutopickPolicy {
    * existed must keep replaying without it forever.
    */
   readonly lateRoundOnlyRoundsFromEnd?: number;
+  /**
+   * THE ROSTER-NEED CEILINGS (the 2026-09-12 round, founder report: autopick took three
+   * quarterbacks in real mock drafts; measured at two on 99% of autopicked teams and three on
+   * 12%, 47% in the founder's own bot rooms, before this field). When present, `bestAvailableFor`
+   * scores under `roster-need.ts`'s rule instead of `needMultiplier`'s: a candidate who would
+   * start is warm per open starting slot he could fill, the flex included; a candidate who would
+   * sit is cooled to `startersFilledDamp` and again by `surplusDamp` per body already sitting at
+   * his position (bench bodies, never a flex starter, which is the count the older scoring got
+   * wrong); a position is capped at its starters plus its bench allowance (`positionCeiling`);
+   * and a backup at a position no flex takes waits until every starter is filled.
+   *
+   * OPTIONAL, AND ABSENT MEANS THE SURPLUS-DAMP SCORING, BYTE FOR BYTE, for the identical F3
+   * reason every other field here carries: this value rides the `START_DRAFT` snapshot, and a
+   * log written before the ceilings existed must keep replaying without them forever.
+   */
+  readonly rosterCeilings?: RosterCeilingPolicy;
 }
 
 /**
@@ -210,6 +228,13 @@ export interface DraftAutopickPolicy {
  * of them out of order on its very last pick. See `DraftAutopickPolicy.lateRoundOnlyRoundsFromEnd`
  * for the whole argument and for the three ways the deferral lifts.
  */
+/**
+ * `rosterCeilings: { backupsAtNonFlexPosition: 1 }` — one backup quarterback in a 1-QB league,
+ * the founder's own number ("a team should hold at most two, and the second comes late"). The
+ * flex positions' allowances are not dials: `positionCeiling` derives them from the bench size
+ * and the dedicated starters (six bench spots over RB 2, WR 2, TE 1 give 2, 2 and 1), so a
+ * league with a longer bench widens them on its own.
+ */
 export const AUTOPICK_CONFIG: DraftAutopickPolicy = {
   temperature: 3.0,
   needPerOpenStartingSlot: 0.4,
@@ -217,6 +242,7 @@ export const AUTOPICK_CONFIG: DraftAutopickPolicy = {
   rampFullAtRosterFraction: 0.5,
   surplusDamp: 0.25,
   lateRoundOnlyRoundsFromEnd: 2,
+  rosterCeilings: { backupsAtNonFlexPosition: 1 },
 };
 
 export const AUCTION_CONFIG = {

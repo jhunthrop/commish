@@ -8,6 +8,7 @@ export {
 } from "./state";
 export { assignSlot, type SlotAssignment } from "./slotting";
 export { rankWeight, openStartingSlots, needMultiplier, type NeedMultiplierOptions } from "./scoring";
+export { positionCeiling, isBackupOnlyPosition, anyStarterOpen, type RosterCeilingPolicy } from "./roster-need";
 export { snakeTeamForPick, roundForPick } from "./order";
 export { reduceDraft } from "./reduce";
 export { admitCommand, type AdmitResult } from "./admit";

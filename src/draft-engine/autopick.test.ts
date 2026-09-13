@@ -4,7 +4,8 @@ import type { Position } from "@/domain/player";
 import type { RosterSlot } from "@/domain/roster";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { initialDraftState, totalRosterSlots, type CompletedPick, type DraftConfig, type DraftState } from "./state";
-import { AUTOPICK_CONFIG, DRAFT_CLOCK_SCHEDULE } from "./config";
+import { AUTOPICK_CONFIG, DRAFT_CLOCK_SCHEDULE, type DraftAutopickPolicy } from "./config";
+import { positionCeiling } from "./roster-need";
 import { assignSlot } from "./slotting";
 import { needMultiplier } from "./scoring";
 import { reduceDraft } from "./reduce";
@@ -21,6 +22,20 @@ const SNAKE_CONFIG: DraftConfig = {
   draftId: "d_auto", leagueId: "l_auto", format: "snake", kickoffAt: "2026-09-10T17:00:00.000Z",
   auctionBudget: null, slotConfig: STANDARD_ROSTER_SLOTS, clockSchedule: DRAFT_CLOCK_SCHEDULE,
   autopick: AUTOPICK_CONFIG,
+};
+
+/**
+ * The 2026-09-05 snapshot: surplus damp and the late-round deferral, no roster ceilings — what
+ * every log written between that fix and the 2026-09-12 ceilings carries, built field by field
+ * so it can never quietly inherit a later dial.
+ */
+const SURPLUS_SNAPSHOT: DraftAutopickPolicy = {
+  temperature: AUTOPICK_CONFIG.temperature,
+  needPerOpenStartingSlot: AUTOPICK_CONFIG.needPerOpenStartingSlot,
+  startersFilledDamp: AUTOPICK_CONFIG.startersFilledDamp,
+  rampFullAtRosterFraction: AUTOPICK_CONFIG.rampFullAtRosterFraction,
+  surplusDamp: AUTOPICK_CONFIG.surplusDamp,
+  lateRoundOnlyRoundsFromEnd: AUTOPICK_CONFIG.lateRoundOnlyRoundsFromEnd,
 };
 
 /**
@@ -118,14 +133,16 @@ describe("need-aware autopick (bestAvailableFor fallback)", () => {
     expect(bestAvailableFor(state, "t2")?.playerId).toBe("rb5");
   });
 
-  it("still takes the board's best early in the draft even at an already-filled position", () => {
+  it("still takes the board's best early in the draft at an already-filled position, under the surplus-damp snapshot", () => {
     // One pick in, the ramp is barely awake (1/7.5 of full weight): a second QB at the top of
-    // the board beats an open-need RB one rank below it.
+    // the board beats an open-need RB one rank below it. Pinned to the 2026-09-05 snapshot: the
+    // 2026-09-12 ceilings make the second quarterback wait for the starters at any ramp (see the
+    // roster-need describe below), which is the founder's own rule and not a ramp question.
     const pool: readonly DraftPoolEntry[] = [
       ...players("QB", 2), ...players("RB", 20), ...players("WR", 20),
       ...players("TE", 5), ...players("K", 3), ...players("DEF", 3),
     ];
-    const state = midDraftState(SNAKE_CONFIG, pool, { t1: ["qb1"], t2: [] });
+    const state = midDraftState({ ...SNAKE_CONFIG, autopick: SURPLUS_SNAPSHOT }, pool, { t1: ["qb1"], t2: [] });
     expect(bestAvailableFor(state, "t1")?.playerId).toBe("qb2");
   });
 
@@ -135,16 +152,16 @@ describe("need-aware autopick (bestAvailableFor fallback)", () => {
     expect(bestAvailableFor(round8State(), "t1")?.playerId).toBe("te1");
   });
 
-  it("cools a filled-starters position below an open-need position of comparable rank", () => {
-    // Six picks in (ramp 0.8): the board's best available is a WR, but t1's WR starters are
-    // both filled and the TE slot is open — the TE one rank below wins.
+  it("cools a bench body below an open-need starter of comparable rank", () => {
+    // Seven picks in (ramp 0.93): the board's best available is a WR, but t1's WR starters and
+    // the flex are all filled so he would sit, and the TE slot is open — the TE one rank below wins.
     const pool: readonly DraftPoolEntry[] = [
-      ...players("QB", 1), ...players("RB", 2), ...players("WR", 2), ...players("DEF", 1),
+      ...players("QB", 1), ...players("RB", 3), ...players("WR", 2), ...players("DEF", 1),
       { playerId: "wr9", position: "WR" }, { playerId: "te1", position: "TE" },
-      ...players("QB", 3, 2), ...players("RB", 10, 3), ...players("WR", 10, 10), ...players("TE", 5, 2),
+      ...players("QB", 3, 2), ...players("RB", 10, 4), ...players("WR", 10, 10), ...players("TE", 5, 2),
       ...players("K", 4), ...players("DEF", 3, 2),
     ];
-    const state = midDraftState(SNAKE_CONFIG, pool, { t1: ["qb1", "rb1", "rb2", "wr1", "wr2", "def1"], t2: [] });
+    const state = midDraftState(SNAKE_CONFIG, pool, { t1: ["qb1", "rb1", "rb2", "wr1", "wr2", "def1", "rb3"], t2: [] });
     expect(bestAvailableFor(state, "t1")?.playerId).toBe("te1");
   });
 
@@ -195,9 +212,10 @@ describe("surplus damp cools a stacked QB below a genuinely open skill need (202
     startersFilledDamp: AUTOPICK_CONFIG.startersFilledDamp,
     rampFullAtRosterFraction: AUTOPICK_CONFIG.rampFullAtRosterFraction,
   };
+  const SURPLUS_CONFIG: DraftConfig = { ...SNAKE_CONFIG, autopick: SURPLUS_SNAPSHOT };
 
   it("with surplusDamp on the snapshot, routes to the still-needed TE instead of stacking a second QB", () => {
-    const state = midDraftState(SNAKE_CONFIG, SURPLUS_POOL, { t1: SURPLUS_ROSTER, t2: [] });
+    const state = midDraftState(SURPLUS_CONFIG, SURPLUS_POOL, { t1: SURPLUS_ROSTER, t2: [] });
     expect(bestAvailableFor(state, "t1")?.playerId).toBe("te1");
   });
 
@@ -239,7 +257,7 @@ describe("surplus damp cools a stacked QB below a genuinely open skill need (202
     ];
 
     it("2 QBs already rostered: the next QB candidate (qb3) scores exactly filledDamp × surplusDamp^2, and autopick routes to TE instead", () => {
-      const state = midDraftState(SNAKE_CONFIG, WEAK_ALTERNATIVES_POOL, { t1: TWO_QB_ROSTER, t2: [] });
+      const state = midDraftState(SURPLUS_CONFIG, WEAK_ALTERNATIVES_POOL, { t1: TWO_QB_ROSTER, t2: [] });
       const roster = state.rosters["t1"] ?? [];
       const ramp = roster.length / (0.5 * totalRosterSlots(STANDARD_ROSTER_SLOTS)); // 6 / 7.5 = 0.8
       const filledDamp = 1 - ramp * (1 - AUTOPICK_CONFIG.startersFilledDamp);
@@ -255,7 +273,7 @@ describe("surplus damp cools a stacked QB below a genuinely open skill need (202
     });
 
     it("3 QBs already rostered: the next QB candidate (qb4) scores exactly filledDamp × surplusDamp^3 — genuinely cooler than the 2-rostered case above, and autopick still routes to TE", () => {
-      const state = midDraftState(SNAKE_CONFIG, WEAK_ALTERNATIVES_POOL, { t1: THREE_QB_ROSTER, t2: [] });
+      const state = midDraftState(SURPLUS_CONFIG, WEAK_ALTERNATIVES_POOL, { t1: THREE_QB_ROSTER, t2: [] });
       const roster = state.rosters["t1"] ?? [];
       const ramp = roster.length / (0.5 * totalRosterSlots(STANDARD_ROSTER_SLOTS)); // 7 / 7.5 = 0.9333…
       const filledDamp = 1 - ramp * (1 - AUTOPICK_CONFIG.startersFilledDamp);
@@ -287,7 +305,7 @@ describe("surplus damp cools a stacked QB below a genuinely open skill need (202
     //
     // Both configs below are frozen COPIES (`{ ...AUTOPICK_CONFIG }`, never the module's own
     // reference) for that reason.
-    const withSnapshot: DraftConfig = { ...SNAKE_CONFIG, autopick: { ...AUTOPICK_CONFIG } };
+    const withSnapshot: DraftConfig = { ...SNAKE_CONFIG, autopick: { ...SURPLUS_SNAPSHOT } };
     const withoutSnapshot: DraftConfig = { ...SNAKE_CONFIG, autopick: PRE_FIX_AUTOPICK };
     const mutable = AUTOPICK_CONFIG as { surplusDamp?: number };
     const saved = mutable.surplusDamp;
@@ -348,6 +366,95 @@ describe("endgame regression: a full 15-round all-autopick draft", () => {
         expect(roster.filter((s) => s.slot === slotConfig.slot)).toHaveLength(slotConfig.count);
       }
     }
+  });
+
+  it("holds every roster under its position ceilings: two quarterbacks, one kicker, one defence at most", () => {
+    const positionOf = new Map(POOL.map((entry) => [entry.playerId, entry.position] as const));
+    for (const teamId of TEAMS) {
+      const counts = new Map<Position, number>();
+      for (const spot of final.rosters[teamId] ?? []) {
+        const position = positionOf.get(spot.playerId!)!;
+        counts.set(position, (counts.get(position) ?? 0) + 1);
+      }
+      expect(counts.get("QB") ?? 0).toBeLessThanOrEqual(2);
+      expect(counts.get("K") ?? 0).toBe(1);
+      expect(counts.get("DEF") ?? 0).toBe(1);
+      for (const [position, count] of counts) expect(count).toBeLessThanOrEqual(positionCeiling(position, STANDARD_ROSTER_SLOTS, AUTOPICK_CONFIG.rosterCeilings!));
+    }
+  });
+});
+
+describe("roster-need ceilings (the 2026-09-12 round: the founder's mock rooms took three quarterbacks)", () => {
+  // t1 has built its whole lineup: every dedicated starter plus a third back in the flex.
+  const LINEUP = ["qb1", "rb1", "rb2", "rb3", "wr1", "wr2", "te1"];
+  // And then a backup quarterback, a bench receiver and a bench tight end: the ten-man roster
+  // the founder's incident reached, where every alternative left was a second bench body.
+  const STACKED = [...LINEUP, "qb2", "wr3", "te2"];
+  // The kicker and defence tail sits behind a block of receivers, where a real board keeps it:
+  // with the lineup complete their deferral lifts, and a kicker at the top of the board would
+  // simply be the late-round policy's own (correct) answer rather than anything about ceilings.
+  const CEILING_POOL: readonly DraftPoolEntry[] = [
+    ...players("QB", 3), ...players("RB", 3), ...players("WR", 2), { playerId: "te1", position: "TE" }, // t1's own
+    { playerId: "qb4", position: "QB" }, { playerId: "rb4", position: "RB" }, { playerId: "wr3", position: "WR" },
+    { playerId: "te2", position: "TE" }, { playerId: "rb5", position: "RB" }, ...players("WR", 12, 10),
+    { playerId: "def2", position: "DEF" }, ...players("K", 2), { playerId: "def1", position: "DEF" },
+  ];
+
+  it("never takes a third quarterback: with two rostered, the board-topping QB is passed for the bench back", () => {
+    const state = midDraftState(SNAKE_CONFIG, CEILING_POOL, { t1: STACKED, t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("rb4");
+  });
+
+  it("but replays the surplus-damp snapshot as it was: the same state stacked the third quarterback", () => {
+    const state = midDraftState({ ...SNAKE_CONFIG, autopick: SURPLUS_SNAPSHOT }, CEILING_POOL, { t1: STACKED, t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("qb3");
+  });
+
+  it("makes the second quarterback wait while a starter is open, and takes the bench receiver instead", () => {
+    // TE open (te1 not yet drafted), flex held by rb3: qb2 tops the board but sits, so he waits;
+    // wr3 would sit too but is not a backup-only position, and te1 is too deep to warm past him.
+    const pool: readonly DraftPoolEntry[] = [
+      ...players("QB", 2), ...players("RB", 3), ...players("WR", 2),
+      { playerId: "wr3", position: "WR" }, ...players("RB", 8, 4), { playerId: "te1", position: "TE" },
+      ...players("K", 2), ...players("DEF", 2),
+    ];
+    const state = midDraftState(SNAKE_CONFIG, pool, { t1: ["qb1", "rb1", "rb2", "rb3", "wr1", "wr2"], t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("wr3");
+  });
+
+  it("takes the second quarterback once the lineup is built and the board ranks him above the bench back", () => {
+    const state = midDraftState(SNAKE_CONFIG, CEILING_POOL, { t1: LINEUP, t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("qb2");
+  });
+
+  it("and the bench back when he outranks the quarterback: bench bodies compete on the board alone", () => {
+    const pool: readonly DraftPoolEntry[] = [
+      ...players("RB", 4), ...players("QB", 2), ...players("WR", 2), { playerId: "te1", position: "TE" },
+      ...players("WR", 12, 10), ...players("K", 2), ...players("DEF", 2),
+    ];
+    const state = midDraftState(SNAKE_CONFIG, pool, { t1: LINEUP, t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("rb4");
+  });
+
+  it("never takes a second defence, even when the board is topped by one", () => {
+    const pool: readonly DraftPoolEntry[] = [
+      ...players("QB", 1), ...players("RB", 3), ...players("WR", 2), { playerId: "te1", position: "TE" }, { playerId: "def1", position: "DEF" }, // t1's own
+      { playerId: "def2", position: "DEF" }, { playerId: "rb4", position: "RB" }, ...players("WR", 12, 10), ...players("K", 2),
+    ];
+    const state = midDraftState(SNAKE_CONFIG, pool, { t1: [...LINEUP, "def1"], t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("rb4");
+  });
+
+  it("still returns a pick when every legal candidate is over a ceiling, rather than stalling the clock", () => {
+    const pool: readonly DraftPoolEntry[] = [...players("QB", 4), ...players("RB", 3), ...players("WR", 2), { playerId: "te1", position: "TE" }];
+    const state = midDraftState(SNAKE_CONFIG, pool, { t1: [...LINEUP, "qb2"], t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("qb3");
+  });
+
+  it("reads a third back who would start in the flex as a starter: he beats a second quarterback of higher rank", () => {
+    const pool: readonly DraftPoolEntry[] = [...players("QB", 2), ...players("RB", 3), ...players("WR", 2), { playerId: "te1", position: "TE" }, ...players("K", 2), ...players("DEF", 2)];
+    const state = midDraftState(SNAKE_CONFIG, pool, { t1: ["qb1", "rb1", "rb2", "wr1", "wr2", "te1"], t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("rb3");
   });
 });
 

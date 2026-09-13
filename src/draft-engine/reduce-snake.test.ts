@@ -148,7 +148,9 @@ describe("MAKE_PICK (snake)", () => {
     state = pick(state, "t1", "rb2");
     state = pick(state, "t1", "rb3");
     const result = reduceDraft(state, { v: 1, type: "MAKE_PICK", timestamp: START.timestamp, teamId: "t2", playerId: "qb3" });
-    expect(result).toEqual({ ok: false, reason: "Your roster has no open slot for a QB." });
+    // The bench is full and one starter is open, so the league names what it can still take
+    // (`mustPickLine`), never "no open slot" (the 2026-09-12 round's founder report).
+    expect(result).toEqual({ ok: false, reason: "Your next pick must be an RB." });
   });
 
   it("rejects a nomination in a snake draft", () => {

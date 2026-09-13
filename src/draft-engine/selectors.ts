@@ -1,11 +1,12 @@
 import type { DraftPoolEntry, DraftStatus } from "@/domain/draft";
 import type { DraftFormat } from "@/domain/league";
 import type { Position } from "@/domain/player";
-import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
+import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig, type RosterSlotType } from "@/domain/roster";
 import { auctionOf, rosterFor, totalPickCount, totalRosterSlots, type AuctionState, type CompletedPick, type DraftState } from "./state";
 import { snakeTeamForPick } from "./order";
-import { assignSlot } from "./slotting";
+import { assignSlot, type SlotAssignment } from "./slotting";
 import { deferredLateRoundPosition, needMultiplier, rankWeight } from "./scoring";
+import { anyStarterOpen, benchBodiesByPosition, isBackupOnlyPosition, openStartingSlotsEligible, positionCeiling } from "./roster-need";
 import { AUCTION_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier, type DraftAutopickPolicy, type PauseWindow } from "./config";
 import { MS_PER_SECOND, clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
 import { deadlineAfter, pausedUntil as pauseWindowEndAt } from "./pause";
@@ -176,6 +177,8 @@ export function autopickEligible(entry: DraftPoolEntry): boolean {
 function autopickContext(state: DraftState, teamId: string): {
   readonly roster: readonly RosterSlot[];
   readonly available: readonly DraftPoolEntry[];
+  /** Where the candidate would land on this roster, the engine's one legality oracle. */
+  readonly assignmentFor: (entry: DraftPoolEntry) => SlotAssignment;
   readonly canFill: (entry: DraftPoolEntry) => boolean;
   readonly queuedFirst: DraftPoolEntry | null;
 } {
@@ -184,10 +187,10 @@ function autopickContext(state: DraftState, teamId: string): {
   // still never the room's pick for a manager, however he got onto the list.
   const available = availablePool(state).filter(autopickEligible);
   const availableIds = new Set(available.map((entry) => entry.playerId));
-  const canFill = (entry: DraftPoolEntry): boolean =>
-    assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig }).ok;
+  const assignmentFor = (entry: DraftPoolEntry): SlotAssignment => assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig });
+  const canFill = (entry: DraftPoolEntry): boolean => assignmentFor(entry).ok;
   const queuedFirst = queuedEntriesFor(state, teamId).find((entry) => availableIds.has(entry.playerId) && canFill(entry)) ?? null;
-  return { roster, available, canFill, queuedFirst };
+  return { roster, available, assignmentFor, canFill, queuedFirst };
 }
 
 /**
@@ -246,13 +249,57 @@ function rosteredCountsByPosition(roster: readonly RosterSlot[], pool: readonly 
  * starters legal) is inherited, never restated.
  */
 export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEntry | null {
-  const { roster, available, canFill, queuedFirst } = autopickContext(state, teamId);
+  const { roster, available, assignmentFor, canFill, queuedFirst } = autopickContext(state, teamId);
   if (queuedFirst !== null) return queuedFirst;
 
   const policy = state.config.autopick ?? null;
   if (policy === null) return available.find(canFill) ?? null;
 
   const ramp = needRamp(roster.length, state, policy);
+  const scorer = policy.rosterCeilings === undefined ? surplusDampScorer(state, roster, policy, ramp) : rosterCeilingScorer(state, roster, policy, ramp);
+  const best: Record<CandidateBucket, { entry: DraftPoolEntry | null; score: number }> = {
+    now: { entry: null, score: -Infinity },
+    deferred: { entry: null, score: -Infinity },
+    capped: { entry: null, score: -Infinity },
+  };
+  let legalIndex = 0;
+  for (const entry of available) {
+    const assignment = assignmentFor(entry);
+    if (!assignment.ok) continue;
+    const { need, bucket } = scorer(entry, assignment.slot);
+    const score = rankWeight(legalIndex, policy.temperature) * need;
+    // `legalIndex` advances for EVERY legal candidate, deferred or capped or not, so the board rank
+    // a candidate is scored at never depends on his bucket: a deferred kicker sitting at legal
+    // index 40 is still at 40 when the deferral lifts, and everyone below him is untouched.
+    legalIndex += 1;
+    if (score > best[bucket].score) best[bucket] = { entry, score };
+  }
+  // Deferring and capping are preferences; refusing to pick never is, and a null here would
+  // stall a real room's clock. A board that is nothing but kickers, or nothing but a third
+  // quarterback, still returns a pick.
+  return best.now.entry ?? best.deferred.entry ?? best.capped.entry;
+}
+
+/**
+ * Where a legal candidate sits for the argmax: `now` competes outright, `deferred` is taken only
+ * when nothing competes (the late-round kicker and defence, the backup quarterback while a starter
+ * is open), `capped` only when nothing else is legal at all (a body over the position's ceiling).
+ */
+type CandidateBucket = "now" | "deferred" | "capped";
+
+interface CandidateNeed {
+  readonly need: number;
+  readonly bucket: CandidateBucket;
+}
+
+type CandidateScorer = (entry: DraftPoolEntry, landsIn: RosterSlotType) => CandidateNeed;
+
+/**
+ * The surplus-damp scoring (snapshots from 2026-09-03 through 2026-09-11): `needMultiplier` over
+ * dedicated starters, compounding per extra body when the snapshot carries `surplusDamp`. Kept
+ * byte for byte for every log that was made under it.
+ */
+function surplusDampScorer(state: DraftState, roster: readonly RosterSlot[], policy: DraftAutopickPolicy, ramp: number): CandidateScorer {
   const baseNeedOptions = {
     openSlotBoost: ramp * policy.needPerOpenStartingSlot,
     filledDamp: 1 - ramp * (1 - policy.startersFilledDamp),
@@ -264,44 +311,45 @@ export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEn
     // all (pre-fix snapshot) must never gain one from ramping arithmetic.
     surplusDamp: policy.surplusDamp === undefined ? undefined : 1 - ramp * (1 - policy.surplusDamp),
   };
-  // Only computed when a snapshot actually carries `surplusDamp` — every pre-fix log (every log
-  // today) skips this join entirely, exactly as cheap as before this fix existed.
+  // Only computed when a snapshot actually carries `surplusDamp` — a pre-fix log skips this join
+  // entirely, exactly as cheap as before the fix existed.
   const rosteredCounts = policy.surplusDamp === undefined ? null : rosteredCountsByPosition(roster, state.pool);
-  let best: DraftPoolEntry | null = null;
-  let bestScore = -Infinity;
-  /**
-   * The best candidate IGNORING the late-round deferral, kept so a legal board that is entirely
-   * kickers and defences still returns a pick rather than null. Deferring is a preference; refusing
-   * to pick never is, and a null here would stall a real room's clock.
-   */
-  let bestDeferred: DraftPoolEntry | null = null;
-  let bestDeferredScore = -Infinity;
-  let legalIndex = 0;
-  for (const entry of available) {
-    if (!canFill(entry)) continue;
-    const needOptions = rosteredCounts === null
-      ? baseNeedOptions
-      : { ...baseNeedOptions, rosteredAtPosition: rosteredCounts.get(entry.position) ?? 0 };
-    const score =
-      rankWeight(legalIndex, policy.temperature) *
-      needMultiplier(entry.position, roster, state.config.slotConfig, needOptions);
-    // `legalIndex` advances for EVERY legal candidate, deferred or not, so the board rank a
-    // candidate is scored at never depends on the deferral: a deferred kicker sitting at legal
-    // index 40 is still at 40 when the deferral lifts, and everyone below him is untouched.
-    legalIndex += 1;
-    if (deferredLateRoundPosition(entry.position, roster, state.config.slotConfig, policy.lateRoundOnlyRoundsFromEnd)) {
-      if (score > bestDeferredScore) {
-        bestDeferred = entry;
-        bestDeferredScore = score;
-      }
-      continue;
-    }
-    if (score > bestScore) {
-      best = entry;
-      bestScore = score;
-    }
-  }
-  return best ?? bestDeferred;
+  return (entry) => {
+    const needOptions = rosteredCounts === null ? baseNeedOptions : { ...baseNeedOptions, rosteredAtPosition: rosteredCounts.get(entry.position) ?? 0 };
+    const deferred = deferredLateRoundPosition(entry.position, roster, state.config.slotConfig, policy.lateRoundOnlyRoundsFromEnd);
+    return { need: needMultiplier(entry.position, roster, state.config.slotConfig, needOptions), bucket: deferred ? "deferred" : "now" };
+  };
+}
+
+/**
+ * The roster-need scoring (snapshots from 2026-09-12, `DraftAutopickPolicy.rosterCeilings`; the
+ * whole rule is `roster-need.ts`'s docblock). A candidate who would start is warm per open
+ * starting slot he could fill, the flex included; one who would sit is cooled to the bench damp,
+ * and cooled again by `surplusDamp` for every body already SITTING at his position (a bench body,
+ * never a flex starter, which is the count the surplus-damp scoring got wrong); a body over his
+ * position's ceiling is capped; a backup at a backup-only position waits for the starters. Every
+ * dial is ramped by the team's own progress exactly as before, so a first pick is still plain
+ * board order.
+ */
+function rosterCeilingScorer(state: DraftState, roster: readonly RosterSlot[], policy: DraftAutopickPolicy, ramp: number): CandidateScorer {
+  const ceilings = policy.rosterCeilings!;
+  const slotConfig = state.config.slotConfig;
+  const openSlotBoost = ramp * policy.needPerOpenStartingSlot;
+  const benchDamp = 1 - ramp * (1 - policy.startersFilledDamp);
+  const depthDamp = 1 - ramp * (1 - (policy.surplusDamp ?? 1));
+  const rosteredCounts = rosteredCountsByPosition(roster, state.pool);
+  const benchBodies = benchBodiesByPosition(roster, state.pool);
+  const starterOpen = anyStarterOpen(roster, slotConfig);
+  return (entry, landsIn) => {
+    const starts = landsIn !== BENCH_SLOT;
+    const need = starts
+      ? 1 + openSlotBoost * openStartingSlotsEligible(entry.position, roster, slotConfig)
+      : benchDamp * depthDamp ** (benchBodies.get(entry.position) ?? 0);
+    if ((rosteredCounts.get(entry.position) ?? 0) + 1 > positionCeiling(entry.position, slotConfig, ceilings)) return { need, bucket: "capped" };
+    const waitsForStarters = !starts && starterOpen && isBackupOnlyPosition(entry.position, slotConfig);
+    const deferred = waitsForStarters || deferredLateRoundPosition(entry.position, roster, slotConfig, policy.lateRoundOnlyRoundsFromEnd);
+    return { need, bucket: deferred ? "deferred" : "now" };
+  };
 }
 
 /**

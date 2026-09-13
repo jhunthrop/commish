@@ -19,3 +19,9 @@ const POSITION_WORDS: Readonly<Record<Position, readonly [string, string]>> = {
 export function positionWord(position: Position, plural: boolean): string {
   return POSITION_WORDS[position][plural ? 1 : 0];
 }
+
+/** The badge abbreviation a row prints: the position's own letters, the team defense as D/ST.
+ *  Named once so the dock, the sheet columns and the must-pick line cannot spell it two ways. */
+export function positionLabel(position: Position): string {
+  return position === "DEF" ? "D/ST" : position;
+}
