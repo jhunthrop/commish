@@ -7,8 +7,8 @@
  */
 import type { DraftPoolEntry, MakePickAction, StartDraftAction } from "@/domain/draft";
 import type { Position } from "@/domain/player";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { initialDraftState, teamOnClock, type DraftConfig, type DraftState } from "@/draft-engine";
+import { STANDARD_ROSTER_SLOTS, type RosterSlot } from "@/domain/roster";
+import { assignSlot, initialDraftState, teamOnClock, type CompletedPick, type DraftConfig, type DraftState } from "@/draft-engine";
 import { valueBoardIndexed, type LeagueShape } from "@/projections/decide/replacement";
 import { NEUTRAL_ARCHETYPE } from "../sim/seat-model";
 import { chooseBotPick } from "@/mock-draft/bots";
@@ -82,6 +82,26 @@ export function fixtureAdvance(state: DraftState, count: number, seed = 11): Dra
     s = submit(s, action);
   }
   return s;
+}
+
+/**
+ * The fixture with `teamId` holding `playerIds`, placed through the engine's own slotting as if
+ * they were its picks so far, every other seat untouched and the room's pick counter just past
+ * them. For rosters no legal turn order reaches quickly (a bench already full).
+ */
+export function fixtureHolding(state: DraftState, teamId: string, playerIds: readonly string[]): DraftState {
+  const positionOf = new Map(state.pool.map((entry) => [entry.playerId, entry.position] as const));
+  let roster: readonly RosterSlot[] = [];
+  const picks: CompletedPick[] = [];
+  for (const playerId of playerIds) {
+    const position = positionOf.get(playerId);
+    if (position === undefined) throw new Error(`fixture player ${playerId} is not in the pool`);
+    const assigned = assignSlot({ position, roster, slotConfig: state.config.slotConfig });
+    if (!assigned.ok) throw new Error(`fixture cannot roster ${playerId}: ${assigned.reason}`);
+    roster = [...roster, { slot: assigned.slot, slotIndex: assigned.slotIndex, playerId }];
+    picks.push({ pickNumber: picks.length + 1, round: 1, teamId, playerId, slot: assigned.slot, slotIndex: assigned.slotIndex, price: null, timestamp: SIM_INSTANT, auto: false });
+  }
+  return { ...state, picks, rosters: { ...state.rosters, [teamId]: roster }, pickNumber: picks.length + 1, sequence: picks.length + 1 };
 }
 
 export function fixtureNames(): Readonly<Record<string, string>> {

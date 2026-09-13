@@ -208,6 +208,50 @@ describe("recommendPick", () => {
     expect(ranked.some((r) => r.playerId === "eighthQuarterback")).toBe(false);
   });
 
+  describe("roster-need ceilings and bench insurance (the 2026-09-12 round)", () => {
+    const own = (playerId: string, position: Position, valueOverReplacement: number): RosteredPlayer => ({ playerId, position, valueOverReplacement });
+    // A built lineup: a quarterback, three backs (one in the flex), two receivers, a tight end.
+    const LINEUP: readonly RosteredPlayer[] = [own("qb1", "QB", 40), own("rb1", "RB", 120), own("rb2", "RB", 90), own("rb3", "RB", 30), own("wr1", "WR", 110), own("wr2", "WR", 80), own("te1", "TE", 60)];
+    const query = (board: readonly DraftCandidate[], roster: readonly RosteredPlayer[]) =>
+      recommendPick({ board, roster, shape: SHAPE, pickNumber: 100, nextPickNumber: 121, shortlistSize: board.length });
+
+    it("never recommends a third quarterback, however he is valued", () => {
+      const roster = [...LINEUP, own("qb2", "QB", 20)];
+      const ranked = query([candidate("thirdQuarterback", "QB", 80, 90), ...filler("WR", 12, 100, 0)], roster);
+      expect(ranked.some((rec) => rec.playerId === "thirdQuarterback")).toBe(false);
+      expect(ranked.length).toBeGreaterThan(0);
+    });
+
+    it("makes the backup quarterback wait while a starter is open, and lets him in once the lineup is built", () => {
+      const openTightEnd = LINEUP.filter((player) => player.playerId !== "te1");
+      const board = [candidate("backupQuarterback", "QB", 30, 60), candidate("tightEnd", "TE", 5, 160), ...filler("WR", 12, 100, 0)];
+      expect(query(board, openTightEnd).some((rec) => rec.playerId === "backupQuarterback")).toBe(false);
+      expect(query(board, openTightEnd)[0]!.playerId).toBe("tightEnd");
+      expect(query(board, LINEUP)[0]!.playerId).toBe("backupQuarterback");
+    });
+
+    it("insures nothing with a third tight end who could not start even with the first one out: the bench back ranks ahead", () => {
+      const roster = [...LINEUP, own("te2", "TE", 20)];
+      const ranked = query([candidate("thirdTightEnd", "TE", 15, 150), candidate("fourthBack", "RB", 0, 140), ...filler("WR", 12, 160, -5)], roster);
+      const thirdTightEnd = ranked.find((rec) => rec.playerId === "thirdTightEnd")!;
+      expect(thirdTightEnd.rosterAdjustedValue).toBe(0);
+      expect(ranked.findIndex((rec) => rec.playerId === "fourthBack")).toBeLessThan(ranked.findIndex((rec) => rec.playerId === "thirdTightEnd"));
+    });
+
+    it("still insures the first backup by what he covers when the starter is out", () => {
+      const ranked = query([candidate("backupQuarterback", "QB", 25, 120), ...filler("WR", 12, 130, -5)], LINEUP);
+      expect(ranked[0]!.playerId).toBe("backupQuarterback");
+      expect(ranked[0]!.rosterAdjustedValue).toBeCloseTo(0.08 * 25, 6);
+    });
+
+    it("breaks an exact tie by the market's order, never by the player id", () => {
+      const later = candidate("aaa-later", "WR", -5, 150);
+      const sooner = candidate("zzz-sooner", "WR", -5, 120);
+      const ranked = query([later, sooner, ...filler("RB", 12, 160, -5)], [...LINEUP, own("wr3", "WR", 10)]);
+      expect(ranked.findIndex((rec) => rec.playerId === "zzz-sooner")).toBeLessThan(ranked.findIndex((rec) => rec.playerId === "aaa-later"));
+    });
+  });
+
   it("returns a shortlist rather than the whole board, and the same one twice", () => {
     const board = filler("WR", 60, 1, 40);
     const query = { board, roster: [], shape: SHAPE, pickNumber: 37, nextPickNumber: 60 } as const;

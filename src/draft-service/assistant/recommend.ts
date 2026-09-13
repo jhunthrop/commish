@@ -12,7 +12,9 @@
  * board cannot be re-valued from a population that excludes him. `RecommendationQuery.board` is
  * then every UNDRAFTED entry of that one valuation.
  */
-import { draftedPlayerIds, snakeTeamForPick, teamOnClock, totalPickCount, type DraftState } from "@/draft-engine";
+import type { DraftPoolEntry } from "@/domain/draft";
+import { restrictedPositions } from "@/domain/roster-eligibility";
+import { assignSlot, autopickEligible, availablePool, draftedPlayerIds, rosterFor, snakeTeamForPick, teamOnClock, totalPickCount, type DraftState } from "@/draft-engine";
 import { recommendPick, type Recommendation, type RosteredPlayer } from "@/projections/decide/draft";
 import { valueBoardIndexed, type LeagueShape, type ValuedPlayer } from "@/projections/decide/replacement";
 import type { SimPlayerEvidence } from "../sim/types";
@@ -88,13 +90,46 @@ export interface RecommendInput {
   readonly shortlistSize?: number;
 }
 
+/**
+ * THE BOARD-ORDER SHORTLIST, for a seat the valued board cannot serve (the 2026-09-12 round,
+ * founder report 3). The evidence board carries no kicker or team defence (the K and D/ST
+ * market-order ruling of 2026-09-05 ships them unprojected), so once a roster's bench was full
+ * and only those slots remained, `recommendPick` had nobody to rank: the card went dark, the
+ * dock fell back to the best skill player left, and the room refused him. The seat's shortlist
+ * is then whatever it can still take, in the room's own board order (the market's, which is the
+ * order the clock would take them in too), each named as the slot he fills. When the bench is
+ * open (`restrictedPositions` null) anything legal qualifies; nothing legal, nothing named.
+ */
+function boardOrderShortlist(state: DraftState, askingTeamId: string, shortlistSize: number): readonly Recommendation[] {
+  const roster = rosterFor(state, askingTeamId);
+  const slotConfig = state.config.slotConfig;
+  const owed = restrictedPositions(slotConfig, roster);
+  const fits = (entry: DraftPoolEntry): boolean => (owed === null || owed.includes(entry.position)) && assignSlot({ position: entry.position, roster, slotConfig }).ok;
+  return availablePool(state)
+    .filter((entry) => autopickEligible(entry) && fits(entry))
+    .slice(0, shortlistSize)
+    .map((entry) => {
+      const assignment = assignSlot({ position: entry.position, roster, slotConfig });
+      return {
+        playerId: entry.playerId,
+        position: entry.position,
+        expectedValueAdded: 0,
+        valueOverReplacement: 0,
+        rosterAdjustedValue: 0,
+        survivalProbability: 0,
+        reasons: assignment.ok ? [{ code: "fills_starting_slot", slot: assignment.slot }] : [],
+      };
+    });
+}
+
 /** The seat's shortlist for its current-or-next decision, best first; empty when the seat has no
- *  turn left to decide. */
+ *  turn left to decide. The valued board's own ranking, or the board-order shortlist when the
+ *  valued board has nobody the roster can take. */
 export function recommendNow({ state, askingTeamId, valued, shape, shortlistSize = ADVISOR_CONFIG.shortlistSize }: RecommendInput): readonly Recommendation[] {
   const window = askingWindow(state, askingTeamId);
   if (window === null) return [];
   const drafted = draftedPlayerIds(state);
-  return recommendPick({
+  const ranked = recommendPick({
     board: [...valued.values()].filter((entry) => !drafted.has(entry.playerId)),
     roster: rosterSoFar(state, askingTeamId, valued),
     shape,
@@ -102,6 +137,7 @@ export function recommendNow({ state, askingTeamId, valued, shape, shortlistSize
     nextPickNumber: window.nextPickNumber,
     shortlistSize,
   });
+  return ranked.length > 0 ? ranked : boardOrderShortlist(state, askingTeamId, shortlistSize);
 }
 
 /** The on-clock seat's own shortlist, held off its current pick in every run (ruling R-3, see

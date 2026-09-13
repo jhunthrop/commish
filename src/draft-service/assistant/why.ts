@@ -11,6 +11,7 @@
  * vocabulary for how a seat was read. Every number names its basis. No em-dash, no semicolon,
  * second person.
  */
+import { mustPickLine } from "@/domain/must-pick";
 import type { Position } from "@/domain/player";
 import { positionWord } from "@/domain/position-words";
 import { BENCH_SLOT, type RosterSlotType } from "@/domain/roster";
@@ -29,6 +30,9 @@ export interface WhyFacts {
   readonly ahead: readonly SeatTendency[];
   /** Continuations behind the seats-ahead read. */
   readonly runs: number;
+  /** The positions the roster can still take once its bench is full (`restrictedPositions`),
+   *  `null` while any position fits. Non-empty, it is the whole first sentence. */
+  readonly mustPick: readonly Position[] | null;
 }
 
 export interface WhySentence {
@@ -49,10 +53,15 @@ function slotClause(slot: RosterSlotType | null): string {
 
 type Cliff = Extract<PickReason, { code: "tier_cliff" }>;
 
-/** A market-order position (the kicker and team defence decision) never argues a drop: a number
- *  for it would be one nobody measured. */
-function cliffOf(position: Position, reasons: readonly PickReason[]): Cliff | undefined {
-  if (!shipsProjectedRows(position)) return undefined;
+/**
+ * A market-order position (the kicker and team defence decision) never argues a drop: a number
+ * for it would be one nobody measured. Nor does a man who would SIT (the 2026-09-12 round, founder
+ * report 2): the drop behind a bench body is a fact about the board, not a reason to take him,
+ * and a card that led with it read as a tier chasing the pick. The tier argument is bounded to a
+ * pick that fills a starting slot; a bench body is argued by his rank and the spot he takes.
+ */
+function cliffOf(position: Position, fillsSlot: RosterSlotType | null, reasons: readonly PickReason[]): Cliff | undefined {
+  if (!shipsProjectedRows(position) || fillsSlot === null || fillsSlot === BENCH_SLOT) return undefined;
   return reasons.find((reason): reason is Cliff => reason.code === "tier_cliff");
 }
 
@@ -106,10 +115,14 @@ function roomSentence(facts: WhyFacts): string {
   return `${capitalize(positionWord(run.position, true))} are going, ${run.count} of the last ${run.window} picks, and ${lean}.`;
 }
 
-/** Two sentences at most. `variant` is the pick the card was computed at, so shapes rotate. */
+/** Two sentences at most. `variant` is the pick the card was computed at, so shapes rotate. With
+ *  the bench full, sentence one is the league's own line about what the roster still owes. */
 export function buildWhy(facts: WhyFacts, variant: number): WhySentence {
+  if (facts.mustPick !== null && facts.mustPick.length > 0) {
+    return { text: `${mustPickLine(facts.mustPick)} ${roomSentence(facts)}`, shape: "must:0" };
+  }
   const him: HimFacts = { one: positionWord(facts.position, false), many: positionWord(facts.position, true), slot: slotClause(facts.fillsSlot), rank: facts.positionRank };
-  const cliff = cliffOf(facts.position, facts.reasons);
+  const cliff = cliffOf(facts.position, facts.fillsSlot, facts.reasons);
   const shapes = cliff === undefined ? VALUE_SHAPES : CLIFF_SHAPES;
   const index = ((variant % shapes.length) + shapes.length) % shapes.length;
   const first = cliff === undefined ? VALUE_SHAPES[index]!(him) : CLIFF_SHAPES[index]!(him, cliff);

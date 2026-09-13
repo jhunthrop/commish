@@ -8,6 +8,7 @@
  * live room does — one function, never a second implementation of "what the advisor says".
  */
 import { SURVIVAL_BANDS } from "@/domain/draft-odds";
+import { restrictedPositions } from "@/domain/roster-eligibility";
 import { assignSlot, rosterFor, teamOnClock, type DraftState } from "@/draft-engine";
 import type { Recommendation } from "@/projections/decide/draft";
 import type { LeagueShape } from "@/projections/decide/replacement";
@@ -48,10 +49,20 @@ function oddsView(survival: SeatSurvival | null): SurvivalOdds | null {
 function nextPickFor(input: AdvisorCoreInput, top: Recommendation, survival: SeatSurvival | null, run: PositionRun | null): NextPick {
   const { state, askingTeamId, valued, table } = input;
   const entry = valued.get(top.playerId);
-  const assigned = assignSlot({ position: top.position, roster: rosterFor(state, askingTeamId), slotConfig: state.config.slotConfig });
+  const roster = rosterFor(state, askingTeamId);
+  const assigned = assignSlot({ position: top.position, roster, slotConfig: state.config.slotConfig });
   const fillsSlot = assigned.ok ? assigned.slot : null;
   const why = buildWhy(
-    { position: top.position, positionRank: entry?.positionRank ?? 0, fillsSlot, reasons: top.reasons, run, ahead: seatsAheadFor(table, state, askingTeamId), runs: table.runs },
+    {
+      position: top.position,
+      positionRank: entry?.positionRank ?? 0,
+      fillsSlot,
+      reasons: top.reasons,
+      run,
+      ahead: seatsAheadFor(table, state, askingTeamId),
+      runs: table.runs,
+      mustPick: restrictedPositions(state.config.slotConfig, roster),
+    },
     state.pickNumber,
   );
   return {

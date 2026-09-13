@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { teamOnClock } from "@/draft-engine";
 import { ADVISOR_CONFIG } from "./config";
 import { askingWindow, onClockShortlist, recommendNow, valuedEvidence } from "./recommend";
-import { FIXTURE_POOL, FIXTURE_SHAPE, FIXTURE_TEAM_IDS, fixtureAdvance, fixtureStart, fixtureValued } from "./test-fixture";
+import { FIXTURE_POOL, FIXTURE_SHAPE, FIXTURE_TEAM_IDS, fixtureAdvance, fixtureHolding, fixtureStart, fixtureValued } from "./test-fixture";
 
 const ASKING = FIXTURE_TEAM_IDS[3]!;
 
@@ -39,6 +39,20 @@ describe("recommendNow and onClockShortlist", () => {
     expect(shortlist).toHaveLength(ADVISOR_CONFIG.shortlistSize);
     expect(new Set(shortlist.map((rec) => rec.playerId)).size).toBe(shortlist.length);
     expect(recommendNow({ state: fixtureAdvance(fixtureStart(), 149), askingTeamId: ASKING, valued: fixtureValued(), shape: FIXTURE_SHAPE })).toEqual([]);
+  });
+
+  it("names the kicker and defence in the board's own order once only those slots remain, even with neither on the valued board", () => {
+    // Thirteen held: every starter, the flex, and a full bench. Only K and D/ST are open, and the
+    // valued board (as in production, where the two ship unprojected) carries neither.
+    const held = ["qb1", "rb1", "rb2", "wr1", "wr2", "te1", "rb3", "qb2", "rb4", "wr3", "te2", "rb5", "wr4"];
+    const state = fixtureHolding(fixtureStart(), ASKING, held);
+    const valued = new Map([...fixtureValued()].filter(([, entry]) => entry.position !== "K" && entry.position !== "DEF"));
+    const shortlist = recommendNow({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE });
+    expect(shortlist.length).toBeGreaterThan(0);
+    expect(shortlist.every((rec) => rec.position === "K" || rec.position === "DEF")).toBe(true);
+    const boardOrder = state.pool.filter((entry) => entry.position === "K" || entry.position === "DEF").map((entry) => entry.playerId);
+    expect(shortlist.map((rec) => rec.playerId)).toEqual(boardOrder.slice(0, shortlist.length));
+    expect(shortlist[0]!.reasons).toEqual([{ code: "fills_starting_slot", slot: shortlist[0]!.position }]);
   });
 
   it("holds the on-clock seat's own shortlist, and nothing when nobody is on the clock", () => {

@@ -1,6 +1,6 @@
 import type { Position } from "@/domain/player";
 import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig, type RosterSlotType } from "@/domain/roster";
-import { assignSlot } from "@/draft-engine";
+import { AUTOPICK_CONFIG, anyStarterOpen, assignSlot, isBackupOnlyPosition, positionCeiling, type RosterCeilingPolicy } from "@/draft-engine";
 import { bestStartingTotal } from "./slots";
 import type { LeagueShape, ValuedPlayer } from "./replacement";
 import { survivalProbabilities, type RoomTendency } from "./survival";
@@ -75,6 +75,14 @@ export interface RecommendationQuery {
   readonly nextPickNumber: number | null;
   readonly room?: RoomTendency;
   readonly shortlistSize?: number;
+  /**
+   * The roster-need ceilings (`positionCeiling`, `@/draft-engine`): a candidate who would push
+   * his position past its ceiling is never recommended, and a backup at a position no flex takes
+   * waits until every starter is filled. Defaults to the engine's own current rule
+   * (`AUTOPICK_CONFIG.rosterCeilings`): advice follows today's rule, whatever snapshot the room
+   * was started under, because advice is not a replay of the room's own picks.
+   */
+  readonly ceilings?: RosterCeilingPolicy;
 }
 
 export type PickReason =
@@ -103,14 +111,14 @@ export interface Recommendation {
 export const DEFAULT_SHORTLIST = 5;
 
 /**
- * What a man is worth sitting behind somebody: a bye week, an injury, and not much else. Each
- * further body already stacked at that position is worth less again.
+ * What a man is worth sitting behind somebody: a bye week, an injury, and not much else. The
+ * share is applied to what he would ADD if the best man at his position were out (`coverValue`),
+ * so a body who could not start even then is worth nothing sitting.
  *
  * Chosen rather than fitted, and `scripts/decision-report.ts` is what says whether the choice
  * pays. Anything finer would be false precision.
  */
 export const BENCH_INSURANCE_SHARE = 0.08;
-export const BENCH_DEPTH_DECAY = 0.7;
 
 /** Below this he is going, above it he will keep. Thresholds for the reason, never for the score. */
 export const WILL_NOT_SURVIVE_BELOW = 0.35;
@@ -191,11 +199,16 @@ interface RosterFit {
   /** What he is worth sitting behind somebody: a bye, an injury, and not much else. */
   readonly insurance: number;
   readonly value: number;
-  /** Where he would land, or `null` when the roster cannot legally take him at all. */
+  /** Where he would land, or `null` when the roster cannot legally take him, or may not under
+   *  its position ceiling. */
   readonly slot: RosterSlotType | null;
+  /** A backup at a position no flex takes, asked for while a starter is still open: he waits. */
+  readonly waitsForStarters: boolean;
   readonly alreadyRostered: number;
   readonly alreadyBenched: number;
 }
+
+const UNPLACEABLE = { marginalStartingValue: 0, insurance: 0, value: 0, slot: null, waitsForStarters: false } as const;
 
 /** Below-replacement men contribute nothing to a lineup; they do not contribute NEGATIVELY to it. */
 function surplus(player: RosteredPlayer): number {
@@ -226,39 +239,58 @@ function startingValue(
  * the flex are already held by better tight ends. That single change is what makes a recommendation
  * a roster-building decision rather than a very careful way of reading one column.
  *
- * A bench body is not worthless, so a small insurance share of his surplus remains, decaying with
- * every man already stacked behind that position: the fourth backup at one position cannot start
- * even if the man ahead of him goes down.
+ * A bench body is not worthless, so a small insurance share remains, of what he would add with
+ * the best man at his position OUT (`coverValue`): a second backup who still could not start
+ * insures nothing, which is what the 2026-09-12 measurement found the old flat share getting
+ * wrong (an advisor-led seat ended with 3.5 tight ends and 2.9 quarterbacks in the founder's own
+ * mock rooms, every one of them "insurance" over a bench back worth nothing at replacement).
+ *
+ * THE CEILINGS (`positionCeiling`, `@/draft-engine`, the same rule the autopick keeps): a man who
+ * would push his position past its ceiling is unplaceable here, exactly as if no slot took him.
  */
 function fitFor(
   candidate: RosteredPlayer,
   roster: readonly RosteredPlayer[],
   slotConfig: readonly RosterSlotConfig[],
+  ceilings: RosterCeilingPolicy,
 ): RosterFit {
   const alreadyRostered = roster.filter((player) => player.position === candidate.position).length;
   const placements = placeRoster(roster, slotConfig);
   const alreadyBenched = placements.filter(
     (placement) => placement.position === candidate.position && placement.slot === BENCH_SLOT,
   ).length;
-  const assignment = assignSlot({
-    position: candidate.position,
-    roster: filledSlots(placements),
-    slotConfig,
-  });
-  if (!assignment.ok) {
-    return { marginalStartingValue: 0, insurance: 0, value: 0, slot: null, alreadyRostered, alreadyBenched };
+  if (alreadyRostered + 1 > positionCeiling(candidate.position, slotConfig, ceilings)) {
+    return { ...UNPLACEABLE, alreadyRostered, alreadyBenched };
   }
+  const filled = filledSlots(placements);
+  const assignment = assignSlot({ position: candidate.position, roster: filled, slotConfig });
+  if (!assignment.ok) return { ...UNPLACEABLE, alreadyRostered, alreadyBenched };
   const marginalStartingValue =
     startingValue([...roster, candidate], slotConfig) - startingValue(roster, slotConfig);
-  const insurance = BENCH_INSURANCE_SHARE * surplus(candidate) * BENCH_DEPTH_DECAY ** alreadyBenched;
+  const insurance = BENCH_INSURANCE_SHARE * coverValue(candidate, roster, slotConfig);
+  const sits = assignment.slot === BENCH_SLOT;
   return {
     marginalStartingValue,
     insurance,
     value: marginalStartingValue + insurance,
     slot: assignment.slot,
+    waitsForStarters: sits && isBackupOnlyPosition(candidate.position, slotConfig) && anyStarterOpen(filled, slotConfig),
     alreadyRostered,
     alreadyBenched,
   };
+}
+
+/**
+ * What the candidate adds to the lineup when the best man already rostered at his position is
+ * out: the bye or the injury a bench body exists for. With nobody at his position to cover, his
+ * own surplus, as the flat share always read it.
+ */
+function coverValue(candidate: RosteredPlayer, roster: readonly RosteredPlayer[], slotConfig: readonly RosterSlotConfig[]): number {
+  const atPosition = roster.filter((player) => player.position === candidate.position);
+  if (atPosition.length === 0) return surplus(candidate);
+  const best = atPosition.reduce((top, player) => (player.valueOverReplacement > top.valueOverReplacement ? player : top));
+  const without = roster.filter((player) => player !== best);
+  return startingValue([...without, candidate], slotConfig) - startingValue(without, slotConfig);
 }
 
 /**
@@ -371,7 +403,7 @@ function reasonsFor(
  * why he was told something after the fact.
  */
 export function recommendPick(query: RecommendationQuery): readonly Recommendation[] {
-  const { board, roster, shape, pickNumber, nextPickNumber, room, shortlistSize = DEFAULT_SHORTLIST } = query;
+  const { board, roster, shape, pickNumber, nextPickNumber, room, shortlistSize = DEFAULT_SHORTLIST, ceilings = AUTOPICK_CONFIG.rosterCeilings! } = query;
   if (!Number.isInteger(pickNumber) || pickNumber < 1) {
     throw new Error(`A recommendation is made at a whole pick number; got ${pickNumber}.`);
   }
@@ -382,15 +414,21 @@ export function recommendPick(query: RecommendationQuery): readonly Recommendati
       ? new Map<string, number>()
       : survivalProbabilities({ board, fromPick: pickNumber, toPick: nextPickNumber, room });
 
-  const rankable = board
-    .map((candidate) => ({ candidate, fit: fitFor(candidate, roster, slotConfig) }))
-    .filter((entry) => entry.fit.slot !== null)
-    .sort(
-      (a, b) =>
-        b.fit.value - a.fit.value ||
-        b.candidate.valueOverReplacement - a.candidate.valueOverReplacement ||
-        a.candidate.playerId.localeCompare(b.candidate.playerId),
-    );
+  // TIES DEFER TO THE MARKET, never to the player id: two men the model cannot separate are
+  // separated by where drafters take them, the same doctrine as the board's own order.
+  const placeable = board
+    .map((candidate) => ({ candidate, fit: fitFor(candidate, roster, slotConfig, ceilings) }))
+    .filter((entry) => entry.fit.slot !== null);
+  // The backup quarterback waits for the starters (the founder's rule): dropped while anyone
+  // else can be placed, kept when he is all that is left rather than handing back nothing.
+  const eligible = placeable.some((entry) => !entry.fit.waitsForStarters) ? placeable.filter((entry) => !entry.fit.waitsForStarters) : placeable;
+  const rankable = [...eligible].sort(
+    (a, b) =>
+      b.fit.value - a.fit.value ||
+      b.candidate.valueOverReplacement - a.candidate.valueOverReplacement ||
+      a.candidate.averageDraftPosition - b.candidate.averageDraftPosition ||
+      a.candidate.playerId.localeCompare(b.candidate.playerId),
+  );
 
   // Only the top of the board can win, and each one costs a full re-valuation of what is left.
   const considered = rankable.slice(0, Math.max(shortlistSize * 3, DEFAULT_SHORTLIST * 3));
@@ -403,23 +441,36 @@ export function recommendPick(query: RecommendationQuery): readonly Recommendati
       const survivors = board
         .filter((entry) => entry.playerId !== candidate.playerId)
         .map((entry) => ({
-          value: fitFor(entry, after, slotConfig).value,
+          value: fitFor(entry, after, slotConfig, ceilings).value,
           survival: survival.get(entry.playerId) ?? 0,
         }));
       expectedValueAdded += expectedBestSurvivor(survivors);
     }
     return {
-      playerId: candidate.playerId,
-      position: candidate.position,
-      expectedValueAdded,
-      valueOverReplacement: candidate.valueOverReplacement,
-      rosterAdjustedValue: fit.value,
-      survivalProbability: survives,
-      reasons: reasonsFor(candidate, fit, survives, query, board),
-    } satisfies Recommendation;
+      recommendation: {
+        playerId: candidate.playerId,
+        position: candidate.position,
+        expectedValueAdded,
+        valueOverReplacement: candidate.valueOverReplacement,
+        rosterAdjustedValue: fit.value,
+        survivalProbability: survives,
+        reasons: reasonsFor(candidate, fit, survives, query, board),
+      } satisfies Recommendation,
+      alreadyBenched: fit.alreadyBenched,
+      averageDraftPosition: candidate.averageDraftPosition,
+    };
   });
 
+  // Equal expected value: the position with fewer bodies already sitting first (depth spread
+  // across the roster, the same read the autopick keeps), then the market's order.
   return scored
-    .sort((a, b) => b.expectedValueAdded - a.expectedValueAdded || a.playerId.localeCompare(b.playerId))
-    .slice(0, shortlistSize);
+    .sort(
+      (a, b) =>
+        b.recommendation.expectedValueAdded - a.recommendation.expectedValueAdded ||
+        a.alreadyBenched - b.alreadyBenched ||
+        a.averageDraftPosition - b.averageDraftPosition ||
+        a.recommendation.playerId.localeCompare(b.recommendation.playerId),
+    )
+    .slice(0, shortlistSize)
+    .map((entry) => entry.recommendation);
 }
