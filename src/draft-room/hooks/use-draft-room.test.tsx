@@ -211,10 +211,34 @@ describe("useDraftRoom", () => {
     await act(async () => {
       outcome = await result.current.submit({ type: "MAKE_PICK", playerId: "qb1" });
     });
-    expect(outcome).toEqual({ ok: true });
+    expect(outcome).toEqual({ ok: true, notice: null });
     expect(result.current.view?.picks).toHaveLength(1);
     expect(result.current.pendingPlayerId).toBeNull();
     expect(h.calls).toContain("POST /api/drafts/d1/actions");
+  });
+
+  it("hands the league's own notice back when the pick landed but the room was not told (review finding 3)", async () => {
+    const h = fixtureDeps();
+    h.postResponse = { ok: true, data: { draft: { ...SNAKE_VIEW, sequence: 2 }, notice: "The room lost its voice for a moment, catching up." } };
+    const { result } = await mounted(h);
+    let outcome: SubmitOutcome | undefined;
+    await act(async () => {
+      outcome = await result.current.submit({ type: "MAKE_PICK", playerId: "qb1" });
+    });
+    expect(outcome).toEqual({ ok: true, notice: "The room lost its voice for a moment, catching up." });
+  });
+
+  it("a draft.resync frame from the stream refetches the room, for this draft only (review finding 3)", async () => {
+    const h = fixtureDeps();
+    const { result } = await mounted(h);
+    const before = h.calls.filter((f) => f === "GET /api/drafts/d1").length;
+    act(() => h.sources[0]!.emit("draft.resync", { draftId: "other" }));
+    await act(async () => undefined);
+    expect(h.calls.filter((f) => f === "GET /api/drafts/d1")).toHaveLength(before);
+    h.view = { ...SNAKE_VIEW, sequence: 4 };
+    act(() => h.sources[0]!.emit("draft.resync", { draftId: "d1", markedAt: "2026-09-19T00:00:00.000Z" }));
+    await waitFor(() => expect(result.current.view?.sequence).toBe(4));
+    expect(h.calls.filter((f) => f === "GET /api/drafts/d1")).toHaveLength(before + 1);
   });
 
   it("rolls back and reports the reducer's reason when the server rejects the action — control case, nothing else happened", async () => {

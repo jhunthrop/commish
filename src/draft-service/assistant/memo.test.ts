@@ -1,54 +1,72 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ADVISOR_CONFIG } from "./config";
-import { resetAdvisorMemoForTests, roomFactsFor, seatShortlistFor, type RoomFacts } from "./memo";
+import type { RoomFacts } from "./memo";
+import { heldRoomFacts, resetAdvisorMemoForTests, roomFactsFor, seatShortlistFor } from "./memo";
 
-function facts(fromPick: number): RoomFacts {
-  return { table: { runs: 1, fromPick, throughPick: fromPick, played: [] }, tiers: {}, collapses: [] };
-}
+/** Facts told apart by their `fromPick`, which is all these tests need to distinguish. */
+const facts = (fromPick: number): RoomFacts => ({ table: { runs: 1, fromPick, throughPick: fromPick, played: [] }, tiers: {}, collapses: [] });
 
-describe("roomFactsFor", () => {
-  beforeEach(() => resetAdvisorMemoForTests());
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
-  it("computes once per room state and serves every later viewer of that state from memory", () => {
-    const compute = vi.fn(() => facts(4));
-    const first = roomFactsFor("d1", 4, compute);
-    const second = roomFactsFor("d1", 4, compute);
-    expect(second).toBe(first);
+beforeEach(() => {
+  resetAdvisorMemoForTests();
+});
+
+describe("roomFactsFor (the per-process memo, async compute)", () => {
+  it("computes once per room state and serves the held facts to every later ask for that sequence", async () => {
+    const compute = vi.fn(async () => facts(1));
+    const first = await roomFactsFor("d1", 3, compute);
+    const second = await roomFactsFor("d1", 3, compute);
     expect(compute).toHaveBeenCalledTimes(1);
+    expect(second).toBe(first);
+    expect(heldRoomFacts("d1", 3)).toBe(first);
+    expect(heldRoomFacts("d1", 4)).toBeNull();
   });
 
-  it("replaces the room's facts on a new sequence, so a pick event evicts the old state", () => {
-    const old = roomFactsFor("d1", 4, () => facts(4));
-    const fresh = roomFactsFor("d1", 5, () => facts(5));
-    expect(fresh).not.toBe(old);
-    const again = vi.fn(() => facts(4));
-    roomFactsFor("d1", 4, again);
-    expect(again).toHaveBeenCalledTimes(1);
+  it("two concurrent asks for one state share ONE in-flight compute (the compute is async now, so the window is real)", async () => {
+    let release: () => void = () => undefined;
+    const compute = vi.fn(() => new Promise<RoomFacts>((resolve) => { release = () => resolve(facts(2)); }));
+    const a = roomFactsFor("d1", 5, compute);
+    const b = roomFactsFor("d1", 5, compute);
+    await settle();
+    expect(compute).toHaveBeenCalledTimes(1);
+    release();
+    expect(await a).toBe(await b);
   });
 
-  it("computes a seat's shortlist once per room state, per seat, beside the room facts", () => {
-    roomFactsFor("d1", 4, () => facts(4));
-    const compute = vi.fn(() => []);
-    seatShortlistFor("d1", 4, "t1", compute);
-    seatShortlistFor("d1", 4, "t1", compute);
-    seatShortlistFor("d1", 4, "t2", compute);
+  it("a newer sequence replaces the room's entry, and a compute that fails is forgotten so the next ask computes again", async () => {
+    await roomFactsFor("d1", 1, async () => facts(3));
+    await roomFactsFor("d1", 2, async () => facts(4));
+    expect(heldRoomFacts("d1", 1)).toBeNull();
+    expect(heldRoomFacts("d1", 2)).not.toBeNull();
+    await expect(roomFactsFor("d2", 1, async () => Promise.reject(new Error("sim failed")))).rejects.toThrow("sim failed");
+    expect(heldRoomFacts("d2", 1)).toBeNull();
+    const retry = vi.fn(async () => facts(5));
+    await roomFactsFor("d2", 1, retry);
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("seat shortlists ride the held entry, single-flight per seat, and compute every time for a state the room does not hold", async () => {
+    const compute = vi.fn(async () => []);
+    expect(await seatShortlistFor("d1", 9, "t1", compute)).toEqual([]);
+    expect(await seatShortlistFor("d1", 9, "t1", compute)).toEqual([]);
     expect(compute).toHaveBeenCalledTimes(2);
-    roomFactsFor("d1", 5, () => facts(5));
-    seatShortlistFor("d1", 5, "t1", compute);
+    await roomFactsFor("d1", 9, async () => facts(9));
+    const a = seatShortlistFor("d1", 9, "t1", compute);
+    const b = seatShortlistFor("d1", 9, "t1", compute);
+    expect(await a).toBe(await b);
     expect(compute).toHaveBeenCalledTimes(3);
-    // A state the room does not hold is computed every time, never remembered against the wrong one.
-    seatShortlistFor("d1", 4, "t1", compute);
-    seatShortlistFor("d1", 4, "t1", compute);
-    expect(compute).toHaveBeenCalledTimes(5);
+    // A failed compute is forgotten: the next ask computes again.
+    await expect(seatShortlistFor("d1", 9, "t2", async () => Promise.reject(new Error("no")))).rejects.toThrow("no");
+    expect(await seatShortlistFor("d1", 9, "t2", compute)).toEqual([]);
+    expect(compute).toHaveBeenCalledTimes(4);
   });
 
-  it("evicts the least recently computed room past the bound", () => {
-    for (let i = 0; i <= ADVISOR_CONFIG.memoRooms; i += 1) roomFactsFor(`d${i}`, 1, () => facts(1));
-    const recompute = vi.fn(() => facts(1));
-    roomFactsFor("d0", 1, recompute);
-    expect(recompute).toHaveBeenCalledTimes(1);
-    const kept = vi.fn(() => facts(1));
-    roomFactsFor(`d${ADVISOR_CONFIG.memoRooms}`, 1, kept);
-    expect(kept).not.toHaveBeenCalled();
+  it("rememberRoomFacts holds facts computed elsewhere (a store read) as if this process had computed them", async () => {
+    const { rememberRoomFacts } = await import("./memo");
+    const held = facts(6);
+    rememberRoomFacts("d3", 7, held);
+    const compute = vi.fn(async () => facts(7));
+    expect(await roomFactsFor("d3", 7, compute)).toBe(held);
+    expect(compute).not.toHaveBeenCalled();
   });
 });

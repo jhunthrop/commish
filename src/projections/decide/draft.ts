@@ -441,6 +441,65 @@ function reasonsFor(
  * why he was told something after the fact.
  */
 export function recommendPick(query: RecommendationQuery): readonly Recommendation[] {
+  const prepared = prepareRecommendation(query);
+  return finishRecommendation(prepared, prepared.considered.map((entry) => scoreCandidate(prepared, entry)));
+}
+
+export interface ChunkedRecommendationOptions {
+  /** Candidates scored before the event loop gets a turn. */
+  readonly chunkCandidates: number;
+  /** Test seam over the yield itself. Defaults to one macrotask (`setImmediate`). */
+  readonly yieldToEventLoop?: () => Promise<void>;
+}
+
+const nextMacrotask = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+/**
+ * THE SAME SHORTLIST, IN CHUNKS (draft-room performance round): each considered candidate costs
+ * a re-valuation of the whole board (about 3 ms on the real one), and thirty of them held in
+ * one synchronous stretch block every timer on the invocation that computes them. The scoring is
+ * one candidate at a time and shares nothing between candidates, so scoring them a chunk at a
+ * time and yielding one macrotask between chunks changes no number: `draft.test.ts` pins the two
+ * entry points equal for the same query.
+ */
+export async function recommendPickInChunks(query: RecommendationQuery, options: ChunkedRecommendationOptions): Promise<readonly Recommendation[]> {
+  const prepared = prepareRecommendation(query);
+  const yieldToEventLoop = options.yieldToEventLoop ?? nextMacrotask;
+  const chunk = Math.max(1, options.chunkCandidates);
+  const scored: ScoredCandidate[] = [];
+  for (let index = 0; index < prepared.considered.length; index += 1) {
+    if (index > 0 && index % chunk === 0) await yieldToEventLoop();
+    scored.push(scoreCandidate(prepared, prepared.considered[index]!));
+  }
+  return finishRecommendation(prepared, scored);
+}
+
+interface ConsideredCandidate {
+  readonly candidate: DraftCandidate;
+  readonly fit: ReturnType<typeof fitFor>;
+}
+
+interface PreparedRecommendation {
+  readonly query: RecommendationQuery;
+  readonly board: readonly DraftCandidate[];
+  readonly roster: RecommendationQuery["roster"];
+  readonly slotConfig: RecommendationQuery["shape"]["rosterSlots"];
+  readonly ceilings: NonNullable<RecommendationQuery["ceilings"]>;
+  readonly nextPickNumber: number | null;
+  readonly shortlistSize: number;
+  readonly survival: ReadonlyMap<string, number>;
+  /** The top of the rankable board, each one a full re-valuation away from its score. */
+  readonly considered: readonly ConsideredCandidate[];
+}
+
+interface ScoredCandidate {
+  readonly recommendation: Recommendation;
+  readonly alreadyBenched: number;
+  readonly averageDraftPosition: number;
+}
+
+/** Everything before the per-candidate scoring: one fit per board entry, the ranking, the cut. */
+function prepareRecommendation(query: RecommendationQuery): PreparedRecommendation {
   const { board, roster, shape, pickNumber, nextPickNumber, room, shortlistSize = DEFAULT_SHORTLIST, ceilings = AUTOPICK_CONFIG.rosterCeilings! } = query;
   if (!Number.isInteger(pickNumber) || pickNumber < 1) {
     throw new Error(`A recommendation is made at a whole pick number; got ${pickNumber}.`);
@@ -470,38 +529,43 @@ export function recommendPick(query: RecommendationQuery): readonly Recommendati
 
   // Only the top of the board can win, and each one costs a full re-valuation of what is left.
   const considered = rankable.slice(0, Math.max(shortlistSize * 3, DEFAULT_SHORTLIST * 3));
+  return { query, board, roster, slotConfig, ceilings, nextPickNumber, shortlistSize, survival, considered };
+}
 
-  const scored = considered.map(({ candidate, fit }) => {
-    const survives = survival.get(candidate.playerId) ?? 0;
-    let expectedValueAdded = fit.value;
-    if (nextPickNumber !== null) {
-      const after = [...roster, candidate];
-      const survivors = board
-        .filter((entry) => entry.playerId !== candidate.playerId)
-        .map((entry) => ({
-          value: fitFor(entry, after, slotConfig, ceilings).value,
-          survival: survival.get(entry.playerId) ?? 0,
-        }));
-      expectedValueAdded += expectedBestSurvivor(survivors);
-    }
-    return {
-      recommendation: {
-        playerId: candidate.playerId,
-        position: candidate.position,
-        expectedValueAdded,
-        valueOverReplacement: candidate.valueOverReplacement,
-        rosterAdjustedValue: fit.value,
-        survivalProbability: survives,
-        reasons: reasonsFor(candidate, fit, survives, query, board),
-      } satisfies Recommendation,
-      alreadyBenched: fit.alreadyBenched,
-      averageDraftPosition: candidate.averageDraftPosition,
-    };
-  });
+/** One candidate's score: his own fit plus the best of what survives to the next turn with him taken. */
+function scoreCandidate(prepared: PreparedRecommendation, { candidate, fit }: ConsideredCandidate): ScoredCandidate {
+  const { board, roster, slotConfig, ceilings, nextPickNumber, survival, query } = prepared;
+  const survives = survival.get(candidate.playerId) ?? 0;
+  let expectedValueAdded = fit.value;
+  if (nextPickNumber !== null) {
+    const after = [...roster, candidate];
+    const survivors = board
+      .filter((entry) => entry.playerId !== candidate.playerId)
+      .map((entry) => ({
+        value: fitFor(entry, after, slotConfig, ceilings).value,
+        survival: survival.get(entry.playerId) ?? 0,
+      }));
+    expectedValueAdded += expectedBestSurvivor(survivors);
+  }
+  return {
+    recommendation: {
+      playerId: candidate.playerId,
+      position: candidate.position,
+      expectedValueAdded,
+      valueOverReplacement: candidate.valueOverReplacement,
+      rosterAdjustedValue: fit.value,
+      survivalProbability: survives,
+      reasons: reasonsFor(candidate, fit, survives, query, board),
+    } satisfies Recommendation,
+    alreadyBenched: fit.alreadyBenched,
+    averageDraftPosition: candidate.averageDraftPosition,
+  };
+}
 
-  // Equal expected value: the position with fewer bodies already sitting first (depth spread
-  // across the roster, the same read the autopick keeps), then the market's order.
-  return scored
+/** Equal expected value: the position with fewer bodies already sitting first (depth spread
+ *  across the roster, the same read the autopick keeps), then the market's order. */
+function finishRecommendation(prepared: PreparedRecommendation, scored: readonly ScoredCandidate[]): readonly Recommendation[] {
+  return [...scored]
     .sort(
       (a, b) =>
         b.recommendation.expectedValueAdded - a.recommendation.expectedValueAdded ||
@@ -509,6 +573,6 @@ export function recommendPick(query: RecommendationQuery): readonly Recommendati
         a.averageDraftPosition - b.averageDraftPosition ||
         a.recommendation.playerId.localeCompare(b.recommendation.playerId),
     )
-    .slice(0, shortlistSize)
+    .slice(0, prepared.shortlistSize)
     .map((entry) => entry.recommendation);
 }

@@ -129,7 +129,7 @@ export function PoolList({ leagueId, players, available, byeWeeks, odds, nextPic
       {visible.length === 0 ? (
         <PoolFilterEmpty filter={filter} />
       ) : (
-        <ol aria-label="Available players, best first" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+        <ol aria-label="Available players, best first" className="relative flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
           <MotionList items={items} keyOf={keyOf}>
             {(item, row) => (
               <PoolRow

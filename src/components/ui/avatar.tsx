@@ -100,8 +100,11 @@ export function Avatar({ name, avatar, size = "md", label, ring, className = "" 
           <Icon name={ref.preset.icon} size={ICON_SIZE[size]} />
         </span>
       ) : showImage ? (
+        // Lazy and async (draft-room performance round, item 6): a room opens with a hundred-odd
+        // headshots, and the browser fetches the ones near the viewport first, the rest as they
+        // scroll near, none of them holding the first paint.
         // eslint-disable-next-line @next/next/no-img-element -- parseAvatarRef already enforces the https-only allowlist; next/image is still not used because that would need a per-host allowlist we do not have
-        <img src={remoteUrl} alt="" className="size-full object-cover object-top" onError={() => setFailedUrl(remoteUrl)} />
+        <img src={remoteUrl} alt="" loading="lazy" decoding="async" className="size-full object-cover object-top" onError={() => setFailedUrl(remoteUrl)} />
       ) : (
         <span>{initialsFor(name)}</span>
       )}

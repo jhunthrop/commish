@@ -16,6 +16,22 @@ export const REALTIME_CONFIG = {
   streamMaxLen: 10_000,
   /** How long a single XREAD BLOCK call waits before looping (ms). Bounds shutdown latency. */
   blockMs: 5_000,
+  /**
+   * THE FAIL-FAST BOUNDS (draft-room performance round, item 4; `redis.ts`). A command is retried
+   * this many times across reconnects and a non-blocking one is cut off after `commandTimeoutMs`
+   * (queue time included), so a publish against a Redis that will not answer fails in seconds
+   * rather than holding an advance until the sweep's attempt timeout. The connect timeout bounds
+   * the socket itself. A subscriber's blocking read is exempt from the command timeout (its
+   * `blockMs` is the wait) and keeps only the retry bound.
+   */
+  maxRetriesPerRequest: 2,
+  connectTimeoutMs: 5_000,
+  commandTimeoutMs: 3_000,
+  /** THE RESYNC MARKER (review finding 3; `resync.ts`): the key a draft whose frame failed to
+   *  publish is marked under, and how long the mark lives — one planned stream life, since a
+   *  stream that opens later resyncs on its own open anyway. */
+  resyncKey: (draftId: string): string => `realtime:resync:${draftId}`,
+  resyncMarkerTtlMs: 280_000,
   /** SSE keepalive comment interval (ms) — keeps proxies from closing an idle stream. */
   keepaliveMs: 15_000,
   /**

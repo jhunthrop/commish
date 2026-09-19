@@ -9,13 +9,14 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@/db/schema";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { getDraftStore } from "@/draft-service";
+import { awaitDraftFollowThroughForTests, getDraftStore } from "@/draft-service";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { simulateRoomOdds } from "../sim/room-odds";
 import { ADVISOR_CONFIG } from "./config";
+import { createMemoryRoomFactsStore } from "./facts-store";
 import { resetAdvisorMemoForTests } from "./memo";
 import { recommendNow } from "./recommend";
-import { advisorFor, warmAdvisorRoom } from "./service";
+import { advisorFor, publishRoomFacts, warmAdvisorRoom } from "./service";
 
 const db = createTestDb();
 const DRAFT_ID = "draft_advisor_service";
@@ -38,14 +39,23 @@ async function fixture() {
   );
   const started = await getDraftStore().startDraft(DRAFT_ID);
   if (!started.ok) throw new Error(started.reason);
+  // The process-wide store's own follow-through (item 1) computes the start's facts at once
+  // outside a request scope; these tests count THEIR simulate, so that entry is forgotten.
+  await awaitDraftFollowThroughForTests();
+  resetAdvisorMemoForTests();
   const userFor = (teamId: string) => f.userIds[f.teamIds.indexOf(teamId)]!;
   return { onClockUser: userFor(started.state.draftOrder[0]!), waitingUser: userFor(started.state.draftOrder[1]!) };
 }
+
+/** A fresh cross-process store per test: the default is the shared Redis, which the fixture's own
+ *  follow-through writes to, and these tests count THEIR simulate. */
+let facts = createMemoryRoomFactsStore();
 
 beforeEach(async () => {
   await truncateAll(db);
   getDraftStore().invalidate(DRAFT_ID);
   resetAdvisorMemoForTests();
+  facts = createMemoryRoomFactsStore();
 });
 
 describe("advisorFor", () => {
@@ -53,9 +63,9 @@ describe("advisorFor", () => {
     const { onClockUser, waitingUser } = await fixture();
     const simulate = vi.fn(simulateRoomOdds);
     const recommend = vi.fn(recommendNow);
-    const first = await advisorFor(db, DRAFT_ID, onClockUser, { simulate, recommend });
-    const second = await advisorFor(db, DRAFT_ID, waitingUser, { simulate, recommend });
-    const again = await advisorFor(db, DRAFT_ID, waitingUser, { simulate, recommend });
+    const first = await advisorFor(db, DRAFT_ID, onClockUser, { simulate, recommend, facts });
+    const second = await advisorFor(db, DRAFT_ID, waitingUser, { simulate, recommend, facts });
+    const again = await advisorFor(db, DRAFT_ID, waitingUser, { simulate, recommend, facts });
     expect(simulate).toHaveBeenCalledTimes(1);
     // The on-clock seat's own shortlist is computed once for the R-3 exclusion inside the room
     // facts and once as its card; the waiting seat once, its second request served from memory.
@@ -78,15 +88,64 @@ describe("advisorFor", () => {
   it("warmAdvisorRoom computes the room facts for the current state ahead of any viewer, so the viewer's own request simulates nothing", async () => {
     const { onClockUser } = await fixture();
     const simulate = vi.fn(simulateRoomOdds);
-    await warmAdvisorRoom(db, DRAFT_ID, { simulate });
+    await warmAdvisorRoom(db, DRAFT_ID, { simulate, facts });
     expect(simulate).toHaveBeenCalledTimes(1);
-    const view = await advisorFor(db, DRAFT_ID, onClockUser, { simulate });
+    const view = await advisorFor(db, DRAFT_ID, onClockUser, { simulate, facts });
     expect(view).not.toBeNull();
     expect(simulate).toHaveBeenCalledTimes(1);
     // Warming again for the same sequence is free, and a draft that does not exist is a no-op.
-    await warmAdvisorRoom(db, DRAFT_ID, { simulate });
-    await warmAdvisorRoom(db, "no_such_draft", { simulate });
+    await warmAdvisorRoom(db, DRAFT_ID, { simulate, facts });
+    await warmAdvisorRoom(db, "no_such_draft", { simulate, facts });
     expect(simulate).toHaveBeenCalledTimes(1);
+  });
+
+  it("publishRoomFacts computes for the state it is handed (the pick's own invocation, nothing re-read), and a viewer racing it shares the one in-flight compute (item 1)", async () => {
+    const { onClockUser } = await fixture();
+    const state = (await getDraftStore().getDraftState(DRAFT_ID))!;
+    let release: (() => void) | null = null;
+    const simulate = vi.fn((input: Parameters<typeof simulateRoomOdds>[0]) => new Promise<ReturnType<typeof simulateRoomOdds>>((resolve) => { release = () => resolve(simulateRoomOdds(input)); }));
+    const publishing = publishRoomFacts(db, state, { simulate, facts });
+    const viewing = advisorFor(db, DRAFT_ID, onClockUser, { simulate, facts });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(simulate).toHaveBeenCalledTimes(1);
+    release!();
+    await publishing;
+    expect(await viewing).not.toBeNull();
+    expect(simulate).toHaveBeenCalledTimes(1);
+    // A state that is not running publishes nothing.
+    await publishRoomFacts(db, { ...state, phase: "complete" }, { simulate, facts });
+    expect(simulate).toHaveBeenCalledTimes(1);
+  });
+
+  it("a viewer on ANOTHER instance reads the facts the pick's invocation wrote, and simulates nothing (item 2: the cross-process store)", async () => {
+    const { onClockUser, waitingUser } = await fixture();
+    const state = (await getDraftStore().getDraftState(DRAFT_ID))!;
+    const simulate = vi.fn(simulateRoomOdds);
+    await publishRoomFacts(db, state, { simulate, facts });
+    expect(simulate).toHaveBeenCalledTimes(1);
+    expect(facts.held.size).toBe(1);
+    // The other instance: an empty process memo, the same store.
+    resetAdvisorMemoForTests();
+    const view = await advisorFor(db, DRAFT_ID, onClockUser, { simulate, facts });
+    expect(view).not.toBeNull();
+    expect(simulate).toHaveBeenCalledTimes(1);
+    // And it remembered what it read: a second seat on that instance touches neither.
+    facts.held.clear();
+    expect(await advisorFor(db, DRAFT_ID, waitingUser, { simulate, facts })).not.toBeNull();
+    expect(simulate).toHaveBeenCalledTimes(1);
+    // A miss everywhere computes once, under the lock, and writes for the next instance.
+    resetAdvisorMemoForTests();
+    expect(await advisorFor(db, DRAFT_ID, waitingUser, { simulate, facts })).not.toBeNull();
+    expect(simulate).toHaveBeenCalledTimes(2);
+    expect(facts.held.size).toBe(1);
+    expect(facts.locks.size).toBe(0);
+  });
+
+  it("the default simulation yields to the event loop between chunks, so the pick's own invocation never holds it for the whole table (item 1)", async () => {
+    const { onClockUser } = await fixture();
+    const view = await advisorFor(db, DRAFT_ID, onClockUser);
+    expect(view!.odds!.runs).toBe(ADVISOR_CONFIG.runs);
+    expect(ADVISOR_CONFIG.simChunkRuns).toBeLessThan(ADVISOR_CONFIG.runs);
   });
 
   it("is null for a member with no seat and before the draft runs", async () => {

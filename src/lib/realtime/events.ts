@@ -23,6 +23,15 @@ export const REALTIME_EVENT_TYPES = [
   "draft.queue",
   /** The AI draft moderator's pacing prompt for the team currently on the clock. */
   "draft.nudge",
+  /**
+   * THE LOST VOICE (draft-room performance round, review finding 3): a pick committed but its
+   * frame never reached the stream (the fail-fast publish). The store marks the draft for resync
+   * (`resync.ts`), and every open stream on the league relays this frame on its next keepalive,
+   * so a viewer refetches the room within one keepalive instead of sitting on a stale board until
+   * the planned close. Never published through the stream itself (Redis was the thing that
+   * failed): synthesized by the stream on read, carrying `{ draftId }` and no stream id.
+   */
+  "draft.resync",
   "chat.message",
   "chat.reaction",
   /**

@@ -5,7 +5,7 @@ import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import { currentClockSeconds, teamOnClock, type DraftState } from "@/draft-engine";
 import type { DraftStore } from "@/draft-service/store";
 import { assignArchetypes, type BotArchetype } from "@/mock-draft/archetypes";
-import { botThinkDelayMs, chooseBotPick } from "@/mock-draft/bots";
+import { botDelayStreamKey, botThinkDelayMs, chooseBotPick } from "@/mock-draft/bots";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 import { rngFor, type Rng } from "@/mock-draft/rng";
 import type { MockLifecycleDeps } from "./claim";
@@ -288,7 +288,7 @@ export function createMockBotDriver({ db, store }: MockBotDriverDeps): MockBotDr
     // Non-null exactly when a clock is running: `currentTier` (which `currentClockSeconds` just
     // answered through) is null whenever `turnStartedAt` is — one fact, checked once above.
     const startedAtMs = Date.parse(state.turnStartedAt!);
-    const dueAtMs = startedAtMs + botThinkDelayMs(clockSeconds, rngFor(meta.botSeed, `${onClockTeamId}:delay:${state.pickNumber}`));
+    const dueAtMs = startedAtMs + botThinkDelayMs(clockSeconds, rngFor(meta.botSeed, botDelayStreamKey(onClockTeamId, state.pickNumber)));
     return {
       teamId: onClockTeamId,
       dueAtMs,

@@ -14,6 +14,15 @@ function frame(event: RealtimeEvent): Uint8Array {
 const KEEPALIVE = encoder.encode(": keepalive\n\n");
 
 /**
+ * A frame the stream synthesizes rather than relays (`draft.resync`): no `id:` line, so the
+ * browser keeps the last stream id it saw as its `Last-Event-ID` and a reconnect still resumes
+ * from the stream's own position.
+ */
+function synthesizedFrame(event: Omit<RealtimeEvent, "id">): Uint8Array {
+  return encoder.encode(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+}
+
+/**
  * The opening bytes: the browser's reconnect delay for the planned close (`retry:` is the SSE
  * field that sets it), then the same comment frame the keepalive sends. The `retry:` line is
  * part of the comment frame's own message, so an `EventSource` still sees no event here.
@@ -57,8 +66,21 @@ export interface EventStreamOptions {
   /** Called with every frame this connection relays, after it is enqueued — the league route's
    *  seam for waking its draft advance loop off the stream it already reads (finding 2). */
   readonly onEvent?: (event: RealtimeEvent) => void;
-  /** Test seam over `REALTIME_CONFIG.plannedCloseMs`. */
+  /** Test seams over `REALTIME_CONFIG.plannedCloseMs` and `keepaliveMs`. */
   readonly plannedCloseMs?: number;
+  readonly keepaliveMs?: number;
+  /**
+   * THE LOST VOICE (review finding 3): the draft this league's stream watches, and the resync
+   * marker's read for it. Read once as the stream opens (a mark older than this connection is
+   * the client's own open resync's business) and on every keepalive; a newer mark relays one
+   * synthesized `draft.resync` frame, so a viewer refetches within one keepalive of a pick that
+   * committed but failed to publish.
+   */
+  readonly resync?: {
+    readonly leagueId: string;
+    readonly draftId: string;
+    readonly check: (draftId: string) => Promise<string | null>;
+  };
   /**
    * The connection's three moments, for the presence store (`presence.ts`): the opening bytes
    * have gone, a keepalive went, the socket closed. Each is awaited nowhere and may never throw
@@ -125,16 +147,28 @@ function createEventStream(request: Request, userId: string, streamKeys: readonl
       // which can itself take a moment on a cold socket.
       sink.enqueue(OPENING);
       void options.lifecycle?.onOpen();
+      // The resync mark this connection has already accounted for: whatever stood as it opened.
+      let lastResyncMark: string | null = null;
+      const resync = options.resync;
+      const relayResyncIfMarked = async (): Promise<void> => {
+        if (resync === undefined) return;
+        const mark = await resync.check(resync.draftId);
+        if (mark === null || mark === lastResyncMark) return;
+        lastResyncMark = mark;
+        sink.enqueue(synthesizedFrame({ type: "draft.resync", leagueId: resync.leagueId, payload: { draftId: resync.draftId, markedAt: mark }, timestamp: mark }));
+      };
+      if (resync !== undefined) lastResyncMark = await resync.check(resync.draftId);
       try {
-        redis = createRedisConnection();
+        redis = createRedisConnection("subscribe");
         keepalive = setInterval(() => {
           try {
             sink.enqueue(KEEPALIVE);
             void options.lifecycle?.onKeepalive();
+            relayResyncIfMarked().catch(() => undefined);
           } catch {
             controller.abort();
           }
-        }, REALTIME_CONFIG.keepaliveMs);
+        }, options.keepaliveMs ?? REALTIME_CONFIG.keepaliveMs);
         for await (const event of subscribe({ redis, streamKey, extraStreamKeys, afterId, signal: controller.signal })) {
           sink.enqueue(frame(event));
           options.onEvent?.(event);

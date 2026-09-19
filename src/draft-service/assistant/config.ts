@@ -10,6 +10,17 @@ export const ADVISOR_CONFIG = {
    *  furthest next turn at the worst case a room can pose (14 teams, 16 rounds, pick 1) is the
    *  budget this constant is held to, and the count the card states. */
   runs: 200,
+  /** Runs played before the simulation yields one macrotask (draft-room performance round, item
+   *  1; `simulateRoomOddsInChunks`). Two runs of a 12-team room are about 3 ms on Apple silicon
+   *  (200 runs measured 250 ms after the pool index), so a pick's database round trip sharing
+   *  the invocation waits at most that long, never the whole table. */
+  simChunkRuns: 2,
+  /** Candidates a shortlist scores before yielding (`recommendPickInChunks`). Each candidate
+   *  re-values the whole board, about 3 ms on the real one. ONE, like two sim runs above (review
+   *  fix round): a pacing job on the same instance is twenty database round trips, and every one
+   *  of them resumes only after the running chunk; at eight runs (25 ms) a pick's own path
+   *  stretched to over a second behind the previous pick's facts and two picks stacked. */
+  recommendChunkCandidates: 1,
   /** How many candidates `recommendPick` ranks for every seat, on or off the clock: the card's
    *  pick is the first the runs leave on the board past the reach floor, the tab's rows are the
    *  rest, and the on-clock seat's whole shortlist is held off its own current pick in the runs
@@ -24,4 +35,20 @@ export const ADVISOR_CONFIG = {
   /** Room odds tables remembered at once, one per room state; a new pick evicts the room's old
    *  table, and the least-recently-computed room goes past this. */
   memoRooms: 64,
+  /**
+   * THE CROSS-PROCESS FACTS STORE (draft-room performance round, item 2; `facts-store.ts`).
+   * `ttlMs` is short by ruling: a room's facts are superseded by its next pick within seconds in
+   * a mock and within a clock in a real league, and a viewer who reads past it computes once
+   * under the lock. `lockMs` bounds the compute lock well past the longest measured simulation
+   * (1,137 ms on Apple silicon before the engine index, a few seconds on a Vercel vCPU) so a
+   * holder that died releases by expiry; `waitPollMs` and `waitMaxMs` bound how long a contending
+   * reader waits for the holder's write before computing itself, inside the lock's own life so
+   * the two never disagree.
+   */
+  facts: {
+    ttlMs: 10 * 60_000,
+    lockMs: 15_000,
+    waitPollMs: 50,
+    waitMaxMs: 5_000,
+  },
 } as const;

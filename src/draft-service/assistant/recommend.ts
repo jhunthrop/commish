@@ -15,7 +15,7 @@
 import type { DraftPoolEntry } from "@/domain/draft";
 import { restrictedPositions } from "@/domain/roster-eligibility";
 import { assignSlot, autopickEligible, availablePool, draftedPlayerIds, rosterFor, snakeTeamForPick, teamOnClock, totalPickCount, type DraftState } from "@/draft-engine";
-import { recommendPick, type Recommendation, type RosteredPlayer } from "@/projections/decide/draft";
+import { recommendPick, recommendPickInChunks, type Recommendation, type RecommendationQuery, type RosteredPlayer } from "@/projections/decide/draft";
 import { valueBoardIndexed, type LeagueShape, type ValuedPlayer } from "@/projections/decide/replacement";
 import type { SimPlayerEvidence } from "../sim/types";
 import { ADVISOR_CONFIG } from "./config";
@@ -131,18 +131,35 @@ function boardOrderShortlist(state: DraftState, askingTeamId: string, shortlistS
  *  turn left to decide. The valued board's own ranking, or the board-order shortlist when the
  *  valued board has nobody the roster can take. */
 export function recommendNow({ state, askingTeamId, valued, shape, shortlistSize = ADVISOR_CONFIG.shortlistSize }: RecommendInput): readonly Recommendation[] {
+  const query = recommendationQueryFor(state, askingTeamId, valued, shape, shortlistSize);
+  if (query === null) return [];
+  const ranked = recommendPick(query);
+  return ranked.length > 0 ? ranked : boardOrderShortlist(state, askingTeamId, shortlistSize);
+}
+
+/** `recommendNow`, scored a chunk of candidates at a time (draft-room performance round): the
+ *  same query, the same fallback, the same answer (`recommend.test.ts` pins it), with the event
+ *  loop given a turn every `ADVISOR_CONFIG.recommendChunkCandidates` candidates. */
+export async function recommendNowInChunks({ state, askingTeamId, valued, shape, shortlistSize = ADVISOR_CONFIG.shortlistSize }: RecommendInput): Promise<readonly Recommendation[]> {
+  const query = recommendationQueryFor(state, askingTeamId, valued, shape, shortlistSize);
+  if (query === null) return [];
+  const ranked = await recommendPickInChunks(query, { chunkCandidates: ADVISOR_CONFIG.recommendChunkCandidates });
+  return ranked.length > 0 ? ranked : boardOrderShortlist(state, askingTeamId, shortlistSize);
+}
+
+/** The one query both entry points score: null when the seat has no turn left to decide. */
+function recommendationQueryFor(state: DraftState, askingTeamId: string, valued: ReadonlyMap<string, ValuedEntry>, shape: LeagueShape, shortlistSize: number): RecommendationQuery | null {
   const window = askingWindow(state, askingTeamId);
-  if (window === null) return [];
+  if (window === null) return null;
   const drafted = draftedPlayerIds(state);
-  const ranked = recommendPick({
+  return {
     board: [...valued.values()].filter((entry) => !drafted.has(entry.playerId)),
     roster: rosterSoFar(state, askingTeamId, valued),
     shape,
     pickNumber: window.pickNumber,
     nextPickNumber: window.nextPickNumber,
     shortlistSize,
-  });
-  return ranked.length > 0 ? ranked : boardOrderShortlist(state, askingTeamId, shortlistSize);
+  };
 }
 
 /** The on-clock seat's own shortlist, held off its current pick in every run (ruling R-3, see
@@ -151,4 +168,11 @@ export function onClockShortlist(state: DraftState, valued: ReadonlyMap<string, 
   const onClock = teamOnClock(state);
   if (onClock === null) return new Set();
   return new Set(recommendNow({ state, askingTeamId: onClock, valued, shape }).map((rec) => rec.playerId));
+}
+
+/** `onClockShortlist` over the chunked scoring; the same set. */
+export async function onClockShortlistInChunks(state: DraftState, valued: ReadonlyMap<string, ValuedEntry>, shape: LeagueShape): Promise<ReadonlySet<string>> {
+  const onClock = teamOnClock(state);
+  if (onClock === null) return new Set();
+  return new Set((await recommendNowInChunks({ state, askingTeamId: onClock, valued, shape })).map((rec) => rec.playerId));
 }

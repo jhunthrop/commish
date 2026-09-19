@@ -23,6 +23,7 @@ import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logg
 import { sweepQuietly } from "@/integrity-service/multi-account";
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import { enqueueDraftGradesJobQuietly } from "@/jobs/defs/draft-grades-job";
+import { pickPath } from "@/lib/timing/pick-path";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { hasOpenSeat } from "@/matchmaking/filter";
@@ -38,9 +39,11 @@ import { slotPreferencesFor } from "./slot-preference";
 
 export type { PublishFn } from "@/lib/realtime/publish";
 
-interface PublishFailureEvent {
+export interface PublishFailureEvent {
   readonly type: RealtimeEventType;
   readonly leagueId: string;
+  /** The draft whose frame was lost, so the edge can mark it for resync (review finding 3). */
+  readonly draftId: string;
 }
 
 export interface DraftStoreDeps {
@@ -67,11 +70,33 @@ export interface DraftStoreDeps {
    * set still lands its notes; tests hand in a memory set.
    */
   readonly wake?: WakeSet;
+  /**
+   * THE POST-COMMIT FOLLOW-THROUGH (draft-room performance round, item 1): called with the state
+   * an accepted action produced, after the commit, the broadcast and the wake note — the one seam
+   * every accepted action passes, whichever driver submitted it. The edge wires the pick's own
+   * follow-through here (the room's facts for the advisor); a refusal never reaches it. Synchronous
+   * by contract: the hook defers its own work past the response and owns its own failures, and a
+   * hook that throws is logged here, so nothing it does can fail, delay or reorder the write it
+   * follows. A caller that must not follow through (the stream's own advance loop, whose process
+   * relays only) opts out per call with `ApplyOptions.followThrough`.
+   */
+  readonly afterApplied?: (state: DraftState, action: DraftAction) => void;
 }
 
 export type ApplyResult =
-  | { readonly ok: true; readonly state: DraftState }
+  | {
+      readonly ok: true;
+      readonly state: DraftState;
+      /** Whether every frame this action owed reached the league stream (draft-room performance
+       *  round, item 4). False means the write stands and the room was NOT told: the publisher
+       *  failed fast (`REALTIME_CONFIG.commandTimeoutMs`, bounded retries), the failure went to
+       *  `onPublishError`, and the caller may say so in a person's words. */
+      readonly published: boolean;
+    }
   | { readonly ok: false; readonly reason: string };
+
+/** What the transaction itself decides, before the broadcast that follows the commit. */
+type TransactionOutcome = { readonly ok: true; readonly state: DraftState } | { readonly ok: false; readonly reason: string };
 
 export interface ApplyOptions {
   /**
@@ -90,6 +115,8 @@ export interface ApplyOptions {
   readonly alsoInTransaction?: (tx: DbTx) => Promise<readonly MemberNotice[] | void>;
   /** Who submitted this action. Absent means the clock acted (a `TIMER_EXPIRE`, never a person). */
   readonly actor?: { readonly id: string };
+  /** Whether the store's `afterApplied` hook runs for this action. Defaults to true; see the hook. */
+  readonly followThrough?: boolean;
 }
 
 export type CommitResult =
@@ -288,6 +315,7 @@ export function createDraftStore({
   audit = getAuditLogger(),
   deliverNotice: deliver = deliverNotice,
   wake,
+  afterApplied,
 }: DraftStoreDeps): DraftStore {
   const cache = new Map<string, DraftState>();
   const mutex = createKeyedMutex();
@@ -321,15 +349,26 @@ export function createDraftStore({
     return state;
   }
 
-  async function broadcast(previous: DraftState, next: DraftState, action: DraftAction): Promise<void> {
+  /** Publishes every frame the action owes; answers whether all of them reached the stream. */
+  async function broadcast(previous: DraftState, next: DraftState, action: DraftAction): Promise<boolean> {
+    let published = true;
     for (const event of draftEventsFor(previous, next, action)) {
       try {
-        await publish({ leagueId: next.config.leagueId, type: event.type, payload: event.payload });
+        // The publish stage of the pick path, timed when a measurement run asks (`pickPath`).
+        const id = await pickPath.time("publish", () => publish({ leagueId: next.config.leagueId, type: event.type, payload: event.payload }), { type: event.type, draftId: next.config.draftId, sequence: next.sequence });
+        // The publisher answers null for a failure it already logged (`createPublisher`); the
+        // store's own sink still hears it, so the resync mark is set whichever way it failed.
+        if (id === null) {
+          published = false;
+          onPublishError?.(new Error("publish answered null"), { type: event.type, leagueId: next.config.leagueId, draftId: next.config.draftId });
+        }
       } catch (error: unknown) {
         // Best-effort by contract: the write is already committed and clients can refetch.
-        onPublishError?.(error, { type: event.type, leagueId: next.config.leagueId });
+        onPublishError?.(error, { type: event.type, leagueId: next.config.leagueId, draftId: next.config.draftId });
+        published = false;
       }
     }
+    return published;
   }
 
   const store: DraftStore = {
@@ -362,7 +401,7 @@ export function createDraftStore({
         const createdNotices: MemberNotice[] = [];
 
         try {
-          const outcome = await db.transaction(async (tx): Promise<ApplyResult> => {
+          const outcome = await db.transaction(async (tx): Promise<TransactionOutcome> => {
             /**
              * THE LEAGUE ROW, FIRST, AS ITS OWN STATEMENT (final whole-branch review, F1 — a
              * cycle reproduced with real `psql` sessions, SQLSTATE 40P01).
@@ -625,7 +664,7 @@ export function createDraftStore({
           }
 
           cache.set(draftId, outcome.state);
-          if (previous !== null && applied !== null) await broadcast(previous, outcome.state, applied);
+          const published = previous !== null && applied !== null ? await broadcast(previous, outcome.state, applied) : true;
           await noteWake(outcome.state);
           // THE MULTI-ACCOUNT SWEEP'S SECOND TRIGGER (final review, HIGH 2), after the commit for
           // the same reason `broadcast` is: this transaction has just released `drafts` FOR
@@ -653,10 +692,18 @@ export function createDraftStore({
             try {
               await deliver(notice);
             } catch (error: unknown) {
-              onPublishError?.(error, { type: "notice.created", leagueId: notice.leagueId ?? "" });
+              onPublishError?.(error, { type: "notice.created", leagueId: notice.leagueId ?? "", draftId });
             }
           }
-          return outcome;
+          // LAST, and never awaited: see `DraftStoreDeps.afterApplied`.
+          if (afterApplied !== undefined && applied !== null && options?.followThrough !== false) {
+            try {
+              afterApplied(outcome.state, applied);
+            } catch (error: unknown) {
+              console.error("[draft] afterApplied hook threw", { draftId }, error);
+            }
+          }
+          return { ...outcome, published };
         } catch (error: unknown) {
           // Our view of the log is provably stale — drop it so the next read replays.
           cache.delete(draftId);

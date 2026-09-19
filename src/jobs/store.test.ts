@@ -5,13 +5,16 @@ import { createTestDb, truncateAll, truncateJobTables } from "@/db/test-db";
 import type { Clock } from "@/domain/timing";
 import { JOBS_CONFIG } from "./config";
 import {
+  claimJobById,
   claimNextJob,
   completedStepsFor,
   enqueueJob,
+  isJobPending,
   recordAttemptFailure,
   recordHeartbeat,
   recordStepCompletion,
   reclaimStaleJobs,
+  retirePendingJobs,
   succeedJob,
 } from "./store";
 
@@ -85,6 +88,32 @@ describe("claimNextJob", () => {
     expect(won).toHaveLength(2);
     expect(new Set(won.map((claim) => claim.jobId)).size).toBe(2);
     expect(claims.filter((claim) => claim === null)).toHaveLength(1);
+  });
+});
+
+describe("claimJobById and retirePendingJobs (the self-wake's claim, draft-room performance round item 3)", () => {
+  it("claims exactly the named job when pending and due, opening its run row; not when early, claimed or gone", async () => {
+    const { jobId } = await enqueueJob(db, clock, request("by-id", { runAt: new Date(Date.parse(T0) + 500) }));
+    expect(await claimJobById(db, clock, "w1", jobId!)).toBeNull();
+    const later = clockAt(new Date(Date.parse(T0) + 500).toISOString());
+    const claimed = await claimJobById(db, later, "w1", jobId!);
+    expect(claimed).toMatchObject({ jobId, name: "season-week", attempt: 1 });
+    expect(await claimJobById(db, later, "w2", jobId!)).toBeNull();
+    expect(await claimJobById(db, later, "w2", jobId! + 999)).toBeNull();
+    expect(await db.select().from(jobRuns).where(eq(jobRuns.jobId, jobId!))).toHaveLength(1);
+  });
+
+  it("retires only pending jobs, as succeeded with no run, and reports how many", async () => {
+    const a = (await enqueueJob(db, clock, request("retire-a"))).jobId!;
+    const b = (await enqueueJob(db, clock, request("retire-b"))).jobId!;
+    await claimJobById(db, clock, "w1", b);
+    expect(await retirePendingJobs(db, clock, [a, b])).toBe(1);
+    expect(await retirePendingJobs(db, clock, [])).toBe(0);
+    const rows = await db.select({ id: jobs.id, status: jobs.status }).from(jobs);
+    expect(rows.find((row) => row.id === a)?.status).toBe("succeeded");
+    expect(rows.find((row) => row.id === b)?.status).toBe("running");
+    expect(await isJobPending(db, a)).toBe(false);
+    expect(await isJobPending(db, a + 999)).toBe(false);
   });
 });
 

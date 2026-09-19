@@ -83,8 +83,10 @@ function rowClassName(entered: boolean, leaving: boolean): string {
  * Nothing animates on the list's own mount (law 6). With reduced motion the fades are what
  * `globals.css` makes of them, nothing slides, and a leaving row leaves at once.
  *
- * The caller owns the `<ol>`; this renders the rows and hands each one a `MotionRowProps` it
- * must spread onto its list item. Those props are cached per key and rebuilt only when the
+ * The caller owns the `<ol>`, which MUST be positioned (`relative`): a leaving row is pinned
+ * absolutely inside it at the offset it held (see the layout effect), so the rows below slide up
+ * while it fades rather than after. This renders the rows and hands each one a `MotionRowProps`
+ * it must spread onto its list item. Those props are cached per key and rebuilt only when the
  * row's phase changes, so a memoized row component sees the same object across renders and
  * skips — the whole point of the round is that a pick landing re-renders one row, not sixty.
  */
@@ -92,6 +94,10 @@ export function MotionList<T>({ items, keyOf, children }: MotionListProps<T>) {
   const reduced = usePrefersReducedMotion();
   const [memory, setMemory] = useState<Memory<T>>(() => ({ items, known: new Set(items.map(keyOf)), entered: new Set(), leaving: new Map(), rendered: items }));
   const [nodes] = useState(() => new Map<string, HTMLElement>());
+  // Each row's LAYOUT offset inside the list from the last pass (`offsetTop`, never a viewport
+  // rect): a rect carries an in-flight transform, so a re-render mid-glide read a row halfway
+  // home and played a second glide from there (measured at 634 ms on the pool, item 5), and it
+  // moves with the list's scroll. The offset is also where a ghost is pinned when it leaves.
   const [positions] = useState(() => new Map<string, number>());
   const [rowProps] = useState(() => new Map<string, MotionRowProps>());
   const [timers] = useState(() => new Map<string, ReturnType<typeof setTimeout>>());
@@ -124,10 +130,24 @@ export function MotionList<T>({ items, keyOf, children }: MotionListProps<T>) {
   useEffect(() => () => timers.forEach((timer) => clearTimeout(timer)), [timers]);
 
   useIsomorphicLayoutEffect(() => {
+    // THE GHOST LEAVES THE FLOW AT ONCE (draft-room performance round, item 5): a leaving row
+    // used to hold its place for the whole fade, and only then did the rows below slide up — a
+    // fade of `out` followed by a reorder of `in`, about 420 ms stacked on the pool for every
+    // pick. Its class now takes it out of the flow (`.animate-row-leave` is absolute in the
+    // list), pinned here at the offset it held when it was last laid out, so the rows below
+    // reflow this same frame and their FLIP below carries them up WHILE the ghost fades: one
+    // `in`-long motion, not two in a row. Pinned before the reads, so nothing is measured twice.
+    for (const key of current.leaving.keys()) {
+      const node = nodes.get(key);
+      const offset = positions.get(key);
+      if (node !== undefined && offset !== undefined && node.style.top === "") node.style.top = `${offset}px`;
+    }
     // All reads, then all writes, then ONE forced layout: a write between reads would force a
     // layout per moved row (measured once at 11.8 s for a long list before this was batched).
     const next = new Map<string, number>();
-    for (const [key, node] of nodes) next.set(key, node.getBoundingClientRect().top);
+    for (const [key, node] of nodes) {
+      if (!current.leaving.has(key)) next.set(key, node.offsetTop);
+    }
     if (!reduced) {
       const moves: { readonly node: HTMLElement; readonly deltaPx: number }[] = [];
       for (const [key, top] of next) {
@@ -138,7 +158,8 @@ export function MotionList<T>({ items, keyOf, children }: MotionListProps<T>) {
       }
       playMoves(moves);
     }
-    positions.clear();
+    // A ghost keeps its pinned offset until it goes; every present row records its layout.
+    for (const key of [...positions.keys()]) if (!current.leaving.has(key)) positions.delete(key);
     for (const [key, top] of next) positions.set(key, top);
   });
 

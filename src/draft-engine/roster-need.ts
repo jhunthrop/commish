@@ -144,8 +144,27 @@ export function rosteredByPosition(roster: readonly RosterSlot[], pool: readonly
   return countByPosition(roster, pool);
 }
 
+/**
+ * THE POOL'S POSITIONS, INDEXED ONCE PER POOL (draft-room performance round). A draft's pool is
+ * the START_DRAFT snapshot, one array object for the draft's whole life, and every count above
+ * used to rebuild a map over all of it (1,700 entries on the real board) to read the positions of
+ * at most sixteen roster spots: 30% of the advisor simulation's CPU, measured. The index is held
+ * by the pool object's identity in a WeakMap, so a pool is indexed the first time it is asked and
+ * never again, and a different array (a test's, a shadow state's filtered pool) gets its own.
+ * Pure in every observable way: the same pool object always answers the same index.
+ */
+const positionIndexes = new WeakMap<readonly DraftPoolEntry[], ReadonlyMap<string, Position>>();
+
+export function positionIndexFor(pool: readonly DraftPoolEntry[]): ReadonlyMap<string, Position> {
+  const held = positionIndexes.get(pool);
+  if (held !== undefined) return held;
+  const index = new Map(pool.map((entry) => [entry.playerId, entry.position] as const));
+  positionIndexes.set(pool, index);
+  return index;
+}
+
 function countByPosition(spots: readonly RosterSlot[], pool: readonly DraftPoolEntry[]): ReadonlyMap<Position, number> {
-  const positionOf = new Map(pool.map((entry) => [entry.playerId, entry.position] as const));
+  const positionOf = positionIndexFor(pool);
   const counts = new Map<Position, number>();
   for (const spot of spots) {
     const position = spot.playerId === null ? undefined : positionOf.get(spot.playerId);

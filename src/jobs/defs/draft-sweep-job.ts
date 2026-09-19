@@ -31,6 +31,7 @@ import { getDraftAdvancer, getDraftStore } from "@/draft-service";
 import { autoStartDueDrafts } from "@/draft-service/auto-start";
 import { DRAFT_ADVANCE_CONFIG } from "@/draft-service/config";
 import type { AdvanceOutcome, DraftAdvancer } from "@/draft-service/advance";
+import { isPacingChainLive, pendingPacingJobs } from "@/draft-service/pacing";
 import type { DraftStore } from "@/draft-service/store";
 import { liveDraftsQuery } from "@/draft-service/ticker";
 import { startDueMockRooms } from "@/mock-draft-service/driver";
@@ -52,6 +53,9 @@ export interface DraftSweepContext {
   readonly maxActions?: number;
   /** Where the sweep writes what it learned. Defaults to the installed set (`wakeSet()`). */
   readonly wake?: WakeSet;
+  /** The executor's cut-off for this attempt (`JobStepContext.deadlineAt`): the sweep stops
+   *  `DRAFT_ADVANCE_CONFIG.sweepReserveMs` before it rather than be killed mid-advance. */
+  readonly deadlineAt?: Date;
 }
 
 interface SweepTally {
@@ -59,6 +63,8 @@ interface SweepTally {
   readonly advanced: number;
   readonly exhausted: boolean;
   readonly wedged: readonly string[];
+  /** Live drafts left alone because their pacing job is on its way. */
+  readonly paced: number;
 }
 
 /**
@@ -77,11 +83,23 @@ export async function sweepDrafts(ctx: DraftSweepContext): Promise<StepOutcome> 
   const mocks = await startDueMockRooms(ctx.db, { store: ctx.store, clock: ctx.clock, newId: ctx.newId });
 
   const rows = await liveDraftsQuery(ctx.db);
-  let tally: SweepTally = { actions: 0, advanced: 0, exhausted: false, wedged: [] };
+  // THE SAFETY NET ONLY (draft-room performance round, item 3): a room whose pacing job is live —
+  // running, or pending and not yet older than the grace past its instant — is on its way under
+  // its own invocation, and a sweep that advanced it too would only race it (the "advance
+  // wedged" pairs of the Phase 1 logs). The sweep takes a room only when its chain has broken:
+  // no job, or one the wake never came for.
+  const chains = await pendingPacingJobs(ctx.db);
+  let tally: SweepTally = { actions: 0, advanced: 0, exhausted: false, wedged: [], paced: 0 };
   for (const row of rows) {
+    if (isPacingChainLive(chains.get(row.id), nowMs)) {
+      tally = { ...tally, paced: tally.paced + 1 };
+      continue;
+    }
     const remaining = budget - tally.actions;
-    if (remaining <= 0) {
-      // Budget spent before this draft was reached: it owes work now, the next fire finds it.
+    const outOfTime = ctx.deadlineAt !== undefined && Date.parse(ctx.clock.now()) + DRAFT_ADVANCE_CONFIG.sweepReserveMs > ctx.deadlineAt.getTime();
+    if (remaining <= 0 || outOfTime) {
+      // Budget (actions or time) spent before this draft was reached: it owes work now, the
+      // next fire finds it. Stopping here is what keeps the attempt timeout unreachable.
       tally = { ...tally, exhausted: true };
       await wake.add(wakeMember.draft(row.id), nowMs);
       continue;
@@ -94,7 +112,7 @@ export async function sweepDrafts(ctx: DraftSweepContext): Promise<StepOutcome> 
   await wake.add(WAKE_MEMBERS.sweepSafety, nowMs + JOBS_CONFIG.sweepMaxQuietMs);
 
   return {
-    summary: `sweep: ${started.filter((s) => s.started).length} auto-starts, ${mocks.filter((m) => m.started).length} mock starts, ${tally.actions} actions across ${tally.advanced} of ${rows.length} live drafts${tally.wedged.length > 0 ? `, ${tally.wedged.length} WEDGED` : ""}${tally.exhausted ? " (budget hit — the next fire resumes)" : ""}`,
+    summary: `sweep: ${started.filter((s) => s.started).length} auto-starts, ${mocks.filter((m) => m.started).length} mock starts, ${tally.actions} actions across ${tally.advanced} of ${rows.length} live drafts${tally.paced > 0 ? ` (${tally.paced} paced by their own jobs, left alone)` : ""}${tally.wedged.length > 0 ? `, ${tally.wedged.length} WEDGED` : ""}${tally.exhausted ? " (budget hit — the next fire resumes)" : ""}`,
     detail: [
       ...started.filter((s) => !s.started && s.rolled !== true && s.reason !== undefined).map((s) => `auto-start ${s.draftId}: ${s.reason}`),
       ...mocks.flatMap((m) => (!m.started && !m.benignRace ? [`mock ${m.leagueId}: ${m.reason}`] : [])),
@@ -111,6 +129,7 @@ function fold(tally: SweepTally, outcome: AdvanceOutcome): SweepTally {
     advanced: tally.advanced + (outcome.applied > 0 ? 1 : 0),
     exhausted: tally.exhausted || outcome.exhausted,
     wedged: outcome.wedged ? [...tally.wedged, outcome.draftId] : tally.wedged,
+    paced: tally.paced,
   };
 }
 
@@ -163,6 +182,7 @@ export const draftSweepJob: AnyJobDefinition = defineJob<Record<string, never>>(
           store: getDraftStore(),
           advance: (draftId, now, opts) => getDraftAdvancer().advance(draftId, now, opts),
           newId: () => crypto.randomUUID(),
+          deadlineAt: ctx.deadlineAt,
         }),
     },
   ],

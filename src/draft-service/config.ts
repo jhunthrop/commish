@@ -48,44 +48,43 @@ export const DRAFT_SERVICE_CONFIG = {
 } as const;
 
 /**
- * The serverless drivers' own knobs (draft-driver design, 2026-09-03): advance-on-read, the SSE
- * watcher loop, and the minute-cron sweep all read from here — never a literal at a call site.
+ * The serverless drivers' own knobs (draft-driver design, 2026-09-03; the draft-room performance
+ * round, item 3, retired the SSE watcher loop): advance-on-read, the per-pick pacing job and the
+ * minute-cron sweep all read from here — never a literal at a call site.
  */
 export const DRAFT_ADVANCE_CONFIG = {
   /**
    * Ceiling on actions one `advance()` call may apply. Sized to carry the deepest realistic
    * backlog in one call — a fully abandoned 12-team, 15-round board is 180 expiries — while
    * still bounding a pathological loop; an exhausted call reports it and the next driver
-   * (another read, the SSE tick, the sweep) resumes from the log.
+   * (another read, the pacing job, the sweep) resumes from the log.
    */
   maxActionsPerAdvance: 200,
-  /**
-   * THE WATCHER LOOP IS DEADLINE-DRIVEN (Neon cost audit 2026-09-07, finding 2). It used to
-   * advance once a second for the life of every open tab — two to three statements a second per
-   * tab, for drafts weeks from kickoff. It now sleeps until the advancer's own `nextDueAt` (the
-   * clock deadline, a bot's seeded due pick, a kickoff) and wakes early only when a draft frame
-   * from another driver arrives on the stream it already reads. These three bound that sleep.
-   */
-  /** When no due instant is known (no running clock, a transient error): the fallback cadence. */
-  sseIdlePollMs: 30_000,
-  /** The longest the loop ever sleeps, so a lost frame or a dropped subscription costs at most
-   *  this much latency before the loop re-reads the truth for itself. */
-  sseMaxSleepMs: 60_000,
-  /** The shortest sleep, so a due instant already in the past cannot spin the loop. */
-  sseMinSleepMs: 250,
-  /**
-   * A REAL draft still `scheduled` further than this from kickoff starts no loop at all: the
-   * stream's own planned reconnects (`REALTIME_CONFIG.plannedCloseMs`) re-evaluate on each
-   * connection, and the minute sweep is the backstop. Mock rooms always loop — they live minutes,
-   * and their start instant moves under a host's own actions.
-   */
-  sseScheduledWindowMs: 2 * 60_000,
   /**
    * Sweep-wide ceiling on actions one `draft-sweep` job run may apply across ALL drafts, so a
    * minute tick's sweep can never outgrow the job runner's own budget. Level-triggered: work
    * left over is found by the next minute's fire.
    */
   sweepMaxActions: 600,
+  /**
+   * THE SWEEP'S OWN CLOCK (draft-room performance round, item 4). The executor cuts a job off at
+   * its `deadlineAt`; a sweep that started one more draft's advance with less than this left
+   * could be killed mid-transaction and dead-lettered at the attempt timeout, which is what the
+   * production log showed (`draft-sweep ... exceeded its 45000 ms`). The sweep stops before that
+   * draft, registers every draft it did not reach as due now, and the next fire resumes. Sized
+   * for one advance of a deep backlog (`maxActionsPerAdvance` picks at a few ms each, plus its
+   * publishes at the fail-fast bound) with margin.
+   */
+  sweepReserveMs: 16_000,
+  /**
+   * THE WIRE FLOOR (review fix round, finding 1's second pass): a pacing job applies ONE action
+   * per run and paces the next no sooner than this after the pick it just landed, so a pick that
+   * ran late can never share the wire with the one after it; the founder's "two picks at once"
+   * has a hard floor whatever an instance's load. Stamps are untouched (every action is still
+   * stamped at its seeded due instant), only the instant it is applied moves, and only when it
+   * was already late. The acceptance's own number.
+   */
+  minPickSpacingMs: 300,
 } as const;
 
 export const DRAFT_NUDGE_CONFIG = {

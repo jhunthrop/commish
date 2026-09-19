@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Position } from "@/domain/player";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { recommendPick, type DraftCandidate, type RosteredPlayer } from "./draft";
+import { recommendPick, recommendPickInChunks, type DraftCandidate, type RosteredPlayer } from "./draft";
 import type { LeagueShape } from "./replacement";
 
 const SHAPE: LeagueShape = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS };
@@ -264,5 +264,18 @@ describe("recommendPick", () => {
     const first = recommendPick(query);
     expect(first.length).toBeLessThanOrEqual(5);
     expect(recommendPick(query)).toEqual(first);
+  });
+
+  it("scored in chunks answers byte for byte what the synchronous scoring answers, yielding between chunks (draft-room performance round)", async () => {
+    const board = [...filler("WR", 60, 1, 40), ...filler("RB", 40, 1, 30)];
+    const query = { board, roster: [], shape: SHAPE, pickNumber: 37, nextPickNumber: 60 } as const;
+    const yields = vi.fn(async () => undefined);
+    const chunked = await recommendPickInChunks(query, { chunkCandidates: 4, yieldToEventLoop: yields });
+    expect(chunked).toEqual(recommendPick(query));
+    // Fifteen considered (three times the default shortlist) in chunks of four: three yields.
+    expect(yields).toHaveBeenCalledTimes(3);
+    const single = await recommendPickInChunks({ board: filler("WR", 3, 1, 40), roster: [], shape: SHAPE, pickNumber: 1, nextPickNumber: null }, { chunkCandidates: 4, yieldToEventLoop: yields });
+    expect(single).toEqual(recommendPick({ board: filler("WR", 3, 1, 40), roster: [], shape: SHAPE, pickNumber: 1, nextPickNumber: null }));
+    expect(yields).toHaveBeenCalledTimes(3);
   });
 });

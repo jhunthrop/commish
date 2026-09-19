@@ -104,7 +104,11 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   const submitPick = useCallback(
     (playerId: string): void => {
       void submit({ type: "MAKE_PICK", playerId }).then((outcome) => {
-        if (outcome.ok) return;
+        if (outcome.ok) {
+          // The league speaking (review finding 3): the pick stands, the room is catching up.
+          if (outcome.notice !== null) show({ message: outcome.notice, tone: "info" });
+          return;
+        }
         const name = playersById.get(playerId)?.name ?? "Your pick";
         show({ message: `${name} did not land. ${outcome.reason} You are still on the clock.`, tone: "error" });
       });

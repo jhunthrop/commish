@@ -6,12 +6,16 @@
  * MEMBERSHIP AND SEAT, ONE CONDITION: a stranger and a commissioner with no seat both read as
  * `teamId === null`, and there is nothing to advise.
  *
- * THE WARM (founder report 2026-09-08, the hang): the memo is keyed by the log sequence, so
- * every pick used to leave the next viewer's request a cold compute on the request path. The
- * room's SSE advance loop now calls `warmAdvisorRoom` on every sequence it observes, so the
- * facts for a new state are computed once, in the background, as the pick lands — and the
- * human's own request at their turn reads a warm memo. Both entry points share
- * `roomFactsForState`, so there is exactly one definition of "the room's facts".
+ * WHERE THE FACTS COME FROM (draft-room performance round, item 1, replacing the 2026-09-08 warm
+ * that rode the stream's advance loop). The room's facts for a sequence are computed on the
+ * invocation that made the pick (`publishRoomFacts`, fired by the store's post-commit hook after
+ * the response has gone) into the process memo; a viewer's `/assistant` request reads the memo
+ * and computes only on a miss, single-flight per state (`memo.ts`). The stream's own process
+ * computes nothing any more: the 200-run simulation left its event loop, which is what lets the
+ * pacing timer fire and the frames relay on time (the round's ledger). The simulation itself
+ * yields between chunks (`simulateRoomOddsInChunks`), so no invocation holds its loop for a
+ * whole table. Both entry points share `roomFactsForState`, so there is exactly one definition
+ * of "the room's facts".
  */
 import type { Db } from "@/db/client";
 import type { DraftState } from "@/draft-engine";
@@ -19,22 +23,37 @@ import type { Recommendation } from "@/projections/decide/draft";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { getDraftStore, resolveDraftActor } from "@/draft-service";
 import { leagueBoardFormat } from "@/league-service/board-format";
+import { getSharedRedis } from "@/lib/realtime/redis";
+import { pickPath } from "@/lib/timing/pick-path";
 import { evidencePoolFor } from "../sim/evidence";
-import { simulateRoomOdds, type RoomOddsInput, type RoomOddsTable } from "../sim/room-odds";
-import { inferSeatDrivers } from "../sim/seat-model";
+import { simulateRoomOddsInChunks, type RoomOddsInput, type RoomOddsTable } from "../sim/room-odds";
+import { inferSeatDriversInChunks } from "../sim/seat-model";
 import { advisorCore, seedFor } from "./advisor";
 import { ADVISOR_CONFIG } from "./config";
+import { createRedisRoomFactsStore, roomFactsOnce, type FactsKey, type RoomFactsStore } from "./facts-store";
 import { roomFactsFor, seatShortlistFor, type RoomFacts } from "./memo";
-import { askingWindow, onClockShortlist, recommendNow, valuedEvidence, type RecommendInput, type ValuedEntry } from "./recommend";
+import { askingWindow, onClockShortlistInChunks, recommendNowInChunks, valuedEvidence, type RecommendInput, type ValuedEntry } from "./recommend";
 import { tierCollapses } from "./signals";
 import { tierStandings } from "./tiers";
 import type { AdvisorView } from "./view";
 
 export interface AdvisorServiceDeps {
-  /** The sim entry point, injectable so a test can count how often a room state simulates. */
-  readonly simulate?: (input: RoomOddsInput) => RoomOddsTable;
-  /** The recommendation entry point, injectable for the same reason. */
-  readonly recommend?: (input: RecommendInput) => readonly Recommendation[];
+  /** The sim entry point, injectable so a test can count how often a room state simulates. Sync
+   *  or async: the production one yields between chunks. */
+  readonly simulate?: (input: RoomOddsInput) => RoomOddsTable | Promise<RoomOddsTable>;
+  /** The recommendation entry point, injectable for the same reason. Sync or async: the
+   *  production one scores a chunk of candidates at a time. */
+  readonly recommend?: (input: RecommendInput) => readonly Recommendation[] | Promise<readonly Recommendation[]>;
+  /** The cross-process facts store (item 2). Defaults to the shared Redis one; tests hand in memory. */
+  readonly facts?: RoomFactsStore;
+}
+
+let sharedFacts: RoomFactsStore | undefined;
+
+function factsStore(deps: AdvisorServiceDeps): RoomFactsStore {
+  if (deps.facts !== undefined) return deps.facts;
+  sharedFacts ??= createRedisRoomFactsStore(getSharedRedis());
+  return sharedFacts;
 }
 
 interface ValuedRoom {
@@ -43,23 +62,40 @@ interface ValuedRoom {
   readonly facts: RoomFacts;
 }
 
+const simulateInChunks = (input: RoomOddsInput): Promise<RoomOddsTable> => simulateRoomOddsInChunks(input, { chunkRuns: ADVISOR_CONFIG.simChunkRuns });
+
 /** The evidence board valued under this room's shape, and the room's facts for exactly this
- *  state — from the memo when held, computed (and remembered) otherwise.
+ *  state — from the memo when held (or in flight), computed (and remembered) otherwise.
  *
  *  THE LEAGUE'S OWN BOARD (the scoring-formats round, 2026-09-08): the pool is the board the
  *  league's scoring row resolves to (`leagueBoardFormat`; a half-PPR room values the half board),
- *  read here so the warm and the request path value the same board, and no memo ever holds facts
- *  computed on one format and served for another. */
-async function roomFactsForState(db: Db, draftId: string, state: DraftState, simulate: (input: RoomOddsInput) => RoomOddsTable): Promise<ValuedRoom> {
+ *  read here so every path values the same board, and no memo ever holds facts computed on one
+ *  format and served for another. */
+async function roomFactsForState(db: Db, draftId: string, state: DraftState, deps: AdvisorServiceDeps): Promise<ValuedRoom> {
+  const simulate = deps.simulate ?? simulateInChunks;
   const shape: LeagueShape = { teamCount: state.draftOrder.length, rosterSlots: state.config.slotConfig };
   const board = await leagueBoardFormat(db, state.config.leagueId);
   const { pool } = await evidencePoolFor(db, new Date(), board.source);
   const valued = valuedEvidence(pool, shape);
-  const facts = roomFactsFor(draftId, state.sequence, () => ({
-    table: simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) }),
-    tiers: tierStandings(state, valued),
-    collapses: tierCollapses(state, valued),
-  }));
+  // Two levels, one compute: the process memo (single-flight) in front of the cross-process
+  // store (read, else compute under its lock) — a viewer on another instance reads what the
+  // pick's own invocation wrote, and simulates only when nothing has.
+  const key: FactsKey = { draftId, sequence: state.sequence, draftOrder: state.draftOrder };
+  // EVERY STAGE YIELDS (item 3's second pass): the seat drivers one seat at a time, the on-clock
+  // shortlist a few candidates at a time, the simulation a few runs at a time, so no stretch of
+  // this compute holds the event loop past a chunk — and a pacing wake sleeping on the same
+  // process fires within one chunk of its instant, never after a whole table.
+  const facts = await roomFactsFor(draftId, state.sequence, () =>
+    roomFactsOnce(factsStore(deps), key, async () => {
+      const drivers = await inferSeatDriversInChunks(state);
+      const excludeFromOnClockSeat = await onClockShortlistInChunks(state, valued, shape);
+      return {
+        table: await simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers, excludeFromOnClockSeat }),
+        tiers: tierStandings(state, valued),
+        collapses: tierCollapses(state, valued),
+      };
+    }),
+  );
   return { shape, valued, facts };
 }
 
@@ -68,8 +104,7 @@ async function roomFactsForState(db: Db, draftId: string, state: DraftState, sim
  * no further turn.
  */
 export async function advisorFor(db: Db, draftId: string, userId: string, deps: AdvisorServiceDeps = {}): Promise<AdvisorView | null> {
-  const simulate = deps.simulate ?? simulateRoomOdds;
-  const recommend = deps.recommend ?? recommendNow;
+  const recommend = deps.recommend ?? recommendNowInChunks;
   const actorResult = await resolveDraftActor(db, draftId, userId);
   if (!actorResult.ok) return null;
   const teamId = actorResult.actor.teamId;
@@ -79,18 +114,27 @@ export async function advisorFor(db: Db, draftId: string, userId: string, deps: 
   if (state === null || state.phase !== "in_progress") return null;
   if (askingWindow(state, teamId) === null) return null;
 
-  const { shape, valued, facts } = await roomFactsForState(db, draftId, state, simulate);
-  const shortlist = seatShortlistFor(draftId, state.sequence, teamId, () => recommend({ state, askingTeamId: teamId, valued, shape, shortlistSize: ADVISOR_CONFIG.shortlistSize }));
+  const { shape, valued, facts } = await roomFactsForState(db, draftId, state, deps);
+  const shortlist = await seatShortlistFor(draftId, state.sequence, teamId, async () => recommend({ state, askingTeamId: teamId, valued, shape, shortlistSize: ADVISOR_CONFIG.shortlistSize }));
   return advisorCore({ state, askingTeamId: teamId, valued, shape, table: facts.table, tiers: facts.tiers, collapses: facts.collapses, shortlist });
 }
 
 /**
- * The background warm (module docblock): the room's facts for its CURRENT state, computed into
- * the memo if not already held. No seat, no membership — nothing here is answered to anyone.
- * A draft that is gone or not running is a no-op.
+ * THE PICK'S OWN COMPUTE (module docblock): the room's facts for `state` — the state the pick
+ * just produced, handed in by the store's post-commit hook so nothing is re-read — computed into
+ * the memo if not already held. No seat, no membership: nothing here is answered to anyone.
+ * Runs after the response has gone (`runAfterResponse`), never on a request's critical path and
+ * never on the stream's process. A state that is not running is a no-op.
  */
+export async function publishRoomFacts(db: Db, state: DraftState, deps: AdvisorServiceDeps = {}): Promise<void> {
+  if (state.phase !== "in_progress") return;
+  await pickPath.time("facts.publish", () => roomFactsForState(db, state.config.draftId, state, deps), { draftId: state.config.draftId, sequence: state.sequence });
+}
+
+/** `publishRoomFacts` for a draft whose current state is not in hand (tooling, tests). A draft
+ *  that is gone is a no-op. */
 export async function warmAdvisorRoom(db: Db, draftId: string, deps: AdvisorServiceDeps = {}): Promise<void> {
   const state = await getDraftStore().getDraftState(draftId);
-  if (state === null || state.phase !== "in_progress") return;
-  await roomFactsForState(db, draftId, state, deps.simulate ?? simulateRoomOdds);
+  if (state === null) return;
+  await publishRoomFacts(db, state, deps);
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Position } from "@/domain/player";
 import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlot, type RosterSlotConfig } from "@/domain/roster";
-import { anyStarterOpen, benchBodiesByPosition, isSingleStarterPosition, openStartingSlotsEligible, positionCeiling, type RosterCeilingPolicy } from "./roster-need";
+import { anyStarterOpen, benchBodiesByPosition, isSingleStarterPosition, openStartingSlotsEligible, positionCeiling, positionIndexFor, rosteredByPosition, type RosterCeilingPolicy } from "./roster-need";
 
 const POLICY: RosterCeilingPolicy = { backupsAtSingleStarterPosition: 1 };
 const POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
@@ -116,5 +116,16 @@ describe("the roster reads the engine needs", () => {
     // nowhere rather than throwing: the read stays a count, never a legality claim.
     const stray: readonly RosterSlot[] = [...roster, { slot: "BENCH", slotIndex: 2, playerId: "ghost" }, { slot: "BENCH", slotIndex: 3, playerId: null }];
     expect(benchBodiesByPosition(stray, pool).get("RB")).toBe(2);
+  });
+
+  it("indexes a pool's positions once per pool object, so a count costs the roster, never the board (draft-room performance round)", () => {
+    const pool = [{ playerId: "p0", position: "QB" as const }, { playerId: "p1", position: "RB" as const }];
+    const first = positionIndexFor(pool);
+    expect(positionIndexFor(pool)).toBe(first);
+    expect(first.get("p1")).toBe("RB");
+    // A different pool object, even with the same entries, is its own index: the memo is by
+    // identity, which is what a START_DRAFT snapshot keeps for a draft's whole life.
+    expect(positionIndexFor([...pool])).not.toBe(first);
+    expect(rosteredByPosition(spots(["QB", 0], ["BENCH", 0]), pool)).toEqual(benchBodiesByPosition(spots(["BENCH", 0], ["BENCH", 1]), pool));
   });
 });

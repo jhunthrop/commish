@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { DraftPoolEntry, MakePickAction, StartDraftAction } from "@/domain/draft";
 import type { Position } from "@/domain/player";
 import { BENCH_SLOT, type RosterSlotConfig } from "@/domain/roster";
@@ -7,7 +7,7 @@ import { BOT_ARCHETYPES } from "@/mock-draft/archetypes";
 import { chooseBotPick } from "@/mock-draft/bots";
 import { rngFor } from "@/mock-draft/rng";
 import { continueRoom } from "./continue";
-import { furthestNextTurn, nextTurnFor, seatsAheadFor, simulateRoomOdds, survivalFor } from "./room-odds";
+import { furthestNextTurn, nextTurnFor, seatsAheadFor, simulateRoomOdds, simulateRoomOddsInChunks, survivalFor } from "./room-odds";
 import { SIM_INSTANT, submit } from "./run";
 
 // 4-team snake [t1,t2,t3,t4], 3 slots each, 12 picks. t1 holds picks 1, 8 and 9; t2 holds 2, 7
@@ -156,5 +156,25 @@ describe("seatsAheadFor", () => {
     const state = advance(freshState(), 2, 11);
     const table = simulateRoomOdds({ state, seed: 1, runs: 5, excludeFromOnClockSeat: NONE });
     expect(seatsAheadFor(table, state, "t1")).toEqual([]);
+  });
+});
+
+describe("simulateRoomOddsInChunks (the same runs, yielding to the event loop between chunks)", () => {
+  it("answers byte for byte what the synchronous simulation answers for the same input, and yields between chunks", async () => {
+    const state = advance(freshState(), 11, 3);
+    const input = { state, seed: 99, runs: 20, excludeFromOnClockSeat: NONE };
+    const yields = vi.fn(async () => undefined);
+    const chunked = await simulateRoomOddsInChunks(input, { chunkRuns: 6, yieldToEventLoop: yields });
+    expect(chunked).toEqual(simulateRoomOdds(input));
+    // 20 runs in chunks of 6: three boundaries yield, the last chunk does not.
+    expect(yields).toHaveBeenCalledTimes(3);
+  });
+
+  it("plays nothing, without yielding, when no seat has a next turn", async () => {
+    const state = advance(freshState(), 11, 12);
+    const yields = vi.fn(async () => undefined);
+    const table = await simulateRoomOddsInChunks({ state, seed: 1, runs: 5, excludeFromOnClockSeat: NONE }, { chunkRuns: 2, yieldToEventLoop: yields });
+    expect(table.played.every((run) => run.length === 0)).toBe(true);
+    expect(yields).not.toHaveBeenCalled();
   });
 });

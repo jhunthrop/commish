@@ -30,6 +30,9 @@ describe("Avatar", () => {
     const img = container.querySelector("img");
     expect(img).toHaveAttribute("src", "https://workoscdn.com/u/a.png");
     expect(img).toHaveAttribute("alt", "");
+    // A face never holds the first paint: fetched as it nears the viewport, decoded off the main thread.
+    expect(img).toHaveAttribute("loading", "lazy");
+    expect(img).toHaveAttribute("decoding", "async");
   });
 
   it("falls back to the initials when the remote image fails to load, and tries again for a new ref", () => {

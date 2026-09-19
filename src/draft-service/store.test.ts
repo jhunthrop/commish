@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { createTestDb, recordStatements, truncateAll } from "@/db/test-db";
@@ -273,7 +273,8 @@ describe("draft store — persistence", () => {
     const stubStore = createDraftStore({ db: stubDb, publish, clock });
 
     const result = await stubStore.applyAction("draft_stub", start(["team_a", "team_b"]));
-    expect(result).toEqual({ ok: true, state: fakeState });
+    // Nothing owed the stream, so nothing failed to reach it: the room counts as told.
+    expect(result).toEqual({ ok: true, state: fakeState, published: true });
     expect(published).toEqual([]);
   });
 
@@ -316,7 +317,7 @@ describe("draft store — persistence", () => {
     });
   });
 
-  it("accepts the action even when publishing blows up — Postgres is authoritative", async () => {
+  it("accepts the action even when publishing blows up — Postgres is authoritative — and says the room was not told (item 4)", async () => {
     const { draftId, teamIds } = await fixture();
     const store = newStore(async () => {
       throw new Error("redis is down");
@@ -324,7 +325,17 @@ describe("draft store — persistence", () => {
     expect((await store.applyAction(draftId, start(teamIds))).ok).toBe(true);
     const result = await store.applyAction(draftId, pick(teamIds[0]!, "qb1"));
     expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.published).toBe(false);
     expect(await actionRows(draftId)).toHaveLength(2);
+    // The publisher's own quiet failure (it answers null once it has reported) reads the same.
+    const quiet = newStore(async () => null);
+    const quietResult = await quiet.applyAction(draftId, pick(teamIds[1]!, "rb1"));
+    expect(quietResult.ok && !quietResult.published).toBe(true);
+    // And an ordinary publish answers that the room was told (the snake's third pick is the
+    // second seat's again).
+    const told = await newStore().applyAction(draftId, pick(teamIds[1]!, "wr1"));
+    expect(told.ok && told.published).toBe(true);
   });
 
   it("throws and persists nothing when the database insert fails for a reason other than a race", async () => {
@@ -748,14 +759,14 @@ describe("draft store — notices", () => {
     // loop), so a rejecting `deliverNotice` must be swallowed exactly like a Redis outage in
     // `broadcast`, reported through the same `onPublishError` sink, and never surface as a
     // rejection of `applyAction` or undo anything already written.
-    const publishFailures: { type: string; leagueId: string }[] = [];
+    const publishFailures: { type: string; leagueId: string; draftId: string }[] = [];
     const throwingDeliverNotice = async (): Promise<void> => {
       throw new Error("Redis is unreachable");
     };
     const { draftId, leagueId, teamIds, userIds } = await fixture();
     const store = newStore(publish, {
       deliverNotice: throwingDeliverNotice,
-      onPublishError: (_error, event) => publishFailures.push({ type: event.type, leagueId: event.leagueId }),
+      onPublishError: (_error, event) => publishFailures.push({ type: event.type, leagueId: event.leagueId, draftId: event.draftId }),
     });
     await store.applyAction(draftId, start(teamIds));
     await queueOnClockTeam(store, draftId);
@@ -778,7 +789,7 @@ describe("draft store — notices", () => {
 
     // The failure was reported through the existing sink, not swallowed silently, and not
     // thrown back at the caller.
-    expect(publishFailures).toEqual([{ type: "notice.created", leagueId }]);
+    expect(publishFailures).toEqual([{ type: "notice.created", leagueId, draftId }]);
   });
 
   it("falls back to an empty string in the failure sink when a notice's leagueId is somehow absent", async () => {
@@ -1147,5 +1158,38 @@ describe("draft store — the mock lane (Task 4)", () => {
     expect(result.ok).toBe(true);
     expect(await db.select().from(memberNotices)).toHaveLength(0);
     expect(await db.select().from(auditEvents)).toHaveLength(0);
+  });
+});
+
+describe("draft store — the post-commit follow-through hook (draft-room performance round, item 1)", () => {
+  it("calls afterApplied with the state an accepted action produced, after the commit and the broadcast, and never for a refusal", async () => {
+    const { draftId, teamIds } = await fixture();
+    const seen: { sequence: number; type: string; publishedSoFar: number }[] = [];
+    const store = createDraftStore({
+      db, publish, clock, deliverNotice: deliverNoticeFake,
+      afterApplied: (state, action) => { seen.push({ sequence: state.sequence, type: action.type, publishedSoFar: published.length }); },
+    });
+    await store.applyAction(draftId, start(teamIds));
+    await store.applyAction(draftId, pick(teamIds[0]!, "qb1"));
+    // A refusal: the same team picks again out of turn.
+    expect((await store.applyAction(draftId, pick(teamIds[0]!, "rb1"))).ok).toBe(false);
+    expect(seen).toEqual([
+      { sequence: 1, type: "START_DRAFT", publishedSoFar: 1 },
+      { sequence: 2, type: "MAKE_PICK", publishedSoFar: 2 },
+    ]);
+  });
+
+  it("a hook that throws is logged and never fails the accepted action; followThrough: false skips it", async () => {
+    const { draftId, teamIds } = await fixture();
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const hook = vi.fn(() => { throw new Error("hook broke"); });
+    const store = createDraftStore({ db, publish, clock, deliverNotice: deliverNoticeFake, afterApplied: hook });
+    expect((await store.applyAction(draftId, start(teamIds))).ok).toBe(true);
+    expect(hook).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledWith("[draft] afterApplied hook threw", expect.objectContaining({ draftId }), expect.any(Error));
+    expect((await store.applyAction(draftId, pick(teamIds[0]!, "qb1"), { followThrough: false })).ok).toBe(true);
+    expect(hook).toHaveBeenCalledTimes(1);
+    expect(await actionRows(draftId)).toHaveLength(2);
+    error.mockRestore();
   });
 });
