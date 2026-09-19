@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { jobs } from "@/db/schema";
 import { createTestDb, recordStatements, truncateAll, truncateJobTables } from "@/db/test-db";
 import type { Clock } from "@/domain/timing";
 import { defineJob, type AnyJobDefinition } from "./contract";
-import { runTick, type RunnerDeps } from "./runner";
+import { runJobById, runTick, type RunnerDeps } from "./runner";
 import { createScheduleMemory } from "./schedule";
 import { SCHEDULES } from "./schedules";
 import { JOB_DEFINITIONS } from "./registry";
@@ -53,6 +54,21 @@ async function enqueueN(n: number): Promise<void> {
 beforeEach(async () => {
   await truncateAll(db);
   await truncateJobTables(db);
+});
+
+describe("runJobById (the self-wake's targeted run, draft-room performance round item 3)", () => {
+  it("runs exactly the named job under the caller's budget and reports it; an unclaimable id is null", async () => {
+    const counter = { count: 0 };
+    const definitions = new Map([["count-me", countingDefinition(counter)]]);
+    await enqueueN(2);
+    const [first, second] = await db.select({ id: jobs.id }).from(jobs);
+    const report = await runJobById(deps(), definitions, second!.id, { budgetMs: 5_000 });
+    expect(report).toMatchObject({ jobId: second!.id, outcome: "succeeded" });
+    expect(counter.count).toBe(1);
+    expect(await runJobById(deps(), definitions, second!.id, { budgetMs: 5_000 })).toBeNull();
+    expect(await runJobById(deps(), definitions, first!.id + 1_000, { budgetMs: 5_000 })).toBeNull();
+    expect(counter.count).toBe(1);
+  });
 });
 
 describe("runTick", () => {

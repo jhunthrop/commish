@@ -5,10 +5,11 @@ import { isLLMEnabled, getLlmClient } from "@/lib/llm/client";
 import { getPublisher } from "@/lib/realtime/publisher";
 import type { PublishFn } from "./store";
 import { createMockBotDriver, type MockBotDriver } from "@/mock-draft-service/driver";
-import { createDraftAdvancer, draftLoopTarget, runDraftAdvanceLoop, type AdvanceLoopHandle, type DraftAdvancer } from "./advance";
+import { createDraftAdvancer, type DraftAdvancer } from "./advance";
 import { publishRoomFacts } from "./assistant/service";
 import { createNudgeScheduler, type NudgeScheduler } from "./nudge";
 import { createNudgeCopy } from "./nudge-copy";
+import { createDraftPacer, NO_OP_PACER, pacingEnabledIn, type DraftPacer } from "./pacing";
 import { createDraftStore, type DraftStore } from "./store";
 import { createDraftTicker, type DraftTicker } from "./ticker";
 
@@ -20,6 +21,7 @@ let ticker: DraftTicker | undefined;
 let mockDriver: MockBotDriver | undefined;
 let advancer: DraftAdvancer | undefined;
 let nudger: NudgeScheduler | undefined;
+let pacer: DraftPacer | undefined;
 
 /**
  * The store's `onPublishError` wiring, extracted to its own name — same reasoning as
@@ -44,20 +46,32 @@ export function logDraftNudgeError(error: unknown, context: unknown): void {
  */
 export const publishDraftEvent: PublishFn = (input) => getPublisher().publish(input);
 
-/**
- * THE PICK'S FOLLOW-THROUGH (draft-room performance round, item 1): what every accepted action
- * owes once it has committed — the room's facts for the new state, so the viewers' `/assistant`
- * requests read instead of simulate — run on the invocation that made it, after its response has
- * gone (`runAfterResponse`), never before the writer's own answer and never on the stream's
- * process (whose advance loop opts out per call). Owns its failure: a compute that fails costs
- * the next viewer a single-flight compute on the request path, exactly what a miss always cost.
- */
-export async function followThroughAppliedAction(state: DraftState): Promise<void> {
+/** The facts half of the follow-through, owning its failure: a compute that fails costs the next
+ *  viewer a single-flight compute on the request path, exactly what a miss always cost. */
+export async function followThroughRoomFacts(state: DraftState): Promise<void> {
   try {
     await publishRoomFacts(getDb(), state);
   } catch (error: unknown) {
     console.error("[draft] room facts follow-through failed", { draftId: state.config.draftId, sequence: state.sequence }, error);
   }
+}
+
+/**
+ * THE PICK'S FOLLOW-THROUGH (draft-room performance round, items 1 and 3): what every accepted
+ * action owes once it has committed, run on the invocation that made it, after its response has
+ * gone (`runAfterResponse`), never before the writer's own answer. First the pacing: the room's
+ * next due work as one queued job, woken at its instant (`getDraftPacer`), so the next pick is on
+ * its way before anything heavier starts. Then the room's facts for the new state, so the
+ * viewers' `/assistant` requests read instead of simulate. Each half owns its own failure; a
+ * pacing failure is loud because the sweep is then the only thing moving the room.
+ */
+export async function followThroughAppliedAction(state: DraftState): Promise<void> {
+  try {
+    await getDraftPacer().pace(state);
+  } catch (error: unknown) {
+    console.error("[draft] pacing failed; the sweep is the room's driver until the next action", { draftId: state.config.draftId, sequence: state.sequence }, error);
+  }
+  await followThroughRoomFacts(state);
 }
 
 /** The follow-throughs in flight, chained so a test can settle the last one (`awaitDraftFollowThroughForTests`). */
@@ -170,30 +184,17 @@ export async function advanceDraftNow(draftId: string): Promise<void> {
 }
 
 /**
- * THE SSE STREAM'S TICK (driver 2): called by the league events route as it accepts a
- * connection. Resolves the league's draft and — while it still has work to ever do — runs the
- * advance loop until the client disconnects or the draft completes, handing back the handle the
- * route wakes with each draft frame it relays. Never-throwing for the same reason
- * `advanceDraftNow` is: the stream must open regardless; `null` means no loop runs.
- *
- * THE STREAM RELAYS ONLY (draft-room performance round, item 1). The 2026-09-08 advisor warm used
- * to ride this loop's `onSequence`: 600 to 1100 ms of synchronous simulation on the very event
- * loop that paces the bots and relays their frames, which is what the founder saw as a hang and
- * then two picks at once (the round's ledger). Nothing hangs off the loop now, and the actions it
- * applies opt out of the store's follow-through: the facts are the pick's own invocation's
- * business elsewhere, and a bot pick this loop lands leaves its facts to the viewer's request.
+ * THE PACER (driver 2 of the draft-driver design, remade by the draft-room performance round,
+ * item 3): bot picks and clock expiries as one queued job per due instant, each run in its own
+ * invocation at its own time, whether or not anybody is watching. The SSE stream's advance loop
+ * that used to be this driver is gone; the stream relays only. Where a long-lived process paces
+ * the room already (the local dev ticker), the pacer paces nothing (`pacingEnabledIn`).
  */
-export async function startDraftAdvanceLoopForLeague(leagueId: string, signal: AbortSignal): Promise<AdvanceLoopHandle | null> {
-  try {
-    // `draftLoopTarget` owns the terminal-status and distant-kickoff gates, so this wrapper
-    // stays pure wiring.
-    const draftId = await draftLoopTarget(getDb(), leagueId, systemClock.now());
-    if (draftId === null) return null;
-    return runDraftAdvanceLoop(draftId, signal, { advance: (id, now) => getDraftAdvancer().advance(id, now, { followThrough: false }), clock: systemClock });
-  } catch (error: unknown) {
-    console.error("[draft] could not start the stream's advance loop", { leagueId }, error);
-    return null;
+export function getDraftPacer(): DraftPacer {
+  if (pacer === undefined) {
+    pacer = pacingEnabledIn(process.env) ? createDraftPacer({ db: getDb(), clock: systemClock, mockDriver: getMockBotDriver() }) : NO_OP_PACER;
   }
+  return pacer;
 }
 
 // Barrel surface: only names actually imported through `@/draft-service` elsewhere in the

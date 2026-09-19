@@ -17,7 +17,7 @@ import {
   type DraftConfig,
   type DraftState,
 } from "@/draft-engine";
-import { PIN_LEGACY_BOT_PICKS, PIN_POOL, PIN_SEED, PIN_TEAMS } from "@/draft-engine/replay-pins.fixture";
+import { PIN_BOT_DELAYS_MS, PIN_LEGACY_BOT_PICKS, PIN_POOL, PIN_SEED, PIN_TEAMS } from "@/draft-engine/replay-pins.fixture";
 import { submitCommand } from "@/draft-engine/test-support";
 import { MS_PER_SECOND } from "@/domain/duration";
 import { BOT_ARCHETYPES, assignArchetypes, type BotArchetype } from "./archetypes";
@@ -454,5 +454,18 @@ describe("botCandidateWeights", () => {
     for (let seed = 1; seed <= 25; seed++) {
       expect(named.has(chooseBotPick(state, teamId, archetypeNamed("rb_heavy"), rngFor(seed, teamId))!)).toBe(true);
     }
+  });
+});
+
+describe("the pacing pins (draft-room performance round, 2026-09-19)", () => {
+  it("replays the first 24 seeded think-delays of PIN_SEED byte for byte: the instants every driver stamps a bot's pick at", () => {
+    const delays = PIN_BOT_DELAYS_MS.map((_, index) => {
+      const pick = index + 1;
+      const round = Math.ceil(pick / PIN_TEAMS.length);
+      const seat = (pick - 1) % PIN_TEAMS.length;
+      const teamId = PIN_TEAMS[round % 2 === 1 ? seat : PIN_TEAMS.length - 1 - seat]!;
+      return botThinkDelayMs(60, rngFor(PIN_SEED, `${teamId}:delay:${pick}`));
+    });
+    expect(delays).toEqual(PIN_BOT_DELAYS_MS);
   });
 });

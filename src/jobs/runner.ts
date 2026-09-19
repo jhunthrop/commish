@@ -19,7 +19,7 @@ import type { AnyJobDefinition } from "./contract";
 import { executeClaimedJob, type ExecutionReport } from "./execute";
 import { tickSchedules, type ScheduleMemory, type ScheduleTickReport } from "./schedule";
 import type { ScheduleDefinition } from "./schedules";
-import { claimNextJob, reclaimStaleJobs, type ReclaimedJob } from "./store";
+import { claimJobById, claimNextJob, reclaimStaleJobs, type ReclaimedJob } from "./store";
 import { wakeSet, type WakeDue, type WakeSet } from "./wake";
 
 export interface RunnerDeps {
@@ -86,6 +86,25 @@ export async function runTick(deps: RunnerDeps, definitions: ReadonlyMap<string,
   }
 
   return { startedAt, schedules, reclaimed, executed, stoppedBecause, elapsedMs: monotonicNow() - startedAtMs };
+}
+
+/**
+ * THE TARGETED RUN (draft-room performance round, item 3): claim one named job if it is pending
+ * and due, and execute it under the caller's budget — a self-woken invocation's whole tick
+ * (`run-handler.ts`). No schedules, no reclaim, no drain: a wake sent for one bot pick runs that
+ * bot pick and nothing else. `null` when the job was not claimable (a cron tick got there first,
+ * not yet due, retired, gone), which is nothing to do rather than an error. A dead letter is as
+ * loud here as in `runTick`.
+ */
+export async function runJobById(deps: RunnerDeps, definitions: ReadonlyMap<string, AnyJobDefinition>, jobId: number, options: { readonly budgetMs: number }): Promise<ExecutionReport | null> {
+  const wake = deps.wake ?? wakeSet();
+  const claimed = await claimJobById(deps.db, deps.clock, deps.workerId, jobId, wake);
+  if (claimed === null) return null;
+  const report = await executeClaimedJob({ ...deps, wake }, definitions, claimed, { timeoutCapMs: options.budgetMs });
+  if (report.outcome === "dead-lettered") {
+    console.error(`[jobs] DEAD-LETTER: job ${report.jobId} "${report.name}" failed terminally on attempt ${report.attempt} (${report.errorKind ?? "unknown"}): ${report.error ?? "no error text"}`);
+  }
+  return report;
 }
 
 /** A schedule that fired (or found its fire already queued) makes the queue known non-empty, so
