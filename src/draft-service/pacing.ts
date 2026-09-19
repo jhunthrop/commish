@@ -121,11 +121,27 @@ export async function pendingPacingJobs(db: Db, statuses: readonly ("pending" | 
   return byDraft;
 }
 
-/** Whether `draftId` has a pacing job on its way: running, or pending and inside the grace past
- *  its instant (`JOBS_CONFIG.pacingChainGraceMs`). The rule the sweep and advance-on-read share. */
+export interface PacingChain {
+  readonly runAt: Date;
+  readonly status: string;
+}
+
+/**
+ * Whether a pacing job is on its way (the rule the sweep and advance-on-read share): pending and
+ * inside the grace past its instant (`JOBS_CONFIG.pacingChainGraceMs`), or running and younger
+ * than one sleep ceiling plus that grace. A running job older than that is an invocation that
+ * died after its pick committed and before it paced (review fix round, finding 2): the reclaim
+ * will requeue it, but the room must not wait the reclaim's two minutes for that.
+ */
+export function isPacingChainLive(chain: PacingChain | undefined, nowMs: number): boolean {
+  if (chain === undefined) return false;
+  const ageMs = nowMs - chain.runAt.getTime();
+  return chain.status === "running" ? ageMs < JOBS_CONFIG.selfWakeMaxSleepMs + JOBS_CONFIG.pacingChainGraceMs : ageMs < JOBS_CONFIG.pacingChainGraceMs;
+}
+
+/** Whether `draftId` has a pacing job on its way (`isPacingChainLive`). */
 export async function hasLivePacingJob(db: Db, draftId: string, nowMs: number): Promise<boolean> {
-  const chain = (await pendingPacingJobs(db)).get(draftId);
-  return chain !== undefined && (chain.status === "running" || chain.runAt.getTime() > nowMs - JOBS_CONFIG.pacingChainGraceMs);
+  return isPacingChainLive((await pendingPacingJobs(db)).get(draftId), nowMs);
 }
 
 export { NO_SELF_WAKE };

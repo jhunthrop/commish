@@ -9,7 +9,8 @@ import type { SelfWake } from "@/jobs/self-wake";
 import { createMemoryWakeSet, wakeMember } from "@/jobs/wake";
 import { createMockBotDriver } from "@/mock-draft-service/driver";
 import { createDraftAdvancer } from "./advance";
-import { createDraftPacer, NO_OP_PACER, pacingEnabledIn, pendingPacingJobs } from "./pacing";
+import { JOBS_CONFIG } from "@/jobs/config";
+import { createDraftPacer, hasLivePacingJob, isPacingChainLive, NO_OP_PACER, pacingEnabledIn, pendingPacingJobs } from "./pacing";
 import { createDraftStore, type DraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -52,6 +53,31 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await truncateAll(db);
+});
+
+describe("isPacingChainLive (finding 2: a job whose invocation died after the commit)", () => {
+  const at = (ageMs: number) => ({ runAt: new Date(Date.parse(BASE_NOW) - ageMs) });
+  const nowMs = Date.parse(BASE_NOW);
+  it("a pending job is live inside the grace past its instant, and a future one always", () => {
+    expect(isPacingChainLive({ ...at(-30_000), status: "pending" }, nowMs)).toBe(true);
+    expect(isPacingChainLive({ ...at(JOBS_CONFIG.pacingChainGraceMs - 1), status: "pending" }, nowMs)).toBe(true);
+    expect(isPacingChainLive({ ...at(JOBS_CONFIG.pacingChainGraceMs + 1), status: "pending" }, nowMs)).toBe(false);
+  });
+  it("a running job is live for one sleep ceiling plus the grace, then reads as dead so the sweep and a read take the room", () => {
+    const ceiling = JOBS_CONFIG.selfWakeMaxSleepMs + JOBS_CONFIG.pacingChainGraceMs;
+    expect(isPacingChainLive({ ...at(ceiling - 1), status: "running" }, nowMs)).toBe(true);
+    expect(isPacingChainLive({ ...at(ceiling + 1), status: "running" }, nowMs)).toBe(false);
+    expect(isPacingChainLive(undefined, nowMs)).toBe(false);
+  });
+  it("hasLivePacingJob reads the newest job for the draft through the same rule", async () => {
+    const fixture = await seedMock("dead", 2);
+    const draftId = fixture.draftId;
+    const runAt = new Date(Date.parse(BASE_NOW) - JOBS_CONFIG.selfWakeMaxSleepMs - JOBS_CONFIG.pacingChainGraceMs - 1_000);
+    await db.insert(jobs).values({ name: DRAFT_ADVANCE_JOB_NAME, idempotencyKey: draftAdvanceIdempotencyKey(draftId, 1), payload: { draftId, sequence: 1 }, status: "running", attempts: 1, maxAttempts: 3, runAt, createdAt: runAt });
+    expect(await hasLivePacingJob(db, draftId, Date.parse(BASE_NOW))).toBe(false);
+    await db.update(jobs).set({ runAt: new Date(Date.parse(BASE_NOW) - 5_000) }).where(eq(jobs.name, DRAFT_ADVANCE_JOB_NAME));
+    expect(await hasLivePacingJob(db, draftId, Date.parse(BASE_NOW))).toBe(true);
+  });
 });
 
 describe("pacingEnabledIn", () => {

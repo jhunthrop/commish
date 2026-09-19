@@ -31,7 +31,7 @@ import { getDraftAdvancer, getDraftStore } from "@/draft-service";
 import { autoStartDueDrafts } from "@/draft-service/auto-start";
 import { DRAFT_ADVANCE_CONFIG } from "@/draft-service/config";
 import type { AdvanceOutcome, DraftAdvancer } from "@/draft-service/advance";
-import { pendingPacingJobs } from "@/draft-service/pacing";
+import { isPacingChainLive, pendingPacingJobs } from "@/draft-service/pacing";
 import type { DraftStore } from "@/draft-service/store";
 import { liveDraftsQuery } from "@/draft-service/ticker";
 import { startDueMockRooms } from "@/mock-draft-service/driver";
@@ -91,8 +91,7 @@ export async function sweepDrafts(ctx: DraftSweepContext): Promise<StepOutcome> 
   const chains = await pendingPacingJobs(ctx.db);
   let tally: SweepTally = { actions: 0, advanced: 0, exhausted: false, wedged: [], paced: 0 };
   for (const row of rows) {
-    const chain = chains.get(row.id);
-    if (chain !== undefined && (chain.status === "running" || chain.runAt.getTime() > nowMs - JOBS_CONFIG.pacingChainGraceMs)) {
+    if (isPacingChainLive(chains.get(row.id), nowMs)) {
       tally = { ...tally, paced: tally.paced + 1 };
       continue;
     }

@@ -22,14 +22,18 @@ function testStore(): DraftStore {
 
 function recordingPacer() {
   const paced: AdvanceOutcome[] = [];
+  const repaced: number[] = [];
   const pacer: DraftPacer = {
-    pace: async () => ({ kind: "nothing-due" }),
+    pace: async (state) => {
+      repaced.push(state.sequence);
+      return { kind: "scheduled", jobId: 2, dueAt: atMs(1_000), retired: 0 };
+    },
     paceFromOutcome: async (outcome) => {
       paced.push(outcome);
       return { kind: "scheduled", jobId: 1, dueAt: atMs(1_000), retired: 0 };
     },
   };
-  return { pacer, paced };
+  return { pacer, paced, repaced };
 }
 
 async function seedMock(id: string, botTeams: number) {
@@ -48,8 +52,8 @@ async function seedMock(id: string, botTeams: number) {
   return fixture;
 }
 
-function depsFor(store: DraftStore, overrides: Partial<DraftAdvanceJobDeps> = {}): DraftAdvanceJobDeps & { readonly published: number[]; readonly paced: AdvanceOutcome[] } {
-  const { pacer, paced } = recordingPacer();
+function depsFor(store: DraftStore, overrides: Partial<DraftAdvanceJobDeps> = {}): DraftAdvanceJobDeps & { readonly published: number[]; readonly paced: AdvanceOutcome[]; readonly repaced: number[] } {
+  const { pacer, paced, repaced } = recordingPacer();
   const published: number[] = [];
   return {
     store,
@@ -60,6 +64,7 @@ function depsFor(store: DraftStore, overrides: Partial<DraftAdvanceJobDeps> = {}
     ...overrides,
     published,
     paced,
+    repaced,
   };
 }
 
@@ -104,20 +109,43 @@ describe("the draft-advance job", () => {
     expect(deps.published).toEqual(fresh.phase === "in_progress" ? [fresh.sequence] : []);
   });
 
-  it("a superseded job (the log moved past its sequence) and a gone draft are quiet no-ops: no advance, no pace, no facts", async () => {
+  it("a superseded job (the log moved past its sequence) advances nothing and publishes nothing, but re-paces from the room's current state (finding 2: the crash after the commit); a gone draft does nothing at all", async () => {
     const fixture = await seedMock("superseded", 2);
     const store = testStore();
     const started = await store.startDraft(fixture.draftId);
     if (!started.ok) throw new Error(started.reason);
     const advance = vi.fn(createDraftAdvancer({ db, store, mockDriver: createMockBotDriver({ db, store }) }).advance);
     const deps = depsFor(store, { advance });
+    // The crash: a pick committed (the log moved) and the invocation died before pacing, so the
+    // requeued job finds itself superseded with nothing queued behind it.
     const stale = await runDraftAdvanceStep({ draftId: fixture.draftId, sequence: started.state.sequence - 1 }, deps);
     expect(stale.summary).toMatch(/superseded/);
+    expect(stale.summary).toMatch(/re-paced/);
+    expect(deps.repaced).toEqual([started.state.sequence]);
     const gone = await runDraftAdvanceStep({ draftId: "draft_nowhere", sequence: 1 }, deps);
     expect(gone.summary).toMatch(/gone/);
     expect(advance).not.toHaveBeenCalled();
     expect(deps.paced).toEqual([]);
     expect(deps.published).toEqual([]);
+    expect(deps.repaced).toHaveLength(1);
+  });
+
+  it("re-pacing an unmoved chain through the real pacer is idempotent: one job, keyed by the sequence, however many superseded runs notice it", async () => {
+    const fixture = await seedMock("idempotent", 2);
+    const store = testStore();
+    const started = await store.startDraft(fixture.draftId);
+    if (!started.ok) throw new Error(started.reason);
+    const { createDraftPacer } = await import("@/draft-service/pacing");
+    const { createMemoryWakeSet } = await import("../wake");
+    const { NO_SELF_WAKE } = await import("../self-wake");
+    const pacer = createDraftPacer({ db, clock, mockDriver: createMockBotDriver({ db, store }), wake: createMemoryWakeSet(), selfWake: NO_SELF_WAKE });
+    const deps = depsFor(store, { pacer });
+    await runDraftAdvanceStep({ draftId: fixture.draftId, sequence: started.state.sequence - 1 }, deps);
+    await runDraftAdvanceStep({ draftId: fixture.draftId, sequence: started.state.sequence - 1 }, deps);
+    const { jobs } = await import("@/db/schema");
+    const rows = await db.select({ payload: jobs.payload, status: jobs.status }).from(jobs);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.payload).toEqual({ draftId: fixture.draftId, sequence: started.state.sequence });
   });
 
   it("a transient advance error is thrown as retryable, so the executor backs off rather than dead-lettering", async () => {

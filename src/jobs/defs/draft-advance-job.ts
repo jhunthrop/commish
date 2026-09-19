@@ -64,7 +64,14 @@ export async function runDraftAdvanceStep(payload: DraftAdvanceJobPayload, deps:
   const state = await deps.store.getDraftState(draftId);
   if (state === null) return { summary: `draft-advance ${draftId}: the draft is gone; nothing to do.`, detail: [] };
   if (state.sequence !== sequence) {
-    return { summary: `draft-advance ${draftId}: superseded, the room stands at sequence ${state.sequence} (paced at ${sequence}).`, detail: [] };
+    // THE CRASH AFTER THE COMMIT (review fix round, finding 2): whoever moved the log normally
+    // paced the next job from there, but an invocation that died between its pick's commit and
+    // its pacing left nothing queued, and this requeued job is the first thing to notice. Pacing
+    // from the room's current state is idempotent by key, so the ordinary case costs one refused
+    // enqueue and the crashed case restarts the chain.
+    const paced = await deps.pacer.pace(state);
+    const line = paced.kind === "scheduled" ? `re-paced: next due ${paced.dueAt} (job ${paced.jobId})` : paced.kind === "already-scheduled" ? "the chain is queued" : "nothing due";
+    return { summary: `draft-advance ${draftId}: superseded, the room stands at sequence ${state.sequence} (paced at ${sequence}); ${line}.`, detail: [] };
   }
   // The store's own follow-through is off for this call: the job paces and publishes itself,
   // in that order, so the next pick's wake is on its way before the facts compute begins.
