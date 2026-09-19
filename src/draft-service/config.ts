@@ -75,7 +75,7 @@ export const DRAFT_ADVANCE_CONFIG = {
    * for one advance of a deep backlog (`maxActionsPerAdvance` picks at a few ms each, plus its
    * publishes at the fail-fast bound) with margin.
    */
-  sweepReserveMs: 8_000,
+  sweepReserveMs: 16_000,
 } as const;
 
 export const DRAFT_NUDGE_CONFIG = {

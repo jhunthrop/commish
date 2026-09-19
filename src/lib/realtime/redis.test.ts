@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DRAFT_ADVANCE_CONFIG } from "@/draft-service/config";
 import { REALTIME_CONFIG } from "./config";
 import { redisOptionsFor } from "./redis";
 
@@ -19,8 +20,9 @@ describe("redisOptionsFor (item 4: finite retries, a fail-fast publish)", () => 
     expect(REALTIME_CONFIG.commandTimeoutMs).toBeLessThan(REALTIME_CONFIG.blockMs);
   });
 
-  it("the sweep's attempt can never be held by one publish: a few retried commands stay far under 45 s", () => {
+  it("the sweep's attempt can never be held by one publish: a few retried commands stay far under 45 s, and inside the sweep's own reserve (review LOW 7)", () => {
     const worst = (REALTIME_CONFIG.maxRetriesPerRequest + 1) * REALTIME_CONFIG.commandTimeoutMs + REALTIME_CONFIG.connectTimeoutMs;
     expect(worst).toBeLessThan(15_000);
+    expect(DRAFT_ADVANCE_CONFIG.sweepReserveMs).toBeGreaterThan(worst);
   });
 });
