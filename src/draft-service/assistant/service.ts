@@ -19,6 +19,7 @@ import type { Recommendation } from "@/projections/decide/draft";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { getDraftStore, resolveDraftActor } from "@/draft-service";
 import { leagueBoardFormat } from "@/league-service/board-format";
+import { pickPath } from "@/lib/timing/pick-path";
 import { evidencePoolFor } from "../sim/evidence";
 import { simulateRoomOdds, type RoomOddsInput, type RoomOddsTable } from "../sim/room-odds";
 import { inferSeatDrivers } from "../sim/seat-model";
@@ -92,5 +93,5 @@ export async function advisorFor(db: Db, draftId: string, userId: string, deps: 
 export async function warmAdvisorRoom(db: Db, draftId: string, deps: AdvisorServiceDeps = {}): Promise<void> {
   const state = await getDraftStore().getDraftState(draftId);
   if (state === null || state.phase !== "in_progress") return;
-  await roomFactsForState(db, draftId, state, deps.simulate ?? simulateRoomOdds);
+  await pickPath.time("advisor.warm", () => roomFactsForState(db, draftId, state, deps.simulate ?? simulateRoomOdds), { draftId, sequence: state.sequence });
 }

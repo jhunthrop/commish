@@ -4,6 +4,7 @@ import { drafts, leagues, mockRooms } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import { currentDeadline, type DraftState } from "@/draft-engine";
+import { pickPath } from "@/lib/timing/pick-path";
 import { settleMockDraftCompletion, type MockBotDriver } from "@/mock-draft-service/driver";
 import { startMockDraft } from "@/mock-draft-service/start";
 import { dueDraftsQuery } from "./auto-start";
@@ -361,6 +362,9 @@ export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: 
   // True while the last tick(s) errored — the log-once-per-streak latch (fix round HIGH 1): a
   // transient failure must neither kill the loop nor log once a second for the connection's life.
   let erroring = false;
+  // The instant the armed timer was meant to fire, so a measurement run can read how late the
+  // event loop let it (`pickPath`): the stream's own pacing lag, stage by stage.
+  let armedForMs: number | null = null;
 
   const stop = (): void => {
     if (stopped) return;
@@ -377,6 +381,7 @@ export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: 
   const schedule = (ms: number): void => {
     if (stopped) return;
     clearTimeout(timer);
+    armedForMs = Date.parse(deps.clock.now()) + ms;
     timer = setTimeout(() => void tick(), ms);
   };
 
@@ -388,7 +393,10 @@ export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: 
     }
     running = true;
     try {
-      const outcome = await deps.advance(draftId, deps.clock.now());
+      const now = deps.clock.now();
+      const lateMs = armedForMs === null ? null : Math.max(0, Date.parse(now) - armedForMs);
+      armedForMs = null;
+      const outcome = await pickPath.time("loop.advance", () => deps.advance(draftId, now), (result) => ({ draftId, applied: result.applied, sequence: result.sequence, lateMs }));
       if (outcome.outcome === "error") {
         // Transient weather: KEEP TICKING — the next tick may succeed (and in the reviewer's
         // repro, does). Stopping here left a watched room frozen for the rest of its connection.

@@ -23,6 +23,7 @@ import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logg
 import { sweepQuietly } from "@/integrity-service/multi-account";
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import { enqueueDraftGradesJobQuietly } from "@/jobs/defs/draft-grades-job";
+import { pickPath } from "@/lib/timing/pick-path";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { hasOpenSeat } from "@/matchmaking/filter";
@@ -324,7 +325,8 @@ export function createDraftStore({
   async function broadcast(previous: DraftState, next: DraftState, action: DraftAction): Promise<void> {
     for (const event of draftEventsFor(previous, next, action)) {
       try {
-        await publish({ leagueId: next.config.leagueId, type: event.type, payload: event.payload });
+        // The publish stage of the pick path, timed when a measurement run asks (`pickPath`).
+        await pickPath.time("publish", () => publish({ leagueId: next.config.leagueId, type: event.type, payload: event.payload }), { type: event.type, draftId: next.config.draftId, sequence: next.sequence });
       } catch (error: unknown) {
         // Best-effort by contract: the write is already committed and clients can refetch.
         onPublishError?.(error, { type: event.type, leagueId: next.config.leagueId });
