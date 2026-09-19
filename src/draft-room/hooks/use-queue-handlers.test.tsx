@@ -24,7 +24,7 @@ function fakeRoom(over: Partial<DraftRoomState> = {}): DraftRoomState {
     nudge: null,
     mock: null,
     waiting: null,
-    submit: async () => ({ ok: true }),
+    submit: async () => ({ ok: true, notice: null }),
     refresh: async () => {},
     setQueue: async () => ({ ok: true }),
     ...over,

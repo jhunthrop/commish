@@ -8,8 +8,8 @@ export const DRAFT_SERVICE_COPY = {
    * THE FAIL-FAST PUBLISH'S OWN WORDS. A pick is committed to Postgres before the room is told
    * over Redis; when that telling fails (Redis refused inside `REALTIME_CONFIG.commandTimeoutMs`,
    * a bounded number of retries) the pick still stands, and the actions route says so in the
-   * envelope's `notice` rather than pretending the room already knows. The room refetches on
-   * its next resync, which is where it catches up.
+   * envelope's `notice` rather than pretending the room already knows: the league speaking, in
+   * the room's toast. Every open stream relays a resync within one keepalive (review finding 3).
    */
-  publishDelayed: "Your pick is saved. The room may take a moment to show it.",
+  publishDelayed: "The room lost its voice for a moment, catching up.",
 } as const;

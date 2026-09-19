@@ -42,7 +42,7 @@ const room: DraftRoomState = {
   mock: null,
   waiting: null,
   byeWeeks: new Map([["KC", 10]]),
-  submit: async () => ({ ok: true }),
+  submit: async () => ({ ok: true, notice: null }),
   refresh: async () => {},
   setQueue: async () => ({ ok: true }),
 };
@@ -106,7 +106,7 @@ describe("SnakeRoom (Sideline)", () => {
     });
 
     it("holds a Draft in the undo window and submits only on expiry", () => {
-      const submit = vi.fn(async () => ({ ok: true as const }));
+      const submit = vi.fn(async () => ({ ok: true as const, notice: null }));
       renderRoom({ submit });
       fireEvent.click(desktop().getByTestId("dock-verb"));
       expect(submit).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe("SnakeRoom (Sideline)", () => {
     });
 
     it("Undo inside the window means nothing was ever sent", () => {
-      const submit = vi.fn(async () => ({ ok: true as const }));
+      const submit = vi.fn(async () => ({ ok: true as const, notice: null }));
       renderRoom({ submit });
       fireEvent.click(desktop().getByTestId("dock-verb"));
       fireEvent.click(desktop().getByRole("button", { name: "Undo" }));
@@ -139,7 +139,7 @@ describe("SnakeRoom (Sideline)", () => {
     });
 
     it("a second Draft from a pool row swaps the pill and says what it replaced", () => {
-      const submit = vi.fn(async () => ({ ok: true as const }));
+      const submit = vi.fn(async () => ({ ok: true as const, notice: null }));
       renderRoom({ submit });
       fireEvent.click(desktop().getByTestId("dock-verb"));
       expect(desktop().getByTestId("undo-pill")).toHaveTextContent("locking in…");
@@ -218,7 +218,7 @@ describe("SnakeRoom (Sideline)", () => {
 
   it("on your turn a sheet row drafts through the same undo window", () => {
     vi.useFakeTimers();
-    const submit = vi.fn(async () => ({ ok: true as const }));
+    const submit = vi.fn(async () => ({ ok: true as const, notice: null }));
     renderRoom({ submit });
     const surface = desktop();
     fireEvent.click(surface.getByRole("tab", { name: "Your sheet" }));
@@ -268,7 +268,7 @@ describe("SnakeRoom (Sideline)", () => {
 
   it("inverts on the phone: the stream is the page, the call block is pinned, picking is two-step", () => {
     vi.mocked(useMediaQuery).mockReturnValue(false);
-    const submit = vi.fn(async () => ({ ok: true as const }));
+    const submit = vi.fn(async () => ({ ok: true as const, notice: null }));
     renderRoom({ submit });
     expect(screen.queryByTestId("quilt-room")).toBeNull();
     const phone = within(screen.getByTestId("phone-room"));
@@ -281,7 +281,7 @@ describe("SnakeRoom (Sideline)", () => {
 
   it("keeps a pending confirmation across a resize that swaps compositions", () => {
     vi.mocked(useMediaQuery).mockReturnValue(false);
-    const submit = vi.fn(async () => ({ ok: true as const }));
+    const submit = vi.fn(async () => ({ ok: true as const, notice: null }));
     const { rerender } = render(element({ submit }));
     fireEvent.click(within(screen.getByTestId("phone-room")).getByTestId("dock-verb"));
     expect(screen.getByRole("dialog", { name: /Confirm your pick/ })).toBeInTheDocument();

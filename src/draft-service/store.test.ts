@@ -759,14 +759,14 @@ describe("draft store — notices", () => {
     // loop), so a rejecting `deliverNotice` must be swallowed exactly like a Redis outage in
     // `broadcast`, reported through the same `onPublishError` sink, and never surface as a
     // rejection of `applyAction` or undo anything already written.
-    const publishFailures: { type: string; leagueId: string }[] = [];
+    const publishFailures: { type: string; leagueId: string; draftId: string }[] = [];
     const throwingDeliverNotice = async (): Promise<void> => {
       throw new Error("Redis is unreachable");
     };
     const { draftId, leagueId, teamIds, userIds } = await fixture();
     const store = newStore(publish, {
       deliverNotice: throwingDeliverNotice,
-      onPublishError: (_error, event) => publishFailures.push({ type: event.type, leagueId: event.leagueId }),
+      onPublishError: (_error, event) => publishFailures.push({ type: event.type, leagueId: event.leagueId, draftId: event.draftId }),
     });
     await store.applyAction(draftId, start(teamIds));
     await queueOnClockTeam(store, draftId);
@@ -789,7 +789,7 @@ describe("draft store — notices", () => {
 
     // The failure was reported through the existing sink, not swallowed silently, and not
     // thrown back at the caller.
-    expect(publishFailures).toEqual([{ type: "notice.created", leagueId }]);
+    expect(publishFailures).toEqual([{ type: "notice.created", leagueId, draftId }]);
   });
 
   it("falls back to an empty string in the failure sink when a notice's leagueId is somehow absent", async () => {

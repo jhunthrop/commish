@@ -85,6 +85,7 @@ export function DraftRoom({ draftId, dismissedAt, topBar = null }: DraftRoomProp
   const act = (action: ClientDraftAction): void => {
     void room.submit(action).then((outcome) => {
       if (!outcome.ok) show({ message: outcome.reason, tone: "error" });
+      else if (outcome.notice !== null) show({ message: outcome.notice, tone: "info" });
     });
   };
 

@@ -219,6 +219,49 @@ describe("createLeagueEventStream — onEvent (the advance loop's wake seam, fin
   });
 });
 
+describe("createLeagueEventStream — the lost voice (review finding 3): a resync mark relays on the keepalive", () => {
+  const controllers: AbortController[] = [];
+
+  beforeEach(() => {
+    vi.stubEnv("REDIS_URL", process.env.REDIS_URL ?? "redis://localhost:6379");
+  });
+
+  afterEach(async () => {
+    for (const controller of controllers) controller.abort();
+    controllers.length = 0;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    vi.unstubAllEnvs();
+  });
+
+  it("a mark newer than the one the connection opened with relays one synthesized draft.resync frame, without a stream id, once", async () => {
+    const controller = new AbortController();
+    controllers.push(controller);
+    let mark: string | null = "2026-09-19T00:00:00.000Z";
+    const response = createLeagueEventStream(new Request("http://localhost/x", { signal: controller.signal }), "league_sse_resync", "user_sse_resync", {
+      keepaliveMs: 40,
+      resync: { leagueId: "league_sse_resync", draftId: "draft_resync", check: async () => mark },
+    });
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    await reader.read(); // the opening comment frame
+    // The mark that stood at open is this connection's own business already: only keepalives follow.
+    const first = decoder.decode((await reader.read()).value);
+    expect(first).toBe(": keepalive\n\n");
+    mark = "2026-09-19T00:00:01.000Z";
+    const chunks: string[] = [];
+    while (!chunks.some((chunk) => chunk.includes("event: draft.resync")) && chunks.length < 8) chunks.push(decoder.decode((await reader.read()).value));
+    const frame = chunks.find((chunk) => chunk.includes("event: draft.resync"))!;
+    expect(frame.startsWith("event: draft.resync\ndata: ")).toBe(true);
+    expect(frame).not.toContain("id:");
+    expect(JSON.parse(frame.slice("event: draft.resync\ndata: ".length))).toEqual({ type: "draft.resync", leagueId: "league_sse_resync", payload: { draftId: "draft_resync", markedAt: "2026-09-19T00:00:01.000Z" }, timestamp: "2026-09-19T00:00:01.000Z" });
+    // The same mark relays no second frame.
+    const after: string[] = [];
+    for (let i = 0; i < 3; i += 1) after.push(decoder.decode((await reader.read()).value));
+    expect(after.every((chunk) => chunk === ": keepalive\n\n")).toBe(true);
+    await reader.cancel();
+  });
+});
+
 describe("createLeagueEventStream — per-user connection ceiling", () => {
   const controllers: AbortController[] = [];
 

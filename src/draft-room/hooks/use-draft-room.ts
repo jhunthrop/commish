@@ -20,7 +20,17 @@ const DRAFT_EVENT_TYPES = [
 const NETWORK_ERROR = "We couldn't reach the draft. Check your connection and try again.";
 
 export type ConnectionStatus = "connecting" | "live" | "reconnecting";
-export type SubmitOutcome = { readonly ok: true } | { readonly ok: false; readonly reason: string };
+export type SubmitOutcome =
+  /** `notice`: the league's own sentence when the action landed but the room was not told yet
+   *  (the fail-fast publish, review finding 3); null when the room already knows. */
+  | { readonly ok: true; readonly notice: string | null }
+  | { readonly ok: false; readonly reason: string };
+
+/** A queue edit's outcome: it is not a draft action, so it never carries the room's notice. */
+export type QueueOutcome = { readonly ok: true } | { readonly ok: false; readonly reason: string };
+
+/** The stream's cue that the room fell behind (a pick committed but its frame was lost). */
+const RESYNC_EVENT_TYPE = "draft.resync";
 
 export interface LandedPick {
   readonly pick: CompletedPick;
@@ -77,7 +87,7 @@ interface RoomState {
 export interface DraftRoom extends RoomState {
   readonly submit: (action: ClientDraftAction) => Promise<SubmitOutcome>;
   readonly refresh: () => Promise<void>;
-  readonly setQueue: (playerIds: readonly string[]) => Promise<SubmitOutcome>;
+  readonly setQueue: (playerIds: readonly string[]) => Promise<QueueOutcome>;
 }
 
 const INITIAL: RoomState = {
@@ -286,7 +296,19 @@ export function useDraftRoom(draftId: string): DraftRoom {
       setState((prev) => ({ ...prev, connection: "reconnecting" }));
     };
 
+    // The lost voice (review finding 3): the stream synthesizes this frame on its keepalive when a
+    // pick committed but never reached it; the answer is the same refetch a gap gets.
+    const onResync = (event: MessageEvent) => {
+      let draftIdOfFrame: unknown = null;
+      try {
+        draftIdOfFrame = (JSON.parse(String(event.data)) as { readonly payload?: { readonly draftId?: unknown } }).payload?.draftId;
+      } catch {
+        return;
+      }
+      if (draftIdOfFrame === viewRef.current?.draftId) void refresh();
+    };
     for (const type of DRAFT_EVENT_TYPES) source.addEventListener(type, onDraftEvent);
+    source.addEventListener(RESYNC_EVENT_TYPE, onResync);
     source.addEventListener("open", onOpen);
     source.addEventListener("error", onError);
 
@@ -331,7 +353,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
           // the keepalive budget, so this costs nothing on the ordinary path.
           keepalive: true,
         });
-        const body = (await response.json()) as ApiEnvelope<{ readonly draft: DraftStateView }>;
+        const body = (await response.json()) as ApiEnvelope<{ readonly draft: DraftStateView; readonly notice?: string | null }>;
         if (!body.ok) {
           rollback();
           return { ok: false, reason: body.error };
@@ -341,7 +363,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
         const settled = held !== null && held.sequence > body.data.draft.sequence ? held : body.data.draft;
         viewRef.current = settled;
         setState((prev) => ({ ...prev, view: settled, pendingPlayerId: null, submitting: false }));
-        return { ok: true };
+        return { ok: true, notice: body.data.notice ?? null };
       } catch {
         rollback();
         return { ok: false, reason: NETWORK_ERROR };
@@ -354,7 +376,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
   // `optimisticView` or the view at all — only `queue` moves, optimistically, then settles on
   // the server's own answer (or rolls back on rejection).
   const setQueue = useCallback(
-    async (playerIds: readonly string[]): Promise<SubmitOutcome> => {
+    async (playerIds: readonly string[]): Promise<QueueOutcome> => {
       const before = queueRef.current;
       queueRef.current = playerIds;
       setState((prev) => ({ ...prev, queue: playerIds }));

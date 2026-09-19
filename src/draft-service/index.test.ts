@@ -16,7 +16,7 @@ import { players } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { heldRoomFacts, resetAdvisorMemoForTests } from "./assistant/memo";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
-import { awaitDraftFollowThroughForTests, followThroughAppliedAction, getDraftStore, getDraftTicker, logDraftNudgeError, logDraftPublishError, publishDraftEvent } from "./index";
+import { awaitDraftFollowThroughForTests, followThroughAppliedAction, getDraftStore, getDraftTicker, logDraftNudgeError, logDraftPublishError, noteDraftPublishFailure, publishDraftEvent } from "./index";
 
 const db = createTestDb();
 
@@ -87,6 +87,19 @@ describe("draft-service edge wiring", () => {
     const input = { leagueId: "league_wiring_test", type: "draft.nudge" as const, payload: { draftId: "draft_1" } };
     await expect(publishDraftEvent(input)).resolves.toBe("1-0");
     expect(publishSpy).toHaveBeenCalledWith(input);
+  });
+
+  it("noteDraftPublishFailure logs the lost frame and marks the draft for resync in Redis (review finding 3)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { getResyncMarker } = await import("@/lib/realtime/resync");
+      const draftId = `draft_lost_voice_${Date.now()}`;
+      noteDraftPublishFailure(new Error("connect ETIMEDOUT"), { type: "draft.pick", leagueId: "league_x", draftId });
+      expect(errorSpy).toHaveBeenCalledWith("[draft] publish failed", { type: "draft.pick", leagueId: "league_x", draftId }, expect.any(Error));
+      await vi.waitFor(async () => expect(await getResyncMarker().check(draftId)).not.toBeNull());
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it("logDraftPublishError logs a publish failure without throwing", () => {

@@ -27,6 +27,11 @@ export const REALTIME_CONFIG = {
   maxRetriesPerRequest: 2,
   connectTimeoutMs: 5_000,
   commandTimeoutMs: 3_000,
+  /** THE RESYNC MARKER (review finding 3; `resync.ts`): the key a draft whose frame failed to
+   *  publish is marked under, and how long the mark lives — one planned stream life, since a
+   *  stream that opens later resyncs on its own open anyway. */
+  resyncKey: (draftId: string): string => `realtime:resync:${draftId}`,
+  resyncMarkerTtlMs: 280_000,
   /** SSE keepalive comment interval (ms) — keeps proxies from closing an idle stream. */
   keepaliveMs: 15_000,
   /**

@@ -39,9 +39,11 @@ import { slotPreferencesFor } from "./slot-preference";
 
 export type { PublishFn } from "@/lib/realtime/publish";
 
-interface PublishFailureEvent {
+export interface PublishFailureEvent {
   readonly type: RealtimeEventType;
   readonly leagueId: string;
+  /** The draft whose frame was lost, so the edge can mark it for resync (review finding 3). */
+  readonly draftId: string;
 }
 
 export interface DraftStoreDeps {
@@ -354,11 +356,15 @@ export function createDraftStore({
       try {
         // The publish stage of the pick path, timed when a measurement run asks (`pickPath`).
         const id = await pickPath.time("publish", () => publish({ leagueId: next.config.leagueId, type: event.type, payload: event.payload }), { type: event.type, draftId: next.config.draftId, sequence: next.sequence });
-        // The publisher answers null for a failure it already reported (`createPublisher`).
-        if (id === null) published = false;
+        // The publisher answers null for a failure it already logged (`createPublisher`); the
+        // store's own sink still hears it, so the resync mark is set whichever way it failed.
+        if (id === null) {
+          published = false;
+          onPublishError?.(new Error("publish answered null"), { type: event.type, leagueId: next.config.leagueId, draftId: next.config.draftId });
+        }
       } catch (error: unknown) {
         // Best-effort by contract: the write is already committed and clients can refetch.
-        onPublishError?.(error, { type: event.type, leagueId: next.config.leagueId });
+        onPublishError?.(error, { type: event.type, leagueId: next.config.leagueId, draftId: next.config.draftId });
         published = false;
       }
     }
@@ -686,7 +692,7 @@ export function createDraftStore({
             try {
               await deliver(notice);
             } catch (error: unknown) {
-              onPublishError?.(error, { type: "notice.created", leagueId: notice.leagueId ?? "" });
+              onPublishError?.(error, { type: "notice.created", leagueId: notice.leagueId ?? "", draftId });
             }
           }
           // LAST, and never awaited: see `DraftStoreDeps.afterApplied`.

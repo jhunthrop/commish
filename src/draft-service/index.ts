@@ -3,7 +3,8 @@ import type { DraftState } from "@/draft-engine";
 import { runAfterResponse } from "@/lib/api/after-response";
 import { isLLMEnabled, getLlmClient } from "@/lib/llm/client";
 import { getPublisher } from "@/lib/realtime/publisher";
-import type { PublishFn } from "./store";
+import { getResyncMarker } from "@/lib/realtime/resync";
+import type { PublishFailureEvent, PublishFn } from "./store";
 import { createMockBotDriver, type MockBotDriver } from "@/mock-draft-service/driver";
 import { createDraftAdvancer, type DraftAdvancer } from "./advance";
 import { publishRoomFacts } from "./assistant/service";
@@ -30,6 +31,18 @@ let pacer: DraftPacer | undefined;
  */
 export function logDraftPublishError(error: unknown, event: unknown): void {
   console.error("[draft] publish failed", event, error);
+}
+
+/**
+ * THE LOST VOICE (review finding 3): a frame that failed to publish is logged AND the draft is
+ * marked for resync (`@/lib/realtime/resync`), so every open stream on the league relays a
+ * `draft.resync` on its next keepalive and the viewers catch up within one. The mark is
+ * best-effort over the same Redis that just refused the publish; when it fails too, the
+ * viewers' own planned reconnect is the fallback, as it always was.
+ */
+export function noteDraftPublishFailure(error: unknown, event: PublishFailureEvent): void {
+  logDraftPublishError(error, { type: event.type, leagueId: event.leagueId, draftId: event.draftId });
+  void getResyncMarker().mark(event.draftId);
 }
 
 /** The ticker's nudger's `onError` wiring, extracted for the same reason. */
@@ -95,7 +108,7 @@ export function getDraftStore(): DraftStore {
       db: getDb(),
       publish: publishDraftEvent,
       clock: systemClock,
-      onPublishError: logDraftPublishError,
+      onPublishError: noteDraftPublishFailure,
       afterApplied: scheduleFollowThrough,
     });
   }

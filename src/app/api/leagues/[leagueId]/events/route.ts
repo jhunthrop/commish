@@ -1,6 +1,10 @@
+import { eq } from "drizzle-orm";
+import { getDb } from "@/db/client";
+import { drafts } from "@/db/schema";
 import { createPresenceStore, presenceLifecycle } from "@/lib/realtime/presence";
 import { getPublisher } from "@/lib/realtime/publisher";
 import { getSharedRedis } from "@/lib/realtime/redis";
+import { getResyncMarker } from "@/lib/realtime/resync";
 import { createLeagueEventStream } from "@/lib/realtime/sse";
 import { withLeagueMemberActor, type LeagueRouteContext } from "../../_shared";
 
@@ -25,7 +29,8 @@ export const maxDuration = 300;
  * while somebody watched, with the advisor's warm hung off it. Both are gone from here. The pacing
  * is one queued job per due instant (`@/draft-service/pacing`, `draft-advance-job.ts`), run in
  * its own invocation, whether or not a stream is open; the facts are the pick's own invocation's
- * business. Nothing on this event loop is heavier than a frame.
+ * business. Nothing on this event loop is heavier than a frame — the one read it adds is the
+ * resync mark on each keepalive (review finding 3), a single Redis GET for the league's draft.
  *
  * SIDELINE (P5): the connection is also the member's PRESENCE. Opening it marks them in the
  * room, every keepalive refreshes the mark, closing it marks them gone, and each edge publishes
@@ -39,6 +44,8 @@ export async function GET(request: Request, context: LeagueRouteContext) {
       actor.leagueId,
       actor.userId,
     );
-    return createLeagueEventStream(request, actor.leagueId, actor.userId, { lifecycle });
+    const [draft] = await getDb().select({ id: drafts.id }).from(drafts).where(eq(drafts.leagueId, actor.leagueId));
+    const resync = draft === undefined ? undefined : { leagueId: actor.leagueId, draftId: draft.id, check: (draftId: string) => getResyncMarker().check(draftId) };
+    return createLeagueEventStream(request, actor.leagueId, actor.userId, { lifecycle, resync });
   });
 }
