@@ -23,6 +23,7 @@ import type { Db } from "@/db/client";
 import { jobs } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { DraftState } from "@/draft-engine";
+import { JOBS_CONFIG } from "@/jobs/config";
 import { DRAFT_ADVANCE_JOB_NAME, draftAdvanceIdempotencyKey, draftAdvanceJob } from "@/jobs/defs/draft-advance-job";
 import { getSelfWake, NO_SELF_WAKE, type SelfWake } from "@/jobs/self-wake";
 import { enqueueJob, retirePendingJobs } from "@/jobs/store";
@@ -118,6 +119,13 @@ export async function pendingPacingJobs(db: Db, statuses: readonly ("pending" | 
     if (held === undefined || row.runAt.getTime() > held.runAt.getTime()) byDraft.set(draftId, { runAt: row.runAt, status: row.status });
   }
   return byDraft;
+}
+
+/** Whether `draftId` has a pacing job on its way: running, or pending and inside the grace past
+ *  its instant (`JOBS_CONFIG.pacingChainGraceMs`). The rule the sweep and advance-on-read share. */
+export async function hasLivePacingJob(db: Db, draftId: string, nowMs: number): Promise<boolean> {
+  const chain = (await pendingPacingJobs(db)).get(draftId);
+  return chain !== undefined && (chain.status === "running" || chain.runAt.getTime() > nowMs - JOBS_CONFIG.pacingChainGraceMs);
 }
 
 export { NO_SELF_WAKE };

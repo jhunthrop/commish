@@ -45,11 +45,20 @@ describe("roomFactsFor (the per-process memo, async compute)", () => {
     expect(retry).toHaveBeenCalledTimes(1);
   });
 
-  it("seat shortlists ride the held entry and compute every time for a state the room does not hold", () => {
-    const compute = vi.fn(() => []);
-    expect(seatShortlistFor("d1", 9, "t1", compute)).toEqual([]);
-    expect(seatShortlistFor("d1", 9, "t1", compute)).toEqual([]);
+  it("seat shortlists ride the held entry, single-flight per seat, and compute every time for a state the room does not hold", async () => {
+    const compute = vi.fn(async () => []);
+    expect(await seatShortlistFor("d1", 9, "t1", compute)).toEqual([]);
+    expect(await seatShortlistFor("d1", 9, "t1", compute)).toEqual([]);
     expect(compute).toHaveBeenCalledTimes(2);
+    await roomFactsFor("d1", 9, async () => facts(9));
+    const a = seatShortlistFor("d1", 9, "t1", compute);
+    const b = seatShortlistFor("d1", 9, "t1", compute);
+    expect(await a).toBe(await b);
+    expect(compute).toHaveBeenCalledTimes(3);
+    // A failed compute is forgotten: the next ask computes again.
+    await expect(seatShortlistFor("d1", 9, "t2", async () => Promise.reject(new Error("no")))).rejects.toThrow("no");
+    expect(await seatShortlistFor("d1", 9, "t2", compute)).toEqual([]);
+    expect(compute).toHaveBeenCalledTimes(4);
   });
 
   it("rememberRoomFacts holds facts computed elsewhere (a store read) as if this process had computed them", async () => {

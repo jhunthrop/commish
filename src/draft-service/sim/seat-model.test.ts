@@ -7,7 +7,7 @@ import { assignArchetypes, BOT_ARCHETYPES } from "@/mock-draft/archetypes";
 import { chooseBotPick } from "@/mock-draft/bots";
 import { rngFor } from "@/mock-draft/rng";
 import { SIM_INSTANT, submit } from "./run";
-import { inferSeatDriver, inferSeatDrivers, SEAT_MODEL_CONFIG } from "./seat-model";
+import { inferSeatDriver, inferSeatDrivers, inferSeatDriversInChunks, SEAT_MODEL_CONFIG } from "./seat-model";
 
 const TEAMS = Array.from({ length: 12 }, (_, i) => `t${String(i + 1).padStart(2, "0")}`);
 
@@ -152,5 +152,22 @@ describe("the read under the roster-need ceilings (founder ruling 2026-09-12: th
     expect(seats).toBe(20 * TEAMS.length);
     expect(correct / seats).toBeGreaterThanOrEqual(0.08);
     expect(wrong / seats).toBeLessThanOrEqual(0.6);
+  });
+});
+
+describe("inferSeatDriversInChunks (draft-room performance round)", () => {
+  it("reads every seat exactly as the synchronous read does, one seat per turn of the event loop", async () => {
+    let state = submit(initialDraftState(CONFIG), START);
+    const dealt = assignArchetypes(7, TEAMS);
+    for (let i = 0; i < 40; i += 1) {
+      const teamId = teamOnClock(state)!;
+      const playerId = chooseBotPick(state, teamId, dealt[teamId]!, rngFor(7, `${teamId}:chunks:${state.pickNumber}`))!;
+      const action: MakePickAction = { v: 1, type: "MAKE_PICK", timestamp: SIM_INSTANT, teamId, playerId };
+      state = submit(state, action);
+    }
+    const yields: number[] = [];
+    const chunked = await inferSeatDriversInChunks(state, async () => { yields.push(1); });
+    expect(chunked).toEqual(inferSeatDrivers(state));
+    expect(yields).toHaveLength(TEAMS.length - 1);
   });
 });

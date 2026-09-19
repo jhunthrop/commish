@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { teamOnClock } from "@/draft-engine";
 import { ADVISOR_CONFIG } from "./config";
-import { askingWindow, onClockShortlist, recommendNow, valuedEvidence } from "./recommend";
+import { askingWindow, onClockShortlist, onClockShortlistInChunks, recommendNow, recommendNowInChunks, valuedEvidence } from "./recommend";
 import { FIXTURE_POOL, FIXTURE_SHAPE, FIXTURE_TEAM_IDS, fixtureAdvance, fixtureHolding, fixtureStart, fixtureValued } from "./test-fixture";
 
 const ASKING = FIXTURE_TEAM_IDS[3]!;
@@ -60,5 +60,15 @@ describe("recommendNow and onClockShortlist", () => {
     const held = onClockShortlist(state, fixtureValued(), FIXTURE_SHAPE);
     expect(held).toEqual(new Set(recommendNow({ state, askingTeamId: ASKING, valued: fixtureValued(), shape: FIXTURE_SHAPE }).map((rec) => rec.playerId)));
     expect(onClockShortlist(fixtureAdvance(fixtureStart(), 150), fixtureValued(), FIXTURE_SHAPE).size).toBe(0);
+  });
+
+  it("the chunked entry points answer exactly what the synchronous ones answer (draft-room performance round)", async () => {
+    const state = fixtureAdvance(fixtureStart(), 3);
+    const valued = fixtureValued();
+    expect(await recommendNowInChunks({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE })).toEqual(recommendNow({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE }));
+    expect(await onClockShortlistInChunks(state, valued, FIXTURE_SHAPE)).toEqual(onClockShortlist(state, valued, FIXTURE_SHAPE));
+    const done = fixtureAdvance(fixtureStart(), 150);
+    expect(await recommendNowInChunks({ state: done, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE })).toEqual([]);
+    expect((await onClockShortlistInChunks(done, valued, FIXTURE_SHAPE)).size).toBe(0);
   });
 });

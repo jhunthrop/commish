@@ -27,12 +27,12 @@ import { getSharedRedis } from "@/lib/realtime/redis";
 import { pickPath } from "@/lib/timing/pick-path";
 import { evidencePoolFor } from "../sim/evidence";
 import { simulateRoomOddsInChunks, type RoomOddsInput, type RoomOddsTable } from "../sim/room-odds";
-import { inferSeatDrivers } from "../sim/seat-model";
+import { inferSeatDriversInChunks } from "../sim/seat-model";
 import { advisorCore, seedFor } from "./advisor";
 import { ADVISOR_CONFIG } from "./config";
 import { createRedisRoomFactsStore, roomFactsOnce, type FactsKey, type RoomFactsStore } from "./facts-store";
 import { roomFactsFor, seatShortlistFor, type RoomFacts } from "./memo";
-import { askingWindow, onClockShortlist, recommendNow, valuedEvidence, type RecommendInput, type ValuedEntry } from "./recommend";
+import { askingWindow, onClockShortlistInChunks, recommendNowInChunks, valuedEvidence, type RecommendInput, type ValuedEntry } from "./recommend";
 import { tierCollapses } from "./signals";
 import { tierStandings } from "./tiers";
 import type { AdvisorView } from "./view";
@@ -41,8 +41,9 @@ export interface AdvisorServiceDeps {
   /** The sim entry point, injectable so a test can count how often a room state simulates. Sync
    *  or async: the production one yields between chunks. */
   readonly simulate?: (input: RoomOddsInput) => RoomOddsTable | Promise<RoomOddsTable>;
-  /** The recommendation entry point, injectable for the same reason. */
-  readonly recommend?: (input: RecommendInput) => readonly Recommendation[];
+  /** The recommendation entry point, injectable for the same reason. Sync or async: the
+   *  production one scores a chunk of candidates at a time. */
+  readonly recommend?: (input: RecommendInput) => readonly Recommendation[] | Promise<readonly Recommendation[]>;
   /** The cross-process facts store (item 2). Defaults to the shared Redis one; tests hand in memory. */
   readonly facts?: RoomFactsStore;
 }
@@ -80,12 +81,20 @@ async function roomFactsForState(db: Db, draftId: string, state: DraftState, dep
   // store (read, else compute under its lock) — a viewer on another instance reads what the
   // pick's own invocation wrote, and simulates only when nothing has.
   const key: FactsKey = { draftId, sequence: state.sequence, draftOrder: state.draftOrder };
+  // EVERY STAGE YIELDS (item 3's second pass): the seat drivers one seat at a time, the on-clock
+  // shortlist a few candidates at a time, the simulation a few runs at a time, so no stretch of
+  // this compute holds the event loop past a chunk — and a pacing wake sleeping on the same
+  // process fires within one chunk of its instant, never after a whole table.
   const facts = await roomFactsFor(draftId, state.sequence, () =>
-    roomFactsOnce(factsStore(deps), key, async () => ({
-      table: await simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) }),
-      tiers: tierStandings(state, valued),
-      collapses: tierCollapses(state, valued),
-    })),
+    roomFactsOnce(factsStore(deps), key, async () => {
+      const drivers = await inferSeatDriversInChunks(state);
+      const excludeFromOnClockSeat = await onClockShortlistInChunks(state, valued, shape);
+      return {
+        table: await simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers, excludeFromOnClockSeat }),
+        tiers: tierStandings(state, valued),
+        collapses: tierCollapses(state, valued),
+      };
+    }),
   );
   return { shape, valued, facts };
 }
@@ -95,7 +104,7 @@ async function roomFactsForState(db: Db, draftId: string, state: DraftState, dep
  * no further turn.
  */
 export async function advisorFor(db: Db, draftId: string, userId: string, deps: AdvisorServiceDeps = {}): Promise<AdvisorView | null> {
-  const recommend = deps.recommend ?? recommendNow;
+  const recommend = deps.recommend ?? recommendNowInChunks;
   const actorResult = await resolveDraftActor(db, draftId, userId);
   if (!actorResult.ok) return null;
   const teamId = actorResult.actor.teamId;
@@ -106,7 +115,7 @@ export async function advisorFor(db: Db, draftId: string, userId: string, deps: 
   if (askingWindow(state, teamId) === null) return null;
 
   const { shape, valued, facts } = await roomFactsForState(db, draftId, state, deps);
-  const shortlist = seatShortlistFor(draftId, state.sequence, teamId, () => recommend({ state, askingTeamId: teamId, valued, shape, shortlistSize: ADVISOR_CONFIG.shortlistSize }));
+  const shortlist = await seatShortlistFor(draftId, state.sequence, teamId, async () => recommend({ state, askingTeamId: teamId, valued, shape, shortlistSize: ADVISOR_CONFIG.shortlistSize }));
   return advisorCore({ state, askingTeamId: teamId, valued, shape, table: facts.table, tiers: facts.tiers, collapses: facts.collapses, shortlist });
 }
 

@@ -9,7 +9,7 @@ import { createDraftAdvancer, type DraftAdvancer } from "./advance";
 import { publishRoomFacts } from "./assistant/service";
 import { createNudgeScheduler, type NudgeScheduler } from "./nudge";
 import { createNudgeCopy } from "./nudge-copy";
-import { createDraftPacer, NO_OP_PACER, pacingEnabledIn, type DraftPacer } from "./pacing";
+import { createDraftPacer, hasLivePacingJob, NO_OP_PACER, pacingEnabledIn, type DraftPacer } from "./pacing";
 import { createDraftStore, type DraftStore } from "./store";
 import { createDraftTicker, type DraftTicker } from "./ticker";
 
@@ -180,6 +180,11 @@ export function getDraftAdvancer(): DraftAdvancer {
  * advance must never fail the read that triggered it.
  */
 export async function advanceDraftNow(draftId: string): Promise<void> {
+  // A ROOM ON ITS WAY IS LEFT TO ITS JOB (draft-room performance round, item 3): where the
+  // pacer runs, a read that finds a live pacing job applies nothing — it would only race the
+  // job's own invocation and, arriving after a late wake, land two due picks in one loop. A
+  // read still fast-forwards a room whose chain has broken, which is what driver 1 was for.
+  if (getDraftPacer() !== NO_OP_PACER && (await hasLivePacingJob(getDb(), draftId, Date.now()))) return;
   await getDraftAdvancer().advance(draftId, systemClock.now());
 }
 

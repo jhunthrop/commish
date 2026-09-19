@@ -88,6 +88,9 @@ export async function handleJobRun(request: Request, deps: RunHandlerDeps): Prom
   deps.defer(async () => {
     try {
       if (!(await sleepWhilePending(deps, jobId, Date.parse(dueAt)))) return;
+      // How late the sleep ended against the instant it was asked for: the event loop's own
+      // lag on this invocation's process, the number a measurement run reads (`pickPath`).
+      pickPath.mark("job.wake", { jobId, lateMs: Math.max(0, now() - Date.parse(dueAt)) });
       await runJobById(
         { db: deps.db, clock: { now: () => new Date().toISOString() }, random: Math.random, workerId: deps.workerId },
         deps.definitions,

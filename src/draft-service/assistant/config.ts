@@ -15,6 +15,10 @@ export const ADVISOR_CONFIG = {
    *  silicon (200 runs measured 587 ms), so a pick request or a pacing timer sharing the
    *  invocation waits at most that long, never the whole table. */
   simChunkRuns: 8,
+  /** Candidates a shortlist scores before yielding (draft-room performance round, item 3's
+   *  second pass; `recommendPickInChunks`). Each candidate re-values the whole board, about 3 ms
+   *  on the real one, so four is roughly one sim chunk's worth of holding the loop. */
+  recommendChunkCandidates: 4,
   /** How many candidates `recommendPick` ranks for every seat, on or off the clock: the card's
    *  pick is the first the runs leave on the board past the reach floor, the tab's rows are the
    *  rest, and the on-clock seat's whole shortlist is held off its own current pick in the runs

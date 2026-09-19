@@ -36,8 +36,9 @@ interface Entry {
   /** Each seat's own shortlist for this state, filled on that seat's first request (fix round:
    *  `recommendPick` measured 37 to 87 ms per viewer on the real board, and a viewer's
    *  recommendation changes only when the room state or the viewer's roster does, both of which
-   *  are inside the sequence). */
-  readonly shortlists: Map<string, readonly Recommendation[]>;
+   *  are inside the sequence). Held as the compute's promise from the moment it starts, so a
+   *  second ask for the same seat during its chunked compute awaits the one in flight. */
+  readonly shortlists: Map<string, Promise<readonly Recommendation[]>>;
 }
 
 const rooms = new Map<string, Entry>();
@@ -92,14 +93,18 @@ export function roomFactsFor(draftId: string, sequence: number, compute: () => P
   );
 }
 
-/** One seat's shortlist for `draftId` at `sequence`, computed once per seat per room state. Asks
- *  for a state the room does not hold (the facts must be asked for first) compute every time. */
-export function seatShortlistFor(draftId: string, sequence: number, teamId: string, compute: () => readonly Recommendation[]): readonly Recommendation[] {
+/** One seat's shortlist for `draftId` at `sequence`, computed once per seat per room state and
+ *  single-flight while it computes. Asks for a state the room does not hold (the facts must be
+ *  asked for first) compute every time. A compute that fails is forgotten. */
+export function seatShortlistFor(draftId: string, sequence: number, teamId: string, compute: () => Promise<readonly Recommendation[]>): Promise<readonly Recommendation[]> {
   const held = entryFor(draftId, sequence);
   if (held === null) return compute();
   const known = held.shortlists.get(teamId);
   if (known !== undefined) return known;
-  const shortlist = compute();
+  const shortlist = compute().catch((error: unknown) => {
+    if (held.shortlists.get(teamId) === shortlist) held.shortlists.delete(teamId);
+    throw error;
+  });
   held.shortlists.set(teamId, shortlist);
   return shortlist;
 }

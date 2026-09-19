@@ -104,3 +104,21 @@ export function inferSeatDriver(state: DraftState, teamId: string): SeatDriver {
 export function inferSeatDrivers(state: DraftState): SeatDrivers {
   return Object.fromEntries(state.draftOrder.map((teamId) => [teamId, inferSeatDriver(state, teamId)] as const));
 }
+
+const nextMacrotask = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+/**
+ * THE SAME DRIVERS, ONE SEAT PER TURN OF THE EVENT LOOP (draft-room performance round): each seat
+ * is read from its own picks alone, so reading them one at a time and yielding between seats
+ * changes nothing (`seat-model.test.ts` pins the two equal) and bounds what any timer on the
+ * invocation waits to one seat's read, a few milliseconds, never the room's.
+ */
+export async function inferSeatDriversInChunks(state: DraftState, yieldToEventLoop: () => Promise<void> = nextMacrotask): Promise<SeatDrivers> {
+  const drivers: Record<string, SeatDriver> = {};
+  for (let index = 0; index < state.draftOrder.length; index += 1) {
+    if (index > 0) await yieldToEventLoop();
+    const teamId = state.draftOrder[index]!;
+    drivers[teamId] = inferSeatDriver(state, teamId);
+  }
+  return drivers;
+}
