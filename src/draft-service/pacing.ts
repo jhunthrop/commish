@@ -84,7 +84,7 @@ export function createDraftPacer({ db, clock, mockDriver, wake, selfWake }: Draf
     );
     if (!result.enqueued || result.jobId === null) return { kind: "already-scheduled", dueAt };
     const retired = await retireOlder(draftId, sequence);
-    wakeFor().wake(result.jobId, dueAtMs);
+    wakeFor().wake(result.jobId, dueAtMs, draftId);
     return { kind: "scheduled", jobId: result.jobId, dueAt, retired };
   }
 

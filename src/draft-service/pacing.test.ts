@@ -25,7 +25,7 @@ function testStore(): DraftStore {
 
 function recordingWake(): SelfWake & { readonly calls: { jobId: number; dueAtMs: number }[] } {
   const calls: { jobId: number; dueAtMs: number }[] = [];
-  return { calls, wake: (jobId, dueAtMs) => { calls.push({ jobId, dueAtMs }); } };
+  return { calls, wake: (jobId, dueAtMs) => { calls.push({ jobId, dueAtMs }); }, wakeNow: async (jobId, dueAtMs) => { calls.push({ jobId, dueAtMs }); } };
 }
 
 async function seedMock(id: string, botTeams: number) {
