@@ -503,6 +503,36 @@ describe("dissolved drafts are terminal (fix round MEDIUM 2)", () => {
   });
 });
 
+describe("two drivers on one room (draft-room performance round, item 4: the false wedge)", () => {
+  it("a refusal whose reload finds the log moved is the other driver's progress, not a wedge, and the call goes on", async () => {
+    const fixture = await seedAbandonedMock("racing");
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+    // The other driver: every other attempt lands the very action this advancer was about to,
+    // then refuses this one — the shape of two sweeps racing one room pick by pick.
+    let attempts = 0;
+    const racing: DraftStore = {
+      ...store,
+      applyAction: async (draftId, action, opts) => {
+        attempts += 1;
+        if (attempts % 2 === 1) {
+          await store.applyAction(draftId, action, opts);
+          return { ok: false, reason: "It's not your turn to pick." };
+        }
+        return store.applyAction(draftId, action, opts);
+      },
+    };
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    now = atMs(10 * 60_000);
+    const outcome = await createDraftAdvancer({ db, store: racing, mockDriver: createMockBotDriver({ db, store }) }).advance(fixture.draftId, now);
+    expect(outcome.wedged).toBe(false);
+    expect(outcome.phase).toBe("complete");
+    expect((await actionLog(fixture.draftId)).length).toBe(7);
+    expect(error).not.toHaveBeenCalledWith("[draft] advance wedged", expect.anything());
+    error.mockRestore();
+  });
+});
+
 describe("nextDueInstantMs (the pacer's read of a room, draft-room performance round item 3)", () => {
   it("a bot on the clock: its seeded due pick, the same instant the advance stamps; a human: the deadline; a finished room: nothing", async () => {
     const fixture = await seedAbandonedMock("nextdue", { botTeams: 1, pickSeconds: 30 });

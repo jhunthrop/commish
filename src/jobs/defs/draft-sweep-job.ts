@@ -53,6 +53,9 @@ export interface DraftSweepContext {
   readonly maxActions?: number;
   /** Where the sweep writes what it learned. Defaults to the installed set (`wakeSet()`). */
   readonly wake?: WakeSet;
+  /** The executor's cut-off for this attempt (`JobStepContext.deadlineAt`): the sweep stops
+   *  `DRAFT_ADVANCE_CONFIG.sweepReserveMs` before it rather than be killed mid-advance. */
+  readonly deadlineAt?: Date;
 }
 
 interface SweepTally {
@@ -94,8 +97,10 @@ export async function sweepDrafts(ctx: DraftSweepContext): Promise<StepOutcome> 
       continue;
     }
     const remaining = budget - tally.actions;
-    if (remaining <= 0) {
-      // Budget spent before this draft was reached: it owes work now, the next fire finds it.
+    const outOfTime = ctx.deadlineAt !== undefined && Date.parse(ctx.clock.now()) + DRAFT_ADVANCE_CONFIG.sweepReserveMs > ctx.deadlineAt.getTime();
+    if (remaining <= 0 || outOfTime) {
+      // Budget (actions or time) spent before this draft was reached: it owes work now, the
+      // next fire finds it. Stopping here is what keeps the attempt timeout unreachable.
       tally = { ...tally, exhausted: true };
       await wake.add(wakeMember.draft(row.id), nowMs);
       continue;
@@ -178,6 +183,7 @@ export const draftSweepJob: AnyJobDefinition = defineJob<Record<string, never>>(
           store: getDraftStore(),
           advance: (draftId, now, opts) => getDraftAdvancer().advance(draftId, now, opts),
           newId: () => crypto.randomUUID(),
+          deadlineAt: ctx.deadlineAt,
         }),
     },
   ],

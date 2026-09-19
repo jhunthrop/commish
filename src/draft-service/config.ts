@@ -66,6 +66,16 @@ export const DRAFT_ADVANCE_CONFIG = {
    * left over is found by the next minute's fire.
    */
   sweepMaxActions: 600,
+  /**
+   * THE SWEEP'S OWN CLOCK (draft-room performance round, item 4). The executor cuts a job off at
+   * its `deadlineAt`; a sweep that started one more draft's advance with less than this left
+   * could be killed mid-transaction and dead-lettered at the attempt timeout, which is what the
+   * production log showed (`draft-sweep ... exceeded its 45000 ms`). The sweep stops before that
+   * draft, registers every draft it did not reach as due now, and the next fire resumes. Sized
+   * for one advance of a deep backlog (`maxActionsPerAdvance` picks at a few ms each, plus its
+   * publishes at the fail-fast bound) with margin.
+   */
+  sweepReserveMs: 8_000,
 } as const;
 
 export const DRAFT_NUDGE_CONFIG = {

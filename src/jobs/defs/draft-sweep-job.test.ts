@@ -6,6 +6,7 @@ import { enqueueJob } from "../store";
 import { DRAFT_ADVANCE_JOB_NAME, draftAdvanceIdempotencyKey } from "./draft-advance-job";
 import type { Clock } from "@/domain/timing";
 import { createDraftAdvancer } from "@/draft-service/advance";
+import { DRAFT_ADVANCE_CONFIG } from "@/draft-service/config";
 import { createDraftStore, type DraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { createMockBotDriver } from "@/mock-draft-service/driver";
@@ -143,6 +144,35 @@ describe("the draft-sweep job (driver 3 — the backstop for rooms nobody is wat
     const taken = await sweepDrafts({ ...sweepContext(store), wake: createMemoryWakeSet() });
     expect(taken.summary).toContain("6 actions across 1 of 1 live drafts");
     expect((await store.getDraftState(fixture.draftId))!.phase).toBe("complete");
+  });
+
+  it("stops before a draft it has no time left for, registering it as due now, so the attempt timeout is never reached (item 4)", async () => {
+    const fixture = await seedDraftFixture(db, {
+      draftId: "draft_sw_time",
+      leagueId: "league_sw_time",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date(Date.parse(BASE_NOW) + 24 * 60 * 60 * 1000),
+      auctionBudget: null,
+      isMock: true,
+      botTeams: 0,
+      mockPickSeconds: 60,
+    });
+    await seedSprintPlayers();
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+    now = new Date(Date.parse(BASE_NOW) + 10 * 60_000).toISOString();
+    const wake = createMemoryWakeSet();
+    // The executor's cut-off is closer than the reserve: no draft is started.
+    const outOfTime = await sweepDrafts({ ...sweepContext(store), wake, deadlineAt: new Date(Date.parse(now) + DRAFT_ADVANCE_CONFIG.sweepReserveMs - 1) });
+    expect(outOfTime.summary).toContain("0 actions across 0 of 1 live drafts");
+    expect(outOfTime.summary).toContain("budget hit");
+    expect((await wake.due(Date.parse(now))).members).toContain(wakeMember.draft(fixture.draftId));
+    expect((await store.getDraftState(fixture.draftId))!.phase).toBe("in_progress");
+    // With time to spare, the same sweep takes it.
+    const inTime = await sweepDrafts({ ...sweepContext(store), wake: createMemoryWakeSet(), deadlineAt: new Date(Date.parse(now) + 60_000) });
+    expect(inTime.summary).toContain("6 actions across 1 of 1 live drafts");
   });
 
   it("forgets a finished draft and names no kickoff once nothing is scheduled", async () => {

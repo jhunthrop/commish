@@ -82,8 +82,19 @@ export interface DraftStoreDeps {
 }
 
 export type ApplyResult =
-  | { readonly ok: true; readonly state: DraftState }
+  | {
+      readonly ok: true;
+      readonly state: DraftState;
+      /** Whether every frame this action owed reached the league stream (draft-room performance
+       *  round, item 4). False means the write stands and the room was NOT told: the publisher
+       *  failed fast (`REALTIME_CONFIG.commandTimeoutMs`, bounded retries), the failure went to
+       *  `onPublishError`, and the caller may say so in a person's words. */
+      readonly published: boolean;
+    }
   | { readonly ok: false; readonly reason: string };
+
+/** What the transaction itself decides, before the broadcast that follows the commit. */
+type TransactionOutcome = { readonly ok: true; readonly state: DraftState } | { readonly ok: false; readonly reason: string };
 
 export interface ApplyOptions {
   /**
@@ -336,16 +347,22 @@ export function createDraftStore({
     return state;
   }
 
-  async function broadcast(previous: DraftState, next: DraftState, action: DraftAction): Promise<void> {
+  /** Publishes every frame the action owes; answers whether all of them reached the stream. */
+  async function broadcast(previous: DraftState, next: DraftState, action: DraftAction): Promise<boolean> {
+    let published = true;
     for (const event of draftEventsFor(previous, next, action)) {
       try {
         // The publish stage of the pick path, timed when a measurement run asks (`pickPath`).
-        await pickPath.time("publish", () => publish({ leagueId: next.config.leagueId, type: event.type, payload: event.payload }), { type: event.type, draftId: next.config.draftId, sequence: next.sequence });
+        const id = await pickPath.time("publish", () => publish({ leagueId: next.config.leagueId, type: event.type, payload: event.payload }), { type: event.type, draftId: next.config.draftId, sequence: next.sequence });
+        // The publisher answers null for a failure it already reported (`createPublisher`).
+        if (id === null) published = false;
       } catch (error: unknown) {
         // Best-effort by contract: the write is already committed and clients can refetch.
         onPublishError?.(error, { type: event.type, leagueId: next.config.leagueId });
+        published = false;
       }
     }
+    return published;
   }
 
   const store: DraftStore = {
@@ -378,7 +395,7 @@ export function createDraftStore({
         const createdNotices: MemberNotice[] = [];
 
         try {
-          const outcome = await db.transaction(async (tx): Promise<ApplyResult> => {
+          const outcome = await db.transaction(async (tx): Promise<TransactionOutcome> => {
             /**
              * THE LEAGUE ROW, FIRST, AS ITS OWN STATEMENT (final whole-branch review, F1 — a
              * cycle reproduced with real `psql` sessions, SQLSTATE 40P01).
@@ -641,7 +658,7 @@ export function createDraftStore({
           }
 
           cache.set(draftId, outcome.state);
-          if (previous !== null && applied !== null) await broadcast(previous, outcome.state, applied);
+          const published = previous !== null && applied !== null ? await broadcast(previous, outcome.state, applied) : true;
           await noteWake(outcome.state);
           // THE MULTI-ACCOUNT SWEEP'S SECOND TRIGGER (final review, HIGH 2), after the commit for
           // the same reason `broadcast` is: this transaction has just released `drafts` FOR
@@ -680,7 +697,7 @@ export function createDraftStore({
               console.error("[draft] afterApplied hook threw", { draftId }, error);
             }
           }
-          return outcome;
+          return { ...outcome, published };
         } catch (error: unknown) {
           // Our view of the log is provably stale — drop it so the next read replays.
           cache.delete(draftId);

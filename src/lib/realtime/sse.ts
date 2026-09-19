@@ -126,7 +126,7 @@ function createEventStream(request: Request, userId: string, streamKeys: readonl
       sink.enqueue(OPENING);
       void options.lifecycle?.onOpen();
       try {
-        redis = createRedisConnection();
+        redis = createRedisConnection("subscribe");
         keepalive = setInterval(() => {
           try {
             sink.enqueue(KEEPALIVE);

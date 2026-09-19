@@ -273,7 +273,8 @@ describe("draft store — persistence", () => {
     const stubStore = createDraftStore({ db: stubDb, publish, clock });
 
     const result = await stubStore.applyAction("draft_stub", start(["team_a", "team_b"]));
-    expect(result).toEqual({ ok: true, state: fakeState });
+    // Nothing owed the stream, so nothing failed to reach it: the room counts as told.
+    expect(result).toEqual({ ok: true, state: fakeState, published: true });
     expect(published).toEqual([]);
   });
 
@@ -316,7 +317,7 @@ describe("draft store — persistence", () => {
     });
   });
 
-  it("accepts the action even when publishing blows up — Postgres is authoritative", async () => {
+  it("accepts the action even when publishing blows up — Postgres is authoritative — and says the room was not told (item 4)", async () => {
     const { draftId, teamIds } = await fixture();
     const store = newStore(async () => {
       throw new Error("redis is down");
@@ -324,7 +325,17 @@ describe("draft store — persistence", () => {
     expect((await store.applyAction(draftId, start(teamIds))).ok).toBe(true);
     const result = await store.applyAction(draftId, pick(teamIds[0]!, "qb1"));
     expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.published).toBe(false);
     expect(await actionRows(draftId)).toHaveLength(2);
+    // The publisher's own quiet failure (it answers null once it has reported) reads the same.
+    const quiet = newStore(async () => null);
+    const quietResult = await quiet.applyAction(draftId, pick(teamIds[1]!, "rb1"));
+    expect(quietResult.ok && !quietResult.published).toBe(true);
+    // And an ordinary publish answers that the room was told (the snake's third pick is the
+    // second seat's again).
+    const told = await newStore().applyAction(draftId, pick(teamIds[1]!, "wr1"));
+    expect(told.ok && told.published).toBe(true);
   });
 
   it("throws and persists nothing when the database insert fails for a reason other than a race", async () => {

@@ -226,7 +226,10 @@ export function createDraftAdvancer({
       }
       // A refusal means a concurrent driver got there first (or this draft genuinely cannot
       // advance — e.g. no eligible autopick). Reload once and re-derive; two consecutive
-      // refusals end the call rather than spin.
+      // refusals AGAINST AN UNMOVED LOG end the call rather than spin. A reload that finds the
+      // log moved is the other driver making progress (draft-room performance round, item 4:
+      // the Phase 1 "advance wedged" pairs were two sweeps racing one room pick by pick, each
+      // refused twice while the other landed the work), so the count starts over.
       refusals += 1;
       if (refusals >= 2) {
         // THE WEDGED LINE (fix round MEDIUM 3): due work is still pending and the store
@@ -238,6 +241,7 @@ export function createDraftAdvancer({
       }
       const fresh = await store.getDraftState(state.config.draftId);
       if (fresh === null) return null;
+      if (fresh.sequence !== state.sequence) refusals = 0;
       state = fresh;
     }
     return { state, applied, exhausted: false, wedged: false, nextDueAt: null };
