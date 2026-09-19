@@ -21,7 +21,7 @@ import { GET as getDraft } from "@/app/api/drafts/[draftId]/route";
 import { GET as getPlayers } from "@/app/api/drafts/[draftId]/players/route";
 import { POST as postAction } from "@/app/api/drafts/[draftId]/actions/route";
 import { POST as postStart } from "@/app/api/drafts/[draftId]/start/route";
-import { getDraftAdvancer, getDraftStore } from "@/draft-service";
+import { getDraftAdvancer, getDraftStore, getMockBotDriver } from "@/draft-service";
 import { teamOnClock } from "@/draft-engine";
 import { expectedBotThinkDelaySeconds } from "@/mock-draft/bots";
 import { MOCK_CONFIG, MOCK_COPY } from "@/mock-draft/config";
@@ -68,10 +68,15 @@ function postJson(body: unknown): Request {
  * this only patches `mock_rooms.mode` after the fact, since `seedDraftFixture` always seeds
  * `"solo"` and Task 8's own `ShareLinkPanel` data only ever answers for `"link"`.
  */
+/** An UNSTARTED room's start instant has to sit ahead of the real wall clock the route reads
+ *  (advance-on-read starts a mock whose `starts_at` has passed): a day out, computed, never a
+ *  literal date the calendar walks past (which is exactly what happened on 2026-09-10). */
+const MOCK_STARTS_AT = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
 async function mockFixture(mode: MockMode = "solo", botTeams = 0) {
   const f = await seedDraftFixture(db, {
     draftId: MOCK_DRAFT_ID, leagueId: "league_api_mock", format: "snake", teamCount: 2,
-    slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: MOCK_STARTS_AT, auctionBudget: null,
     isMock: true, botTeams,
   });
   if (mode !== "solo") await db.update(mockRooms).set({ mode }).where(eq(mockRooms.leagueId, f.leagueId));
@@ -127,6 +132,9 @@ beforeEach(async () => {
   await truncateAll(db);
   getDraftStore().invalidate(DRAFT_ID);
   getDraftStore().invalidate(MOCK_DRAFT_ID);
+  // The process-wide bot driver caches which seats are bots per draft id for the draft's life;
+  // these tests reseed the same id with different seats, so that cache is dropped like the store's.
+  getMockBotDriver().invalidateDraft(MOCK_DRAFT_ID);
   vi.mocked(getCurrentUser).mockReset();
 });
 
@@ -259,7 +267,7 @@ describe("GET /api/drafts/[draftId] — Task 8's mock room info", () => {
       url: "http://test/app/draft/mock-drafts/league_api_mock_code",
       teamCount: 2,
       seatsFilled: 2,
-      startsAt: "2026-09-10T17:00:00.000Z",
+      startsAt: MOCK_STARTS_AT.toISOString(),
     });
     expect(body.data.mock.results).toBeNull();
     // The ETA is the paced delay draw's expected value for this room's 60s clock (Task 10,

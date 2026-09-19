@@ -102,7 +102,7 @@ export function getDraftStore(): DraftStore {
  * advance funnel below, so there is a single per-draft meta cache and the retention sweep's
  * `invalidateDraft` wiring (through the ticker) empties it for both callers.
  */
-function getMockBotDriver(): MockBotDriver {
+export function getMockBotDriver(): MockBotDriver {
   if (mockDriver === undefined) {
     mockDriver = createMockBotDriver({ db: getDb(), store: getDraftStore() });
   }
