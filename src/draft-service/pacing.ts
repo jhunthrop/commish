@@ -31,6 +31,7 @@ import type { EnvRecord } from "@/jobs/tick-auth";
 import { wakeSet, type WakeSet } from "@/jobs/wake";
 import type { MockBotDriver } from "@/mock-draft-service/driver";
 import { nextDueInstantMs, type AdvanceOutcome } from "./advance";
+import { DRAFT_ADVANCE_CONFIG } from "./config";
 
 export interface DraftPacerDeps {
   readonly db: Db;
@@ -96,7 +97,11 @@ export function createDraftPacer({ db, clock, mockDriver, wake, selfWake }: Draf
     },
     async paceFromOutcome(outcome) {
       if (outcome.outcome !== "ok" || outcome.nextDueAt === null || outcome.sequence === null || outcome.phase !== "in_progress") return { kind: "nothing-due" };
-      return schedule(outcome.draftId, outcome.sequence, Date.parse(outcome.nextDueAt));
+      // The wire floor (`DRAFT_ADVANCE_CONFIG.minPickSpacingMs`): a next instant already at hand
+      // (the pick this outcome landed ran late, or the job stopped at its one action with more
+      // due) is applied no sooner than the floor from now, never in the same breath.
+      const floorMs = outcome.applied > 0 ? Date.parse(clock.now()) + DRAFT_ADVANCE_CONFIG.minPickSpacingMs : 0;
+      return schedule(outcome.draftId, outcome.sequence, Math.max(Date.parse(outcome.nextDueAt), floorMs));
     },
   };
 }

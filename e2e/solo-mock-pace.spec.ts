@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { JOBS_CONFIG } from "../src/jobs/config";
 import { MOCK_CONFIG } from "../src/mock-draft/config";
 import { expect, test } from "./support/fixtures";
 
@@ -20,11 +21,16 @@ const PICK_SECONDS = Number(process.env.E2E_PICK_SECONDS ?? 60);
 const HUMAN_SEAT = 7;
 const MIN_BOT_GAP_MS = 300;
 const HUMAN_THINK_MS = 1_500;
+/** A clock longer than one wake's sleep (`JOBS_CONFIG.selfWakeMaxSleepMs`) is let run once. */
+const LET_CLOCK_RUN_ABOVE_MS = JOBS_CONFIG.selfWakeMaxSleepMs;
+/** One sleep slice past 0:00, plus the pick's own transaction and relay. */
+const EXPIRY_SLACK_MS = JOBS_CONFIG.selfWakeSleepSliceMs + 2_000;
 /** Every pick of a 12-team, full-roster mock, paced at the top of the delay window, plus slack. */
-const DRAFT_TIMEOUT_MS = TEAM_COUNT * 16 * (MOCK_CONFIG.botDelay.baseMs + MOCK_CONFIG.botDelay.jitterMs) + 15 * HUMAN_THINK_MS + 120_000;
+const DRAFT_TIMEOUT_MS = TEAM_COUNT * 16 * (MOCK_CONFIG.botDelay.baseMs + MOCK_CONFIG.botDelay.jitterMs) + 15 * HUMAN_THINK_MS + PICK_SECONDS * 1_000 + 120_000;
 
 interface Frame {
   readonly t: number;
+  readonly type: string;
   readonly pick: number | null;
   readonly team: string | null;
   readonly onClock: string | null;
@@ -40,7 +46,7 @@ const RECORDER = `(() => {
     for (const type of ["draft.pick", "draft.status", "draft.timer_expire"]) es.addEventListener(type, (e) => {
       let p = null; try { p = JSON.parse(e.data); } catch {}
       const pl = p && p.payload ? p.payload : {};
-      W.__pace.frames.push({ t: performance.timeOrigin + performance.now(), pick: pl.pickNumber ?? null, team: pl.teamId ?? null, onClock: pl.clock ? pl.clock.onClockTeamId : null, phase: pl.clock ? pl.clock.phase ?? null : null });
+      W.__pace.frames.push({ t: performance.timeOrigin + performance.now(), type, pick: pl.pickNumber ?? null, team: pl.teamId ?? null, onClock: pl.clock ? pl.clock.onClockTeamId : null, phase: pl.clock ? pl.clock.phase ?? null : null });
     });
     return es;
   }
@@ -64,14 +70,24 @@ test("a 12-team solo mock drafts to completion on the jobs' pacing, every bot pi
   await expect(managerA.getByTestId("quilt-room")).toBeVisible();
 
   let lastHumanPick = 0;
+  // THE CLOCK THAT RUNS OUT (review finding 1): on a clock longer than one wake's sleep, the
+  // human's first turn is left to expire, so the run proves the chained wake lands the expiry
+  // within one slice of 0:00 rather than a cron minute later.
+  const letFirstClockRun = PICK_SECONDS * 1_000 > LET_CLOCK_RUN_ABOVE_MS;
+  let letRunDeadlineMs: number | null = null;
   const deadline = Date.now() + DRAFT_TIMEOUT_MS - 30_000;
   while (Date.now() < deadline) {
     const state = await managerA.request.get(`/api/drafts/${draftId}`);
-    const snapshot = (await state.json()) as { readonly ok: boolean; readonly data: { readonly draft: { readonly phase: string; readonly onClockTeamId: string | null; readonly pickNumber: number; readonly availablePlayerIds: readonly string[] } } };
+    const snapshot = (await state.json()) as { readonly ok: boolean; readonly data: { readonly draft: { readonly phase: string; readonly onClockTeamId: string | null; readonly pickNumber: number; readonly deadlineAt: string | null; readonly availablePlayerIds: readonly string[] } } };
     const draft = snapshot.data.draft;
     if (draft.phase === "complete") break;
     if (draft.onClockTeamId === teamId && draft.pickNumber > lastHumanPick) {
       lastHumanPick = draft.pickNumber;
+      if (letFirstClockRun && letRunDeadlineMs === null && draft.deadlineAt !== null) {
+        letRunDeadlineMs = Date.parse(draft.deadlineAt);
+        await managerA.waitForTimeout(250);
+        continue;
+      }
       await managerA.waitForTimeout(HUMAN_THINK_MS);
       // The best man the roster can still take: late in the draft only a kicker or a defense
       // fits (the must-pick line), and the board's top name is refused, so walk the board.
@@ -104,4 +120,14 @@ test("a 12-team solo mock drafts to completion on the jobs' pacing, every bot pi
   const tooClose = gaps.filter((gap) => gap.gapMs < MIN_BOT_GAP_MS);
   expect(tooClose, `bot picks landing within ${MIN_BOT_GAP_MS} ms of the previous: ${JSON.stringify(tooClose)}`).toEqual([]);
   expect(gaps.length).toBeGreaterThan(100);
+
+  if (letRunDeadlineMs !== null) {
+    const expiries = (await frames(managerA)).filter((frame) => frame.type === "draft.timer_expire" && frame.t >= letRunDeadlineMs! - 1_000);
+    const expiry = expiries[0];
+    expect(expiry, "the let-run clock never expired on the wire").toBeDefined();
+    const lateMs = expiry!.t - letRunDeadlineMs;
+    console.log(`[pace] the ${PICK_SECONDS} s clock that ran out expired ${Math.round(lateMs)} ms after 0:00 at the browser`);
+    expect(lateMs).toBeGreaterThanOrEqual(-50);
+    expect(lateMs).toBeLessThan(EXPIRY_SLACK_MS);
+  }
 });

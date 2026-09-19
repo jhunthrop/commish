@@ -10,6 +10,7 @@ import { createMemoryWakeSet, wakeMember } from "@/jobs/wake";
 import { createMockBotDriver } from "@/mock-draft-service/driver";
 import { createDraftAdvancer } from "./advance";
 import { JOBS_CONFIG } from "@/jobs/config";
+import { DRAFT_ADVANCE_CONFIG } from "./config";
 import { createDraftPacer, hasLivePacingJob, isPacingChainLive, NO_OP_PACER, pacingEnabledIn, pendingPacingJobs } from "./pacing";
 import { createDraftStore, type DraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
@@ -165,5 +166,21 @@ describe("the pacer", () => {
     expect(fromOutcome.kind).toBe("scheduled");
     expect(await NO_OP_PACER.pace(started.state)).toEqual({ kind: "nothing-due" });
     expect(await db.select().from(jobs)).toHaveLength(1);
+  });
+
+  it("the wire floor (review fix round): a next instant already at hand after a landed action is paced no sooner than minPickSpacingMs from now; a future instant and a no-op outcome keep their own", async () => {
+    const fixture = await seedMock("floor", 2);
+    const store = testStore();
+    const started = await store.startDraft(fixture.draftId);
+    if (!started.ok) throw new Error(started.reason);
+    const pacer = createDraftPacer({ db, clock, mockDriver: createMockBotDriver({ db, store }), wake: createMemoryWakeSet(), selfWake: recordingWake() });
+    const outcome = { draftId: fixture.draftId, exhausted: false, phase: "in_progress" as const, outcome: "ok" as const, wedged: false };
+    const late = await pacer.paceFromOutcome({ ...outcome, applied: 1, nextDueAt: atMs(-2_000), sequence: 2 });
+    expect(late.kind === "scheduled" && late.dueAt).toBe(atMs(DRAFT_ADVANCE_CONFIG.minPickSpacingMs));
+    const ahead = await pacer.paceFromOutcome({ ...outcome, applied: 1, nextDueAt: atMs(700), sequence: 3 });
+    expect(ahead.kind === "scheduled" && ahead.dueAt).toBe(atMs(700));
+    // Nothing landed: a stale instant is the room's own to apply now, no floor.
+    const idle = await pacer.paceFromOutcome({ ...outcome, applied: 0, nextDueAt: atMs(-2_000), sequence: 4 });
+    expect(idle.kind === "scheduled" && idle.dueAt).toBe(atMs(-2_000));
   });
 });

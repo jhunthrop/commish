@@ -11,14 +11,16 @@ export const ADVISOR_CONFIG = {
    *  budget this constant is held to, and the count the card states. */
   runs: 200,
   /** Runs played before the simulation yields one macrotask (draft-room performance round, item
-   *  1; `simulateRoomOddsInChunks`). Eight runs of a 12-team room are about 25 ms on Apple
-   *  silicon (200 runs measured 587 ms), so a pick request or a pacing timer sharing the
-   *  invocation waits at most that long, never the whole table. */
-  simChunkRuns: 8,
-  /** Candidates a shortlist scores before yielding (draft-room performance round, item 3's
-   *  second pass; `recommendPickInChunks`). Each candidate re-values the whole board, about 3 ms
-   *  on the real one, so four is roughly one sim chunk's worth of holding the loop. */
-  recommendChunkCandidates: 4,
+   *  1; `simulateRoomOddsInChunks`). Two runs of a 12-team room are about 3 ms on Apple silicon
+   *  (200 runs measured 250 ms after the pool index), so a pick's database round trip sharing
+   *  the invocation waits at most that long, never the whole table. */
+  simChunkRuns: 2,
+  /** Candidates a shortlist scores before yielding (`recommendPickInChunks`). Each candidate
+   *  re-values the whole board, about 3 ms on the real one. ONE, like two sim runs above (review
+   *  fix round): a pacing job on the same instance is twenty database round trips, and every one
+   *  of them resumes only after the running chunk; at eight runs (25 ms) a pick's own path
+   *  stretched to over a second behind the previous pick's facts and two picks stacked. */
+  recommendChunkCandidates: 1,
   /** How many candidates `recommendPick` ranks for every seat, on or off the clock: the card's
    *  pick is the first the runs leave on the board past the reach floor, the tab's rows are the
    *  rest, and the on-clock seat's whole shortlist is held off its own current pick in the runs

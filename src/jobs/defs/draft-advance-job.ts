@@ -74,8 +74,10 @@ export async function runDraftAdvanceStep(payload: DraftAdvanceJobPayload, deps:
     return { summary: `draft-advance ${draftId}: superseded, the room stands at sequence ${state.sequence} (paced at ${sequence}); ${line}.`, detail: [] };
   }
   // The store's own follow-through is off for this call: the job paces and publishes itself,
-  // in that order, so the next pick's wake is on its way before the facts compute begins.
-  const outcome = await pickPath.time("job.advance", () => deps.advance(draftId, deps.clock.now(), { followThrough: false }), (result) => ({ draftId, applied: result.applied, sequence: result.sequence, pacedAt: sequence }));
+  // in that order, so the next pick's wake is on its way before the facts compute begins. ONE
+  // action per run (review fix round): a room that fell behind catches up pick by pick, each on
+  // its own wake no sooner than the wire floor (`paceFromOutcome`), never two in one breath.
+  const outcome = await pickPath.time("job.advance", () => deps.advance(draftId, deps.clock.now(), { followThrough: false, maxActions: 1 }), (result) => ({ draftId, applied: result.applied, sequence: result.sequence, pacedAt: sequence }));
   if (outcome.outcome === "error") throw new DraftAdvanceTransientError(draftId);
   const paced = await deps.pacer.paceFromOutcome(outcome);
   const pacedLine = paced.kind === "scheduled" ? `next due ${paced.dueAt} (job ${paced.jobId}${paced.retired > 0 ? `, ${paced.retired} retired` : ""})` : paced.kind === "already-scheduled" ? `next due ${paced.dueAt} (already queued)` : "nothing due";

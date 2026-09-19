@@ -99,12 +99,15 @@ describe("the draft-advance job", () => {
     const store = testStore();
     const started = await store.startDraft(fixture.draftId);
     if (!started.ok) throw new Error(started.reason);
-    const deps = depsFor(store);
+    const advance = vi.fn(createDraftAdvancer({ db, store, mockDriver: createMockBotDriver({ db, store }) }).advance);
+    const deps = depsFor(store, { advance });
     now = atMs(60_000);
     const outcome = await runDraftAdvanceStep({ draftId: fixture.draftId, sequence: started.state.sequence }, deps);
     expect(outcome.summary).toMatch(/applied \d+/);
+    // One action per run (the wire floor's other half), whatever is due.
+    expect(advance).toHaveBeenCalledWith(fixture.draftId, now, { followThrough: false, maxActions: 1 });
     expect(deps.paced).toHaveLength(1);
-    expect(deps.paced[0]!.applied).toBeGreaterThan(0);
+    expect(deps.paced[0]!.applied).toBe(1);
     const fresh = (await store.getDraftState(fixture.draftId))!;
     expect(deps.published).toEqual(fresh.phase === "in_progress" ? [fresh.sequence] : []);
   });

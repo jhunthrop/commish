@@ -76,6 +76,15 @@ export const DRAFT_ADVANCE_CONFIG = {
    * publishes at the fail-fast bound) with margin.
    */
   sweepReserveMs: 16_000,
+  /**
+   * THE WIRE FLOOR (review fix round, finding 1's second pass): a pacing job applies ONE action
+   * per run and paces the next no sooner than this after the pick it just landed, so a pick that
+   * ran late can never share the wire with the one after it; the founder's "two picks at once"
+   * has a hard floor whatever an instance's load. Stamps are untouched (every action is still
+   * stamped at its seeded due instant), only the instant it is applied moves, and only when it
+   * was already late. The acceptance's own number.
+   */
+  minPickSpacingMs: 300,
 } as const;
 
 export const DRAFT_NUDGE_CONFIG = {
