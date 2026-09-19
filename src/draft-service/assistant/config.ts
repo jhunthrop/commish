@@ -10,6 +10,11 @@ export const ADVISOR_CONFIG = {
    *  furthest next turn at the worst case a room can pose (14 teams, 16 rounds, pick 1) is the
    *  budget this constant is held to, and the count the card states. */
   runs: 200,
+  /** Runs played before the simulation yields one macrotask (draft-room performance round, item
+   *  1; `simulateRoomOddsInChunks`). Eight runs of a 12-team room are about 25 ms on Apple
+   *  silicon (200 runs measured 587 ms), so a pick request or a pacing timer sharing the
+   *  invocation waits at most that long, never the whole table. */
+  simChunkRuns: 8,
   /** How many candidates `recommendPick` ranks for every seat, on or off the clock: the card's
    *  pick is the first the runs leave on the board past the reach floor, the tab's rows are the
    *  rest, and the on-clock seat's whole shortlist is held off its own current pick in the runs

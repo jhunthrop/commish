@@ -68,6 +68,17 @@ export interface DraftStoreDeps {
    * set still lands its notes; tests hand in a memory set.
    */
   readonly wake?: WakeSet;
+  /**
+   * THE POST-COMMIT FOLLOW-THROUGH (draft-room performance round, item 1): called with the state
+   * an accepted action produced, after the commit, the broadcast and the wake note — the one seam
+   * every accepted action passes, whichever driver submitted it. The edge wires the pick's own
+   * follow-through here (the room's facts for the advisor); a refusal never reaches it. Synchronous
+   * by contract: the hook defers its own work past the response and owns its own failures, and a
+   * hook that throws is logged here, so nothing it does can fail, delay or reorder the write it
+   * follows. A caller that must not follow through (the stream's own advance loop, whose process
+   * relays only) opts out per call with `ApplyOptions.followThrough`.
+   */
+  readonly afterApplied?: (state: DraftState, action: DraftAction) => void;
 }
 
 export type ApplyResult =
@@ -91,6 +102,8 @@ export interface ApplyOptions {
   readonly alsoInTransaction?: (tx: DbTx) => Promise<readonly MemberNotice[] | void>;
   /** Who submitted this action. Absent means the clock acted (a `TIMER_EXPIRE`, never a person). */
   readonly actor?: { readonly id: string };
+  /** Whether the store's `afterApplied` hook runs for this action. Defaults to true; see the hook. */
+  readonly followThrough?: boolean;
 }
 
 export type CommitResult =
@@ -289,6 +302,7 @@ export function createDraftStore({
   audit = getAuditLogger(),
   deliverNotice: deliver = deliverNotice,
   wake,
+  afterApplied,
 }: DraftStoreDeps): DraftStore {
   const cache = new Map<string, DraftState>();
   const mutex = createKeyedMutex();
@@ -656,6 +670,14 @@ export function createDraftStore({
               await deliver(notice);
             } catch (error: unknown) {
               onPublishError?.(error, { type: "notice.created", leagueId: notice.leagueId ?? "" });
+            }
+          }
+          // LAST, and never awaited: see `DraftStoreDeps.afterApplied`.
+          if (afterApplied !== undefined && applied !== null && options?.followThrough !== false) {
+            try {
+              afterApplied(outcome.state, applied);
+            } catch (error: unknown) {
+              console.error("[draft] afterApplied hook threw", { draftId }, error);
             }
           }
           return outcome;

@@ -95,6 +95,41 @@ export function simulateRoomOdds(input: RoomOddsInput): RoomOddsTable {
   return { runs, fromPick: state.pickNumber, throughPick, played };
 }
 
+export interface ChunkedSimulationOptions {
+  /** Runs per chunk; the event loop gets a turn between chunks. */
+  readonly chunkRuns: number;
+  /** Test seam over the yield itself. Defaults to one macrotask (`setImmediate`). */
+  readonly yieldToEventLoop?: () => Promise<void>;
+}
+
+const nextMacrotask = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+/**
+ * THE SAME TABLE, IN CHUNKS (draft-room performance round, item 1). A 12-team room's 200 runs are
+ * 600 to 900 ms of CPU (Phase 1 ledger); held in one synchronous stretch they block every timer
+ * and every other request on the invocation that computes them. Each run is seeded by its own
+ * index (`seed + runIndex`) and shares nothing with its neighbours, so playing them a chunk at a
+ * time and yielding one macrotask between chunks changes no run and no number: `room-odds.test.ts`
+ * pins the two entry points equal for the same input. The chunk size is the caller's
+ * (`ADVISOR_CONFIG.simChunkRuns` in the service), so the longest stretch the loop is held is one
+ * chunk's worth of runs.
+ */
+export async function simulateRoomOddsInChunks(input: RoomOddsInput, options: ChunkedSimulationOptions): Promise<RoomOddsTable> {
+  const { state, seed, drivers, excludeFromOnClockSeat } = input;
+  const runs = input.runs ?? ROOM_ODDS_RUNS;
+  const furthest = furthestNextTurn(state);
+  const throughPick = furthest === null ? state.pickNumber - 1 : furthest - 1;
+  if (furthest === null) return { runs, fromPick: state.pickNumber, throughPick, played: Array.from({ length: runs }, (): readonly PlayedPick[] => []) };
+  const yieldToEventLoop = options.yieldToEventLoop ?? nextMacrotask;
+  const chunkRuns = Math.max(1, options.chunkRuns);
+  const played: (readonly PlayedPick[])[] = [];
+  for (let runIndex = 0; runIndex < runs; runIndex += 1) {
+    if (runIndex > 0 && runIndex % chunkRuns === 0) await yieldToEventLoop();
+    played.push(continueRoom({ state, seed: seed + runIndex, throughPick, excludeFromOnClockSeat, drivers }).played);
+  }
+  return { runs, fromPick: state.pickNumber, throughPick, played };
+}
+
 /** Whether one run played every pick before `pickNumber` (or the draft owed none). */
 function reached(run: readonly PlayedPick[], fromPick: number, pickNumber: number): boolean {
   const needed = pickNumber - fromPick;

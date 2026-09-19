@@ -729,3 +729,26 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick, deadline-driven)", () => 
   });
 });
 
+describe("the follow-through opt-out (draft-room performance round, item 1)", () => {
+  it("advance threads opts.followThrough into every action it applies; the default keeps the store's own follow-through on", async () => {
+    const fixture = await seedAbandonedMock("follow", { botTeams: 2, pickSeconds: 30 });
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+    const options: (unknown | undefined)[] = [];
+    const spying: DraftStore = {
+      ...store,
+      applyAction: (draftId, action, opts) => {
+        options.push(opts);
+        return store.applyAction(draftId, action, opts);
+      },
+    };
+    const advancer = createDraftAdvancer({ db, store: spying, mockDriver: createMockBotDriver({ db, store }) });
+    now = atMs(2 * 60_000);
+    const outcome = await advancer.advance(fixture.draftId, now, { maxActions: 2, followThrough: false });
+    expect(outcome.applied).toBe(2);
+    expect(options).toEqual([{ followThrough: false }, { followThrough: false }]);
+    await advancer.advance(fixture.draftId, now, { maxActions: 1 });
+    expect(options.at(-1)).toEqual({ followThrough: true });
+  });
+});
+

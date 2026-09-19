@@ -9,13 +9,13 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@/db/schema";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { getDraftStore } from "@/draft-service";
+import { awaitDraftFollowThroughForTests, getDraftStore } from "@/draft-service";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { simulateRoomOdds } from "../sim/room-odds";
 import { ADVISOR_CONFIG } from "./config";
 import { resetAdvisorMemoForTests } from "./memo";
 import { recommendNow } from "./recommend";
-import { advisorFor, warmAdvisorRoom } from "./service";
+import { advisorFor, publishRoomFacts, warmAdvisorRoom } from "./service";
 
 const db = createTestDb();
 const DRAFT_ID = "draft_advisor_service";
@@ -38,6 +38,10 @@ async function fixture() {
   );
   const started = await getDraftStore().startDraft(DRAFT_ID);
   if (!started.ok) throw new Error(started.reason);
+  // The process-wide store's own follow-through (item 1) computes the start's facts at once
+  // outside a request scope; these tests count THEIR simulate, so that entry is forgotten.
+  await awaitDraftFollowThroughForTests();
+  resetAdvisorMemoForTests();
   const userFor = (teamId: string) => f.userIds[f.teamIds.indexOf(teamId)]!;
   return { onClockUser: userFor(started.state.draftOrder[0]!), waitingUser: userFor(started.state.draftOrder[1]!) };
 }
@@ -87,6 +91,31 @@ describe("advisorFor", () => {
     await warmAdvisorRoom(db, DRAFT_ID, { simulate });
     await warmAdvisorRoom(db, "no_such_draft", { simulate });
     expect(simulate).toHaveBeenCalledTimes(1);
+  });
+
+  it("publishRoomFacts computes for the state it is handed (the pick's own invocation, nothing re-read), and a viewer racing it shares the one in-flight compute (item 1)", async () => {
+    const { onClockUser } = await fixture();
+    const state = (await getDraftStore().getDraftState(DRAFT_ID))!;
+    let release: (() => void) | null = null;
+    const simulate = vi.fn((input: Parameters<typeof simulateRoomOdds>[0]) => new Promise<ReturnType<typeof simulateRoomOdds>>((resolve) => { release = () => resolve(simulateRoomOdds(input)); }));
+    const publishing = publishRoomFacts(db, state, { simulate });
+    const viewing = advisorFor(db, DRAFT_ID, onClockUser, { simulate });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(simulate).toHaveBeenCalledTimes(1);
+    release!();
+    await publishing;
+    expect(await viewing).not.toBeNull();
+    expect(simulate).toHaveBeenCalledTimes(1);
+    // A state that is not running publishes nothing.
+    await publishRoomFacts(db, { ...state, phase: "complete" }, { simulate });
+    expect(simulate).toHaveBeenCalledTimes(1);
+  });
+
+  it("the default simulation yields to the event loop between chunks, so the pick's own invocation never holds it for the whole table (item 1)", async () => {
+    const { onClockUser } = await fixture();
+    const view = await advisorFor(db, DRAFT_ID, onClockUser);
+    expect(view!.odds!.runs).toBe(ADVISOR_CONFIG.runs);
+    expect(ADVISOR_CONFIG.simChunkRuns).toBeLessThan(ADVISOR_CONFIG.runs);
   });
 
   it("is null for a member with no seat and before the draft runs", async () => {

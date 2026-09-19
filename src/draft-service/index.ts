@@ -1,10 +1,12 @@
 import { getDb } from "@/db/client";
+import type { DraftState } from "@/draft-engine";
+import { runAfterResponse } from "@/lib/api/after-response";
 import { isLLMEnabled, getLlmClient } from "@/lib/llm/client";
 import { getPublisher } from "@/lib/realtime/publisher";
 import type { PublishFn } from "./store";
 import { createMockBotDriver, type MockBotDriver } from "@/mock-draft-service/driver";
 import { createDraftAdvancer, draftLoopTarget, runDraftAdvanceLoop, type AdvanceLoopHandle, type DraftAdvancer } from "./advance";
-import { warmAdvisorRoom } from "./assistant/service";
+import { publishRoomFacts } from "./assistant/service";
 import { createNudgeScheduler, type NudgeScheduler } from "./nudge";
 import { createNudgeCopy } from "./nudge-copy";
 import { createDraftStore, type DraftStore } from "./store";
@@ -42,6 +44,37 @@ export function logDraftNudgeError(error: unknown, context: unknown): void {
  */
 export const publishDraftEvent: PublishFn = (input) => getPublisher().publish(input);
 
+/**
+ * THE PICK'S FOLLOW-THROUGH (draft-room performance round, item 1): what every accepted action
+ * owes once it has committed — the room's facts for the new state, so the viewers' `/assistant`
+ * requests read instead of simulate — run on the invocation that made it, after its response has
+ * gone (`runAfterResponse`), never before the writer's own answer and never on the stream's
+ * process (whose advance loop opts out per call). Owns its failure: a compute that fails costs
+ * the next viewer a single-flight compute on the request path, exactly what a miss always cost.
+ */
+export async function followThroughAppliedAction(state: DraftState): Promise<void> {
+  try {
+    await publishRoomFacts(getDb(), state);
+  } catch (error: unknown) {
+    console.error("[draft] room facts follow-through failed", { draftId: state.config.draftId, sequence: state.sequence }, error);
+  }
+}
+
+/** The follow-throughs in flight, chained so a test can settle the last one (`awaitDraftFollowThroughForTests`). */
+let followThroughTail: Promise<void> = Promise.resolve();
+
+function scheduleFollowThrough(state: DraftState): void {
+  runAfterResponse(() => {
+    followThroughTail = followThroughTail.then(() => followThroughAppliedAction(state));
+    return followThroughTail;
+  });
+}
+
+/** Test seam only: settles every follow-through the store's hook has scheduled so far. */
+export function awaitDraftFollowThroughForTests(): Promise<void> {
+  return followThroughTail;
+}
+
 export function getDraftStore(): DraftStore {
   if (store === undefined) {
     store = createDraftStore({
@@ -49,6 +82,7 @@ export function getDraftStore(): DraftStore {
       publish: publishDraftEvent,
       clock: systemClock,
       onPublishError: logDraftPublishError,
+      afterApplied: scheduleFollowThrough,
     });
   }
   return store;
@@ -136,36 +170,18 @@ export async function advanceDraftNow(draftId: string): Promise<void> {
 }
 
 /**
- * THE ADVISOR'S BACKGROUND WARM (founder report 2026-09-08, the hang): fired by the watcher
- * loop on every sequence it observes, one macrotask later. The yield matters: the loop's own
- * tick runs right after the pick's commit, and the room-facts compute is synchronous CPU —
- * running it inline would sit between the pick's frame reaching Redis and the stream relaying
- * it to the watching browser. One `setTimeout(0)` lets that relay (and any request already
- * queued) go first. Never throws into the loop; a failed warm costs the next viewer a cold
- * compute, which is the request path as it was.
- *
- * THE TRADE-OFF (review of the pace round): the warm shares the one event loop with the pace
- * itself. A compute that runs longer than the gap to the next bot pick (450 ms at the
- * tightest; the compute measured 100-260 ms) delays that pick's timer by the overrun — a
- * slightly late pick, stamped at its own due instant regardless, never a pile-up, because
- * the memo is keyed by the log sequence and `roomFactsFor` answers a held sequence without
- * computing: a second warm for the same state, or a viewer's request racing the warm, finds
- * the entry (or waits behind the synchronous compute) rather than computing again.
- */
-function scheduleAdvisorWarm(draftId: string): void {
-  setTimeout(() => {
-    warmAdvisorRoom(getDb(), draftId).catch((error: unknown) => {
-      console.error("[draft] advisor warm failed", { draftId }, error);
-    });
-  }, 0);
-}
-
-/**
  * THE SSE STREAM'S TICK (driver 2): called by the league events route as it accepts a
  * connection. Resolves the league's draft and — while it still has work to ever do — runs the
  * advance loop until the client disconnects or the draft completes, handing back the handle the
  * route wakes with each draft frame it relays. Never-throwing for the same reason
  * `advanceDraftNow` is: the stream must open regardless; `null` means no loop runs.
+ *
+ * THE STREAM RELAYS ONLY (draft-room performance round, item 1). The 2026-09-08 advisor warm used
+ * to ride this loop's `onSequence`: 600 to 1100 ms of synchronous simulation on the very event
+ * loop that paces the bots and relays their frames, which is what the founder saw as a hang and
+ * then two picks at once (the round's ledger). Nothing hangs off the loop now, and the actions it
+ * applies opt out of the store's follow-through: the facts are the pick's own invocation's
+ * business elsewhere, and a bot pick this loop lands leaves its facts to the viewer's request.
  */
 export async function startDraftAdvanceLoopForLeague(leagueId: string, signal: AbortSignal): Promise<AdvanceLoopHandle | null> {
   try {
@@ -173,7 +189,7 @@ export async function startDraftAdvanceLoopForLeague(leagueId: string, signal: A
     // stays pure wiring.
     const draftId = await draftLoopTarget(getDb(), leagueId, systemClock.now());
     if (draftId === null) return null;
-    return runDraftAdvanceLoop(draftId, signal, { advance: getDraftAdvancer().advance, clock: systemClock, onSequence: () => scheduleAdvisorWarm(draftId) });
+    return runDraftAdvanceLoop(draftId, signal, { advance: (id, now) => getDraftAdvancer().advance(id, now, { followThrough: false }), clock: systemClock });
   } catch (error: unknown) {
     console.error("[draft] could not start the stream's advance loop", { leagueId }, error);
     return null;

@@ -81,11 +81,19 @@ export interface AdvanceOutcome {
   readonly sequence: number | null;
 }
 
+export interface AdvanceOptions {
+  /** A caller with its own budget (the sweep job) caps this call under the advancer's ceiling. */
+  readonly maxActions?: number;
+  /** Whether the store's post-commit follow-through runs for the actions this call applies
+   *  (`ApplyOptions.followThrough`). Defaults to true; the stream's own loop passes false, because
+   *  its process relays only (draft-room performance round, item 1). */
+  readonly followThrough?: boolean;
+}
+
 export interface DraftAdvancer {
   /** Apply all due work for one draft as of `now`. NEVER throws — a broken advance must not
-   *  fail the read (or the stream, or the sweep) that triggered it. `opts.maxActions` lets a
-   *  caller with its own budget (the sweep job) cap this call under the advancer's ceiling. */
-  advance(draftId: string, now: string, opts?: { readonly maxActions?: number }): Promise<AdvanceOutcome>;
+   *  fail the read (or the stream, or the sweep) that triggered it. */
+  advance(draftId: string, now: string, opts?: AdvanceOptions): Promise<AdvanceOutcome>;
 }
 
 export interface DraftAdvancerDeps {
@@ -167,7 +175,7 @@ export function createDraftAdvancer({
    *  otherwise the clock's own expiry. `waiting` when nothing is due yet, carrying the earlier of
    *  the bot's due instant and the deadline; `dueWork` names what was attempted so a wedged trip
    *  can say what the draft is stuck on (fix round MEDIUM 3). */
-  async function applyNextDue(state: DraftState, nowMs: number): Promise<NextDue> {
+  async function applyNextDue(state: DraftState, nowMs: number, followThrough: boolean): Promise<NextDue> {
     let botDueAtMs: number | null = null;
     if (state.config.isMock === true) {
       const due = await mockDriver.dueBotPick(state);
@@ -180,7 +188,7 @@ export function createDraftAdvancer({
           // the first whole millisecond at-or-after it, so the recorded instant never precedes
           // the true due instant and two advancers stamp identically.
           const timestamp = new Date(Math.ceil(due.dueAtMs)).toISOString();
-          const result = await store.applyAction(state.config.draftId, { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp, teamId: due.teamId, playerId });
+          const result = await store.applyAction(state.config.draftId, { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp, teamId: due.teamId, playerId }, { followThrough });
           return { kind: "applied", dueWork: `bot-pick due ${timestamp}`, result };
         }
       }
@@ -192,20 +200,20 @@ export function createDraftAdvancer({
       const dueAtMs = botDueAtMs !== null && (deadlineMs === null || botDueAtMs < deadlineMs) ? botDueAtMs : deadlineMs;
       return { kind: "waiting", dueAtMs };
     }
-    const result = await store.applyAction(state.config.draftId, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: deadline! });
+    const result = await store.applyAction(state.config.draftId, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: deadline! }, { followThrough });
     return { kind: "applied", dueWork: `expire due ${deadline}`, result };
   }
 
   /** The in-progress loop: apply due work until nothing is due, the ceiling is hit, or the
    *  refusal breaker trips. Returns the state it ended on and what the drivers need next. */
-  async function applyDueWork(initial: DraftState, now: string, maxActions: number, alreadyApplied: number): Promise<DueLoopResult | null> {
+  async function applyDueWork(initial: DraftState, now: string, maxActions: number, alreadyApplied: number, followThrough: boolean): Promise<DueLoopResult | null> {
     const nowMs = Date.parse(now);
     let state = initial;
     let applied = alreadyApplied;
     let refusals = 0;
     while (state.phase === "in_progress") {
       if (applied >= maxActions) return { state, applied, exhausted: true, wedged: false, nextDueAt: now };
-      const attempt = await applyNextDue(state, nowMs);
+      const attempt = await applyNextDue(state, nowMs, followThrough);
       if (attempt.kind === "waiting") {
         // Nothing due — the clock is still running: the moderator's window, exactly where
         // `tickOne` gives it. It never applies an action, so it can never change what this
@@ -238,7 +246,7 @@ export function createDraftAdvancer({
     return { state, applied, exhausted: false, wedged: false, nextDueAt: null };
   }
 
-  async function advanceOrThrow(draftId: string, now: string, maxActions: number): Promise<AdvanceOutcome> {
+  async function advanceOrThrow(draftId: string, now: string, maxActions: number, followThrough: boolean): Promise<AdvanceOutcome> {
     // Terminal statuses first (fix round MEDIUM 2): a DISSOLVED draft still carries an
     // action log — replaying it looks in_progress — but nothing may ever advance it again,
     // so it classifies with not_found (a loop stops, a read just renders what it has). One
@@ -258,7 +266,7 @@ export function createDraftAdvancer({
       state = fresh;
     }
 
-    const loop = await applyDueWork(state, now, maxActions, applied);
+    const loop = await applyDueWork(state, now, maxActions, applied, followThrough);
     if (loop === null) return report(draftId, applied, { outcome: "not_found" });
     // A finished mock settles its status row in the same call (`settleMockDraftCompletion`
     // is guarded and idempotent), so its `liveDraftsQuery` slot frees immediately — the same
@@ -277,7 +285,7 @@ export function createDraftAdvancer({
     async advance(draftId, now, opts) {
       const maxActions = Math.min(maxActionsPerAdvance, opts?.maxActions ?? maxActionsPerAdvance);
       try {
-        return await advanceOrThrow(draftId, now, maxActions);
+        return await advanceOrThrow(draftId, now, maxActions, opts?.followThrough ?? true);
       } catch (error: unknown) {
         // The ticker's own discipline, held per call: one draft's DB error must not fail the
         // read (or stream, or sweep) that triggered the advance.

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { createTestDb, recordStatements, truncateAll } from "@/db/test-db";
@@ -1147,5 +1147,38 @@ describe("draft store — the mock lane (Task 4)", () => {
     expect(result.ok).toBe(true);
     expect(await db.select().from(memberNotices)).toHaveLength(0);
     expect(await db.select().from(auditEvents)).toHaveLength(0);
+  });
+});
+
+describe("draft store — the post-commit follow-through hook (draft-room performance round, item 1)", () => {
+  it("calls afterApplied with the state an accepted action produced, after the commit and the broadcast, and never for a refusal", async () => {
+    const { draftId, teamIds } = await fixture();
+    const seen: { sequence: number; type: string; publishedSoFar: number }[] = [];
+    const store = createDraftStore({
+      db, publish, clock, deliverNotice: deliverNoticeFake,
+      afterApplied: (state, action) => { seen.push({ sequence: state.sequence, type: action.type, publishedSoFar: published.length }); },
+    });
+    await store.applyAction(draftId, start(teamIds));
+    await store.applyAction(draftId, pick(teamIds[0]!, "qb1"));
+    // A refusal: the same team picks again out of turn.
+    expect((await store.applyAction(draftId, pick(teamIds[0]!, "rb1"))).ok).toBe(false);
+    expect(seen).toEqual([
+      { sequence: 1, type: "START_DRAFT", publishedSoFar: 1 },
+      { sequence: 2, type: "MAKE_PICK", publishedSoFar: 2 },
+    ]);
+  });
+
+  it("a hook that throws is logged and never fails the accepted action; followThrough: false skips it", async () => {
+    const { draftId, teamIds } = await fixture();
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const hook = vi.fn(() => { throw new Error("hook broke"); });
+    const store = createDraftStore({ db, publish, clock, deliverNotice: deliverNoticeFake, afterApplied: hook });
+    expect((await store.applyAction(draftId, start(teamIds))).ok).toBe(true);
+    expect(hook).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledWith("[draft] afterApplied hook threw", expect.objectContaining({ draftId }), expect.any(Error));
+    expect((await store.applyAction(draftId, pick(teamIds[0]!, "qb1"), { followThrough: false })).ok).toBe(true);
+    expect(hook).toHaveBeenCalledTimes(1);
+    expect(await actionRows(draftId)).toHaveLength(2);
+    error.mockRestore();
   });
 });

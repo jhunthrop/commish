@@ -12,7 +12,49 @@ vi.mock("@/lib/realtime/publisher", () => ({
   getPublisher: vi.fn(() => ({ publish: publishSpy })),
 }));
 
-import { getDraftStore, getDraftTicker, logDraftNudgeError, logDraftPublishError, publishDraftEvent } from "./index";
+import { players } from "@/db/schema";
+import { createTestDb, truncateAll } from "@/db/test-db";
+import { heldRoomFacts, resetAdvisorMemoForTests } from "./assistant/memo";
+import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
+import { awaitDraftFollowThroughForTests, followThroughAppliedAction, getDraftStore, getDraftTicker, logDraftNudgeError, logDraftPublishError, publishDraftEvent } from "./index";
+
+const db = createTestDb();
+
+describe("the pick's follow-through (draft-room performance round, item 1)", () => {
+  it("every action the process-wide store accepts computes the room's facts for its new state, after the response, and the stream's loop is the one caller that opts out", async () => {
+    await truncateAll(db);
+    resetAdvisorMemoForTests();
+    const fixture = await seedDraftFixture(db, {
+      draftId: "draft_follow_through", leagueId: "league_follow_through", format: "snake", teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+    await db.insert(players).values([
+      { id: "qb1", name: "QB One", position: "QB", nflTeam: "KC" },
+      { id: "qb2", name: "QB Two", position: "QB", nflTeam: "KC" },
+      { id: "rb1", name: "RB One", position: "RB", nflTeam: "SF" },
+      { id: "rb2", name: "RB Two", position: "RB", nflTeam: "SF" },
+      { id: "wr1", name: "WR One", position: "WR", nflTeam: "NYJ" },
+      { id: "wr2", name: "WR Two", position: "WR", nflTeam: "NYJ" },
+    ]);
+    const started = await getDraftStore().startDraft(fixture.draftId);
+    if (!started.ok) throw new Error(started.reason);
+    // Outside a request scope `after()` throws, so the follow-through runs detached at once.
+    await awaitDraftFollowThroughForTests();
+    expect(heldRoomFacts(fixture.draftId, started.state.sequence)).not.toBeNull();
+    await truncateAll(db);
+  });
+
+  it("followThroughAppliedAction never throws: a failing compute is logged", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const broken = { phase: "in_progress", sequence: 1, config: { draftId: "draft_missing", leagueId: "league_missing" } } as unknown as Parameters<typeof followThroughAppliedAction>[0];
+      await expect(followThroughAppliedAction(broken)).resolves.toBeUndefined();
+      expect(errorSpy).toHaveBeenCalledWith("[draft] room facts follow-through failed", { draftId: "draft_missing", sequence: 1 }, expect.anything());
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+});
 
 describe("draft-service edge wiring", () => {
   it("getDraftStore is a singleton, so two calls never mint two stores", () => {
