@@ -236,6 +236,10 @@ function maxThinkDelayMs(pickClockSeconds: number): number {
  * clock — no branch here has to defend it. Fractional on purpose: the drivers stamp the pick at
  * the first whole millisecond at or after this instant, so two drivers stamp identically.
  */
+/** The one spelling of a pick's delay stream (`rngFor(botSeed, this)`): the driver draws from
+ *  it and the replay pin replays it, so the label cannot drift between the two. */
+export const botDelayStreamKey = (teamId: string, pickNumber: number): string => `${teamId}:delay:${pickNumber}`;
+
 export function botThinkDelayMs(pickClockSeconds: number, rng: Rng): number {
   const { baseMs, jitterMs } = MOCK_CONFIG.botDelay;
   const minMs = baseMs - jitterMs;
