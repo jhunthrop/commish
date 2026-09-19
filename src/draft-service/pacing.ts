@@ -18,7 +18,7 @@
  * long-lived process exists (Vercel) or where a deployment says so (`JOBS_SELF_URL`, the
  * measurement harness's `next start`). `pacingEnabledIn` reads that from the env once.
  */
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { jobs } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
@@ -69,8 +69,8 @@ export function createDraftPacer({ db, clock, mockDriver, wake, selfWake }: Draf
     const pending = await db
       .select({ id: jobs.id, payload: jobs.payload })
       .from(jobs)
-      .where(and(eq(jobs.name, DRAFT_ADVANCE_JOB_NAME), eq(jobs.status, "pending")));
-    const stale = pending.filter((row) => row.payload.draftId === draftId && typeof row.payload.sequence === "number" && row.payload.sequence < sequence).map((row) => row.id);
+      .where(and(eq(jobs.name, DRAFT_ADVANCE_JOB_NAME), eq(jobs.status, "pending"), forDraft(draftId)));
+    const stale = pending.filter((row) => typeof row.payload.sequence === "number" && row.payload.sequence < sequence).map((row) => row.id);
     return retirePendingJobs(db, clock, stale);
   }
 
@@ -139,9 +139,17 @@ export function isPacingChainLive(chain: PacingChain | undefined, nowMs: number)
   return chain.status === "running" ? ageMs < JOBS_CONFIG.selfWakeMaxSleepMs + JOBS_CONFIG.pacingChainGraceMs : ageMs < JOBS_CONFIG.pacingChainGraceMs;
 }
 
+/** The one-draft predicate over the payload, so a per-room read never scans every room's rows. */
+const forDraft = (draftId: string) => sql`${jobs.payload}->>'draftId' = ${draftId}`;
+
 /** Whether `draftId` has a pacing job on its way (`isPacingChainLive`). */
 export async function hasLivePacingJob(db: Db, draftId: string, nowMs: number): Promise<boolean> {
-  return isPacingChainLive((await pendingPacingJobs(db)).get(draftId), nowMs);
+  const rows = await db
+    .select({ runAt: jobs.runAt, status: jobs.status })
+    .from(jobs)
+    .where(and(eq(jobs.name, DRAFT_ADVANCE_JOB_NAME), inArray(jobs.status, ["pending", "running"]), forDraft(draftId)));
+  const newest = rows.reduce<PacingChain | undefined>((held, row) => (held === undefined || row.runAt.getTime() > held.runAt.getTime() ? row : held), undefined);
+  return isPacingChainLive(newest, nowMs);
 }
 
 export { NO_SELF_WAKE };
