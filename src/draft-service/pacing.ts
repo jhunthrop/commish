@@ -32,6 +32,7 @@ import { wakeSet, type WakeSet } from "@/jobs/wake";
 import type { MockBotDriver } from "@/mock-draft-service/driver";
 import { nextDueInstantMs, type AdvanceOutcome } from "./advance";
 import { DRAFT_ADVANCE_CONFIG } from "./config";
+import type { DraftStore } from "./store";
 
 export interface DraftPacerDeps {
   readonly db: Db;
@@ -48,10 +49,18 @@ export type PaceOutcome =
   | { readonly kind: "already-scheduled"; readonly dueAt: string }
   | { readonly kind: "nothing-due" };
 
+export interface PaceOptions {
+  /** An action just landed on the wire: the next is applied no sooner than the wire floor
+   *  (`DRAFT_ADVANCE_CONFIG.minPickSpacingMs`) from now, whatever its own instant says. */
+  readonly afterLanding?: boolean;
+}
+
 export interface DraftPacer {
-  /** Paces from a state in hand (the store's post-commit hook). */
-  pace(state: DraftState): Promise<PaceOutcome>;
-  /** Paces from an advance outcome (the job's own follow-through, no re-read). */
+  /** Paces from a state in hand (the store's post-commit hook; a job that stopped at its budget). */
+  pace(state: DraftState, options?: PaceOptions): Promise<PaceOutcome>;
+  /** Paces from an advance outcome that ran to a quiet end (nothing due yet: its `nextDueAt` is
+   *  the room's true next instant). An exhausted outcome names "now", not the next instant, so
+   *  a job that stopped at its budget paces from the fresh state instead. */
   paceFromOutcome(outcome: AdvanceOutcome): Promise<PaceOutcome>;
 }
 
@@ -75,7 +84,11 @@ export function createDraftPacer({ db, clock, mockDriver, wake, selfWake }: Draf
     return retirePendingJobs(db, clock, stale);
   }
 
-  async function schedule(draftId: string, sequence: number, dueAtMs: number): Promise<PaceOutcome> {
+  async function schedule(draftId: string, sequence: number, instantMs: number, afterLanding: boolean): Promise<PaceOutcome> {
+    // The wire floor (`DRAFT_ADVANCE_CONFIG.minPickSpacingMs`): an instant already at hand behind
+    // a pick that just landed is applied no sooner than the floor from now, never in the same
+    // breath. The action's stamp is untouched; only its landing moves, and only when late.
+    const dueAtMs = afterLanding ? Math.max(instantMs, Date.parse(clock.now()) + DRAFT_ADVANCE_CONFIG.minPickSpacingMs) : instantMs;
     const dueAt = new Date(dueAtMs).toISOString();
     const result = await enqueueJob(
       db,
@@ -90,18 +103,14 @@ export function createDraftPacer({ db, clock, mockDriver, wake, selfWake }: Draf
   }
 
   return {
-    async pace(state) {
+    async pace(state, options = {}) {
       const dueAtMs = await nextDueInstantMs(state, mockDriver);
       if (dueAtMs === null) return { kind: "nothing-due" };
-      return schedule(state.config.draftId, state.sequence, dueAtMs);
+      return schedule(state.config.draftId, state.sequence, dueAtMs, options.afterLanding ?? false);
     },
     async paceFromOutcome(outcome) {
-      if (outcome.outcome !== "ok" || outcome.nextDueAt === null || outcome.sequence === null || outcome.phase !== "in_progress") return { kind: "nothing-due" };
-      // The wire floor (`DRAFT_ADVANCE_CONFIG.minPickSpacingMs`): a next instant already at hand
-      // (the pick this outcome landed ran late, or the job stopped at its one action with more
-      // due) is applied no sooner than the floor from now, never in the same breath.
-      const floorMs = outcome.applied > 0 ? Date.parse(clock.now()) + DRAFT_ADVANCE_CONFIG.minPickSpacingMs : 0;
-      return schedule(outcome.draftId, outcome.sequence, Math.max(Date.parse(outcome.nextDueAt), floorMs));
+      if (outcome.outcome !== "ok" || outcome.exhausted || outcome.nextDueAt === null || outcome.sequence === null || outcome.phase !== "in_progress") return { kind: "nothing-due" };
+      return schedule(outcome.draftId, outcome.sequence, Date.parse(outcome.nextDueAt), outcome.applied > 0);
     },
   };
 }
@@ -111,6 +120,17 @@ export const NO_OP_PACER: DraftPacer = {
   pace: async () => ({ kind: "nothing-due" }),
   paceFromOutcome: async () => ({ kind: "nothing-due" }),
 };
+
+/**
+ * What a job owes after its advance (`draft-advance-job.ts`): a call that stopped at its one
+ * action reports "now" as its next instant, so the next is read off the fresh state and floored;
+ * a call that ran to a quiet end carries the room's true next instant already.
+ */
+export async function paceAfterAdvance(pacer: DraftPacer, store: DraftStore, outcome: AdvanceOutcome): Promise<PaceOutcome> {
+  if (!outcome.exhausted) return pacer.paceFromOutcome(outcome);
+  const fresh = await store.getDraftState(outcome.draftId);
+  return fresh === null ? { kind: "nothing-due" } : pacer.pace(fresh, { afterLanding: outcome.applied > 0 });
+}
 
 /** Pending pacing jobs by draft id, for the sweep's own read (`inArray` keeps it one statement). */
 export async function pendingPacingJobs(db: Db, statuses: readonly ("pending" | "running")[] = ["pending", "running"]): Promise<ReadonlyMap<string, { readonly runAt: Date; readonly status: string }>> {

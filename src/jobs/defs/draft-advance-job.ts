@@ -17,7 +17,7 @@ import type { DraftState } from "@/draft-engine";
 import { followThroughRoomFacts, getDraftAdvancer, getDraftPacer, getDraftStore } from "@/draft-service";
 import { pickPath } from "@/lib/timing/pick-path";
 import type { AdvanceOutcome, DraftAdvancer } from "@/draft-service/advance";
-import type { DraftPacer } from "@/draft-service/pacing";
+import { paceAfterAdvance, type DraftPacer } from "@/draft-service/pacing";
 import type { DraftStore } from "@/draft-service/store";
 import { defineJob, type AnyJobDefinition, type StepOutcome } from "../contract";
 
@@ -79,7 +79,7 @@ export async function runDraftAdvanceStep(payload: DraftAdvanceJobPayload, deps:
   // its own wake no sooner than the wire floor (`paceFromOutcome`), never two in one breath.
   const outcome = await pickPath.time("job.advance", () => deps.advance(draftId, deps.clock.now(), { followThrough: false, maxActions: 1 }), (result) => ({ draftId, applied: result.applied, sequence: result.sequence, pacedAt: sequence }));
   if (outcome.outcome === "error") throw new DraftAdvanceTransientError(draftId);
-  const paced = await deps.pacer.paceFromOutcome(outcome);
+  const paced = await paceAfterAdvance(deps.pacer, deps.store, outcome);
   const pacedLine = paced.kind === "scheduled" ? `next due ${paced.dueAt} (job ${paced.jobId}${paced.retired > 0 ? `, ${paced.retired} retired` : ""})` : paced.kind === "already-scheduled" ? `next due ${paced.dueAt} (already queued)` : "nothing due";
   if (outcome.applied > 0 && outcome.phase === "in_progress") {
     const fresh = await deps.store.getDraftState(draftId);

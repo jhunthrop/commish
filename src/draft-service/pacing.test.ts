@@ -11,7 +11,7 @@ import { createMockBotDriver } from "@/mock-draft-service/driver";
 import { createDraftAdvancer } from "./advance";
 import { JOBS_CONFIG } from "@/jobs/config";
 import { DRAFT_ADVANCE_CONFIG } from "./config";
-import { createDraftPacer, hasLivePacingJob, isPacingChainLive, NO_OP_PACER, pacingEnabledIn, pendingPacingJobs } from "./pacing";
+import { createDraftPacer, hasLivePacingJob, isPacingChainLive, NO_OP_PACER, paceAfterAdvance, pacingEnabledIn, pendingPacingJobs } from "./pacing";
 import { createDraftStore, type DraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -30,11 +30,12 @@ function recordingWake(): SelfWake & { readonly calls: { jobId: number; dueAtMs:
   return { calls, wake: (jobId, dueAtMs) => { calls.push({ jobId, dueAtMs }); }, wakeNow: async (jobId, dueAtMs) => { calls.push({ jobId, dueAtMs }); } };
 }
 
-async function seedMock(id: string, botTeams: number) {
+async function seedMock(id: string, botTeams: number, seedPlayers = true) {
   const fixture = await seedDraftFixture(db, {
     draftId: `draft_${id}`, leagueId: `league_${id}`, format: "snake", teamCount: 2, slotConfig: SPRINT_ROSTER_SLOTS,
     kickoffAt: new Date(Date.parse(BASE_NOW) + 24 * 60 * 60 * 1000), auctionBudget: null, isMock: true, botTeams, mockPickSeconds: 30,
   });
+  if (!seedPlayers) return fixture;
   await db.insert(players).values([
     { id: "qb1", name: "QB One", position: "QB", nflTeam: "KC" },
     { id: "qb2", name: "QB Two", position: "QB", nflTeam: "KC" },
@@ -182,5 +183,33 @@ describe("the pacer", () => {
     // Nothing landed: a stale instant is the room's own to apply now, no floor.
     const idle = await pacer.paceFromOutcome({ ...outcome, applied: 0, nextDueAt: atMs(-2_000), sequence: 4 });
     expect(idle.kind === "scheduled" && idle.dueAt).toBe(atMs(-2_000));
+  });
+
+  it("a job that stopped at its budget (exhausted names 'now', not the next instant) paces from the fresh state, floored; a quiet end paces from its outcome (paceAfterAdvance)", async () => {
+    const fixture = await seedMock("exhausted", 2);
+    const store = testStore();
+    const started = await store.startDraft(fixture.draftId);
+    if (!started.ok) throw new Error(started.reason);
+    const mockDriver = createMockBotDriver({ db, store });
+    const pacer = createDraftPacer({ db, clock, mockDriver, wake: createMemoryWakeSet(), selfWake: recordingWake() });
+    const trueDueMs = (await mockDriver.dueBotPick(started.state))!.dueAtMs;
+    // The exhausted outcome of a one-action run whose action landed: never "now", never the
+    // same breath. The fresh state's own instant (the bot's seeded delay, well past the floor).
+    const exhausted = { draftId: fixture.draftId, applied: 1, exhausted: true, phase: "in_progress" as const, outcome: "ok" as const, wedged: false, nextDueAt: BASE_NOW, sequence: started.state.sequence };
+    expect(await pacer.paceFromOutcome(exhausted)).toEqual({ kind: "nothing-due" });
+    const paced = await paceAfterAdvance(pacer, store, exhausted);
+    expect(paced.kind === "scheduled" && paced.dueAt).toBe(new Date(Math.max(Math.ceil(trueDueMs), Date.parse(BASE_NOW) + DRAFT_ADVANCE_CONFIG.minPickSpacingMs)).toISOString());
+    // The same state, an instant already behind the clock: the floor.
+    now = new Date(Math.ceil(trueDueMs) + 5_000).toISOString();
+    const floored = await pacer.pace(started.state, { afterLanding: true });
+    expect(floored.kind).toBe("already-scheduled");
+    const draftB = await seedMock("exhausted-b", 2, false);
+    const startedB = await store.startDraft(draftB.draftId);
+    if (!startedB.ok) throw new Error(startedB.reason);
+    now = new Date(Math.ceil((await mockDriver.dueBotPick(startedB.state))!.dueAtMs) + 5_000).toISOString();
+    const late = await pacer.pace(startedB.state, { afterLanding: true });
+    expect(late.kind === "scheduled" && late.dueAt).toBe(new Date(Date.parse(now) + DRAFT_ADVANCE_CONFIG.minPickSpacingMs).toISOString());
+    // A gone draft paces nothing.
+    expect(await paceAfterAdvance(pacer, store, { ...exhausted, draftId: "draft_nowhere" })).toEqual({ kind: "nothing-due" });
   });
 });

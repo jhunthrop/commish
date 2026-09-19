@@ -22,10 +22,10 @@ function testStore(): DraftStore {
 
 function recordingPacer() {
   const paced: AdvanceOutcome[] = [];
-  const repaced: number[] = [];
+  const repaced: { sequence: number; afterLanding: boolean }[] = [];
   const pacer: DraftPacer = {
-    pace: async (state) => {
-      repaced.push(state.sequence);
+    pace: async (state, options) => {
+      repaced.push({ sequence: state.sequence, afterLanding: options?.afterLanding ?? false });
       return { kind: "scheduled", jobId: 2, dueAt: atMs(1_000), retired: 0 };
     },
     paceFromOutcome: async (outcome) => {
@@ -52,7 +52,7 @@ async function seedMock(id: string, botTeams: number) {
   return fixture;
 }
 
-function depsFor(store: DraftStore, overrides: Partial<DraftAdvanceJobDeps> = {}): DraftAdvanceJobDeps & { readonly published: number[]; readonly paced: AdvanceOutcome[]; readonly repaced: number[] } {
+function depsFor(store: DraftStore, overrides: Partial<DraftAdvanceJobDeps> = {}): DraftAdvanceJobDeps & { readonly published: number[]; readonly paced: AdvanceOutcome[]; readonly repaced: { sequence: number; afterLanding: boolean }[] } {
   const { pacer, paced, repaced } = recordingPacer();
   const published: number[] = [];
   return {
@@ -104,11 +104,12 @@ describe("the draft-advance job", () => {
     now = atMs(60_000);
     const outcome = await runDraftAdvanceStep({ draftId: fixture.draftId, sequence: started.state.sequence }, deps);
     expect(outcome.summary).toMatch(/applied \d+/);
-    // One action per run (the wire floor's other half), whatever is due.
+    // One action per run (the wire floor's other half), whatever is due: the run stops at its
+    // budget, so the next instant is read off the fresh state, floored, never off "now".
     expect(advance).toHaveBeenCalledWith(fixture.draftId, now, { followThrough: false, maxActions: 1 });
-    expect(deps.paced).toHaveLength(1);
-    expect(deps.paced[0]!.applied).toBe(1);
+    expect(deps.paced).toEqual([]);
     const fresh = (await store.getDraftState(fixture.draftId))!;
+    expect(deps.repaced).toEqual([{ sequence: fresh.sequence, afterLanding: true }]);
     expect(deps.published).toEqual(fresh.phase === "in_progress" ? [fresh.sequence] : []);
   });
 
@@ -124,7 +125,7 @@ describe("the draft-advance job", () => {
     const stale = await runDraftAdvanceStep({ draftId: fixture.draftId, sequence: started.state.sequence - 1 }, deps);
     expect(stale.summary).toMatch(/superseded/);
     expect(stale.summary).toMatch(/re-paced/);
-    expect(deps.repaced).toEqual([started.state.sequence]);
+    expect(deps.repaced).toEqual([{ sequence: started.state.sequence, afterLanding: false }]);
     const gone = await runDraftAdvanceStep({ draftId: "draft_nowhere", sequence: 1 }, deps);
     expect(gone.summary).toMatch(/gone/);
     expect(advance).not.toHaveBeenCalled();
