@@ -29,4 +29,20 @@ export const ADVISOR_CONFIG = {
   /** Room odds tables remembered at once, one per room state; a new pick evicts the room's old
    *  table, and the least-recently-computed room goes past this. */
   memoRooms: 64,
+  /**
+   * THE CROSS-PROCESS FACTS STORE (draft-room performance round, item 2; `facts-store.ts`).
+   * `ttlMs` is short by ruling: a room's facts are superseded by its next pick within seconds in
+   * a mock and within a clock in a real league, and a viewer who reads past it computes once
+   * under the lock. `lockMs` bounds the compute lock well past the longest measured simulation
+   * (1,137 ms on Apple silicon before the engine index, a few seconds on a Vercel vCPU) so a
+   * holder that died releases by expiry; `waitPollMs` and `waitMaxMs` bound how long a contending
+   * reader waits for the holder's write before computing itself, inside the lock's own life so
+   * the two never disagree.
+   */
+  facts: {
+    ttlMs: 10 * 60_000,
+    lockMs: 15_000,
+    waitPollMs: 50,
+    waitMaxMs: 5_000,
+  },
 } as const;

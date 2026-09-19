@@ -23,12 +23,14 @@ import type { Recommendation } from "@/projections/decide/draft";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { getDraftStore, resolveDraftActor } from "@/draft-service";
 import { leagueBoardFormat } from "@/league-service/board-format";
+import { getSharedRedis } from "@/lib/realtime/redis";
 import { pickPath } from "@/lib/timing/pick-path";
 import { evidencePoolFor } from "../sim/evidence";
 import { simulateRoomOddsInChunks, type RoomOddsInput, type RoomOddsTable } from "../sim/room-odds";
 import { inferSeatDrivers } from "../sim/seat-model";
 import { advisorCore, seedFor } from "./advisor";
 import { ADVISOR_CONFIG } from "./config";
+import { createRedisRoomFactsStore, roomFactsOnce, type FactsKey, type RoomFactsStore } from "./facts-store";
 import { roomFactsFor, seatShortlistFor, type RoomFacts } from "./memo";
 import { askingWindow, onClockShortlist, recommendNow, valuedEvidence, type RecommendInput, type ValuedEntry } from "./recommend";
 import { tierCollapses } from "./signals";
@@ -41,6 +43,16 @@ export interface AdvisorServiceDeps {
   readonly simulate?: (input: RoomOddsInput) => RoomOddsTable | Promise<RoomOddsTable>;
   /** The recommendation entry point, injectable for the same reason. */
   readonly recommend?: (input: RecommendInput) => readonly Recommendation[];
+  /** The cross-process facts store (item 2). Defaults to the shared Redis one; tests hand in memory. */
+  readonly facts?: RoomFactsStore;
+}
+
+let sharedFacts: RoomFactsStore | undefined;
+
+function factsStore(deps: AdvisorServiceDeps): RoomFactsStore {
+  if (deps.facts !== undefined) return deps.facts;
+  sharedFacts ??= createRedisRoomFactsStore(getSharedRedis());
+  return sharedFacts;
 }
 
 interface ValuedRoom {
@@ -64,11 +76,17 @@ async function roomFactsForState(db: Db, draftId: string, state: DraftState, dep
   const board = await leagueBoardFormat(db, state.config.leagueId);
   const { pool } = await evidencePoolFor(db, new Date(), board.source);
   const valued = valuedEvidence(pool, shape);
-  const facts = await roomFactsFor(draftId, state.sequence, async () => ({
-    table: await simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) }),
-    tiers: tierStandings(state, valued),
-    collapses: tierCollapses(state, valued),
-  }));
+  // Two levels, one compute: the process memo (single-flight) in front of the cross-process
+  // store (read, else compute under its lock) — a viewer on another instance reads what the
+  // pick's own invocation wrote, and simulates only when nothing has.
+  const key: FactsKey = { draftId, sequence: state.sequence, draftOrder: state.draftOrder };
+  const facts = await roomFactsFor(draftId, state.sequence, () =>
+    roomFactsOnce(factsStore(deps), key, async () => ({
+      table: await simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) }),
+      tiers: tierStandings(state, valued),
+      collapses: tierCollapses(state, valued),
+    })),
+  );
   return { shape, valued, facts };
 }
 
