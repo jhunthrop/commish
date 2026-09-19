@@ -94,10 +94,11 @@ export function MotionList<T>({ items, keyOf, children }: MotionListProps<T>) {
   const reduced = usePrefersReducedMotion();
   const [memory, setMemory] = useState<Memory<T>>(() => ({ items, known: new Set(items.map(keyOf)), entered: new Set(), leaving: new Map(), rendered: items }));
   const [nodes] = useState(() => new Map<string, HTMLElement>());
+  // Each row's LAYOUT offset inside the list from the last pass (`offsetTop`, never a viewport
+  // rect): a rect carries an in-flight transform, so a re-render mid-glide read a row halfway
+  // home and played a second glide from there (measured at 634 ms on the pool, item 5), and it
+  // moves with the list's scroll. The offset is also where a ghost is pinned when it leaves.
   const [positions] = useState(() => new Map<string, number>());
-  // Each present row's offset inside the list, from the last layout: where a ghost is pinned
-  // the moment it leaves the flow (draft-room performance round, item 5).
-  const [offsets] = useState(() => new Map<string, number>());
   const [rowProps] = useState(() => new Map<string, MotionRowProps>());
   const [timers] = useState(() => new Map<string, ReturnType<typeof setTimeout>>());
 
@@ -138,29 +139,28 @@ export function MotionList<T>({ items, keyOf, children }: MotionListProps<T>) {
     // `in`-long motion, not two in a row. Pinned before the reads, so nothing is measured twice.
     for (const key of current.leaving.keys()) {
       const node = nodes.get(key);
-      const offset = offsets.get(key);
+      const offset = positions.get(key);
       if (node !== undefined && offset !== undefined && node.style.top === "") node.style.top = `${offset}px`;
     }
     // All reads, then all writes, then ONE forced layout: a write between reads would force a
     // layout per moved row (measured once at 11.8 s for a long list before this was batched).
     const next = new Map<string, number>();
-    for (const [key, node] of nodes) next.set(key, node.getBoundingClientRect().top);
+    for (const [key, node] of nodes) {
+      if (!current.leaving.has(key)) next.set(key, node.offsetTop);
+    }
     if (!reduced) {
       const moves: { readonly node: HTMLElement; readonly deltaPx: number }[] = [];
       for (const [key, top] of next) {
         const before = positions.get(key);
         const node = nodes.get(key);
-        if (before === undefined || node === undefined || current.leaving.has(key) || Math.abs(before - top) < NO_MOVE_PX) continue;
+        if (before === undefined || node === undefined || Math.abs(before - top) < NO_MOVE_PX) continue;
         moves.push({ node, deltaPx: before - top });
       }
       playMoves(moves);
     }
-    positions.clear();
-    offsets.clear();
-    for (const [key, top] of next) {
-      positions.set(key, top);
-      if (!current.leaving.has(key)) offsets.set(key, nodes.get(key)!.offsetTop);
-    }
+    // A ghost keeps its pinned offset until it goes; every present row records its layout.
+    for (const key of [...positions.keys()]) if (!current.leaving.has(key)) positions.delete(key);
+    for (const [key, top] of next) positions.set(key, top);
   });
 
   return (
