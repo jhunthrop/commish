@@ -15,7 +15,8 @@ import { expect, test } from "./support/fixtures";
  * itself (the e2e runner's own environment), so the dev ticker is off and the jobs pace.
  */
 const TEAM_COUNT = 12;
-const PICK_SECONDS = 60;
+/** The room's clock: 60 by default, or `E2E_PICK_SECONDS` (90 exercises the wake chain, review finding 1). */
+const PICK_SECONDS = Number(process.env.E2E_PICK_SECONDS ?? 60);
 const HUMAN_SEAT = 7;
 const MIN_BOT_GAP_MS = 300;
 const HUMAN_THINK_MS = 1_500;
