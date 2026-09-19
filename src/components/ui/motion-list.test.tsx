@@ -97,6 +97,26 @@ describe("MotionList", () => {
     expect(screen.getByTestId("row-a").style.transform).toBe("translateY(-40px)");
   });
 
+  it("a leaving row is pinned out of the flow at its last offset, and the rows below slide up in the SAME frame it starts fading (item 5: the leave and the reorder never stack)", () => {
+    const tops = new Map<string, number>([["a", 0], ["b", 40], ["c", 80]]);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const top = tops.get(this.getAttribute("data-motion-key") ?? "") ?? 0;
+      return { top, left: 0, right: 0, bottom: top, width: 0, height: 0, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
+    });
+    vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (this: HTMLElement) {
+      return tops.get(this.getAttribute("data-motion-key") ?? "") ?? 0;
+    });
+    const { rerender } = render(<List items={[A, B, C]} />);
+    // Bravo leaves; out of the flow, Charlie is laid out at Bravo's old place at once.
+    tops.set("c", 40);
+    rerender(<List items={[A, C]} />);
+    const ghost = screen.getByTestId("row-b");
+    expect(ghost.className).toContain(MOTION.leave.className);
+    expect(ghost.style.top).toBe("40px");
+    expect(ghost.style.transform).toBe("");
+    expect(screen.getByTestId("row-c").style.transform).toBe("translateY(40px)");
+  });
+
   it("hands an unchanged row the same props object, so a memoized row does not re-render when a sibling leaves", () => {
     vi.useFakeTimers();
     const { rerender } = render(<List items={[A, B, C]} />);

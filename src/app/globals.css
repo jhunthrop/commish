@@ -312,6 +312,13 @@ body {
   animation: commish-fade-in var(--commish-motion-duration-in) var(--commish-motion-easing-spring) both;
 }
 .animate-row-leave {
+  /* Out of the flow the moment it leaves (draft-room performance round, item 5): pinned by
+     `MotionList` at the offset it held, so the rows below slide up while it fades. The list it
+     sits in is `relative`. */
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
   animation: commish-fade-out var(--commish-motion-duration-out) var(--commish-motion-easing-out) both;
 }
 .animate-swap {

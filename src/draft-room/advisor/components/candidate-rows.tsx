@@ -81,7 +81,7 @@ export function CandidateRows({ view, acts, playersById, byeWeeks, count }: Cand
   const rows = useStableList(built, keyOf);
   if (rows.length === 0) return null;
   return (
-    <ol data-testid="advisor-candidates" aria-label="Next best picks" className="flex flex-col gap-1">
+    <ol data-testid="advisor-candidates" aria-label="Next best picks" className="relative flex flex-col gap-1">
       <MotionList items={rows} keyOf={keyOf}>
         {(item, row) => <CandidateRow item={item} acts={acts} row={row} />}
       </MotionList>
