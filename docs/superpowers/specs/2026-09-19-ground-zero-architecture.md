@@ -181,9 +181,9 @@ Each phase runs the loop (plan, build, review, merge to main) and ends at a gate
 
 Fifteen weeks. Starting the first week of October puts parity in mid January 2027.
 
-## Testing during the rebuild (founder ruling, 2026-09-19)
+## Testing during the rebuild (founder rulings, 2026-09-19)
 
-No new tests are written during the rebuild. Surfaces are built to their approved mock, walked by the persona panel, reviewed by reading the code, and gated by measurement: the pick-arrival trace, the per-surface settle times, a socket open across a whole draft. Three nets that already exist stay on because they cost seconds and catch what a screenshot cannot: the salvaged core's existing suite including the replay pins, the source guards (copy rules, honest numbers, the client boundary sweep), and the measurement harness. The test suite for the new app is its own phase after cutover, written once against the finished surfaces. Any round brief for this rebuild that says "tests first" is wrong and this section wins.
+No new tests are written during the rebuild, and no test suite runs during a build phase, not even the salvaged core's. Per round the gates are `tsc`, the source guards (copy rules, honest numbers, the client boundary sweep, each under a second), and the measurement trace for the surface: pick arrival, per-surface settle, a socket open across a whole draft. Surfaces are built to their approved mock, walked by the persona panel, and reviewed by reading the code. The full suite, including the replay pins, runs once at cutover as the acceptance of the whole, and the app's own suite is written as its own phase after that. Any round brief for this rebuild that says "tests first" or "run vitest" is wrong and this section wins.
 
 ## 15. Risks
 
