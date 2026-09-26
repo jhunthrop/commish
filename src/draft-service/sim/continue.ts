@@ -81,7 +81,12 @@ function playPick(state: DraftState, teamId: string, driver: SeatDriver, seed: n
   const playerId = pickFor(state, teamId, driver, seed, excluded);
   if (playerId === null) return null;
   const pick: PlayedPick = { pickNumber: state.pickNumber, teamId, playerId };
-  const action: MakePickAction = { v: 1, type: "MAKE_PICK", timestamp: SIM_INSTANT, teamId, playerId };
+  // Stamped at the turn's own start, never the inert `SIM_INSTANT`: a live room's
+  // `turnStartedAt` can sit in the future (the last batched bot's reveal instant, the batched
+  // bots round), and `admitMakePick` refuses a pick stamped before it. The stamp is inert to
+  // everything the table reads; it only has to be the turn's, so each simulated pick starts the
+  // next turn at the same instant and the whole continuation admits.
+  const action: MakePickAction = { v: 1, type: "MAKE_PICK", timestamp: state.turnStartedAt ?? SIM_INSTANT, teamId, playerId };
   return { state: submit(state, action), pick };
 }
 
