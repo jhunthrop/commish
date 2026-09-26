@@ -13,8 +13,10 @@
 // here funnels into the same seams: `autoStartDueDrafts` (real due starts AND kickoff rolls),
 // `startDueMockRooms` (due mock rooms, the deferred-solo-start retry), the shared advance routine
 // per live draft (`liveDraftsQuery`, the bounded scan), the house shelf's reconcile
-// (`ensureHouseCatalog`) and the mock rooms' retention sweep (`sweepExpiredMocks`), the last two
-// carried over from the dev ticker, which was the only thing that ever ran them.
+// (`ensureHouseCatalog`: the spawn half as it always ran, the retire half only behind
+// `HOUSE_RETIRE_ENABLED`, the founder's switch) and the mock rooms' retention sweep
+// (`sweepExpiredMocks`), the last two carried over from the dev ticker, which was the only thing
+// that ever ran them.
 //
 // GATED, AND SELF-SCHEDULING (Neon cost audit 2026-09-07, finding 1). The schedule that fires
 // this job sits behind the wake gate (`ScheduleDefinition.gate`), so the minute cron only
@@ -38,7 +40,7 @@ import { DRAFT_ADVANCE_CONFIG } from "@/draft-service/config";
 import type { AdvanceOutcome, DraftAdvancer } from "@/draft-service/advance";
 import { liveDraftsQuery } from "@/draft-service/live-drafts";
 import type { DraftStore } from "@/draft-service/store";
-import { ensureHouseCatalog, type HouseFactoryDeps, type HouseFactoryOutcome } from "@/league-service/house-factory";
+import { ensureHouseCatalog, houseRetireEnabled, rungOfHouseLeagueId, type HouseFactoryDeps, type HouseFactoryOutcome } from "@/league-service/house-factory";
 import { startDueMockRooms } from "@/mock-draft-service/driver";
 import { sweepExpiredMocks, type MockSweepDeps, type SweptMockRoom } from "@/mock-draft-service/sweep";
 import { JOBS_CONFIG } from "../config";
@@ -64,6 +66,8 @@ export interface DraftSweepContext {
   readonly deadlineAt?: Date;
   /** The house shelf's reconcile. Defaults to the real `ensureHouseCatalog`; a test stubs it. */
   readonly reconcileHouse?: (db: Db, deps: HouseFactoryDeps) => Promise<HouseFactoryOutcome>;
+  /** Whether the reconcile's retire half runs (`HouseFactoryDeps.retire`); the job reads the env. */
+  readonly retireHouse?: boolean;
   /** The mock rooms' retention sweep. Defaults to the real `sweepExpiredMocks`; a test stubs it. */
   readonly sweepMocks?: (db: Db, deps: MockSweepDeps) => Promise<readonly SweptMockRoom[]>;
   /** The bot driver's per-draft meta, dropped per swept room (`MockSweepDeps.invalidateDriverMeta`). */
@@ -141,10 +145,10 @@ function fold(tally: SweepTally, outcome: AdvanceOutcome): SweepTally {
 /** The shelf's restock, one line per refusal for the admin page; a thrown failure is one line too. */
 async function reconcileHouseQuietly(ctx: DraftSweepContext): Promise<readonly string[]> {
   try {
-    const outcome = await (ctx.reconcileHouse ?? ensureHouseCatalog)(ctx.db, { clock: ctx.clock, newId: ctx.newId });
+    const outcome = await (ctx.reconcileHouse ?? ensureHouseCatalog)(ctx.db, { clock: ctx.clock, newId: ctx.newId, retire: ctx.retireHouse ?? false });
     // A retirement is the one headless writer that closes a league nobody asked it to close:
     // one line per retired league, so it is never silent just because nobody watched it happen.
-    for (const leagueId of outcome.retired) console.log("[house] retired", leagueId);
+    for (const leagueId of outcome.retired) console.log("[house] retired", leagueId, rungOfHouseLeagueId(leagueId) ?? "unknown-rung");
     return outcome.refused.map((refusal) => `house ${refusal.rung}: ${refusal.reason}`);
   } catch (error: unknown) {
     console.error("[draft] house reconcile failed", error);
@@ -214,6 +218,7 @@ export const draftSweepJob: AnyJobDefinition = defineJob<Record<string, never>>(
           newId: () => crypto.randomUUID(),
           deadlineAt: ctx.deadlineAt,
           invalidateDriverMeta: (draftId) => getMockBotDriver().invalidateDraft(draftId),
+          retireHouse: houseRetireEnabled(process.env),
         }),
     },
   ],
