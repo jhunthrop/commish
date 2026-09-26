@@ -10,7 +10,7 @@ import type { BoardReason } from "@/projections/preseason/board";
 import type { DraftPlayersBody, DraftQueueBody, DraftSnapshotBody, MockRoomInfo, WaitingInfo } from "@/draft-room/contract";
 import { applyDraftFrame, parseDraftFrame, type NudgeNotice } from "@/draft-room/state/apply-event";
 import { optimisticView } from "@/draft-room/state/optimistic";
-import type { DraftEventFrame } from "@/draft-room/state/payloads";
+import { parseFactsFrame, type DraftEventFrame } from "@/draft-room/state/payloads";
 import { frameRevealAtMs, planReveal } from "@/draft-room/state/reveal";
 import { useDraftRoomDeps } from "./deps";
 
@@ -33,6 +33,8 @@ export type QueueOutcome = { readonly ok: true } | { readonly ok: false; readonl
 
 /** The stream's cue that the room fell behind (a pick committed but its frame was lost). */
 const RESYNC_EVENT_TYPE = "draft.resync";
+/** The stream's word that the advisor's facts for a sequence are written (or failed). */
+const FACTS_EVENT_TYPE = "draft.facts";
 
 export interface LandedPick {
   readonly pick: CompletedPick;
@@ -57,8 +59,14 @@ interface RoomState {
   /** THE COMMITTED VIEW: the log as the server holds it, every batched pick included, folded the
    *  moment its frame arrives. What the wire's sequence continuity and the advisor key on. */
   readonly committed: DraftStateView | null;
-  /** The next instant (this browser's clock) a committed pick is revealed, or null when nothing waits. */
-  readonly nextRevealAtMs: number | null;
+  /**
+   * The newest committed sequence whose advisor facts the server has said are settled (written,
+   * or their compute failed and a viewer should ask anyway): the `draft.facts` frame's sequence,
+   * or a snapshot's own sequence on load (its facts were written with its last commit, or are
+   * this viewer's to compute). The advisor asks `/assistant` only once this reaches the
+   * committed sequence, so it never simulates alongside the writer (review M5).
+   */
+  readonly factsReadySequence: number | null;
   readonly players: readonly Player[];
   /**
    * Task 8: the pool's own law-backed reasons, keyed by `Player.id` — fetched and cached
@@ -108,7 +116,7 @@ const INITIAL: RoomState = {
   error: null,
   view: null,
   committed: null,
-  nextRevealAtMs: null,
+  factsReadySequence: null,
   players: [],
   reasons: new Map(),
   laws: [],
@@ -146,11 +154,14 @@ function publishedAtMs(data: string): number | null {
  * `Last-Event-ID` automatically. There is deliberately no retry loop, backoff timer or poll
  * in here — only the full-state refetch the conventions name as the fallback.
  *
- * TWO CLOCKS, ONE OFFSET: a pick's stamp is the server's clock. Every stream frame carries its
- * publish instant, and the smallest `Date.now() - published` seen this session is this
- * browser's offset from the server (the true skew plus the least network delay), so a reveal
- * scheduled from a stamp lands at the right instant on this clock. Until the first frame the
- * offset is zero.
+ * TWO CLOCKS, ONE OFFSET: a pick's stamp is the server's clock. Every answer the server gives
+ * carries its own instant (a snapshot's and an action's `servedAt`, a stream frame's publish
+ * stamp), and the smallest `Date.now() - serverInstant` seen this session is this browser's
+ * offset from the server (the true skew plus the least network delay), measured whichever way
+ * the two clocks differ (review H1: a browser AHEAD of the server measures a positive offset; a
+ * floor of zero would have hidden it and revealed a batch as one burst). Unset until the first
+ * answer, and unset reads as zero; the snapshot that opens the room is the first measurement,
+ * so a tab reloaded mid-batch reveals on the seeded cadence before any frame arrives.
  */
 export function useDraftRoom(draftId: string): DraftRoom {
   const deps = useDraftRoomDeps();
@@ -163,8 +174,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
   const revealedRef = useRef<DraftStateView | null>(null);
   const pendingRef = useRef<readonly DraftEventFrame[]>([]);
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const nextRevealRef = useRef<number | null>(null);
-  const offsetRef = useRef<number>(0);
+  const offsetRef = useRef<number | null>(null);
   const teamRef = useRef<string | null>(null);
   // Mirrors `state.queue` the same way `viewRef` mirrors `state.view` — long-lived closures
   // (the SSE handler, `setQueue`'s own rollback) need today's queue without re-subscribing.
@@ -188,7 +198,15 @@ export function useDraftRoom(draftId: string): DraftRoom {
   const playersLoadedForRef = useRef<string | null>(null);
 
   /** A stamp on the server's clock, on this browser's. */
-  const toLocalMs = useCallback((serverMs: number): number => serverMs + offsetRef.current, []);
+  const toLocalMs = useCallback((serverMs: number): number => serverMs + (offsetRef.current ?? 0), []);
+
+  /** One more measurement of this browser's offset from the server: an instant the server
+   *  stamped, seen now. The smallest wins (the least network delay on top of the true skew). */
+  const noteServerInstant = useCallback((serverMs: number): void => {
+    if (Number.isNaN(serverMs)) return;
+    const measured = Date.now() - serverMs;
+    offsetRef.current = offsetRef.current === null ? measured : Math.min(offsetRef.current, measured);
+  }, []);
 
   /** The head of the reveal queue's instant on this clock, or null with nothing waiting. */
   const nextRevealAt = useCallback((): number | null => {
@@ -225,14 +243,12 @@ export function useDraftRoom(draftId: string): DraftRoom {
     revealedRef.current = revealed;
     const view = revealed;
     const next = nextRevealAt();
-    // One render per change of what is shown or of what waits, never one per frame that only
-    // joined the queue behind others (a batch is a dozen frames in one breath).
-    if (changed || next !== nextRevealRef.current) {
-      nextRevealRef.current = next;
+    // One render per change of what is shown, never one per frame that only joined the queue
+    // behind others (a batch is a dozen frames in one breath).
+    if (changed) {
       setState((prev) => ({
         ...prev,
         view,
-        nextRevealAtMs: next,
         lastPick: landed === null ? prev.lastPick : { pick: landed, isMine: landed.teamId === teamRef.current },
         // A nudge names exactly one team. Everybody on the league stream receives the frame;
         // only that team's manager is shown it.
@@ -244,16 +260,18 @@ export function useDraftRoom(draftId: string): DraftRoom {
   }, [nextRevealAt, toLocalMs]);
 
   /** Adopts a whole view from the server: the committed view as it is, the revealed view and
-   *  the reveal queue derived from the picks' own stamps (`planReveal`). */
+   *  the reveal queue derived from the picks' own stamps (`planReveal`). `servedAt` is the
+   *  server's clock at the answer, the offset's measurement for this adoption. */
   const adoptView = useCallback(
-    (view: DraftStateView): void => {
+    (view: DraftStateView, servedAt: string | undefined): void => {
+      if (servedAt !== undefined) noteServerInstant(Date.parse(servedAt));
       viewRef.current = view;
-      const plan = planReveal(view, Date.now() - offsetRef.current);
+      const plan = planReveal(view, Date.now() - (offsetRef.current ?? 0));
       revealedRef.current = plan.revealed;
       pendingRef.current = plan.pending;
       drainReveals();
     },
-    [drainReveals],
+    [drainReveals, noteServerInstant],
   );
 
   const refresh = useCallback((): Promise<void> => {
@@ -325,8 +343,11 @@ export function useDraftRoom(draftId: string): DraftRoom {
           queue: snapshot.data.queue,
           mock: snapshot.data.mock,
           waiting: snapshot.data.waiting,
+          // A snapshot's facts were written with its last commit, or are this viewer's own to
+          // compute: the advisor asks at once.
+          factsReadySequence: snapshot.data.draft.sequence,
         }));
-        adoptView(snapshot.data.draft);
+        adoptView(snapshot.data.draft, snapshot.data.servedAt);
       } catch {
         if (generation === generationRef.current) {
           setState((prev) => ({ ...prev, status: "error", error: NETWORK_ERROR }));
@@ -379,7 +400,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
       if (current === null) return;
       const data = String(event.data);
       const published = publishedAtMs(data);
-      if (published !== null) offsetRef.current = Math.min(offsetRef.current, Date.now() - published);
+      if (published !== null) noteServerInstant(published);
       const frame = parseDraftFrame(data);
       if (frame === null) return;
       const result = applyDraftFrame(current, frame);
@@ -420,13 +441,21 @@ export function useDraftRoom(draftId: string): DraftRoom {
       }
       if (draftIdOfFrame === viewRef.current?.draftId) void refresh();
     };
+    // The facts frame (review M5): the advisor's cue that the server's own simulator has finished
+    // for this sequence, so its fetch reads the row rather than starting a second simulation.
+    const onFacts = (event: MessageEvent) => {
+      const frame = parseFactsFrame(String(event.data));
+      if (frame === null || frame.payload.draftId !== viewRef.current?.draftId) return;
+      setState((prev) => (prev.factsReadySequence !== null && prev.factsReadySequence >= frame.payload.sequence ? prev : { ...prev, factsReadySequence: frame.payload.sequence }));
+    };
     for (const type of DRAFT_EVENT_TYPES) source.addEventListener(type, onDraftEvent);
+    source.addEventListener(FACTS_EVENT_TYPE, onFacts);
     source.addEventListener(RESYNC_EVENT_TYPE, onResync);
     source.addEventListener("open", onOpen);
     source.addEventListener("error", onError);
 
     return () => source.close();
-  }, [deps, leagueId, refresh, drainReveals]);
+  }, [deps, leagueId, refresh, drainReveals, noteServerInstant]);
 
   const submit = useCallback(
     async (action: ClientDraftAction): Promise<SubmitOutcome> => {
@@ -471,7 +500,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
           // the keepalive budget, so this costs nothing on the ordinary path.
           keepalive: true,
         });
-        const body = (await response.json()) as ApiEnvelope<{ readonly draft: DraftStateView; readonly notice?: string | null }>;
+        const body = (await response.json()) as ApiEnvelope<{ readonly draft: DraftStateView; readonly notice?: string | null; readonly servedAt?: string }>;
         if (!body.ok) {
           rollback();
           return { ok: false, reason: body.error };
@@ -480,7 +509,8 @@ export function useDraftRoom(draftId: string): DraftRoom {
         // When the response IS ahead (the frames are still on their way), it carries the whole
         // commit — the pick and every bot batched behind it — and the reveals derive from it.
         const held = viewRef.current;
-        if (held === null || held.sequence < body.data.draft.sequence) adoptView(body.data.draft);
+        if (held === null || held.sequence < body.data.draft.sequence) adoptView(body.data.draft, body.data.servedAt);
+        else if (body.data.servedAt !== undefined) noteServerInstant(Date.parse(body.data.servedAt));
         setState((prev) => ({ ...prev, pendingPlayerId: null, submitting: false }));
         return { ok: true, notice: body.data.notice ?? null };
       } catch {
@@ -488,7 +518,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
         return { ok: false, reason: NETWORK_ERROR };
       }
     },
-    [deps, draftId, refresh, adoptView],
+    [deps, draftId, refresh, adoptView, noteServerInstant],
   );
 
   // A queue edit is not a draft action: it never touches `pendingPlayerId`, `submitting`,

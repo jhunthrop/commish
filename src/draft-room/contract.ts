@@ -181,6 +181,14 @@ export interface DraftSnapshotBody {
   readonly mock: MockRoomInfo | null;
   /** The scheduled room's waiting story (R2) — null once the draft has left `scheduled`. */
   readonly waiting: WaitingInfo | null;
+  /**
+   * THE SERVER'S CLOCK AT THE ANSWER (the batched bots round, review H1): an ISO instant the
+   * route stamps as it answers, so a room that loads mid-batch measures its own clock's offset
+   * from the server's before the first stream frame and reveals the batch on the seeded cadence
+   * whichever way its clock runs. Optional for the same fixture reason `DraftPlayersBody.reasons`
+   * is; the real route always sets it.
+   */
+  readonly servedAt?: string;
 }
 
 export interface DraftPlayersBody {

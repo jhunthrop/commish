@@ -208,6 +208,7 @@ export async function GET(request: Request, context: RouteContext) {
       mock,
       // R2: the waiting story is a scheduled-room fact only — null the moment the draft starts.
       waiting: view.phase === "scheduled" ? await waitingInfoFor(getDb(), actor.leagueId, actor.draftId, state.config.isMock === true) : null,
+      servedAt: new Date().toISOString(),
     };
     return ok(body);
   });
