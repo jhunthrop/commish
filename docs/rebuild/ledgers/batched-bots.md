@@ -190,3 +190,60 @@ that revealed the human's turn; the odds figures are never "updating" once her t
 `ce40b7b7` the batch, the reveal, the facts row, the deletions; `b54c1f81` the existing suites
 reconciled to compile; the ledger last. Never merged to main here; no production write of any
 kind was made.
+
+## Fix round (whole-branch review, verdict merge after fixes)
+
+Input: `scratchpad/batched-bots-review.md` (range `a8651b1f..cc266852`). One commit per finding.
+
+- **H1, `f1b84fc9`.** The browser's offset from the server is unset until measured, measured
+  from every answer the server stamps (a snapshot's and an action's new `servedAt`, every frame's
+  publish stamp), the smallest winning whichever sign it has. A tab that loads mid-batch measures
+  from its snapshot, before any frame.
+- **H2, `f1b84fc9`.** `admitMakePick` (`draft-engine/admit.ts`, command time only) refuses a
+  MAKE_PICK stamped before `turnStartedAt`: "The picks before yours are still landing." The room
+  offers the turn only at the last reveal on its corrected clock. Ruling on the way: the
+  advisor's live-room continuation (`sim/continue.ts`) stamped every simulated pick at the inert
+  `SIM_INSTANT`, which the guard refuses against a future `turnStartedAt`; the first skewed run
+  showed every facts compute failing and the dock in its error state. `8a031154` stamps the
+  continuation's picks at the turn's own start (inert to everything the table reads). Deviation
+  stated: `continue.test.ts` and `room-odds.test.ts` (2 files, 19 tests) were run once to check
+  the stamp change against their pins; both passed.
+- **M4, `837f2c3f`.** `resolveBots` opens only for a bot with a legal pick (`choosePick()`
+  non-null); a resolve refused by a concurrent commit reloads and continues, and only a refusal
+  against an unmoved log counts toward the wedge breaker.
+- **M5, `f5ea91fb`.** The invocation that writes the facts publishes `draft.facts` (`{ draftId,
+  sequence, ready }`); the room records the newest settled sequence (a snapshot counts as its own);
+  the advisor asks `/assistant` only once that reaches the committed sequence, with an 8 s
+  ceiling (`ADVISOR_ROOM_CONFIG.factsWaitMaxMs`) for a frame that never comes. Never two
+  simulators. The interpretation of "the response carries the facts when ready within the
+  request": the facts are computed after the response by ruling, so the response never carries
+  them; the frame is the signal, and a snapshot load asks at once (its facts were written with
+  its last commit).
+- **House retire flag, `88f29adb`.** `HouseFactoryDeps.retire`, the sweep passing
+  `houseRetireEnabled(process.env)` (`HOUSE_RETIRE_ENABLED=1`/`true`, default off everywhere);
+  the spawn half runs as it always did; `.env.example` documents it.
+- **LOWs, `aff4193c`.** The eight stale docblocks; `MOCK_CONFIG.maxBotPicksPerTick` and
+  `sweepIntervalMs` removed with their pins in `config.test.ts`. LOW 6 (rank order on the
+  snapshot path, no countdown before a start batch's first reveal), LOW 7 (the upsert's key-share
+  wait, latency only), LOW 10 (an all-bot deferred room drafts inside one commit) and LOW 11
+  (no unit for `reveal.ts`) stand as stated. LOW 9's Vercel `JOBS_SELF_URL` is dead and is the
+  founder's to remove per environment (no cloud change was made here).
+
+### The skew measurement (`.lab/measure/after-skew`, bundle from `8a031154`)
+
+`MEASURE_SKEW_MS=2000 MEASURE_RELOAD_AFTER_PICK=2 run.sh after-skew .next-e2e`: the browser's
+`Date` runs 2 s ahead of the server (the recorder's own instants stay real), and the tab is
+reloaded 1.2 s after the second human pick, mid-batch.
+
+| measure | after-skew |
+|---|---|
+| bot-to-bot reveal gap, error against the seeded delay | 1 / 12 / 600 ms, 32 of 33 within 50 |
+| the one outside | picks 1 and 2 revealed together at the room's first paint (1,021 ms after open, both stamps already past): a viewer joining mid-batch reveals everything already past at once, by design |
+| picks 19 to 30, revealed after the mid-batch reload | on cadence (pick 21: 584 against 569 seeded; 22: 783 against 794), then the turn |
+| first bot after a human pick, lateness against its stamp | 7 / 7 / 7 ms |
+| dock ready after the turn began | 8 / 12 / 12 ms |
+| facts computes / `/assistant` calls / long tasks | 4 (one per batch) / 5 (open, reload, three batches) / 0 |
+
+Gates after the fix round: `tsc` clean; eslint clean on every touched path (the pre-existing
+`veto/route.ts` warning aside); replay pins and the 17 source guards, 19 files, 3382 tests,
+passed, the new refusal string inside them.
