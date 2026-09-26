@@ -111,7 +111,11 @@ export interface DraftAdvancerDeps {
 
 type DeferredStart = "started" | "raced" | { readonly notDueUntilMs: number | null };
 
-type NextDue = { readonly kind: "applied"; readonly dueWork: string; readonly result: ApplyResult; readonly count: number } | { readonly kind: "waiting"; readonly dueAtMs: number | null };
+type NextDue =
+  | { readonly kind: "applied"; readonly dueWork: string; readonly result: ApplyResult; readonly count: number }
+  | { readonly kind: "waiting"; readonly dueAtMs: number | null }
+  /** The bots' resolve lost a commit to another writer: reload and go on, never a refusal counted. */
+  | { readonly kind: "raced" };
 
 interface DueLoopResult {
   readonly state: DraftState;
@@ -176,9 +180,16 @@ export function createDraftAdvancer({
    *  (fix round MEDIUM 3). A bot whose roster can take nothing resolves to no pick, and its turn
    *  falls to the expiry below. */
   async function applyNextDue(state: DraftState, nowMs: number): Promise<NextDue> {
-    if (state.config.isMock === true && (await mockDriver.botTurn(state)) !== null) {
-      const result = await store.resolveBots(state.config.draftId);
-      if (!result.ok || result.batched > 0) return { kind: "applied", dueWork: `bot picks from sequence ${state.sequence}`, result, count: result.ok ? result.batched : 0 };
+    if (state.config.isMock === true) {
+      // The lock opens only for a bot that has something legal to take (review M4): a bot whose
+      // roster can take nothing keeps the clock until it expires, and every read of the room in
+      // between would otherwise replay the log under the row lock for nothing.
+      const turn = await mockDriver.botTurn(state);
+      if (turn !== null && turn.choosePick() !== null) {
+        const result = await store.resolveBots(state.config.draftId);
+        if (!result.ok) return { kind: "raced" };
+        if (result.batched > 0) return { kind: "applied", dueWork: `bot picks from sequence ${state.sequence}`, result, count: result.batched };
+      }
     }
     const deadline = currentDeadline(state);
     const deadlineMs = deadline === null ? null : Date.parse(deadline);
@@ -197,6 +208,20 @@ export function createDraftAdvancer({
     while (state.phase === "in_progress") {
       if (applied >= maxActions) return { state, applied, exhausted: true, wedged: false, nextDueAt: now };
       const attempt = await applyNextDue(state, nowMs);
+      if (attempt.kind === "raced") {
+        // Another writer committed under this call's feet (a human's pick, another driver's
+        // resolve): the log moved, so this is progress, not a refusal, and the breaker is not
+        // touched. A log that did NOT move is the one case that would spin, so it counts.
+        const fresh = await store.getDraftState(state.config.draftId);
+        if (fresh === null) return null;
+        if (fresh.sequence === state.sequence) refusals += 1;
+        if (refusals >= 2) {
+          console.error("[draft] advance wedged", { draftId: state.config.draftId, reason: "the bots' resolve was refused against an unmoved log", dueWork: `bot picks from sequence ${state.sequence}` });
+          return { state, applied, exhausted: false, wedged: true, nextDueAt: null };
+        }
+        state = fresh;
+        continue;
+      }
       if (attempt.kind === "waiting") {
         // Nothing due — the clock is still running: the moderator's window, exactly where
         // `tickOne` gives it. It never applies an action, so it can never change what this
