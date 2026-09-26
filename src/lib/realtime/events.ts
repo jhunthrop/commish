@@ -32,6 +32,15 @@ export const REALTIME_EVENT_TYPES = [
    * failed): synthesized by the stream on read, carrying `{ draftId }` and no stream id.
    */
   "draft.resync",
+  /**
+   * THE FACTS FRAME (the batched bots round, review M5): the room's advisor facts for one log
+   * sequence are written, or their compute failed. Published by the invocation that landed the
+   * commit, right after its own facts write (`followThroughAppliedAction`), carrying
+   * `{ draftId, sequence, ready }`. A viewer's advisor waits for this frame before asking
+   * `/assistant` for that sequence, so it reads the row instead of racing the writer with a
+   * simulation of its own; `ready: false` tells it to ask anyway (the request then computes).
+   */
+  "draft.facts",
   "chat.message",
   "chat.reaction",
   /**

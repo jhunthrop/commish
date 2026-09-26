@@ -479,9 +479,9 @@ async function seedDraftAutoStartLeague(db: Db, clock: Clock, deps: SeedEnforcem
     .values({ id: AUTOSTART_DRAFT_ID, leagueId: AUTOSTART_LEAGUE_ID, format: "snake", status: "scheduled", kickoffAt, auctionBudget: null })
     .onConflictDoUpdate({ target: drafts.id, set: { kickoffAt } });
 
-  // The real ticker action (`@/draft-service/auto-start`) — the SAME function `getDraftTicker()`'s
-  // own `tick()` calls every interval (`@/draft-service/ticker.ts`), called here directly rather
-  // than through a running ticker process. Never `store.startDraft` directly: that would be the
+  // The real sweep action (`@/draft-service/auto-start`) — the SAME function the minute sweep
+  // (`@/jobs/defs/draft-sweep-job`) calls on every fire, called here directly rather than through
+  // a running sweep. Never `store.startDraft` directly: that would be the
   // seed pretending to be the commissioner's manual press, not the platform's own hand.
   await autoStartDueDrafts(db, { store: deps.store ?? getDraftStore(), clock });
 

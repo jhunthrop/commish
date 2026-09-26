@@ -16,8 +16,9 @@
  * and the fix are identical either way, because this predicate only ever reads the kickoff column
  * and asks whether it sits comfortably ahead, never which arm wrote it. On a long-lived shared dev
  * database, that fixed-until-filled kickoff is exactly the kind of fixture that ages out from
- * under a later run: found running Task 15's own e2e battery, where the real ticker
- * (`@/draft-service/ticker.ts`) runs alongside a backstage fill and can claim a stale-kickoff
+ * under a later run: found running Task 15's own e2e battery, where the real auto-start
+ * (`@/draft-service/auto-start`, then on a ticker, now on the minute sweep) runs alongside a
+ * backstage fill and can claim a stale-kickoff
  * draft mid-loop, turning a routine seat-taking into an intermittent `DRAFT_ALREADY_STARTED`
  * refusal that has nothing to do with whatever the caller is actually proving — the identical "a
  * seeded fixture the ticker can move" class of hazard `seed-tier-demo.ts`'s own docblock already

@@ -5,6 +5,7 @@ import type { ApiEnvelope } from "@/lib/api/respond";
 import type { AdvisorView } from "@/draft-service/assistant/view";
 import { useDraftRoomDeps } from "../hooks/deps";
 import { forgetAdvisor, recallAdvisor, rememberAdvisor } from "./advisor-memory";
+import { ADVISOR_ROOM_CONFIG } from "./config";
 
 export interface UseAdvisorResult {
   /** The held view, shown only for candidates still on the room's board at render time
@@ -17,11 +18,18 @@ export interface UseAdvisorResult {
   readonly error: string | null;
 }
 
-/** The room as the advisor reads it: which draft, the log sequence the client holds right now,
- *  and every player still on the board — all off the `DraftStateView` the room already has. */
+/**
+ * The room as the advisor reads it (the batched bots round, 2026-09-25): which draft, the log
+ * sequence the server holds (`sequence`, the committed view's, what the advisor is computed
+ * against), the sequence the room has REVEALED so far, the newest sequence whose facts the
+ * server has said are settled (`useDraftRoom.factsReadySequence`), and every player still on
+ * the revealed board.
+ */
 export interface AdvisorRoom {
   readonly draftId: string;
   readonly sequence: number;
+  readonly revealedSequence: number;
+  readonly factsReadySequence: number | null;
   readonly availablePlayerIds: ReadonlySet<string>;
 }
 
@@ -58,7 +66,7 @@ function hydrate(draftId: string): AdvisorView | null {
 
 /**
  * THE ADVISOR'S FETCH — spec 3.4: `GET /api/drafts/:draftId/assistant` on every change of the
- * room's log sequence, which every pick event (and every other applied action) moves.
+ * room's committed log sequence, which every pick event (and every other applied action) moves.
  * `myTeamId === null` never fetches: a commissioner has no seat to advise.
  *
  * COALESCED, NEVER PILED UP (simplification round): the request carries no state of its own,
@@ -66,16 +74,31 @@ function hydrate(draftId: string): AdvisorView | null {
  * request is in flight only marks the hook dirty, and exactly one more request follows when the
  * current one lands. The lag the founder measured was requests queued behind each other on the
  * server, one per pick event, each computing a state nobody would see.
+ *
+ * ASKED WHEN THE FACTS ARE WRITTEN, SHOWN AT THE LAST REVEAL (the batched bots round; review
+ * M5). A batch of bot picks commits at once and reveals one by one; the server's facts for the
+ * post-batch state are computed by the pick's own invocation right after it answers, and the
+ * `draft.facts` frame says when they are written, so the fetch waits for that frame
+ * (`factsReadySequence`) and reads the row instead of racing the writer with a simulation of its
+ * own: never two simulators. A frame that never comes (the writer died, the stream missed it)
+ * is covered by `ADVISOR_ROOM_CONFIG.factsWaitMaxMs`, after which the fetch goes anyway and the
+ * request computes. Its answer is about the state the human will face when the last bot is
+ * revealed, so it is STAGED until the room's revealed sequence reaches its stamp, then shown:
+ * her dock is ready the moment her turn is, and no odds about a pick still hidden ever show
+ * while it is hidden.
  */
 export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvisorResult {
-  const { draftId, sequence, availablePlayerIds } = room;
+  const { draftId, sequence, revealedSequence, factsReadySequence, availablePlayerIds } = room;
   const deps = useDraftRoomDeps();
   const [held, setHeld] = useState<AdvisorView | null>(() => hydrate(draftId));
+  const [staged, setStaged] = useState<AdvisorView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const draftIdRef = useRef<string>(draftId);
   const aliveRef = useRef(true);
   const inFlightRef = useRef(false);
   const dirtyRef = useRef(false);
+  const revealedSequenceRef = useRef(revealedSequence);
+  revealedSequenceRef.current = revealedSequence;
 
   const fetchOnce = useCallback(async (): Promise<void> => {
     try {
@@ -86,9 +109,14 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
         setError(body.error);
         return;
       }
-      setHeld(body.data);
       setError(null);
-      rememberAdvisor(draftId, { lastView: body.data });
+      if (body.data.stamp.sequence <= revealedSequenceRef.current) {
+        setStaged(null);
+        setHeld(body.data);
+        rememberAdvisor(draftId, { lastView: body.data });
+      } else {
+        setStaged(body.data);
+      }
     } catch {
       if (aliveRef.current) setError(NETWORK_ERROR);
     }
@@ -122,25 +150,42 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
     };
   }, []);
 
+  // The fetch, once per committed sequence, once the server has said its facts are settled (or
+  // after the wait's ceiling, the writer having gone quiet).
   useEffect(() => {
     if (draftIdRef.current !== draftId) {
       forgetAdvisor(draftIdRef.current);
       draftIdRef.current = draftId;
       setHeld(hydrate(draftId));
+      setStaged(null);
     }
     if (myTeamId === null) {
       setHeld(null);
+      setStaged(null);
       setError(null);
       forgetAdvisor(draftId);
       return;
     }
-    recompute();
-  }, [draftId, sequence, myTeamId, recompute]);
+    if (factsReadySequence !== null && factsReadySequence >= sequence) {
+      recompute();
+      return;
+    }
+    const timer = setTimeout(recompute, ADVISOR_ROOM_CONFIG.factsWaitMaxMs);
+    return () => clearTimeout(timer);
+  }, [draftId, sequence, factsReadySequence, myTeamId, recompute]);
+
+  // The promotion: a staged answer is shown once the room has revealed the state it is about.
+  useEffect(() => {
+    if (staged === null || staged.stamp.sequence > revealedSequence) return;
+    setHeld(staged);
+    setStaged(null);
+    rememberAdvisor(draftId, { lastView: staged });
+  }, [staged, revealedSequence, draftId]);
 
   const view = useMemo(() => (held === null ? null : presentView(held, availablePlayerIds)), [held, availablePlayerIds]);
-  // Recomputing: a seated caller whose held view trails the room, or who holds nothing yet and
-  // has not been refused. Derived, so it changes exactly when the view or the room does.
-  const recomputing = myTeamId !== null && (held === null ? error === null : held.stamp.sequence < sequence);
+  // Recomputing: a seated caller whose held view trails the revealed room, or who holds nothing
+  // yet and has not been refused. Derived, so it changes exactly when the view or the room does.
+  const recomputing = myTeamId !== null && (held === null ? error === null : held.stamp.sequence < revealedSequence);
   // One object per distinct answer: every drawer tab and every pool row takes this as a prop.
   return useMemo(() => ({ view, recomputing, error }), [view, recomputing, error]);
 }

@@ -10,19 +10,15 @@ import { createDraftAdvancer, type DraftAdvancer } from "./advance";
 import { publishRoomFacts } from "./assistant/service";
 import { createNudgeScheduler, type NudgeScheduler } from "./nudge";
 import { createNudgeCopy } from "./nudge-copy";
-import { createDraftPacer, hasLivePacingJob, NO_OP_PACER, pacingEnabledIn, type DraftPacer } from "./pacing";
 import { createDraftStore, type DraftStore } from "./store";
-import { createDraftTicker, type DraftTicker } from "./ticker";
 
 /** The outermost edge is the only place a wall clock is allowed. */
 const systemClock = { now: () => new Date().toISOString() };
 
 let store: DraftStore | undefined;
-let ticker: DraftTicker | undefined;
 let mockDriver: MockBotDriver | undefined;
 let advancer: DraftAdvancer | undefined;
 let nudger: NudgeScheduler | undefined;
-let pacer: DraftPacer | undefined;
 
 /**
  * The store's `onPublishError` wiring, extracted to its own name — same reasoning as
@@ -45,7 +41,7 @@ export function noteDraftPublishFailure(error: unknown, event: PublishFailureEve
   void getResyncMarker().mark(event.draftId);
 }
 
-/** The ticker's nudger's `onError` wiring, extracted for the same reason. */
+/** The nudger's `onError` wiring, extracted for the same reason. */
 export function logDraftNudgeError(error: unknown, context: unknown): void {
   console.error("[draft] nudge failed", context, error);
 }
@@ -59,32 +55,28 @@ export function logDraftNudgeError(error: unknown, context: unknown): void {
  */
 export const publishDraftEvent: PublishFn = (input) => getPublisher().publish(input);
 
-/** The facts half of the follow-through, owning its failure: a compute that fails costs the next
- *  viewer a single-flight compute on the request path, exactly what a miss always cost. */
-export async function followThroughRoomFacts(state: DraftState): Promise<void> {
+/**
+ * THE COMMIT'S FOLLOW-THROUGH (draft-room performance round, item 1; the batched bots round,
+ * 2026-09-25): what every accepted commit owes once it has committed, run on the invocation that
+ * made it, after its response has gone (`runAfterResponse`), never before the writer's own
+ * answer. The room's facts for the new state — for a mock, the post-batch state the next human
+ * faces — computed once and written to the draft's own row, so the viewers' `/assistant`
+ * requests read instead of simulate and the dock has its answer when her turn is revealed. Owns
+ * its own failure: a compute that fails costs the next viewer a single-flight compute on the
+ * request path, exactly what a miss always cost.
+ */
+export async function followThroughAppliedAction(state: DraftState): Promise<void> {
+  let ready = true;
   try {
     await publishRoomFacts(getDb(), state);
   } catch (error: unknown) {
+    ready = false;
     console.error("[draft] room facts follow-through failed", { draftId: state.config.draftId, sequence: state.sequence }, error);
   }
-}
-
-/**
- * THE PICK'S FOLLOW-THROUGH (draft-room performance round, items 1 and 3): what every accepted
- * action owes once it has committed, run on the invocation that made it, after its response has
- * gone (`runAfterResponse`), never before the writer's own answer. First the pacing: the room's
- * next due work as one queued job, woken at its instant (`getDraftPacer`), so the next pick is on
- * its way before anything heavier starts. Then the room's facts for the new state, so the
- * viewers' `/assistant` requests read instead of simulate. Each half owns its own failure; a
- * pacing failure is loud because the sweep is then the only thing moving the room.
- */
-export async function followThroughAppliedAction(state: DraftState): Promise<void> {
-  try {
-    await getDraftPacer().pace(state);
-  } catch (error: unknown) {
-    console.error("[draft] pacing failed; the sweep is the room's driver until the next action", { draftId: state.config.draftId, sequence: state.sequence }, error);
-  }
-  await followThroughRoomFacts(state);
+  // THE FACTS FRAME (review M5): the viewers' advisors wait for this before asking, so the one
+  // simulator is this invocation's. A running room only; a finished one has nothing to advise.
+  if (state.phase !== "in_progress") return;
+  await publishDraftEvent({ leagueId: state.config.leagueId, type: "draft.facts", payload: { draftId: state.config.draftId, sequence: state.sequence, ready } });
 }
 
 /** The follow-throughs in flight, chained so a test can settle the last one (`awaitDraftFollowThroughForTests`). */
@@ -102,6 +94,12 @@ export function awaitDraftFollowThroughForTests(): Promise<void> {
   return followThroughTail;
 }
 
+/**
+ * The process-wide store. Its bot policy is the process-wide driver's `botTurn` (resolved per
+ * call, so the two singletons need no construction order): inside the commit that lands any
+ * accepted action on a mock, the store runs every consecutive bot seat forward and appends their
+ * picks to the same commit (`DraftStoreDeps.botTurn`).
+ */
 export function getDraftStore(): DraftStore {
   if (store === undefined) {
     store = createDraftStore({
@@ -110,36 +108,28 @@ export function getDraftStore(): DraftStore {
       clock: systemClock,
       onPublishError: noteDraftPublishFailure,
       afterApplied: scheduleFollowThrough,
+      botTurn: (state) => getMockBotDriver().botTurn(state),
     });
   }
   return store;
 }
 
 /**
- * Task 7's auto-start rides this same ticker rather than a third `setInterval` — see
- * `ticker.ts`'s own `tick()` docblock. Its `autoStart` dependency is left at `createDraftTicker`'s
- * default (the real `autoStartDueDrafts`, `./auto-start`), which needs only `{ store, clock }`:
- * the `draft_auto_started` announcement is fused into `getDraftStore()`'s own `startDraft`
- * transaction (`store.ts`), so it inherits that store's `audit`/`deliverNotice` wiring — already
- * the process-wide logger and publisher, by `createDraftStore`'s own defaults above — with nothing
- * new to wire here.
- */
-/**
- * The process-wide bot driver — ONE instance, shared by the ticker's own drive lane and the
- * advance funnel below, so there is a single per-draft meta cache and the retention sweep's
- * `invalidateDraft` wiring (through the ticker) empties it for both callers.
+ * The process-wide bot driver — ONE instance, shared by the store's batch and the advance
+ * funnel, so there is a single per-draft meta cache and the retention sweep's `invalidateDraft`
+ * wiring (through the sweep job) empties it for both callers.
  */
 export function getMockBotDriver(): MockBotDriver {
   if (mockDriver === undefined) {
-    mockDriver = createMockBotDriver({ db: getDb(), store: getDraftStore() });
+    mockDriver = createMockBotDriver({ db: getDb() });
   }
   return mockDriver;
 }
 
 /**
- * The ONE moderator instance the ticker (dev) and the advancer (the serverless drivers) share —
- * a single `isBot` cache and one LLM-copy wiring, and the `draft_nudges` claim row already makes
- * a nudge once-per-pick across any number of instances regardless.
+ * The ONE moderator instance the advancer's drivers share — a single `isBot` cache and one
+ * LLM-copy wiring, and the `draft_nudges` claim row already makes a nudge once-per-pick across
+ * any number of instances regardless.
  */
 function getNudgeScheduler(): NudgeScheduler {
   if (nudger === undefined) {
@@ -155,24 +145,10 @@ function getNudgeScheduler(): NudgeScheduler {
   return nudger;
 }
 
-export function getDraftTicker(): DraftTicker {
-  if (ticker === undefined) {
-    ticker = createDraftTicker({
-      db: getDb(),
-      store: getDraftStore(),
-      clock: systemClock,
-      mockDriver: getMockBotDriver(),
-      nudger: getNudgeScheduler(),
-    });
-  }
-  return ticker;
-}
-
 /**
- * The process-wide advance funnel (draft-driver design, 2026-09-03) — the routine every
- * serverless driver calls: advance-on-read, the SSE watcher loop, and the `draft-sweep` job.
- * Wired over the SAME store, bot driver and moderator the ticker uses, so dev (where the ticker
- * also runs) and Vercel (where it does not) advance drafts through one implementation.
+ * The process-wide advance funnel (draft-driver design, 2026-09-03) — the routine every driver
+ * calls: advance-on-read and the `draft-sweep` job. Wired over the SAME store, bot driver and
+ * moderator, so every host advances drafts through one implementation.
  */
 export function getDraftAdvancer(): DraftAdvancer {
   if (advancer === undefined) {
@@ -189,30 +165,11 @@ export function getDraftAdvancer(): DraftAdvancer {
 /**
  * ADVANCE-ON-READ (driver 1): applied by every authenticated draft read before it loads state,
  * so a room someone reopens fast-forwards to the true present — deferred starts, due expiries
- * and due bot picks included. Never throws (`DraftAdvancer.advance`'s own contract): a broken
- * advance must never fail the read that triggered it.
+ * and any bot still on a committed clock included. Never throws (`DraftAdvancer.advance`'s own
+ * contract): a broken advance must never fail the read that triggered it.
  */
 export async function advanceDraftNow(draftId: string): Promise<void> {
-  // A ROOM ON ITS WAY IS LEFT TO ITS JOB (draft-room performance round, item 3): where the
-  // pacer runs, a read that finds a live pacing job applies nothing — it would only race the
-  // job's own invocation and, arriving after a late wake, land two due picks in one loop. A
-  // read still fast-forwards a room whose chain has broken, which is what driver 1 was for.
-  if (getDraftPacer() !== NO_OP_PACER && (await hasLivePacingJob(getDb(), draftId, Date.now()))) return;
   await getDraftAdvancer().advance(draftId, systemClock.now());
-}
-
-/**
- * THE PACER (driver 2 of the draft-driver design, remade by the draft-room performance round,
- * item 3): bot picks and clock expiries as one queued job per due instant, each run in its own
- * invocation at its own time, whether or not anybody is watching. The SSE stream's advance loop
- * that used to be this driver is gone; the stream relays only. Where a long-lived process paces
- * the room already (the local dev ticker), the pacer paces nothing (`pacingEnabledIn`).
- */
-export function getDraftPacer(): DraftPacer {
-  if (pacer === undefined) {
-    pacer = pacingEnabledIn(process.env) ? createDraftPacer({ db: getDb(), clock: systemClock, mockDriver: getMockBotDriver() }) : NO_OP_PACER;
-  }
-  return pacer;
 }
 
 // Barrel surface: only names actually imported through `@/draft-service` elsewhere in the

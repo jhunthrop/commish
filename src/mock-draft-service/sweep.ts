@@ -20,8 +20,9 @@ import { MOCK_CONFIG } from "@/mock-draft/config";
  * (`deleteMockLeagueRow`) carries `is_mock = true` in its own WHERE (the second belt), so even a
  * hand-corrupted sidecar row cannot aim this DELETE at a real league.
  *
- * Interval-gated by the ticker (`MOCK_CONFIG.sweepIntervalMs`, the `houseReconcileIntervalMs`
- * shape) rather than run every tick — retention windows are hours long, not seconds.
+ * Run by the minute sweep (`@/jobs/defs/draft-sweep-job`, the batched bots round: the dev ticker
+ * that used to gate it by interval is gone) — retention windows are hours long, so a fire that
+ * finds nothing expired costs three bounded scans and nothing else.
  */
 
 /**

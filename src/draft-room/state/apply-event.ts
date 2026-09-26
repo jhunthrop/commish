@@ -17,7 +17,8 @@ export type ApplyEventResult =
 const IGNORED: ApplyEventResult = { ok: false, outcome: "ignored" };
 const RESYNC: ApplyEventResult = { ok: false, outcome: "resync" };
 
-function parseFrame(data: string): DraftEventFrame | null {
+/** One frame off the stream, parsed and validated; `null` for anything that is not a draft frame. */
+export function parseDraftFrame(data: string): DraftEventFrame | null {
   let raw: unknown;
   try {
     raw = JSON.parse(data);
@@ -117,8 +118,17 @@ function applyFrame(view: DraftStateView, frame: DraftEventFrame): DraftStateVie
  * where a bid arrives against a lot we never saw open.
  */
 export function applyDraftEvent(view: DraftStateView, data: string): ApplyEventResult {
-  const frame = parseFrame(data);
+  const frame = parseDraftFrame(data);
   if (frame === null) return IGNORED;
+  return applyDraftFrame(view, frame);
+}
+
+/**
+ * The fold itself, over an already-parsed frame: what the room applies to its committed view on
+ * arrival and to its revealed view at the pick's own stamp (`reveal.ts`), so the two views are
+ * folded by one rule and differ only in WHEN.
+ */
+export function applyDraftFrame(view: DraftStateView, frame: DraftEventFrame): ApplyEventResult {
   if (frame.payload.draftId !== view.draftId) return IGNORED;
 
   const { sequence } = frame.payload.clock;

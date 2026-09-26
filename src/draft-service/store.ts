@@ -23,6 +23,7 @@ import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logg
 import { sweepQuietly } from "@/integrity-service/multi-account";
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import { enqueueDraftGradesJobQuietly } from "@/jobs/defs/draft-grades-job";
+import { settleMockDraftCompletion, type BotTurn } from "@/mock-draft-service/driver";
 import { pickPath } from "@/lib/timing/pick-path";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
@@ -72,15 +73,29 @@ export interface DraftStoreDeps {
   readonly wake?: WakeSet;
   /**
    * THE POST-COMMIT FOLLOW-THROUGH (draft-room performance round, item 1): called with the state
-   * an accepted action produced, after the commit, the broadcast and the wake note — the one seam
+   * an accepted commit produced — the human's action and every bot pick batched behind it, one
+   * call for the whole commit — after the commit, the broadcast and the wake note: the one seam
    * every accepted action passes, whichever driver submitted it. The edge wires the pick's own
-   * follow-through here (the room's facts for the advisor); a refusal never reaches it. Synchronous
-   * by contract: the hook defers its own work past the response and owns its own failures, and a
-   * hook that throws is logged here, so nothing it does can fail, delay or reorder the write it
-   * follows. A caller that must not follow through (the stream's own advance loop, whose process
-   * relays only) opts out per call with `ApplyOptions.followThrough`.
+   * follow-through here (the room's facts for the advisor, computed for the post-batch state the
+   * next human faces); a refusal never reaches it. Synchronous by contract: the hook defers its
+   * own work past the response and owns its own failures, and a hook that throws is logged here,
+   * so nothing it does can fail, delay or reorder the write it follows.
    */
-  readonly afterApplied?: (state: DraftState, action: DraftAction) => void;
+  readonly afterApplied?: (state: DraftState) => void;
+  /**
+   * THE BOT POLICY (the batched bots round, 2026-09-25): the bot on the clock, priced — its seat,
+   * the instant its pick is revealed, and the pick itself (`BotTurn`, `@/mock-draft-service/
+   * driver`); null when a human holds the clock, or the room has no bots. Inside the transaction
+   * that lands ANY accepted action on a mock, `applyAction` runs this forward through every
+   * consecutive bot seat until a human is on the clock or the draft is complete, appending each
+   * bot's `MAKE_PICK` to the log in the SAME commit, stamped at its own reveal instant (the
+   * previous action's stamp plus that pick's seeded think-delay, the identical arithmetic the
+   * pick-by-pick drivers stamped by, so an older log replays byte for byte). The picks are a
+   * function of the seeded snapshot, so nothing about them has to happen at a time; only the
+   * reveal is time-shaped, and the client does that from each pick's stamp. Absent (the edge's
+   * tests, a real league's store), no batch ever runs.
+   */
+  readonly botTurn?: (state: DraftState) => Promise<BotTurn | null>;
 }
 
 export type ApplyResult =
@@ -92,11 +107,21 @@ export type ApplyResult =
        *  failed fast (`REALTIME_CONFIG.commandTimeoutMs`, bounded retries), the failure went to
        *  `onPublishError`, and the caller may say so in a person's words. */
       readonly published: boolean;
+      /** Bot picks appended behind the action in the same commit (`DraftStoreDeps.botTurn`). */
+      readonly batched: number;
     }
   | { readonly ok: false; readonly reason: string };
 
-/** What the transaction itself decides, before the broadcast that follows the commit. */
-type TransactionOutcome = { readonly ok: true; readonly state: DraftState } | { readonly ok: false; readonly reason: string };
+/** One accepted action and the states either side of it: what the broadcast diffs. */
+interface Transition {
+  readonly previous: DraftState;
+  readonly next: DraftState;
+  readonly action: DraftAction;
+}
+
+/** What the transaction itself decides, before the broadcast that follows the commit: every
+ *  transition it committed, in order (the action, then each batched bot pick). */
+type TransactionOutcome = { readonly ok: true; readonly chain: readonly Transition[] } | { readonly ok: false; readonly reason: string };
 
 export interface ApplyOptions {
   /**
@@ -115,8 +140,6 @@ export interface ApplyOptions {
   readonly alsoInTransaction?: (tx: DbTx) => Promise<readonly MemberNotice[] | void>;
   /** Who submitted this action. Absent means the clock acted (a `TIMER_EXPIRE`, never a person). */
   readonly actor?: { readonly id: string };
-  /** Whether the store's `afterApplied` hook runs for this action. Defaults to true; see the hook. */
-  readonly followThrough?: boolean;
 }
 
 export type CommitResult =
@@ -170,6 +193,14 @@ export type DraftActionSource = DraftAction | ((tx: DbTx) => Promise<DraftAction
 export interface DraftStore {
   getDraftState(draftId: string): Promise<DraftState | null>;
   applyAction(draftId: string, action: DraftActionSource, options?: ApplyOptions): Promise<ApplyResult>;
+  /**
+   * Runs the bot policy forward from the room's CURRENT state, with no action of anybody's in
+   * front of it: the drivers' lane for a mock whose committed state still has a bot on the clock
+   * (a room started before bot picks were batched, or one whose batch stopped at a roster that
+   * could take nothing). Every pick is stamped exactly as a batch behind an action would stamp
+   * it. `batched` is 0, and nothing is written or published, when no bot holds the clock.
+   */
+  resolveBots(draftId: string): Promise<ApplyResult>;
   invalidate(draftId: string): void;
   startDraft(draftId: string, options?: StartDraftOptions): Promise<ApplyResult>;
   commitDraftResults(draftId: string): Promise<CommitResult>;
@@ -316,6 +347,7 @@ export function createDraftStore({
   deliverNotice: deliver = deliverNotice,
   wake,
   afterApplied,
+  botTurn,
 }: DraftStoreDeps): DraftStore {
   const cache = new Map<string, DraftState>();
   const mutex = createKeyedMutex();
@@ -371,6 +403,107 @@ export function createDraftStore({
     return published;
   }
 
+  /** Every frame the commit owes, transition by transition, in the order the log holds them. */
+  async function broadcastChain(chain: readonly Transition[]): Promise<boolean> {
+    let published = true;
+    for (const { previous, next, action } of chain) published = (await broadcast(previous, next, action)) && published;
+    return published;
+  }
+
+  /**
+   * THE LOCKS EVERY WRITE TAKES, in the one fixed order. The league row FIRST, as its own
+   * statement, `FOR KEY SHARE` (final whole-branch review, F1, a cycle reproduced with real
+   * `psql` sessions, SQLSTATE 40P01): this transaction was never a leaf, its notice inserts and
+   * `commitDraftState`'s FK-carrying inserts take an implicit `FOR KEY SHARE` on `leagues`, and
+   * `joinLeagueInTx` holds `leagues FOR UPDATE` and then reaches `drafts`. THE GLOBAL RULE (stated
+   * in full in `setDraftKickoff`'s own docblock, `@/league-service/draft-schedule`): ANY TRANSACTION
+   * THAT TAKES BOTH A `leagues` ROW LOCK AND A `drafts` ROW LOCK ACQUIRES `leagues` FIRST, AS ITS
+   * OWN STATEMENT. `FOR KEY SHARE`, not `FOR UPDATE`, because it is exactly the lock the inserts
+   * take later anyway, so acquiring it up front reorders nothing and strengthens nothing, and an
+   * escalation would deadlock against `proposeTrade`'s `teams FOR UPDATE` then `leagues FOR KEY
+   * SHARE`. `OF leagues` scopes it to the one row despite the join: the `drafts` row is only READ
+   * here and is locked by the second statement.
+   *
+   * Then THE CROSS-INSTANCE LOCK: every accepted action for this draft passes through the
+   * draft's own row, so "replay the action log" becomes the single-writer path across any
+   * number of app instances. `SELECT ... FOR UPDATE` and not `pg_advisory_lock`: this
+   * connection reaches Postgres through PgBouncer in transaction pooling mode, where
+   * session-scoped state does not survive statement boundaries; a row lock is transaction-scoped
+   * by construction (docs/decisions/data-layer-hardening.md). Lock order: `leagues`, then
+   * `drafts`, then the audit anchor, the same order `joinLeagueInTx` and `setDraftKickoff` take.
+   * False when the draft does not exist.
+   */
+  async function lockDraftRow(tx: DbTx, draftId: string): Promise<boolean> {
+    const [league] = await tx
+      .select({ id: leagues.id })
+      .from(leagues)
+      .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
+      .where(eq(drafts.id, draftId))
+      .for("key share", { of: leagues });
+    if (league === undefined) return false;
+    const [locked] = await tx.select({ id: drafts.id }).from(drafts).where(eq(drafts.id, draftId)).for("update");
+    return locked !== undefined;
+  }
+
+  /**
+   * THE BATCH (the batched bots round, 2026-09-25; `DraftStoreDeps.botTurn`): from `from`, every
+   * consecutive bot seat's pick, appended to the log inside the caller's transaction, each stamped
+   * at its own reveal instant and each the next iteration's state, until a human is on the clock,
+   * the draft is complete, or a roster can take nothing (that turn is then the clock's to expire).
+   * A reducer refusal here is a bug worth a loud line, never a rolled-back commit: the batch
+   * stops and the action in front of it still stands. Returns the transitions it appended.
+   */
+  async function appendBotPicks(tx: DbTx, draftId: string, from: DraftState): Promise<readonly Transition[]> {
+    if (botTurn === undefined || from.config.isMock !== true) return [];
+    const chain: Transition[] = [];
+    let state = from;
+    while (state.phase === "in_progress") {
+      const turn = await botTurn(state);
+      if (turn === null) break;
+      const playerId = turn.choosePick();
+      if (playerId === null) break;
+      // `Math.ceil`: the seeded delay is fractional-millisecond arithmetic; the stamp is the
+      // first whole millisecond at or after it, so the recorded instant never precedes the true
+      // reveal instant and every writer stamps identically (`PIN_BOT_DELAYS_MS`).
+      const action: DraftAction = { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp: new Date(Math.ceil(turn.revealAtMs)).toISOString(), teamId: turn.teamId, playerId };
+      const reduced = reduceDraft(state, action);
+      if (!reduced.ok) {
+        console.error("[draft] bot batch stopped: the reducer refused a bot's pick", { draftId, sequence: state.sequence, reason: reduced.reason });
+        break;
+      }
+      await tx.insert(draftActions).values({ draftId, sequence: reduced.state.sequence, action, timestamp: new Date(action.timestamp) });
+      chain.push({ previous: state, next: reduced.state, action });
+      state = reduced.state;
+    }
+    return chain;
+  }
+
+  /** A mock the commit just finished settles its status row in the same commit (`settleMockDraftCompletion`
+   *  is guarded and idempotent): no window in which `drafts.status` lies about a finished room. */
+  async function settleIfMockCompleted(tx: DbTx, draftId: string, before: DraftState, after: DraftState): Promise<void> {
+    if (after.config.isMock === true && after.phase === "complete" && before.phase !== "complete") await settleMockDraftCompletion(tx, draftId);
+  }
+
+  /** What every accepted commit owes once it is durable: the materialization, every frame in
+   *  order, and the sweep's wake note. */
+  async function announce(draftId: string, chain: readonly Transition[]): Promise<boolean> {
+    const final = chain[chain.length - 1]!.next;
+    cache.set(draftId, final);
+    const published = await broadcastChain(chain);
+    await noteWake(final);
+    return published;
+  }
+
+  /** LAST, and never awaited: see `DraftStoreDeps.afterApplied`. */
+  function followThrough(draftId: string, final: DraftState): void {
+    if (afterApplied === undefined) return;
+    try {
+      afterApplied(final);
+    } catch (error: unknown) {
+      console.error("[draft] afterApplied hook threw", { draftId }, error);
+    }
+  }
+
   const store: DraftStore = {
     async getDraftState(draftId) {
       return mutex.run(draftId, () => load(draftId));
@@ -382,89 +515,25 @@ export function createDraftStore({
 
     async applyAction(draftId, source, options?: ApplyOptions) {
       return mutex.run(draftId, async (): Promise<ApplyResult> => {
-        // `previous` is captured out of the transaction so `broadcast` (which must run AFTER
-        // the commit, because publishing is best-effort and must never fail a committed write)
-        // still has the before-state to diff against. `createdNotices` is the same idea for
-        // `deliverNotice`: the durable rows below are written and returned INSIDE the
-        // transaction, but their live frames must only go out once that transaction has
-        // actually committed — see `deliverNotice`'s own docblock.
-        let previous: DraftState | null = null;
+        // The transitions this commit made ride out of the transaction on its outcome, so
+        // `broadcast` (which must run AFTER the commit, because publishing is best-effort and
+        // must never fail a committed write) has every before-state to diff against.
+        // `createdNotices` is the same idea for `deliverNotice`: the durable rows below are
+        // written and returned INSIDE the transaction, but their live frames must only go out
+        // once that transaction has actually committed — see `deliverNotice`'s own docblock.
         // Set inside the transaction, on the ONE branch that turns a draft into a season, and
         // read after the commit by the multi-account sweep's second trigger below. Captured
-        // there rather than re-derived here for the same reason `previous` is: the before-state
-        // this transition is judged against only exists inside the transaction.
+        // there rather than re-derived here because the before-state this transition is judged
+        // against only exists inside the transaction.
         let completedLeagueId: string | null = null;
-        // The action this call actually applied — captured out of the transaction for the same
-        // reason `previous` is, because a `DraftActionSource` function only resolves to a value
-        // INSIDE it, and `broadcast` (which must run after the commit) diffs against it.
-        let applied: DraftAction | null = null;
         const createdNotices: MemberNotice[] = [];
 
         try {
           const outcome = await db.transaction(async (tx): Promise<TransactionOutcome> => {
-            /**
-             * THE LEAGUE ROW, FIRST, AS ITS OWN STATEMENT (final whole-branch review, F1 — a
-             * cycle reproduced with real `psql` sessions, SQLSTATE 40P01).
-             *
-             * This transaction was NEVER a leaf, and the docblock below used to claim it was.
-             * Its autopick/skip notices insert into `member_notices`, and `commitDraftState`
-             * inserts `draft_picks`/`roster_slots`/`matchups` — every one of those statements
-             * takes an implicit `FOR KEY SHARE` on the `leagues` row through its own foreign key,
-             * and `FOR KEY SHARE` conflicts with `FOR UPDATE`. So the true order was
-             * drafts-then-leagues, while `joinLeagueInTx` (`@/league-service/join`) holds
-             * `leagues FOR UPDATE` and then reaches `drafts` through `fireWhenFullInTx`'s
-             * `UPDATE drafts SET kickoff_at`. Two transactions, two orders, one cycle — and
-             * Postgres resolves a cycle by killing somebody's draft pick or somebody's join.
-             *
-             * THE GLOBAL RULE this branch now holds everywhere (stated in full in
-             * `setDraftKickoff`'s own docblock, `@/league-service/draft-schedule`): ANY
-             * TRANSACTION THAT TAKES BOTH A `leagues` ROW LOCK AND A `drafts` ROW LOCK ACQUIRES
-             * `leagues` FIRST, AS ITS OWN STATEMENT.
-             *
-             * `FOR KEY SHARE`, not `FOR UPDATE`, and the weaker mode is the point: it is EXACTLY
-             * the lock this transaction's own FK-carrying inserts take later anyway, so acquiring
-             * it up front reorders nothing and strengthens nothing. Escalating to `FOR UPDATE`
-             * here would be a genuine regression — `proposeTrade` (`@/league-service/trades`)
-             * holds `teams FOR UPDATE` and then takes `leagues FOR KEY SHARE` through its own
-             * notice insert, which coexists with this lock today and would start deadlocking
-             * against `commitDraftState`'s `teams FOR KEY SHARE` the moment this row went
-             * exclusive.
-             *
-             * `FOR KEY SHARE OF leagues` scopes the lock to the one row despite the join: the
-             * `drafts` row is only READ here (reading is not locking), and it is locked by the
-             * statement below, in the fixed order.
-             */
-            const [league] = await tx
-              .select({ id: leagues.id })
-              .from(leagues)
-              .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
-              .where(eq(drafts.id, draftId))
-              .for("key share", { of: leagues });
-            if (league === undefined) return { ok: false, reason: "That draft does not exist." };
+            if (!(await lockDraftRow(tx, draftId))) return { ok: false, reason: "That draft does not exist." };
 
-            /**
-             * THE CROSS-INSTANCE LOCK. Every accepted action for this draft passes through this
-             * one row, so "replay the action log" becomes the single-writer path across any
-             * number of app instances rather than only across restarts.
-             *
-             * `SELECT ... FOR UPDATE` and not `pg_advisory_lock`: this connection reaches
-             * Postgres through PgBouncer in transaction pooling mode, where session-scoped state
-             * does not survive statement boundaries. A row lock is transaction-scoped by
-             * construction, so it is taken and released entirely inside this block — which is
-             * exactly the property transaction pooling requires and exactly the trap the spec
-             * warns about. See docs/decisions/data-layer-hardening.md.
-             *
-             * Lock order: `leagues` (above) then `drafts` then the audit anchor, the same order
-             * `joinLeagueInTx` and `setDraftKickoff` take, so no cycle exists.
-             */
-            const [locked] = await tx.select({ id: drafts.id }).from(drafts).where(eq(drafts.id, draftId)).for("update");
-            if (locked === undefined) return { ok: false, reason: "That draft does not exist." };
-
-            // Loaded INSIDE the lock and validated against the log, so a state another instance
-            // has already advanced can never be the state this action is admitted against.
             const state = await load(draftId, tx);
             if (state === null) return { ok: false, reason: "That draft does not exist." };
-            previous = state;
             // TASK 4'S GUARD, READ ONCE. `config.isMock` never changes for a draft's lifetime
             // (it is set once by `loadDraftConfig` from the `mock_rooms` sidecar), so `state`'s
             // own config is as good a read of it as `result.state`'s would be after `reduceDraft`
@@ -480,7 +549,6 @@ export function createDraftStore({
             // `startDraft` so a `setSlotPreference` racing it either lands before the draw reads
             // it or is refused against a draft that has already started.
             const action = typeof source === "function" ? await source(tx) : source;
-            applied = action;
 
             // Command-time preconditions — the tunable-reading guards the reducer must not own,
             // because it also runs on replay.
@@ -652,7 +720,13 @@ export function createDraftStore({
               });
               createdNotices.push(await attachAuditEvent(tx, skipNotice.notice, skipEvent.eventId));
             }
-            return { ok: true, state: result.state };
+            // THE BATCH (the batched bots round): every consecutive bot seat's pick, appended to
+            // this same commit behind the action, then a finished mock's status settled with it.
+            // Timed as one stage when a measurement run asks (`pickPath`).
+            const batched = await pickPath.time("batch", () => appendBotPicks(tx, draftId, result.state), (chain) => ({ draftId, picks: chain.length, sequence: result.state.sequence }));
+            const final = batched.length === 0 ? result.state : batched[batched.length - 1]!.next;
+            await settleIfMockCompleted(tx, draftId, state, final);
+            return { ok: true, chain: [{ previous: state, next: result.state, action }, ...batched] };
           });
 
           if (!outcome.ok) {
@@ -663,9 +737,8 @@ export function createDraftStore({
             return outcome;
           }
 
-          cache.set(draftId, outcome.state);
-          const published = previous !== null && applied !== null ? await broadcast(previous, outcome.state, applied) : true;
-          await noteWake(outcome.state);
+          const final = outcome.chain[outcome.chain.length - 1]!.next;
+          const published = await announce(draftId, outcome.chain);
           // THE MULTI-ACCOUNT SWEEP'S SECOND TRIGGER (final review, HIGH 2), after the commit for
           // the same reason `broadcast` is: this transaction has just released `drafts` FOR
           // UPDATE, and the sweep appends to the PLATFORM chain — a third lock, on an anchor row,
@@ -695,15 +768,8 @@ export function createDraftStore({
               onPublishError?.(error, { type: "notice.created", leagueId: notice.leagueId ?? "", draftId });
             }
           }
-          // LAST, and never awaited: see `DraftStoreDeps.afterApplied`.
-          if (afterApplied !== undefined && applied !== null && options?.followThrough !== false) {
-            try {
-              afterApplied(outcome.state, applied);
-            } catch (error: unknown) {
-              console.error("[draft] afterApplied hook threw", { draftId }, error);
-            }
-          }
-          return { ...outcome, published };
+          followThrough(draftId, final);
+          return { ok: true, state: final, published, batched: outcome.chain.length - 1 };
         } catch (error: unknown) {
           // Our view of the log is provably stale — drop it so the next read replays.
           cache.delete(draftId);
@@ -714,6 +780,37 @@ export function createDraftStore({
           // See `DraftActionRefused`'s own docblock — the one refusal a `DraftActionSource`
           // thunk can raise from inside the transaction it runs in.
           if (error instanceof DraftActionRefused) return { ok: false, reason: error.reason };
+          throw error;
+        }
+      });
+    },
+
+    async resolveBots(draftId) {
+      return mutex.run(draftId, async (): Promise<ApplyResult> => {
+        try {
+          const outcome = await db.transaction(async (tx): Promise<TransactionOutcome> => {
+            if (!(await lockDraftRow(tx, draftId))) return { ok: false, reason: "That draft does not exist." };
+            const state = await load(draftId, tx);
+            if (state === null) return { ok: false, reason: "That draft does not exist." };
+            const chain = await pickPath.time("batch", () => appendBotPicks(tx, draftId, state), (appended) => ({ draftId, picks: appended.length, sequence: state.sequence }));
+            if (chain.length > 0) await settleIfMockCompleted(tx, draftId, state, chain[chain.length - 1]!.next);
+            return { ok: true, chain };
+          });
+          if (!outcome.ok) {
+            cache.delete(draftId);
+            return outcome;
+          }
+          if (outcome.chain.length === 0) {
+            const held = cache.get(draftId);
+            return held === undefined ? { ok: false, reason: "That draft does not exist." } : { ok: true, state: held, published: true, batched: 0 };
+          }
+          const final = outcome.chain[outcome.chain.length - 1]!.next;
+          const published = await announce(draftId, outcome.chain);
+          followThrough(draftId, final);
+          return { ok: true, state: final, published, batched: outcome.chain.length };
+        } catch (error: unknown) {
+          cache.delete(draftId);
+          if (isSequenceConflict(error)) return { ok: false, reason: "Someone else acted first. Try again." };
           throw error;
         }
       });

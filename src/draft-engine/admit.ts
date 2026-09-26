@@ -1,4 +1,4 @@
-import type { BidAction, DraftAction, NominateAction, SetQueueAction, TimerExpireAction } from "@/domain/draft";
+import type { BidAction, DraftAction, MakePickAction, NominateAction, SetQueueAction, TimerExpireAction } from "@/domain/draft";
 import { auctionOf, totalRosterSlots, type DraftState } from "./state";
 import { AUCTION_CONFIG, DRAFT_QUEUE_CONFIG } from "./config";
 import { currentDeadline, maxBidFor, openSlotCount } from "./selectors";
@@ -37,9 +37,7 @@ export function admitCommand(state: DraftState, action: DraftAction): AdmitResul
     case "BID":
       return admitBid(state, action);
     case "MAKE_PICK":
-      // Every MAKE_PICK guard (turn order, pool membership, roster shape) is a pure function
-      // of the log and prior state, so a pick has nothing to admit.
-      return ADMITTED;
+      return admitMakePick(state, action);
   }
 }
 
@@ -53,6 +51,23 @@ function admitStart(state: DraftState): AdmitResult {
   if (state.config.format !== "auction" || budget === null || budget <= 0) return ADMITTED;
   if (budget < totalRosterSlots(state.config.slotConfig) * AUCTION_CONFIG.minBid) {
     return { ok: false, reason: `An auction budget must be at least $${AUCTION_CONFIG.minBid} for every roster spot.` };
+  }
+  return ADMITTED;
+}
+
+/**
+ * A pick stamped before the turn it is made in began is refused (the batched bots round,
+ * 2026-09-25). Every other MAKE_PICK guard (turn order, pool membership, roster shape) is a pure
+ * function of the log and prior state and lives in the reducer; this one is about the WIRE
+ * clock. A mock's bot picks are committed in a batch stamped at their reveal instants, so the
+ * human's `turnStartedAt` sits in the future until the last bot is revealed; a pick posted
+ * before then (a reloaded tab whose clock ran ahead and offered the turn early, a direct POST)
+ * would be applied stamped before the bot ahead of it, and the next batch would chain from that
+ * earlier instant. Command time only, never replay: an older log holds no such stamp.
+ */
+function admitMakePick(state: DraftState, action: MakePickAction): AdmitResult {
+  if (state.turnStartedAt !== null && Date.parse(action.timestamp) < Date.parse(state.turnStartedAt)) {
+    return { ok: false, reason: "The picks before yours are still landing." };
   }
   return ADMITTED;
 }

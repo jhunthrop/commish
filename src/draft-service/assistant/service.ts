@@ -6,16 +6,16 @@
  * MEMBERSHIP AND SEAT, ONE CONDITION: a stranger and a commissioner with no seat both read as
  * `teamId === null`, and there is nothing to advise.
  *
- * WHERE THE FACTS COME FROM (draft-room performance round, item 1, replacing the 2026-09-08 warm
- * that rode the stream's advance loop). The room's facts for a sequence are computed on the
- * invocation that made the pick (`publishRoomFacts`, fired by the store's post-commit hook after
- * the response has gone) into the process memo; a viewer's `/assistant` request reads the memo
- * and computes only on a miss, single-flight per state (`memo.ts`). The stream's own process
- * computes nothing any more: the 200-run simulation left its event loop, which is what lets the
- * pacing timer fire and the frames relay on time (the round's ledger). The simulation itself
- * yields between chunks (`simulateRoomOddsInChunks`), so no invocation holds its loop for a
- * whole table. Both entry points share `roomFactsForState`, so there is exactly one definition
- * of "the room's facts".
+ * WHERE THE FACTS COME FROM (the batched bots round, 2026-09-25). The room's facts for a
+ * sequence are computed on the invocation that landed the action (`publishRoomFacts`, fired by
+ * the store's post-commit hook after the response has gone) and written to the draft's own row
+ * (`facts-store.ts`, one row per draft in Postgres) as well as the process memo; a viewer's
+ * `/assistant` request reads the memo, then the row, and computes only when neither holds the
+ * sequence it asks for, single-flight per process (`memo.ts`). A pick that batches the bots
+ * computes the facts once, for the post-batch state the next human faces, so her dock has its
+ * answer the moment her turn is revealed. The simulation itself yields between chunks
+ * (`simulateRoomOddsInChunks`), so no invocation holds its loop for a whole table. Both entry
+ * points share `roomFactsForState`, so there is exactly one definition of "the room's facts".
  */
 import type { Db } from "@/db/client";
 import type { DraftState } from "@/draft-engine";
@@ -23,14 +23,13 @@ import type { Recommendation } from "@/projections/decide/draft";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { getDraftStore, resolveDraftActor } from "@/draft-service";
 import { leagueBoardFormat } from "@/league-service/board-format";
-import { getSharedRedis } from "@/lib/realtime/redis";
 import { pickPath } from "@/lib/timing/pick-path";
 import { evidencePoolFor } from "../sim/evidence";
 import { simulateRoomOddsInChunks, type RoomOddsInput, type RoomOddsTable } from "../sim/room-odds";
 import { inferSeatDriversInChunks } from "../sim/seat-model";
 import { advisorCore, seedFor } from "./advisor";
 import { ADVISOR_CONFIG } from "./config";
-import { createRedisRoomFactsStore, roomFactsOnce, type FactsKey, type RoomFactsStore } from "./facts-store";
+import { createDbRoomFactsStore, type FactsKey, type RoomFactsStore } from "./facts-store";
 import { roomFactsFor, seatShortlistFor, type RoomFacts } from "./memo";
 import { askingWindow, onClockShortlistInChunks, recommendNowInChunks, valuedEvidence, type RecommendInput, type ValuedEntry } from "./recommend";
 import { tierCollapses } from "./signals";
@@ -44,16 +43,25 @@ export interface AdvisorServiceDeps {
   /** The recommendation entry point, injectable for the same reason. Sync or async: the
    *  production one scores a chunk of candidates at a time. */
   readonly recommend?: (input: RecommendInput) => readonly Recommendation[] | Promise<readonly Recommendation[]>;
-  /** The cross-process facts store (item 2). Defaults to the shared Redis one; tests hand in memory. */
+  /** The cross-function facts store (the draft's own row). Defaults to Postgres; tests hand in memory. */
   readonly facts?: RoomFactsStore;
 }
 
 let sharedFacts: RoomFactsStore | undefined;
 
-function factsStore(deps: AdvisorServiceDeps): RoomFactsStore {
+function factsStore(db: Db, deps: AdvisorServiceDeps): RoomFactsStore {
   if (deps.facts !== undefined) return deps.facts;
-  sharedFacts ??= createRedisRoomFactsStore(getSharedRedis());
+  sharedFacts ??= createDbRoomFactsStore(db);
   return sharedFacts;
+}
+
+/** The facts held for this key in the store, else computed and written for the next reader. */
+async function roomFactsStoredOrComputed(store: RoomFactsStore, key: FactsKey, compute: () => Promise<RoomFacts>): Promise<RoomFacts> {
+  const held = await store.read(key);
+  if (held !== null) return held;
+  const facts = await compute();
+  await store.write(key, facts);
+  return facts;
 }
 
 interface ValuedRoom {
@@ -77,16 +85,15 @@ async function roomFactsForState(db: Db, draftId: string, state: DraftState, dep
   const board = await leagueBoardFormat(db, state.config.leagueId);
   const { pool } = await evidencePoolFor(db, new Date(), board.source);
   const valued = valuedEvidence(pool, shape);
-  // Two levels, one compute: the process memo (single-flight) in front of the cross-process
-  // store (read, else compute under its lock) — a viewer on another instance reads what the
-  // pick's own invocation wrote, and simulates only when nothing has.
+  // Two levels, one compute: the process memo (single-flight) in front of the draft's own row
+  // (read, else compute and write) — a viewer on another function reads what the pick's own
+  // invocation wrote, and simulates only when nothing has.
   const key: FactsKey = { draftId, sequence: state.sequence, draftOrder: state.draftOrder };
-  // EVERY STAGE YIELDS (item 3's second pass): the seat drivers one seat at a time, the on-clock
-  // shortlist a few candidates at a time, the simulation a few runs at a time, so no stretch of
-  // this compute holds the event loop past a chunk — and a pacing wake sleeping on the same
-  // process fires within one chunk of its instant, never after a whole table.
+  // EVERY STAGE YIELDS: the seat drivers one seat at a time, the on-clock shortlist a few
+  // candidates at a time, the simulation a few runs at a time, so no stretch of this compute
+  // holds the event loop past a chunk, and a request sharing the instance answers between them.
   const facts = await roomFactsFor(draftId, state.sequence, () =>
-    roomFactsOnce(factsStore(deps), key, async () => {
+    roomFactsStoredOrComputed(factsStore(db, deps), key, async () => {
       const drivers = await inferSeatDriversInChunks(state);
       const excludeFromOnClockSeat = await onClockShortlistInChunks(state, valued, shape);
       return {

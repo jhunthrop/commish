@@ -118,7 +118,14 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   const { pending, begin, undo } = usePendingPick(submitPick, view.deadlineAt);
   const queueHandlers = useQueueHandlers(room);
   const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
-  const advisorRoom = useMemo(() => ({ draftId: view.draftId, sequence: view.sequence, availablePlayerIds: available }), [view.draftId, view.sequence, available]);
+  // The advisor keys on the COMMITTED sequence (what the server computes against) and shows its
+  // answer once the room has revealed that far (`useAdvisor`); the board it filters by is the
+  // revealed one, so no name still hidden in a batch ever reads as drafted.
+  const committedSequence = room.committed?.sequence ?? view.sequence;
+  const advisorRoom = useMemo(
+    () => ({ draftId: view.draftId, sequence: committedSequence, revealedSequence: view.sequence, factsReadySequence: room.factsReadySequence, availablePlayerIds: available }),
+    [view.draftId, committedSequence, view.sequence, room.factsReadySequence, available],
+  );
   const advisor = useAdvisor(advisorRoom, room.myTeamId);
 
   const boardIds = useMemo(() => room.players.map((player) => player.id), [room.players]);

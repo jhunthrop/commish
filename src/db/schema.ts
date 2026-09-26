@@ -837,6 +837,27 @@ export const draftNudges = pgTable(
   (t) => [primaryKey({ columns: [t.draftId, t.pickNumber] })],
 );
 
+/**
+ * THE ROOM'S FACTS FOR ITS CURRENT LOG SEQUENCE (the batched bots round, 2026-09-25): the
+ * advisor's odds table, tier standings and collapses for one draft state, in the wire form
+ * `serializeRoomFacts` writes (`@/draft-service/assistant/facts-store`). ONE row per draft,
+ * replaced whenever a newer sequence is computed: the facts for a sequence the room has moved
+ * past can never be asked for again, so keeping them would only grow the table. Written by the
+ * invocation that landed the pick (its own follow-through, after its response), read by every
+ * viewer's `/assistant` request on any function, which is what makes the dock ready when the
+ * human's turn begins without a second process ever simulating. Replaces the Redis facts store
+ * and its compute lock: a row is durable, needs no TTL, and its writer never needs to be waited
+ * on, because a viewer who finds no row for the sequence simply computes (a miss's honest cost).
+ */
+export const draftRoomFacts = pgTable("draft_room_facts", {
+  draftId: text("draft_id")
+    .primaryKey()
+    .references(() => drafts.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").notNull(),
+  facts: text("facts").notNull(),
+  computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const draftPicks = pgTable(
   "draft_picks",
   {

@@ -1,15 +1,22 @@
-// THE DRAFT SWEEP — driver 3 of the draft-driver design (2026-09-03): the minute-cron backstop
-// that keeps an ABANDONED room moving on Vercel, where no long-lived ticker exists. Drivers 1
-// and 2 (advance-on-read, the SSE watcher loop) cover every room somebody opens; this job covers
-// the rooms nobody is watching — a tab closed mid-draft still completes on minute granularity
-// instead of freezing.
+// THE DRAFT SWEEP — driver 2 of the draft-driver design (2026-09-03): the minute-cron backstop
+// that keeps an ABANDONED room moving, on every host alike (the batched bots round, 2026-09-25,
+// retired the dev ticker; this is the one heartbeat now). Advance-on-read covers every room
+// somebody opens; this job covers the rooms nobody is watching — a human whose clock ran out
+// with no client present is autopicked here, on minute granularity, and a tab closed mid-draft
+// still completes. Bot picks are never its business: they are batched into the commit that
+// lands the human action before them (`DraftStoreDeps.botTurn`), and only a room whose committed
+// state still has a bot on the clock (a pre-batch room) resolves its bots through the advance.
 //
 // ONE bounded step, deliberately not checkpointed work (contrast `season-week-job.ts`): the
 // sweep is LEVEL-TRIGGERED — `drafts.status` never lies, so unfinished work is always findable —
 // and reruns every minute, which makes checkpoint resume within one run worthless. Everything
-// here funnels into the SAME seams the dev ticker uses: `autoStartDueDrafts` (real due starts
-// AND kickoff rolls), `startDueMockRooms` (due mock rooms, the deferred-solo-start retry), and
-// the shared advance routine per live draft (`liveDraftsQuery`, the ticker's own bounded scan).
+// here funnels into the same seams: `autoStartDueDrafts` (real due starts AND kickoff rolls),
+// `startDueMockRooms` (due mock rooms, the deferred-solo-start retry), the shared advance routine
+// per live draft (`liveDraftsQuery`, the bounded scan), the house shelf's reconcile
+// (`ensureHouseCatalog`: the spawn half as it always ran, the retire half only behind
+// `HOUSE_RETIRE_ENABLED`, the founder's switch) and the mock rooms' retention sweep
+// (`sweepExpiredMocks`), the last two carried over from the dev ticker, which was the only thing
+// that ever ran them.
 //
 // GATED, AND SELF-SCHEDULING (Neon cost audit 2026-09-07, finding 1). The schedule that fires
 // this job sits behind the wake gate (`ScheduleDefinition.gate`), so the minute cron only
@@ -27,14 +34,15 @@ import { and, eq, gt, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { drafts, mockRooms } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
-import { getDraftAdvancer, getDraftStore } from "@/draft-service";
+import { getDraftAdvancer, getDraftStore, getMockBotDriver } from "@/draft-service";
 import { autoStartDueDrafts } from "@/draft-service/auto-start";
 import { DRAFT_ADVANCE_CONFIG } from "@/draft-service/config";
 import type { AdvanceOutcome, DraftAdvancer } from "@/draft-service/advance";
-import { isPacingChainLive, pendingPacingJobs } from "@/draft-service/pacing";
+import { liveDraftsQuery } from "@/draft-service/live-drafts";
 import type { DraftStore } from "@/draft-service/store";
-import { liveDraftsQuery } from "@/draft-service/ticker";
+import { ensureHouseCatalog, houseRetireEnabled, rungOfHouseLeagueId, type HouseFactoryDeps, type HouseFactoryOutcome } from "@/league-service/house-factory";
 import { startDueMockRooms } from "@/mock-draft-service/driver";
+import { sweepExpiredMocks, type MockSweepDeps, type SweptMockRoom } from "@/mock-draft-service/sweep";
 import { JOBS_CONFIG } from "../config";
 import { defineJob, type AnyJobDefinition, type StepOutcome } from "../contract";
 import { WAKE_MEMBERS, wakeMember, wakeSet, type WakeSet } from "../wake";
@@ -56,6 +64,14 @@ export interface DraftSweepContext {
   /** The executor's cut-off for this attempt (`JobStepContext.deadlineAt`): the sweep stops
    *  `DRAFT_ADVANCE_CONFIG.sweepReserveMs` before it rather than be killed mid-advance. */
   readonly deadlineAt?: Date;
+  /** The house shelf's reconcile. Defaults to the real `ensureHouseCatalog`; a test stubs it. */
+  readonly reconcileHouse?: (db: Db, deps: HouseFactoryDeps) => Promise<HouseFactoryOutcome>;
+  /** Whether the reconcile's retire half runs (`HouseFactoryDeps.retire`); the job reads the env. */
+  readonly retireHouse?: boolean;
+  /** The mock rooms' retention sweep. Defaults to the real `sweepExpiredMocks`; a test stubs it. */
+  readonly sweepMocks?: (db: Db, deps: MockSweepDeps) => Promise<readonly SweptMockRoom[]>;
+  /** The bot driver's per-draft meta, dropped per swept room (`MockSweepDeps.invalidateDriverMeta`). */
+  readonly invalidateDriverMeta?: (draftId: string) => void;
 }
 
 interface SweepTally {
@@ -63,8 +79,6 @@ interface SweepTally {
   readonly advanced: number;
   readonly exhausted: boolean;
   readonly wedged: readonly string[];
-  /** Live drafts left alone because their pacing job is on its way. */
-  readonly paced: number;
 }
 
 /**
@@ -80,21 +94,16 @@ export async function sweepDrafts(ctx: DraftSweepContext): Promise<StepOutcome> 
   const nowMs = Date.parse(now);
 
   const started = await autoStartDueDrafts(ctx.db, { store: ctx.store, clock: ctx.clock });
+  // The house shelf, restocked before the scans below: a house league whose draft this very
+  // sweep auto-started is already off the shelf, so its replacement opens on this same fire.
+  // Its own failure never stops the rooms behind it (the per-lane discipline every lane keeps).
+  const houseRefusals = await reconcileHouseQuietly(ctx);
   const mocks = await startDueMockRooms(ctx.db, { store: ctx.store, clock: ctx.clock, newId: ctx.newId });
+  const swept = await sweepMocksQuietly(ctx);
 
   const rows = await liveDraftsQuery(ctx.db);
-  // THE SAFETY NET ONLY (draft-room performance round, item 3): a room whose pacing job is live —
-  // running, or pending and not yet older than the grace past its instant — is on its way under
-  // its own invocation, and a sweep that advanced it too would only race it (the "advance
-  // wedged" pairs of the Phase 1 logs). The sweep takes a room only when its chain has broken:
-  // no job, or one the wake never came for.
-  const chains = await pendingPacingJobs(ctx.db);
-  let tally: SweepTally = { actions: 0, advanced: 0, exhausted: false, wedged: [], paced: 0 };
+  let tally: SweepTally = { actions: 0, advanced: 0, exhausted: false, wedged: [] };
   for (const row of rows) {
-    if (isPacingChainLive(chains.get(row.id), nowMs)) {
-      tally = { ...tally, paced: tally.paced + 1 };
-      continue;
-    }
     const remaining = budget - tally.actions;
     const outOfTime = ctx.deadlineAt !== undefined && Date.parse(ctx.clock.now()) + DRAFT_ADVANCE_CONFIG.sweepReserveMs > ctx.deadlineAt.getTime();
     if (remaining <= 0 || outOfTime) {
@@ -112,9 +121,10 @@ export async function sweepDrafts(ctx: DraftSweepContext): Promise<StepOutcome> 
   await wake.add(WAKE_MEMBERS.sweepSafety, nowMs + JOBS_CONFIG.sweepMaxQuietMs);
 
   return {
-    summary: `sweep: ${started.filter((s) => s.started).length} auto-starts, ${mocks.filter((m) => m.started).length} mock starts, ${tally.actions} actions across ${tally.advanced} of ${rows.length} live drafts${tally.paced > 0 ? ` (${tally.paced} paced by their own jobs, left alone)` : ""}${tally.wedged.length > 0 ? `, ${tally.wedged.length} WEDGED` : ""}${tally.exhausted ? " (budget hit — the next fire resumes)" : ""}`,
+    summary: `sweep: ${started.filter((s) => s.started).length} auto-starts, ${mocks.filter((m) => m.started).length} mock starts, ${swept} mock rooms cleared, ${tally.actions} actions across ${tally.advanced} of ${rows.length} live drafts${tally.wedged.length > 0 ? `, ${tally.wedged.length} WEDGED` : ""}${tally.exhausted ? " (budget hit — the next fire resumes)" : ""}`,
     detail: [
       ...started.filter((s) => !s.started && s.rolled !== true && s.reason !== undefined).map((s) => `auto-start ${s.draftId}: ${s.reason}`),
+      ...houseRefusals,
       ...mocks.flatMap((m) => (!m.started && !m.benignRace ? [`mock ${m.leagueId}: ${m.reason}`] : [])),
       // Fix round MEDIUM 3: the admin jobs page shows a stuck draft instead of it being
       // invisible; the per-draft "[draft] advance wedged" log carries the refusal reason.
@@ -129,8 +139,32 @@ function fold(tally: SweepTally, outcome: AdvanceOutcome): SweepTally {
     advanced: tally.advanced + (outcome.applied > 0 ? 1 : 0),
     exhausted: tally.exhausted || outcome.exhausted,
     wedged: outcome.wedged ? [...tally.wedged, outcome.draftId] : tally.wedged,
-    paced: tally.paced,
   };
+}
+
+/** The shelf's restock, one line per refusal for the admin page; a thrown failure is one line too. */
+async function reconcileHouseQuietly(ctx: DraftSweepContext): Promise<readonly string[]> {
+  try {
+    const outcome = await (ctx.reconcileHouse ?? ensureHouseCatalog)(ctx.db, { clock: ctx.clock, newId: ctx.newId, retire: ctx.retireHouse ?? false });
+    // A retirement is the one headless writer that closes a league nobody asked it to close:
+    // one line per retired league, so it is never silent just because nobody watched it happen.
+    for (const leagueId of outcome.retired) console.log("[house] retired", leagueId, rungOfHouseLeagueId(leagueId) ?? "unknown-rung");
+    return outcome.refused.map((refusal) => `house ${refusal.rung}: ${refusal.reason}`);
+  } catch (error: unknown) {
+    console.error("[draft] house reconcile failed", error);
+    return ["house reconcile failed (see the log)"];
+  }
+}
+
+/** The mock rooms past their retention, cleared; how many. A thrown failure clears none and says so. */
+async function sweepMocksQuietly(ctx: DraftSweepContext): Promise<number> {
+  try {
+    const swept = await (ctx.sweepMocks ?? sweepExpiredMocks)(ctx.db, { store: ctx.store, clock: ctx.clock, invalidateDriverMeta: ctx.invalidateDriverMeta });
+    return swept.length;
+  } catch (error: unknown) {
+    console.error("[draft] mock sweep failed", error);
+    return 0;
+  }
 }
 
 /** What one advanced draft leaves in the wake set: its next due instant, or nothing. */
@@ -183,6 +217,8 @@ export const draftSweepJob: AnyJobDefinition = defineJob<Record<string, never>>(
           advance: (draftId, now, opts) => getDraftAdvancer().advance(draftId, now, opts),
           newId: () => crypto.randomUUID(),
           deadlineAt: ctx.deadlineAt,
+          invalidateDriverMeta: (draftId) => getMockBotDriver().invalidateDraft(draftId),
+          retireHouse: houseRetireEnabled(process.env),
         }),
     },
   ],

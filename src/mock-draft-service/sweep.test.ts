@@ -5,7 +5,8 @@ import { chatMessages, draftActions, drafts, leagues, mockRooms, players, scorin
 import type { Clock } from "@/domain/timing";
 import { rankedPlayers } from "@/draft-service/pool";
 import { createDraftStore, type DraftStore } from "@/draft-service/store";
-import { createDraftTicker } from "@/draft-service/ticker";
+import { createDraftAdvancer } from "@/draft-service/advance";
+import { createMockBotDriver } from "./driver";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 import { deleteMockLeagueRow, sweepExpiredMocks } from "./sweep";
@@ -61,25 +62,18 @@ async function seedMock(id: string, opts: { readonly completed: boolean }): Prom
     .values({ leagueId: fixture.leagueId, authorUserId: `${fixture.leagueId}_user_1`, body: "hello room" })
     .onConflictDoNothing();
   const store = testStore();
-  const ticker = createDraftTicker({
-    db,
-    store,
-    clock,
-    autoStart: async () => [],
-    reconcileHouse: async () => ({ opened: [], retired: [], refused: [] }),
-  });
+  const advancer = createDraftAdvancer({ db, store, mockDriver: createMockBotDriver({ db }) });
   await store.startDraft(fixture.draftId);
   if (opts.completed) {
     for (let i = 0; i < 40; i += 1) {
       const state = await store.getDraftState(fixture.draftId);
       if (state!.phase === "complete") break;
       advance(10_000);
-      await ticker.tick();
+      await advancer.advance(fixture.draftId, now);
     }
     expect((await store.getDraftState(fixture.draftId))!.phase).toBe("complete");
-    // One more tick: the driver settles the finished room's status (Task 6 fix round, ruled),
-    // which is exactly what makes it a candidate of the sweep's pure-SQL 'complete' scan.
-    await ticker.tick();
+    // The commit that finished the room settled its status (the batched bots round), which is
+    // exactly what makes it a candidate of the sweep's pure-SQL 'complete' scan.
     const [settled] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, fixture.draftId));
     expect(settled?.status).toBe("complete");
   }
@@ -291,17 +285,4 @@ describe("the retention sweep (Task 6, Step 4)", () => {
     expect(invalidateDriverMeta).toHaveBeenCalledWith(draftId);
   });
 
-  it("rides the real ticker by default: an expired room is gone after a tick, with no other help", async () => {
-    const { leagueId, draftId, store } = await seedMock("via_ticker", { completed: true });
-    advance(MOCK_CONFIG.retention.completedMs + 60_000);
-    const ticker = createDraftTicker({
-      db,
-      store,
-      clock,
-      autoStart: async () => [],
-      reconcileHouse: async () => ({ opened: [], retired: [], refused: [] }),
-    });
-    await ticker.tick();
-    expect(await rowCounts(leagueId, draftId)).toEqual(ZERO_ROWS);
-  });
 });

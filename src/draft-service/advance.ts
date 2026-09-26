@@ -11,13 +11,20 @@ import { NO_OP_NUDGE_SCHEDULER, type NudgeScheduler } from "./nudge";
 import type { ApplyResult, DraftStore } from "./store";
 
 /**
- * THE SERVERLESS ADVANCE FUNNEL (draft-driver design, 2026-09-03). On Vercel no process lives
- * long enough to host the dev ticker, so drafts advance through three cooperating drivers —
- * any authenticated read of a draft, the SSE stream's own loop while somebody watches, and the
- * minute-cron `draft-sweep` job — and every one of them calls THIS routine. It applies ALL due
- * work for one draft, through the identical store entry points the ticker uses (`applyAction`
- * for `TIMER_EXPIRE` and the bot's `MAKE_PICK`, `startDraft`/`startMockDraft` for a deferred
- * start), so there is exactly one advancement implementation whichever driver fires first.
+ * THE SERVERLESS ADVANCE FUNNEL (draft-driver design, 2026-09-03). No process lives long
+ * enough on Vercel to hold a clock, so drafts advance through two cooperating drivers — any
+ * authenticated read of a draft, and the minute-cron `draft-sweep` job — and both call THIS
+ * routine. It applies ALL due work for one draft through the identical store entry points
+ * (`applyAction` for `TIMER_EXPIRE`, `startDraft`/`startMockDraft` for a deferred start,
+ * `resolveBots` for a mock whose committed state still has a bot on the clock), so there is
+ * exactly one advancement implementation whichever driver fires first.
+ *
+ * BOT PICKS ARE NOT DUE WORK (the batched bots round, 2026-09-25). The store appends every
+ * consecutive bot seat's pick to the SAME commit as the human action in front of it
+ * (`DraftStoreDeps.botTurn`), each stamped at its own reveal instant, so a committed mock state
+ * almost never has a bot on the clock. The one lane left here is `resolveBots`: a room started
+ * before the batch shipped, or one whose batch stopped at a roster that could take nothing,
+ * still catches up here, stamped identically to what the batch would have stamped.
  *
  * TIMESTAMP SEMANTICS — CHAINED DUE INSTANTS (decided, with the proof tests in `advance.test.ts`):
  * every reducer sets `turnStartedAt` to the applied action's own timestamp, and both
@@ -25,13 +32,11 @@ import type { ApplyResult, DraftStore } from "./store";
  * "now" for a pick that was due 40 seconds ago would push every later deadline 40 seconds late
  * AND judge later turns against the wrong clock tier. Catch-up therefore stamps each action at
  * its COMPUTED DUE INSTANT: a `TIMER_EXPIRE` at exactly `currentDeadline(state)`
- * (`admitTimerExpire`'s guard is a strict `<`, so the exact deadline is admitted), a bot's
- * `MAKE_PICK` at `turnStartedAt + its seeded think-delay` (`dueBotPick`), each stamp becoming
- * the next turn's `turnStartedAt`. A draft abandoned ten minutes on 60-second clocks catches up
- * ~10 actions whose timestamps march in clock-sized steps — never a pile stamped at read time —
- * and because the bot RNG is cursored off the log, any two drivers can only ever compute the
- * same actions: catch-up is byte-identical to the stepped schedule a live per-second driver
- * would have written.
+ * (`admitTimerExpire`'s guard is a strict `<`, so the exact deadline is admitted), each stamp
+ * becoming the next turn's `turnStartedAt`. A draft abandoned ten minutes on 60-second clocks
+ * catches up ~10 actions whose timestamps march in clock-sized steps — never a pile stamped at
+ * read time — and because the bot RNG is cursored off the log, any two drivers can only ever
+ * compute the same actions.
  *
  * CONCURRENCY: two simultaneous advancers serialize through the store's existing guards — the
  * per-draft `drafts FOR UPDATE` row lock, the in-lock replay against `MAX(sequence)`,
@@ -41,12 +46,8 @@ import type { ApplyResult, DraftStore } from "./store";
  * rather than ever spinning.
  *
  * NEXT DUE INSTANT (Neon cost audit 2026-09-07, findings 1 and 2): every outcome names the next
- * instant this draft owes work — the running clock's deadline, a bot's seeded due pick if
- * earlier, or a scheduled draft's kickoff — so the drivers can SLEEP until it instead of polling.
- * The pacer queues one job for it (`./pacing`, the draft-room performance round's driver 2,
- * which replaced the SSE stream's own loop), the sweep registers it in the wake set, and neither
- * touches Postgres again before it passes. `nextDueInstantMs` below is the same read for a
- * state in hand.
+ * instant this draft owes work — the running clock's deadline, or a scheduled draft's kickoff —
+ * so the sweep registers it in the wake set and touches Postgres again only once it passes.
  */
 /**
  * The tri-state a caller steers by (fix round HIGH 1): `"ok"` — the call ran to a quiet end
@@ -84,10 +85,6 @@ export interface AdvanceOutcome {
 export interface AdvanceOptions {
   /** A caller with its own budget (the sweep job) caps this call under the advancer's ceiling. */
   readonly maxActions?: number;
-  /** Whether the store's post-commit follow-through runs for the actions this call applies
-   *  (`ApplyOptions.followThrough`). Defaults to true; the stream's own loop passes false, because
-   *  its process relays only (draft-room performance round, item 1). */
-  readonly followThrough?: boolean;
 }
 
 export interface DraftAdvancer {
@@ -99,8 +96,9 @@ export interface DraftAdvancer {
 export interface DraftAdvancerDeps {
   readonly db: Db;
   readonly store: DraftStore;
-  /** The process-wide bot driver (`@/draft-service`'s singleton in production) — its
-   *  `dueBotPick` prices every bot turn, so catch-up and the live lanes share one computation. */
+  /** The process-wide bot driver (`@/draft-service`'s singleton in production): its `botTurn`
+   *  is the one read of "does a bot hold this clock", so a read of a room with a human on the
+   *  clock never opens the store's locking transaction for nothing. */
   readonly mockDriver: MockBotDriver;
   /** The moderator. Defaults to a no-op, exactly like `TickerDeps.nudger`; the production
    *  advancer wires the real scheduler so a watched room on Vercel still gets its nudge. */
@@ -113,7 +111,11 @@ export interface DraftAdvancerDeps {
 
 type DeferredStart = "started" | "raced" | { readonly notDueUntilMs: number | null };
 
-type NextDue = { readonly kind: "applied"; readonly dueWork: string; readonly result: ApplyResult } | { readonly kind: "waiting"; readonly dueAtMs: number | null };
+type NextDue =
+  | { readonly kind: "applied"; readonly dueWork: string; readonly result: ApplyResult; readonly count: number }
+  | { readonly kind: "waiting"; readonly dueAtMs: number | null }
+  /** The bots' resolve lost a commit to another writer: reload and go on, never a refusal counted. */
+  | { readonly kind: "raced" };
 
 interface DueLoopResult {
   readonly state: DraftState;
@@ -170,47 +172,56 @@ export function createDraftAdvancer({
     return started.ok ? "started" : "raced";
   }
 
-  /** One due action: the bot's pick when a bot holds a due clock (its think-delay always
-   *  elapses inside the turn's clock — the T1 guarantee, the same ordering `tickOne` keeps),
-   *  otherwise the clock's own expiry. `waiting` when nothing is due yet, carrying the earlier of
-   *  the bot's due instant and the deadline; `dueWork` names what was attempted so a wedged trip
-   *  can say what the draft is stuck on (fix round MEDIUM 3). */
-  async function applyNextDue(state: DraftState, nowMs: number, followThrough: boolean): Promise<NextDue> {
-    let botDueAtMs: number | null = null;
+  /** One due step: a mock whose committed state has a bot on the clock resolves its bots
+   *  (`store.resolveBots`, the whole run of consecutive bot seats in one commit, whatever the
+   *  hour: their stamps are the seeded reveal instants, never now); otherwise the clock's own
+   *  expiry once it has run out. `waiting` when nothing is due yet, carrying the deadline;
+   *  `dueWork` names what was attempted so a wedged trip can say what the draft is stuck on
+   *  (fix round MEDIUM 3). A bot whose roster can take nothing resolves to no pick, and its turn
+   *  falls to the expiry below. */
+  async function applyNextDue(state: DraftState, nowMs: number): Promise<NextDue> {
     if (state.config.isMock === true) {
-      const due = await mockDriver.dueBotPick(state);
-      if (due !== null && due.dueAtMs <= nowMs) {
-        // The selection runs only past the due check (fix round LOW 5); a null choice means the
-        // roster can take nothing, so the turn falls through to the clock's own expiry below.
-        const playerId = due.choosePick();
-        if (playerId !== null) {
-          // `Math.ceil`: the seeded delay is fractional-millisecond arithmetic; the stamp is
-          // the first whole millisecond at-or-after it, so the recorded instant never precedes
-          // the true due instant and two advancers stamp identically.
-          const timestamp = new Date(Math.ceil(due.dueAtMs)).toISOString();
-          const result = await store.applyAction(state.config.draftId, { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp, teamId: due.teamId, playerId }, { followThrough });
-          return { kind: "applied", dueWork: `bot-pick due ${timestamp}`, result };
-        }
+      // The lock opens only for a bot that has something legal to take (review M4): a bot whose
+      // roster can take nothing keeps the clock until it expires, and every read of the room in
+      // between would otherwise replay the log under the row lock for nothing.
+      const turn = await mockDriver.botTurn(state);
+      if (turn !== null && turn.choosePick() !== null) {
+        const result = await store.resolveBots(state.config.draftId);
+        if (!result.ok) return { kind: "raced" };
+        if (result.batched > 0) return { kind: "applied", dueWork: `bot picks from sequence ${state.sequence}`, result, count: result.batched };
       }
-      if (due !== null && due.dueAtMs > nowMs) botDueAtMs = Math.ceil(due.dueAtMs);
     }
     const deadline = currentDeadline(state);
     const deadlineMs = deadline === null ? null : Date.parse(deadline);
-    if (deadlineMs === null || deadlineMs > nowMs) return { kind: "waiting", dueAtMs: earlierDueMs(botDueAtMs, deadlineMs) };
-    const result = await store.applyAction(state.config.draftId, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: deadline! }, { followThrough });
-    return { kind: "applied", dueWork: `expire due ${deadline}`, result };
+    if (deadlineMs === null || deadlineMs > nowMs) return { kind: "waiting", dueAtMs: deadlineMs };
+    const result = await store.applyAction(state.config.draftId, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: deadline! });
+    return { kind: "applied", dueWork: `expire due ${deadline}`, result, count: result.ok ? 1 + result.batched : 0 };
   }
 
   /** The in-progress loop: apply due work until nothing is due, the ceiling is hit, or the
    *  refusal breaker trips. Returns the state it ended on and what the drivers need next. */
-  async function applyDueWork(initial: DraftState, now: string, maxActions: number, alreadyApplied: number, followThrough: boolean): Promise<DueLoopResult | null> {
+  async function applyDueWork(initial: DraftState, now: string, maxActions: number, alreadyApplied: number): Promise<DueLoopResult | null> {
     const nowMs = Date.parse(now);
     let state = initial;
     let applied = alreadyApplied;
     let refusals = 0;
     while (state.phase === "in_progress") {
       if (applied >= maxActions) return { state, applied, exhausted: true, wedged: false, nextDueAt: now };
-      const attempt = await applyNextDue(state, nowMs, followThrough);
+      const attempt = await applyNextDue(state, nowMs);
+      if (attempt.kind === "raced") {
+        // Another writer committed under this call's feet (a human's pick, another driver's
+        // resolve): the log moved, so this is progress, not a refusal, and the breaker is not
+        // touched. A log that did NOT move is the one case that would spin, so it counts.
+        const fresh = await store.getDraftState(state.config.draftId);
+        if (fresh === null) return null;
+        if (fresh.sequence === state.sequence) refusals += 1;
+        if (refusals >= 2) {
+          console.error("[draft] advance wedged", { draftId: state.config.draftId, reason: "the bots' resolve was refused against an unmoved log", dueWork: `bot picks from sequence ${state.sequence}` });
+          return { state, applied, exhausted: false, wedged: true, nextDueAt: null };
+        }
+        state = fresh;
+        continue;
+      }
       if (attempt.kind === "waiting") {
         // Nothing due — the clock is still running: the moderator's window, exactly where
         // `tickOne` gives it. It never applies an action, so it can never change what this
@@ -220,7 +231,7 @@ export function createDraftAdvancer({
       }
       if (attempt.result.ok) {
         state = attempt.result.state;
-        applied += 1;
+        applied += attempt.count;
         refusals = 0;
         continue;
       }
@@ -247,7 +258,7 @@ export function createDraftAdvancer({
     return { state, applied, exhausted: false, wedged: false, nextDueAt: null };
   }
 
-  async function advanceOrThrow(draftId: string, now: string, maxActions: number, followThrough: boolean): Promise<AdvanceOutcome> {
+  async function advanceOrThrow(draftId: string, now: string, maxActions: number): Promise<AdvanceOutcome> {
     // Terminal statuses first (fix round MEDIUM 2): a DISSOLVED draft still carries an
     // action log — replaying it looks in_progress — but nothing may ever advance it again,
     // so it classifies with not_found (a loop stops, a read just renders what it has). One
@@ -267,7 +278,7 @@ export function createDraftAdvancer({
       state = fresh;
     }
 
-    const loop = await applyDueWork(state, now, maxActions, applied, followThrough);
+    const loop = await applyDueWork(state, now, maxActions, applied);
     if (loop === null) return report(draftId, applied, { outcome: "not_found" });
     // A finished mock settles its status row in the same call (`settleMockDraftCompletion`
     // is guarded and idempotent), so its `liveDraftsQuery` slot frees immediately — the same
@@ -286,7 +297,7 @@ export function createDraftAdvancer({
     async advance(draftId, now, opts) {
       const maxActions = Math.min(maxActionsPerAdvance, opts?.maxActions ?? maxActionsPerAdvance);
       try {
-        return await advanceOrThrow(draftId, now, maxActions, opts?.followThrough ?? true);
+        return await advanceOrThrow(draftId, now, maxActions);
       } catch (error: unknown) {
         // The ticker's own discipline, held per call: one draft's DB error must not fail the
         // read (or stream, or sweep) that triggered the advance.
@@ -296,26 +307,3 @@ export function createDraftAdvancer({
     },
   };
 }
-
-/** The earlier of a bot's due instant and the clock's deadline; null when neither exists. */
-export function earlierDueMs(botDueAtMs: number | null, deadlineMs: number | null): number | null {
-  if (botDueAtMs !== null && (deadlineMs === null || botDueAtMs < deadlineMs)) return botDueAtMs;
-  return deadlineMs;
-}
-
-/**
- * The next instant a room in hand owes work (the pacer's read, draft-room performance round item
- * 3): the on-clock bot's seeded due pick when one holds a running clock — the exact whole
- * millisecond the advance stamps that pick at — else the clock's own deadline; null for a room
- * that is not running or holds no clock. The same arithmetic `applyNextDue`'s waiting branch
- * reports as `nextDueAt`, so a job paced from a state and one paced from an outcome name one
- * instant.
- */
-export async function nextDueInstantMs(state: DraftState, mockDriver: MockBotDriver): Promise<number | null> {
-  if (state.phase !== "in_progress") return null;
-  const deadline = currentDeadline(state);
-  const deadlineMs = deadline === null ? null : Date.parse(deadline);
-  const due = state.config.isMock === true ? await mockDriver.dueBotPick(state) : null;
-  return earlierDueMs(due === null ? null : Math.ceil(due.dueAtMs), deadlineMs);
-}
-

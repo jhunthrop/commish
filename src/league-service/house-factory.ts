@@ -18,9 +18,10 @@ import { liveHoldsFor } from "./seat-hold";
  * by touching a league that already exists.
  *
  * A RECONCILER, NOT A HOOK (the decision that carries the rest, per the task brief): nothing
- * calls this the moment a house league fills. `src/draft-service/ticker.ts` calls it on an
- * interval instead, and that is what gives it its one real property — a partial failure leaves a
- * partly restocked shelf, which the NEXT tick finishes. There is no missed-event failure mode,
+ * calls this the moment a house league fills. The minute sweep (`@/jobs/defs/draft-sweep-job`,
+ * on every host since the batched bots round) calls it on its fires instead, and that is what
+ * gives it its one real property — a partial failure leaves a partly restocked shelf, which the
+ * NEXT fire finishes. There is no missed-event failure mode,
  * because there is no event to miss.
  */
 
@@ -153,7 +154,7 @@ async function retirementCandidates(
 /**
  * The rung encoded in a house league's own id (`house_${rung}_${edition}`, the same shape
  * `nextEdition` below constructs and reads back) — the one place outside this module allowed to
- * know that shape, so the ticker's own retirement log (`src/draft-service/ticker.ts`, wave-1
+ * know that shape, so the sweep's own retirement log (`@/jobs/defs/draft-sweep-job`, wave-1
  * review Q3) never restates the id format itself. `undefined` for anything that is not a real
  * house league id, rather than throwing — this feeds an operational log line, never a gate.
  */
@@ -202,6 +203,19 @@ export interface HouseFactoryDeps {
    *  (`house_${rung}_${edition}`), the one id in this product a caller never generates. */
   readonly newId: () => string;
   readonly audit?: AuditLogger;
+  /**
+   * Whether the retire half runs (storefront review E13's dissolution of member-less surplus
+   * house leagues). Defaults to true for the callers that always had it (the seed, the tests);
+   * the minute sweep passes `houseRetireEnabled(process.env)`, off unless `HOUSE_RETIRE_ENABLED`
+   * says so (founder ruling, the batched bots round: the sweep restocks the shelf on every host
+   * now, and the founder decides when production starts dissolving).
+   */
+  readonly retire?: boolean;
+}
+
+/** `HOUSE_RETIRE_ENABLED=1` (or `true`) turns the sweep's retire half on; anything else is off. */
+export function houseRetireEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
+  return env.HOUSE_RETIRE_ENABLED === "1" || env.HOUSE_RETIRE_ENABLED === "true";
 }
 
 export interface HouseFactoryOutcome {
@@ -408,7 +422,7 @@ export async function ensureHouseCatalog(db: Db, deps: HouseFactoryDeps): Promis
     // shortfall loop's own FRESH re-read (below) already sees the narrowed shelf rather than
     // computing against a surplus this same call is about to close.
     const openBeforeRetire = await openHouseLeaguesQuery(db, rungName, deps.clock.now());
-    const candidates = await retirementCandidates(db, deps.clock.now(), openBeforeRetire, rung.openAtOnce);
+    const candidates = deps.retire === false ? [] : await retirementCandidates(db, deps.clock.now(), openBeforeRetire, rung.openAtOnce);
     if (candidates.length > 0) {
       const outcome = await retireSurplusForRung(db, rungName, candidates, deps, audit, retireBudget);
       retired.push(...outcome.retired);

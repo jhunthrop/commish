@@ -57,7 +57,9 @@ const pickPayloadSchema = z.object({
   round: z.number().int().positive(),
   teamId: z.string().min(1),
   playerId: z.string().min(1),
-  slot: z.enum(["QB", "RB", "WR", "TE", "FLEX", "K", "DEF", "BENCH"]),
+  // Every `RosterSlotType` (`@/domain/roster`), the superflex included: a pick into a slot this
+  // list lacked failed the parse and cost the room a resync it never needed.
+  slot: z.enum(["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "DEF", "BENCH"]),
   slotIndex: z.number().int().nonnegative(),
   price: z.number().nullable(),
   timestamp: z.string().min(1),
@@ -109,4 +111,22 @@ export const draftEventSchema = z.discriminatedUnion("type", [
 ]);
 
 export type DraftEventFrame = z.infer<typeof draftEventSchema>;
+
+/** THE FACTS FRAME (`draft.facts`, `@/lib/realtime/events`): the advisor's facts for a sequence
+ *  are written (`ready`), or their compute failed and a viewer should ask anyway. */
+export const factsFrameSchema = z.object({ type: z.literal("draft.facts"), payload: z.object({ draftId: z.string().min(1), sequence: z.number().int().nonnegative(), ready: z.boolean() }) });
+
+export type FactsFrame = z.infer<typeof factsFrameSchema>;
+
+/** One `draft.facts` frame off the stream, parsed and validated; `null` for anything else. */
+export function parseFactsFrame(data: string): FactsFrame | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(data);
+  } catch {
+    return null;
+  }
+  const parsed = factsFrameSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
 export type DraftPickPayload = z.infer<typeof pickPayloadSchema>;

@@ -6,6 +6,13 @@ export const ADVISOR_ROOM_CONFIG = {
   rememberedDrafts: 5,
   /** Rows the demo's odds list shows per filter. */
   demoListSize: 12,
+  /**
+   * How long the advisor waits for the server's `draft.facts` frame after a commit before asking
+   * `/assistant` anyway (review M5). Past the facts compute at its slowest measured (2.2 s) with
+   * margin; a frame that never comes means the writer died or the stream missed it, and the
+   * request then computes once, which is the miss's honest cost.
+   */
+  factsWaitMaxMs: 8_000,
   /** The tab's pick-count selector: how many of the shortlist it shows, the lead card counted
    *  as the first. The largest option is the server's `shortlistSize`, so no choice needs a
    *  second request. Remembered per browser under the key, read in a try/catch. */

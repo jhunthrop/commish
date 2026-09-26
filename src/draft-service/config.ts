@@ -1,21 +1,12 @@
 export const DRAFT_SERVICE_CONFIG = {
-  /** How often the server checks live drafts for an expired clock (ms). */
-  tickIntervalMs: 1_000,
   /**
-   * Ceiling on drafts examined per tick, so one tick can't starve the event loop. Shared by both
-   * of the ticker's scans (the in-progress expiry scan, and Task 7's `autoStartDueDrafts` —
-   * `@/draft-service/auto-start`) rather than each getting its own number: both run on the same
-   * cadence against the same connection pool, and a second ceiling to keep in step with this one
-   * would be a config value with no independent reason to differ.
+   * Ceiling on drafts examined per sweep, so one fire can't starve the event loop. Shared by
+   * both of the sweep's scans (the in-progress expiry scan, `liveDraftsQuery`, and Task 7's
+   * `autoStartDueDrafts` — `@/draft-service/auto-start`) rather than each getting its own
+   * number: both run on the same cadence against the same connection pool, and a second ceiling
+   * to keep in step with this one would be a config value with no independent reason to differ.
    */
   maxDraftsPerTick: 50,
-  /**
-   * Minimum gap between two `onOutcome` logs for the same stuck draft (ms). A draft whose
-   * clock keeps failing to expire (e.g. a persistent sequence conflict) would otherwise log
-   * once per tick — every second — forever. The first failure always logs immediately; after
-   * that, at most one log per interval keeps a stuck draft visible without spamming.
-   */
-  tickWarnIntervalMs: 60_000,
   /**
    * Phase 3.5 addendum, Task 13: the ceiling on house leagues `ensureHouseCatalog`
    * (`@/league-service/house-factory`) may spawn in one reconcile — following `maxDraftsPerTick`
@@ -48,9 +39,8 @@ export const DRAFT_SERVICE_CONFIG = {
 } as const;
 
 /**
- * The serverless drivers' own knobs (draft-driver design, 2026-09-03; the draft-room performance
- * round, item 3, retired the SSE watcher loop): advance-on-read, the per-pick pacing job and the
- * minute-cron sweep all read from here — never a literal at a call site.
+ * The drivers' own knobs (draft-driver design, 2026-09-03): advance-on-read and the minute-cron
+ * sweep read from here — never a literal at a call site.
  */
 export const DRAFT_ADVANCE_CONFIG = {
   /**
@@ -76,15 +66,6 @@ export const DRAFT_ADVANCE_CONFIG = {
    * publishes at the fail-fast bound) with margin.
    */
   sweepReserveMs: 16_000,
-  /**
-   * THE WIRE FLOOR (review fix round, finding 1's second pass): a pacing job applies ONE action
-   * per run and paces the next no sooner than this after the pick it just landed, so a pick that
-   * ran late can never share the wire with the one after it; the founder's "two picks at once"
-   * has a hard floor whatever an instance's load. Stamps are untouched (every action is still
-   * stamped at its seeded due instant), only the instant it is applied moves, and only when it
-   * was already late. The acceptance's own number.
-   */
-  minPickSpacingMs: 300,
 } as const;
 
 export const DRAFT_NUDGE_CONFIG = {

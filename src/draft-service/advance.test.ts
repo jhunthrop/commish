@@ -5,9 +5,7 @@ import { draftActions, drafts, players } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { DraftAction } from "@/domain/draft";
 import { createMockBotDriver, type MockBotDriver } from "@/mock-draft-service/driver";
-import { MOCK_CONFIG } from "@/mock-draft/config";
-import { currentDeadline, teamOnClock } from "@/draft-engine";
-import { createDraftAdvancer, earlierDueMs, nextDueInstantMs, type DraftAdvancer } from "./advance";
+import { createDraftAdvancer, type DraftAdvancer } from "./advance";
 import { createDraftStore, type DraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -19,14 +17,14 @@ const clock: Clock = { now: () => now };
 const atMs = (offsetMs: number): string => new Date(Date.parse(BASE_NOW) + offsetMs).toISOString();
 
 function testStore(): DraftStore {
-  return createDraftStore({ db, publish: async () => "0-0", clock });
+  return createDraftStore({ db, publish: async () => "0-0", clock, botTurn: createMockBotDriver({ db }).botTurn });
 }
 
 function testAdvancer(store: DraftStore, overrides?: { readonly maxActionsPerAdvance?: number; readonly mockDriver?: MockBotDriver }): DraftAdvancer {
   return createDraftAdvancer({
     db,
     store,
-    mockDriver: overrides?.mockDriver ?? createMockBotDriver({ db, store }),
+    mockDriver: overrides?.mockDriver ?? createMockBotDriver({ db }),
     maxActionsPerAdvance: overrides?.maxActionsPerAdvance,
   });
 }
@@ -209,41 +207,6 @@ describe("catch-up chaining (the decided timestamp semantics)", () => {
 });
 
 describe("the next due instant (Neon cost audit finding 2: sleep until it, never poll)", () => {
-  it("a bot on the clock prices the wake at its seeded think-delay, inside the ruled window and far under the clock's deadline", async () => {
-    const fixture = await seedAbandonedMock("botdue", { botTeams: 2, pickSeconds: 30 });
-    const store = testStore();
-    await store.startDraft(fixture.draftId);
-    now = atMs(100);
-    const outcome = await testAdvancer(store).advance(fixture.draftId, now);
-    expect(outcome.applied).toBe(0);
-    const dueMs = Date.parse(outcome.nextDueAt!);
-    expect(dueMs).toBeGreaterThan(Date.parse(now));
-    expect(dueMs - Date.parse(BASE_NOW)).toBeGreaterThanOrEqual(MOCK_CONFIG.botDelay.baseMs - MOCK_CONFIG.botDelay.jitterMs);
-    expect(dueMs - Date.parse(BASE_NOW)).toBeLessThanOrEqual(MOCK_CONFIG.botDelay.baseMs + MOCK_CONFIG.botDelay.jitterMs);
-    expect(dueMs).toBeLessThan(Date.parse(atMs(30_000)));
-  });
-
-  it("consecutive bot picks are never batched: an advance at the first due instant lands exactly one pick and names the next bot's own due instant after it (founder report 2026-09-08)", async () => {
-    const fixture = await seedAbandonedMock("botpace", { botTeams: 2, pickSeconds: 30 });
-    const store = testStore();
-    const advancer = testAdvancer(store);
-    await store.startDraft(fixture.draftId);
-    const firstDue = (await advancer.advance(fixture.draftId, atMs(100))).nextDueAt!;
-
-    now = firstDue;
-    const outcome = await advancer.advance(fixture.draftId, now);
-    expect(outcome.applied).toBe(1);
-    const state = (await store.getDraftState(fixture.draftId))!;
-    expect(state.picks).toHaveLength(1);
-    // The next bot's delay runs from the landed pick's own stamp, never from the driver's tick.
-    const gapMs = Date.parse(outcome.nextDueAt!) - Date.parse(state.picks[0]!.timestamp);
-    expect(gapMs).toBeGreaterThanOrEqual(MOCK_CONFIG.botDelay.baseMs - MOCK_CONFIG.botDelay.jitterMs);
-    expect(gapMs).toBeLessThanOrEqual(MOCK_CONFIG.botDelay.baseMs + MOCK_CONFIG.botDelay.jitterMs);
-    // A second advance before that instant lands nothing: the pace holds per pick.
-    now = new Date(Date.parse(outcome.nextDueAt!) - 1).toISOString();
-    expect((await advancer.advance(fixture.draftId, now)).applied).toBe(0);
-  });
-
   it("a scheduled mock room names its start instant; a scheduled real draft names its kickoff", async () => {
     const mock = await seedAbandonedMock("schedmock", { startsAtMs: Date.parse(BASE_NOW) + 5 * 60_000 });
     expect((await testAdvancer(testStore()).advance(mock.draftId, now)).nextDueAt).toBe(atMs(5 * 60_000));
@@ -419,7 +382,7 @@ describe("transient errors vs a missing draft (fix round HIGH 1: the tri-state o
       },
     };
     now = atMs(10 * 60_000);
-    const advancer = createDraftAdvancer({ db, store: flaky, mockDriver: createMockBotDriver({ db, store: flaky }) });
+    const advancer = createDraftAdvancer({ db, store: flaky, mockDriver: createMockBotDriver({ db }) });
 
     const first = await advancer.advance(fixture.draftId, now);
     expect(first.outcome).toBe("error");
@@ -524,47 +487,11 @@ describe("two drivers on one room (draft-room performance round, item 4: the fal
     };
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     now = atMs(10 * 60_000);
-    const outcome = await createDraftAdvancer({ db, store: racing, mockDriver: createMockBotDriver({ db, store }) }).advance(fixture.draftId, now);
+    const outcome = await createDraftAdvancer({ db, store: racing, mockDriver: createMockBotDriver({ db }) }).advance(fixture.draftId, now);
     expect(outcome.wedged).toBe(false);
     expect(outcome.phase).toBe("complete");
     expect((await actionLog(fixture.draftId)).length).toBe(7);
     expect(error).not.toHaveBeenCalledWith("[draft] advance wedged", expect.anything());
     error.mockRestore();
-  });
-});
-
-describe("nextDueInstantMs (the pacer's read of a room, draft-room performance round item 3)", () => {
-  it("a bot on the clock: its seeded due pick, the same instant the advance stamps; a human: the deadline; a finished room: nothing", async () => {
-    const fixture = await seedAbandonedMock("nextdue", { botTeams: 1, pickSeconds: 30 });
-    const store = testStore();
-    const started = await store.startDraft(fixture.draftId);
-    if (!started.ok) throw new Error(started.reason);
-    const driver = createMockBotDriver({ db, store });
-    const state = started.state;
-    const onClock = teamOnClock(state)!;
-    const due = await driver.dueBotPick(state);
-    const expected = due === null ? Date.parse(currentDeadline(state)!) : Math.ceil(due.dueAtMs);
-    expect(await nextDueInstantMs(state, driver)).toBe(expected);
-    if (due !== null) {
-      // The pick lands exactly there when advanced past it.
-      const outcome = await testAdvancer(store, { mockDriver: driver }).advance(fixture.draftId, atMs(60_000), { maxActions: 1 });
-      expect(outcome.applied).toBe(1);
-      const log = await actionLog(fixture.draftId);
-      expect(Date.parse(log[1]!.action.timestamp)).toBe(expected);
-      expect(log[1]!.action.type).toBe("MAKE_PICK");
-      // Now a human is on the clock: the deadline.
-      const next = (await store.getDraftState(fixture.draftId))!;
-      expect(teamOnClock(next)).not.toBe(onClock);
-      expect(await nextDueInstantMs(next, driver)).toBe(Date.parse(currentDeadline(next)!));
-    }
-    expect(await nextDueInstantMs({ ...state, phase: "complete" }, driver)).toBeNull();
-  });
-
-  it("earlierDueMs picks the earlier of a bot's due instant and the deadline, and null when neither exists", () => {
-    expect(earlierDueMs(10, 20)).toBe(10);
-    expect(earlierDueMs(30, 20)).toBe(20);
-    expect(earlierDueMs(null, 20)).toBe(20);
-    expect(earlierDueMs(10, null)).toBe(10);
-    expect(earlierDueMs(null, null)).toBeNull();
   });
 });

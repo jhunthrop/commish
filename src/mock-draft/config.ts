@@ -83,11 +83,10 @@ export const MOCK_CONFIG = {
      *  ticking) is cleared after this. */
     inProgressMs: 6 * 60 * 60 * 1000,
   },
-  /** Ticker-lane bounds, following `DRAFT_SERVICE_CONFIG.maxDraftsPerTick`'s precedent
-   *  (`src/draft-service/config.ts`) — no scan in this codebase is unbounded. */
+  /** The due scan's and the retention sweep's per-run batch width, following
+   *  `DRAFT_SERVICE_CONFIG.maxDraftsPerTick`'s precedent (`src/draft-service/config.ts`) — no
+   *  scan in this codebase is unbounded. */
   maxMockStartsPerTick: 20,
-  maxBotPicksPerTick: 100,
-  sweepIntervalMs: 60_000,
   /**
    * Task 7: `GET /api/mock-drafts`'s own cap on both halves of the lobby read (the open-room
    * listing and the caller's own rooms) — the identical "no scan in this codebase is unbounded"

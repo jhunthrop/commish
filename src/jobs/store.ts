@@ -1,7 +1,7 @@
 // THE QUEUE'S LIFECYCLE, and nothing else: enqueue, claim, heartbeat, finish, reclaim,
 // checkpoints. Schedule cursors live with the scheduler (`schedule.ts`), admin reads with the
 // admin surface (`admin-view.ts`) — this file is the one place a `jobs` row's status ever moves.
-import { and, asc, eq, inArray, lt, lte } from "drizzle-orm";
+import { and, asc, eq, lt, lte } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { unwrapCauseChain } from "@/db/errors";
 import { jobRunSteps, jobRuns, jobs } from "@/db/schema";
@@ -102,63 +102,6 @@ export async function claimNextJob(db: Db, clock: Clock, workerId: string, wake:
   });
   if (claimed !== null) await wake.add(WAKE_MEMBERS.reclaim, now.getTime() + JOBS_CONFIG.reclaimWakeDelayMs);
   return claimed;
-}
-
-/**
- * THE TARGETED CLAIM (draft-room performance round, item 3): one named job, if it is pending and
- * due, under the same `FOR UPDATE SKIP LOCKED` and the same run-row opening as `claimNextJob`.
- * What a self-woken invocation runs (`run-handler.ts`): the job it was woken for and nothing
- * else, so the queue's heavier work can never sit between a room and its next pick. `null` when
- * the row is not claimable (a cron tick got there first, not yet due, gone), which is nothing to
- * do rather than an error.
- */
-export async function claimJobById(db: Db, clock: Clock, workerId: string, jobId: number, wake: WakeSet = wakeSet()): Promise<ClaimedJob | null> {
-  const now = new Date(clock.now());
-  const claimed = await db.transaction(async (tx) => {
-    const [row] = await tx
-      .select()
-      .from(jobs)
-      .where(and(eq(jobs.id, jobId), eq(jobs.status, "pending"), lte(jobs.runAt, now)))
-      .for("update", { skipLocked: true });
-    if (row === undefined) return null;
-    const attempt = row.attempts + 1;
-    await tx
-      .update(jobs)
-      .set({ status: "running", claimedBy: workerId, heartbeatAt: now, attempts: attempt })
-      .where(eq(jobs.id, row.id));
-    const runRows = await tx
-      .insert(jobRuns)
-      .values({ jobId: row.id, attempt, status: "running", startedAt: now, claimedBy: workerId })
-      .returning({ id: jobRuns.id });
-    return { jobId: row.id, runId: runRows[0]!.id, name: row.name, payload: row.payload, attempt, maxAttempts: row.maxAttempts };
-  });
-  if (claimed !== null) await wake.add(WAKE_MEMBERS.reclaim, now.getTime() + JOBS_CONFIG.reclaimWakeDelayMs);
-  return claimed;
-}
-
-/** Whether a job is still waiting to be claimed — what a sleeping self-wake checks between
- *  slices, so a job retired or claimed while it slept ends the sleep. */
-export async function isJobPending(db: Db, jobId: number): Promise<boolean> {
-  const [row] = await db.select({ status: jobs.status }).from(jobs).where(eq(jobs.id, jobId));
-  return row?.status === "pending";
-}
-
-/**
- * RETIRING PENDING JOBS (item 3): a pacing job names the log sequence it was scheduled from, and
- * once the log has moved past it (a human picked before her clock ran out) the job is a no-op
- * nobody should wait for. Retired jobs finish as `succeeded` with no run row: the queue's own
- * record that the work was never owed, distinct from a run that did it. Only `pending` rows are
- * touched, so a job already claimed finishes under its own attempt's bookkeeping.
- */
-export async function retirePendingJobs(db: Db, clock: Clock, jobIds: readonly number[]): Promise<number> {
-  if (jobIds.length === 0) return 0;
-  const now = new Date(clock.now());
-  const retired = await db
-    .update(jobs)
-    .set({ status: "succeeded", finishedAt: now })
-    .where(and(inArray(jobs.id, jobIds), eq(jobs.status, "pending")))
-    .returning({ id: jobs.id });
-  return retired.length;
 }
 
 /** Refreshed on an interval while an attempt runs — the liveness signal `reclaimStaleJobs` reads.

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-// getDraftStore() and getDraftTicker() open a real Postgres pool the moment they're called
+// getDraftStore() and getDraftAdvancer() open a real Postgres pool the moment they're called
 // (`getDb()`, shared across the request path) — point it at the test infrastructure before the
 // module under test is imported, the same idiom `src/stats-pipeline/index.test.ts` uses.
 vi.hoisted(() => {
@@ -16,7 +16,7 @@ import { players } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { heldRoomFacts, resetAdvisorMemoForTests } from "./assistant/memo";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
-import { awaitDraftFollowThroughForTests, followThroughAppliedAction, getDraftStore, getDraftTicker, logDraftNudgeError, logDraftPublishError, noteDraftPublishFailure, publishDraftEvent } from "./index";
+import { awaitDraftFollowThroughForTests, followThroughAppliedAction, getDraftAdvancer, getDraftStore, logDraftNudgeError, logDraftPublishError, noteDraftPublishFailure, publishDraftEvent } from "./index";
 
 const db = createTestDb();
 
@@ -61,23 +61,13 @@ describe("draft-service edge wiring", () => {
     expect(getDraftStore()).toBe(getDraftStore());
   });
 
-  it("getDraftTicker is a singleton, so two calls never mint two tickers, and wires a nudger", () => {
-    const first = getDraftTicker();
-    expect(getDraftTicker()).toBe(first);
-    // Constructing the ticker also constructs its nudger via createNudgeScheduler, wired with
-    // isLLMEnabled()/getLlmClient() read once at the edge — reaching getDraftTicker() at all is
-    // what exercises that wiring line, whichever way ANTHROPIC_API_KEY happens to be set in this
-    // process's environment.
-    expect(first).toHaveProperty("tick");
-    expect(first).toHaveProperty("start");
-    expect(first).toHaveProperty("stop");
-  });
-
-  it("getDraftTicker() reuses the same store getDraftStore() returns", () => {
+  it("getDraftAdvancer() is a singleton over the same store getDraftStore() returns, and wires a nudger", () => {
     // Both singletons share one `getDb()`-backed store rather than each minting their own —
     // proven by construction succeeding and by the store singleton assertion above rather than a
-    // second accessor, since DraftTicker does not expose its store.
-    expect(() => getDraftTicker()).not.toThrow();
+    // second accessor, since the advancer does not expose its store. Constructing it also
+    // constructs its nudger via createNudgeScheduler, wired with isLLMEnabled()/getLlmClient()
+    // read once at the edge, whichever way ANTHROPIC_API_KEY happens to be set.
+    expect(getDraftAdvancer()).toBe(getDraftAdvancer());
   });
 
   it("publishDraftEvent delegates to the process-wide publisher", async () => {
