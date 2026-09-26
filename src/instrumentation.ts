@@ -1,17 +1,18 @@
 /**
  * Next.js calls this once per server process. On a LONG-LIVED server (local dev, a self-hosted
- * node) the draft clock has to keep running whether or not anyone has a browser tab open, so the
- * in-process ticker starts here — it is why drafts feel instant locally. Plan B's stats-ingestion
- * worker (`@/stats-pipeline`) is the same shape for the same reason.
+ * node) Plan B's stats-ingestion worker (`@/stats-pipeline`) starts here.
  *
- * ON VERCEL NEITHER WORKER STARTS (the draft-driver design, 2026-09-03 — the mock-drafts-stall
- * incident): each function invocation is short-lived, so a ticker started here would live only
- * as long as whichever invocation happened to run `register()`, which is exactly how deferred
- * solo starts, bot picks and clock expiries froze in production. Drafts on Vercel advance
- * through the three drivers instead — advance-on-read, the SSE watcher loop, and the minute-cron
- * `draft-sweep` job (`src/jobs/defs/draft-sweep-job.ts`) — all funneling into the same store
- * paths this ticker uses, so gating it off changes topology, never semantics. `process.env.VERCEL`
- * is the platform's own marker, set on every Vercel build and function.
+ * NO DRAFT TICKER, ANYWHERE (the batched bots round, 2026-09-25). Drafts advance through the
+ * same two drivers on every host — advance-on-read and the minute-cron `draft-sweep` job
+ * (`src/jobs/defs/draft-sweep-job.ts`, run locally by `npm run jobs:runner`) — and a mock's bot
+ * picks are batched into the commit that lands the human action before them, so nothing has to
+ * tick for a room to move. The dev ticker that used to start here paced bots and expiries
+ * per second on a local process only; one topology now, never two.
+ *
+ * ON VERCEL THE INGESTION WORKER DOES NOT START EITHER (the draft-driver design, 2026-09-03):
+ * each function invocation is short-lived, so a worker started here would live only as long as
+ * whichever invocation happened to run `register()`. `process.env.VERCEL` is the platform's own
+ * marker, set on every Vercel build and function.
  *
  * The stats ingestion worker has the same serverless death, and its correct production path is
  * the existing jobs system (`src/jobs/defs/season-week-job.ts` carries the weekly cadence
@@ -24,11 +25,8 @@
  * and excludes that branch from the edge runtime bundle. `@/draft-service` and `@/stats-pipeline`
  * both pull in ioredis, which needs Node core modules ('net', 'dns', 'crypto', 'stream') the
  * edge runtime doesn't have — an early-return guard still leaves the import reachable from the
- * edge bundle's perspective and fails the build. Both workers' starts live inside the SAME `if`
- * block for that same bundler reason: a second identical guard would still be recognized
- * correctly, but there is no reason to write it twice, and two separate blocks would be two
- * places to keep in sync instead of one. The Vercel gate is an ordinary runtime condition
- * NESTED inside that statically-recognized block, so the bundler shape is untouched.
+ * edge bundle's perspective and fails the build. The Vercel gate is an ordinary runtime
+ * condition NESTED inside that statically-recognized block, so the bundler shape is untouched.
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === "nodejs") {
@@ -45,8 +43,6 @@ export async function register(): Promise<void> {
       installWakeSet(createRedisWakeSet(getSharedRedis()));
     }
     if (process.env.VERCEL === undefined) {
-      const { getDraftTicker } = await import("@/draft-service");
-      getDraftTicker().start();
       const { getIngestionWorker } = await import("@/stats-pipeline");
       getIngestionWorker().start();
     }

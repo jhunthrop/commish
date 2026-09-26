@@ -1,9 +1,7 @@
 import { and, asc, eq, inArray, lte } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db, DbTx } from "@/db/client";
 import { drafts, leagues, mockRooms, teams, users } from "@/db/schema";
-import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import { currentClockSeconds, teamOnClock, type DraftState } from "@/draft-engine";
-import type { DraftStore } from "@/draft-service/store";
 import { assignArchetypes, type BotArchetype } from "@/mock-draft/archetypes";
 import { botDelayStreamKey, botThinkDelayMs, chooseBotPick } from "@/mock-draft/bots";
 import { MOCK_CONFIG } from "@/mock-draft/config";
@@ -12,15 +10,14 @@ import type { MockLifecycleDeps } from "./claim";
 import { startMockDraft } from "./start";
 
 /**
- * The ticker's two mock GO lanes (Phase 4.5, Task 6): the due scan that starts rooms whose
- * window has fired, and the bot driver that makes a mock room's bots pick on the clock. The
- * third lane — retention — lives in `./sweep`. All three ride `createDraftTicker`'s own tick
- * (`@/draft-service/ticker`), never a second `setInterval`, the same "one heartbeat" rule
- * Task 7's auto-start and the house reconcile already keep.
+ * The mock room's two service lanes beyond the store itself: the due scan that starts rooms
+ * whose window has fired (the sweep job's, `@/jobs/defs/draft-sweep-job`), and the bot policy
+ * the draft store runs forward inside the transaction that lands a human's action (the batched
+ * bots round, 2026-09-25: `DraftStoreDeps.botTurn`). Retention lives in `./sweep`.
  */
 
 /** The outcome reason the due scan reports when `startMockDraft` itself throws — product copy
- *  in the ticker-outcome voice (`"Something went wrong checking this draft's clock."`). */
+ *  in the sweep-outcome voice (`"Something went wrong checking this draft's clock."`). */
 export const MOCK_START_FAILED_REASON = "Something went wrong starting this mock draft.";
 
 /**
@@ -53,8 +50,8 @@ export type MockStartOutcome =
       /**
        * `true` for a mapped 409 — the race answer, not an error (the T5 carry): another
        * instance's scan (or the room's own solo self-start) got there first, so the state this
-       * scan wanted to bring about already exists. The ticker absorbs it silently; only a
-       * NON-benign failure reaches the rate-limited outcome log.
+       * scan wanted to bring about already exists. The sweep absorbs it silently; only a
+       * NON-benign failure reaches the outcome log.
        */
       readonly benignRace: boolean;
       readonly reason: string;
@@ -64,7 +61,7 @@ export type MockStartOutcome =
  * The due-start lane: scan, then `startMockDraft` per row — the ONE callable every start path
  * shares (`./start`), so bot top-up and the guarded status transition happen exactly the way a
  * solo room's own self-start does. Per-row try/catch, the same "one room's failure must not
- * starve the rooms after it" shape every ticker lane keeps.
+ * starve the rooms after it" shape every sweep lane keeps.
  */
 export async function startDueMockRooms(db: Db, deps: Pick<MockLifecycleDeps, "store" | "clock" | "newId">): Promise<readonly MockStartOutcome[]> {
   const rows = await dueMockRoomsQuery(db, new Date(Date.parse(deps.clock.now())));
@@ -93,9 +90,9 @@ export async function startDueMockRooms(db: Db, deps: Pick<MockLifecycleDeps, "s
  *
  * Why it exists: without it a finished mock stayed `'in_progress'` for its whole retention
  * window, occupying one of `liveDraftsQuery`'s bounded scan slots (LIMIT `maxDraftsPerTick`)
- * every tick for up to a day — enough finished mocks could crowd REAL drafts out of the expiry
- * scan. Settled, the row leaves the scan on the very next tick, and the sweep's started-room
- * windows become pure SQL (`./sweep`) because status now tells completed and abandoned apart.
+ * every sweep for up to a day — enough finished mocks could crowd REAL drafts out of the expiry
+ * scan. Settled, the row leaves the scan at once, and the sweep's started-room windows become
+ * pure SQL (`./sweep`) because status now tells completed and abandoned apart.
  *
  * Guarded three ways, so it is idempotent and mock-only by construction: the draft id, the
  * `'in_progress'` precondition (a second call — or a race with another instance's settle —
@@ -103,11 +100,11 @@ export async function startDueMockRooms(db: Db, deps: Pick<MockLifecycleDeps, "s
  * sweep's own `deleteMockLeagueRow` also carries; a real league's status is only ever written
  * by `claimAutoStart`/`commitDraftState`). Returns whether THIS call did the flip.
  *
- * Called from `driveBotPick` below, level-triggered like everything else in this module: the
- * tick after the last pick lands observes `phase === "complete"` with no team on the clock and
- * settles — no stored "needs settling" flag, so a restart cannot lose the transition.
+ * Takes `Db | DbTx`: the store settles a mock its own batch completed inside that batch's
+ * transaction (the batched bots round), and the advance funnel settles one it observes complete
+ * on a plain connection, level-triggered, so a restart cannot lose the transition.
  */
-export async function settleMockDraftCompletion(db: Db, draftId: string): Promise<boolean> {
+export async function settleMockDraftCompletion(db: Db | DbTx, draftId: string): Promise<boolean> {
   const settled = await db
     .update(drafts)
     .set({ status: "complete" })
@@ -122,43 +119,31 @@ export async function settleMockDraftCompletion(db: Db, draftId: string): Promis
   return settled.length > 0;
 }
 
-/** What one driver call did: the one due pick landed through the real store, or the store
- *  refused it. `null` means there was nothing for the driver to do this tick — a human on the
- *  clock, a think-delay still running, or a roster that can take nothing (the T3 carry: not an
- *  error). A drive never lands more than one pick: every bot pick waits its own seeded delay
- *  (founder report 2026-09-08 — the board animates pick by pick, never as a burst). */
-export type BotDriveOutcome = { readonly picked: true } | { readonly picked: false; readonly reason: string };
-
-export type MockBotDriveFn = (state: DraftState, now: string) => Promise<BotDriveOutcome | null>;
-
 /**
- * The one due computation every bot-driving caller reads (draft-driver design, 2026-09-03):
- * which bot is on the clock, WHEN its pick falls due, and — behind `choosePick` — WHAT it
- * picks. `dueAtMs` is the exact (fractional-millisecond) instant
- * `turnStartedAt + botThinkDelayMs(...)` — kept as a number, not an ISO string, so the paced
- * lane's strict `now < dueAtMs` boundary stays the arithmetic the delay-boundary test pins
- * rather than a rounded copy of it. Every room prices the same way, a lone human's included
- * (founder report 2026-09-08 retired the one-human zero-delay lane). The catch-up driver
- * (`@/draft-service/advance`) stamps the applied action at this instant, which is what chains
- * an abandoned room's deadlines from due instant to due instant — and, live, what makes the
- * next bot's delay run from the previous pick's own instant rather than from a driver's tick.
+ * THE BOT ON THE CLOCK, PRICED (the batched bots round, 2026-09-25): which bot holds the clock,
+ * WHEN its pick is revealed, and — behind `choosePick` — WHAT it picks. `revealAtMs` is the
+ * exact (fractional-millisecond) instant `turnStartedAt + botThinkDelayMs(...)`, kept as a number
+ * so the stamp the store writes (`Math.ceil`, the first whole millisecond at or after it) is the
+ * arithmetic the delay pins cover (`PIN_BOT_DELAYS_MS`, `@/draft-engine/replay-pins.fixture`)
+ * rather than a rounded copy. The store runs this forward through every consecutive bot seat
+ * inside the transaction that lands a human's action (or starts the draft, or expires a human's
+ * clock), each pick stamped at its own reveal instant, each instant the next turn's start: the
+ * picks are a function of the seeded state, only their reveal is time-shaped.
  *
- * `choosePick` is a THUNK (fix round LOW 5): the rank-weighted selection walks the pool, and a
- * paced ticker asks "is this turn due yet?" once a second for turns that mostly are not — so
- * the selection only runs once a caller has passed its own due check. Pure over the state this
- * answer was derived from (the pick stream rebuilds its cursor from the log), so calling it
- * never moves an RNG cursor and two calls answer identically. Null when the roster can take
- * nothing (the T3 carry: not an error).
+ * `choosePick` is a THUNK: the rank-weighted selection walks the pool, so it runs only once the
+ * caller has decided to land the pick. Pure over the state this answer was derived from (the
+ * pick stream rebuilds its cursor from the log), so calling it never moves an RNG cursor and two
+ * calls answer identically. Null when the roster can take nothing (the T3 carry: not an error;
+ * the turn then falls to the clock's own expiry).
  */
-export interface DueBotPick {
+export interface BotTurn {
   readonly teamId: string;
-  readonly dueAtMs: number;
+  readonly revealAtMs: number;
   readonly choosePick: () => string | null;
 }
 
 export interface MockBotDriverDeps {
   readonly db: Db;
-  readonly store: DraftStore;
 }
 
 /** The per-draft facts the driver needs beyond `DraftState`: the room's stored seed, which
@@ -175,14 +160,14 @@ interface MockDraftMeta {
  * THE REPLAY LAW, restated as arithmetic: pick N of a bot's own draft always consumes draw N of
  * `rngFor(botSeed, teamId)` — "one stream per bot, held for the draft's life" is a fact about
  * the SEQUENCE, and the cursor into it is derived from state (`chooseBotPick` consumes exactly
- * one draw per sampled pick, and a bot's driver picks are exactly its non-`auto` picks), never
- * held in memory. That derivation is what makes the driver level-triggered all the way down: a
- * restarted server rebuilds the identical stream position from the log alone and resumes
- * mid-draft with picks byte-identical to the ones an uninterrupted run would have made —
- * `driver.test.ts`'s replay proof drives both runs and compares the logs.
+ * one draw per sampled pick, and a bot's picks are exactly its non-`auto` picks), never held in
+ * memory. That derivation is what makes the batch level-triggered all the way down: the batch
+ * loop hands each iteration the state the previous pick produced, so every pick reads the
+ * identical stream position a pick-by-pick driver would have read, and a restarted server
+ * resumes an in-flight room with picks byte-identical to the ones an uninterrupted run made.
  *
  * The bijection leans on two structural facts: a bot's autopicked turn (`auto: true` — only
- * possible if the driver was down past the room's whole clock) consumed no draw and is excluded
+ * possible if every driver was down past the room's whole clock) consumed no draw and is excluded
  * from the count; and a queue-honored pick would consume no draw while still counting — but a
  * bot cannot hold a queue (queue writes ride authenticated member routes, and a bot account is
  * structurally refused everywhere a member acts).
@@ -195,50 +180,36 @@ function pickStreamFor(botSeed: number, teamId: string, state: DraftState): Rng 
 }
 
 /**
- * The bot driver (brief, Step 3): at most ONE bot pick for ONE mock draft per call, invoked by
- * `tickOne` (`@/draft-service/ticker`) for each live mock the expiry scan already fetched — no
- * second scan, and no throttle beyond `maxBotPicksPerTick`'s tick-wide budget (held by the
- * ticker). The live pace itself is the SSE loop's (`runDraftAdvanceLoop`), which wakes at each
- * pick's own due instant; the once-a-second ticker is the dev backstop and can only ever land a
- * pick that is already due.
+ * The bot policy the store runs forward (see `BotTurn`). Level-triggered and derived-only:
+ * everything here is a pure function of the draft state the caller handed in and the room's
+ * stored seed — no "bot is thinking" flag exists anywhere.
  *
- * Level-triggered and derived-only: everything here is a pure function of the draft state the
- * caller handed in, the room's stored seed, and `now` — no "bot is thinking" flag exists
- * anywhere, so a restarted server resumes any in-flight mock cleanly (see `pickStreamFor`).
- *
- * The think-delay is drawn from each pick's OWN stream (`${teamId}:delay:${pickNumber}` — the
- * T3 report's shape), uniform within `MOCK_CONFIG.botDelay` (450 to 950 ms), whose top
- * (`config.test.ts` pins it) sits under half the fastest offered clock: a bot can never be
- * autopicked by its own dawdling — the T1 arithmetic guarantee — and never collides with the
- * moderator's nudge threshold (which `nudge.ts` additionally short-circuits for bots).
- *
- * The pick itself is a plain `MAKE_PICK` through the REAL `store.applyAction` — the same mutex,
- * the same row locks, the same admit+reduce, the same sequence-conflict backstop, the same SSE
- * broadcast as every human pick (bots ride MAKE_PICK, never TIMER_EXPIRE — the T3-era ruling),
- * with `actor` absent because the mock lane skips attribution machinery outright (Task 4).
+ * The think-delay is drawn from each pick's OWN stream (`botDelayStreamKey`), uniform within
+ * `MOCK_CONFIG.botDelay` (450 to 950 ms), whose top (`config.test.ts` pins it) sits under half
+ * the fastest offered clock: a bot can never be autopicked by its own dawdling — the T1
+ * arithmetic guarantee — and never collides with the moderator's nudge threshold (which
+ * `nudge.ts` additionally short-circuits for bots).
  *
  * The per-draft meta cache is keyed by draft id; every cached fact (the stored seed, which
  * seats are bots, the archetype deal) is immutable for the draft's life — teams are
  * delete-and-recreate, never reassigned — so the ONE invalidation moment is the room ceasing to
- * exist: the retention sweep drops each swept draft's entry through `invalidateDraft` below
- * (fix round, review MEDIUM: the ticker wires it into `MockSweepDeps.invalidateDriverMeta`),
+ * exist: the retention sweep drops each swept draft's entry through `invalidateDraft` below,
  * the identical lifecycle the sweep already gives `pool.ts`'s ranking cache and the store's own
  * state cache. No size cap beyond that, the `isBotCache` precedent (`nudge.ts`).
  */
 export interface MockBotDriver {
-  readonly driveBotPick: MockBotDriveFn;
   /**
-   * The shared due computation (see `DueBotPick`): null unless a BOT holds a running clock in a
-   * room whose sidecar still exists and whose roster can take something. Pure over the handed-in
-   * state, the stored seed and the cached meta — it draws from the same delay stream and the
-   * same pick stream the drive itself consumes, so pricing a turn never moves either cursor.
+   * The bot on the clock, priced (`BotTurn`): null unless a BOT holds a running clock in a room
+   * whose sidecar still exists. Pure over the handed-in state, the stored seed and the cached
+   * meta — it draws from the delay stream and the pick stream the batch itself consumes, so
+   * pricing a turn never moves either cursor.
    */
-  readonly dueBotPick: (state: DraftState) => Promise<DueBotPick | null>;
+  readonly botTurn: (state: DraftState) => Promise<BotTurn | null>;
   /** Drops one draft's cached meta — the sweep's seam, called per swept room. */
   readonly invalidateDraft: (draftId: string) => void;
 }
 
-export function createMockBotDriver({ db, store }: MockBotDriverDeps): MockBotDriver {
+export function createMockBotDriver({ db }: MockBotDriverDeps): MockBotDriver {
   const metaCache = new Map<string, MockDraftMeta>();
 
   async function metaFor(state: DraftState): Promise<MockDraftMeta | null> {
@@ -271,13 +242,7 @@ export function createMockBotDriver({ db, store }: MockBotDriverDeps): MockBotDr
     return meta;
   }
 
-  /**
-   * See `MockBotDriver.dueBotPick`. The delay draw rides its own seeded stream (`:delay:`), and
-   * the selection behind `choosePick` rebuilds its pick-stream cursor from the log on every
-   * call — so pricing a not-yet-due turn costs the delay arithmetic only (fix round LOW 5), and
-   * choosing consumes nothing and changes nothing however many callers ask.
-   */
-  async function dueBotPick(state: DraftState): Promise<DueBotPick | null> {
+  async function botTurn(state: DraftState): Promise<BotTurn | null> {
     const onClockTeamId = teamOnClock(state);
     if (onClockTeamId === null) return null;
     const meta = await metaFor(state);
@@ -288,47 +253,16 @@ export function createMockBotDriver({ db, store }: MockBotDriverDeps): MockBotDr
     // Non-null exactly when a clock is running: `currentTier` (which `currentClockSeconds` just
     // answered through) is null whenever `turnStartedAt` is — one fact, checked once above.
     const startedAtMs = Date.parse(state.turnStartedAt!);
-    const dueAtMs = startedAtMs + botThinkDelayMs(clockSeconds, rngFor(meta.botSeed, botDelayStreamKey(onClockTeamId, state.pickNumber)));
+    const revealAtMs = startedAtMs + botThinkDelayMs(clockSeconds, rngFor(meta.botSeed, botDelayStreamKey(onClockTeamId, state.pickNumber)));
     return {
       teamId: onClockTeamId,
-      dueAtMs,
+      revealAtMs,
       choosePick: () => chooseBotPick(state, onClockTeamId, meta.archetypes[onClockTeamId]!, pickStreamFor(meta.botSeed, onClockTeamId, state)),
     };
   }
 
-  async function driveBotPick(state: DraftState, now: string): Promise<BotDriveOutcome | null> {
-    // Resolved BEFORE any other database read. No team on the clock means either a finished
-    // room — settled below (fix round, ruled), so the expiry scan stops re-fetching it on the
-    // very next tick instead of holding a scan slot for the whole retention window — or a state
-    // no snake mock reaches mid-draft (nothing to drive either way).
-    const onClockTeamId = teamOnClock(state);
-    if (onClockTeamId === null) {
-      if (state.phase === "complete") await settleMockDraftCompletion(db, state.config.draftId);
-      return null;
-    }
-    // The shared due computation (null for a human's turn, a vanished sidecar or no running
-    // clock): not yet due means nothing to drive this tick — and the selection is only ever
-    // computed PAST that check (fix round LOW 5), so an idle per-second tick prices the delay
-    // and walks no pool.
-    const due = await dueBotPick(state);
-    if (due === null) return null;
-    if (Date.parse(now) < due.dueAtMs) return null;
-    const playerId = due.choosePick();
-    if (playerId === null) return null;
-
-    const result = await store.applyAction(state.config.draftId, {
-      v: DRAFT_ACTION_VERSION,
-      type: "MAKE_PICK",
-      timestamp: now,
-      teamId: due.teamId,
-      playerId,
-    });
-    return result.ok ? { picked: true } : { picked: false, reason: result.reason };
-  }
-
   return {
-    driveBotPick,
-    dueBotPick,
+    botTurn,
     invalidateDraft(draftId: string): void {
       metaCache.delete(draftId);
     },

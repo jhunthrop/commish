@@ -55,37 +55,4 @@ export const JOBS_CONFIG = {
    * the trade against compute: each safety run wakes Neon for about six minutes.
    */
   sweepMaxQuietMs: 30 * 60_000,
-  /**
-   * THE SELF-WAKE (draft-room performance round, item 3): a job due inside the next minute is not
-   * left to the cron's minute. The invocation that enqueued it POSTs `/api/jobs/run` for it at
-   * once (`self-wake.ts`, after its own response has gone); that invocation answers 202 and, after
-   * ITS response, sleeps until the due instant and claims exactly that job (`run-handler.ts`): one
-   * invocation per bot pick, each at its own due instant, never a sleep inside a request somebody
-   * is waiting on or a stream that may not be open.
-   *
-   * THE CHAIN (review fix round, finding 1): one invocation sleeps at most `selfWakeMaxSleepMs`
-   * (under the route's `maxDuration`); a job due further out is carried by a chain — the sleeper
-   * sleeps its ceiling, then re-arms a wake for the remainder, and so on until due, each hop
-   * retiring the moment a human's pick retires the job. The chain covers due times up to
-   * `selfWakeChainMaxMs`: every mock clock (30, 60, 90 s) and the real schedule's 90 s and ten
-   * minute tiers, at one to ten hops a turn. Longer clocks (an hour, four, eight) stay on the
-   * cron, where a minute's lateness is under two percent of the clock and a chain would cost 60
-   * to 480 idle invocations per turn for nothing a manager could see.
-   *
-   * `selfWakeTimeoutMs` bounds the wake request, so an unreachable self never stalls the
-   * caller's follow-through; `selfWakeSleepSliceMs` is how often a sleeping invocation checks
-   * that its job is still pending, so a job retired while it slept costs one slice of idle. A
-   * wake that fails or never happens costs latency only: the job is queued, and the tick claims it.
-   */
-  selfWakeMaxSleepMs: 60_000,
-  selfWakeChainMaxMs: 10 * 60_000,
-  selfWakeTimeoutMs: 5_000,
-  selfWakeSleepSliceMs: 5_000,
-  /**
-   * How long past its `run_at` a pending pacing job is still trusted to be on its way (the wake
-   * request in flight, a tick about to claim it). The draft sweep leaves a room alone while its
-   * pacing job is inside this grace, and advances it directly once the job is older: the wake was
-   * lost, and the sweep is the safety net (`draft-sweep-job.ts`).
-   */
-  pacingChainGraceMs: 30_000,
 } as const;

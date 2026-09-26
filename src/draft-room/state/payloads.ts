@@ -57,7 +57,9 @@ const pickPayloadSchema = z.object({
   round: z.number().int().positive(),
   teamId: z.string().min(1),
   playerId: z.string().min(1),
-  slot: z.enum(["QB", "RB", "WR", "TE", "FLEX", "K", "DEF", "BENCH"]),
+  // Every `RosterSlotType` (`@/domain/roster`), the superflex included: a pick into a slot this
+  // list lacked failed the parse and cost the room a resync it never needed.
+  slot: z.enum(["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "DEF", "BENCH"]),
   slotIndex: z.number().int().nonnegative(),
   price: z.number().nullable(),
   timestamp: z.string().min(1),

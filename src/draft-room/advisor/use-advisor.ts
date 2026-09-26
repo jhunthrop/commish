@@ -17,11 +17,18 @@ export interface UseAdvisorResult {
   readonly error: string | null;
 }
 
-/** The room as the advisor reads it: which draft, the log sequence the client holds right now,
- *  and every player still on the board — all off the `DraftStateView` the room already has. */
+/**
+ * The room as the advisor reads it (the batched bots round, 2026-09-25): which draft, the log
+ * sequence the server holds (`sequence`, the committed view's, what the advisor is computed
+ * against), the sequence the room has REVEALED so far, the next instant a committed pick is
+ * revealed (this browser's clock; null when nothing waits), and every player still on the
+ * revealed board.
+ */
 export interface AdvisorRoom {
   readonly draftId: string;
   readonly sequence: number;
+  readonly revealedSequence: number;
+  readonly nextRevealAtMs: number | null;
   readonly availablePlayerIds: ReadonlySet<string>;
 }
 
@@ -58,7 +65,7 @@ function hydrate(draftId: string): AdvisorView | null {
 
 /**
  * THE ADVISOR'S FETCH — spec 3.4: `GET /api/drafts/:draftId/assistant` on every change of the
- * room's log sequence, which every pick event (and every other applied action) moves.
+ * room's committed log sequence, which every pick event (and every other applied action) moves.
  * `myTeamId === null` never fetches: a commissioner has no seat to advise.
  *
  * COALESCED, NEVER PILED UP (simplification round): the request carries no state of its own,
@@ -66,16 +73,30 @@ function hydrate(draftId: string): AdvisorView | null {
  * request is in flight only marks the hook dirty, and exactly one more request follows when the
  * current one lands. The lag the founder measured was requests queued behind each other on the
  * server, one per pick event, each computing a state nobody would see.
+ *
+ * ASKED AT THE FIRST REVEAL, SHOWN AT THE LAST (the batched bots round). A batch of bot picks
+ * commits at once and reveals one by one; the server's facts for the post-batch state are
+ * computed by the pick's own invocation right after it answers, and the first bot's reveal is
+ * at least one seeded delay later, so the fetch waits for that instant (`nextRevealAtMs`) and
+ * reads what was written instead of racing the writer. Its answer is about the state the human
+ * will face when the last bot is revealed, so it is STAGED until the room's revealed sequence
+ * reaches its stamp, then shown: her dock is ready the moment her turn is, and no odds about a
+ * pick still hidden ever show while it is hidden. With nothing waiting the fetch is immediate.
  */
 export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvisorResult {
-  const { draftId, sequence, availablePlayerIds } = room;
+  const { draftId, sequence, revealedSequence, nextRevealAtMs, availablePlayerIds } = room;
   const deps = useDraftRoomDeps();
   const [held, setHeld] = useState<AdvisorView | null>(() => hydrate(draftId));
+  const [staged, setStaged] = useState<AdvisorView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const draftIdRef = useRef<string>(draftId);
   const aliveRef = useRef(true);
   const inFlightRef = useRef(false);
   const dirtyRef = useRef(false);
+  const revealedSequenceRef = useRef(revealedSequence);
+  revealedSequenceRef.current = revealedSequence;
+  const nextRevealAtRef = useRef(nextRevealAtMs);
+  nextRevealAtRef.current = nextRevealAtMs;
 
   const fetchOnce = useCallback(async (): Promise<void> => {
     try {
@@ -86,9 +107,14 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
         setError(body.error);
         return;
       }
-      setHeld(body.data);
       setError(null);
-      rememberAdvisor(draftId, { lastView: body.data });
+      if (body.data.stamp.sequence <= revealedSequenceRef.current) {
+        setStaged(null);
+        setHeld(body.data);
+        rememberAdvisor(draftId, { lastView: body.data });
+      } else {
+        setStaged(body.data);
+      }
     } catch {
       if (aliveRef.current) setError(NETWORK_ERROR);
     }
@@ -122,25 +148,39 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
     };
   }, []);
 
+  // The fetch, once per committed sequence, at the first reveal it is waiting on (or now).
   useEffect(() => {
     if (draftIdRef.current !== draftId) {
       forgetAdvisor(draftIdRef.current);
       draftIdRef.current = draftId;
       setHeld(hydrate(draftId));
+      setStaged(null);
     }
     if (myTeamId === null) {
       setHeld(null);
+      setStaged(null);
       setError(null);
       forgetAdvisor(draftId);
       return;
     }
-    recompute();
+    const at = nextRevealAtRef.current;
+    const delay = at === null ? 0 : Math.max(0, at - Date.now());
+    const timer = setTimeout(recompute, delay);
+    return () => clearTimeout(timer);
   }, [draftId, sequence, myTeamId, recompute]);
 
+  // The promotion: a staged answer is shown once the room has revealed the state it is about.
+  useEffect(() => {
+    if (staged === null || staged.stamp.sequence > revealedSequence) return;
+    setHeld(staged);
+    setStaged(null);
+    rememberAdvisor(draftId, { lastView: staged });
+  }, [staged, revealedSequence, draftId]);
+
   const view = useMemo(() => (held === null ? null : presentView(held, availablePlayerIds)), [held, availablePlayerIds]);
-  // Recomputing: a seated caller whose held view trails the room, or who holds nothing yet and
-  // has not been refused. Derived, so it changes exactly when the view or the room does.
-  const recomputing = myTeamId !== null && (held === null ? error === null : held.stamp.sequence < sequence);
+  // Recomputing: a seated caller whose held view trails the revealed room, or who holds nothing
+  // yet and has not been refused. Derived, so it changes exactly when the view or the room does.
+  const recomputing = myTeamId !== null && (held === null ? error === null : held.stamp.sequence < revealedSequence);
   // One object per distinct answer: every drawer tab and every pool row takes this as a prop.
   return useMemo(() => ({ view, recomputing, error }), [view, recomputing, error]);
 }
