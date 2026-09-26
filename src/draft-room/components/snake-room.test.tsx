@@ -28,6 +28,8 @@ const room: DraftRoomState = {
   status: "ready",
   error: null,
   view: { ...SNAKE_VIEW, deadlineAt: roomyDeadline() },
+  committed: null,
+  nextRevealAtMs: null,
   players: PLAYERS,
   teams: TEAMS,
   leagueName: LEAGUE_NAME,

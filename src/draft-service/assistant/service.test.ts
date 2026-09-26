@@ -133,12 +133,11 @@ describe("advisorFor", () => {
     facts.held.clear();
     expect(await advisorFor(db, DRAFT_ID, waitingUser, { simulate, facts })).not.toBeNull();
     expect(simulate).toHaveBeenCalledTimes(1);
-    // A miss everywhere computes once, under the lock, and writes for the next instance.
+    // A miss everywhere computes once and writes for the next instance.
     resetAdvisorMemoForTests();
     expect(await advisorFor(db, DRAFT_ID, waitingUser, { simulate, facts })).not.toBeNull();
     expect(simulate).toHaveBeenCalledTimes(2);
     expect(facts.held.size).toBe(1);
-    expect(facts.locks.size).toBe(0);
   });
 
   it("the default simulation yields to the event loop between chunks, so the pick's own invocation never holds it for the whole table (item 1)", async () => {

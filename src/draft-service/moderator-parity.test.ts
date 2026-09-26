@@ -3,7 +3,8 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { players } from "@/db/schema";
 import type { LlmClient } from "@/lib/llm/client";
 import { createDraftStore } from "./store";
-import { createDraftTicker } from "./ticker";
+import { createDraftAdvancer } from "./advance";
+import { createMockBotDriver } from "@/mock-draft-service/driver";
 import { createNudgeScheduler } from "./nudge";
 import { createNudgeCopy } from "./nudge-copy";
 import { setTeamQueue } from "./queue";
@@ -32,7 +33,7 @@ const POOL = [
 ];
 
 /**
- * Runs one identical draft end to end under the ticker: the same fixture, the same queues,
+ * Runs one identical draft end to end under the advance funnel: the same fixture, the same queues,
  * the same clock advances — differing ONLY in whether the moderator's copy comes from a
  * model. Returns the picks, which is the whole mechanical outcome.
  */
@@ -63,10 +64,10 @@ async function runDraft(llmEnabled: boolean) {
   const llm: LlmClient = {
     generateCompletion: vi.fn().mockResolvedValue({ text: "Clock's running — take someone!", inputTokens: 1, outputTokens: 1 }),
   };
-  const ticker = createDraftTicker({
+  const advancer = createDraftAdvancer({
     db,
     store,
-    clock,
+    mockDriver: createMockBotDriver({ db }),
     nudger: createNudgeScheduler({
       db,
       publish: async (input) => {
@@ -88,7 +89,7 @@ async function runDraft(llmEnabled: boolean) {
   // exactly on the threshold each turn while still covering the same 96-hour span (48 steps).
   for (let step = 0; step < 48; step++) {
     now = new Date(Date.parse("2026-09-01T00:00:00.000Z") + step * 2 * 60 * 60 * 1000).toISOString();
-    await ticker.tick();
+    await advancer.advance(draftId, now);
   }
 
   const state = await store.getDraftState(draftId);

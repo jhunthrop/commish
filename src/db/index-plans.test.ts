@@ -22,7 +22,7 @@ import { chatPageQuery } from "@/chat-service/chat";
 import { dueDraftsQuery } from "@/draft-service/auto-start";
 import { dueMockRoomsQuery } from "@/mock-draft-service/driver";
 import { listOpenMockRoomsQuery } from "@/mock-draft-service/lobby";
-import { liveDraftsQuery } from "@/draft-service/ticker";
+import { liveDraftsQuery } from "@/draft-service/live-drafts";
 import { openQuestionsQuery, pendingFlagQuery } from "@/integrity-service/flags";
 import { signalsForUsersQuery } from "@/integrity-service/session-signals";
 import { completedSeasonsQuery } from "@/league-service/participation";

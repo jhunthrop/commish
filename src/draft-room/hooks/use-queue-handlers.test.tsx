@@ -11,6 +11,8 @@ function fakeRoom(over: Partial<DraftRoomState> = {}): DraftRoomState {
     status: "ready",
     error: null,
     view: SNAKE_VIEW,
+    committed: SNAKE_VIEW,
+    nextRevealAtMs: null,
     players: PLAYERS,
     teams: TEAMS,
     leagueName: LEAGUE_NAME,

@@ -19,7 +19,7 @@ const EVERYONE: ReadonlySet<string> = new Set(CANDIDATES.map((candidate) => cand
 
 /** The room as the hook reads it: the draft, the log sequence the client holds, and who is still on the board. */
 function roomAt(sequence: number, available: ReadonlySet<string> = EVERYONE, draftId = "d1"): AdvisorRoom {
-  return { draftId, sequence, availablePlayerIds: available };
+  return { draftId, sequence, revealedSequence: sequence, nextRevealAtMs: null, availablePlayerIds: available };
 }
 
 const wrapper = (deps: DraftRoomDeps) =>
