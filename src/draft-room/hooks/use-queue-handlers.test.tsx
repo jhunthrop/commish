@@ -12,7 +12,7 @@ function fakeRoom(over: Partial<DraftRoomState> = {}): DraftRoomState {
     error: null,
     view: SNAKE_VIEW,
     committed: SNAKE_VIEW,
-    nextRevealAtMs: null,
+    factsReadySequence: null,
     players: PLAYERS,
     teams: TEAMS,
     leagueName: LEAGUE_NAME,

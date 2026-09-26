@@ -66,11 +66,17 @@ export const publishDraftEvent: PublishFn = (input) => getPublisher().publish(in
  * request path, exactly what a miss always cost.
  */
 export async function followThroughAppliedAction(state: DraftState): Promise<void> {
+  let ready = true;
   try {
     await publishRoomFacts(getDb(), state);
   } catch (error: unknown) {
+    ready = false;
     console.error("[draft] room facts follow-through failed", { draftId: state.config.draftId, sequence: state.sequence }, error);
   }
+  // THE FACTS FRAME (review M5): the viewers' advisors wait for this before asking, so the one
+  // simulator is this invocation's. A running room only; a finished one has nothing to advise.
+  if (state.phase !== "in_progress") return;
+  await publishDraftEvent({ leagueId: state.config.leagueId, type: "draft.facts", payload: { draftId: state.config.draftId, sequence: state.sequence, ready } });
 }
 
 /** The follow-throughs in flight, chained so a test can settle the last one (`awaitDraftFollowThroughForTests`). */

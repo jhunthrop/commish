@@ -5,6 +5,7 @@ import type { ApiEnvelope } from "@/lib/api/respond";
 import type { AdvisorView } from "@/draft-service/assistant/view";
 import { useDraftRoomDeps } from "../hooks/deps";
 import { forgetAdvisor, recallAdvisor, rememberAdvisor } from "./advisor-memory";
+import { ADVISOR_ROOM_CONFIG } from "./config";
 
 export interface UseAdvisorResult {
   /** The held view, shown only for candidates still on the room's board at render time
@@ -20,15 +21,15 @@ export interface UseAdvisorResult {
 /**
  * The room as the advisor reads it (the batched bots round, 2026-09-25): which draft, the log
  * sequence the server holds (`sequence`, the committed view's, what the advisor is computed
- * against), the sequence the room has REVEALED so far, the next instant a committed pick is
- * revealed (this browser's clock; null when nothing waits), and every player still on the
- * revealed board.
+ * against), the sequence the room has REVEALED so far, the newest sequence whose facts the
+ * server has said are settled (`useDraftRoom.factsReadySequence`), and every player still on
+ * the revealed board.
  */
 export interface AdvisorRoom {
   readonly draftId: string;
   readonly sequence: number;
   readonly revealedSequence: number;
-  readonly nextRevealAtMs: number | null;
+  readonly factsReadySequence: number | null;
   readonly availablePlayerIds: ReadonlySet<string>;
 }
 
@@ -74,17 +75,20 @@ function hydrate(draftId: string): AdvisorView | null {
  * current one lands. The lag the founder measured was requests queued behind each other on the
  * server, one per pick event, each computing a state nobody would see.
  *
- * ASKED AT THE FIRST REVEAL, SHOWN AT THE LAST (the batched bots round). A batch of bot picks
- * commits at once and reveals one by one; the server's facts for the post-batch state are
- * computed by the pick's own invocation right after it answers, and the first bot's reveal is
- * at least one seeded delay later, so the fetch waits for that instant (`nextRevealAtMs`) and
- * reads what was written instead of racing the writer. Its answer is about the state the human
- * will face when the last bot is revealed, so it is STAGED until the room's revealed sequence
- * reaches its stamp, then shown: her dock is ready the moment her turn is, and no odds about a
- * pick still hidden ever show while it is hidden. With nothing waiting the fetch is immediate.
+ * ASKED WHEN THE FACTS ARE WRITTEN, SHOWN AT THE LAST REVEAL (the batched bots round; review
+ * M5). A batch of bot picks commits at once and reveals one by one; the server's facts for the
+ * post-batch state are computed by the pick's own invocation right after it answers, and the
+ * `draft.facts` frame says when they are written, so the fetch waits for that frame
+ * (`factsReadySequence`) and reads the row instead of racing the writer with a simulation of its
+ * own: never two simulators. A frame that never comes (the writer died, the stream missed it)
+ * is covered by `ADVISOR_ROOM_CONFIG.factsWaitMaxMs`, after which the fetch goes anyway and the
+ * request computes. Its answer is about the state the human will face when the last bot is
+ * revealed, so it is STAGED until the room's revealed sequence reaches its stamp, then shown:
+ * her dock is ready the moment her turn is, and no odds about a pick still hidden ever show
+ * while it is hidden.
  */
 export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvisorResult {
-  const { draftId, sequence, revealedSequence, nextRevealAtMs, availablePlayerIds } = room;
+  const { draftId, sequence, revealedSequence, factsReadySequence, availablePlayerIds } = room;
   const deps = useDraftRoomDeps();
   const [held, setHeld] = useState<AdvisorView | null>(() => hydrate(draftId));
   const [staged, setStaged] = useState<AdvisorView | null>(null);
@@ -95,8 +99,6 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
   const dirtyRef = useRef(false);
   const revealedSequenceRef = useRef(revealedSequence);
   revealedSequenceRef.current = revealedSequence;
-  const nextRevealAtRef = useRef(nextRevealAtMs);
-  nextRevealAtRef.current = nextRevealAtMs;
 
   const fetchOnce = useCallback(async (): Promise<void> => {
     try {
@@ -148,7 +150,8 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
     };
   }, []);
 
-  // The fetch, once per committed sequence, at the first reveal it is waiting on (or now).
+  // The fetch, once per committed sequence, once the server has said its facts are settled (or
+  // after the wait's ceiling, the writer having gone quiet).
   useEffect(() => {
     if (draftIdRef.current !== draftId) {
       forgetAdvisor(draftIdRef.current);
@@ -163,11 +166,13 @@ export function useAdvisor(room: AdvisorRoom, myTeamId: string | null): UseAdvis
       forgetAdvisor(draftId);
       return;
     }
-    const at = nextRevealAtRef.current;
-    const delay = at === null ? 0 : Math.max(0, at - Date.now());
-    const timer = setTimeout(recompute, delay);
+    if (factsReadySequence !== null && factsReadySequence >= sequence) {
+      recompute();
+      return;
+    }
+    const timer = setTimeout(recompute, ADVISOR_ROOM_CONFIG.factsWaitMaxMs);
     return () => clearTimeout(timer);
-  }, [draftId, sequence, myTeamId, recompute]);
+  }, [draftId, sequence, factsReadySequence, myTeamId, recompute]);
 
   // The promotion: a staged answer is shown once the room has revealed the state it is about.
   useEffect(() => {

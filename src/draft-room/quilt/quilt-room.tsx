@@ -123,8 +123,8 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   // revealed one, so no name still hidden in a batch ever reads as drafted.
   const committedSequence = room.committed?.sequence ?? view.sequence;
   const advisorRoom = useMemo(
-    () => ({ draftId: view.draftId, sequence: committedSequence, revealedSequence: view.sequence, nextRevealAtMs: room.nextRevealAtMs, availablePlayerIds: available }),
-    [view.draftId, committedSequence, view.sequence, room.nextRevealAtMs, available],
+    () => ({ draftId: view.draftId, sequence: committedSequence, revealedSequence: view.sequence, factsReadySequence: room.factsReadySequence, availablePlayerIds: available }),
+    [view.draftId, committedSequence, view.sequence, room.factsReadySequence, available],
   );
   const advisor = useAdvisor(advisorRoom, room.myTeamId);
 

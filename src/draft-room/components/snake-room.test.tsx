@@ -29,7 +29,7 @@ const room: DraftRoomState = {
   error: null,
   view: { ...SNAKE_VIEW, deadlineAt: roomyDeadline() },
   committed: null,
-  nextRevealAtMs: null,
+  factsReadySequence: null,
   players: PLAYERS,
   teams: TEAMS,
   leagueName: LEAGUE_NAME,
