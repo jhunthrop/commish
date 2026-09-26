@@ -24,13 +24,13 @@ export const maxDuration = 300;
  * route now shares (R-B5): a signed-in stranger with no team here — and who isn't the
  * commissioner — must not be able to watch another league's picks, chat and scores.
  *
- * THE STREAM RELAYS ONLY (draft-room performance round, items 1 and 3). This invocation used to
- * be driver 2 of the draft-driver design: an advance loop that paced bot picks and clock expiries
- * while somebody watched, with the advisor's warm hung off it. Both are gone from here. The pacing
- * is one queued job per due instant (`@/draft-service/pacing`, `draft-advance-job.ts`), run in
- * its own invocation, whether or not a stream is open; the facts are the pick's own invocation's
- * business. Nothing on this event loop is heavier than a frame — the one read it adds is the
- * resync mark on each keepalive (review finding 3), a single Redis GET for the league's draft.
+ * THE STREAM RELAYS ONLY (draft-room performance round, items 1 and 3; the batched bots round).
+ * This invocation used to be driver 2 of the draft-driver design: an advance loop that paced bot
+ * picks and clock expiries while somebody watched, with the advisor's warm hung off it. Both are
+ * gone from here. A mock's bot picks are committed in the batch behind the human action before
+ * them (`@/draft-service/store`) and revealed by the room at their stamps; the facts are the
+ * pick's own invocation's business. Nothing on this event loop is heavier than a frame — the one
+ * read it adds is the resync mark on each keepalive (review finding 3), a single Redis GET.
  *
  * SIDELINE (P5): the connection is also the member's PRESENCE. Opening it marks them in the
  * room, every keepalive refreshes the mark, closing it marks them gone, and each edge publishes

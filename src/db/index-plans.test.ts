@@ -537,7 +537,7 @@ describe("hot read paths use indexes", () => {
    * only the due-kickoff scan above had an assertion behind it. Against this branch's own standard
    * that is an overclaim, and the cheaper of the two fixes is the honest one: measure it.
    *
-   * `liveDraftsQuery` (`@/draft-service/ticker`) is the ticker's expiry scan, run on every tick.
+   * `liveDraftsQuery` (`@/draft-service/live-drafts`) is the sweep's expiry scan, run on every fire.
    * It reads `status = 'in_progress'` alone, which is equality on the index's LEADING column, so
    * widening the index to `(status, kickoff_at)` in migration 0029 could not have changed its plan
    * — the argument the migration comment made carefully and this assertion now makes measured.

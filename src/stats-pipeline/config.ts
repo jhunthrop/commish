@@ -126,7 +126,7 @@ export const STATS_INGESTION_CONFIG = {
    * critical about a week that has been over for a month.
    */
   maxSettlementsPerTick: 20,
-  /** Minimum gap between two logs about the same stuck week, mirroring DRAFT_SERVICE_CONFIG.tickWarnIntervalMs. */
+  /** Minimum gap between two logs about the same stuck week: a stuck week is visible once an hour, never once a tick. */
   warnIntervalMs: 60 * 60_000,
   keys: {
     snapshot: (week: number): string => `stats:snapshot:${week}`,

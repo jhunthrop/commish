@@ -71,8 +71,7 @@ interface WorkerDeps {
   readonly wedgedWeekTicks?: number;
   /**
    * Called for every `applied: false` outcome, rate-limited per (week, league, reason) triple —
-   * see `STATS_INGESTION_CONFIG.warnIntervalMs` — mirroring `draft-service/ticker.ts`'s
-   * `onOutcome`. Defaults to `console.warn`.
+   * see `STATS_INGESTION_CONFIG.warnIntervalMs`. Defaults to `console.warn`.
    */
   readonly onOutcome?: (outcome: TickOutcome) => void;
   /**
