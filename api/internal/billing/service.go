@@ -31,14 +31,14 @@ const (
 
 // Rate limits. Checkout and the portal mint Stripe sessions, so they are
 // budgeted by the hour; the webhook is Stripe's own retry pace.
-var (
-	limitCheckout = httpx.Limit{N: 20, Per: time.Hour}
-	limitManage   = httpx.Limit{N: 20, Per: time.Hour}
-	limitPlans    = httpx.Limit{N: 120, Per: time.Minute}
-	limitWebhook  = httpx.Limit{N: 600, Per: time.Minute}
-	limitClaim    = httpx.Limit{N: 20, Per: time.Hour}
-	limitPreview  = httpx.Limit{N: 60, Per: time.Minute}
-	limitRead     = httpx.Limit{N: 120, Per: time.Minute}
+const (
+	limitCheckoutPerHour  = 20
+	limitManagePerHour    = 20
+	limitPlansPerMinute   = 120
+	limitWebhookPerMinute = 600
+	limitClaimPerHour     = 20
+	limitPreviewPerMinute = 60
+	limitReadPerMinute    = 120
 )
 
 // Entitlements is the part of entitlements.Store billing reads and
@@ -98,15 +98,15 @@ type Service struct {
 // Routes is every route this package serves.
 func (s *Service) Routes() []httpx.Route {
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/billing/plans", Access: httpx.Public, Limit: limitPlans, Handler: s.plans},
-		{Method: http.MethodPost, Path: "/billing/checkout", Access: httpx.SignedIn, Limit: limitCheckout, Handler: s.checkout},
-		{Method: http.MethodPost, Path: "/billing/portal", Access: httpx.SignedIn, Limit: limitManage, Handler: s.portal},
-		{Method: http.MethodPost, Path: "/billing/membership/cancel", Access: httpx.SignedIn, Limit: limitManage, Handler: s.cancel},
-		{Method: http.MethodPost, Path: "/billing/membership/resume", Access: httpx.SignedIn, Limit: limitManage, Handler: s.resume},
-		{Method: http.MethodPost, Path: "/billing/webhook", Access: httpx.Webhook, Limit: limitWebhook, Handler: s.webhook},
-		{Method: http.MethodGet, Path: "/billing/group-passes", Access: httpx.SignedIn, Limit: limitRead, Handler: s.listGroupPasses},
-		{Method: http.MethodGet, Path: "/group-passes/{code}", Access: httpx.Public, Limit: limitPreview, Handler: s.previewGroupPass},
-		{Method: http.MethodPost, Path: "/group-passes/{code}/claim", Access: httpx.SignedIn, Limit: limitClaim, Handler: s.claimGroupPass},
+		{Method: http.MethodGet, Path: "/billing/plans", Access: httpx.Public, Limit: httpx.PerMinute(limitPlansPerMinute), Handler: s.plans},
+		{Method: http.MethodPost, Path: "/billing/checkout", Access: httpx.SignedIn, Limit: httpx.PerHour(limitCheckoutPerHour), Handler: s.checkout},
+		{Method: http.MethodPost, Path: "/billing/portal", Access: httpx.SignedIn, Limit: httpx.PerHour(limitManagePerHour), Handler: s.portal},
+		{Method: http.MethodPost, Path: "/billing/membership/cancel", Access: httpx.SignedIn, Limit: httpx.PerHour(limitManagePerHour), Handler: s.cancel},
+		{Method: http.MethodPost, Path: "/billing/membership/resume", Access: httpx.SignedIn, Limit: httpx.PerHour(limitManagePerHour), Handler: s.resume},
+		{Method: http.MethodPost, Path: "/billing/webhook", Access: httpx.Webhook, Limit: httpx.PerMinute(limitWebhookPerMinute), Handler: s.webhook},
+		{Method: http.MethodGet, Path: "/billing/group-passes", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: s.listGroupPasses},
+		{Method: http.MethodGet, Path: "/group-passes/{code}", Access: httpx.Public, Limit: httpx.PerMinute(limitPreviewPerMinute), Handler: s.previewGroupPass},
+		{Method: http.MethodPost, Path: "/group-passes/{code}/claim", Access: httpx.SignedIn, Limit: httpx.PerHour(limitClaimPerHour), Handler: s.claimGroupPass},
 	}
 }
 

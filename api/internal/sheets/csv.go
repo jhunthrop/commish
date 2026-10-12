@@ -15,13 +15,15 @@ import (
 )
 
 // Columns is the CSV's header, the export's and the import's.
-var Columns = []string{"rank", "player_id", "name", "position", "team", "tier", "tag", "note"}
+func Columns() []string {
+	return []string{"rank", "player_id", "name", "position", "team", "tier", "tag", "note"}
+}
 
 // byteOrderMark is what a spreadsheet often writes before the header.
-var byteOrderMark = string(rune(0xFEFF))
+const byteOrderMark = "\uFEFF"
 
 // requiredColumns must be present in an import.
-var requiredColumns = []string{"rank", "player_id", "name", "position"}
+func requiredColumns() []string { return []string{"rank", "player_id", "name", "position"} }
 
 // formulaLead are the characters a spreadsheet reads as the start of a
 // formula. An exported cell starting with one is prefixed with a quote,
@@ -53,7 +55,7 @@ func deref[T any](p *T, format func(T) string) string {
 func EncodeCSV(d apitypes.SheetDetail) ([]byte, error) {
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	if err := w.Write(Columns); err != nil {
+	if err := w.Write(Columns()); err != nil {
 		return nil, fmt.Errorf("sheets: csv header: %w", err)
 	}
 	for _, r := range d.Rows {
@@ -104,7 +106,7 @@ func DecodeCSV(r io.Reader) ([]apitypes.SheetRowInput, []apitypes.ImportSkip, er
 	for i, h := range header {
 		col[strings.ToLower(strings.TrimSpace(strings.TrimPrefix(h, byteOrderMark)))] = i
 	}
-	for _, c := range requiredColumns {
+	for _, c := range requiredColumns() {
 		if _, ok := col[c]; !ok {
 			return nil, nil, fmt.Errorf("%w: missing %s", ErrBadHeader, c)
 		}

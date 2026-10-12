@@ -16,9 +16,9 @@ import (
 )
 
 // Rate limits for the league routes.
-var (
-	limitRead  = httpx.Limit{N: 240, Per: time.Minute}
-	limitWrite = httpx.Limit{N: 60, Per: time.Minute}
+const (
+	limitReadPerMinute  = 240
+	limitWritePerMinute = 60
 )
 
 // Checker is the part of entitlements.Store a gate needs.
@@ -58,21 +58,36 @@ func (g *Gate) Check(w http.ResponseWriter, r *http.Request, accountID uuid.UUID
 	return true
 }
 
+// Repository is the part of Store the handlers use.
+type Repository interface {
+	List(ctx context.Context, accountID uuid.UUID, limit, offset int) ([]apitypes.League, int64, error)
+	Get(ctx context.Context, accountID, id uuid.UUID) (apitypes.League, error)
+	Create(ctx context.Context, accountID uuid.UUID, in apitypes.LeagueInput) (apitypes.League, error)
+	Replace(ctx context.Context, accountID, id uuid.UUID, in apitypes.LeagueInput) (apitypes.League, error)
+	Delete(ctx context.Context, accountID, id uuid.UUID) error
+}
+
+// SettingsGate checks settings and the features they need, answering
+// the request itself when they fail. *Gate implements it.
+type SettingsGate interface {
+	Check(w http.ResponseWriter, r *http.Request, accountID uuid.UUID, s apitypes.LeagueSettings, prefix string) bool
+}
+
 // Handler serves /leagues.
 type Handler struct {
-	Store *Store
-	Gate  *Gate
+	Store Repository
+	Gate  SettingsGate
 	Log   *slog.Logger
 }
 
 // Routes is every route this package serves.
 func (h *Handler) Routes() []httpx.Route {
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/leagues", Access: httpx.SignedIn, Limit: limitRead, Handler: h.list},
-		{Method: http.MethodPost, Path: "/leagues", Access: httpx.SignedIn, Limit: limitWrite, Handler: h.create},
-		{Method: http.MethodGet, Path: "/leagues/{id}", Access: httpx.SignedIn, Limit: limitRead, Handler: h.get},
-		{Method: http.MethodPut, Path: "/leagues/{id}", Access: httpx.SignedIn, Limit: limitWrite, Handler: h.replace},
-		{Method: http.MethodDelete, Path: "/leagues/{id}", Access: httpx.SignedIn, Limit: limitWrite, Handler: h.delete},
+		{Method: http.MethodGet, Path: "/leagues", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: h.list},
+		{Method: http.MethodPost, Path: "/leagues", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitWritePerMinute), Handler: h.create},
+		{Method: http.MethodGet, Path: "/leagues/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: h.get},
+		{Method: http.MethodPut, Path: "/leagues/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitWritePerMinute), Handler: h.replace},
+		{Method: http.MethodDelete, Path: "/leagues/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitWritePerMinute), Handler: h.delete},
 	}
 }
 

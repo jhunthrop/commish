@@ -11,3 +11,4 @@ oapi-codegen.yaml
 Dockerfile
 .dockerignore
 .gitignore
+README.md

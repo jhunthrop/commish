@@ -7,9 +7,9 @@ name: api
 on:
   push:
     branches: [main]
-    paths: ['api/**', 'go.work', '.github/workflows/api.yml']
+    paths: ['api/**', 'go.work', 'web/src/lib/api/types.ts', '.github/workflows/api.yml']
   pull_request:
-    paths: ['api/**', 'go.work', '.github/workflows/api.yml']
+    paths: ['api/**', 'go.work', 'web/src/lib/api/types.ts', '.github/workflows/api.yml']
   workflow_dispatch:
 
 # Deploys run one at a time and never cancel each other mid-migration.
@@ -25,7 +25,7 @@ env:
   RUNTIME_SA: api-runtime@trycommish.iam.gserviceaccount.com
   # The plain settings every api process gets (internal/config).
   API_ENV_VARS: >-
-    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,TRUSTED_PROXY_HOPS=1,STRIPE_ENVIRONMENT=${{ vars.STRIPE_ENVIRONMENT || 'test' }},STRIPE_AUTOMATIC_TAX=${{ vars.STRIPE_AUTOMATIC_TAX || 'false' }},R2_ACCOUNT_ID=${{ vars.CLOUDFLARE_ACCOUNT_ID }},R2_EXPORTS_BUCKET=commish-exports
+    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '1' }},STRIPE_ENVIRONMENT=${{ vars.STRIPE_ENVIRONMENT || 'test' }},STRIPE_AUTOMATIC_TAX=${{ vars.STRIPE_AUTOMATIC_TAX || 'false' }},R2_ACCOUNT_ID=${{ vars.CLOUDFLARE_ACCOUNT_ID }},R2_EXPORTS_BUCKET=commish-exports
   # Secret Manager references, NAME=secret:version.
   API_SECRETS: >-
     DATABASE_URL=DATABASE_URL:latest,WORKOS_CLIENT_ID=WORKOS_CLIENT_ID:latest,WORKOS_API_KEY=WORKOS_API_KEY:latest,WORKOS_COOKIE_PASSWORD=WORKOS_COOKIE_PASSWORD:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,R2_ACCESS_KEY_ID=R2_ACCESS_KEY_ID:latest,R2_SECRET_ACCESS_KEY=R2_SECRET_ACCESS_KEY:latest
@@ -52,11 +52,11 @@ jobs:
     env:
       TEST_DATABASE_URL: postgres://commish:commish@localhost:5433/commish_test?sslmode=disable
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with: { go-version-file: api/go.mod, cache-dependency-path: api/go.sum }
-      - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
       - name: gofmt
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
       - run: go vet ./...
@@ -74,24 +74,24 @@ jobs:
     env:
       PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - id: auth
         if: env.PUSH == 'true'
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
           service_account: ${{ vars.GCP_DEPLOYER_SA }}
           token_format: access_token
       - if: env.PUSH == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
           username: oauth2accesstoken
           password: ${{ steps.auth.outputs.access_token }}
         # Built on every push and PR that can change it, pushed only from
         # main, so a broken image is caught before it reaches a deploy.
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: api
           file: api/Dockerfile
@@ -110,11 +110,11 @@ jobs:
       REGION: ${{ vars.GCP_REGION }}
       PROJECT: ${{ vars.GCP_PROJECT }}
     steps:
-      - uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
           service_account: ${{ vars.GCP_DEPLOYER_SA }}
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
         with: { project_id: '${{ vars.GCP_PROJECT }}' }
 
         # Migrations first. Gated on APP_SCHEMA_READY until the Neon app
@@ -133,7 +133,7 @@ jobs:
         if: vars.APP_SCHEMA_READY != 'true'
         run: echo "::warning::APP_SCHEMA_READY is not true, so migrations did not run"
 
-      - uses: google-github-actions/deploy-cloudrun@v2
+      - uses: google-github-actions/deploy-cloudrun@251330ba9a8a34bfbc1622895f42e1d53fd14522 # v2.7.6
         with:
           service: api
           region: ${{ vars.GCP_REGION }}
@@ -151,7 +151,7 @@ jobs:
         # never throttled, and a WebSocket stays on one instance by
         # session affinity. ROOM_MIN_INSTANCES is 0 out of season and 1
         # from July through September (spec §2.2).
-      - uses: google-github-actions/deploy-cloudrun@v2
+      - uses: google-github-actions/deploy-cloudrun@251330ba9a8a34bfbc1622895f42e1d53fd14522 # v2.7.6
         with:
           service: room
           region: ${{ vars.GCP_REGION }}

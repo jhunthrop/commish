@@ -7,7 +7,6 @@ package names
 import (
 	_ "embed"
 	"fmt"
-	"regexp"
 	"strings"
 )
 
@@ -32,8 +31,9 @@ const (
 	ErrBlocked Refusal = "That name is not available"
 )
 
-var shape = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
-
+// blocklistFile is the list as compiled into the binary. It is read
+// once, by Default, and never written.
+//
 //go:embed blocklist.txt
 var blocklistFile string
 
@@ -44,12 +44,12 @@ type Filter struct {
 }
 
 // Default is the filter built from the embedded blocklist.txt.
-func Default() *Filter {
+func Default() (*Filter, error) {
 	f, err := Parse(blocklistFile)
 	if err != nil {
-		panic(fmt.Sprintf("names: embedded blocklist: %v", err))
+		return nil, fmt.Errorf("names: embedded blocklist: %w", err)
 	}
-	return f
+	return f, nil
 }
 
 // Parse reads a blocklist in blocklist.txt's format.
@@ -74,14 +74,45 @@ func Parse(src string) (*Filter, error) {
 	return f, nil
 }
 
-// lookalikes folds the digits people use for letters, so "sh1t" reads
+// lookalike maps the digits people use for letters, so "sh1t" reads
 // as the word it spells.
-var lookalikes = strings.NewReplacer("0", "o", "1", "i", "3", "e", "4", "a", "5", "s", "7", "t", "8", "b", "9", "g")
+func lookalike(c byte) byte {
+	switch c {
+	case '0':
+		return 'o'
+	case '1':
+		return 'i'
+	case '3':
+		return 'e'
+	case '4':
+		return 'a'
+	case '5':
+		return 's'
+	case '7':
+		return 't'
+	case '8':
+		return 'b'
+	case '9':
+		return 'g'
+	}
+	return c
+}
 
 // fold lowercases, maps look-alike digits to letters and drops
 // underscores, so "Sh_1T" and "shit" compare equal.
 func fold(s string) string {
-	return lookalikes.Replace(strings.ReplaceAll(strings.ToLower(s), "_", ""))
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, c := range []byte(strings.ToLower(s)) {
+		if c != '_' {
+			b.WriteByte(lookalike(c))
+		}
+	}
+	return b.String()
+}
+
+func allowedChar(c byte) bool {
+	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }
 
 // Check returns nil for an acceptable name, or the reason it is not.
@@ -89,8 +120,10 @@ func (f *Filter) Check(name string) error {
 	if n := len(name); n < MinLen || n > MaxLen {
 		return ErrLength
 	}
-	if !shape.MatchString(name) {
-		return ErrChars
+	for i := range len(name) {
+		if !allowedChar(name[i]) {
+			return ErrChars
+		}
 	}
 	if name[0] >= '0' && name[0] <= '9' {
 		return ErrDigit

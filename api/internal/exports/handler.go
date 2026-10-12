@@ -28,9 +28,9 @@ const (
 
 // Rate limits for the export routes. Writing a file costs storage, so
 // creating one is budgeted by the hour.
-var (
-	limitCreate = httpx.Limit{N: 30, Per: time.Hour}
-	limitRead   = httpx.Limit{N: 120, Per: time.Minute}
+const (
+	limitCreatePerHour = 30
+	limitReadPerMinute = 120
 )
 
 // Objects is the bucket. *R2 implements it.
@@ -45,9 +45,16 @@ type SheetReader interface {
 	Get(ctx context.Context, accountID, id uuid.UUID) (apitypes.SheetDetail, error)
 }
 
+// Repository is the part of Store the handlers use.
+type Repository interface {
+	Insert(ctx context.Context, x Row) (Row, error)
+	Get(ctx context.Context, accountID, id uuid.UUID, now time.Time) (Row, error)
+	List(ctx context.Context, accountID uuid.UUID, now time.Time, limit, offset int) ([]apitypes.Export, int64, error)
+}
+
 // Handler serves the export routes.
 type Handler struct {
-	Store  *Store
+	Store  Repository
 	Sheets SheetReader
 	// Objects is nil when R2 is not configured; the routes then answer
 	// 503 rather than the API refusing to start.
@@ -59,9 +66,9 @@ type Handler struct {
 // Routes is every route this package serves.
 func (h *Handler) Routes() []httpx.Route {
 	return []httpx.Route{
-		{Method: http.MethodPost, Path: "/sheets/{id}/exports", Access: httpx.SignedIn, Limit: limitCreate, Handler: h.create},
-		{Method: http.MethodGet, Path: "/exports", Access: httpx.SignedIn, Limit: limitRead, Handler: h.list},
-		{Method: http.MethodGet, Path: "/exports/{id}", Access: httpx.SignedIn, Limit: limitRead, Handler: h.get},
+		{Method: http.MethodPost, Path: "/sheets/{id}/exports", Access: httpx.SignedIn, Limit: httpx.PerHour(limitCreatePerHour), Handler: h.create},
+		{Method: http.MethodGet, Path: "/exports", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: h.list},
+		{Method: http.MethodGet, Path: "/exports/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: h.get},
 	}
 }
 
@@ -182,9 +189,15 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	h.link(w, r, x, http.StatusOK)
 }
 
+// ExpiredRows is the part of Store the sweep uses.
+type ExpiredRows interface {
+	Expired(ctx context.Context, now time.Time, limit int) ([]Row, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
 // Sweep deletes expired exports, object first and then row, up to
 // batch at a time. The bucket's lifecycle rule is the backstop.
-func Sweep(ctx context.Context, store *Store, objects Objects, now time.Time, batch int) (int, error) {
+func Sweep(ctx context.Context, store ExpiredRows, objects Objects, now time.Time, batch int) (int, error) {
 	expired, err := store.Expired(ctx, now, batch)
 	if err != nil {
 		return 0, err

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -22,10 +21,10 @@ const maxSeed = 1<<32 - 1
 
 // Rate limits for the mock routes. Run it again is the loop, so
 // creating allows a brisk pace.
-var (
-	limitRead   = httpx.Limit{N: 240, Per: time.Minute}
-	limitCreate = httpx.Limit{N: 120, Per: time.Hour}
-	limitDelete = httpx.Limit{N: 60, Per: time.Minute}
+const (
+	limitReadPerMinute   = 240
+	limitCreatePerHour   = 120
+	limitDeletePerMinute = 60
 )
 
 // LeagueReader is the part of leagues.Store a mock reads.
@@ -33,21 +32,35 @@ type LeagueReader interface {
 	Get(ctx context.Context, accountID, id uuid.UUID) (apitypes.League, error)
 }
 
+// Repository is the part of Store the handlers use.
+type Repository interface {
+	List(ctx context.Context, accountID uuid.UUID, limit, offset int) ([]apitypes.Mock, int64, error)
+	Get(ctx context.Context, accountID, id uuid.UUID) (apitypes.MockDetail, error)
+	Create(ctx context.Context, accountID uuid.UUID, leagueID *uuid.UUID, settings apitypes.LeagueSettings, seed int64) (apitypes.Mock, error)
+	Delete(ctx context.Context, accountID, id uuid.UUID) error
+}
+
+// SettingsGate checks a mock's settings and the features they need.
+// *leagues.Gate implements it.
+type SettingsGate interface {
+	Check(w http.ResponseWriter, r *http.Request, accountID uuid.UUID, s apitypes.LeagueSettings, prefix string) bool
+}
+
 // Handler serves /mocks.
 type Handler struct {
-	Store   *Store
+	Store   Repository
 	Leagues LeagueReader
-	Gate    *leagues.Gate
+	Gate    SettingsGate
 	Log     *slog.Logger
 }
 
 // Routes is every route this package serves.
 func (h *Handler) Routes() []httpx.Route {
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/mocks", Access: httpx.SignedIn, Limit: limitRead, Handler: h.list},
-		{Method: http.MethodPost, Path: "/mocks", Access: httpx.SignedIn, Limit: limitCreate, Handler: h.create},
-		{Method: http.MethodGet, Path: "/mocks/{id}", Access: httpx.SignedIn, Limit: limitRead, Handler: h.get},
-		{Method: http.MethodDelete, Path: "/mocks/{id}", Access: httpx.SignedIn, Limit: limitDelete, Handler: h.delete},
+		{Method: http.MethodGet, Path: "/mocks", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: h.list},
+		{Method: http.MethodPost, Path: "/mocks", Access: httpx.SignedIn, Limit: httpx.PerHour(limitCreatePerHour), Handler: h.create},
+		{Method: http.MethodGet, Path: "/mocks/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: h.get},
+		{Method: http.MethodDelete, Path: "/mocks/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDeletePerMinute), Handler: h.delete},
 	}
 }
 

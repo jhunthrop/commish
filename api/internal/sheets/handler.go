@@ -1,10 +1,13 @@
 package sheets
 
 import (
+	"context"
+
 	"errors"
 	"log/slog"
 	"net/http"
-	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
@@ -17,30 +20,41 @@ const maxImportBody = 1 << 20
 
 // Rate limits for the sheet routes. A drag sends the whole order, so
 // row writes allow a steady hand.
-var (
-	limitRead   = httpx.Limit{N: 240, Per: time.Minute}
-	limitWrite  = httpx.Limit{N: 120, Per: time.Minute}
-	limitCreate = httpx.Limit{N: 30, Per: time.Minute}
-	limitImport = httpx.Limit{N: 30, Per: time.Hour}
+const (
+	limitReadPerMinute   = 240
+	limitWritePerMinute  = 120
+	limitCreatePerMinute = 30
+	limitImportPerHour   = 30
 )
+
+// Repository is the part of Store the handlers use.
+type Repository interface {
+	List(ctx context.Context, accountID uuid.UUID, limit, offset int) ([]apitypes.Sheet, int64, error)
+	Get(ctx context.Context, accountID, id uuid.UUID) (apitypes.SheetDetail, error)
+	Create(ctx context.Context, accountID uuid.UUID, in apitypes.SheetCreate) (apitypes.SheetDetail, error)
+	Rename(ctx context.Context, accountID, id uuid.UUID, name string) (apitypes.Sheet, error)
+	Delete(ctx context.Context, accountID, id uuid.UUID) error
+	ReplaceRows(ctx context.Context, accountID, id uuid.UUID, rows []apitypes.SheetRowInput) (apitypes.SheetDetail, error)
+	UpdateRow(ctx context.Context, accountID, id uuid.UUID, playerID string, in apitypes.SheetRowUpdate) (apitypes.SheetRow, error)
+}
 
 // Handler serves /sheets.
 type Handler struct {
-	Store *Store
+	Store Repository
 	Log   *slog.Logger
 }
 
 // Routes is every route this package serves.
 func (h *Handler) Routes() []httpx.Route {
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/sheets", Access: httpx.SignedIn, Limit: limitRead, Handler: h.list},
-		{Method: http.MethodPost, Path: "/sheets", Access: httpx.SignedIn, Limit: limitCreate, Handler: h.create},
-		{Method: http.MethodGet, Path: "/sheets/{id}", Access: httpx.SignedIn, Limit: limitRead, Handler: h.get},
-		{Method: http.MethodPatch, Path: "/sheets/{id}", Access: httpx.SignedIn, Limit: limitWrite, Handler: h.rename},
-		{Method: http.MethodDelete, Path: "/sheets/{id}", Access: httpx.SignedIn, Limit: limitWrite, Handler: h.delete},
-		{Method: http.MethodPut, Path: "/sheets/{id}/rows", Access: httpx.SignedIn, Limit: limitWrite, Handler: h.replaceRows},
-		{Method: http.MethodPut, Path: "/sheets/{id}/rows/{player_id}", Access: httpx.SignedIn, Limit: limitWrite, Handler: h.updateRow},
-		{Method: http.MethodPost, Path: "/sheets/{id}/import", Access: httpx.SignedIn, Limit: limitImport, Handler: h.importCSV},
+		{Method: http.MethodGet, Path: "/sheets", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: h.list},
+		{Method: http.MethodPost, Path: "/sheets", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitCreatePerMinute), Handler: h.create},
+		{Method: http.MethodGet, Path: "/sheets/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: h.get},
+		{Method: http.MethodPatch, Path: "/sheets/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitWritePerMinute), Handler: h.rename},
+		{Method: http.MethodDelete, Path: "/sheets/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitWritePerMinute), Handler: h.delete},
+		{Method: http.MethodPut, Path: "/sheets/{id}/rows", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitWritePerMinute), Handler: h.replaceRows},
+		{Method: http.MethodPut, Path: "/sheets/{id}/rows/{player_id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitWritePerMinute), Handler: h.updateRow},
+		{Method: http.MethodPost, Path: "/sheets/{id}/import", Access: httpx.SignedIn, Limit: httpx.PerHour(limitImportPerHour), Handler: h.importCSV},
 	}
 }
 

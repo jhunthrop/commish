@@ -8,7 +8,10 @@ import (
 // The names filter is a boundary: whatever it lets through is shown to
 // strangers in a lobby.
 func TestCheck(t *testing.T) {
-	f := Default()
+	f, err := Default()
+	if err != nil {
+		t.Fatal(err)
+	}
 	cases := []struct {
 		name string
 		want error
