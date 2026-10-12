@@ -1,15 +1,4 @@
 <script lang="ts">
-	import {
-		LOBBY_BUG,
-		ROOM_KEYS,
-		ROW_PLAYER,
-		SCORING_UNIT,
-		SOLO_ROOM,
-		SOLO_TEAM,
-		VALUE_PLAYERS,
-		WR_RANGE_SCALE,
-		WR_TIER
-	} from '../../fixtures/mock-2026-ppr.ts';
 	import { adpWords, draftersGap, lastName, oddsWords, pickLabel } from '#lib/format/draft.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
 	import CallPanel from '#lib/ui/CallPanel.svelte';
@@ -40,6 +29,9 @@
 	import Part from '#lib/ui/system/Part.svelte';
 	import Parts from '#lib/ui/system/Parts.svelte';
 	import Specimen from '#lib/ui/system/Specimen.svelte';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
 
 	const ROW_MIN_WIDTH = 760;
 	const BAND_MIN_WIDTH = 520;
@@ -50,9 +42,10 @@
 		'Marvin Harrison Jr.': 'Rose with a minus. Below replacement, a bench player in PPR this year.'
 	};
 
-	const row = ROW_PLAYER;
-	const { call, runner } = SOLO_ROOM;
-	const nextLabel = pickLabel(SOLO_ROOM.next);
+	const row = $derived(data.rowPlayer);
+	const call = $derived(data.soloRoom.call);
+	const runner = $derived(data.soloRoom.runner);
+	const nextLabel = $derived(pickLabel(data.soloRoom.next));
 	const positionView = ['WR', 'RB'] as const;
 	let chosenPosition = $state<(typeof positionView)[number]>('WR');
 	const sheetTags = ['Targets', 'Sleepers', 'Avoid', 'Notes'] as const;
@@ -76,9 +69,9 @@
 				<Row
 					player={row}
 					href={PLAYER_HREF}
-					scale={WR_RANGE_SCALE}
+					scale={data.wrRangeScale}
 					showTier={false}
-					unit={SCORING_UNIT}
+					unit={data.scoringUnit}
 					eager
 				/>
 			</Specimen>
@@ -125,11 +118,11 @@
 		>
 			<Specimen minWidth={BAND_MIN_WIDTH}>
 				<TierStrip
-					tier={WR_TIER.tier}
-					count={WR_TIER.count}
-					group={WR_TIER.group}
-					cliff={WR_TIER.cliff}
-					unit={SCORING_UNIT}
+					tier={data.wrTier.tier}
+					count={data.wrTier.count}
+					group={data.wrTier.group}
+					cliff={data.wrTier.cliff}
+					unit={data.scoringUnit}
 				/>
 			</Specimen>
 			<Parts>
@@ -138,8 +131,8 @@
 					about="Tier number on the tier's hue. Hot red at the top of a position, cold slate at the bottom. The number is printed, so hue is never the only channel."
 				/>
 				<Part name="The name and the count" about="How many players share the tier.">
-					{#snippet show()}<b>Tier {WR_TIER.tier}</b>
-						<Label>{WR_TIER.count} {WR_TIER.group}</Label>{/snippet}
+					{#snippet show()}<b>Tier {data.wrTier.tier}</b>
+						<Label>{data.wrTier.count} {data.wrTier.group}</Label>{/snippet}
 				</Part>
 				<Part
 					name="The drop label"
@@ -158,7 +151,7 @@
 			sub="Points over replacement, PPR 2026, tinted by the round it ranks in among our 400."
 		>
 			<Parts>
-				{#each VALUE_PLAYERS as player (player.id)}
+				{#each data.valuePlayers as player (player.id)}
 					<Part name={player.name} about={VALUE_NOTES[player.name] ?? ''}>
 						{#snippet show()}<ValueCell {...vorCell(player.vor, player.vorRound)} />{/snippet}
 					</Part>
@@ -207,23 +200,23 @@
 			sub="The solo room at pick 5.08 of a 12-team PPR mock, with real survival odds, and the lobby score bug."
 		>
 			<Specimen frame="dashed">
-				<SinceStrip since={SOLO_ROOM.since} went={SOLO_ROOM.went} />
+				<SinceStrip since={data.soloRoom.since} went={data.soloRoom.went} />
 				<CallPanel
-					tag="Our call at {pickLabel(SOLO_ROOM.now)}"
+					tag="Our call at {pickLabel(data.soloRoom.now)}"
 					player={call}
 					vor={call.vor}
-					adp={adpWords(call.adp, SOLO_ROOM.now)}
-					odds={SOLO_ROOM.callOdds}
+					adp={adpWords(call.adp, data.soloRoom.now)}
+					odds={data.soloRoom.callOdds}
 					oddsLabel="chance he is still there at {nextLabel}"
 					action={{ label: `Draft ${lastName(call.name)}`, key: 'Enter' }}
 				>
 					{#snippet reason()}
 						<b>{runner.name}</b> has more over replacement at {signed(runner.vor)}, but he is still
 						there at {nextLabel}
-						{oddsWords(SOLO_ROOM.runnerOdds)} of the time. {lastName(call.name)} is not.
+						{oddsWords(data.soloRoom.runnerOdds)} of the time. {lastName(call.name)} is not.
 					{/snippet}
 				</CallPanel>
-				<ScoreBug {...LOBBY_BUG} />
+				<ScoreBug {...data.lobbyBug} />
 			</Specimen>
 			<Parts>
 				<Part
@@ -243,8 +236,8 @@
 
 		<DocSection title="Your team and the keys" sub="The same solo room at 5.08, from the dock.">
 			<Parts as="div">
-				<TeamPanel slots={SOLO_TEAM} rosterSize={SOLO_ROOM.rosterSize} />
-				<Keys bindings={ROOM_KEYS} />
+				<TeamPanel slots={data.soloTeam} rosterSize={data.soloRoom.rosterSize} />
+				<Keys bindings={data.roomKeys} />
 			</Parts>
 		</DocSection>
 

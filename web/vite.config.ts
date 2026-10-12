@@ -4,6 +4,9 @@ import { defineConfig } from 'vite';
 import { SHELL_HREFS } from './src/lib/ui/nav.ts';
 
 const NOT_FOUND = 404;
+/** A route's stylesheets under this many characters ride in the HTML, so a prerendered page paints
+ * on its first response. The design system's CSS for a whole page sits well under it. */
+const INLINE_STYLE_LIMIT = 32_768;
 
 export default defineConfig({
 	plugins: [
@@ -14,6 +17,7 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 			adapter: adapter(),
+			inlineStyleThreshold: INLINE_STYLE_LIMIT,
 			prerender: {
 				// The shell links to every section from day one. A section's route arrives with its
 				// lane, so until then a 404 on exactly a shell link is expected. Any other failure fails the build.

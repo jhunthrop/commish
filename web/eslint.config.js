@@ -20,7 +20,7 @@ export default defineConfig(
 		languageOptions: {
 			globals: { ...globals.browser, ...globals.node },
 			parserOptions: {
-				projectService: { allowDefaultProject: ['*.js', 'scripts/*.mjs'] },
+				projectService: { allowDefaultProject: ['*.js'] },
 				tsconfigRootDir: import.meta.dirname
 			}
 		},

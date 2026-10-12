@@ -1,17 +1,18 @@
 // Screenshots a page in both themes at the desktop and phone widths, into screenshots/ (git-ignored).
-// Usage: node scripts/screenshots.mjs <url> [name]. Run against `npm run preview`.
+// Usage: npm run screenshots -- <url> [name]. Run against `npm run preview`.
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 
-const THEMES = ['light', 'dark'];
-const WIDTHS = [1440, 390];
+const THEMES = ['light', 'dark'] as const;
+const WIDTHS = [1440, 390] as const;
 const VIEWPORT_HEIGHT = 900;
-const THEME_STORAGE_KEY = 'commish-theme';
 const OUT_DIR = new URL('../screenshots/', import.meta.url);
 
 const [url, name = 'page'] = process.argv.slice(2);
+
 if (!url) {
-	throw new Error('Usage: node scripts/screenshots.mjs <url> [name]');
+	throw new Error('Usage: npm run screenshots -- <url> [name]');
 }
 
 await mkdir(OUT_DIR, { recursive: true });
@@ -24,8 +25,10 @@ try {
 				colorScheme: theme
 			});
 			await context.addInitScript(
-				([key, value]) => localStorage.setItem(key, value),
-				[THEME_STORAGE_KEY, theme]
+				([key, value]: readonly [string, string]) => {
+					localStorage.setItem(key, value);
+				},
+				[THEME_STORAGE_KEY, theme] as const
 			);
 			const page = await context.newPage();
 			await page.goto(url, { waitUntil: 'networkidle' });

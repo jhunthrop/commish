@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { FACE_OVERFILL, headshotSources } from './headshot.ts';
+
 	interface Props {
 		/** The headshot URL. */
 		src: string;
@@ -15,10 +17,26 @@
 	}
 
 	let { src, size, alt = '', loading = 'lazy', ringed = false, marked = false }: Props = $props();
+
+	const sources = $derived(headshotSources(src, size));
 </script>
 
-<span class="face" class:ringed class:marked style:--face-size="{size}px">
-	<img {src} {alt} {loading} width={size} height={size} decoding="async" />
+<span
+	class="face"
+	class:ringed
+	class:marked
+	style:--face-size="{size}px"
+	style:--face-overfill="{FACE_OVERFILL * 100}%"
+>
+	<img
+		src={sources.src}
+		srcset={sources.srcset}
+		{alt}
+		{loading}
+		width={size}
+		height={size}
+		decoding="async"
+	/>
 </span>
 
 <style>
@@ -43,7 +61,7 @@
 
 	/* Headshots are cut wide with the face high, so the image overfills the circle and sits low. */
 	img {
-		width: 140%;
+		width: var(--face-overfill);
 		max-width: none;
 		height: auto;
 		display: block;
