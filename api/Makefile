@@ -7,12 +7,15 @@ CMDS := api room migrate
 # and credentials as CI's.
 TEST_DATABASE_URL ?= postgres://commish:commish@localhost:5433/commish_test?sslmode=disable
 
-# The web lane's generated types. Until web/ exists in a checkout, they
-# land in gen/ so the contract still compiles to TypeScript.
+# The web lane's generated types, tracked in git. They are written by
+# openapi-typescript and then put through the web app's own eslint fix
+# and prettier, so `npm run lint` in web/ passes on them unchanged.
 OPENAPI_TYPESCRIPT := openapi-typescript@7.13.0
-WEB_TYPES ?= $(if $(wildcard ../web/src),../web/src/lib/api/types.ts,gen/web-types.ts)
+WEB_DIR := ../web
+WEB_TYPES := src/lib/api/types.ts
+GO_TYPES := internal/apitypes
 
-.PHONY: build vet test db-up db-down gen gen-go gen-types check-gen image
+.PHONY: build vet test db-up db-down gen gen-go gen-types web-deps check-gen image
 
 build:
 	@mkdir -p bin
@@ -37,13 +40,22 @@ gen: gen-go gen-types
 gen-go:
 	go tool oapi-codegen -config oapi-codegen.yaml openapi.yaml
 
-gen-types:
-	@mkdir -p $(dir $(WEB_TYPES))
-	npx --yes $(OPENAPI_TYPESCRIPT) openapi.yaml -o $(WEB_TYPES)
+web-deps:
+	@test -d $(WEB_DIR)/node_modules || npm ci --prefix $(WEB_DIR) --no-audit --no-fund
 
-# CI's drift check: the checked-in generated code matches the contract.
+gen-types: web-deps
+	@mkdir -p $(dir $(WEB_DIR)/$(WEB_TYPES))
+	npx --yes $(OPENAPI_TYPESCRIPT) openapi.yaml -o $(WEB_DIR)/$(WEB_TYPES)
+	cd $(WEB_DIR) && npx eslint --fix $(WEB_TYPES) && npx prettier --write $(WEB_TYPES)
+
+# CI's drift check: regenerate both, then fail on any difference from
+# what is committed, including a generated file that is missing or not
+# tracked at all (git diff alone would pass an untracked file).
 check-gen: gen
-	git diff --exit-code -- internal/apitypes $(WEB_TYPES)
+	@git ls-files --error-unmatch $(WEB_DIR)/$(WEB_TYPES) >/dev/null
+	@out=$$(git status --porcelain -- $(GO_TYPES) $(WEB_DIR)/$(WEB_TYPES)); \
+	  if [ -n "$$out" ]; then echo "generated types differ from openapi.yaml:"; echo "$$out"; \
+	  git diff -- $(GO_TYPES) $(WEB_DIR)/$(WEB_TYPES) | head -40; exit 1; fi
 
 image:
 	docker build --build-arg VERSION=$(VERSION) -t commish-api:local .

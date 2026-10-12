@@ -1,6 +1,5 @@
 # The image needs go.mod, go.sum, cmd/, internal/ and migrations/.
 bin
-gen
 .env
 .env.*
 **/*_test.go
