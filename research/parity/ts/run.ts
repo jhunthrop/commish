@@ -19,6 +19,26 @@ export interface TsCaseContext {
 
 export type TsCase = (ctx: TsCaseContext) => Promise<void>;
 
+/**
+ * THE WALL CLOCK, FROZEN AT THE PARITY INSTANT. Several production paths read `new Date()` where
+ * no clock is injected (a publisher's fetched-at stamp, the week-one roster's default clock), and
+ * the Python side is handed the same instant explicitly. Only the no-argument forms are frozen;
+ * `new Date(x)` and `Date.UTC` behave exactly as before.
+ */
+function freezeWallClock(nowMs: number): void {
+  const RealDate = Date;
+  class FrozenDate extends RealDate {
+    constructor(...args: ConstructorParameters<typeof Date> | []) {
+      if (args.length === 0) super(nowMs);
+      else super(...(args as ConstructorParameters<typeof Date>));
+    }
+    static override now(): number {
+      return nowMs;
+    }
+  }
+  globalThis.Date = FrozenDate as DateConstructor;
+}
+
 async function main(): Promise<void> {
   const [name, ...fixtureDirs] = process.argv.slice(2);
   const url = process.env.DATABASE_URL;
@@ -28,6 +48,7 @@ async function main(): Promise<void> {
   }
   const run = TS_CASES[name];
   if (run === undefined) throw new Error(`no TypeScript case named ${name}`);
+  freezeWallClock(Date.parse(nowIso));
   const requested = installReplay(fixtureDirs);
   const db = createDb(url, { max: 1 });
   try {

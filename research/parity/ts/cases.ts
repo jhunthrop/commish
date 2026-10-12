@@ -29,6 +29,16 @@ import type { RequestBudget } from "@/stats-pipeline/budget";
 import { ingestSchedule as ingestTank01Schedule } from "@/stats-pipeline/schedule";
 import { createTank01StatsProvider } from "@/stats/tank01/tank01-stats-provider";
 import type { StatsProvider } from "@/stats/provider";
+import { runCaptureHarvestStep } from "@/jobs/defs/capture-harvest-job";
+import { ingestAdpSnapshot } from "@/projections/market/adp-snapshot";
+import { ingestAdpBenchmark, rosterIdentitiesFor } from "@/projections/preseason/adp-benchmark";
+import { BENCHMARK_SOURCES, resolveRankings, type RosterIdentity } from "@/projections/preseason/benchmarks";
+import { BOARD_FORMATS, DEFAULT_BOARD_FORMAT } from "@/projections/preseason/board-formats";
+import { crossedRosterIdentities, PRODUCT_SEASON } from "@/projections/preseason/current";
+import { ingestDepthCharts, ingestWeek1Rosters } from "@/projections/preseason/ingest";
+import { fetchAverageDraftPosition, fetchExpertConsensus, type PublishedBoard } from "@/projections/preseason/publishers";
+import { recordPreseasonRankings } from "@/projections/preseason/store";
+import type { Db } from "@/db/client";
 import type { TsCase } from "./run";
 
 /** `realIngestStats` (`src/jobs/season-week/deps.ts`) for one season: the season-week job's path. */
@@ -67,7 +77,71 @@ async function seed(ctx: Parameters<TsCase>[0], lastWeekOfSeason: number): Promi
   await seedPlayers(ctx.db, tank01Provider(lastWeekOfSeason));
 }
 
+/** `preseason-ingest.ts`'s own `ingestBenchmark`, which the script does not export. */
+async function recordBoard(db: Db, season: number, source: string, board: PublishedBoard, identities: readonly RosterIdentity[]): Promise<void> {
+  const resolution = resolveRankings(board.candidates, identities);
+  await recordPreseasonRankings(
+    db,
+    resolution.resolved.map((row) => ({ season, source, playerId: row.playerId, rank: row.rank, asOf: board.publishedAt })),
+  );
+}
+
+const KDEF_POSITIONS = new Set(["PK", "K", "DEF", "DST", "D/ST"]);
+
+/** `preseason-ingest.ts`'s per-season body (and `kdef-adp-ingest.ts`'s, when asked), after the
+ *  universe and the season's schedule they read. The scripts run `main()` on import, so their
+ *  bodies are re-assembled here from the exported functions they call, step for step. */
+function preseasonCase(season: number, kdef: boolean): TsCase {
+  return async ({ db }) => {
+    const client = createNflverseClient();
+    await ingestPlayerUniverse(db, client);
+    await seedTeamDefenseUniverse(db);
+    await ingestSchedule(db, [season]);
+    await ingestWeek1Rosters(db, season, client);
+    await ingestDepthCharts(db, season, client);
+    const identities = await rosterIdentitiesFor(db, season);
+    for (const format of BOARD_FORMATS) {
+      try {
+        await ingestAdpBenchmark(db, season, format, identities);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (format !== DEFAULT_BOARD_FORMAT && /published no \d{4} board/.test(message)) continue;
+        process.stderr.write(`adp ${format} FAILED: ${message}\n`);
+      }
+    }
+    try {
+      await recordBoard(db, season, BENCHMARK_SOURCES.ecr, await fetchExpertConsensus(season), identities);
+    } catch (error: unknown) {
+      process.stderr.write(`ecr FAILED: ${error instanceof Error ? error.message : String(error)}\n`);
+    }
+    if (kdef) {
+      const board = await fetchAverageDraftPosition(season);
+      const candidates = board.candidates.filter((c) => KDEF_POSITIONS.has(c.position.trim().toUpperCase()));
+      await recordBoard(db, season, BENCHMARK_SOURCES.adp, { ...board, candidates }, await rosterIdentitiesFor(db, season));
+    }
+  };
+}
+
 export const TS_CASES: Readonly<Record<string, TsCase>> = {
+  "preseason-2025": preseasonCase(2025, true),
+  "preseason-2026-live": preseasonCase(2026, false),
+  "adp-snapshot": async ({ db, now }) => {
+    const client = createNflverseClient();
+    await ingestPlayerUniverse(db, client);
+    await seedTeamDefenseUniverse(db);
+    await ingestSchedule(db, [2026]);
+    await ingestWeek1Rosters(db, 2026, client);
+    await ingestAdpSnapshot(db, { now: () => now });
+  },
+  // `scripts/ingest-current-ecr.ts`, after the crosswalk it requires.
+  "current-ecr": async (ctx) => {
+    await ingestPlayerUniverse(ctx.db, createNflverseClient());
+    await seed(ctx, 0);
+    await seedTeamDefenseUniverse(ctx.db);
+    const { providers, universe, teamDefenses } = await crosswalkInputs(ctx.db);
+    await recordCrosswalk(ctx.db, crosswalkRows(resolveCrosswalk(providers, universe, teamDefenses), ctx.now));
+    await recordBoard(ctx.db, PRODUCT_SEASON, BENCHMARK_SOURCES.ecr, await fetchExpertConsensus(PRODUCT_SEASON), await crossedRosterIdentities(ctx.db));
+  },
   "nflverse-universe": async ({ db }) => {
     await ingestPlayerUniverse(db, createNflverseClient());
   },
@@ -127,6 +201,14 @@ export const TS_CASES: Readonly<Record<string, TsCase>> = {
   "tank01-adp": async (ctx) => {
     await seed(ctx, 0);
     await ingestAdp(ctx.db, tank01Provider(), UNMETERED);
+  },
+  // The capture-harvest job's step, fired twice an hour apart on the same recordings.
+  "tank01-capture-harvest": async ({ db, now }) => {
+    const later = new Date(now.getTime() + 3_600_000);
+    for (const firedAt of [now, later]) {
+      const clock = { now: () => firedAt.toISOString() };
+      await runCaptureHarvestStep(db, clock, { firedAt: firedAt.toISOString() }, { apiKey: "replay" });
+    }
   },
   // `scripts/build-crosswalk.ts`, with the parity clock where the script reads `new Date()`.
   crosswalk: async (ctx) => {

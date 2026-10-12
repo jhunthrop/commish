@@ -1,0 +1,57 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "The capture harvest's five Tank01 feeds (injuries by date, news, depth charts, inactives for week 1, the betting odds for 2026-10-12), recorded from the live API.",
+  "responses": [
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLDepthCharts",
+      "status": 200,
+      "file": "tank01_depth_charts.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 92477
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLNews?fantasyNews=true",
+      "status": 200,
+      "file": "tank01_news.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 9210
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBettingOdds?gameDate=20261012",
+      "status": 200,
+      "file": "tank01_betting_odds.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 2327
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLInjuriesByDate",
+      "status": 200,
+      "file": "tank01_injuries_by_date.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 56802
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLInactiveList?week=1",
+      "status": 200,
+      "file": "tank01_inactives.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 111618
+    }
+  ]
+}

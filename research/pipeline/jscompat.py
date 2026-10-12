@@ -7,6 +7,7 @@ different set of characters than `str.strip`, `Math.round(-2.5)` is -2), the por
 function here instead of the Python builtin. Each one names the builtin it reproduces.
 """
 
+import json
 import math
 import re
 import unicodedata
@@ -87,6 +88,36 @@ def js_sum(values: Iterable[float]) -> float:
     for value in values:
         total += value
     return total
+
+
+def js_json_stringify(value: object) -> str:
+    """`JSON.stringify` of a parsed JSON value: no whitespace, keys in JavaScript's own property
+    order (`js_object_keys`), numbers as JavaScript prints them (a parsed `1.0` is the number 1),
+    non-ASCII left as is. What a TypeScript writer hands Postgres for a json column, and what its
+    digests hash, byte for byte."""
+    if value is None:
+        return "null"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, int):
+        return js_string(float(value)) if abs(value) >= 2**53 else str(value)
+    if isinstance(value, float):
+        return js_string(value) if math.isfinite(value) else "null"
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, list):
+        return "[" + ",".join(js_json_stringify(item) for item in value) + "]"
+    if isinstance(value, dict):
+        return (
+            "{"
+            + ",".join(
+                f"{json.dumps(k, ensure_ascii=False)}:{js_json_stringify(value[k])}" for k in js_object_keys(value)
+            )
+            + "}"
+        )
+    raise TypeError(f"not a JSON value: {type(value).__name__}")
 
 
 def js_is_integer(value: float) -> bool:

@@ -1,0 +1,208 @@
+"""THE CAPTURE ARCHIVE (`src/projections/capture.ts`, `capture-feeds.ts`, the capture-harvest job).
+
+Tank01 publishes several facts only as a current snapshot (injury designations, depth charts,
+headlines, the pre-game line, inactives); nobody archives them, so this does. Each feed's
+response is stored verbatim in `capture_snapshots` with the instant it was captured and a digest
+of its canonical form; a feed whose digest equals its latest stored one writes nothing. A single
+feed's failure is an outcome, never a fabricated row and never the whole pass's failure.
+
+THE HARVEST (`capture-harvest-job.ts`) runs five cheap, daily-value feeds against a fixed per-run
+budget of ten requests. Its follow-on event (enqueuing peek-document rebuilds for the players
+whose designation or headlines moved) is a capsule concern and lands with the capsules in phase C.
+"""
+
+import hashlib
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Final, Literal
+
+from sqlalchemy import Connection, select, text
+
+from research.db.schema import CAPTURE_SNAPSHOTS, STAT_WEEKS
+from research.pipeline.budget import FixedBudget, RequestBudget
+from research.pipeline.jscompat import js_iso, js_json_stringify, js_object_keys
+from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
+from research.pipeline.tank01.client import Paths, Tank01Client
+from research.pipeline.tank01.mapping import ADP_TYPE
+
+Cadence = Literal["daily", "game-day", "weekly"]
+Status = Literal["captured", "unchanged", "fresh", "off-cadence", "budget-refused", "failed"]
+
+_GAME_DAYS_UTC: Final = (0, 1, 4, 5, 6)  # JavaScript's getUTCDay: Sunday 0, Monday 1, Thursday to Saturday.
+CAPTURE_HARVEST_REQUEST_BUDGET: Final = 10
+
+
+@dataclass(frozen=True)
+class CaptureContext:
+    season: int
+    week: int
+    day: str
+    teams: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CaptureRequest:
+    path: str
+    query: dict[str, str]
+
+
+@dataclass(frozen=True)
+class CaptureFeed:
+    source: str
+    cadence: Cadence
+    requests: Callable[[CaptureContext], list[CaptureRequest]]
+
+
+CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
+    CaptureFeed(
+        "tank01_injuries",
+        "daily",
+        lambda c: [CaptureRequest(Paths.TEAM_ROSTER, {"teamAbv": t, "getStats": "false"}) for t in c.teams],
+    ),
+    CaptureFeed("tank01_depth_charts", "daily", lambda _c: [CaptureRequest(Paths.DEPTH_CHARTS, {})]),
+    CaptureFeed("tank01_changelog", "daily", lambda _c: [CaptureRequest(Paths.CHANGELOG, {})]),
+    CaptureFeed("tank01_news", "daily", lambda _c: [CaptureRequest(Paths.NEWS, {"fantasyNews": "true"})]),
+    CaptureFeed("tank01_betting_odds", "game-day", lambda c: [CaptureRequest(Paths.BETTING_ODDS, {"gameDate": c.day})]),
+    CaptureFeed("tank01_dfs_salaries", "game-day", lambda c: [CaptureRequest(Paths.DFS, {"date": c.day})]),
+    CaptureFeed("tank01_adp", "weekly", lambda _c: [CaptureRequest(Paths.ADP, {"adpType": ADP_TYPE})]),
+    CaptureFeed("tank01_projections", "daily", lambda c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(c.week)})]),
+    CaptureFeed("tank01_injuries_by_date", "daily", lambda _c: [CaptureRequest(Paths.INJURIES_BY_DATE, {})]),
+    CaptureFeed("tank01_inactives", "game-day", lambda c: [CaptureRequest(Paths.INACTIVES, {"week": str(c.week)})]),
+    CaptureFeed("tank01_player_list", "weekly", lambda _c: [CaptureRequest(Paths.PLAYER_LIST, {})]),
+)
+
+# The harvest's deliberate subset: single-request feeds a player card or capsule reads.
+HARVEST_FEED_SOURCES: Final = frozenset(
+    {"tank01_injuries_by_date", "tank01_news", "tank01_depth_charts", "tank01_inactives", "tank01_betting_odds"}
+)
+
+
+def harvest_feeds(feeds: Sequence[CaptureFeed] = CAPTURE_FEEDS) -> list[CaptureFeed]:
+    return [feed for feed in feeds if feed.source in HARVEST_FEED_SOURCES]
+
+
+def cadence_allows(cadence: Cadence, at: datetime) -> bool:
+    if cadence != "game-day":
+        return True
+    return (at.isoweekday() % 7) in _GAME_DAYS_UTC
+
+
+def _canonical(value: object) -> object:
+    if isinstance(value, list):
+        return [_canonical(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    return {key: _canonical(value[key]) for key in sorted(js_object_keys(value))}
+
+
+def digest_of(payload: object) -> str:
+    """sha256 of the canonical JSON: keys sorted, JavaScript's own stringification."""
+    return hashlib.sha256(js_json_stringify(_canonical(payload)).encode("utf-8")).hexdigest()
+
+
+def _latest_digest(conn: Connection, source: str) -> str | None:
+    table = CAPTURE_SNAPSHOTS
+    query = (
+        select(table.c.digest)
+        .where(table.c.source == source)
+        .order_by(table.c.captured_at.desc(), table.c.id.desc())
+        .limit(1)
+    )
+    return conn.execute(query).scalar_one_or_none()
+
+
+@dataclass(frozen=True)
+class FeedOutcome:
+    source: str
+    status: Status
+    requests: int
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
+class CaptureResult:
+    feeds: list[FeedOutcome]
+    reason: str | None = None
+
+
+_INSERT = text(
+    "insert into capture_snapshots (source, captured_at, digest, payload) "
+    "values (:source, :captured_at, :digest, cast(:payload as jsonb))"
+)
+
+
+def capture_once(
+    conn: Connection,
+    client: Tank01Client,
+    captured_at: datetime,
+    budget: RequestBudget,
+    season: int,
+    week: int,
+    feeds: Sequence[CaptureFeed] = CAPTURE_FEEDS,
+    teams: Sequence[str] = NFL_TEAM_ABBREVIATIONS,
+    is_fresh: Callable[[str], bool] = lambda _key: False,
+) -> CaptureResult:
+    """`captureOnce`: due feeds, one budget reservation, each feed captured or left unchanged."""
+    day = js_iso(captured_at)[:10].replace("-", "")
+    context = CaptureContext(season, week, day, tuple(teams))
+    due: list[CaptureFeed] = []
+    skipped: list[FeedOutcome] = []
+    for feed in feeds:
+        if not cadence_allows(feed.cadence, captured_at):
+            skipped.append(FeedOutcome(feed.source, "off-cadence", 0))
+        elif is_fresh(f"commish:capture:attempted:{feed.source}"):
+            skipped.append(FeedOutcome(feed.source, "fresh", 0))
+        else:
+            due.append(feed)
+    if not due:
+        return CaptureResult(skipped)
+    reservation = budget.reserve(sum(len(feed.requests(context)) for feed in due))
+    if not reservation.granted:
+        return CaptureResult(
+            [*skipped, *(FeedOutcome(feed.source, "budget-refused", 0) for feed in due)],
+            f"The upstream request budget refused the capture pass ({reservation.denial or 'denied'}).",
+        )
+    outcomes = list(skipped)
+    for feed in due:
+        requests = feed.requests(context)
+        try:
+            bodies = [client.get(r.path, r.query) for r in requests]
+            payload: object = bodies[0] if len(bodies) == 1 else bodies
+            digest = digest_of(payload)
+            if digest == _latest_digest(conn, feed.source):
+                outcomes.append(FeedOutcome(feed.source, "unchanged", len(requests)))
+                continue
+            conn.execute(
+                _INSERT,
+                {
+                    "source": feed.source,
+                    "captured_at": captured_at,
+                    "digest": digest,
+                    "payload": js_json_stringify(payload),
+                },
+            )
+            outcomes.append(FeedOutcome(feed.source, "captured", len(requests)))
+        except Exception as error:
+            outcomes.append(FeedOutcome(feed.source, "failed", len(requests), str(error)))
+    return CaptureResult(outcomes)
+
+
+def current_nfl_week(conn: Connection) -> int:
+    """`currentNflWeek`: the earliest week not yet final, or week 1 when the table is empty."""
+    query = select(STAT_WEEKS.c.week).where(STAT_WEEKS.c.status != "final").order_by(STAT_WEEKS.c.week).limit(1)
+    week = conn.execute(query).scalar_one_or_none()
+    return 1 if week is None else int(week)
+
+
+def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: datetime, season: int) -> CaptureResult:
+    """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys."""
+    return capture_once(
+        conn,
+        client,
+        fired_at,
+        FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET),
+        season,
+        current_nfl_week(conn),
+        feeds=harvest_feeds(),
+    )
