@@ -1,0 +1,1047 @@
+openapi: 3.0.3
+info:
+  title: Commish API
+  version: 1.0.0
+  description: >-
+    The prep site's request-time API (spec docs/superpowers/specs/2026-10-12-prep-site-architecture-design.md §2.2).
+    Every response is the envelope: ok, data, error, meta (pages only), request_id. Every route is rate limited
+    by a token bucket keyed by the signed-in account, or by the client address when signed out; a spent bucket
+    answers 429 with error.code rate_limited and a Retry-After header. State-changing requests that carry the
+    session cookie must echo the commish_csrf cookie in the X-CSRF-Token header.
+servers:
+  - url: https://api.trycommish.app
+    description: the request API (cmd/api)
+  - url: https://room.trycommish.app
+    description: the live room service (cmd/room), WebSocket only
+  - url: http://localhost:8080
+    description: local development
+
+tags:
+  - { name: health }
+  - { name: auth }
+  - { name: leagues }
+  - { name: sheets }
+  - { name: exports }
+  - { name: billing }
+  - { name: mocks }
+  - { name: rooms }
+
+paths:
+  /healthz:
+    get:
+      tags: [health]
+      operationId: liveness
+      summary: The process is up. Never touches the database.
+      responses:
+        "200": { $ref: "#/components/responses/HealthResponse" }
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readiness
+      summary: The process can reach the database.
+      responses:
+        "200": { $ref: "#/components/responses/HealthResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+
+  /auth/login:
+    get:
+      tags: [auth]
+      operationId: login
+      summary: Redirects to WorkOS AuthKit. return_to is a path on the site the browser comes back to.
+      parameters:
+        - { name: return_to, in: query, required: false, schema: { type: string, maxLength: 512 } }
+        - { name: screen, in: query, required: false, schema: { type: string, enum: [sign-in, sign-up] } }
+      responses:
+        "302": { description: to WorkOS }
+  /auth/callback:
+    get:
+      tags: [auth]
+      operationId: callback
+      summary: WorkOS returns here. Sets the sealed session cookie on the apex domain and redirects to the site.
+      parameters:
+        - { name: code, in: query, required: true, schema: { type: string } }
+        - { name: state, in: query, required: true, schema: { type: string } }
+      responses:
+        "302": { description: to the site, or to its sign-in problem page }
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Ends the session here and returns the WorkOS logout URL that ends it there.
+      responses:
+        "200":
+          description: signed out
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/Redirect" } }
+
+  /me:
+    get:
+      tags: [auth]
+      operationId: getMe
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/AccountResponse" }
+        "401": { $ref: "#/components/responses/ErrorResponse" }
+    patch:
+      tags: [auth]
+      operationId: updateMe
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountUpdate" }
+      responses:
+        "200": { $ref: "#/components/responses/AccountResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+
+  /leagues:
+    get:
+      tags: [leagues]
+      operationId: listLeagues
+      security: [{ session: [] }]
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PerPage" }]
+      responses:
+        "200":
+          description: the account's saved leagues, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/League" } } }
+    post:
+      tags: [leagues]
+      operationId: createLeague
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LeagueInput" }
+      responses:
+        "201": { $ref: "#/components/responses/LeagueResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/{id}:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    get:
+      tags: [leagues]
+      operationId: getLeague
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/LeagueResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+    put:
+      tags: [leagues]
+      operationId: replaceLeague
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LeagueInput" }
+      responses:
+        "200": { $ref: "#/components/responses/LeagueResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+    delete:
+      tags: [leagues]
+      operationId: deleteLeague
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+
+  /sheets:
+    get:
+      tags: [sheets]
+      operationId: listSheets
+      security: [{ session: [] }]
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PerPage" }]
+      responses:
+        "200":
+          description: the account's sheets, most recently changed first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/Sheet" } } }
+    post:
+      tags: [sheets]
+      operationId: createSheet
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SheetCreate" }
+      responses:
+        "201": { $ref: "#/components/responses/SheetDetailResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
+  /sheets/{id}:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    get:
+      tags: [sheets]
+      operationId: getSheet
+      summary: The sheet with every row in rank order. Also the print view's data.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/SheetDetailResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+    patch:
+      tags: [sheets]
+      operationId: renameSheet
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SheetUpdate" }
+      responses:
+        "200": { $ref: "#/components/responses/SheetResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+    delete:
+      tags: [sheets]
+      operationId: deleteSheet
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+  /sheets/{id}/rows:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    put:
+      tags: [sheets]
+      operationId: replaceSheetRows
+      summary: Replaces every row. Rank is the order of the array, from 1. A drag sends the whole order.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SheetRowsReplace" }
+      responses:
+        "200": { $ref: "#/components/responses/SheetDetailResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+  /sheets/{id}/rows/{player_id}:
+    parameters:
+      - { $ref: "#/components/parameters/ID" }
+      - { name: player_id, in: path, required: true, schema: { type: string, maxLength: 64 } }
+    put:
+      tags: [sheets]
+      operationId: updateSheetRow
+      summary: Sets one row's tier, tag and note. Null clears a field.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SheetRowUpdate" }
+      responses:
+        "200":
+          description: the row as stored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/SheetRow" } }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+  /sheets/{id}/import:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    post:
+      tags: [sheets]
+      operationId: importSheet
+      summary: >-
+        Replaces the rows from a CSV in the export's columns (rank, player_id, name, position, team, tier, tag,
+        note). rank and player_id and name and position are required. Rows are ordered by rank.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: { type: string }
+      responses:
+        "200":
+          description: what was imported and what was skipped, by line
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/SheetImportResult" } }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+  /sheets/{id}/exports:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    post:
+      tags: [exports]
+      operationId: exportSheet
+      summary: Writes the sheet as a file to object storage and returns a signed link to it.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExportCreate" }
+      responses:
+        "201": { $ref: "#/components/responses/ExportLinkResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /exports:
+    get:
+      tags: [exports]
+      operationId: listExports
+      security: [{ session: [] }]
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PerPage" }]
+      responses:
+        "200":
+          description: the account's unexpired exports, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/Export" } } }
+  /exports/{id}:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    get:
+      tags: [exports]
+      operationId: getExport
+      summary: A fresh signed link to an export that has not expired.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/ExportLinkResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+
+  /billing/plans:
+    get:
+      tags: [billing]
+      operationId: getPlans
+      summary: What is for sale and for how much, read from Stripe. The Membership lists the annual price first.
+      responses:
+        "200":
+          description: the catalog
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/PlanCatalog" } }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /billing/checkout:
+    post:
+      tags: [billing]
+      operationId: checkout
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CheckoutRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/RedirectResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /billing/portal:
+    post:
+      tags: [billing]
+      operationId: billingPortal
+      summary: The Stripe customer portal, for the card and receipts.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/RedirectResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /billing/membership/cancel:
+    post:
+      tags: [billing]
+      operationId: cancelMembership
+      summary: One-click cancellation. The Membership runs to the end of the period it was paid for and does not renew.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/AccountResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /billing/membership/resume:
+    post:
+      tags: [billing]
+      operationId: resumeMembership
+      summary: Undoes a cancellation before the period ends.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/AccountResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /billing/webhook:
+    post:
+      tags: [billing]
+      operationId: stripeWebhook
+      summary: Stripe events. The signature is verified on the raw body before anything else runs.
+      parameters:
+        - { name: Stripe-Signature, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+  /billing/group-passes:
+    get:
+      tags: [billing]
+      operationId: listGroupPasses
+      summary: The group passes this account bought, with their claim links.
+      security: [{ session: [] }]
+      responses:
+        "200":
+          description: newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/GroupPass" } } }
+  /group-passes/{code}:
+    parameters: [{ $ref: "#/components/parameters/ClaimCode" }]
+    get:
+      tags: [billing]
+      operationId: previewGroupPass
+      summary: What a claim link grants and how many seats are left. Readable signed out.
+      responses:
+        "200":
+          description: the pass
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/GroupPassPreview" } }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+  /group-passes/{code}/claim:
+    parameters: [{ $ref: "#/components/parameters/ClaimCode" }]
+    post:
+      tags: [billing]
+      operationId: claimGroupPass
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/AccountResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+
+  /mocks:
+    get:
+      tags: [mocks]
+      operationId: listMocks
+      security: [{ session: [] }]
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PerPage" }]
+      responses:
+        "200":
+          description: the account's mocks, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/Mock" } } }
+    post:
+      tags: [mocks]
+      operationId: createMock
+      summary: Saves a solo mock's settings and seed. Picks are the engine lane's routes.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MockCreate" }
+      responses:
+        "201": { $ref: "#/components/responses/MockDetailResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+  /mocks/{id}:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    get:
+      tags: [mocks]
+      operationId: getMock
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/MockDetailResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+    delete:
+      tags: [mocks]
+      operationId: deleteMock
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+
+  /rooms/{id}/ws:
+    servers:
+      - url: https://room.trycommish.app
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    get:
+      tags: [rooms]
+      operationId: roomSocket
+      summary: >-
+        Upgrades to a WebSocket. The client's first message is RoomHello with the last seq it applied (0 for none).
+        The server answers RoomWelcome with every action after that seq, then streams RoomAction messages in seq
+        order. A reconnect sends the same hello with its last seq and loses nothing.
+      security: [{ session: [] }]
+      responses:
+        "101": { description: switching protocols }
+        "401": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: commish_session
+
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ClaimCode:
+      name: code
+      in: path
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 64 }
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, default: 1 }
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+
+  responses:
+    ErrorResponse:
+      description: the error envelope
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Envelope" }
+    EmptyResponse:
+      description: done, data is null
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Envelope" }
+    HealthResponse:
+      description: health
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/Health" } }
+    RedirectResponse:
+      description: where the browser goes next
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/Redirect" } }
+    AccountResponse:
+      description: the signed-in account
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/Account" } }
+    LeagueResponse:
+      description: a saved league
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/League" } }
+    SheetResponse:
+      description: a sheet without its rows
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/Sheet" } }
+    SheetDetailResponse:
+      description: a sheet with its rows
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/SheetDetail" } }
+    ExportLinkResponse:
+      description: an export with a signed link
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/ExportLink" } }
+    MockDetailResponse:
+      description: a mock with its action log
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/MockDetail" } }
+
+  schemas:
+    Envelope:
+      type: object
+      required: [ok, data, error, request_id]
+      properties:
+        ok: { type: boolean }
+        data: { nullable: true, description: the payload, null on error }
+        error:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/ErrorBody" }]
+        meta:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/PageMeta" }]
+        request_id: { type: string }
+    ErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: >-
+            invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large,
+            billing_unavailable, storage_unavailable, unavailable, internal
+        message: { type: string }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+        feature: { $ref: "#/components/schemas/Feature" }
+    PageMeta:
+      type: object
+      required: [page, per_page, total]
+      properties:
+        page: { type: integer }
+        per_page: { type: integer }
+        total: { type: integer, format: int64 }
+    Health:
+      type: object
+      required: [status, version]
+      properties:
+        status: { type: string, enum: [ok, unavailable] }
+        version: { type: string }
+    Redirect:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+
+    Feature:
+      type: string
+      enum: [live_draft_advisor, custom_scoring, full_reasoning, range_of_outcomes, synced_sheet, early_run]
+    Product:
+      type: string
+      enum: [draft_pass, membership, group_pass]
+    Interval:
+      type: string
+      enum: [year, month]
+
+    Account:
+      type: object
+      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        first_name: { type: string, nullable: true }
+        last_name: { type: string, nullable: true }
+        handle:
+          type: string
+          nullable: true
+          description: the name shown in lobbies, 3 to 20 letters, digits or underscores, not starting with a digit
+        features:
+          type: array
+          items: { $ref: "#/components/schemas/Feature" }
+        draft_pass:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/DraftPassState" }]
+        membership:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/MembershipState" }]
+        created_at: { type: string, format: date-time }
+    DraftPassState:
+      type: object
+      required: [season, ends_at, source]
+      properties:
+        season: { type: integer }
+        ends_at: { type: string, format: date-time }
+        source: { type: string, enum: [purchase, group_pass, grant] }
+    MembershipState:
+      type: object
+      required: [status, interval, current_period_end, cancel_at_period_end]
+      properties:
+        status: { type: string }
+        interval:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/Interval" }]
+        current_period_end: { type: string, format: date-time, nullable: true }
+        cancel_at_period_end: { type: boolean }
+    AccountUpdate:
+      type: object
+      required: [handle]
+      properties:
+        handle: { type: string, minLength: 3, maxLength: 20, pattern: "^[A-Za-z_][A-Za-z0-9_]{2,19}$" }
+
+    ScoringPreset:
+      type: string
+      enum: [ppr, half_ppr, standard, te_premium]
+    Lineup:
+      type: string
+      enum: [standard, superflex, two_flex]
+    BotStyle:
+      type: string
+      enum: [adp, last_draft]
+    BoardFormat:
+      type: string
+      enum: [ppr, half_ppr, standard, te_premium, superflex, two_flex, dynasty, best_ball]
+    Scoring:
+      type: object
+      description: exactly one of preset and custom. custom needs the custom_scoring feature.
+      properties:
+        preset:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/ScoringPreset" }]
+        custom:
+          type: object
+          nullable: true
+          description: points per stat, keyed by stat (snake_case), at most 200 stats
+          additionalProperties: { type: number, format: double }
+    RosterCounts:
+      type: object
+      description: starters per position and the bench. Flex spots come from the lineup.
+      required: [qb, rb, wr, te, k, dst, bench]
+      properties:
+        qb: { type: integer, minimum: 0, maximum: 4 }
+        rb: { type: integer, minimum: 0, maximum: 6 }
+        wr: { type: integer, minimum: 0, maximum: 6 }
+        te: { type: integer, minimum: 0, maximum: 4 }
+        k: { type: integer, minimum: 0, maximum: 2 }
+        dst: { type: integer, minimum: 0, maximum: 2 }
+        bench: { type: integer, minimum: 0, maximum: 15 }
+    Keeper:
+      type: object
+      required: [slot, player_id, round]
+      properties:
+        slot: { type: integer, minimum: 1 }
+        player_id: { type: string, maxLength: 64 }
+        round: { type: integer, minimum: 1 }
+    LeagueSettings:
+      type: object
+      required: [scoring, teams, slot, roster, lineup, keepers, bot_style]
+      properties:
+        scoring: { $ref: "#/components/schemas/Scoring" }
+        teams: { type: integer, minimum: 8, maximum: 14 }
+        slot: { type: integer, nullable: true, minimum: 1, description: null drafts from a random slot }
+        roster: { $ref: "#/components/schemas/RosterCounts" }
+        lineup: { $ref: "#/components/schemas/Lineup" }
+        keepers:
+          type: array
+          maxItems: 56
+          items: { $ref: "#/components/schemas/Keeper" }
+        bot_style: { $ref: "#/components/schemas/BotStyle" }
+    LeagueInput:
+      type: object
+      required: [name, settings]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60 }
+        settings: { $ref: "#/components/schemas/LeagueSettings" }
+    League:
+      type: object
+      required: [id, name, settings, rounds, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        settings: { $ref: "#/components/schemas/LeagueSettings" }
+        rounds: { type: integer, description: the roster's total, which is the draft's round count }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    SheetTag:
+      type: string
+      enum: [target, sleeper, breakout, avoid, injury, handcuff]
+    Sheet:
+      type: object
+      required: [id, name, format, row_count, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        format: { $ref: "#/components/schemas/BoardFormat" }
+        row_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    SheetRow:
+      type: object
+      required: [player_id, name, position, team, rank, tier, tag, note]
+      properties:
+        player_id: { type: string }
+        name: { type: string }
+        position: { type: string }
+        team: { type: string, nullable: true }
+        rank: { type: integer }
+        tier: { type: integer, nullable: true }
+        tag:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/SheetTag" }]
+        note: { type: string, nullable: true }
+    SheetDetail:
+      allOf:
+        - $ref: "#/components/schemas/Sheet"
+        - type: object
+          required: [rows]
+          properties:
+            rows:
+              type: array
+              items: { $ref: "#/components/schemas/SheetRow" }
+    SheetRowInput:
+      type: object
+      required: [player_id, name, position]
+      properties:
+        player_id: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        position: { type: string, minLength: 1, maxLength: 8 }
+        team: { type: string, nullable: true, maxLength: 8 }
+        tier: { type: integer, nullable: true, minimum: 1, maximum: 50 }
+        tag:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/SheetTag" }]
+        note: { type: string, nullable: true, maxLength: 500 }
+    SheetCreate:
+      type: object
+      required: [name, format]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60 }
+        format: { $ref: "#/components/schemas/BoardFormat" }
+        rows:
+          type: array
+          maxItems: 1000
+          items: { $ref: "#/components/schemas/SheetRowInput" }
+    SheetUpdate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60 }
+    SheetRowsReplace:
+      type: object
+      required: [rows]
+      properties:
+        rows:
+          type: array
+          maxItems: 1000
+          items: { $ref: "#/components/schemas/SheetRowInput" }
+    SheetRowUpdate:
+      type: object
+      required: [tier, tag, note]
+      properties:
+        tier: { type: integer, nullable: true, minimum: 1, maximum: 50 }
+        tag:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/SheetTag" }]
+        note: { type: string, nullable: true, maxLength: 500 }
+    ImportSkip:
+      type: object
+      required: [line, reason]
+      properties:
+        line: { type: integer }
+        reason: { type: string }
+    SheetImportResult:
+      type: object
+      required: [imported, skipped, sheet]
+      properties:
+        imported: { type: integer }
+        skipped:
+          type: array
+          items: { $ref: "#/components/schemas/ImportSkip" }
+        sheet: { $ref: "#/components/schemas/SheetDetail" }
+
+    ExportFormat:
+      type: string
+      enum: [csv]
+    ExportCreate:
+      type: object
+      required: [format]
+      properties:
+        format: { $ref: "#/components/schemas/ExportFormat" }
+    Export:
+      type: object
+      required: [id, sheet_id, format, file_name, bytes, created_at, expires_at]
+      properties:
+        id: { type: string, format: uuid }
+        sheet_id: { type: string, format: uuid, nullable: true }
+        format: { $ref: "#/components/schemas/ExportFormat" }
+        file_name: { type: string }
+        bytes: { type: integer, format: int64 }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+    ExportLink:
+      allOf:
+        - $ref: "#/components/schemas/Export"
+        - type: object
+          required: [url, url_expires_at]
+          properties:
+            url: { type: string }
+            url_expires_at: { type: string, format: date-time }
+
+    Price:
+      type: object
+      required: [lookup_key, amount_cents, currency, interval]
+      properties:
+        lookup_key: { type: string }
+        amount_cents: { type: integer, format: int64 }
+        currency: { type: string }
+        interval:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/Interval" }]
+    PlanCatalog:
+      type: object
+      required: [season, draft_pass, membership, group_pass]
+      properties:
+        season: { type: integer, description: the season a pass bought now is for }
+        draft_pass: { $ref: "#/components/schemas/Price" }
+        membership:
+          type: array
+          description: annual first
+          items: { $ref: "#/components/schemas/Price" }
+        group_pass: { $ref: "#/components/schemas/GroupPassPrice" }
+    GroupPassPrice:
+      type: object
+      required: [per_seat, min_seats, max_seats]
+      properties:
+        per_seat: { $ref: "#/components/schemas/Price" }
+        min_seats: { type: integer }
+        max_seats: { type: integer }
+    CheckoutRequest:
+      type: object
+      required: [product]
+      properties:
+        product: { $ref: "#/components/schemas/Product" }
+        interval:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/Interval" }]
+        seats: { type: integer, nullable: true, description: group_pass only }
+        league_name: { type: string, nullable: true, maxLength: 60, description: group_pass only }
+    GroupPass:
+      type: object
+      required: [id, league_name, season, seats, claimed, claim_url, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        league_name: { type: string }
+        season: { type: integer }
+        seats: { type: integer }
+        claimed: { type: integer }
+        claim_url: { type: string }
+        created_at: { type: string, format: date-time }
+    GroupPassPreview:
+      type: object
+      required: [league_name, season, seats, claimed, purchaser_handle, claimed_by_me]
+      properties:
+        league_name: { type: string }
+        season: { type: integer }
+        seats: { type: integer }
+        claimed: { type: integer }
+        purchaser_handle: { type: string, nullable: true }
+        claimed_by_me: { type: boolean }
+
+    MockStatus:
+      type: string
+      enum: [active, complete]
+    MockCreate:
+      type: object
+      description: exactly one of league_id and settings
+      properties:
+        league_id: { type: string, format: uuid, nullable: true }
+        settings:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/LeagueSettings" }]
+        seed: { type: integer, format: int64, nullable: true, minimum: 0, maximum: 4294967295 }
+    Mock:
+      type: object
+      required: [id, league_id, settings, seed, status, created_at, updated_at, completed_at]
+      properties:
+        id: { type: string, format: uuid }
+        league_id: { type: string, format: uuid, nullable: true }
+        settings: { $ref: "#/components/schemas/LeagueSettings" }
+        seed: { type: integer, format: int64 }
+        status: { $ref: "#/components/schemas/MockStatus" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time, nullable: true }
+    MockAction:
+      type: object
+      required: [seq, kind, payload, at]
+      properties:
+        seq: { type: integer, format: int64 }
+        kind: { type: string }
+        payload: { type: object }
+        at: { type: string, format: date-time }
+    MockDetail:
+      allOf:
+        - $ref: "#/components/schemas/Mock"
+        - type: object
+          required: [actions]
+          properties:
+            actions:
+              type: array
+              items: { $ref: "#/components/schemas/MockAction" }
+
+    RoomHello:
+      type: object
+      required: [type, last_seq]
+      properties:
+        type: { type: string, enum: [hello] }
+        last_seq: { type: integer, format: int64, minimum: 0 }
+    RoomWelcome:
+      type: object
+      required: [type, room_id, seq, actions]
+      properties:
+        type: { type: string, enum: [welcome] }
+        room_id: { type: string, format: uuid }
+        seq: { type: integer, format: int64, description: the room's latest seq }
+        actions:
+          type: array
+          items: { $ref: "#/components/schemas/RoomAction" }
+    RoomAction:
+      type: object
+      required: [seq, kind, seat, payload, at]
+      properties:
+        seq: { type: integer, format: int64 }
+        kind: { type: string }
+        seat: { type: integer, nullable: true }
+        payload: { type: object }
+        at: { type: string, format: date-time }
+    RoomError:
+      type: object
+      required: [type, code, message]
+      properties:
+        type: { type: string, enum: [error] }
+        code: { type: string }
+        message: { type: string }

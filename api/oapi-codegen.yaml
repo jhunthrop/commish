@@ -1,0 +1,9 @@
+# Go types for every schema in openapi.yaml. The handlers answer with
+# these, so the wire shape and the contract cannot drift: `make gen`
+# regenerates and CI fails if the checked-in file differs.
+package: apitypes
+output: internal/apitypes/types.gen.go
+generate:
+  models: true
+output-options:
+  skip-prune: true
