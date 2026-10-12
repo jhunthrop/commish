@@ -46,3 +46,11 @@ export function parsePositiveInteger(name: string, raw: string): number {
   }
   return parsed;
 }
+
+/** A variable the process cannot run without: its value, or a named failure at the start of a run
+ *  rather than a confusing one deep inside it. */
+export function requireEnv(name: string): string {
+  const value = envOrUndefined(name);
+  if (value === undefined) throw new Error(`${name} is not set. Put it in .env.local, or in the job's environment.`);
+  return value;
+}

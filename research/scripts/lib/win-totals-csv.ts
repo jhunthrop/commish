@@ -11,7 +11,7 @@ import type { Db } from "@research/db/client";
 import { parseWinTotalsCsv, writeVerifiedWinTotals, type VegasIngestReport } from "@research/projections/vegas/ingest";
 
 /** The committed file, relative to the repo root every npm script runs from. */
-export const WIN_TOTALS_CSV_PATH = "data/win-totals/win-totals.csv";
+export const WIN_TOTALS_CSV_PATH = "research/data/win-totals/win-totals.csv";
 
 /**
  * FAILS LOUDLY when the CSV does not exist, rather than treating an absent file as zero rows: a

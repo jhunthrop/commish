@@ -94,7 +94,8 @@ function read(file: string): string {
   return readFileSync(join(REPO_ROOT, file), "utf8");
 }
 
-const SWEPT = [...sourceFilesIn(["src"], ".ts"), ...sourceFilesIn(["src"], ".tsx")];
+// The research core joined the sweep at the carve-out (2026-10-12): research/src is runtime code too.
+const SWEPT = [...sourceFilesIn(["src", "research/src"], ".ts"), ...sourceFilesIn(["src"], ".tsx")];
 
 function exceptionFor(file: string): Exception | undefined {
   return ALLOWLIST.find((entry) => entry.file === file);

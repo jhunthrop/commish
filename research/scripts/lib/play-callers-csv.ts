@@ -12,7 +12,7 @@ import { parsePlayCallers, validatePlayCallers, type PlayCallerRow } from "@rese
 import { FACT_SEASONS, finalWeekOf, nflTeamsBySeason } from "@research/projections/nflverse/team-eras";
 
 /** The committed file, relative to the repo root every npm script runs from. */
-export const PLAY_CALLERS_CSV_PATH = "data/play-callers/play-callers.csv";
+export const PLAY_CALLERS_CSV_PATH = "research/data/play-callers/play-callers.csv";
 
 /**
  * THE SEASONS WHOSE `head_coach` COLUMN IS CLAIMED COMPLETE (fact-sheet depth round, 2026-09-07).

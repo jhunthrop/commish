@@ -14,7 +14,7 @@ import { parseModelArtifactRecord, renderModelArtifactRecord, type ModelArtifact
 import { publishModelArtifact, type ModelArtifactSpec, type PublishOutcome } from "@research/projections/model/artifacts";
 
 /** The committed records, relative to the repo root every npm script runs from. */
-export const MODEL_ARTIFACT_RECORDS_DIR = "data/model-artifacts";
+export const MODEL_ARTIFACT_RECORDS_DIR = "research/data/model-artifacts";
 
 /** `<dir>/<family>/<artifact>/v<version>.json`. */
 export function modelArtifactRecordPath(name: string, version: number, dir: string = MODEL_ARTIFACT_RECORDS_DIR): string {

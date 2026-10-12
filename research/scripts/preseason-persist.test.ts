@@ -12,7 +12,7 @@ import { recordObservations, type PlayerWeekObservation } from "@research/projec
 import { recordTeamObservations } from "@research/projections/team-store";
 import { recordNflPlayers } from "@research/projections/universe";
 import { publishCommittedModelArtifacts } from "./lib/model-artifact-records";
-import { diffReasons, persistSeason } from "./preseason-persist";
+import { diffReasons, persistSeason } from "@research/projections/preseason/persist";
 
 /**
  * I5 (Task 4 fix round 2) — THE ORDERING GUARANTEE ITSELF, proven end to end against a real
