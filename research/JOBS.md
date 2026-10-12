@@ -1,0 +1,52 @@
+# Jobs and ingests: where each one runs today, and where it lands in Python
+
+The TypeScript core's job registry (`src/jobs/registry.ts`, schedules in `src/jobs/schedules.ts`,
+driven by the Vercel cron `/api/jobs/tick` every minute) and the operator scripts that write the
+research tables. "Python destination" is the function this lane ported (phase A) or the phase that
+ports it. The nightly chain that will call these on Cloud Run is phase D; until it is live, the
+Vercel cron keeps running the TypeScript on the schedules below.
+
+## Scheduled jobs (the registry)
+
+| Job | Schedule today | What it ingests or does | Python destination |
+|---|---|---|---|
+| `season-week` step `stats-ingest` | Tue 08:00, Wed 18:00, Thu 14:00 ET | nflverse universe, snap counts, weekly stats into `nfl_players`, `player_week_observations`, `player_week_teams`, `team_week_observations` | `pipeline.nflverse.ingest.ingest_player_universe` + `schedule_week_as_of` + `ingest_season` (phase A, parity `nflverse-season-*`) |
+| `season-week` step `props-snapshot` | same | The Odds API props into `player_prop_observations` | `pipeline.odds.ingest.run_odds_snapshot` (phase A, parity `odds-snapshot-and-resolve`) |
+| `season-week` steps `grade`, `freeze`, `scoreboard` | same | the register (`register_freeze_rows`, `register_grade_rows`) | `research.model` (phase B, register parity) |
+| `season-week` steps `peek-facts`, `peek-documents` | same | `player_peek_facts`, peek document rebuild events | `research.capsules` (phase C) |
+| `capture-harvest` | 02:00 and hourly 07:00-23:00 ET | five Tank01 feeds into `capture_snapshots` | `pipeline.tank01.capture.run_capture_harvest` (phase A, parity `tank01-capture-harvest`); its peek-document rebuild event is phase C |
+| `adp-snapshot` | 03:00 ET nightly | Fantasy Football Calculator ADP, three formats, into `adp_snapshots` | `pipeline.preseason.ingest.ingest_adp_snapshot` (phase A, parity `adp-snapshot`) |
+| `props-preseason-snapshot` | 03:30 ET daily, self-disabled after the season's first kickoff | the props snapshot, then name resolution into `props_player_map` | `pipeline.odds.ingest.run_props_preseason_snapshot` (phase A; the snapshot and the resolution it calls are parity `odds-snapshot-and-resolve`) |
+| `capsule-sweep` | 04:00 ET nightly | facts, capsules (LLM), peek facts | `research.capsules` (phase C) |
+| `win-totals` | Wed 05:00 ET, self-disabled after kickoff | the publisher's win totals into `team_week_observations` | `pipeline.vegas.run_win_totals` (phase A, parity `win-totals-job`) |
+| `peek-document` | event-driven (no schedule) | `player_peek_documents` | `research.capsules` (phase C) |
+| `draft-sweep` | every minute, wake-gated | live draft rooms | league platform; the prep site's rooms are Go (Lane 4/6), not research |
+| `sim-run` | on request | draft simulations | Go engine port (Lane 4) |
+| `draft-grades` | on a real draft's completion | `draft_grades` | league platform, not ported |
+
+## Operator scripts that write research tables (run by hand today)
+
+| Script | What it ingests | Python destination |
+|---|---|---|
+| `projections:backfill` | universe and seasons over a range, derived gap seasons with a control-season validation | `ingest_season` per season and `pipeline.nflverse.derived_stat_lines.ingest_derived_stat_lines` (phase A); the control-season points agreement needs the scoring engine (phase B) |
+| `projections:context` | schedule, play-by-play, coaches observations, opponent adjustment, injury reports, injury archive, weekly rosters | `python -m research.pipeline context` (phase A, parity `nflverse-context`, `nflverse-injury-*`, `nflverse-roster-weeks`) |
+| `projections:schedule:results`, `projections:schedule:points-allowed` | the two narrowed schedule backfills | `pipeline.nflverse.ingest_schedule` (phase A, parity) |
+| `projections:draft-picks` | `nfl_draft_picks` | `pipeline.nflverse.draft_picks.ingest_draft_picks` (phase A, parity) |
+| `projections:roster-weeks` | `nflverse_roster_weeks` | `pipeline.nflverse.roster_weeks` (phase A, parity) |
+| `projections:kdef:backfill` | 32 synthetic defenses, `nflverse_kicking_weeks`, `nflverse_team_defense_weeks` | `python -m research.pipeline kdef` (phase A, parity `nflverse-kdef`) |
+| `projections:kdef:adp` | kicker and defense ADP into `preseason_rankings` | `pipeline.preseason.ingest.ingest_kdef_adp` (phase A, parity `preseason-2025`) |
+| `projections:preseason:ingest` | week-one rosters, depth charts, ADP x3, ECR | `pipeline.preseason.ingest.ingest_preseason` (phase A, parity `preseason-*`) |
+| `projections:adp:ingest` | the ADP benchmark for the product season | `ingest_preseason`'s ADP half (same functions, phase A) |
+| `projections:ecr:current` | the live season's consensus onto the crossed roster | `pipeline.preseason.ingest.ingest_current_ecr` (phase A, parity `current-ecr`) |
+| `projections:crosswalk` | `player_crosswalk` | `pipeline.crosswalk.build_crosswalk` (phase A, parity `crosswalk`) |
+| `projections:odds:snapshot`, `projections:odds:resolve` | props and their names | `pipeline.odds.ingest` (phase A, parity) |
+| `projections:odds:backfill` | the historical props archive, budgeted | `pipeline.odds.ingest.backfill_props` (phase A, parity `odds-backfill`, the script run unmodified) |
+| `projections:vegas:ingest` | the committed win-totals seed | `pipeline.vegas.ingest_win_totals_csv` (phase A, parity `win-totals-seed`) |
+| `coaches:ingest` | the committed play-caller seed into `coaches` | `pipeline.coaches.ingest_play_callers_csv` (phase A, parity `coaches-seed`) |
+| `npm run seed` (`seedPlayers`) | the Tank01 roster into `players`, box scores into `player_stat_lines` | `pipeline.tank01.ingest.ingest_roster_and_lines` (phase A, parity `tank01-roster-and-lines`) |
+| `stats:schedule` | Tank01 fixtures into `nfl_games` | `pipeline.tank01.ingest.ingest_schedule` (phase A, parity `tank01-schedule`) |
+| `stats:adp` | Tank01 ADP onto `players.adp` | `pipeline.tank01.ingest.ingest_adp` (phase A, parity `tank01-adp`) |
+| `stats:headshots` | headshot URLs onto `players` | `pipeline.tank01.ingest.backfill_headshots` (phase A, parity `tank01-headshots`) |
+| `stats:capture` | every capture feed into `capture_snapshots` | `pipeline.tank01.capture.capture_once` (phase A, parity `tank01-capture-all`) |
+| `stats:ingest` (the live-scoring worker tick) | Tank01 box scores during a live week, then league settlement, lineups and score pushes | not ported: league platform machinery. The box-score write it shares with the seed is ported as `ingest_roster_and_lines`; phase D decides whether the nightly needs an in-season box-score cadence |
+| `projections:*:fit`, `projections:preseason:persist`, `projections:register:*` | fits, the board, the register | `research.model` (phase B) |
