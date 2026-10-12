@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 )
@@ -31,6 +33,14 @@ func WithAccount(ctx context.Context, a Account) context.Context {
 func AccountFrom(ctx context.Context) (Account, bool) {
 	a, ok := ctx.Value(accountKey).(Account)
 	return a, ok
+}
+
+// AccountID is the signed-in account's id, for handlers on SignedIn
+// routes, where RequireSession has already refused a signed-out
+// request. It is uuid.Nil otherwise.
+func AccountID(r *http.Request) uuid.UUID {
+	a, _ := AccountFrom(r.Context())
+	return a.ID
 }
 
 // SessionReader is the part of Store the middleware needs.
