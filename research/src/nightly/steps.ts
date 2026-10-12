@@ -8,6 +8,8 @@ import { voiceRuleHits } from "@research/capsules/voice-rules";
 import { envOrUndefined } from "@research/lib/env";
 import { harvestCaptures } from "@research/projections/harvest";
 import { ingestAdpSnapshot } from "@research/projections/market/adp-snapshot";
+import { snapshotPreseasonProps } from "@research/projections/odds/preseason-snapshot";
+import { refreshWinTotals } from "@research/projections/vegas/win-totals-refresh";
 import { PRODUCT_SEASON } from "@research/projections/preseason/current";
 import { persistSeason } from "@research/projections/preseason/persist";
 import { TANK01_CONFIG } from "@research/stats/tank01/config";
@@ -20,11 +22,15 @@ export interface StepContext {
   readonly log: (line: string) => void;
 }
 
+/** The odds provider's key, read by the props snapshot (`projections/odds/http.ts`). */
+const ODDS_API_KEY_ENV = "ODDS_API_KEY";
+
 /**
  * INGEST: the provider capture the capsules read facts from (injuries, news, depth charts, inactives,
- * betting lines; `projections/harvest.ts`) and tonight's ADP in every format
- * (`projections/market/adp-snapshot.ts`). The capture needs the stats provider key; without it the
- * capture is skipped by name and the ADP capture, which needs no key, still runs.
+ * betting lines; `projections/harvest.ts`), tonight's ADP in every format
+ * (`projections/market/adp-snapshot.ts`), the pre-kickoff props snapshot and the win totals (both
+ * no-ops once the product season has kicked off). A capture whose key is not set is skipped by
+ * name; the others still run. The step fails only when the ADP capture failed in every format.
  */
 export async function ingestStep({ db, clock }: StepContext): Promise<StepRecord> {
   const parts: string[] = [];
@@ -35,6 +41,10 @@ export async function ingestStep({ db, clock }: StepContext): Promise<StepRecord
     parts.push(`${harvest.summary}, ${harvest.moved.length} player(s) moved`);
   }
   const adp = await ingestAdpSnapshot(db, { now: () => new Date(clock.now()) });
+  parts.push(
+    envOrUndefined(ODDS_API_KEY_ENV) === undefined ? `props skipped, ${ODDS_API_KEY_ENV} is not set` : (await snapshotPreseasonProps(db, clock, {})).summary,
+  );
+  parts.push((await refreshWinTotals(db, clock, {})).summary);
   const failed = adp.byFormat.filter((format) => format.error !== null);
   parts.push(`adp: ${adp.written} rows written over ${adp.byFormat.length} formats${failed.map((format) => `, ${format.format} failed: ${format.error}`).join("")}`);
   return { name: "ingest", status: failed.length === adp.byFormat.length ? "failed" : "ran", summary: parts.join(". ") };

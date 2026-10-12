@@ -2,11 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestDb } from "@research/db/test-db";
 import type { ResolveAllPropNamesResult } from "@research/projections/odds/player-map";
 import type { SnapshotSummary } from "@research/projections/odds/snapshot";
-import {
-  parsePropsPreseasonSnapshotPayload,
-  runPropsPreseasonSnapshotStep,
-  type PropsPreseasonSnapshotDeps,
-} from "./props-preseason-snapshot-job";
+import type { PropsPreseasonSnapshotDeps } from "@research/projections/odds/preseason-snapshot";
+import { parsePropsPreseasonSnapshotPayload, runPropsPreseasonSnapshotStep } from "./props-preseason-snapshot-job";
 
 const db = createTestDb();
 const CLOCK = { now: () => "2026-09-01T00:00:00.000Z" };
