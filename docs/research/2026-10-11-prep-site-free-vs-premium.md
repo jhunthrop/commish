@@ -222,3 +222,27 @@ Custom scoring stays paid only because the veteran persona will pay for it while
 - [S16] FSGA 2025 research, https://thefsga.org/new-fsga-research-highlights-industry-stability-and-next-generation-growth-in-fantasy-sports-and-sports-betting
 - [S17] ChartMogul conversion report, https://chartmogul.com/reports/saas-conversion-report/
 - [S18] RevenueCat State of Subscription Apps 2026, https://www.revenuecat.com/state-of-subscription-apps (paywall comparison via secondary summary)
+
+## Founder review, 2026-10-11, and the revised model
+
+The founder read the recommendation and asked whether giving everything away was the plan, and whether FantasyPros was not $20 a month. Both questions changed the answer.
+
+**On the anchor.** FantasyPros' top tier is $22.99 month to month, but its plans page leads with the annual price, $8.99 a month for the same tier (about $108 a year). The monthly number is an anchor that makes the annual look cheap and catches August sign-ups that forget to cancel, which is the second-largest complaint theme in its recent reviews (72 of 235 one- and two-star reviews). The market's reference for a full-year membership is therefore about $100, not $59, and draft-only passes sit at $29 to $59 (Flock's season pass lists at $49). The first recommendation underpriced both lines.
+
+**On giving everything away.** Revenue cannot rest on one product converting at a borrowed benchmark rate. The trust loop still has to be free: in August a player uses three or four sites and returns to the one whose rankings prove out, and a paywall in front of the board means nobody learns the model is better. So the line is drawn by what each product pays for, depth or the live moment, never access to the number and its basis.
+
+**Free, unconditionally:** the board for the standard formats, the projection and its basis on every player page, the prose, ADP, the public accuracy record, the cheat sheet, bot mocks with the advisor.
+
+**Paid, three products:**
+
+| Product | Price | What it is |
+|---|---|---|
+| Draft Pass | $39 a season, non-renewing | The advisor beside a live draft on another platform (ESPN, Yahoo, Sleeper), custom-scoring boards, every format |
+| Membership | $99 a year, or $14.99 a month with the annual shown first | The pass plus the model's reasoning per player at full depth, range of outcomes, the sheet synced to a live draft, early access to the nightly run |
+| Group Draft Pass | priced per league, to be set | One purchase covers a league's drafters; the commissioner is the buyer |
+
+Cancellation in one click and a reminder before any renewal: the complaint FantasyPros earns most is the one this product never earns.
+
+**Never:** gating the prose or the projection, contests or prize entries, sportsbook bundles, ads.
+
+**When the price is set:** in 2027 with the 2026 held-out accuracy record in hand. If the model beats consensus on a held-out season, $99 holds and is justified by the record. If it does not, the pass is the whole offer and there is no membership worth selling.
