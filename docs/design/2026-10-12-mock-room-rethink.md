@@ -1,6 +1,6 @@
 # The mock room, rethought for a prep site
 
-Date 2026-10-12. Status: design authority for the mock room on the prep site, decided under the founder's autonomy grant of 2026-10-11 and the two directions below. Mocks: `docs/design/mocks/2026-10-12/commish/{setup,mock,lobby,report}.html` once committed, and the artifact linked from the ledger.
+Date 2026-10-12. Status: design authority for the mock room on the prep site, decided under the founder's autonomy grant of 2026-10-11 and the two directions below. Mocks: `docs/design/mocks/2026-10-12-commish/{setup,mock,lobby,report}.html`, and the artifact linked from the ledger.
 
 ## The founder's words
 

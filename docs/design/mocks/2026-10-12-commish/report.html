@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Commish Mock Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;800&family=Outfit:wght@400;500;600;700&display=swap">
+<style>
+/* Commish tokens: the Press Box system with two bounded borrowings. One file, both themes.
+   Layout concept: a near-black or paper-white shell, an icon rail on the left, a persistent
+   search across the top, dense rows in the middle, a filter and sheet rail on the right.
+   Borrowed from Scout: a reading serif, allowed on the player page's prose and its pull figures only.
+   Borrowed from Broadcast: the score bug and the lower third, allowed in a live draft room only.
+   Light values live on bare :root. Dark redefines tokens only, twice, so the OS
+   setting and the explicit data-theme toggle both win. */
+
+:root {
+  /* Type. Outfit is the geometric UI face: Poppins's circles with a tighter set width,
+     so a dense row holds "Jaxon Smith-Njigba" at 15px without truncating.
+     Big Shoulders Display is the condensed number face, drawn from stadium and
+     transit lettering, narrow enough that 344.1 fits a 64px cell at display size. */
+  --font-ui: "Outfit", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Big Shoulders Display", "Oswald", "Arial Narrow", sans-serif;
+  /* Newsreader is the reading face. Optical sizes cut for long screen reading, because the
+     capsule is writing. Allowed on the player page's prose block and its pull figures, nowhere else. */
+  --font-read: "Newsreader", "Iowan Old Style", "Charter", Georgia, serif;
+  --t-read: 1.1875rem;  /* 19 capsule prose */
+  --t-pull: 2.75rem;    /* 44 a pull figure, the same step as --t-2xl */
+
+  /* Type scale, 1.2 ratio from a 14px base. Numbers use --font-num at the top three. */
+  --t-xs: 0.6875rem;   /* 11 labels on cells, uppercase, tracked */
+  --t-sm: 0.8125rem;   /* 13 secondary text */
+  --t-md: 0.9375rem;   /* 15 names, body in rows */
+  --t-lg: 1.125rem;    /* 18 section heads, prose */
+  --t-xl: 1.625rem;    /* 26 cell numbers in display face */
+  --t-2xl: 2.75rem;    /* 44 tier cliffs, clock */
+  --t-3xl: 5.5rem;     /* 88 the one big number on a page */
+  --track-label: 0.08em;
+
+  /* Space and shape. Rows are 52px on desktop and 48 on the phone. Radii are small:
+     a press box is glass and steel, not pillows. */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --row-h: 52px;
+  --rail-w: 84px;
+  --side-w: 296px;
+  --r-sm: 4px; --r-md: 8px; --r-pill: 999px;
+
+  /* Neutrals, light. True paper white with ink that leans a touch warm toward the
+     accent, so the greys read as chosen rather than default. */
+  --bg: #ffffff;
+  --surface: #f8f7f5;
+  --surface-2: #efedea;
+  --line: #e3dfda;
+  --line-strong: #cfc9c2;
+  --ink: #15120f;
+  --ink-2: #48413b;
+  --ink-3: #6b635c;      /* 5.9:1 on --bg */
+  --shell: #ffffff;      /* rail and top bar */
+  --shell-line: #e3dfda;
+
+  /* The one warm accent: burnt orange at hue 20. Streak amber (#E39A0E) sits at 38
+     and reads 2.3:1 as text on white, so it cannot carry a verb in light. This orange
+     holds 5:1 under white text and as text on paper, and stays clear of every tier hue.
+     It marks three things only: the brand, the one solid verb, and you. */
+  --accent: #c2470a;
+  --accent-ink: #ffffff;       /* text on an accent fill */
+  --accent-text: #b03f06;      /* accent used as text on --bg */
+  --accent-wash: #fdebe0;      /* your rows, your picks */
+  --focus: #c2470a;
+
+  /* Magnitude. Over replacement is tinted by the round it would go in on our board
+     of 400 (1 to 4, then none). Below replacement takes the rose wash and a minus. */
+  --heat-1: #a6e3bd;
+  --heat-2: #c8eed5;
+  --heat-3: #e0f5e7;
+  --heat-4: #f0faf3;
+  --heat-neg: #fbe1e4;
+  --heat-ink: #15120f;
+
+  /* Drafters versus us. Later is a gain for you, earlier is a cost. Always with the word. */
+  --gain-bg: #dcf3e4; --gain-ink: #11663a;
+  --loss-bg: #fbe1e4; --loss-ink: #a3243a;
+
+  /* Tiers run hot to cold down the board. Each band's label carries the tier number
+     and the drop to the next tier, so the colour is never the only channel. */
+  --tier-1: #c62a47;
+  --tier-2: #b8287f;
+  --tier-3: #7a3cb0;
+  --tier-4: #3a55b4;
+  --tier-5: #0f6f99;
+  --tier-6: #0b7a68;
+  --tier-7: #5b5a65;
+  --tier-ink: #ffffff;
+  --tier-wash: 9%;   /* how much of the tier hue tints its band */
+
+  /* The scoreboard: a lit board on black in both themes. In Commish it carries the draft room's
+     score bug and lower third, and nothing outside a live draft. The orange on it is the dark-theme
+     accent, so the brand reads the same on the board in either theme. */
+  --scoreboard: #15120f;
+  --scoreboard-2: #221d19;     /* a raised segment of the bug */
+  --scoreboard-line: #3a332d;  /* dividers between segments */
+  --scoreboard-ink: #f5f0ea;
+  --scoreboard-ink-2: #b9b0a7; /* labels on the board */
+  --scoreboard-num: #ff7130;
+  --scoreboard-num-ink: #170802; /* text on an orange segment of the bug */
+
+  --shadow-pop: 0 1px 2px rgb(21 18 15 / 0.06), 0 8px 24px rgb(21 18 15 / 0.08);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #090807; --surface: #12100e; --surface-2: #1b1815; --line: #29241f; --line-strong: #3a332d;
+    --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
+    --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
+    --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
+    --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f;
+    --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
+    --tier-ink: #ffffff; --tier-wash: 16%;
+    --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
+    --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #090807; --surface: #12100e; --surface-2: #1b1815; --line: #29241f; --line-strong: #3a332d;
+  --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
+  --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
+  --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
+  --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f;
+  --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
+  --tier-ink: #ffffff; --tier-wash: 16%;
+    --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
+  --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:var(--t-md);line-height:1.4;
+  -webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:0.01em}
+.label{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);font-weight:500}
+.app{display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);min-height:100vh}
+.rail{position:sticky;top:0;height:100vh;background:var(--shell);border-right:1px solid var(--shell-line);
+  display:flex;flex-direction:column;align-items:stretch;gap:var(--s-1);padding-block:var(--s-4)}
+.mark{display:grid;place-items:center;height:56px;margin-bottom:var(--s-3);text-decoration:none}
+.mark b{font-family:var(--font-num);font-weight:800;font-size:30px;line-height:1;color:var(--ink);
+  border-bottom:4px solid var(--accent);padding-bottom:2px}
+.rail a.item{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;text-decoration:none;
+  color:var(--ink-3);font-size:var(--t-xs);font-weight:500;text-align:center;border-left:3px solid transparent}
+.rail a.item:hover{color:var(--ink)}
+.rail a.item[aria-current="page"]{color:var(--accent-text);border-left-color:var(--accent)}
+.rail .spacer{flex:1}
+.main{min-width:0;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:5;background:var(--shell);border-bottom:1px solid var(--shell-line);
+  display:flex;align-items:center;gap:var(--s-4);padding:var(--s-3) var(--s-5);min-height:68px}
+.top h1{margin:0;font-size:var(--t-lg);font-weight:700;white-space:nowrap}
+.search{flex:1;max-width:620px;display:flex;align-items:center;gap:var(--s-2);height:42px;padding:0 var(--s-3);
+  border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);color:var(--ink-3)}
+.search input{flex:1;min-width:0;border:0;background:transparent;font:inherit;color:var(--ink);outline:none}
+.search input::placeholder{color:var(--ink-3)}
+.search kbd{font-family:var(--font-ui);font-size:var(--t-xs);border:1px solid var(--line-strong);border-radius:var(--r-sm);padding:1px 6px}
+.top .tail{margin-left:auto;display:flex;align-items:center;gap:var(--s-3)}
+.quiet{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 var(--s-3);border-radius:var(--r-md);
+  border:1px solid var(--line-strong);background:transparent;cursor:pointer;font-size:var(--t-sm);font-weight:500;color:var(--ink-2);text-decoration:none}
+.quiet:hover{color:var(--ink);border-color:var(--ink-3)}
+.theme{display:flex;gap:2px;padding:3px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface)}
+.theme button{height:30px;padding:0 10px;border:0;border-radius:var(--r-sm);background:transparent;cursor:pointer;
+  font-size:var(--t-sm);font-weight:500;color:var(--ink-2)}
+.theme button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.verb{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 var(--s-5);
+  border:0;border-radius:var(--r-md);background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:var(--t-md);
+  cursor:pointer;text-decoration:none;white-space:nowrap}
+.verb:hover{filter:brightness(1.06)}
+.chips{display:flex;flex-wrap:wrap;gap:var(--s-2);align-items:center}
+.chip{height:32px;padding:0 var(--s-3);border-radius:var(--r-pill);border:1px solid var(--line-strong);background:transparent;
+  font-size:var(--t-sm);font-weight:500;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.chip-group{display:flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface)}
+.chip-group .chip{border-color:transparent;height:28px}
+.face{flex:none;border-radius:50%;background:var(--surface-2);overflow:hidden;display:grid;place-items:end center}
+.face img{width:140%;max-width:none;height:auto;display:block;transform:translateY(6%)}
+.pos{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);
+  background:var(--surface-2);color:var(--ink);font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em;white-space:nowrap}
+.tier-chip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);
+  color:var(--tier-ink);font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em}
+.t1{--tier:var(--tier-1)}.t2{--tier:var(--tier-2)}.t3{--tier:var(--tier-3)}.t4{--tier:var(--tier-4)}
+.t5{--tier:var(--tier-5)}.t6{--tier:var(--tier-6)}.t7{--tier:var(--tier-7)}
+.tier-chip{background:var(--tier)}
+.heat-1{background:var(--heat-1)}.heat-2{background:var(--heat-2)}.heat-3{background:var(--heat-3)}
+.heat-4{background:var(--heat-4)}.heat-neg{background:var(--heat-neg)}.heat-0{background:transparent}
+.gap{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:var(--r-sm);font-size:var(--t-sm);font-weight:600;white-space:nowrap}
+.gap.later{background:var(--gain-bg);color:var(--gain-ink)}
+.gap.earlier{background:var(--loss-bg);color:var(--loss-ink)}
+.gap.even{background:var(--surface-2);color:var(--ink-2)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+@media (max-width: 760px){
+  :root{--row-h:48px}
+  .app{grid-template-columns:minmax(0,1fr);padding-bottom:64px}
+  .rail{position:fixed;inset:auto 0 0 0;top:auto;height:auto;z-index:20;flex-direction:row;justify-content:space-around;
+    padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid var(--shell-line)}
+  .rail .mark,.rail .spacer,.rail a.item.wide-only{display:none}
+  .rail a.item{border-left:0;border-top:3px solid transparent;padding:6px 2px;flex:1}
+  .rail a.item[aria-current="page"]{border-top-color:var(--accent)}
+  .top{padding:var(--s-2) var(--s-4);gap:var(--s-2);flex-wrap:wrap;min-height:0}
+  .top h1{display:none}
+  .top .search{order:3;flex-basis:100%;max-width:none;height:38px}
+  .top .tail{margin-left:auto}
+  .search kbd{display:none}
+  .theme button{height:26px;padding:0 7px;font-size:var(--t-xs)}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+
+.room{display:grid;grid-template-columns:minmax(0,1fr) 352px;gap:var(--s-5);padding:var(--s-4) var(--s-5) var(--s-6)}
+.content{min-width:0;display:flex;flex-direction:column;gap:var(--s-4)}
+.dock{display:flex;flex-direction:column;gap:var(--s-4);align-self:start;position:sticky;top:84px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s-3) var(--s-4);min-height:48px}
+.bar .where{display:flex;align-items:baseline;gap:var(--s-2);white-space:nowrap}
+.bar .where b{font-family:var(--font-num);font-weight:800;font-size:30px;line-height:1;text-transform:uppercase}
+.bar .where span{font-size:var(--t-sm);color:var(--ink-2)}
+.bar .you-next{display:flex;align-items:baseline;gap:6px;white-space:nowrap;color:var(--ink-2);font-size:var(--t-sm)}
+.bar .you-next b{font-family:var(--font-num);font-weight:700;font-size:22px;line-height:1;color:var(--ink)}
+.bar .acts{margin-left:auto;display:flex;flex-wrap:wrap;gap:var(--s-2)}
+.quiet kbd{font-family:var(--font-ui);font-size:10px;border:1px solid var(--line-strong);border-radius:3px;padding:0 5px;color:var(--ink-3)}
+.since{display:flex;align-items:center;gap:var(--s-3);padding:var(--s-3) var(--s-4);overflow-x:auto}
+.since .lead{flex:none;display:flex;flex-direction:column;gap:2px;padding-right:var(--s-3);border-right:1px solid var(--line)}
+.since .lead b{font-family:var(--font-num);font-weight:800;font-size:26px;line-height:1}
+.since .lead span{font-size:var(--t-xs);color:var(--ink-3);white-space:nowrap}
+.since .run{display:flex;gap:var(--s-2)}
+.since .went{flex:none;display:flex;flex-direction:column;align-items:center;gap:3px;width:58px;font-size:10px;color:var(--ink-3);text-align:center}
+.since .went b{font-weight:600;color:var(--ink);white-space:nowrap;max-width:58px;overflow:hidden;text-overflow:ellipsis;font-size:11px}
+.since .went.queued .face{box-shadow:0 0 0 2px var(--accent)}
+.since .went.queued span{color:var(--accent-text);font-weight:600}
+.call{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--s-4);align-items:center;padding:var(--s-4);
+  border-left:4px solid var(--accent)}
+.call .tag{display:block;font-size:var(--t-xs);font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--accent-text);margin-bottom:4px}
+.call h2{margin:0;font-family:var(--font-num);font-weight:800;font-size:38px;line-height:0.95;text-transform:uppercase;text-wrap:balance}
+.call .meta{display:flex;gap:6px;align-items:center;font-size:var(--t-sm);color:var(--ink-2);margin:6px 0 8px}
+.call p{margin:0;font-size:var(--t-md);color:var(--ink-2);max-width:60ch}
+.call p b{color:var(--ink);font-weight:600}
+.call .odds-big{display:flex;flex-direction:column;align-items:flex-end;gap:var(--s-2);text-align:right}
+.call .odds-big b{font-family:var(--font-num);font-weight:800;font-size:72px;line-height:0.8;font-variant-numeric:tabular-nums}
+.call .odds-big span{font-size:var(--t-sm);color:var(--ink-2);max-width:22ch}
+.call .verb{height:46px;min-width:200px}
+.call .verb kbd{font-family:var(--font-ui);font-size:10px;border:1px solid rgba(255,255,255,.5);border-radius:3px;padding:0 5px;opacity:.9}
+.pool-head{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s-3)}
+.pool-head h2{margin:0;font-family:var(--font-num);font-weight:800;font-size:30px;line-height:1;text-transform:uppercase}
+.pool-head .chips{margin-left:auto}
+.prow{display:grid;grid-template-columns:40px minmax(0,1fr) 118px 136px 118px 150px;align-items:center;column-gap:var(--s-3);
+  min-height:var(--row-h);padding:4px var(--s-3);border-bottom:1px solid var(--line)}
+.prow.head{min-height:0;padding-bottom:var(--s-2);border-bottom:1px solid var(--line-strong)}
+.prow.call-row{background:var(--accent-wash)}
+.prow .who{min-width:0;display:flex;flex-direction:column;gap:2px}
+.prow .who b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .meta{display:flex;gap:6px;align-items:center;font-size:var(--t-sm);color:var(--ink-3)}
+.prow .acts{display:flex;gap:6px;justify-content:flex-end}
+.prow .acts .quiet{height:34px;padding:0 10px}
+.c{display:flex;flex-direction:column;justify-content:center;align-items:flex-end;height:calc(var(--row-h) - 8px);padding:0 var(--s-3);border-radius:var(--r-sm)}
+.c b{font-family:var(--font-num);font-weight:700;font-size:var(--t-xl);line-height:1;font-variant-numeric:tabular-nums}
+.c .label{font-size:10px;margin-top:3px;white-space:nowrap}
+.vor{color:var(--heat-ink)}.vor .label{color:inherit}
+.odds{align-items:stretch}
+.odds .ot{display:flex;justify-content:space-between;align-items:baseline}
+.odds .meter{height:5px;border-radius:3px;background:var(--surface-2);margin-top:5px;overflow:hidden}
+.odds .meter i{display:block;height:100%;background:var(--ink-2)}
+.r{text-align:right}
+.wall-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
+.wall{display:grid;grid-template-columns:24px repeat(12,minmax(0,1fr));min-width:860px}
+.wall .h{padding:8px 6px;font-size:var(--t-xs);font-weight:600;color:var(--ink-3);border-bottom:1px solid var(--line);
+  text-transform:uppercase;letter-spacing:var(--track-label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wall .h.you{color:var(--accent-text)}
+.wall .rd{display:grid;place-items:center;font-family:var(--font-num);font-weight:700;font-size:18px;color:var(--ink-3);border-bottom:1px solid var(--line)}
+.cell{display:grid;grid-template-columns:22px minmax(0,1fr);grid-template-rows:auto auto;column-gap:5px;row-gap:3px;align-items:center;
+  padding:6px;min-height:54px;min-width:0;border-bottom:1px solid var(--line);border-left:1px solid var(--line);font-size:12.5px}
+.cell b{grid-column:1 / -1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell span.s{font-size:10px;color:var(--ink-3);white-space:nowrap}
+.cell.mine{background:var(--accent-wash);box-shadow:inset 3px 0 0 var(--accent)}
+.cell.now{display:flex;flex-direction:column;justify-content:center;gap:2px;outline:2px dashed var(--accent);outline-offset:-4px;
+  background:var(--accent-wash);color:var(--accent-text);font-weight:700}
+.cell.now span{font-size:10px;font-weight:500}
+.cell.empty{color:var(--ink-3)}
+.team{padding:var(--s-4)}
+.team h3{margin:0 0 var(--s-3);font-size:var(--t-md);display:flex;justify-content:space-between;align-items:baseline}
+.team h3 span{font-size:var(--t-xs);color:var(--ink-3);font-weight:500}
+.team ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.team li{display:grid;grid-template-columns:40px 32px 1fr auto;gap:var(--s-2);align-items:center;font-size:var(--t-sm);min-height:32px}
+.team li .slot{font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em;color:var(--ink-3)}
+.team li.open{color:var(--ink-3)}
+.team li.open .slot{color:var(--accent-text)}
+.team li .hole{grid-column:2 / span 2;height:28px;border:1px dashed var(--line-strong);border-radius:var(--r-sm)}
+.team li .pk{font-family:var(--font-num);font-weight:700;font-size:16px;color:var(--ink-2)}
+.team .need{margin-top:var(--s-3);padding-top:var(--s-3);border-top:1px solid var(--line);font-size:var(--t-sm);color:var(--ink-2)}
+.team .need b{color:var(--ink)}
+.keys{padding:var(--s-3) var(--s-4);display:grid;grid-template-columns:auto 1fr;gap:4px var(--s-3);font-size:var(--t-sm);color:var(--ink-2);align-items:center}
+.keys kbd{font-family:var(--font-ui);font-size:11px;border:1px solid var(--line-strong);border-radius:4px;padding:1px 7px;color:var(--ink);justify-self:start}
+.seed{font-size:var(--t-xs);color:var(--ink-3);padding:0 var(--s-1)}
+@media (max-width: 1180px){.room{grid-template-columns:minmax(0,1fr) 300px}.prow{grid-template-columns:40px minmax(0,1fr) 108px 126px 108px 44px}.prow .acts .q{display:none}}
+@media (max-width: 760px){
+  .room{grid-template-columns:minmax(0,1fr);padding:var(--s-3) var(--s-4) var(--s-5);gap:var(--s-3)}
+  .dock{position:static}
+  .bar .acts{margin-left:0;width:100%}
+  .call{grid-template-columns:auto minmax(0,1fr);row-gap:var(--s-3);padding:var(--s-3)}
+  .call h2{font-size:28px}
+  .call .odds-big{grid-column:1 / -1;flex-direction:row;flex-wrap:wrap;align-items:flex-end;justify-content:flex-start;gap:var(--s-3);text-align:left}
+  .call .odds-big b{font-size:56px}
+  .call .odds-big span{flex:1;min-width:0}
+  .call .verb{min-width:0;flex-basis:100%}
+  .since{padding:var(--s-3)}
+  .prow{grid-template-columns:36px minmax(0,1fr) 84px 84px;padding:4px 0;column-gap:var(--s-2)}
+  .prow .gapc,.prow .acts{display:none}
+  .c{padding:0 var(--s-2);height:auto;min-height:calc(var(--row-h) - 8px)}
+  .c b{font-size:20px}
+  .c .label{white-space:normal;text-align:right;line-height:1.1}
+  .keys{display:none}
+}
+
+.report{padding:var(--s-4) var(--s-5) var(--s-7);display:grid;grid-template-columns:minmax(0,1fr) 352px;gap:var(--s-5)}
+.hero{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--s-5);align-items:end;padding:var(--s-4) 0 var(--s-5);border-bottom:1px solid var(--line)}
+.hero .big b{display:block;font-family:var(--font-num);font-weight:800;font-size:var(--t-3xl);line-height:0.8;font-variant-numeric:tabular-nums}
+.hero .big span{display:block;margin-top:8px;font-size:var(--t-sm);color:var(--ink-2);max-width:30ch}
+.hero h2{margin:0 0 6px;font-family:var(--font-num);font-weight:800;font-size:38px;line-height:0.95;text-transform:uppercase}
+.hero p{margin:0;color:var(--ink-2);max-width:62ch}
+.hero .acts{display:flex;flex-wrap:wrap;gap:var(--s-2);margin-top:var(--s-3)}
+.sec h3{margin:var(--s-5) 0 var(--s-3);font-family:var(--font-num);font-weight:800;font-size:26px;line-height:1;text-transform:uppercase;display:flex;align-items:baseline;gap:var(--s-3)}
+.sec h3 span{font-family:var(--font-ui);font-weight:500;font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3)}
+.field{display:flex;flex-direction:column;gap:4px}
+.field .t{display:grid;grid-template-columns:28px 120px minmax(0,1fr) 70px;gap:var(--s-2);align-items:center;font-size:var(--t-sm);min-height:26px}
+.field .t .n{font-family:var(--font-num);font-weight:700;font-size:16px;color:var(--ink-3)}
+.field .t .barw{height:16px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.field .t .barw i{display:block;height:100%;background:var(--ink-3)}
+.field .t.you{font-weight:600}
+.field .t.you .barw i{background:var(--accent)}
+.field .t .pts{font-family:var(--font-num);font-weight:700;font-size:18px;text-align:right;font-variant-numeric:tabular-nums}
+.picks{display:flex;flex-direction:column}
+.pk{display:grid;grid-template-columns:52px 36px minmax(0,1fr) 112px 150px 150px;gap:var(--s-3);align-items:center;min-height:var(--row-h);padding:4px 0;border-bottom:1px solid var(--line);font-size:var(--t-sm)}
+.pk.head{min-height:0;padding-bottom:var(--s-2);border-bottom:1px solid var(--line-strong)}
+.pk .no{font-family:var(--font-num);font-weight:700;font-size:20px;color:var(--ink-2)}
+.pk .who{min-width:0}.pk .who b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk .who span{color:var(--ink-3);font-size:var(--t-xs)}
+.pk .vor{font-family:var(--font-num);font-weight:700;font-size:20px;text-align:right;font-variant-numeric:tabular-nums}
+.tagc{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:var(--r-sm);font-size:var(--t-xs);font-weight:600;white-space:nowrap}
+.tagc.ok{background:var(--gain-bg);color:var(--gain-ink)}
+.tagc.wait{background:var(--loss-bg);color:var(--loss-ink)}
+.tagc.even{background:var(--surface-2);color:var(--ink-2)}
+.hist{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;align-items:end;height:120px;margin-top:var(--s-2)}
+.hist i{display:block;background:var(--ink-3);border-radius:2px 2px 0 0;min-height:2px}
+.hist i.med{background:var(--accent)}
+.hist-x{display:flex;justify-content:space-between;font-size:var(--t-xs);color:var(--ink-3);margin-top:4px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s-3);margin-top:var(--s-3)}
+.stat{padding:var(--s-3);border:1px solid var(--line);border-radius:var(--r-md)}
+.stat b{display:block;font-family:var(--font-num);font-weight:800;font-size:34px;line-height:0.9;font-variant-numeric:tabular-nums}
+.stat span{display:block;margin-top:6px;font-size:var(--t-xs);color:var(--ink-3)}
+.expo{display:flex;flex-direction:column;gap:6px}
+.expo .e{display:grid;grid-template-columns:32px minmax(0,1fr) 110px 48px;gap:var(--s-2);align-items:center;font-size:var(--t-sm)}
+.expo .e b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.expo .e .barw{height:8px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.expo .e .barw i{display:block;height:100%;background:var(--ink-2)}
+.expo .e .pct{font-family:var(--font-num);font-weight:700;font-size:18px;text-align:right}
+.basis{font-size:var(--t-xs);color:var(--ink-3);margin-top:var(--s-3);max-width:70ch}
+.ranks{display:flex;gap:4px;margin-top:var(--s-3)}
+.ranks span{flex:1;text-align:center;font-size:var(--t-xs);color:var(--ink-3)}
+.ranks span b{display:block;font-family:var(--font-num);font-weight:700;font-size:18px;color:var(--ink)}
+.ranks span.you b{color:var(--accent-text)}
+@media (max-width: 1180px){.report{grid-template-columns:minmax(0,1fr) 300px}.pk{grid-template-columns:48px 36px minmax(0,1fr) 90px 130px}.pk .gapc{display:none}}
+@media (max-width: 760px){
+  .report{grid-template-columns:minmax(0,1fr);padding:var(--s-3) var(--s-4) var(--s-6)}
+  .hero{grid-template-columns:minmax(0,1fr);gap:var(--s-3)}
+  .hero .big b{font-size:64px}.hero h2{font-size:28px}
+  .pk{grid-template-columns:44px 32px minmax(0,1fr) 70px}.pk .hind,.pk .gapc{display:none}
+  .stats{grid-template-columns:1fr 1fr}
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="rail" aria-label="Sections">
+  <a class="mark" href="direction.html" aria-label="Commish"><b>C</b></a>
+  <a class="item" href="board.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg><span>Board</span></a><a class="item" href="player.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Players</span></a><a class="item" href="setup.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16M15 4v16"/></svg><span>Mock draft</span></a><a class="item" href="board.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h5"/></svg><span>Cheat sheet</span></a><a class="item wide-only" href="mock.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Advisor</span></a><a class="item wide-only" href="direction.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Our record</span></a>
+  <span class="spacer"></span>
+  <a class="item wide-only" href="direction.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18c1.5-2 3.4-3 5.5-3s4 1 5.5 3"/></svg><span>Account</span></a>
+</nav>
+<div class="main">
+<header class="top">
+  <h1>Mock draft</h1>
+  <label class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="q" type="search" placeholder="Search 400 players" aria-label="Search players"><kbd>/</kbd></label>
+  <div class="tail">
+    <div class="theme" role="group" aria-label="Theme"><button type="button" data-set="auto" aria-pressed="true">Auto</button><button type="button" data-set="light" aria-pressed="false">Light</button><button type="button" data-set="dark" aria-pressed="false">Dark</button></div>
+    <a class="quiet" href="setup.html">New mock</a>
+  </div>
+</header>
+<main class="report">
+<div class="content">
+  <div class="hero">
+    <div class="big"><b>1,597</b><span>projected points from your starters, 1st of 12, the next team at 1,535</span></div>
+    <div><h2>Your draft from slot 8</h2>
+      <p>12 teams, PPR, 14 rounds, bots drafting from where drafters take players. Starters: QB Prescott, RB Achane, RB Henry, WR Brown, WR Williams, TE Kelce, FLEX Sutton. Points are our projections, the same numbers the board ranks by, so a team drafted off the board should lead this table. The useful read is how far ahead, and where it came from.</p>
+      <div class="acts"><a class="verb" href="mock.html">Run it again from slot 8</a><a class="quiet" href="setup.html">Try another slot</a><button class="quiet" type="button">Save this draft as a sheet</button><button class="quiet" type="button">Copy a share link</button></div>
+    </div>
+  </div>
+  <section class="sec"><h3>The field <span>projected starting points, 12 teams</span></h3><div class="field"><div class="t you"><span class="n">1</span><span>You</span><span class="barw"><i style="width:100.0%"></i></span><span class="pts">1,597</span></div><div class="t"><span class="n">2</span><span>Bot 5</span><span class="barw"><i style="width:96.1%"></i></span><span class="pts">1,535</span></div><div class="t"><span class="n">3</span><span>Bot 6</span><span class="barw"><i style="width:95.0%"></i></span><span class="pts">1,517</span></div><div class="t"><span class="n">4</span><span>Bot 7</span><span class="barw"><i style="width:92.5%"></i></span><span class="pts">1,477</span></div><div class="t"><span class="n">5</span><span>Bot 10</span><span class="barw"><i style="width:91.2%"></i></span><span class="pts">1,456</span></div><div class="t"><span class="n">6</span><span>Bot 4</span><span class="barw"><i style="width:90.0%"></i></span><span class="pts">1,438</span></div><div class="t"><span class="n">7</span><span>Bot 2</span><span class="barw"><i style="width:89.9%"></i></span><span class="pts">1,436</span></div><div class="t"><span class="n">8</span><span>Bot 9</span><span class="barw"><i style="width:89.6%"></i></span><span class="pts">1,432</span></div><div class="t"><span class="n">9</span><span>Bot 3</span><span class="barw"><i style="width:88.6%"></i></span><span class="pts">1,415</span></div><div class="t"><span class="n">10</span><span>Bot 8</span><span class="barw"><i style="width:85.7%"></i></span><span class="pts">1,369</span></div><div class="t"><span class="n">11</span><span>Bot 11</span><span class="barw"><i style="width:78.1%"></i></span><span class="pts">1,247</span></div><div class="t"><span class="n">12</span><span>Bot 1</span><span class="barw"><i style="width:72.3%"></i></span><span class="pts">1,154</span></div></div></section>
+  <section class="sec"><h3>Pick by pick <span>what you took, what drafters do, and whether he would have lasted</span></h3>
+    <div class="picks"><div class="pk head"><span class="label">Pick</span><span></span><span class="label">Player</span><span class="label r">Over repl</span><span class="label gapc">Against ADP</span><span class="label hind">Hindsight</span></div><div class="pk"><span class="no">1.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4374302.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Amon-Ra St. Brown</b><span>WR 4 · DET</span></span>
+  <span class="vor">+115.2</span><span class="gapc"><span class="tagc ok">3 after drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">2.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4429160.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>De&#x27;Von Achane</b><span>RB 3 · MIA</span></span>
+  <span class="vor">+97.3</span><span class="gapc"><span class="tagc wait">4 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">3.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3043078.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Derrick Henry</b><span>RB 11 · BAL</span></span>
+  <span class="vor">+63.3</span><span class="gapc"><span class="tagc wait">7 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, 36% there next turn</span></span></div><div class="pk"><span class="no">4.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4427366.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Breece Hall</b><span>RB 13 · NYJ</span></span>
+  <span class="vor">+43.4</span><span class="gapc"><span class="tagc even">at ADP</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">5.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4426388.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Jameson Williams</b><span>WR 18 · DET</span></span>
+  <span class="vor">+42.9</span><span class="gapc"><span class="tagc even">at ADP</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">6.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/2577417.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Dak Prescott</b><span>QB 5 · DAL</span></span>
+  <span class="vor">+22.2</span><span class="gapc"><span class="tagc wait">12 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, 13% there next turn</span></span></div><div class="pk"><span class="no">7.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3128429.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Courtland Sutton</b><span>WR 25 · DEN</span></span>
+  <span class="vor">+21.1</span><span class="gapc"><span class="tagc wait">4 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">8.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/15847.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Travis Kelce</b><span>TE 7 · KC</span></span>
+  <span class="vor">+6.7</span><span class="gapc"><span class="tagc wait">9 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">9.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4361050.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Isaiah Likely</b><span>TE 8 · NYG</span></span>
+  <span class="vor">+6.6</span><span class="gapc"><span class="tagc wait">18 before drafters</span></span><span class="hind"><span class="tagc wait">could wait, 96% there next turn</span></span></div><div class="pk"><span class="no">10.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3052587.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Baker Mayfield</b><span>QB 11 · TB</span></span>
+  <span class="vor">+0.8</span><span class="gapc"><span class="tagc wait">5 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">11.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4683062.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Xavier Worthy</b><span>WR 46 · KC</span></span>
+  <span class="vor">−20.1</span><span class="gapc"><span class="tagc even">at ADP</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">12.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4428718.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Tre Tucker</b><span>WR 47 · LV</span></span>
+  <span class="vor">−21.2</span><span class="gapc"><span class="tagc wait">25 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, 58% there next turn</span></span></div><div class="pk"><span class="no">13.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4241463.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Jerry Jeudy</b><span>WR 49 · CLE</span></span>
+  <span class="vor">−27.7</span><span class="gapc"><span class="tagc wait">17 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, 9% there next turn</span></span></div><div class="pk"><span class="no">14.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/15818.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="who"><b>Keenan Allen</b><span>WR 52 · IND</span></span>
+  <span class="vor">−39.6</span><span class="gapc"><span class="tagc wait">32 before drafters</span></span><span class="hind"><span class="tagc even">last pick</span></span></div></div>
+    <p class="basis">Hindsight odds are the chance he was still there at your next turn, from where drafters take everyone who was still in the pool at that pick. "Could wait" starts at 60%.</p>
+  </section>
+  <section class="sec"><h3>The same draft, 200 more times <span>your picks on autopick from the board, the bots reshuffled each run</span></h3>
+    <div class="hist"><i class="" style="height:7%" title="4 runs"></i><i class="" style="height:7%" title="4 runs"></i><i class="" style="height:0%" title="0 runs"></i><i class="" style="height:4%" title="2 runs"></i><i class="" style="height:16%" title="9 runs"></i><i class="" style="height:36%" title="20 runs"></i><i class="" style="height:64%" title="36 runs"></i><i class="med" style="height:50%" title="28 runs"></i><i class="" style="height:100%" title="56 runs"></i><i class="" style="height:38%" title="21 runs"></i><i class="" style="height:20%" title="11 runs"></i><i class="" style="height:16%" title="9 runs"></i></div><div class="hist-x"><span>1,483</span><span>median 1,592</span><span>1,648</span></div>
+    <div class="stats"><div class="stat"><b>1,592</b><span>median starting points</span></div><div class="stat"><b>1,559 to 1,621</b><span>the middle 80% of runs</span></div><div class="stat"><b>98%</b><span>of runs finish top 3 of 12</span></div></div>
+    <div class="ranks"><span class=you><b>174</b>1st</span><span><b>18</b>2nd</span><span><b>3</b>3rd</span><span><b>3</b>4th</span><span><b>0</b>5th</span><span><b>2</b>6th</span></div>
+    <p class="basis">Bots pick from ADP with the same spread the survival odds use, so these 200 runs and the odds you saw in the room describe one world. A bot that reaches or hunts a position would widen the band. Seeds 1 to 200.</p>
+  </section>
+</div>
+<aside class="dock">
+  <div class="team panel"><h3>Who you end up with <span>share of 200 runs</span></h3><div class="expo"><div class="e"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/2577417.png" alt="" loading="lazy" width="32" height="32"></span><b>Dak Prescott <span class="label">QB 5</span></b><span class="barw"><i style="width:99%"></i></span><span class="pct">99%</span></div><div class="e"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4428718.png" alt="" loading="lazy" width="32" height="32"></span><b>Tre Tucker <span class="label">WR 47</span></b><span class="barw"><i style="width:98%"></i></span><span class="pct">98%</span></div><div class="e"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4429160.png" alt="" loading="lazy" width="32" height="32"></span><b>De&#x27;Von Achane <span class="label">RB 3</span></b><span class="barw"><i style="width:94%"></i></span><span class="pct">94%</span></div><div class="e"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3128429.png" alt="" loading="lazy" width="32" height="32"></span><b>Courtland Sutton <span class="label">WR 25</span></b><span class="barw"><i style="width:94%"></i></span><span class="pct">94%</span></div><div class="e"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/15847.png" alt="" loading="lazy" width="32" height="32"></span><b>Travis Kelce <span class="label">TE 7</span></b><span class="barw"><i style="width:94%"></i></span><span class="pct">94%</span></div><div class="e"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4241463.png" alt="" loading="lazy" width="32" height="32"></span><b>Jerry Jeudy <span class="label">WR 49</span></b><span class="barw"><i style="width:94%"></i></span><span class="pct">94%</span></div><div class="e"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3116389.png" alt="" loading="lazy" width="32" height="32"></span><b>Samaje Perine <span class="label">RB 43</span></b><span class="barw"><i style="width:88%"></i></span><span class="pct">88%</span></div><div class="e"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4361050.png" alt="" loading="lazy" width="32" height="32"></span><b>Isaiah Likely <span class="label">TE 8</span></b><span class="barw"><i style="width:81%"></i></span><span class="pct">81%</span></div></div>
+    <div class="need">Every player you land in more than half the runs from slot 8 is a player to know cold.</div></div>
+</aside>
+</main>
+</div>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement, KEY='commish-theme';
+  var buttons=[].slice.call(document.querySelectorAll('.theme button'));
+  function mark(mode){buttons.forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-set')===mode));});}
+  function apply(mode){if(mode==='auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme',mode); mark(mode);}
+  var saved=null;
+  try{saved=localStorage.getItem(KEY);}catch(e){saved=null;}
+  if(saved) apply(saved); else mark(root.getAttribute('data-theme')||'auto');
+  buttons.forEach(function(b){b.addEventListener('click',function(){
+    var mode=b.getAttribute('data-set'); apply(mode);
+    try{localStorage.setItem(KEY,mode);}catch(e){}
+  });});
+})();
+</script>
+
+
+</body>
+</html>

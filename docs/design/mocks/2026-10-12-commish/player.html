@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Commish Chris Olave</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;800&family=Outfit:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap">
+<style>
+/* Commish tokens: the Press Box system with two bounded borrowings. One file, both themes.
+   Layout concept: a near-black or paper-white shell, an icon rail on the left, a persistent
+   search across the top, dense rows in the middle, a filter and sheet rail on the right.
+   Borrowed from Scout: a reading serif, allowed on the player page's prose and its pull figures only.
+   Borrowed from Broadcast: the score bug and the lower third, allowed in a live draft room only.
+   Light values live on bare :root. Dark redefines tokens only, twice, so the OS
+   setting and the explicit data-theme toggle both win. */
+
+:root {
+  /* Type. Outfit is the geometric UI face: Poppins's circles with a tighter set width,
+     so a dense row holds "Jaxon Smith-Njigba" at 15px without truncating.
+     Big Shoulders Display is the condensed number face, drawn from stadium and
+     transit lettering, narrow enough that 344.1 fits a 64px cell at display size. */
+  --font-ui: "Outfit", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Big Shoulders Display", "Oswald", "Arial Narrow", sans-serif;
+  /* Newsreader is the reading face. Optical sizes cut for long screen reading, because the
+     capsule is writing. Allowed on the player page's prose block and its pull figures, nowhere else. */
+  --font-read: "Newsreader", "Iowan Old Style", "Charter", Georgia, serif;
+  --t-read: 1.1875rem;  /* 19 capsule prose */
+  --t-pull: 2.75rem;    /* 44 a pull figure, the same step as --t-2xl */
+
+  /* Type scale, 1.2 ratio from a 14px base. Numbers use --font-num at the top three. */
+  --t-xs: 0.6875rem;   /* 11 labels on cells, uppercase, tracked */
+  --t-sm: 0.8125rem;   /* 13 secondary text */
+  --t-md: 0.9375rem;   /* 15 names, body in rows */
+  --t-lg: 1.125rem;    /* 18 section heads, prose */
+  --t-xl: 1.625rem;    /* 26 cell numbers in display face */
+  --t-2xl: 2.75rem;    /* 44 tier cliffs, clock */
+  --t-3xl: 5.5rem;     /* 88 the one big number on a page */
+  --track-label: 0.08em;
+
+  /* Space and shape. Rows are 52px on desktop and 48 on the phone. Radii are small:
+     a press box is glass and steel, not pillows. */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --row-h: 52px;
+  --rail-w: 84px;
+  --side-w: 296px;
+  --r-sm: 4px; --r-md: 8px; --r-pill: 999px;
+
+  /* Neutrals, light. True paper white with ink that leans a touch warm toward the
+     accent, so the greys read as chosen rather than default. */
+  --bg: #ffffff;
+  --surface: #f8f7f5;
+  --surface-2: #efedea;
+  --line: #e3dfda;
+  --line-strong: #cfc9c2;
+  --ink: #15120f;
+  --ink-2: #48413b;
+  --ink-3: #6b635c;      /* 5.9:1 on --bg */
+  --shell: #ffffff;      /* rail and top bar */
+  --shell-line: #e3dfda;
+
+  /* The one warm accent: burnt orange at hue 20. Streak amber (#E39A0E) sits at 38
+     and reads 2.3:1 as text on white, so it cannot carry a verb in light. This orange
+     holds 5:1 under white text and as text on paper, and stays clear of every tier hue.
+     It marks three things only: the brand, the one solid verb, and you. */
+  --accent: #c2470a;
+  --accent-ink: #ffffff;       /* text on an accent fill */
+  --accent-text: #b03f06;      /* accent used as text on --bg */
+  --accent-wash: #fdebe0;      /* your rows, your picks */
+  --focus: #c2470a;
+
+  /* Magnitude. Over replacement is tinted by the round it would go in on our board
+     of 400 (1 to 4, then none). Below replacement takes the rose wash and a minus. */
+  --heat-1: #a6e3bd;
+  --heat-2: #c8eed5;
+  --heat-3: #e0f5e7;
+  --heat-4: #f0faf3;
+  --heat-neg: #fbe1e4;
+  --heat-ink: #15120f;
+
+  /* Drafters versus us. Later is a gain for you, earlier is a cost. Always with the word. */
+  --gain-bg: #dcf3e4; --gain-ink: #11663a;
+  --loss-bg: #fbe1e4; --loss-ink: #a3243a;
+
+  /* Tiers run hot to cold down the board. Each band's label carries the tier number
+     and the drop to the next tier, so the colour is never the only channel. */
+  --tier-1: #c62a47;
+  --tier-2: #b8287f;
+  --tier-3: #7a3cb0;
+  --tier-4: #3a55b4;
+  --tier-5: #0f6f99;
+  --tier-6: #0b7a68;
+  --tier-7: #5b5a65;
+  --tier-ink: #ffffff;
+  --tier-wash: 9%;   /* how much of the tier hue tints its band */
+
+  /* The scoreboard: a lit board on black in both themes. In Commish it carries the draft room's
+     score bug and lower third, and nothing outside a live draft. The orange on it is the dark-theme
+     accent, so the brand reads the same on the board in either theme. */
+  --scoreboard: #15120f;
+  --scoreboard-2: #221d19;     /* a raised segment of the bug */
+  --scoreboard-line: #3a332d;  /* dividers between segments */
+  --scoreboard-ink: #f5f0ea;
+  --scoreboard-ink-2: #b9b0a7; /* labels on the board */
+  --scoreboard-num: #ff7130;
+  --scoreboard-num-ink: #170802; /* text on an orange segment of the bug */
+
+  --shadow-pop: 0 1px 2px rgb(21 18 15 / 0.06), 0 8px 24px rgb(21 18 15 / 0.08);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #090807; --surface: #12100e; --surface-2: #1b1815; --line: #29241f; --line-strong: #3a332d;
+    --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
+    --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
+    --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
+    --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f;
+    --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
+    --tier-ink: #ffffff; --tier-wash: 16%;
+    --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
+    --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #090807; --surface: #12100e; --surface-2: #1b1815; --line: #29241f; --line-strong: #3a332d;
+  --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
+  --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
+  --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
+  --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f;
+  --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
+  --tier-ink: #ffffff; --tier-wash: 16%;
+    --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
+  --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:var(--t-md);line-height:1.4;
+  -webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:0.01em}
+.label{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);font-weight:500}
+.app{display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);min-height:100vh}
+.rail{position:sticky;top:0;height:100vh;background:var(--shell);border-right:1px solid var(--shell-line);
+  display:flex;flex-direction:column;align-items:stretch;gap:var(--s-1);padding-block:var(--s-4)}
+.mark{display:grid;place-items:center;height:56px;margin-bottom:var(--s-3);text-decoration:none}
+.mark b{font-family:var(--font-num);font-weight:800;font-size:30px;line-height:1;color:var(--ink);
+  border-bottom:4px solid var(--accent);padding-bottom:2px}
+.rail a.item{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;text-decoration:none;
+  color:var(--ink-3);font-size:var(--t-xs);font-weight:500;text-align:center;border-left:3px solid transparent}
+.rail a.item:hover{color:var(--ink)}
+.rail a.item[aria-current="page"]{color:var(--accent-text);border-left-color:var(--accent)}
+.rail .spacer{flex:1}
+.main{min-width:0;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:5;background:var(--shell);border-bottom:1px solid var(--shell-line);
+  display:flex;align-items:center;gap:var(--s-4);padding:var(--s-3) var(--s-5);min-height:68px}
+.top h1{margin:0;font-size:var(--t-lg);font-weight:700;white-space:nowrap}
+.search{flex:1;max-width:620px;display:flex;align-items:center;gap:var(--s-2);height:42px;padding:0 var(--s-3);
+  border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);color:var(--ink-3)}
+.search input{flex:1;min-width:0;border:0;background:transparent;font:inherit;color:var(--ink);outline:none}
+.search input::placeholder{color:var(--ink-3)}
+.search kbd{font-family:var(--font-ui);font-size:var(--t-xs);border:1px solid var(--line-strong);border-radius:var(--r-sm);padding:1px 6px}
+.top .tail{margin-left:auto;display:flex;align-items:center;gap:var(--s-3)}
+.quiet{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 var(--s-3);border-radius:var(--r-md);
+  border:1px solid var(--line-strong);background:transparent;cursor:pointer;font-size:var(--t-sm);font-weight:500;color:var(--ink-2);text-decoration:none}
+.quiet:hover{color:var(--ink);border-color:var(--ink-3)}
+.theme{display:flex;gap:2px;padding:3px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface)}
+.theme button{height:30px;padding:0 10px;border:0;border-radius:var(--r-sm);background:transparent;cursor:pointer;
+  font-size:var(--t-sm);font-weight:500;color:var(--ink-2)}
+.theme button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.verb{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 var(--s-5);
+  border:0;border-radius:var(--r-md);background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:var(--t-md);
+  cursor:pointer;text-decoration:none;white-space:nowrap}
+.verb:hover{filter:brightness(1.06)}
+.chips{display:flex;flex-wrap:wrap;gap:var(--s-2);align-items:center}
+.chip{height:32px;padding:0 var(--s-3);border-radius:var(--r-pill);border:1px solid var(--line-strong);background:transparent;
+  font-size:var(--t-sm);font-weight:500;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.chip-group{display:flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface)}
+.chip-group .chip{border-color:transparent;height:28px}
+.face{flex:none;border-radius:50%;background:var(--surface-2);overflow:hidden;display:grid;place-items:end center}
+.face img{width:140%;max-width:none;height:auto;display:block;transform:translateY(6%)}
+.pos{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);
+  background:var(--surface-2);color:var(--ink);font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em;white-space:nowrap}
+.tier-chip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);
+  color:var(--tier-ink);font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em}
+.t1{--tier:var(--tier-1)}.t2{--tier:var(--tier-2)}.t3{--tier:var(--tier-3)}.t4{--tier:var(--tier-4)}
+.t5{--tier:var(--tier-5)}.t6{--tier:var(--tier-6)}.t7{--tier:var(--tier-7)}
+.tier-chip{background:var(--tier)}
+.heat-1{background:var(--heat-1)}.heat-2{background:var(--heat-2)}.heat-3{background:var(--heat-3)}
+.heat-4{background:var(--heat-4)}.heat-neg{background:var(--heat-neg)}.heat-0{background:transparent}
+.gap{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:var(--r-sm);font-size:var(--t-sm);font-weight:600;white-space:nowrap}
+.gap.later{background:var(--gain-bg);color:var(--gain-ink)}
+.gap.earlier{background:var(--loss-bg);color:var(--loss-ink)}
+.gap.even{background:var(--surface-2);color:var(--ink-2)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+@media (max-width: 760px){
+  :root{--row-h:48px}
+  .app{grid-template-columns:minmax(0,1fr);padding-bottom:64px}
+  .rail{position:fixed;inset:auto 0 0 0;top:auto;height:auto;z-index:20;flex-direction:row;justify-content:space-around;
+    padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid var(--shell-line)}
+  .rail .mark,.rail .spacer,.rail a.item.wide-only{display:none}
+  .rail a.item{border-left:0;border-top:3px solid transparent;padding:6px 2px;flex:1}
+  .rail a.item[aria-current="page"]{border-top-color:var(--accent)}
+  .top{padding:var(--s-2) var(--s-4);gap:var(--s-2);flex-wrap:wrap;min-height:0}
+  .top h1{display:none}
+  .top .search{order:3;flex-basis:100%;max-width:none;height:38px}
+  .top .tail{margin-left:auto}
+  .search kbd{display:none}
+  .theme button{height:26px;padding:0 7px;font-size:var(--t-xs)}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+
+.player{padding:var(--s-5);display:flex;flex-direction:column;gap:var(--s-5);max-width:1320px}
+.crumb{font-size:var(--t-sm);color:var(--ink-3)}
+.crumb a{text-decoration:none}.crumb a:hover{text-decoration:underline}
+.hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--s-6);align-items:center;
+  padding:var(--s-6);border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line)}
+.hero .face{box-shadow:inset 0 0 0 1px var(--line)}
+.ident{display:flex;flex-direction:column;gap:var(--s-3);min-width:0}
+.ident h2{margin:0;font-size:clamp(2rem,4vw,3.25rem);font-weight:700;line-height:1;letter-spacing:-0.01em;text-wrap:balance}
+.ident .meta{display:flex;flex-wrap:wrap;gap:var(--s-2);align-items:center;font-size:var(--t-md);color:var(--ink-2)}
+.ident .pos,.ident .tier-chip{height:24px;font-size:var(--t-sm)}
+.big{display:flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right}
+.big b{font-family:var(--font-num);font-weight:800;font-size:var(--t-3xl);line-height:0.82;font-variant-numeric:tabular-nums}
+.big span{font-size:var(--t-sm);color:var(--ink-2);max-width:24ch}
+.big .verb{margin-top:var(--s-3)}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s-4)}
+.fact{padding:var(--s-4);display:flex;flex-direction:column;gap:var(--s-2);min-width:0}
+.fact .v{display:flex;align-items:baseline;gap:var(--s-2);flex-wrap:wrap}
+.fact .v b{font-family:var(--font-num);font-weight:700;font-size:var(--t-xl);line-height:1;font-variant-numeric:tabular-nums}
+.fact p{margin:0;font-size:var(--t-sm);color:var(--ink-2)}
+.fact.vor-fact{color:var(--heat-ink)}
+.fact.vor-fact .label,.fact.vor-fact p{color:inherit}
+.rng{position:relative;height:10px;margin:14px 0 22px;border-radius:5px;background:var(--surface-2)}
+.rng .span{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--line-strong)}
+.rng .med{position:absolute;top:-5px;width:4px;height:20px;margin-left:-2px;border-radius:2px;background:var(--accent)}
+.rng .tick{position:absolute;top:16px;transform:translateX(-50%);font-family:var(--font-num);font-weight:700;font-size:var(--t-lg);font-variant-numeric:tabular-nums}
+.rng .tick.l{transform:none}.rng .tick.r{transform:translateX(-100%)}
+.split{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:var(--s-6);align-items:start}
+/* Borrowed from Scout, player page only: the capsule is writing, so it is set in a reading serif.
+   The serif covers the prose block and its pull figures and nothing else on the page. */
+.read{max-width:68ch;min-width:0}
+.prose{font-family:var(--font-read);font-optical-sizing:auto}
+.pulls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s-4);margin:var(--s-2) 0 var(--s-5);
+  padding-block:var(--s-4);border-block:1px solid var(--line)}
+.pulls div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pulls b{font-family:var(--font-read);font-weight:500;font-size:var(--t-pull);line-height:1;letter-spacing:-0.01em;font-variant-numeric:lining-nums tabular-nums}
+.pulls span{font-family:var(--font-read);font-style:italic;font-size:var(--t-md);line-height:1.35;color:var(--ink-2)}
+.read h3,.tier h3{margin:0 0 var(--s-3);font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);font-weight:600}
+.prose p{margin:0 0 1em;font-size:var(--t-read);line-height:1.62;color:var(--ink)}
+.prose p:first-of-type{font-size:1.375rem;line-height:1.5}
+.tier{padding:0;overflow:hidden}
+.tier .band{display:grid;grid-template-columns:44px 1fr;align-items:center;min-height:52px;
+  background:color-mix(in srgb,var(--tier) var(--tier-wash),var(--bg));border-bottom:2px solid var(--tier)}
+.tier .band .strip{align-self:stretch;display:grid;place-items:center;background:var(--tier);color:var(--tier-ink);font-family:var(--font-num);font-weight:800;font-size:30px}
+.tier .band div{padding:0 var(--s-3);display:flex;flex-direction:column}
+.tier .band b{font-size:var(--t-md)}
+.tier .band span{font-size:var(--t-sm);color:var(--ink-2)}
+.tier ol{list-style:none;margin:0;padding:var(--s-2)}
+.tier li{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:var(--s-2);align-items:center;padding:6px var(--s-2);border-radius:var(--r-sm);font-size:var(--t-sm)}
+.tier li.me{background:var(--accent-wash);font-weight:700}
+.tier li b{font-family:var(--font-num);font-weight:700;font-size:20px;font-variant-numeric:tabular-nums}
+.tier .foot{padding:var(--s-3) var(--s-4);border-top:1px solid var(--line);font-size:var(--t-sm);color:var(--ink-2)}
+@media (max-width: 1080px){.split{grid-template-columns:minmax(0,1fr)}.facts{grid-template-columns:minmax(0,1fr)}}
+@media (max-width: 760px){
+  .player{padding:var(--s-4);gap:var(--s-4)}
+  .hero{grid-template-columns:auto minmax(0,1fr);gap:var(--s-4);padding:var(--s-4)}
+  .hero > .face{width:96px!important;height:96px!important}
+  .big{grid-column:1 / -1;align-items:flex-start;text-align:left}
+  .big b{font-size:72px}
+  .big .verb{width:100%}
+  .prose p,.prose p:first-of-type{font-size:1.0625rem}
+  .pulls{grid-template-columns:minmax(0,1fr);gap:var(--s-3)}
+  .pulls div{flex-direction:row;align-items:baseline;gap:var(--s-3)}
+  .pulls b{font-size:34px;min-width:3.2ch}
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="rail" aria-label="Sections">
+  <a class="mark" href="direction.html" aria-label="Commish"><b>C</b></a>
+  <a class="item" href="board.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg><span>Board</span></a><a class="item" href="player.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Players</span></a><a class="item" href="setup.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16M15 4v16"/></svg><span>Mock draft</span></a><a class="item" href="board.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h5"/></svg><span>Cheat sheet</span></a><a class="item wide-only" href="mock.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Advisor</span></a><a class="item wide-only" href="direction.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Our record</span></a>
+  <span class="spacer"></span>
+  <a class="item wide-only" href="direction.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18c1.5-2 3.4-3 5.5-3s4 1 5.5 3"/></svg><span>Account</span></a>
+</nav>
+<div class="main">
+<header class="top">
+  <h1>Players</h1>
+  <label class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="q" type="search" placeholder="Search 400 players" aria-label="Search players"><kbd>/</kbd></label>
+  <div class="tail">
+    <div class="theme" role="group" aria-label="Theme"><button type="button" data-set="auto" aria-pressed="true">Auto</button><button type="button" data-set="light" aria-pressed="false">Light</button><button type="button" data-set="dark" aria-pressed="false">Dark</button></div>
+    <a class="quiet" href="draft.html">Queue in a mock</a>
+  </div>
+</header>
+<main class="player">
+  <div class="crumb"><a href="board.html">Board</a> / <a href="board.html">WR</a> / Chris Olave</div>
+  <section class="hero">
+    <span class="face" style="width:168px;height:168px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4361370.png" alt="" loading="lazy" width="168" height="168"></span>
+    <div class="ident">
+      <h2>Chris Olave</h2>
+      <div class="meta"><span class="pos">WR 6</span>
+        <span class="tier-chip t3">Tier 3</span><span>NO</span></div>
+    </div>
+    <div class="big">
+      <b>273.7</b>
+      <span>projected PPR points in 2026, over 14.6 expected games</span>
+      <button class="verb" type="button">Add to my sheet</button>
+    </div>
+  </section>
+  <section class="facts">
+    <div class="fact panel">
+      <span class="label">Where drafters take him</span>
+      <div class="v"><b>Pick 18</b><span class="gap later">9 picks later</span></div>
+      <p>We have him at pick 9, so drafters take him 9 picks later. ADP 18.1.</p>
+    </div>
+    <div class="fact panel vor-fact heat-1">
+      <span class="label">Over replacement</span>
+      <div class="v"><b>+93.7</b><span>PPR pts</span></div>
+      <p>Round 1 value among the 400 on our board</p>
+    </div>
+    <div class="fact panel">
+      <span class="label">Floor, median, ceiling</span>
+      <div class="rng"><span class="span" style="width:100%"></span><span class="med" style="left:50.0%"></span>
+        <span class="tick l" style="left:0">185</span><span class="tick" style="left:50.0%">274</span><span class="tick r" style="left:100%">362</span></div>
+      <p>2026 PPR points, from his low case to his high case</p>
+    </div>
+  </section>
+  <div class="split">
+    <article class="read"><h3>Our read</h3><div class="prose"><p>The number that should drive your pick here is the tier. We have nine players left in his tier before a 16.8-point cliff, and we put Olave at 274 points, WR6 on our board. Drafters take him around pick 18, and WR6 going at 18 is a round later than he should. Our number is +28.3 over the history of receivers drafted where he&#x27;s going, and that history already pools in the busts and injuries. He doesn&#x27;t need to beat his own 2025 to win you the pick.</p><figure class="pulls"><div><b>29%</b><span>target share last season</span></div><div><b>49.7%</b><span>of the team&#x27;s air yards</span></div><div><b>16.8</b><span>PPR points from the end of his tier to the next</span></div></figure><p>The usage is what makes me trust it. 29% target share, 84% of the snaps, and half the team&#x27;s air yards at 49.7%. That air-yards number is the interesting one, because his average depth of target was only 11.8 yards, WR99. He&#x27;s not a pure deep threat, he&#x27;s just the first read on everything that travels. Kellen Moore and Doug Nussmeier are back running the same offense that took his target share from 18.8% to 29.4% in one year. There&#x27;s no new-system risk here.</p><p>The honest worry is the games column. Our 15-game expectation comes with a range of 9 to 17, and the record explains why: 2024 ended after week 9 with a concussion, 2025 ended after week 17 with an illness. The low tail in our full range is from seasons cut short like that. He still cleared 15 points in 8 of 16 weeks last year and beat the position&#x27;s weekly median all 16 times. Take him at 18, don&#x27;t reach into the teens, and let him fall if the room sleeps.</p></div></article>
+    <aside class="tier panel t3">
+      <div class="band"><span class="strip">3</span><div><b>Tier 3 WRs</b><span>9 players, then 16.8 PPR pts down to tier 4</span></div></div>
+      <ol><li class="me"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4361370.png" alt="" loading="lazy" width="32" height="32"></span><span>Chris Olave<br><span class="label">WR 6 · NO</span></span><b>273.7</b></li><li class=""><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4262921.png" alt="" loading="lazy" width="32" height="32"></span><span>Justin Jefferson<br><span class="label">WR 7 · MIN</span></span><b>271.4</b></li><li class=""><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4426354.png" alt="" loading="lazy" width="32" height="32"></span><span>George Pickens<br><span class="label">WR 8 · DAL</span></span><b>271.4</b></li><li class=""><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4426502.png" alt="" loading="lazy" width="32" height="32"></span><span>Drake London<br><span class="label">WR 9 · ATL</span></span><b>268.2</b></li><li class=""><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4047646.png" alt="" loading="lazy" width="32" height="32"></span><span>A.J. Brown<br><span class="label">WR 10 · NE</span></span><b>256.2</b></li><li class=""><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4258173.png" alt="" loading="lazy" width="32" height="32"></span><span>Nico Collins<br><span class="label">WR 11 · HOU</span></span><b>253.2</b></li><li class=""><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4428331.png" alt="" loading="lazy" width="32" height="32"></span><span>Rashee Rice<br><span class="label">WR 12 · KC</span></span><b>252.6</b></li><li class=""><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4429615.png" alt="" loading="lazy" width="32" height="32"></span><span>Zay Flowers<br><span class="label">WR 13 · BAL</span></span><b>251.8</b></li><li class=""><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4241478.png" alt="" loading="lazy" width="32" height="32"></span><span>DeVonta Smith<br><span class="label">WR 14 · PHI</span></span><b>248.2</b></li></ol>
+      <div class="foot">Projected PPR points, 2026</div>
+    </aside>
+  </div>
+</main>
+</div>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement, KEY='commish-theme';
+  var buttons=[].slice.call(document.querySelectorAll('.theme button'));
+  function mark(mode){buttons.forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-set')===mode));});}
+  function apply(mode){if(mode==='auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme',mode); mark(mode);}
+  var saved=null;
+  try{saved=localStorage.getItem(KEY);}catch(e){saved=null;}
+  if(saved) apply(saved); else mark(root.getAttribute('data-theme')||'auto');
+  buttons.forEach(function(b){b.addEventListener('click',function(){
+    var mode=b.getAttribute('data-set'); apply(mode);
+    try{localStorage.setItem(KEY,mode);}catch(e){}
+  });});
+})();
+</script>
+
+
+</body>
+</html>
