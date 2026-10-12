@@ -68,3 +68,9 @@ test-results/
 # Claude Code harness worktrees (nested checkouts — never commit, never lint/test)
 .claude/worktrees/
 graphify-out/
+
+# web (the SvelteKit prep site): dependencies, generated and local-only output
+web/node_modules/
+web/.svelte-kit/
+web/build/
+web/screenshots/
