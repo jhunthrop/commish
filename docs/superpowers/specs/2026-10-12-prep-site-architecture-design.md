@@ -51,14 +51,13 @@ Two commands from one image:
 
 Request shape: a consistent envelope (`ok`, `data`, `error`, `meta` for pages) and OpenAPI in `api/openapi.yaml`, generated types for the web lane, rate limits on every endpoint, parameterized queries only, secrets from the environment validated at start.
 
-### 2.3 research: the TypeScript core, carved out
+### 2.3 research: Python, migrated now
 
-`research/` is a package built from today's `src/projections` (the fit, validation, backtests, the decide layer), `src/capsules` (the writer), the ingests (`src/data`, nflverse, the stats provider), the crosswalk, and the research tables' Drizzle schema and migrations. It has two entry points:
+Revised 2026-10-12 after the founder's ruling ("we'll still need all of the data and models we were previously using. We can use python for that", then "no let's migrate it now - it is what it is"). The research lane is Python, in the shape of foreversixty's `data/` lane: one `research/` project (Python 3.13, `uv`, `pyproject.toml`) with packages `pipeline` (every ingest: nflverse, the stats provider, schedules, rosters, the crosswalk, ADP sources, coaches), `model` (the fit, validation, backtests, the decide layer with survival and the pick recommendation), `capsules` (the grounded writer and its rejection pass), `nightly` (the chain and the run format), and `advisor` (the request-time HTTP service for `api` and `room`). Numeric work uses numpy, pandas and scipy; the schema stays the existing `research` schema in Neon, with alembic taking over from Drizzle at a baseline revision equal to the current state.
 
-- **`nightly`**, a Cloud Run Job on a schedule: ingest, fit, validate, write the boards, player data, ADP, the record and the capsules, upload the run to R2, dispatch the web build. The research tables are its input and its ledger. It never serves a page.
-- **`advisor`**, a small HTTP service on Cloud Run called only by `api` and `room`: the closed-form survival, `recommendPick`, the why text and the tiers for a room state. Internal only, under 50 ms per call at p90, measured.
+The oracle is the TypeScript core as it stands on main at the ruling, carved out by Lane 2 into `research-ts/` so it runs on its own: every ingest is switched only after a parallel run matches the TypeScript ingest row for row on the same inputs, and the Python fit replaces the TypeScript fit only after it reproduces the stored projections for every player-week of the 2026 register within a stated tolerance, with the differences listed by cause. The register carries an `implementation` tag per run, and the accuracy record page states the switch date, because the held-out claim is only honest if the switch is visible. `research-ts/` is deleted once every parity gate has passed and the Python nightly has produced seven clean runs.
 
-The projections fit is never ported to Go (`docs/research/2026-10-11-prep-site-architecture-options.md`, decision 1): Go and V8 differ in floating point enough to flip ranks silently, and the held-out validation is the product.
+Two entry points, as before: `nightly`, a Cloud Run Job on a schedule, and `advisor`, a small HTTP service called only by `api` and `room`, under 50 ms per call at p90, measured. The projections fit is never ported to Go.
 
 ### 2.4 The engine port
 
@@ -103,7 +102,8 @@ Each lane is a worktree with its own ledger. Gates during the build are `svelte-
 |---|---|---|---|
 | 0 Tokens and primitives | `web/` skeleton with adapter-cloudflare, `tokens.css` as Svelte tokens, the primitives list in §2.1, a system page that renders every primitive in both themes, Lighthouse config | nothing | nothing |
 | 1 Infra | Cloudflare zone and Workers project, Cloud Run services (`api`, `room`, `advisor`), the Cloud Run Job (`nightly`), Artifact Registry, Neon database with the two schemas, R2 bucket, GitHub Actions per lane with path filters and a Postgres service at 5433 for Go tests, secrets | nothing | Cloudflare account and the `trycommish.app` zone, a GCP project with billing, a Neon project, Stripe products in test mode, WorkOS redirect URIs for the new domain |
-| 2 Research carve-out | `research/` with the nightly and advisor entry points, the run format in R2, the validation gates, the capsule defect fixes (rank from the board, strip set phrases and asides) | 1 for R2 and the job, else local | nothing |
+| 2 TypeScript oracle | `research-ts/`: the TypeScript core carved out so it runs on its own, a nightly entry point writing a run locally, the advisor server, the job inventory (`JOBS.md`), the import guard. Not deployed. Deleted after parity. | nothing | nothing |
+| 2P Python research lane | `research/` in four phases: A ingests and schema with row-for-row parity, B the fit, validation and backtests with register parity, C the decide layer, the capsule writer with the two defect fixes, the advisor service, D the nightly chain, the run format to R2, the image, the Cloud Run Job, the schedule, the web build dispatch | 2 for the oracle, 1 for the deploy | nothing |
 | 3 Go API | accounts, sessions, leagues, sheets, entitlements, billing, exports, OpenAPI, the envelope, rate limits | 1 | Stripe webhook secret |
 | 4 Engine port | `draft`, `bots`, `sim` in Go against the pins and the 1,000-run fixture, the solo pick batch, the report's 200 runs | 3 for persistence | nothing |
 | 5 Nightly surfaces | board per format, player page, ADP, the record, clubs, comparison, strength of schedule, search, prerender from a run | 0, 2 | nothing |
@@ -112,7 +112,7 @@ Each lane is a worktree with its own ledger. Gates during the build are `svelte-
 | 8 Draft Pass | Sleeper live draft companion, custom scoring import, the pass and membership pages, checkout, the group pass | 3, 5, 6, 7 | Stripe live keys at launch |
 | 9 Cutover | delete every Next.js file, retire Vercel, DNS to Cloudflare, the full suite, the first nightly run in production, the ledger's measurements | all | the DNS change |
 
-Lane 0 and Lane 2 start now. Lane 1 starts when the founder has provisioned the accounts in the table, and Lanes 3 to 7 fan out behind it.
+Lane 0, Lane 2 and Lane 2P phase A start now. Lane 1 starts when the founder has provisioned the accounts in the table, and Lanes 3 to 7 fan out behind it.
 
 ## 8. Open questions resolved here
 
