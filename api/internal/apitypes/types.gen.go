@@ -47,16 +47,16 @@ func (e BoardFormat) Valid() bool {
 
 // Defines values for BotStyle.
 const (
-	Adp       BotStyle = "adp"
-	LastDraft BotStyle = "last_draft"
+	BotStyleAdp       BotStyle = "adp"
+	BotStyleLastDraft BotStyle = "last_draft"
 )
 
 // Valid indicates whether the value is a known member of the BotStyle enum.
 func (e BotStyle) Valid() bool {
 	switch e {
-	case Adp:
+	case BotStyleAdp:
 		return true
-	case LastDraft:
+	case BotStyleLastDraft:
 		return true
 	default:
 		return false
@@ -86,13 +86,13 @@ func (e DraftPassStateSource) Valid() bool {
 
 // Defines values for ExportFormat.
 const (
-	Csv ExportFormat = "csv"
+	ExportFormatCsv ExportFormat = "csv"
 )
 
 // Valid indicates whether the value is a known member of the ExportFormat enum.
 func (e ExportFormat) Valid() bool {
 	switch e {
-	case Csv:
+	case ExportFormatCsv:
 		return true
 	default:
 		return false
@@ -101,28 +101,28 @@ func (e ExportFormat) Valid() bool {
 
 // Defines values for Feature.
 const (
-	CustomScoring    Feature = "custom_scoring"
-	EarlyRun         Feature = "early_run"
-	FullReasoning    Feature = "full_reasoning"
-	LiveDraftAdvisor Feature = "live_draft_advisor"
-	RangeOfOutcomes  Feature = "range_of_outcomes"
-	SyncedSheet      Feature = "synced_sheet"
+	FeatureCustomScoring    Feature = "custom_scoring"
+	FeatureEarlyRun         Feature = "early_run"
+	FeatureFullReasoning    Feature = "full_reasoning"
+	FeatureLiveDraftAdvisor Feature = "live_draft_advisor"
+	FeatureRangeOfOutcomes  Feature = "range_of_outcomes"
+	FeatureSyncedSheet      Feature = "synced_sheet"
 )
 
 // Valid indicates whether the value is a known member of the Feature enum.
 func (e Feature) Valid() bool {
 	switch e {
-	case CustomScoring:
+	case FeatureCustomScoring:
 		return true
-	case EarlyRun:
+	case FeatureEarlyRun:
 		return true
-	case FullReasoning:
+	case FeatureFullReasoning:
 		return true
-	case LiveDraftAdvisor:
+	case FeatureLiveDraftAdvisor:
 		return true
-	case RangeOfOutcomes:
+	case FeatureRangeOfOutcomes:
 		return true
-	case SyncedSheet:
+	case FeatureSyncedSheet:
 		return true
 	default:
 		return false
@@ -131,16 +131,16 @@ func (e Feature) Valid() bool {
 
 // Defines values for HealthStatus.
 const (
-	Ok          HealthStatus = "ok"
-	Unavailable HealthStatus = "unavailable"
+	HealthStatusOk          HealthStatus = "ok"
+	HealthStatusUnavailable HealthStatus = "unavailable"
 )
 
 // Valid indicates whether the value is a known member of the HealthStatus enum.
 func (e HealthStatus) Valid() bool {
 	switch e {
-	case Ok:
+	case HealthStatusOk:
 		return true
-	case Unavailable:
+	case HealthStatusUnavailable:
 		return true
 	default:
 		return false
@@ -149,16 +149,16 @@ func (e HealthStatus) Valid() bool {
 
 // Defines values for Interval.
 const (
-	Month Interval = "month"
-	Year  Interval = "year"
+	IntervalMonth Interval = "month"
+	IntervalYear  Interval = "year"
 )
 
 // Valid indicates whether the value is a known member of the Interval enum.
 func (e Interval) Valid() bool {
 	switch e {
-	case Month:
+	case IntervalMonth:
 		return true
-	case Year:
+	case IntervalYear:
 		return true
 	default:
 		return false
@@ -188,16 +188,16 @@ func (e Lineup) Valid() bool {
 
 // Defines values for MockStatus.
 const (
-	Active   MockStatus = "active"
-	Complete MockStatus = "complete"
+	MockStatusActive   MockStatus = "active"
+	MockStatusComplete MockStatus = "complete"
 )
 
 // Valid indicates whether the value is a known member of the MockStatus enum.
 func (e MockStatus) Valid() bool {
 	switch e {
-	case Active:
+	case MockStatusActive:
 		return true
-	case Complete:
+	case MockStatusComplete:
 		return true
 	default:
 		return false
@@ -227,13 +227,13 @@ func (e Product) Valid() bool {
 
 // Defines values for RoomErrorType.
 const (
-	Error RoomErrorType = "error"
+	RoomErrorTypeError RoomErrorType = "error"
 )
 
 // Valid indicates whether the value is a known member of the RoomErrorType enum.
 func (e RoomErrorType) Valid() bool {
 	switch e {
-	case Error:
+	case RoomErrorTypeError:
 		return true
 	default:
 		return false
@@ -242,13 +242,13 @@ func (e RoomErrorType) Valid() bool {
 
 // Defines values for RoomHelloType.
 const (
-	Hello RoomHelloType = "hello"
+	RoomHelloTypeHello RoomHelloType = "hello"
 )
 
 // Valid indicates whether the value is a known member of the RoomHelloType enum.
 func (e RoomHelloType) Valid() bool {
 	switch e {
-	case Hello:
+	case RoomHelloTypeHello:
 		return true
 	default:
 		return false
@@ -257,13 +257,13 @@ func (e RoomHelloType) Valid() bool {
 
 // Defines values for RoomWelcomeType.
 const (
-	Welcome RoomWelcomeType = "welcome"
+	RoomWelcomeTypeWelcome RoomWelcomeType = "welcome"
 )
 
 // Valid indicates whether the value is a known member of the RoomWelcomeType enum.
 func (e RoomWelcomeType) Valid() bool {
 	switch e {
-	case Welcome:
+	case RoomWelcomeTypeWelcome:
 		return true
 	default:
 		return false
@@ -296,28 +296,28 @@ func (e ScoringPreset) Valid() bool {
 
 // Defines values for SheetTag.
 const (
-	Avoid    SheetTag = "avoid"
-	Breakout SheetTag = "breakout"
-	Handcuff SheetTag = "handcuff"
-	Injury   SheetTag = "injury"
-	Sleeper  SheetTag = "sleeper"
-	Target   SheetTag = "target"
+	SheetTagAvoid    SheetTag = "avoid"
+	SheetTagBreakout SheetTag = "breakout"
+	SheetTagHandcuff SheetTag = "handcuff"
+	SheetTagInjury   SheetTag = "injury"
+	SheetTagSleeper  SheetTag = "sleeper"
+	SheetTagTarget   SheetTag = "target"
 )
 
 // Valid indicates whether the value is a known member of the SheetTag enum.
 func (e SheetTag) Valid() bool {
 	switch e {
-	case Avoid:
+	case SheetTagAvoid:
 		return true
-	case Breakout:
+	case SheetTagBreakout:
 		return true
-	case Handcuff:
+	case SheetTagHandcuff:
 		return true
-	case Injury:
+	case SheetTagInjury:
 		return true
-	case Sleeper:
+	case SheetTagSleeper:
 		return true
-	case Target:
+	case SheetTagTarget:
 		return true
 	default:
 		return false
@@ -326,16 +326,16 @@ func (e SheetTag) Valid() bool {
 
 // Defines values for LoginParamsScreen.
 const (
-	SignIn LoginParamsScreen = "sign-in"
-	SignUp LoginParamsScreen = "sign-up"
+	LoginParamsScreenSignIn LoginParamsScreen = "sign-in"
+	LoginParamsScreenSignUp LoginParamsScreen = "sign-up"
 )
 
 // Valid indicates whether the value is a known member of the LoginParamsScreen enum.
 func (e LoginParamsScreen) Valid() bool {
 	switch e {
-	case SignIn:
+	case LoginParamsScreenSignIn:
 		return true
-	case SignUp:
+	case LoginParamsScreenSignUp:
 		return true
 	default:
 		return false

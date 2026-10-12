@@ -3,5 +3,3 @@
 // so the contract and the wire shape cannot drift. Never edit
 // types.gen.go by hand: change openapi.yaml and run `make gen`.
 package apitypes
-
-//go:generate go tool oapi-codegen -config ../../oapi-codegen.yaml ../../openapi.yaml
