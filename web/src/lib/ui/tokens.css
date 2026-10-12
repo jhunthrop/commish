@@ -1,0 +1,204 @@
+/* Commish tokens: the Press Box system with two bounded borrowings. One file, both themes.
+   Layout concept: a near-black or paper-white shell, an icon rail on the left, a persistent
+   search across the top, dense rows in the middle, a filter and sheet rail on the right.
+   Borrowed from Scout: a reading serif, allowed on the player page's prose and its pull figures only.
+   Borrowed from Broadcast: the score bug and the lower third, allowed in a live draft room only.
+   Light values live on bare :root. Dark redefines tokens only, twice, so the OS
+   setting and the explicit data-theme toggle both win. */
+
+:root {
+	/* Type. Outfit is the geometric UI face: Poppins's circles with a tighter set width,
+     so a dense row holds "Jaxon Smith-Njigba" at 15px without truncating.
+     Big Shoulders Display is the condensed number face, drawn from stadium and
+     transit lettering, narrow enough that 344.1 fits a 64px cell at display size. */
+	--font-ui: 'Outfit', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+	--font-num: 'Big Shoulders Display', 'Oswald', 'Arial Narrow', sans-serif;
+	/* Newsreader is the reading face. Optical sizes cut for long screen reading, because the
+     capsule is writing. Allowed on the player page's prose block and its pull figures, nowhere else. */
+	--font-read: 'Newsreader', 'Iowan Old Style', 'Charter', Georgia, serif;
+	--t-read: 1.1875rem; /* 19 capsule prose */
+	--t-pull: 2.75rem; /* 44 a pull figure, the same step as --t-2xl */
+
+	/* Type scale, 1.2 ratio from a 14px base. Numbers use --font-num at the top three. */
+	--t-xs: 0.6875rem; /* 11 labels on cells, uppercase, tracked */
+	--t-sm: 0.8125rem; /* 13 secondary text */
+	--t-md: 0.9375rem; /* 15 names, body in rows */
+	--t-lg: 1.125rem; /* 18 section heads, prose */
+	--t-xl: 1.625rem; /* 26 cell numbers in display face */
+	--t-2xl: 2.75rem; /* 44 tier cliffs, clock */
+	--t-3xl: 5.5rem; /* 88 the one big number on a page */
+	--track-label: 0.08em;
+
+	/* Space and shape. Rows are 52px on desktop and 48 on the phone. Radii are small:
+     a press box is glass and steel, not pillows. */
+	--s-1: 4px;
+	--s-2: 8px;
+	--s-3: 12px;
+	--s-4: 16px;
+	--s-5: 24px;
+	--s-6: 32px;
+	--s-7: 48px;
+	--row-h: 52px;
+	--rail-w: 84px;
+	--side-w: 296px;
+	--r-sm: 4px;
+	--r-md: 8px;
+	--r-pill: 999px;
+
+	/* Neutrals, light. True paper white with ink that leans a touch warm toward the
+     accent, so the greys read as chosen rather than default. */
+	--bg: #ffffff;
+	--surface: #f8f7f5;
+	--surface-2: #efedea;
+	--line: #e3dfda;
+	--line-strong: #cfc9c2;
+	--ink: #15120f;
+	--ink-2: #48413b;
+	--ink-3: #6b635c; /* 5.9:1 on --bg */
+	--shell: #ffffff; /* rail and top bar */
+	--shell-line: #e3dfda;
+
+	/* The one warm accent: burnt orange at hue 20. Streak amber (#E39A0E) sits at 38
+     and reads 2.3:1 as text on white, so it cannot carry a verb in light. This orange
+     holds 5:1 under white text and as text on paper, and stays clear of every tier hue.
+     It marks three things only: the brand, the one solid verb, and you. */
+	--accent: #c2470a;
+	--accent-ink: #ffffff; /* text on an accent fill */
+	--accent-text: #b03f06; /* accent used as text on --bg */
+	--accent-wash: #fdebe0; /* your rows, your picks */
+	--focus: #c2470a;
+
+	/* Magnitude. Over replacement is tinted by the round it would go in on our board
+     of 400 (1 to 4, then none). Below replacement takes the rose wash and a minus. */
+	--heat-1: #a6e3bd;
+	--heat-2: #c8eed5;
+	--heat-3: #e0f5e7;
+	--heat-4: #f0faf3;
+	--heat-neg: #fbe1e4;
+	--heat-ink: #15120f;
+
+	/* Drafters versus us. Later is a gain for you, earlier is a cost. Always with the word. */
+	--gain-bg: #dcf3e4;
+	--gain-ink: #11663a;
+	--loss-bg: #fbe1e4;
+	--loss-ink: #a3243a;
+
+	/* Tiers run hot to cold down the board. Each band's label carries the tier number
+     and the drop to the next tier, so the colour is never the only channel. */
+	--tier-1: #c62a47;
+	--tier-2: #b8287f;
+	--tier-3: #7a3cb0;
+	--tier-4: #3a55b4;
+	--tier-5: #0f6f99;
+	--tier-6: #0b7a68;
+	--tier-7: #5b5a65;
+	--tier-ink: #ffffff;
+	--tier-wash: 9%; /* how much of the tier hue tints its band */
+
+	/* The scoreboard: a lit board on black in both themes. In Commish it carries the draft room's
+     score bug and lower third, and nothing outside a live draft. The orange on it is the dark-theme
+     accent, so the brand reads the same on the board in either theme. */
+	--scoreboard: #15120f;
+	--scoreboard-2: #221d19; /* a raised segment of the bug */
+	--scoreboard-line: #3a332d; /* dividers between segments */
+	--scoreboard-ink: #f5f0ea;
+	--scoreboard-ink-2: #b9b0a7; /* labels on the board */
+	--scoreboard-num: #ff7130;
+	--scoreboard-num-ink: #170802; /* text on an orange segment of the bug */
+
+	--shadow-pop: 0 1px 2px rgb(21 18 15 / 0.06), 0 8px 24px rgb(21 18 15 / 0.08);
+	color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--bg: #090807;
+		--surface: #12100e;
+		--surface-2: #1b1815;
+		--line: #29241f;
+		--line-strong: #3a332d;
+		--ink: #f5f0ea;
+		--ink-2: #b9b0a7;
+		--ink-3: #8f857c;
+		--shell: #050404;
+		--shell-line: #1e1a17;
+		--accent: #ff7130;
+		--accent-ink: #170802;
+		--accent-text: #ff8a4f;
+		--accent-wash: #2a160b;
+		--focus: #ff8a4f;
+		--heat-1: #1d6a3e;
+		--heat-2: #17502f;
+		--heat-3: #133a23;
+		--heat-4: #10261a;
+		--heat-neg: #43191f;
+		--heat-ink: #f5f0ea;
+		--gain-bg: #12341f;
+		--gain-ink: #6fdc99;
+		--loss-bg: #3a161c;
+		--loss-ink: #ff8f9f;
+		--tier-1: #cf3350;
+		--tier-2: #c0338a;
+		--tier-3: #8d52cc;
+		--tier-4: #4b6ad6;
+		--tier-5: #12789f;
+		--tier-6: #0e8070;
+		--tier-7: #6c6b78;
+		--tier-ink: #ffffff;
+		--tier-wash: 16%;
+		--scoreboard: #000000;
+		--scoreboard-2: #15120f;
+		--scoreboard-line: #29241f;
+		--scoreboard-ink: #f5f0ea;
+		--scoreboard-ink-2: #b9b0a7;
+		--scoreboard-num: #ff7130;
+		--scoreboard-num-ink: #170802;
+		--shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+		color-scheme: dark;
+	}
+}
+:root[data-theme='dark'] {
+	--bg: #090807;
+	--surface: #12100e;
+	--surface-2: #1b1815;
+	--line: #29241f;
+	--line-strong: #3a332d;
+	--ink: #f5f0ea;
+	--ink-2: #b9b0a7;
+	--ink-3: #8f857c;
+	--shell: #050404;
+	--shell-line: #1e1a17;
+	--accent: #ff7130;
+	--accent-ink: #170802;
+	--accent-text: #ff8a4f;
+	--accent-wash: #2a160b;
+	--focus: #ff8a4f;
+	--heat-1: #1d6a3e;
+	--heat-2: #17502f;
+	--heat-3: #133a23;
+	--heat-4: #10261a;
+	--heat-neg: #43191f;
+	--heat-ink: #f5f0ea;
+	--gain-bg: #12341f;
+	--gain-ink: #6fdc99;
+	--loss-bg: #3a161c;
+	--loss-ink: #ff8f9f;
+	--tier-1: #cf3350;
+	--tier-2: #c0338a;
+	--tier-3: #8d52cc;
+	--tier-4: #4b6ad6;
+	--tier-5: #12789f;
+	--tier-6: #0e8070;
+	--tier-7: #6c6b78;
+	--tier-ink: #ffffff;
+	--tier-wash: 16%;
+	--scoreboard: #000000;
+	--scoreboard-2: #15120f;
+	--scoreboard-line: #29241f;
+	--scoreboard-ink: #f5f0ea;
+	--scoreboard-ink-2: #b9b0a7;
+	--scoreboard-num: #ff7130;
+	--scoreboard-num-ink: #170802;
+	--shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+	color-scheme: dark;
+}
