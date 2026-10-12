@@ -89,6 +89,9 @@ type Stripe struct {
 	SecretKey     string
 	WebhookSecret string
 	Environment   string
+	// AutomaticTax turns on Stripe Tax at checkout. It needs Stripe Tax
+	// set up on the account first, or every checkout fails.
+	AutomaticTax bool
 }
 
 // Configured reports whether billing can be offered.
@@ -166,6 +169,19 @@ func (l *loader) optional(name, def string) string {
 		return v
 	}
 	return def
+}
+
+// flag reads a boolean: true or false, absent meaning false.
+func (l *loader) flag(name string) bool {
+	switch strings.TrimSpace(l.get(name)) {
+	case "", "false":
+		return false
+	case "true":
+		return true
+	default:
+		l.invalid(name, "must be true or false")
+		return false
+	}
 }
 
 func (l *loader) invalid(name, reason string) {
@@ -290,6 +306,7 @@ func (l *loader) stripe() Stripe {
 		SecretKey:     l.optional("STRIPE_SECRET_KEY", ""),
 		WebhookSecret: l.optional("STRIPE_WEBHOOK_SECRET", ""),
 		Environment:   l.optional("STRIPE_ENVIRONMENT", "test"),
+		AutomaticTax:  l.flag("STRIPE_AUTOMATIC_TAX"),
 	}
 	if s.SecretKey == "" {
 		return s

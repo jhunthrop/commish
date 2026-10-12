@@ -91,7 +91,7 @@ func runReconcile(ctx context.Context, log *slog.Logger, cfg config.API, pool *p
 	}
 	svc := &billing.Service{
 		Store: &billing.Store{Pool: pool}, Entitlements: &entitlements.Store{Pool: pool},
-		Gateway: billing.NewStripeGateway(cfg.Stripe.SecretKey), Now: time.Now, Log: log,
+		Gateway: billing.NewStripeGateway(cfg.Stripe.SecretKey, cfg.Stripe.AutomaticTax), Now: time.Now, Log: log,
 	}
 	n, err := svc.Reconcile(ctx)
 	log.Info("reconciled", "subscriptions", n)
@@ -145,7 +145,7 @@ func runStripeSetup(ctx context.Context, log *slog.Logger, cfg config.API, _ *pg
 	if err := requireStripe(cfg); err != nil {
 		return err
 	}
-	g := billing.NewStripeGateway(cfg.Stripe.SecretKey)
+	g := billing.NewStripeGateway(cfg.Stripe.SecretKey, cfg.Stripe.AutomaticTax)
 	for _, spec := range priceSpecs {
 		if err := g.EnsurePrice(ctx, spec); err != nil {
 			return err

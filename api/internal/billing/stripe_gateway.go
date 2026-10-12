@@ -20,16 +20,17 @@ type cachedPrice struct {
 
 // StripeGateway is the real Gateway. It is never built in a test.
 type StripeGateway struct {
-	client *stripe.Client
+	client       *stripe.Client
+	automaticTax bool
 
 	mu    sync.Mutex
 	cache map[string]cachedPrice
 }
 
 // NewStripeGateway binds a gateway to secretKey, test or live as
-// config already checked.
-func NewStripeGateway(secretKey string) *StripeGateway {
-	return &StripeGateway{client: stripe.NewClient(secretKey), cache: map[string]cachedPrice{}}
+// config already checked. automaticTax turns on Stripe Tax at checkout.
+func NewStripeGateway(secretKey string, automaticTax bool) *StripeGateway {
+	return &StripeGateway{client: stripe.NewClient(secretKey), automaticTax: automaticTax, cache: map[string]cachedPrice{}}
 }
 
 func (g *StripeGateway) CreateCustomer(ctx context.Context, email, accountID string) (string, error) {
@@ -51,11 +52,14 @@ func (g *StripeGateway) CreateCheckout(ctx context.Context, p CheckoutParams) (C
 		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{
 			{Price: stripe.String(p.PriceID), Quantity: stripe.Int64(p.Quantity)},
 		},
-		AutomaticTax:        &stripe.CheckoutSessionCreateAutomaticTaxParams{Enabled: stripe.Bool(true)},
-		CustomerUpdate:      &stripe.CheckoutSessionCreateCustomerUpdateParams{Address: stripe.String("auto")},
 		AllowPromotionCodes: stripe.Bool(true),
 		SuccessURL:          stripe.String(p.SuccessURL),
 		CancelURL:           stripe.String(p.CancelURL),
+	}
+	if g.automaticTax {
+		params.AutomaticTax = &stripe.CheckoutSessionCreateAutomaticTaxParams{Enabled: stripe.Bool(true)}
+		// Stripe Tax needs the buyer's address on the customer.
+		params.CustomerUpdate = &stripe.CheckoutSessionCreateCustomerUpdateParams{Address: stripe.String("auto")}
 	}
 	if p.Mode == ModeSubscription {
 		params.SubscriptionData = &stripe.CheckoutSessionCreateSubscriptionDataParams{Metadata: p.Metadata}

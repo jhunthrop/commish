@@ -128,7 +128,7 @@ func gateway(cfg config.API, log *slog.Logger) billing.Gateway {
 		log.Warn("stripe not configured", "effect", "billing routes answer 503")
 		return nil
 	}
-	return billing.NewStripeGateway(cfg.Stripe.SecretKey)
+	return billing.NewStripeGateway(cfg.Stripe.SecretKey, cfg.Stripe.AutomaticTax)
 }
 
 // objects is the exports bucket, or nil (exports answer 503) when R2
