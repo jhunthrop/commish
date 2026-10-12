@@ -125,7 +125,7 @@ describe("ruling 15 — no in-product way to grant operator access (a drift trip
       "src/components/app-shell/admin-console-nav.tsx",
       "src/components/app-shell/app-shell.tsx",
       "src/components/app-shell/top-bar.tsx",
-      "research-ts/src/db/schema.ts",
+      "src/db/schema.ts",
       "src/integrity-service/grant-admin.ts",
     ]);
 

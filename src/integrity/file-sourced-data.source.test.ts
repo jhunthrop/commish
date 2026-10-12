@@ -43,6 +43,11 @@ const ALLOWLIST: readonly Exception[] = [
   { file: "src/gifs/giphy/fixtures.ts", rule: "node-fs", reason: "recorded-fixture loader; imported by tests only" },
   { file: "research-ts/src/projections/nflverse/fixtures.ts", rule: "node-fs", reason: "recorded-fixture loader; imported by tests only" },
   {
+    file: "research-ts/src/nightly/run-store.ts",
+    rule: "node-fs",
+    reason: "the nightly run's local output store: it writes the run and reads back only what an earlier run wrote (the latest pointer, a manifest), never repository data",
+  },
+  {
     file: "src/stats/mock/mock-stats-provider.ts",
     rule: "static-data-import",
     reason: "the e2e mock dataset, selected only under STATS_PROVIDER=mock; inventory 2026-09-09 lists it for a lazy import behind the provider switch",
