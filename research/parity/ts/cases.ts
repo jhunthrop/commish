@@ -39,6 +39,15 @@ import { ingestDepthCharts, ingestWeek1Rosters } from "@/projections/preseason/i
 import { fetchAverageDraftPosition, fetchExpertConsensus, type PublishedBoard } from "@/projections/preseason/publishers";
 import { recordPreseasonRankings } from "@/projections/preseason/store";
 import type { Db } from "@/db/client";
+import { resolveAllPropNames } from "@/projections/odds/player-map";
+import { runOddsSnapshot } from "@/projections/odds/snapshot";
+import { runWinTotalsStep } from "@/jobs/defs/win-totals-job";
+import { ingestWinTotalsCsv } from "../../../scripts/lib/win-totals-csv";
+import { eq } from "drizzle-orm";
+import { players } from "@/db/schema";
+import { captureOnce } from "@/projections/capture";
+import { NFL_TEAM_ABBREVIATIONS } from "@/projections/capture-feeds";
+import { createTank01Client } from "@/stats/tank01/client";
 import type { TsCase } from "./run";
 
 /** `realIngestStats` (`src/jobs/season-week/deps.ts`) for one season: the season-week job's path. */
@@ -123,6 +132,23 @@ function preseasonCase(season: number, kdef: boolean): TsCase {
 }
 
 export const TS_CASES: Readonly<Record<string, TsCase>> = {
+  // The season-week job's props step (`realSnapshotProps`), then the preseason job's resolve.
+  "odds-snapshot-and-resolve": async ({ db }) => {
+    await ingestPlayerUniverse(db, createNflverseClient());
+    await runOddsSnapshot(db, "replay");
+    await resolveAllPropNames(db);
+  },
+  // The schedule the backfill reads its week instants from; the script itself runs after this.
+  "odds-backfill": async ({ db }) => {
+    await ingestSchedule(db, [2025]);
+  },
+  "win-totals-seed": async ({ db }) => {
+    await ingestWinTotalsCsv(db);
+  },
+  "win-totals-job": async ({ db, now }) => {
+    await ingestSchedule(db, [2026]);
+    await runWinTotalsStep(db, { now: () => now.toISOString() }, { season: 2026 });
+  },
   "preseason-2025": preseasonCase(2025, true),
   "preseason-2026-live": preseasonCase(2026, false),
   "adp-snapshot": async ({ db, now }) => {
@@ -198,9 +224,31 @@ export const TS_CASES: Readonly<Record<string, TsCase>> = {
   "tank01-schedule": async ({ db }) => {
     await ingestTank01Schedule(db, tank01Provider(), UNMETERED);
   },
+  // `scripts/backfill-headshots.ts`'s loop, on a provider of its own (the script's `getStatsProvider()`
+  // is this provider behind a Redis-backed ledger, which a replay has no use for).
+  "tank01-headshots": async (ctx) => {
+    await seed(ctx, 0);
+    for (const player of (await tank01Provider().listPlayers()).filter((p) => p.headshotUrl !== null)) {
+      await ctx.db.update(players).set({ headshotUrl: player.headshotUrl }).where(eq(players.id, player.id)).returning({ id: players.id });
+    }
+  },
   "tank01-adp": async (ctx) => {
     await seed(ctx, 0);
     await ingestAdp(ctx.db, tank01Provider(), UNMETERED);
+  },
+  // `captureOnce` with every feed, the operator's `stats:capture` pass without its Redis freshness keys.
+  "tank01-capture-all": async ({ db, now }) => {
+    await captureOnce({
+      db,
+      client: createTank01Client({ apiKey: "replay" }),
+      clock: { now: () => now.toISOString() },
+      budget: { reserve: async () => ({ granted: true }) },
+      season: 2026,
+      week: 1,
+      teams: NFL_TEAM_ABBREVIATIONS,
+      isFresh: async () => false,
+      markFresh: async () => {},
+    });
   },
   // The capture-harvest job's step, fired twice an hour apart on the same recordings.
   "tank01-capture-harvest": async ({ db, now }) => {

@@ -47,3 +47,6 @@ class Case:
     # ingest reads rows another ingest (or the app) writes. Seeds are recorded real rows too.
     seed_sql: tuple[str, ...] = ()
     recordings: tuple[Recording, ...] = field(default_factory=tuple)
+    # Operator scripts the TypeScript side runs AS IS after its setup case (`ts/run.ts`), each a
+    # repo-relative path and its arguments, for a script whose body is an unexported `main()`.
+    ts_scripts: tuple[tuple[str, ...], ...] = ()

@@ -8,6 +8,7 @@
 // re-assembly of its parts. The last line of stdout is `{"requested": [...]}`: which recordings
 // were served, for the harness to check both sides asked for exactly the same inputs.
 import { createDb, type Db } from "@/db/client";
+import { freezeWallClock } from "./clock";
 import { installReplay } from "./replay";
 import { TS_CASES } from "./cases";
 
@@ -18,26 +19,6 @@ export interface TsCaseContext {
 }
 
 export type TsCase = (ctx: TsCaseContext) => Promise<void>;
-
-/**
- * THE WALL CLOCK, FROZEN AT THE PARITY INSTANT. Several production paths read `new Date()` where
- * no clock is injected (a publisher's fetched-at stamp, the week-one roster's default clock), and
- * the Python side is handed the same instant explicitly. Only the no-argument forms are frozen;
- * `new Date(x)` and `Date.UTC` behave exactly as before.
- */
-function freezeWallClock(nowMs: number): void {
-  const RealDate = Date;
-  class FrozenDate extends RealDate {
-    constructor(...args: ConstructorParameters<typeof Date> | []) {
-      if (args.length === 0) super(nowMs);
-      else super(...(args as ConstructorParameters<typeof Date>));
-    }
-    static override now(): number {
-      return nowMs;
-    }
-  }
-  globalThis.Date = FrozenDate as DateConstructor;
-}
 
 async function main(): Promise<void> {
   const [name, ...fixtureDirs] = process.argv.slice(2);

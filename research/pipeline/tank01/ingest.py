@@ -15,7 +15,7 @@ prep site.
 import json
 from dataclasses import dataclass
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, text, update
 from sqlalchemy.dialects.postgresql import insert
 
 from research.db.schema import NFL_GAMES, PLAYER_STAT_LINES, PLAYERS
@@ -161,3 +161,19 @@ def ingest_adp(conn: Connection, provider: Tank01Provider, budget: RequestBudget
         {"feed": feed},
     ).all()
     return AdpIngestResult(adp_entries=len(entries), players_updated=len(updated))
+
+
+def backfill_headshots(conn: Connection, provider: Tank01Provider) -> int:
+    """`backfill-headshots.ts`: each listed player's headshot URL onto his existing row, never an insert."""
+    updated = 0
+    for player in provider.list_players():
+        if player.headshot_url is None:
+            continue
+        statement = (
+            update(PLAYERS)
+            .where(PLAYERS.c.id == player.id)
+            .values(headshot_url=player.headshot_url)
+            .returning(PLAYERS.c.id)
+        )
+        updated += len(conn.execute(statement).all())
+    return updated

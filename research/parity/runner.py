@@ -10,6 +10,7 @@ replaying the same fixture sets and reading the same fixed instant as now.
 import json
 import os
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
@@ -94,6 +95,41 @@ def run_typescript(case: Case, url: str) -> list[str]:
     return payload["requested"]
 
 
+TS_PRELOAD = databases.RESEARCH_ROOT / "parity" / "ts" / "preload.ts"
+
+
+def run_typescript_scripts(case: Case, url: str) -> list[str]:
+    """Each operator script, unmodified, under the replay preload."""
+    requested: list[str] = []
+    for script, *args in case.ts_scripts:
+        with tempfile.TemporaryDirectory() as scratch:
+            out = Path(scratch) / "requested.json"
+            env = {
+                **os.environ,
+                "DATABASE_URL": url,
+                "PARITY_NOW": js_iso(case.now),
+                "PARITY_FIXTURE_DIRS": "\n".join(str(d) for d in fixture_dirs(case)),
+                "PARITY_REQUESTED_OUT": str(out),
+                # A replayed script never holds a real key: the replay strips keys and checks none.
+                "ODDS_API_KEY": "replay",
+                "TANK01_API_KEY": "replay",
+                "NODE_NO_WARNINGS": "1",
+                "TZ": "UTC",
+            }
+            completed = subprocess.run(
+                ["npx", "tsx", "--import", str(TS_PRELOAD), script, *args],
+                cwd=databases.REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if completed.returncode != 0:
+                raise RuntimeError(f"{script} for {case.name} failed:\n{completed.stderr[-4000:]}")
+            requested.extend(json.loads(out.read_text())["requested"])
+    return requested
+
+
 def run_python(case: Case, url: str) -> list[str]:
     fetcher = ReplayFetcher(fixture_dirs(case))
     engine = make_engine(sqlalchemy_url(url))
@@ -112,7 +148,7 @@ def run_case(case: Case) -> CaseResult:
     py_url = clone(py_template, f"parity_{slug}_py")
     seed(ts_url, case.seed_sql)
     seed(py_url, case.seed_sql)
-    ts_requests = run_typescript(case, ts_url)
+    ts_requests = run_typescript(case, ts_url) + run_typescript_scripts(case, ts_url)
     py_requests = run_python(case, py_url)
     diffs = [diff_table(ts_url, py_url, spec) for spec in case.tables]
     return CaseResult(case=case, diffs=diffs, ts_requests=ts_requests, py_requests=py_requests)

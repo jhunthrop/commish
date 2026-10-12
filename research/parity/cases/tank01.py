@@ -23,7 +23,7 @@ from research.pipeline.http import Fetcher
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.ingest import ingest_player_universe
 from research.pipeline.tank01.client import API_KEY_ENV, Paths, Tank01Client
-from research.pipeline.tank01.ingest import ingest_adp, ingest_roster_and_lines, ingest_schedule
+from research.pipeline.tank01.ingest import backfill_headshots, ingest_adp, ingest_roster_and_lines, ingest_schedule
 from research.pipeline.tank01.mapping import ADP_TYPE, SEASON_TYPE, WEEKS_LAST, map_games
 from research.pipeline.tank01.provider import Tank01Provider
 
@@ -96,6 +96,11 @@ def _adp(conn: Connection, ctx: RunContext) -> None:
     ingest_adp(conn, _provider(ctx), UnmeteredBudget())
 
 
+def _headshots(conn: Connection, ctx: RunContext) -> None:
+    ingest_roster_and_lines(conn, _provider(ctx, 0))
+    backfill_headshots(conn, _provider(ctx))
+
+
 def _crosswalk(conn: Connection, ctx: RunContext) -> None:
     ingest_player_universe(conn, NflverseClient(ctx.fetcher))
     ingest_roster_and_lines(conn, _provider(ctx, 0))
@@ -126,6 +131,14 @@ CASES: tuple[Case, ...] = (
         fixture_sets=("tank01-2026",),
         tables=(PLAYERS,),
         run_python=_adp,
+        now=NOW,
+    ),
+    Case(
+        name="tank01-headshots",
+        summary="backfill-headshots: the roster's headshot URLs onto existing players rows (an update only)",
+        fixture_sets=("tank01-2026",),
+        tables=(PLAYERS,),
+        run_python=_headshots,
         now=NOW,
     ),
     Case(

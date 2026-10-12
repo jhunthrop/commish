@@ -1,7 +1,16 @@
 """Every parity case, by name, and every fixture set's recording recipe."""
 
 from research.parity.case import Case, Recording
-from research.parity.cases import capture, nflverse_context, nflverse_pbp, nflverse_season, preseason, tank01
+from research.parity.cases import (
+    capture,
+    nflverse_context,
+    nflverse_pbp,
+    nflverse_season,
+    odds,
+    preseason,
+    tank01,
+    vegas,
+)
 
 ALL_CASES: tuple[Case, ...] = (
     *nflverse_season.CASES,
@@ -10,6 +19,8 @@ ALL_CASES: tuple[Case, ...] = (
     *tank01.CASES,
     *capture.CASES,
     *preseason.CASES,
+    *odds.CASES,
+    *vegas.CASES,
 )
 
 CASES_BY_NAME: dict[str, Case] = {case.name: case for case in ALL_CASES}

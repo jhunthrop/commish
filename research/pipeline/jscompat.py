@@ -144,6 +144,7 @@ def js_iso(instant: datetime) -> str:
 
 
 _ISO_DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+_LEGACY_DATE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
 _ISO_DATE_TIME = re.compile(
     r"^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}:?\d{2})?$"
 )
@@ -159,6 +160,13 @@ def js_date_parse(text: str) -> datetime | None:
     """
     match = _ISO_DATE.match(text)
     if match is not None:
+        try:
+            return datetime(int(match[1]), int(match[2]), int(match[3]), tzinfo=UTC)
+        except ValueError:
+            return None
+    match = _LEGACY_DATE.match(text)
+    if match is not None:
+        # V8's legacy parser: an unpadded date is LOCAL midnight (UTC here, see above).
         try:
             return datetime(int(match[1]), int(match[2]), int(match[3]), tzinfo=UTC)
         except ValueError:

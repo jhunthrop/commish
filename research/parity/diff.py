@@ -40,6 +40,10 @@ class TableSpec:
     # Columns this case's writer stamps with the database clock even though the column has no
     # default of its own: excluded by name, with the reason in the case definition.
     also_excluded: tuple[str, ...] = ()
+    # False for a table whose writer is a plain insert and may legitimately hold two identical
+    # rows under one key (an event's props fetched twice): the rows under a key are compared as
+    # multisets instead of flagged as duplicates.
+    unique: bool = True
 
 
 @dataclass
@@ -97,16 +101,15 @@ def _key_of(row: Mapping[str, object], key: Sequence[str]) -> str:
     return "|".join(str(row[c]) for c in key)
 
 
-def _index(
-    rows: Sequence[dict[str, object]], key: Sequence[str], dupes: list[str], side: str
-) -> dict[str, dict[str, object]]:
-    indexed: dict[str, dict[str, object]] = {}
+def _index(rows: Sequence[dict[str, object]], key: Sequence[str]) -> dict[str, list[dict[str, object]]]:
+    indexed: dict[str, list[dict[str, object]]] = {}
     for row in rows:
-        k = _key_of(row, key)
-        if k in indexed:
-            dupes.append(f"{side} {k}")
-        indexed[k] = row
+        indexed.setdefault(_key_of(row, key), []).append(row)
     return indexed
+
+
+def _ordered(rows: list[dict[str, object]], columns: Sequence[str]) -> list[dict[str, object]]:
+    return sorted(rows, key=lambda row: repr([row[c] for c in columns]))
 
 
 def diff_table(ts_url: str, py_url: str, spec: TableSpec, limit: int = 20) -> TableDiff:
@@ -114,18 +117,25 @@ def diff_table(ts_url: str, py_url: str, spec: TableSpec, limit: int = 20) -> Ta
     ts_rows = read_table(ts_url, spec, columns)
     py_rows = read_table(py_url, spec, columns)
     result = TableDiff(table=spec.table, ts_rows=len(ts_rows), py_rows=len(py_rows))
-    ts = _index(ts_rows, spec.key, result.duplicate_keys, "ts")
-    py = _index(py_rows, spec.key, result.duplicate_keys, "py")
+    ts = _index(ts_rows, spec.key)
+    py = _index(py_rows, spec.key)
+    if spec.unique:
+        result.duplicate_keys.extend(f"ts {k}" for k, v in ts.items() if len(v) > 1)
+        result.duplicate_keys.extend(f"py {k}" for k, v in py.items() if len(v) > 1)
     tolerances = {t.column: t for t in spec.tolerances}
     for k in sorted(ts.keys() - py.keys()):
         result.only_ts.append(k)
     for k in sorted(py.keys() - ts.keys()):
         result.only_py.append(k)
     for k in sorted(ts.keys() & py.keys()):
-        for column in columns:
-            a, b = ts[k][column], py[k][column]
-            if not _equal(a, b, tolerances.get(column)):
-                result.differing.append(f"{k} {column}: ts={a!r} py={b!r}")
+        if len(ts[k]) != len(py[k]):
+            result.differing.append(f"{k}: ts holds {len(ts[k])} row(s), py holds {len(py[k])}")
+            continue
+        for ts_row, py_row in zip(_ordered(ts[k], columns), _ordered(py[k], columns), strict=True):
+            for column in columns:
+                a, b = ts_row[column], py_row[column]
+                if not _equal(a, b, tolerances.get(column)):
+                    result.differing.append(f"{k} {column}: ts={a!r} py={b!r}")
     result.only_ts = result.only_ts[:limit] + (
         [f"... {len(result.only_ts) - limit} more"] if len(result.only_ts) > limit else []
     )

@@ -1,0 +1,215 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "The Odds API, recorded 2026-10-12: the NFL events list and the five prop markets for every event the snapshot selects (kicking off within fourteen days of 05:00 UTC, earliest first, at most twenty). The key is stripped from every recorded URL.",
+  "responses": [
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events",
+      "status": 200,
+      "file": "events.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99997",
+        "x-requests-used": "3",
+        "x-requests-last": "0"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 2992
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/e6d00eedd87d367e510314bd8cab8f6f/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_e6d00eedd87d367e510314bd8cab8f6f.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99992",
+        "x-requests-used": "8",
+        "x-requests-last": "5"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 46001
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/855f58fad5f0f14b239f4f63df27998b/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_855f58fad5f0f14b239f4f63df27998b.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99987",
+        "x-requests-used": "13",
+        "x-requests-last": "5"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 26304
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/57418b2cf5aca558b3c98eafac1e264a/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_57418b2cf5aca558b3c98eafac1e264a.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99982",
+        "x-requests-used": "18",
+        "x-requests-last": "5"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 12173
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/7c312fdf24fb35f58b0e07c2932cc997/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_7c312fdf24fb35f58b0e07c2932cc997.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99982",
+        "x-requests-used": "18",
+        "x-requests-last": "0"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 210
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/e86227938fd3cf008fc5648fb5128344/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_e86227938fd3cf008fc5648fb5128344.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99982",
+        "x-requests-used": "18",
+        "x-requests-last": "0"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 214
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/caca2d752fe1a1779029082e95332fcc/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_caca2d752fe1a1779029082e95332fcc.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99982",
+        "x-requests-used": "18",
+        "x-requests-last": "0"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 218
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/84aa9e190e625d7e9cd67e1f157a45b4/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_84aa9e190e625d7e9cd67e1f157a45b4.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99982",
+        "x-requests-used": "18",
+        "x-requests-last": "0"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 216
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/0b0b582b32b09ab6ff6664ffae0c9653/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_0b0b582b32b09ab6ff6664ffae0c9653.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99982",
+        "x-requests-used": "18",
+        "x-requests-last": "0"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 215
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/1cf74afd313e9fd300e1462012b174cb/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_1cf74afd313e9fd300e1462012b174cb.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99982",
+        "x-requests-used": "18",
+        "x-requests-last": "0"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 215
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/27f3994841ce8081c0b7349cf3d1e3d7/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_27f3994841ce8081c0b7349cf3d1e3d7.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99982",
+        "x-requests-used": "18",
+        "x-requests-last": "0"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 221
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/3729ac6d2a66b642850caf2044cdc658/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_3729ac6d2a66b642850caf2044cdc658.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99982",
+        "x-requests-used": "18",
+        "x-requests-last": "0"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 215
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/45b2690b350ed45145c7a716b18e8e66/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_45b2690b350ed45145c7a716b18e8e66.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99982",
+        "x-requests-used": "18",
+        "x-requests-last": "0"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 212
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/20fefae8c296247460ba5773caa42218/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_20fefae8c296247460ba5773caa42218.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99982",
+        "x-requests-used": "18",
+        "x-requests-last": "0"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 220
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/82fd5a159fa130e67abab93a9537f70b/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_82fd5a159fa130e67abab93a9537f70b.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99982",
+        "x-requests-used": "18",
+        "x-requests-last": "0"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 213
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/f122527f003276d3bca19efa48c902c1/odds?markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "event_odds_f122527f003276d3bca19efa48c902c1.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99977",
+        "x-requests-used": "23",
+        "x-requests-last": "5"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 5565
+    }
+  ]
+}
