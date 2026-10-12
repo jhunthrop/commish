@@ -34,7 +34,7 @@ worker's JavaScript is never type-checked as if it were ours. Everything we writ
 ## Budgets
 
 `lighthouserc.json` carries the spec's budgets at the mobile profile (150 ms round trip, 1.6 Mbps,
-4x CPU), applied throttling, five runs, asserted on the median. Prerendered pages: LCP 1.2 s, script
+4x CPU), applied throttling, seven runs, asserted on the median. Applied throttling in Chrome lands an occasional run near 1.7 s whatever the page (it does so with no web fonts at all), and the median absorbs it. Prerendered pages are measured from `npm run preview:static`, a compressing static server over the build, because in production they are Workers static assets with no Worker in the path. Prerendered pages: LCP 1.2 s, script
 transfer 60 KB. User pages (sheet, mock, lobby, report, account, pass): LCP 2.0 s, script 180 KB.
 CLS 0.05 everywhere. Only the system page is collected until the product routes exist.
 

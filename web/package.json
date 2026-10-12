@@ -15,7 +15,8 @@
 		"gen": "wrangler types",
 		"screenshots": "node scripts/screenshots.ts",
 		"lighthouse": "lhci autorun",
-		"fonts": "node scripts/subset-fonts.ts && prettier --write src/lib/ui/fonts/ui.css"
+		"fonts": "node scripts/subset-fonts.ts && prettier --write src/lib/ui/fonts/ui.css",
+		"preview:static": "serve .svelte-kit/cloudflare -l 4173 --no-request-logging"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
@@ -32,6 +33,7 @@
 		"playwright": "^1.64.0",
 		"prettier": "^3.8.3",
 		"prettier-plugin-svelte": "^4.1.0",
+		"serve": "^14.2.6",
 		"subset-font": "^2.9.0",
 		"svelte": "^5.57.1",
 		"svelte-check": "^4.6.0",
