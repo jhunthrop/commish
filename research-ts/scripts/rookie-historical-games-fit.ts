@@ -23,8 +23,9 @@ import {
 import { HISTORICAL_ROSTER_FLOOR } from "@research-ts/projections/nflverse/rosters";
 import { DRAFT_BUCKETS, draftBucketFor } from "@research-ts/projections/preseason/draft-buckets";
 import { rookieCurveTrainSeasons } from "./rookie-curve-fit";
+import { packagePath } from "@research-ts/lib/package-path";
 
-const OUTPUT = "research-ts/src/projections/preseason/rookie-historical-games-fitted.ts";
+const OUTPUT = packagePath("src/projections/preseason/rookie-historical-games-fitted.ts");
 const POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 
 function requireEnv(name: string): string {

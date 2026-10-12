@@ -78,8 +78,9 @@ import {
   type MeasuredJson,
 } from "@research-ts/projections/laws/registry";
 import type { LawMeasurement, LawVerdict, PlayerSeasonPoint } from "@research-ts/projections/laws/types";
+import { packagePath } from "@research-ts/lib/package-path";
 
-const OUTPUT_PATH = MEASURED_JSON_PATH;
+const OUTPUT_PATH = packagePath(MEASURED_JSON_PATH);
 
 function requireEnv(name: string): string {
   const value = process.env[name];

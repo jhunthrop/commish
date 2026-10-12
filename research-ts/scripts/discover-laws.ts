@@ -32,8 +32,9 @@ import { quantileCoverageGaps } from "@research-ts/projections/laws/discovery/te
 import { MIN_TRAIN_PAIRS, runDiscoveryPipeline, type DiscoverySeasonRow } from "@research-ts/projections/laws/discovery/measure";
 import { DISCOVERED_JSON_PATH, MIN_OUT_OF_TRAIN_FOLD_PAIRS, MIN_REPLICATION_PAIRS, type DiscoveredJson } from "@research-ts/projections/laws/registry";
 import { STAT_LINE_GAPS } from "@research-ts/projections/nflverse/stat-lines";
+import { packagePath } from "@research-ts/lib/package-path";
 
-const OUTPUT_PATH = DISCOVERED_JSON_PATH;
+const OUTPUT_PATH = packagePath(DISCOVERED_JSON_PATH);
 
 function requireEnv(name: string): string {
   const value = process.env[name];

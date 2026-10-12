@@ -578,16 +578,16 @@ export function registryFrom(specs: readonly LawSpec[], measuredJson: MeasuredJs
 }
 
 /**
- * Where `measured.json` lives, relative to the process's working directory — the repo root, for
- * every real caller (`npm run` scripts and `next dev`/`next build` alike) and for `vitest`, which
- * both run from there. The same constant `scripts/measure-laws.ts` writes through, so the reader
- * and the writer can never name two different files.
+ * Where `measured.json` lives, relative to this PACKAGE's root (`research-ts/`), never the working
+ * directory: the writer (`scripts/measure-laws.ts`) and the tests resolve it with `packagePath`
+ * (`@research-ts/lib/package-path`), so a script started at the repository root and one started in
+ * the package write the same file. `registry()` itself reads the JSON by static import.
  */
-export const MEASURED_JSON_PATH = "research-ts/src/projections/laws/measured.json";
+export const MEASURED_JSON_PATH = "src/projections/laws/measured.json";
 
-/** Where `discovered.json` lives — the same repo-root-relative convention as `MEASURED_JSON_PATH`,
- *  written through by `scripts/discover-laws.ts`. */
-export const DISCOVERED_JSON_PATH = "research-ts/src/projections/laws/discovered.json";
+/** Where `discovered.json` lives, relative to the package root like `MEASURED_JSON_PATH`; written
+ *  through `packagePath` by `scripts/discover-laws.ts`. */
+export const DISCOVERED_JSON_PATH = "src/projections/laws/discovered.json";
 
 /** The thin file-reading wrapper every real caller uses: the committed `LAW_SPECS` against the
  *  committed `measured.json` (shape-validated by `measuredJsonFromData`, drift-checked by

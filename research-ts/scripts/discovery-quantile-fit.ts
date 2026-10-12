@@ -23,8 +23,9 @@ import {
   type QuantityRow,
 } from "@research-ts/projections/laws/discovery/templates";
 import { preseasonMomentFor } from "@research-ts/projections/preseason/source";
+import { packagePath } from "@research-ts/lib/package-path";
 
-const OUTPUT = "research-ts/src/projections/laws/discovery/quantiles.ts";
+const OUTPUT = packagePath("src/projections/laws/discovery/quantiles.ts");
 
 function requireEnv(name: string): string {
   const value = process.env[name];

@@ -10,9 +10,10 @@ import { upsertCoachRows } from "@research-ts/coaches/store";
 import type { Db } from "@research-ts/db/client";
 import { parsePlayCallers, validatePlayCallers, type PlayCallerRow } from "@research-ts/projections/nflverse/play-callers";
 import { FACT_SEASONS, finalWeekOf, nflTeamsBySeason } from "@research-ts/projections/nflverse/team-eras";
+import { packagePath } from "@research-ts/lib/package-path";
 
 /** The committed file, relative to the repo root every npm script runs from. */
-export const PLAY_CALLERS_CSV_PATH = "research-ts/data/play-callers/play-callers.csv";
+export const PLAY_CALLERS_CSV_PATH = packagePath("data/play-callers/play-callers.csv");
 
 /**
  * THE SEASONS WHOSE `head_coach` COLUMN IS CLAIMED COMPLETE (fact-sheet depth round, 2026-09-07).

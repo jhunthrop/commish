@@ -79,19 +79,20 @@ describe("THE WALL: the sweep covers everything", () => {
   });
 
   it("sweeps the fit and measurement scripts by literal name", () => {
-    for (const script of ["scripts/blend-fit.ts", "scripts/measure-laws.ts", "scripts/preseason-persist.ts"]) {
+    for (const script of ["research-ts/scripts/blend-fit.ts", "research-ts/scripts/measure-laws.ts", "research-ts/scripts/preseason-persist.ts"]) {
       expect(swept).toContain(script);
     }
   });
 
-  it("exempts the register itself and its own four scripts, and nothing else", () => {
+  it("exempts the register itself, its own operator files and the record page's read, and nothing else", () => {
     expect(swept.some((file) => file.startsWith(`${REGISTER_DIR}/`))).toBe(false);
     for (const script of WALL_EXEMPT_FILES) expect(swept).not.toContain(script);
     expect(WALL_EXEMPT_FILES).toEqual([
-      "scripts/register-freeze.ts",
-      "scripts/register-grade.ts",
+      "research-ts/scripts/register-freeze.ts",
+      "research-ts/scripts/register-grade.ts",
       "research-ts/src/projections/season-week/steps.ts",
       "research-ts/src/projections/season-week/steps.test.ts",
+      "research-ts/src/nightly/reads/record.ts",
     ]);
   });
 });
@@ -117,7 +118,7 @@ const PLANTED_EVASIONS: readonly { readonly name: string; readonly file: string;
   {
     name: "a require(), which carries no from clause either",
     file: "research-ts/src/projections/laws/measure.ts",
-    source: 'const store = require("./store");\n',
+    source: 'const store = require("../register/store");\n',
   },
   {
     name: "a RE-EXPORT PROXY in a directory no allowlist would name",
@@ -137,16 +138,16 @@ const PLANTED_EVASIONS: readonly { readonly name: string; readonly file: string;
   {
     name: "a relative import climbing out of a sibling engine directory",
     file: "research-ts/src/projections/preseason/board.ts",
-    source: 'import type { RegisterFreezeRow } from "./store";\n',
+    source: 'import type { RegisterFreezeRow } from "../register/store";\n',
   },
   {
     name: "a backtick specifier, which a quote-only regex would miss",
-    file: "scripts/blend-fit.ts",
+    file: "research-ts/scripts/blend-fit.ts",
     source: "const mod = await import(`@research-ts/projections/register/store`);\n",
   },
   {
     name: "a repo-relative path spelled without the alias",
-    file: "scripts/measure-laws.ts",
+    file: "research-ts/scripts/measure-laws.ts",
     source: 'const rows = readFileSync("research-ts/src/projections/register/store.ts");\n',
   },
   {
@@ -226,9 +227,9 @@ describe("THE WALL: planted evasions are caught by the real walk over a real tre
     write("research-ts/src/projections/market/blend.ts", 'const mod = await import("@research-ts/projections/register/store");\n');
     write("src/lib/board-helpers.ts", 'export { takeFreeze } from "@research-ts/projections/register/freeze";\n');
     // A fit script, which is swept, beside the register's own scripts, which are not.
-    write("scripts/blend-fit.ts", 'import { gradeWeek } from "@research-ts/projections/register/grade";\n');
-    write("scripts/register-freeze.ts", 'import { takeFreeze } from "@research-ts/projections/register/freeze";\n');
-    write("scripts/register-grade.ts", 'import { gradeWeek } from "@research-ts/projections/register/grade";\n');
+    write("research-ts/scripts/blend-fit.ts", 'import { gradeWeek } from "@research-ts/projections/register/grade";\n');
+    write("research-ts/scripts/register-freeze.ts", 'import { takeFreeze } from "@research-ts/projections/register/freeze";\n');
+    write("research-ts/scripts/register-grade.ts", 'import { gradeWeek } from "@research-ts/projections/register/grade";\n');
     // The register's own files, which must not report themselves.
     write("research-ts/src/projections/register/store.ts", 'export const REGISTER_DIR = "research-ts/src/projections/register";\n');
     // An innocent bystander, so the walk is proven to read files it does not flag.
@@ -241,19 +242,19 @@ describe("THE WALL: planted evasions are caught by the real walk over a real tre
 
   it("walks into every directory, including ones no allowlist named", () => {
     expect([...sweptSourceFiles(planted)].sort()).toEqual([
-      "scripts/blend-fit.ts",
-      "src/lib/board-helpers.ts",
+      "research-ts/scripts/blend-fit.ts",
       "research-ts/src/projections/laws/pricing.ts",
       "research-ts/src/projections/market/blend.ts",
+      "src/lib/board-helpers.ts",
     ]);
   });
 
   it("catches the dynamic import, the re-export proxy and the fit script, and exempts only the register's own", () => {
     const offenders = wallOffenders(planted);
     expect([...offenders.map((offender) => offender.file)].sort()).toEqual([
-      "scripts/blend-fit.ts",
-      "src/lib/board-helpers.ts",
+      "research-ts/scripts/blend-fit.ts",
       "research-ts/src/projections/market/blend.ts",
+      "src/lib/board-helpers.ts",
     ]);
   });
 });

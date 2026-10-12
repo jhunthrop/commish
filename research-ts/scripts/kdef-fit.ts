@@ -25,8 +25,9 @@ import { fitKickerPriors, kickerWeeklyPoints, type KickerPriors } from "@researc
 import { kickingWeekRowsForSeasons } from "@research-ts/projections/nflverse/kicking-weeks";
 import { defenseWeeklyPoints, fitDefensePriors, type DefensePriors } from "@research-ts/projections/preseason/team-defense";
 import { recordAndPublishFit } from "./lib/model-artifact-records";
+import { packagePath } from "@research-ts/lib/package-path";
 
-const OUTPUT = "research-ts/src/projections/preseason/kdef-fitted.ts";
+const OUTPUT = packagePath("src/projections/preseason/kdef-fitted.ts");
 const FIRST_FIT_SEASON = 2013;
 const LAST_FIT_SEASON = 2024;
 /** 2025 is judged exactly once and 2026 is never read. Both are refused by every fit below. */

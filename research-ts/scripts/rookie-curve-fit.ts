@@ -38,8 +38,9 @@ import {
   type RookieCurveObservation,
   type RookieCurvePriors,
 } from "@research-ts/projections/preseason/rookie-curve";
+import { packagePath } from "@research-ts/lib/package-path";
 
-const OUTPUT = "research-ts/src/projections/preseason/rookie-curve-fitted.ts";
+const OUTPUT = packagePath("src/projections/preseason/rookie-curve-fitted.ts");
 const POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 const SANITY_PICKS = [1, 32, 100] as const;
 

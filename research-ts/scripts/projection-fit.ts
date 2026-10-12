@@ -44,6 +44,7 @@ import { LAST_POSSIBLE_WEEK } from "@research-ts/projections/store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "@research-ts/projections/team-store";
 import type { TeamContext } from "@research-ts/projections/team-context";
 import { usageAsOf, type PlayerWeekUsage } from "@research-ts/projections/usage";
+import { packagePath } from "@research-ts/lib/package-path";
 
 /**
  * 2020 is history only — it has no prior season of its own (nflverse does not publish
@@ -80,7 +81,7 @@ const ACCEPTED_EXPERIENCE_POSITIONS: readonly Position[] = [];
  */
 const FINAL = new Date("9999-12-31T00:00:00.000Z");
 
-const OUTPUT = "research-ts/src/projections/model/fitted.ts";
+const OUTPUT = packagePath("src/projections/model/fitted.ts");
 
 /** Mirrors `MAX_REGRESSION` in `fit.ts`; a constant at it means "no measurable spread", not "a lot". */
 const MAX_REGRESSION_REPORTED = 10_000;

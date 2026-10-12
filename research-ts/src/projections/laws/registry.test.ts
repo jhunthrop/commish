@@ -26,6 +26,7 @@ import type { Law, PlayerSeasonPoint } from "./types";
 import { predictOpportunity } from "../model/opportunity";
 import { TOUCHDOWN_RATES } from "../model/efficiency";
 import { fitRedistributionPriors } from "../model/redistribution-fit";
+import { packagePath } from "@research-ts/lib/package-path";
 
 /**
  * `registryFrom` DRIVEN WITH HAND-BUILT FIXTURES — no DB, no `measured.json` on disk. Every test
@@ -278,7 +279,7 @@ describe("registry", () => {
 
   it("merges in the committed discovered.json's own BH survivors, tagged discovered, with no drift", () => {
     const laws = registry();
-    const discoveredJson = parseDiscoveredJson(readFileSync(DISCOVERED_JSON_PATH, "utf-8"));
+    const discoveredJson = parseDiscoveredJson(readFileSync(packagePath(DISCOVERED_JSON_PATH), "utf-8"));
     const discovered = laws.filter((law) => law.origin === "discovered");
     expect(discovered.map((law) => law.id).sort()).toEqual(Object.keys(discoveredJson.laws).sort());
     for (const law of discovered) expect(law.modelPath).toBeNull();
@@ -725,7 +726,7 @@ describe("chipEligibleLaws", () => {
 
 describe("discoveredPipelineCounts", () => {
   it("reads the committed discovered.json's own top-level counts", () => {
-    const raw = readFileSync(DISCOVERED_JSON_PATH, "utf-8");
+    const raw = readFileSync(packagePath(DISCOVERED_JSON_PATH), "utf-8");
     const expected = parseDiscoveredJson(raw).counts;
     expect(discoveredPipelineCounts()).toEqual(expected);
   });

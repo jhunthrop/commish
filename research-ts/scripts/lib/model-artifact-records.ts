@@ -12,9 +12,10 @@ import type { Db } from "@research-ts/db/client";
 import { catalogSpecFor } from "@research-ts/projections/model/artifact-catalog";
 import { parseModelArtifactRecord, renderModelArtifactRecord, type ModelArtifactRecord } from "@research-ts/projections/model/artifact-record";
 import { publishModelArtifact, type ModelArtifactSpec, type PublishOutcome } from "@research-ts/projections/model/artifacts";
+import { packagePath } from "@research-ts/lib/package-path";
 
 /** The committed records, relative to the repo root every npm script runs from. */
-export const MODEL_ARTIFACT_RECORDS_DIR = "research-ts/data/model-artifacts";
+export const MODEL_ARTIFACT_RECORDS_DIR = packagePath("data/model-artifacts");
 
 /** `<dir>/<family>/<artifact>/v<version>.json`. */
 export function modelArtifactRecordPath(name: string, version: number, dir: string = MODEL_ARTIFACT_RECORDS_DIR): string {

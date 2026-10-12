@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { BLEND_TRAIN_CUTOFF_SEASON, scoreBlendConstants, type BlendConstants, type BlendTrainRow } from "@research-ts/projections/market/blend";
 import { HELD_OUT_SEASONS } from "@research-ts/projections/model/fitted";
@@ -26,7 +27,14 @@ import { rookieCurveTrainSeasons } from "./rookie-curve-fit";
  *      what this catches.
  */
 
-const SOURCE_PATHS = ["scripts/blend-fit.ts", "scripts/rookie-curve-fit.ts"] as const;
+/** A script beside this test, by its file name: resolved from this file, so the read does not depend
+ *  on the directory vitest was started in (the scripts moved into research-ts/scripts/ at the
+ *  carve-out, and a cwd-relative "scripts/..." silently pointed at nothing). */
+function besideThisTest(name: string): string {
+  return join(import.meta.dirname, name);
+}
+
+const SOURCE_PATHS = [besideThisTest("blend-fit.ts"), besideThisTest("rookie-curve-fit.ts")] as const;
 
 /** Comments and string/template literals removed, so a season named in prose (this file's own
  *  header talks about 2023 and 2024 constantly) is never mistaken for a season the code reads. */
@@ -98,7 +106,7 @@ describe("the objective REFUSES a held-out row at runtime", () => {
 
 describe("the fit scripts' data reads are bounded by the train list", () => {
   it("iterates seasons ONLY over the exported train-season list", () => {
-    const source = executableSource("scripts/blend-fit.ts");
+    const source = executableSource(besideThisTest("blend-fit.ts"));
     const loops = [...source.matchAll(/for \(const (\w+) of ([^)]+)\)/g)].filter(([, name]) => name === "season");
     expect(loops.length).toBeGreaterThan(0);
     for (const [, , iterated] of loops) expect(iterated).toContain("seasons");
@@ -113,7 +121,7 @@ describe("the fit scripts' data reads are bounded by the train list", () => {
   });
 
   it("the rookie curve fit loads observations for its own train list and nothing else", () => {
-    const source = executableSource("scripts/rookie-curve-fit.ts");
+    const source = executableSource(besideThisTest("rookie-curve-fit.ts"));
     expect(source).toContain("const seasons = rookieCurveTrainSeasons()");
     expect(source).toContain("deps.loadObservations(db, seasons)");
   });
@@ -121,7 +129,7 @@ describe("the fit scripts' data reads are bounded by the train list", () => {
 
 describe("the scorecard judges on the held-out seasons, and says so in one place", () => {
   it("defaults market-edge-scorecard.ts's target seasons to exactly the held-out list", () => {
-    const source = readFileSync("scripts/market-edge-scorecard.ts", "utf-8");
+    const source = readFileSync(besideThisTest("market-edge-scorecard.ts"), "utf-8");
     const match = /TARGET_SEASONS = SEASONS\.length > 0 \? SEASONS : \[([^\]]+)\]/.exec(source);
     expect(match, "market-edge-scorecard.ts no longer declares TARGET_SEASONS the way this pin reads it").not.toBeNull();
     const declared = match![1]!.split(",").map((value) => Number(value.trim()));

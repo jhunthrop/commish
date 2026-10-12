@@ -32,14 +32,15 @@ import { BENCHMARK_BOARD_FLOOR } from "@research-ts/projections/preseason/benchm
 import { BOARD_FORMAT_SPECS, DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@research-ts/projections/preseason/board-formats";
 import { preseasonRankingsAsOf } from "@research-ts/projections/preseason/store";
 import { fitMarketCurve, loadMarketCurveObservations, marketCurve, MARKET_CURVE_TRAIN_CUTOFF_SEASON, type MarketCurvePriors } from "@research-ts/projections/market/curve";
+import { packagePath } from "@research-ts/lib/package-path";
 
 /** Where each format's fit lands, and the constant it exports. PPR keeps the file and the name every
  *  reader already imports; the two new formats get their own files rather than growing a 2,000-line
  *  one further. */
 const OUTPUTS: Readonly<Record<BoardFormat, { readonly path: string; readonly constant: string }>> = {
-  ppr: { path: "research-ts/src/projections/market/curve-fitted.ts", constant: "FITTED_MARKET_CURVE" },
-  half: { path: "research-ts/src/projections/market/curve-fitted-half.ts", constant: "FITTED_MARKET_CURVE_HALF" },
-  std: { path: "research-ts/src/projections/market/curve-fitted-std.ts", constant: "FITTED_MARKET_CURVE_STD" },
+  ppr: { path: packagePath("src/projections/market/curve-fitted.ts"), constant: "FITTED_MARKET_CURVE" },
+  half: { path: packagePath("src/projections/market/curve-fitted-half.ts"), constant: "FITTED_MARKET_CURVE_HALF" },
+  std: { path: packagePath("src/projections/market/curve-fitted-std.ts"), constant: "FITTED_MARKET_CURVE_STD" },
 };
 const POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 const SANITY_RANKS = [1, 12, 50, 150] as const;

@@ -35,8 +35,9 @@ import {
   loadDepthObservations,
   loadRookieObservations,
 } from "@research-ts/projections/preseason/source";
+import { packagePath } from "@research-ts/lib/package-path";
 
-const OUTPUT = "research-ts/src/projections/preseason/fitted.ts";
+const OUTPUT = packagePath("src/projections/preseason/fitted.ts");
 const POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 
 function requireEnv(name: string): string {

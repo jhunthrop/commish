@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { chipEligibleLaws, DISCOVERED_JSON_PATH } from "./registry";
 import { pricingEligibleLawIds, pricingEligibleLaws, SUSPECT_LAWS, SUSPECT_LAW_IDS } from "./pricing";
 import type { Law } from "./types";
+import { packagePath } from "@research-ts/lib/package-path";
 
 function law(overrides: Partial<Law> = {}): Law {
   return {
@@ -46,7 +47,7 @@ describe("SUSPECT_LAWS — the vigilance record, carried as data", () => {
   /** A suspect id that matches no committed law is a silent no-op: the gate would look armed and
    *  price the law anyway. This is the check that a typo cannot survive. */
   it("names only ids the committed discovery file actually confirms", () => {
-    const parsed = JSON.parse(readFileSync(DISCOVERED_JSON_PATH, "utf-8")) as {
+    const parsed = JSON.parse(readFileSync(packagePath(DISCOVERED_JSON_PATH), "utf-8")) as {
       readonly laws: Readonly<Record<string, { readonly verdict: string }>>;
     };
     for (const id of SUSPECT_LAW_IDS) {

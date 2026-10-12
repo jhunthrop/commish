@@ -126,8 +126,9 @@ import { FITTED_MODEL } from "@research-ts/projections/model/source";
 import { loadPreseason, preseasonCandidates, SHIPPED_PRESEASON_FEATURES, type PreseasonPriors } from "@research-ts/projections/preseason/source";
 import { gradableInputs } from "@research-ts/projections/preseason/scorecard";
 import type { ReadonlyDb } from "@research-ts/db/client";
+import { packagePath } from "@research-ts/lib/package-path";
 
-const OUTPUT = "research-ts/src/projections/market/blend-fitted.ts";
+const OUTPUT = packagePath("src/projections/market/blend-fitted.ts");
 
 /**
  * THE CORRECTIONS-ONLY RESTRICTION (fit-round Task 4, founder ruling of 2026-09-02, after the v8
