@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { clientQueueSchema } from "@/draft-engine";
 import { getDraftStore, getTeamQueue, setTeamQueue } from "@/draft-service";

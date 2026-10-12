@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import { Button, PositionBadge } from "@/components/ui";
 import { useCountdown } from "@/components/ui/countdown";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";

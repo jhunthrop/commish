@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { createTestDb } from "@research/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@research/db/schema";
+import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@research-ts/db/schema";
 import { draftGrades, leagues, memberNotices } from "@/db/schema";
 import { currentDeadline, DRAFT_SKIP_POLICY } from "@/draft-engine";
-import type { DraftAction } from "@research/domain/draft";
+import type { DraftAction } from "@research-ts/domain/draft";
 import { createDraftStore, type DraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import type { MemberNotice } from "@/integrity-service/notify";
-import { BOARD_SOURCE } from "@research/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { BOARD_SOURCE } from "@research-ts/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
 import { parseDraftGradesJobPayload, runDraftGradesJobStep } from "./draft-grades-job";
 
 const db: Db = createTestDb();

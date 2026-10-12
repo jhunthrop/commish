@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { DraftAction } from "@research/domain/draft";
-import type { RosterSlotConfig } from "@research/domain/roster";
+import type { DraftAction } from "@research-ts/domain/draft";
+import type { RosterSlotConfig } from "@research-ts/domain/roster";
 import { DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY, AUCTION_CONFIG } from "./config";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
 import { reduceDraft } from "./reduce";

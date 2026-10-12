@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail } from "@/lib/api/respond";
 import { requireLeagueMember, resolveLeagueMembership } from "@/lib/leagues/membership";
 import { withCurrentUser } from "@/app/api/leagues/_shared";

@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import type { PreferenceState } from "@/identity";
 import { updatePreferences, type UpdatePreferencesParams } from "@/identity-service/preferences";
 import { updatePreferencesSchema } from "@/identity-service/schemas";

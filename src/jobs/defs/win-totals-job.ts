@@ -1,10 +1,10 @@
 // THE WIN-TOTALS REFRESH AS A LEAGUE-APP JOB. The work is the research core's
-// (`@research/projections/vegas/win-totals-refresh`); this binding owns the payload and classifies a
+// (`@research-ts/projections/vegas/win-totals-refresh`); this binding owns the payload and classifies a
 // publisher file that changed shape as terminal, since no retry fixes it.
-import type { Db } from "@research/db/client";
-import type { JsonObject } from "@research/domain/json";
-import type { Clock } from "@research/domain/timing";
-import { PublisherShapeError, refreshWinTotals, type WinTotalsDeps, type WinTotalsPayload } from "@research/projections/vegas/win-totals-refresh";
+import type { Db } from "@research-ts/db/client";
+import type { JsonObject } from "@research-ts/domain/json";
+import type { Clock } from "@research-ts/domain/timing";
+import { PublisherShapeError, refreshWinTotals, type WinTotalsDeps, type WinTotalsPayload } from "@research-ts/projections/vegas/win-totals-refresh";
 import { defineJob, TerminalJobError, type AnyJobDefinition, type StepOutcome } from "../contract";
 
 export const WIN_TOTALS_JOB_NAME = "win-totals";

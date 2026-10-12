@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok, parseQuery } from "@/lib/api/respond";
 import { claimMockSeat } from "@/mock-draft-service/claim";
 import { mockRoomSummary, type MockRoomSummary } from "@/mock-draft-service/lobby";

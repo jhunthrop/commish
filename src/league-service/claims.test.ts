@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { players } from "@research/db/schema";
+import { players } from "@research-ts/db/schema";
 import { leagueWaivers, teams, waiverClaims } from "@/db/schema";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { pendingWaiverClaims } from "./claims";
 import { twoTeamLeague } from "./test-support";

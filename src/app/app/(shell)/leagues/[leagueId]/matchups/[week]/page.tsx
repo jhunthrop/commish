@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
 import { leagueHome, lineupView, matchupWeek } from "@/league-service";

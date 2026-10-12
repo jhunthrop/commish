@@ -5,7 +5,7 @@ import { BigNumber, Button, Manager, PlayerRow } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { DecisionSheet } from "@/components/ui/decision-sheet";
 import { positionStickerClass } from "@/components/ui/position-badge";
-import type { Position } from "@research/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { TradeProposalView } from "@/trades/contract";
 import type { TradeAssessmentBody, TradeRoomContext } from "../contract";

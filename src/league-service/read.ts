@@ -1,11 +1,11 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { players, playerStatLines, statWeeks } from "@research/db/schema";
+import type { Db } from "@research-ts/db/client";
+import { players, playerStatLines, statWeeks } from "@research-ts/db/schema";
 import { drafts, leagues, matchups, scoringSettings, teams, users, weeks } from "@/db/schema";
 import { UI_CONFIG } from "@/components/ui/config";
-import type { DraftStatus } from "@research/domain/draft";
-import { PPR_SCORING, type ScoringSettings } from "@research/domain/scoring";
-import type { Clock } from "@research/domain/timing";
+import type { DraftStatus } from "@research-ts/domain/draft";
+import { PPR_SCORING, type ScoringSettings } from "@research-ts/domain/scoring";
+import type { Clock } from "@research-ts/domain/timing";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { listTeamCards } from "@/draft-service/teams";
 import { benchOf, LEAGUE_CONFIG, leagueTerms, medianResultFor, seasonProgress, startersOf, type WeekStatus } from "@/league";
@@ -25,7 +25,7 @@ import type {
   MatchupSummary,
   MatchupWeekBody,
 } from "@/league-room/contract";
-import { computeFantasyPoints, type ScoringRules } from "@research/scoring";
+import { computeFantasyPoints, type ScoringRules } from "@research-ts/scoring";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { getLineup, weekStatusFor } from "./lineups";
 import { leagueStandings } from "./results";
@@ -451,7 +451,7 @@ export async function matchupWeek(
       // Gameday law 3 ("a player is an object"): the club code and the headshot the season
       // surfaces draw a player WITH. Free — `playerById` above already holds the whole row, so
       // this is three more fields off a map lookup that had already happened, not a fourth read.
-      // `adp` rides with them because `Player` (`@research/domain/player`) requires it, and a surface
+      // `adp` rides with them because `Player` (`@research-ts/domain/player`) requires it, and a surface
       // that wants to hand this entry to `PlayerFace`/`PlayerRow` needs a whole `Player`.
       nflTeam: player?.nflTeam ?? null,
       headshotUrl: player?.headshotUrl ?? null,

@@ -1,5 +1,5 @@
-import { collectPlayerFacts } from "@research/capsules/collect-one";
-import { rankWithinGroups, type RankableStat } from "@research/capsules/rank";
+import { collectPlayerFacts } from "@research-ts/capsules/collect-one";
+import { rankWithinGroups, type RankableStat } from "@research-ts/capsules/rank";
 import type {
   PlayerFacts,
   PlayerFactsAvailability,
@@ -10,15 +10,15 @@ import type {
   PlayerFactsProjection,
   PlayerFactsTrend,
   PlayerFactsUsage,
-} from "@research/capsules/facts";
-import type { Db } from "@research/db/client";
-import type { Position } from "@research/domain/player";
-import { PPR_SCORING } from "@research/domain/scoring";
-import { allPositions } from "@research/projections/backtest";
-import { nflPlayerIdFor } from "@research/projections/crosswalk";
-import { BOARD_SOURCE, preseasonProjectionsAsOf, type PreseasonProjectionRow } from "@research/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@research/projections/preseason/current";
-import { describeScoring, roundPoints } from "@research/scoring";
+} from "@research-ts/capsules/facts";
+import type { Db } from "@research-ts/db/client";
+import type { Position } from "@research-ts/domain/player";
+import { PPR_SCORING } from "@research-ts/domain/scoring";
+import { allPositions } from "@research-ts/projections/backtest";
+import { nflPlayerIdFor } from "@research-ts/projections/crosswalk";
+import { BOARD_SOURCE, preseasonProjectionsAsOf, type PreseasonProjectionRow } from "@research-ts/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import { describeScoring, roundPoints } from "@research-ts/scoring";
 
 /** A per-game rank, honestly qualified — `rankWithinGroups`' own `RankedStat` minus
  *  `namedNeighbor`: a per-game rank has no consumer asking for the peer just above him (unlike

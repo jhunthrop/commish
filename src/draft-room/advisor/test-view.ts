@@ -1,6 +1,6 @@
 /** A complete `AdvisorView` for the room's own tests, overridable field by field. Not a test
  *  file itself (no `.test.`), so several suites can share it. */
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { AdvisorView, Candidate, NextPick } from "@/draft-service/assistant/view";
 
 const CANDIDATE_NAMES: Readonly<Record<string, readonly [string, string]>> = {

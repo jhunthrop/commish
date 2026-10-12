@@ -1,6 +1,6 @@
-import type { BidAction, NominateAction } from "@research/domain/draft";
+import type { BidAction, NominateAction } from "@research-ts/domain/draft";
 import { rosterFor, type AuctionState, type DraftReduceResult, type DraftState } from "./state";
-import { assignSlot } from "@research/draft-engine/slotting";
+import { assignSlot } from "@research-ts/draft-engine/slotting";
 import { applyPick, expectApplied } from "./apply-pick";
 import { bestNominationFor, nextNominator, remainingBudget } from "./selectors";
 

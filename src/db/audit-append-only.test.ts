@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 // `expectRejectionMatching`/`causeChainMessage` lived here privately until Phase 4 Task 2 gave a
 // second table trigger-enforced immutability (`src/money-service/schema-invariants.test.ts`) —
 // the cause-chain walk is shared test support now, one copy in `test-db.ts`.
-import { createTestDb, expectRejectionMatching } from "@research/db/test-db";
+import { createTestDb, expectRejectionMatching } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { GENESIS_HASH } from "@/integrity/chain";
 

@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import type { AvatarPresetKey } from "@/identity";
 import { updateProfile, type UpdateProfileParams } from "@/identity-service/profile";
 import { updateProfileSchema } from "@/identity-service/schemas";

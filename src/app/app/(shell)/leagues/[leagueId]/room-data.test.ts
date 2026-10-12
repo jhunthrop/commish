@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // `trades/page.test.tsx` already holds for a full-room read — this test is about Task 10's OWN
 // wiring (the `draftGradesVisible`/`draftId` gate deciding whether `gradesForDraft` is even
 // called), not about re-proving any of these sibling reads.
-vi.mock("@research/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research-ts/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/identity-service/preferences", () => ({ readPreferences: vi.fn() }));
 vi.mock("@/integrity-service/activity", () => ({ listLeagueActivity: vi.fn() }));
 vi.mock("@/integrity-service/notify", () => ({ listNotices: vi.fn(), quoteFor: vi.fn() }));
@@ -16,7 +16,7 @@ vi.mock("@/league-service", () => ({
   fixtureLabelsByTeam: vi.fn(),
   gradesForDraft: vi.fn(),
 }));
-vi.mock("@research/reference/nfl-schedule", () => ({ byeWeeksByTeam: vi.fn() }));
+vi.mock("@research-ts/reference/nfl-schedule", () => ({ byeWeeksByTeam: vi.fn() }));
 vi.mock("@/league-service/claims", () => ({ pendingWaiverClaims: vi.fn() }));
 vi.mock("@/league-service/trades", () => ({ listTrades: vi.fn() }));
 vi.mock("@/league-service/reference-cache-instance", () => ({ getReferenceCache: () => ({}) }));
@@ -26,7 +26,7 @@ vi.mock("@/league-service/head-to-head-cache-instance", () => ({ getHeadToHeadCa
 import { readPreferences } from "@/identity-service/preferences";
 import { listLeagueActivity } from "@/integrity-service/activity";
 import { leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId, fixtureLabelsByTeam, gradesForDraft } from "@/league-service";
-import { byeWeeksByTeam } from "@research/reference/nfl-schedule";
+import { byeWeeksByTeam } from "@research-ts/reference/nfl-schedule";
 import { pendingWaiverClaims } from "@/league-service/claims";
 import { listTrades } from "@/league-service/trades";
 import { cachedHeadToHeadRecords } from "@/league-service/head-to-head";

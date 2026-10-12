@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { createSheetDefaults, shellData } from "@/components/app-shell/shell-data";

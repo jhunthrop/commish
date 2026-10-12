@@ -9,7 +9,7 @@ vi.mock("@/lib/auth/current-user", () => ({
   getCurrentUser: vi.fn(),
 }));
 
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { drafts, leagues, teams, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";

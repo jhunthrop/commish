@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll, truncateMoneyTables } from "@/db/test-db";
-import { players } from "@research/db/schema";
+import { players } from "@research-ts/db/schema";
 import { auditEvents, drafts, leagues, moneyAccounts, moneyEntries, moneyTransactions, scoringSettings, seatHolds, teams, users } from "@/db/schema";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { autoStartDueDrafts } from "@/draft-service/auto-start";
 import { DRAFT_SERVICE_CONFIG } from "@/draft-service/config";
 import { createDraftStore } from "@/draft-service/store";

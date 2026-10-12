@@ -1,5 +1,5 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import type { ReadonlyDb } from "@research/db/client";
+import type { ReadonlyDb } from "@research-ts/db/client";
 import { moneyEntries, moneyTransactions, users, type KycStatus } from "@/db/schema";
 import { accountIdFor, parseAccountId, signedBalance, type MoneyAccountId } from "@/money/accounts";
 

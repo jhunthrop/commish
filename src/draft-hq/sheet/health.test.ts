@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Position } from "@research/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import type { SimSummary } from "@/draft-service/sim/types";
 import { sheetHealth, type SheetHealthEntry } from "./health";
 

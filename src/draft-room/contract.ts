@@ -1,9 +1,9 @@
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
 import type { TeamGrade } from "@/draft-service/grades/engine";
-import type { Law } from "@research/projections/laws/types";
-import type { BoardReason } from "@research/projections/preseason/board";
+import type { Law } from "@research-ts/projections/laws/types";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
 import type { PickFactCopy } from "./state/format";
 
 /**
@@ -210,7 +210,7 @@ export interface DraftPlayersBody {
    *  Optional for the same reason `reasons` is. */
   readonly laws?: readonly Law[];
   /**
-   * NFL team code → that team's bye week, from `byeWeeksByTeam` (`@research/reference/nfl-schedule`,
+   * NFL team code → that team's bye week, from `byeWeeksByTeam` (`@research-ts/reference/nfl-schedule`,
    * the Quilt's BYES tab and lens, 2026-09-02) — a fact the real ingested schedule states, never
    * an invention. A team absent from this record has no claimable bye (schedule not ingested, or
    * incomplete), and every bye surface renders nothing for it. Optional for the same

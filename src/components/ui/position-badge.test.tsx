@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import type { Position } from "@research/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import { PositionBadge } from "./position-badge";
 import { renderSurface } from "./test-utils";
 

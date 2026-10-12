@@ -1,5 +1,5 @@
-import type { Position } from "@research/domain/player";
-import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import type { Position } from "@research-ts/domain/player";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
 import { bestAvailableFor, positionCeiling, totalRosterSlots, AUTOPICK_CONFIG, type DraftState } from "../src/draft-engine";
 import { draftStoreForE2e, setTableChip } from "./support/mock-room";
 import { expect, test } from "./support/fixtures";

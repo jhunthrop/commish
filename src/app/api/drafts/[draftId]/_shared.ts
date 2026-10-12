@@ -1,5 +1,5 @@
 import type { NextResponse } from "next/server";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { fail } from "@/lib/api/respond";
 import { requireLeagueMember } from "@/lib/leagues/membership";

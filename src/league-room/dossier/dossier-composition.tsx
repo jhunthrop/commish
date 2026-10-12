@@ -1,4 +1,4 @@
-import { absenceSlotKey, ABSENCE_MODULES, narrativeSlot, NARRATIVE_KEYS } from "@research/capsules/narrative-slots";
+import { absenceSlotKey, ABSENCE_MODULES, narrativeSlot, NARRATIVE_KEYS } from "@research-ts/capsules/narrative-slots";
 import { EdgeCell, SourceStrip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { PlayerDossierFacts } from "@/league-service/dossier-facts";

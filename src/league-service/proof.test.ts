@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { drafts, leagues, mockRooms, reviews, teams, users } from "@/db/schema";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { LEAGUE_CONFIG } from "@/league/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";

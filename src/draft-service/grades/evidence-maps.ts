@@ -11,7 +11,7 @@
  * their own).
  */
 import type { SimPlayerEvidence } from "@/draft-service/sim/types";
-import { valueBoardIndexed, type LeagueShape } from "@research/projections/decide/replacement";
+import { valueBoardIndexed, type LeagueShape } from "@research-ts/projections/decide/replacement";
 
 export interface GradeEvidenceMaps {
   readonly pointsByPlayerId: ReadonlyMap<string, number>;

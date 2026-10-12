@@ -1,4 +1,4 @@
-import type { Position } from "@research/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import type { MedianResult, WeekStatus } from "@/league";
 import type { MatchupDetail, MatchupLineupEntry, MatchupSide } from "../contract";
 import { BigNumber, Card, EYEBROW, Manager, PlayerFace, PositionBadge, SlotChip, Stat, Table, type TableColumn } from "@/components/ui";

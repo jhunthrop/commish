@@ -1,11 +1,11 @@
 import { and, desc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { drafts, leagues, mockRooms, scoringSettings, teams } from "@/db/schema";
-import type { Position, Player } from "@research/domain/player";
-import type { RosterShapeName, RosterSlot, RosterSlotConfig } from "@research/domain/roster";
-import { SCORING_PRESETS, type ScoringPresetName } from "@research/domain/scoring";
-import type { Clock } from "@research/domain/timing";
+import type { Position, Player } from "@research-ts/domain/player";
+import type { RosterShapeName, RosterSlot, RosterSlotConfig } from "@research-ts/domain/roster";
+import { SCORING_PRESETS, type ScoringPresetName } from "@research-ts/domain/scoring";
+import type { Clock } from "@research-ts/domain/timing";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { draftStateView } from "@/draft-engine";
 import { getDraftStore } from "@/draft-service";
@@ -27,10 +27,10 @@ import {
 import { verdictFor, verdictPopulation } from "@/draft-room/lib/verdict";
 import { reviewPicks } from "@/draft-room/state/pick-review";
 import { LEAGUE_CONFIG } from "@/league";
-import { ROSTER_SHAPES } from "@research/domain/roster-shape";
-import { byeWeeksByTeam } from "@research/reference/nfl-schedule";
+import { ROSTER_SHAPES } from "@research-ts/domain/roster-shape";
+import { byeWeeksByTeam } from "@research-ts/reference/nfl-schedule";
 import { MOCK_CONFIG, type MockMode } from "@/mock-draft/config";
-import type { LeagueShape } from "@research/projections/decide/replacement";
+import type { LeagueShape } from "@research-ts/projections/decide/replacement";
 
 /**
  * THE LEARNING COLUMN'S SERVER READ (the mock-drafts workflow pass, law 3): every completed,

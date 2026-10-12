@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { players } from "@research/db/schema";
+import { players } from "@research-ts/db/schema";
 import { leagues, teams, users } from "@/db/schema";
-import { countingDb, createTestDb } from "@research/db/test-db";
+import { countingDb, createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import type { AuditEventInput } from "@/domain/audit";
 import { INTEGRITY_CONFIG } from "@/integrity/config";

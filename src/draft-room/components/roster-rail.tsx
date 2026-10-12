@@ -1,5 +1,5 @@
-import type { Player } from "@research/domain/player";
-import { BENCH_SLOT, type RosterSlotConfig } from "@research/domain/roster";
+import type { Player } from "@research-ts/domain/player";
+import { BENCH_SLOT, type RosterSlotConfig } from "@research-ts/domain/roster";
 import type { DraftStateView } from "@/draft-engine";
 import { EYEBROW } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";

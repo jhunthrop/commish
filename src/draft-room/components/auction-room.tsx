@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { ClientDraftAction } from "@/draft-engine";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { useQueueHandlers } from "../hooks/use-queue-handlers";

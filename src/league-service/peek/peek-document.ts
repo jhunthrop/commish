@@ -3,7 +3,7 @@
 // `hydratePeekDocument` turns a stored one plus the three facts a league contributes into the body
 // the screen draws. Neither touches a database, which is what lets the writer, the request path and
 // the tests all run the same assembly.
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { PlayerLeagueDraftPhase, PlayerOwner, PlayerSeasonBody } from "@/league-service/player-body";
 import {
   pointsPerGameOf,
@@ -13,10 +13,10 @@ import {
   type PlayerWeekView,
 } from "@/league-service/player-season-stats";
 import type { PlayerDossierFacts } from "@/league-service/dossier-facts";
-import { chipEligibleLaws, registry } from "@research/projections/laws/registry";
-import type { BoardReason } from "@research/projections/preseason/board";
-import { PRODUCT_SEASON } from "@research/projections/preseason/current";
-import type { PlayerCapsuleView } from "@research/capsules/store";
+import { chipEligibleLaws, registry } from "@research-ts/projections/laws/registry";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import type { PlayerCapsuleView } from "@research-ts/capsules/store";
 import type { PeekDocument, PeekDocumentBasis, PeekDocumentSeason } from "./peek-document-row";
 
 /** Everything one document is built from. Every read it needs has already happened. */

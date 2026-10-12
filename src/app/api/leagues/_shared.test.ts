@@ -4,7 +4,7 @@ vi.mock("@/lib/auth/current-user", () => ({
   getCurrentUser: vi.fn(),
 }));
 
-vi.mock("@research/db/client", () => ({
+vi.mock("@research-ts/db/client", () => ({
   getDb: vi.fn(() => ({})),
 }));
 

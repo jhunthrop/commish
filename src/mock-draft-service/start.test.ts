@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, expectRejectionMatching } from "@research/db/test-db";
+import { createTestDb, expectRejectionMatching } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { drafts, leagues, mockRooms, teams, users } from "@/db/schema";
 import { currentDeadline } from "@/draft-engine";

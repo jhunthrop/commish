@@ -6,7 +6,7 @@ import { MICRO_LABEL } from "@/components/ui/config";
 import { ROW_META_CLASS, ROW_NAME_CLASS, rowShellClass } from "@/components/ui/player-row";
 import { useValueChangeHighlight } from "@/design/use-value-change-highlight";
 import { TOKENS } from "@/design/tokens";
-import type { FixtureLabel } from "@research/reference/nfl-schedule";
+import type { FixtureLabel } from "@research-ts/reference/nfl-schedule";
 import type { MatchupDetail, MatchupLineupEntry, MatchupSide, MatchupWeekBody } from "../contract";
 import { useLiveScores } from "../hooks/use-live-scores";
 import { formatPoints } from "../lib/format";

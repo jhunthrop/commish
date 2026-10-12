@@ -13,7 +13,7 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import type { NoticeView } from "@/account-room/contract";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { memberNotices, users } from "@/db/schema";
 import type { ApiEnvelope } from "@/lib/api/respond";

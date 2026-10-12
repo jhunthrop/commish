@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TANK01_CONFIG } from "@research/stats/tank01/config";
+import { TANK01_CONFIG } from "@research-ts/stats/tank01/config";
 import { mapAdpList, mapBoxScoreToStatLines, mapGames, mapPlayerList, mapTeamsToDefensePlayers } from "./map";
 
 describe("mapPlayerList", () => {

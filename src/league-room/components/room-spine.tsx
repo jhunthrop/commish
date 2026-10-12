@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PlayerFace } from "@/components/ui";
-import type { FixtureLabel } from "@research/reference/nfl-schedule";
+import type { FixtureLabel } from "@research-ts/reference/nfl-schedule";
 import type { LineupBody, LineupSlotView } from "../contract";
 import { playerOf } from "../lib/player";
 

@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { ok, parseQuery } from "@/lib/api/respond";
 import { withCurrentUser } from "@/app/api/leagues/_shared";
 import type { SearchBody } from "@/search/contract";

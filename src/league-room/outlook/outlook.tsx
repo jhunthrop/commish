@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { Badge, ReasonChip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { narrativeSlot, NARRATIVE_KEYS } from "@research/capsules/narrative-slots";
-import type { PlayerCapsuleView } from "@research/capsules/store";
-import { TEMPLATE_CAPSULE_NOTE } from "@research/capsules/template";
-import type { Position } from "@research/domain/player";
-import type { Law } from "@research/projections/laws/types";
-import type { BoardReason } from "@research/projections/preseason/board";
-import { groupReasons, lawGroupLabel, type EvidenceGroup } from "@research/capsules/outlook/groups";
-import { verdictLine } from "@research/capsules/outlook/verdict";
+import { narrativeSlot, NARRATIVE_KEYS } from "@research-ts/capsules/narrative-slots";
+import type { PlayerCapsuleView } from "@research-ts/capsules/store";
+import { TEMPLATE_CAPSULE_NOTE } from "@research-ts/capsules/template";
+import type { Position } from "@research-ts/domain/player";
+import type { Law } from "@research-ts/projections/laws/types";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
+import { groupReasons, lawGroupLabel, type EvidenceGroup } from "@research-ts/capsules/outlook/groups";
+import { verdictLine } from "@research-ts/capsules/outlook/verdict";
 
 /**
  * THE OUTLOOK, REDESIGNED (founder, 2026-09-04) — "a timing tower, not a spreadsheet." The old

@@ -1,6 +1,6 @@
-import type { StatLine } from "@research/domain/player";
-import { PPR_SCORING } from "@research/domain/scoring";
-import { computeFantasyPoints } from "@research/scoring";
+import type { StatLine } from "@research-ts/domain/player";
+import { PPR_SCORING } from "@research-ts/domain/scoring";
+import { computeFantasyPoints } from "@research-ts/scoring";
 import type { AdpEntry, GameStatus, GameSummary, StatsProvider } from "../provider";
 import type { Dataset } from "./generate-dataset";
 import { deriveMockGames } from "./games";

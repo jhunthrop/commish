@@ -8,7 +8,7 @@
 // One tick and exit (an operator smoke test, or an external scheduler): npm run jobs:runner -- --once
 import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
-import { createDb } from "@research/db/client";
+import { createDb } from "@research-ts/db/client";
 import { JOBS_CONFIG } from "@/jobs/config";
 import { formatErrorForLog } from "@/jobs/execute";
 import { JOB_DEFINITIONS } from "@/jobs/registry";

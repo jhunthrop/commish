@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { eq } from "drizzle-orm";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { users } from "@/db/schema";
 import type { User } from "@/domain/user";
 import { syncUserFromWorkOS } from "./user-sync";

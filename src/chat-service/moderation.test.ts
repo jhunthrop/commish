@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq, isNull } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { auditEvents, chatMessageReports, chatMessages, integrityFlags, memberNotices, users } from "@/db/schema";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { quoteFor, type MemberNotice } from "@/integrity-service/notify";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { chatRemovalPhraseFor } from "@/moderation/removal";
 import { REASON_FRAGMENTS } from "@/moderation/test-support";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import { postMessage } from "./chat";

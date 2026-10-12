@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { SegmentGroup, type SegmentOption } from "@/components/ui";
-import { BOARD_FORMAT_QUERY_KEY, BOARD_FORMAT_SPECS, BOARD_FORMATS, isBoardFormat, type BoardFormat } from "@research/projections/preseason/board-formats";
+import { BOARD_FORMAT_QUERY_KEY, BOARD_FORMAT_SPECS, BOARD_FORMATS, isBoardFormat, type BoardFormat } from "@research-ts/projections/preseason/board-formats";
 import { readStoredBoardFormat, storeBoardFormat } from "./scoring-format-preference";
 
 /** The picker's three segments, in the order the formats are defined. */

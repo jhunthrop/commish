@@ -1,7 +1,7 @@
 import { and, asc, eq, lte, sql } from "drizzle-orm";
-import type { Db, DbTx } from "@research/db/client";
+import type { Db, DbTx } from "@research-ts/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import { DRAFT_SERVICE_CONFIG } from "@/draft-service/config";

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { TeamCard } from "@/domain/league";
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { WaitingInfo } from "../contract";
 import { Badge, EYEBROW } from "@/components/ui";

@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { draftActions, drafts, leagues, scoringSettings, sessionSignals, teams } from "@/db/schema";
-import type { DraftAction } from "@research/domain/draft";
-import { STANDARD_ROSTER_SLOTS, type RosterSlot } from "@research/domain/roster";
-import { PPR_SCORING } from "@research/domain/scoring";
-import type { Clock } from "@research/domain/timing";
+import type { DraftAction } from "@research-ts/domain/draft";
+import { STANDARD_ROSTER_SLOTS, type RosterSlot } from "@research-ts/domain/roster";
+import { PPR_SCORING } from "@research-ts/domain/scoring";
+import type { Clock } from "@research-ts/domain/timing";
 import { assignSlot, AUTOPICK_CONFIG, DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY, replayDraft, snakeTeamForPick, type DraftConfig } from "@/draft-engine";
 import { buildDraftPool, rankedPlayers } from "@/draft-service/pool";
 import { defaultSweepDeps, sweepLeagueForMultiAccounts, type SweepResult } from "@/integrity-service/multi-account";

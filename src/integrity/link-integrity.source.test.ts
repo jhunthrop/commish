@@ -192,8 +192,8 @@ function matchesServedRoute(segments: readonly string[]): boolean {
  * path SUFFIXES joined onto a vendor base URL. Swept-dir-shaped exemption, with the reason.
  */
 const NOT_ROUTE_FILES: ReadonlyMap<string, string> = new Map([
-  ["research/src/stats/tank01/config.ts", "Tank01 RapidAPI endpoint suffixes (/getNFLPlayerList, ...), joined onto the vendor base URL — no internal navigation."],
-  ["research/src/projections/odds/snapshot.ts", "The Odds API endpoint suffixes (/events, /events/${eventId}/odds), joined onto the vendor base URL — no internal navigation."],
+  ["research-ts/src/stats/tank01/config.ts", "Tank01 RapidAPI endpoint suffixes (/getNFLPlayerList, ...), joined onto the vendor base URL — no internal navigation."],
+  ["research-ts/src/projections/odds/snapshot.ts", "The Odds API endpoint suffixes (/events, /events/${eventId}/odds), joined onto the vendor base URL — no internal navigation."],
 ]);
 
 /**

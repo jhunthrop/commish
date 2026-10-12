@@ -8,7 +8,7 @@
 //   { "crons": [{ "path": "/api/jobs/tick", "schedule": "* * * * *" }] }
 // with CRON_SECRET set in the project env (Vercel sends it as the Authorization bearer).
 import { randomUUID } from "node:crypto";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { JOB_DEFINITIONS } from "@/jobs/registry";
 import { handleTick } from "@/jobs/tick-handler";
 

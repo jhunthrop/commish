@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { Db } from "@research/db/client";
-import { createTestDb } from "@research/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import type { Clock } from "@research/domain/timing";
-import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@research/projections/nflverse/schedule";
-import { recordTeamObservations, teamObservationsAsOf } from "@research/projections/team-store";
-import { PRODUCT_SEASON } from "@research/projections/preseason/current";
-import { VEGAS_METRICS, VEGAS_SOURCE } from "@research/projections/vegas/ingest";
+import type { Clock } from "@research-ts/domain/timing";
+import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@research-ts/projections/nflverse/schedule";
+import { recordTeamObservations, teamObservationsAsOf } from "@research-ts/projections/team-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import { VEGAS_METRICS, VEGAS_SOURCE } from "@research-ts/projections/vegas/ingest";
 import { TerminalJobError } from "../contract";
 import { parseWinTotalsPayload, runWinTotalsStep } from "./win-totals-job";
 

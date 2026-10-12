@@ -1,4 +1,4 @@
-import type { Position } from "@research/domain/player";
+import type { Position } from "@research-ts/domain/player";
 
 /**
  * THE CLAIM SURFACE'S ROW SHAPES, AND NOTHING ELSE. Types only, one import (`Position`), no

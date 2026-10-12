@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import { DRAFT_ROOM_CONFIG } from "../../state/config";
 import { PoolList } from "./pool-list";
 

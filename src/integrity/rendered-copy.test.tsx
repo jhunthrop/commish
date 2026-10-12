@@ -219,7 +219,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn(), requireAdmin: vi.fn() }));
 vi.mock("@/lib/leagues/membership", () => ({ resolveLeagueMembership: vi.fn() }));
-vi.mock("@research/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research-ts/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/draft-service/teams", () => ({ leagueNameFor: vi.fn() }));
 vi.mock("@/integrity-service/activity", () => ({ listLeagueActivity: vi.fn() }));
 vi.mock("@/integrity-service/notify", () => ({ listNotices: vi.fn(), quoteFor: vi.fn(() => null) }));

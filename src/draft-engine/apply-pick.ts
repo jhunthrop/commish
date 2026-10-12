@@ -1,9 +1,9 @@
-import { mustPickLine } from "@research/domain/must-pick";
-import type { RosterSlot } from "@research/domain/roster";
-import { restrictedPositions } from "@research/domain/roster-eligibility";
+import { mustPickLine } from "@research-ts/domain/must-pick";
+import type { RosterSlot } from "@research-ts/domain/roster";
+import { restrictedPositions } from "@research-ts/domain/roster-eligibility";
 import { rosterFor, type CompletedPick, type DraftReduceResult, type DraftState } from "./state";
-import { roundForPick } from "@research/draft-engine/order";
-import { assignSlot } from "@research/draft-engine/slotting";
+import { roundForPick } from "@research-ts/draft-engine/order";
+import { assignSlot } from "@research-ts/draft-engine/slotting";
 import { draftedPlayerIds } from "./selectors";
 
 /**

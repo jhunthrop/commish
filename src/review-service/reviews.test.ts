@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq, getTableName, is, isNull, Table } from "drizzle-orm";
-import { countingDb, createTestDb } from "@research/db/test-db";
+import { countingDb, createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import type { Db } from "@research/db/client";
-import * as researchSchema from "@research/db/schema";
+import type { Db } from "@research-ts/db/client";
+import * as researchSchema from "@research-ts/db/schema";
 import * as appSchema from "@/db/schema";
 import { auditEvents, integrityFlags, leagues, memberNotices, reviewReports, reviews, teams, users } from "@/db/schema";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { notifyAffectedMember, quoteFor, type MemberNotice } from "@/integrity-service/notify";
 import { renderNotice } from "@/integrity/notices";

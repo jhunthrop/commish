@@ -8,7 +8,7 @@
  */
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { stripCommentsPreservingLines } from "@research/lib/source-text";
+import { stripCommentsPreservingLines } from "@research-ts/lib/source-text";
 
 export { stripCommentsPreservingLines };
 

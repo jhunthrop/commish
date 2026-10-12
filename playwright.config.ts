@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { envOr } from "@research/lib/env";
+import { envOr } from "@research-ts/lib/env";
 
 // DEVIATION from the original spec: port 3000 is occupied by another developer's live `next
 // dev` server on this machine, and this suite must never touch it. The default here is 3100,

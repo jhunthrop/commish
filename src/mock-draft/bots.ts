@@ -5,10 +5,10 @@
  * comes from the engine's own selectors (`availablePool` + `assignSlot`, the identical oracle
  * `bestAvailableFor` uses), never a second rule that could drift from what `reduceDraft` accepts.
  */
-import type { DraftPoolEntry } from "@research/domain/draft";
+import type { DraftPoolEntry } from "@research-ts/domain/draft";
 import { MS_PER_SECOND } from "@/domain/duration";
-import type { Position } from "@research/domain/player";
-import type { RosterSlot, RosterSlotConfig } from "@research/domain/roster";
+import type { Position } from "@research-ts/domain/player";
+import type { RosterSlot, RosterSlotConfig } from "@research-ts/domain/roster";
 import { assignSlot, autopickEligible, availablePool, candidateRoleReader, draftedPlayerIds, needMultiplier, queuedEntriesFor, rankWeight, rosterFor, type CandidateRole, type DraftState, type RosterCeilingPolicy } from "@/draft-engine";
 import type { BotArchetype } from "./archetypes";
 import { MOCK_CONFIG } from "./config";

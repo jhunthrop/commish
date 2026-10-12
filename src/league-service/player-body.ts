@@ -2,11 +2,11 @@
 // both render. Its own module since the peek document round (2026-09-07): the document writer
 // builds this shape offline and `playerSeason` hydrates it, so the type cannot live inside the
 // reader that returns it without the two importing each other in a circle.
-import type { Player } from "@research/domain/player";
-import type { PlayerCapsuleView } from "@research/capsules/store";
-import type { KdefSeasonLine } from "@research/projections/kdef/season-lines";
-import type { Law } from "@research/projections/laws/types";
-import type { BoardReason } from "@research/projections/preseason/board";
+import type { Player } from "@research-ts/domain/player";
+import type { PlayerCapsuleView } from "@research-ts/capsules/store";
+import type { KdefSeasonLine } from "@research-ts/projections/kdef/season-lines";
+import type { Law } from "@research-ts/projections/laws/types";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
 import type { PlayerDossierFacts } from "./dossier-facts";
 import type { PlayerGameLogRow, PlayerSeasonTotals, PlayerWeekView } from "./player-season-stats";
 

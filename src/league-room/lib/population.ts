@@ -1,4 +1,4 @@
-import type { Position } from "@research/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import type { StatComparison } from "@/components/ui";
 import { comparisonWithin } from "@/components/ui";
 import type { MatchupDetail } from "../contract";

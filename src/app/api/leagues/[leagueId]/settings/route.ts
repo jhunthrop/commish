@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { ok, parseJson } from "@/lib/api/respond";
 import { setDraftGradesVisible, setDraftGradesVisibleSchema } from "@/league-service";
 import type { LeagueSettingsBody } from "@/league-room/contract";

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { DbTx } from "@research/db/client";
+import type { DbTx } from "@research-ts/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
 import { formatClockLength, MS_PER_SECOND } from "@/domain/duration";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
@@ -108,7 +108,7 @@ export type FireWhenFullOutcome =
  * audit-anchored and nothing ever deletes one, so "delete the notice" was never an available fix.
  * `fill_fired_at` is a COLUMN instead: stamped here, on the same `UPDATE` that writes
  * `kickoff_at`, and CLEARED by `releaseSeat` (see `drafts.fillFiredAt`'s own docblock,
- * `@research/db/schema`) whenever a released seat un-fills a league that had already fired. A league that
+ * `@research-ts/db/schema`) whenever a released seat un-fills a league that had already fired. A league that
  * fills, loses a member, and refills now fires its notices a second time, exactly as this column
  * was always meant to allow. NO-WRITE-BEFORE-REFUSAL holds throughout: every refusal branch below
  * returns before the `UPDATE` is ever reached.

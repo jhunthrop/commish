@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Avatar, BigNumber, ButtonLink, Card, PlayerObject } from "@/components/ui";
 import type { PlayerSeasonBody } from "@/league-service/player";
-import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
 import { firstNameOf } from "../lib/format";
 
 /**

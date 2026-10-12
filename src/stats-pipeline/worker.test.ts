@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { and, asc, eq } from "drizzle-orm";
 import Redis from "ioredis";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { crossLeagueHome } from "@/league-service/home";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
-import type { Db } from "@research/db/client";
-import { playerStatLines, players, statWeeks } from "@research/db/schema";
+import type { Db } from "@research-ts/db/client";
+import { playerStatLines, players, statWeeks } from "@research-ts/db/schema";
 import { drafts, leagues, matchups, rosterSlots, teams, users } from "@/db/schema";
-import type { StatLine } from "@research/domain/player";
+import type { StatLine } from "@research-ts/domain/player";
 import { writeSchedule } from "@/league-service/schedule";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { createRequestBudget, type RequestBudget } from "./budget";

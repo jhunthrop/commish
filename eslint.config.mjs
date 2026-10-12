@@ -335,14 +335,14 @@ const eslintConfig = [
     // operator files — which necessarily import it, and are the only four files in the tree that
     // may. See REGISTER_QUARANTINE_SELECTORS above for why this owns `no-restricted-syntax` rather
     // than extending `no-restricted-imports`.
-    files: ["src/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "scripts/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "research/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+    files: ["src/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "scripts/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "research-ts/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     ignores: [
-      "research/src/projections/register/**",
-      "research/scripts/register-freeze.ts",
-      "research/scripts/register-grade.ts",
-      "research/src/projections/season-week/steps.ts",
-      "research/src/projections/season-week/steps.test.ts",
-      "research/src/nightly/reads/record.ts",
+      "research-ts/src/projections/register/**",
+      "research-ts/scripts/register-freeze.ts",
+      "research-ts/scripts/register-grade.ts",
+      "research-ts/src/projections/season-week/steps.ts",
+      "research-ts/src/projections/season-week/steps.test.ts",
+      "research-ts/src/nightly/reads/record.ts",
     ],
     rules: {
       "no-restricted-syntax": ["error", ...REGISTER_QUARANTINE_SELECTORS],

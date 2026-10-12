@@ -21,7 +21,7 @@ vi.mock("@/lib/auth/current-user", () => ({
 
 import Redis from "ioredis";
 import type { ChatMessagePayload, ChatPageBody, ChatReactionPayload, PostChatBody, ReactionBody } from "@/chat/contract";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { REALTIME_CONFIG } from "@/lib/realtime/config";

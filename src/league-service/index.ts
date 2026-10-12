@@ -7,7 +7,7 @@
 export { createLeague } from "./creation";
 export { createInvite, acceptInvite, invitePreview, listInvites, revokeInvite } from "./invites";
 export { listLeaguesForUser, leagueHome, matchupWeek } from "./read";
-export { fixtureLabelsByTeam, type FixtureLabel } from "@research/reference/nfl-schedule";
+export { fixtureLabelsByTeam, type FixtureLabel } from "@research-ts/reference/nfl-schedule";
 export { weeklyProjectionsByPlayerId } from "./weekly-projections";
 export { crossLeagueHome } from "./home";
 export { setLineup, lineupView } from "./lineups";

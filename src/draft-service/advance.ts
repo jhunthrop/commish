@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { drafts, mockRooms } from "@/db/schema";
-import { DRAFT_ACTION_VERSION } from "@research/domain/draft";
+import { DRAFT_ACTION_VERSION } from "@research-ts/domain/draft";
 import { currentDeadline, type DraftState } from "@/draft-engine";
 import { settleMockDraftCompletion, type MockBotDriver } from "@/mock-draft-service/driver";
 import { startMockDraft } from "@/mock-draft-service/start";

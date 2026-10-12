@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useMemo, useRef } from "react";
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { SurvivalOdds } from "@/draft-service/assistant/view";
 import { BigNumber, Button, MotionList, PlayerRow, type MotionRowProps } from "@/components/ui";
 import { useStableList } from "@/design/use-stable-list";

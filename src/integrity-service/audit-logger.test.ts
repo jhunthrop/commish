@@ -1,8 +1,8 @@
 import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { DbTx } from "@research/db/client";
+import type { DbTx } from "@research-ts/db/client";
 import { auditChains, auditEvents, leagues, users } from "@/db/schema";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import type { AuditEventInput } from "@/domain/audit";
 import { GENESIS_HASH, computeEventHash } from "@/integrity/chain";

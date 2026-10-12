@@ -10,7 +10,7 @@ vi.mock("next/navigation", async (importOriginal) => ({
   ...(await importOriginal<typeof import("next/navigation")>()),
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
-vi.mock("@research/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research-ts/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/jobs/admin-view", () => ({ deadLetterJobs: vi.fn(), recentRuns: vi.fn(), scheduleStatuses: vi.fn() }));
 
 import { requireAdmin } from "@/lib/auth/current-user";

@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { tradeProposals, tradeVetoes, users, teams } from "@/db/schema";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { processTradeReviews, vetoTrade, vetoVotesRequired } from "./trade-review";
 import { TRADE_GOVERNANCE_REFUSALS } from "./trades";

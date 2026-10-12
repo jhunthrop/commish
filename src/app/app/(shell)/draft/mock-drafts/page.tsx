@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { ButtonLink, ErrorState } from "@/components/ui";
-import { SCORING_PRESETS } from "@research/domain/scoring";
+import { SCORING_PRESETS } from "@research-ts/domain/scoring";
 import { LEAGUE_CONFIG } from "@/league";
-import { ROSTER_SHAPES } from "@research/domain/roster-shape";
+import { ROSTER_SHAPES } from "@research-ts/domain/roster-shape";
 import { MOCK_CONFIG, MOCK_COPY } from "@/mock-draft/config";
 import { createMockRoom } from "@/mock-draft-service/creation";
 import { completedMockDebriefs } from "@/mock-draft-service/debrief";

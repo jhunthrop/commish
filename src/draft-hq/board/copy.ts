@@ -4,7 +4,7 @@
  * in `board-view.tsx`) so each one is independently testable and never re-derived at a second
  * call site.
  */
-import { lawGroupLabel, type EvidenceGroup } from "@research/capsules/outlook/groups";
+import { lawGroupLabel, type EvidenceGroup } from "@research-ts/capsules/outlook/groups";
 
 /**
  * FIX 3 — the retired "Strongest law" column's own sentence, moved to the why drawer's top line.

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { activateFromInjuredReserve, placeOnInjuredReserve } from "@/league-service/injured-reserve";
 import { withLeagueMemberActor, type LeagueRouteContext } from "@/app/api/leagues/_shared";

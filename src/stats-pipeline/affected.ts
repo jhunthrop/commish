@@ -1,7 +1,7 @@
 import { and, eq, inArray, ne, notExists, sql } from "drizzle-orm";
-import type { ReadonlyDb } from "@research/db/client";
+import type { ReadonlyDb } from "@research-ts/db/client";
 import { lineupSlots, rosterSlots, teams } from "@/db/schema";
-import { BENCH_SLOT } from "@research/domain/roster";
+import { BENCH_SLOT } from "@research-ts/domain/roster";
 
 export interface AffectedTeam {
   readonly leagueId: string;

@@ -10,10 +10,10 @@ vi.mock("@/lib/auth/current-user", () => ({
   requireCurrentUser: vi.fn(),
 }));
 
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { createLeague } from "@/league-service/creation";
 import { POST as postInvite, GET as getInvites, DELETE as deleteInvite } from "./route";

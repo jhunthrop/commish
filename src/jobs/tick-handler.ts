@@ -2,7 +2,7 @@
 // definitions and env injected so the route file stays a wire and this logic runs against the
 // test lanes. One authenticated request = one bounded `runTick` = schedule catch-up + reclaim +
 // a budgeted drain; a long job makes progress via step checkpoints and finishes across ticks.
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { fail, ok } from "@/lib/api/respond";
 import { JOBS_CONFIG } from "./config";
 import type { AnyJobDefinition } from "./contract";

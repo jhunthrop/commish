@@ -1,15 +1,15 @@
 import { sql } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { drafts, leagues, rosterSlots, scoringSettings, teams } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS, type RosterSlotType } from "@research/domain/roster";
-import { PPR_SCORING } from "@research/domain/scoring";
-import type { Clock } from "@research/domain/timing";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotType } from "@research-ts/domain/roster";
+import { PPR_SCORING } from "@research-ts/domain/scoring";
+import type { Clock } from "@research-ts/domain/timing";
 import { assignSlot, snakeTeamForPick, totalRosterSlots } from "@/draft-engine";
 import { rankedPlayers } from "@/draft-service/pool";
 import { LEAGUE_CONFIG } from "@/league";
 import { writeSchedule } from "@/league-service/schedule";
 import { finalizeWeek } from "@/stats-pipeline/finalize";
-import { excludedSetFor } from "@research/db/upsert";
+import { excludedSetFor } from "@research-ts/db/upsert";
 import { DEV_SEED } from "./config";
 import { ensureDevUsers, preserveRealCommissioner, preserveRealTeamOwner } from "./dev-users";
 

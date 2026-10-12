@@ -1,4 +1,4 @@
-import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig, type RosterSlotType } from "@research/domain/roster";
+import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig, type RosterSlotType } from "@research-ts/domain/roster";
 
 /**
  * The league's declared roster shape expanded into one entry per spot, filled from whatever

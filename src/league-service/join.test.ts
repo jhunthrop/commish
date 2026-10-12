@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { and, eq, isNull } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { createTestDb } from "@research/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { auditEvents, draftActions, drafts, integrityFlags, leagues, memberNotices, sessionSignals, teams, users } from "@/db/schema";
 import type { AuditEventType } from "@/domain/audit";

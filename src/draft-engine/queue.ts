@@ -1,4 +1,4 @@
-import type { DraftPoolEntry, SetQueueAction } from "@research/domain/draft";
+import type { DraftPoolEntry, SetQueueAction } from "@research-ts/domain/draft";
 import type { DraftReduceResult, DraftState } from "./state";
 
 /**

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { auditEvents, userPreferences, users } from "@/db/schema";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { syncUserFromWorkOS } from "@/lib/auth/user-sync";

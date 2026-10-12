@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { Button, ButtonLink, Celebration, Modal, PlayerFace, PositionBadge, SlotChip } from "@/components/ui";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";

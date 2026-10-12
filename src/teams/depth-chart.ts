@@ -1,4 +1,4 @@
-import type { Position } from "@research/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import { TEAM_PAGE_CONFIG } from "./config";
 import type { DatedDepthChart, DepthChartGroup, DepthChartSlot } from "./contract";
 

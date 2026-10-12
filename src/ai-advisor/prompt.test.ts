@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import type { Db } from "@research/db/client";
-import { createTestDb } from "@research/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { assembleAdvisorContext } from "./context";
 import { ADVISOR_SYSTEM_PROMPT, startSitPrompt, tradePrompt } from "./prompt";

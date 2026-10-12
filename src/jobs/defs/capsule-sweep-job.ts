@@ -1,17 +1,17 @@
 // THE CAPSULE SWEEP AS A LEAGUE-APP JOB. The sweep itself is the research core's
-// (`@research/capsules/sweep`); this binding owns what belongs to this app's queue: the payload, the tick
+// (`@research-ts/capsules/sweep`); this binding owns what belongs to this app's queue: the payload, the tick
 // deadline, the continuation it enqueues for itself, the precomputed peek rows written from the
 // sweep's facts pass, the peek-document rebuild for every player written, and the board memo drop.
 //
 // TERMINAL VS RETRYABLE: the sweep never fails on a player (the template is the permanent floor);
 // what can throw is the database work around it, which is ordinary retryable weather.
-import type { Db } from "@research/db/client";
-import type { JsonObject } from "@research/domain/json";
-import type { Clock } from "@research/domain/timing";
-import { CAPSULE_CONFIG } from "@research/capsules/config";
-import { describeSweep, reservedMsPerPlayer, sweepCapsules, type CapsuleSweepDeps } from "@research/capsules/sweep";
+import type { Db } from "@research-ts/db/client";
+import type { JsonObject } from "@research-ts/domain/json";
+import type { Clock } from "@research-ts/domain/timing";
+import { CAPSULE_CONFIG } from "@research-ts/capsules/config";
+import { describeSweep, reservedMsPerPlayer, sweepCapsules, type CapsuleSweepDeps } from "@research-ts/capsules/sweep";
 import { writeRefresh } from "@/league-service/peek/peek-facts";
-import { BOARD_MEMO_GROUP, invalidateTtlMemoGroup } from "@research/lib/cache/ttl-memo";
+import { BOARD_MEMO_GROUP, invalidateTtlMemoGroup } from "@research-ts/lib/cache/ttl-memo";
 import { JOBS_CONFIG } from "../config";
 import { defineJob, type AnyJobDefinition, type JobStepContext, type StepOutcome } from "../contract";
 import { enqueueJob } from "../store";

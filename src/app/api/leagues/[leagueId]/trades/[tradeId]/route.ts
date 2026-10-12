@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import { withLeagueMemberActor } from "@/app/api/leagues/_shared";
@@ -7,7 +7,7 @@ import { getScoreCache } from "@/league-service/score-cache-instance";
 import { tradeDecisionSchema } from "@/league-service/trade-schemas";
 import { tradeRateLimited } from "../_shared";
 import { processTradeReviews } from "@/league-service/trade-review";
-import { getDb as getDbForReviews } from "@research/db/client";
+import { getDb as getDbForReviews } from "@research-ts/db/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

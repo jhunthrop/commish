@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
-import type { PlayerFactsBooksNumbers, PlayerFactsLastSeasonStory, PlayerFactsTrend, PlayerFactsUsage } from "@research/capsules/facts";
+import type { PlayerFactsBooksNumbers, PlayerFactsLastSeasonStory, PlayerFactsTrend, PlayerFactsUsage } from "@research-ts/capsules/facts";
 import type { PlayerSeasonBody } from "@/league-service/player";
 import { BooksModule } from "./books-module";
 import { CallCard } from "./call-card";

@@ -1,6 +1,6 @@
 import { chatCursorSchema, listMessages, postMessage, postMessageSchema } from "@/chat-service";
 import type { ChatPageBody, PostChatBody } from "@/chat/contract";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { createGifProvider } from "@/gifs/registry";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { getPublisher } from "@/lib/realtime/publisher";

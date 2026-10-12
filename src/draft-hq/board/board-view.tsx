@@ -1,18 +1,18 @@
 "use client";
 
 import { Fragment, useMemo, useState, type ReactNode } from "react";
-import type { Player, Position } from "@research/domain/player";
-import { auctionValues, type AuctionShape } from "@research/projections/auction/value";
-import { quartilesFromSeasonBand } from "@research/projections/preseason/band-quartiles";
-import type { BoardReason } from "@research/projections/preseason/board";
+import type { Player, Position } from "@research-ts/domain/player";
+import { auctionValues, type AuctionShape } from "@research-ts/projections/auction/value";
+import { quartilesFromSeasonBand } from "@research-ts/projections/preseason/band-quartiles";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
 import { BigNumber, BottomSheet, Card, Input, NOT_STARTED_DASH, PlayerFace, PlayerRow, ReasonChip, RosterStatusPill, SegmentGroup, TierDivider } from "@/components/ui";
-import { NOT_ON_ACTIVE_ROSTER_BAND, NOT_ON_ACTIVE_ROSTER_NOTE } from "@research/projections/preseason/roster-status-copy";
+import { NOT_ON_ACTIVE_ROSTER_BAND, NOT_ON_ACTIVE_ROSTER_NOTE } from "@research-ts/projections/preseason/roster-status-copy";
 import { MICRO_LABEL } from "@/components/ui/config";
-import type { Law } from "@research/projections/laws/types";
-import { groupReasons } from "@research/capsules/outlook/groups";
+import type { Law } from "@research-ts/projections/laws/types";
+import { groupReasons } from "@research-ts/capsules/outlook/groups";
 import { marketOrderNoteFor } from "@/draft-room/lib/market-order-note";
 import { strongestEvidenceSentence, tierBandLabel, tierNumber, vsMarketLabel } from "./copy";
-import { BOARD_LAST_SEASON, type BoardRow } from "@research/board/service";
+import { BOARD_LAST_SEASON, type BoardRow } from "@research-ts/board/service";
 
 const POSITION_TABS: readonly { readonly value: string; readonly label: string }[] = [
   { value: "ALL", label: "Overall" },

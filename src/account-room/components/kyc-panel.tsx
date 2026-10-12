@@ -23,7 +23,7 @@ const STATUS_HEADLINE: Readonly<Partial<Record<KycStatus, string>>> = {
 };
 
 /** What each status tells the reader, in one sentence — no jargon, and no reason `KycPanel`
- *  invents a fifth status of its own: these are `KYC_STATUSES` (`@research/db/schema`), verbatim. */
+ *  invents a fifth status of its own: these are `KYC_STATUSES` (`@research-ts/db/schema`), verbatim. */
 const STATUS_SENTENCE: Readonly<Record<KycStatus, string>> = {
   none: "Federal rules require this before you can hold a balance.",
   pending: "Your verification is in review.",

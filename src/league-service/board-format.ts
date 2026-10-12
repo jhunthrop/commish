@@ -1,14 +1,14 @@
 import { eq } from "drizzle-orm";
-import type { Db, ReadonlyDb } from "@research/db/client";
-import { PPR_SCORING } from "@research/domain/scoring";
-import { boardFormatForLeagueRules, type LeagueBoardFormat } from "@research/board/format-resolution";
-import { PRODUCT_SEASON } from "@research/projections/preseason/current";
-import type { ScoringRules } from "@research/scoring/compute";
+import type { Db, ReadonlyDb } from "@research-ts/db/client";
+import { PPR_SCORING } from "@research-ts/domain/scoring";
+import { boardFormatForLeagueRules, type LeagueBoardFormat } from "@research-ts/board/format-resolution";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import type { ScoringRules } from "@research-ts/scoring/compute";
 import { scoringSettings } from "@/db/schema";
 
 /**
  * THE LEAGUE'S HALF OF WHICH BOARD A LEAGUE READS. The resolution from a set of rules is the
- * research core's (`@research/board/format-resolution`); reading a league's own `scoring_settings`
+ * research core's (`@research-ts/board/format-resolution`); reading a league's own `scoring_settings`
  * row is the league app's, so it lives here (the prep site carve-out, 2026-10-12).
  */
 

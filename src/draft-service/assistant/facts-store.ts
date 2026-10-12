@@ -5,7 +5,7 @@
  * of this; this is the level that survives a function boundary, which on Vercel is the boundary
  * between the invocation that made the pick and the one answering a viewer's `/assistant` request.
  *
- * ONE ROW PER DRAFT (`draft_room_facts`, `@research/db/schema`): the invocation that lands a pick computes
+ * ONE ROW PER DRAFT (`draft_room_facts`, `@research-ts/db/schema`): the invocation that lands a pick computes
  * the facts for the state it produced and writes them over the draft's row; a reader asks for the
  * facts at the sequence it holds and gets them only when the row's sequence is that one. No lock
  * and no waiting on a writer: a viewer who reads before the pick's own compute has landed simply
@@ -18,7 +18,7 @@
  * the round trip is exact by construction (`facts-store.test.ts` proves both shapes).
  */
 import { eq, sql } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { draftRoomFacts } from "@/db/schema";
 import { snakeTeamForPick } from "@/draft-engine";
 import type { PlayedPick } from "../sim/continue";

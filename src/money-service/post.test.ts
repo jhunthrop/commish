@@ -1,10 +1,10 @@
 import { asc, eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import type { DbTx } from "@research/db/client";
+import type { DbTx } from "@research-ts/db/client";
 import { auditEvents, moneyAccounts, moneyEntries, moneyTransactions } from "@/db/schema";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll, truncateMoneyTables } from "@/db/test-db";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
 import { accountIdFor, accountSide, parseAccountId } from "@/money/accounts";
 import { MONEY_REFUSALS } from "@/money/config";

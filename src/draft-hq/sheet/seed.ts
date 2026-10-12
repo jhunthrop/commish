@@ -1,6 +1,6 @@
-import type { Db } from "@research/db/client";
-import { GENERIC_BOARD_SHAPE } from "@research/board/generic-board";
-import { boardRows } from "@research/board/service";
+import type { Db } from "@research-ts/db/client";
+import { GENERIC_BOARD_SHAPE } from "@research-ts/board/generic-board";
+import { boardRows } from "@research-ts/board/service";
 import { seedOrderFrom } from "@/draft-room/quilt/state/sheet-seed";
 import { completedMockRoomsQuery, mockDebriefDeps } from "@/mock-draft-service/debrief";
 import type { SheetEntryInput } from "./types";

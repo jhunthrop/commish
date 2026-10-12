@@ -20,7 +20,7 @@ import type { ParticipationTier } from "@/participation/tier";
  * member-only reads today, and there is no reason browse should be the hole in that).
  *
  * `scoringLabel` is the one deliberate exception to "scoring settings stay member-only": it is
- * a DERIVED label (`describeScoring`, `@research/scoring`), never the fifteen raw weights, and it is a
+ * a DERIVED label (`describeScoring`, `@research-ts/scoring`), never the fifteen raw weights, and it is a
  * property of the league being advertised, not of any person in it. A manager cannot evaluate
  * whether to join a league without knowing how it scores, so withholding it would not be
  * privacy, it would just be a worse card. See `browse.ts`'s docblock and the commit that added
@@ -134,7 +134,7 @@ export interface PublicLeagueSummary {
   /**
    * Phase 3.6, Task 5, the fourteenth field: "15 slots, 1 flex" or "16 slots, 2 flex, superflex"
    * — a derived sentence from the league's stored `roster_slots` rows, through the existing
-   * `describeRosterShape` (`@research/domain/roster-shape`), on the SAME disclosure reasoning
+   * `describeRosterShape` (`@research-ts/domain/roster-shape`), on the SAME disclosure reasoning
    * `scoringLabel` and `draftAt` already established for this interface: a fact about the
    * league's own shape, never about a person in it. The gauntlet's veteran finding was that the
    * card "looks premium, reads shallow" — this is one of the two cheapest fields that fix it,

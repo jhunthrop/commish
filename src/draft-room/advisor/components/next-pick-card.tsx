@@ -1,4 +1,4 @@
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import { survivalBand } from "@/domain/draft-odds";
 import { Card, PlayerFace } from "@/components/ui";
 import type { AdvisorView } from "@/draft-service/assistant/view";

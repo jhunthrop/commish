@@ -1,9 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { captureSnapshots, statWeeks } from "@research/db/schema";
+import { captureSnapshots, statWeeks } from "@research-ts/db/schema";
 import { injuredReserve, lineupSlots, rosterSlots } from "@/db/schema";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { freeAgents } from "./claims";
 import { activateFromInjuredReserve, IR_REFUSALS, placeOnInjuredReserve } from "./injured-reserve";

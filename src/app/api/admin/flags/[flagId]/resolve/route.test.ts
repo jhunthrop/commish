@@ -10,7 +10,7 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { eq } from "drizzle-orm";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { integrityFlags, memberNotices, reviews, users } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth/current-user";

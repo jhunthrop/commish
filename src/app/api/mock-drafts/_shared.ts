@@ -1,5 +1,5 @@
 import { getDraftStore } from "@/draft-service";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { fail } from "@/lib/api/respond";
 import { createRateLimiter } from "@/lib/api/rate-limit";
 import { MOCK_CONFIG } from "@/mock-draft/config";

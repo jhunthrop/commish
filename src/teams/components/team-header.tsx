@@ -1,5 +1,5 @@
 import { Card, PlayerFace, Stat } from "@/components/ui";
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { TeamPageData } from "../contract";
 import { formatStampedDate, formatTeamRecord } from "./format";
 

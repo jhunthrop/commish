@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { asc, eq } from "drizzle-orm";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { players } from "@research/db/schema";
+import { players } from "@research-ts/db/schema";
 import { auditEvents, teams, users } from "@/db/schema";
-import { DRAFT_ACTION_VERSION } from "@research/domain/draft";
+import { DRAFT_ACTION_VERSION } from "@research-ts/domain/draft";
 import { teamOnClock } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";

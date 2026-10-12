@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import { PlayerFace } from "./player-face";
 import { PositionBadge } from "./position-badge";
 

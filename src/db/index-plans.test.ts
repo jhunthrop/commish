@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { and, asc, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { createTestDb } from "@research/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll, truncateMoneyTables } from "@/db/test-db";
 import { auditEvents, draftActions, leagues, lineupSlots, matchups, moneyEntries, moneyTransactions, rosterSlots, teams, MONEY_DIRECTIONS, MONEY_TXN_KINDS } from "@/db/schema";
 import { explainPlan, findNode, indexScanNode, nodeTypes, planCost, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { ErrorState, PageTitle } from "@/components/ui";
 import { AppShell } from "@/components/app-shell/app-shell";

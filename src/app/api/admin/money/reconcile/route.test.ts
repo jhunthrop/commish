@@ -9,7 +9,7 @@ vi.mock("@/lib/auth/current-user", () => ({
   requireAdmin: vi.fn(),
 }));
 
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll, truncateMoneyTables } from "@/db/test-db";
 import { requireAdmin } from "@/lib/auth/current-user";
 import { getAuditLogger } from "@/integrity-service/audit-logger";

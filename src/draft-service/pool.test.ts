@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { sql } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { createTestDb } from "@research/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { nflPlayers, playerCrosswalk, players, playerStatLines, preseasonBoardReasons } from "@research/db/schema";
+import { nflPlayers, playerCrosswalk, players, playerStatLines, preseasonBoardReasons } from "@research-ts/db/schema";
 import { scoringSettings } from "@/db/schema";
-import { STANDARD_SCORING } from "@research/domain/scoring";
-import { invalidateAllTtlMemosForTests } from "@research/lib/cache/ttl-memo";
-import { BOARD_SOURCE } from "@research/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@research/projections/preseason/current";
-import { computeFantasyPoints } from "@research/scoring";
+import { STANDARD_SCORING } from "@research-ts/domain/scoring";
+import { invalidateAllTtlMemosForTests } from "@research-ts/lib/cache/ttl-memo";
+import { BOARD_SOURCE } from "@research-ts/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import { computeFantasyPoints } from "@research-ts/scoring";
 import { buildDraftPool, invalidateRankedPlayersCache, rankedPlayers } from "./pool";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 

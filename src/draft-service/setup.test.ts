@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { DRAFT_CLOCK_SCHEDULE, DRAFT_PAUSE_WINDOW } from "@/draft-engine";
 import { loadDraftConfig } from "./setup";

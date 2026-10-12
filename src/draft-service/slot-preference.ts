@@ -1,8 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Db, DbTx } from "@research/db/client";
+import type { Db, DbTx } from "@research-ts/db/client";
 import { draftSlotPreferences, drafts, leagues, teams } from "@/db/schema";
-import { excludedSetFor } from "@research/db/upsert";
+import { excludedSetFor } from "@research-ts/db/upsert";
 import type { SlotPreferenceMap } from "./order";
 
 /**
@@ -55,7 +55,7 @@ export type SetSlotPreferenceResult =
 
 /**
  * Writes one team's slot ranking. A TABLE write, not a draft action (ruling 27 — see
- * `draft_slot_preferences`'s own docblock in `@research/db/schema`): this is an input to the one-time
+ * `draft_slot_preferences`'s own docblock in `@research-ts/db/schema`): this is an input to the one-time
  * draw `assignDraftSlots` (`@/draft-service/order`) runs at `START_DRAFT`, never itself part of
  * the replayed log.
  *

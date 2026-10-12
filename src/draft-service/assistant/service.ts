@@ -17,10 +17,10 @@
  * (`simulateRoomOddsInChunks`), so no invocation holds its loop for a whole table. Both entry
  * points share `roomFactsForState`, so there is exactly one definition of "the room's facts".
  */
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import type { DraftState } from "@/draft-engine";
-import type { Recommendation } from "@research/projections/decide/draft";
-import type { LeagueShape } from "@research/projections/decide/replacement";
+import type { Recommendation } from "@research-ts/projections/decide/draft";
+import type { LeagueShape } from "@research-ts/projections/decide/replacement";
 import { getDraftStore, resolveDraftActor } from "@/draft-service";
 import { leagueBoardFormat } from "@/league-service/board-format";
 import { pickPath } from "@/lib/timing/pick-path";

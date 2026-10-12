@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { describeStatsProviderContract } from "../test-support";
-import { Tank01Error } from "@research/stats/tank01/client";
-import { TANK01_CONFIG } from "@research/stats/tank01/config";
+import { Tank01Error } from "@research-ts/stats/tank01/client";
+import { TANK01_CONFIG } from "@research-ts/stats/tank01/config";
 import { createFixtureFetch, readManifest } from "./fixtures";
 import { createTank01StatsProvider } from "./tank01-stats-provider";
 

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { Db } from "@research/db/client";
-import { createTestDb } from "@research/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { players } from "@research/db/schema";
+import { players } from "@research-ts/db/schema";
 import { playerDirectoryFor } from "./present";
 import type { SimSummary } from "./types";
 

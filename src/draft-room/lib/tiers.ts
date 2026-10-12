@@ -1,4 +1,4 @@
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { TierGrade } from "@/design/tokens";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 

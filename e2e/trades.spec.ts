@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { createDb } from "@research/db/client";
+import { createDb } from "@research-ts/db/client";
 import { integrityFlags, tradeProposals } from "@/db/schema";
 import { expect, expectNotice, test } from "./support/fixtures";
 import {

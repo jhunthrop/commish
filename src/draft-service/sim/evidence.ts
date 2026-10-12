@@ -2,7 +2,7 @@
  * THE SIM'S EVIDENCE POOL, READ FROM REAL STORES — the one bridge between `simulateDrafts`'s pure
  * arithmetic (`simulate.ts`) and the two real facts it needs: the evidence board's own projected
  * points (`preseasonProjectionsAsOf`, `BOARD_SOURCE` — the identical read
- * `@research/board/service`'s `boardRows` already uses), and the market's own rank
+ * `@research-ts/board/service`'s `boardRows` already uses), and the market's own rank
  * (`players.adp`, the live feed `ingestAdp` writes, joined through `player_crosswalk` exactly the
  * way `boardRows` already joins it).
  *
@@ -15,10 +15,10 @@
  * half (`store.ts`), so a board refresh naturally invalidates a stale cached run.
  */
 import { eq, inArray } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { players as playersTable, playerCrosswalk } from "@research/db/schema";
-import { BOARD_SOURCE, preseasonProjectionsAsOf } from "@research/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import type { Db } from "@research-ts/db/client";
+import { players as playersTable, playerCrosswalk } from "@research-ts/db/schema";
+import { BOARD_SOURCE, preseasonProjectionsAsOf } from "@research-ts/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
 import type { SimPlayerEvidence } from "./types";
 
 export interface EvidencePool {

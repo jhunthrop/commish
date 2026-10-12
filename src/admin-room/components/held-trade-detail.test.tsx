@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import type { Position } from "@research/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import { contrastRatio } from "@/design/test-support";
 import { TOKENS, type ThemeName } from "@/design/tokens";
 import { renderSurface } from "@/components/ui/test-utils";

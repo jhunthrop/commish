@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { leagues, matchups, teams, users, weeks } from "@/db/schema";
-import { countingDb, createTestDb } from "@research/db/test-db";
+import { countingDb, createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { headToHeadKey, LEAGUE_CONFIG, type HeadToHeadRecord } from "@/league";
 import { cachedHeadToHeadRecords, headToHeadRecords, recordsForTeam } from "./head-to-head";
 

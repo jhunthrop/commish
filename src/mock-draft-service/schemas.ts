@@ -1,9 +1,9 @@
 import { z } from "zod";
-import type { RosterShapeName } from "@research/domain/roster";
-import { SCORING_PRESETS, type ScoringPresetName } from "@research/domain/scoring";
+import type { RosterShapeName } from "@research-ts/domain/roster";
+import { SCORING_PRESETS, type ScoringPresetName } from "@research-ts/domain/scoring";
 import { isPrintableDisplayName } from "@/identity/display-name";
 import { LEAGUE_CONFIG } from "@/league";
-import { ROSTER_SHAPES } from "@research/domain/roster-shape";
+import { ROSTER_SHAPES } from "@research-ts/domain/roster-shape";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 
 /**

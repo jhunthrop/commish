@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { Db } from "@research/db/client";
-import { players, playerStatLines } from "@research/db/schema";
+import type { Db } from "@research-ts/db/client";
+import { players, playerStatLines } from "@research-ts/db/schema";
 import { auditEvents, drafts, integrityFlags, rosterSlots, teams, tradeProposals, users } from "@/db/schema";
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { assembleAdvisorContext } from "@/ai-advisor/context";
 import { createTradeAnalyzer } from "@/ai-advisor/trade";

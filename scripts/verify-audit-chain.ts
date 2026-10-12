@@ -22,7 +22,7 @@
 // has ever touched. This command walks every chain in audit_chains, including ones never verified
 // before, so one run closes the floor for every chain that existed when it started. It exits
 // non-zero and names the scope, sequence, event and reason on any break.
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
 import { verifyAllChains, verifyChainIntegrity, verifyFullChainIntegrity, type ChainVerificationResult } from "@/integrity-service/verify";
 import { INTEGRITY_CONFIG } from "@/integrity/config";

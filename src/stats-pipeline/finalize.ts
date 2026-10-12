@@ -1,16 +1,16 @@
 import { and, asc, eq } from "drizzle-orm";
-import type { Db, DbTx, ReadonlyDb } from "@research/db/client";
-import { players, playerStatLines } from "@research/db/schema";
+import type { Db, DbTx, ReadonlyDb } from "@research-ts/db/client";
+import { players, playerStatLines } from "@research-ts/db/schema";
 import { drafts, leagues, matchups, scoringSettings, weeks } from "@/db/schema";
-import type { Position, StatLine } from "@research/domain/player";
-import type { RosterSlotConfig } from "@research/domain/roster";
-import { PPR_SCORING } from "@research/domain/scoring";
-import type { Clock } from "@research/domain/timing";
+import type { Position, StatLine } from "@research-ts/domain/player";
+import type { RosterSlotConfig } from "@research-ts/domain/roster";
+import { PPR_SCORING } from "@research-ts/domain/scoring";
+import type { Clock } from "@research-ts/domain/timing";
 import { LEAGUE_CONFIG, leagueMedian, startersOf } from "@/league";
 import { getLineup } from "@/league-service/lineups";
 import { stampSeasonCompleteInTx } from "@/league-service/participation";
 import { advancePlayoffsInTx } from "@/league-service/playoff-advance";
-import { scoreLineup, type ScoringRules } from "@research/scoring";
+import { scoreLineup, type ScoringRules } from "@research-ts/scoring";
 import type { ScoreCache } from "./score-cache";
 
 /** No Redis connection needed: every existing caller of `finalizeWeek` keeps working untouched. */
@@ -205,7 +205,7 @@ export interface FinalizeWrite {
  * either caller.
  *
  * `occurredAt` is the caller's own clock reading (never `new Date()` taken here — see
- * `@research/domain/timing`'s `Clock`), passed straight through to `stampSeasonCompleteInTx` below.
+ * `@research-ts/domain/timing`'s `Clock`), passed straight through to `stampSeasonCompleteInTx` below.
  *
  * `stampSeasonCompleteInTx` (`@/league-service/participation`) runs LAST, after every matchup row
  * for this week has its score written — it is a conditional `UPDATE … WHERE season_completed_at

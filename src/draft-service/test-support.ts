@@ -1,7 +1,7 @@
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { drafts, leagues, mockRooms, teams, users } from "@/db/schema";
 import type { DraftFormat } from "@/domain/league";
-import type { RosterSlotConfig } from "@research/domain/roster";
+import type { RosterSlotConfig } from "@research-ts/domain/roster";
 
 /** Three roster spots — enough to exercise every rule, short enough that a 12-team draft is fast. */
 export const SPRINT_ROSTER_SLOTS: readonly RosterSlotConfig[] = [

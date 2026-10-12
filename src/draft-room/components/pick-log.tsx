@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import type { TeamCard } from "@/domain/league";
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { PlayerFace, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";

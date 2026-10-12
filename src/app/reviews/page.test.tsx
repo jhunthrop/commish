@@ -10,7 +10,7 @@ const forwardedFor = { value: "203.0.113.9" };
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ "x-forwarded-for": forwardedFor.value }),
 }));
-vi.mock("@research/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research-ts/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/review-service/reviews", () => ({ listReviews: vi.fn(), myReview: vi.fn() }));
 

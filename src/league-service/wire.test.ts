@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { auditEvents, drafts, leagues, teams, users } from "@/db/schema";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { WireItem } from "@/matchmaking/contract";
 import { listWireItems } from "./wire";

@@ -2,9 +2,9 @@
 // history: the dead-lettered row and its runs stay exactly as they ended, and the new job gets a
 // new idempotency key minted from the operator action's instant.
 import { eq } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { jobs } from "@/db/schema";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { enqueueJob } from "./store";
 
 export type RerunResult =

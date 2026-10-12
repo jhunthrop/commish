@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
-import { createTestDb, TEST_DATABASE_URL } from "@research/db/test-db";
+import { createTestDb, TEST_DATABASE_URL } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
 import { INTEGRITY_CONFIG } from "@/integrity/config";

@@ -1,8 +1,8 @@
 import type { DraftFormat } from "@/domain/league";
-import type { DraftPoolEntry, DraftStatus } from "@research/domain/draft";
-import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@research/domain/roster";
+import type { DraftPoolEntry, DraftStatus } from "@research-ts/domain/draft";
+import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@research-ts/domain/roster";
 import type { ClockTier, DraftAutopickPolicy, DraftSkipPolicy, PauseWindow } from "./config";
-import { totalRosterSlots } from "@research/draft-engine/order";
+import { totalRosterSlots } from "@research-ts/draft-engine/order";
 
 export { totalRosterSlots };
 

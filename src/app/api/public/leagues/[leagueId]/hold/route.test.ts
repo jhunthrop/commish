@@ -13,7 +13,7 @@ vi.mock("next/headers", () => ({
 }));
 
 import { eq } from "drizzle-orm";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { drafts, leagues, seatHolds, teams, users } from "@/db/schema";
 import { SEAT_HOLD_COOKIE, SEAT_HOLD_REFUSALS } from "@/matchmaking/seat-hold";

@@ -1,9 +1,9 @@
-import type { PlayerFactsRankedStat, PlayerFactsTrend, PlayerFactsUsage } from "@research/capsules/facts";
-import type { Position } from "@research/domain/player";
+import type { PlayerFactsRankedStat, PlayerFactsTrend, PlayerFactsUsage } from "@research-ts/capsules/facts";
+import type { Position } from "@research-ts/domain/player";
 import { Card, Stat } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { formatTenth, formatWhole } from "../lib/format";
-import type { DefenseSeasonFacts, KdefSeasonLine, KickerSeasonFacts } from "@research/projections/kdef/season-lines";
+import type { DefenseSeasonFacts, KdefSeasonLine, KickerSeasonFacts } from "@research-ts/projections/kdef/season-lines";
 
 export interface RoleModuleProps {
   /** Not part of the dossier plan's own two-prop shorthand, but required by the format it binds

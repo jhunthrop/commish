@@ -26,7 +26,7 @@
  * seat on autopick picks exactly as the clock would (`bestAvailableFor`). Absent, every seat
  * draws the seeded archetype deal `run.ts` uses.
  */
-import type { MakePickAction } from "@research/domain/draft";
+import type { MakePickAction } from "@research-ts/domain/draft";
 import { bestAvailableFor, isComplete, teamOnClock, type DraftState } from "@/draft-engine";
 import { assignArchetypes, type BotArchetype } from "@/mock-draft/archetypes";
 import { chooseBotPick } from "@/mock-draft/bots";

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { auditEvents, users } from "@/db/schema";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { clearSelfExclusion, exclusionPreview, setSelfExclusion } from "./exclusion";

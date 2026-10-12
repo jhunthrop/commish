@@ -1,11 +1,11 @@
 // THE CAPTURE HARVEST AS A LEAGUE-APP JOB. The harvest itself is the research core's
-// (`@research/projections/harvest`, which documents the feed selection and the budget); this binding owns
+// (`@research-ts/projections/harvest`, which documents the feed selection and the budget); this binding owns
 // the payload, the terminal classification of a missing provider key, and the peek-document
 // rebuild for every player the harvest says moved (peek document design §3.4, row four).
-import type { Db } from "@research/db/client";
-import type { JsonObject } from "@research/domain/json";
-import type { Clock } from "@research/domain/timing";
-import { harvestCaptures, MissingProviderKeyError, type CaptureHarvestDeps, type CaptureHarvestPayload, type HarvestReport } from "@research/projections/harvest";
+import type { Db } from "@research-ts/db/client";
+import type { JsonObject } from "@research-ts/domain/json";
+import type { Clock } from "@research-ts/domain/timing";
+import { harvestCaptures, MissingProviderKeyError, type CaptureHarvestDeps, type CaptureHarvestPayload, type HarvestReport } from "@research-ts/projections/harvest";
 import { defineJob, TerminalJobError, type AnyJobDefinition, type StepOutcome } from "../contract";
 import { enqueuePeekDocumentRebuildsQuietly } from "./peek-document-job";
 

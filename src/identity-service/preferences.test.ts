@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { users, userPreferences } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { readPreferences, updatePreferences } from "./preferences";

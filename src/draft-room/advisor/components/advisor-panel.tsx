@@ -1,6 +1,6 @@
 "use client";
 
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import { SegmentGroup } from "@/components/ui";
 import type { AdvisorView } from "@/draft-service/assistant/view";
 import { ADVISOR_ROOM_CONFIG } from "../config";

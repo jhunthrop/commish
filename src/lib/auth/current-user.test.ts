@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { createTestDb } from "@research/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { users } from "@/db/schema";
 
@@ -9,8 +9,8 @@ const withAuth = vi.fn<() => Promise<{ readonly user: { readonly id: string; rea
 vi.mock("@workos-inc/authkit-nextjs", () => ({ withAuth: () => withAuth() }));
 
 const db: Db = createTestDb();
-vi.mock("@research/db/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@research/db/client")>();
+vi.mock("@research-ts/db/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@research-ts/db/client")>();
   return { ...actual, getDb: () => db };
 });
 

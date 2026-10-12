@@ -1,6 +1,6 @@
 import { formatOrdinal } from "@/domain/format";
-import { mustPickLine } from "@research/domain/must-pick";
-import type { Position } from "@research/domain/player";
+import { mustPickLine } from "@research-ts/domain/must-pick";
+import type { Position } from "@research-ts/domain/player";
 import { formatUsd } from "@/money/config";
 
 /**

@@ -21,20 +21,20 @@
 // `sim-job.ts`'s own missing-row case uses. A DB blip while reading the evidence board, the
 // roster, or writing the grades/notices is ordinary weather — retryable.
 import { eq } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { players } from "@research/db/schema";
+import type { Db } from "@research-ts/db/client";
+import { players } from "@research-ts/db/schema";
 import { draftGrades, draftPicks, drafts, leagues, rosterSlots, teams } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
-import type { Position } from "@research/domain/player";
-import type { Clock } from "@research/domain/timing";
-import { excludedSetFor } from "@research/db/upsert";
+import type { Position } from "@research-ts/domain/player";
+import type { Clock } from "@research-ts/domain/timing";
+import { excludedSetFor } from "@research-ts/db/upsert";
 import type { GradeDraftInput } from "@/draft-service/grades/engine";
 import { gradeDraft } from "@/draft-service/grades/engine";
 import { gradeEvidenceMaps } from "@/draft-service/grades/evidence-maps";
 import { evidencePoolFor } from "@/draft-service/sim/evidence";
 import { deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
-import { byeWeeksByTeam } from "@research/reference/nfl-schedule";
-import type { LeagueShape } from "@research/projections/decide/replacement";
+import { byeWeeksByTeam } from "@research-ts/reference/nfl-schedule";
+import type { LeagueShape } from "@research-ts/projections/decide/replacement";
 import { enqueueJob } from "../store";
 import { defineJob, TerminalJobError, type AnyJobDefinition, type StepOutcome } from "../contract";
 

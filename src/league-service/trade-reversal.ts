@@ -1,8 +1,8 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import type { DbTx } from "@research/db/client";
-import { players, statWeeks } from "@research/db/schema";
+import type { DbTx } from "@research-ts/db/client";
+import { players, statWeeks } from "@research-ts/db/schema";
 import { leagues, rosterSlots, teams, tradeProposals } from "@/db/schema";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import { assetPlayerIds } from "@/trades/assets";

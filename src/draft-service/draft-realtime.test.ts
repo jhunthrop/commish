@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import Redis from "ioredis";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { players } from "@research/db/schema";
-import type { RosterSlotConfig } from "@research/domain/roster";
+import { players } from "@research-ts/db/schema";
+import type { RosterSlotConfig } from "@research-ts/domain/roster";
 import { bestAvailableFor, currentDeadline, teamOnClock, type DraftState } from "@/draft-engine";
 import { deliverNotice } from "@/integrity-service/notify";
 import { createPublisher } from "@/lib/realtime/publish";

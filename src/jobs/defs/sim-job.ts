@@ -8,7 +8,7 @@
 // or a config the pure sim layer itself refuses (a pool thinner than the draft needs) are both
 // refusals no retry fixes — terminal. A DB blip while reading the evidence board or writing the
 // summary is ordinary weather — retryable.
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import type { JsonObject } from "@/domain/audit";
 import { evidencePoolFor } from "@/draft-service/sim/evidence";
 import { simulateAllSlots, simulateDrafts } from "@/draft-service/sim/simulate";

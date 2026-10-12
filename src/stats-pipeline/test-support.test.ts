@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Player, StatLine } from "@research/domain/player";
+import type { Player, StatLine } from "@research-ts/domain/player";
 import { describeStatsProviderContract } from "@/stats/test-support";
 import { fakeStatsProvider, type FakeStatsProviderScript } from "./test-support";
 

@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { jobs, scheduleCursors } from "@/db/schema";
-import { createTestDb, recordStatements } from "@research/db/test-db";
+import { createTestDb, recordStatements } from "@research-ts/db/test-db";
 import { truncateAll, truncateJobTables } from "@/db/test-db";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { defineJob, type AnyJobDefinition } from "./contract";
 import { createScheduleMemory, tickSchedules } from "./schedule";
 import { SCHEDULES } from "./schedules";

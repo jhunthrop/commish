@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { deleteSheet, getSheet, renameSheet } from "@/draft-hq/sheet/service";
 import { renameSheetSchema } from "@/draft-hq/sheet/schemas";

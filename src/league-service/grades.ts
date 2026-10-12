@@ -3,7 +3,7 @@
 // themselves are `draft-grades-job.ts`'s own write, computed once at draft completion; this
 // module only ever reads them back, never recomputes a grade.
 import { asc, eq } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { draftGrades, teams } from "@/db/schema";
 import type { LeagueGradeRow } from "@/league-room/contract";
 

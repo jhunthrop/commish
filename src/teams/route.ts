@@ -1,5 +1,5 @@
-import { NFL_TEAM_ABBREVIATIONS } from "@research/projections/capture-feeds";
-import { productTeamCode } from "@research/projections/nflverse/team-codes";
+import { NFL_TEAM_ABBREVIATIONS } from "@research-ts/projections/capture-feeds";
+import { productTeamCode } from "@research-ts/projections/nflverse/team-codes";
 import { TEAM_PAGE_CONFIG } from "./config";
 
 /**

@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
-import { createDb, type Db } from "@research/db/client";
+import { createDb, type Db } from "@research-ts/db/client";
 import { drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
-import { HALF_PPR_SCORING } from "@research/domain/scoring";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
+import { HALF_PPR_SCORING } from "@research-ts/domain/scoring";
 import { ensureDevUsers } from "../src/data/seed/dev-users";
 import { isSafeToKeepFillingHouseLeague, staleHouseShelfMessage } from "../src/data/seed/house-fill-safety";
 import { openHouseLeaguesQuery } from "../src/league-service/house-factory";

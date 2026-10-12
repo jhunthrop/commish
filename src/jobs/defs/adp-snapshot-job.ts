@@ -2,7 +2,7 @@
 // (`schedules.ts`'s own cron entry) and captures the current ADP feed, in all three scoring
 // formats (`ADP_SNAPSHOT_REQUESTS_PER_FIRE` upstream requests a night, three, since the
 // scoring-formats round), into the append-only `adp_snapshots` archive
-// (`@research/projections/market/adp-snapshot`).
+// (`@research-ts/projections/market/adp-snapshot`).
 //
 // TERMINAL VS RETRYABLE: everything this job can throw is either the feed's own network/HTTP
 // weather (`fetchAverageDraftPosition`'s fetch call) or the feed publishing no board at all for
@@ -12,9 +12,9 @@
 // tries again on the next night's fire, which is the correct behavior for "not yet, not never."
 // Only the PPR capture's failure throws (`ingestAdpSnapshot`'s own docblock); a secondary format
 // that fails is named in the detail lines and the fire still lands its PPR rows.
-import type { Db } from "@research/db/client";
-import type { JsonObject } from "@research/domain/json";
-import { ingestAdpSnapshot } from "@research/projections/market/adp-snapshot";
+import type { Db } from "@research-ts/db/client";
+import type { JsonObject } from "@research-ts/domain/json";
+import { ingestAdpSnapshot } from "@research-ts/projections/market/adp-snapshot";
 import { defineJob, type AnyJobDefinition, type StepOutcome } from "../contract";
 
 export const ADP_SNAPSHOT_JOB_NAME = "adp-snapshot";

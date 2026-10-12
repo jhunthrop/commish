@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { Db, DbTx } from "@research/db/client";
+import type { Db, DbTx } from "@research-ts/db/client";
 import { drafts, leagues, mockRooms } from "@/db/schema";
 import { DRAFT_CLOCK_SCHEDULE, DRAFT_PAUSE_WINDOW, type DraftConfig } from "@/draft-engine";
 

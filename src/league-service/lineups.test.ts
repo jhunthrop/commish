@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { nflGames, statWeeks } from "@research/db/schema";
+import { nflGames, statWeeks } from "@research-ts/db/schema";
 import { auditEvents, leagues, lineupSlots, rosterSlots, teams, users } from "@/db/schema";
 import type { WeekStatus } from "@/league";
 import { createAuditLogger } from "@/integrity-service/audit-logger";

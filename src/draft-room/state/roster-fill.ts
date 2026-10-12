@@ -1,4 +1,4 @@
-import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@research/domain/roster";
+import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@research-ts/domain/roster";
 
 export interface RosterFillRow {
   readonly slot: RosterSlotType;
@@ -17,7 +17,7 @@ export interface RosterFillRow {
  * pass).
  *
  * This does no slot ASSIGNMENT of its own — `roster` already carries the engine's own answer to
- * "where did this pick land": `assignSlot` (`@research/draft-engine/slotting`), applied at pick time in
+ * "where did this pick land": `assignSlot` (`@research-ts/draft-engine/slotting`), applied at pick time in
  * `apply-pick.ts`, puts a pick in the first open dedicated slot for its position, else FLEX if
  * eligible, else bench. This function only re-shapes that already-decided roster into one row
  * per configured spot, so a spot nothing has claimed yet reads as `playerId: null` instead of

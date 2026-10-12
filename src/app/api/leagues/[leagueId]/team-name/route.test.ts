@@ -11,10 +11,10 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { eq } from "drizzle-orm";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { teams, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
 import { IDENTITY_CONFIG } from "@/identity";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { LEAGUE_CONFIG } from "@/league";

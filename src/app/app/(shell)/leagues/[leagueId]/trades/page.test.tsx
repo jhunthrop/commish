@@ -19,7 +19,7 @@ vi.mock("next/navigation", async (importOriginal) => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), back: vi.fn() }),
 }));
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
-vi.mock("@research/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research-ts/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/identity-service/preferences", () => ({ readPreferences: vi.fn() }));
 vi.mock("@/integrity-service/activity", () => ({ listLeagueActivity: vi.fn() }));
 vi.mock("@/integrity-service/notify", () => ({ listNotices: vi.fn(), quoteFor: vi.fn(() => null) }));
@@ -31,7 +31,7 @@ vi.mock("@/league-service", () => ({
   fixtureLabelsByTeam: vi.fn(),
   gradesForDraft: vi.fn(),
 }));
-vi.mock("@research/reference/nfl-schedule", () => ({ byeWeeksByTeam: vi.fn() }));
+vi.mock("@research-ts/reference/nfl-schedule", () => ({ byeWeeksByTeam: vi.fn() }));
 vi.mock("@/league-service/claims", () => ({ pendingWaiverClaims: vi.fn() }));
 vi.mock("@/league-service/trades", () => ({ listTrades: vi.fn() }));
 vi.mock("@/league-service/reference-cache-instance", () => ({ getReferenceCache: () => ({}) }));
@@ -49,7 +49,7 @@ import { readPreferences } from "@/identity-service/preferences";
 import { listLeagueActivity } from "@/integrity-service/activity";
 import { listNotices } from "@/integrity-service/notify";
 import { leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId, fixtureLabelsByTeam, gradesForDraft } from "@/league-service";
-import { byeWeeksByTeam } from "@research/reference/nfl-schedule";
+import { byeWeeksByTeam } from "@research-ts/reference/nfl-schedule";
 import { pendingWaiverClaims } from "@/league-service/claims";
 import { listTrades } from "@/league-service/trades";
 import { cachedHeadToHeadRecords } from "@/league-service/head-to-head";

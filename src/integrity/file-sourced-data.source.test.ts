@@ -41,14 +41,14 @@ const ALLOWLIST: readonly Exception[] = [
     reason: "recorded-fixture loader; imported by tests and scripts/record-tank01-fixtures.ts, never by the request path",
   },
   { file: "src/gifs/giphy/fixtures.ts", rule: "node-fs", reason: "recorded-fixture loader; imported by tests only" },
-  { file: "research/src/projections/nflverse/fixtures.ts", rule: "node-fs", reason: "recorded-fixture loader; imported by tests only" },
+  { file: "research-ts/src/projections/nflverse/fixtures.ts", rule: "node-fs", reason: "recorded-fixture loader; imported by tests only" },
   {
     file: "src/stats/mock/mock-stats-provider.ts",
     rule: "static-data-import",
     reason: "the e2e mock dataset, selected only under STATS_PROVIDER=mock; inventory 2026-09-09 lists it for a lazy import behind the provider switch",
   },
   {
-    file: "research/src/projections/laws/registry.ts",
+    file: "research-ts/src/projections/laws/registry.ts",
     rule: "static-data-import",
     reason: "measured.json and discovered.json, the laws artifact family; blocked this round by blend.ts's registry() default (inventory M13-M15), next round moves it to model_artifacts",
   },
@@ -94,8 +94,8 @@ function read(file: string): string {
   return readFileSync(join(REPO_ROOT, file), "utf8");
 }
 
-// The research core joined the sweep at the carve-out (2026-10-12): research/src is runtime code too.
-const SWEPT = [...sourceFilesIn(["src", "research/src"], ".ts"), ...sourceFilesIn(["src"], ".tsx")];
+// The research core joined the sweep at the carve-out (2026-10-12): research-ts/src is runtime code too.
+const SWEPT = [...sourceFilesIn(["src", "research-ts/src"], ".ts"), ...sourceFilesIn(["src"], ".tsx")];
 
 function exceptionFor(file: string): Exception | undefined {
   return ALLOWLIST.find((entry) => entry.file === file);

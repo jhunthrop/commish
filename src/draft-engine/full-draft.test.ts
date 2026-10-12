@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import type { DraftPoolEntry, StartDraftAction } from "@research/domain/draft";
-import type { Position } from "@research/domain/player";
-import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import type { DraftPoolEntry, StartDraftAction } from "@research-ts/domain/draft";
+import type { Position } from "@research-ts/domain/player";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
 import { initialDraftState, totalRosterSlots, type DraftConfig, type DraftState } from "./state";
 import { AUTOPICK_CONFIG, DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY } from "./config";
-import { snakeTeamForPick } from "@research/draft-engine/order";
+import { snakeTeamForPick } from "@research-ts/draft-engine/order";
 import { isComplete, remainingBudget } from "./selectors";
 import { expireAt, submitCommand } from "./test-support";
 

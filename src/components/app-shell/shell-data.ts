@@ -1,5 +1,5 @@
-import type { Db } from "@research/db/client";
-import type { Clock } from "@research/domain/timing";
+import type { Db } from "@research-ts/db/client";
+import type { Clock } from "@research-ts/domain/timing";
 import { LEAGUE_CONFIG } from "@/league";
 import { crossLeagueHome } from "@/league-service";
 import type { LiveState as HomeLiveState } from "@/league-room/contract";

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { drafts } from "@/db/schema";
 import { DRAFT_SERVICE_CONFIG } from "./config";
 

@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { players, playerStatLines, statWeeks } from "@research/db/schema";
+import { players, playerStatLines, statWeeks } from "@research-ts/db/schema";
 import { drafts, leagues, lineupSlots, matchups, rosterSlots, teams, users, weeks } from "@/db/schema";
-import type { ScoringPresetName } from "@research/domain/scoring";
-import { HALF_PPR_SCORING, PPR_SCORING } from "@research/domain/scoring";
-import { computeFantasyPoints } from "@research/scoring";
+import type { ScoringPresetName } from "@research-ts/domain/scoring";
+import { HALF_PPR_SCORING, PPR_SCORING } from "@research-ts/domain/scoring";
+import { computeFantasyPoints } from "@research-ts/scoring";
 import { leagueMedian } from "@/league/median";
 import { createLeague } from "@/league-service/creation";
 import { writeSchedule } from "@/league-service/schedule";

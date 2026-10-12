@@ -1,7 +1,7 @@
 /** The wire shape both sim read routes (`/api/draft/sim`, `/api/draft/sim/[simRunId]`) return —
  *  one place, so the two routes can never quietly diverge on what a "sim run" looks like over
  *  the wire. */
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { playerDirectoryFor, type PlayerDirectory } from "./present";
 import type { SimRunRow } from "./store";
 

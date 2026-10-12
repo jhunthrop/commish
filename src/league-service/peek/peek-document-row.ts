@@ -1,12 +1,12 @@
 // THE SHAPE OF A STORED PEEK DOCUMENT (peek document design §3.1, 2026-09-07). Types only, no
 // database and no arithmetic, so the schema, the writer, the reader and the tests can all name the
 // same shape without any of them importing the others — the same split `peek-facts-row.ts` made.
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { PlayerDossierFacts } from "@/league-service/dossier-facts";
 import type { PlayerGameLogRow, PlayerSeasonTotals, PlayerWeekView } from "@/league-service/player-season-stats";
-import type { KdefSeasonLine } from "@research/projections/kdef/season-lines";
-import type { BoardReason } from "@research/projections/preseason/board";
-import type { PlayerCapsuleView } from "@research/capsules/store";
+import type { KdefSeasonLine } from "@research-ts/projections/kdef/season-lines";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
+import type { PlayerCapsuleView } from "@research-ts/capsules/store";
 
 /** A later document shape writes under a new source rather than overwriting rows a reader is
  *  already serving. */

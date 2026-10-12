@@ -1,8 +1,8 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { envOrUndefined } from "@research/lib/env";
-import { createTank01Client } from "@research/stats/tank01/client";
-import { TANK01_CONFIG } from "@research/stats/tank01/config";
+import { envOrUndefined } from "@research-ts/lib/env";
+import { createTank01Client } from "@research-ts/stats/tank01/client";
+import { TANK01_CONFIG } from "@research-ts/stats/tank01/config";
 import { readManifest } from "@/stats/tank01/fixtures";
 
 /**

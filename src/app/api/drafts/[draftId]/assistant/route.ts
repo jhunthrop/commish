@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok } from "@/lib/api/respond";
 import { advisorFor } from "@/draft-service/assistant/service";
 import { withLeagueMember, type RouteContext } from "../_shared";

@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { auditEvents, drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
-import { PPR_SCORING } from "@research/domain/scoring";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
+import { PPR_SCORING } from "@research-ts/domain/scoring";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { LEAGUE_CONFIG } from "@/league";
-import { SUPERFLEX_ROSTER_SLOTS } from "@research/domain/roster-shape";
+import { SUPERFLEX_ROSTER_SLOTS } from "@research-ts/domain/roster-shape";
 import { ENFORCEMENT_REFUSALS } from "./enforcement";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { MONEY_REFUSALS } from "@/money/config";

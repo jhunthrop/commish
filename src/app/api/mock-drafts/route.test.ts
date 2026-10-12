@@ -11,7 +11,7 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { eq } from "drizzle-orm";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { draftSlotPreferences, drafts, mockRooms, users } from "@/db/schema";
 import { createDraftStore } from "@/draft-service/store";

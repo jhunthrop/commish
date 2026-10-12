@@ -1,10 +1,10 @@
 import { mkdirSync } from "node:fs";
 import { eq, sql } from "drizzle-orm";
-import { createDb, type Db } from "@research/db/client";
-import { players } from "@research/db/schema";
+import { createDb, type Db } from "@research-ts/db/client";
+import { players } from "@research-ts/db/schema";
 import { drafts, leagues, matchups, scoringSettings, teams, users, weeks } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
-import { STANDARD_SCORING } from "@research/domain/scoring";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
+import { STANDARD_SCORING } from "@research-ts/domain/scoring";
 import { createAuditLogger } from "../src/integrity-service/audit-logger";
 import { expect, managerAUserId, test } from "./support/fixtures";
 

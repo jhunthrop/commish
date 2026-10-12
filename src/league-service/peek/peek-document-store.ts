@@ -6,9 +6,9 @@
 // calls the exact same two functions for one player, so there is one builder in this codebase and
 // no chance of a stored document and a freshly built one disagreeing.
 import { sql } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { playerPeekDocuments } from "@/db/schema";
-import { changedRowWhere, excludedSetFor } from "@research/db/upsert";
+import { changedRowWhere, excludedSetFor } from "@research-ts/db/upsert";
 import { buildPeekDocument } from "./peek-document";
 import { collectPeekDocumentInputs, type PeekDocumentRequest } from "./peek-document-inputs";
 import { PEEK_DOCUMENT_SOURCE, type PeekDocumentRow } from "./peek-document-row";

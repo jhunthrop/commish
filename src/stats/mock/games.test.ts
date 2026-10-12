@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Player, StatLine } from "@research/domain/player";
+import type { Player, StatLine } from "@research-ts/domain/player";
 import { deriveMockGames } from "./games";
 
 function player(id: string, nflTeam: string): Player {

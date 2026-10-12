@@ -1,5 +1,5 @@
-import type { Player } from "@research/domain/player";
-import type { RosterSlotType } from "@research/domain/roster";
+import type { Player } from "@research-ts/domain/player";
+import type { RosterSlotType } from "@research-ts/domain/roster";
 import { PlayerFace, PositionBadge, SlotChip } from "@/components/ui";
 import { PlayerName } from "@/league-room/components/player-peek";
 

@@ -30,12 +30,12 @@ import {
   type SeasonWeekDeps,
   type SeasonWeekOptions,
   type StepResult,
-} from "@research/projections/season-week/steps";
-import { realIngestStats, realSnapshotProps } from "@research/projections/season-week/deps";
+} from "@research-ts/projections/season-week/steps";
+import { realIngestStats, realSnapshotProps } from "@research-ts/projections/season-week/deps";
 import { refreshPeekFacts } from "@/league-service/peek/peek-facts";
 import { enqueuePeekDocumentRebuildsQuietly } from "./peek-document-job";
-import type { Db } from "@research/db/client";
-import type { JsonObject } from "@research/domain/json";
+import type { Db } from "@research-ts/db/client";
+import type { JsonObject } from "@research-ts/domain/json";
 import { JOBS_CONFIG } from "../config";
 import { TerminalJobError, defineJob, type AnyJobDefinition, type JobStepContext, type StepOutcome } from "../contract";
 

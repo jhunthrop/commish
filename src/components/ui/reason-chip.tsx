@@ -1,9 +1,9 @@
-import { lawHeadline, type LawReason } from "@research/projections/laws/headline";
-import type { Law } from "@research/projections/laws/types";
-import type { BoardReason } from "@research/projections/preseason/board";
-import { rosterStatusSentence } from "@research/projections/preseason/roster-status-copy";
+import { lawHeadline, type LawReason } from "@research-ts/projections/laws/headline";
+import type { Law } from "@research-ts/projections/laws/types";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
+import { rosterStatusSentence } from "@research-ts/projections/preseason/roster-status-copy";
 import { Badge } from "./badge";
-import { formatTenth, signedPoints } from "@research/lib/number-format";
+import { formatTenth, signedPoints } from "@research-ts/lib/number-format";
 
 /**
  * ONE REASON, ONE CHIP — the board's own "why" made legible next to a player, everywhere a

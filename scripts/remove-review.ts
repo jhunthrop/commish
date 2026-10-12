@@ -3,7 +3,7 @@
 // `docs/decisions/operators-and-moderation.md` §3-4) offers a second door onto the same
 // `removeReview` writer. This script stamps `removed_at`/`removed_by_user_id`/`removal_reason`;
 // the review row and its text are never deleted or altered, only marked (see `reviews`' own
-// docblock in `@research/db/schema`).
+// docblock in `@research-ts/db/schema`).
 //
 // Run: npm run reviews:remove -- --id <reviewId> --reason "<reason>" --by <operatorUserId>
 //
@@ -18,7 +18,7 @@
 // type an internal note into a sentence a user reads.
 import { createInterface } from "node:readline/promises";
 import { eq } from "drizzle-orm";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { reviews, users } from "@/db/schema";
 import { renderNotice } from "@/integrity/notices";
 import { REVIEW_CONFIG, REMOVAL_REASON_VALUES, removalPhraseFor, removalSentenceFor } from "@/reviews/config";

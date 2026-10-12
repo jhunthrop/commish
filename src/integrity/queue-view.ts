@@ -1,6 +1,6 @@
 import type { IconName } from "@/components/ui/icon";
 import type { AuditEvent, JsonObject } from "@/domain/audit";
-import type { Position } from "@research/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import { decisionIsOperatorChoosable, decisionIsWiredFor, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision, type TradeFairnessBasis } from "@/integrity/flags";
 import type { ActivityRow } from "@/integrity/activity-view";
 import type { TradeStatus } from "@/trades/lifecycle";

@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { confiscateHold, holdPreview, releaseHold } from "@/money-service/settlement";
 import { holdOutcomeRequestSchema } from "@/money-service/schemas";
 import { fail, ok, parseJson } from "@/lib/api/respond";

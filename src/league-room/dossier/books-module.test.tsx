@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
-import type { PlayerFactsBooksNumbers } from "@research/capsules/facts";
+import type { PlayerFactsBooksNumbers } from "@research-ts/capsules/facts";
 import { BooksModule } from "./books-module";
 
 const BOOKS: PlayerFactsBooksNumbers = {

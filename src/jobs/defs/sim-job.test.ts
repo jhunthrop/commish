@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { Db } from "@research/db/client";
-import { createTestDb } from "@research/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
 import { createSimRun, getSimRun, hashSimConfig, markSimRunSucceeded } from "@/draft-service/sim/store";
 import type { SimConfig } from "@/draft-service/sim/types";
 import { evidencePoolFor } from "@/draft-service/sim/evidence";

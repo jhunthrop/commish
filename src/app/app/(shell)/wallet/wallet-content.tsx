@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { ButtonLink, LowerThird, Panel } from "@/components/ui";
 import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
 import { formatUsd } from "@/money/config";

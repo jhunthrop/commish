@@ -9,7 +9,7 @@
  * opponent marker (`MOCK_COPY.botMarkerLabel`/`botBadge`), because a seeded sampler is not
  * intelligence and this product does not pretend otherwise.
  */
-import type { Position } from "@research/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import { rngFor, seededShuffle } from "./rng";
 
 export interface BotArchetype {

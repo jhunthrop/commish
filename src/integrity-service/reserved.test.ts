@@ -180,7 +180,7 @@ describe("the audit vocabulary", () => {
     // And the exclusion is not vacuous: these files really are there, and really do sit under a
     // directory the scan walks.
     expect(existsSync(join(process.cwd(), "src/integrity-service/test-support.ts"))).toBe(true);
-    expect(existsSync(join(process.cwd(), "research/src/db/test-db.ts"))).toBe(true);
+    expect(existsSync(join(process.cwd(), "research-ts/src/db/test-db.ts"))).toBe(true);
   });
 
   it("has NO publisher anywhere in this repo for a type reserved to another plan", async () => {

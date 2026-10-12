@@ -1,7 +1,7 @@
 import { inArray } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { players } from "@research/db/schema";
-import type { Clock } from "@research/domain/timing";
+import type { Db } from "@research-ts/db/client";
+import { players } from "@research-ts/db/schema";
+import type { Clock } from "@research-ts/domain/timing";
 import { queueFor, toSetQueueAction } from "@/draft-engine";
 import type { DraftStore } from "./store";
 

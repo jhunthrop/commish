@@ -1,4 +1,4 @@
-import type { PlayerFactsCoaching } from "@research/capsules/facts/types";
+import type { PlayerFactsCoaching } from "@research-ts/capsules/facts/types";
 import { Table, type TableColumn } from "@/components/ui";
 import { Section } from "./section";
 

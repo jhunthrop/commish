@@ -1,15 +1,15 @@
 // THE PRE-KICKOFF PROPS SNAPSHOT AS A LEAGUE-APP JOB. The work and its self-disable at kickoff are
-// the research core's (`@research/projections/odds/preseason-snapshot`, whose docblock carries
+// the research core's (`@research-ts/projections/odds/preseason-snapshot`, whose docblock carries
 // the reasoning); this binding owns the payload and the schedule's fire instant.
-import type { Db } from "@research/db/client";
-import type { JsonObject } from "@research/domain/json";
-import type { Clock } from "@research/domain/timing";
+import type { Db } from "@research-ts/db/client";
+import type { JsonObject } from "@research-ts/domain/json";
+import type { Clock } from "@research-ts/domain/timing";
 import {
   REAL_PROPS_PRESEASON_DEPS,
   snapshotPreseasonProps,
   type PropsPreseasonSnapshotDeps,
   type PropsPreseasonSnapshotPayload,
-} from "@research/projections/odds/preseason-snapshot";
+} from "@research-ts/projections/odds/preseason-snapshot";
 import { defineJob, type AnyJobDefinition, type StepOutcome } from "../contract";
 
 export const PROPS_PRESEASON_SNAPSHOT_JOB_NAME = "props-preseason-snapshot";

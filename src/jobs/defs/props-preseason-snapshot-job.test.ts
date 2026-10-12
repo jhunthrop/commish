@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestDb } from "@research/db/test-db";
-import type { ResolveAllPropNamesResult } from "@research/projections/odds/player-map";
-import type { SnapshotSummary } from "@research/projections/odds/snapshot";
-import type { PropsPreseasonSnapshotDeps } from "@research/projections/odds/preseason-snapshot";
+import { createTestDb } from "@research-ts/db/test-db";
+import type { ResolveAllPropNamesResult } from "@research-ts/projections/odds/player-map";
+import type { SnapshotSummary } from "@research-ts/projections/odds/snapshot";
+import type { PropsPreseasonSnapshotDeps } from "@research-ts/projections/odds/preseason-snapshot";
 import { parsePropsPreseasonSnapshotPayload, runPropsPreseasonSnapshotStep } from "./props-preseason-snapshot-job";
 
 const db = createTestDb();

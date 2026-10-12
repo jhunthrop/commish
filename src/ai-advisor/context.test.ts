@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { countingDb, createTestDb } from "@research/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { countingDb, createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { players, playerStatLines } from "@research/db/schema";
+import { players, playerStatLines } from "@research-ts/db/schema";
 import { drafts, rosterSlots, teams, users } from "@/db/schema";
 import { ADVISOR_CONFIG } from "@/domain/advisor";
 import { createLeague } from "@/league-service/creation";

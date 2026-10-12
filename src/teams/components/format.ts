@@ -1,4 +1,4 @@
-import type { PlayerFactsFixture } from "@research/capsules/facts/types";
+import type { PlayerFactsFixture } from "@research-ts/capsules/facts/types";
 import type { TeamRecord } from "../contract";
 
 /** A 0..1 share as a whole percentage, "27%". */

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { createDb } from "@research/db/client";
-import { DB_POOL_CONFIG } from "@research/db/config";
-import { createTestDb, TEST_DATABASE_URL } from "@research/db/test-db";
+import { createDb } from "@research-ts/db/client";
+import { DB_POOL_CONFIG } from "@research-ts/db/config";
+import { createTestDb, TEST_DATABASE_URL } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { auditEvents, drafts, memberNotices, users } from "@/db/schema";
 import { INTEGRITY_CONFIG } from "@/integrity/config";

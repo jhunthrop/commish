@@ -1,9 +1,9 @@
 import { and, eq } from "drizzle-orm";
-import type { Db, DbTx, ReadonlyDb } from "@research/db/client";
-import { statWeeks } from "@research/db/schema";
+import type { Db, DbTx, ReadonlyDb } from "@research-ts/db/client";
+import { statWeeks } from "@research-ts/db/schema";
 import { leagues, matchups, teams, weeks } from "@/db/schema";
-import type { StatLine } from "@research/domain/player";
-import type { Clock } from "@research/domain/timing";
+import type { StatLine } from "@research-ts/domain/player";
+import type { Clock } from "@research-ts/domain/timing";
 import { medianResultFor } from "@/league";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";

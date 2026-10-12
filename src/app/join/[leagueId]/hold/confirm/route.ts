@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { ok } from "@/lib/api/respond";
 import { withCurrentUser } from "@/app/api/leagues/_shared";
 import { returnFromSignIn } from "@/league-service/join";

@@ -1,6 +1,6 @@
-import type { JsonObject } from "@research/domain/json";
+import type { JsonObject } from "@research-ts/domain/json";
 
-export type { JsonObject, JsonValue } from "@research/domain/json";
+export type { JsonObject, JsonValue } from "@research-ts/domain/json";
 
 /**
  * The audit vocabulary, as a runtime array with the union derived from it — the same shape

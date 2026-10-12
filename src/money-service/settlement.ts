@@ -1,8 +1,8 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import type { Db, DbTx } from "@research/db/client";
+import type { Db, DbTx } from "@research-ts/db/client";
 import { chatMessages, integrityFlags, leagues, moneyAccounts, moneyEntries, moneyTransactions, reviews, teams, tradeProposals, users } from "@/db/schema";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { notifyAffectedMember } from "@/integrity-service/notify";
 import { accountIdFor, type MoneyAccountId } from "@/money/accounts";

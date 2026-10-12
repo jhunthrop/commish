@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }));
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
-vi.mock("@research/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research-ts/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/league-service", () => ({ crossLeagueHome: vi.fn() }));
 vi.mock("@/league-service/browse", () => ({ listPublicLeagues: vi.fn() }));
 vi.mock("@/league-service/score-cache-instance", () => ({ getScoreCache: () => ({}) }));

@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
 import { ensureMockBotRoster } from "@/data/seed/bot-roster";
-import type { Db, DbTx } from "@research/db/client";
+import type { Db, DbTx } from "@research-ts/db/client";
 import { draftSlotPreferences, mockRooms, users } from "@/db/schema";
 import type { AuditEvent, AuditEventInput } from "@/domain/audit";
-import type { RosterShapeName } from "@research/domain/roster";
-import type { ScoringPresetName } from "@research/domain/scoring";
+import type { RosterShapeName } from "@research-ts/domain/roster";
+import type { ScoringPresetName } from "@research-ts/domain/scoring";
 import type { AuditLogger } from "@/integrity-service/audit-logger";
 import { generateInviteCode, LEAGUE_CONFIG } from "@/league";
 import { writeLeagueInTx } from "@/league-service/creation";

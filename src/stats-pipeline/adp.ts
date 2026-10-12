@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { players } from "@research/db/schema";
+import type { Db } from "@research-ts/db/client";
+import { players } from "@research-ts/db/schema";
 import { LIST_ADP_REQUEST_COST, LIST_PLAYERS_REQUEST_COST, type StatsProvider } from "@/stats/provider";
 import { reserveBackfillOrThrow, type RequestBudget } from "./budget";
 

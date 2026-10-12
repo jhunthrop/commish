@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import type { DraftState } from "@/draft-engine";
 import { runAfterResponse } from "@/lib/api/after-response";
 import { isLLMEnabled, getLlmClient } from "@/lib/llm/client";

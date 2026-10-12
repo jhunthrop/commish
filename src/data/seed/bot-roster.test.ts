@@ -1,6 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { userPreferences, users } from "@/db/schema";
 import { MOCK_CONFIG } from "@/mock-draft/config";

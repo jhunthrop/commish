@@ -8,9 +8,9 @@
  * `null`, never a stand-in. Names, teams, byes and headshots are the room's own (`playersById`),
  * so the wire carries ids only.
  */
-import type { Position } from "@research/domain/player";
-import type { RosterSlotType } from "@research/domain/roster";
-import type { PositionRun } from "@research/advisor/why";
+import type { Position } from "@research-ts/domain/player";
+import type { RosterSlotType } from "@research-ts/domain/roster";
+import type { PositionRun } from "@research-ts/advisor/why";
 
 /** A survival fraction and the runs it is a fraction of. */
 export interface OddsCell {

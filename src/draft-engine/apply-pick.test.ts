@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research/domain/roster";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research-ts/domain/roster";
 import { initialDraftState, rosterFor, type DraftConfig, type DraftState } from "./state";
 import { DRAFT_CLOCK_SCHEDULE } from "./config";
 import { applyPick, expectApplied, redeemOwedPick, type ApplyPickResult } from "./apply-pick";

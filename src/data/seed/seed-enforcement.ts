@@ -1,11 +1,11 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { assembleAdvisorContext } from "@/ai-advisor/context";
-import type { Db } from "@research/db/client";
-import { statWeeks } from "@research/db/schema";
+import type { Db } from "@research-ts/db/client";
+import { statWeeks } from "@research-ts/db/schema";
 import { drafts, leagues, lineupSlots, matchups, rosterSlots, scoringSettings, teams, tradeProposals } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig, type RosterSlotType } from "@research/domain/roster";
-import { PPR_SCORING } from "@research/domain/scoring";
-import type { Clock } from "@research/domain/timing";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig, type RosterSlotType } from "@research-ts/domain/roster";
+import { PPR_SCORING } from "@research-ts/domain/scoring";
+import type { Clock } from "@research-ts/domain/timing";
 import { assignSlot, snakeTeamForPick, totalRosterSlots } from "@/draft-engine";
 import { getDraftStore } from "@/draft-service";
 import { autoStartDueDrafts } from "@/draft-service/auto-start";

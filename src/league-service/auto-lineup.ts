@@ -1,9 +1,9 @@
 import { and, asc, eq, exists, isNull, notExists, sql } from "drizzle-orm";
-import type { Db, DbTx } from "@research/db/client";
-import { players, statWeeks } from "@research/db/schema";
+import type { Db, DbTx } from "@research-ts/db/client";
+import { players, statWeeks } from "@research-ts/db/schema";
 import { leagues, lineupSlots, matchups, rosterSlots, teams } from "@/db/schema";
-import type { Position } from "@research/domain/player";
-import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig } from "@research/domain/roster";
+import type { Position } from "@research-ts/domain/player";
+import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig } from "@research-ts/domain/roster";
 import { defaultLineup, deriveBenchSlots, isLineupLocked, startersOf } from "@/league";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
@@ -430,7 +430,7 @@ export function leaguesNeedingAutoSetQuery(db: Db, weekNumber: number) {
         // scores already stand, and a candidate query that kept offering settled leagues would
         // open a transaction per league per tick forever to be refused inside it — the level
         // trigger makes a stale predicate expensive rather than merely untidy. It also matches
-        // `matchups_unsettled_idx`'s own partial predicate (`@research/db/schema`), which is the index
+        // `matchups_unsettled_idx`'s own partial predicate (`@research-ts/db/schema`), which is the index
         // built for exactly this question.
         isNull(matchups.homeScore),
         ENFORCED_LEAGUE_SQL,

@@ -15,11 +15,11 @@
 // does (`simBoardOrder`, the sim's own "mixed" sharpness by default), because the autopick carries
 // no RNG and two hundred drafts of one fixed board would be two hundred copies of one draft.
 import { asc, isNotNull } from "drizzle-orm";
-import { createDb } from "@research/db/client";
-import { players as playersTable } from "@research/db/schema";
-import type { DraftPoolEntry, MakePickAction, StartDraftAction } from "@research/domain/draft";
-import type { Position } from "@research/domain/player";
-import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research/domain/roster";
+import { createDb } from "@research-ts/db/client";
+import { players as playersTable } from "@research-ts/db/schema";
+import type { DraftPoolEntry, MakePickAction, StartDraftAction } from "@research-ts/domain/draft";
+import type { Position } from "@research-ts/domain/player";
+import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research-ts/domain/roster";
 import {
   AUTOPICK_CONFIG,
   bestAvailableFor,
@@ -41,8 +41,8 @@ import { assignArchetypes, type BotArchetype } from "@/mock-draft/archetypes";
 import { inferSeatDrivers } from "@/draft-service/sim/seat-model";
 import { chooseBotPick } from "@/mock-draft/bots";
 import { rngFor } from "@/mock-draft/rng";
-import type { Recommendation } from "@research/projections/decide/draft";
-import type { LeagueShape } from "@research/projections/decide/replacement";
+import type { Recommendation } from "@research-ts/projections/decide/draft";
+import type { LeagueShape } from "@research-ts/projections/decide/replacement";
 
 const POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
 const TEAM_COUNT = 12;

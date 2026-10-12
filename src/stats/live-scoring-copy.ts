@@ -1,4 +1,4 @@
-import { envOr } from "@research/lib/env";
+import { envOr } from "@research-ts/lib/env";
 import { STATS_CONFIG, isStatsProviderName, type StatsProviderName } from "./config";
 import { UnknownStatsProviderError } from "./registry";
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { DraftPoolEntry, MakePickAction, StartDraftAction } from "@research/domain/draft";
-import type { Position } from "@research/domain/player";
-import { BENCH_SLOT, type RosterSlotConfig } from "@research/domain/roster";
+import type { DraftPoolEntry, MakePickAction, StartDraftAction } from "@research-ts/domain/draft";
+import type { Position } from "@research-ts/domain/player";
+import { BENCH_SLOT, type RosterSlotConfig } from "@research-ts/domain/roster";
 import { availablePool, initialDraftState, teamOnClock, type DraftConfig, type DraftState } from "@/draft-engine";
 import { BOT_ARCHETYPES } from "@/mock-draft/archetypes";
 import { chooseBotPick } from "@/mock-draft/bots";

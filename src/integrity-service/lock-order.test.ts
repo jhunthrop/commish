@@ -1,8 +1,8 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { playerStatLines, statWeeks } from "@research/db/schema";
+import { playerStatLines, statWeeks } from "@research-ts/db/schema";
 import { auditChains, auditEvents, chatMessages, draftSlotPreferences, drafts, integrityFlags, leagues, lineupSlots, memberNotices, moneyAccounts, moneyTransactions, reviews, rosterSlots, seatHolds, sessionSignals, teams, tradeProposals, users } from "@/db/schema";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll, truncateMoneyTables } from "@/db/test-db";
 import { currentDeadline, DRAFT_SKIP_POLICY } from "@/draft-engine";
 import { setSlotPreference } from "@/draft-service/slot-preference";
@@ -19,7 +19,7 @@ import { writeSchedule } from "@/league-service/schedule";
 import { seasonCurrentWeek } from "@/league-service/test-support";
 import { acceptTrade, blockHeldTradeInTx, proposeTrade, rejectTrade, releaseHeldTradeInTx } from "@/league-service/trades";
 import { reverseTradeInTx } from "@/league-service/trade-reversal";
-import type { StatLine } from "@research/domain/player";
+import type { StatLine } from "@research-ts/domain/player";
 import { SEAT_HOLD_REFUSALS } from "@/matchmaking/seat-hold";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { notifyAffectedMember } from "@/integrity-service/notify";
@@ -46,8 +46,8 @@ import { createMockPaymentsProvider } from "@/payments-provider/mock/mock-paymen
 import { raiseFlag, resolveFlag } from "./flags";
 import { closeSupersededHoldFlag } from "./trade-fairness";
 import { grantAdmin } from "./grant-admin";
-import type { DraftPoolEntry } from "@research/domain/draft";
-import { players } from "@research/db/schema";
+import type { DraftPoolEntry } from "@research-ts/domain/draft";
+import { players } from "@research-ts/db/schema";
 
 /**
  * RULING 3, AS RESTATED, HELD TO BY TWO REAL CONNECTIONS.

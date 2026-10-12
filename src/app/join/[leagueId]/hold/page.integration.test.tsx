@@ -17,14 +17,14 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 // `AppShell` needs a `NoticesProvider` its real parent layout supplies (not this page) — this
-// file is about the WRITE PATH (`@/league-service/join`, `@research/db/client`, `@/league-service/browse`
+// file is about the WRITE PATH (`@/league-service/join`, `@research-ts/db/client`, `@/league-service/browse`
 // all run real, unmocked, against the test database below), never about `AppShell`'s own
 // rendering, which `hold/page.test.tsx` already owns as a unit.
 vi.mock("@/components/app-shell/app-shell", () => ({
   AppShell: ({ children }: { readonly children: ReactNode }) => children,
 }));
 
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { drafts, leagues, teams, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";

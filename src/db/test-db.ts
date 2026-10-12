@@ -1,11 +1,11 @@
 import { sql } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { invalidateAllTtlMemosForTests } from "@research/lib/cache/ttl-memo";
+import type { Db } from "@research-ts/db/client";
+import { invalidateAllTtlMemosForTests } from "@research-ts/lib/cache/ttl-memo";
 import { resetRankedPlayersCacheForTests } from "@/draft-service/pool";
 
 /**
  * THE LEAGUE APP'S TRUNCATIONS. The connection, the statement recorder and the error walk are the
- * research core's test support (`@research/db/test-db`); what is here is the league app's: every
+ * research core's test support (`@research-ts/db/test-db`); what is here is the league app's: every
  * table of both halves, the money tables and the job tables, and the league caches a truncate must
  * drop with them (the prep site carve-out, 2026-10-12).
  */

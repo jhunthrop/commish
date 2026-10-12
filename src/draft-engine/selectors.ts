@@ -1,12 +1,12 @@
-import type { DraftPoolEntry, DraftStatus } from "@research/domain/draft";
+import type { DraftPoolEntry, DraftStatus } from "@research-ts/domain/draft";
 import type { DraftFormat } from "@/domain/league";
-import type { Position } from "@research/domain/player";
-import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@research/domain/roster";
+import type { Position } from "@research-ts/domain/player";
+import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@research-ts/domain/roster";
 import { auctionOf, rosterFor, totalPickCount, totalRosterSlots, type AuctionState, type CompletedPick, type DraftState } from "./state";
-import { snakeTeamForPick } from "@research/draft-engine/order";
-import { assignSlot, type SlotAssignment } from "@research/draft-engine/slotting";
+import { snakeTeamForPick } from "@research-ts/draft-engine/order";
+import { assignSlot, type SlotAssignment } from "@research-ts/draft-engine/slotting";
 import { deferredLateRoundPosition, needMultiplier, rankWeight } from "./scoring";
-import { candidateRoleReader } from "@research/draft-engine/roster-need";
+import { candidateRoleReader } from "@research-ts/draft-engine/roster-need";
 import { AUCTION_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier, type DraftAutopickPolicy, type PauseWindow } from "./config";
 import { MS_PER_SECOND, clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
 import { deadlineAfter, pausedUntil as pauseWindowEndAt } from "./pause";

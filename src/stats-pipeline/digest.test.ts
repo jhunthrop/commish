@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StatLine } from "@research/domain/player";
+import type { StatLine } from "@research-ts/domain/player";
 import { diffStatLines, statLineDigest } from "./digest";
 
 const line = (playerId: string, over: Partial<StatLine> = {}): StatLine => ({

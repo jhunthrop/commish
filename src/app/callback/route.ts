@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { handleAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { syncUserFromWorkOS } from "@/lib/auth/user-sync";
 import { firstForwardedFor } from "./forwarded-for";
 

@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { listReviews, submitReview } from "@/review-service/reviews";
 import { listReviewsQuerySchema, submitReviewSchema } from "@/review-service/schemas";
 import { fail, ok, parseJson, parseQuery } from "@/lib/api/respond";

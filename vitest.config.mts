@@ -31,7 +31,7 @@ import { TEST_DB_LANE_COUNT } from "./src/db/test-lanes";
  * at 0%).
  */
 const COVERAGE_GATED_DIRS = [
-  "research/src/scoring",
+  "research-ts/src/scoring",
   "src/draft-engine",
   "src/draft-room/state",
   "src/league",
@@ -156,7 +156,7 @@ export default defineConfig({
       reporter: ["text", "html"],
       include: coverageInclude,
       thresholds: {
-        "research/src/scoring/**": {
+        "research-ts/src/scoring/**": {
           branches: 100,
           functions: 100,
           lines: 100,

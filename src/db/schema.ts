@@ -16,7 +16,7 @@ import {
   check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research/domain/roster";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research-ts/domain/roster";
 import { AUDIT_EVENT_TYPES, type JsonObject } from "@/domain/audit";
 import type { GradeComponents } from "@/draft-service/grades/engine";
 import { MOCK_CONFIG } from "@/mock-draft/config";
@@ -27,11 +27,11 @@ import type { TransferIntent } from "@/payments-provider/contract";
 import type { PeekFactsRow } from "@/league-service/peek/peek-facts-row";
 import type { PeekDocument, PeekDocumentBasis } from "@/league-service/peek/peek-document-row";
 import type { TradeAsset } from "@/trades/assets";
-import { players } from "@research/db/schema";
+import { players } from "@research-ts/db/schema";
 
 /**
  * THE LEAGUE APP'S TABLES. The research tables (players, the observation archives, the boards, the
- * capsules, the register) are the research core's, in `@research/db/schema`; the tables here
+ * capsules, the register) are the research core's, in `@research-ts/db/schema`; the tables here
  * reference them and never the other way round. Both live in one database until cutover, so the
  * league app's drizzle config reads both files (`drizzle.config.ts`).
  */
@@ -40,7 +40,7 @@ export const draftFormatEnum = pgEnum("draft_format", ["snake", "auction"]);
 /**
  * `"dissolved"` (Phase 4, Task 9, migration 0040) added to the END, on `0039`'s own precedent: a
  * value `ALTER TYPE ... ADD VALUE`s onto an existing Postgres enum can only ever append, never
- * insert — `@research/domain/draft`'s own `DraftStatus` docblock carries the full reasoning for what this
+ * insert — `@research-ts/domain/draft`'s own `DraftStatus` docblock carries the full reasoning for what this
  * value means and where it is (and is not) read.
  */
 export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress", "complete", "dissolved"]);
@@ -1917,7 +1917,7 @@ export const simRuns = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     /** Null for a sim run against the generic (no-league) default settings — the same "generic"
-     *  option `@research/board/service`'s own board picker already offers. */
+     *  option `@research-ts/board/service`'s own board picker already offers. */
     leagueId: text("league_id").references(() => leagues.id, { onDelete: "cascade" }),
     /** The exact `SimConfig` this run was asked to compute (`@/draft-service/sim/types.ts`) —
      *  persisted so a stored run can be replayed byte-for-byte and so `configHash` below is
@@ -1952,7 +1952,7 @@ export const simRuns = pgTable(
      * pending-or-running row may exist per `(user_id, config_hash, board_generation)` — the exact
      * "at most one OPEN X" shape `trade_proposals_open_fingerprint_idx` already uses for an open
      * trade proposal, applied here to an in-flight sim. The loser's insert raises a unique
-     * violation `store.ts`'s `createSimRun` catches (`isUniqueViolation`, `@research/db/errors`) and
+     * violation `store.ts`'s `createSimRun` catches (`isUniqueViolation`, `@research-ts/db/errors`) and
      * answers with the WINNER's own row — a concurrent duplicate request joins the run already in
      * flight rather than erroring or starting a second one.
      */

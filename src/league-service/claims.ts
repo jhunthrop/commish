@@ -1,13 +1,13 @@
 import { and, asc, eq, ilike, notInArray, sql } from "drizzle-orm";
-import type { Db, DbTx } from "@research/db/client";
-import { excludedSetFor } from "@research/db/upsert";
-import { players, statWeeks } from "@research/db/schema";
+import type { Db, DbTx } from "@research-ts/db/client";
+import { excludedSetFor } from "@research-ts/db/upsert";
+import { players, statWeeks } from "@research-ts/db/schema";
 import { leagueWaivers, waiverClaims, injuredReserve, drafts, leagues, lineupSlots, rosterSlots, teams } from "@/db/schema";
-import type { Position } from "@research/domain/player";
-import type { RosterSlotConfig } from "@research/domain/roster";
+import type { Position } from "@research-ts/domain/player";
+import type { RosterSlotConfig } from "@research-ts/domain/roster";
 import type { FreeAgentRow, PendingWaiverClaim } from "./claims-contract";
 import { assignSlot } from "@/draft-engine";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { defaultLineup, isLineupLocked } from "@/league";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { materializeLockedLineupsInTx, toFilledRosterSlots } from "./trade-transfer";
@@ -23,7 +23,7 @@ const UNDROPPABLE_ADP_CEILING = 120;
 
 /** Waivers v1: re-exported spelling of the window length lives in ./waivers. */
 import { WAIVER_PERIOD_HOURS } from "./waivers";
-import { injuryDesignations } from "@research/reference/injuries";
+import { injuryDesignations } from "@research-ts/reference/injuries";
 
 export const CLAIM_REFUSALS = {
   leagueMissing: "That league does not exist.",

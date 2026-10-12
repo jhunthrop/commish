@@ -2,7 +2,7 @@
 // Failures first is the point of the page: `failed` and `abandoned` are the dead-letter states,
 // and the contract says they must be impossible to miss.
 import { desc, eq, inArray } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { jobRuns, jobs, scheduleCursors } from "@/db/schema";
 import { JOBS_CONFIG } from "./config";
 import { SCHEDULES, type ScheduleDefinition } from "./schedules";

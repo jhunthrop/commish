@@ -5,11 +5,11 @@
  * every number a test asserts against is the real decision layer's output over this board.
  * Not a test file itself (no `.test.`), so several suites can share it.
  */
-import type { DraftPoolEntry, MakePickAction, StartDraftAction } from "@research/domain/draft";
-import type { Position } from "@research/domain/player";
-import { STANDARD_ROSTER_SLOTS, type RosterSlot } from "@research/domain/roster";
+import type { DraftPoolEntry, MakePickAction, StartDraftAction } from "@research-ts/domain/draft";
+import type { Position } from "@research-ts/domain/player";
+import { STANDARD_ROSTER_SLOTS, type RosterSlot } from "@research-ts/domain/roster";
 import { assignSlot, initialDraftState, teamOnClock, type CompletedPick, type DraftConfig, type DraftState } from "@/draft-engine";
-import { valueBoardIndexed, type LeagueShape } from "@research/projections/decide/replacement";
+import { valueBoardIndexed, type LeagueShape } from "@research-ts/projections/decide/replacement";
 import { NEUTRAL_ARCHETYPE } from "../sim/seat-model";
 import { chooseBotPick } from "@/mock-draft/bots";
 import { rngFor } from "@/mock-draft/rng";

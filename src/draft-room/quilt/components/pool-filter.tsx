@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, type ReactNode, type RefObject } from "react";
-import type { Player, Position } from "@research/domain/player";
+import type { Player, Position } from "@research-ts/domain/player";
 import { Button, EmptyState, PositionBadge } from "@/components/ui";
 import { POOL_SEARCH_ID } from "../hooks/use-room-keys";
 

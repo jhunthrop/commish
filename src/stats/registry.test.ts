@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createStatsProvider, UnknownStatsProviderError } from "./registry";
 import { STATS_CONFIG } from "./config";
-import { TANK01_CONFIG } from "@research/stats/tank01/config";
+import { TANK01_CONFIG } from "@research-ts/stats/tank01/config";
 
 afterEach(() => {
   delete process.env[STATS_CONFIG.envVars.provider];

@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach, beforeEach, afterAll, vi } from "vitest";
 import { and, eq, sql } from "drizzle-orm";
-import { createTestDb, TEST_DATABASE_URL } from "@research/db/test-db";
+import { createTestDb, TEST_DATABASE_URL } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { players, playerStatLines } from "@research/db/schema";
+import { players, playerStatLines } from "@research-ts/db/schema";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
 import { PLAYER_COUNT, SEASON_WEEKS } from "@/stats/mock/generate-dataset";
 import type { StatsProvider } from "@/stats/provider";

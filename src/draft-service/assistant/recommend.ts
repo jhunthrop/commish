@@ -1,22 +1,22 @@
 /**
- * THE RECOMMENDATION UNDER THE CARD — what `recommendPick` (`@research/projections/decide/draft`) would
+ * THE RECOMMENDATION UNDER THE CARD — what `recommendPick` (`@research-ts/projections/decide/draft`) would
  * take from the room's OWN replayed `DraftState` (ruling R-pf2: mid-draft, a manager's roster and
  * picks come from the REPLAYED live state, never from `draft_picks` rows, which do not exist until
  * the draft completes).
  *
  * VALUATION, COMPUTED ONCE OVER THE WHOLE EVIDENCE POOL, THROUGH ONE SHARED HELPER.
- * `valueBoardIndexed` (`@research/projections/decide/replacement`) runs once against every player
+ * `valueBoardIndexed` (`@research-ts/projections/decide/replacement`) runs once against every player
  * `evidencePoolFor` returns (drafted and undrafted alike) — the identical population
- * `@research/board/service`'s `boardRows` values the Board from. This is what lets a
+ * `@research-ts/board/service`'s `boardRows` values the Board from. This is what lets a
  * ROSTERED player's own `valueOverReplacement` be computed at all — a player already off the
  * board cannot be re-valued from a population that excludes him. `RecommendationQuery.board` is
  * then every UNDRAFTED entry of that one valuation.
  */
-import type { DraftPoolEntry } from "@research/domain/draft";
-import { restrictedPositions } from "@research/domain/roster-eligibility";
+import type { DraftPoolEntry } from "@research-ts/domain/draft";
+import { restrictedPositions } from "@research-ts/domain/roster-eligibility";
 import { assignSlot, autopickEligible, availablePool, draftedPlayerIds, rosterFor, snakeTeamForPick, teamOnClock, totalPickCount, type DraftState } from "@/draft-engine";
-import { recommendPick, recommendPickInChunks, type Recommendation, type RecommendationQuery, type RosteredPlayer } from "@research/projections/decide/draft";
-import { valueBoardIndexed, type LeagueShape, type ValuedPlayer } from "@research/projections/decide/replacement";
+import { recommendPick, recommendPickInChunks, type Recommendation, type RecommendationQuery, type RosteredPlayer } from "@research-ts/projections/decide/draft";
+import { valueBoardIndexed, type LeagueShape, type ValuedPlayer } from "@research-ts/projections/decide/replacement";
 import type { SimPlayerEvidence } from "../sim/types";
 import { ADVISOR_CONFIG } from "./config";
 

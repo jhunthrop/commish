@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { copyViolations } from "./copy-rules";
-import { ROSTER_STATUS_KINDS, ROSTER_STATUS_SOURCES, type RosterStatusNote } from "@research/projections/preseason/roster-status";
+import { ROSTER_STATUS_KINDS, ROSTER_STATUS_SOURCES, type RosterStatusNote } from "@research-ts/projections/preseason/roster-status";
 import {
   NOT_ON_ACTIVE_ROSTER_BAND,
   NOT_ON_ACTIVE_ROSTER_NOTE,
@@ -10,7 +10,7 @@ import {
   rosterStatusObservation,
   rosterStatusPhrase,
   rosterStatusSentence,
-} from "@research/projections/preseason/roster-status-copy";
+} from "@research-ts/projections/preseason/roster-status-copy";
 
 function note(overrides: Partial<RosterStatusNote> = {}): RosterStatusNote {
   return { status: "injured_reserve", source: "tank01_player_list", observedAt: "2026-09-05T22:35:00.000Z", team: "KC", excluded: false, ...overrides };

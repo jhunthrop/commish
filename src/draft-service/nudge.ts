@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { draftNudges, teams, users } from "@/db/schema";
 import { currentDeadline, draftClockView, isPaused, nudgeDeadline, teamOnClock, type DraftState } from "@/draft-engine";
 import { MS_PER_SECOND } from "@/domain/duration";

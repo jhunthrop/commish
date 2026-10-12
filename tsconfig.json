@@ -26,8 +26,8 @@
       "@/*": [
         "./src/*"
       ],
-      "@research/*": [
-        "./research/src/*"
+      "@research-ts/*": [
+        "./research-ts/src/*"
       ]
     }
   },
@@ -41,6 +41,6 @@
   ],
   "exclude": [
     "node_modules",
-    "research/node_modules"
+    "research-ts/node_modules"
   ]
 }

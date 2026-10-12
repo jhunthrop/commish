@@ -7,9 +7,9 @@
 // question, and nothing in the data would say which of the two a manager was looking at.
 //
 // NOTHING HERE TOUCHES A DATABASE. The caller hands over the lines it already read.
-import type { Position, StatLine } from "@research/domain/player";
-import { computeFantasyPoints, roundPoints, type ScoringRules } from "@research/scoring";
-import type { KdefSeasonLine } from "@research/projections/kdef/season-lines";
+import type { Position, StatLine } from "@research-ts/domain/player";
+import { computeFantasyPoints, roundPoints, type ScoringRules } from "@research-ts/scoring";
+import type { KdefSeasonLine } from "@research-ts/projections/kdef/season-lines";
 
 /**
  * One week of a player's season, as the detail screen draws it.

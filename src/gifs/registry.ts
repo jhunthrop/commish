@@ -1,4 +1,4 @@
-import { envOr, envOrUndefined } from "@research/lib/env";
+import { envOr, envOrUndefined } from "@research-ts/lib/env";
 import { GIF_CONFIG, isGifProviderName, type GifProviderName } from "./config";
 import { GIPHY_CONFIG } from "./giphy/config";
 import { createGiphyGifProvider } from "./giphy/giphy-gif-provider";

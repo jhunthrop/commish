@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { STAT_FIELDS } from "@research/domain/player";
-import type { Position, StatLine } from "@research/domain/player";
+import { STAT_FIELDS } from "@research-ts/domain/player";
+import type { Position, StatLine } from "@research-ts/domain/player";
 import type { GameStatus, StatsProvider } from "./provider";
 
 const POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];

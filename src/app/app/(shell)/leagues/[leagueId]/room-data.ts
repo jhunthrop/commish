@@ -1,10 +1,10 @@
-import { getDb } from "@research/db/client";
-import type { Db } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
+import type { Db } from "@research-ts/db/client";
 import { readPreferences } from "@/identity-service/preferences";
 import { listLeagueActivity } from "@/integrity-service/activity";
 import { listNotices, quoteFor } from "@/integrity-service/notify";
 import { leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId, fixtureLabelsByTeam, gradesForDraft } from "@/league-service";
-import { byeWeeksByTeam } from "@research/reference/nfl-schedule";
+import { byeWeeksByTeam } from "@research-ts/reference/nfl-schedule";
 import { pendingWaiverClaims } from "@/league-service/claims";
 import { reactionsForEvents } from "@/league-service/event-reactions";
 import { cachedHeadToHeadRecords, recordsForTeam } from "@/league-service/head-to-head";

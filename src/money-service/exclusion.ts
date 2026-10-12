@@ -1,7 +1,7 @@
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { users } from "@/db/schema";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 
 const systemClock: Clock = { now: () => new Date().toISOString() };

@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok } from "@/lib/api/respond";
 import type { SeatHoldBody } from "@/league-room/contract";
 import { SEAT_HOLD_COOKIE } from "@/matchmaking/seat-hold";

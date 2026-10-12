@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "../hooks/deps";
 import type { LineupFixPlan } from "../lib/lineup-problems";
 import { LINEUP } from "../test-fixtures";

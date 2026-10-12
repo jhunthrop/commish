@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { asc, eq } from "drizzle-orm";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { players } from "@research/db/schema";
+import { players } from "@research-ts/db/schema";
 import { LIST_ADP_REQUEST_COST, LIST_PLAYERS_REQUEST_COST } from "@/stats/provider";
 import { ingestAdp } from "./adp";
 import { fakeStatsProvider } from "./test-support";

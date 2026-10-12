@@ -18,8 +18,8 @@
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { players } from "@research/db/schema";
+import type { Db } from "@research-ts/db/client";
+import { players } from "@research-ts/db/schema";
 import { leagues } from "@/db/schema";
 import { playerSeason } from "@/league-service/player";
 

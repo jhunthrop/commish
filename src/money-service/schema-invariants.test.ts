@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, expectRejectionMatching } from "@research/db/test-db";
+import { createTestDb, expectRejectionMatching } from "@research-ts/db/test-db";
 import { truncateAll, truncateMoneyTables } from "@/db/test-db";
 
 const db = createTestDb();

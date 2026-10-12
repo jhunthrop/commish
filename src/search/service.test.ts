@@ -1,11 +1,11 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { countingDb, createTestDb } from "@research/db/test-db";
+import { countingDb, createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { nflGames, playerCrosswalk, players } from "@research/db/schema";
-import type { BoardEntry } from "@research/projections/preseason/board";
-import { BOARD_SOURCE, writePreseasonBoard } from "@research/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@research/projections/preseason/current";
-import { recordNflPlayers } from "@research/projections/universe";
+import { nflGames, playerCrosswalk, players } from "@research-ts/db/schema";
+import type { BoardEntry } from "@research-ts/projections/preseason/board";
+import { BOARD_SOURCE, writePreseasonBoard } from "@research-ts/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import { recordNflPlayers } from "@research-ts/projections/universe";
 import { siteSearch, siteSearchIndex } from "./service";
 
 /**

@@ -1,4 +1,4 @@
-import type { Player, StatLine } from "@research/domain/player";
+import type { Player, StatLine } from "@research-ts/domain/player";
 
 /**
  * Where a fixture is in its life. Three values, because three is what any downstream decision

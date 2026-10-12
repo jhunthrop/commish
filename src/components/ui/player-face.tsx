@@ -1,4 +1,4 @@
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import { TOKENS } from "@/design/tokens";
 import { Avatar, type AvatarSize } from "./avatar";
 

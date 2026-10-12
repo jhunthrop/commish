@@ -1,7 +1,7 @@
-import type { Player, StatLine } from "@research/domain/player";
+import type { Player, StatLine } from "@research-ts/domain/player";
 import type { GameSummary, StatsProvider } from "../provider";
-import { createTank01Client, type Tank01ClientOptions } from "@research/stats/tank01/client";
-import { TANK01_CONFIG } from "@research/stats/tank01/config";
+import { createTank01Client, type Tank01ClientOptions } from "@research-ts/stats/tank01/client";
+import { TANK01_CONFIG } from "@research-ts/stats/tank01/config";
 import { mapAdpList, mapBoxScoreToStatLines, mapGames, mapPlayerList, mapTeamsToDefensePlayers } from "./map";
 
 export interface Tank01ProviderOptions extends Tank01ClientOptions {

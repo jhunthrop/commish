@@ -1,6 +1,6 @@
 import type { Tightening } from "@/draft-engine";
-import type { Position } from "@research/domain/player";
-import type { RosterSlotConfig } from "@research/domain/roster";
+import type { Position } from "@research-ts/domain/player";
+import type { RosterSlotConfig } from "@research-ts/domain/roster";
 import { UI_CONFIG } from "@/components/ui/config";
 import { MINUTES_PER_HOUR, MS_PER_SECOND, formatClockLength, plural } from "@/domain/duration";
 import { formatOrdinal } from "@/domain/format";

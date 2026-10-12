@@ -2,8 +2,8 @@
 
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import type { DraftStatus } from "@research/domain/draft";
-import type { Player } from "@research/domain/player";
+import type { DraftStatus } from "@research-ts/domain/draft";
+import type { Player } from "@research-ts/domain/player";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody, LineupSlotView } from "../contract";
 import { BigNumber, Button, PlayerFace, PositionBadge } from "@/components/ui";

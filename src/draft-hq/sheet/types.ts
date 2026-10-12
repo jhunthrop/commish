@@ -4,7 +4,7 @@
  * different ideas of what an entry is.
  */
 
-/** The three tags spec §4 names, worded in the enum as `avoid`/`never` (`@research/db/schema`'s
+/** The three tags spec §4 names, worded in the enum as `avoid`/`never` (`@research-ts/db/schema`'s
  *  `draftSheetTagEnum`) — this is the presentation spelling every surface renders. */
 export type SheetTag = "target" | "avoid" | "never";
 

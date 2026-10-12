@@ -11,7 +11,7 @@ vi.mock("@/lib/auth/current-user", () => ({
 
 import { eq } from "drizzle-orm";
 import { drafts, leagues, memberNotices, teams, users } from "@/db/schema";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { requireAdmin } from "@/lib/auth/current-user";
 import { DISSOLUTION_REFUSALS } from "@/money-service/dissolution";

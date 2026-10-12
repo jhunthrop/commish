@@ -1,5 +1,5 @@
 import { reactionSchema } from "@/chat-service";
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { toggleEventReaction } from "@/league-service/event-reactions";
 import { streamEventIdSchema } from "@/league-service/schemas";
 import type { EventReactionBody } from "@/league-room/contract";

@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
-import type { DbTx } from "@research/db/client";
-import { isUniqueViolation } from "@research/db/errors";
+import type { DbTx } from "@research-ts/db/client";
+import { isUniqueViolation } from "@research-ts/db/errors";
 import { leagues, moneyAccounts, moneyEntries, moneyTransactions, type MoneyTxnKind } from "@/db/schema";
 import type { AuditEventInput } from "@/domain/audit";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import type { AuditLogger } from "@/integrity-service/audit-logger";
 import { parseAccountId, signedBalance, type MoneyAccountId, type MoneyAccountKind } from "@/money/accounts";
 import { MONEY_REFUSALS } from "@/money/config";

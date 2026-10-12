@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { and, asc, eq, sql } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { createTestDb } from "@research/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { players } from "@research/db/schema";
+import { players } from "@research-ts/db/schema";
 import { draftActions, draftSlotPreferences, drafts } from "@/db/schema";
 import { draftOrderFor, drawSequenceFor } from "./order";
 import { createDraftStore } from "./store";

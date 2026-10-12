@@ -1,7 +1,7 @@
 import { and, eq, lte, sql } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { teams, tradeProposals, tradeVetoes } from "@/db/schema";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { LEAGUE_CONFIG } from "@/league";
 import { acceptTrade, TRADE_GOVERNANCE_REFUSALS } from "./trades";
 

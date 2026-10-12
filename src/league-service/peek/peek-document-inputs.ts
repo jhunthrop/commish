@@ -13,29 +13,29 @@
 // for the capsule, the harvest captures for the designation and the headlines, the observation and
 // stat-line readers for the seasons. There is no second store and no second definition of anything.
 import { eq, inArray, ne } from "drizzle-orm";
-import type { Db } from "@research/db/client";
-import { nflPlayers, players, playerStatLines, statWeeks } from "@research/db/schema";
-import type { Player, Position, StatLine } from "@research/domain/player";
+import type { Db } from "@research-ts/db/client";
+import { nflPlayers, players, playerStatLines, statWeeks } from "@research-ts/db/schema";
+import type { Player, Position, StatLine } from "@research-ts/domain/player";
 import {
   kdefSeasonStatsFrom,
   percentileOf,
   seasonStatsFromLines,
   type PlayerSeasonStats,
 } from "@/league-service/player-season-stats";
-import { newsSnapshotForPlayers } from "@research/reference/news";
-import { injurySnapshot } from "@research/reference/injuries";
-import { nflPlayerIdsFor } from "@research/projections/crosswalk";
-import { kdefSeasonLines, type KdefSeasonLine } from "@research/projections/kdef/season-lines";
-import { STAT_LINE_SOURCE } from "@research/projections/lines";
-import { admitsDerivedForLiveSurface, DERIVED_STAT_LINE_SOURCE, statLinesAsOfForLiveSurface } from "@research/projections/nflverse/derived-stat-lines";
-import { finalWeekOf } from "@research/projections/nflverse/team-eras";
-import { BENCHMARK_SOURCES } from "@research/projections/preseason/benchmarks";
-import type { BoardReason } from "@research/projections/preseason/board";
-import { assertSingleGeneration, BOARD_SOURCE, boardReasons, preseasonProjectionsFor } from "@research/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@research/projections/preseason/current";
-import { preseasonRankingsFor } from "@research/projections/preseason/store";
-import type { ScoringRules } from "@research/scoring";
-import { getStoredCapsulesFor } from "@research/capsules/store";
+import { newsSnapshotForPlayers } from "@research-ts/reference/news";
+import { injurySnapshot } from "@research-ts/reference/injuries";
+import { nflPlayerIdsFor } from "@research-ts/projections/crosswalk";
+import { kdefSeasonLines, type KdefSeasonLine } from "@research-ts/projections/kdef/season-lines";
+import { STAT_LINE_SOURCE } from "@research-ts/projections/lines";
+import { admitsDerivedForLiveSurface, DERIVED_STAT_LINE_SOURCE, statLinesAsOfForLiveSurface } from "@research-ts/projections/nflverse/derived-stat-lines";
+import { finalWeekOf } from "@research-ts/projections/nflverse/team-eras";
+import { BENCHMARK_SOURCES } from "@research-ts/projections/preseason/benchmarks";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
+import { assertSingleGeneration, BOARD_SOURCE, boardReasons, preseasonProjectionsFor } from "@research-ts/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import { preseasonRankingsFor } from "@research-ts/projections/preseason/store";
+import type { ScoringRules } from "@research-ts/scoring";
+import { getStoredCapsulesFor } from "@research-ts/capsules/store";
 import { priorSeasonCandidates, readPeekFactsFor } from "./peek-facts";
 import { PEEK_FACTS_SOURCE } from "./peek-facts-row";
 import type { PeekDocumentBasis } from "./peek-document-row";

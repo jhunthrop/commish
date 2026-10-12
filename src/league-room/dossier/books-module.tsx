@@ -1,5 +1,5 @@
-import type { PlayerFactsBooksNumbers } from "@research/capsules/facts";
-import { PROP_MARKET_LABELS } from "@research/capsules/prop-market-labels";
+import type { PlayerFactsBooksNumbers } from "@research-ts/capsules/facts";
+import { PROP_MARKET_LABELS } from "@research-ts/capsules/prop-market-labels";
 import { Card } from "@/components/ui";
 import { formatLine } from "../lib/format";
 
@@ -26,7 +26,7 @@ export interface BooksModuleProps {
  * what they hang on him, never this engine's own claim (`render.ts`'s own "color facts" rule,
  * group b, carried into the client-facing module).
  *
- * `PROP_MARKET_LABELS` is IMPORTED from `@research/capsules/prop-market-labels`, never re-typed here — one
+ * `PROP_MARKET_LABELS` is IMPORTED from `@research-ts/capsules/prop-market-labels`, never re-typed here — one
  * label map for both the model-facing prose (`capsules/render.ts`) and this client component. That
  * module holds nothing but a `Record` keyed by a type, so a client bundle importing it costs
  * nothing (see its own docblock for why this is a separate file from `render.ts`, which pulls in

@@ -1,9 +1,9 @@
-import { envOr, envOrUndefined, parsePositiveInteger } from "@research/lib/env";
+import { envOr, envOrUndefined, parsePositiveInteger } from "@research-ts/lib/env";
 import { STATS_CONFIG, isStatsProviderName, type StatsProviderName } from "./config";
 import { createMockStatsProvider } from "./mock/mock-stats-provider";
 import type { StatsProvider } from "./provider";
 import { createTank01StatsProvider } from "./tank01/tank01-stats-provider";
-import { TANK01_CONFIG } from "@research/stats/tank01/config";
+import { TANK01_CONFIG } from "@research-ts/stats/tank01/config";
 
 /**
  * A configured provider name that no implementation answers to.

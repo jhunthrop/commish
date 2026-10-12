@@ -28,7 +28,7 @@ export function firstNameOf(name: string): string {
  * decimal), and they may not import from a feature folder. One definition, both layers, and every
  * existing `../lib/format` import keeps working.
  */
-export { countWord, countWordCapitalized, formatLine, formatTenth, formatWhole } from "@research/lib/number-format";
+export { countWord, countWordCapitalized, formatLine, formatTenth, formatWhole } from "@research-ts/lib/number-format";
 
 export function formatWeek(weekNumber: number): string {
   return `Week ${weekNumber}`;

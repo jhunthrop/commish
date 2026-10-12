@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import { refundEntryFeeInTx } from "./entry-fee";
@@ -118,7 +118,7 @@ export const LEAGUE_DISSOLVED_SUMMARY = "An operator closed this league because 
  * deliberately — the same "the guard lives in the UPDATE's own WHERE" discipline every one-way
  * state stamp in this codebase holds to (`setSelfExclusion`, `clearSelfExclusion`, `grantAdmin`).
  * Nothing in the live draft engine (`@/draft-engine`, `@/draft-room`) ever reads or assigns this
- * value — see `DraftStatus`'s own docblock (`@research/domain/draft`) for why that is safe by
+ * value — see `DraftStatus`'s own docblock (`@research-ts/domain/draft`) for why that is safe by
  * construction rather than by omission.
  *
  * **THE REFUND, COMPOSED PER SEAT.** `refundEntryFeeInTx` (`./entry-fee`, Task 8's own mirror

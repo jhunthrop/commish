@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import Redis from "ioredis";
 import { chatMessages, leagues, teams, users } from "@/db/schema";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { CHAT_CONFIG } from "@/chat/config";
 import type { AuditEventInput } from "@/domain/audit";
@@ -14,8 +14,8 @@ import { reactionsForEvents } from "./event-reactions";
 const db: Db = createTestDb();
 const currentUser = vi.fn<() => Promise<{ readonly id: string } | null>>();
 
-vi.mock("@research/db/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@research/db/client")>();
+vi.mock("@research-ts/db/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@research-ts/db/client")>();
   return { ...actual, getDb: () => db };
 });
 vi.mock("@/lib/auth/current-user", () => ({

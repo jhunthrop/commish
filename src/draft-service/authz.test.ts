@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Db } from "@research/db/client";
+import type { Db } from "@research-ts/db/client";
 import { drafts, leagues } from "@/db/schema";
 import { resolveDraftActor } from "./authz";
 

@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { jobRuns, jobs } from "@/db/schema";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll, truncateJobTables } from "@/db/test-db";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { TerminalJobError, defineJob, type AnyJobDefinition, type StepOutcome } from "./contract";
 import { executeClaimedJob, formatErrorForLog, scrubSecrets, type ExecutorDeps } from "./execute";
 import { JOBS_CONFIG } from "./config";

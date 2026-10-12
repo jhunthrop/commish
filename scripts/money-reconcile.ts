@@ -14,7 +14,7 @@
 // the bank (a settlement day, a large deposit/withdrawal batch). It answers four checks, each its
 // own figure — the bank agreement, the double-entry law, the floor on `user_available`, and
 // escrow-by-league consistency — and names every one that disagrees, to the cent.
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { moneyDriftFindings, reconcileMoney } from "@/money-service/reconcile";
 import { formatUsd } from "@/money/config";
 import { createPaymentsProvider } from "@/payments-provider/registry";

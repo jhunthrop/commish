@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok } from "@/lib/api/respond";
 import { leagueHome } from "@/league-service";
 import type { LeagueHomeBody } from "@/league-room/contract";

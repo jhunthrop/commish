@@ -1,12 +1,12 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import type { Player, Position } from "@research/domain/player";
+import type { Player, Position } from "@research-ts/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import type { Law } from "@research/projections/laws/types";
-import type { BoardReason } from "@research/projections/preseason/board";
+import type { Law } from "@research-ts/projections/laws/types";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
 import { Badge, Button, EmptyState, Input, Movement, PlayerRow, PositionBadge, ReasonChip, RosterStatusPill, TierDivider, strongestLawReasons } from "@/components/ui";
-import { rosterStatusNoteOf } from "@research/projections/preseason/roster-status";
+import { rosterStatusNoteOf } from "@research-ts/projections/preseason/roster-status";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { queueButtonLabel } from "../lib/lookups";
 import { marketOrderNoteFor } from "../lib/market-order-note";

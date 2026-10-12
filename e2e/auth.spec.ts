@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
-import { createDb, type Db } from "@research/db/client";
+import { createDb, type Db } from "@research-ts/db/client";
 import { drafts, leagues, scoringSettings, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
-import { STANDARD_SCORING } from "@research/domain/scoring";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
+import { STANDARD_SCORING } from "@research-ts/domain/scoring";
 import { expect, test } from "./support/fixtures";
 
 /**

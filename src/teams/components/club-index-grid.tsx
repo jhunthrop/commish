@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, PlayerFace } from "@/components/ui";
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { ClubIndexRow } from "../club-index";
 
 /**

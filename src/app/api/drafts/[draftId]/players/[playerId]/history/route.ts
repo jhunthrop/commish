@@ -1,4 +1,4 @@
-import { getDb } from "@research/db/client";
+import { getDb } from "@research-ts/db/client";
 import { ok } from "@/lib/api/respond";
 import { playerHistory } from "@/draft-service/player-history";
 import { withLeagueMember, type RouteContext } from "../../../_shared";

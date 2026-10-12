@@ -6,9 +6,9 @@ vi.hoisted(() => {
 });
 
 import { users } from "@/db/schema";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll, truncateMoneyTables } from "@/db/test-db";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
 import { initiateDeposit, type DepositDeps } from "@/money-service/deposits";
 import { initiateWithdrawal, type WithdrawalDeps } from "@/money-service/withdrawals";

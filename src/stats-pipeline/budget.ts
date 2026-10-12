@@ -1,5 +1,5 @@
 import type Redis from "ioredis";
-import type { Clock } from "@research/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { STATS_INGESTION_CONFIG } from "./config";
 
 interface RequestBudgetDeps {

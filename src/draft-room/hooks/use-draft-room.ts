@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TeamCard } from "@/domain/league";
-import type { Player } from "@research/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { ClientDraftAction, CompletedPick, DraftStateView } from "@/draft-engine";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import type { Law } from "@research/projections/laws/types";
-import type { BoardReason } from "@research/projections/preseason/board";
+import type { Law } from "@research-ts/projections/laws/types";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
 import type { DraftPlayersBody, DraftQueueBody, DraftSnapshotBody, MockRoomInfo, WaitingInfo } from "@/draft-room/contract";
 import { applyDraftFrame, parseDraftFrame, type NudgeNotice } from "@/draft-room/state/apply-event";
 import { optimisticView } from "@/draft-room/state/optimistic";

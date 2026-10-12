@@ -1,15 +1,15 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { upsertCoachRows } from "@research/coaches/store";
-import { countingDb, createTestDb } from "@research/db/test-db";
+import { upsertCoachRows } from "@research-ts/coaches/store";
+import { countingDb, createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
-import { captureSnapshots, nflGames, playerCrosswalk, players, preseasonProjections } from "@research/db/schema";
-import { recordTeamDefenseWeekRows } from "@research/projections/nflverse/team-defense-weeks";
-import { BOARD_SOURCE } from "@research/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@research/projections/preseason/current";
-import { DEPTH_METRIC, DEPTH_SOURCE } from "@research/projections/preseason/depth";
-import { recordObservations } from "@research/projections/store";
-import { recordPlayerTeams, recordTeamObservations } from "@research/projections/team-store";
-import { recordNflPlayers } from "@research/projections/universe";
+import { captureSnapshots, nflGames, playerCrosswalk, players, preseasonProjections } from "@research-ts/db/schema";
+import { recordTeamDefenseWeekRows } from "@research-ts/projections/nflverse/team-defense-weeks";
+import { BOARD_SOURCE } from "@research-ts/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import { DEPTH_METRIC, DEPTH_SOURCE } from "@research-ts/projections/preseason/depth";
+import { recordObservations } from "@research-ts/projections/store";
+import { recordPlayerTeams, recordTeamObservations } from "@research-ts/projections/team-store";
+import { recordNflPlayers } from "@research-ts/projections/universe";
 import { teamPage, TEAM_PRIOR_SEASON } from "./service";
 
 /**

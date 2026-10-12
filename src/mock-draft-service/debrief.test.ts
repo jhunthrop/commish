@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb } from "@research/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
 import { truncateAll } from "@/db/test-db";
 import { drafts, users } from "@/db/schema";
-import type { Player } from "@research/domain/player";
-import type { RosterSlot, RosterSlotConfig } from "@research/domain/roster";
+import type { Player } from "@research-ts/domain/player";
+import type { RosterSlot, RosterSlotConfig } from "@research-ts/domain/roster";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import type { SimPlayerEvidence } from "@/draft-service/sim/types";
 import { createMockRoom } from "./creation";
