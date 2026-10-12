@@ -76,7 +76,9 @@ def fixture_dirs(case: Case) -> list[Path]:
 
 
 def run_typescript(case: Case, url: str) -> list[str]:
-    env = {**os.environ, "DATABASE_URL": url, "PARITY_NOW": js_iso(case.now), "NODE_NO_WARNINGS": "1"}
+    # TZ=UTC because production runs the TypeScript under UTC (Vercel), and V8 reads an offset-less
+    # date-time string as local time: the oracle is the production behaviour, not this laptop's.
+    env = {**os.environ, "DATABASE_URL": url, "PARITY_NOW": js_iso(case.now), "NODE_NO_WARNINGS": "1", "TZ": "UTC"}
     completed = subprocess.run(
         ["npx", "tsx", str(TS_DRIVER), case.name, *[str(d) for d in fixture_dirs(case)]],
         cwd=databases.REPO_ROOT,

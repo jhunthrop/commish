@@ -1,0 +1,17 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "Every NFL draft pick, the whole release, unfiltered (the blank-gsis rows it really carries included).",
+  "responses": [
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/draft_picks/draft_picks.csv",
+      "status": 200,
+      "file": "draft_picks.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 1661320
+    }
+  ]
+}

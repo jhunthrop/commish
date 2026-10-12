@@ -50,6 +50,8 @@ ignore = [
     "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR2004",
     # The formatter owns line length; what it cannot wrap is a string, and a split message is worse.
     "E501",
+    # A loop that appends reads closer to the TypeScript it ports than a comprehension does.
+    "PERF401",
 ]
 
 [tool.ruff.lint.isort]

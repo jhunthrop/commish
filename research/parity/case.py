@@ -29,7 +29,9 @@ class Recording:
     """How a fixture set was recorded: the requests, and the note the manifest carries."""
 
     fixture_set: str
-    specs: Callable[[], Sequence[RecordSpec]]
+    # Given the live fetcher, so a recipe can read one response to learn the next URLs (a week's
+    # fixtures name its box scores).
+    specs: Callable[[Fetcher], Sequence[RecordSpec]]
     note: str
 
 

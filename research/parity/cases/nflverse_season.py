@@ -19,6 +19,7 @@ from research.parity.cases.tables import (
     TEAM_WEEK_OBSERVATIONS,
 )
 from research.parity.record import RecordSpec
+from research.pipeline.http import Fetcher
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.config import Files, Releases
 from research.pipeline.nflverse.ingest import ingest_player_universe, ingest_season, schedule_week_as_of
@@ -27,20 +28,20 @@ NOW = datetime(2026, 10, 12, 5, 0, tzinfo=UTC)
 
 UNIVERSE = Recording(
     fixture_set="nflverse-universe",
-    specs=lambda: [RecordSpec(url=release_url(Releases.PLAYERS, Files.PLAYERS), file="players.csv.gz")],
+    specs=lambda _fetcher: [RecordSpec(url=release_url(Releases.PLAYERS, Files.PLAYERS), file="players.csv.gz")],
     note="The whole nflverse players release, unfiltered: every person back to 1999. The universe decides "
     "who resolves in every nflverse case, so a slice here would change resolution everywhere downstream.",
 )
 
 SCHEDULE = Recording(
     fixture_set="nflverse-schedule",
-    specs=lambda: [RecordSpec(url=SCHEDULE_URL, file="games.csv.gz")],
+    specs=lambda _fetcher: [RecordSpec(url=SCHEDULE_URL, file="games.csv.gz")],
     note="nflverse/nfldata's games.csv, unfiltered: every game back to 1999.",
 )
 
 
 def _season_recording(season: int, snap_filter: TeamFilter | None, week_filter: TeamFilter | None) -> Recording:
-    def specs() -> list[RecordSpec]:
+    def specs(_fetcher: Fetcher) -> list[RecordSpec]:
         return [
             RecordSpec(
                 url=release_url(Releases.SNAP_COUNTS, f"snap_counts_{season}.csv"),

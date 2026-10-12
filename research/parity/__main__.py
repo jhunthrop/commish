@@ -13,8 +13,10 @@ sides did not ask for exactly the same recordings.
 
 import argparse
 import logging
+import os
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 from research.parity.cases import ALL_CASES, CASES_BY_NAME, all_recordings
 from research.parity.record import record_case
@@ -82,14 +84,27 @@ def _schema() -> int:
     return 0 if result.passed else 1
 
 
-def _record(names: Sequence[str]) -> int:
+def _load_env_file(path: str | None) -> None:
+    """Secrets a recording needs (a provider key), read from a dotenv file into this process only.
+    Nothing read here is printed or written anywhere."""
+    if path is None:
+        return
+    for line in Path(path).read_text().splitlines():
+        if "=" not in line or line.lstrip().startswith("#"):
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def _record(names: Sequence[str], env_file: str | None) -> int:
+    _load_env_file(env_file)
     recordings = all_recordings()
     chosen = list(recordings) if names == ["all"] else list(names)
     fetcher = LiveFetcher()
     try:
         for name in chosen:
             recording = recordings[name]
-            path = record_case(recording.fixture_set, recording.specs(), fetcher, recording.note)
+            path = record_case(recording.fixture_set, recording.specs(fetcher), fetcher, recording.note)
             _print(f"recorded {name} -> {path}")
     finally:
         fetcher.close()
@@ -113,6 +128,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("schema", help="the alembic baseline against drizzle's catalog")
     record = sub.add_parser("record", help="re-record fixture sets from the live provider")
     record.add_argument("names", nargs="+", help="fixture set names, or all")
+    record.add_argument("--env-file", help="a dotenv file holding the provider keys a recording needs")
     sub.add_parser("list", help="every case and fixture set")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
@@ -121,7 +137,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "schema":
         return _schema()
     if args.command == "record":
-        return _record(args.names)
+        return _record(args.names, args.env_file)
     return _list()
 
 

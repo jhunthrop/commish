@@ -10,7 +10,7 @@ function here instead of the Python builtin. Each one names the builtin it repro
 import math
 import re
 import unicodedata
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 # ECMAScript WhiteSpace and LineTerminator code points: what `String.prototype.trim` removes.
 _JS_WHITESPACE = "".join(
@@ -46,6 +46,37 @@ def js_number(value: str) -> float:
     return float(text)
 
 
+def js_number_of(value: object) -> float:
+    """`Number(value)` for a parsed JSON value: undefined is NaN, null and false are 0, true is 1,
+    a string goes through `Number(string)`, an array of one element through that element, and
+    any other object is NaN."""
+    if value is None:
+        return 0.0
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        return js_number(value)
+    if isinstance(value, list):
+        if len(value) == 0:
+            return 0.0
+        if len(value) == 1:
+            return js_number_of(value[0])
+        return math.nan
+    return math.nan
+
+
+_ARRAY_INDEX = re.compile(r"^(?:0|[1-9]\d*)$")
+
+
+def js_object_keys(obj: dict[str, object]) -> list[str]:
+    """`Object.keys` order: integer-like keys ascending first, then the rest in insertion order."""
+    indices = sorted((k for k in obj if _ARRAY_INDEX.match(k) and int(k) < 2**32 - 1), key=int)
+    index_set = set(indices)
+    return [*indices, *(k for k in obj if k not in index_set)]
+
+
 def js_is_integer(value: float) -> bool:
     """`Number.isInteger`."""
     return math.isfinite(value) and value == math.floor(value)
@@ -67,6 +98,45 @@ def js_iso(instant: datetime) -> str:
     """`Date.prototype.toISOString`: UTC, millisecond precision, a `Z` suffix."""
     utc = instant.astimezone(UTC)
     return utc.strftime("%Y-%m-%dT%H:%M:%S.") + f"{utc.microsecond // 1000:03d}Z"
+
+
+_ISO_DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+_ISO_DATE_TIME = re.compile(
+    r"^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}:?\d{2})?$"
+)
+
+
+def js_date_parse(text: str) -> datetime | None:
+    """`new Date(string)` for the ISO shapes these feeds publish, or None where V8 yields NaN.
+
+    A date alone is UTC midnight; a date-time with a `Z` or an offset is that instant; a date-time
+    with neither is LOCAL time in V8, and local is UTC here because the TypeScript runs under
+    TZ=UTC in production (Vercel) and in the parity harness. Shapes outside these are not parsed,
+    and the callers that reach for this treat None exactly as they treat an invalid Date.
+    """
+    match = _ISO_DATE.match(text)
+    if match is not None:
+        try:
+            return datetime(int(match[1]), int(match[2]), int(match[3]), tzinfo=UTC)
+        except ValueError:
+            return None
+    match = _ISO_DATE_TIME.match(text)
+    if match is None:
+        return None
+    year, month, day, hour, minute = (int(match[i]) for i in range(1, 6))
+    second = int(match[6]) if match[6] is not None else 0
+    millis = int((match[7] or "0")[:3].ljust(3, "0"))
+    try:
+        naive = datetime(year, month, day, hour, minute, second, millis * 1000, tzinfo=UTC)
+    except ValueError:
+        return None
+    zone = match[8]
+    if zone is None or zone == "Z":
+        return naive
+    sign = 1 if zone[0] == "+" else -1
+    digits = zone[1:].replace(":", "")
+    offset_minutes = int(digits[:2]) * 60 + int(digits[2:])
+    return naive - sign * timedelta(minutes=offset_minutes)
 
 
 def js_epoch_ms(instant: datetime) -> int:

@@ -1,0 +1,163 @@
+"""THE STATS PROVIDER'S INGESTS: the roster and its weekly lines, the fixtures, and the ADP column.
+
+`ingest_roster_and_lines` is `seedPlayers` (`src/data/seed/seed-players.ts`): the roster upserted
+into `players` (ADP left alone: only the ADP feed writes it), then every week's box scores into
+`player_stat_lines`, one line per player, upserted. `ingest_schedule` is the stats pipeline's
+fixture walk into `nfl_games` (`stats-pipeline/schedule.ts`). `ingest_adp` is its ADP enrichment
+(`stats-pipeline/adp.ts`): an UPDATE of `players.adp` and `pos_adp`, never an insert.
+
+NOT PORTED, ON PURPOSE: the live-scoring worker (`stats-pipeline/worker.ts`) that ticks a week
+in progress, settles matchups and publishes scores. It is the league platform's machinery (it
+reads `matchups`, sets lineups, publishes to leagues), and the league platform is not part of the
+prep site.
+"""
+
+import json
+from dataclasses import dataclass
+
+from sqlalchemy import Connection, text
+from sqlalchemy.dialects.postgresql import insert
+
+from research.db.schema import NFL_GAMES, PLAYER_STAT_LINES, PLAYERS
+from research.db.upsert import excluded_set
+from research.pipeline.budget import RequestBudget, UnmeteredBudget, reserve_or_raise
+from research.pipeline.tank01.mapping import StatLine, deduped_by_player_id
+from research.pipeline.tank01.provider import LIST_ADP_REQUEST_COST, LIST_PLAYERS_REQUEST_COST, Tank01Provider
+
+_SEED_BATCH = 500
+
+
+def _chunks[T](items: list[T], size: int) -> list[list[T]]:
+    return [items[i : i + size] for i in range(0, len(items), size)]
+
+
+_STAT_COLUMNS = tuple(c.name for c in PLAYER_STAT_LINES.columns if c.name not in ("player_id", "week"))
+
+
+def _stat_line_row(line: StatLine) -> dict[str, object]:
+    """Every column named, a field the source said nothing about at the column's own default of
+    zero (a multi-row VALUES needs one shape; the TypeScript leaves the field out and Postgres
+    fills the same zero)."""
+    return {"player_id": line.player_id, "week": line.week, **{c: line.values.get(c, 0.0) for c in _STAT_COLUMNS}}
+
+
+@dataclass(frozen=True)
+class SeedReport:
+    players: int
+    stat_lines: int
+
+
+def ingest_roster_and_lines(
+    conn: Connection, provider: Tank01Provider, budget: RequestBudget | None = None
+) -> SeedReport:
+    """`seedPlayers`: the roster, then weeks 1 through the provider's last week of box scores."""
+    ledger = budget if budget is not None else UnmeteredBudget()
+    reserve_or_raise(ledger, LIST_PLAYERS_REQUEST_COST, "the player list")
+    players = provider.list_players()
+    for batch in _chunks(players, _SEED_BATCH):
+        statement = insert(PLAYERS).values(
+            [
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "position": p.position,
+                    "nfl_team": p.nfl_team,
+                    "headshot_url": p.headshot_url,
+                }
+                for p in batch
+            ]
+        )
+        conn.execute(
+            statement.on_conflict_do_update(
+                index_elements=[PLAYERS.c.id], set_=excluded_set(statement, PLAYERS, ("id", "adp"))
+            )
+        )
+
+    stat_count = 0
+    for week in range(1, provider.last_week_of_season + 1):
+        reserve_or_raise(ledger, 1, f"week {week}'s schedule")
+        games = provider.list_games(week)
+        if not games:
+            continue
+        reserve_or_raise(ledger, len(games), f"week {week}'s {len(games)} box scores")
+        lines: list[StatLine] = []
+        for game in games:
+            lines.extend(provider.get_game_stat_lines(game))
+        if not lines:
+            continue
+        week_lines = deduped_by_player_id(lines)
+        for line_batch in _chunks(week_lines, _SEED_BATCH):
+            lines_statement = insert(PLAYER_STAT_LINES).values([_stat_line_row(line) for line in line_batch])
+            conn.execute(
+                lines_statement.on_conflict_do_update(
+                    index_elements=[PLAYER_STAT_LINES.c.player_id, PLAYER_STAT_LINES.c.week],
+                    set_=excluded_set(lines_statement, PLAYER_STAT_LINES, ("player_id", "week")),
+                )
+            )
+        stat_count += len(week_lines)
+    return SeedReport(players=len(players), stat_lines=stat_count)
+
+
+@dataclass(frozen=True)
+class ScheduleIngestResult:
+    weeks: int
+    games: int
+
+
+def ingest_schedule(conn: Connection, provider: Tank01Provider, budget: RequestBudget) -> ScheduleIngestResult:
+    """Every fixture of weeks 1 through the last, upserted on its own id (a flexed kickoff lands)."""
+    weeks = 0
+    games = 0
+    for week in range(1, provider.last_week_of_season + 1):
+        reserve_or_raise(budget, 1, f"week {week}'s schedule")
+        fixtures = provider.list_games(week)
+        if not fixtures:
+            continue
+        statement = insert(NFL_GAMES).values(
+            [
+                {
+                    "game_id": game.game_id,
+                    "week": game.week,
+                    "home_nfl_team": game.home_nfl_team,
+                    "away_nfl_team": game.away_nfl_team,
+                    "game_date": game.game_date,
+                    "kickoff_et": game.kickoff_et,
+                    "status": game.status,
+                }
+                for game in fixtures
+            ]
+        )
+        conn.execute(
+            statement.on_conflict_do_update(
+                index_elements=[NFL_GAMES.c.game_id], set_=excluded_set(statement, NFL_GAMES, ("game_id",))
+            )
+        )
+        weeks += 1
+        games += len(fixtures)
+    return ScheduleIngestResult(weeks=weeks, games=games)
+
+
+@dataclass(frozen=True)
+class AdpIngestResult:
+    adp_entries: int
+    players_updated: int
+
+
+def ingest_adp(conn: Connection, provider: Tank01Provider, budget: RequestBudget) -> AdpIngestResult:
+    """`ingestAdp`: one absolute-value UPDATE keyed by player id; a ranked player with no row lands on nothing."""
+    reserve_or_raise(budget, LIST_PLAYERS_REQUEST_COST, "the player list")
+    provider.list_players()
+    reserve_or_raise(budget, LIST_ADP_REQUEST_COST, "the ADP feed")
+    entries = provider.list_adp()
+    if not entries:
+        return AdpIngestResult(0, 0)
+    feed = json.dumps([{"id": e.player_id, "adp": e.adp, "pos_adp": e.pos_adp} for e in entries])
+    updated = conn.execute(
+        text(
+            "update players set adp = data.adp, pos_adp = data.pos_adp "
+            "from jsonb_to_recordset(cast(:feed as jsonb)) as data(id text, adp real, pos_adp text) "
+            "where players.id = data.id returning players.id"
+        ),
+        {"feed": feed},
+    ).all()
+    return AdpIngestResult(adp_entries=len(entries), players_updated=len(updated))
