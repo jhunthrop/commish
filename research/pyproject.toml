@@ -1,0 +1,70 @@
+[project]
+name = "research"
+version = "0.1.0"
+description = "The Commish research lane: ingests, the projections fit, capsules, the nightly run and the advisor."
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "alembic==1.20.0",
+    "httpx==0.28.1",
+    "numpy==2.5.4",
+    "pandas==3.0.6",
+    "psycopg[binary]==3.3.6",
+    "pyarrow==26.0.0",
+    "pydantic==2.14.1",
+    "sqlalchemy==2.1.4",
+]
+
+[dependency-groups]
+dev = [
+    "mypy==2.4.0",
+    "pandas-stubs==3.0.5.260914",
+    "pytest==9.1.1",
+    "ruff==0.17.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# THE PACKAGE IS THIS DIRECTORY. `research/` is both the uv project and the importable `research`
+# package (`research.pipeline`, `research.parity`, ...), so the editable install puts the parent
+# directory on the path rather than copying files anywhere. That is what lets
+# `uv run python -m research.parity ingest players` work from inside `research/`.
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.hatch.build]
+dev-mode-dirs = [".."]
+exclude = [".venv", "parity/fixtures", "parity/ts"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = ["parity/ts", "alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "N", "C4", "PL", "PERF"]
+ignore = [
+    # Ported mappers keep the TypeScript's own branch structure on purpose: a parity port that
+    # restructures control flow is a port nobody can diff against its oracle line by line.
+    "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR2004",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["research"]
+known-third-party = ["alembic"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+mypy_path = ".."
+explicit_package_bases = true
+plugins = ["pydantic.mypy"]
+exclude = ["^\\.venv/", "^alembic/versions/", "^parity/ts/"]
+
+[[tool.mypy.overrides]]
+module = ["pyarrow.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
