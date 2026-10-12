@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { STANDARD_ROSTER_SLOTS, type RosterSlot } from "@/domain/roster";
-import { validateLineup } from "@/domain/roster-eligibility";
-import { SUPERFLEX_ROSTER_SLOTS } from "./roster-shape";
+import { STANDARD_ROSTER_SLOTS, type RosterSlot } from "@research/domain/roster";
+import { validateLineup } from "@research/domain/roster-eligibility";
+import { SUPERFLEX_ROSTER_SLOTS } from "@research/domain/roster-shape";
 import { benchOf, defaultLineup, setSlotPlayer, startersOf } from "./lineup";
 
 const SLOTS = [

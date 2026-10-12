@@ -11,25 +11,25 @@
 // themselves, so `validate-win-totals.test.ts` can drive them from fixture rows with no I/O at
 // all. `main()` is the only place that touches Postgres or fetches nflverse's schedule file.
 import { eq } from "drizzle-orm";
-import { createDb, type ReadonlyDb } from "@/db/client";
-import { teamWeekObservations } from "@/db/schema";
-import { firstKickoffFor } from "@/projections/team-store";
-import { nflTeamsBySeason } from "@/projections/nflverse/team-eras";
+import { createDb, type ReadonlyDb } from "@research/db/client";
+import { teamWeekObservations } from "@research/db/schema";
+import { firstKickoffFor } from "@research/projections/team-store";
+import { nflTeamsBySeason } from "@research/projections/nflverse/team-eras";
 import {
   mapSchedule,
   regularSeasonGamesPerTeam,
   SCHEDULE_SOURCE,
   SCHEDULE_SOURCE_CONFIG,
   type TeamGame,
-} from "@/projections/nflverse/schedule";
-import { createNflverseClient } from "@/projections/nflverse/client";
+} from "@research/projections/nflverse/schedule";
+import { createNflverseClient } from "@research/projections/nflverse/client";
 import {
   FIRST_WIN_TOTALS_SEASON,
   LAST_WIN_TOTALS_SEASON,
   parseWinTotalsCsv,
   WIN_TOTALS_SEASONS,
   type WinTotalRow,
-} from "@/projections/vegas/ingest";
+} from "@research/projections/vegas/ingest";
 import { readWinTotalsCsv, WIN_TOTALS_CSV_PATH } from "./lib/win-totals-csv";
 
 // The CSV shape (`WinTotalRow`, `parseWinTotalsCsv`) and the season-range constants moved to

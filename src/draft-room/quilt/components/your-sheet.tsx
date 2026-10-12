@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { SurvivalOdds, TierStandingView } from "@/draft-service/assistant/view";
 import { Button } from "@/components/ui";
 import { useReusedValue } from "@/design/use-stable-list";

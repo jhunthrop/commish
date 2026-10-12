@@ -15,18 +15,18 @@
 // 2024 out as well, which is how the model was iterated on before the single 2025 run. Every such
 // iteration is recorded in the build ledger before the judgment is taken.
 import { writeFileSync } from "node:fs";
-import { createDb } from "@/db/client";
-import { PPR_SCORING } from "@/domain/scoring";
-import { draftVersionOf } from "@/projections/model/artifacts";
-import { fitGameVariance, type GameVarianceObservation, type GameVariancePriors } from "@/projections/preseason/game-variance";
-import { GAME_VARIANCE_KDEF_ARTIFACT } from "@/projections/preseason/game-variance-artifacts";
-import { loadKdefHistory } from "@/projections/preseason/kdef-history";
-import { fitKickerPriors, kickerWeeklyPoints, type KickerPriors } from "@/projections/preseason/kicker";
-import { kickingWeekRowsForSeasons } from "@/projections/nflverse/kicking-weeks";
-import { defenseWeeklyPoints, fitDefensePriors, type DefensePriors } from "@/projections/preseason/team-defense";
+import { createDb } from "@research/db/client";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { draftVersionOf } from "@research/projections/model/artifacts";
+import { fitGameVariance, type GameVarianceObservation, type GameVariancePriors } from "@research/projections/preseason/game-variance";
+import { GAME_VARIANCE_KDEF_ARTIFACT } from "@research/projections/preseason/game-variance-artifacts";
+import { loadKdefHistory } from "@research/projections/preseason/kdef-history";
+import { fitKickerPriors, kickerWeeklyPoints, type KickerPriors } from "@research/projections/preseason/kicker";
+import { kickingWeekRowsForSeasons } from "@research/projections/nflverse/kicking-weeks";
+import { defenseWeeklyPoints, fitDefensePriors, type DefensePriors } from "@research/projections/preseason/team-defense";
 import { recordAndPublishFit } from "./lib/model-artifact-records";
 
-const OUTPUT = "src/projections/preseason/kdef-fitted.ts";
+const OUTPUT = "research/src/projections/preseason/kdef-fitted.ts";
 const FIRST_FIT_SEASON = 2013;
 const LAST_FIT_SEASON = 2024;
 /** 2025 is judged exactly once and 2026 is never read. Both are refused by every fit below. */

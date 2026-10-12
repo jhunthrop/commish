@@ -7,8 +7,8 @@
 // A warm server instance sees a newly published version only once the code pins it; the loader
 // memoizes each pinned version per instance, so a deploy that bumps a pin reads the new row on its
 // first request.
-import { createDb } from "@/db/client";
-import { envOrUndefined } from "@/lib/env";
+import { createDb } from "@research/db/client";
+import { envOrUndefined } from "@research/lib/env";
 import { MODEL_ARTIFACT_RECORDS_DIR, publishCommittedModelArtifacts } from "./lib/model-artifact-records";
 
 function requireDatabaseUrl(): string {

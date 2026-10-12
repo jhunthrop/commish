@@ -1,8 +1,8 @@
 // One-shot: fetch the whole nflverse draft-pick history into `nfl_draft_picks` (filtered to the
 // universe's known ids, see `ingestDraftPicks`). A re-run picks up whatever seasons are new.
 // (dotenv -e .env.local -- tsx scripts/draft-picks-ingest.ts)
-import { createDb } from "@/db/client";
-import { ingestDraftPicks } from "@/projections/nflverse/draft-picks";
+import { createDb } from "@research/db/client";
+import { ingestDraftPicks } from "@research/projections/nflverse/draft-picks";
 
 function requireEnv(name: string): string {
   const value = process.env[name];

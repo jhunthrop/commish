@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
-import { playerStatLines, statWeeks } from "@/db/schema";
-import type { StatLine } from "@/domain/player";
-import { changedRowWhere, excludedSetFor } from "@/db/upsert";
+import type { Db } from "@research/db/client";
+import { playerStatLines, statWeeks } from "@research/db/schema";
+import type { StatLine } from "@research/domain/player";
+import { changedRowWhere, excludedSetFor } from "@research/db/upsert";
 import type { WeekStatus } from "./contract";
 
 export interface PersistTickInput {

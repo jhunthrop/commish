@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, truncateAll, truncateMoneyTables } from "@/db/test-db";
-import type { Clock } from "@/domain/timing";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll, truncateMoneyTables } from "@/db/test-db";
+import type { Clock } from "@research/domain/timing";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
 import { accountIdFor } from "@/money/accounts";
 import { MONEY_REFUSALS } from "@/money/config";

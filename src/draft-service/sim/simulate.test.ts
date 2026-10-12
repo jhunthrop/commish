@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Position } from "@/domain/player";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import type { Position } from "@research/domain/player";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
 import { totalRosterSlots } from "@/draft-engine";
 import { BUILD_LABELS } from "./classify";
 import { simulateAllSlots, simulateDrafts } from "./simulate";

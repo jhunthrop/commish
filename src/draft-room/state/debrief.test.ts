@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Position } from "@/domain/player";
+import type { Position } from "@research/domain/player";
 import type { CompletedPick } from "@/draft-engine";
 import type { Verdict } from "../lib/verdict";
 import {

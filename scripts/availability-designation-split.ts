@@ -14,16 +14,16 @@
 // A MEASUREMENT RUN, SO THE DEV STORE ONLY: repeated reads against production are what the Neon
 // data-transfer quota incident was made of (`prod-db-is-for-backfills-only`).
 import { inArray } from "drizzle-orm";
-import { createDb, type Db } from "@/db/client";
-import { nflPlayers } from "@/db/schema";
-import { marketBoard } from "@/projections/market/curve";
-import { FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
-import { expectedGamesPlayed, type AvailabilityPriors } from "@/projections/preseason/availability";
-import { fitAvailabilityPriors, type AvailabilityObservation } from "@/projections/preseason/availability-fit";
-import { loadAvailabilityObservations } from "@/projections/preseason/availability-history";
-import { AVAILABILITY_DESIGNATIONS, type AvailabilityDesignation } from "@/projections/preseason/availability-status";
-import { FITTED_AVAILABILITY_PRIORS } from "@/projections/preseason/fitted";
-import { replayMomentFor } from "@/projections/preseason/source";
+import { createDb, type Db } from "@research/db/client";
+import { nflPlayers } from "@research/db/schema";
+import { marketBoard } from "@research/projections/market/curve";
+import { FIT_SEASONS, HELD_OUT_SEASONS } from "@research/projections/model/fitted";
+import { expectedGamesPlayed, type AvailabilityPriors } from "@research/projections/preseason/availability";
+import { fitAvailabilityPriors, type AvailabilityObservation } from "@research/projections/preseason/availability-fit";
+import { loadAvailabilityObservations } from "@research/projections/preseason/availability-history";
+import { AVAILABILITY_DESIGNATIONS, type AvailabilityDesignation } from "@research/projections/preseason/availability-status";
+import { FITTED_AVAILABILITY_PRIORS } from "@research/projections/preseason/fitted";
+import { replayMomentFor } from "@research/projections/preseason/source";
 
 const SKILL = new Set(["QB", "RB", "WR", "TE"]);
 

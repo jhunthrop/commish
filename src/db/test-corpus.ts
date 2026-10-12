@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import type { Db } from "./client";
+import type { Db } from "@research/db/client";
 
 /**
  * THE CORPUS-REALISM MECHANISM. Plan B's final review found two of its own gate tests measuring
@@ -35,7 +35,7 @@ export const USER_COUNT = 200;
 
 /**
  * The full 15-slot roster and its 9-slot starting subset, inlined as raw-SQL `VALUES` lists
- * rather than imported from `@/domain/roster`: this file seeds through `db.execute(sql\`...\`)`,
+ * rather than imported from `@research/domain/roster`: this file seeds through `db.execute(sql\`...\`)`,
  * not the domain layer, and the shape only needs to produce a realistic row count and column
  * spread, not stay wired to `STANDARD_ROSTER_SLOTS`.
  */

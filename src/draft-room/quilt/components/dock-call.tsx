@@ -2,10 +2,10 @@
 
 import { memo, useMemo } from "react";
 import { mustPickLine } from "@/domain/must-pick";
-import type { Player } from "@/domain/player";
-import { positionLabel } from "@/domain/position-words";
-import type { RosterSlotType } from "@/domain/roster";
-import { restrictedPositions } from "@/domain/roster-eligibility";
+import type { Player } from "@research/domain/player";
+import { positionLabel } from "@research/domain/position-words";
+import type { RosterSlotType } from "@research/domain/roster";
+import { restrictedPositions } from "@research/domain/roster-eligibility";
 import type { DraftStateView } from "@/draft-engine";
 import type { AdvisorView } from "@/draft-service/assistant/view";
 import { BigNumber, Button, PlayerFace, PositionBadge } from "@/components/ui";

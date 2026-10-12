@@ -6,8 +6,8 @@
 // assumed America/New_York — the brief's own "check what it assumed" — and the schedules keep the
 // installed reality rather than re-deciding the wall clock; see the spec's judgment calls.
 import type { JsonObject } from "@/domain/audit";
-import { HARVEST_CONFIG } from "@/projections/harvest-config";
-import { ADP_SNAPSHOT_CAPTURES } from "@/projections/market/adp-snapshot";
+import { HARVEST_CONFIG } from "@research/projections/harvest-config";
+import { ADP_SNAPSHOT_CAPTURES } from "@research/projections/market/adp-snapshot";
 import { parseCronExpression, type CronExpression } from "./cron";
 
 export interface ScheduleDefinition {

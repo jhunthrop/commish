@@ -1,10 +1,11 @@
 import { describe, it, expect, afterEach, beforeEach, afterAll, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { createTestDb, truncateAll, TEST_DATABASE_URL } from "@/db/test-db";
+import { createTestDb, TEST_DATABASE_URL } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { leagues, matchups, rosterSlots, teams, users, weeks } from "@/db/schema";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
 import { totalRosterSlots } from "@/draft-engine";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { computeStandings, LEAGUE_CONFIG } from "@/league";
 import { completedSeasonsFor } from "@/league-service/participation";

@@ -1,4 +1,4 @@
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research/domain/timing";
 import type { KycProvider, KycProviderStatus, KycSubmissionInput, KycSubmissionRef } from "../kyc-contract";
 
 /**

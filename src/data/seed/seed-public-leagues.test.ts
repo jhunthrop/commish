@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { createTestDb, truncateAll, TEST_DATABASE_URL } from "@/db/test-db";
+import { createTestDb, TEST_DATABASE_URL } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { drafts, leagues, teams } from "@/db/schema";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { INTEGRITY_CONFIG } from "@/integrity/config";

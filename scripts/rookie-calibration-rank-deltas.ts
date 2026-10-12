@@ -15,24 +15,24 @@
 // THE PRODUCTION CONTROL (fix round 1): the controller runs `projections:preseason:persist -- 2026`
 // against prod as part of the SAME ship sequence that merges this branch — a merge without that run
 // serves stale numbers. That run, not this script, is what makes the fix visible in production.
-import { createDb, type Db } from "@/db/client";
-import type { Clock } from "@/domain/timing";
-import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";
-import { PPR_SCORING } from "@/domain/scoring";
-import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import type { LeagueShape } from "@/projections/decide/replacement";
-import { rookieCurve } from "@/projections/preseason/rookie-curve";
-import { preseasonBoard, type BoardCandidate, type BoardEntry } from "@/projections/preseason/board";
-import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
+import { createDb, type Db } from "@research/db/client";
+import type { Clock } from "@research/domain/timing";
+import { STAT_FIELDS, type Position, type StatLine } from "@research/domain/player";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research/domain/roster";
+import type { LeagueShape } from "@research/projections/decide/replacement";
+import { rookieCurve } from "@research/projections/preseason/rookie-curve";
+import { preseasonBoard, type BoardCandidate, type BoardEntry } from "@research/projections/preseason/board";
+import { loadShippedGameVariance } from "@research/projections/preseason/game-variance-artifacts";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
-} from "@/projections/preseason/fitted";
-import { FITTED_MODEL } from "@/projections/model/source";
-import { marketBoard } from "@/projections/market/curve";
-import { shippedPreseasonCandidates } from "@/projections/market/blend";
+} from "@research/projections/preseason/fitted";
+import { FITTED_MODEL } from "@research/projections/model/source";
+import { marketBoard } from "@research/projections/market/curve";
+import { shippedPreseasonCandidates } from "@research/projections/market/blend";
 import {
   liveMomentFor,
   loadPreseason,
@@ -41,7 +41,7 @@ import {
   SHIPPED_PRESEASON_FEATURES,
   type BoardMoment,
   type PreseasonPriors,
-} from "@/projections/preseason/source";
+} from "@research/projections/preseason/source";
 
 const SEASON = 2026;
 const SYSTEM_CLOCK: Clock = { now: () => new Date().toISOString() };
@@ -147,7 +147,7 @@ async function main(): Promise<void> {
   // round; only the rookie branch moved. Reusing the CURRENT `shippedPreseasonCandidates` internals
   // via `blendBoard` on the old-priors raw candidates gives the correct (unchanged) non-rookie
   // pricing, and `applyPreFixRookieSubstitution` then overwrites exactly the branch that changed.
-  const { blendBoard } = await import("@/projections/market/blend");
+  const { blendBoard } = await import("@research/projections/market/blend");
   const oldBlended = applyPreFixRookieSubstitution(blendBoard(market, oldRawCandidates, { season: SEASON }), marketByPlayer);
   const oldBoard = preseasonBoard(oldBlended, {
     season: SEASON,

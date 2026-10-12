@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import type { JsonObject } from "@/domain/audit";
 import { flagDetail } from "@/integrity-service/flags";
 import { leagueNameFor } from "@/draft-service/teams";

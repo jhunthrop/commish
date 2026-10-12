@@ -1,6 +1,6 @@
 import type Redis from "ioredis";
-import type { Player } from "@/domain/player";
-import type { ScoringSettings } from "@/domain/scoring";
+import type { Player } from "@research/domain/player";
+import type { ScoringSettings } from "@research/domain/scoring";
 import { STATS_INGESTION_CONFIG } from "./config";
 
 export interface ReferenceCache {

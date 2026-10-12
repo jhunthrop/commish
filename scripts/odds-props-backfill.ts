@@ -23,19 +23,19 @@
 // stated cap. A LATER RUN NEEDS NO RESUME FLAG: `archivedEventIds` (`props-store.ts`) is read once
 // at start-up and `eventsNeedingFetch` (`backfill-plan.ts`) skips every event already archived, so
 // re-running the identical command simply picks up where the budget stopped it.
-import { createDb } from "@/db/client";
-import type { Db } from "@/db/client";
+import { createDb } from "@research/db/client";
+import type { Db } from "@research/db/client";
 import {
   eventsInWeekWindow,
   eventsNeedingFetch,
   hasBudgetRemaining,
   weekSnapshotInstants,
   type WeekSnapshotInstant,
-} from "@/projections/odds/backfill-plan";
-import { parseHistoricalEventOddsPage, parseHistoricalEventsPage, type HistoricalEventsPage } from "@/projections/odds/historical";
-import { ODDS_API_BASE, SPORT_KEY, creditStatus, requireEnv, requireOk, toHistoricalDateParam, type CreditStatus } from "@/projections/odds/http";
-import { archivedEventIds, parseEventOddsResponse, PROP_MARKETS, recordPropObservations } from "@/projections/odds/props-store";
-import { kickoffInstantsByWeek } from "@/projections/team-store";
+} from "@research/projections/odds/backfill-plan";
+import { parseHistoricalEventOddsPage, parseHistoricalEventsPage, type HistoricalEventsPage } from "@research/projections/odds/historical";
+import { ODDS_API_BASE, SPORT_KEY, creditStatus, requireEnv, requireOk, toHistoricalDateParam, type CreditStatus } from "@research/projections/odds/http";
+import { archivedEventIds, parseEventOddsResponse, PROP_MARKETS, recordPropObservations } from "@research/projections/odds/props-store";
+import { kickoffInstantsByWeek } from "@research/projections/team-store";
 
 const DEFAULT_BUDGET = 9000;
 const DEFAULT_SEASONS: readonly number[] = [2023, 2024, 2025];

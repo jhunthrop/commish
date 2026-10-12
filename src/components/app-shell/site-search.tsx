@@ -8,7 +8,7 @@ import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { PlayerRow } from "@/components/ui/player-row";
 import { TeamRow } from "@/components/ui/team-row";
-import { rosterStatusLabel } from "@/projections/preseason/roster-status-copy";
+import { rosterStatusLabel } from "@research/projections/preseason/roster-status-copy";
 import { SEARCH_CONFIG } from "@/search/config";
 import { searchResultKey, type SearchResult } from "@/search/contract";
 import { useSiteSearch } from "@/search/use-site-search";

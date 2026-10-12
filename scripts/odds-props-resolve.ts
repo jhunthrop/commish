@@ -15,9 +15,9 @@
 // THE UNMATCHED SUMMARY IS ALSO WRITTEN TO THE WORKSPACE (not just printed), so the record survives
 // past this run's own terminal scrollback.
 import { writeFileSync } from "node:fs";
-import { createDb } from "@/db/client";
-import { requireEnv } from "@/projections/odds/http";
-import { observationCountsByPropName, resolveAllPropNames, type UnmatchedPropName } from "@/projections/odds/player-map";
+import { createDb } from "@research/db/client";
+import { requireEnv } from "@research/projections/odds/http";
+import { observationCountsByPropName, resolveAllPropNames, type UnmatchedPropName } from "@research/projections/odds/player-map";
 
 const UNMATCHED_REPORT_PATH = ".superpowers/sdd/2026-09-01-props-backfill/props-unmatched-report.json";
 /** How many of each season's unmatched names to name in the printed summary -- enough to see the

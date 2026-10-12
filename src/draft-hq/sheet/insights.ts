@@ -1,7 +1,7 @@
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { completedMockDebriefs, completedMockRoomsQuery, habitFactsOf, mockDebriefDeps } from "@/mock-draft-service/debrief";
 import { mockHabits } from "@/draft-room/state/debrief";
-import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
+import { byeWeeksByTeam } from "@research/reference/nfl-schedule";
 
 /**
  * MY SHEET'S INTELLIGENCE (spec §4) — "what your mocks say" and the bye-stack warning, both

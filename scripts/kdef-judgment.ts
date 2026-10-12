@@ -14,27 +14,27 @@
 // it.
 import { writeFileSync } from "node:fs";
 import { readFileSync } from "node:fs";
-import { createDb, type ReadonlyDb } from "@/db/client";
-import { PPR_SCORING } from "@/domain/scoring";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { nflPlayers } from "@/db/schema";
-import type { LeagueShape } from "@/projections/decide/replacement";
-import { shippedPreseasonCandidates } from "@/projections/market/blend";
-import { FITTED_MODEL } from "@/projections/model/source";
-import { kickingWeekRowsForSeasons } from "@/projections/nflverse/kicking-weeks";
-import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
-import { preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
-import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
+import { createDb, type ReadonlyDb } from "@research/db/client";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import { nflPlayers } from "@research/db/schema";
+import type { LeagueShape } from "@research/projections/decide/replacement";
+import { shippedPreseasonCandidates } from "@research/projections/market/blend";
+import { FITTED_MODEL } from "@research/projections/model/source";
+import { kickingWeekRowsForSeasons } from "@research/projections/nflverse/kicking-weeks";
+import { BENCHMARK_SOURCES } from "@research/projections/preseason/benchmarks";
+import { preseasonBoard, type BoardEntry } from "@research/projections/preseason/board";
+import { loadShippedGameVariance } from "@research/projections/preseason/game-variance-artifacts";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
-} from "@/projections/preseason/fitted";
-import { seasonPointsInterval, Z75 } from "@/projections/preseason/game-variance";
-import { kdefCandidates } from "@/projections/preseason/kdef-candidates";
-import { FITTED_DEFENSE_PRIORS, FITTED_KICKER_PRIORS } from "@/projections/preseason/kdef-fitted";
-import { kdefHistorySeasonsFor, loadKdefHistory } from "@/projections/preseason/kdef-history";
+} from "@research/projections/preseason/fitted";
+import { seasonPointsInterval, Z75 } from "@research/projections/preseason/game-variance";
+import { kdefCandidates } from "@research/projections/preseason/kdef-candidates";
+import { FITTED_DEFENSE_PRIORS, FITTED_KICKER_PRIORS } from "@research/projections/preseason/kdef-fitted";
+import { kdefHistorySeasonsFor, loadKdefHistory } from "@research/projections/preseason/kdef-history";
 import {
   decisionFor,
   gateCalibration,
@@ -42,12 +42,12 @@ import {
   gateMarket,
   gateOrdering,
   type GateResult,
-} from "@/projections/preseason/kdef-scorecard";
-import { kickerWeeklyPoints } from "@/projections/preseason/kicker";
-import { loadPreseason, type PreseasonPriors } from "@/projections/preseason/source";
-import { preseasonRankingsAsOf, preseasonRostersAsOf } from "@/projections/preseason/store";
-import { defenseWeeklyPoints } from "@/projections/preseason/team-defense";
-import { computeFantasyPoints } from "@/scoring/compute";
+} from "@research/projections/preseason/kdef-scorecard";
+import { kickerWeeklyPoints } from "@research/projections/preseason/kicker";
+import { loadPreseason, type PreseasonPriors } from "@research/projections/preseason/source";
+import { preseasonRankingsAsOf, preseasonRostersAsOf } from "@research/projections/preseason/store";
+import { defenseWeeklyPoints } from "@research/projections/preseason/team-defense";
+import { computeFantasyPoints } from "@research/scoring/compute";
 
 /** The preregistered judgment season. Everything else needs `--dry-run` and is a development check. */
 const JUDGMENT_SEASON = 2025;

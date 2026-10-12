@@ -18,16 +18,16 @@
 // name that failed, so counting raw messages would produce a list as long as the sample.
 // `categoryOf` folds them into the handful of causes an engineer can act on.
 import { writeFileSync } from "node:fs";
-import { createDb, type Db } from "@/db/client";
-import { collectBoardFacts } from "@/capsules/collect";
-import { CAPSULE_CONFIG, CAPSULE_MODEL } from "@/capsules/config";
-import type { PlayerFacts } from "@/capsules/facts";
-import { generateCapsule, type CapsuleFallbackReason, type CapsuleGenerationResult, type ReadAttempt } from "@/capsules/generate";
-import { renderFactsForModel } from "@/capsules/render";
-import { measureSameness, samenessOverThreshold, type SamenessReport, type SamenessRow } from "@/capsules/sameness";
-import { wordCount, type CapsuleSize } from "@/capsules/validate";
-import type { GatewayResponseInfo } from "@/capsules/write";
-import { getStoredCapsulesFor } from "@/capsules/store";
+import { createDb, type Db } from "@research/db/client";
+import { collectBoardFacts } from "@research/capsules/collect";
+import { CAPSULE_CONFIG, CAPSULE_MODEL } from "@research/capsules/config";
+import type { PlayerFacts } from "@research/capsules/facts";
+import { generateCapsule, type CapsuleFallbackReason, type CapsuleGenerationResult, type ReadAttempt } from "@research/capsules/generate";
+import { renderFactsForModel } from "@research/capsules/render";
+import { measureSameness, samenessOverThreshold, type SamenessReport, type SamenessRow } from "@research/capsules/sameness";
+import { wordCount, type CapsuleSize } from "@research/capsules/validate";
+import type { GatewayResponseInfo } from "@research/capsules/write";
+import { getStoredCapsulesFor } from "@research/capsules/store";
 
 const ARGUMENTS = process.argv.slice(2);
 const TEMPLATES_ONLY = ARGUMENTS.includes("--templates-only");

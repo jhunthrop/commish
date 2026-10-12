@@ -8,11 +8,11 @@
 // board, it prints the one `scripts/preseason-persist.ts` already wrote down under `BOARD_SOURCE`
 // (`board-store.ts`'s current value — the blended v4 board). An empty result means no board has been
 // persisted for the season yet, not a silent guess.
-import { createDb } from "@/db/client";
-import { nflPlayers } from "@/db/schema";
-import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
-import { BOARD_SOURCE, assertSingleGeneration, boardReasons, preseasonProjectionsAsOf } from "@/projections/preseason/board-store";
-import { preseasonRankingsAsOf, preseasonRostersAsOf } from "@/projections/preseason/store";
+import { createDb } from "@research/db/client";
+import { nflPlayers } from "@research/db/schema";
+import { BENCHMARK_SOURCES } from "@research/projections/preseason/benchmarks";
+import { BOARD_SOURCE, assertSingleGeneration, boardReasons, preseasonProjectionsAsOf } from "@research/projections/preseason/board-store";
+import { preseasonRankingsAsOf, preseasonRostersAsOf } from "@research/projections/preseason/store";
 
 /** Far past any correction: this script reads the CURRENT state of the store, never a point-in-time
  *  reconstruction — the same `9999-12-31` convention every other read-only report script uses. */

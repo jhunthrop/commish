@@ -19,9 +19,9 @@
 // It reuses that same file's `statLineFor` for realistic per-position magnitudes — the ranges are
 // proven and tested there — but writes only `WEEK_COUNT * PLAYER_CAP` rows, capped well below
 // "few hundred" on purpose: this is a fixture for the player-card season widening, not a season.
-import { getDb } from "@/db/client";
-import { players, playerStatLines, statWeeks } from "@/db/schema";
-import { excludedSetFor } from "@/db/upsert";
+import { getDb } from "@research/db/client";
+import { players, playerStatLines, statWeeks } from "@research/db/schema";
+import { excludedSetFor } from "@research/db/upsert";
 import { assertLocalSeedTarget } from "@/data/seed/guard";
 import { mulberry32 } from "@/lib/random/mulberry32";
 import { statLineFor } from "@/stats/mock/generate-dataset";

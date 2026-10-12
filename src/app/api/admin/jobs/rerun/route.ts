@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { withAdmin } from "@/app/api/admin/_shared";
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { rerunJob } from "@/jobs/rerun";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 

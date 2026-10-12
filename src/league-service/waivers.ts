@@ -1,7 +1,7 @@
 import { and, asc, eq, lte, sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { leagueWaivers, teams, waiverClaims } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research/domain/timing";
 
 const systemClock: Clock = { now: () => new Date().toISOString() };
 import { claimPlayer } from "./claims";

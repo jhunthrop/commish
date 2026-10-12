@@ -8,7 +8,7 @@ import { EMPTY_TEAM, FULL_TEAM } from "@/teams/test-fixtures";
 // synchronous throws carrying a digest, no request context required), so a redirect proven here
 // is the one a browser would follow.
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
-vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/teams/service", () => ({ teamPage: vi.fn() }));
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next/navigation")>();

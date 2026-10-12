@@ -1,15 +1,15 @@
 /**
  * TIER STANDINGS FOR THE POOL ROWS — "Tier 2, 5 of 6 left", from the games-worth tiers our board
- * already draws (`tiersOf`, `@/projections/decide/tiers`). Tiers are drawn over the FULL board at
+ * already draws (`tiersOf`, `@research/projections/decide/tiers`). Tiers are drawn over the FULL board at
  * each position, drafted players included, so a tier's size is a fact about the board and "left"
  * is what the room has not taken from it yet. A position the board ships in market order
  * (`shipsProjectedRows` false: the kicker and team defence decision) has no projected points to
  * draw a tier from, so it gets no entry rather than a number nobody measured.
  */
-import type { Position } from "@/domain/player";
+import type { Position } from "@research/domain/player";
 import { availablePool, draftedPlayerIds, type DraftState } from "@/draft-engine";
-import { tiersOf } from "@/projections/decide/tiers";
-import { shipsProjectedRows } from "@/projections/preseason/kdef-decision";
+import { tiersOf } from "@research/projections/decide/tiers";
+import { shipsProjectedRows } from "@research/projections/preseason/kdef-decision";
 import type { ValuedEntry } from "./recommend";
 import type { TierStandingView } from "./view";
 

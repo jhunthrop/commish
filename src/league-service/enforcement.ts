@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { ReadonlyDb } from "@/db/client";
+import type { ReadonlyDb } from "@research/db/client";
 import { leagues } from "@/db/schema";
 import type { ExperienceTier } from "@/domain/user";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
@@ -23,7 +23,7 @@ import { completedSeasonsFor } from "./participation";
  * being turned away from somebody else's league; the other is being told to change one field of
  * their own), but the RULE that decides who is turned away exists exactly once.
  *
- * Deliberately NOT `Pick<typeof leagues.$inferSelect, ...>` (`@/db/schema`'s row type): a creator
+ * Deliberately NOT `Pick<typeof leagues.$inferSelect, ...>` (`@research/db/schema`'s row type): a creator
  * asks this question about a league that does not have a row yet, before the `INSERT` that would
  * give it one, just as readily as a joiner asks it about a league that already does — so this is
  * the smallest shape either caller can supply, real row or proposed one.

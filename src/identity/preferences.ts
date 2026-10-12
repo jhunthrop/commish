@@ -9,7 +9,7 @@ export type HelpLevel = "guided" | "standard";
 
 /**
  * The two preferences this product actually reads, per user. Nothing else belongs here — see
- * `@/db/schema`'s `userPreferences` docblock for why the notification channel is not a third
+ * `@research/db/schema`'s `userPreferences` docblock for why the notification channel is not a third
  * field.
  */
 export interface PreferenceState {
@@ -19,7 +19,7 @@ export interface PreferenceState {
 }
 
 /**
- * The column default (`guided`, `@/db/schema`) is a floor, not the answer: the row is seeded
+ * The column default (`guided`, `@research/db/schema`) is a floor, not the answer: the row is seeded
  * from what the user told us about themselves at sign-up (`experienceTier`), so guidance is on
  * for the person who needs it without them finding a setting first, and off for the person who
  * would find it patronizing.

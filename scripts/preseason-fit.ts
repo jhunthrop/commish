@@ -11,13 +11,13 @@
 // twenty-four rookie cells is a set of claims a reader should be able to disagree with, and a
 // generated file nobody ever reads is a set of claims nobody ever checked.
 import { writeFileSync } from "node:fs";
-import { createDb } from "@/db/client";
-import { FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
-import { FITTED_MODEL } from "@/projections/model/source";
-import { AGE_BRACKETS, ROLE_BRACKETS, expectedGamesPlayed } from "@/projections/preseason/availability";
-import { AVAILABILITY_DESIGNATIONS } from "@/projections/preseason/availability-status";
-import { fitAvailabilityPriors } from "@/projections/preseason/availability-fit";
-import { loadAvailabilityObservations } from "@/projections/preseason/availability-history";
+import { createDb } from "@research/db/client";
+import { FIT_SEASONS, HELD_OUT_SEASONS } from "@research/projections/model/fitted";
+import { FITTED_MODEL } from "@research/projections/model/source";
+import { AGE_BRACKETS, ROLE_BRACKETS, expectedGamesPlayed } from "@research/projections/preseason/availability";
+import { AVAILABILITY_DESIGNATIONS } from "@research/projections/preseason/availability-status";
+import { fitAvailabilityPriors } from "@research/projections/preseason/availability-fit";
+import { loadAvailabilityObservations } from "@research/projections/preseason/availability-history";
 import {
   fitCareerPriors,
   fitDepthPriors,
@@ -25,18 +25,18 @@ import {
   fitRookiePriors,
   ROOKIE_DURABILITY_HELD_OUT_SEASONS,
   ROOKIE_DURABILITY_TRAIN_SEASONS,
-} from "@/projections/preseason/fit";
-import { DEPTH_RANKS, depthMultiplier } from "@/projections/preseason/depth";
-import { FITTED_DEPTH_PRIORS } from "@/projections/preseason/fitted";
-import { EXPERIENCE_BANDS, careerMultiplier } from "@/projections/preseason/career";
-import { DRAFT_BUCKETS, draftBucketFor } from "@/projections/preseason/rookies";
+} from "@research/projections/preseason/fit";
+import { DEPTH_RANKS, depthMultiplier } from "@research/projections/preseason/depth";
+import { FITTED_DEPTH_PRIORS } from "@research/projections/preseason/fitted";
+import { EXPERIENCE_BANDS, careerMultiplier } from "@research/projections/preseason/career";
+import { DRAFT_BUCKETS, draftBucketFor } from "@research/projections/preseason/rookies";
 import {
   loadCareerObservations,
   loadDepthObservations,
   loadRookieObservations,
-} from "@/projections/preseason/source";
+} from "@research/projections/preseason/source";
 
-const OUTPUT = "src/projections/preseason/fitted.ts";
+const OUTPUT = "research/src/projections/preseason/fitted.ts";
 const POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 
 function requireEnv(name: string): string {

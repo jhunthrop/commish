@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestDb } from "@/db/test-db";
-import type { ResolveAllPropNamesResult } from "@/projections/odds/player-map";
-import type { SnapshotSummary } from "@/projections/odds/snapshot";
+import { createTestDb } from "@research/db/test-db";
+import type { ResolveAllPropNamesResult } from "@research/projections/odds/player-map";
+import type { SnapshotSummary } from "@research/projections/odds/snapshot";
 import {
   parsePropsPreseasonSnapshotPayload,
   runPropsPreseasonSnapshotStep,

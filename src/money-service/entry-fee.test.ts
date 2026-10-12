@@ -1,9 +1,10 @@
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { auditEvents, drafts, leagues, moneyAccounts, moneyTransactions, teams, users } from "@/db/schema";
-import { createTestDb, recordStatements, truncateAll, truncateMoneyTables } from "@/db/test-db";
-import type { Clock } from "@/domain/timing";
+import { createTestDb, recordStatements } from "@research/db/test-db";
+import { truncateAll, truncateMoneyTables } from "@/db/test-db";
+import type { Clock } from "@research/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { joinPublicLeague, LEAGUE_FULL } from "@/league-service/join";
 import { releaseSeat } from "@/league-service/release";

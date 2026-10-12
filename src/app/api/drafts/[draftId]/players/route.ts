@@ -1,13 +1,13 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { ok } from "@/lib/api/respond";
 import { advanceDraftNow } from "@/draft-service";
 import { rankedPlayers } from "@/draft-service/pool";
 import type { DraftPlayersBody } from "@/draft-room/contract";
 import { leagueBoardFormat } from "@/league-service/board-format";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { reasonsByLeaguePlayerId } from "@/projections/preseason/reasons-by-player";
-import { chipEligibleLaws, registry } from "@/projections/laws/registry";
-import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { reasonsByLeaguePlayerId } from "@research/projections/preseason/reasons-by-player";
+import { chipEligibleLaws, registry } from "@research/projections/laws/registry";
+import { byeWeeksByTeam } from "@research/reference/nfl-schedule";
 import { withLeagueMember, type RouteContext } from "../_shared";
 
 export const runtime = "nodejs";

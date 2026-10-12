@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { BOARD_LAST_SEASON, type BoardRow } from "./service";
+import { BOARD_LAST_SEASON, type BoardRow } from "@research/board/service";
 import { boardCsvLines, BoardView } from "./board-view";
 
 const SHAPE = { teamCount: 12, rosterSpots: 15, budget: 200 } as const;

@@ -11,9 +11,9 @@
 //
 // IT IS IDEMPOTENT. `writePeekFacts` counts only rows that actually changed, so a second run at the
 // same moment writes nothing.
-import { collectBoardFacts } from "@/capsules/collect";
+import { collectBoardFacts } from "@research/capsules/collect";
 import { writeRefresh } from "@/league-service/peek/peek-facts";
-import { createDb } from "@/db/client";
+import { createDb } from "@research/db/client";
 
 async function main(): Promise<void> {
   const url = process.env.DATABASE_URL;

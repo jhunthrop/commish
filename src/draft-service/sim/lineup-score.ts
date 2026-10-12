@@ -1,6 +1,6 @@
 /**
  * ONE ROSTER'S SEASON SCORE, under the league's own roster shape and the evidence board's own
- * points (`BOARD_SOURCE`'s `projectedPoints` — see `@/draft-hq/board/service.ts`'s docblock for
+ * points (`BOARD_SOURCE`'s `projectedPoints` — see `@research/board/service`'s docblock for
  * why those points are NOT repriced under a league's scoring FORMAT: that would need the season
  * stat line stored and `computeFantasyPoints` re-run per format, which is undone work, reported
  * deferred rather than faked. This module inherits that same honest limit).
@@ -10,7 +10,7 @@
  * TE-premium league's own counts) is exactly what `RosterSlotConfig` carries.
  *
  * THE ASSIGNMENT IS GREEDY, MOST-RESTRICTIVE-SLOT-FIRST — the identical algorithm
- * `@/projections/decide/replacement.ts`'s `startingDemand` already uses and already documents as
+ * `@research/projections/decide/replacement`'s `startingDemand` already uses and already documents as
  * optimal for this product's NESTED eligibility shapes (a dedicated position slot's eligible set
  * is always a subset of FLEX's, which is always a subset of SUPERFLEX's, which is always a subset
  * of BENCH's): processing slots from the smallest eligible-position set to the largest can never
@@ -19,8 +19,8 @@
  * upper bound rather than the true optimum — `replacement.ts`'s own docblock carries the
  * identical caveat.
  */
-import type { RosterSlotConfig } from "@/domain/roster";
-import { BENCH_SLOT } from "@/domain/roster";
+import type { RosterSlotConfig } from "@research/domain/roster";
+import { BENCH_SLOT } from "@research/domain/roster";
 
 export interface RosteredPlayer {
   readonly playerId: string;

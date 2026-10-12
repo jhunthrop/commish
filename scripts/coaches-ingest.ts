@@ -5,8 +5,8 @@
 //
 // A warm server instance sees the new rows when its coaches memo expires (the board's hourly
 // cadence) or when the next board write clears the board memo group, whichever comes first.
-import { createDb } from "@/db/client";
-import { envOrUndefined } from "@/lib/env";
+import { createDb } from "@research/db/client";
+import { envOrUndefined } from "@research/lib/env";
 import { ingestPlayCallersCsv, PLAY_CALLERS_CSV_PATH } from "./lib/play-callers-csv";
 
 function requireDatabaseUrl(): string {

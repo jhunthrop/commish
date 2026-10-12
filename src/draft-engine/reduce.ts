@@ -1,4 +1,4 @@
-import type { DraftAction, StartDraftAction } from "@/domain/draft";
+import type { DraftAction, StartDraftAction } from "@research/domain/draft";
 import { auctionOf, totalRosterSlots, type DraftReduceResult, type DraftState } from "./state";
 import { reduceMakePick, reduceSnakeExpiry } from "./snake";
 import { reduceAuctionExpiry, reduceBid, reduceNominate } from "./auction";

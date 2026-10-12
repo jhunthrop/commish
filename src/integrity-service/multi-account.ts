@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { draftActions, drafts, teams } from "@/db/schema";
-import type { DraftAction } from "@/domain/draft";
-import type { Clock } from "@/domain/timing";
+import type { DraftAction } from "@research/domain/draft";
+import type { Clock } from "@research/domain/timing";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import {
   behavioralSimilarity,

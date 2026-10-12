@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { leagues, teams, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import type { Db } from "@/db/client";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import type { Db } from "@research/db/client";
 import type { AuditEventInput } from "@/domain/audit";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import type { RealtimeEventType } from "@/lib/realtime/events";

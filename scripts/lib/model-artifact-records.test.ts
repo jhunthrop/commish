@@ -2,12 +2,13 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { MODEL_ARTIFACT_CATALOG } from "@/projections/model/artifact-catalog";
-import { draftVersionOf, loadModelArtifact, readModelArtifact } from "@/projections/model/artifacts";
-import { PROPS_ANCHOR_WEIGHT_ARTIFACT } from "@/projections/market/props-anchor-artifact";
-import { VARIANCE_POSITIONS } from "@/projections/preseason/game-variance";
-import { GAME_VARIANCE_SKILL_ARTIFACT, loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { MODEL_ARTIFACT_CATALOG } from "@research/projections/model/artifact-catalog";
+import { draftVersionOf, loadModelArtifact, readModelArtifact } from "@research/projections/model/artifacts";
+import { PROPS_ANCHOR_WEIGHT_ARTIFACT } from "@research/projections/market/props-anchor-artifact";
+import { VARIANCE_POSITIONS } from "@research/projections/preseason/game-variance";
+import { GAME_VARIANCE_SKILL_ARTIFACT, loadShippedGameVariance } from "@research/projections/preseason/game-variance-artifacts";
 import {
   listModelArtifactRecordFiles,
   MODEL_ARTIFACT_RECORDS_DIR,

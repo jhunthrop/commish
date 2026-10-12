@@ -16,38 +16,38 @@
 // compute; the pre-fix BLEND formula (full substitution, `rookieCurve(pick)` divided by that
 // candidate's own `games.expected`) is then applied literally, matching `market/blend.ts`'s own
 // pre-fix `pointsOnlyPerGame` call exactly.
-import { createDb, type ReadonlyDb } from "@/db/client";
-import type { Position } from "@/domain/player";
-import { PPR_SCORING } from "@/domain/scoring";
-import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import { computeFantasyPoints } from "@/scoring/compute";
-import type { LeagueShape } from "@/projections/decide/replacement";
-import { meanAbsoluteError, scoreCard, spearman, type Observation } from "@/projections/metrics";
-import { shrinkTowardMarket } from "@/projections/market/thin-evidence-shrink";
-import { historicalRookieExpectedGames, rookieCurve, rookieCurveEvidenceN } from "@/projections/preseason/rookie-curve";
-import { preseasonBoard, type BoardCandidate, type BoardEntry } from "@/projections/preseason/board";
+import { createDb, type ReadonlyDb } from "@research/db/client";
+import type { Position } from "@research/domain/player";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research/domain/roster";
+import { computeFantasyPoints } from "@research/scoring/compute";
+import type { LeagueShape } from "@research/projections/decide/replacement";
+import { meanAbsoluteError, scoreCard, spearman, type Observation } from "@research/projections/metrics";
+import { shrinkTowardMarket } from "@research/projections/market/thin-evidence-shrink";
+import { historicalRookieExpectedGames, rookieCurve, rookieCurveEvidenceN } from "@research/projections/preseason/rookie-curve";
+import { preseasonBoard, type BoardCandidate, type BoardEntry } from "@research/projections/preseason/board";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
-} from "@/projections/preseason/fitted";
-import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
-import type { GameVariancePriors } from "@/projections/preseason/game-variance";
-import { FITTED_MODEL } from "@/projections/model/source";
-import { marketBoard } from "@/projections/market/curve";
-import { shippedPreseasonCandidates } from "@/projections/market/blend";
-import { gradableInputs } from "@/projections/preseason/scorecard";
+} from "@research/projections/preseason/fitted";
+import { loadShippedGameVariance } from "@research/projections/preseason/game-variance-artifacts";
+import type { GameVariancePriors } from "@research/projections/preseason/game-variance";
+import { FITTED_MODEL } from "@research/projections/model/source";
+import { marketBoard } from "@research/projections/market/curve";
+import { shippedPreseasonCandidates } from "@research/projections/market/blend";
+import { gradableInputs } from "@research/projections/preseason/scorecard";
 import {
   loadPreseason,
   preseasonCandidates,
   rookieSegmentFor,
   SHIPPED_PRESEASON_FEATURES,
   type PreseasonPriors,
-} from "@/projections/preseason/source";
-import { allPositions } from "@/projections/backtest";
-import { statLinesAsOfForMeasurement } from "@/projections/nflverse/derived-stat-lines";
-import { LAST_POSSIBLE_WEEK } from "@/projections/store";
+} from "@research/projections/preseason/source";
+import { allPositions } from "@research/projections/backtest";
+import { statLinesAsOfForMeasurement } from "@research/projections/nflverse/derived-stat-lines";
+import { LAST_POSSIBLE_WEEK } from "@research/projections/store";
 
 const SCORE_SEASON = 2025;
 const REPORT_PATH = "docs/research/2026-09-04-rookie-calibration-backtest.md";

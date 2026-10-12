@@ -1,4 +1,4 @@
-import type { Db } from "./client";
+import type { Db } from "@research/db/client";
 
 /** The subset of a Postgres `EXPLAIN (FORMAT JSON)` node this repo asserts on. */
 export interface PlanNode {

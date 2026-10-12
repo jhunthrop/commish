@@ -1,10 +1,10 @@
-import type { Db } from "@/db/client";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { BOARD_MEMO_GROUP, createTtlMemo } from "@/lib/cache/ttl-memo";
-import type { LeagueShape } from "@/projections/decide/replacement";
-import { DEFAULT_BOARD_FORMAT, type BoardFormat } from "@/projections/preseason/board-formats";
-import { BOARD_REASONS_MEMO_TTL_MS } from "@/projections/preseason/reasons-by-player";
-import { boardRows, type BoardRow } from "./service";
+import type { Db } from "@research/db/client";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import { BOARD_MEMO_GROUP, createTtlMemo } from "@research/lib/cache/ttl-memo";
+import type { LeagueShape } from "@research/projections/decide/replacement";
+import { DEFAULT_BOARD_FORMAT, type BoardFormat } from "@research/projections/preseason/board-formats";
+import { BOARD_REASONS_MEMO_TTL_MS } from "@research/projections/preseason/reasons-by-player";
+import { boardRows, type BoardRow } from "@research/board/service";
 
 /**
  * THE GENERIC BOARD, READ ONCE PER INSTANCE (site search round, 2026-09-08): the 12-team standard

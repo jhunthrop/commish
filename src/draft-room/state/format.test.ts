@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
 /**
  * Test-only cross-check that `rosterSpots` agrees with the engine's own `totalRosterSlots`;
  * this file never ships to the browser bundle, so the "no server-only values in draft-room

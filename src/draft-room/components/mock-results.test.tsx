@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { renderSurface } from "@/components/ui/test-utils";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";

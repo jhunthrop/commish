@@ -1,5 +1,5 @@
 import { and, eq, isNotNull } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { matchups } from "@/db/schema";
 import { headToHeadKey, LEAGUE_CONFIG, type HeadToHeadRecord } from "@/league";
 import type { HeadToHeadCache } from "./head-to-head-cache";

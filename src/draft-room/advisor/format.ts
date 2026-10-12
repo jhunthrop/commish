@@ -5,7 +5,7 @@
  * row prints carries the runs in its tooltip. No em-dash, no semicolon, second person, plain.
  */
 import { pickLabel } from "@/domain/pick-label";
-import { positionWord } from "@/domain/position-words";
+import { positionWord } from "@research/domain/position-words";
 import type { AdvisorView, OddsCell, PositionRun, TierCollapse } from "@/draft-service/assistant/view";
 
 export { pickLabel };

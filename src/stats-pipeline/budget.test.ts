@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterAll } from "vitest";
 import Redis from "ioredis";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research/domain/timing";
 import { createRequestBudget, reserveBackfillOrThrow } from "./budget";
 import { STATS_INGESTION_CONFIG } from "./config";
 

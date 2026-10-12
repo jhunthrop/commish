@@ -1,4 +1,4 @@
-import { DRAFT_ACTION_VERSION } from "../src/domain/draft";
+import { DRAFT_ACTION_VERSION } from "@research/domain/draft";
 import type { DraftState } from "../src/draft-engine";
 import { MOCK_CONFIG, MOCK_COPY } from "../src/mock-draft/config";
 import { expect, test } from "./support/fixtures";

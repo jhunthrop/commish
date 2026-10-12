@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { and, asc, eq, sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions, draftSlotPreferences, drafts, players } from "@/db/schema";
+import type { Db } from "@research/db/client";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players } from "@research/db/schema";
+import { draftActions, draftSlotPreferences, drafts } from "@/db/schema";
 import { draftOrderFor, drawSequenceFor } from "./order";
 import { createDraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";

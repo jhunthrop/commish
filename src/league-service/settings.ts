@@ -3,12 +3,12 @@
 // A future toggle joins this module rather than growing a second settings file, the same
 // "one write module per concern" shape `draft-schedule.ts` and `invites.ts` each hold.
 import { and, eq } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
-import type { Clock } from "@/domain/timing";
+import type { Db, DbTx } from "@research/db/client";
+import type { Clock } from "@research/domain/timing";
 import { enqueuePeekDocumentRebuildsQuietly } from "@/jobs/defs/peek-document-job";
 import { leagues, scoringSettings, teams } from "@/db/schema";
-import { excludedSetFor } from "@/db/upsert";
-import type { ScoringRules } from "@/scoring";
+import { excludedSetFor } from "@research/db/upsert";
+import type { ScoringRules } from "@research/scoring";
 import { writeLeagueScoringHash } from "./scoring-hash";
 
 export interface SetDraftGradesVisibleInput {

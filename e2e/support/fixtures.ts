@@ -1,9 +1,9 @@
 import { test as base, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
-import { type Db } from "../../src/db/client";
-import { drafts, leagues, scoringSettings, teams, users } from "../../src/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "../../src/domain/roster";
-import { STANDARD_SCORING } from "../../src/domain/scoring";
+import { type Db } from "@research/db/client";
+import { drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import { STANDARD_SCORING } from "@research/domain/scoring";
 import { DEV_SEED } from "../../src/data/seed/config";
 import { joinPublicLeague } from "../../src/league-service/join";
 import { MANAGER_A_EMAIL, MANAGER_A_STATE, MANAGER_B_STATE, MANAGER_D_STATE, MANAGER_SIGNOUT_STATE, MANAGER_ZERO_STATE } from "../global-setup";

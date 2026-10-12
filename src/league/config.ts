@@ -1,7 +1,7 @@
 import type { DraftFormat } from "@/domain/league";
-import { STANDARD_ROSTER_SLOTS, type RosterShapeName } from "@/domain/roster";
-import type { ScoringPresetName } from "@/domain/scoring";
-import { SEASON_CONFIG } from "@/domain/season";
+import { STANDARD_ROSTER_SLOTS, type RosterShapeName } from "@research/domain/roster";
+import type { ScoringPresetName } from "@research/domain/scoring";
+import { SEASON_CONFIG } from "@research/domain/season";
 
 /** Every tunable the season has. No service, route or component may inline one of these. */
 export const LEAGUE_CONFIG = {
@@ -76,7 +76,7 @@ export const LEAGUE_CONFIG = {
   /**
    * Phase 3.6, Task 4: THE ONE PLACE "this season" means a specific instant. Every league on
    * this platform today belongs to the single season that started on this date — there is no
-   * season-rollover mechanic yet (`leagues.season_completed_at`'s own docblock in `@/db/schema`:
+   * season-rollover mechanic yet (`leagues.season_completed_at`'s own docblock in `@research/db/schema`:
    * no league here has finished one), so this is a fixed boundary, not a computed one. `proofStats`
    * (`@/league-service/proof`) reads it to decide whether "N leagues filled this season" counts a
    * given league; nothing else may re-derive "this season" from `now()`, a league's own age, or

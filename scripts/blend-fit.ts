@@ -91,9 +91,9 @@
 // own top 100 and the count of unlisted players still priced above their positional tail, never the
 // single "best unlisted rank" number that hid the QB regression from fix round 1's own diagnostic.
 import { readFileSync, writeFileSync } from "node:fs";
-import { createDb } from "@/db/client";
-import { PPR_SCORING } from "@/domain/scoring";
-import type { Position } from "@/domain/player";
+import { createDb } from "@research/db/client";
+import { PPR_SCORING } from "@research/domain/scoring";
+import type { Position } from "@research/domain/player";
 import {
   BLEND_TRAIN_CUTOFF_SEASON,
   detectPlateau,
@@ -102,32 +102,32 @@ import {
   type BlendConstants,
   type BlendTrainRow,
   type ScoredCell,
-} from "@/projections/market/blend";
+} from "@research/projections/market/blend";
 import {
   fitImpliedGamesByPosition,
   loadMarketCurveObservations,
   marketBoard,
   type ImpliedGamesByPosition,
-} from "@/projections/market/curve";
-import { propsAnchorForSeason } from "@/projections/market/props-anchor";
-import { withAvailabilityRecency } from "@/projections/preseason/availability";
-import { registry } from "@/projections/laws/registry";
-import { statLinesAsOfForMeasurement } from "@/projections/nflverse/derived-stat-lines";
-import { BENCHMARK_BOARD_FLOOR } from "@/projections/preseason/benchmarks";
-import { LAST_POSSIBLE_WEEK } from "@/projections/store";
-import { computeFantasyPoints } from "@/scoring/compute";
+} from "@research/projections/market/curve";
+import { propsAnchorForSeason } from "@research/projections/market/props-anchor";
+import { withAvailabilityRecency } from "@research/projections/preseason/availability";
+import { registry } from "@research/projections/laws/registry";
+import { statLinesAsOfForMeasurement } from "@research/projections/nflverse/derived-stat-lines";
+import { BENCHMARK_BOARD_FLOOR } from "@research/projections/preseason/benchmarks";
+import { LAST_POSSIBLE_WEEK } from "@research/projections/store";
+import { computeFantasyPoints } from "@research/scoring/compute";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
-} from "@/projections/preseason/fitted";
-import { FITTED_MODEL } from "@/projections/model/source";
-import { loadPreseason, preseasonCandidates, SHIPPED_PRESEASON_FEATURES, type PreseasonPriors } from "@/projections/preseason/source";
-import { gradableInputs } from "@/projections/preseason/scorecard";
-import type { ReadonlyDb } from "@/db/client";
+} from "@research/projections/preseason/fitted";
+import { FITTED_MODEL } from "@research/projections/model/source";
+import { loadPreseason, preseasonCandidates, SHIPPED_PRESEASON_FEATURES, type PreseasonPriors } from "@research/projections/preseason/source";
+import { gradableInputs } from "@research/projections/preseason/scorecard";
+import type { ReadonlyDb } from "@research/db/client";
 
-const OUTPUT = "src/projections/market/blend-fitted.ts";
+const OUTPUT = "research/src/projections/market/blend-fitted.ts";
 
 /**
  * THE CORRECTIONS-ONLY RESTRICTION (fit-round Task 4, founder ruling of 2026-09-02, after the v8

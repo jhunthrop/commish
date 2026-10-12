@@ -12,10 +12,10 @@
 // `graded_at` beside the first, never an overwrite, so a re-run after a stat correction shows both
 // what was scored before the correction and after it. The running scoreboard reads only the LATEST
 // grading of each week, so a re-run does not double-count.
-import { createDb } from "@/db/client";
-import type { Clock } from "@/domain/timing";
-import { requireEnv } from "@/projections/odds/http";
-import { formatScoreboard, gradableWeeksFor, gradeWeek, runningScoreboard } from "@/projections/register/grade";
+import { createDb } from "@research/db/client";
+import type { Clock } from "@research/domain/timing";
+import { requireEnv } from "@research/projections/odds/http";
+import { formatScoreboard, gradableWeeksFor, gradeWeek, runningScoreboard } from "@research/projections/register/grade";
 
 const systemClock: Clock = { now: () => new Date().toISOString() };
 

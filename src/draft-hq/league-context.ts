@@ -1,8 +1,8 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
 import type { DraftFormat } from "@/domain/league";
-import type { RosterSlotConfig } from "@/domain/roster";
+import type { RosterSlotConfig } from "@research/domain/roster";
 
 /**
  * THE DRAFT AREA'S ONE READ OF "WHICH LEAGUE IS THIS ABOUT" — shared by the Board, Your sheet and

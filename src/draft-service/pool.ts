@@ -1,15 +1,16 @@
 import { eq } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
-import { players, scoringSettings } from "@/db/schema";
-import type { DraftPoolEntry } from "@/domain/draft";
-import type { Player } from "@/domain/player";
-import { PPR_SCORING } from "@/domain/scoring";
+import type { Db, DbTx } from "@research/db/client";
+import { players } from "@research/db/schema";
+import { scoringSettings } from "@/db/schema";
+import type { DraftPoolEntry } from "@research/domain/draft";
+import type { Player } from "@research/domain/player";
+import { PPR_SCORING } from "@research/domain/scoring";
 import { LEAGUE_CONFIG } from "@/league";
 import { leagueBoardFormat } from "@/league-service/board-format";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { reasonsByLeaguePlayerId } from "@/projections/preseason/reasons-by-player";
-import { rosterStatusNoteOf } from "@/projections/preseason/roster-status";
-import { computeFantasyPoints } from "@/scoring";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { reasonsByLeaguePlayerId } from "@research/projections/preseason/reasons-by-player";
+import { rosterStatusNoteOf } from "@research/projections/preseason/roster-status";
+import { computeFantasyPoints } from "@research/scoring";
 import { seasonStatTotalsByPlayer } from "./season-totals";
 
 /**

@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, players, playerStatLines, rosterSlots, teams, users, weeks } from "@/db/schema";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players, playerStatLines } from "@research/db/schema";
+import { drafts, rosterSlots, teams, users, weeks } from "@/db/schema";
 import { listTeamCards } from "@/draft-service/teams";
 import { finalizeWeek } from "@/stats-pipeline/finalize";
 import { createLeague } from "./creation";

@@ -53,8 +53,8 @@
  *   top on points while grading poorly on value, or the reverse; `engine.test.ts` pins a fixture
  *   where this is true, so the two facts can never be mistaken for restatements of one another.
  */
-import type { Position } from "@/domain/player";
-import type { RosterSlotConfig } from "@/domain/roster";
+import type { Position } from "@research/domain/player";
+import type { RosterSlotConfig } from "@research/domain/roster";
 import { assignStartingLineup, type RosteredPlayer } from "@/draft-service/sim/lineup-score";
 
 /** The minimal facts this module needs from a completed pick — see `CompletedPick`
@@ -77,7 +77,7 @@ export interface GradeDraftInput {
   /** One entry per team in the room; the team's own final roster (matches
    *  `RunOneDraftResult.rosters`'s per-team shape, `@/draft-service/sim/run.ts`). */
   readonly rosters: ReadonlyMap<string, readonly { readonly playerId: string; readonly position: Position }[]>;
-  /** The league's own roster shape — which slots exist and how many, `@/domain/roster`. */
+  /** The league's own roster shape — which slots exist and how many, `@research/domain/roster`. */
   readonly slotConfig: readonly RosterSlotConfig[];
   /** Evidence-board projected points. A player absent contributes 0, never invented. */
   readonly pointsByPlayerId: ReadonlyMap<string, number>;

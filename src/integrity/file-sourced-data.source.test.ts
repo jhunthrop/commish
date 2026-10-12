@@ -41,14 +41,14 @@ const ALLOWLIST: readonly Exception[] = [
     reason: "recorded-fixture loader; imported by tests and scripts/record-tank01-fixtures.ts, never by the request path",
   },
   { file: "src/gifs/giphy/fixtures.ts", rule: "node-fs", reason: "recorded-fixture loader; imported by tests only" },
-  { file: "src/projections/nflverse/fixtures.ts", rule: "node-fs", reason: "recorded-fixture loader; imported by tests only" },
+  { file: "research/src/projections/nflverse/fixtures.ts", rule: "node-fs", reason: "recorded-fixture loader; imported by tests only" },
   {
     file: "src/stats/mock/mock-stats-provider.ts",
     rule: "static-data-import",
     reason: "the e2e mock dataset, selected only under STATS_PROVIDER=mock; inventory 2026-09-09 lists it for a lazy import behind the provider switch",
   },
   {
-    file: "src/projections/laws/registry.ts",
+    file: "research/src/projections/laws/registry.ts",
     rule: "static-data-import",
     reason: "measured.json and discovered.json, the laws artifact family; blocked this round by blend.ts's registry() default (inventory M13-M15), next round moves it to model_artifacts",
   },

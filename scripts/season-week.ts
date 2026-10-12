@@ -15,10 +15,10 @@
 // fake network. This script's only jobs are: wire real dependencies, parse argv, print the
 // report, and set the exit code. The durable job system (`src/jobs/defs/season-week-job.ts`) runs
 // the same steps on the same deps; this CLI stays for operator-initiated runs.
-import { createDb } from "@/db/client";
-import { requireEnv } from "@/projections/odds/http";
-import { realIngestStats, realSnapshotProps } from "@/projections/season-week/deps";
-import { defaultSeason, runSeasonWeek, type SeasonWeekDeps, type SeasonWeekOptions, type StepResult } from "@/projections/season-week/steps";
+import { createDb } from "@research/db/client";
+import { requireEnv } from "@research/projections/odds/http";
+import { realIngestStats, realSnapshotProps } from "@research/projections/season-week/deps";
+import { defaultSeason, runSeasonWeek, type SeasonWeekDeps, type SeasonWeekOptions, type StepResult } from "@research/projections/season-week/steps";
 
 // THE STATS-INGEST CHOICE and both real network deps live in `src/projections/season-week/deps.ts` —
 // one implementation, two entry points (this CLI and the durable job).

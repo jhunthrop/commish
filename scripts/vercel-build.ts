@@ -1,10 +1,10 @@
 // THE VERCEL BUILD (`npm run build:vercel`, named in vercel.json): migrate, then build — but
 // migrate ONLY on a Production deployment (Neon cost audit 2026-09-07, finding 5). A preview
 // build used to apply its branch's migrations to whatever database its `DATABASE_URL` named,
-// which was production. The rule itself is `shouldMigrateOnBuild` (`@/db/deployment`), pure and
+// which was production. The rule itself is `shouldMigrateOnBuild` (`@research/db/deployment`), pure and
 // tested; this file is the wire that runs the two commands with the build's own stdio.
 import { spawnSync } from "node:child_process";
-import { shouldMigrateOnBuild } from "@/db/deployment";
+import { shouldMigrateOnBuild } from "@research/db/deployment";
 
 function run(command: string, args: readonly string[]): void {
   const result = spawnSync(command, args, { stdio: "inherit", shell: process.platform === "win32" });

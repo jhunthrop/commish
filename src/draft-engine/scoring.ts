@@ -7,9 +7,9 @@
  * read, so the autopick's constants (`AUTOPICK_CONFIG`, `./config`) and the bots' constants
  * (`MOCK_CONFIG.strategy`) can never contaminate each other.
  */
-import type { Position } from "@/domain/player";
-import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig } from "@/domain/roster";
-import { LATE_ROUND_ONLY_POSITIONS } from "./roster-need";
+import type { Position } from "@research/domain/player";
+import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig } from "@research/domain/roster";
+import { LATE_ROUND_ONLY_POSITIONS } from "@research/draft-engine/roster-need";
 
 /** `exp(-index / temperature)`: rank 0 weighs 1, each step down the board decays smoothly. */
 export function rankWeight(index: number, temperature: number): number {

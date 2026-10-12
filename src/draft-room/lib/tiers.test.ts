@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
-import type { Position } from "@/domain/player";
+import type { Position } from "@research/domain/player";
 import { formatAdp, poolTiers, positionRanks } from "./tiers";
 
 const TEAMS = 12;

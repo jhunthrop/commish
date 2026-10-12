@@ -1,4 +1,4 @@
-import type { Position } from "@/domain/player";
+import type { Position } from "@research/domain/player";
 import type { CompletedPick } from "@/draft-engine";
 import type { Verdict } from "../lib/verdict";
 import { DRAFT_ROOM_CONFIG } from "./config";
@@ -139,7 +139,7 @@ export function positionShape(
  * named only when at least `DRAFT_ROOM_CONFIG.debrief.byeStackMin` rostered players share it —
  * two teammates sharing a bye is every roster ever, and calling it stacking would be invented
  * psychology. `byeWeeks` is the REAL schedule read (`byeWeeksByTeam`,
- * `@/league-service/nfl-schedule`), carried to the room on `DraftPlayersBody.byeWeeks`; a
+ * `@research/reference/nfl-schedule`), carried to the room on `DraftPlayersBody.byeWeeks`; a
  * player whose team the schedule has no bye for contributes nothing.
  */
 export function byeStackWeek(

@@ -7,11 +7,11 @@
 // `--all` first stamps EVERY stored capsule stale (`queueCapsuleRegeneration`), for the night a
 // prompt or voice change lands without moving the facts hash: the sweep's own eligibility rule
 // would otherwise skip every written row whose facts are unchanged.
-import { CAPSULE_CONFIG } from "@/capsules/config";
-import { queueCapsuleRegeneration } from "@/capsules/store";
-import { createDb, type Db } from "@/db/client";
-import { playerCapsules } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import { CAPSULE_CONFIG } from "@research/capsules/config";
+import { queueCapsuleRegeneration } from "@research/capsules/store";
+import { createDb, type Db } from "@research/db/client";
+import { playerCapsules } from "@research/db/schema";
+import type { Clock } from "@research/domain/timing";
 import { runCapsuleSweepStep } from "@/jobs/defs/capsule-sweep-job";
 
 const DEFAULT_BUDGET = 2_000;

@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import type { NextResponse } from "next/server";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { leagues, teams } from "@/db/schema";
 import { fail } from "@/lib/api/respond";
 import { leagueAuthority, type LeagueAuthority } from "@/league-service/authority";

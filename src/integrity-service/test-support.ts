@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 
 /**
  * Runs `work` with one table's user triggers turned off, and turns them back on whatever happens.

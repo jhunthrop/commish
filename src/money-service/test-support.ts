@@ -1,6 +1,6 @@
 import { asc } from "drizzle-orm";
 import { expect } from "vitest";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { moneyAccounts, moneyEntries, moneyTransactions, paymentTransferIntents } from "@/db/schema";
 import { accountIdFor } from "@/money/accounts";
 import { postMoneyTransaction, type MoneyTransactionInput, type PostDeps, type PostMoneyOutcome } from "./post";

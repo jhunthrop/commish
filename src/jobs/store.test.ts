@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { jobRuns, jobs } from "@/db/schema";
-import { createTestDb, truncateAll, truncateJobTables } from "@/db/test-db";
-import type { Clock } from "@/domain/timing";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll, truncateJobTables } from "@/db/test-db";
+import type { Clock } from "@research/domain/timing";
 import { JOBS_CONFIG } from "./config";
 import {
   claimNextJob,

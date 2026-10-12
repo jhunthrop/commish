@@ -1,5 +1,5 @@
 import type { Matchup } from "@/domain/schedule";
-import { roundPoints } from "@/scoring";
+import { roundPoints } from "@research/scoring";
 import { medianResultFor } from "./median";
 
 export interface StandingsRow {

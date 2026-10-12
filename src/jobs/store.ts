@@ -2,11 +2,11 @@
 // checkpoints. Schedule cursors live with the scheduler (`schedule.ts`), admin reads with the
 // admin surface (`admin-view.ts`) — this file is the one place a `jobs` row's status ever moves.
 import { and, asc, eq, lt, lte } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
-import { unwrapCauseChain } from "@/db/errors";
+import type { Db, DbTx } from "@research/db/client";
+import { unwrapCauseChain } from "@research/db/errors";
 import { jobRunSteps, jobRuns, jobs } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research/domain/timing";
 import { JOBS_CONFIG } from "./config";
 import { WAKE_MEMBERS, wakeMember, wakeSet, type WakeSet } from "./wake";
 

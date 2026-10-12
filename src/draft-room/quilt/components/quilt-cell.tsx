@@ -1,8 +1,8 @@
 "use client";
 
 import { memo } from "react";
-import type { Player } from "@/domain/player";
-import type { Position } from "@/domain/player";
+import type { Player } from "@research/domain/player";
+import type { Position } from "@research/domain/player";
 import { CountdownLabel } from "@/components/ui";
 import { PlayerFace } from "@/components/ui/player-face";
 import { MOTION } from "@/design/motion";

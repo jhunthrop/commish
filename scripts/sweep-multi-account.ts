@@ -11,7 +11,7 @@
 // FLAGS ONLY, same as the detector it calls: this script raises `PENDING_REVIEW` flags into the
 // operator queue and does nothing else — see `src/integrity/flag-only.test.ts` for the proof
 // that no code path reachable from here can suspend, ban or restrict an account.
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { defaultSweepDeps, sweepLeagueForMultiAccounts } from "@/integrity-service/multi-account";
 
 const USAGE = "Usage: npm run integrity:sweep -- --league <leagueId>";

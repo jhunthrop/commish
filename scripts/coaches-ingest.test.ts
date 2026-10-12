@@ -2,9 +2,10 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { readCoachRows } from "@/coaches/store";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { FACT_SEASONS } from "@/projections/nflverse/team-eras";
+import { readCoachRows } from "@research/coaches/store";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { FACT_SEASONS } from "@research/projections/nflverse/team-eras";
 import { ingestPlayCallersCsv, PLAY_CALLERS_CSV_PATH } from "./lib/play-callers-csv";
 
 /**

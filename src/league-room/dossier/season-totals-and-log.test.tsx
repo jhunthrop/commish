@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { PlayerSeasonBody } from "@/league-service/player";
 import { SeasonTotalsAndLog } from "./season-totals-and-log";
 

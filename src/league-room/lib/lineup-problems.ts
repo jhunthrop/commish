@@ -13,9 +13,9 @@
  * designations already riding on the lineup rows. No rest-of-season numbers, no win
  * probability: nothing invents what the backend did not compute.
  */
-import type { Position } from "@/domain/player";
-import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
-import type { FixtureLabel } from "@/league-service/nfl-schedule";
+import type { Position } from "@research/domain/player";
+import type { RosterSlot, RosterSlotConfig } from "@research/domain/roster";
+import type { FixtureLabel } from "@research/reference/nfl-schedule";
 import type { WeekStatus } from "@/league/week-status";
 import type { LineupBody, LineupSlotView } from "../contract";
 

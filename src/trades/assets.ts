@@ -1,4 +1,4 @@
-import type { Position } from "@/domain/player";
+import type { Position } from "@research/domain/player";
 import type { ValuedPlayer } from "./fairness";
 
 /**

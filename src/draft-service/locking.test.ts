@@ -1,10 +1,12 @@
 import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createDb } from "@/db/client";
-import { DB_POOL_CONFIG } from "@/db/config";
-import { TEST_DATABASE_URL, createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions, players } from "@/db/schema";
-import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
+import { createDb } from "@research/db/client";
+import { DB_POOL_CONFIG } from "@research/db/config";
+import { TEST_DATABASE_URL, createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players } from "@research/db/schema";
+import { draftActions } from "@/db/schema";
+import { DRAFT_ACTION_VERSION, type DraftAction } from "@research/domain/draft";
 import { availablePool, bestAvailableFor, teamOnClock, type DraftState } from "@/draft-engine";
 import { createDraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";

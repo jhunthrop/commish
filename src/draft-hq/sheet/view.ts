@@ -1,9 +1,9 @@
 import { inArray } from "drizzle-orm";
-import type { Db } from "@/db/client";
-import { players as playersTable } from "@/db/schema";
-import type { Position } from "@/domain/player";
-import { boardRows, isProjectedRow, type BoardOptions, type BoardRow } from "@/draft-hq/board/service";
-import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
+import type { Db } from "@research/db/client";
+import { players as playersTable } from "@research/db/schema";
+import type { Position } from "@research/domain/player";
+import { boardRows, isProjectedRow, type BoardOptions, type BoardRow } from "@research/board/service";
+import { byeWeeksByTeam } from "@research/reference/nfl-schedule";
 import type { SheetEntry, SheetWithEntries } from "./types";
 
 /**

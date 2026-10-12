@@ -6,7 +6,7 @@
  * and its log is folded by whatever code is deployed. Generated once by a scratchpad script;
  * never regenerated to make a test pass.
  */
-import type { DraftPoolEntry } from "@/domain/draft";
+import type { DraftPoolEntry } from "@research/domain/draft";
 
 export const PIN_SEED = 20260912;
 export const PIN_TEAMS: readonly string[] = ["t01","t02","t03","t04","t05","t06","t07","t08","t09","t10","t11","t12"];

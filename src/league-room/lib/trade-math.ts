@@ -7,7 +7,7 @@
  * against the real NFL schedule. No rest-of-season splits are invented: nothing in the
  * platform computes one, so nothing here renders one.
  */
-import type { Position } from "@/domain/player";
+import type { Position } from "@research/domain/player";
 import type { TradeProposalView } from "@/trades/contract";
 import { assetPlayerIds } from "@/trades/assets";
 import type { TradeRosterPlayer } from "../contract";

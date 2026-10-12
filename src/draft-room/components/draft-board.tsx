@@ -1,10 +1,10 @@
 "use client";
 
 import type { TeamCard } from "@/domain/league";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
-import type { Law } from "@/projections/laws/types";
-import type { BoardReason } from "@/projections/preseason/board";
+import type { Law } from "@research/projections/laws/types";
+import type { BoardReason } from "@research/projections/preseason/board";
 import { Avatar, Badge, EYEBROW, ReasonChip, Sticker, strongestLawReasons } from "@/components/ui";
 import { useEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";

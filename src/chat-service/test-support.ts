@@ -1,4 +1,4 @@
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { leagues, teams, users } from "@/db/schema";
 
 /**

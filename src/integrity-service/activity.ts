@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
-import type { Db } from "@/db/client";
-import { auditEvents, players, teams, users } from "@/db/schema";
+import type { Db } from "@research/db/client";
+import { players } from "@research/db/schema";
+import { auditEvents, teams, users } from "@/db/schema";
 import type { AuditEvent, JsonObject } from "@/domain/audit";
 import { activityKindFor, activityRowFor, type ActivityKind, type ActivityNames, type ActivityRow } from "@/integrity/activity-view";
 import { INTEGRITY_CONFIG } from "@/integrity/config";

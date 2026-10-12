@@ -1,11 +1,11 @@
-import type { DraftStatus } from "@/domain/draft";
+import type { DraftStatus } from "@research/domain/draft";
 import type { DraftFormat, TeamCard } from "@/domain/league";
-import type { Position } from "@/domain/player";
-import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
+import type { Position } from "@research/domain/player";
+import type { RosterSlotConfig, RosterSlotType } from "@research/domain/roster";
 import type { TradeFlag, TradeVerdict } from "@/trades/fairness";
 import type { TradesPageBody } from "@/trades/contract";
 import type { HelpLevel } from "@/identity/preferences";
-import type { FixtureLabel } from "@/league-service/nfl-schedule";
+import type { FixtureLabel } from "@research/reference/nfl-schedule";
 import type { PendingWaiverClaim } from "@/league-service/claims-contract";
 import type { ActivityActor, ActivityFeedRow } from "@/integrity-service/activity";
 import type { ActivityKind } from "@/integrity/activity-view";

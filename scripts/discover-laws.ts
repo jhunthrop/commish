@@ -18,20 +18,20 @@
 // this script) supplies the ungated season-N+1 outcome. Both are Task 6/tribal exports reused here
 // rather than reimplemented, the "same actuals discipline" this task's own brief requires.
 import { readFileSync, writeFileSync } from "node:fs";
-import { createDb } from "@/db/client";
-import type { ReadonlyDb } from "@/db/client";
-import { allPositions } from "@/projections/backtest";
-import { PPR_SCORING } from "@/domain/scoring";
-import { DISCOVERY_TRAIN_SEASONS, MEASURE_SEASONS, REPLICATION_FOLDS } from "@/projections/laws/config";
-import { discoveryFactsForSeason } from "@/projections/laws/discovery-facts";
-import { actualPointsPerGame, factsForSeason } from "@/projections/laws/populations";
-import { preseasonMomentFor } from "@/projections/preseason/source";
-import { generateCandidates } from "@/projections/laws/discovery/generate";
-import { DISCOVERY_QUANTILES } from "@/projections/laws/discovery/quantiles";
-import { quantileCoverageGaps } from "@/projections/laws/discovery/templates";
-import { MIN_TRAIN_PAIRS, runDiscoveryPipeline, type DiscoverySeasonRow } from "@/projections/laws/discovery/measure";
-import { DISCOVERED_JSON_PATH, MIN_OUT_OF_TRAIN_FOLD_PAIRS, MIN_REPLICATION_PAIRS, type DiscoveredJson } from "@/projections/laws/registry";
-import { STAT_LINE_GAPS } from "@/projections/nflverse/stat-lines";
+import { createDb } from "@research/db/client";
+import type { ReadonlyDb } from "@research/db/client";
+import { allPositions } from "@research/projections/backtest";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { DISCOVERY_TRAIN_SEASONS, MEASURE_SEASONS, REPLICATION_FOLDS } from "@research/projections/laws/config";
+import { discoveryFactsForSeason } from "@research/projections/laws/discovery-facts";
+import { actualPointsPerGame, factsForSeason } from "@research/projections/laws/populations";
+import { preseasonMomentFor } from "@research/projections/preseason/source";
+import { generateCandidates } from "@research/projections/laws/discovery/generate";
+import { DISCOVERY_QUANTILES } from "@research/projections/laws/discovery/quantiles";
+import { quantileCoverageGaps } from "@research/projections/laws/discovery/templates";
+import { MIN_TRAIN_PAIRS, runDiscoveryPipeline, type DiscoverySeasonRow } from "@research/projections/laws/discovery/measure";
+import { DISCOVERED_JSON_PATH, MIN_OUT_OF_TRAIN_FOLD_PAIRS, MIN_REPLICATION_PAIRS, type DiscoveredJson } from "@research/projections/laws/registry";
+import { STAT_LINE_GAPS } from "@research/projections/nflverse/stat-lines";
 
 const OUTPUT_PATH = DISCOVERED_JSON_PATH;
 

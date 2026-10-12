@@ -10,7 +10,8 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { reviewReports, reviews, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { POST } from "./route";

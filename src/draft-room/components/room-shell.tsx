@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { QueueHandlers } from "../hooks/use-queue-handlers";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";

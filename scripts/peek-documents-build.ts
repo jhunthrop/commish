@@ -16,7 +16,7 @@
 // IT IS IDEMPOTENT IN CONTENT. `writePeekDocuments` counts only rows that actually changed. It is
 // not idempotent in ROWS: each run stamps a new `as_of` generation, which is what a point-in-time
 // store is for.
-import { createDb } from "@/db/client";
+import { createDb } from "@research/db/client";
 import { backfillLeagueScoringHashes, scoringHashesInUse } from "@/league-service/scoring-hash";
 import { runPeekDocumentStep } from "@/jobs/defs/peek-document-job";
 

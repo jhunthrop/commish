@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import { render, type RenderResult } from "@testing-library/react";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftClockView, DraftStateView } from "@/draft-engine";
 import type { MockResultsCopy, MockResultsInfo, MockRoomInfo, WaitingInfo } from "./contract";

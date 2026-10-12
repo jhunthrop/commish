@@ -10,21 +10,21 @@
 // `DISCOVERY_TRAIN_SEASONS` (`laws/config.ts`) and nothing later — `computeQuantileTable` itself
 // re-enforces that gate rather than trusting this script to have filtered correctly.
 import { writeFileSync } from "node:fs";
-import { createDb } from "@/db/client";
-import { allPositions } from "@/projections/backtest";
-import { PPR_SCORING } from "@/domain/scoring";
-import { DISCOVERY_TRAIN_SEASONS } from "@/projections/laws/config";
-import { discoveryFactsForSeason } from "@/projections/laws/discovery-facts";
+import { createDb } from "@research/db/client";
+import { allPositions } from "@research/projections/backtest";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { DISCOVERY_TRAIN_SEASONS } from "@research/projections/laws/config";
+import { discoveryFactsForSeason } from "@research/projections/laws/discovery-facts";
 import {
   computeQuantileTable,
   QUANTILE_LEVELS,
   QUANTILE_TAG,
   QUANTITY_DEFS,
   type QuantityRow,
-} from "@/projections/laws/discovery/templates";
-import { preseasonMomentFor } from "@/projections/preseason/source";
+} from "@research/projections/laws/discovery/templates";
+import { preseasonMomentFor } from "@research/projections/preseason/source";
 
-const OUTPUT = "src/projections/laws/discovery/quantiles.ts";
+const OUTPUT = "research/src/projections/laws/discovery/quantiles.ts";
 
 function requireEnv(name: string): string {
   const value = process.env[name];

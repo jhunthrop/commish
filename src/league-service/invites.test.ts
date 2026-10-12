@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { eq, isNull } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import type { Db, DbTx } from "@research/db/client";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { auditEvents, draftActions, drafts, integrityFlags, leagueInvites, leagues, sessionSignals, teams, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { canonicalPairId } from "@/integrity-service/multi-account";

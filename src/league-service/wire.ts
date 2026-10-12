@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { auditEvents, drafts, leagues, teams } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research/domain/timing";
 import { notAFixtureLeague } from "@/league-service/browse";
 import { ENFORCED_LEAGUE_SQL } from "@/league-service/enforcement";
 import { leaguesFilledQuery } from "@/league-service/proof";

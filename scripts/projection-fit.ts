@@ -13,37 +13,37 @@
 // this work, because it produces a number nobody can trust and that cannot be detected from the
 // inside — so the fence is code rather than intention.
 import { writeFileSync } from "node:fs";
-import { createDb, type Db } from "@/db/client";
-import { nflPlayers } from "@/db/schema";
-import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";
-import { PPR_SCORING } from "@/domain/scoring";
-import { computeFantasyPoints } from "@/scoring/compute";
-import { statLinesAsOf, type SeasonStatLine } from "@/projections/lines";
-import { composeStatLine } from "@/projections/model/compose";
-import { experienceCohort, RATES, TOUCHDOWN_RATES, type EfficiencyPriors, type RateName } from "@/projections/model/efficiency";
+import { createDb, type Db } from "@research/db/client";
+import { nflPlayers } from "@research/db/schema";
+import { STAT_FIELDS, type Position, type StatLine } from "@research/domain/player";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { computeFantasyPoints } from "@research/scoring/compute";
+import { statLinesAsOf, type SeasonStatLine } from "@research/projections/lines";
+import { composeStatLine } from "@research/projections/model/compose";
+import { experienceCohort, RATES, TOUCHDOWN_RATES, type EfficiencyPriors, type RateName } from "@research/projections/model/efficiency";
 import {
   fitEfficiencyPriors,
   fitExperienceMultiplier,
   fitOpportunityPriors,
   fitShareShrinkageForPosition,
   type ExperienceObservation,
-} from "@/projections/model/fit";
-import { fitLinePriors, type LinePriors } from "@/projections/model/line-fit";
-import type { OpportunityShrinkage } from "@/projections/model/opportunity";
-import { fitSchemePriors, type SchemePriors } from "@/projections/model/scheme-fit";
-import { fitRedistributionPriors, type RedistributionPriors } from "@/projections/model/redistribution-fit";
-import { fitGameContextPriors, type GameContextPriors } from "@/projections/model/context-fit";
-import { fitRedZonePriors, type RedZoneFitReport } from "@/projections/model/red-zone-fit";
-import { fitTargetDepthPriors, type TargetDepthFitReport } from "@/projections/model/target-depth-fit";
-import { fitNewsPriors, type NewsFitReport } from "@/projections/model/news-fit";
-import { firstRosterSeasonsThrough } from "@/projections/preseason/store";
-import { observationsAsOf, type PlayerWeekObservation } from "@/projections/store";
-import { INJURY_SOURCE } from "@/projections/news/retrieve";
-import { projectedPosition } from "@/projections/nflverse/players";
-import { LAST_POSSIBLE_WEEK } from "@/projections/store";
-import { playerTeamsAsOf, teamObservationsAsOf } from "@/projections/team-store";
-import type { TeamContext } from "@/projections/team-context";
-import { usageAsOf, type PlayerWeekUsage } from "@/projections/usage";
+} from "@research/projections/model/fit";
+import { fitLinePriors, type LinePriors } from "@research/projections/model/line-fit";
+import type { OpportunityShrinkage } from "@research/projections/model/opportunity";
+import { fitSchemePriors, type SchemePriors } from "@research/projections/model/scheme-fit";
+import { fitRedistributionPriors, type RedistributionPriors } from "@research/projections/model/redistribution-fit";
+import { fitGameContextPriors, type GameContextPriors } from "@research/projections/model/context-fit";
+import { fitRedZonePriors, type RedZoneFitReport } from "@research/projections/model/red-zone-fit";
+import { fitTargetDepthPriors, type TargetDepthFitReport } from "@research/projections/model/target-depth-fit";
+import { fitNewsPriors, type NewsFitReport } from "@research/projections/model/news-fit";
+import { firstRosterSeasonsThrough } from "@research/projections/preseason/store";
+import { observationsAsOf, type PlayerWeekObservation } from "@research/projections/store";
+import { INJURY_SOURCE } from "@research/projections/news/retrieve";
+import { projectedPosition } from "@research/projections/nflverse/players";
+import { LAST_POSSIBLE_WEEK } from "@research/projections/store";
+import { playerTeamsAsOf, teamObservationsAsOf } from "@research/projections/team-store";
+import type { TeamContext } from "@research/projections/team-context";
+import { usageAsOf, type PlayerWeekUsage } from "@research/projections/usage";
 
 /**
  * 2020 is history only — it has no prior season of its own (nflverse does not publish
@@ -80,7 +80,7 @@ const ACCEPTED_EXPERIENCE_POSITIONS: readonly Position[] = [];
  */
 const FINAL = new Date("9999-12-31T00:00:00.000Z");
 
-const OUTPUT = "src/projections/model/fitted.ts";
+const OUTPUT = "research/src/projections/model/fitted.ts";
 
 /** Mirrors `MAX_REGRESSION` in `fit.ts`; a constant at it means "no measurable spread", not "a lot". */
 const MAX_REGRESSION_REPORTED = 10_000;

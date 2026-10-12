@@ -1,9 +1,9 @@
 import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { drafts, leagues, mockRooms, teams } from "@/db/schema";
-import type { DraftStatus } from "@/domain/draft";
-import type { Clock } from "@/domain/timing";
+import type { DraftStatus } from "@research/domain/draft";
+import type { Clock } from "@research/domain/timing";
 import { MOCK_CONFIG, type MockMode } from "@/mock-draft/config";
 import { MOCK_REFUSALS } from "./claim";
 

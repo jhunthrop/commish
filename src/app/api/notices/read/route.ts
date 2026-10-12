@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { markNoticesRead } from "@/integrity-service/notify";
 import { markNoticesReadSchema } from "@/integrity-service/schemas";
 import { ok, parseJson } from "@/lib/api/respond";

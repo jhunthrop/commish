@@ -1,5 +1,5 @@
 import { and, eq, isNotNull, lte } from "drizzle-orm";
-import type { DbTx } from "@/db/client";
+import type { DbTx } from "@research/db/client";
 import { matchups, teams, weeks } from "@/db/schema";
 import { LEAGUE_CONFIG, computeStandings } from "@/league";
 import { championshipPairing, firstRoundPairings, playoffRoundOf, semifinalPairings, type SeededTeam } from "@/league/playoffs";

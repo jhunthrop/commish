@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { draftActions, draftSlotPreferences } from "@/db/schema";
 import { draftActionSchema } from "@/draft-engine";
 

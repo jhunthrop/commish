@@ -10,28 +10,28 @@
 // Every board it builds is taken at the preseason moment, which `loadPreseason` derives as one
 // millisecond before the earliest stamp the season carries and then asserts against the store. A
 // board that could see the season it is predicting throws rather than scoring well.
-import { createDb, type ReadonlyDb } from "@/db/client";
-import { PPR_SCORING } from "@/domain/scoring";
-import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import type { Position } from "@/domain/player";
-import { allPositions } from "@/projections/backtest";
-import { nflPlayers } from "@/db/schema";
-import { FITTED_MODEL } from "@/projections/model/source";
-import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
-import type { LeagueShape } from "@/projections/decide/replacement";
-import { shippedPreseasonCandidates } from "@/projections/market/blend";
-import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
-import { overlapTiers, preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
-import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
-import type { GameVariancePriors } from "@/projections/preseason/game-variance";
-import { KDEF_DECISION, marketOrderPositions, shipsProjectedRows } from "@/projections/preseason/kdef-decision";
+import { createDb, type ReadonlyDb } from "@research/db/client";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research/domain/roster";
+import type { Position } from "@research/domain/player";
+import { allPositions } from "@research/projections/backtest";
+import { nflPlayers } from "@research/db/schema";
+import { FITTED_MODEL } from "@research/projections/model/source";
+import { RANK_BANDS, type ScoreCard } from "@research/projections/metrics";
+import type { LeagueShape } from "@research/projections/decide/replacement";
+import { shippedPreseasonCandidates } from "@research/projections/market/blend";
+import { BENCHMARK_SOURCES } from "@research/projections/preseason/benchmarks";
+import { overlapTiers, preseasonBoard, type BoardEntry } from "@research/projections/preseason/board";
+import { loadShippedGameVariance } from "@research/projections/preseason/game-variance-artifacts";
+import type { GameVariancePriors } from "@research/projections/preseason/game-variance";
+import { KDEF_DECISION, marketOrderPositions, shipsProjectedRows } from "@research/projections/preseason/kdef-decision";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
-} from "@/projections/preseason/fitted";
-import { actualSeasonPoints, boardPoints, boardValues, gradableInputs, scoreOrdering } from "@/projections/preseason/scorecard";
+} from "@research/projections/preseason/fitted";
+import { actualSeasonPoints, boardPoints, boardValues, gradableInputs, scoreOrdering } from "@research/projections/preseason/scorecard";
 import {
   SHIPPED_PRESEASON_FEATURES,
   loadPreseason,
@@ -41,9 +41,9 @@ import {
   type PreseasonFeatures,
   type PreseasonInputs,
   type PreseasonPriors,
-} from "@/projections/preseason/source";
-import { UNDRAFTED_PICK } from "@/projections/preseason/rookies";
-import { preseasonRankingsAsOf } from "@/projections/preseason/store";
+} from "@research/projections/preseason/source";
+import { UNDRAFTED_PICK } from "@research/projections/preseason/rookies";
+import { preseasonRankingsAsOf } from "@research/projections/preseason/store";
 
 const SEASONS = process.argv.slice(2).map(Number);
 const TARGET_SEASONS = SEASONS.length > 0 ? SEASONS : [2023, 2024];

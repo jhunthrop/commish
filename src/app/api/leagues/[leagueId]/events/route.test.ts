@@ -12,7 +12,8 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { leagues, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";

@@ -1,5 +1,5 @@
-import type { TeamMetricRow } from "@/capsules/facts/team-context";
-import { PBP_METRICS } from "@/projections/nflverse/pbp";
+import type { TeamMetricRow } from "@research/capsules/facts/team-context";
+import { PBP_METRICS } from "@research/projections/nflverse/pbp";
 import type { RankedFigure, TeamOffenseProfile } from "./contract";
 
 /**

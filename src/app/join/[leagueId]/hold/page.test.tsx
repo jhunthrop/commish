@@ -5,7 +5,7 @@ import { fixtureLeagueDeps } from "@/league-room/test-fixtures";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
 
 vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/league-service/browse", () => ({ publicLeaguePreview: vi.fn() }));
 // A1's own regression backstop, pinned at the module boundary rather than merely by absence of
 // an assertion: if anything in this render path ever imports `returnFromSignIn` again, this

@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, gt, inArray, ne, or, sql } from "drizzle-orm";
 import { assembleAdvisorContext, valuePlayers } from "@/ai-advisor/context";
-import type { Db, DbTx } from "@/db/client";
-import { isUniqueViolation } from "@/db/errors";
-import { leagues, players, rosterSlots, statWeeks, teams, tradeProposals } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
-import type { Position } from "@/domain/player";
+import type { Db, DbTx } from "@research/db/client";
+import { isUniqueViolation } from "@research/db/errors";
+import { players, statWeeks } from "@research/db/schema";
+import { leagues, rosterSlots, teams, tradeProposals } from "@/db/schema";
+import type { Clock } from "@research/domain/timing";
+import type { Position } from "@research/domain/player";
 import { isLineupLocked } from "@/league";
 import { canonicalSerialize } from "@/integrity/canonical";
 import { INTEGRITY_CONFIG } from "@/integrity/config";

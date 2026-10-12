@@ -9,8 +9,8 @@
  * derives the same set client-side from `restrictedPositions` (`./roster-eligibility`) and
  * prints this line, so a client component may import it: no server value lives here.
  */
-import type { Position } from "./player";
-import { positionLabel } from "./position-words";
+import type { Position } from "@research/domain/player";
+import { positionLabel } from "@research/domain/position-words";
 
 /** Spoken article for a badge read aloud: "an RB", "a WR", "a K". */
 function withArticle(position: Position): string {

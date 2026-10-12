@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { and, eq, ne } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { draftGrades, teams, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
 import type { GradeComponents } from "@/draft-service/grades/engine";
 import { createLeague } from "./creation";
 import { gradesForDraft } from "./grades";

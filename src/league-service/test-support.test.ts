@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { advisorFixture, seasonThroughWeek, twoTeamLeague } from "./test-support";
 
 /**

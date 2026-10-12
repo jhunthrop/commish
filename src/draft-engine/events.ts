@@ -1,4 +1,4 @@
-import type { DraftAction } from "@/domain/draft";
+import type { DraftAction } from "@research/domain/draft";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import { auctionOf, type DraftState } from "./state";
 import { draftClockView, maxBidsFor, minBidFor } from "./selectors";

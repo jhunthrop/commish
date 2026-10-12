@@ -1,9 +1,10 @@
 import { and, eq, inArray } from "drizzle-orm";
-import type { DbTx } from "@/db/client";
-import { excludedSetFor } from "@/db/upsert";
-import { lineupSlots, players, rosterSlots, statWeeks } from "@/db/schema";
-import type { Position } from "@/domain/player";
-import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@/domain/roster";
+import type { DbTx } from "@research/db/client";
+import { excludedSetFor } from "@research/db/upsert";
+import { players, statWeeks } from "@research/db/schema";
+import { lineupSlots, rosterSlots } from "@/db/schema";
+import type { Position } from "@research/domain/player";
+import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@research/domain/roster";
 import { assignSlot } from "@/draft-engine";
 import { defaultLineup, isLineupLocked, LEAGUE_CONFIG } from "@/league";
 import { assetPlayerIds, type TradeAsset } from "@/trades/assets";
@@ -119,7 +120,7 @@ function placeAll(startingRoster: readonly FilledRosterSlot[], incoming: readonl
  * incoming QB has no home until the outgoing one leaves. Clearing first is also what makes the
  * plan order-independent: the answer does not depend on which side the caller calls "proposer".
  *
- * Placement reuses `assignSlot` (`@/draft-engine/slotting`), which already composes
+ * Placement reuses `assignSlot` (`@research/draft-engine/slotting`), which already composes
  * `eligibleSlotsForPosition` and `validateRosterAdd` and already prefers a starting slot over
  * FLEX over the bench. A second placement policy here would be a second set of eligibility
  * rules, and the spec says twice to reuse them rather than restate them.

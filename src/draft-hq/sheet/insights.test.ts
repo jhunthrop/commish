@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { nflGames } from "@/db/schema";
+import type { Db } from "@research/db/client";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { nflGames } from "@research/db/schema";
 import { LEAGUE_CONFIG } from "@/league/config";
 import { byeStackWarning } from "./insights";
 

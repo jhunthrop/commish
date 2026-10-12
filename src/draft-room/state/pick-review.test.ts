@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { CompletedPick } from "@/draft-engine";
 import { reviewPicks } from "./pick-review";
 

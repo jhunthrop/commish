@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BoardRow } from "@/draft-hq/board/service";
+import type { BoardRow } from "@research/board/service";
 import { EXPORT_HEADER, exportLines, parseExportArguments } from "./rankings-export";
 
 function row(overrides: Partial<BoardRow>): BoardRow {

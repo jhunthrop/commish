@@ -12,8 +12,9 @@ vi.mock("@/lib/realtime/publisher", () => ({
   getPublisher: vi.fn(() => ({ publish: publishSpy })),
 }));
 
-import { players } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { players } from "@research/db/schema";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { heldRoomFacts, resetAdvisorMemoForTests } from "./assistant/memo";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 import { awaitDraftFollowThroughForTests, followThroughAppliedAction, getDraftAdvancer, getDraftStore, logDraftNudgeError, logDraftPublishError, noteDraftPublishFailure, publishDraftEvent } from "./index";

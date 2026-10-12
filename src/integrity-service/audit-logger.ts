@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { DbTx } from "@/db/client";
+import type { DbTx } from "@research/db/client";
 import { auditChains, auditEvents } from "@/db/schema";
 import type { AuditEvent, AuditEventInput } from "@/domain/audit";
 import { GENESIS_HASH, linkEvent, scopeFor, type ChainAnchor } from "@/integrity/chain";

@@ -1,5 +1,5 @@
 import { Card, NOT_STARTED_DASH, PositionBadge } from "@/components/ui";
-import type { Position } from "@/domain/player";
+import type { Position } from "@research/domain/player";
 import { ordinal } from "../lib/format";
 
 /** The market's own two readings — never our own board's, which is `CallCardOurBoard` below.

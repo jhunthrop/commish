@@ -11,10 +11,10 @@
 // commit. The change is additive by construction — one section appended last, every earlier section
 // byte-identical — so slicing the appended heading off reproduces the old output exactly, and does
 // it against the same five players rather than against whatever a second run happened to collect.
-import { getDb } from "@/db/client";
-import { collectAllPlayerFacts } from "@/capsules/collect";
-import { renderFactsForModel } from "@/capsules/render";
-import { renderDepthSection } from "@/capsules/render-depth";
+import { getDb } from "@research/db/client";
+import { collectAllPlayerFacts } from "@research/capsules/collect";
+import { renderFactsForModel } from "@research/capsules/render";
+import { renderDepthSection } from "@research/capsules/render-depth";
 
 const SAMPLE_SIZE = 5;
 const CHARS_PER_TOKEN = 4;

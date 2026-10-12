@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { PlayerDossierFacts } from "@/league-service/dossier-facts";
 import type { PlayerSeasonBody } from "@/league-service/player";
 
@@ -10,7 +10,7 @@ import type { PlayerSeasonBody } from "@/league-service/player";
 // (a plain synchronous throw, no request context required) so a membership-gate 404 is provably real.
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
 vi.mock("@/lib/leagues/membership", () => ({ resolveLeagueMembership: vi.fn() }));
-vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research/db/client", () => ({ getDb: () => ({}) }));
 // `parseSeasonParam` is left as its real implementation (pure, no DB) — only `playerSeason`
 // itself is stubbed. Mocking it too would let a bug in the page's use of `parseSeasonParam`
 // hide behind a mock that always echoes back whatever the test expected.

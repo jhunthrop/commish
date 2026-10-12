@@ -14,11 +14,11 @@
 // board, which the parser refuses; it is printed as "not published upstream" and the run goes on.
 // Any other failure (an HTTP error, a resolution below the bar) marks the run thin and it exits 2,
 // the identical contract `preseason-ingest.ts` keeps.
-import { createDb } from "@/db/client";
-import { ingestAdpBenchmark, rosterIdentitiesFor } from "@/projections/preseason/adp-benchmark";
-import { BENCHMARK_BOARD_FLOOR } from "@/projections/preseason/benchmarks";
-import { BOARD_FORMAT_SPECS, BOARD_FORMATS, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { createDb } from "@research/db/client";
+import { ingestAdpBenchmark, rosterIdentitiesFor } from "@research/projections/preseason/adp-benchmark";
+import { BENCHMARK_BOARD_FLOOR } from "@research/projections/preseason/benchmarks";
+import { BOARD_FORMAT_SPECS, BOARD_FORMATS, isBoardFormat, type BoardFormat } from "@research/projections/preseason/board-formats";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
 
 /** The same bar `preseason-ingest.ts` holds a benchmark to. */
 const MINIMUM_RESOLUTION = 0.7;

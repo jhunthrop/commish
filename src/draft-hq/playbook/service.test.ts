@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@/db/schema";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import type { Db } from "@research/db/client";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@research/db/schema";
+import { BOARD_SOURCE } from "@research/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
 import type { BuildOutcome } from "@/draft-service/sim/types";
 import { describeBuild, scarcityCurve } from "./service";
 

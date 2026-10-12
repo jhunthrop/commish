@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { fail, ok } from "@/lib/api/respond";
 import { withCurrentUser } from "@/app/api/leagues/_shared";
 import { joinPublicLeague } from "@/league-service/join";

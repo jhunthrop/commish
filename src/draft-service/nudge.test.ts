@@ -1,7 +1,9 @@
 import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { players, users } from "@/db/schema";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players } from "@research/db/schema";
+import { users } from "@/db/schema";
 import type { DraftState } from "@/draft-engine";
 import { createDraftStore } from "./store";
 import { createNudgeScheduler, NO_OP_NUDGE_SCHEDULER } from "./nudge";

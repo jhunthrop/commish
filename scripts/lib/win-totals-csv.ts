@@ -7,8 +7,8 @@
 // source and metric names; the filesystem read lives here, in tooling, where a serverless bundle
 // never has to carry it. The same split `scripts/lib/play-callers-csv.ts` makes for the coaches file.
 import { readFileSync } from "node:fs";
-import type { Db } from "@/db/client";
-import { parseWinTotalsCsv, writeVerifiedWinTotals, type VegasIngestReport } from "@/projections/vegas/ingest";
+import type { Db } from "@research/db/client";
+import { parseWinTotalsCsv, writeVerifiedWinTotals, type VegasIngestReport } from "@research/projections/vegas/ingest";
 
 /** The committed file, relative to the repo root every npm script runs from. */
 export const WIN_TOTALS_CSV_PATH = "data/win-totals/win-totals.csv";

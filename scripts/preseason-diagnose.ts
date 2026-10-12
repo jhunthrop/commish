@@ -27,39 +27,39 @@
 //
 // Reads the store only, and every board is taken at the same gated preseason moment the report
 // uses. Nothing here writes anything.
-import { createDb, type ReadonlyDb } from "@/db/client";
-import { PPR_SCORING } from "@/domain/scoring";
-import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import type { Position } from "@/domain/player";
-import { computeFantasyPoints } from "@/scoring/compute";
-import { allPositions } from "@/projections/backtest";
-import { nflPlayers } from "@/db/schema";
-import { statLinesAsOf } from "@/projections/lines";
-import { FITTED_MODEL } from "@/projections/model/source";
-import { RANK_BANDS, spearman, type Observation, type RankBandName } from "@/projections/metrics";
-import type { LeagueShape } from "@/projections/decide/replacement";
-import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
-import { preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
-import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
-import type { GameVariancePriors } from "@/projections/preseason/game-variance";
-import { gradableInputs } from "@/projections/preseason/scorecard";
+import { createDb, type ReadonlyDb } from "@research/db/client";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research/domain/roster";
+import type { Position } from "@research/domain/player";
+import { computeFantasyPoints } from "@research/scoring/compute";
+import { allPositions } from "@research/projections/backtest";
+import { nflPlayers } from "@research/db/schema";
+import { statLinesAsOf } from "@research/projections/lines";
+import { FITTED_MODEL } from "@research/projections/model/source";
+import { RANK_BANDS, spearman, type Observation, type RankBandName } from "@research/projections/metrics";
+import type { LeagueShape } from "@research/projections/decide/replacement";
+import { BENCHMARK_SOURCES } from "@research/projections/preseason/benchmarks";
+import { preseasonBoard, type BoardEntry } from "@research/projections/preseason/board";
+import { loadShippedGameVariance } from "@research/projections/preseason/game-variance-artifacts";
+import type { GameVariancePriors } from "@research/projections/preseason/game-variance";
+import { gradableInputs } from "@research/projections/preseason/scorecard";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
-} from "@/projections/preseason/fitted";
+} from "@research/projections/preseason/fitted";
 import {
   SHIPPED_PRESEASON_FEATURES,
   loadPreseason,
   preseasonCandidates,
   type PreseasonInputs,
   type PreseasonPriors,
-} from "@/projections/preseason/source";
-import { preseasonRankingsAsOf } from "@/projections/preseason/store";
-import { usageAsOf } from "@/projections/usage";
-import { LAST_POSSIBLE_WEEK } from "@/projections/store";
-import { ageAtSeason, teamGamesIn } from "@/projections/preseason/availability";
+} from "@research/projections/preseason/source";
+import { preseasonRankingsAsOf } from "@research/projections/preseason/store";
+import { usageAsOf } from "@research/projections/usage";
+import { LAST_POSSIBLE_WEEK } from "@research/projections/store";
+import { ageAtSeason, teamGamesIn } from "@research/projections/preseason/availability";
 
 const SEASONS = process.argv.slice(2).map(Number);
 const TARGET_SEASONS = SEASONS.length > 0 ? SEASONS : [2021, 2022, 2023, 2024];

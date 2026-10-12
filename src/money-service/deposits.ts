@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research/db/client";
 import { moneyTransactions, paymentTransferIntents, users } from "@/db/schema";
 import { accountIdFor, type MoneyAccountId } from "@/money/accounts";
 import type { MoneyStatesConfig, StateCode } from "@/money/states";

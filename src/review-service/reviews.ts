@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research/db/client";
 import { reviewReports, reviews, users } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research/domain/timing";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { raiseFlag } from "@/integrity-service/flags";
@@ -127,7 +127,7 @@ async function ratingsFor(db: Db, ids: readonly string[]): Promise<ReadonlyMap<s
  * the average rating and how many reviews it is built from, over exactly the reviews the feed
  * itself would ever show. Same `removed_at IS NULL` filter `feedQuery` applies, so a removed
  * review can never nudge the number a stranger reads on the front door — respected exactly, not
- * re-derived, because `reviews_feed_idx` (`@/db/schema`) is partial on that identical predicate.
+ * re-derived, because `reviews_feed_idx` (`@research/db/schema`) is partial on that identical predicate.
  *
  * Exported as a builder, not just run inline, mirroring `feedQuery` above — `src/db/
  * index-plans.test.ts` EXPLAINs this exact statement rather than a hand copy that could drift.
@@ -401,7 +401,7 @@ export type RemoveReviewResult =
   | { readonly ok: false; readonly reason: string };
 
 /**
- * Removal is a STAMP, never a delete (ruling 18, `reviews`' own docblock in `@/db/schema`): the
+ * Removal is a STAMP, never a delete (ruling 18, `reviews`' own docblock in `@research/db/schema`): the
  * row keeps its author, its text, who removed it and why. TWO doors call this now: the operator
  * script (`scripts/remove-review.ts`, via `removeReview` below) and `resolveFlag`'s
  * `content_removed` decision (`@/integrity-service/flags`, via this function directly) — there is

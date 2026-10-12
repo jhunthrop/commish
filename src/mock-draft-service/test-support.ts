@@ -1,8 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import { expect } from "vitest";
-import type { Db } from "@/db/client";
-import { leagues, mockRooms, players, teams, users } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Db } from "@research/db/client";
+import { players } from "@research/db/schema";
+import { leagues, mockRooms, teams, users } from "@/db/schema";
+import type { Clock } from "@research/domain/timing";
 import { createDraftStore } from "@/draft-service/store";
 import { claimMockSeat, type MockLifecycleDeps } from "./claim";
 import { createMockRoom, type CreateMockRoomResult } from "./creation";

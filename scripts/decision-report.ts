@@ -9,18 +9,18 @@
 // Reads the store and nothing else. Unlike `projection-report.ts` it does not ingest, because
 // every number here is computed from seasons the backfill has already landed, and re-fetching
 // them would put a network dependency in front of a measurement that has none.
-import { createDb } from "@/db/client";
-import type { Position, StatLine } from "@/domain/player";
-import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import { PPR_SCORING } from "@/domain/scoring";
-import { computeFantasyPoints } from "@/scoring/compute";
-import { allPositions } from "@/projections/backtest";
-import { emptyTeamContext } from "@/projections/team-context";
-import { naiveProjection } from "@/projections/benchmarks/naive";
-import type { DraftCandidate } from "@/projections/decide/draft";
-import type { LineupCandidate } from "@/projections/decide/lineup";
-import { outlookAround, realizedDispersion } from "@/projections/decide/outlook";
-import { valueBoard, type LeagueShape, type SeasonProjection } from "@/projections/decide/replacement";
+import { createDb } from "@research/db/client";
+import type { Position, StatLine } from "@research/domain/player";
+import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research/domain/roster";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { computeFantasyPoints } from "@research/scoring/compute";
+import { allPositions } from "@research/projections/backtest";
+import { emptyTeamContext } from "@research/projections/team-context";
+import { naiveProjection } from "@research/projections/benchmarks/naive";
+import type { DraftCandidate } from "@research/projections/decide/draft";
+import type { LineupCandidate } from "@research/projections/decide/lineup";
+import { outlookAround, realizedDispersion } from "@research/projections/decide/outlook";
+import { valueBoard, type LeagueShape, type SeasonProjection } from "@research/projections/decide/replacement";
 import {
   byProjectedPoints,
   byRecommendation,
@@ -31,12 +31,12 @@ import {
   replayDraft,
   scoreSleepers,
   type PairedDraftResult,
-} from "@/projections/decide/replay";
-import { sleepers } from "@/projections/decide/sleepers";
-import { statLinesAsOf, type SeasonStatLine } from "@/projections/lines";
-import { modelProjection } from "@/projections/model/source";
-import { LAST_POSSIBLE_WEEK } from "@/projections/store";
-import { usageAsOf, type PlayerWeekUsage } from "@/projections/usage";
+} from "@research/projections/decide/replay";
+import { sleepers } from "@research/projections/decide/sleepers";
+import { statLinesAsOf, type SeasonStatLine } from "@research/projections/lines";
+import { modelProjection } from "@research/projections/model/source";
+import { LAST_POSSIBLE_WEEK } from "@research/projections/store";
+import { usageAsOf, type PlayerWeekUsage } from "@research/projections/usage";
 
 const SEASONS = process.argv.slice(2).map(Number).filter(Number.isFinite);
 const TARGET_SEASONS = SEASONS.length > 0 ? SEASONS : [2023, 2024];

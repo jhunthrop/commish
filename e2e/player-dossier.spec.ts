@@ -1,10 +1,10 @@
 import { and, eq, ne } from "drizzle-orm";
-import { createDb, type Db } from "../src/db/client";
-import { nflPlayers, playerCrosswalk, players, playerStatLines, playerWeekObservations, preseasonBoardReasons, preseasonProjections, statWeeks } from "../src/db/schema";
-import { statMetricName, STAT_LINE_SOURCE } from "../src/projections/lines";
-import { BOARD_SOURCE, recordPreseasonBoardReasons, recordPreseasonProjections } from "../src/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "../src/projections/preseason/current";
-import { recordObservations, type PlayerWeekObservation } from "../src/projections/store";
+import { createDb, type Db } from "@research/db/client";
+import { nflPlayers, playerCrosswalk, players, playerStatLines, playerWeekObservations, preseasonBoardReasons, preseasonProjections, statWeeks } from "@research/db/schema";
+import { statMetricName, STAT_LINE_SOURCE } from "@research/projections/lines";
+import { BOARD_SOURCE, recordPreseasonBoardReasons, recordPreseasonProjections } from "@research/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { recordObservations, type PlayerWeekObservation } from "@research/projections/store";
 import { E2E_TRADES_LEAGUE_ID } from "./global-setup";
 import { expect, SEEDED_SEASON_LEAGUE_ID, test } from "./support/fixtures";
 

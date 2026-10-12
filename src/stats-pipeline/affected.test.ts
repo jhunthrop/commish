@@ -1,8 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { leagues, lineupSlots, rosterSlots, teams, users } from "@/db/schema";
-import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
-import { BENCH_SLOT } from "@/domain/roster";
+import { countingDb, createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { BENCH_SLOT } from "@research/domain/roster";
 import { affectedTeams } from "./affected";
 
 const db = createTestDb();
@@ -144,7 +145,7 @@ describe("affectedTeams", () => {
       .set({ playerId: "p-shared" })
       .where(and(inArray(rosterSlots.teamId, SHARED_TEAM_IDS), eq(rosterSlots.slot, "STARTER"), eq(rosterSlots.slotIndex, 0)));
 
-    // `countingDb` (`@/db/test-db`) counts at `$client.unsafe`, not `.select(...)` calls: the
+    // `countingDb` (`@research/db/test-db`) counts at `$client.unsafe`, not `.select(...)` calls: the
     // bound of 2 below is 2 real round trips, even though `affected.ts`'s roster fallback builds
     // a SECOND `db.select(...)` internally for a `notExists` correlated subquery — that one is
     // embedded into the outer query's SQL text and never separately awaited, so counting

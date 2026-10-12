@@ -1,8 +1,8 @@
 import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { and, eq, isNotNull } from "drizzle-orm";
-import { createDb } from "../src/db/client";
-import { rosterSlots, tradeProposals } from "../src/db/schema";
+import { createDb } from "@research/db/client";
+import { rosterSlots, tradeProposals } from "@/db/schema";
 import { proposalFingerprint } from "../src/league-service/trades";
 import {
   E2E_TRADES_LEAGUE_ID,

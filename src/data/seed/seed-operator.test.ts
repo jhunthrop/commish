@@ -3,7 +3,8 @@ import { join, relative } from "node:path";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { auditEvents, memberNotices, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { DEV_SEED } from "./config";
 import { seedOperator } from "./seed-operator";
 
@@ -124,7 +125,7 @@ describe("ruling 15 — no in-product way to grant operator access (a drift trip
       "src/components/app-shell/admin-console-nav.tsx",
       "src/components/app-shell/app-shell.tsx",
       "src/components/app-shell/top-bar.tsx",
-      "src/db/schema.ts",
+      "research/src/db/schema.ts",
       "src/integrity-service/grant-admin.ts",
     ]);
 

@@ -1,15 +1,16 @@
 import { and, eq } from "drizzle-orm";
-import type { Db, ReadonlyDb } from "@/db/client";
-import { leagues, lineupSlots, matchups, players, rosterSlots, statWeeks, teams } from "@/db/schema";
-import { validateLineup } from "@/domain/roster-eligibility";
-import { BENCH_SLOT } from "@/domain/roster";
-import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@/domain/roster";
-import type { Clock } from "@/domain/timing";
+import type { Db, ReadonlyDb } from "@research/db/client";
+import { players, statWeeks } from "@research/db/schema";
+import { leagues, lineupSlots, matchups, rosterSlots, teams } from "@/db/schema";
+import { validateLineup } from "@research/domain/roster-eligibility";
+import { BENCH_SLOT } from "@research/domain/roster";
+import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@research/domain/roster";
+import type { Clock } from "@research/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { benchOf, defaultLineup, deriveBenchSlots, isLineupLocked, startersOf, type WeekStatus } from "@/league";
-import { excludedSetFor } from "@/db/upsert";
-import { startedTeamsForWeek } from "./nfl-schedule";
-import { injuryDesignations } from "./injuries";
+import { excludedSetFor } from "@research/db/upsert";
+import { startedTeamsForWeek } from "@research/reference/nfl-schedule";
+import { injuryDesignations } from "@research/reference/injuries";
 import { injuredReserve } from "@/db/schema";
 import type { LineupBody, LineupSlotView } from "@/league-room/contract";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
@@ -320,7 +321,7 @@ export async function lineupView(
       injuryDesignation: slot.playerId === null ? null : (designations.get(slot.playerId) ?? null),
       // Gameday law 3: the club code and the headshot a lineup editor draws a player WITH. Free —
       // `playerById` above already holds the whole row. `adp` rides along because `Player`
-      // (`@/domain/player`) requires it, and a surface handing this slot to `PlayerFace` needs a
+      // (`@research/domain/player`) requires it, and a surface handing this slot to `PlayerFace` needs a
       // whole `Player`.
       nflTeam: player?.nflTeam ?? null,
       headshotUrl: player?.headshotUrl ?? null,

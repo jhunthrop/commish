@@ -14,12 +14,12 @@
 // indistinguishable from a freeze taken in a week nobody had an opinion about. The coverage line and
 // the top-ten stance below are the check an operator can actually make with their own eyes.
 import { inArray } from "drizzle-orm";
-import { createDb, type ReadonlyDb } from "@/db/client";
-import { nflPlayers } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
-import { requireEnv } from "@/projections/odds/http";
-import { formatCoverage, takeFreeze } from "@/projections/register/freeze";
-import type { RegisterFreezeRow } from "@/projections/register/store";
+import { createDb, type ReadonlyDb } from "@research/db/client";
+import { nflPlayers } from "@research/db/schema";
+import type { Clock } from "@research/domain/timing";
+import { requireEnv } from "@research/projections/odds/http";
+import { formatCoverage, takeFreeze } from "@research/projections/register/freeze";
+import type { RegisterFreezeRow } from "@research/projections/register/store";
 
 const systemClock: Clock = { now: () => new Date().toISOString() };
 

@@ -13,8 +13,8 @@
 // narrowing `schedule-results-ingest.ts` makes, and for the identical reason: re-running the full
 // schedule ingestion to add one metric would also insert every row the upstream file has gained
 // since the last real run, which is a data change nobody asked for.
-import { createDb } from "@/db/client";
-import { ingestPointsAllowed } from "@/projections/nflverse/ingest";
+import { createDb } from "@research/db/client";
+import { ingestPointsAllowed } from "@research/projections/nflverse/ingest";
 import { seasonsWithScheduleCoverage } from "./validate-win-totals";
 
 function requireEnv(name: string): string {

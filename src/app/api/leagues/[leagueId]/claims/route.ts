@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import { claimPlayer, freeAgents } from "@/league-service/claims";

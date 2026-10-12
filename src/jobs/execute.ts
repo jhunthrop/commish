@@ -1,8 +1,8 @@
 // THE EXECUTOR — runs one claimed job's remaining steps under heartbeat and timeout, classifies
 // whatever goes wrong (terminal, retryable, timeout), and hands the store the right disposition.
 // This is the only file that decides a job's fate; the store just writes it down.
-import type { Db } from "@/db/client";
-import type { Clock } from "@/domain/timing";
+import type { Db } from "@research/db/client";
+import type { Clock } from "@research/domain/timing";
 import { backoffDelayMs } from "./backoff";
 import { JOBS_CONFIG } from "./config";
 import { TerminalJobError, type AnyJobDefinition } from "./contract";

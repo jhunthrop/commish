@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { matchups, weeks } from "@/db/schema";
 import type { TeamCard } from "@/domain/league";
 import { clinchedTeamIds, computeStandings, LEAGUE_CONFIG, seasonProgress } from "@/league";

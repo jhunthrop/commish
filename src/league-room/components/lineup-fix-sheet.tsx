@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button, PositionBadge } from "@/components/ui";
 import { DecisionSheet } from "@/components/ui/decision-sheet";
-import type { RosterSlotConfig } from "@/domain/roster";
+import type { RosterSlotConfig } from "@research/domain/roster";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody } from "../contract";
 import { useLeagueRoomDeps } from "../hooks/deps";

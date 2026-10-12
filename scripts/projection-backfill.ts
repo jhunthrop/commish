@@ -58,17 +58,17 @@
 // counts, the derived season's games-per-player distribution shape read beside the most recent
 // published season's own shape, and the derived rows' position mix. Descriptive, not a bar — there is
 // no rank correlation to report and none is fabricated to stand in for one.
-import { createDb } from "@/db/client";
-import type { Db } from "@/db/client";
-import { allPositions } from "@/projections/backtest";
-import { statLinesAsOf } from "@/projections/lines";
-import { createNflverseClient } from "@/projections/nflverse/client";
-import { derivedSeasonSanityReport, seasonPointsAgreement, type DerivedSeasonSanityReport } from "@/projections/nflverse/derived-stat-lines";
-import { computeDerivedStatLines, ingestDerivedStatLines, ingestPlayerUniverse, ingestSeason, scheduleWeekAsOf } from "@/projections/nflverse/ingest";
-import { SNAP_COUNT_ASSET_FLOOR } from "@/projections/nflverse/map";
-import { STAT_LINE_GAPS } from "@/projections/nflverse/stat-lines";
-import { LAST_POSSIBLE_WEEK } from "@/projections/store";
-import type { NflverseClient } from "@/projections/nflverse/client";
+import { createDb } from "@research/db/client";
+import type { Db } from "@research/db/client";
+import { allPositions } from "@research/projections/backtest";
+import { statLinesAsOf } from "@research/projections/lines";
+import { createNflverseClient } from "@research/projections/nflverse/client";
+import { derivedSeasonSanityReport, seasonPointsAgreement, type DerivedSeasonSanityReport } from "@research/projections/nflverse/derived-stat-lines";
+import { computeDerivedStatLines, ingestDerivedStatLines, ingestPlayerUniverse, ingestSeason, scheduleWeekAsOf } from "@research/projections/nflverse/ingest";
+import { SNAP_COUNT_ASSET_FLOOR } from "@research/projections/nflverse/map";
+import { STAT_LINE_GAPS } from "@research/projections/nflverse/stat-lines";
+import { LAST_POSSIBLE_WEEK } from "@research/projections/store";
+import type { NflverseClient } from "@research/projections/nflverse/client";
 
 const FIRST_SEASON = Number(process.argv[2] ?? 2020);
 const LAST_SEASON = Number(process.argv[3] ?? 2024);

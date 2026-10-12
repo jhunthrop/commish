@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import postgres from "postgres";
-import { createDb } from "./client";
-import { DB_POOL_CONFIG } from "./config";
-import { truncateAll } from "./test-db";
-import { drafts } from "./schema";
+import { createDb } from "@research/db/client";
+import { DB_POOL_CONFIG } from "@research/db/config";
+import { truncateAll } from "@/db/test-db";
+import { drafts } from "@/db/schema";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
-import { envOr } from "@/lib/env";
+import { envOr } from "@research/lib/env";
 
 /**
  * docker-compose's `pgbouncer-test` service, in front of `postgres-test`. Not skipped when

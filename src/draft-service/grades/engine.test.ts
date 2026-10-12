@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RosterSlotConfig } from "@/domain/roster";
+import type { RosterSlotConfig } from "@research/domain/roster";
 import { gradeDraft, type GradeDraftInput, type GradePick, type TeamGrade } from "./engine";
 
 /**

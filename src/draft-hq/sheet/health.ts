@@ -10,7 +10,7 @@
  * identical classifier the sim itself uses to label its own runs, so a sheet's own shape and a
  * sim's own shape are named by the same rule.
  */
-import type { Position } from "@/domain/player";
+import type { Position } from "@research/domain/player";
 import { BUILD_CLASSIFICATION_ROUNDS, classifyBuild, type BuildLabel, type ClassifiablePick } from "@/draft-service/sim/classify";
 import type { SimSummary } from "@/draft-service/sim/types";
 import { describeBuild } from "@/draft-hq/playbook/service";

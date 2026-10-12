@@ -1,4 +1,4 @@
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { MatchupLineupEntry, LineupSlotView } from "../contract";
 
 /**

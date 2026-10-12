@@ -1,11 +1,11 @@
-import type { Position } from "@/domain/player";
-import type { RosterSlotConfig } from "@/domain/roster";
+import type { Position } from "@research/domain/player";
+import type { RosterSlotConfig } from "@research/domain/roster";
 import type { BuildLabel } from "./classify";
 
 /**
  * One player as the simulator needs to see them: the evidence board's own projected points
- * (`@/projections/preseason/board-store.ts`'s `PreseasonProjectionRow`, joined to the product's
- * own player id the way `@/draft-hq/board/service.ts` already does), plus the market's own
+ * (`@research/projections/preseason/board-store`'s `PreseasonProjectionRow`, joined to the product's
+ * own player id the way `@research/board/service` already does), plus the market's own
  * 0-based rank when the ADP feed carries one and null when it does not.
  *
  * DELIBERATELY CARRIES NO BOARD RANK. Our board's order is value over replacement under a

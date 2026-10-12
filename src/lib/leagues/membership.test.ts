@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { leagues, teams, users } from "@/db/schema";
 import { NO_TEAM_MESSAGE, requireLeagueMember, resolveLeagueMembership } from "./membership";
 

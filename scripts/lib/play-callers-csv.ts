@@ -6,10 +6,10 @@
 // `src/coaches/store.ts`; the filesystem read lives here, in tooling, where a serverless bundle
 // never has to carry it (the 2026-09-08 ENOENT outage was a request-path read of this same file).
 import { readFileSync } from "node:fs";
-import { upsertCoachRows } from "@/coaches/store";
-import type { Db } from "@/db/client";
-import { parsePlayCallers, validatePlayCallers, type PlayCallerRow } from "@/projections/nflverse/play-callers";
-import { FACT_SEASONS, finalWeekOf, nflTeamsBySeason } from "@/projections/nflverse/team-eras";
+import { upsertCoachRows } from "@research/coaches/store";
+import type { Db } from "@research/db/client";
+import { parsePlayCallers, validatePlayCallers, type PlayCallerRow } from "@research/projections/nflverse/play-callers";
+import { FACT_SEASONS, finalWeekOf, nflTeamsBySeason } from "@research/projections/nflverse/team-eras";
 
 /** The committed file, relative to the repo root every npm script runs from. */
 export const PLAY_CALLERS_CSV_PATH = "data/play-callers/play-callers.csv";

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { drafts } from "@/db/schema";
 import { resolveLeagueMembership } from "@/lib/leagues/membership";
 

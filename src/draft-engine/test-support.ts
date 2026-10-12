@@ -1,4 +1,4 @@
-import { DRAFT_ACTION_VERSION, type DraftAction, type TimerExpireAction } from "@/domain/draft";
+import { DRAFT_ACTION_VERSION, type DraftAction, type TimerExpireAction } from "@research/domain/draft";
 import { admitCommand } from "./admit";
 import { reduceDraft } from "./reduce";
 import { currentDeadline } from "./selectors";

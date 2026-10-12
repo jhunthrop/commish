@@ -2,10 +2,11 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { leagueWaivers, rosterSlots, teams, waiverClaims } from "@/db/schema";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { claimPlayer, CLAIM_REFUSALS } from "./claims";
 import { processWaivers, WAIVER_PERIOD_HOURS } from "./waivers";
-import { players } from "@/db/schema";
+import { players } from "@research/db/schema";
 import { twoTeamLeague } from "./test-support";
 
 /** `twoTeamLeague` + one unowned RB: team one (u1) is FULL (4 of 4 slots), team_2 (u2) is

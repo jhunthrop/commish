@@ -1,14 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type Redis from "ioredis";
-import type { Db } from "@/db/client";
-import { matchups, statWeeks } from "@/db/schema";
-import type { StatLine } from "@/domain/player";
-import type { Clock } from "@/domain/timing";
+import type { Db } from "@research/db/client";
+import { statWeeks } from "@research/db/schema";
+import { matchups } from "@/db/schema";
+import type { StatLine } from "@research/domain/player";
+import type { Clock } from "@research/domain/timing";
 import { isLineupLocked, weekStatusFromGames } from "@/league";
 import { autoSetLineupsForWeek } from "@/league-service/auto-lineup";
 import type { PublishFn } from "@/lib/realtime/publish";
-import type { CaptureResult } from "@/projections/capture";
+import type { CaptureResult } from "@research/projections/capture";
 import type { GameSummary, StatsProvider } from "@/stats/provider";
 import { affectedTeams } from "./affected";
 import { STATS_INGESTION_CONFIG, type IngestionMode } from "./config";
@@ -83,7 +84,7 @@ interface WorkerDeps {
    */
   readonly autoSet?: typeof autoSetLineupsForWeek;
   /**
-   * One pass of the projection engine's ephemeral-feed capture (`@/projections/capture`), run
+   * One pass of the projection engine's ephemeral-feed capture (`@research/projections/capture`), run
    * inside this tick rather than on a scheduler of its own.
    *
    * It rides here because this worker already owns the three things the capture must not

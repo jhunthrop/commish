@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { captureSnapshots } from "@/db/schema";
-import { createTestDb, recordStatements, truncateAll } from "@/db/test-db";
+import { captureSnapshots } from "@research/db/schema";
+import { createTestDb, recordStatements } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { weeklyProjectionsByPlayerId } from "./weekly-projections";
 
 const db = createTestDb();

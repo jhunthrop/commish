@@ -12,20 +12,20 @@
 // an ablation that gets skipped. The replay moments come from `replayMomentsFor`, which reads back
 // the very stamps the ingestion wrote, so a number printed here and a number printed there are
 // comparable by construction.
-import { createDb, type ReadonlyDb } from "@/db/client";
-import { PPR_SCORING } from "@/domain/scoring";
-import { replayHeadToHead, replayOpportunity, SHARE_FIELDS, type ProjectionSource } from "@/projections/backtest";
-import { naiveProjection, NAIVE_SOURCE_NAME } from "@/projections/benchmarks/naive";
-import { ALL_FEATURES, NO_FEATURES, SHIPPED_FEATURES, type FeatureFlags } from "@/projections/model/features";
-import { scoreShares } from "@/projections/model/fit";
-import { FITTED_OPPORTUNITY_PRIORS, FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
-import { lastObservedPriors } from "@/projections/model/opportunity";
-import { modelSource } from "@/projections/model/source";
-import { detectTransactions } from "@/projections/model/transactions";
-import { predictOpportunity } from "@/projections/model/opportunity";
-import type { ProjectionInput } from "@/projections/backtest";
-import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
-import { gameWeekMomentsFor, playerGameMomentsFor, replayMomentsFor } from "@/projections/replay-moments";
+import { createDb, type ReadonlyDb } from "@research/db/client";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { replayHeadToHead, replayOpportunity, SHARE_FIELDS, type ProjectionSource } from "@research/projections/backtest";
+import { naiveProjection, NAIVE_SOURCE_NAME } from "@research/projections/benchmarks/naive";
+import { ALL_FEATURES, NO_FEATURES, SHIPPED_FEATURES, type FeatureFlags } from "@research/projections/model/features";
+import { scoreShares } from "@research/projections/model/fit";
+import { FITTED_OPPORTUNITY_PRIORS, FIT_SEASONS, HELD_OUT_SEASONS } from "@research/projections/model/fitted";
+import { lastObservedPriors } from "@research/projections/model/opportunity";
+import { modelSource } from "@research/projections/model/source";
+import { detectTransactions } from "@research/projections/model/transactions";
+import { predictOpportunity } from "@research/projections/model/opportunity";
+import type { ProjectionInput } from "@research/projections/backtest";
+import { RANK_BANDS, type ScoreCard } from "@research/projections/metrics";
+import { gameWeekMomentsFor, playerGameMomentsFor, replayMomentsFor } from "@research/projections/replay-moments";
 
 const LAST_REGULAR_WEEK = 18;
 

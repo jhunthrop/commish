@@ -27,8 +27,8 @@
  * command is ever refused), as a regression guard against a future edit here breaking the
  * MAKE_PICK sequencing this reuse depends on.
  */
-import type { DraftPoolEntry, MakePickAction, StartDraftAction } from "@/domain/draft";
-import type { RosterSlotConfig } from "@/domain/roster";
+import type { DraftPoolEntry, MakePickAction, StartDraftAction } from "@research/domain/draft";
+import type { RosterSlotConfig } from "@research/domain/roster";
 import {
   AUTOPICK_CONFIG,
   admitCommand,

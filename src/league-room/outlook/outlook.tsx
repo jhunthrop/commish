@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { Badge, ReasonChip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { narrativeSlot, NARRATIVE_KEYS } from "@/capsules/narrative-slots";
-import type { PlayerCapsuleView } from "@/capsules/store";
-import { TEMPLATE_CAPSULE_NOTE } from "@/capsules/template";
-import type { Position } from "@/domain/player";
-import type { Law } from "@/projections/laws/types";
-import type { BoardReason } from "@/projections/preseason/board";
-import { groupReasons, lawGroupLabel, type EvidenceGroup } from "./groups";
-import { verdictLine } from "./verdict";
+import { narrativeSlot, NARRATIVE_KEYS } from "@research/capsules/narrative-slots";
+import type { PlayerCapsuleView } from "@research/capsules/store";
+import { TEMPLATE_CAPSULE_NOTE } from "@research/capsules/template";
+import type { Position } from "@research/domain/player";
+import type { Law } from "@research/projections/laws/types";
+import type { BoardReason } from "@research/projections/preseason/board";
+import { groupReasons, lawGroupLabel, type EvidenceGroup } from "@research/capsules/outlook/groups";
+import { verdictLine } from "@research/capsules/outlook/verdict";
 
 /**
  * THE OUTLOOK, REDESIGNED (founder, 2026-09-04) — "a timing tower, not a spreadsheet." The old

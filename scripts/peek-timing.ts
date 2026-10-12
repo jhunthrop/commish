@@ -8,7 +8,7 @@
 // IT READS AND NEVER WRITES. It opens its OWN postgres client rather than `getDb()` so it can hand
 // `postgres`' `debug` hook a counter: the driver calls it once per statement it actually sends, so
 // the number printed is real round trips, not an application-level guess at how many queries a code
-// path "should" make. The client is wrapped in the same `drizzle(client, { schema })` the product
+// path "should" make. The client is wrapped in the same schema-less `drizzle(client)` the product
 // uses, so `playerSeason` runs byte-for-byte what it runs in production.
 //
 // COLD AND WARM. Each player is timed twice against the same process. The first pass pays for every
@@ -18,8 +18,9 @@
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq } from "drizzle-orm";
-import * as schema from "@/db/schema";
-import { leagues, players } from "@/db/schema";
+import type { Db } from "@research/db/client";
+import { players } from "@research/db/schema";
+import { leagues } from "@/db/schema";
 import { playerSeason } from "@/league-service/player";
 
 /** One timed call: which player, which pass, what it cost. */
@@ -58,7 +59,7 @@ function parseArgs(argv: readonly string[]): Args {
 /** A mutable counter the driver's own `debug` hook increments, and the drizzle handle built over
  *  the client that reports to it. One object so the two can never be wired to different counters. */
 interface CountingDb {
-  readonly db: ReturnType<typeof drizzle<typeof schema>>;
+  readonly db: Db;
   readonly client: postgres.Sql;
   count(): number;
   reset(): void;
@@ -74,7 +75,7 @@ function countingDb(connectionString: string): CountingDb {
     },
   });
   return {
-    db: drizzle(client, { schema }),
+    db: drizzle(client),
     client,
     count: () => queries,
     reset: () => {

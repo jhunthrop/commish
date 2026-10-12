@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { DraftPoolEntry } from "@/domain/draft";
-import type { Position } from "@/domain/player";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import type { DraftPoolEntry } from "@research/domain/draft";
+import type { Position } from "@research/domain/player";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
 import { totalRosterSlots } from "@/draft-engine";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 import { runOneDraft } from "./run";

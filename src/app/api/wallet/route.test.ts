@@ -10,7 +10,8 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { users } from "@/db/schema";
-import { createTestDb, truncateAll, truncateMoneyTables } from "@/db/test-db";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll, truncateMoneyTables } from "@/db/test-db";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { postMoneyTransaction, type MoneyTransactionInput } from "@/money-service/post";
 import { getAuditLogger } from "@/integrity-service/audit-logger";

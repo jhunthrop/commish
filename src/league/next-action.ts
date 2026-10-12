@@ -1,4 +1,4 @@
-import type { DraftStatus } from "@/domain/draft";
+import type { DraftStatus } from "@research/domain/draft";
 import type { WeekStatus } from "./week-status";
 
 /**

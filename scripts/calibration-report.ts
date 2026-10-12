@@ -15,14 +15,14 @@
 // TARGET cohort improving without degrading the OTHERS on this fold. Every skill position is printed
 // for every fix, not only the one it targets, so "without degrading the others" is a claim this
 // report can actually back up rather than one taken on faith.
-import { createDb } from "@/db/client";
-import type { Position } from "@/domain/player";
-import { PPR_SCORING } from "@/domain/scoring";
-import { replayHeadToHead, type ProjectionInput, type ProjectionSource } from "@/projections/backtest";
-import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
-import { FITTED_MODEL, modelSource, type ModelPriors } from "@/projections/model/source";
-import { SHIPPED_FEATURES } from "@/projections/model/features";
-import { replayMomentsFor } from "@/projections/replay-moments";
+import { createDb } from "@research/db/client";
+import type { Position } from "@research/domain/player";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { replayHeadToHead, type ProjectionInput, type ProjectionSource } from "@research/projections/backtest";
+import { RANK_BANDS, type ScoreCard } from "@research/projections/metrics";
+import { FITTED_MODEL, modelSource, type ModelPriors } from "@research/projections/model/source";
+import { SHIPPED_FEATURES } from "@research/projections/model/features";
+import { replayMomentsFor } from "@research/projections/replay-moments";
 
 const VALIDATION_SEASON = 2022;
 const NEVER_SCORE_SEASONS = [2023, 2024] as const;

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, recordStatements, truncateAll, truncateJobTables } from "@/db/test-db";
-import type { Clock } from "@/domain/timing";
+import { createTestDb, recordStatements } from "@research/db/test-db";
+import { truncateAll, truncateJobTables } from "@/db/test-db";
+import type { Clock } from "@research/domain/timing";
 import { defineJob, type AnyJobDefinition } from "./contract";
 import { runTick, type RunnerDeps } from "./runner";
 import { createScheduleMemory } from "./schedule";

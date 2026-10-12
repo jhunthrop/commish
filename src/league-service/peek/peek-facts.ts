@@ -1,18 +1,18 @@
 import { and, desc, eq, inArray, lte } from "drizzle-orm";
-import type { Db, ReadonlyDb } from "@/db/client";
+import type { Db, ReadonlyDb } from "@research/db/client";
 import { playerPeekFacts } from "@/db/schema";
-import { changedRowWhere, excludedSetFor } from "@/db/upsert";
+import { changedRowWhere, excludedSetFor } from "@research/db/upsert";
 import { boardWidePerGameFacts, dossierFactsFrom, type PlayerDossierFacts, type PlayerDossierRank } from "@/league-service/dossier-facts";
-import { STAT_LINE_SOURCE } from "@/projections/lines";
-import { admitsDerivedForLiveSurface, DERIVED_STAT_LINE_SOURCE, statLinesAsOfForLiveSurface } from "@/projections/nflverse/derived-stat-lines";
-import { NFLVERSE_SOURCE } from "@/projections/nflverse/map";
-import { PBP_PLAYER_SOURCE } from "@/projections/nflverse/pbp-players";
-import { finalWeekOf } from "@/projections/nflverse/team-eras";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { STAT_LINE_SOURCE } from "@research/projections/lines";
+import { admitsDerivedForLiveSurface, DERIVED_STAT_LINE_SOURCE, statLinesAsOfForLiveSurface } from "@research/projections/nflverse/derived-stat-lines";
+import { NFLVERSE_SOURCE } from "@research/projections/nflverse/map";
+import { PBP_PLAYER_SOURCE } from "@research/projections/nflverse/pbp-players";
+import { finalWeekOf } from "@research/projections/nflverse/team-eras";
+import { BOARD_SOURCE } from "@research/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
 import { enqueuePeekDocumentRebuildsQuietly } from "@/jobs/defs/peek-document-job";
-import { collectBoardFacts, type BoardFactsPass } from "@/capsules/collect";
-import type { PlayerFacts } from "@/capsules/facts";
+import { collectBoardFacts, type BoardFactsPass } from "@research/capsules/collect";
+import type { PlayerFacts } from "@research/capsules/facts";
 import { PEEK_FACTS_SOURCE, PEEK_HISTORY_SEASONS, type PeekFactsBasis, type PeekFactsRow, type PeekLastSeasonLine } from "./peek-facts-row";
 
 /**

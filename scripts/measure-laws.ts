@@ -61,12 +61,12 @@
 // a RESULT, not a bug — the spec ships debunked laws as content, and `LAW_SPECS`'s calipers were
 // fixed before this script ever ran.
 import { readFileSync, writeFileSync } from "node:fs";
-import { createDb } from "@/db/client";
-import type { ReadonlyDb } from "@/db/client";
-import { matchedPairsStratified, measureEffect } from "@/projections/laws/harness";
-import { MEASURE_SEASONS, REPLICATION_FOLDS } from "@/projections/laws/config";
-import { buildPopulations, LAW_SPECS, type LawSpec } from "@/projections/laws/populations";
-import { STAT_LINE_GAPS } from "@/projections/nflverse/stat-lines";
+import { createDb } from "@research/db/client";
+import type { ReadonlyDb } from "@research/db/client";
+import { matchedPairsStratified, measureEffect } from "@research/projections/laws/harness";
+import { MEASURE_SEASONS, REPLICATION_FOLDS } from "@research/projections/laws/config";
+import { buildPopulations, LAW_SPECS, type LawSpec } from "@research/projections/laws/populations";
+import { STAT_LINE_GAPS } from "@research/projections/nflverse/stat-lines";
 import {
   foldEffectsFor,
   MEASURED_JSON_PATH,
@@ -76,8 +76,8 @@ import {
   type FoldEffect,
   type MeasuredEntry,
   type MeasuredJson,
-} from "@/projections/laws/registry";
-import type { LawMeasurement, LawVerdict, PlayerSeasonPoint } from "@/projections/laws/types";
+} from "@research/projections/laws/registry";
+import type { LawMeasurement, LawVerdict, PlayerSeasonPoint } from "@research/projections/laws/types";
 
 const OUTPUT_PATH = MEASURED_JSON_PATH;
 

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { MakePickAction } from "@/domain/draft";
-import type { Position } from "@/domain/player";
+import type { MakePickAction } from "@research/domain/draft";
+import type { Position } from "@research/domain/player";
 import { availablePool, teamOnClock, type DraftState } from "@/draft-engine";
 import { SIM_INSTANT, submit } from "../sim/run";
 import { draftedPlayerIds } from "@/draft-engine";
-import { isRealTierCliff, tierStanding } from "@/projections/decide/tiers";
+import { isRealTierCliff, tierStanding } from "@research/projections/decide/tiers";
 import { ADVISOR_CONFIG } from "./config";
 import { detectRun, tierCollapses } from "./signals";
 import { fixtureStart, fixtureValued } from "./test-fixture";

@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, draftPicks, drafts, matchups, memberNotices, players, teams, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players } from "@research/db/schema";
+import { auditEvents, draftPicks, drafts, matchups, memberNotices, teams, users } from "@/db/schema";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
 import { autoStartDueDrafts } from "@/draft-service/auto-start";
 import { createDraftStore } from "@/draft-service/store";
 import { SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
@@ -256,7 +258,7 @@ describe("releaseSeat", () => {
     // A `'scheduled'`-status league (asserted just above to genuinely have neither row) is
     // exactly the state `releaseSeat`'s own refusal on `status !== 'scheduled'` exists to
     // guarantee — `draft_picks`/`matchups` reference `teams` WITHOUT `ON DELETE CASCADE`
-    // (`@/db/schema`), so a non-empty either table here would have aborted this DELETE with a
+    // (`@research/db/schema`), so a non-empty either table here would have aborted this DELETE with a
     // real foreign key violation rather than silently orphaning anything.
     const result = await releaseSeat(db, { leagueId, userId: "filler_" + leagueId + "_1" }, { clock });
     expect(result.ok).toBe(true);

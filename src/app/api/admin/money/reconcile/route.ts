@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { moneyDriftFindings, reconcileMoney, type MoneyDriftFinding, type MoneyDriftReport } from "@/money-service/reconcile";
 import { getSharedPaymentsProvider } from "@/payments-provider/registry";
 import { ok } from "@/lib/api/respond";

@@ -1,5 +1,5 @@
-import type { StatLine } from "@/domain/player";
-import { STAT_FIELDS } from "@/domain/player";
+import type { StatLine } from "@research/domain/player";
+import { STAT_FIELDS } from "@research/domain/player";
 
 const DIGEST_SEPARATOR = "|";
 

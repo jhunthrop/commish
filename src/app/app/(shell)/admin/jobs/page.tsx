@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { withAdmin } from "@/app/api/admin/_shared";
 import { JobRerunControl } from "@/admin-room/components/job-rerun-control";
 import { Badge, PageTitle, Table, type TableColumn } from "@/components/ui";
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { deadLetterJobs, recentRuns, scheduleStatuses, type DeadLetterRow, type RecentRunRow, type ScheduleStatusRow } from "@/jobs/admin-view";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 

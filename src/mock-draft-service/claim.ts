@@ -1,7 +1,7 @@
 import { and, eq, gt } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research/db/client";
 import { drafts, leagues, mockRooms, teams, users } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research/domain/timing";
 import type { DraftStore } from "@/draft-service/store";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 

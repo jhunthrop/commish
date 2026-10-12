@@ -1,6 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestDb, TEST_DATABASE_URL, truncateAll } from "@/db/test-db";
+import { createTestDb, TEST_DATABASE_URL } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { auditEvents, drafts, leagues, teams } from "@/db/schema";
 import { ensureHouseCatalog } from "@/league-service/house-factory";
 import { HOUSE_CATALOG } from "@/matchmaking/house-catalog";

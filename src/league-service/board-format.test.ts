@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import type { Db } from "@research/db/client";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { leagues, scoringSettings, users } from "@/db/schema";
-import { HALF_PPR_SCORING, STANDARD_SCORING } from "@/domain/scoring";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { boardFormatResolution, leagueBoardFormat } from "./board-format";
+import { HALF_PPR_SCORING, STANDARD_SCORING } from "@research/domain/scoring";
+import { BOARD_SOURCE } from "@research/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { boardFormatResolution } from "@research/board/format-resolution";
+import { leagueBoardFormat } from "./board-format";
 
 describe("leagueBoardFormat", () => {
   let db: Db;

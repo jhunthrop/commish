@@ -1,17 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { leagues, nflPlayers, nflverseTeamDefenseWeeks, playerCrosswalk, players, preseasonBoardReasons, preseasonProjections, scoringSettings, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { HALF_PPR_SCORING, PPR_SCORING } from "@/domain/scoring";
-import { roundPoints } from "@/scoring";
+import type { Db } from "@research/db/client";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { nflPlayers, nflverseTeamDefenseWeeks, playerCrosswalk, players, preseasonBoardReasons, preseasonProjections } from "@research/db/schema";
+import { leagues, scoringSettings, users } from "@/db/schema";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import { HALF_PPR_SCORING, PPR_SCORING } from "@research/domain/scoring";
+import { roundPoints } from "@research/scoring";
 import { valueOrderFor } from "@/draft-service/sim/value-order";
-import type { TeamDefenseWeekRow } from "@/projections/nflverse/team-defense-weeks";
-import { boardSourceFor } from "@/projections/preseason/board-formats";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import type { TeamDefenseWeekRow } from "@research/projections/nflverse/team-defense-weeks";
+import { boardSourceFor } from "@research/projections/preseason/board-formats";
+import { BOARD_SOURCE } from "@research/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
 import { leagueBoardFormat } from "@/league-service/board-format";
-import { BOARD_LAST_SEASON, boardRows, isProjectedRow, resolveBoardFormat } from "./service";
+import { BOARD_LAST_SEASON, boardRows, isProjectedRow, resolveBoardFormat } from "@research/board/service";
 
 /** One archived defense week for the Rams, in the archive's OWN spelling (`LA`) — the fold onto
  *  the product's `DST-LAR` is the reader's job, and this fixture must not do it for it. */

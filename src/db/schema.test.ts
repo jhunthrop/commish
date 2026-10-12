@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import { unwrapCauseChain } from "./errors";
-import { createTestDb, truncateAll } from "./test-db";
-import { users, leagues, teams, scoringSettings, leagueInvites, lineupSlots, statWeeks, userPreferences, reviews, reviewReports } from "./schema";
-import { PPR_SCORING } from "@/domain/scoring";
+import { unwrapCauseChain } from "@research/db/errors";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { statWeeks } from "@research/db/schema";
+import { users, leagues, teams, scoringSettings, leagueInvites, lineupSlots, userPreferences, reviews, reviewReports } from "@/db/schema";
+import { PPR_SCORING } from "@research/domain/scoring";
 
 const db = createTestDb();
 

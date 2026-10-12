@@ -16,11 +16,11 @@
 //
 // THE RESOLUTION RATE IS PRINTED AND THE UNRESOLVED ARE NAMED. A benchmark that silently resolved
 // sixty percent of a board would be shown on the sixty percent of players that happened to match.
-import { createDb } from "@/db/client";
-import { BENCHMARK_SOURCES, resolveRankings } from "@/projections/preseason/benchmarks";
-import { crossedRosterIdentities, PRODUCT_SEASON } from "@/projections/preseason/current";
-import { fetchExpertConsensus } from "@/projections/preseason/publishers";
-import { recordPreseasonRankings } from "@/projections/preseason/store";
+import { createDb } from "@research/db/client";
+import { BENCHMARK_SOURCES, resolveRankings } from "@research/projections/preseason/benchmarks";
+import { crossedRosterIdentities, PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { fetchExpertConsensus } from "@research/projections/preseason/publishers";
+import { recordPreseasonRankings } from "@research/projections/preseason/store";
 
 const SEASON = Number(process.argv[2] ?? PRODUCT_SEASON);
 

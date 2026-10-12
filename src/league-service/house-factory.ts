@@ -1,7 +1,7 @@
 import { and, asc, eq, gt, or, sql, type SQL } from "drizzle-orm";
-import type { Db, DbTx, ReadonlyDb } from "@/db/client";
+import type { Db, DbTx, ReadonlyDb } from "@research/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research/domain/timing";
 import { DRAFT_SERVICE_CONFIG } from "@/draft-service/config";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { LEAGUE_CONFIG } from "@/league";
@@ -53,7 +53,7 @@ export function houseKickoffStillAhead(nowIso: string): SQL | undefined {
  *
  * Ordered by `created_at` ascending — the order THIS reconciler needs (each new spawn gets the
  * next stagger slot, `openIndex` below, off how many of the rung's own leagues already exist),
- * and the order `leagues_house_rung_idx` (`@/db/schema`) carries `created_at` as its second
+ * and the order `leagues_house_rung_idx` (`@research/db/schema`) carries `created_at` as its second
  * column for.
  *
  * NOT the order the shelf itself is read in. An earlier draft of this docblock (and of the

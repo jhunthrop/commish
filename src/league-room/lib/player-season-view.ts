@@ -2,8 +2,8 @@ import type { SeasonWeek, SourceValue } from "@/components/ui";
 import type { PlayerDossierFacts } from "@/league-service/dossier-facts";
 import type { PlayerSeasonBody } from "@/league-service/player";
 import type { CallCardMarket, CallCardOurBoard } from "../dossier/call-card";
-import { POSITION_PLURAL } from "@/domain/position-words";
-import { verdictLine } from "../outlook/verdict";
+import { POSITION_PLURAL } from "@research/domain/position-words";
+import { verdictLine } from "@research/capsules/outlook/verdict";
 
 /** The source strip's five cells; precision rulings live with each cell. See the player page's
  *  original docblock for the full account of which sources reach this season. */

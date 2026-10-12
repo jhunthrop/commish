@@ -1,5 +1,5 @@
 // THE PRE-KICKOFF PROPS SNAPSHOT JOB — fires daily (`schedules.ts`'s own cron entry) and captures
-// the current season's props archive (`@/projections/odds/snapshot`'s `runOddsSnapshot`, the same
+// the current season's props archive (`@research/projections/odds/snapshot`'s `runOddsSnapshot`, the same
 // work `npm run projections:odds:snapshot` does), THEN RESOLVES it (`player-map.ts`'s
 // `resolveAllPropNames`, the identical core `npm run projections:odds:resolve` runs by hand) so a
 // newly-captured or newly-postable name reaches `props_player_map` the same night rather than
@@ -41,14 +41,14 @@
 // `ODDS_API_KEY`, a network/HTTP failure inside `runOddsSnapshot`, or a DB failure inside the
 // resolve step is worth retrying (the next scheduled fire, or a same-night redelivery, may simply
 // find the key configured or the upstream recovered), so nothing here is classified terminal.
-import type { Db } from "@/db/client";
-import type { JsonObject } from "@/domain/json";
-import type { Clock } from "@/domain/timing";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { requireEnv } from "@/projections/odds/http";
-import { resolveAllPropNames, type ResolveAllPropNamesResult } from "@/projections/odds/player-map";
-import { runOddsSnapshot, type SnapshotSummary } from "@/projections/odds/snapshot";
-import { firstKickoffFor } from "@/projections/team-store";
+import type { Db } from "@research/db/client";
+import type { JsonObject } from "@research/domain/json";
+import type { Clock } from "@research/domain/timing";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { requireEnv } from "@research/projections/odds/http";
+import { resolveAllPropNames, type ResolveAllPropNamesResult } from "@research/projections/odds/player-map";
+import { runOddsSnapshot, type SnapshotSummary } from "@research/projections/odds/snapshot";
+import { firstKickoffFor } from "@research/projections/team-store";
 import { defineJob, type AnyJobDefinition, type StepOutcome } from "../contract";
 
 export const PROPS_PRESEASON_SNAPSHOT_JOB_NAME = "props-preseason-snapshot";

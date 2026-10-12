@@ -1,4 +1,4 @@
-import type { Player, StatLine } from "@/domain/player";
+import type { Player, StatLine } from "@research/domain/player";
 import type { AdpEntry, GameStatus, GameSummary, RequestCost, StatsProvider } from "@/stats/provider";
 
 /** One game the fake provider knows about, plus the box score it hands back for it. */

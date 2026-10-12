@@ -1,4 +1,4 @@
-import type { Player, StatLine } from "@/domain/player";
+import type { Player, StatLine } from "@research/domain/player";
 import type { GameStatus, GameSummary } from "../provider";
 
 /**

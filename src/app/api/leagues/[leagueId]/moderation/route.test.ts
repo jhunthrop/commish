@@ -11,7 +11,8 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { chatMessages, leagues, teams, users } from "@/db/schema";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { GET as getModeration } from "./route";

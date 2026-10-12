@@ -47,34 +47,34 @@
 // that: v1 gets the RAW board's own reasons back (`shippedPreseasonCandidates`'s `{ raw: true }`
 // seam), honest again; v2, a source with no prior rows, gets the blended board's projections AND
 // reasons written for real, for the first time.
-import { createDb, type Db } from "@/db/client";
-import { PPR_SCORING } from "@/domain/scoring";
-import { BOARD_FORMAT_SPECS, BOARD_FORMATS, boardSourceFor, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
-import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import type { Position } from "@/domain/player";
-import type { Clock } from "@/domain/timing";
-import { nflPlayers } from "@/db/schema";
-import type { LeagueShape } from "@/projections/decide/replacement";
-import { shippedPreseasonBoardInputs, type BlendConstants } from "@/projections/market/blend";
-import { rosterStatusReason } from "@/projections/preseason/roster-status";
-import type { ExcludedCandidate } from "@/projections/preseason/roster-status-gate";
-import type { SweepCoverage } from "@/projections/preseason/roster-status-read";
-import { FITTED_BLEND_CONSTANTS } from "@/projections/market/blend-fitted";
-import { marketBoard } from "@/projections/market/curve";
-import { propsAnchorForSeason } from "@/projections/market/props-anchor";
-import { blendConstantsWithPropsAnchor, PROPS_ANCHOR_WEIGHT_ARTIFACT } from "@/projections/market/props-anchor-artifact";
-import { loadModelArtifact } from "@/projections/model/artifacts";
-import { preseasonBoard, type BoardEntry, type BoardReason } from "@/projections/preseason/board";
-import type { GameVariancePriors } from "@/projections/preseason/game-variance";
-import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
-import { boardReasons, BOARD_SOURCE_V1_RAW, writePreseasonBoard, type BoardWriteCounts } from "@/projections/preseason/board-store";
+import { createDb, type Db } from "@research/db/client";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { BOARD_FORMAT_SPECS, BOARD_FORMATS, boardSourceFor, isBoardFormat, type BoardFormat } from "@research/projections/preseason/board-formats";
+import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research/domain/roster";
+import type { Position } from "@research/domain/player";
+import type { Clock } from "@research/domain/timing";
+import { nflPlayers } from "@research/db/schema";
+import type { LeagueShape } from "@research/projections/decide/replacement";
+import { shippedPreseasonBoardInputs, type BlendConstants } from "@research/projections/market/blend";
+import { rosterStatusReason } from "@research/projections/preseason/roster-status";
+import type { ExcludedCandidate } from "@research/projections/preseason/roster-status-gate";
+import type { SweepCoverage } from "@research/projections/preseason/roster-status-read";
+import { FITTED_BLEND_CONSTANTS } from "@research/projections/market/blend-fitted";
+import { marketBoard } from "@research/projections/market/curve";
+import { propsAnchorForSeason } from "@research/projections/market/props-anchor";
+import { blendConstantsWithPropsAnchor, PROPS_ANCHOR_WEIGHT_ARTIFACT } from "@research/projections/market/props-anchor-artifact";
+import { loadModelArtifact } from "@research/projections/model/artifacts";
+import { preseasonBoard, type BoardEntry, type BoardReason } from "@research/projections/preseason/board";
+import type { GameVariancePriors } from "@research/projections/preseason/game-variance";
+import { loadShippedGameVariance } from "@research/projections/preseason/game-variance-artifacts";
+import { boardReasons, BOARD_SOURCE_V1_RAW, writePreseasonBoard, type BoardWriteCounts } from "@research/projections/preseason/board-store";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
-} from "@/projections/preseason/fitted";
-import { FITTED_MODEL } from "@/projections/model/source";
+} from "@research/projections/preseason/fitted";
+import { FITTED_MODEL } from "@research/projections/model/source";
 import {
   liveMomentFor,
   loadPreseason,
@@ -82,7 +82,7 @@ import {
   type BoardMoment,
   type PreseasonInputs,
   type PreseasonPriors,
-} from "@/projections/preseason/source";
+} from "@research/projections/preseason/source";
 
 /**
  * Every season this script will build WITHOUT being asked for one by name.

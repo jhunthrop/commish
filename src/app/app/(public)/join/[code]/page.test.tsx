@@ -7,7 +7,7 @@ import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/identity-service/preferences", () => ({ readPreferences: vi.fn() }));
 vi.mock("@/league-service/invites", () => ({ invitePreview: vi.fn() }));
 vi.mock("@/money-service/read", () => ({ walletSummary: vi.fn() }));

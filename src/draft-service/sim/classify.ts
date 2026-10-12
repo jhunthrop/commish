@@ -22,7 +22,7 @@
  * read them as one three-way split when it wants to; `early-TE` and `late-QB` are independent
  * axes layered on top, matching the mock's own compound naming ("Hero-RB, TE early").
  */
-import type { Position } from "@/domain/player";
+import type { Position } from "@research/domain/player";
 
 export type BuildLabel = "hero-RB" | "zero-RB" | "robust-RB" | "early-TE" | "late-QB";
 

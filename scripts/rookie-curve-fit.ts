@@ -27,9 +27,9 @@
 // writes are part of the residual its own decomposition could not mask away. A check is now
 // READ-ONLY, and `rookie-curve-fit.test.ts` pins it that way.
 import { readFileSync, writeFileSync } from "node:fs";
-import { createDb, type Db, type ReadonlyDb } from "@/db/client";
-import { ingestDraftPicks, type DraftPickIngestReport } from "@/projections/nflverse/draft-picks";
-import { HISTORICAL_ROSTER_FLOOR } from "@/projections/nflverse/rosters";
+import { createDb, type Db, type ReadonlyDb } from "@research/db/client";
+import { ingestDraftPicks, type DraftPickIngestReport } from "@research/projections/nflverse/draft-picks";
+import { HISTORICAL_ROSTER_FLOOR } from "@research/projections/nflverse/rosters";
 import {
   fitRookieCurve,
   loadRookieCurveObservations,
@@ -37,9 +37,9 @@ import {
   ROOKIE_CURVE_TRAIN_CUTOFF_SEASON,
   type RookieCurveObservation,
   type RookieCurvePriors,
-} from "@/projections/preseason/rookie-curve";
+} from "@research/projections/preseason/rookie-curve";
 
-const OUTPUT = "src/projections/preseason/rookie-curve-fitted.ts";
+const OUTPUT = "research/src/projections/preseason/rookie-curve-fitted.ts";
 const POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 const SANITY_PICKS = [1, 32, 100] as const;
 
@@ -77,7 +77,7 @@ function header(): string {
 `;
 }
 
-function render(priors: import("@/projections/preseason/rookie-curve").RookieCurvePriors): string {
+function render(priors: import("@research/projections/preseason/rookie-curve").RookieCurvePriors): string {
   return `${header()}
 export const FITTED_ROOKIE_CURVE: RookieCurvePriors = ${JSON.stringify(priors, null, 2)};
 `;

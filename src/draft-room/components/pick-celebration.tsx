@@ -1,6 +1,6 @@
 "use client";
 
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { TeamCard } from "@/domain/league";
 import { Celebration } from "@/components/ui";
 import { useTransientVisibility } from "@/design/use-transient-visibility";

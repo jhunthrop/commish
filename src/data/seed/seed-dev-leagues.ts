@@ -1,8 +1,8 @@
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { drafts, leagues, scoringSettings, teams } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { PPR_SCORING } from "@/domain/scoring";
+import type { Clock } from "@research/domain/timing";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import { PPR_SCORING } from "@research/domain/scoring";
 import { DEV_SEED } from "./config";
 import { ensureDevUsers, preserveRealCommissioner, preserveRealTeamOwner } from "./dev-users";
 

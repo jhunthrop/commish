@@ -14,10 +14,10 @@
  * else. Both reads are facts about the room state, not the viewer, so the service memoises them
  * beside the odds table.
  */
-import type { Position } from "@/domain/player";
+import type { Position } from "@research/domain/player";
 import { draftedPlayerIds, type DraftState } from "@/draft-engine";
-import { isRealTierCliff, tierStanding } from "@/projections/decide/tiers";
-import { shipsProjectedRows } from "@/projections/preseason/kdef-decision";
+import { isRealTierCliff, tierStanding } from "@research/projections/decide/tiers";
+import { shipsProjectedRows } from "@research/projections/preseason/kdef-decision";
 import { ADVISOR_CONFIG } from "./config";
 import type { ValuedEntry } from "./recommend";
 import type { PositionRun, TierCollapse } from "./view";

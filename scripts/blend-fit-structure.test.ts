@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { BLEND_TRAIN_CUTOFF_SEASON, scoreBlendConstants, type BlendConstants, type BlendTrainRow } from "@/projections/market/blend";
-import { HELD_OUT_SEASONS } from "@/projections/model/fitted";
-import { BENCHMARK_BOARD_FLOOR } from "@/projections/preseason/benchmarks";
-import { ROOKIE_CURVE_TRAIN_CUTOFF_SEASON } from "@/projections/preseason/rookie-curve";
+import { BLEND_TRAIN_CUTOFF_SEASON, scoreBlendConstants, type BlendConstants, type BlendTrainRow } from "@research/projections/market/blend";
+import { HELD_OUT_SEASONS } from "@research/projections/model/fitted";
+import { BENCHMARK_BOARD_FLOOR } from "@research/projections/preseason/benchmarks";
+import { ROOKIE_CURVE_TRAIN_CUTOFF_SEASON } from "@research/projections/preseason/rookie-curve";
 import { blendTrainSeasons } from "./blend-fit";
 import { rookieCurveTrainSeasons } from "./rookie-curve-fit";
 

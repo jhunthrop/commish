@@ -4,7 +4,7 @@
 // The worker runs this same pass on its tick; this script exists so an operator can land a
 // fresh snapshot (a new feed's first, an injury report before kickoff) without waiting out
 // the poll interval. Same singletons, same ledger, same freshness keys.
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { getCapture, getIngestionBudget } from "@/stats-pipeline";
 
 async function main(): Promise<void> {

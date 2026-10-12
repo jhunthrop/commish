@@ -1,4 +1,4 @@
-import type { ReadonlyDb } from "@/db/client";
+import type { ReadonlyDb } from "@research/db/client";
 import { moneyAccounts } from "@/db/schema";
 import { accountIdFor, accountSide, type MoneyAccountKind } from "@/money/accounts";
 import { formatUsd, MONEY_CONFIG } from "@/money/config";

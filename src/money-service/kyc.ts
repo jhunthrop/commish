@@ -1,7 +1,7 @@
 import { and, eq, ne } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { users } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research/domain/timing";
 import type { AuditLogger } from "@/integrity-service/audit-logger";
 import { MONEY_REFUSALS, type MoneyRefusalReason } from "@/money/config";
 import type { MoneyStatesConfig, StateCode } from "@/money/states";

@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { draftActions, drafts, leagues, teams, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { DRAFT_ACTION_VERSION } from "@/domain/draft";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import { DRAFT_ACTION_VERSION } from "@research/domain/draft";
 import { DRAFT_SKIP_POLICY } from "@/draft-engine";
 import { setSlotPreference } from "@/draft-service/slot-preference";
 import { LEAGUE_CONFIG } from "@/league";

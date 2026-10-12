@@ -6,7 +6,7 @@
  * result byte-for-byte is `{config}` plus the pool it was called with, both already persisted
  * onto `sim_runs.config` by the caller (`persist.ts`).
  */
-import type { DraftPoolEntry } from "@/domain/draft";
+import type { DraftPoolEntry } from "@research/domain/draft";
 import { roundForPick, snakeTeamForPick, totalRosterSlots } from "@/draft-engine";
 import { simBoardOrder, type SimRankableEntry } from "./board-order";
 import { valueOrderFor } from "./value-order";

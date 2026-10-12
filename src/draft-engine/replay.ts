@@ -1,4 +1,4 @@
-import type { DraftAction } from "@/domain/draft";
+import type { DraftAction } from "@research/domain/draft";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
 import { reduceDraft } from "./reduce";
 

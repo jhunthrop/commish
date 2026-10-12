@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { PlayerSeasonStats } from "@/league-service/player-season-stats";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
 import { buildPeekDocument, hydratePeekDocument, type PeekDocumentInput, type PeekDocumentLiveFacts } from "./peek-document";
 import type { PeekDocumentBasis } from "./peek-document-row";
 

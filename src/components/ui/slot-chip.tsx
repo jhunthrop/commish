@@ -1,4 +1,4 @@
-import type { RosterSlotType } from "@/domain/roster";
+import type { RosterSlotType } from "@research/domain/roster";
 import { EYEBROW } from "./config";
 
 export interface SlotChipProps {

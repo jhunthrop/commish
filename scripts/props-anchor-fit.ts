@@ -56,32 +56,32 @@
 // Run: npm run projections:props-anchor:fit
 //      npm run projections:props-anchor:fit -- --check   (recomputes, exits 1 when the pinned artifact drifts)
 import { writeFileSync } from "node:fs";
-import { createDb } from "@/db/client";
-import type { Db, ReadonlyDb } from "@/db/client";
-import { PPR_SCORING } from "@/domain/scoring";
-import type { Position } from "@/domain/player";
-import { blendBoard, seasonPointsOf, type BlendConstants } from "@/projections/market/blend";
-import { FITTED_BLEND_CONSTANTS } from "@/projections/market/blend-fitted";
-import { marketBoard, isCurvePosition, type CurvePosition, type MarketPriorEntry } from "@/projections/market/curve";
-import { propsAnchorForSeason } from "@/projections/market/props-anchor";
-import { PROPS_ANCHOR_WEIGHT_ARTIFACT, type PropsAnchorWeight } from "@/projections/market/props-anchor-artifact";
-import { draftVersionOf, loadModelArtifact } from "@/projections/model/artifacts";
-import { registry } from "@/projections/laws/registry";
-import type { Law } from "@/projections/laws/types";
-import { statLinesAsOfForMeasurement } from "@/projections/nflverse/derived-stat-lines";
-import { LAST_POSSIBLE_WEEK } from "@/projections/store";
-import { computeFantasyPoints } from "@/scoring/compute";
-import type { BoardCandidate } from "@/projections/preseason/board";
+import { createDb } from "@research/db/client";
+import type { Db, ReadonlyDb } from "@research/db/client";
+import { PPR_SCORING } from "@research/domain/scoring";
+import type { Position } from "@research/domain/player";
+import { blendBoard, seasonPointsOf, type BlendConstants } from "@research/projections/market/blend";
+import { FITTED_BLEND_CONSTANTS } from "@research/projections/market/blend-fitted";
+import { marketBoard, isCurvePosition, type CurvePosition, type MarketPriorEntry } from "@research/projections/market/curve";
+import { propsAnchorForSeason } from "@research/projections/market/props-anchor";
+import { PROPS_ANCHOR_WEIGHT_ARTIFACT, type PropsAnchorWeight } from "@research/projections/market/props-anchor-artifact";
+import { draftVersionOf, loadModelArtifact } from "@research/projections/model/artifacts";
+import { registry } from "@research/projections/laws/registry";
+import type { Law } from "@research/projections/laws/types";
+import { statLinesAsOfForMeasurement } from "@research/projections/nflverse/derived-stat-lines";
+import { LAST_POSSIBLE_WEEK } from "@research/projections/store";
+import { computeFantasyPoints } from "@research/scoring/compute";
+import type { BoardCandidate } from "@research/projections/preseason/board";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
-} from "@/projections/preseason/fitted";
-import { FITTED_MODEL } from "@/projections/model/source";
-import { loadPreseason, preseasonCandidates, SHIPPED_PRESEASON_FEATURES, type PreseasonPriors } from "@/projections/preseason/source";
-import { gradableInputs } from "@/projections/preseason/scorecard";
-import { spearman, meanAbsoluteError, type Observation } from "@/projections/metrics";
+} from "@research/projections/preseason/fitted";
+import { FITTED_MODEL } from "@research/projections/model/source";
+import { loadPreseason, preseasonCandidates, SHIPPED_PRESEASON_FEATURES, type PreseasonPriors } from "@research/projections/preseason/source";
+import { gradableInputs } from "@research/projections/preseason/scorecard";
+import { spearman, meanAbsoluteError, type Observation } from "@research/projections/metrics";
 import { recordAndPublishFit, type PublishedRecord } from "./lib/model-artifact-records";
 
 const REPORT_PATH = "docs/research/2026-09-05-props-anchor-backtest.md";

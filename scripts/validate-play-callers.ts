@@ -3,7 +3,7 @@
 //
 // The reading and the checks live in `./lib/play-callers-csv.ts`, shared with `coaches-ingest.ts`
 // so the ingest can never write a file this validator would refuse.
-import { FACT_SEASONS } from "@/projections/nflverse/team-eras";
+import { FACT_SEASONS } from "@research/projections/nflverse/team-eras";
 import { HEAD_COACH_SEASONS, loadPlayCallers, PLAY_CALLERS_CSV_PATH } from "./lib/play-callers-csv";
 
 const { rows, problems } = loadPlayCallers(PLAY_CALLERS_CSV_PATH);

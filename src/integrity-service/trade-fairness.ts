@@ -1,7 +1,7 @@
 import { and, eq, isNull, notExists, sql } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research/db/client";
 import { integrityFlags, tradeProposals } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research/domain/timing";
 import { assembleAdvisorContext, valuePlayers, type AdvisorTeamContext } from "@/ai-advisor/context";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import type { ResolutionDecision, TradeFairnessBasis } from "@/integrity/flags";

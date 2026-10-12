@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import type { Db } from "@research/db/client";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { assembleAdvisorContext } from "./context";
 import { ADVISOR_SYSTEM_PROMPT, startSitPrompt, tradePrompt } from "./prompt";
 import { advisorFixture } from "@/league-service/test-support";

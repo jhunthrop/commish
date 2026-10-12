@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BigNumber, Button, PlayerRow, SegmentGroup } from "@/components/ui";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { FreeAgentRow, PendingWaiverClaim } from "@/league-service/claims-contract";
-import type { FixtureLabel } from "@/league-service/nfl-schedule";
+import type { FixtureLabel } from "@research/reference/nfl-schedule";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { formatWeekdayClock, ordinal } from "../lib/format";

@@ -1,5 +1,5 @@
-import type { Player } from "@/domain/player";
-import type { BoardReason } from "@/projections/preseason/board";
+import type { Player } from "@research/domain/player";
+import type { BoardReason } from "@research/projections/preseason/board";
 import type { CheatSheet } from "../state/sheet";
 import type { PeekFacts } from "../components/peek-sheet";
 

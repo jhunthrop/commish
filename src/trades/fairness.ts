@@ -1,6 +1,6 @@
 import { ADVISOR_CONFIG } from "@/domain/advisor";
-import type { Position } from "@/domain/player";
-import { roundPoints } from "@/scoring";
+import type { Position } from "@research/domain/player";
+import { roundPoints } from "@research/scoring";
 
 export interface ValuedPlayer {
   readonly playerId: string;

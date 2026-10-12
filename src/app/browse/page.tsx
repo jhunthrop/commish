@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { createSheetDefaults, shellData } from "@/components/app-shell/shell-data";

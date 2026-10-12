@@ -1,10 +1,11 @@
 import { asc, eq, sql } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
-import { isUniqueViolation } from "@/db/errors";
-import { draftActions, drafts, leagues, players, teams } from "@/db/schema";
-import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
-import { restrictedPositions } from "@/domain/roster-eligibility";
-import type { Clock } from "@/domain/timing";
+import type { Db, DbTx } from "@research/db/client";
+import { isUniqueViolation } from "@research/db/errors";
+import { players } from "@research/db/schema";
+import { draftActions, drafts, leagues, teams } from "@/db/schema";
+import { DRAFT_ACTION_VERSION, type DraftAction } from "@research/domain/draft";
+import { restrictedPositions } from "@research/domain/roster-eligibility";
+import type { Clock } from "@research/domain/timing";
 import {
   admitCommand,
   AUCTION_CONFIG,
@@ -908,7 +909,7 @@ export function createDraftStore({
             // Task 6: NFFC's Kentucky Derby System. The draw's OUTPUT is what rides the persisted
             // action from here on (`draftOrder` itself), so replay never re-reads this table and a
             // preference saved after this instant can never change history (ruling 27 — see
-            // `draft_slot_preferences`'s own docblock in `@/db/schema`). What F9 changed is only
+            // `draft_slot_preferences`'s own docblock in `@research/db/schema`). What F9 changed is only
             // WHEN the input is read, never that the output is a snapshot.
             // Mock rooms grant a chosen seat outright ("ranked-first" — see `assignDraftSlots`);
             // real leagues keep the fair-lottery draw-order rule byte-identical.

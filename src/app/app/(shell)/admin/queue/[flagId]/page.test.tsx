@@ -7,7 +7,7 @@ import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
 
 vi.mock("@/lib/auth/current-user", () => ({ requireAdmin: vi.fn() }));
-vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/integrity-service/flags", () => ({ flagDetail: vi.fn() }));
 vi.mock("@/draft-service/teams", () => ({ leagueNameFor: vi.fn() }));
 

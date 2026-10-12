@@ -1,10 +1,12 @@
 import { describe, expect, it, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
-import type { DbTx } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, drafts, leagues, matchups, memberNotices, players, playerStatLines, rosterSlots, statWeeks, teams, users, weeks } from "@/db/schema";
+import type { DbTx } from "@research/db/client";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players, playerStatLines, statWeeks } from "@research/db/schema";
+import { auditEvents, drafts, leagues, matchups, memberNotices, rosterSlots, teams, users, weeks } from "@/db/schema";
 import type { AuditEvent, AuditEventInput } from "@/domain/audit";
-import type { StatLine } from "@/domain/player";
+import type { StatLine } from "@research/domain/player";
 import { leagueMedian } from "@/league/median";
 import { writeSchedule } from "@/league-service/schedule";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
@@ -299,7 +301,7 @@ describe("correctSettledWeek", () => {
     // `correctSettledWeek` re-runs settlement inside the three-day correction window and
     // OVERWRITES scores. A median left at its first value would describe a week that no longer
     // exists, so the write is an overwrite, not a one-way stamp — see `weeks.median_score`'s own
-    // docblock in `@/db/schema` for why that is the opposite of `leagues.season_completed_at`.
+    // docblock in `@research/db/schema` for why that is the opposite of `leagues.season_completed_at`.
     await db.insert(players).values([
       { id: "qb_a", name: "QB A", position: "QB", nflTeam: "KC" },
       { id: "qb_b", name: "QB B", position: "QB", nflTeam: "SF" },

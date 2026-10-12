@@ -1,5 +1,5 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
 import { LEAGUE_CONFIG } from "@/league/config";
 import { notAFixtureLeague } from "@/league-service/browse";
@@ -15,7 +15,7 @@ const DRAFTED_STATUSES = ["in_progress", "complete"] as const;
  * "Leagues filled this season" (Phase 3.6, Task 4) — a claim about rooms that got to draft, not
  * about rows. A league sitting at capacity with a `'scheduled'` draft has not yet done the thing
  * being counted, and counting it would inflate the number by exactly the leagues most likely to
- * still fall over before kickoff. `drafts_league_id_idx`'s own uniqueness (`@/db/schema`) is what
+ * still fall over before kickoff. `drafts_league_id_idx`'s own uniqueness (`@research/db/schema`) is what
  * makes `count(*)` over this join exactly "leagues", never a fan-out — one draft per league,
  * always.
  *

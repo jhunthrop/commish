@@ -10,14 +10,15 @@ vi.mock("@/lib/auth/current-user", () => ({
   requireCurrentUser: vi.fn(),
 }));
 
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { nflPlayers, playerCrosswalk, players } from "@/db/schema";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { nflPlayers, playerCrosswalk, players } from "@research/db/schema";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import type { PlayerHistoryBody } from "@/draft-room/contract";
-import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
-import { STAT_LINE_SOURCE, statMetricName } from "@/projections/lines";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { recordObservations, type PlayerWeekObservation } from "@research/projections/store";
+import { STAT_LINE_SOURCE, statMetricName } from "@research/projections/lines";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
 import { GET as getHistory } from "@/app/api/drafts/[draftId]/players/[playerId]/history/route";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 

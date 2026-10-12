@@ -8,10 +8,10 @@
  * live room does — one function, never a second implementation of "what the advisor says".
  */
 import { SURVIVAL_BANDS } from "@/domain/draft-odds";
-import { restrictedPositions } from "@/domain/roster-eligibility";
+import { restrictedPositions } from "@research/domain/roster-eligibility";
 import { assignSlot, rosterFor, teamOnClock, type DraftState } from "@/draft-engine";
-import type { Recommendation } from "@/projections/decide/draft";
-import type { LeagueShape } from "@/projections/decide/replacement";
+import type { Recommendation } from "@research/projections/decide/draft";
+import type { LeagueShape } from "@research/projections/decide/replacement";
 import { seatsAheadFor, survivalFor, type RoomOddsTable, type SeatSurvival } from "../sim/room-odds";
 import { ADVISOR_CONFIG } from "./config";
 import { askingWindow, recommendNow, type ValuedEntry } from "./recommend";

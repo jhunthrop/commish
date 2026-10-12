@@ -12,11 +12,11 @@
  * second person.
  */
 import { mustPickLine } from "@/domain/must-pick";
-import type { Position } from "@/domain/player";
-import { positionWord } from "@/domain/position-words";
-import { BENCH_SLOT, type RosterSlotType } from "@/domain/roster";
-import type { PickReason } from "@/projections/decide/draft";
-import { shipsProjectedRows } from "@/projections/preseason/kdef-decision";
+import type { Position } from "@research/domain/player";
+import { positionWord } from "@research/domain/position-words";
+import { BENCH_SLOT, type RosterSlotType } from "@research/domain/roster";
+import type { PickReason } from "@research/projections/decide/draft";
+import { shipsProjectedRows } from "@research/projections/preseason/kdef-decision";
 import type { SeatTendency } from "../sim/room-odds";
 import type { PositionRun } from "./view";
 

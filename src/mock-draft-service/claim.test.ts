@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { DbTx } from "@/db/client";
-import { createTestDb, expectRejectionMatching, recordStatements, truncateAll } from "@/db/test-db";
+import type { DbTx } from "@research/db/client";
+import { createTestDb, expectRejectionMatching, recordStatements } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { drafts, mockRooms, teams, users } from "@/db/schema";
 import { copyViolations } from "@/integrity/copy-rules";
 import { MOCK_CONFIG } from "@/mock-draft/config";

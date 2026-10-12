@@ -11,7 +11,7 @@
 // checks and what the file holds. A second small file, fit by its own small script, costs nothing
 // and touches nothing that fit-round already trusted.
 import { writeFileSync } from "node:fs";
-import { createDb } from "@/db/client";
+import { createDb } from "@research/db/client";
 import {
   fitHistoricalRookieGamesRate,
   fitRookieCurveEvidence,
@@ -19,12 +19,12 @@ import {
   ROOKIE_CURVE_TRAIN_CUTOFF_SEASON,
   type HistoricalRookieGamesRate,
   type RookieCurveEvidence,
-} from "@/projections/preseason/rookie-curve";
-import { HISTORICAL_ROSTER_FLOOR } from "@/projections/nflverse/rosters";
-import { DRAFT_BUCKETS, draftBucketFor } from "@/projections/preseason/draft-buckets";
+} from "@research/projections/preseason/rookie-curve";
+import { HISTORICAL_ROSTER_FLOOR } from "@research/projections/nflverse/rosters";
+import { DRAFT_BUCKETS, draftBucketFor } from "@research/projections/preseason/draft-buckets";
 import { rookieCurveTrainSeasons } from "./rookie-curve-fit";
 
-const OUTPUT = "src/projections/preseason/rookie-historical-games-fitted.ts";
+const OUTPUT = "research/src/projections/preseason/rookie-historical-games-fitted.ts";
 const POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 
 function requireEnv(name: string): string {

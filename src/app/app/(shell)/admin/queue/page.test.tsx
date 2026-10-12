@@ -11,7 +11,7 @@ import { NoticesProvider } from "@/components/app-shell/notices-provider";
 // `next/navigation` implementation (a plain synchronous throw with a
 // `NEXT_HTTP_ERROR_FALLBACK;404` digest), same discipline `activity/page.test.tsx` uses.
 vi.mock("@/lib/auth/current-user", () => ({ requireAdmin: vi.fn() }));
-vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/integrity-service/flags", () => ({ listPendingFlags: vi.fn() }));
 
 import { requireAdmin } from "@/lib/auth/current-user";

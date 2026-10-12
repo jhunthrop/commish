@@ -1,6 +1,6 @@
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
-import { nflverseKickingWeeks, nflverseTeamDefenseWeeks } from "./schema";
+import { nflverseKickingWeeks, nflverseTeamDefenseWeeks } from "@research/db/schema";
 
 describe("the kicking and team-defense history tables", () => {
   it("keys a kicking row on season, week and player", () => {

@@ -12,11 +12,11 @@
 // record per team-week, and the plays are discarded as they arrive.
 //
 // nflverse is free, so this spends no upstream request budget.
-import { createDb } from "@/db/client";
-import { createNflverseClient } from "@/projections/nflverse/client";
-import { ingestCoaches, ingestInjuryReports, ingestOpponentDefence, ingestPlayByPlay, ingestSchedule } from "@/projections/nflverse/ingest";
-import { ingestInjuries } from "@/projections/nflverse/injuries";
-import { ingestRosterWeeks } from "@/projections/nflverse/roster-weeks";
+import { createDb } from "@research/db/client";
+import { createNflverseClient } from "@research/projections/nflverse/client";
+import { ingestCoaches, ingestInjuryReports, ingestOpponentDefence, ingestPlayByPlay, ingestSchedule } from "@research/projections/nflverse/ingest";
+import { ingestInjuries } from "@research/projections/nflverse/injuries";
+import { ingestRosterWeeks } from "@research/projections/nflverse/roster-weeks";
 
 const FIRST_SEASON = Number(process.argv[2] ?? 2020);
 const LAST_SEASON = Number(process.argv[3] ?? 2024);

@@ -8,10 +8,10 @@
 // bundle never has to carry it.
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Db } from "@/db/client";
-import { catalogSpecFor } from "@/projections/model/artifact-catalog";
-import { parseModelArtifactRecord, renderModelArtifactRecord, type ModelArtifactRecord } from "@/projections/model/artifact-record";
-import { publishModelArtifact, type ModelArtifactSpec, type PublishOutcome } from "@/projections/model/artifacts";
+import type { Db } from "@research/db/client";
+import { catalogSpecFor } from "@research/projections/model/artifact-catalog";
+import { parseModelArtifactRecord, renderModelArtifactRecord, type ModelArtifactRecord } from "@research/projections/model/artifact-record";
+import { publishModelArtifact, type ModelArtifactSpec, type PublishOutcome } from "@research/projections/model/artifacts";
 
 /** The committed records, relative to the repo root every npm script runs from. */
 export const MODEL_ARTIFACT_RECORDS_DIR = "data/model-artifacts";

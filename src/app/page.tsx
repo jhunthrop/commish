@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { ButtonLink } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";

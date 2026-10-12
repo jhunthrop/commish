@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Db, ReadonlyDb } from "@/db/client";
-import { HISTORICAL_ROSTER_FLOOR } from "@/projections/nflverse/rosters";
-import { ROOKIE_CURVE_TRAIN_CUTOFF_SEASON, type RookieCurveObservation } from "@/projections/preseason/rookie-curve";
+import type { Db, ReadonlyDb } from "@research/db/client";
+import { HISTORICAL_ROSTER_FLOOR } from "@research/projections/nflverse/rosters";
+import { ROOKIE_CURVE_TRAIN_CUTOFF_SEASON, type RookieCurveObservation } from "@research/projections/preseason/rookie-curve";
 import { rookieCurveTrainSeasons, runRookieCurveFit, type RookieCurveFitDeps } from "./rookie-curve-fit";
 
 /**

@@ -12,8 +12,8 @@
 // Writes ONLY the result rows, never the rest of `scheduleObservations` — see `ingestGameResults`'s
 // own docblock for why re-running the full schedule ingestion to add one metric would be a data
 // change nobody asked for.
-import { createDb } from "@/db/client";
-import { ingestGameResults } from "@/projections/nflverse/ingest";
+import { createDb } from "@research/db/client";
+import { ingestGameResults } from "@research/projections/nflverse/ingest";
 import { seasonsWithScheduleCoverage } from "./validate-win-totals";
 
 function requireEnv(name: string): string {

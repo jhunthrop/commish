@@ -1,6 +1,6 @@
 /** The autopick policy is shared with the research core's decide layer and lives beside the roster
  *  rules it reads (`./autopick-policy`); the engine's config surface keeps exporting it. */
-export { AUTOPICK_CONFIG, type DraftAutopickPolicy } from "./autopick-policy";
+export { AUTOPICK_CONFIG, type DraftAutopickPolicy } from "@research/draft-engine/autopick-policy";
 
 /**
  * One tier of the auto-tightening pick clock. A tier applies while the draft is more than
@@ -66,7 +66,7 @@ export const DRAFT_PAUSE_WINDOW: PauseWindow = {
  * (re-read fresh from `loadDraftConfig` on every load). A deploy that changed the allowance
  * mid-draft would otherwise change what an already-persisted TIMER_EXPIRE did the next time
  * that log replayed. Instead this is snapshotted onto the `START_DRAFT` action itself
- * (`StartDraftAction.skipPolicy`, `@/domain/draft`), the same way `AUCTION_CONFIG.minBid`
+ * (`StartDraftAction.skipPolicy`, `@research/domain/draft`), the same way `AUCTION_CONFIG.minBid`
  * already is, and `reduceStart` copies it into `DraftConfig.skipPolicy` — the value baked into
  * that one draft's own history, forever.
  */

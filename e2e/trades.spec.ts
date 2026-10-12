@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { createDb } from "../src/db/client";
-import { integrityFlags, tradeProposals } from "../src/db/schema";
+import { createDb } from "@research/db/client";
+import { integrityFlags, tradeProposals } from "@/db/schema";
 import { expect, expectNotice, test } from "./support/fixtures";
 import {
   E2E_TRADES_FIXTURE_STATE,

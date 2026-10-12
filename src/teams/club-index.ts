@@ -1,5 +1,5 @@
-import { NFL_TEAM_ABBREVIATIONS } from "@/projections/capture-feeds";
-import { NFL_TEAM_NAMES } from "@/domain/nfl-team-names";
+import { NFL_TEAM_ABBREVIATIONS } from "@research/projections/capture-feeds";
+import { NFL_TEAM_NAMES } from "@research/domain/nfl-team-names";
 import { teamPagePath } from "./route";
 
 export interface ClubIndexRow {

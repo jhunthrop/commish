@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { Db } from "@/db/client";
-import { nflGames, nflPlayers, playerCrosswalk, players, preseasonProjections } from "@/db/schema";
+import type { Db } from "@research/db/client";
+import { nflGames, nflPlayers, playerCrosswalk, players, preseasonProjections } from "@research/db/schema";
 import { LEAGUE_CONFIG } from "@/league";
-import { statMetricName, STAT_LINE_SOURCE } from "@/projections/lines";
-import { NFLVERSE_SOURCE, PARTICIPATION_METRICS } from "@/projections/nflverse/map";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { statMetricName, STAT_LINE_SOURCE } from "@research/projections/lines";
+import { NFLVERSE_SOURCE, PARTICIPATION_METRICS } from "@research/projections/nflverse/map";
+import { BOARD_SOURCE } from "@research/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { recordObservations, type PlayerWeekObservation } from "@research/projections/store";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { dossierFactsFor } from "./dossier-facts";
 
 /** SF plays every regular-season week except `byeWeek`; DAL plays every one — the same

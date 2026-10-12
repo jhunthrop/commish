@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { crossLeagueHome } from "@/league-service";

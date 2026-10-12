@@ -1,7 +1,8 @@
 import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auditChainCheckpoints, auditChains, auditEvents } from "@/db/schema";
-import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
+import { countingDb, createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import type { AuditEventInput } from "@/domain/audit";
 import { computeEventHash } from "@/integrity/chain";
 import { createAuditLogger } from "./audit-logger";

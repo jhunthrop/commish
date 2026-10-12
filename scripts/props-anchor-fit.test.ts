@@ -2,9 +2,10 @@ import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { PROPS_ANCHOR_WEIGHT_ARTIFACT } from "@/projections/market/props-anchor-artifact";
-import { draftVersionOf, MissingModelArtifactError, readModelArtifact } from "@/projections/model/artifacts";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { PROPS_ANCHOR_WEIGHT_ARTIFACT } from "@research/projections/market/props-anchor-artifact";
+import { draftVersionOf, MissingModelArtifactError, readModelArtifact } from "@research/projections/model/artifacts";
 import { publishCommittedModelArtifacts, readModelArtifactRecord } from "./lib/model-artifact-records";
 import { checkVerdict, publishVerdict } from "./props-anchor-fit";
 

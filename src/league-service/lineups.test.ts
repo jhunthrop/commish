@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, leagues, lineupSlots, nflGames, rosterSlots, statWeeks, teams, users } from "@/db/schema";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { nflGames, statWeeks } from "@research/db/schema";
+import { auditEvents, leagues, lineupSlots, rosterSlots, teams, users } from "@/db/schema";
 import type { WeekStatus } from "@/league";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";

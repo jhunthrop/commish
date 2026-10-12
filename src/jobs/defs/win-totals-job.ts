@@ -25,12 +25,12 @@
 // TERMINAL VS RETRYABLE: a publisher file whose shape has changed (a renamed column) is terminal —
 // every attempt reads the same file and no retry fixes a rename, it needs a human. Everything else
 // (a 5xx, a network error, the database write) is ordinary retryable weather.
-import type { Db } from "@/db/client";
-import type { JsonObject } from "@/domain/json";
-import type { Clock } from "@/domain/timing";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { firstKickoffFor } from "@/projections/team-store";
-import { fetchPublishedWinTotals, writeVerifiedWinTotals } from "@/projections/vegas/ingest";
+import type { Db } from "@research/db/client";
+import type { JsonObject } from "@research/domain/json";
+import type { Clock } from "@research/domain/timing";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { firstKickoffFor } from "@research/projections/team-store";
+import { fetchPublishedWinTotals, writeVerifiedWinTotals } from "@research/projections/vegas/ingest";
 import { defineJob, TerminalJobError, type AnyJobDefinition, type StepOutcome } from "../contract";
 
 export const WIN_TOTALS_JOB_NAME = "win-totals";

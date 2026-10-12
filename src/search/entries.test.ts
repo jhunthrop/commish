@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BoardRow } from "@/draft-hq/board/service";
+import type { BoardRow } from "@research/board/service";
 import { searchEntriesFor } from "./entries";
 
 function row(overrides: Partial<BoardRow> & Pick<BoardRow, "playerId" | "name" | "position" | "team">): BoardRow {

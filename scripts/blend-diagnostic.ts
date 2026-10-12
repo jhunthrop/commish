@@ -16,24 +16,24 @@
 //      re-verifying the structural guarantee LIVE rather than trusting the code that promises it.
 //
 // Run: npm run projections:blend:diagnose [season ...]   (defaults to 2023, 2024)
-import { createDb } from "@/db/client";
-import { PPR_SCORING } from "@/domain/scoring";
-import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import type { Position } from "@/domain/player";
-import type { LeagueShape } from "@/projections/decide/replacement";
-import { shippedPreseasonCandidates } from "@/projections/market/blend";
-import { FITTED_BLEND_CONSTANTS } from "@/projections/market/blend-fitted";
-import { isCurvePosition } from "@/projections/market/curve";
-import { preseasonBoard, type BoardCandidate, type BoardEntry } from "@/projections/preseason/board";
-import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
+import { createDb } from "@research/db/client";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research/domain/roster";
+import type { Position } from "@research/domain/player";
+import type { LeagueShape } from "@research/projections/decide/replacement";
+import { shippedPreseasonCandidates } from "@research/projections/market/blend";
+import { FITTED_BLEND_CONSTANTS } from "@research/projections/market/blend-fitted";
+import { isCurvePosition } from "@research/projections/market/curve";
+import { preseasonBoard, type BoardCandidate, type BoardEntry } from "@research/projections/preseason/board";
+import { loadShippedGameVariance } from "@research/projections/preseason/game-variance-artifacts";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
-} from "@/projections/preseason/fitted";
-import { FITTED_MODEL } from "@/projections/model/source";
-import { loadPreseason, type PreseasonPriors } from "@/projections/preseason/source";
+} from "@research/projections/preseason/fitted";
+import { FITTED_MODEL } from "@research/projections/model/source";
+import { loadPreseason, type PreseasonPriors } from "@research/projections/preseason/source";
 
 const SEASONS = process.argv.slice(2).map(Number);
 const TARGET_SEASONS = SEASONS.length > 0 ? SEASONS : [2023, 2024];

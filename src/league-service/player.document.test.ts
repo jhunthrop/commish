@@ -4,23 +4,25 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { collectBoardFacts } from "@/capsules/collect";
+import { collectBoardFacts } from "@research/capsules/collect";
 import { writeRefresh } from "@/league-service/peek/peek-facts";
 import { writePeekDocuments } from "@/league-service/peek/peek-document-store";
 import type { PeekDocumentRequest } from "@/league-service/peek/peek-document-inputs";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import * as schema from "@/db/schema";
-import { jobs, nflPlayers, playerCrosswalk, players, playerPeekDocuments, preseasonProjections, users } from "@/db/schema";
+import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@research/db/schema";
+import { jobs, playerPeekDocuments, users } from "@/db/schema";
 import { PEEK_DOCUMENT_JOB_NAME, runPeekDocumentStep } from "@/jobs/defs/peek-document-job";
-import { createTestDb, truncateAll, TEST_DATABASE_URL } from "@/db/test-db";
-import { PPR_SCORING } from "@/domain/scoring";
-import { statMetricName } from "@/projections/lines";
-import { DERIVED_STAT_LINE_SOURCE } from "@/projections/nflverse/derived-stat-lines";
-import { PBP_PLAYER_METRICS, PBP_PLAYER_SOURCE } from "@/projections/nflverse/pbp-players";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
-import { scoringHashOf } from "@/scoring/hash";
+import { createTestDb, TEST_DATABASE_URL } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { statMetricName } from "@research/projections/lines";
+import { DERIVED_STAT_LINE_SOURCE } from "@research/projections/nflverse/derived-stat-lines";
+import { PBP_PLAYER_METRICS, PBP_PLAYER_SOURCE } from "@research/projections/nflverse/pbp-players";
+import { BOARD_SOURCE } from "@research/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { recordObservations, type PlayerWeekObservation } from "@research/projections/store";
+import { scoringHashOf } from "@research/scoring/hash";
 import { createLeague } from "./creation";
 import { playerSeason } from "./player";
 
@@ -61,7 +63,7 @@ const SLOTS = [
 function countingDb(): { readonly db: Db; statements(): readonly string[]; reset(): void; close(): Promise<void> } {
   let seen: string[] = [];
   const client = postgres(TEST_DATABASE_URL, { max: 2, prepare: false, debug: (_connection, query) => { seen.push(query); } });
-  const db = drizzle(client, { schema }) as unknown as Db;
+  const db = drizzle(client) as unknown as Db;
   return {
     db,
     // THE DRIVER'S OWN CONNECTION BOOTSTRAP IS NOT A ROUND TRIP THIS PAGE PAYS. `postgres` reads the

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { LEAGUE_CONFIG } from "@/league";
 import { fixtureLabelsByTeam, leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId } from "@/league-service";

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research/db/client";
 import { userPreferences, users } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
 import { defaultPreferences, type HelpLevel, type PreferenceState } from "@/identity";
 
@@ -63,7 +63,7 @@ export async function applyTierDefaultHelpLevel(tx: DbTx, userId: string, experi
 
 /**
  * The caller's own preferences, seeding the row on first read rather than at sign-up
- * (`userPreferences`'s own docblock in `@/db/schema`).
+ * (`userPreferences`'s own docblock in `@research/db/schema`).
  *
  * READ FIRST, seed only on a miss. This used to run `seedIfMissing` unconditionally, which made
  * every read a write: `GET /api/home` calls it, `HomeBoard` polls that route every 30 seconds,
@@ -84,7 +84,7 @@ export async function readPreferences(db: Db, user: { readonly id: string; reado
 
 /**
  * Writes `helpLevel` and/or stamps `draftTourDismissedAt` from `clock`, never `Date.now()`
- * directly (`@/domain/timing`'s `Clock` convention).
+ * directly (`@research/domain/timing`'s `Clock` convention).
  *
  * Self-sufficient: a bare `PATCH /api/preferences` from a user who has never opened anything
  * that calls `readPreferences` first must still succeed, not 500. So this looks up the caller's

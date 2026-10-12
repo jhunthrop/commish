@@ -1,5 +1,5 @@
 import { and, asc, eq, gt } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { auditChainCheckpoints, auditChains, auditEvents } from "@/db/schema";
 import type { AuditEvent } from "@/domain/audit";
 import { INTEGRITY_CONFIG } from "@/integrity/config";

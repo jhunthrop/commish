@@ -6,8 +6,8 @@
  * concerns. One real DB read, never a fabricated name for an id the roster somehow lost.
  */
 import { inArray } from "drizzle-orm";
-import type { Db } from "@/db/client";
-import { players } from "@/db/schema";
+import type { Db } from "@research/db/client";
+import { players } from "@research/db/schema";
 import type { StoredSimSummary } from "./types";
 
 export interface PlayerIdentity {

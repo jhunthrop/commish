@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, lte } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research/db/client";
 import { drafts, leagues, mockRooms, teams, users } from "@/db/schema";
 import { currentClockSeconds, teamOnClock, type DraftState } from "@/draft-engine";
 import { assignArchetypes, type BotArchetype } from "@/mock-draft/archetypes";

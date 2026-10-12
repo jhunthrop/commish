@@ -1,4 +1,4 @@
-// THE PROPS SNAPSHOT'S CLI — a thin wire around `@/projections/odds/snapshot`, where the whole
+// THE PROPS SNAPSHOT'S CLI — a thin wire around `@research/projections/odds/snapshot`, where the whole
 // implementation moved when the durable job system became a second caller living in `src/` (which
 // may not import `scripts/`). This file's only jobs: parse `--dry-run`, wire a real db, set the
 // exit code.
@@ -6,9 +6,9 @@
 // Run: npm run projections:odds:snapshot
 // Dry run (fetches the event list only, makes no odds requests, writes nothing):
 // npm run projections:odds:snapshot -- --dry-run
-import { createDb } from "@/db/client";
-import { requireEnv } from "@/projections/odds/http";
-import { runOddsSnapshot, selectUpcomingEvents } from "@/projections/odds/snapshot";
+import { createDb } from "@research/db/client";
+import { requireEnv } from "@research/projections/odds/http";
+import { runOddsSnapshot, selectUpcomingEvents } from "@research/projections/odds/snapshot";
 
 async function main(): Promise<void> {
   const dryRun = process.argv.includes("--dry-run");

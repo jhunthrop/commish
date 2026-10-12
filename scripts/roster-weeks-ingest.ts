@@ -3,9 +3,9 @@
 // the availability classifier read). The projection-context script does this too, but only
 // alongside a full season's play-by-play; the current season needs the roster file on its own.
 // (dotenv -e .env.local -- tsx scripts/roster-weeks-ingest.ts 2026 [lastSeason])
-import { createDb } from "@/db/client";
-import { createNflverseClient } from "@/projections/nflverse/client";
-import { ingestRosterWeeks } from "@/projections/nflverse/roster-weeks";
+import { createDb } from "@research/db/client";
+import { createNflverseClient } from "@research/projections/nflverse/client";
+import { ingestRosterWeeks } from "@research/projections/nflverse/roster-weeks";
 
 function requireEnv(name: string): string {
   const value = process.env[name];

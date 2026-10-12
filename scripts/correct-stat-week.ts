@@ -12,7 +12,7 @@
 // this actually cost.
 import { createInterface } from "node:readline/promises";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { leagues, matchups, teams } from "@/db/schema";
 import { renderNotice } from "@/integrity/notices";
 import { getIngestionBudget, getStatsProvider } from "@/stats-pipeline";

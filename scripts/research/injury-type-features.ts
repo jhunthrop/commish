@@ -37,15 +37,15 @@ import { sql } from "drizzle-orm";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createDb, type Db } from "@/db/client";
-import type { Position } from "@/domain/player";
+import { createDb, type Db } from "@research/db/client";
+import type { Position } from "@research/domain/player";
 import {
   deriveSeasonEnding,
   type WeeklyInjuryReport,
   type WeeklyRosterStatus,
-} from "@/projections/availability/season-end";
-import { rosterStatusOf, type RosterStatus } from "@/projections/nflverse/rosters";
-import { ageAtSeason, teamGamesIn } from "@/projections/preseason/availability";
+} from "@research/projections/availability/season-end";
+import { rosterStatusOf, type RosterStatus } from "@research/projections/nflverse/rosters";
+import { ageAtSeason, teamGamesIn } from "@research/projections/preseason/availability";
 
 const CACHE_DIR = process.env.RESEARCH_CACHE_DIR ?? join(tmpdir(), "injury-type-research");
 const OUTPUT_PATH = join(CACHE_DIR, "feature-dataset.json");

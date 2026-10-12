@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { publishQuietly, type PublishErrorSink } from "@/chat-service/chat";
-import type { Db } from "@/db/client";
+import type { Db } from "@research/db/client";
 import { auditEvents, eventReactions } from "@/db/schema";
 import type { EventReactionView } from "@/league-room/contract";
 import type { PublishFn } from "@/lib/realtime/publish";

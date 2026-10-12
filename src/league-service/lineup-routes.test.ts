@@ -10,8 +10,10 @@ vi.mock("@/lib/auth/current-user", () => ({
   requireCurrentUser: vi.fn(),
 }));
 
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { leagues, statWeeks, users } from "@/db/schema";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { statWeeks } from "@research/db/schema";
+import { leagues, users } from "@/db/schema";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { LEAGUE_CONFIG } from "@/league";
 import { GET as getLineupRoute, PUT as putLineup } from "@/app/api/leagues/[leagueId]/teams/me/lineup/route";

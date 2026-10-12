@@ -1,5 +1,5 @@
-import type { PlayerCapsuleView } from "@/capsules/store";
-import { TEMPLATE_CAPSULE_NOTE } from "@/capsules/template";
+import type { PlayerCapsuleView } from "@research/capsules/store";
+import { TEMPLATE_CAPSULE_NOTE } from "@research/capsules/template";
 import { Card } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 

@@ -1,4 +1,4 @@
-import { PBP_PLAYER_METRICS } from "@/projections/nflverse/pbp-players";
+import { PBP_PLAYER_METRICS } from "@research/projections/nflverse/pbp-players";
 import { TEAM_PAGE_CONFIG } from "./config";
 import type { TeamCompetition, UsageCount, UsageShare } from "./contract";
 

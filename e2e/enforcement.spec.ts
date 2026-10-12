@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { and, desc, eq } from "drizzle-orm";
 import { DEV_SEED } from "../src/data/seed/config";
-import { createDb } from "../src/db/client";
-import { memberNotices, teams, tradeProposals, users } from "../src/db/schema";
+import { createDb } from "@research/db/client";
+import { memberNotices, teams, tradeProposals, users } from "@/db/schema";
 import { formatDraftTime } from "../src/league";
 import { ENFORCEMENT_REFUSALS } from "../src/league-service/enforcement";
 import { expect, expectNotice, test } from "./support/fixtures";

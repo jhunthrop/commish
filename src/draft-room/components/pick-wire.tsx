@@ -1,6 +1,6 @@
 "use client";
 
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { PositionBadge } from "@/components/ui";

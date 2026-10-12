@@ -1,5 +1,5 @@
-import type { Position } from "@/domain/player";
-import { shipsProjectedRows } from "@/projections/preseason/kdef-decision";
+import type { Position } from "@research/domain/player";
+import { shipsProjectedRows } from "@research/projections/preseason/kdef-decision";
 
 /**
  * WHAT A POSITION WITH NO PROJECTION SAYS FOR ITSELF (the 2026-09-05 kicker and team defence round).

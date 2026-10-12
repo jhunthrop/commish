@@ -17,16 +17,16 @@
 // reason: re-running the full benchmark ingestion to pick up a resolution fix would also rewrite
 // every other row from a board that may have moved since it was first ingested, which is a data
 // change nobody asked for and which no baseline in this repository would attribute correctly.
-import { createDb, type ReadonlyDb } from "@/db/client";
-import { nflPlayers } from "@/db/schema";
+import { createDb, type ReadonlyDb } from "@research/db/client";
+import { nflPlayers } from "@research/db/schema";
 import {
   BENCHMARK_SOURCES,
   resolveRankings,
   type RankingCandidate,
   type RosterIdentity,
-} from "@/projections/preseason/benchmarks";
-import { fetchAverageDraftPosition } from "@/projections/preseason/publishers";
-import { preseasonRostersAsOf, recordPreseasonRankings } from "@/projections/preseason/store";
+} from "@research/projections/preseason/benchmarks";
+import { fetchAverageDraftPosition } from "@research/projections/preseason/publishers";
+import { preseasonRostersAsOf, recordPreseasonRankings } from "@research/projections/preseason/store";
 
 const FIRST_SEASON = 2013;
 const LAST_SEASON = 2025;

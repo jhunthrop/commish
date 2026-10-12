@@ -7,7 +7,7 @@ import type { LeagueTerms } from "@/league";
 const FORMAT_LABEL: Readonly<Record<DraftFormat, string>> = { snake: "Snake draft", auction: "Auction draft" };
 
 /**
- * `scoringLabel` is a derived string (`describeScoring`, `@/scoring`), not a term key. Every label
+ * `scoringLabel` is a derived string (`describeScoring`, `@research/scoring`), not a term key. Every label
  * it can produce used to carry an `InfoTip` except "Standard"; the founder ruling retired the
  * triggers, so THE RULE ITSELF IS PRINTED instead — one clause, beside the label, in the words a
  * manager would use. That is the ruling's own instruction ("change the word") rather than a

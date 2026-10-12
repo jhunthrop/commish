@@ -19,22 +19,22 @@
 // stat mix (`market/blend.ts`'s `formatRatioOf`). Each format's ADP feed, fitted curve, raw arm
 // scoring and unlisted tail ARE its own (`market/format-anchor.ts`). The half-PPR curve pools four
 // train seasons (2018-2021) where PPR and standard pool nine.
-import { createDb, type ReadonlyDb } from "@/db/client";
-import type { Position } from "@/domain/player";
-import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import { allPositions } from "@/projections/backtest";
-import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
-import type { LeagueShape } from "@/projections/decide/replacement";
-import { shippedPreseasonCandidates } from "@/projections/market/blend";
-import { FITTED_MODEL } from "@/projections/model/source";
-import { preseasonBoard } from "@/projections/preseason/board";
-import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
-import { BOARD_FORMAT_SPECS, BOARD_FORMATS, type BoardFormat } from "@/projections/preseason/board-formats";
-import { FITTED_AVAILABILITY_PRIORS, FITTED_CAREER_PRIORS, FITTED_DEPTH_PRIORS, FITTED_ROOKIE_PRIORS } from "@/projections/preseason/fitted";
-import { actualSeasonPoints, boardPoints, gradableInputs, scoreOrdering } from "@/projections/preseason/scorecard";
-import { loadPreseason, type PreseasonInputs, type PreseasonPriors } from "@/projections/preseason/source";
-import { preseasonRankingsAsOf } from "@/projections/preseason/store";
-import { bootstrapRankCorrelationDifference, type RankCorrelationDifferenceRow } from "@/projections/rank-correlation-bootstrap";
+import { createDb, type ReadonlyDb } from "@research/db/client";
+import type { Position } from "@research/domain/player";
+import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research/domain/roster";
+import { allPositions } from "@research/projections/backtest";
+import { RANK_BANDS, type ScoreCard } from "@research/projections/metrics";
+import type { LeagueShape } from "@research/projections/decide/replacement";
+import { shippedPreseasonCandidates } from "@research/projections/market/blend";
+import { FITTED_MODEL } from "@research/projections/model/source";
+import { preseasonBoard } from "@research/projections/preseason/board";
+import { loadShippedGameVariance } from "@research/projections/preseason/game-variance-artifacts";
+import { BOARD_FORMAT_SPECS, BOARD_FORMATS, type BoardFormat } from "@research/projections/preseason/board-formats";
+import { FITTED_AVAILABILITY_PRIORS, FITTED_CAREER_PRIORS, FITTED_DEPTH_PRIORS, FITTED_ROOKIE_PRIORS } from "@research/projections/preseason/fitted";
+import { actualSeasonPoints, boardPoints, gradableInputs, scoreOrdering } from "@research/projections/preseason/scorecard";
+import { loadPreseason, type PreseasonInputs, type PreseasonPriors } from "@research/projections/preseason/source";
+import { preseasonRankingsAsOf } from "@research/projections/preseason/store";
+import { bootstrapRankCorrelationDifference, type RankCorrelationDifferenceRow } from "@research/projections/rank-correlation-bootstrap";
 
 const SEASONS = process.argv.slice(2).map(Number).filter(Number.isFinite);
 const TARGET_SEASONS = SEASONS.length > 0 ? SEASONS : [2023, 2024];

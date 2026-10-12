@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import type { MemberNotice } from "@/integrity-service/notify";
 import { listNotices, quoteFor } from "@/integrity-service/notify";
 import { ok } from "@/lib/api/respond";

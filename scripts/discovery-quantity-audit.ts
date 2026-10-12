@@ -13,14 +13,14 @@
 // Rows are counted per player-season FACTS ROW (the `current` half), position-scoped exactly as the
 // discovery pipeline scopes them, so the denominators here are the same denominators the candidate
 // conditions see.
-import { createDb } from "@/db/client";
-import type { ReadonlyDb } from "@/db/client";
-import { allPositions } from "@/projections/backtest";
-import { PPR_SCORING } from "@/domain/scoring";
-import { MEASURE_SEASONS } from "@/projections/laws/config";
-import { discoveryFactsForSeason } from "@/projections/laws/discovery-facts";
-import { QUANTITY_DEFS } from "@/projections/laws/discovery/templates";
-import { preseasonMomentFor } from "@/projections/preseason/source";
+import { createDb } from "@research/db/client";
+import type { ReadonlyDb } from "@research/db/client";
+import { allPositions } from "@research/projections/backtest";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { MEASURE_SEASONS } from "@research/projections/laws/config";
+import { discoveryFactsForSeason } from "@research/projections/laws/discovery-facts";
+import { QUANTITY_DEFS } from "@research/projections/laws/discovery/templates";
+import { preseasonMomentFor } from "@research/projections/preseason/source";
 
 function requireEnv(name: string): string {
   const value = process.env[name];

@@ -1,5 +1,5 @@
 import type Redis from "ioredis";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research/domain/timing";
 import { REALTIME_CONFIG } from "./config";
 import type { RealtimeEventType } from "./events";
 

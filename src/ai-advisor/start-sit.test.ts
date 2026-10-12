@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import type { Db } from "@research/db/client";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import type { LlmClient } from "@/lib/llm/client";
 import { assembleAdvisorContext, type AdvisorContext } from "./context";
 import { createStartSitAdvisor } from "./start-sit";

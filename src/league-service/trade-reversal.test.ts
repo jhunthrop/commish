@@ -1,10 +1,12 @@
 import { acceptTradeAndFinalize } from "./test-support";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import type { DbTx } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, drafts, lineupSlots, matchups, memberNotices, players, rosterSlots, statWeeks, teams, tradeProposals, users } from "@/db/schema";
-import type { RosterSlotConfig } from "@/domain/roster";
+import type { DbTx } from "@research/db/client";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players, statWeeks } from "@research/db/schema";
+import { auditEvents, drafts, lineupSlots, matchups, memberNotices, rosterSlots, teams, tradeProposals, users } from "@/db/schema";
+import type { RosterSlotConfig } from "@research/domain/roster";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
 import { raiseFlag } from "@/integrity-service/flags";
 import { getLineup } from "./lineups";

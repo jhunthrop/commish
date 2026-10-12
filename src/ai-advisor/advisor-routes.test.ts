@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import type { Db } from "@research/db/client";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { leagues, users } from "@/db/schema";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
@@ -12,8 +13,8 @@ import type { TradeAssessment } from "./trade";
 const db: Db = createTestDb();
 const currentUser = vi.fn<() => Promise<{ readonly id: string } | null>>();
 
-vi.mock("@/db/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/db/client")>();
+vi.mock("@research/db/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@research/db/client")>();
   return { ...actual, getDb: () => db };
 });
 vi.mock("@/lib/auth/current-user", () => ({

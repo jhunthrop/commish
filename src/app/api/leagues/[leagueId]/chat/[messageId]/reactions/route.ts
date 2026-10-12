@@ -1,6 +1,6 @@
 import { chatMessageIdSchema, reactionSchema, toggleReaction } from "@/chat-service";
 import type { ReactionBody } from "@/chat/contract";
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { getPublisher } from "@/lib/realtime/publisher";
 import { withLeagueMemberActor } from "@/app/api/leagues/_shared";

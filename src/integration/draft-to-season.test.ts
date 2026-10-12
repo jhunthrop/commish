@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { and, asc, eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { draftPicks, drafts, matchups, rosterSlots, weeks } from "@/db/schema";
 import { AUCTION_CONFIG } from "@/draft-engine";
 import { LEAGUE_CONFIG } from "@/league";

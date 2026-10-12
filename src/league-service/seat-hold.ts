@@ -1,5 +1,5 @@
 import { and, eq, gt, isNull } from "drizzle-orm";
-import type { Db, DbTx, ReadonlyDb } from "@/db/client";
+import type { Db, DbTx, ReadonlyDb } from "@research/db/client";
 import { drafts, leagues, seatHolds, teams } from "@/db/schema";
 import { hasOpenSeat } from "@/matchmaking/filter";
 import { plusMinutesIso } from "@/matchmaking/house-catalog";
@@ -19,7 +19,7 @@ export type ClaimSeatHoldOutcome = { readonly ok: true; readonly expiresAt: stri
 /**
  * Live holds against `leagueId` at `nowIso` — expiry is a PREDICATE (`expires_at > now`), never a
  * deletion somebody has to schedule (Step 2's own reasoning, and `seat_holds`'s own docblock in
- * `@/db/schema`). `db` is `ReadonlyDb`, so a standalone caller (a plain `Db`, this function's own
+ * `@research/db/schema`). `db` is `ReadonlyDb`, so a standalone caller (a plain `Db`, this function's own
  * exported use) and a caller mid-transaction (`claimSeatHold` and `joinLeagueInTx`, both handing
  * in their own `DbTx`) satisfy the same signature without a second copy of this query.
  */

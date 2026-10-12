@@ -1,9 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { players, playerStatLines } from "@/db/schema";
-import { createTestDb, recordStatements, truncateAll } from "@/db/test-db";
-import { PPR_SCORING, TE_PREMIUM_SCORING } from "@/domain/scoring";
-import type { Position } from "@/domain/player";
-import { computeFantasyPoints } from "@/scoring";
+import { players, playerStatLines } from "@research/db/schema";
+import { createTestDb, recordStatements } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { PPR_SCORING, TE_PREMIUM_SCORING } from "@research/domain/scoring";
+import type { Position } from "@research/domain/player";
+import { computeFantasyPoints } from "@research/scoring";
 import { seasonStatTotalsByPlayer } from "./season-totals";
 
 const db = createTestDb();

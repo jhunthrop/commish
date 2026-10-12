@@ -1,6 +1,6 @@
-import { NFL_TEAM_NAMES } from "@/domain/nfl-team-names";
-import type { BoardRow } from "@/draft-hq/board/service";
-import { isProjectedRow } from "@/draft-hq/board/service";
+import { NFL_TEAM_NAMES } from "@research/domain/nfl-team-names";
+import type { BoardRow } from "@research/board/service";
+import { isProjectedRow } from "@research/board/service";
 import type { MatchFields } from "./match";
 import { normalizeSearchText } from "./normalize";
 import type { SearchResult } from "./contract";

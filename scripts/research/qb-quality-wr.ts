@@ -40,13 +40,13 @@
 // traded special-teamer). This is only possible for 2023 and 2024, the only two seasons carrying
 // these three metrics. 2025 has no team fingerprint at all; it is used ONLY as an outcome season
 // (a receiver's own next-season PPG needs no team information).
-import { createDb, type Db } from "@/db/client";
+import { createDb, type Db } from "@research/db/client";
 import { sql } from "drizzle-orm";
 import { writeFileSync } from "node:fs";
-import { PPR_SCORING } from "@/domain/scoring";
-import { computeFantasyPoints } from "@/scoring/compute";
-import { LAST_POSSIBLE_WEEK } from "@/projections/store";
-import { statLinesAsOfForMeasurement } from "@/projections/nflverse/derived-stat-lines";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { computeFantasyPoints } from "@research/scoring/compute";
+import { LAST_POSSIBLE_WEEK } from "@research/projections/store";
+import { statLinesAsOfForMeasurement } from "@research/projections/nflverse/derived-stat-lines";
 
 const REPORT_PATH = "docs/research/2026-09-05-qb-quality-for-receivers.md";
 const FINAL_OUTCOME = new Date("9999-12-31T00:00:00.000Z");

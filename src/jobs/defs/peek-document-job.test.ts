@@ -1,20 +1,22 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { collectBoardFacts } from "@/capsules/collect";
+import { collectBoardFacts } from "@research/capsules/collect";
 import { writeRefresh } from "@/league-service/peek/peek-facts";
-import type { Db } from "@/db/client";
-import { jobs, leagues, nflPlayers, playerCrosswalk, players, playerPeekDocuments, preseasonProjections, rosterSlots, teams, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { HALF_PPR_SCORING, PPR_SCORING, STANDARD_SCORING } from "@/domain/scoring";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import type { Db } from "@research/db/client";
+import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@research/db/schema";
+import { jobs, leagues, playerPeekDocuments, rosterSlots, teams, users } from "@/db/schema";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { HALF_PPR_SCORING, PPR_SCORING, STANDARD_SCORING } from "@research/domain/scoring";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
 import { createLeague } from "@/league-service/creation";
 import { writeLeagueScoring } from "@/league-service/settings";
-import { statMetricName } from "@/projections/lines";
-import { DERIVED_STAT_LINE_SOURCE } from "@/projections/nflverse/derived-stat-lines";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
-import { scoringHashOf } from "@/scoring/hash";
+import { statMetricName } from "@research/projections/lines";
+import { DERIVED_STAT_LINE_SOURCE } from "@research/projections/nflverse/derived-stat-lines";
+import { BOARD_SOURCE } from "@research/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { recordObservations, type PlayerWeekObservation } from "@research/projections/store";
+import { scoringHashOf } from "@research/scoring/hash";
 import { runCapsuleSweepStep } from "./capsule-sweep-job";
 import {
   enqueuePeekDocumentRebuildsQuietly,

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { drafts, leagues, users } from "@/db/schema";
 import { claimMockSeat } from "./claim";
 import { createMockRoom } from "./creation";

@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { originFor } from "@/lib/api/origin";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { createInvite, createInviteSchema, listInvites, revokeInvite, revokeInviteSchema } from "@/league-service";

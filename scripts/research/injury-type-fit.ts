@@ -13,10 +13,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Position } from "@/domain/player";
-import { FITTED_AVAILABILITY_PRIORS } from "@/projections/preseason/fitted";
-import { expectedGamesPlayed, outlookFromRate, type AvailabilityInput } from "@/projections/preseason/availability";
-import type { RosterStatus } from "@/projections/nflverse/rosters";
+import type { Position } from "@research/domain/player";
+import { FITTED_AVAILABILITY_PRIORS } from "@research/projections/preseason/fitted";
+import { expectedGamesPlayed, outlookFromRate, type AvailabilityInput } from "@research/projections/preseason/availability";
+import type { RosterStatus } from "@research/projections/nflverse/rosters";
 import type { AbsenceFeatures } from "./injury-type-features";
 
 const CACHE_DIR = process.env.RESEARCH_CACHE_DIR ?? join(tmpdir(), "injury-type-research");

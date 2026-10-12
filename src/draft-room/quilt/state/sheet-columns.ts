@@ -1,5 +1,5 @@
-import type { Player, Position } from "@/domain/player";
-import { positionLabel } from "@/domain/position-words";
+import type { Player, Position } from "@research/domain/player";
+import { positionLabel } from "@research/domain/position-words";
 import type { SheetTag } from "@/draft-hq/sheet/types";
 import type { SurvivalOdds, TierStandingView } from "@/draft-service/assistant/view";
 import { reuseListItems } from "@/design/reuse-list-items";

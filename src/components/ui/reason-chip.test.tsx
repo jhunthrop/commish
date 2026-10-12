@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import type { Law } from "@/projections/laws/types";
-import type { BoardReason } from "@/projections/preseason/board";
-import { discoveredHeadline, lawHeadline } from "@/projections/laws/headline";
+import type { Law } from "@research/projections/laws/types";
+import type { BoardReason } from "@research/projections/preseason/board";
+import { discoveredHeadline, lawHeadline } from "@research/projections/laws/headline";
 import { ReasonChip, strongestLawReasons } from "./reason-chip";
 
 /**

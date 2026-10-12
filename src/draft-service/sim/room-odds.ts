@@ -15,7 +15,7 @@
  * The furthest next turn in a snake is under two rounds away (a seat at the turn boundary), so
  * a run is at most `2 * teamCount - 1` picks. Nothing here estimates survival any other way.
  */
-import type { Position } from "@/domain/player";
+import type { Position } from "@research/domain/player";
 import { availablePool, snakeTeamForPick, teamOnClock, totalPickCount, type DraftState } from "@/draft-engine";
 import { continueRoom, type PlayedPick } from "./continue";
 import type { SeatDrivers } from "./seat-model";

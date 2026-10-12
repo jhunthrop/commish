@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { settlementPreview, settleSeasonPayouts } from "@/money-service/settlement";
 import { settleSeasonRequestSchema } from "@/money-service/schemas";
 import type { PrizeTable } from "@/money/prize-table";

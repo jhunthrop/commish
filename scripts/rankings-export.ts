@@ -7,10 +7,10 @@
 // exported; PPR when omitted. The format rides on every row in its own "Scoring" column and in the
 // default file name, so a file read away from this screen still says what its numbers are under.
 import { writeFileSync } from "node:fs";
-import { createDb } from "@/db/client";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { boardRows, type BoardRow } from "@/draft-hq/board/service";
-import { BOARD_FORMAT_SPECS, BOARD_FORMATS, DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
+import { createDb } from "@research/db/client";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import { boardRows, type BoardRow } from "@research/board/service";
+import { BOARD_FORMAT_SPECS, BOARD_FORMATS, DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@research/projections/preseason/board-formats";
 
 const EXPORT_SHAPE = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } as const;
 /** "Over repl" is the board's own ranking key and the number its rows print on screen (fix round 2):

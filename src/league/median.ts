@@ -1,4 +1,4 @@
-import { roundPoints } from "@/scoring";
+import { roundPoints } from "@research/scoring";
 
 export type MedianResult = "win" | "loss" | "tie";
 

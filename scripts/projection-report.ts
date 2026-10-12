@@ -11,17 +11,17 @@
 // nflverse is free, so unlike `ingest-once.ts` and `ingest-adp.ts` this spends no upstream request
 // budget and prints no budget line. It does reach the network, which is why it is a script an
 // operator runs and never anything the product calls.
-import { createDb } from "@/db/client";
-import { PPR_SCORING } from "@/domain/scoring";
-import { replayHeadToHead, replayOpportunity, SHARE_FIELDS, type ProjectionSource, type ReplayResult } from "@/projections/backtest";
-import { naiveProjection, NAIVE_SOURCE_NAME } from "@/projections/benchmarks/naive";
-import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
-import { scoreShares } from "@/projections/model/fit";
-import { FITTED_OPPORTUNITY_PRIORS, FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
-import { lastObservedPriors } from "@/projections/model/opportunity";
-import { modelSource } from "@/projections/model/source";
-import { createNflverseClient } from "@/projections/nflverse/client";
-import { ingestPlayerUniverse, ingestSeason } from "@/projections/nflverse/ingest";
+import { createDb } from "@research/db/client";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { replayHeadToHead, replayOpportunity, SHARE_FIELDS, type ProjectionSource, type ReplayResult } from "@research/projections/backtest";
+import { naiveProjection, NAIVE_SOURCE_NAME } from "@research/projections/benchmarks/naive";
+import { RANK_BANDS, type ScoreCard } from "@research/projections/metrics";
+import { scoreShares } from "@research/projections/model/fit";
+import { FITTED_OPPORTUNITY_PRIORS, FIT_SEASONS, HELD_OUT_SEASONS } from "@research/projections/model/fitted";
+import { lastObservedPriors } from "@research/projections/model/opportunity";
+import { modelSource } from "@research/projections/model/source";
+import { createNflverseClient } from "@research/projections/nflverse/client";
+import { ingestPlayerUniverse, ingestSeason } from "@research/projections/nflverse/ingest";
 
 /** The season to replay. Its prior season is ingested too, because that is what naive projects from. */
 const TARGET_SEASON = Number(process.argv[2] ?? 2024);

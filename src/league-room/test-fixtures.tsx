@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import { render, type RenderResult } from "@testing-library/react";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
 import type { LeagueTerms } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";

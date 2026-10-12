@@ -14,9 +14,9 @@
 // THE MATCH RATE IS PRINTED, AND SO IS EVERY MISS. A crosswalk that reported only its successes
 // would report 100% every time. The unmatched are listed by reason and named, because an absent
 // player is otherwise indistinguishable from one nobody asked about.
-import { createDb } from "@/db/client";
-import { createNflverseClient } from "@/projections/nflverse/client";
-import { ingestPlayerUniverse } from "@/projections/nflverse/ingest";
+import { createDb } from "@research/db/client";
+import { createNflverseClient } from "@research/projections/nflverse/client";
+import { ingestPlayerUniverse } from "@research/projections/nflverse/ingest";
 import {
   CROSSWALK_METHOD,
   crosswalkInputs,
@@ -26,7 +26,7 @@ import {
   seedTeamDefenseUniverse,
   type CrosswalkMiss,
   type UnmatchedReason,
-} from "@/projections/crosswalk";
+} from "@research/projections/crosswalk";
 
 /** How many of each kind of miss to name. Enough to see the shape without a thousand-line report. */
 const NAMED_MISSES = 12;

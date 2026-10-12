@@ -27,19 +27,19 @@
 // the train seasons first; this script reads the store only and reports, per season, how many ADP
 // rows it found, so a season silently missing its board is visible rather than assumed.
 import { readFileSync, writeFileSync } from "node:fs";
-import { createDb } from "@/db/client";
-import { BENCHMARK_BOARD_FLOOR } from "@/projections/preseason/benchmarks";
-import { BOARD_FORMAT_SPECS, DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
-import { preseasonRankingsAsOf } from "@/projections/preseason/store";
-import { fitMarketCurve, loadMarketCurveObservations, marketCurve, MARKET_CURVE_TRAIN_CUTOFF_SEASON, type MarketCurvePriors } from "@/projections/market/curve";
+import { createDb } from "@research/db/client";
+import { BENCHMARK_BOARD_FLOOR } from "@research/projections/preseason/benchmarks";
+import { BOARD_FORMAT_SPECS, DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@research/projections/preseason/board-formats";
+import { preseasonRankingsAsOf } from "@research/projections/preseason/store";
+import { fitMarketCurve, loadMarketCurveObservations, marketCurve, MARKET_CURVE_TRAIN_CUTOFF_SEASON, type MarketCurvePriors } from "@research/projections/market/curve";
 
 /** Where each format's fit lands, and the constant it exports. PPR keeps the file and the name every
  *  reader already imports; the two new formats get their own files rather than growing a 2,000-line
  *  one further. */
 const OUTPUTS: Readonly<Record<BoardFormat, { readonly path: string; readonly constant: string }>> = {
-  ppr: { path: "src/projections/market/curve-fitted.ts", constant: "FITTED_MARKET_CURVE" },
-  half: { path: "src/projections/market/curve-fitted-half.ts", constant: "FITTED_MARKET_CURVE_HALF" },
-  std: { path: "src/projections/market/curve-fitted-std.ts", constant: "FITTED_MARKET_CURVE_STD" },
+  ppr: { path: "research/src/projections/market/curve-fitted.ts", constant: "FITTED_MARKET_CURVE" },
+  half: { path: "research/src/projections/market/curve-fitted-half.ts", constant: "FITTED_MARKET_CURVE_HALF" },
+  std: { path: "research/src/projections/market/curve-fitted-std.ts", constant: "FITTED_MARKET_CURVE_STD" },
 };
 const POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 const SANITY_RANKS = [1, 12, 50, 150] as const;

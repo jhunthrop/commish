@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useMemo, useState } from "react";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { Card } from "@/components/ui";
 import { AdvisorPanel } from "../../advisor/components/advisor-panel";

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import type { PlayerDossierFacts } from "@/league-service/dossier-facts";
 import type { PlayerSeasonBody } from "@/league-service/player";
-import type { Law } from "@/projections/laws/types";
+import type { Law } from "@research/projections/laws/types";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "../hooks/deps";
 import { openPlayerPeek, PlayerPeekHost } from "./player-peek";
 import { resetPlayerPeekHostsForTests } from "./use-peek-load";

@@ -13,8 +13,10 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions, drafts, leagues, mockRooms, players, users } from "@/db/schema";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players } from "@research/db/schema";
+import { draftActions, drafts, leagues, mockRooms, users } from "@/db/schema";
 import { describeStartTiming } from "@/matchmaking/roll";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { GET as getDraft } from "@/app/api/drafts/[draftId]/route";

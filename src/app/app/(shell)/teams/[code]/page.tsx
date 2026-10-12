@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { pageTitle } from "@/components/app-shell/page-metadata";
-import { NFL_TEAM_NAMES } from "@/domain/nfl-team-names";
+import { NFL_TEAM_NAMES } from "@research/domain/nfl-team-names";
 import { TeamPageView } from "@/teams/components/team-page-view";
 import { resolveTeamRoute, teamPagePath } from "@/teams/route";
 import { teamPage } from "@/teams/service";

@@ -1,7 +1,7 @@
-import type { PlayerFactsCoaching, PlayerFactsSchedule } from "@/capsules/facts/types";
-import type { Player, Position } from "@/domain/player";
-import type { DefenseSeasonFacts } from "@/projections/kdef/season-lines";
-import type { RosterStatusNote } from "@/projections/preseason/roster-status";
+import type { PlayerFactsCoaching, PlayerFactsSchedule } from "@research/capsules/facts/types";
+import type { Player, Position } from "@research/domain/player";
+import type { DefenseSeasonFacts } from "@research/projections/kdef/season-lines";
+import type { RosterStatusNote } from "@research/projections/preseason/roster-status";
 
 /**
  * WHAT THE TEAM PAGE RENDERS (site search round, 2026-09-08). Types only, browser-safe, so the

@@ -12,10 +12,10 @@
 // per-line rounding was the identity; summing before rounding lands on the same two-decimal total.
 import { eq, lte, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import type { Db, DbTx } from "@/db/client";
-import { players, playerStatLines } from "@/db/schema";
-import type { StatLine } from "@/domain/player";
-import { SCORING_TIER_TABLES } from "@/scoring";
+import type { Db, DbTx } from "@research/db/client";
+import { players, playerStatLines } from "@research/db/schema";
+import type { StatLine } from "@research/domain/player";
+import { SCORING_TIER_TABLES } from "@research/scoring";
 
 /** One player's season, as the engine wants to score it: every linear stat summed, the defense
  *  brackets already scored per game and summed separately. */

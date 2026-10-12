@@ -5,7 +5,7 @@
 // Re-running is the refresh: statuses and flexed kickoffs overwrite in place. With
 // STATS_PROVIDER=tank01 this is a real-money read (18 requests for a full season), so the budget
 // line prints last and always, the same discipline as scripts/ingest-adp.ts.
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { getIngestionBudget, getStatsProvider } from "@/stats-pipeline";
 import { ingestSchedule } from "@/stats-pipeline/schedule";
 

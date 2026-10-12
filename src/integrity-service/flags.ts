@@ -1,9 +1,9 @@
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research/db/client";
 import { auditEvents, chatMessageReports, chatMessages, integrityFlags, leagues, reviewReports, reviews, rosterSlots, teams, tradeProposals, users } from "@/db/schema";
 import type { AuditEvent, AuditEventType, JsonObject } from "@/domain/audit";
-import type { Clock } from "@/domain/timing";
-import type { Position } from "@/domain/player";
+import type { Clock } from "@research/domain/timing";
+import type { Position } from "@research/domain/player";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import type { ModerationSummaryView } from "@/league-room/contract";
 import {

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
-import { getDb, type Db } from "@/db/client";
+import { getDb, type Db } from "@research/db/client";
 import { drafts, leagues, mockRooms, teams as teamsTable } from "@/db/schema";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import { originFor } from "@/lib/api/origin";
 import { fail, ok } from "@/lib/api/respond";
 import { draftStateView, queueFor, type DraftStateView } from "@/draft-engine";

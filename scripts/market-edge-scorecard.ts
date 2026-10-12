@@ -38,32 +38,32 @@
 // as lost to a benchmark when that interval excludes zero in the benchmark's favour — a negative
 // point-estimate difference whose interval still spans zero is noise, not a loss, and is reported as
 // such rather than rounded into a verdict the sample cannot support.
-import { createDb, type ReadonlyDb } from "@/db/client";
-import type { Position } from "@/domain/player";
-import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import { PPR_SCORING } from "@/domain/scoring";
-import { computeFantasyPoints } from "@/scoring/compute";
-import { allPositions } from "@/projections/backtest";
-import { naiveProjection } from "@/projections/benchmarks/naive";
-import { statLinesAsOf } from "@/projections/lines";
-import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
-import type { LeagueShape } from "@/projections/decide/replacement";
-import { shippedPreseasonCandidates, withLawsAblated } from "@/projections/market/blend";
-import { FITTED_BLEND_CONSTANTS } from "@/projections/market/blend-fitted";
-import { FITTED_MODEL } from "@/projections/model/source";
-import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
-import { preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
-import { loadShippedGameVariance } from "@/projections/preseason/game-variance-artifacts";
+import { createDb, type ReadonlyDb } from "@research/db/client";
+import type { Position } from "@research/domain/player";
+import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research/domain/roster";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { computeFantasyPoints } from "@research/scoring/compute";
+import { allPositions } from "@research/projections/backtest";
+import { naiveProjection } from "@research/projections/benchmarks/naive";
+import { statLinesAsOf } from "@research/projections/lines";
+import { RANK_BANDS, type ScoreCard } from "@research/projections/metrics";
+import type { LeagueShape } from "@research/projections/decide/replacement";
+import { shippedPreseasonCandidates, withLawsAblated } from "@research/projections/market/blend";
+import { FITTED_BLEND_CONSTANTS } from "@research/projections/market/blend-fitted";
+import { FITTED_MODEL } from "@research/projections/model/source";
+import { BENCHMARK_SOURCES } from "@research/projections/preseason/benchmarks";
+import { preseasonBoard, type BoardEntry } from "@research/projections/preseason/board";
+import { loadShippedGameVariance } from "@research/projections/preseason/game-variance-artifacts";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
-} from "@/projections/preseason/fitted";
-import { actualSeasonPoints, boardPoints, gradableInputs, scoreOrdering } from "@/projections/preseason/scorecard";
-import { loadPreseason, type PreseasonPriors } from "@/projections/preseason/source";
-import { preseasonRankingsAsOf } from "@/projections/preseason/store";
-import { bootstrapRankCorrelationDifference, type RankCorrelationDifferenceRow } from "@/projections/rank-correlation-bootstrap";
+} from "@research/projections/preseason/fitted";
+import { actualSeasonPoints, boardPoints, gradableInputs, scoreOrdering } from "@research/projections/preseason/scorecard";
+import { loadPreseason, type PreseasonPriors } from "@research/projections/preseason/source";
+import { preseasonRankingsAsOf } from "@research/projections/preseason/store";
+import { bootstrapRankCorrelationDifference, type RankCorrelationDifferenceRow } from "@research/projections/rank-correlation-bootstrap";
 
 const SEASONS = process.argv.slice(2).map(Number).filter(Number.isFinite);
 const TARGET_SEASONS = SEASONS.length > 0 ? SEASONS : [2023, 2024];

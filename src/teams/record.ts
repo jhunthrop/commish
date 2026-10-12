@@ -1,5 +1,5 @@
-import type { TeamMetricRow } from "@/capsules/facts/team-context";
-import { SCHEDULE_METRICS } from "@/projections/nflverse/schedule";
+import type { TeamMetricRow } from "@research/capsules/facts/team-context";
+import { SCHEDULE_METRICS } from "@research/projections/nflverse/schedule";
 import type { TeamLastSeason, TeamRecord, TeamWinTotal } from "./contract";
 
 /**

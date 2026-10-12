@@ -11,10 +11,10 @@
 //
 // THE CODE SERVES THE NEW VERSION ONLY WHEN A REVIEWED COMMIT BUMPS THE PIN
 // (`GAME_VARIANCE_SKILL_ARTIFACT.version`); this script prints the pin to bump.
-import { createDb } from "@/db/client";
-import { draftVersionOf } from "@/projections/model/artifacts";
-import { fitGameVariance, loadGameVarianceObservations, VARIANCE_POSITIONS, type GameVariancePriors, type GameVarianceObservation } from "@/projections/preseason/game-variance";
-import { GAME_VARIANCE_SKILL_ARTIFACT } from "@/projections/preseason/game-variance-artifacts";
+import { createDb } from "@research/db/client";
+import { draftVersionOf } from "@research/projections/model/artifacts";
+import { fitGameVariance, loadGameVarianceObservations, VARIANCE_POSITIONS, type GameVariancePriors, type GameVarianceObservation } from "@research/projections/preseason/game-variance";
+import { GAME_VARIANCE_SKILL_ARTIFACT } from "@research/projections/preseason/game-variance-artifacts";
 import { recordAndPublishFit } from "./lib/model-artifact-records";
 
 const TRAIN_SEASONS = [2023, 2024];

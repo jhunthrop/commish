@@ -1,11 +1,11 @@
 import type { DraftFormat } from "@/domain/league";
-import { BENCH_SLOT, ROSTER_SHAPE_LABEL, type RosterSlotConfig } from "@/domain/roster";
+import { BENCH_SLOT, ROSTER_SHAPE_LABEL, type RosterSlotConfig } from "@research/domain/roster";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { hasOpenSeat, stakeTierLabel } from "@/matchmaking/filter";
 import { formatUsd } from "@/money/config";
 import { prizePotCents, type PrizeTable } from "@/money/prize-table";
-import { describeScoring, type ScoringRules } from "@/scoring";
-import { describeRosterShape } from "./roster-shape";
+import { describeScoring, type ScoringRules } from "@research/scoring";
+import { describeRosterShape } from "@research/domain/roster-shape";
 
 /**
  * Everything a person decides whether to join with, in one pure value. Rendered by

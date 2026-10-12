@@ -8,7 +8,7 @@
 //
 // Reuses the process-wide singletons (`@/stats-pipeline`) rather than building a second wiring:
 // the same provider instance, the same ledger, the same shared dev database `getDb()` serves.
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { getIngestionBudget, getStatsProvider } from "@/stats-pipeline";
 import { ingestAdp } from "@/stats-pipeline/adp";
 

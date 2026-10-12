@@ -2,9 +2,10 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { recordTeamObservations, teamObservationsAsOf } from "@/projections/team-store";
-import { parseWinTotalsCsv, VEGAS_METRICS, VEGAS_SOURCE, winTotalObservations } from "@/projections/vegas/ingest";
+import { createTestDb } from "@research/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { recordTeamObservations, teamObservationsAsOf } from "@research/projections/team-store";
+import { parseWinTotalsCsv, VEGAS_METRICS, VEGAS_SOURCE, winTotalObservations } from "@research/projections/vegas/ingest";
 import { ingestWinTotalsCsv, readWinTotalsCsv } from "./win-totals-csv";
 
 /**

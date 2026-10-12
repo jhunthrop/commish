@@ -1,13 +1,13 @@
 // THE LEAGUE'S OWN SCORING HASH (peek document design §3.2, 2026-09-07) — `leagues.scoring_hash`
 // is a cache of `scoring_settings`, and this module is the only place that fills it. The digest
-// itself is `scoringHashOf` (`@/scoring`), one function shared by the document writer, the peek's
+// itself is `scoringHashOf` (`@research/scoring`), one function shared by the document writer, the peek's
 // reader and this write path, so a document can never be served to a league it was not scored for.
 import { eq, inArray } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research/db/client";
 import { leagues, scoringSettings } from "@/db/schema";
-import { PPR_SCORING } from "@/domain/scoring";
-import { type ScoringRules } from "@/scoring";
-import { scoringHashOf } from "@/scoring/hash";
+import { PPR_SCORING } from "@research/domain/scoring";
+import { type ScoringRules } from "@research/scoring";
+import { scoringHashOf } from "@research/scoring/hash";
 
 /** One league's rules as stored, or the same `PPR_SCORING` fallback `playerSeason` has always used
  *  for a league whose settings row was never written. */

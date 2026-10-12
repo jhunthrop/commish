@@ -6,7 +6,7 @@
 // Reads a committed file, not the network — run `npm run projections:win-totals:validate` first if
 // the CSV itself has not been validated since it last changed; this script trusts it. The file read
 // lives in `./lib/win-totals-csv.ts`, shared with the validator; nothing under `src/` reads the file.
-import { createDb } from "@/db/client";
+import { createDb } from "@research/db/client";
 import { ingestWinTotalsCsv } from "./lib/win-totals-csv";
 
 function requireEnv(name: string): string {

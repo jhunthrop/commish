@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { desc, inArray } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research/db/client";
 import { sessionSignals } from "@/db/schema";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 

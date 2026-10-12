@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { PlayerRow } from "@/components/ui";
 import { tierLetter } from "@/draft-hq/board/copy";
-import { rosterStatusLabel } from "@/projections/preseason/roster-status-copy";
+import { rosterStatusLabel } from "@research/projections/preseason/roster-status-copy";
 import type { TeamBoardPlayer } from "../contract";
 import { usePlayerLink } from "./player-name-link";
 import { Section } from "./section";

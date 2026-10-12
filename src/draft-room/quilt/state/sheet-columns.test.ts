@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research/domain/player";
 import { QUILT_CONFIG } from "./config";
 import { bandAt, buildSheetColumns, layoutColumn, nextOpenTierOffset, reuseSheetColumns, windowFor, type SheetColumnModel, type SheetColumnsInput } from "./sheet-columns";
 

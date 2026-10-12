@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { setSlotPreference, setSlotPreferenceSchema } from "@/draft-service";
 import { draftScheduleView } from "@/league-service";

@@ -13,15 +13,15 @@
 // the reason `projection-backfill.ts` prints its own: a benchmark that resolved sixty percent of a
 // board would be scored on the sixty percent that happened to match, which selects on exactly the
 // players both sources found easy.
-import { createDb } from "@/db/client";
-import { createNflverseClient } from "@/projections/nflverse/client";
-import { ROSTER_SOURCE_CONFIG } from "@/projections/nflverse/rosters";
-import { ingestAdpBenchmark, rosterIdentitiesFor } from "@/projections/preseason/adp-benchmark";
-import { BENCHMARK_BOARD_FLOOR, BENCHMARK_SOURCES, resolveRankings, type RosterIdentity } from "@/projections/preseason/benchmarks";
-import { BOARD_FORMAT_SPECS, BOARD_FORMATS, DEFAULT_BOARD_FORMAT } from "@/projections/preseason/board-formats";
-import { ingestDepthCharts, ingestWeek1Rosters, type RosterIngestReport } from "@/projections/preseason/ingest";
-import { fetchExpertConsensus, type PublishedBoard } from "@/projections/preseason/publishers";
-import { recordPreseasonRankings } from "@/projections/preseason/store";
+import { createDb } from "@research/db/client";
+import { createNflverseClient } from "@research/projections/nflverse/client";
+import { ROSTER_SOURCE_CONFIG } from "@research/projections/nflverse/rosters";
+import { ingestAdpBenchmark, rosterIdentitiesFor } from "@research/projections/preseason/adp-benchmark";
+import { BENCHMARK_BOARD_FLOOR, BENCHMARK_SOURCES, resolveRankings, type RosterIdentity } from "@research/projections/preseason/benchmarks";
+import { BOARD_FORMAT_SPECS, BOARD_FORMATS, DEFAULT_BOARD_FORMAT } from "@research/projections/preseason/board-formats";
+import { ingestDepthCharts, ingestWeek1Rosters, type RosterIngestReport } from "@research/projections/preseason/ingest";
+import { fetchExpertConsensus, type PublishedBoard } from "@research/projections/preseason/publishers";
+import { recordPreseasonRankings } from "@research/projections/preseason/store";
 
 const FIRST_SEASON = Number(process.argv[2] ?? ROSTER_SOURCE_CONFIG.earliestSeason);
 const LAST_SEASON = Number(process.argv[3] ?? 2024);

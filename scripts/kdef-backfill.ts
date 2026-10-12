@@ -10,12 +10,12 @@
 // (`docs/superpowers/specs/2026-09-05-kicker-defense-projections-design.md`, and the standing
 // "launch 2027, data year 2026" ruling); ingesting it would put a pristine season one query away
 // from a fit.
-import { createDb } from "@/db/client";
-import { seedTeamDefenseUniverse } from "@/projections/crosswalk";
-import { createNflverseClient } from "@/projections/nflverse/client";
-import { ingestKickingWeeks } from "@/projections/nflverse/kicking-weeks";
-import { SCHEDULE_SOURCE_CONFIG } from "@/projections/nflverse/schedule";
-import { ingestTeamDefenseWeeks } from "@/projections/nflverse/team-defense-weeks";
+import { createDb } from "@research/db/client";
+import { seedTeamDefenseUniverse } from "@research/projections/crosswalk";
+import { createNflverseClient } from "@research/projections/nflverse/client";
+import { ingestKickingWeeks } from "@research/projections/nflverse/kicking-weeks";
+import { SCHEDULE_SOURCE_CONFIG } from "@research/projections/nflverse/schedule";
+import { ingestTeamDefenseWeeks } from "@research/projections/nflverse/team-defense-weeks";
 
 /** The first season the model reads. Earlier seasons exist in the release and are deliberately not
  *  ingested: the game before this is a different one for both positions (the extra point moved to
