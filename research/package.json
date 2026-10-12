@@ -11,9 +11,11 @@
     "typecheck": "tsc --noEmit -p .",
     "guard": "tsx scripts/guard-imports.ts",
     "nightly": "dotenv -e ../.env.local -- tsx src/nightly/main.ts",
+    "inseason": "dotenv -e ../.env.local -- tsx src/inseason/main.ts",
     "advisor": "tsx src/advisor/server.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "dotenv -e ../.env.local -- drizzle-kit migrate"
+    "db:migrate": "dotenv -e ../.env.local -- drizzle-kit migrate",
+    "advisor:measure": "tsx scripts/advisor-measure.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
