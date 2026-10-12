@@ -6,7 +6,7 @@ import type { PlayerDossierFacts } from "@/league-service/dossier-facts";
 import type { PlayerGameLogRow, PlayerSeasonTotals, PlayerWeekView } from "@/league-service/player-season-stats";
 import type { KdefSeasonLine } from "@/projections/kdef/season-lines";
 import type { BoardReason } from "@/projections/preseason/board";
-import type { PlayerCapsuleView } from "./store";
+import type { PlayerCapsuleView } from "@/capsules/store";
 
 /** A later document shape writes under a new source rather than overwriting rows a reader is
  *  already serving. */

@@ -25,8 +25,8 @@ import { MONEY_ACCOUNT_KINDS } from "@/money/accounts";
 import type { MoneyPostingDirection } from "@/money/posting";
 import type { PrizeTable } from "@/money/prize-table";
 import type { TransferIntent } from "@/payments-provider/contract";
-import type { PeekFactsRow } from "@/capsules/peek-facts-row";
-import type { PeekDocument, PeekDocumentBasis } from "@/capsules/peek-document-row";
+import type { PeekFactsRow } from "@/league-service/peek/peek-facts-row";
+import type { PeekDocument, PeekDocumentBasis } from "@/league-service/peek/peek-document-row";
 import type { TradeAsset } from "@/trades/assets";
 
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);

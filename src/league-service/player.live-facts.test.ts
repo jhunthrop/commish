@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { buildPeekDocument } from "@/capsules/peek-document";
+import { buildPeekDocument } from "@/league-service/peek/peek-document";
 import type { Db } from "@/db/client";
 import { drafts, leagues, matchups, playerPeekDocuments, players, rosterSlots, teams, users, weeks } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";

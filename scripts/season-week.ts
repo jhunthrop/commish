@@ -8,19 +8,19 @@
 //      npm run season:week -- --season=2026      (overrides the season; defaults from today's date)
 //      npm run season:week -- --help
 //
-// THIN ON PURPOSE. Every step's actual logic lives in `src/jobs/season-week/steps.ts` — the one
+// THIN ON PURPOSE. Every step's actual logic lives in `src/projections/season-week/steps.ts` — the one
 // other file besides `register-freeze.ts` and `register-grade.ts` the register's own quarantine
 // wall (`src/projections/register/wall.source.test.ts`) allows to import it, and the file
-// `src/jobs/season-week/steps.test.ts` exercises directly against a real test database with a
+// `src/projections/season-week/steps.test.ts` exercises directly against a real test database with a
 // fake network. This script's only jobs are: wire real dependencies, parse argv, print the
 // report, and set the exit code. The durable job system (`src/jobs/defs/season-week-job.ts`) runs
 // the same steps on the same deps; this CLI stays for operator-initiated runs.
 import { createDb } from "@/db/client";
 import { requireEnv } from "@/projections/odds/http";
-import { realIngestStats, realSnapshotProps } from "@/jobs/season-week/deps";
-import { defaultSeason, runSeasonWeek, type SeasonWeekDeps, type SeasonWeekOptions, type StepResult } from "@/jobs/season-week/steps";
+import { realIngestStats, realSnapshotProps } from "@/projections/season-week/deps";
+import { defaultSeason, runSeasonWeek, type SeasonWeekDeps, type SeasonWeekOptions, type StepResult } from "@/projections/season-week/steps";
 
-// THE STATS-INGEST CHOICE and both real network deps live in `src/jobs/season-week/deps.ts` —
+// THE STATS-INGEST CHOICE and both real network deps live in `src/projections/season-week/deps.ts` —
 // one implementation, two entry points (this CLI and the durable job).
 
 interface Args {

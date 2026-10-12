@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { collectBoardFacts } from "@/capsules/collect";
-import { writeRefresh } from "@/capsules/peek-facts";
+import { writeRefresh } from "@/league-service/peek/peek-facts";
 import type { Db } from "@/db/client";
 import { jobs, leagues, nflPlayers, playerCrosswalk, players, playerPeekDocuments, preseasonProjections, rosterSlots, teams, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";

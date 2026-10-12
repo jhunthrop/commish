@@ -10,11 +10,11 @@ import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
 import { scoringHashOf } from "@/scoring/hash";
-import { collectBoardFacts } from "./collect";
+import { collectBoardFacts } from "@/capsules/collect";
 import { writeRefresh } from "./peek-facts";
 import { writePeekDocuments } from "./peek-document-store";
 import type { PeekDocumentRequest } from "./peek-document-inputs";
-import { upsertCapsule } from "./store";
+import { upsertCapsule } from "@/capsules/store";
 
 const PRIOR_SEASON = PRODUCT_SEASON - 1;
 const NOW = new Date("2026-09-07T12:00:00.000Z");

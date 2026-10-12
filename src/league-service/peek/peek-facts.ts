@@ -11,8 +11,8 @@ import { finalWeekOf } from "@/projections/nflverse/team-eras";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { enqueuePeekDocumentRebuildsQuietly } from "@/jobs/defs/peek-document-job";
-import { collectBoardFacts, type BoardFactsPass } from "./collect";
-import type { PlayerFacts } from "./facts";
+import { collectBoardFacts, type BoardFactsPass } from "@/capsules/collect";
+import type { PlayerFacts } from "@/capsules/facts";
 import { PEEK_FACTS_SOURCE, PEEK_HISTORY_SEASONS, type PeekFactsBasis, type PeekFactsRow, type PeekLastSeasonLine } from "./peek-facts-row";
 
 /**

@@ -8,7 +8,7 @@ import { PBP_PLAYER_METRICS, PBP_PLAYER_SOURCE } from "@/projections/nflverse/pb
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
-import { collectBoardFacts } from "./collect";
+import { collectBoardFacts } from "@/capsules/collect";
 import { dossierFactsFor } from "@/league-service/dossier-facts";
 import { peekFactsRowsFor, readPeekFacts, writePeekFacts, writeRefresh } from "./peek-facts";
 import { PEEK_FACTS_SOURCE } from "./peek-facts-row";

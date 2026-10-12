@@ -8,7 +8,7 @@
  *
  * Lives inside `register/` on purpose: the refusal vocabulary is the register's own law, and this
  * placement keeps the wall untouched — only wall-exempt files import it directly, and the job
- * definition reaches the CLASS through `src/jobs/season-week/steps.ts`'s sanctioned re-export.
+ * definition reaches the CLASS through `src/projections/season-week/steps.ts`'s sanctioned re-export.
  */
 export type RegisterRefusalCode =
   /** The week has already begun; a freeze now would not be a prospective claim. */

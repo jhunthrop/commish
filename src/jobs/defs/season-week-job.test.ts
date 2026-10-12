@@ -15,11 +15,11 @@ import { recordTeamObservations } from "@/projections/team-store";
 import { recordNflPlayers } from "@/projections/universe";
 import { TerminalJobError } from "../contract";
 import { executeClaimedJob, type ExecutorDeps } from "../execute";
-import { RegisterRefusalError } from "../season-week/steps";
+import { RegisterRefusalError } from "@/projections/season-week/steps";
 import { claimNextJob, completedStepsFor, enqueueJob } from "../store";
 import { classifyFreezeError, parseSeasonWeekPayload, seasonWeekJobWith, SEASON_WEEK_JOB_NAME } from "./season-week-job";
 import { PEEK_DOCUMENT_JOB_NAME } from "./peek-document-job";
-import { defaultSeason } from "../season-week/steps";
+import { defaultSeason } from "@/projections/season-week/steps";
 
 const db = createTestDb();
 

@@ -39,7 +39,7 @@ export const REGISTER_DIR = "src/projections/register";
 /** The register's own operator scripts, which necessarily import it. Everything else under
  *  `scripts/` is swept, because a fit script that read a frozen row would leak this season's
  *  prospective record into next season's constants just as surely as a module would.
- *  `src/jobs/season-week/steps.ts` (Task 2's weekly cadence, moved out of `scripts/` in the
+ *  `src/projections/season-week/steps.ts` (Task 2's weekly cadence, moved out of `scripts/` in the
  *  job-system round so the Vercel tick route could reach it — `src/**` may not import
  *  `scripts/**`) is the third: it orchestrates `takeFreeze` and `gradeWeek` on a schedule and has
  *  to read `latestFreezeFor` to decide skip-vs-supersede, which is exactly the same "necessarily
@@ -51,8 +51,8 @@ export const REGISTER_DIR = "src/projections/register";
 export const WALL_EXEMPT_FILES: readonly string[] = [
   "scripts/register-freeze.ts",
   "scripts/register-grade.ts",
-  "src/jobs/season-week/steps.ts",
-  "src/jobs/season-week/steps.test.ts",
+  "src/projections/season-week/steps.ts",
+  "src/projections/season-week/steps.test.ts",
 ];
 
 /** Everything that ships or runs. Not `e2e/` — it is the browser harness, cannot reach a database,

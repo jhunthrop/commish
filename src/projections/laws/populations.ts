@@ -297,7 +297,7 @@ function sumPublishedParticipation(rows: readonly PlayerWeekObservation[]): Map<
  * THE DEFINITION DIFFERS AND THE BASIS SAYS SO. `pbp-players.ts` counts a DESIGNED carry (no
  * scrambles) where the published weekly file counts every rushing attempt, so a scrambling
  * quarterback's gap-season touches read low against a published season's. Every surface that stores
- * one of these numbers carries its source key beside it (`capsules/peek-facts.ts`'s own `basis`), so
+ * one of these numbers carries its source key beside it (`league-service/peek/peek-facts.ts`'s own `basis`), so
  * no reader can mistake which definition produced it.
  *
  * TEAM TARGETS ARE DERIVED, NOT MISSING (dossier-voice round, 2026-09-07). The published feed's

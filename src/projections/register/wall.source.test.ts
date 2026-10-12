@@ -90,8 +90,8 @@ describe("THE WALL: the sweep covers everything", () => {
     expect(WALL_EXEMPT_FILES).toEqual([
       "scripts/register-freeze.ts",
       "scripts/register-grade.ts",
-      "src/jobs/season-week/steps.ts",
-      "src/jobs/season-week/steps.test.ts",
+      "src/projections/season-week/steps.ts",
+      "src/projections/season-week/steps.test.ts",
     ]);
   });
 });

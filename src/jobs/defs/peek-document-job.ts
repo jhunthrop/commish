@@ -18,7 +18,7 @@
 // terminal path, since no retry makes a malformed row parse. Everything the build itself can throw
 // is ordinary database weather and retries, exactly like every other data job here.
 import type { Db, DbTx } from "@/db/client";
-import { writePeekDocuments } from "@/capsules/peek-document-store";
+import { writePeekDocuments } from "@/league-service/peek/peek-document-store";
 import type { JsonObject } from "@/domain/audit";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";

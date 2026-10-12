@@ -9,7 +9,8 @@ import { getStoredCapsule, REGENERATE_FACTS_HASH, RETRY_FIRST_FACTS_HASH } from 
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { JOBS_CONFIG } from "../config";
-import { reservedMsPerPlayer, runCapsuleSweepStep } from "./capsule-sweep-job";
+import { reservedMsPerPlayer } from "@/capsules/sweep";
+import { runCapsuleSweepStep } from "./capsule-sweep-job";
 
 const CLOCK = { now: () => "2026-09-04T12:00:00.000Z" };
 

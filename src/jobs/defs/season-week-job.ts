@@ -1,5 +1,5 @@
 // THE SEASON-WEEK JOB — the three crontab fires' one payload, rebuilt on the job contract. Five
-// checkpointed steps mapping one-to-one onto `src/jobs/season-week/steps.ts`'s exported step
+// checkpointed steps mapping one-to-one onto `src/projections/season-week/steps.ts`'s exported step
 // functions (that file is the wall-exempt home of everything that touches the register; this
 // module calls THROUGH it and never imports `src/projections/register` itself), plus a sixth of
 // this module's own (see just below).
@@ -30,9 +30,9 @@ import {
   type SeasonWeekDeps,
   type SeasonWeekOptions,
   type StepResult,
-} from "../season-week/steps";
-import { realIngestStats, realSnapshotProps } from "../season-week/deps";
-import { refreshPeekFacts } from "@/capsules/peek-facts";
+} from "@/projections/season-week/steps";
+import { realIngestStats, realSnapshotProps } from "@/projections/season-week/deps";
+import { refreshPeekFacts } from "@/league-service/peek/peek-facts";
 import { enqueuePeekDocumentRebuildsQuietly } from "./peek-document-job";
 import type { Db } from "@/db/client";
 import type { JsonObject } from "@/domain/json";

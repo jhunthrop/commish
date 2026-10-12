@@ -119,7 +119,7 @@ function perGamePointsRanksFor(rows: readonly PreseasonProjectionRow[], position
 
 /** The whole-board read `perGamePointsRanksFor` needs — bundled into its own function so
  *  `dossierFactsFor` runs it exactly once regardless of whether the target player himself ends up
- *  ranked. Exported for the precompute writer (`capsules/peek-facts.ts`), which needs the same map
+ *  ranked. Exported for the precompute writer (`league-service/peek/peek-facts.ts`), which needs the same map
  *  ONCE for a whole sweep rather than once per player. */
 export async function boardWidePerGameFacts(db: Db, asOf: Date): Promise<ReadonlyMap<string, PlayerDossierRank>> {
   const rows = await preseasonProjectionsAsOf(db, { season: PRODUCT_SEASON, source: BOARD_SOURCE, asOf });
@@ -132,7 +132,7 @@ export async function boardWidePerGameFacts(db: Db, asOf: Date): Promise<Readonl
  * THE SHAPE, WITH NO READS OF ITS OWN — `PlayerFacts` plus the one rank that is not on it, reshaped
  * for the client. Pure on purpose (peek-facts round, 2026-09-07): it has TWO callers now and they
  * must produce byte-identical objects or the precomputed row and the live computation would render
- * differently for the same player. `dossierFactsFor` below is the live one, `capsules/peek-facts.ts`
+ * differently for the same player. `dossierFactsFor` below is the live one, `league-service/peek/peek-facts.ts`
  * the precompute one, and neither has a copy of this mapping.
  */
 export function dossierFactsFrom(facts: PlayerFacts, perGamePositionRank: PlayerDossierRank | null): PlayerDossierFacts {

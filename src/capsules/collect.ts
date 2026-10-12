@@ -565,7 +565,7 @@ export function factsInputFor(
  * ONE PASS'S WHOLE RESULT — the facts themselves plus the three things a SECOND consumer of the same
  * pass needs and `PlayerFacts` does not carry (peek-facts round, 2026-09-07).
  *
- * The precompute writer (`capsules/peek-facts.ts`) rides on this pass rather than running a second
+ * The precompute writer (`league-service/peek/peek-facts.ts`) rides on this pass rather than running a second
  * heavy one of its own, which is the design's "no second heavy job" rule. What it needs beyond the
  * facts is the crosswalk map (to look a player's per-game rank up by nflverse id) and the two
  * numbers a stored fact's BASIS has to state: how many peers a rank was taken over, and whether the

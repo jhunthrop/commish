@@ -16,7 +16,7 @@ import type { PlayerDossierFacts } from "@/league-service/dossier-facts";
 import { chipEligibleLaws, registry } from "@/projections/laws/registry";
 import type { BoardReason } from "@/projections/preseason/board";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import type { PlayerCapsuleView } from "./store";
+import type { PlayerCapsuleView } from "@/capsules/store";
 import type { PeekDocument, PeekDocumentBasis, PeekDocumentSeason } from "./peek-document-row";
 
 /** Everything one document is built from. Every read it needs has already happened. */

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { collectBoardFacts } from "@/capsules/collect";
-import { writeRefresh } from "@/capsules/peek-facts";
+import { writeRefresh } from "@/league-service/peek/peek-facts";
 import { upsertCapsule } from "@/capsules/store";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { matchups, players, playerStatLines, scoringSettings, statWeeks, teams, users } from "@/db/schema";

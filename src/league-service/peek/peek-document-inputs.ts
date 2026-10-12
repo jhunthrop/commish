@@ -35,7 +35,7 @@ import { assertSingleGeneration, BOARD_SOURCE, boardReasons, preseasonProjection
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { preseasonRankingsFor } from "@/projections/preseason/store";
 import type { ScoringRules } from "@/scoring";
-import { getStoredCapsulesFor } from "./store";
+import { getStoredCapsulesFor } from "@/capsules/store";
 import { priorSeasonCandidates, readPeekFactsFor } from "./peek-facts";
 import { PEEK_FACTS_SOURCE } from "./peek-facts-row";
 import type { PeekDocumentBasis } from "./peek-document-row";
