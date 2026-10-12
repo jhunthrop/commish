@@ -3,6 +3,7 @@ import type { PlayerFacts } from "./facts";
 import { NARRATIVE_MIN_WORDS } from "./narrative-slots";
 import { extractNumbers, isDerivedFromLedger, isLooseReadingOf, promptNumbers, roundHalfUp } from "./number-grounding";
 import { renderFactsForModel } from "./render";
+import { voiceRuleHits, type VoiceRuleHit } from "./voice-rules";
 
 export type CapsuleSize = "compact" | "full";
 
@@ -566,11 +567,32 @@ function tradingWordCorrectionFor(violation: string): string | null {
   return `Your text uses the trading word "${term}". Rewrite this sentence: "${sentence}". Say it in your own words, with drafting words instead: ${quoted(replacement)}. Then leave everything else as it is.`;
 }
 
+/** The voice-rule violation's own shape, read back by `voiceRuleCorrectionFor`: the rule, what it
+ *  matched, and the sentence it sits in. */
+const VOICE_RULE_VIOLATION_PATTERN = /^The text carries a (set phrase|aside \([^)]+\)), "([^"]+)", in the sentence "(.+)"\. Rewrite that sentence\.$/;
+
+function voiceRuleViolation(hit: VoiceRuleHit, text: string): string {
+  const lowered = hit.found.toLowerCase();
+  const sentence = splitSentences(text).find((one) => one.replace(/[’‘]/g, "'").toLowerCase().includes(lowered)) ?? text;
+  return `The text carries a ${hit.rule}, "${hit.found}", in the sentence "${sentence}". Rewrite that sentence.`;
+}
+
+/** A set phrase or an aside is corrected like a trading word: the one sentence is rewritten to say
+ *  only its point, and the rest of the prose is kept. */
+function voiceRuleCorrectionFor(violation: string): string | null {
+  const match = VOICE_RULE_VIOLATION_PATTERN.exec(violation);
+  if (match === null) return null;
+  const [, , found, sentence] = match;
+  return `Rewrite this sentence: "${sentence}". Say only what it means, plainly and in your own words, without "${found}" or anything like it. Then leave everything else as it is.`;
+}
+
 /** True for a violation that is a framing note, not a fabrication — see `SOFT_CORRECTIONS`. */
 export function softCorrectionFor(violation: string): string | null {
   if (violation in SOFT_CORRECTIONS) return SOFT_CORRECTIONS[violation] ?? null;
   const tradingWord = tradingWordCorrectionFor(violation);
   if (tradingWord !== null) return tradingWord;
+  const voiceRule = voiceRuleCorrectionFor(violation);
+  if (voiceRule !== null) return voiceRule;
   if (violation.startsWith("Mixed evidence:")) {
     const number = TENSION_NUMBER_PATTERN.exec(violation)?.[1];
     const downside = number === undefined ? "the strongest downside on the sheet" : `the ${number} pts/game downside`;
@@ -638,6 +660,10 @@ function validateGrounded(body: string, source: GroundingSource, band: Grounding
   if (competitor !== null) {
     violations.push(`The text names a competitor product ("${competitor}"). Remove it.`);
   }
+
+  // THE VOICE RULES (prep site carve-out, 2026-10-12): a set phrase or a writer's aside is how a
+  // sentence was said, so it is a soft correction of that one sentence (`voiceRuleCorrectionFor`).
+  for (const hit of voiceRuleHits(trimmed)) violations.push(voiceRuleViolation(hit, trimmed));
 
   if (hasUnframedFloorClaim(trimmed)) {
     violations.push(UNFRAMED_FLOOR_VIOLATION);

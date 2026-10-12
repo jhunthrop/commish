@@ -9,6 +9,8 @@ import { byeWeeksByTeam } from "@research/reference/nfl-schedule";
 import { chipEligibleLaws, registry } from "@research/projections/laws/registry";
 import { BOARD_SOURCE, boardReasons, preseasonProjectionsFor, type BoardStamp, type PreseasonProjectionRow } from "@research/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@research/projections/preseason/current";
+import { GENERIC_BOARD_SHAPE } from "@research/board/generic-board";
+import { boardRows, isProjectedRow } from "@research/board/service";
 import { activePeersFor } from "./peers";
 import {
   currentSeasonSummaries,
@@ -49,7 +51,14 @@ interface PlayerBoardMembership {
  *  `collectPlayerFacts` gathered separately (identity, board projection, his team's bye, his own
  *  stored reasons) — pulled out on its own so the caller's own body reads as one linear list of
  *  reads plus one merge, never a second sprawling object literal in the middle of it. */
-function factsRowFor(playerId: string, identity: PlayerIdentity, projection: PreseasonProjectionRow, byeWeek: number | null, reasons: FactsBoardRowInput["reasons"]): FactsBoardRowInput {
+function factsRowFor(
+  playerId: string,
+  identity: PlayerIdentity,
+  projection: PreseasonProjectionRow,
+  overallRank: number,
+  byeWeek: number | null,
+  reasons: FactsBoardRowInput["reasons"],
+): FactsBoardRowInput {
   return {
     playerId,
     name: identity.name,
@@ -57,7 +66,7 @@ function factsRowFor(playerId: string, identity: PlayerIdentity, projection: Pre
     team: identity.team,
     marketAdp: identity.adp,
     marketPositionAdp: identity.posAdp,
-    rank: projection.rank,
+    overallRank,
     projectedPoints: projection.projectedPoints,
     floorPoints: projection.floorPoints,
     medianPoints: projection.medianPoints,
@@ -183,7 +192,8 @@ export async function collectPlayerFacts(db: Db, playerId: string, asOf: Date = 
   // buckets by position, and no other position was ever going to enter his bucket).
   const teamByPlayerId = new Map([[nflPlayerId, identity.team]]);
 
-  const [byes, reasonsByNflId, injuries, news, seasons, lastSeasonStoryByGsisId, usageTouchesAndTrend, propsLinesByGsisId, winTotalByTeam, depthPass] = await Promise.all([
+  const [servedBoard, byes, reasonsByNflId, injuries, news, seasons, lastSeasonStoryByGsisId, usageTouchesAndTrend, propsLinesByGsisId, winTotalByTeam, depthPass] = await Promise.all([
+    boardRows(db, { shape: GENERIC_BOARD_SHAPE, asOf }),
     byeWeeksByTeam(db),
     boardReasons(db, BOARD_SOURCE, PRODUCT_SEASON),
     injurySnapshot(db),
@@ -207,6 +217,11 @@ export async function collectPlayerFacts(db: Db, playerId: string, asOf: Date = 
     depthByGsisId: depthPass.byPlayerId,
   };
 
-  const row = factsRowFor(playerId, identity, projection, byes.get(identity.team) ?? null, reasonsByNflId.get(nflPlayerId) ?? []);
+  // THE RANK THE PAGE SHOWS: his place in the served board's value order under the generic shape,
+  // the same rank the whole-board sweep hands the writer (`collect.ts`), so a live peek and a stored
+  // capsule can never quote two different ranks for one man.
+  const servedRow = servedBoard.find((boardRow) => boardRow.playerId === playerId);
+  if (servedRow === undefined || !isProjectedRow(servedRow)) return null;
+  const row = factsRowFor(playerId, identity, projection, servedRow.overallRank, byes.get(identity.team) ?? null, reasonsByNflId.get(nflPlayerId) ?? []);
   return buildPlayerFacts(factsInputFor(row, seasons.get(playerId), injuries, news, laws, color));
 }

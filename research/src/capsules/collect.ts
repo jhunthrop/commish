@@ -3,8 +3,8 @@ import type { Db } from "@research/db/client";
 import { nflPlayers, playerStatLines, statWeeks } from "@research/db/schema";
 import type { Position, StatLine } from "@research/domain/player";
 import { PPR_SCORING } from "@research/domain/scoring";
-import { boardRows, isProjectedRow, type BoardOptions, type ProjectedBoardRow } from "@research/board/service";
-import { STANDARD_ROSTER_SLOTS } from "@research/domain/roster";
+import { GENERIC_BOARD_SHAPE } from "@research/board/generic-board";
+import { boardRows, isProjectedRow, type ProjectedBoardRow } from "@research/board/service";
 import { injurySnapshot, type InjurySnapshot } from "@research/reference/injuries";
 import { newsForPlayers, type NewsStory } from "@research/reference/news";
 import { nflPlayerIdsFor } from "@research/projections/crosswalk";
@@ -76,7 +76,6 @@ import { EMPTY_DEPTH, type PlayerFactsDepth } from "./facts/types";
  * same discipline `currentSeasonSummaries` below already keeps.
  */
 
-const GENERIC_BOARD_SHAPE: BoardOptions["shape"] = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS };
 
 /** `PROP_MARKETS`' own fixed order, as a lookup — the sort key `propsLinesByPlayer` uses so a
  *  player's `propsLines` array never depends on the database's own row order (facts.ts's own
@@ -516,7 +515,7 @@ export interface ColorFacts {
  *  single-player collector can build one of these from a single narrow-scoped row read instead of
  *  running the whole-board value/tier recompute for one man; a real `BoardRow` still satisfies this
  *  type structurally, so `collectAllPlayerFacts` below passes one unchanged. */
-export type FactsBoardRowInput = Pick<ProjectedBoardRow, "playerId" | "name" | "position" | "team" | "marketAdp" | "marketPositionAdp" | "rank" | "projectedPoints" | "floorPoints" | "medianPoints" | "ceilingPoints" | "byeWeek" | "reasons">;
+export type FactsBoardRowInput = Pick<ProjectedBoardRow, "playerId" | "name" | "position" | "team" | "marketAdp" | "marketPositionAdp" | "overallRank" | "projectedPoints" | "floorPoints" | "medianPoints" | "ceilingPoints" | "byeWeek" | "reasons">;
 
 function lastSeasonStoryFor(gsisId: string | undefined, color: ColorFacts): PlayerFactsLastSeasonStory | null {
   if (gsisId === undefined) return null;
@@ -547,7 +546,11 @@ export function factsInputFor(
     productSeason: PRODUCT_SEASON,
     reasons: row.reasons,
     laws,
-    market: { adp: row.marketAdp, positionAdp: row.marketPositionAdp, boardRank: row.rank },
+    // THE RANK THE PAGE SHOWS (prep site carve-out, 2026-10-12): the board's served order under the
+    // generic shape (`overallRank`, value over replacement), never the stored points sort (`rank`).
+    // The mocks caught the difference: a capsule said "32nd overall" beside a board that ranked the
+    // same man 14th.
+    market: { adp: row.marketAdp, positionAdp: row.marketPositionAdp, boardRank: row.overallRank },
     projection: { projectedPoints: row.projectedPoints, floorPoints: row.floorPoints, medianPoints: row.medianPoints, ceilingPoints: row.ceilingPoints },
     byeWeek: row.byeWeek,
     season: season ?? null,

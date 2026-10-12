@@ -1,5 +1,5 @@
 import type { Db } from "@research/db/client";
-import { genericBoardRows } from "@/draft-hq/board/generic-board";
+import { genericBoardRows } from "@research/board/generic-board";
 import { byeWeeksByTeam } from "@research/reference/nfl-schedule";
 import { BOARD_MEMO_GROUP, createTtlMemo } from "@research/lib/cache/ttl-memo";
 import { NFL_TEAM_ABBREVIATIONS } from "@research/projections/capture-feeds";

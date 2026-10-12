@@ -8,7 +8,7 @@ import { captureSnapshots, playerCrosswalk, players } from "@research/db/schema"
 import { NFL_TEAM_NAMES } from "@research/domain/nfl-team-names";
 import type { Position } from "@research/domain/player";
 import { PPR_SCORING } from "@research/domain/scoring";
-import { genericBoardRows } from "@/draft-hq/board/generic-board";
+import { genericBoardRows } from "@research/board/generic-board";
 import type { BoardRow } from "@research/board/service";
 import { byeWeeksByTeam } from "@research/reference/nfl-schedule";
 import { BOARD_MEMO_GROUP, createTtlMemo } from "@research/lib/cache/ttl-memo";
