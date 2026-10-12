@@ -14,9 +14,17 @@ const (
 	// SignedIn routes answer 401 without a session.
 	SignedIn
 	// Webhook routes are public and exempt from the CSRF check, because
-	// the caller is a server that signs its body instead.
+	// the caller is a server that signs its body instead. No session is
+	// resolved for them.
 	Webhook
+	// Anonymous routes never resolve a session: the health probes, which
+	// must not touch the database, and the catch-all 404.
+	Anonymous
 )
+
+// ResolvesSession reports whether the route looks up the caller's
+// session before its handler runs.
+func (a Access) ResolvesSession() bool { return a != Webhook && a != Anonymous }
 
 // Route is one endpoint with its access rule and its rate limit. Every
 // package declares its routes as a list of these, so the whole surface,

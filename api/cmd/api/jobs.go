@@ -140,10 +140,12 @@ func runSweep(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpo
 // creates a price only when its lookup key has none, so repricing is a
 // new price under the key in the Stripe dashboard, never this list. The
 // Group Draft Pass seat has no price in the spec and is set by hand.
-var priceSpecs = []billing.PriceSpec{
-	{ProductID: billing.ProductIDDraftPass, ProductName: "Commish Draft Pass", LookupKey: billing.LookupDraftPass, AmountCents: 3900},
-	{ProductID: billing.ProductIDMembership, ProductName: "Commish Membership", LookupKey: billing.LookupMembershipYearly, AmountCents: 9900, Interval: "year"},
-	{ProductID: billing.ProductIDMembership, ProductName: "Commish Membership", LookupKey: billing.LookupMembershipMonthly, AmountCents: 1499, Interval: "month"},
+func priceSpecs() []billing.PriceSpec {
+	return []billing.PriceSpec{
+		{ProductID: billing.ProductIDDraftPass, ProductName: "Commish Draft Pass", LookupKey: billing.LookupDraftPass, AmountCents: 3900},
+		{ProductID: billing.ProductIDMembership, ProductName: "Commish Membership", LookupKey: billing.LookupMembershipYearly, AmountCents: 9900, Interval: "year"},
+		{ProductID: billing.ProductIDMembership, ProductName: "Commish Membership", LookupKey: billing.LookupMembershipMonthly, AmountCents: 1499, Interval: "month"},
+	}
 }
 
 func runStripeSetup(ctx context.Context, log *slog.Logger, cfg config.API, _ *pgxpool.Pool, _ []string) error {
@@ -151,7 +153,7 @@ func runStripeSetup(ctx context.Context, log *slog.Logger, cfg config.API, _ *pg
 		return err
 	}
 	g := billing.NewStripeGateway(cfg.Stripe.SecretKey, cfg.Stripe.AutomaticTax)
-	for _, spec := range priceSpecs {
+	for _, spec := range priceSpecs() {
 		if err := g.EnsurePrice(ctx, spec); err != nil {
 			return err
 		}

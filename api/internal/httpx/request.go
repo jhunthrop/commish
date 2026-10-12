@@ -70,9 +70,12 @@ type Page struct {
 func (p Page) Offset() int { return (p.Page - 1) * p.PerPage }
 
 // Paging bounds, matching openapi.yaml's Page and PerPage parameters.
+// MaxPage keeps the offset far from overflow and every list the API
+// serves is far shorter.
 const (
 	DefaultPerPage = 25
 	MaxPerPage     = 100
+	MaxPage        = 10000
 )
 
 // ParsePage reads page and per_page. On a bad value it has already
@@ -82,8 +85,8 @@ func ParsePage(w http.ResponseWriter, r *http.Request) (Page, bool) {
 	fields := map[string]string{}
 	if v := r.URL.Query().Get("page"); v != "" {
 		n, err := strconv.Atoi(v)
-		if err != nil || n < 1 {
-			fields["page"] = "must be 1 or more"
+		if err != nil || n < 1 || n > MaxPage {
+			fields["page"] = fmt.Sprintf("must be from 1 to %d", MaxPage)
 		}
 		p.Page = n
 	}

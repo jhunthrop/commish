@@ -24,7 +24,9 @@ const (
 
 // Defaults, every one of them a value a fresh deployment can run on.
 const (
-	defaultPort             = "8080"
+	defaultPort = "8080"
+	// defaultMetricsPort is OpenTelemetry's Prometheus exporter port.
+	defaultMetricsPort      = "9464"
 	defaultTrustedProxyHops = 1
 	defaultExportsBucket    = "commish-exports"
 	defaultMailFrom         = "Commish <hello@trycommish.app>"
@@ -119,7 +121,9 @@ type Mail struct {
 
 // HTTP is what both servers share about serving.
 type HTTP struct {
-	Port             string
+	Port string
+	// MetricsPort serves /metrics on an internal listener, never PORT.
+	MetricsPort      string
 	PublicBaseURL    string
 	APIBaseURL       string
 	CORSOrigins      []string
@@ -234,6 +238,7 @@ func (l *loader) baseURL(name string, env Env) string {
 func (l *loader) http(env Env) HTTP {
 	h := HTTP{
 		Port:          l.optional("PORT", defaultPort),
+		MetricsPort:   l.optional("METRICS_PORT", defaultMetricsPort),
 		PublicBaseURL: l.baseURL("PUBLIC_BASE_URL", env),
 		APIBaseURL:    l.baseURL("API_BASE_URL", env),
 	}

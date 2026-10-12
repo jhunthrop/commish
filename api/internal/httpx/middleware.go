@@ -67,20 +67,40 @@ func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 // which is what a per-route latency measurement groups by.
 type routeInfo struct{ pattern string }
 
-// Logger writes one structured line per request: route, status,
-// latency. It never logs a query string, a header or a body, so no
-// secret or token can reach the logs through it.
-func Logger(log *slog.Logger) Middleware {
+// Observer records one finished request: the metrics registry.
+type Observer interface {
+	Observe(method, route string, status int, elapsed time.Duration)
+}
+
+// unmatchedRoute names a request no route pattern claimed.
+const unmatchedRoute = "unmatched"
+
+// routeOf is the request's matched route pattern, never its raw path.
+func routeOf(info *routeInfo) string {
+	if info == nil || info.pattern == "" {
+		return unmatchedRoute
+	}
+	return info.pattern
+}
+
+// Observe writes one structured line per request and hands the same
+// facts to obs. The line names the route pattern ("GET
+// /group-passes/{code}"), never the raw path, and never a query string,
+// a header or a body: a claim code, a token or an id in a path segment
+// cannot reach the logs through it.
+func Observe(log *slog.Logger, obs Observer) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			info := &routeInfo{}
 			sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(sw, r.WithContext(withRoute(r.Context(), info)))
+			elapsed := time.Since(start)
+			route := routeOf(info)
+			obs.Observe(r.Method, route, sw.status, elapsed)
 			log.Info("request",
-				"request_id", RequestIDFrom(r.Context()), "method", r.Method, "route", info.pattern,
-				"path", r.URL.Path, "status", sw.status, "bytes", sw.bytes,
-				"ms", float64(time.Since(start).Microseconds())/1000)
+				"request_id", RequestIDFrom(r.Context()), "method", r.Method, "route", route,
+				"status", sw.status, "bytes", sw.bytes, "ms", float64(elapsed.Microseconds())/1000)
 		})
 	}
 }
@@ -95,7 +115,8 @@ func Recover(log *slog.Logger) Middleware {
 					if rec == http.ErrAbortHandler {
 						panic(rec)
 					}
-					log.Error("panic", "request_id", RequestIDFrom(r.Context()), "path", r.URL.Path, "panic", rec)
+					info, _ := r.Context().Value(routeKey).(*routeInfo)
+					log.Error("panic", "request_id", RequestIDFrom(r.Context()), "route", routeOf(info), "panic", rec)
 					WriteError(w, r, http.StatusInternalServerError, CodeInternal, "Something went wrong on our side", nil)
 				}
 			}()

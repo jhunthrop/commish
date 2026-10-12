@@ -8,8 +8,10 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jhunthrop/commish/api/internal/db"
@@ -33,9 +35,29 @@ func URL(t *testing.T) string {
 	return url
 }
 
-// Reset drops the app schema and migrates it from nothing.
+// testDatabaseSuffix is what a database's name must end in before Reset
+// will drop anything in it, so a mistaken paste of a production URL
+// fails the test instead of wiping the app schema.
+const testDatabaseSuffix = "_test"
+
+// requireTestDatabase fails the test unless url names a *_test database.
+func requireTestDatabase(t *testing.T, url string) {
+	t.Helper()
+	cfg, err := pgx.ParseConfig(url)
+	if err != nil {
+		t.Fatalf("%s does not parse: %v", EnvURL, err)
+	}
+	if !strings.HasSuffix(cfg.Database, testDatabaseSuffix) {
+		t.Fatalf("%s names database %q, which does not end in %s: refusing to drop its app schema",
+			EnvURL, cfg.Database, testDatabaseSuffix)
+	}
+}
+
+// Reset drops the app schema and migrates it from nothing. It refuses
+// any database whose name does not end in _test.
 func Reset(t *testing.T, url string) []int64 {
 	t.Helper()
+	requireTestDatabase(t, url)
 	ctx := context.Background()
 	pool, err := db.Connect(ctx, url)
 	if err != nil {

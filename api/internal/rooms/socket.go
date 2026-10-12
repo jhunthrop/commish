@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 )
 
@@ -27,16 +28,18 @@ const (
 )
 
 // limitConnect bounds how often one drafter opens a socket.
-var limitConnect = httpx.Limit{N: 30, Per: time.Minute}
+const limitConnectPerMinute = 30
 
-// Actions is the part of Store the socket reads.
-type Actions interface {
+// RoomReader is the part of Store the socket reads.
+type RoomReader interface {
+	Exists(ctx context.Context, roomID uuid.UUID) (bool, error)
+	HoldsSeat(ctx context.Context, roomID, accountID uuid.UUID) (bool, error)
 	ActionsSince(ctx context.Context, roomID uuid.UUID, afterSeq int64) (int64, []apitypes.RoomAction, error)
 }
 
 // Socket serves GET /rooms/{id}/ws.
 type Socket struct {
-	Actions Actions
+	Rooms RoomReader
 	// OriginHosts are the hosts a browser may open a socket from, the
 	// same origins CORS allows.
 	OriginHosts []string
@@ -58,7 +61,7 @@ func OriginHosts(origins []string) []string {
 // Routes is every route this package serves.
 func (s *Socket) Routes() []httpx.Route {
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/rooms/{id}/ws", Access: httpx.SignedIn, Limit: limitConnect, Handler: s.serve},
+		{Method: http.MethodGet, Path: "/rooms/{id}/ws", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitConnectPerMinute), Handler: s.serve},
 	}
 }
 
@@ -67,11 +70,7 @@ func (s *Socket) serve(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, _, err := s.Actions.ActionsSince(r.Context(), roomID, 0); errors.Is(err, ErrNotFound) {
-		httpx.WriteNotFound(w, r)
-		return
-	} else if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "rooms: open", err)
+	if !s.admit(w, r, roomID) {
 		return
 	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: s.OriginHosts})
@@ -85,6 +84,33 @@ func (s *Socket) serve(w http.ResponseWriter, r *http.Request) {
 	if err := s.session(r.Context(), conn, roomID); err != nil && !isClosed(err) {
 		s.Log.Warn("rooms: session", "request_id", httpx.RequestIDFrom(r.Context()), "room", roomID, "err", err)
 	}
+}
+
+// admit is the socket's authorization rule, the one the lobby lane
+// builds on: a room's log is read only by an account that holds a seat
+// in it (app.room_seats). A missing room answers 404, a room the caller
+// has no seat in answers 403, and in either case no action is sent.
+// Solo mocks never come here: the api serves them to their owner.
+func (s *Socket) admit(w http.ResponseWriter, r *http.Request, roomID uuid.UUID) bool {
+	exists, err := s.Rooms.Exists(r.Context(), roomID)
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "rooms: open", err)
+		return false
+	}
+	if !exists {
+		httpx.WriteNotFound(w, r)
+		return false
+	}
+	seated, err := s.Rooms.HoldsSeat(r.Context(), roomID, auth.AccountID(r))
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "rooms: seat", err)
+		return false
+	}
+	if !seated {
+		httpx.WriteError(w, r, http.StatusForbidden, httpx.CodeForbidden, "You do not have a seat in this room", nil)
+		return false
+	}
+	return true
 }
 
 func isClosed(err error) bool {
@@ -115,7 +141,7 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID uuid.
 			Message: "The first message must be a hello with the last seq you applied"})
 		return conn.Close(websocket.StatusPolicyViolation, "hello expected")
 	}
-	head, actions, err := s.Actions.ActionsSince(ctx, roomID, hello.LastSeq)
+	head, actions, err := s.Rooms.ActionsSince(ctx, roomID, hello.LastSeq)
 	if err != nil {
 		return err
 	}

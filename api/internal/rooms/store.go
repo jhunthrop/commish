@@ -57,3 +57,26 @@ func (s *Store) ActionsSince(ctx context.Context, roomID uuid.UUID, afterSeq int
 	}
 	return head, actions, nil
 }
+
+// Exists reports whether the room exists.
+func (s *Store) Exists(ctx context.Context, roomID uuid.UUID) (bool, error) {
+	var ok bool
+	if err := s.Pool.QueryRow(ctx, `select exists (select 1 from app.rooms where id = $1)`, roomID).Scan(&ok); err != nil {
+		return false, fmt.Errorf("rooms: exists %s: %w", roomID, err)
+	}
+	return ok, nil
+}
+
+// HoldsSeat reports whether the account has a seat in the room, now or
+// before it left: a drafter who closed the tab reconnects to the log of
+// a draft they were part of. Whether a returning drafter takes the seat
+// back from its bot is the lobby lane's rule, not this read's.
+func (s *Store) HoldsSeat(ctx context.Context, roomID, accountID uuid.UUID) (bool, error) {
+	var ok bool
+	if err := s.Pool.QueryRow(ctx, `
+		select exists (select 1 from app.room_seats where room_id = $1 and account_id = $2)`,
+		roomID, accountID).Scan(&ok); err != nil {
+		return false, fmt.Errorf("rooms: seat %s %s: %w", roomID, accountID, err)
+	}
+	return ok, nil
+}

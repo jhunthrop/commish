@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -57,11 +59,13 @@ type Sessions struct {
 	store   SessionReader
 	now     func() time.Time
 	log     *slog.Logger
+	// trustedHops is TRUSTED_PROXY_HOPS, for the signed-out rate key.
+	trustedHops int
 }
 
 // NewSessions derives the session and CSRF keys from the cookie
 // password.
-func NewSessions(cfg config.Session, store SessionReader, now func() time.Time, log *slog.Logger) (*Sessions, error) {
+func NewSessions(cfg config.Session, trustedHops int, store SessionReader, now func() time.Time, log *slog.Logger) (*Sessions, error) {
 	seal, err := NewSealer(cfg.CookiePassword, purposeSession)
 	if err != nil {
 		return nil, err
@@ -70,7 +74,7 @@ func NewSessions(cfg config.Session, store SessionReader, now func() time.Time, 
 	if err != nil {
 		return nil, err
 	}
-	return &Sessions{cookies: cfg, seal: seal, csrf: csrf, store: store, now: now, log: log}, nil
+	return &Sessions{cookies: cfg, seal: seal, csrf: csrf, store: store, now: now, log: log, trustedHops: trustedHops}, nil
 }
 
 func (s *Sessions) cookie(name, value string, maxAge int, httpOnly bool) *http.Cookie {
@@ -159,14 +163,15 @@ func RequireSession(next http.Handler) http.Handler {
 	})
 }
 
-// RateKey keys a rate limit by account when signed in and by client
-// address otherwise, so one drafter on a shared address is not limited
-// by a neighbor and a signed-out flood is still bounded.
-func RateKey(trustedHops int) func(*http.Request) string {
-	return func(r *http.Request) string {
-		if a, ok := AccountFrom(r.Context()); ok {
-			return "a:" + a.ID.String()
-		}
-		return "ip:" + httpx.ClientIP(r, trustedHops)
+// RateKey keys a rate limit without touching the database: by the
+// session token when the cookie opens (only we can seal one, so a
+// flood cannot mint fresh keys that way), and by the client address
+// otherwise, IPv6 by its /64. One drafter on a shared address is not
+// limited by a neighbor, and a signed-out flood is still bounded.
+func (s *Sessions) RateKey(r *http.Request) string {
+	if token, ok := s.Token(r); ok {
+		sum := sha256.Sum256(token)
+		return "s:" + hex.EncodeToString(sum[:16])
 	}
+	return "ip:" + httpx.AddressKey(httpx.ClientIP(r, s.trustedHops))
 }

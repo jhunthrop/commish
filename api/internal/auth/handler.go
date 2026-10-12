@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/names"
@@ -29,10 +31,10 @@ const (
 )
 
 // Rate limits for the auth routes.
-var (
-	limitSignIn  = httpx.Limit{N: 30, Per: time.Minute}
-	limitMeRead  = httpx.Limit{N: 240, Per: time.Minute}
-	limitMeWrite = httpx.Limit{N: 10, Per: time.Minute}
+const (
+	limitSignInPerMinute  = 30
+	limitMeReadPerMinute  = 240
+	limitMeWritePerMinute = 10
 )
 
 // AccountViewer turns an account into the API's Account, with its
@@ -41,9 +43,17 @@ type AccountViewer interface {
 	View(ctx context.Context, a Account) (apitypes.Account, error)
 }
 
+// AccountStore is the part of Store the handlers write through.
+type AccountStore interface {
+	UpsertAccount(ctx context.Context, id Identity) (Account, error)
+	CreateSession(ctx context.Context, accountID uuid.UUID, tokenHash []byte, workosSID, userAgent string, now time.Time) error
+	DeleteSession(ctx context.Context, tokenHash []byte) (string, error)
+	SetHandle(ctx context.Context, id uuid.UUID, handle string) (Account, error)
+}
+
 // Handler serves /auth and /me.
 type Handler struct {
-	Store         *Store
+	Store         AccountStore
 	Sessions      *Sessions
 	IdP           IdentityProvider
 	Viewer        AccountViewer
@@ -61,11 +71,11 @@ func NewStateSealer(password string) (*Sealer, error) { return NewSealer(passwor
 // Routes is every route this package serves.
 func (h *Handler) Routes() []httpx.Route {
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/auth/login", Access: httpx.Public, Limit: limitSignIn, Handler: h.login},
-		{Method: http.MethodGet, Path: "/auth/callback", Access: httpx.Public, Limit: limitSignIn, Handler: h.callback},
-		{Method: http.MethodPost, Path: "/auth/logout", Access: httpx.Public, Limit: limitSignIn, Handler: h.logout},
-		{Method: http.MethodGet, Path: "/me", Access: httpx.SignedIn, Limit: limitMeRead, Handler: h.me},
-		{Method: http.MethodPatch, Path: "/me", Access: httpx.SignedIn, Limit: limitMeWrite, Handler: h.updateMe},
+		{Method: http.MethodGet, Path: "/auth/login", Access: httpx.Public, Limit: httpx.PerMinute(limitSignInPerMinute), Handler: h.login},
+		{Method: http.MethodGet, Path: "/auth/callback", Access: httpx.Public, Limit: httpx.PerMinute(limitSignInPerMinute), Handler: h.callback},
+		{Method: http.MethodPost, Path: "/auth/logout", Access: httpx.Public, Limit: httpx.PerMinute(limitSignInPerMinute), Handler: h.logout},
+		{Method: http.MethodGet, Path: "/me", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitMeReadPerMinute), Handler: h.me},
+		{Method: http.MethodPatch, Path: "/me", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitMeWritePerMinute), Handler: h.updateMe},
 	}
 }
 
@@ -160,6 +170,15 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		h.Log.Error("auth: callback", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
 		http.Redirect(w, r, problem, http.StatusFound)
 		return
+	}
+	// Signing in again replaces this browser's session: the one its
+	// cookie names, if any, ends before the new one is issued.
+	if old, ok := h.Sessions.Token(r); ok {
+		if _, err := h.Store.DeleteSession(r.Context(), hashToken(old)); err != nil {
+			h.Log.Error("auth: callback", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+			http.Redirect(w, r, problem, http.StatusFound)
+			return
+		}
 	}
 	token, hash := newToken()
 	if err := h.Store.CreateSession(r.Context(), acct.ID, hash, id.SessionID, r.UserAgent(), h.Now()); err != nil {

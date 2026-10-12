@@ -23,7 +23,9 @@ import (
 	"github.com/jhunthrop/commish/api/internal/db"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/exports"
+	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leagues"
+	"github.com/jhunthrop/commish/api/internal/metrics"
 	"github.com/jhunthrop/commish/api/internal/mocks"
 	"github.com/jhunthrop/commish/api/internal/names"
 	"github.com/jhunthrop/commish/api/internal/server"
@@ -69,19 +71,24 @@ func serve(ctx context.Context, log *slog.Logger) error {
 		log.Warn("database not reachable at start", "err", err)
 	}
 	cancel()
-	handler, err := build(cfg, pool, log)
+	registry := metrics.New()
+	handler, err := build(cfg, pool, registry, log)
 	if err != nil {
 		return err
 	}
-	return server.Serve(ctx, cfg.HTTP.Port, handler, log)
+	return server.Run(ctx, log, cfg.HTTP.Port, handler, cfg.HTTP.MetricsPort, registry.Handler())
 }
 
 // build wires every package and returns the whole handler.
-func build(cfg config.API, pool *pgxpool.Pool, log *slog.Logger) (http.Handler, error) {
+func build(cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Logger) (http.Handler, error) {
 	now := time.Now
 	authStore := &auth.Store{Pool: pool}
 	ents := &entitlements.Store{Pool: pool}
-	sessions, err := auth.NewSessions(cfg.Session, authStore, now, log)
+	sessions, err := auth.NewSessions(cfg.Session, cfg.HTTP.TrustedProxyHops, authStore, now, log)
+	if err != nil {
+		return nil, err
+	}
+	nameFilter, err := names.Default()
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +102,7 @@ func build(cfg config.API, pool *pgxpool.Pool, log *slog.Logger) (http.Handler, 
 	sheetStore := &sheets.Store{Pool: pool}
 
 	authHandler := &auth.Handler{
-		Store: authStore, Sessions: sessions, Viewer: viewer, Names: names.Default(), StateSealer: stateSealer,
+		Store: authStore, Sessions: sessions, Viewer: viewer, Names: nameFilter, StateSealer: stateSealer,
 		IdP:           auth.NewWorkOS(cfg.WorkOS.APIKey, cfg.WorkOS.ClientID, cfg.WorkOS.RedirectURI),
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, TrustedHops: cfg.HTTP.TrustedProxyHops, Now: now, Log: log,
 	}
@@ -116,10 +123,10 @@ func build(cfg config.API, pool *pgxpool.Pool, log *slog.Logger) (http.Handler, 
 		(&mocks.Handler{Store: &mocks.Store{Pool: pool}, Leagues: leagueStore, Gate: gate, Log: log}).Routes(),
 	)
 	mux := http.NewServeMux()
-	if err := server.Mount(mux, routes, auth.RateKey(cfg.HTTP.TrustedProxyHops), now); err != nil {
+	if err := server.Mount(mux, routes, sessions, now); err != nil {
 		return nil, err
 	}
-	return server.Stack(mux, log, cfg.HTTP.CORSOrigins, sessions), nil
+	return server.Stack(mux, log, obs, cfg.HTTP.CORSOrigins), nil
 }
 
 // gateway is Stripe, or nil (billing answers 503) when it has no keys.

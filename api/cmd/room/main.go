@@ -18,6 +18,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/db"
+	"github.com/jhunthrop/commish/api/internal/metrics"
 	"github.com/jhunthrop/commish/api/internal/rooms"
 	"github.com/jhunthrop/commish/api/internal/server"
 )
@@ -53,17 +54,19 @@ func run(ctx context.Context, log *slog.Logger) error {
 	}
 	cancel()
 
-	sessions, err := auth.NewSessions(cfg.Session, &auth.Store{Pool: pool}, time.Now, log)
+	sessions, err := auth.NewSessions(cfg.Session, cfg.HTTP.TrustedProxyHops, &auth.Store{Pool: pool}, time.Now, log)
 	if err != nil {
 		return err
 	}
 	socket := &rooms.Socket{
-		Actions: &rooms.Store{Pool: pool}, OriginHosts: rooms.OriginHosts(cfg.HTTP.CORSOrigins), Log: log,
+		Rooms: &rooms.Store{Pool: pool}, OriginHosts: rooms.OriginHosts(cfg.HTTP.CORSOrigins), Log: log,
 	}
 	mux := http.NewServeMux()
 	routes := slices.Concat(server.Health(pool, version), socket.Routes())
-	if err := server.Mount(mux, routes, auth.RateKey(cfg.HTTP.TrustedProxyHops), time.Now); err != nil {
+	if err := server.Mount(mux, routes, sessions, time.Now); err != nil {
 		return err
 	}
-	return server.Serve(ctx, cfg.HTTP.Port, server.Stack(mux, log, cfg.HTTP.CORSOrigins, sessions), log)
+	registry := metrics.New()
+	public := server.Stack(mux, log, registry, cfg.HTTP.CORSOrigins)
+	return server.Run(ctx, log, cfg.HTTP.Port, public, cfg.HTTP.MetricsPort, registry.Handler())
 }

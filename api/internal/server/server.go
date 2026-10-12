@@ -5,6 +5,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -26,9 +27,9 @@ const (
 	shutdownTimeout   = 10 * time.Second
 )
 
-var (
-	limitHealth   = httpx.Limit{N: 600, Per: time.Minute}
-	limitNotFound = httpx.Limit{N: 120, Per: time.Minute}
+const (
+	limitHealthPerMinute   = 600
+	limitNotFoundPerMinute = 120
 )
 
 // Pinger is the database, as readiness sees it.
@@ -36,10 +37,21 @@ type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
-// Mount registers routes on mux. A route without a limit is a
-// programming error and refuses to mount, so no endpoint ships
-// unlimited.
-func Mount(mux *http.ServeMux, routes []httpx.Route, keyOf func(*http.Request) string, now func() time.Time) error {
+// Sessions is what Mount needs from auth.Sessions: a rate key read from
+// the cookie alone, and the middleware that resolves the account.
+type Sessions interface {
+	RateKey(r *http.Request) string
+	Middleware(next http.Handler) http.Handler
+}
+
+// Mount registers routes on mux. Each route runs, in order: its name
+// for the access log and the metrics, its rate limit, then the session
+// lookup, then the session requirement. The limit comes before the
+// lookup, so a flood costs no database read: its key is read from the
+// sealed cookie alone (or the address), never from the sessions table.
+// A route without a limit is a programming error and refuses to mount,
+// so no endpoint ships unlimited.
+func Mount(mux *http.ServeMux, routes []httpx.Route, sessions Sessions, now func() time.Time) error {
 	for _, rt := range routes {
 		if rt.Limit.N <= 0 || rt.Limit.Per <= 0 {
 			return fmt.Errorf("server: route %s has no rate limit", rt.Pattern())
@@ -48,7 +60,10 @@ func Mount(mux *http.ServeMux, routes []httpx.Route, keyOf func(*http.Request) s
 		if rt.Access == httpx.SignedIn {
 			h = auth.RequireSession(h)
 		}
-		h = httpx.RateLimit(httpx.NewLimiter(rt.Limit, now), keyOf)(h)
+		if rt.Access.ResolvesSession() {
+			h = sessions.Middleware(h)
+		}
+		h = httpx.RateLimit(httpx.NewLimiter(rt.Limit, now), sessions.RateKey)(h)
 		h = httpx.NameRoute(rt.Pattern())(h)
 		mux.Handle(rt.Pattern(), h)
 	}
@@ -61,11 +76,11 @@ func Health(db Pinger, version string) []httpx.Route {
 		return apitypes.Health{Status: status, Version: version}
 	}
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/healthz", Access: httpx.Public, Limit: limitHealth,
+		{Method: http.MethodGet, Path: "/healthz", Access: httpx.Anonymous, Limit: httpx.PerMinute(limitHealthPerMinute),
 			Handler: func(w http.ResponseWriter, r *http.Request) {
 				httpx.WriteOK(w, r, http.StatusOK, health(apitypes.HealthStatusOk))
 			}},
-		{Method: http.MethodGet, Path: "/readyz", Access: httpx.Public, Limit: limitHealth,
+		{Method: http.MethodGet, Path: "/readyz", Access: httpx.Anonymous, Limit: httpx.PerMinute(limitHealthPerMinute),
 			Handler: func(w http.ResponseWriter, r *http.Request) {
 				ctx, cancel := context.WithTimeout(r.Context(), pingTimeout)
 				defer cancel()
@@ -75,7 +90,7 @@ func Health(db Pinger, version string) []httpx.Route {
 				}
 				httpx.WriteOK(w, r, http.StatusOK, health(apitypes.HealthStatusOk))
 			}},
-		{Method: "", Path: "/", Access: httpx.Public, Limit: limitNotFound,
+		{Method: "", Path: "/", Access: httpx.Anonymous, Limit: httpx.PerMinute(limitNotFoundPerMinute),
 			Handler: func(w http.ResponseWriter, r *http.Request) {
 				httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "No route here", nil)
 			}},
@@ -84,15 +99,29 @@ func Health(db Pinger, version string) []httpx.Route {
 
 // Stack wraps the mux in the middleware every request passes through,
 // outermost first.
-func Stack(mux http.Handler, log *slog.Logger, origins []string, sessions *auth.Sessions) http.Handler {
+func Stack(mux http.Handler, log *slog.Logger, obs httpx.Observer, origins []string) http.Handler {
 	return httpx.Chain(mux,
 		httpx.RequestID(),
-		httpx.Logger(log),
+		httpx.Observe(log, obs),
 		httpx.Recover(log),
 		httpx.SecurityHeaders(),
 		httpx.CORS(origins),
-		sessions.Middleware,
 	)
+}
+
+// Run serves public on port and internal (the metrics) on
+// internalPort until ctx ends or either listener fails, then stops
+// both. Cloud Run routes only PORT from outside, so the internal
+// listener is never public.
+func Run(ctx context.Context, log *slog.Logger, port string, public http.Handler, internalPort string, internal http.Handler) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	errs := make(chan error, 2)
+	go func() { errs <- Serve(ctx, port, public, log) }()
+	go func() { errs <- Serve(ctx, internalPort, internal, log.With("listener", "internal")) }()
+	first := <-errs
+	cancel()
+	return errors.Join(first, <-errs)
 }
 
 // Serve runs handler on port until ctx ends, then drains for up to
