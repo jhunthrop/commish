@@ -30,8 +30,14 @@ type Route struct {
 	Handler http.HandlerFunc
 }
 
-// Pattern is the ServeMux pattern, "GET /sheets/{id}".
-func (rt Route) Pattern() string { return rt.Method + " " + rt.Path }
+// Pattern is the ServeMux pattern, "GET /sheets/{id}", or the bare path
+// for a route that answers every method.
+func (rt Route) Pattern() string {
+	if rt.Method == "" {
+		return rt.Path
+	}
+	return rt.Method + " " + rt.Path
+}
 
 func withRoute(ctx context.Context, info *routeInfo) context.Context {
 	return context.WithValue(ctx, routeKey, info)
