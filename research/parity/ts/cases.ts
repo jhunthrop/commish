@@ -5,8 +5,13 @@ import { seedPlayers } from "@/data/seed/seed-players";
 import { crosswalkInputs, crosswalkRows, recordCrosswalk, resolveCrosswalk, seedTeamDefenseUniverse } from "@/projections/crosswalk";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { ingestDraftPicks } from "@/projections/nflverse/draft-picks";
+import { ingestPlayCallersCsv, PLAY_CALLERS_CSV_PATH } from "../../../scripts/lib/play-callers-csv";
 import {
+  ingestCoaches,
+  ingestDerivedStatLines,
   ingestGameResults,
+  ingestOpponentDefence,
+  ingestPlayByPlay,
   ingestInjuryReports,
   ingestPlayerUniverse,
   ingestPointsAllowed,
@@ -47,6 +52,7 @@ function afterUniverse(run: TsCase): TsCase {
 const CONTEXT_SEASONS = [2024, 2025];
 const SCHEDULE_SEASONS = [2023, 2024, 2025, 2026];
 const KDEF_SEASONS = [2024, 2025];
+const PBP_SEASONS = [2023, 2024];
 
 const UNMETERED = { reserveBackfill: async () => ({ granted: true }) } as unknown as RequestBudget;
 
@@ -95,6 +101,22 @@ export const TS_CASES: Readonly<Record<string, TsCase>> = {
     await seedTeamDefenseUniverse(db);
     await ingestKickingWeeks(db, client, KDEF_SEASONS);
     await ingestTeamDefenseWeeks(db, client, KDEF_SEASONS, createNflverseClient({ baseUrl: SCHEDULE_SOURCE_CONFIG.baseUrl }));
+  }),
+  "coaches-seed": async ({ db }) => {
+    await ingestPlayCallersCsv(db, PLAY_CALLERS_CSV_PATH);
+  },
+  // `scripts/projection-context.ts`'s sequence, after the universe and the coaches seed it requires.
+  "nflverse-context": async ({ db }) => {
+    const client = createNflverseClient();
+    await ingestPlayerUniverse(db, client);
+    await ingestPlayCallersCsv(db, PLAY_CALLERS_CSV_PATH);
+    await ingestSchedule(db, PBP_SEASONS);
+    for (const season of PBP_SEASONS) await ingestPlayByPlay(db, client, season);
+    await ingestCoaches(db, PBP_SEASONS);
+    await ingestOpponentDefence(db, PBP_SEASONS);
+  },
+  "nflverse-derived-stat-lines": afterUniverse(async ({ db }) => {
+    await ingestDerivedStatLines(db, createNflverseClient(), 2025);
   }),
   "tank01-roster-and-lines": async (ctx) => {
     await seed(ctx, 2);

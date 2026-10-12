@@ -10,6 +10,7 @@ function here instead of the Python builtin. Each one names the builtin it repro
 import math
 import re
 import unicodedata
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
 # ECMAScript WhiteSpace and LineTerminator code points: what `String.prototype.trim` removes.
@@ -75,6 +76,17 @@ def js_object_keys(obj: dict[str, object]) -> list[str]:
     indices = sorted((k for k in obj if _ARRAY_INDEX.match(k) and int(k) < 2**32 - 1), key=int)
     index_set = set(indices)
     return [*indices, *(k for k in obj if k not in index_set)]
+
+
+def js_sum(values: Iterable[float]) -> float:
+    """`values.reduce((sum, value) => sum + value, 0)`: a plain left fold.
+
+    NOT the builtin `sum`, which since Python 3.12 compensates float rounding (Neumaier) and so
+    returns a different last bit from the TypeScript's naive fold. Parity is exact, so it folds."""
+    total = 0.0
+    for value in values:
+        total += value
+    return total
 
 
 def js_is_integer(value: float) -> bool:

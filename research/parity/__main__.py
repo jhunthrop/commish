@@ -21,7 +21,7 @@ from pathlib import Path
 from research.parity.cases import ALL_CASES, CASES_BY_NAME, all_recordings
 from research.parity.record import record_case
 from research.parity.runner import CaseResult, run_case
-from research.parity.schema_gate import run_schema_gate
+from research.parity.schema_gate import against_live, run_schema_gate
 from research.pipeline.http import LiveFetcher
 
 
@@ -71,7 +71,16 @@ def _ingest(names: Sequence[str]) -> int:
     return 0 if all(r.matches for r in results) else 1
 
 
-def _schema() -> int:
+def _schema(against: str | None) -> int:
+    if against is not None:
+        only_live, only_baseline = against_live(against)
+        for line in sorted(only_live):
+            _print(f"  only the live database: {line}")
+        for line in sorted(only_baseline):
+            _print(f"  only the baseline: {line}")
+        _print("schema against the live database: " + ("match" if not (only_live or only_baseline) else "DIFFERENT"))
+        if only_live or only_baseline:
+            return 1
     result = run_schema_gate()
     _print(f"schema: {result.facts_compared} catalog facts compared, baseline and head")
     for line in sorted(result.baseline_only_drizzle):
@@ -125,7 +134,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     ingest = sub.add_parser("ingest", help="run both ingests on the recorded input and diff the rows")
     ingest.add_argument("names", nargs="+", help="case names, or all")
-    sub.add_parser("schema", help="the alembic baseline against drizzle's catalog")
+    schema = sub.add_parser("schema", help="the alembic baseline against drizzle's catalog")
+    schema.add_argument("--against", help="also compare a live database (read only, e.g. the dev copy) to the baseline")
     record = sub.add_parser("record", help="re-record fixture sets from the live provider")
     record.add_argument("names", nargs="+", help="fixture set names, or all")
     record.add_argument("--env-file", help="a dotenv file holding the provider keys a recording needs")
@@ -135,7 +145,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "ingest":
         return _ingest(args.names)
     if args.command == "schema":
-        return _schema()
+        return _schema(args.against)
     if args.command == "record":
         return _record(args.names, args.env_file)
     return _list()

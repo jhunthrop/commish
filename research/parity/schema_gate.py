@@ -113,3 +113,11 @@ def run_schema_gate() -> SchemaGateResult:
         baseline_only_alembic=baseline - drizzle,
         head_unexpected=frozenset(unexpected),
     )
+
+
+def against_live(url: str) -> tuple[frozenset[str], frozenset[str]]:
+    """A live database (the dev copy of production, read only) against the alembic baseline:
+    catalog lines only the live database has, and lines only the baseline has."""
+    live = catalog(url)
+    baseline = catalog(databases.build_with_alembic("parity_schema_alembic", "0001_baseline"))
+    return live - baseline, baseline - live
