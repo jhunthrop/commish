@@ -1,0 +1,36 @@
+# Proves the GitHub Actions to GCP chain with no deploy: the run authenticates as the
+# deployer service account through workload identity federation (no stored key), then
+# reads the Artifact Registry repository the lanes push images to. Run it by hand after
+# any change to the pool, the provider, the deployer's roles or the repository variables.
+name: infra-smoke
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  gcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: The deployer can see the image repository
+        run: |
+          gcloud artifacts repositories describe commish \
+            --location "${{ vars.GCP_REGION }}" --project "${{ vars.GCP_PROJECT }}" \
+            --format 'value(name,format)'
+      - name: The deployer can list Cloud Run services
+        run: gcloud run services list --project "${{ vars.GCP_PROJECT }}" --region "${{ vars.GCP_REGION }}" --format 'value(name)'
+  cloudflare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: The token can see the zone and the bucket
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          curl -fsS "https://api.cloudflare.com/client/v4/zones?name=trycommish.app" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | python3 -c 'import sys,json; d=json.load(sys.stdin); z=d["result"][0]; print("zone", z["name"], z["status"])'
+          curl -fsS "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | python3 -c 'import sys,json; d=json.load(sys.stdin); print("buckets", [b["name"] for b in d["result"]["buckets"]])'
