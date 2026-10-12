@@ -342,6 +342,7 @@ const eslintConfig = [
       "research/scripts/register-grade.ts",
       "research/src/projections/season-week/steps.ts",
       "research/src/projections/season-week/steps.test.ts",
+      "research/src/nightly/reads/record.ts",
     ],
     rules: {
       "no-restricted-syntax": ["error", ...REGISTER_QUARANTINE_SELECTORS],

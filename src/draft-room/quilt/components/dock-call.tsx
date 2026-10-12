@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useMemo } from "react";
-import { mustPickLine } from "@/domain/must-pick";
+import { mustPickLine } from "@research/domain/must-pick";
 import type { Player } from "@research/domain/player";
 import { positionLabel } from "@research/domain/position-words";
 import type { RosterSlotType } from "@research/domain/roster";

@@ -53,6 +53,9 @@ export const WALL_EXEMPT_FILES: readonly string[] = [
   "research/scripts/register-grade.ts",
   "research/src/projections/season-week/steps.ts",
   "research/src/projections/season-week/steps.test.ts",
+  // The record page's read (prep site carve-out, 2026-10-12): it publishes the register's running
+  // score into the nightly run's record.json and feeds nothing back into a fit.
+  "research/src/nightly/reads/record.ts",
 ];
 
 /** Everything that ships or runs. Not `e2e/` — it is the browser harness, cannot reach a database,

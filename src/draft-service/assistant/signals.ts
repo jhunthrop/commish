@@ -20,7 +20,8 @@ import { isRealTierCliff, tierStanding } from "@research/projections/decide/tier
 import { shipsProjectedRows } from "@research/projections/preseason/kdef-decision";
 import { ADVISOR_CONFIG } from "./config";
 import type { ValuedEntry } from "./recommend";
-import type { PositionRun, TierCollapse } from "./view";
+import type { TierCollapse } from "./view";
+import type { PositionRun } from "@research/advisor/why";
 
 /** The run read over the room's own last `runWindow` picks. */
 export function detectRun(state: DraftState): PositionRun | null {

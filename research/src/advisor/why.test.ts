@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { SeatTendency } from "../sim/room-odds";
-import { buildWhy, type WhyFacts } from "./why";
+import { buildWhy, type SeatLean, type WhyFacts } from "./why";
 
 const BANNED = /[—;]/;
 
-function seat(pickNumber: number, position: "RB" | "WR" | "QB"): SeatTendency {
-  return { teamId: `t${pickNumber}`, pickNumber, runs: 200, topPosition: { value: position, share: 0.6 }, topPlayer: { value: "x", share: 0.3 } };
+function seat(_pickNumber: number, position: "RB" | "WR" | "QB"): SeatLean {
+  return { topPosition: { value: position } };
 }
 
 const BASE: WhyFacts = {

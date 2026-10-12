@@ -1,5 +1,5 @@
 import { formatOrdinal } from "@/domain/format";
-import { mustPickLine } from "@/domain/must-pick";
+import { mustPickLine } from "@research/domain/must-pick";
 import type { Position } from "@research/domain/player";
 import { formatUsd } from "@/money/config";
 

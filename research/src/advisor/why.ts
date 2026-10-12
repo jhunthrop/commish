@@ -11,14 +11,25 @@
  * vocabulary for how a seat was read. Every number names its basis. No em-dash, no semicolon,
  * second person.
  */
-import { mustPickLine } from "@/domain/must-pick";
+import { mustPickLine } from "@research/domain/must-pick";
 import type { Position } from "@research/domain/player";
 import { positionWord } from "@research/domain/position-words";
 import { BENCH_SLOT, type RosterSlotType } from "@research/domain/roster";
 import type { PickReason } from "@research/projections/decide/draft";
 import { shipsProjectedRows } from "@research/projections/preseason/kdef-decision";
-import type { SeatTendency } from "../sim/room-odds";
-import type { PositionRun } from "./view";
+
+/** A run: `count` of the last `window` picks went to one position. */
+export interface PositionRun {
+  readonly position: Position;
+  readonly count: number;
+  readonly window: number;
+}
+
+/** What one seat between now and your next turn takes most often in the room's simulated runs. The
+ *  league app's sim (`SeatTendency`) carries more; this is the part the sentence reads. */
+export interface SeatLean {
+  readonly topPosition: { readonly value: Position } | null;
+}
 
 export interface WhyFacts {
   readonly position: Position;
@@ -27,7 +38,7 @@ export interface WhyFacts {
   readonly reasons: readonly PickReason[];
   readonly run: PositionRun | null;
   /** The picks between now and your next turn, read from the room's runs. */
-  readonly ahead: readonly SeatTendency[];
+  readonly ahead: readonly SeatLean[];
   /** Continuations behind the seats-ahead read. */
   readonly runs: number;
   /** The positions the roster can still take once its bench is full (`restrictedPositions`),
@@ -106,7 +117,7 @@ function leanClause(facts: WhyFacts, one: string): string {
 }
 
 /** The room sentence: the run at his position when there is one, then the seats ahead. */
-function roomSentence(facts: WhyFacts): string {
+export function roomSentence(facts: WhyFacts): string {
   const one = positionWord(facts.position, false);
   if (facts.ahead.length === 0) return "Nobody picks between now and your next turn.";
   const lean = leanClause(facts, one);
@@ -118,13 +129,18 @@ function roomSentence(facts: WhyFacts): string {
 /** Two sentences at most. `variant` is the pick the card was computed at, so shapes rotate. With
  *  the bench full, sentence one is the league's own line about what the roster still owes. */
 export function buildWhy(facts: WhyFacts, variant: number): WhySentence {
-  if (facts.mustPick !== null && facts.mustPick.length > 0) {
-    return { text: `${mustPickLine(facts.mustPick)} ${roomSentence(facts)}`, shape: "must:0" };
-  }
+  const him = himSentence(facts, variant);
+  return { text: `${him.text} ${roomSentence(facts)}`, shape: him.shape };
+}
+
+/** Sentence one alone: about him, or, with the bench full, the league's line about what the roster
+ *  still owes. The advisor service pairs it with its own closed-form room sentence. */
+export function himSentence(facts: Pick<WhyFacts, "position" | "positionRank" | "fillsSlot" | "reasons" | "mustPick">, variant: number): WhySentence {
+  if (facts.mustPick !== null && facts.mustPick.length > 0) return { text: mustPickLine(facts.mustPick), shape: "must:0" };
   const him: HimFacts = { one: positionWord(facts.position, false), many: positionWord(facts.position, true), slot: slotClause(facts.fillsSlot), rank: facts.positionRank };
   const cliff = cliffOf(facts.position, facts.fillsSlot, facts.reasons);
   const shapes = cliff === undefined ? VALUE_SHAPES : CLIFF_SHAPES;
   const index = ((variant % shapes.length) + shapes.length) % shapes.length;
   const first = cliff === undefined ? VALUE_SHAPES[index]!(him) : CLIFF_SHAPES[index]!(him, cliff);
-  return { text: `${first} ${roomSentence(facts)}`, shape: `${cliff === undefined ? "value" : "cliff"}:${index}` };
+  return { text: first, shape: `${cliff === undefined ? "value" : "cliff"}:${index}` };
 }

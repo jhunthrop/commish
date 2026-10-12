@@ -166,6 +166,12 @@ function filledSlots(placements: readonly Placement[]): readonly RosterSlot[] {
   });
 }
 
+/** The roster as the slots it fills, in draft order: what the roster-eligibility rules
+ *  (`restrictedPositions`) read. */
+export function rosterSlotsOf(roster: readonly RosteredPlayer[], slotConfig: readonly RosterSlotConfig[]): readonly RosterSlot[] {
+  return filledSlots(placeRoster(roster, slotConfig));
+}
+
 /**
  * Where a player at this position would land on this roster, or `null` if the roster cannot take
  * him at all. Asked of the engine's own oracle (`assignSlot`), never a second rule written here.

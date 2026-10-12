@@ -10,6 +10,7 @@
  */
 import type { Position } from "@research/domain/player";
 import type { RosterSlotType } from "@research/domain/roster";
+import type { PositionRun } from "@research/advisor/why";
 
 /** A survival fraction and the runs it is a fraction of. */
 export interface OddsCell {
@@ -63,12 +64,7 @@ export interface Candidate {
   readonly valueOverReplacement: number;
 }
 
-/** A run: `count` of the last `window` picks went to one position. */
-export interface PositionRun {
-  readonly position: Position;
-  readonly count: number;
-  readonly window: number;
-}
+
 
 /** A position whose best man left sits at a real cliff: how many are left before the drop, and
  *  how far the position falls after them. */

@@ -16,8 +16,9 @@ import { seatsAheadFor, survivalFor, type RoomOddsTable, type SeatSurvival } fro
 import { ADVISOR_CONFIG } from "./config";
 import { askingWindow, recommendNow, type ValuedEntry } from "./recommend";
 import { detectRun } from "./signals";
-import type { AdvisorView, Candidate, NextPick, OddsCell, PositionRun, SurvivalOdds, TierCollapse, TierStandingView } from "./view";
-import { buildWhy } from "./why";
+import type { AdvisorView, Candidate, NextPick, OddsCell, SurvivalOdds, TierCollapse, TierStandingView } from "./view";
+import type { PositionRun } from "@research/advisor/why";
+import { buildWhy } from "@research/advisor/why";
 
 export interface AdvisorCoreInput {
   readonly state: DraftState;

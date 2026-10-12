@@ -6,7 +6,8 @@
  */
 import { pickLabel } from "@/domain/pick-label";
 import { positionWord } from "@research/domain/position-words";
-import type { AdvisorView, OddsCell, PositionRun, TierCollapse } from "@/draft-service/assistant/view";
+import type { AdvisorView, OddsCell, TierCollapse } from "@/draft-service/assistant/view";
+import type { PositionRun } from "@research/advisor/why";
 
 export { pickLabel };
 

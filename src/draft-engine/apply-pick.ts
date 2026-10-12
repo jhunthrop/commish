@@ -1,4 +1,4 @@
-import { mustPickLine } from "@/domain/must-pick";
+import { mustPickLine } from "@research/domain/must-pick";
 import type { RosterSlot } from "@research/domain/roster";
 import { restrictedPositions } from "@research/domain/roster-eligibility";
 import { rosterFor, type CompletedPick, type DraftReduceResult, type DraftState } from "./state";
