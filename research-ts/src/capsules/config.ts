@@ -121,6 +121,14 @@ export const CAPSULE_CONFIG = {
    */
   maxGatewayCallsPerPlayer: 4,
   /**
+   * A NARRATIVE SLOT REFUSED ONLY FOR A VOICE RULE IS ASKED AGAIN, ONCE (prep site carve-out,
+   * 2026-10-12): a set phrase or a writer's aside is how the sentence was said, not what it claims,
+   * so the writer is shown its sentence and asked to rewrite it, and the rewrite is graded like the
+   * original. One rewrite per slot, and only while the player's own call ceiling
+   * (`maxGatewayCallsPerPlayer`) has calls left; a slot still refused renders its template sentence.
+   */
+  narrativeVoiceRewritesPerSlot: 1,
+  /**
    * A BAND FAILURE IS ANSWERED WITH THE COUNT TO HIT, OVER OR UNDER (overruns round, 2026-09-08). A
    * production regeneration returned a short note at 133 words against 75 to 120, and the read fell
    * to the template on a length miss a rewrite would have fixed. The correction states the middle

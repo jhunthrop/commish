@@ -126,6 +126,32 @@ describe("generateCapsule", () => {
     expect(result.narrative.rejected.join(" ")).toContain("137");
   });
 
+  it("asks once more for a narrative slot refused only for a set phrase, and keeps the rewrite when it validates", async () => {
+    const withSetPhrase = "Here's the thing, he is the engine of that SF offense and the ADP has not caught up.";
+    const asked: string[] = [];
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      const message = userMessageOf(init);
+      asked.push(message);
+      return okResponse(requestKind(init) === "bundle" ? bundleJson({ narrative: { call: withSetPhrase } }) : GROUNDED_CALL);
+    });
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(asked[1]).toContain(`What you wrote: "${withSetPhrase}"`);
+    expect(result.narrative.slots).toEqual({ call: GROUNDED_CALL });
+    expect(result.narrative.rejected).toEqual([]);
+  });
+
+  it("never asks again for a slot refused for a fabrication, and asks only once for a slot that keeps its set phrase", async () => {
+    const withSetPhrase = "Here's the thing, he is the engine of that SF offense and the ADP has not caught up.";
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) =>
+      okResponse(requestKind(init) === "bundle" ? bundleJson({ narrative: { call: withSetPhrase, "absence:usage": "He caught 137 passes a year ago and nobody tracked it." } }) : withSetPhrase),
+    );
+    const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.narrative.slots).toEqual({});
+    expect(result.narrative.refused.map((slot) => slot.key).sort()).toEqual(["absence:usage", "call"]);
+  });
+
   it("corrects ONLY the part that failed: a fabricated compact costs one compact call, the full read is kept as written", async () => {
     const kinds: RequestKind[] = [];
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {

@@ -8,7 +8,7 @@ import {
   whyGroupSlotKey,
   type NarrativeSlots,
 } from "./narrative-slots";
-import { groundingOf, validateNarrativeSlot } from "./validate";
+import { groundingOf, isVoiceRuleViolation, validateNarrativeSlot, voiceRuleCorrectionFor } from "./validate";
 
 /**
  * THE NARRATIVE (founder amendment, 2026-09-07): "use the LLM to make every part of the player peek
@@ -29,8 +29,11 @@ import { groundingOf, validateNarrativeSlot } from "./validate";
  * held to (every number and multi-word name traces to the fact sheet, no banned vocabulary, no
  * em-dash, no semicolon, no competitor) plus its own word cap. A slot that fails is DROPPED, and
  * its module renders the deterministic template sentence it always had. One bad sentence costs one
- * sentence, never the page. A slot is never retried: it is one sentence, and the template sentence
- * behind it is honest.
+ * sentence, never the page. A slot is not retried for a fabrication: it is one sentence, and the
+ * template sentence behind it is honest. A slot refused ONLY for a voice rule (a set phrase or a
+ * writer's aside, `voice-rules.ts`) is the one exception: how it was said is fixable without a
+ * new claim, so it is asked again, a bounded number of times (`CAPSULE_CONFIG
+ * .narrativeVoiceRewritesPerSlot`, `voiceRewritable` and `slotRewritePrompt` below).
  */
 
 /** One slot the model is asked to write, with what it is for and how long it may be. */
@@ -61,6 +64,35 @@ export interface NarrativeResult {
   /** Set when no slot survived at all, naming why (a refused gateway, a body with no narrative
    *  object in it). */
   readonly failure: string | null;
+}
+
+/** A refused slot whose every violation is a voice rule's, and so is worth one rewrite. */
+export function voiceRewritable(slot: RefusedSlot): boolean {
+  return slot.violations.length > 0 && slot.violations.every(isVoiceRuleViolation);
+}
+
+/** The rewrite request for one voice-refused slot: its own brief, the sentence as written, and the
+ *  correction for each rule it broke. Only the sentence comes back. */
+export function slotRewritePrompt(request: NarrativeSlotRequest, slot: RefusedSlot): string {
+  const corrections = slot.violations.map((violation) => voiceRuleCorrectionFor(violation)).filter((line): line is string => line !== null);
+  return [
+    `This is one sentence you wrote for the ${request.key} module: ${request.brief}`,
+    `What you wrote: "${slot.text}"`,
+    ...corrections,
+    `Keep every number and name it already has, stay under ${request.maxWords} words, and answer with the rewritten sentence alone, no quotes and nothing around it.`,
+  ].join("\n\n");
+}
+
+/** `result` with `key` now written as `text`, and its refusal removed. */
+export function withRewrittenSlot(result: NarrativeResult, key: string, text: string, model: string): NarrativeResult {
+  const refused = result.refused.filter((slot) => slot.key !== key);
+  return {
+    ...result,
+    slots: { ...result.slots, [key]: text },
+    model,
+    refused,
+    rejected: refused.map((slot) => `${slot.key}: ${slot.violations[0] ?? "unknown violation"}`),
+  };
 }
 
 /** No slots, no failure: the state before a call, and the honest one when nothing was asked. */

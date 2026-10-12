@@ -1,10 +1,11 @@
 import { parseBundle, type CapsuleBundle } from "./bundle";
 import { CAPSULE_CONFIG, CAPSULE_MODEL } from "./config";
 import type { PlayerFacts } from "./facts";
-import { failedNarrative, narrativeRequestsFor, settleNarrative, type NarrativeResult, type NarrativeSlotRequest } from "./narrative";
+import { failedNarrative, narrativeRequestsFor, settleNarrative, slotRewritePrompt, voiceRewritable, withRewrittenSlot, type NarrativeResult, type NarrativeSlotRequest } from "./narrative";
+import { NARRATIVE_MIN_WORDS } from "./narrative-slots";
 import { bundlePromptFor, correctionKindOf, correctionPromptFor, NO_WORN_PHRASES, WRITER_RULES, type CorrectionKind, type PriorAttempt, type WornPhrases } from "./prompt";
 import { renderTemplateCapsule } from "./template";
-import { softCorrectionFor, validateCapsule, wordCount, type CapsuleSize, type ValidationResult } from "./validate";
+import { groundingOf, softCorrectionFor, validateCapsule, validateNarrativeSlot, wordCount, type CapsuleSize, type ValidationResult } from "./validate";
 import { addGatewayUsage, CapsuleGenerationError, postChatCompletion, type CapsuleWriterDeps, type GatewayUsage } from "./write";
 
 /**
@@ -284,5 +285,55 @@ export async function generateCapsule(facts: PlayerFacts, deps: CapsuleWriterDep
   const fullStart = startOf(facts, "full", bundle.full);
   const compact = await settleRead(facts, "compact", startOf(facts, "compact", bundle.compact), remaining - (needsCall(fullStart) ? 1 : 0), deps);
   const full = await settleRead(facts, "full", fullStart, remaining - compact.calls, deps);
-  return assemble(compact.result, full.result, settleNarrative(bundle.narrative, facts, requests, model), outcome.usage, model);
+  const settled = settleNarrative(bundle.narrative, facts, requests, model);
+  const callsLeft = CAPSULE_CONFIG.maxGatewayCallsPerPlayer - outcome.calls - compact.calls - full.calls;
+  const voice = await rewriteVoiceSlots(settled, facts, requests, deps, callsLeft, model);
+  return assemble(compact.result, full.result, voice.narrative, sumUsage(outcome.usage, voice.usage), model);
+}
+
+/**
+ * THE VOICE-RULE REWRITES (`narrative.ts`'s docblock): each slot refused only for a set phrase or an
+ * aside is shown back to the writer and rewritten, up to `narrativeVoiceRewritesPerSlot` times and
+ * never past the player's call ceiling, and the rewrite is graded exactly as the original was.
+ */
+async function rewriteVoiceSlots(
+  settled: NarrativeResult,
+  facts: PlayerFacts,
+  requests: readonly NarrativeSlotRequest[],
+  deps: CapsuleWriterDeps,
+  callsLeft: number,
+  model: string,
+): Promise<{ readonly narrative: NarrativeResult; readonly usage: GatewayUsage | null }> {
+  let narrative = settled;
+  let usage: GatewayUsage | null = null;
+  let calls = 0;
+  const grounding = groundingOf(facts);
+  for (const slot of settled.refused.filter(voiceRewritable)) {
+    const request = requests.find((candidate) => candidate.key === slot.key);
+    if (request === undefined) continue;
+    let current = slot;
+    for (let attempt = 0; attempt < CAPSULE_CONFIG.narrativeVoiceRewritesPerSlot && calls < callsLeft; attempt += 1) {
+      calls += 1;
+      const messages = [
+        { role: "system", content: WRITER_RULES },
+        { role: "user", content: slotRewritePrompt(request, current) },
+      ];
+      try {
+        const answer = await postChatCompletion(messages, CAPSULE_CONFIG.bundle.maxTokens, deps, NARRATIVE_MIN_WORDS);
+        usage = sumUsage(usage, answer.usage);
+        const text = answer.content.trim();
+        const result = validateNarrativeSlot(text, grounding, request.maxWords);
+        if (result.ok) {
+          narrative = withRewrittenSlot(narrative, slot.key, text, model);
+          break;
+        }
+        current = { key: slot.key, text, violations: result.violations };
+        if (!voiceRewritable(current)) break;
+      } catch (error: unknown) {
+        usage = sumUsage(usage, error instanceof CapsuleGenerationError ? error.billedUsage : null);
+        break;
+      }
+    }
+  }
+  return { narrative, usage };
 }

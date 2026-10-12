@@ -577,9 +577,15 @@ function voiceRuleViolation(hit: VoiceRuleHit, text: string): string {
   return `The text carries a ${hit.rule}, "${hit.found}", in the sentence "${sentence}". Rewrite that sentence.`;
 }
 
+/** Whether a violation is a voice rule's (a set phrase or an aside), which is corrected by a
+ *  rewrite of its one sentence rather than a fresh write. */
+export function isVoiceRuleViolation(violation: string): boolean {
+  return VOICE_RULE_VIOLATION_PATTERN.test(violation);
+}
+
 /** A set phrase or an aside is corrected like a trading word: the one sentence is rewritten to say
  *  only its point, and the rest of the prose is kept. */
-function voiceRuleCorrectionFor(violation: string): string | null {
+export function voiceRuleCorrectionFor(violation: string): string | null {
   const match = VOICE_RULE_VIOLATION_PATTERN.exec(violation);
   if (match === null) return null;
   const [, , found, sentence] = match;

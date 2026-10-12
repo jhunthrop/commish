@@ -9,8 +9,8 @@ import { byeWeeksByTeam } from "@research-ts/reference/nfl-schedule";
 import { chipEligibleLaws, registry } from "@research-ts/projections/laws/registry";
 import { BOARD_SOURCE, boardReasons, preseasonProjectionsFor, type BoardStamp, type PreseasonProjectionRow } from "@research-ts/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
-import { GENERIC_BOARD_SHAPE } from "@research-ts/board/generic-board";
-import { boardRows, isProjectedRow } from "@research-ts/board/service";
+import { genericBoardRows } from "@research-ts/board/generic-board";
+import type { BoardRow } from "@research-ts/board/service";
 import { activePeersFor } from "./peers";
 import {
   currentSeasonSummaries,
@@ -74,6 +74,19 @@ function factsRowFor(
     byeWeek,
     reasons,
   };
+}
+
+/**
+ * THE RANK THE PAGE SHOWS, for one man, without rebuilding the board for him: his place in the
+ * served board's value order under the generic shape (`overallRank`), read from the generic board
+ * this instance already holds in memory (`genericBoardRows`, refreshed at the board's own cadence),
+ * so a live peek and the whole-board sweep (`collect.ts`) quote the same rank. A man the served
+ * board does not carry (a crosswalk that fails to resolve back, which the board service drops
+ * defensively) still gets his facts, ranked by his own stored generation's value order, the
+ * nearest rank to the page's that exists for him.
+ */
+function servedRankOf(servedBoard: readonly BoardRow[], playerId: string, projection: PreseasonProjectionRow): number {
+  return servedBoard.find((boardRow) => boardRow.playerId === playerId)?.overallRank ?? projection.valueRank;
 }
 
 async function resolvePlayerBoardMembership(db: Db, playerId: string, stamp: BoardStamp): Promise<PlayerBoardMembership | null> {
@@ -193,7 +206,7 @@ export async function collectPlayerFacts(db: Db, playerId: string, asOf: Date = 
   const teamByPlayerId = new Map([[nflPlayerId, identity.team]]);
 
   const [servedBoard, byes, reasonsByNflId, injuries, news, seasons, lastSeasonStoryByGsisId, usageTouchesAndTrend, propsLinesByGsisId, winTotalByTeam, depthPass] = await Promise.all([
-    boardRows(db, { shape: GENERIC_BOARD_SHAPE, asOf }),
+    genericBoardRows(db),
     byeWeeksByTeam(db),
     boardReasons(db, BOARD_SOURCE, PRODUCT_SEASON),
     injurySnapshot(db),
@@ -220,8 +233,6 @@ export async function collectPlayerFacts(db: Db, playerId: string, asOf: Date = 
   // THE RANK THE PAGE SHOWS: his place in the served board's value order under the generic shape,
   // the same rank the whole-board sweep hands the writer (`collect.ts`), so a live peek and a stored
   // capsule can never quote two different ranks for one man.
-  const servedRow = servedBoard.find((boardRow) => boardRow.playerId === playerId);
-  if (servedRow === undefined || !isProjectedRow(servedRow)) return null;
-  const row = factsRowFor(playerId, identity, projection, servedRow.overallRank, byes.get(identity.team) ?? null, reasonsByNflId.get(nflPlayerId) ?? []);
+  const row = factsRowFor(playerId, identity, projection, servedRankOf(servedBoard, playerId, projection), byes.get(identity.team) ?? null, reasonsByNflId.get(nflPlayerId) ?? []);
   return buildPlayerFacts(factsInputFor(row, seasons.get(playerId), injuries, news, laws, color));
 }

@@ -2,8 +2,11 @@
  * THE WRITER'S VOICE RULES, in one place (the prep site carve-out, 2026-10-12): what a capsule may
  * never ship with, however well grounded its numbers are. The validator (`validate.ts`) rejects a
  * read or a narrative slot carrying any of these and the writer is re-prompted to rewrite the one
- * sentence (`softCorrectionFor`); a read that still carries one after its correction falls to the
- * template like any other failed read.
+ * sentence: a read through its correction call (`softCorrectionFor`), a narrative slot through its
+ * own rewrite, at most `CAPSULE_CONFIG.narrativeVoiceRewritesPerSlot` times and within the player's
+ * call ceiling (`generate.ts`'s `rewriteVoiceSlots`). A read that still carries one after its
+ * correction falls to the template like any other failed read; a slot that still does renders its
+ * template sentence.
  *
  * Found in the approved mocks (`docs/design/mocks/2026-10-12-commish/direction.html`, "What did not
  * reconcile"): a stored capsule carried an unedited writer aside ("not that word, let me say it
@@ -20,8 +23,6 @@
 export const SET_PHRASES: readonly string[] = [
   "the honest worry",
   "the honest hesitation",
-  "the honest read",
-  "the honest answer",
   "the stat that sells me",
   "the price is wrong",
   "with a plan behind him",
