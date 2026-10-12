@@ -1,4 +1,5 @@
 import {
+	BOARD_SIZE,
 	LOBBY_BUG,
 	ROOM_KEYS,
 	ROW_PLAYER,
@@ -16,6 +17,7 @@ import type { PageServerLoad } from './$types';
 export const prerender = true;
 
 export const load: PageServerLoad = () => ({
+	boardSize: BOARD_SIZE,
 	lobbyBug: LOBBY_BUG,
 	roomKeys: ROOM_KEYS,
 	rowPlayer: ROW_PLAYER,

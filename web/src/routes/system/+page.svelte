@@ -1,5 +1,12 @@
 <script lang="ts">
-	import { adpWords, draftersGap, lastName, oddsWords, pickLabel } from '#lib/format/draft.ts';
+	import {
+		DEFAULT_TEAMS,
+		adpWords,
+		draftersGap,
+		lastName,
+		oddsWords,
+		pickLabel
+	} from '#lib/format/draft.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
 	import CallPanel from '#lib/ui/CallPanel.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
@@ -22,7 +29,8 @@
 	import TierStrip from '#lib/ui/TierStrip.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { vorCell } from '#lib/ui/heat.ts';
+	import { TINTED_ROUNDS, heatFor, vorCell } from '#lib/ui/heat.ts';
+	import type { BoardPlayer } from '#lib/types/player.ts';
 	import { ICON_NAMES } from '#lib/ui/icons.ts';
 	import DocPage from '#lib/ui/system/DocPage.svelte';
 	import DocSection from '#lib/ui/system/DocSection.svelte';
@@ -36,11 +44,21 @@
 	const ROW_MIN_WIDTH = 760;
 	const BAND_MIN_WIDTH = 520;
 	const PLAYER_HREF = '/players';
-	const VALUE_NOTES: Readonly<Record<string, string>> = {
-		'Chris Olave': 'Round 1 green. His points over replacement rank in the first 12 of our 400.',
-		'Tetairoa McMillan': 'Round 3 green, paler. Four greens, one per round, then no tint.',
-		'Marvin Harrison Jr.': 'Rose with a minus. Below replacement, a bench player in PPR this year.'
-	};
+
+	/** What a value cell's tint says about this player, from his own round and sign. */
+	function valueNote(player: BoardPlayer, boardSize: number): string {
+		const { vor, vorRound } = player;
+		if (heatFor(vor, vorRound) === 'heat-neg') {
+			return 'Rose with a minus. Below replacement, a bench player this year.';
+		}
+		const first = (vorRound - 1) * DEFAULT_TEAMS + 1;
+		const last = vorRound * DEFAULT_TEAMS;
+		const rank = `His points over replacement rank ${first} to ${last} of our ${boardSize}.`;
+		if (heatFor(vor, vorRound) === 'none') {
+			return `No tint. ${rank} Greens stop after round ${TINTED_ROUNDS}.`;
+		}
+		return `Round ${vorRound} green. ${rank} One green per round, paler each round, through round ${TINTED_ROUNDS}.`;
+	}
 
 	const row = $derived(data.rowPlayer);
 	const call = $derived(data.soloRoom.call);
@@ -59,7 +77,7 @@
 
 <Shell title="System" active={null}>
 	{#snippet search()}
-		<Search placeholder="Search 400 players" label="Search players" />
+		<Search placeholder="Search {data.boardSize} players" label="Search players" />
 	{/snippet}
 
 	<DocPage title="System">
@@ -152,7 +170,7 @@
 		>
 			<Parts>
 				{#each data.valuePlayers as player (player.id)}
-					<Part name={player.name} about={VALUE_NOTES[player.name] ?? ''}>
+					<Part name={player.name} about={valueNote(player, data.boardSize)}>
 						{#snippet show()}<ValueCell {...vorCell(player.vor, player.vorRound)} />{/snippet}
 					</Part>
 				{/each}
