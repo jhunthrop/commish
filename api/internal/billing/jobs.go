@@ -2,6 +2,7 @@ package billing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,20 +12,41 @@ import (
 // reconcileActor tags every write the reconcile makes.
 const reconcileActor = "stripe_reconcile"
 
+// ReconcileResult is one reconcile run's tally.
+type ReconcileResult struct {
+	Synced  int
+	Ignored int
+	Failed  int
+}
+
 // Reconcile re-reads every subscription a row still believes live and
 // writes it exactly as a webhook would, healing anything a webhook
-// never delivered. It returns how many it synced.
-func (s *Service) Reconcile(ctx context.Context) (int, error) {
+// never delivered. One subscription's failure never stops the rest:
+// every failure is collected and returned joined, with the tally.
+func (s *Service) Reconcile(ctx context.Context) (ReconcileResult, error) {
+	var res ReconcileResult
 	ids, err := s.Entitlements.LiveSubscriptionIDs(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("billing: reconcile: %w", err)
+		return res, fmt.Errorf("billing: reconcile: %w", err)
 	}
-	for i, id := range ids {
-		if err := s.syncSubscription(ctx, id, reconcileActor); err != nil {
-			return i, fmt.Errorf("billing: reconcile %s: %w", id, err)
+	var failures []error
+	for _, id := range ids {
+		o, err := s.syncSubscription(ctx, id, reconcileActor)
+		switch {
+		case err != nil:
+			res.Failed++
+			failures = append(failures, fmt.Errorf("subscription %s: %w", id, err))
+		case o.Kind == OutcomeIgnored:
+			res.Ignored++
+			s.Log.Warn("billing: reconcile ignored", "subscription", id, "reason", o.Reason)
+		default:
+			res.Synced++
 		}
 	}
-	return len(ids), nil
+	if len(failures) > 0 {
+		return res, fmt.Errorf("billing: reconcile: %d of %d failed: %w", res.Failed, len(ids), errors.Join(failures...))
+	}
+	return res, nil
 }
 
 // ReminderLead is how far ahead of a renewal the reminder goes out

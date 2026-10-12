@@ -62,12 +62,38 @@ func (s *Store) RecordEventOnce(ctx context.Context, id, eventType string, paylo
 	return processedAt == nil, nil
 }
 
-// MarkEventProcessed stamps an event done once its writes committed.
-func (s *Store) MarkEventProcessed(ctx context.Context, id string) error {
-	if _, err := s.Pool.Exec(ctx, `update app.billing_events set processed_at = now() where id = $1`, id); err != nil {
+// MarkEventProcessed stamps an event done once its writes committed,
+// with what became of it.
+func (s *Store) MarkEventProcessed(ctx context.Context, id string, o Outcome) error {
+	if _, err := s.Pool.Exec(ctx, `
+		update app.billing_events set processed_at = now(), outcome = $2, outcome_reason = $3 where id = $1`,
+		id, string(o.Kind), nullable(o.Reason)); err != nil {
 		return fmt.Errorf("billing: mark event %s: %w", id, err)
 	}
 	return nil
+}
+
+func nullable(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// EventPayloadRetention is how long a billing event's (trimmed)
+// payload is kept. The sweep job clears it after; the row stays.
+const EventPayloadRetention = 90 * 24 * time.Hour
+
+// ClearEventPayloads empties the payload of every event received before
+// cutoff. The row, its type, times and outcome stay.
+func (s *Store) ClearEventPayloads(ctx context.Context, cutoff time.Time) (int64, error) {
+	tag, err := s.Pool.Exec(ctx, `
+		update app.billing_events set payload = null, payload_cleared_at = now()
+		where received_at < $1 and payload is not null`, cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("billing: clear event payloads: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }
 
 // WithLock runs fn holding a Postgres advisory lock on key.

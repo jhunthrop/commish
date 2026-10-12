@@ -50,10 +50,29 @@ type Entitlements interface {
 	UpsertSubscription(ctx context.Context, st entitlements.SubscriptionState) error
 	OtherLiveSubscription(ctx context.Context, accountID uuid.UUID, subscriptionID string, now time.Time) (string, error)
 	SetCancelAtPeriodEnd(ctx context.Context, subscriptionID string, cancel bool, actor string) error
-	RefundPayment(ctx context.Context, paymentIntentID, actor string) (int64, error)
-	RefundGroupPass(ctx context.Context, paymentIntentID, actor string) (int64, error)
-	ClaimGroupPass(ctx context.Context, groupPassID, accountID uuid.UUID, actor string) error
+	HasOtherLivePass(ctx context.Context, accountID uuid.UUID, season int, checkoutSessionID string, now time.Time) (bool, error)
+	EndPayment(ctx context.Context, paymentIntentID string, why entitlements.Ending, actor string) (int64, error)
+	RestorePayment(ctx context.Context, paymentIntentID, actor string) (int64, error)
+	EndSubscription(ctx context.Context, subscriptionID string, why entitlements.Ending, now time.Time, actor string) error
+	ClaimGroupPass(ctx context.Context, groupPassID, accountID uuid.UUID, now time.Time, actor string) error
 	LiveSubscriptionIDs(ctx context.Context) ([]string, error)
+}
+
+// BillingStore is the part of Store the service reads and writes:
+// customers, the event log, checkout sessions, group passes and locks.
+type BillingStore interface {
+	CustomerID(ctx context.Context, accountID uuid.UUID) (string, bool, error)
+	SaveCustomerID(ctx context.Context, accountID uuid.UUID, customerID string) error
+	RecordEventOnce(ctx context.Context, id, eventType string, payload []byte) (bool, error)
+	MarkEventProcessed(ctx context.Context, id string, o Outcome) error
+	WithLock(ctx context.Context, key string, fn func(context.Context) error) error
+	OpenCheckoutFor(ctx context.Context, accountID uuid.UUID, product string, seasonKey int, now time.Time) (*OpenCheckout, error)
+	RecordCheckout(ctx context.Context, accountID uuid.UUID, product string, seasonKey int, lookupKey string, quantity int64, cs CheckoutSession) error
+	CloseCheckout(ctx context.Context, sessionID, status string) error
+	CreateGroupPass(ctx context.Context, g NewGroupPass) error
+	GroupPassByCode(ctx context.Context, code string) (GroupPass, error)
+	GroupPassesBoughtBy(ctx context.Context, accountID uuid.UUID) ([]GroupPass, error)
+	ClaimedBy(ctx context.Context, groupPassID, accountID uuid.UUID) (bool, error)
 }
 
 // HandleReader reads an account's public handle.
@@ -63,7 +82,7 @@ type HandleReader interface {
 
 // Service serves every billing route.
 type Service struct {
-	Store        *Store
+	Store        BillingStore
 	Entitlements Entitlements
 	// Gateway is nil when Stripe is not configured; every route then
 	// answers 503 rather than the API refusing to start.

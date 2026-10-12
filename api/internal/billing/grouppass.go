@@ -84,13 +84,16 @@ func (s *Service) claimGroupPass(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	accountID := auth.AccountID(r)
-	err := s.Entitlements.ClaimGroupPass(r.Context(), g.ID, accountID, "claim:"+accountID.String())
+	err := s.Entitlements.ClaimGroupPass(r.Context(), g.ID, accountID, s.Now(), "claim:"+accountID.String())
 	switch {
 	case errors.Is(err, entitlements.ErrAlreadyClaimed):
 		// Claiming twice is not a mistake worth an error: the pass is
 		// already theirs.
 	case errors.Is(err, entitlements.ErrGroupPassFull):
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "Every pass on this link is taken", nil)
+		return
+	case errors.Is(err, entitlements.ErrGroupPassExpired):
+		httpx.WriteError(w, r, http.StatusGone, httpx.CodeConflict, "This pass was for a season that has ended", nil)
 		return
 	case errors.Is(err, entitlements.ErrNoGroupPass), errors.Is(err, entitlements.ErrGroupPassClosed):
 		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "This link does not open a pass", nil)

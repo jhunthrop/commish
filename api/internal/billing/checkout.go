@@ -59,6 +59,9 @@ type checkoutPlan struct {
 	lookupKey string
 	quantity  int64
 	meta      map[string]string
+	// seasonKey scopes the one open checkout: the season for a pass,
+	// 0 for the Membership, which has none.
+	seasonKey int
 }
 
 // plan validates the request into a checkoutPlan, or the fields at
@@ -69,7 +72,7 @@ func (s *Service) plan(a auth.Account, in apitypes.CheckoutRequest) (checkoutPla
 	switch in.Product {
 	case apitypes.ProductDraftPass:
 		meta[metaSeason] = strconv.Itoa(yr)
-		return checkoutPlan{mode: ModePayment, lookupKey: LookupDraftPass, quantity: 1, meta: meta}, nil
+		return checkoutPlan{mode: ModePayment, lookupKey: LookupDraftPass, quantity: 1, meta: meta, seasonKey: yr}, nil
 	case apitypes.ProductMembership:
 		key := LookupMembershipYearly
 		if in.Interval != nil && *in.Interval == apitypes.IntervalMonth {
@@ -92,7 +95,7 @@ func (s *Service) plan(a auth.Account, in apitypes.CheckoutRequest) (checkoutPla
 		meta[metaSeason] = strconv.Itoa(yr)
 		meta[metaSeats] = strconv.Itoa(*in.Seats)
 		meta[metaLeagueName] = *in.LeagueName
-		return checkoutPlan{mode: ModePayment, lookupKey: LookupGroupPassSeat, quantity: int64(*in.Seats), meta: meta}, nil
+		return checkoutPlan{mode: ModePayment, lookupKey: LookupGroupPassSeat, quantity: int64(*in.Seats), meta: meta, seasonKey: yr}, nil
 	default:
 		return checkoutPlan{}, map[string]string{"product": "Pick the Draft Pass, the Membership or the Group Draft Pass"}
 	}
@@ -152,25 +155,15 @@ func (s *Service) checkout(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, errs)
 		return
 	}
-	var session CheckoutSession
+	var url string
 	// One checkout at a time per account, so a double click cannot slip
 	// two purchases past the duplicate check.
 	err := s.Store.WithLock(r.Context(), "checkout:"+a.ID.String(), func(ctx context.Context) error {
 		if err := s.refuseDuplicate(ctx, a, in.Product); err != nil {
 			return err
 		}
-		price, err := s.Gateway.Price(ctx, p.lookupKey)
-		if err != nil {
-			return err
-		}
-		customerID, err := s.customer(ctx, a)
-		if err != nil {
-			return err
-		}
-		session, err = s.Gateway.CreateCheckout(ctx, CheckoutParams{
-			Mode: p.mode, CustomerID: customerID, PriceID: price.ID, Quantity: p.quantity, Metadata: p.meta,
-			SuccessURL: s.site(pathCheckoutDone), CancelURL: s.site(pathCheckoutCanceled),
-		})
+		var err error
+		url, err = s.openCheckout(ctx, a, string(in.Product), p)
 		return err
 	})
 	var refused errRefused
@@ -182,6 +175,50 @@ func (s *Service) checkout(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		httpx.WriteInternal(w, r, s.Log, "billing: checkout", err)
 	default:
-		httpx.WriteOK(w, r, http.StatusOK, apitypes.Redirect{Url: session.URL})
+		httpx.WriteOK(w, r, http.StatusOK, apitypes.Redirect{Url: url})
 	}
+}
+
+// openCheckout keeps at most one open checkout per account, product and
+// season. The same request again gets the open session's link back. A
+// different one (another seat count, the other interval) expires the
+// open session at Stripe first, so it can never be paid alongside the
+// new one.
+func (s *Service) openCheckout(ctx context.Context, a auth.Account, product string, p checkoutPlan) (string, error) {
+	open, err := s.Store.OpenCheckoutFor(ctx, a.ID, product, p.seasonKey, s.Now())
+	if err != nil {
+		return "", err
+	}
+	if open != nil && open.LookupKey == p.lookupKey && open.Quantity == p.quantity {
+		return open.URL, nil
+	}
+	if open != nil {
+		if err := s.Gateway.ExpireCheckout(ctx, open.SessionID); err != nil {
+			// Stripe refuses to expire a session that was just paid. Its
+			// webhook is on the way, so nothing new may start.
+			return "", errRefused{"Your last checkout is still finishing, try again in a minute"}
+		}
+		if err := s.Store.CloseCheckout(ctx, open.SessionID, checkoutExpired); err != nil {
+			return "", err
+		}
+	}
+	price, err := s.Gateway.Price(ctx, p.lookupKey)
+	if err != nil {
+		return "", err
+	}
+	customerID, err := s.customer(ctx, a)
+	if err != nil {
+		return "", err
+	}
+	session, err := s.Gateway.CreateCheckout(ctx, CheckoutParams{
+		Mode: p.mode, CustomerID: customerID, PriceID: price.ID, Quantity: p.quantity, Metadata: p.meta,
+		SuccessURL: s.site(pathCheckoutDone), CancelURL: s.site(pathCheckoutCanceled),
+	})
+	if err != nil {
+		return "", err
+	}
+	if err := s.Store.RecordCheckout(ctx, a.ID, product, p.seasonKey, p.lookupKey, p.quantity, session); err != nil {
+		return "", err
+	}
+	return session.URL, nil
 }

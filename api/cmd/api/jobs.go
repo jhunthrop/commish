@@ -94,7 +94,7 @@ func runReconcile(ctx context.Context, log *slog.Logger, cfg config.API, pool *p
 		Gateway: billing.NewStripeGateway(cfg.Stripe.SecretKey, cfg.Stripe.AutomaticTax), Now: time.Now, Log: log,
 	}
 	n, err := svc.Reconcile(ctx)
-	log.Info("reconciled", "subscriptions", n)
+	log.Info("reconciled", "synced", n.Synced, "ignored", n.Ignored, "failed", n.Failed)
 	return err
 }
 
@@ -118,6 +118,11 @@ func runSweep(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpo
 		return err
 	}
 	log.Info("swept sessions", "deleted", n)
+	cleared, err := (&billing.Store{Pool: pool}).ClearEventPayloads(ctx, now.Add(-billing.EventPayloadRetention))
+	if err != nil {
+		return err
+	}
+	log.Info("cleared billing event payloads", "cleared", cleared)
 	if !cfg.R2.Configured() {
 		log.Warn("r2 not configured", "effect", "exports not swept")
 		return nil

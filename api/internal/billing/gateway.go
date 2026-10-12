@@ -103,6 +103,17 @@ type Gateway interface {
 	GetCheckoutSession(ctx context.Context, id string) (*stripe.CheckoutSession, error)
 	GetSubscription(ctx context.Context, id string) (*stripe.Subscription, error)
 	SetCancelAtPeriodEnd(ctx context.Context, subscriptionID string, cancel bool) error
+	// CancelSubscriptionNow ends a subscription at once, for a dispute.
+	CancelSubscriptionNow(ctx context.Context, subscriptionID string) error
+	// ExpireCheckout closes an open checkout session so it can no
+	// longer be paid.
+	ExpireCheckout(ctx context.Context, sessionID string) error
+	// RefundDuplicate refunds a payment in full as a duplicate, once:
+	// a retried call with the same payment is the same refund.
+	RefundDuplicate(ctx context.Context, paymentIntentID string) error
+	// SubscriptionForPayment is the subscription an invoice payment
+	// belongs to, empty when the payment was not a subscription's.
+	SubscriptionForPayment(ctx context.Context, paymentIntentID string) (string, error)
 	Price(ctx context.Context, lookupKey string) (Price, error)
 	EnsurePrice(ctx context.Context, spec PriceSpec) error
 }

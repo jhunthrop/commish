@@ -8,17 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/jhunthrop/commish/api/internal/season"
-)
-
-// Claim errors.
-var (
-	ErrNoGroupPass     = errors.New("entitlements: no such group pass")
-	ErrGroupPassFull   = errors.New("entitlements: every seat is claimed")
-	ErrAlreadyClaimed  = errors.New("entitlements: already claimed")
-	ErrGroupPassClosed = errors.New("entitlements: group pass refunded")
 )
 
 // PassGrant is one Draft Pass to write.
@@ -114,88 +105,6 @@ func (s *Store) SetCancelAtPeriodEnd(ctx context.Context, subscriptionID string,
 		return fmt.Errorf("entitlements: cancel at period end %s: %w", subscriptionID, err)
 	}
 	return nil
-}
-
-// RefundPayment ends every pass bought with paymentIntentID.
-func (s *Store) RefundPayment(ctx context.Context, paymentIntentID, actor string) (int64, error) {
-	tag, err := s.Pool.Exec(ctx, `
-		update app.entitlements set status = 'refunded', granted_by = $2
-		where stripe_payment_intent_id = $1 and status <> 'refunded'`, paymentIntentID, actor)
-	if err != nil {
-		return 0, fmt.Errorf("entitlements: refund %s: %w", paymentIntentID, err)
-	}
-	return tag.RowsAffected(), nil
-}
-
-// RefundGroupPass ends every pass claimed from a group pass and closes
-// it to further claims.
-func (s *Store) RefundGroupPass(ctx context.Context, paymentIntentID, actor string) (int64, error) {
-	var n int64
-	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		var id uuid.UUID
-		err := tx.QueryRow(ctx, `
-			update app.group_passes set status = 'refunded'
-			where stripe_payment_intent_id = $1 returning id`, paymentIntentID).Scan(&id)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		tag, err := tx.Exec(ctx, `
-			update app.entitlements set status = 'refunded', granted_by = $2
-			where group_pass_id = $1 and status <> 'refunded'`, id, actor)
-		n = tag.RowsAffected()
-		return err
-	})
-	if err != nil {
-		return 0, fmt.Errorf("entitlements: refund group pass %s: %w", paymentIntentID, err)
-	}
-	return n, nil
-}
-
-// ClaimGroupPass writes one Draft Pass from a group pass, inside one
-// transaction that locks the group pass row, so two claims racing for
-// the last seat cannot both win.
-func (s *Store) ClaimGroupPass(ctx context.Context, groupPassID, accountID uuid.UUID, actor string) error {
-	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		var seats, seasonYear int
-		var status string
-		err := tx.QueryRow(ctx, `
-			select seats, season, status from app.group_passes where id = $1 for update`, groupPassID).
-			Scan(&seats, &seasonYear, &status)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNoGroupPass
-		}
-		if err != nil {
-			return err
-		}
-		if status != StatusActive {
-			return ErrGroupPassClosed
-		}
-		var claimed int
-		if err := tx.QueryRow(ctx, `
-			select count(*) from app.entitlements where group_pass_id = $1`, groupPassID).Scan(&claimed); err != nil {
-			return err
-		}
-		if claimed >= seats {
-			return ErrGroupPassFull
-		}
-		_, err = tx.Exec(ctx, `
-			insert into app.entitlements (account_id, product, source, status, season, ends_at, group_pass_id, granted_by)
-			values ($1, 'draft_pass', 'group_pass', 'active', $2, $3, $4, $5)`,
-			accountID, seasonYear, season.End(seasonYear), groupPassID, actor)
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return ErrAlreadyClaimed
-		}
-		return err
-	})
-	if err != nil && !errors.Is(err, ErrNoGroupPass) && !errors.Is(err, ErrGroupPassFull) &&
-		!errors.Is(err, ErrAlreadyClaimed) && !errors.Is(err, ErrGroupPassClosed) {
-		return fmt.Errorf("entitlements: claim group pass %s: %w", groupPassID, err)
-	}
-	return err
 }
 
 // Grant writes a hand grant of product for an account until endsAt,

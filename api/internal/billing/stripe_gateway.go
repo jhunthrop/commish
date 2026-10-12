@@ -108,6 +108,48 @@ func (g *StripeGateway) SetCancelAtPeriodEnd(ctx context.Context, subscriptionID
 	return nil
 }
 
+func (g *StripeGateway) CancelSubscriptionNow(ctx context.Context, subscriptionID string) error {
+	if _, err := g.client.V1Subscriptions.Cancel(ctx, subscriptionID, nil); err != nil {
+		return fmt.Errorf("billing: cancel subscription %s: %w", subscriptionID, err)
+	}
+	return nil
+}
+
+func (g *StripeGateway) ExpireCheckout(ctx context.Context, sessionID string) error {
+	if _, err := g.client.V1CheckoutSessions.Expire(ctx, sessionID, nil); err != nil {
+		return fmt.Errorf("billing: expire checkout %s: %w", sessionID, err)
+	}
+	return nil
+}
+
+func (g *StripeGateway) RefundDuplicate(ctx context.Context, paymentIntentID string) error {
+	params := &stripe.RefundCreateParams{
+		PaymentIntent: stripe.String(paymentIntentID), Reason: stripe.String(string(stripe.RefundReasonDuplicate)),
+	}
+	params.SetIdempotencyKey("refund-duplicate-" + paymentIntentID)
+	if _, err := g.client.V1Refunds.Create(ctx, params); err != nil {
+		return fmt.Errorf("billing: refund %s: %w", paymentIntentID, err)
+	}
+	return nil
+}
+
+func (g *StripeGateway) SubscriptionForPayment(ctx context.Context, paymentIntentID string) (string, error) {
+	params := &stripe.InvoicePaymentListParams{Payment: &stripe.InvoicePaymentListPaymentParams{
+		Type: stripe.String("payment_intent"), PaymentIntent: stripe.String(paymentIntentID),
+	}}
+	params.AddExpand("data.invoice")
+	for p, err := range g.client.V1InvoicePayments.List(ctx, params) {
+		if err != nil {
+			return "", fmt.Errorf("billing: invoice payment for %s: %w", paymentIntentID, err)
+		}
+		inv := p.Invoice
+		if inv != nil && inv.Parent != nil && inv.Parent.SubscriptionDetails != nil && inv.Parent.SubscriptionDetails.Subscription != nil {
+			return inv.Parent.SubscriptionDetails.Subscription.ID, nil
+		}
+	}
+	return "", nil
+}
+
 func priceFrom(p *stripe.Price) Price {
 	out := Price{ID: p.ID, LookupKey: p.LookupKey, AmountCents: p.UnitAmount, Currency: string(p.Currency)}
 	if p.Recurring != nil {

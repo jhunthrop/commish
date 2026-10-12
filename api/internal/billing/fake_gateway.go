@@ -23,9 +23,15 @@ type FakeGateway struct {
 	Subscriptions map[string]*stripe.Subscription
 	Prices        map[string]Price
 
-	Customers []string
-	Checkouts []CheckoutParams
-	Canceled  map[string]bool
+	// PaymentSubscriptions maps a payment intent to its subscription.
+	PaymentSubscriptions map[string]string
+
+	Customers   []string
+	Checkouts   []CheckoutParams
+	Canceled    map[string]bool
+	CanceledNow []string
+	Expired     []string
+	Refunded    []string
 
 	next int
 }
@@ -103,6 +109,45 @@ func (f *FakeGateway) SetCancelAtPeriodEnd(_ context.Context, subscriptionID str
 		s.CancelAtPeriodEnd = cancel
 	}
 	return nil
+}
+
+func (f *FakeGateway) CancelSubscriptionNow(_ context.Context, subscriptionID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.Err != nil {
+		return f.Err
+	}
+	f.CanceledNow = append(f.CanceledNow, subscriptionID)
+	return nil
+}
+
+func (f *FakeGateway) ExpireCheckout(_ context.Context, sessionID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.Err != nil {
+		return f.Err
+	}
+	f.Expired = append(f.Expired, sessionID)
+	return nil
+}
+
+func (f *FakeGateway) RefundDuplicate(_ context.Context, paymentIntentID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.Err != nil {
+		return f.Err
+	}
+	f.Refunded = append(f.Refunded, paymentIntentID)
+	return nil
+}
+
+func (f *FakeGateway) SubscriptionForPayment(_ context.Context, paymentIntentID string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.Err != nil {
+		return "", f.Err
+	}
+	return f.PaymentSubscriptions[paymentIntentID], nil
 }
 
 func (f *FakeGateway) Price(_ context.Context, lookupKey string) (Price, error) {

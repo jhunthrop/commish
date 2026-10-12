@@ -76,7 +76,7 @@ func TestCanAnswersFromRows(t *testing.T) {
 		}
 	}
 
-	if _, err := store.RefundPayment(ctx, "pi_test_1", "test"); err != nil {
+	if _, err := store.EndPayment(ctx, "pi_test_1", entitlements.EndRefunded, "test"); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := store.Can(ctx, passHolder, entitlements.LiveDraftAdvisor, bought); err != nil || got {

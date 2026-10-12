@@ -146,6 +146,22 @@ func (s *Store) HasLivePass(ctx context.Context, accountID uuid.UUID, season int
 	return ok, nil
 }
 
+// HasOtherLivePass reports whether the account holds a live Draft Pass
+// for season that checkout session checkoutSessionID did not buy: the
+// webhook's duplicate guard.
+func (s *Store) HasOtherLivePass(ctx context.Context, accountID uuid.UUID, season int, checkoutSessionID string, now time.Time) (bool, error) {
+	var ok bool
+	err := s.Pool.QueryRow(ctx, `
+		select exists (select 1 from app.entitlements e
+		  where e.account_id = $1 and e.product = 'draft_pass' and e.season = $3 and `+liveClause+`
+		    and e.stripe_checkout_session_id is distinct from $4)`,
+		accountID, now, season, checkoutSessionID).Scan(&ok)
+	if err != nil {
+		return false, fmt.Errorf("entitlements: other pass %s %d: %w", accountID, season, err)
+	}
+	return ok, nil
+}
+
 // LiveSubscriptionIDs lists every Stripe subscription a row still
 // believes live: the nightly reconcile's input.
 func (s *Store) LiveSubscriptionIDs(ctx context.Context) ([]string, error) {

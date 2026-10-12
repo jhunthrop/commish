@@ -3,23 +3,41 @@ package billing
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
-	"strconv"
-	"time"
 
-	"github.com/google/uuid"
 	stripe "github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/webhook"
 
-	"github.com/jhunthrop/commish/api/internal/apitypes"
-	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 )
 
 // maxWebhookBody is generous headroom over a checkout session event.
 const maxWebhookBody = 256 << 10
+
+// OutcomeKind is what became of an event, kept on its row.
+type OutcomeKind string
+
+const (
+	OutcomeApplied           OutcomeKind = "applied"
+	OutcomeIgnored           OutcomeKind = "ignored"
+	OutcomeRefundedDuplicate OutcomeKind = "refunded_duplicate"
+	OutcomeEndedByDispute    OutcomeKind = "ended_by_dispute"
+	OutcomeDisputeClosed     OutcomeKind = "dispute_closed"
+)
+
+// Outcome is an event's result and, when it was not simply applied,
+// why. An ignored event is answered 200 and never retried: it can
+// never succeed (a payment made outside our checkout, a type we do not
+// act on). Only a transient failure is an error and a 500.
+type Outcome struct {
+	Kind   OutcomeKind
+	Reason string
+}
+
+func applied() Outcome                             { return Outcome{Kind: OutcomeApplied} }
+func ignored(reason string) Outcome                { return Outcome{Kind: OutcomeIgnored, Reason: reason} }
+func outcome(k OutcomeKind, reason string) Outcome { return Outcome{Kind: k, Reason: reason} }
 
 func (s *Service) webhook(w http.ResponseWriter, r *http.Request) {
 	if s.Gateway == nil || s.WebhookSecret == "" {
@@ -44,14 +62,18 @@ func (s *Service) webhook(w http.ResponseWriter, r *http.Request) {
 	// One delivery of an event at a time: Stripe's retry can overtake a
 	// slow first attempt, and both must not see it unprocessed.
 	err = s.Store.WithLock(r.Context(), "event:"+event.ID, func(ctx context.Context) error {
-		proceed, err := s.Store.RecordEventOnce(ctx, event.ID, string(event.Type), payload)
+		proceed, err := s.Store.RecordEventOnce(ctx, event.ID, string(event.Type), trimPayload(event))
 		if err != nil || !proceed {
 			return err
 		}
-		if err := s.handleEvent(ctx, event); err != nil {
+		o, err := s.handleEvent(ctx, event)
+		if err != nil {
 			return err
 		}
-		return s.Store.MarkEventProcessed(ctx, event.ID)
+		if o.Kind != OutcomeApplied {
+			s.Log.Warn("billing: event", "event_id", event.ID, "type", event.Type, "outcome", o.Kind, "reason", o.Reason)
+		}
+		return s.Store.MarkEventProcessed(ctx, event.ID, o)
 	})
 	if err != nil {
 		// A 500 makes Stripe retry, which is what a transient failure
@@ -62,25 +84,63 @@ func (s *Service) webhook(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, http.StatusOK, nil)
 }
 
-func (s *Service) handleEvent(ctx context.Context, event stripe.Event) error {
+// keptObjectFields are the only fields of an event's object the
+// handlers read. Everything else, the customer's email and address
+// included, is dropped before the event is stored.
+func keptObjectFields() []string {
+	return []string{
+		"id", "object", "mode", "payment_status", "payment_intent", "subscription",
+		"refunded", "charge", "status", "reason", "amount",
+	}
+}
+
+// trimPayload is the stored form of an event: its envelope and the kept
+// fields of its object, plus an invoice's subscription reference.
+func trimPayload(event stripe.Event) []byte {
+	obj := map[string]any{}
+	for _, k := range keptObjectFields() {
+		if v, ok := event.Data.Object[k]; ok {
+			obj[k] = v
+		}
+	}
+	if sub := subscriptionOfInvoice(event.Data.Raw); sub != "" {
+		obj["subscription"] = sub
+	}
+	out, err := json.Marshal(map[string]any{
+		"id": event.ID, "type": event.Type, "created": event.Created, "api_version": event.APIVersion,
+		"data": map[string]any{"object": obj},
+	})
+	if err != nil {
+		return []byte(`{}`)
+	}
+	return out
+}
+
+func (s *Service) handleEvent(ctx context.Context, event stripe.Event) (Outcome, error) {
 	actor := "stripe:" + event.ID
 	id, _ := event.Data.Object["id"].(string)
 	switch event.Type {
 	case "checkout.session.completed", "checkout.session.async_payment_succeeded":
 		return s.onCheckout(ctx, id, actor)
+	case "checkout.session.expired":
+		return applied(), s.Store.CloseCheckout(ctx, id, checkoutExpired)
 	case "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted":
 		return s.syncSubscription(ctx, id, actor)
 	case "invoice.paid", "invoice.payment_failed":
 		if sub := subscriptionOfInvoice(event.Data.Raw); sub != "" {
 			return s.syncSubscription(ctx, sub, actor)
 		}
-		return nil
+		return ignored("the invoice is not a subscription's"), nil
 	case "charge.refunded":
 		return s.onRefund(ctx, event.Data.Raw, actor)
+	case "charge.dispute.created":
+		return s.onDisputeCreated(ctx, event.Data.Raw, actor)
+	case "charge.dispute.closed":
+		return s.onDisputeClosed(ctx, event.Data.Raw, actor)
 	default:
-		// Recorded, not acted on: the endpoint's event list is the
-		// filter, and this is the safety net if it drifts.
-		return nil
+		// The endpoint's event list is the filter; this is the safety
+		// net if it drifts.
+		return ignored("this event type is not acted on"), nil
 	}
 }
 
@@ -88,14 +148,15 @@ func (s *Service) handleEvent(ctx context.Context, event stripe.Event) error {
 // under parent.subscription_details in Stripe's 2025 API versions.
 func subscriptionOfInvoice(raw json.RawMessage) string {
 	var inv struct {
-		Subscription any `json:"subscription"`
+		Object       string `json:"object"`
+		Subscription any    `json:"subscription"`
 		Parent       struct {
 			SubscriptionDetails struct {
 				Subscription any `json:"subscription"`
 			} `json:"subscription_details"`
 		} `json:"parent"`
 	}
-	if json.Unmarshal(raw, &inv) != nil {
+	if json.Unmarshal(raw, &inv) != nil || inv.Object != "invoice" {
 		return ""
 	}
 	if id := refID(inv.Parent.SubscriptionDetails.Subscription); id != "" {
@@ -115,140 +176,4 @@ func refID(v any) string {
 		return id
 	}
 	return ""
-}
-
-func accountOf(meta map[string]string) (uuid.UUID, error) {
-	id, err := uuid.Parse(meta[metaAccountID])
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("billing: metadata carries no account id")
-	}
-	return id, nil
-}
-
-// onCheckout re-reads the session and acts on what was bought. An
-// unpaid session (a bank transfer still pending) waits for
-// async_payment_succeeded.
-func (s *Service) onCheckout(ctx context.Context, sessionID, actor string) error {
-	sess, err := s.Gateway.GetCheckoutSession(ctx, sessionID)
-	if err != nil {
-		return err
-	}
-	if sess.Mode == stripe.CheckoutSessionModeSubscription {
-		if sess.Subscription == nil {
-			return fmt.Errorf("billing: subscription checkout %s has no subscription", sessionID)
-		}
-		return s.syncSubscription(ctx, sess.Subscription.ID, actor)
-	}
-	if sess.PaymentStatus != stripe.CheckoutSessionPaymentStatusPaid {
-		return nil
-	}
-	accountID, err := accountOf(sess.Metadata)
-	if err != nil {
-		return fmt.Errorf("%w (session %s)", err, sessionID)
-	}
-	yr, err := strconv.Atoi(sess.Metadata[metaSeason])
-	if err != nil {
-		return fmt.Errorf("billing: session %s carries no season", sessionID)
-	}
-	var paymentIntent string
-	if sess.PaymentIntent != nil {
-		paymentIntent = sess.PaymentIntent.ID
-	}
-	switch apitypes.Product(sess.Metadata[metaProduct]) {
-	case apitypes.ProductDraftPass:
-		_, err := s.Entitlements.GrantPass(ctx, entitlements.PassGrant{
-			AccountID: accountID, Season: yr, Source: entitlements.SourcePurchase,
-			CheckoutSessionID: sessionID, PaymentIntentID: paymentIntent, GrantedBy: actor,
-		})
-		return err
-	case apitypes.ProductGroupPass:
-		seats, err := strconv.Atoi(sess.Metadata[metaSeats])
-		if err != nil {
-			return fmt.Errorf("billing: session %s carries no seats", sessionID)
-		}
-		return s.Store.CreateGroupPass(ctx, NewGroupPass{
-			PurchaserID: accountID, LeagueName: sess.Metadata[metaLeagueName], Season: yr, Seats: seats,
-			ClaimCode: newClaimCode(), CheckoutSessionID: sessionID, PaymentIntentID: paymentIntent,
-		})
-	default:
-		return fmt.Errorf("billing: session %s sold an unknown product %q", sessionID, sess.Metadata[metaProduct])
-	}
-}
-
-// subscriptionPeriodEnd reads the paid period's end from the first
-// item: Stripe's 2025 API versions moved it off the subscription. Every
-// Membership has exactly one item.
-func subscriptionPeriodEnd(sub *stripe.Subscription) (time.Time, error) {
-	if sub.Items == nil || len(sub.Items.Data) == 0 {
-		return time.Time{}, fmt.Errorf("billing: subscription %s has no items", sub.ID)
-	}
-	return time.Unix(sub.Items.Data[0].CurrentPeriodEnd, 0).UTC(), nil
-}
-
-func subscriptionInterval(sub *stripe.Subscription) string {
-	if sub.Items == nil || len(sub.Items.Data) == 0 || sub.Items.Data[0].Price == nil || sub.Items.Data[0].Price.Recurring == nil {
-		return ""
-	}
-	return string(sub.Items.Data[0].Price.Recurring.Interval)
-}
-
-// syncSubscription is the only path from Stripe's subscription state to
-// a Membership row: re-fetched fresh, never from an event's snapshot.
-func (s *Service) syncSubscription(ctx context.Context, subscriptionID, actor string) error {
-	sub, err := s.Gateway.GetSubscription(ctx, subscriptionID)
-	if err != nil {
-		return err
-	}
-	accountID, err := accountOf(sub.Metadata)
-	if err != nil {
-		return fmt.Errorf("%w (subscription %s)", err, sub.ID)
-	}
-	end, err := subscriptionPeriodEnd(sub)
-	if err != nil {
-		return err
-	}
-	if err := s.Entitlements.UpsertSubscription(ctx, entitlements.SubscriptionState{
-		AccountID: accountID, SubscriptionID: sub.ID, Status: string(sub.Status), Interval: subscriptionInterval(sub),
-		CurrentPeriodEnd: end, CancelAtPeriodEnd: sub.CancelAtPeriodEnd, GrantedBy: actor,
-	}); err != nil {
-		return err
-	}
-	return s.guardDuplicate(ctx, accountID, sub, actor)
-}
-
-// guardDuplicate cancels a second live Membership at its period end, so
-// a member who somehow paid twice is never billed twice again. The
-// first payment is refunded by hand from the log line.
-func (s *Service) guardDuplicate(ctx context.Context, accountID uuid.UUID, sub *stripe.Subscription, actor string) error {
-	live := sub.Status == stripe.SubscriptionStatusActive || sub.Status == stripe.SubscriptionStatusTrialing
-	if !live || sub.CancelAtPeriodEnd {
-		return nil
-	}
-	other, err := s.Entitlements.OtherLiveSubscription(ctx, accountID, sub.ID, s.Now())
-	if err != nil || other == "" {
-		return err
-	}
-	s.Log.Error("billing: duplicate membership", "account_id", accountID, "kept", other, "canceled", sub.ID)
-	if err := s.Gateway.SetCancelAtPeriodEnd(ctx, sub.ID, true); err != nil {
-		return err
-	}
-	return s.Entitlements.SetCancelAtPeriodEnd(ctx, sub.ID, true, actor)
-}
-
-// onRefund ends whatever a fully refunded payment bought. A partial
-// refund is a goodwill credit and leaves the pass in place.
-func (s *Service) onRefund(ctx context.Context, raw json.RawMessage, actor string) error {
-	var charge stripe.Charge
-	if err := json.Unmarshal(raw, &charge); err != nil {
-		return fmt.Errorf("billing: decode refunded charge: %w", err)
-	}
-	if !charge.Refunded || charge.PaymentIntent == nil {
-		return nil
-	}
-	pi := charge.PaymentIntent.ID
-	if _, err := s.Entitlements.RefundPayment(ctx, pi, actor); err != nil {
-		return err
-	}
-	_, err := s.Entitlements.RefundGroupPass(ctx, pi, actor)
-	return err
 }
