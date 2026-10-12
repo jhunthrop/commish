@@ -338,8 +338,8 @@ const eslintConfig = [
     files: ["src/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "scripts/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "research/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     ignores: [
       "research/src/projections/register/**",
-      "scripts/register-freeze.ts",
-      "scripts/register-grade.ts",
+      "research/scripts/register-freeze.ts",
+      "research/scripts/register-grade.ts",
       "research/src/projections/season-week/steps.ts",
       "research/src/projections/season-week/steps.test.ts",
     ],

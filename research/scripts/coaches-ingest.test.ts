@@ -3,8 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { readCoachRows } from "@research/coaches/store";
-import { createTestDb } from "@research/db/test-db";
-import { truncateAll } from "@/db/test-db";
+import { createTestDb, truncateAll } from "@research/db/test-db";
 import { FACT_SEASONS } from "@research/projections/nflverse/team-eras";
 import { ingestPlayCallersCsv, PLAY_CALLERS_CSV_PATH } from "./lib/play-callers-csv";
 

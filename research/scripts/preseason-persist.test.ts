@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestDb } from "@research/db/test-db";
-import { truncateAll } from "@/db/test-db";
+import { createTestDb, truncateAll } from "@research/db/test-db";
 import type { Clock } from "@research/domain/timing";
 import { STAT_LINE_SOURCE, statMetricName } from "@research/projections/lines";
 import { NFLVERSE_SOURCE, PARTICIPATION_METRICS } from "@research/projections/nflverse/map";

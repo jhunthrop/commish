@@ -49,8 +49,8 @@ export const REGISTER_DIR = "research/src/projections/register";
  *  directory-wide exemption those two get, because it lives beside its module under `src/jobs/`,
  *  a swept location, rather than inside `src/projections/register/` itself. */
 export const WALL_EXEMPT_FILES: readonly string[] = [
-  "scripts/register-freeze.ts",
-  "scripts/register-grade.ts",
+  "research/scripts/register-freeze.ts",
+  "research/scripts/register-grade.ts",
   "research/src/projections/season-week/steps.ts",
   "research/src/projections/season-week/steps.test.ts",
 ];
