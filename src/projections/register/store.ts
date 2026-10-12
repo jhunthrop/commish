@@ -1,7 +1,7 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 import type { Db, DbTx, ReadonlyDb } from "@/db/client";
 import { registerFreezeRows, registerGradeRows } from "@/db/schema";
-import type { JsonObject } from "@/domain/audit";
+import type { JsonObject } from "@/domain/json";
 import { PPR_SCORING } from "@/domain/scoring";
 import type { ScoringRules } from "@/scoring/compute";
 

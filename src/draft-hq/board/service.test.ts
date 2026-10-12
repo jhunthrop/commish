@@ -10,6 +10,7 @@ import type { TeamDefenseWeekRow } from "@/projections/nflverse/team-defense-wee
 import { boardSourceFor } from "@/projections/preseason/board-formats";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { leagueBoardFormat } from "@/league-service/board-format";
 import { BOARD_LAST_SEASON, boardRows, isProjectedRow, resolveBoardFormat } from "./service";
 
 /** One archived defense week for the Rams, in the archive's OWN spelling (`LA`) — the fold onto
@@ -327,15 +328,15 @@ describe("boardRows", () => {
 
       const shape = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS };
       const [pprRow] = await boardRows(db, { shape });
-      const [leagueRow] = await boardRows(db, { shape, leagueId: "half-league" });
+      const [leagueRow] = await boardRows(db, { shape, resolved: await leagueBoardFormat(db, "half-league") });
       const [chosenRow] = await boardRows(db, { shape, format: "half" });
       expect(pprRow!.projectedPoints).toBe(300);
       expect(leagueRow!.projectedPoints).toBe(255);
       expect(chosenRow!.projectedPoints).toBe(255);
       // Inside a league the league decides: a selector's format is ignored when a league is named.
-      const [ignored] = await boardRows(db, { shape, leagueId: "half-league", format: "std" });
+      const [ignored] = await boardRows(db, { shape, resolved: await leagueBoardFormat(db, "half-league"), format: "std" });
       expect(ignored!.projectedPoints).toBe(255);
-      expect((await resolveBoardFormat(db, { leagueId: "half-league" })).basisLine).toBe(`${PRODUCT_SEASON} board, 12-team half PPR, in board order`);
+      expect(resolveBoardFormat({ resolved: await leagueBoardFormat(db, "half-league") }).basisLine).toBe(`${PRODUCT_SEASON} board, 12-team half PPR, in board order`);
     });
 
     it("measures last season under the LEAGUE's own scoring when one is named", async () => {
@@ -347,7 +348,7 @@ describe("boardRows", () => {
 
       const shape = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS };
       const [generic] = await boardRows(db, { shape });
-      const [league] = await boardRows(db, { shape, leagueId: "l1" });
+      const [league] = await boardRows(db, { shape, resolved: await leagueBoardFormat(db, "l1") });
       expect(league!.lastSeason!.points - generic!.lastSeason!.points).toBe(4 * (10 - PPR_SCORING.pointsPerSack));
     });
   });

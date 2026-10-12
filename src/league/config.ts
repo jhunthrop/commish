@@ -1,6 +1,7 @@
 import type { DraftFormat } from "@/domain/league";
 import { STANDARD_ROSTER_SLOTS, type RosterShapeName } from "@/domain/roster";
 import type { ScoringPresetName } from "@/domain/scoring";
+import { SEASON_CONFIG } from "@/domain/season";
 
 /** Every tunable the season has. No service, route or component may inline one of these. */
 export const LEAGUE_CONFIG = {
@@ -42,7 +43,7 @@ export const LEAGUE_CONFIG = {
   maxTeams: 16,
   maxNameLength: 60,
   /** Regular-season length. The mock dataset carries 17 weeks, so this fits inside it. */
-  regularSeasonWeeks: 14,
+  regularSeasonWeeks: SEASON_CONFIG.fantasyRegularSeasonWeeks,
   maxWeeks: 18,
   playoffTeams: 6,
   /** Trade governance (roadmap item 5): no proposing or accepting after this week's trades are
@@ -89,7 +90,7 @@ export const LEAGUE_CONFIG = {
    * forward only when season rollover ships (see this docblock's opening paragraph).
    */
   season: {
-    startedAt: "2026-08-01T00:00:00.000Z",
+    startedAt: SEASON_CONFIG.startedAt,
   },
   /**
    * The rival card's head-to-head read (`headToHeadRecords`), cached per league and week.

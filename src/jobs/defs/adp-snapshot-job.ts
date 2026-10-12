@@ -13,7 +13,7 @@
 // Only the PPR capture's failure throws (`ingestAdpSnapshot`'s own docblock); a secondary format
 // that fails is named in the detail lines and the fire still lands its PPR rows.
 import type { Db } from "@/db/client";
-import type { JsonObject } from "@/domain/audit";
+import type { JsonObject } from "@/domain/json";
 import { ingestAdpSnapshot } from "@/projections/market/adp-snapshot";
 import { defineJob, type AnyJobDefinition, type StepOutcome } from "../contract";
 

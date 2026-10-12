@@ -2,6 +2,9 @@ import type { DraftFormat } from "@/domain/league";
 import type { DraftPoolEntry, DraftStatus } from "@/domain/draft";
 import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import type { ClockTier, DraftAutopickPolicy, DraftSkipPolicy, PauseWindow } from "./config";
+import { totalRosterSlots } from "./order";
+
+export { totalRosterSlots };
 
 /** Static, DB-derived setup. Never changes during a draft. */
 export interface DraftConfig {
@@ -150,11 +153,6 @@ export interface DraftState {
 export type DraftReduceResult =
   | { readonly ok: true; readonly state: DraftState }
   | { readonly ok: false; readonly reason: string };
-
-/** Rounds in a snake draft = roster spots per team. */
-export function totalRosterSlots(slotConfig: readonly RosterSlotConfig[]): number {
-  return slotConfig.reduce((sum, s) => sum + s.count, 0);
-}
 
 /**
  * Every pick a snake draft will ever make: one per roster spot, per team. The ceiling

@@ -2,7 +2,7 @@ import type { Position } from "@/domain/player";
 import type { BoardReason } from "@/projections/preseason/board";
 import { rosterStatusNoteOf } from "@/projections/preseason/roster-status";
 import { noProjectionSentence } from "@/projections/preseason/roster-status-copy";
-import { countWordCapitalized } from "../lib/format";
+import { countWordCapitalized } from "@/components/ui/number-format";
 
 /**
  * THE VERDICT LINE (founder, 2026-09-04, Outlook redesign) — one deterministic sentence opening

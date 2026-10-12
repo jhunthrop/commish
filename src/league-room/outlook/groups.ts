@@ -1,7 +1,7 @@
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
-import { lawHeadline, type LawReason } from "@/components/ui/reason-chip";
-import { signedPoints } from "@/components/ui/event-feed-row";
+import { lawHeadline, type LawReason } from "@/projections/laws/headline";
+import { signedPoints } from "@/components/ui/number-format";
 
 /**
  * THE GROUPED EVIDENCE VIEW-MODEL (founder, 2026-09-04, Outlook redesign) — the fix for "three

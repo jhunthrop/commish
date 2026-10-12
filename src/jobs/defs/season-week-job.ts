@@ -35,7 +35,7 @@ import { realIngestStats, realSnapshotProps } from "../season-week/deps";
 import { refreshPeekFacts } from "@/capsules/peek-facts";
 import { enqueuePeekDocumentRebuildsQuietly } from "./peek-document-job";
 import type { Db } from "@/db/client";
-import type { JsonObject } from "@/domain/audit";
+import type { JsonObject } from "@/domain/json";
 import { JOBS_CONFIG } from "../config";
 import { TerminalJobError, defineJob, type AnyJobDefinition, type JobStepContext, type StepOutcome } from "../contract";
 

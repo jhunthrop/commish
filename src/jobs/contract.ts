@@ -3,7 +3,7 @@
 // (src/jobs/defs/, collected by src/jobs/registry.ts); the queue rows (src/db/schema.ts `jobs`)
 // carry only what scheduling needs. Spec: docs/superpowers/specs/2026-09-02-job-system-design.md.
 import type { Db } from "@/db/client";
-import type { JsonObject } from "@/domain/audit";
+import type { JsonObject } from "@/domain/json";
 import type { Clock } from "@/domain/timing";
 
 /**

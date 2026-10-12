@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, posix } from "node:path";
-import { stripCommentsPreservingLines } from "@/design/test-support";
+import { stripCommentsPreservingLines } from "@/lib/source-text";
 
 /**
  * THE WALL'S DETECTOR — the machinery `wall.source.test.ts` sweeps the tree with, extracted so it

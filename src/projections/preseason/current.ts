@@ -1,7 +1,7 @@
 import { eq, isNotNull } from "drizzle-orm";
 import type { ReadonlyDb } from "@/db/client";
 import { playerCrosswalk, players } from "@/db/schema";
-import { LEAGUE_CONFIG } from "@/league";
+import { SEASON_CONFIG } from "@/domain/season";
 import type { RosterIdentity } from "./benchmarks";
 
 /**
@@ -29,13 +29,13 @@ import type { RosterIdentity } from "./benchmarks";
 /**
  * The NFL season every league on this platform belongs to.
  *
- * Derived from `LEAGUE_CONFIG.season.startedAt`, which that constant's docblock names as "THE ONE
+ * Derived from `SEASON_CONFIG.startedAt`, which that constant's docblock names as "THE ONE
  * PLACE 'this season' means a specific instant" and forbids re-deriving from `now()` or an NFL
  * calendar rule. The boundary is 1 August, so the calendar year of the boundary IS the season year
  * by construction, and this reads it rather than restating it. When season rollover ships, that
  * field rolls and this follows.
  */
-export const PRODUCT_SEASON = new Date(LEAGUE_CONFIG.season.startedAt).getUTCFullYear();
+export const PRODUCT_SEASON = new Date(SEASON_CONFIG.startedAt).getUTCFullYear();
 
 /**
  * Every league player who has a counterpart in the historical universe, in the shape

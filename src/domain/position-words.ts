@@ -25,3 +25,18 @@ export function positionWord(position: Position, plural: boolean): string {
 export function positionLabel(position: Position): string {
   return position === "DEF" ? "D/ST" : position;
 }
+
+/**
+ * A position in the words a manager would use, PLURAL — the shape a population takes in a
+ * sentence ("Top 8% of running backs this season"). Extracted from the player page when the
+ * bottom-sheet peek became this view's second consumer (founder, 2026-08-30: the name opens a
+ * drawer wherever it appears).
+ */
+export const POSITION_PLURAL: Readonly<Record<Position, string>> = {
+  QB: "quarterbacks",
+  RB: "running backs",
+  WR: "receivers",
+  TE: "tight ends",
+  K: "kickers",
+  DEF: "defenses",
+};

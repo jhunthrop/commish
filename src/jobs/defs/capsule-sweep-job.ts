@@ -29,7 +29,7 @@
 // database work around it (`collectBoardFacts`, `writeRefresh`, `getStoredCapsulesFor`,
 // `upsertCapsule`), and that is ordinary retryable weather like every other job's own DB step.
 import type { Db } from "@/db/client";
-import type { JsonObject } from "@/domain/audit";
+import type { JsonObject } from "@/domain/json";
 import type { Clock } from "@/domain/timing";
 import { CAPSULE_CONFIG } from "@/capsules/config";
 import { collectBoardFacts } from "@/capsules/collect";

@@ -1,4 +1,4 @@
-import { snakeTeamForPick, totalRosterSlots } from "@/draft-engine";
+import { snakeTeamForPick, totalRosterSlots } from "@/draft-engine/order";
 import { BENCH_SLOT } from "@/domain/roster";
 import { canRoster, landingSlot, recommendPick, type DraftCandidate, type RosteredPlayer } from "./draft";
 import { startSit, type LineupCandidate, type MatchupContext } from "./lineup";

@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import type { getDb } from "@/db/client";
 import { captureSnapshots } from "@/db/schema";
 import { createTtlMemo } from "@/lib/cache/ttl-memo";
-import { REFERENCE_MEMO_CONFIG } from "./config";
+import { REFERENCE_MEMO_CONFIG } from "./reference-memo-config";
 
 type Db = ReturnType<typeof getDb>;
 

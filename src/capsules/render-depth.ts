@@ -1,4 +1,4 @@
-import { POSITION_PLURAL } from "@/league-room/lib/player-season-view";
+import { POSITION_PLURAL } from "@/domain/position-words";
 import type { PlayerFacts, PlayerFactsRankedStat } from "./facts";
 import type { PlayerFactsDepth, PlayerFactsFixture, PlayerFactsGamesMissed } from "./facts/types";
 

@@ -1,6 +1,5 @@
-import { asc, ne } from "drizzle-orm";
 import { createDb, type Db } from "@/db/client";
-import { statWeeks } from "@/db/schema";
+import { currentNflWeek } from "@/stats/stat-weeks";
 import { envOrUndefined } from "@/lib/env";
 import { captureOnce, type CaptureResult } from "@/projections/capture";
 import { NFL_TEAM_ABBREVIATIONS } from "@/projections/capture-feeds";
@@ -144,26 +143,6 @@ export function getCapture(db: Db): (() => Promise<CaptureResult>) | undefined {
         await redis.set(key, "1", "EX", ttlSeconds);
       },
     });
-}
-
-/**
- * The earliest week not yet final — the week the odds and salary feeds are asking about.
- *
- * Falls back to week 1 when `stat_weeks` is empty, which is the preseason: exactly when ADP drift
- * and injury designations matter most and the scoring half of the tick has nothing to do at all.
- *
- * Exported (not module-private) so `jobs/defs/capture-harvest-job.ts` derives the same week the
- * ingestion worker's own `getCapture()` above does, rather than a second copy of this query
- * drifting from this one.
- */
-export async function currentNflWeek(db: Db): Promise<number> {
-  const [row] = await db
-    .select({ week: statWeeks.week })
-    .from(statWeeks)
-    .where(ne(statWeeks.status, "final"))
-    .orderBy(asc(statWeeks.week))
-    .limit(1);
-  return row?.week ?? 1;
 }
 
 /**

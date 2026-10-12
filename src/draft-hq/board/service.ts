@@ -14,7 +14,7 @@ import { boardReasons, preseasonProjectionsAsOf } from "@/projections/preseason/
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { rosterStatusNoteOf, type RosterStatusNote } from "@/projections/preseason/roster-status";
 import { marketOrderPositions } from "@/projections/preseason/kdef-decision";
-import { boardFormatForLeagueRules, boardFormatResolution, leagueScoringRules, type LeagueBoardFormat } from "@/league-service/board-format";
+import { boardFormatResolution, type LeagueBoardFormat } from "@/league-service/board-format";
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 
 /**
@@ -30,8 +30,8 @@ import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
  * scoring-formats round, 2026-09-08: `commish_board_v9_{ppr,half,std}_12`, each scored under its
  * exact preset and anchored to its own ADP feed; `board-formats.ts`). WHICH board is read is the
  * format: named directly by a league-free surface's selector (`BoardOptions.format`), or decided
- * by the league's own scoring row when a `leagueId` is given (`league-service/board-format.ts`, the
- * nearest of the three for a custom sheet, with a note). What changes per league on top of that is
+ * by a league's own scoring rules when the caller resolved them (`BoardOptions.resolved`, the nearest
+ * of the three for a custom sheet, with a note; the league read itself is the league app's). What changes per league on top of that is
  * the DRAFT-VALUE half: `valueOverReplacement`, `valueRank`, position rank-in-value-order and the
  * tier ladder, all rebuilt from the stored points against the CALLER'S OWN `teamCount`/`rosterSlots`
  * via `decide/replacement.ts`'s `valueBoard`, which is exactly the mechanism that moves fourteen
@@ -165,32 +165,24 @@ export interface BoardOptions {
   readonly asOf?: Date;
   /**
    * Whose scoring rules decide the board: which of the three stored boards is read, and what
-   * `lastSeason` is measured under. Omitted means the same default every other league-free
-   * surface on this product falls back to (`PPR_SCORING`), which is what the generic board is: a
-   * real ruleset, named on screen, rather than a guess.
-   *
-   * Threaded as an id and read here rather than passed as a rules object, the way `rankedPlayers`
-   * (`@/draft-service/pool.ts`) already does it — a caller that had to fetch the rules first would
-   * be a second place that decides what a league without a `scoring_settings` row scores like.
+   * `lastSeason` is measured under, already resolved by the caller (a league's own rules through
+   * `boardFormatForLeagueRules`). The research core never reads a league's settings itself; the
+   * league app resolves them and hands the result here. Omitted means `format`.
    */
-  readonly leagueId?: string;
+  readonly resolved?: LeagueBoardFormat;
   /**
    * A league-free surface's own choice of board (the scoring-formats round): the selector on the
-   * Draft HQ board, the HQ card, the rankings export. Ignored when a `leagueId` is given, because
-   * inside a league the league's own rules decide and no surface offers a selector. Omitted with no
-   * league means PPR.
+   * Draft HQ board, the HQ card, the rankings export, the nightly run. Ignored when `resolved` is
+   * given, because inside a league the league's own rules decide and no surface offers a selector.
+   * Omitted with neither means PPR.
    */
   readonly format?: BoardFormat;
 }
 
-/**
- * Which board this read resolves to, and the rules `lastSeason` is measured under: the league's
- * own row when a league is named, the chosen or default format otherwise. One small query for a
- * league, none for a league-free read.
- */
-export async function resolveBoardFormat(db: Db, { leagueId, format }: Pick<BoardOptions, "leagueId" | "format">): Promise<LeagueBoardFormat> {
-  if (leagueId !== undefined) return boardFormatForLeagueRules(await leagueScoringRules(db, leagueId));
-  return boardFormatResolution(format ?? DEFAULT_BOARD_FORMAT);
+/** Which board this read resolves to: the caller's resolution when it has one, the chosen or
+ *  default format otherwise. No query. */
+export function resolveBoardFormat({ resolved, format }: Pick<BoardOptions, "resolved" | "format">): LeagueBoardFormat {
+  return resolved ?? boardFormatResolution(format ?? DEFAULT_BOARD_FORMAT);
 }
 
 /** The tier standing a `valueBoard` position pool implies — the same aggregate
@@ -214,8 +206,8 @@ function tierStandingsOf(valuesDescending: readonly number[], productionByRow: r
  *  for `options.shape`. A stored board row whose player the crosswalk cannot resolve back to a
  *  product `players` row is dropped — a defensive symmetry with `boardReasons`' own drop-and-warn
  *  posture, though in practice every crosswalked player resolves both directions by construction. */
-export async function boardRows(db: Db, { shape, asOf = new Date(), leagueId, format }: BoardOptions): Promise<readonly BoardRow[]> {
-  const resolved = await resolveBoardFormat(db, { leagueId, format });
+export async function boardRows(db: Db, { shape, asOf = new Date(), resolved: given, format }: BoardOptions): Promise<readonly BoardRow[]> {
+  const resolved = resolveBoardFormat({ resolved: given, format });
   const stamp = { season: PRODUCT_SEASON, source: resolved.source, asOf };
   const [projections, reasonsByNflId, byes] = await Promise.all([
     preseasonProjectionsAsOf(db, stamp),

@@ -1,6 +1,8 @@
 import type { Position } from "@/domain/player";
 import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig, type RosterSlotType } from "@/domain/roster";
-import { AUTOPICK_CONFIG, anyStarterOpen, assignSlot, positionCeiling, type RosterCeilingPolicy } from "@/draft-engine";
+import { AUTOPICK_CONFIG } from "@/draft-engine/autopick-policy";
+import { anyStarterOpen, positionCeiling, type RosterCeilingPolicy } from "@/draft-engine/roster-need";
+import { assignSlot } from "@/draft-engine/slotting";
 import { bestStartingTotal } from "./slots";
 import type { LeagueShape, ValuedPlayer } from "./replacement";
 import { survivalProbabilities, type RoomTendency } from "./survival";

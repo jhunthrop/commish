@@ -52,14 +52,14 @@
 import { desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { captureSnapshots, players } from "@/db/schema";
-import type { JsonObject } from "@/domain/audit";
+import type { JsonObject } from "@/domain/json";
 import type { Clock } from "@/domain/timing";
 import { envOrUndefined } from "@/lib/env";
 import { harvestDesignationDiff, harvestNewsDiff, type HarvestCapture } from "@/projections/harvest-diff";
 import { enqueuePeekDocumentRebuildsQuietly } from "./peek-document-job";
 import { captureOnce, type CaptureBudget, type CaptureFeedOutcome, type CaptureResult } from "@/projections/capture";
 import { CAPTURE_FEEDS, NFL_TEAM_ABBREVIATIONS, type CaptureFeed } from "@/projections/capture-feeds";
-import { currentNflWeek } from "@/stats-pipeline";
+import { currentNflWeek } from "@/stats/stat-weeks";
 import { createTank01Client } from "@/stats/tank01/client";
 import { TANK01_CONFIG } from "@/stats/tank01/config";
 import { defineJob, TerminalJobError, type AnyJobDefinition, type StepOutcome } from "../contract";

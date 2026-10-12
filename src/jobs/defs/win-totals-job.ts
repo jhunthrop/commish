@@ -26,7 +26,7 @@
 // every attempt reads the same file and no retry fixes a rename, it needs a human. Everything else
 // (a 5xx, a network error, the database write) is ordinary retryable weather.
 import type { Db } from "@/db/client";
-import type { JsonObject } from "@/domain/audit";
+import type { JsonObject } from "@/domain/json";
 import type { Clock } from "@/domain/timing";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { firstKickoffFor } from "@/projections/team-store";

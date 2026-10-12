@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { axe } from "vitest-axe";
 import { renderSurface } from "./test-utils";
-import { EventFeedRow, signedPoints } from "./event-feed-row";
+import { EventFeedRow } from "./event-feed-row";
+import { signedPoints } from "./number-format";
 import type { StatComparison } from "./stat";
 
 const SCORING_PLAYS: StatComparison = { percentile: 0.94, population: "scoring plays this week" };

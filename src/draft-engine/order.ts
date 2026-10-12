@@ -1,3 +1,5 @@
+import type { RosterSlotConfig } from "@/domain/roster";
+
 /** 1-based round containing a 1-based pick number. */
 export function roundForPick(teamCount: number, pickNumber: number): number {
   return Math.ceil(pickNumber / teamCount);
@@ -20,4 +22,9 @@ export function snakeTeamForPick(draftOrder: readonly string[], pickNumber: numb
     throw new Error(`draftOrder has no team at index ${orderIndex} for pick ${pickNumber}.`);
   }
   return team;
+}
+
+/** Rounds in a snake draft = roster spots per team. */
+export function totalRosterSlots(slotConfig: readonly RosterSlotConfig[]): number {
+  return slotConfig.reduce((sum, s) => sum + s.count, 0);
 }

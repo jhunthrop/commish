@@ -2,9 +2,9 @@ import { and, eq, gte, lte } from "drizzle-orm";
 import { kickoffInstant } from "./kickoff";
 import type { getDb } from "@/db/client";
 import { nflGames } from "@/db/schema";
-import { LEAGUE_CONFIG } from "@/league";
+import { SEASON_CONFIG } from "@/domain/season";
 import { createTtlMemo } from "@/lib/cache/ttl-memo";
-import { REFERENCE_MEMO_CONFIG } from "./config";
+import { REFERENCE_MEMO_CONFIG } from "./reference-memo-config";
 
 type Db = ReturnType<typeof getDb>;
 
@@ -71,7 +71,7 @@ async function readFixtureLabelsByTeam(db: Db, week: number): Promise<ReadonlyMa
 
 /**
  * EACH TEAM'S BYE WEEK, derived from the real ingested schedule rather than declared by a feed:
- * the one regular-season week (1..{@link LEAGUE_CONFIG.regularSeasonWeeks}) in which a team that
+ * the one regular-season week (1..{@link SEASON_CONFIG.fantasyRegularSeasonWeeks}) in which a team that
  * otherwise plays every week has no fixture. Derivation keeps it honest the same way
  * `fixtureLabelsByTeam`'s bye story is honest — an absence in `nfl_games` is a fact about the
  * schedule, not an invention.
@@ -96,7 +96,7 @@ async function readByeWeeksByTeam(db: Db): Promise<ReadonlyMap<string, number>> 
   const rows = await db
     .select({ week: nflGames.week, home: nflGames.homeNflTeam, away: nflGames.awayNflTeam })
     .from(nflGames)
-    .where(and(gte(nflGames.week, 1), lte(nflGames.week, LEAGUE_CONFIG.regularSeasonWeeks)));
+    .where(and(gte(nflGames.week, 1), lte(nflGames.week, SEASON_CONFIG.fantasyRegularSeasonWeeks)));
   const playedWeeks = new Map<string, Set<number>>();
   for (const game of rows) {
     for (const team of [game.home, game.away]) {
@@ -108,7 +108,7 @@ async function readByeWeeksByTeam(db: Db): Promise<ReadonlyMap<string, number>> 
   const byes = new Map<string, number>();
   for (const [team, played] of playedWeeks) {
     const missing: number[] = [];
-    for (let week = 1; week <= LEAGUE_CONFIG.regularSeasonWeeks; week += 1) {
+    for (let week = 1; week <= SEASON_CONFIG.fantasyRegularSeasonWeeks; week += 1) {
       if (!played.has(week)) missing.push(week);
     }
     if (missing.length === 1) byes.set(team, missing[0]!);

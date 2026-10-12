@@ -8,32 +8,13 @@ import { Stat, type StatComparison } from "./stat";
  */
 export const DELTA_UNIT_LABEL = "pts";
 
-/**
- * A points delta as display text, sign always attached: "+6.0", "-2.0", "+0.0".
- *
- * THE SIGN IS THE COLOURBLIND CHANNEL, so it can never be left to a caller's `toFixed`. Roughly
- * one man in twelve has deuteranopia and this audience is overwhelmingly men; a feed that says
- * "this event helped you" only in green tells one manager in twelve nothing at all. A leading `+`
- * or `-` is text, survives being read aloud, survives being copied, and survives a monochrome
- * screen — which is the whole point.
- *
- * The value is rounded BEFORE its sign is read, so a `-0.04` that displays as `0.0` cannot render
- * as "-0.0" — a negative zero is a number nobody has ever scored. ASCII hyphen-minus rather than
- * the typographic minus sign, deliberately: this glyph exists to be announced and copied, and the
- * ASCII one is the one every screen reader and every clipboard handles the same way.
- */
-export function signedPoints(points: number, digits = 1): string {
-  const rounded = Number(points.toFixed(digits));
-  return `${rounded < 0 ? "-" : "+"}${Math.abs(rounded).toFixed(digits)}`;
-}
-
 export interface EventFeedRowProps {
   /** The clock this happened on, already formatted: "1:42", "Q3 8:42". Fixed-width and mono in
    *  the layout below, so a column of them is a column rather than a ragged edge. */
   readonly time: string;
   /** What happened, in a manager's words: "Bijan Robinson 12 yd rushing TD". */
   readonly children: ReactNode;
-  /** The points this event moved, WITH its sign — `signedPoints` above is how a caller gets one
+  /** The points this event moved, WITH its sign — `signedPoints` (`./number-format`) is how a caller gets one
    *  that cannot be missing. */
   readonly delta: string;
   /** Whether this event happened to the reader's own team. */

@@ -1,6 +1,6 @@
 import type { Db } from "@/db/client";
 import type { Clock } from "@/domain/timing";
-import type { JsonObject } from "@/domain/audit";
+import type { JsonObject } from "@/domain/json";
 import { kickoffInstantsByWeek } from "../team-store";
 import { StitchedGenerationsError, assertSingleGeneration, preseasonProjectionsAsOf } from "../preseason/board-store";
 import { RegisterRefusalError } from "./errors";

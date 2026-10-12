@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { Db, DbTx, ReadonlyDb } from "@/db/client";
 import { preseasonBoardReasons } from "@/db/schema";
 import { changedRowWhere, excludedSetFor } from "@/db/upsert";
-import type { JsonObject } from "@/domain/audit";
+import type { JsonObject } from "@/domain/json";
 import type { BoardEntry, BoardReason } from "./board";
 import type { BoardStamp } from "./board-store";
 import { rosterStatusReason } from "./roster-status";

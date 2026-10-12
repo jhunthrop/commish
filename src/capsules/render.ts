@@ -1,5 +1,5 @@
 import type { Position } from "@/domain/player";
-import { POSITION_PLURAL } from "@/league-room/lib/player-season-view";
+import { POSITION_PLURAL } from "@/domain/position-words";
 import { PROP_MARKET_LABELS } from "./prop-market-labels";
 import { renderDepthSection } from "./render-depth";
 import type { PlayerFacts, PlayerFactsRankedStat, PlayerFactsTrendMetric } from "./facts";

@@ -28,7 +28,6 @@
 import type { DraftPoolEntry } from "@/domain/draft";
 import type { Position } from "@/domain/player";
 import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig } from "@/domain/roster";
-import { LATE_ROUND_ONLY_POSITIONS } from "./scoring";
 
 /** The one dial the ceiling rule carries; it rides the START_DRAFT snapshot (`DraftAutopickPolicy.rosterCeilings`). */
 export interface RosterCeilingPolicy {
@@ -215,3 +214,10 @@ export function candidateRoleReader(
     };
   };
 }
+
+/**
+ * The two positions a real draft board takes last (the 2026-09-05 kicker and team defence round).
+ * Named here rather than inlined at the one call site so a format that starts two of either has one
+ * list to widen.
+ */
+export const LATE_ROUND_ONLY_POSITIONS: readonly Position[] = ["K", "DEF"];

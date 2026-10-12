@@ -42,7 +42,7 @@
 // resolve step is worth retrying (the next scheduled fire, or a same-night redelivery, may simply
 // find the key configured or the upstream recovered), so nothing here is classified terminal.
 import type { Db } from "@/db/client";
-import type { JsonObject } from "@/domain/audit";
+import type { JsonObject } from "@/domain/json";
 import type { Clock } from "@/domain/timing";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { requireEnv } from "@/projections/odds/http";
