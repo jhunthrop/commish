@@ -79,7 +79,6 @@
 		border: 0;
 		background: transparent;
 		color: var(--ink);
-		outline: none;
 	}
 
 	input::placeholder {

@@ -4,6 +4,7 @@
 		THEME_LABELS,
 		THEME_MODES,
 		applyTheme,
+		browserStorage,
 		readSavedTheme,
 		saveTheme,
 		type ThemeMode
@@ -14,13 +15,13 @@
 	let mode = $state<ThemeMode>('auto');
 
 	onMount(() => {
-		mode = readSavedTheme(localStorage);
+		mode = readSavedTheme(browserStorage);
 	});
 
 	function choose(next: ThemeMode): void {
 		mode = next;
 		applyTheme(document.documentElement, next);
-		saveTheme(localStorage, next);
+		saveTheme(browserStorage, next);
 	}
 </script>
 

@@ -63,3 +63,15 @@ export function adpWords(adp: number | null, pick: number): string {
 	if (gap === 0) return 'drafters take him here';
 	return `drafters take him ${Math.abs(gap)} ${gap > 0 ? 'later' : 'earlier'}`;
 }
+
+const SECONDS_PER_MINUTE = 60;
+
+/** "0:19": a pick clock as it reads on the score bug. */
+export function clockLabel(secondsLeft: number): string {
+	if (!Number.isInteger(secondsLeft) || secondsLeft < 0) {
+		throw new RangeError(`A clock is whole seconds from 0, got ${secondsLeft}.`);
+	}
+	const minutes = Math.floor(secondsLeft / SECONDS_PER_MINUTE);
+	const seconds = secondsLeft % SECONDS_PER_MINUTE;
+	return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}

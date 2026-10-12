@@ -1,37 +1,50 @@
 <script lang="ts">
-	import { DEFAULT_TEAMS, pickLabel, snakeSlot } from '#lib/format/draft.ts';
+	import { DEFAULT_TEAMS, clockLabel, pickLabel, snakeSlot } from '#lib/format/draft.ts';
 
 	interface Props {
 		/** The overall pick on the clock. */
 		now: number;
 		/** The drafter on the clock, by handle. */
 		onClock: string;
-		/** The clock as it reads: "0:19". */
-		clock: string;
+		/** Seconds left on the pick clock. */
+		secondsLeft: number;
 		/** Your next overall pick. */
 		yourPick: number;
 		teams?: number;
 	}
 
-	let { now, onClock, clock, yourPick, teams = DEFAULT_TEAMS }: Props = $props();
+	let { now, onClock, secondsLeft, yourPick, teams = DEFAULT_TEAMS }: Props = $props();
+
+	/** A screen reader hears the clock only at these marks, never every tick. */
+	const SPOKEN_MARKS = [10, 5] as const;
 
 	const round = $derived(snakeSlot(now, teams).round);
 	const away = $derived(yourPick - now);
+	const spokenMark = $derived(SPOKEN_MARKS.findLast((mark) => secondsLeft <= mark));
+	const clockWords = $derived(spokenMark === undefined ? '' : `${spokenMark} seconds left`);
 </script>
 
-<!-- Lobby only: the score bug appears only in a room with people in it, because only there is anyone on a clock. -->
-<div class="bug" role="status" aria-live="polite">
-	<div><small>Round {round}</small><b>Pick {pickLabel(now, teams)}</b></div>
-	<div class="grow"><small>On the clock</small><b>{onClock}</b></div>
-	<div class="clock"><small>Clock</small><b>{clock}</b></div>
-	<div class="you">
+<!-- Lobby only: the score bug appears only in a room with people in it, because only there is anyone on a clock.
+     The pick and who is on the clock are announced as they change. The ticking clock is hidden from
+     screen readers, and a separate line speaks it only at ten and five seconds. -->
+<div class="bug">
+	<div role="status" aria-live="polite" class="spoken">
+		<div class="seg"><small>Round {round}</small><b>Pick {pickLabel(now, teams)}</b></div>
+		<div class="seg grow"><small>On the clock</small><b>{onClock}</b></div>
+	</div>
+	<div class="seg clock" aria-hidden="true">
+		<small>Clock</small><b>{clockLabel(secondsLeft)}</b>
+	</div>
+	<div class="seg you">
 		<small>Your pick</small>
 		<b>{away === 0 ? 'Now' : `${pickLabel(yourPick, teams)}, in ${away}`}</b>
 	</div>
+	<span class="visually-hidden" aria-live="polite">{clockWords}</span>
 </div>
 
 <style>
 	.bug {
+		position: relative;
 		display: flex;
 		align-items: stretch;
 		min-height: 64px;
@@ -39,10 +52,10 @@
 		overflow: hidden;
 		background: var(--scoreboard);
 		color: var(--scoreboard-ink);
-		border: 1px solid var(--line);
+		border: 1px solid var(--scoreboard-line);
 	}
 
-	.bug > div {
+	.seg {
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
@@ -52,8 +65,28 @@
 		white-space: nowrap;
 	}
 
-	.bug > div:last-child {
+	.you {
 		border-right: 0;
+	}
+
+	/* The announced segments, one live region, laid out as part of the bug's row. */
+	.spoken {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: stretch;
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		padding: 0;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	small {
@@ -102,7 +135,7 @@
 			min-height: 56px;
 		}
 
-		.bug > div {
+		.seg {
 			padding: 0 var(--s-3);
 		}
 
@@ -121,7 +154,7 @@
 
 	/* The narrowest phones: the four segments only fit with tighter padding and a clock as wide as its digits. */
 	@media (max-width: 420px) {
-		.bug > div {
+		.seg {
 			padding: 0 var(--s-2);
 		}
 

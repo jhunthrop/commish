@@ -20,9 +20,16 @@ export function applyTheme(root: HTMLElement, mode: ThemeMode): void {
 	else root.setAttribute('data-theme', mode);
 }
 
-export function readSavedTheme(storage: Storage): ThemeMode {
+/** Reaching storage can itself throw (blocked cookies, sandboxed frames), so callers pass a getter
+ * and the property access happens inside the try. */
+export type StorageGetter = () => Storage;
+
+/** The browser's own storage, read only when called. */
+export const browserStorage: StorageGetter = () => localStorage;
+
+export function readSavedTheme(getStorage: StorageGetter): ThemeMode {
 	try {
-		const saved = storage.getItem(THEME_STORAGE_KEY);
+		const saved = getStorage().getItem(THEME_STORAGE_KEY);
 		return isThemeMode(saved) ? saved : 'auto';
 	} catch {
 		return 'auto';
@@ -30,9 +37,9 @@ export function readSavedTheme(storage: Storage): ThemeMode {
 }
 
 /** Storage can be disabled or full. The theme still applies for this visit, so a failed write is not an error. */
-export function saveTheme(storage: Storage, mode: ThemeMode): boolean {
+export function saveTheme(getStorage: StorageGetter, mode: ThemeMode): boolean {
 	try {
-		storage.setItem(THEME_STORAGE_KEY, mode);
+		getStorage().setItem(THEME_STORAGE_KEY, mode);
 		return true;
 	} catch {
 		return false;

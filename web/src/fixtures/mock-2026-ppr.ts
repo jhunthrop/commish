@@ -706,7 +706,7 @@ export const SOLO_TEAM: readonly TeamSlot[] = [
 ];
 
 /** The lobby at pick 5.06: jpk88 on the clock, your pick at 5.08. */
-export const LOBBY_BUG = { now: 54, onClock: 'jpk88', clock: '0:19', yourPick: 56 };
+export const LOBBY_BUG = { now: 54, onClock: 'jpk88', secondsLeft: 19, yourPick: 56 };
 
 export const ROOM_KEYS: readonly KeyBinding[] = [
 	{ keys: 'Enter', does: 'draft our call' },
