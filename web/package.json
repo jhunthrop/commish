@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "wrangler types && vite build",
+		"build": "wrangler types && node scripts/check-glyphs.ts && vite build",
 		"preview": "wrangler dev .svelte-kit/cloudflare/_worker.js --port 4173",
 		"prepare": "wrangler types && svelte-kit sync || echo ''",
 		"check": "wrangler types && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -16,7 +16,8 @@
 		"screenshots": "node scripts/screenshots.ts",
 		"lighthouse": "lhci autorun",
 		"fonts": "node scripts/subset-fonts.ts && prettier --write src/lib/ui/fonts/ui.css",
-		"preview:static": "serve .svelte-kit/cloudflare -l 4173 --no-request-logging"
+		"preview:static": "serve .svelte-kit/cloudflare -l 4173 --no-request-logging",
+		"glyphs": "node scripts/check-glyphs.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

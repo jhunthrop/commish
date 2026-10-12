@@ -624,6 +624,12 @@ function byName(name: string): BoardPlayer {
 	return found;
 }
 
+/** Every player name in the fixture, for the build's glyph guard. */
+export const FIXTURE_PLAYER_NAMES: readonly string[] = ROWS.map((row) => row.name);
+
+/** The rows on the mock's 2026 PPR board. */
+export const BOARD_SIZE = 400;
+
 export const SCORING_UNIT = 'PPR pts';
 
 /** The board row specimen: Chris Olave in the WR view, on the WR top 40's range scale. */

@@ -54,9 +54,17 @@ outside. The system page at `/system` renders each of them with the mock's real 
 
 Google Fonts' Outfit and Big Shoulders Display for the UI, Newsreader for capsule prose, all
 self-hosted from the Fontsource packages of the same files so the first paint never waits on a
-cross-origin stylesheet. `scripts/subset-fonts.ts` (`npm run fonts`) cuts the two UI faces to a core
-character set and writes `src/lib/ui/fonts/ui.css` and `src/lib/ui/fonts/core/`. Commit its output.
-Any character outside the core falls through to the full Latin files, which load only when needed.
+cross-origin stylesheet. `scripts/subset-fonts.ts` (`npm run fonts`) cuts the two UI faces to Basic
+Latin, Latin-1 Supplement and Latin Extended-A plus curly quotes, the ellipsis, the minus and the
+arrows, the list in `src/lib/ui/fonts/coverage.ts`, and writes `src/lib/ui/fonts/ui.css` and
+`src/lib/ui/fonts/core/`. Commit its output. Any other character falls through to the full Latin
+files, which load only when needed.
+
+`npm run build` runs the glyph guard first (`scripts/check-glyphs.ts`, also `npm run glyphs`): every
+player name the pages render, today the fixture and later the nightly run's `index.json`, must sit
+inside that same list, or the build fails naming the first glyph outside it. Widen `coverage.ts` and
+rerun `npm run fonts` when a real name needs it.
+
 `src/lib/ui/fonts/read.css` holds Newsreader and is imported only by a component that sets prose.
 
 ## Headshots
