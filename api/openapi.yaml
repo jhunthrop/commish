@@ -923,15 +923,20 @@ components:
           allOf: [{ $ref: "#/components/schemas/Interval" }]
     PlanCatalog:
       type: object
+      description: A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership).
       required: [season, draft_pass, membership, group_pass]
       properties:
         season: { type: integer, description: the season a pass bought now is for }
-        draft_pass: { $ref: "#/components/schemas/Price" }
+        draft_pass:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/Price" }]
         membership:
           type: array
           description: annual first
           items: { $ref: "#/components/schemas/Price" }
-        group_pass: { $ref: "#/components/schemas/GroupPassPrice" }
+        group_pass:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/GroupPassPrice" }]
     GroupPassPrice:
       type: object
       required: [per_seat, min_seats, max_seats]

@@ -593,10 +593,10 @@ type PageMeta struct {
 	Total   int64 `json:"total"`
 }
 
-// PlanCatalog defines model for PlanCatalog.
+// PlanCatalog A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership).
 type PlanCatalog struct {
-	DraftPass Price          `json:"draft_pass"`
-	GroupPass GroupPassPrice `json:"group_pass"`
+	DraftPass *Price          `json:"draft_pass"`
+	GroupPass *GroupPassPrice `json:"group_pass"`
 
 	// Membership annual first
 	Membership []Price `json:"membership"`
