@@ -48,6 +48,8 @@ ignore = [
     # Ported mappers keep the TypeScript's own branch structure on purpose: a parity port that
     # restructures control flow is a port nobody can diff against its oracle line by line.
     "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR2004",
+    # The formatter owns line length; what it cannot wrap is a string, and a split message is worse.
+    "E501",
 ]
 
 [tool.ruff.lint.isort]
