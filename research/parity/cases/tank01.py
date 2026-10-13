@@ -13,15 +13,13 @@ from datetime import UTC, datetime
 from sqlalchemy import Connection
 
 from research.errors import ConfigurationError
-from research.parity.case import Case, Recording, RunContext
+from research.parity.case import Case, Recording, RunContext, Script
 from research.parity.cases.nflverse_season import NOW, UNIVERSE
+from research.parity.cases.steps import cli
 from research.parity.cases.tables import NFL_GAMES, NFL_PLAYERS, PLAYER_CROSSWALK, PLAYER_STAT_LINES, PLAYERS
 from research.parity.record import RecordSpec
 from research.pipeline.budget import UnmeteredBudget
-from research.pipeline.crosswalk import build_crosswalk
 from research.pipeline.http import Fetcher
-from research.pipeline.nflverse.client import NflverseClient
-from research.pipeline.nflverse.ingest import ingest_player_universe
 from research.pipeline.tank01.client import API_KEY_ENV, Paths, Tank01Client
 from research.pipeline.tank01.ingest import backfill_headshots, ingest_adp, ingest_roster_and_lines, ingest_schedule
 from research.pipeline.tank01.mapping import ADP_TYPE, SEASON_TYPE, WEEKS_LAST, map_games
@@ -81,30 +79,38 @@ def _provider(ctx: RunContext, last_week: int = WEEKS_LAST) -> Tank01Provider:
     return Tank01Provider(Tank01Client(ctx.fetcher, REPLAY_KEY), season=SEASON, last_week_of_season=last_week)
 
 
-def _roster_and_lines(conn: Connection, ctx: RunContext) -> None:
-    ingest_roster_and_lines(conn, _provider(ctx, BOX_SCORE_WEEKS))
+def _roster_and_lines(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
+    ingest_roster_and_lines(conn, _provider(ctx, BOX_SCORE_WEEKS), checkpoint=ctx.checkpoint)
+    return ()
 
 
-def _schedule(conn: Connection, ctx: RunContext) -> None:
+def _schedule(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
     ingest_schedule(conn, _provider(ctx), UnmeteredBudget())
+    return ()
 
 
-def _adp(conn: Connection, ctx: RunContext) -> None:
+def _adp(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
     # Two providers, as `npm run seed` and `npm run stats:adp` are two processes: each pays its own
     # roster read, and the harness checks both sides asked for exactly the same recordings.
     ingest_roster_and_lines(conn, _provider(ctx, 0))
     ingest_adp(conn, _provider(ctx), UnmeteredBudget())
+    return ()
 
 
-def _headshots(conn: Connection, ctx: RunContext) -> None:
+def _headshots(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
     ingest_roster_and_lines(conn, _provider(ctx, 0))
     backfill_headshots(conn, _provider(ctx))
+    return ()
 
 
-def _crosswalk(conn: Connection, ctx: RunContext) -> None:
-    ingest_player_universe(conn, NflverseClient(ctx.fetcher))
+def crosswalk_script(conn: Connection, ctx: RunContext) -> int:
+    """`build-crosswalk.ts`: the universe refreshed, then the defenses seeded, resolved, recorded."""
+    return max(cli(conn, ctx, ["universe"]), cli(conn, ctx, ["crosswalk"]))
+
+
+def _crosswalk(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
     ingest_roster_and_lines(conn, _provider(ctx, 0))
-    build_crosswalk(conn, ctx.now)
+    return (crosswalk_script(conn, ctx),)
 
 
 CASES: tuple[Case, ...] = (
@@ -135,7 +141,7 @@ CASES: tuple[Case, ...] = (
     ),
     Case(
         name="tank01-headshots",
-        summary="backfill-headshots: the roster's headshot URLs onto existing players rows (an update only)",
+        summary="backfill-headshots.ts RE-ASSEMBLED (its provider needs Redis): headshot URLs onto existing players rows",
         fixture_sets=("tank01-2026",),
         tables=(PLAYERS,),
         run_python=_headshots,
@@ -143,9 +149,10 @@ CASES: tuple[Case, ...] = (
     ),
     Case(
         name="crosswalk",
-        summary="the provider roster against the nflverse universe into player_crosswalk, defenses seeded",
+        summary="build-crosswalk.ts run as is: the provider roster against the universe, defenses seeded",
         fixture_sets=("nflverse-universe", "tank01-2026"),
-        tables=(NFL_PLAYERS, PLAYERS, PLAYER_CROSSWALK),
+        tables=(NFL_PLAYERS.as_setup(), PLAYERS.as_setup(), PLAYER_CROSSWALK),
+        ts_scripts=(Script("research-ts/scripts/build-crosswalk.ts"),),
         run_python=_crosswalk,
         now=datetime(2026, 10, 12, 5, 0, tzinfo=UTC),
         recordings=(UNIVERSE,),

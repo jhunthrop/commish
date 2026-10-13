@@ -65,54 +65,59 @@ def _season_recording(season: int, snap_filter: TeamFilter | None, week_filter: 
     )
 
 
-def _run_season(season: int) -> "SeasonRunner":
-    return SeasonRunner(season)
+PRIOR = "nflverse-2026-08-27-slices"
 
 
 class SeasonRunner:
-    """`realIngestStats`: the universe, the schedule's week stamps, then the season."""
+    """`realIngestStats` (the season-week job's stats step): the universe, the schedule's week
+    stamps, then the season."""
 
     def __init__(self, season: int) -> None:
         self.season = season
 
-    def __call__(self, conn: Connection, ctx: RunContext) -> None:
+    def __call__(self, conn: Connection, ctx: RunContext) -> tuple[int, ...]:
         client = NflverseClient(ctx.fetcher)
         universe = ingest_player_universe(conn, client)
         schedule_as_of = schedule_week_as_of(client, [self.season]).get(self.season)
         ingest_season(conn, client, universe, self.season, schedule_as_of)
+        return ()
 
 
-def _universe_only(conn: Connection, ctx: RunContext) -> None:
+def _universe_only(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
     ingest_player_universe(conn, NflverseClient(ctx.fetcher))
+    return ()
 
 
-SEASON_TABLES = (NFL_PLAYERS, PLAYER_WEEK_OBSERVATIONS, PLAYER_WEEK_TEAMS, TEAM_WEEK_OBSERVATIONS)
+SEASON_TABLES = (NFL_PLAYERS.as_setup(), PLAYER_WEEK_OBSERVATIONS, PLAYER_WEEK_TEAMS, TEAM_WEEK_OBSERVATIONS)
 
 CASES: tuple[Case, ...] = (
     Case(
         name="nflverse-universe",
-        summary="nflverse players release to nfl_players (the universe upsert)",
+        summary="nflverse players release to nfl_players (the universe upsert, moved ids released first)",
         fixture_sets=("nflverse-universe",),
         tables=(NFL_PLAYERS,),
         run_python=_universe_only,
         now=NOW,
         recordings=(UNIVERSE,),
+        prior_fixture_sets=(PRIOR,),
     ),
     Case(
         name="nflverse-season-2024",
         summary="the season-week stats ingest for an ordinary season (snap counts and weekly stats)",
         fixture_sets=("nflverse-universe", "nflverse-schedule", "nflverse-season-2024"),
         tables=SEASON_TABLES,
-        run_python=_run_season(2024),
+        run_python=SeasonRunner(2024),
         now=NOW,
         recordings=(_season_recording(2024, None, None),),
+        prior_fixture_sets=(PRIOR, "nflverse-schedule"),
     ),
     Case(
         name="nflverse-season-2012",
-        summary="a season below the snap-count floor: stat lines and team edges dated from the schedule",
+        summary="a season below the snap-count floor: stat lines and team edges dated from the schedule "
+        "(no line continuity: there are no snap counts to take it from)",
         fixture_sets=("nflverse-universe", "nflverse-schedule", "nflverse-season-2012"),
-        tables=SEASON_TABLES,
-        run_python=_run_season(2012),
+        tables=SEASON_TABLES[:3],
+        run_python=SeasonRunner(2012),
         now=NOW,
         recordings=(_season_recording(2012, None, TeamFilter(("team",))),),
     ),
@@ -121,7 +126,7 @@ CASES: tuple[Case, ...] = (
         summary="a gap season: weekly stats unpublished, weekly-file participation withheld",
         fixture_sets=("nflverse-universe", "nflverse-schedule", "nflverse-season-2025"),
         tables=SEASON_TABLES,
-        run_python=_run_season(2025),
+        run_python=SeasonRunner(2025),
         now=NOW,
         recordings=(_season_recording(2025, TeamFilter(("team",)), None),),
     ),

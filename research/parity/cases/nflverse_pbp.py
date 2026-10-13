@@ -5,24 +5,22 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
-from research.parity.case import Case, Recording, RunContext
+from research.parity.case import Case, Recording, RunContext, Script
 from research.parity.cases.nflverse_season import NOW
 from research.parity.cases.nflverse_sources import release_url
+from research.parity.cases.steps import cli, universe
 from research.parity.cases.tables import (
     COACHES,
+    NFLVERSE_INJURIES,
+    NFLVERSE_ROSTER_WEEKS,
     PLAYER_WEEK_OBSERVATIONS,
     TEAM_WEEK_OBSERVATIONS,
 )
-from research.parity.databases import REPO_ROOT
 from research.parity.record import RecordSpec
-from research.pipeline.coaches import PLAY_CALLERS_CSV_PATH, ingest_play_callers_csv
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.config import Releases
-from research.pipeline.nflverse.context import ingest_coaches, ingest_opponent_defence, ingest_play_by_play
 from research.pipeline.nflverse.derived_stat_lines import ingest_derived_stat_lines
-from research.pipeline.nflverse.ingest import ingest_player_universe
-from research.pipeline.nflverse.ingest_schedule import ingest_schedule
 
 CONTEXT_SEASONS = (2023, 2024)
 PBP_TEAMS = frozenset({"BUF", "KC"})
@@ -65,44 +63,61 @@ PBP_GAP = Recording(
 )
 
 
-def _coaches_seed(conn: Connection, _ctx: RunContext) -> None:
-    ingest_play_callers_csv(conn, REPO_ROOT / PLAY_CALLERS_CSV_PATH)
+def _coaches_seed(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
+    """`coaches-ingest.ts`."""
+    return (cli(conn, ctx, ["coaches"]),)
 
 
-def _context(conn: Connection, ctx: RunContext) -> None:
-    client = NflverseClient(ctx.fetcher)
-    ingest_player_universe(conn, client)
-    ingest_play_callers_csv(conn, REPO_ROOT / PLAY_CALLERS_CSV_PATH)
-    ingest_schedule(conn, client, CONTEXT_SEASONS)
-    for season in CONTEXT_SEASONS:
-        ingest_play_by_play(conn, client, season)
-    ingest_coaches(conn, client, CONTEXT_SEASONS)
-    ingest_opponent_defence(conn, client, CONTEXT_SEASONS)
+def _context(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
+    """The universe, then `coaches-ingest.ts` and `projection-context.ts 2024 2025`."""
+    universe(conn, ctx)
+    return (cli(conn, ctx, ["coaches"]), cli(conn, ctx, ["context", "--first", "2024", "--last", "2025"]))
 
 
-def _derived(conn: Connection, ctx: RunContext) -> None:
-    client = NflverseClient(ctx.fetcher)
-    ingest_player_universe(conn, client)
-    ingest_derived_stat_lines(conn, client, 2025)
+def _derived(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
+    universe(conn, ctx)
+    ingest_derived_stat_lines(conn, NflverseClient(ctx.fetcher), 2025)
+    return ()
 
+
+CONTEXT_SETS = (
+    "nflverse-universe",
+    "nflverse-schedule",
+    "nflverse-pbp-2023-2024",
+    "nflverse-pbp-2025",
+    "nflverse-injuries-2024-2025",
+    "nflverse-rosters-2024-2025",
+)
 
 CASES: tuple[Case, ...] = (
     Case(
         name="coaches-seed",
-        summary="the committed play-caller CSV, validated whole, into the coaches table",
+        summary="coaches-ingest.ts run as is: the committed play-caller CSV, validated whole, into coaches",
         fixture_sets=(),
         tables=(COACHES,),
         run_python=_coaches_seed,
         now=NOW,
+        ts_scripts=(Script("research-ts/scripts/coaches-ingest.ts"),),
     ),
     Case(
         name="nflverse-context",
-        summary="projection-context: schedule, play-by-play, coach observations, opponent adjustment, 2023-2024",
-        fixture_sets=("nflverse-universe", "nflverse-schedule", "nflverse-pbp-2023-2024"),
-        tables=(TEAM_WEEK_OBSERVATIONS, PLAYER_WEEK_OBSERVATIONS, COACHES),
+        summary="projection-context.ts run as is for 2024-2025: schedule, play-by-play, coach observations, "
+        "opponent adjustment, injury features, injury archive, weekly rosters",
+        fixture_sets=CONTEXT_SETS,
+        tables=(
+            TEAM_WEEK_OBSERVATIONS,
+            PLAYER_WEEK_OBSERVATIONS,
+            NFLVERSE_INJURIES,
+            NFLVERSE_ROSTER_WEEKS,
+            COACHES.as_setup(),
+        ),
         run_python=_context,
         now=NOW,
         recordings=(PBP_CONTEXT,),
+        ts_scripts=(
+            Script("research-ts/scripts/coaches-ingest.ts"),
+            Script("research-ts/scripts/projection-context.ts", ("2024", "2025")),
+        ),
     ),
     Case(
         name="nflverse-derived-stat-lines",

@@ -6,9 +6,10 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
-from research.parity.case import Case, Recording, RunContext
+from research.parity.case import Case, Recording, RunContext, Script
 from research.parity.cases.nflverse_season import NOW, SCHEDULE
 from research.parity.cases.nflverse_sources import SLICE_TEAMS, TeamFilter, release_url
+from research.parity.cases.steps import cli, universe
 from research.parity.cases.tables import (
     NFL_DRAFT_PICKS,
     NFL_PLAYERS,
@@ -20,30 +21,25 @@ from research.parity.cases.tables import (
     TEAM_WEEK_OBSERVATIONS,
 )
 from research.parity.record import RecordSpec
-from research.pipeline.crosswalk import seed_team_defense_universe
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.config import Files, Releases
-from research.pipeline.nflverse.draft_picks import ingest_draft_picks
-from research.pipeline.nflverse.ingest import ingest_player_universe, schedule_client
 from research.pipeline.nflverse.ingest_schedule import ingest_game_results, ingest_points_allowed, ingest_schedule
 from research.pipeline.nflverse.injury_archive import ingest_injuries
 from research.pipeline.nflverse.injury_reports import ingest_injury_reports
-from research.pipeline.nflverse.kicking_weeks import ingest_kicking_weeks
-from research.pipeline.nflverse.roster_weeks import ingest_roster_weeks
-from research.pipeline.nflverse.team_defense_weeks import ingest_team_defense_weeks
 
 CONTEXT_SEASONS = (2024, 2025)
 SCHEDULE_SEASONS = (2023, 2024, 2025, 2026)
 KDEF_SEASONS = (2024, 2025)
 
-Step = Callable[[Connection, RunContext], None]
+Step = Callable[[Connection, RunContext], tuple[int, ...]]
+PRIOR = "nflverse-2026-08-27-slices"
 
 
 def _after_universe(step: Step) -> Step:
-    def run(conn: Connection, ctx: RunContext) -> None:
-        ingest_player_universe(conn, NflverseClient(ctx.fetcher))
-        step(conn, ctx)
+    def run(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
+        universe(conn, ctx)
+        return step(conn, ctx)
 
     return run
 
@@ -112,36 +108,40 @@ KDEF = Recording(
 
 
 def _schedule_step(ingest: Callable[[Connection, NflverseClient, tuple[int, ...]], int]) -> Step:
-    def run(conn: Connection, ctx: RunContext) -> None:
+    def run(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
         ingest(conn, NflverseClient(ctx.fetcher), SCHEDULE_SEASONS)
+        return ()
 
     return run
 
 
-def _injury_reports(conn: Connection, ctx: RunContext) -> None:
+def _injury_reports(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
     ingest_injury_reports(conn, NflverseClient(ctx.fetcher), CONTEXT_SEASONS)
+    return ()
 
 
-def _injury_archive(conn: Connection, ctx: RunContext) -> None:
+def _injury_archive(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
     ingest_injuries(conn, NflverseClient(ctx.fetcher), CONTEXT_SEASONS)
+    return ()
 
 
-def _roster_weeks(conn: Connection, ctx: RunContext) -> None:
-    ingest_roster_weeks(conn, NflverseClient(ctx.fetcher), CONTEXT_SEASONS)
+def _roster_weeks(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
+    """`roster-weeks-ingest.ts 2024 2025`."""
+    return (cli(conn, ctx, ["roster-weeks", "--first", "2024", "--last", "2025"]),)
 
 
-def _draft_picks(conn: Connection, ctx: RunContext) -> None:
-    ingest_draft_picks(conn, NflverseClient(ctx.fetcher))
+def _draft_picks(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
+    """`draft-picks-ingest.ts`."""
+    return (cli(conn, ctx, ["draft-picks"]),)
 
 
-def _kdef(conn: Connection, ctx: RunContext) -> None:
-    client = NflverseClient(ctx.fetcher)
-    seed_team_defense_universe(conn)
-    ingest_kicking_weeks(conn, client, KDEF_SEASONS)
-    ingest_team_defense_weeks(conn, client, KDEF_SEASONS, schedule_client(client))
+def _kdef(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
+    """`kdef-backfill.ts 2024 2025`."""
+    return (cli(conn, ctx, ["kdef", "--first", "2024", "--last", "2025"]),)
 
 
 UNIVERSE_SET = "nflverse-universe"
+SETUP_PLAYERS = NFL_PLAYERS.as_setup()
 
 CASES: tuple[Case, ...] = (
     Case(
@@ -173,10 +173,11 @@ CASES: tuple[Case, ...] = (
         name="nflverse-injury-reports",
         summary="the injury report as ordinal features (2024 stamped, 2025 unstamped and withheld)",
         fixture_sets=(UNIVERSE_SET, "nflverse-injuries-2024-2025"),
-        tables=(NFL_PLAYERS, PLAYER_WEEK_OBSERVATIONS),
+        tables=(SETUP_PLAYERS, PLAYER_WEEK_OBSERVATIONS),
         run_python=_after_universe(_injury_reports),
         now=NOW,
         recordings=(INJURIES,),
+        prior_fixture_sets=(PRIOR,),
     ),
     Case(
         name="nflverse-injury-archive",
@@ -185,32 +186,38 @@ CASES: tuple[Case, ...] = (
         tables=(NFLVERSE_INJURIES,),
         run_python=_after_universe(_injury_archive),
         now=NOW,
+        prior_fixture_sets=(PRIOR,),
     ),
     Case(
         name="nflverse-roster-weeks",
-        summary="the weekly roster release archived into nflverse_roster_weeks, 2024-2025",
+        summary="roster-weeks-ingest.ts run as is: the weekly roster release into nflverse_roster_weeks, 2024-2025",
         fixture_sets=(UNIVERSE_SET, "nflverse-rosters-2024-2025"),
         tables=(NFLVERSE_ROSTER_WEEKS,),
         run_python=_after_universe(_roster_weeks),
         now=NOW,
         recordings=(ROSTERS,),
+        ts_scripts=(Script("research-ts/scripts/roster-weeks-ingest.ts", ("2024", "2025")),),
+        prior_fixture_sets=(PRIOR,),
     ),
     Case(
         name="nflverse-draft-picks",
-        summary="every draft pick into nfl_draft_picks, filtered to the universe",
+        summary="draft-picks-ingest.ts run as is: every draft pick into nfl_draft_picks, filtered to the universe",
         fixture_sets=(UNIVERSE_SET, "nflverse-draft-picks"),
         tables=(NFL_DRAFT_PICKS,),
         run_python=_after_universe(_draft_picks),
         now=NOW,
         recordings=(DRAFT_PICKS,),
+        ts_scripts=(Script("research-ts/scripts/draft-picks-ingest.ts"),),
+        prior_fixture_sets=(PRIOR,),
     ),
     Case(
         name="nflverse-kdef",
-        summary="kdef-backfill: 32 synthetic defenses, kicking weeks and team defense weeks, 2024-2025",
+        summary="kdef-backfill.ts run as is: 32 synthetic defenses, kicking weeks and team defense weeks, 2024-2025",
         fixture_sets=(UNIVERSE_SET, "nflverse-schedule", "nflverse-kdef-2024-2025"),
-        tables=(NFL_PLAYERS, NFLVERSE_KICKING_WEEKS, NFLVERSE_TEAM_DEFENSE_WEEKS),
+        tables=(SETUP_PLAYERS, NFLVERSE_KICKING_WEEKS, NFLVERSE_TEAM_DEFENSE_WEEKS),
         run_python=_after_universe(_kdef),
         now=NOW,
         recordings=(KDEF,),
+        ts_scripts=(Script("research-ts/scripts/kdef-backfill.ts", ("2024", "2025")),),
     ),
 )

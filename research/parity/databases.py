@@ -36,13 +36,40 @@ def url_for(database: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, f"/{database}", parts.query, parts.fragment))
 
 
+def _scratch(database: str) -> str:
+    if SCRATCH_NAME.fullmatch(database) is None:
+        raise ConfigurationError(f"refusing to touch {database!r}: scratch databases are named parity_*.")
+    return database
+
+
+def drop(database: str) -> None:
+    """Drops a scratch database if it exists. Refuses any name not shaped `parity_*`."""
+    with psycopg.connect(admin_url(), autocommit=True) as conn:
+        conn.execute(f'DROP DATABASE IF EXISTS "{_scratch(database)}" WITH (FORCE)')
+
+
+def drop_scratch_databases() -> list[str]:
+    """Drops every `parity_*` database on the server: leftovers of an interrupted run."""
+    with psycopg.connect(admin_url(), autocommit=True) as conn:
+        names = [str(row[0]) for row in conn.execute("select datname from pg_database where datname like 'parity\\_%'")]
+    for name in names:
+        drop(name)
+    return names
+
+
 def recreate(database: str) -> str:
     """Drops and creates `database`, returning its libpq URL. Refuses any name not shaped `parity_*`."""
-    if SCRATCH_NAME.fullmatch(database) is None:
-        raise ConfigurationError(f"refusing to recreate {database!r}: scratch databases are named parity_*.")
+    drop(database)
     with psycopg.connect(admin_url(), autocommit=True) as conn:
-        conn.execute(f'DROP DATABASE IF EXISTS "{database}" WITH (FORCE)')
-        conn.execute(f'CREATE DATABASE "{database}"')
+        conn.execute(f'CREATE DATABASE "{_scratch(database)}"')
+    return url_for(database)
+
+
+def clone(template: str, database: str) -> str:
+    """A fresh `database` copied from `template`, returning its libpq URL."""
+    drop(database)
+    with psycopg.connect(admin_url(), autocommit=True) as conn:
+        conn.execute(f'CREATE DATABASE "{_scratch(database)}" TEMPLATE "{_scratch(template)}"')
     return url_for(database)
 
 

@@ -1,21 +1,32 @@
-"""RUNNING ONE CASE: two scratch databases, two ingests on one recorded input, one diff.
+"""RUNNING ONE CASE: scratch databases, both ingests on the same recorded input, a diff after every pass.
 
-The TypeScript database is migrated by drizzle (the oracle's own schema, every app table
-included); the Python database by alembic (this lane's schema). Both are cloned from per-run
-templates so the migration cost is paid once per harness run, not once per case. The TypeScript
-side runs as a subprocess (`npx tsx research/parity/ts/run.ts`), the Python side in process, both
-replaying the same fixture sets and reading the same fixed instant as now.
+THE PASSES. A nightly run lands on yesterday's rows, not on an empty database, so a case is not
+judged on a cold start alone:
+
+1. `first`: both sides into empty databases.
+2. `rerun`: both sides again, on top of their own first pass, from the same recordings. Every
+   upsert's conflict branch, every changed-row check, every insert-or-ignore and every
+   supersede (the live season's week-one rosters) runs here, against real rows.
+3. `prior` then `later`, on a second pair of empty databases, when the case names an earlier
+   recording: the earlier release lands first and today's lands on top of it.
+
+The databases are diffed after each pass. A pass fails on any differing row, on a declared table
+that is empty on both sides (a vacuous comparison), on the two sides asking for different
+recordings, or on different exit statuses from the operator scripts.
+
+THE DATABASES. The TypeScript side's is cloned from a template migrated by the drizzle journal, the
+Python side's from one migrated by alembic; the `Harness` owns both templates for one harness run,
+and every case drops its own databases when it ends.
 """
 
 import json
 import os
 import subprocess
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass
-from functools import cache
 from pathlib import Path
-
-import psycopg
+from typing import Final
 
 from research.db.engine import make_engine
 from research.db.url import sqlalchemy_url
@@ -25,130 +36,175 @@ from research.parity.diff import TableDiff, diff_table
 from research.parity.replay import FIXTURES_ROOT, ReplayFetcher
 from research.pipeline.jscompat import js_iso
 
-TS_DRIVER = databases.RESEARCH_ROOT / "parity" / "ts" / "run.ts"
-TS_TEMPLATE = "parity_template_ts"
-PY_TEMPLATE = "parity_template_py"
+TS_DRIVER: Final = databases.RESEARCH_ROOT / "parity" / "ts" / "run.ts"
+TS_PRELOAD: Final = databases.RESEARCH_ROOT / "parity" / "ts" / "preload.ts"
+_STDERR_TAIL: Final = 4000
+# An operator script's two success statuses: clean, and THIN (rows written, comparison unsafe).
+_SCRIPT_SUCCESS: Final = frozenset({0, 2})
+
+
+@dataclass(frozen=True)
+class SideRun:
+    requested: tuple[str, ...]
+    statuses: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class PassResult:
+    name: str
+    diffs: tuple[TableDiff, ...]
+    ts: SideRun
+    py: SideRun
+
+    @property
+    def same_requests(self) -> bool:
+        return sorted(self.ts.requested) == sorted(self.py.requested)
+
+    @property
+    def same_statuses(self) -> bool:
+        return self.ts.statuses == self.py.statuses
+
+    @property
+    def matches(self) -> bool:
+        return self.same_requests and self.same_statuses and all(d.matches for d in self.diffs)
 
 
 @dataclass(frozen=True)
 class CaseResult:
     case: Case
-    diffs: list[TableDiff]
-    ts_requests: list[str]
-    py_requests: list[str]
-
-    @property
-    def rows_compared(self) -> int:
-        return sum(max(d.ts_rows, d.py_rows) for d in self.diffs)
+    passes: tuple[PassResult, ...]
 
     @property
     def matches(self) -> bool:
-        same_requests = sorted(self.ts_requests) == sorted(self.py_requests)
-        return same_requests and self.rows_compared > 0 and all(d.matches for d in self.diffs)
+        return all(p.matches for p in self.passes)
+
+    @property
+    def rows_compared(self) -> int:
+        return sum(d.rows for p in self.passes for d in p.diffs)
 
 
-@cache
-def templates() -> tuple[str, str]:
-    """Build the two template databases once per process."""
-    databases.build_with_drizzle(TS_TEMPLATE)
-    databases.build_with_alembic(PY_TEMPLATE)
-    return TS_TEMPLATE, PY_TEMPLATE
+@dataclass(frozen=True)
+class Harness:
+    """One harness run's templates. Built by `open_harness`, dropped by `close_harness`."""
+
+    ts_template: str = "parity_template_ts"
+    py_template: str = "parity_template_py"
 
 
-def clone(template: str, database: str) -> str:
-    if databases.SCRATCH_NAME.fullmatch(database) is None:
-        raise ValueError(f"scratch databases are named parity_*, not {database!r}")
-    with psycopg.connect(databases.admin_url(), autocommit=True) as conn:
-        conn.execute(f'DROP DATABASE IF EXISTS "{database}" WITH (FORCE)')
-        conn.execute(f'CREATE DATABASE "{database}" TEMPLATE "{template}"')
-    return databases.url_for(database)
+def open_harness() -> Harness:
+    """Drop every `parity_*` leftover on the server, then build the two templates."""
+    databases.drop_scratch_databases()
+    harness = Harness()
+    databases.build_with_drizzle(harness.ts_template)
+    databases.build_with_alembic(harness.py_template)
+    return harness
 
 
-def seed(url: str, statements: tuple[str, ...]) -> None:
-    if not statements:
-        return
-    with psycopg.connect(url, autocommit=True) as conn:
-        for statement in statements:
-            conn.execute(statement.encode())
+def close_harness(harness: Harness) -> None:
+    databases.drop(harness.ts_template)
+    databases.drop(harness.py_template)
 
 
-def fixture_dirs(case: Case) -> list[Path]:
-    return [FIXTURES_ROOT / name for name in case.fixture_sets]
+def _fixture_dirs(sets: Sequence[str]) -> list[Path]:
+    return [FIXTURES_ROOT / name for name in sets]
 
 
-def run_typescript(case: Case, url: str) -> list[str]:
-    # TZ=UTC because production runs the TypeScript under UTC (Vercel), and V8 reads an offset-less
+def _ts_env(case: Case, url: str) -> dict[str, str]:
+    # TZ=UTC because production runs the TypeScript under UTC, and V8 reads an offset-less
     # date-time string as local time: the oracle is the production behaviour, not this laptop's.
-    env = {**os.environ, "DATABASE_URL": url, "PARITY_NOW": js_iso(case.now), "NODE_NO_WARNINGS": "1", "TZ": "UTC"}
+    return {**os.environ, "DATABASE_URL": url, "PARITY_NOW": js_iso(case.now), "NODE_NO_WARNINGS": "1", "TZ": "UTC"}
+
+
+def _run_ts_case(case: Case, url: str, dirs: list[Path]) -> list[str]:
     completed = subprocess.run(
-        ["npx", "tsx", str(TS_DRIVER), case.name, *[str(d) for d in fixture_dirs(case)]],
+        ["npx", "tsx", str(TS_DRIVER), case.name, *[str(d) for d in dirs]],
         cwd=databases.REPO_ROOT,
-        env=env,
+        env=_ts_env(case, url),
         capture_output=True,
         text=True,
         check=False,
     )
     if completed.returncode != 0:
-        raise RuntimeError(f"TypeScript side of {case.name} failed:\n{completed.stderr[-4000:]}")
-    last = completed.stdout.strip().splitlines()[-1]
-    payload: dict[str, list[str]] = json.loads(last)
+        raise RuntimeError(f"TypeScript side of {case.name} failed:\n{completed.stderr[-_STDERR_TAIL:]}")
+    payload: dict[str, list[str]] = json.loads(completed.stdout.strip().splitlines()[-1])
     return payload["requested"]
 
 
-TS_PRELOAD = databases.RESEARCH_ROOT / "parity" / "ts" / "preload.ts"
-
-
-def run_typescript_scripts(case: Case, url: str) -> list[str]:
-    """Each operator script, unmodified, under the replay preload."""
+def _run_ts_scripts(case: Case, url: str, dirs: list[Path]) -> tuple[list[str], list[int]]:
     requested: list[str] = []
-    for script, *args in case.ts_scripts:
+    statuses: list[int] = []
+    for script in case.ts_scripts:
         with tempfile.TemporaryDirectory() as scratch:
             out = Path(scratch) / "requested.json"
             env = {
-                **os.environ,
-                "DATABASE_URL": url,
-                "PARITY_NOW": js_iso(case.now),
-                "PARITY_FIXTURE_DIRS": "\n".join(str(d) for d in fixture_dirs(case)),
+                **_ts_env(case, url),
+                "PARITY_FIXTURE_DIRS": "\n".join(str(d) for d in dirs),
                 "PARITY_REQUESTED_OUT": str(out),
-                # A replayed script never holds a real key: the replay strips keys and checks none.
                 "ODDS_API_KEY": "replay",
                 "TANK01_API_KEY": "replay",
-                "NODE_NO_WARNINGS": "1",
-                "TZ": "UTC",
             }
+            command = ["npx", "tsx", "--import", str(TS_PRELOAD), script.path, *script.args]
             completed = subprocess.run(
-                ["npx", "tsx", "--import", str(TS_PRELOAD), script, *args],
-                cwd=databases.REPO_ROOT,
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
+                command, cwd=databases.REPO_ROOT, env=env, capture_output=True, text=True, check=False
             )
-            if completed.returncode != 0:
-                raise RuntimeError(f"{script} for {case.name} failed:\n{completed.stderr[-4000:]}")
+            if completed.returncode not in _SCRIPT_SUCCESS:
+                raise RuntimeError(f"{script.path} for {case.name} failed:\n{completed.stderr[-_STDERR_TAIL:]}")
+            statuses.append(completed.returncode)
             requested.extend(json.loads(out.read_text())["requested"])
-    return requested
+    return requested, statuses
 
 
-def run_python(case: Case, url: str) -> list[str]:
-    fetcher = ReplayFetcher(fixture_dirs(case))
+def _run_typescript(case: Case, url: str, sets: Sequence[str]) -> SideRun:
+    dirs = _fixture_dirs(sets)
+    requested = _run_ts_case(case, url, dirs)
+    script_requested, statuses = _run_ts_scripts(case, url, dirs)
+    return SideRun(tuple(requested + script_requested), tuple(statuses))
+
+
+def _run_python(case: Case, url: str, sets: Sequence[str]) -> SideRun:
+    fetcher = ReplayFetcher(_fixture_dirs(sets))
     engine = make_engine(sqlalchemy_url(url))
     try:
-        with engine.begin() as conn:
-            case.run_python(conn, RunContext(fetcher=fetcher, now=case.now))
+        with engine.connect() as conn:
+            statuses = case.run_python(conn, RunContext(fetcher=fetcher, now=case.now, checkpoint=conn.commit))
+            conn.commit()
     finally:
         engine.dispose()
-    return fetcher.requested
+    return SideRun(tuple(fetcher.requested), statuses)
 
 
-def run_case(case: Case) -> CaseResult:
-    ts_template, py_template = templates()
-    slug = case.name.replace("-", "_")
-    ts_url = clone(ts_template, f"parity_{slug}_ts")
-    py_url = clone(py_template, f"parity_{slug}_py")
-    seed(ts_url, case.seed_sql)
-    seed(py_url, case.seed_sql)
-    ts_requests = run_typescript(case, ts_url) + run_typescript_scripts(case, ts_url)
-    py_requests = run_python(case, py_url)
-    diffs = [diff_table(ts_url, py_url, spec) for spec in case.tables]
-    return CaseResult(case=case, diffs=diffs, ts_requests=ts_requests, py_requests=py_requests)
+def _pass(name: str, case: Case, urls: tuple[str, str], sets: Sequence[str]) -> PassResult:
+    ts = _run_typescript(case, urls[0], sets)
+    py = _run_python(case, urls[1], sets)
+    diffs = tuple(diff_table(urls[0], urls[1], spec) for spec in case.tables)
+    return PassResult(name, diffs, ts, py)
+
+
+def _pair(harness: Harness, case: Case, suffix: str) -> tuple[str, str]:
+    slug = f"{case.name.replace('-', '_')}_{suffix}"
+    return (
+        databases.clone(harness.ts_template, f"parity_{slug}_ts"),
+        databases.clone(harness.py_template, f"parity_{slug}_py"),
+    )
+
+
+def _drop_pair(case: Case, suffix: str) -> None:
+    slug = f"{case.name.replace('-', '_')}_{suffix}"
+    databases.drop(f"parity_{slug}_ts")
+    databases.drop(f"parity_{slug}_py")
+
+
+def run_case(harness: Harness, case: Case) -> CaseResult:
+    passes: list[PassResult] = []
+    try:
+        urls = _pair(harness, case, "a")
+        passes.append(_pass("first", case, urls, case.fixture_sets))
+        passes.append(_pass("rerun", case, urls, case.fixture_sets))
+        if case.prior_fixture_sets:
+            urls = _pair(harness, case, "b")
+            passes.append(_pass("prior", case, urls, case.prior_fixture_sets))
+            passes.append(_pass("later", case, urls, case.fixture_sets))
+    finally:
+        _drop_pair(case, "a")
+        _drop_pair(case, "b")
+    return CaseResult(case, tuple(passes))

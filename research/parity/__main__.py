@@ -6,9 +6,11 @@
     uv run python -m research.parity list                every case and fixture set
 
 `ingest` and `schema` need PARITY_DATABASE_URL (a Postgres where the harness may create its own
-`parity_*` scratch databases) and, for the TypeScript side, the repository's node_modules. Exit
-status is non-zero on any difference, on a case that compared no rows, and on a case whose two
-sides did not ask for exactly the same recordings.
+`parity_*` scratch databases, and drops every one of them, leftovers included) and, for the
+TypeScript side, the repository's node_modules. Each case runs in passes (`runner.py`): into empty
+databases, again on top, and from an earlier recording to today's where one exists. Exit status is
+non-zero on any difference, on a declared table empty on both sides, on the two sides asking for
+different recordings, and on different exit statuses from the operator scripts.
 """
 
 import argparse
@@ -20,7 +22,8 @@ from pathlib import Path
 
 from research.parity.cases import ALL_CASES, CASES_BY_NAME, all_recordings
 from research.parity.record import record_case
-from research.parity.runner import CaseResult, run_case
+from research.parity.report import report
+from research.parity.runner import close_harness, open_harness, run_case
 from research.parity.schema_gate import against_live, run_schema_gate
 from research.pipeline.http import LiveFetcher
 
@@ -29,45 +32,14 @@ def _print(line: str = "") -> None:
     sys.stdout.write(line + "\n")
 
 
-def _report(results: Sequence[CaseResult]) -> None:
-    header = (
-        f"{'case':<28} {'table':<28} {'ts rows':>8} {'py rows':>8} {'only ts':>8} {'only py':>8} {'differ':>7}  result"
-    )
-    _print(header)
-    _print("-" * len(header))
-    for result in results:
-        for diff in result.diffs:
-            verdict = "match" if diff.matches else "DIFFERENT"
-            _print(
-                f"{result.case.name:<28} {diff.table:<28} {diff.ts_rows:>8} {diff.py_rows:>8} "
-                f"{len(diff.only_ts):>8} {len(diff.only_py):>8} {len(diff.differing):>7}  {verdict}"
-            )
-        if sorted(result.ts_requests) != sorted(result.py_requests):
-            _print(
-                f"{result.case.name:<28} requests differ: ts={sorted(result.ts_requests)} py={sorted(result.py_requests)}"
-            )
-        if result.rows_compared == 0:
-            _print(f"{result.case.name:<28} compared no rows: a vacuous case is a failure")
-    for result in results:
-        for diff in result.diffs:
-            for line in [
-                *diff.duplicate_keys,
-                *(f"only ts: {k}" for k in diff.only_ts),
-                *(f"only py: {k}" for k in diff.only_py),
-                *diff.differing,
-            ]:
-                _print(f"  {result.case.name} {diff.table}: {line}")
-    matching = sum(1 for r in results if r.matches)
-    _print()
-    _print(
-        f"parity: {len(results)} ingest case(s), {matching} matching, {sum(r.rows_compared for r in results)} rows compared"
-    )
-
-
 def _ingest(names: Sequence[str]) -> int:
     cases = ALL_CASES if names == ["all"] else tuple(CASES_BY_NAME[name] for name in names)
-    results = [run_case(case) for case in cases]
-    _report(results)
+    harness = open_harness()
+    try:
+        results = [run_case(harness, case) for case in cases]
+    finally:
+        close_harness(harness)
+    report(results)
     return 0 if all(r.matches for r in results) else 1
 
 

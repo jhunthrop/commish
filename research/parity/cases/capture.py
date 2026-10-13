@@ -16,6 +16,7 @@ from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
 from research.pipeline.tank01.capture import (
     CAPTURE_FEEDS,
     CaptureContext,
+    CapturePass,
     capture_once,
     harvest_feeds,
     run_capture_harvest,
@@ -77,14 +78,18 @@ HARVEST = Recording(
 )
 
 
-def _harvest(conn: Connection, ctx: RunContext) -> None:
+def _harvest(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
+    """`harvestCaptures`, the in-season capture task, fired twice an hour apart."""
     client = Tank01Client(ctx.fetcher, REPLAY_KEY)
     run_capture_harvest(conn, client, FIRED_AT, SEASON)
     run_capture_harvest(conn, client, FIRED_AT + timedelta(hours=1), SEASON)
+    return ()
 
 
-def _capture_all(conn: Connection, ctx: RunContext) -> None:
-    capture_once(conn, Tank01Client(ctx.fetcher, REPLAY_KEY), FIRED_AT, UnmeteredBudget(), SEASON, WEEK)
+def _capture_all(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
+    capture = CapturePass(FIRED_AT, SEASON, WEEK)
+    capture_once(conn, Tank01Client(ctx.fetcher, REPLAY_KEY), capture, UnmeteredBudget())
+    return ()
 
 
 CASES: tuple[Case, ...] = (
