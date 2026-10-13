@@ -68,6 +68,8 @@ function assertReassembledUnchanged(script: string): void {
   }
 }
 
+/** `PRESEASON_NOW` in `parity/cases/preseason.py`: an instant before the 2026 opener. */
+const PRESEASON_FIRED_AT = "2026-08-20T12:00:00.000Z";
 const SCHEDULE_SEASONS = [2023, 2024, 2025, 2026];
 const CONTEXT_SEASONS = [2024, 2025];
 const UNMETERED = { reserveBackfill: async () => ({ granted: true }) } as unknown as RequestBudget;
@@ -199,7 +201,9 @@ export const TS_CASES: Readonly<Record<string, TsCase>> = {
   "props-preseason-job": async (ctx) => {
     await universe(ctx);
     await ingestSchedule(ctx.db, [2026]);
-    await snapshotPreseasonProps(ctx.db, { now: () => ctx.now.toISOString() }, {});
+    // Fired before the opener (the gate reads the fire), running at the recording's clock (the
+    // snapshot's window reads the wall clock), as `parity/cases/odds.py` runs it.
+    await snapshotPreseasonProps(ctx.db, { now: () => ctx.now.toISOString() }, { firedAt: PRESEASON_FIRED_AT });
   },
   "odds-backfill": async ({ db }) => {
     await ingestSchedule(db, [2025]);

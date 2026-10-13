@@ -2,9 +2,11 @@
 
 Three checks, each against a real Postgres:
 
-1. A database migrated by alembic from nothing holds what `research.db.schema` declares: alembic's
-   own metadata comparison finds no difference (tables, columns, types, nullability, defaults,
-   keys, indexes, constraints).
+1. A database migrated by alembic from nothing holds what `research.db.schema` declares, two ways:
+   alembic's own metadata comparison finds no difference, and, because that comparison skips CHECK
+   constraints, the migrated database's catalog (every column, every constraint from
+   `pg_constraint` including the checks, every index) equals that of a database built straight
+   from the declaration with `METADATA.create_all`, line for line.
 2. Every research table's legacy entry (`research.db.legacy`) accounts for every column of the
    legacy table as the drizzle journal builds it: read into the research table or dropped with a
    reason. A legacy column added on main without a decision here fails the gate.
@@ -17,7 +19,7 @@ from dataclasses import dataclass
 import psycopg
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
-from sqlalchemy import create_engine, pool
+from sqlalchemy import create_engine, pool, text
 
 from research.db.legacy import LEGACY_SCHEMA, LEGACY_TABLES, NOT_CARRIED, check_complete
 from research.db.schema import METADATA, RESEARCH_SCHEMA
@@ -26,6 +28,8 @@ from research.parity import databases
 
 _MIGRATED = "parity_schema_alembic"
 _LEGACY = "parity_schema_drizzle"
+_DECLARED = "parity_schema_declared"
+_VERSION_TABLE = "alembic_version"
 
 COLUMNS_SQL = """
 select c.relname, a.attnum, a.attname, format_type(a.atttypid, a.atttypmod), a.attnotnull,
@@ -114,25 +118,55 @@ def legacy_map_problems(url: str) -> tuple[str, ...]:
     return tuple(problems)
 
 
+def build_declared(database: str) -> str:
+    """A fresh database holding exactly the declaration, built with `METADATA.create_all`."""
+    url = databases.recreate(database)
+    engine = create_engine(sqlalchemy_url(url), poolclass=pool.NullPool)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(f'CREATE SCHEMA "{RESEARCH_SCHEMA}"'))
+            METADATA.create_all(conn)
+    finally:
+        engine.dispose()
+    return url
+
+
+def declared_differences(migrated_url: str, declared_url: str) -> tuple[str, ...]:
+    """Catalog lines only one side has, alembic's version table aside."""
+    migrated = frozenset(line for line in catalog(migrated_url) if f" {_VERSION_TABLE}." not in line)
+    declared = catalog(declared_url)
+    return (
+        *(f"only the migration: {line}" for line in sorted(migrated - declared)),
+        *(f"only the declaration: {line}" for line in sorted(declared - migrated)),
+    )
+
+
 @dataclass(frozen=True)
 class SchemaGateResult:
     facts: int
     metadata_differences: tuple[str, ...]
+    catalog_differences: tuple[str, ...]
     legacy_map_problems: tuple[str, ...]
 
     @property
     def passed(self) -> bool:
-        return not (self.metadata_differences or self.legacy_map_problems)
+        return not (self.metadata_differences or self.catalog_differences or self.legacy_map_problems)
 
 
 def run_schema_gate() -> SchemaGateResult:
     try:
         migrated = databases.build_with_alembic(_MIGRATED)
+        declared = build_declared(_DECLARED)
         legacy = databases.build_with_drizzle(_LEGACY)
-        return SchemaGateResult(len(catalog(migrated)), metadata_differences(migrated), legacy_map_problems(legacy))
+        return SchemaGateResult(
+            len(catalog(migrated)),
+            metadata_differences(migrated),
+            declared_differences(migrated, declared),
+            legacy_map_problems(legacy),
+        )
     finally:
-        databases.drop(_MIGRATED)
-        databases.drop(_LEGACY)
+        for name in (_MIGRATED, _DECLARED, _LEGACY):
+            databases.drop(name)
 
 
 def against_live(url: str) -> tuple[frozenset[str], frozenset[str]]:

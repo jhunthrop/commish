@@ -54,16 +54,24 @@ PRESEASON_PROJECTIONS: Final = Table(
     Index("preseason_projections_as_of_idx", "season", "source", "as_of"),
 )
 
+# A board's reasons belong to the board generation they explain (`as_of`, the generation's stamp in
+# `preseason_projections`), so a frozen board's reasons stay recoverable after a later generation
+# is written. Not a foreign key onto a projection row: a reason can explain why a player is NOT on
+# the board (`roster_status`, the roster gate's exclusions), and such a player has no projection
+# row at that stamp. A reason code can apply to one player more than once with different
+# particulars, so the `detail` that tells them apart is part of the key.
 PRESEASON_BOARD_REASONS: Final = Table(
     "preseason_board_reasons",
     METADATA,
-    Column("source", Text, primary_key=True),
     Column("season", Integer, primary_key=True),
+    Column("source", Text, primary_key=True),
+    Column("as_of", DateTime(True), primary_key=True),
     Column("player_id", Text, primary_key=True),
     Column("code", Text, primary_key=True),
     Column("detail", Text, primary_key=True),
     Column("payload", JSONB, nullable=False),
     _player_fk("preseason_board_reasons"),
+    Index("preseason_board_reasons_board_idx", "season", "source", "as_of"),
 )
 
 REGISTER_FREEZE_ROWS: Final = Table(
@@ -81,8 +89,11 @@ REGISTER_FREEZE_ROWS: Final = Table(
     Column("board_points", Double(53), nullable=False),
     Column("board_rank", Integer, nullable=False),
     Column("board_value_rank", Integer, nullable=False),
-    Column("adp_rank", Double(53)),
-    Column("ecr_rank", Double(53)),
+    # What the market and the panel published for the player at the freeze: ADP is fractional as
+    # published (12.5), and so is a consensus rank. The grade rows' `adp_rank` and `ecr_rank` are
+    # different numbers, the player's ordinal place among the graded, so they are integers there.
+    Column("adp", Double(53)),
+    Column("ecr", Double(53)),
     Column("props_points", Double(53)),
     Column("props_markets", JSONB),
     one_of("implementation", IMPLEMENTATIONS, "register_freeze_rows_implementation_ck"),

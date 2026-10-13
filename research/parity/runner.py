@@ -8,7 +8,8 @@ judged on a cold start alone:
    upsert's conflict branch, every changed-row check, every insert-or-ignore and every
    supersede (the live season's week-one rosters) runs here, against real rows.
 3. `prior` then `later`, on a second pair of empty databases, when the case names an earlier
-   recording: the earlier release lands first and today's lands on top of it.
+   recording: the earlier release lands first and today's lands on top of it, at the case's
+   `later_now` where it names one (the live roster supersede: the earlier claim must be retired).
 
 The databases are diffed after each pass. A pass fails on any differing row, on a declared table
 that is empty on both sides (a vacuous comparison), on the two sides asking for different
@@ -24,7 +25,7 @@ import os
 import subprocess
 import tempfile
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Final
 
@@ -226,7 +227,8 @@ def run_case(harness: Harness, case: Case) -> CaseResult:
         if case.prior_fixture_sets:
             urls = _pair(harness, case, "b")
             passes.append(_pass("prior", case, urls, case.prior_fixture_sets))
-            passes.append(_pass("later", case, urls, case.fixture_sets))
+            later = case if case.later_now is None else replace(case, now=case.later_now)
+            passes.append(_pass("later", later, urls, case.fixture_sets))
     except Exception as failure:  # reported as the case failure, never swallowed
         error = f"{type(failure).__name__}: {failure}"
     finally:

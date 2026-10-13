@@ -32,6 +32,10 @@ from research.pipeline.tank01.ingest import ingest_roster_and_lines
 
 # Before the 2026 opener: the week-one roster is a live season's, and supersedes.
 PRESEASON_NOW = datetime(2026, 8, 20, 12, 0, tzinfo=UTC)
+# A week later, still before the opener: the later week-one roster supersedes the earlier one.
+PRESEASON_LATER_NOW = datetime(2026, 8, 27, 12, 0, tzinfo=UTC)
+# The 2026 weekly roster release with Kansas City's rows removed (derived, see its manifest).
+LATER_ROSTER = "preseason-2026-later"
 _ECR_HEADERS = MappingProxyType({"user-agent": "commish-projection-engine/1.0"})
 
 
@@ -134,13 +138,19 @@ CASES: tuple[Case, ...] = (
     Case(
         name="preseason-2026-live",
         summary="preseason-ingest.ts run as is before the 2026 opener: the live roster supersedes (the rerun "
-        "pass supersedes stored rows), the dated depth chart, the thin gate",
-        fixture_sets=(*BASE, "preseason-2026"),
+        "pass supersedes stored rows; the later pass, a week on and without Kansas City, must retire "
+        "the earlier claim), the dated depth chart, the thin gate",
+        fixture_sets=(*BASE, "preseason-2026", LATER_ROSTER),
         tables=(PRESEASON_ROSTERS, PLAYER_WEEK_OBSERVATIONS, PRESEASON_RANKINGS),
         run_python=PreseasonRun(2026, kdef=False),
         now=PRESEASON_NOW,
         recordings=(_recording(2026),),
         ts_scripts=(Script("research-ts/scripts/preseason-ingest.ts", ("2026", "2026")),),
+        # The supersede under test: the full four-club roster at the earlier clock, then a later
+        # release without Kansas City at a later clock. Retiring the earlier claim is the only
+        # way both sides end with the later rows alone.
+        prior_fixture_sets=(*BASE, "preseason-2026"),
+        later_now=PRESEASON_LATER_NOW,
     ),
     Case(
         name="adp-snapshot",

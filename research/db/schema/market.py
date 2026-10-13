@@ -2,7 +2,7 @@
 
 from typing import Final
 
-from sqlalchemy import REAL, Column, DateTime, Double, ForeignKeyConstraint, Index, Integer, Table, Text
+from sqlalchemy import Column, Date, DateTime, Double, ForeignKeyConstraint, Index, Integer, Table, Text
 
 from research.db.schema._base import METADATA, RESEARCH_SCHEMA, recorded_at
 
@@ -22,7 +22,7 @@ PRESEASON_ROSTERS: Final = Table(
     Column("team", Text, nullable=False),
     Column("position", Text, nullable=False),
     Column("status", Text, nullable=False),
-    Column("birth_date", Text),
+    Column("birth_date", Date),
     Column("draft_year", Integer),
     Column("draft_pick", Integer),
     Column("draft_club", Text),
@@ -51,6 +51,6 @@ ADP_SNAPSHOTS: Final = Table(
     Column("source", Text, primary_key=True),
     Column("captured_at", DateTime(True), primary_key=True),
     Column("format", Text, nullable=False),
-    Column("adp", REAL, nullable=False),
+    Column("adp", Double(53), nullable=False),
     _player_fk("adp_snapshots"),
 )

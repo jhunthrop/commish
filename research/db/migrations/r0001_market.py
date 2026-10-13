@@ -17,7 +17,7 @@ def _adp_snapshots() -> None:
         sa.Column("source", sa.Text(), nullable=False),
         sa.Column("captured_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("format", sa.Text(), nullable=False),
-        sa.Column("adp", sa.REAL(), nullable=False),
+        sa.Column("adp", sa.Double(precision=53), nullable=False),
         sa.ForeignKeyConstraint(
             ["player_id"], ["research.players.id"], name="adp_snapshots_player_fk", ondelete="CASCADE"
         ),
@@ -59,7 +59,7 @@ def _preseason_rosters() -> None:
         sa.Column("team", sa.Text(), nullable=False),
         sa.Column("position", sa.Text(), nullable=False),
         sa.Column("status", sa.Text(), nullable=False),
-        sa.Column("birth_date", sa.Text(), nullable=True),
+        sa.Column("birth_date", sa.Date(), nullable=True),
         sa.Column("draft_year", sa.Integer(), nullable=True),
         sa.Column("draft_pick", sa.Integer(), nullable=True),
         sa.Column("draft_club", sa.Text(), nullable=True),

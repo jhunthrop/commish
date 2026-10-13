@@ -1,31 +1,47 @@
-"""The compared research tables, each with its natural key (its primary key, or for the two
-append-only archives the columns that name one capture). The TypeScript side of each is read out of
-the legacy tables through `research.db.legacy`."""
+"""The compared research tables. Each is keyed by its primary key, read off the schema itself; the
+two append-only archives, whose primary key is an identity draw, are keyed by the columns that name
+one capture instead, and say so. The TypeScript side of each is read out of the legacy tables
+through `research.db.legacy`."""
 
+from sqlalchemy import Table
+
+from research.db import schema
 from research.parity.diff import TableSpec
 
-PLAYERS = TableSpec("players", ("id",))
-PLAYER_WEEK_OBSERVATIONS = TableSpec(
-    "player_week_observations", ("season", "week", "player_id", "source", "metric", "as_of")
-)
-TEAM_WEEK_OBSERVATIONS = TableSpec("team_week_observations", ("season", "week", "team", "source", "metric", "as_of"))
-PLAYER_WEEK_TEAMS = TableSpec("player_week_teams", ("season", "week", "player_id", "team", "as_of"))
-NFLVERSE_INJURIES = TableSpec("nflverse_injuries", ("season", "week", "player_id"))
-NFLVERSE_ROSTER_WEEKS = TableSpec("nflverse_roster_weeks", ("season", "week", "player_id"))
-NFLVERSE_KICKING_WEEKS = TableSpec("nflverse_kicking_weeks", ("season", "week", "player_id"))
-NFLVERSE_TEAM_DEFENSE_WEEKS = TableSpec("nflverse_team_defense_weeks", ("season", "week", "team"))
-NFL_DRAFT_PICKS = TableSpec("nfl_draft_picks", ("season", "pick"))
-PRESEASON_ROSTERS = TableSpec("preseason_rosters", ("season", "player_id", "as_of"))
-PRESEASON_RANKINGS = TableSpec("preseason_rankings", ("season", "source", "player_id", "as_of"))
-PLAYER_CROSSWALK = TableSpec("player_crosswalk", ("provider_player_id",))
-CAPTURE_SNAPSHOTS = TableSpec("capture_snapshots", ("source", "captured_at"))
-ADP_SNAPSHOTS = TableSpec("adp_snapshots", ("player_id", "source", "captured_at"))
+
+def keyed(table: Table) -> TableSpec:
+    """A table compared on its own primary key."""
+    if any(column.identity is not None for column in table.primary_key.columns):
+        raise ValueError(f"{table.name}'s primary key is an identity draw; name the columns that identify a row")
+    return TableSpec(table.name, tuple(column.name for column in table.primary_key.columns))
+
+
+PLAYERS = keyed(schema.PLAYERS)
+PLAYER_WEEK_OBSERVATIONS = keyed(schema.PLAYER_WEEK_OBSERVATIONS)
+TEAM_WEEK_OBSERVATIONS = keyed(schema.TEAM_WEEK_OBSERVATIONS)
+PLAYER_WEEK_TEAMS = keyed(schema.PLAYER_WEEK_TEAMS)
+NFLVERSE_INJURIES = keyed(schema.NFLVERSE_INJURIES)
+NFLVERSE_ROSTER_WEEKS = keyed(schema.NFLVERSE_ROSTER_WEEKS)
+NFLVERSE_KICKING_WEEKS = keyed(schema.NFLVERSE_KICKING_WEEKS)
+NFLVERSE_TEAM_DEFENSE_WEEKS = keyed(schema.NFLVERSE_TEAM_DEFENSE_WEEKS)
+NFL_DRAFT_PICKS = keyed(schema.NFL_DRAFT_PICKS)
+PRESEASON_ROSTERS = keyed(schema.PRESEASON_ROSTERS)
+PRESEASON_RANKINGS = keyed(schema.PRESEASON_RANKINGS)
+PLAYER_CROSSWALK = keyed(schema.PLAYER_CROSSWALK)
+ADP_SNAPSHOTS = keyed(schema.ADP_SNAPSHOTS)
+PROPS_PLAYER_MAP = keyed(schema.PROPS_PLAYER_MAP)
+COACHES = keyed(schema.COACHES)
+PROVIDER_PLAYERS = keyed(schema.PROVIDER_PLAYERS)
+PROVIDER_GAMES = keyed(schema.PROVIDER_GAMES)
+PROVIDER_STAT_LINES = keyed(schema.PROVIDER_STAT_LINES)
+PROVIDER_WEEKS = keyed(schema.PROVIDER_WEEKS)
+
+# Identity-keyed archives: one capture is a feed at an instant.
+CAPTURE_SNAPSHOTS = TableSpec(schema.CAPTURE_SNAPSHOTS.name, ("source", "captured_at"))
+# A plain insert that may legitimately hold identical rows (an event's props fetched twice), so the
+# rows under one key compare as multisets.
 PLAYER_PROP_OBSERVATIONS = TableSpec(
-    "player_prop_observations", ("event_id", "bookmaker", "market", "player_name", "fetched_at")
+    schema.PLAYER_PROP_OBSERVATIONS.name,
+    ("event_id", "bookmaker", "market", "player_name", "point", "fetched_at"),
+    unique=False,
 )
-PROPS_PLAYER_MAP = TableSpec("props_player_map", ("prop_name", "season"))
-COACHES = TableSpec("coaches", ("season", "team", "role", "start_week"))
-PROVIDER_PLAYERS = TableSpec("provider_players", ("id",))
-PROVIDER_GAMES = TableSpec("provider_games", ("game_id",))
-PROVIDER_STAT_LINES = TableSpec("provider_stat_lines", ("provider_player_id", "week"))
-PROVIDER_WEEKS = TableSpec("provider_weeks", ("week",))

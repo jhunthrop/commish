@@ -185,8 +185,14 @@ class KickoffGate:
     first_kickoff: datetime | None
 
 
-def run_props_preseason_snapshot(conn: Connection, fetcher: Fetcher, api_key: str, gate: KickoffGate) -> str:
-    """The props-preseason-snapshot job: capture then resolve, both strictly before the first kickoff."""
+def run_props_preseason_snapshot(
+    conn: Connection, fetcher: Fetcher, api_key: str, gate: KickoffGate, now: datetime
+) -> str:
+    """The props-preseason-snapshot job: capture then resolve, both strictly before the first kickoff.
+
+    Two instants, as in `snapshotPreseasonProps`: the GATE reads the schedule's fire (`gate.fired_at`,
+    stable across retries of one fire), while the snapshot's fourteen-day window reads the clock at
+    the moment it runs (`now`; the TypeScript's `runOddsSnapshot` reads `new Date()`)."""
     fired_at, season, first_kickoff = gate.fired_at, gate.season, gate.first_kickoff
     if first_kickoff is None:
         return f"{season} has no ingested schedule yet; skipping (no network call made)"
@@ -194,6 +200,6 @@ def run_props_preseason_snapshot(conn: Connection, fetcher: Fetcher, api_key: st
         return (
             f"{season} kicked off at {js_iso(first_kickoff)}; the pre-kickoff window is closed (no network call made)"
         )
-    summary = run_odds_snapshot(conn, fetcher, api_key, fired_at)
+    summary = run_odds_snapshot(conn, fetcher, api_key, now)
     resolve_all_prop_names(conn)
     return f"fetched {summary.total_events} event(s), wrote {summary.total_written}"

@@ -6,7 +6,7 @@ no row repeats it in a `source` column.
 
 from typing import Final
 
-from sqlalchemy import REAL, CheckConstraint, Column, DateTime, ForeignKeyConstraint, Index, Integer, Table, Text
+from sqlalchemy import CheckConstraint, Column, DateTime, Double, ForeignKeyConstraint, Index, Integer, Table, Text
 
 from research.db.schema._base import METADATA, RESEARCH_SCHEMA, one_of, recorded_at
 
@@ -107,7 +107,7 @@ NFLVERSE_TEAM_DEFENSE_WEEKS: Final = Table(
     Column("week", Integer, primary_key=True),
     Column("team", Text, primary_key=True),
     Column("opponent_team", Text, nullable=False),
-    Column("def_sacks", REAL, nullable=False),
+    Column("def_sacks", Double(53), nullable=False),
     *(Column(name, Integer, nullable=False) for name in DEFENSE_COUNT_COLUMNS),
     Column("points_allowed", Integer),
     Column("sack_yards_lost_allowed", Integer),

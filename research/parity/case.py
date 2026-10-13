@@ -76,3 +76,7 @@ class Case:
     # first and then on `fixture_sets`, so the later release's upserts, supersedes and
     # changed-row checks are compared against a real earlier state.
     prior_fixture_sets: tuple[str, ...] = ()
+    # The clock of the `later` pass, when it must differ from `now`: a supersede keyed by the
+    # instant it ran (the live season's week-one roster) is only tested against a real earlier
+    # claim when the later capture is stamped later, so retiring the earlier rows is observable.
+    later_now: datetime | None = None

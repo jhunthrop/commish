@@ -52,8 +52,9 @@ def _player_capsules() -> None:
 def _preseason_board_reasons() -> None:
     op.create_table(
         "preseason_board_reasons",
-        sa.Column("source", sa.Text(), nullable=False),
         sa.Column("season", sa.Integer(), nullable=False),
+        sa.Column("source", sa.Text(), nullable=False),
+        sa.Column("as_of", sa.DateTime(timezone=True), nullable=False),
         sa.Column("player_id", sa.Text(), nullable=False),
         sa.Column("code", sa.Text(), nullable=False),
         sa.Column("detail", sa.Text(), nullable=False),
@@ -61,7 +62,14 @@ def _preseason_board_reasons() -> None:
         sa.ForeignKeyConstraint(
             ["player_id"], ["research.players.id"], name="preseason_board_reasons_player_fk", ondelete="CASCADE"
         ),
-        sa.PrimaryKeyConstraint("source", "season", "player_id", "code", "detail"),
+        sa.PrimaryKeyConstraint("season", "source", "as_of", "player_id", "code", "detail"),
+        schema="research",
+    )
+    op.create_index(
+        "preseason_board_reasons_board_idx",
+        "preseason_board_reasons",
+        ["season", "source", "as_of"],
+        unique=False,
         schema="research",
     )
 
@@ -114,8 +122,8 @@ def _register_freeze_rows() -> None:
         sa.Column("board_points", sa.Double(precision=53), nullable=False),
         sa.Column("board_rank", sa.Integer(), nullable=False),
         sa.Column("board_value_rank", sa.Integer(), nullable=False),
-        sa.Column("adp_rank", sa.Double(precision=53), nullable=True),
-        sa.Column("ecr_rank", sa.Double(precision=53), nullable=True),
+        sa.Column("adp", sa.Double(precision=53), nullable=True),
+        sa.Column("ecr", sa.Double(precision=53), nullable=True),
         sa.Column("props_points", sa.Double(precision=53), nullable=True),
         sa.Column("props_markets", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.CheckConstraint("implementation IN ('typescript', 'python')", name="register_freeze_rows_implementation_ck"),

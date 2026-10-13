@@ -8,11 +8,13 @@ Revision 1 is the whole schema `research.db.schema` declares, created from nothi
 history before it (the founder's ruling of 2026-10-12: rip and replace, no migration debt). The
 DDL is split by table group under `research.db.migrations`, and the groups run in foreign-key
 order: identity first, because every other group references `players` or `provider_players`.
-Downgrade drops the schema whole.
+Downgrade drops the schema whole, and refuses while the register holds rows.
 """
 
 from collections.abc import Sequence
+from typing import Final
 
+import sqlalchemy as sa
 from alembic import op
 
 from research.db.migrations import (
@@ -36,6 +38,19 @@ def upgrade() -> None:
         group.create()
 
 
+# The register is the 2026 held-out record: no downgrade may drop it.
+_PROTECTED: Final = ("register_freeze_rows", "register_grade_rows")
+
+
 def downgrade() -> None:
+    """Drops the schema whole, and refuses while the register holds a single row."""
+    bind = op.get_bind()
+    for table in _PROTECTED:
+        rows = bind.execute(sa.text(f'SELECT count(*) FROM "{RESEARCH_SCHEMA}"."{table}"')).scalar_one()
+        if rows:
+            raise RuntimeError(
+                f"refusing to drop the {RESEARCH_SCHEMA} schema: {table} holds {rows} row(s) of the register, "
+                "the 2026 held-out record. Export it and empty it by hand first if this is really meant."
+            )
     # The version table lives in the schema too; alembic recreates it on the next upgrade.
     op.execute(f'DROP SCHEMA "{RESEARCH_SCHEMA}" CASCADE')

@@ -8,7 +8,7 @@ ids in `provider_players`, because that is how the provider names people, and
 
 from typing import Final
 
-from sqlalchemy import REAL, CheckConstraint, Column, DateTime, ForeignKeyConstraint, Index, Integer, Table, Text
+from sqlalchemy import CheckConstraint, Column, DateTime, Double, ForeignKeyConstraint, Index, Integer, Table, Text
 
 from research.db.schema._base import METADATA, POSITIONS, RESEARCH_SCHEMA, one_of, recorded_at
 
@@ -34,7 +34,7 @@ PROVIDER_PLAYERS: Final = Table(
     Column("name", Text, nullable=False),
     Column("position", Text, nullable=False),
     Column("team", Text, nullable=False),
-    Column("adp", REAL),
+    Column("adp", Double(53)),
     Column("pos_adp", Text),
     Column("headshot_url", Text),
     one_of("position", POSITIONS, "provider_players_position_ck"),

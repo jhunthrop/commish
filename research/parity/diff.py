@@ -29,7 +29,6 @@ from research.db.schema import METADATA, RESEARCH_SCHEMA
 
 # Bookkeeping columns Postgres fills with now(); neither implementation writes them.
 DATABASE_STAMPED: Final = frozenset({"ingested_at", "created_at", "computed_at", "published_at", "generated_at"})
-_SHOWN_LINES: Final = 20
 
 Value = object
 Key = tuple[Value, ...]
@@ -159,12 +158,6 @@ def _ordered(rows: list[Row], columns: Sequence[str]) -> list[Row]:
     return sorted(rows, key=lambda row: repr([row[c] for c in columns]))
 
 
-def _shown(lines: list[str]) -> tuple[str, ...]:
-    if len(lines) <= _SHOWN_LINES:
-        return tuple(lines)
-    return (*lines[:_SHOWN_LINES], f"... {len(lines) - _SHOWN_LINES} more")
-
-
 def _compare_key(
     key: Key,
     rows: tuple[list[Row], list[Row]],
@@ -208,8 +201,8 @@ def diff_table(ts_url: str, py_url: str, spec: TableSpec) -> TableDiff:
         setup=spec.setup,
         ts_rows=len(ts_rows),
         py_rows=len(py_rows),
-        only_ts=_shown(out.only_ts),
-        only_py=_shown(out.only_py),
-        differing=_shown(out.differing),
-        duplicate_keys=_shown(out.duplicate_keys),
+        only_ts=tuple(out.only_ts),
+        only_py=tuple(out.only_py),
+        differing=tuple(out.differing),
+        duplicate_keys=tuple(out.duplicate_keys),
     )

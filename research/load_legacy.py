@@ -8,8 +8,17 @@ the Neon `commish` database. The source is opened read only. Every research tabl
 its legacy counterpart through `research.db.legacy`, in foreign-key order, inside ONE target
 transaction: a load that fails anywhere leaves the target exactly as it was.
 
+THE SOURCE IS READ FROM ONE SNAPSHOT: a single REPEATABLE READ, READ ONLY transaction holds for
+the whole load, so every table is copied as of the same moment even if a legacy writer runs; a
+snapshot that cannot be held fails the load with `SnapshotError` and nothing is written. The
+legacy writers (the Vercel cron's jobs) are still stopped before the cutover load.
+
 Before a table is copied, its legacy entry must account for every legacy column (read, or dropped
-with a reason), and a column dropped as a constant must hold only that constant. After, the
+with a reason), a column dropped as a constant must hold only that constant, and every invariant a
+derivation relies on must hold. One of those is how a board's reasons find their board: a legacy
+reason carries no stamp, so it takes the one `as_of` generation its `(season, source)` holds in
+`preseason_projections` (the TypeScript deleted and replaced the two together), and the load
+refuses if any `(season, source)` holds more than one. After, the
 manifest prints, per table, the legacy row count, the rows kept by design, and the rows that
 landed. A table whose landed count differs from its legacy count fails the load unless its entry
 keeps rows by a stated filter, and then the landed count must equal the filtered count exactly.
@@ -25,6 +34,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 import psycopg
+from psycopg import IsolationLevel
+from psycopg.errors import SerializationFailure, SnapshotTooOld
 from sqlalchemy import Table
 
 from research.db.legacy import LEGACY_SCHEMA, LEGACY_TABLES, NOT_CARRIED, LegacyTable, check_complete
@@ -39,6 +50,24 @@ _READ_ONLY = "-c default_transaction_read_only=on"
 
 class LoadError(ResearchError):
     """The load refused or failed; the target transaction was rolled back."""
+
+
+class SnapshotError(LoadError):
+    """The source could not be read from one snapshot: the copy would not be of one moment."""
+
+
+def _open_snapshot(source: psycopg.Connection) -> None:
+    """One REPEATABLE READ, READ ONLY transaction on the source for the whole load: every count,
+    COPY and fingerprint of every table reads the same snapshot, so the copy is of one moment even
+    while the legacy writers run (they should still be stopped for the cutover, README)."""
+    source.isolation_level = IsolationLevel.REPEATABLE_READ
+    source.read_only = True
+    source.execute("set timezone = 'UTC'")
+    row = source.execute("select current_setting('transaction_isolation')").fetchone()
+    if row is None or row[0] != "repeatable read":
+        raise SnapshotError(
+            f"the source transaction runs at {row[0] if row else 'an unknown level'}, not repeatable read"
+        )
 
 
 @dataclass(frozen=True)
@@ -83,6 +112,10 @@ def _check_entry(source: psycopg.Connection, entry: LegacyTable) -> None:
         ).fetchone()
         if others is None or others[0] != 0:
             raise LoadError(f"{entry.legacy}.{column} is dropped as the constant {dropped.constant!r} but holds others")
+    for invariant in entry.invariants:
+        broken = _count(source, entry.violations_sql(invariant))
+        if broken:
+            raise LoadError(f"{entry.legacy}: {broken} row(s) break the invariant the map relies on ({invariant.why})")
 
 
 def _count(conn: psycopg.Connection, sql: str) -> int:
@@ -149,11 +182,15 @@ def load(source_url: str, target_url: str, replace: bool) -> list[ManifestRow]:
         psycopg.connect(_libpq(target_url)) as target,
     ):
         _prepare_target(target, replace)
-        # Pinned so the text COPY renders instants identically on both sides.
-        source.execute("set timezone = 'UTC'")
+        # UTC on both sides so the text COPY renders instants identically.
+        _open_snapshot(source)
         target.execute("set timezone = 'UTC'")
-        for table in METADATA.sorted_tables:
-            manifest.append(_load_table(source, target, table))
+        try:
+            for table in METADATA.sorted_tables:
+                manifest.append(_load_table(source, target, table))
+        except (SerializationFailure, SnapshotTooOld) as lost:
+            target.rollback()
+            raise SnapshotError(f"the source snapshot could not be held ({lost}); nothing was written") from lost
         failed = [row.table for row in manifest if not row.explained]
         if failed:
             target.rollback()

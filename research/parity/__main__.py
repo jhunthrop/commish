@@ -57,6 +57,8 @@ def _schema(against: str | None) -> int:
     _print(f"schema: {result.facts} catalog facts in the migrated research schema")
     for line in result.metadata_differences:
         _print(f"  migration against the declared schema: {line}")
+    for line in result.catalog_differences:
+        _print(f"  catalog, migration against declaration: {line}")
     for line in result.legacy_map_problems:
         _print(f"  legacy map: {line}")
     _print("schema: match" if result.passed else "schema: DIFFERENT")

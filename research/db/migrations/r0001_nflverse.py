@@ -45,7 +45,7 @@ def _nflverse_team_defense_weeks() -> None:
         sa.Column("week", sa.Integer(), nullable=False),
         sa.Column("team", sa.Text(), nullable=False),
         sa.Column("opponent_team", sa.Text(), nullable=False),
-        sa.Column("def_sacks", sa.REAL(), nullable=False),
+        sa.Column("def_sacks", sa.Double(precision=53), nullable=False),
         sa.Column("def_interceptions", sa.Integer(), nullable=False),
         sa.Column("fumble_recovery_opp", sa.Integer(), nullable=False),
         sa.Column("def_tds", sa.Integer(), nullable=False),

@@ -133,9 +133,15 @@ def schedule_week_as_of(client: NflverseClient, seasons: Sequence[int]) -> dict[
 
 
 def _week_as_of(
-    snap_counts: Sequence[CsvRow], schedule_as_of: Mapping[float, datetime] | None
+    season: int, snap_counts: Sequence[CsvRow], schedule_as_of: Mapping[float, datetime] | None
 ) -> dict[float, datetime]:
     """Each week's as-of: the snap-count publication where there is one, else the schedule's."""
+    if not snap_counts and schedule_as_of is None:
+        raise ValueError(
+            f"nflverse has no snap counts for {season} and no schedule-derived week as-ofs were supplied, so its "
+            f"stat lines cannot be dated. Pass scheduleWeekAsOf([...]).get({season}) for seasons at or below "
+            "SNAP_COUNT_ASSET_FLOOR."
+        )
     return {
         **(dict(schedule_as_of) if schedule_as_of is not None else {}),
         **week_as_of_from_snap_counts(snap_counts, PUBLICATION_LAG_HOURS),
@@ -172,25 +178,17 @@ def ingest_season(
     """`ingestSeason`: participation, stat lines, team edges and line continuity for one season."""
     snap_counts = _fetch_snap_counts(client, season)
     player_week = _fetch_player_week(client, season)
-    if not snap_counts and schedule_as_of is None:
-        raise ValueError(
-            f"nflverse has no snap counts for {season} and no schedule-derived week as-ofs were supplied, so its "
-            f"stat lines cannot be dated. Pass scheduleWeekAsOf([...]).get({season}) for seasons at or below "
-            "SNAP_COUNT_ASSET_FLOOR."
-        )
-    week_as_of = _week_as_of(snap_counts, schedule_as_of)
-
+    week_as_of = _week_as_of(season, snap_counts, schedule_as_of)
     participation = map_participation(snap_counts, player_week, universe)
     stat_lines = map_stat_lines(player_week, week_as_of, universe)
+    # With no player-week release its participation rows are false zeros: not written, and retracted.
     participation_rows = [
         row
         for row in participation_observations(participation.participation)
         if player_week or row.source != NflverseSource.PLAYER_WEEK
     ]
-
     if not player_week:
         _retract_false_zeros(conn, season)
-
     written = record_observations(conn, participation_rows) + record_observations(
         conn, stat_line_observations(stat_lines.stat_lines)
     )

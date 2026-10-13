@@ -36,7 +36,7 @@ def _provider_players() -> None:
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("position", sa.Text(), nullable=False),
         sa.Column("team", sa.Text(), nullable=False),
-        sa.Column("adp", sa.REAL(), nullable=True),
+        sa.Column("adp", sa.Double(precision=53), nullable=True),
         sa.Column("pos_adp", sa.Text(), nullable=True),
         sa.Column("headshot_url", sa.Text(), nullable=True),
         sa.CheckConstraint("position IN ('QB', 'RB', 'WR', 'TE', 'K', 'DEF')", name="provider_players_position_ck"),

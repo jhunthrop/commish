@@ -9,7 +9,7 @@ one at or before the cutoff.
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Literal
 
 from research.errors import SchemaDriftError
@@ -69,11 +69,16 @@ class PreseasonRosterEntry:
     player_id: str
     position: str
     status: RosterStatus
-    birth_date: str | None
+    birth_date: date | None
     draft_year: int | None
     draft_pick: int | None
     draft_club: str | None
     as_of: datetime
+
+
+def _iso_date(raw: str | None) -> date | None:
+    """nflverse's `YYYY-MM-DD` as a date; anything else is a changed release, and refused."""
+    return None if raw is None else date.fromisoformat(raw)
 
 
 def _text(row: CsvRow, column: str) -> str | None:
@@ -114,7 +119,7 @@ def map_week1_rosters(rows: Sequence[CsvRow], season: int, as_of: datetime) -> l
             player_id=player_id,
             position=position,
             status=roster_status_of(_text(row, "status") or ""),
-            birth_date=_text(row, "birth_date"),
+            birth_date=_iso_date(_text(row, "birth_date")),
             draft_year=entry_year if entry_year is not None else _whole(row, "rookie_year", 1936),
             draft_pick=_whole(row, "draft_number", 1),
             draft_club=_text(row, "draft_club"),

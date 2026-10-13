@@ -9,6 +9,7 @@ repetition.
 
 import sys
 from collections.abc import Sequence
+from typing import Final
 
 from research.parity.runner import CaseResult, PassResult
 
@@ -33,6 +34,16 @@ def _pass_lines(result: CaseResult, run: PassResult) -> None:
         _print(f"{result.case.name:<28} {run.name:<6} exit statuses differ: ts={run.ts.statuses} py={run.py.statuses}")
 
 
+# Every difference is counted; only the first few of each table are spelled out.
+_SHOWN_LINES: Final = 20
+
+
+def _shown(lines: list[str]) -> list[str]:
+    if len(lines) <= _SHOWN_LINES:
+        return lines
+    return [*lines[:_SHOWN_LINES], f"... {len(lines) - _SHOWN_LINES} more"]
+
+
 def _details(results: Sequence[CaseResult]) -> None:
     for result in results:
         for run in result.passes:
@@ -44,7 +55,7 @@ def _details(results: Sequence[CaseResult]) -> None:
                     *(f"only py: {k}" for k in diff.only_py),
                     *diff.differing,
                 ]
-                for line in lines:
+                for line in _shown(lines):
                     _print(f"  {result.case.name} {run.name} {diff.table}: {line}")
 
 

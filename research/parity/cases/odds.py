@@ -12,8 +12,14 @@ from research.parity.case import Case, Recording, RunContext, Script
 from research.parity.cases.nflverse_season import NOW
 from research.parity.cases.preseason import PRESEASON_NOW
 from research.parity.cases.steps import cli, schedule, universe
-from research.parity.cases.tables import PLAYERS, PROPS_PLAYER_MAP, TEAM_WEEK_OBSERVATIONS
-from research.parity.diff import TableSpec
+from research.parity.cases.tables import (
+    PLAYER_PROP_OBSERVATIONS as PROP_OBSERVATIONS,
+)
+from research.parity.cases.tables import (
+    PLAYERS,
+    PROPS_PLAYER_MAP,
+    TEAM_WEEK_OBSERVATIONS,
+)
 from research.parity.record import RecordSpec
 from research.parity.replay import FIXTURES_ROOT, ReplayFetcher
 from research.pipeline.http import Fetcher
@@ -36,11 +42,6 @@ from research.pipeline.preseason.ingest import first_kickoff_for
 
 REPLAY_KEY = "replay"
 BACKFILL_SEASON = 2025
-PROP_OBSERVATIONS = TableSpec(
-    "player_prop_observations",
-    ("event_id", "bookmaker", "market", "player_name", "point", "fetched_at"),
-    unique=False,
-)
 
 
 def _key() -> str:
@@ -119,13 +120,13 @@ def _snapshot_and_resolve(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
 
 
 def _preseason_job(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
-    """The props-preseason-snapshot job (`snapshotPreseasonProps`) before the 2026 opener: the
-    kickoff gate open, the snapshot (nothing within fourteen days of August 20 in this October
-    recording, so no event odds), then the archive-wide resolve."""
+    """The props-preseason-snapshot job (`snapshotPreseasonProps`) fired before the 2026 opener
+    (`firedAt` August 20, so the gate is open) and running at the recording's clock, so the snapshot
+    takes the recorded fourteen-day window and the resolve maps every name it wrote."""
     universe(conn, ctx)
     schedule(conn, ctx, [2026])
-    gate = KickoffGate(ctx.now, 2026, first_kickoff_for(conn, 2026))
-    run_props_preseason_snapshot(conn, ctx.fetcher, REPLAY_KEY, gate)
+    gate = KickoffGate(PRESEASON_NOW, 2026, first_kickoff_for(conn, 2026))
+    run_props_preseason_snapshot(conn, ctx.fetcher, REPLAY_KEY, gate, ctx.now)
     return ()
 
 
@@ -148,11 +149,11 @@ CASES: tuple[Case, ...] = (
     ),
     Case(
         name="props-preseason-job",
-        summary="the props-preseason-snapshot job before the opener: the gate, an empty window, the resolve",
+        summary="the props-preseason-snapshot job fired before the opener: the gate, the snapshot, the resolve",
         fixture_sets=("nflverse-universe", "nflverse-schedule", "odds-snapshot-2026-10-12"),
-        tables=(PLAYERS.as_setup(), TEAM_WEEK_OBSERVATIONS.as_setup()),
+        tables=(PLAYERS.as_setup(), TEAM_WEEK_OBSERVATIONS.as_setup(), PROP_OBSERVATIONS, PROPS_PLAYER_MAP),
         run_python=_preseason_job,
-        now=PRESEASON_NOW,
+        now=NOW,
     ),
     Case(
         name="odds-backfill",

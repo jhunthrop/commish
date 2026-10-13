@@ -204,10 +204,13 @@ def capture_once(
     return CaptureResult([*skipped, *(_capture_feed(conn, client, feed, context, capture.captured_at) for feed in due)])
 
 
-def current_nfl_week(conn: Connection) -> int:
+def current_nfl_week(conn: Connection, season: int) -> int:
     """`currentNflWeek`: the earliest week not yet final, or week 1 when the table is empty."""
     query = (
-        select(PROVIDER_WEEKS.c.week).where(PROVIDER_WEEKS.c.status != "final").order_by(PROVIDER_WEEKS.c.week).limit(1)
+        select(PROVIDER_WEEKS.c.week)
+        .where(PROVIDER_WEEKS.c.season == season, PROVIDER_WEEKS.c.status != "final")
+        .order_by(PROVIDER_WEEKS.c.week)
+        .limit(1)
     )
     week = conn.execute(query).scalar_one_or_none()
     return 1 if week is None else int(week)
@@ -215,5 +218,5 @@ def current_nfl_week(conn: Connection) -> int:
 
 def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: datetime, season: int) -> CaptureResult:
     """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys."""
-    capture = CapturePass(fired_at, season, current_nfl_week(conn), feeds=harvest_feeds())
+    capture = CapturePass(fired_at, season, current_nfl_week(conn, season), feeds=harvest_feeds())
     return capture_once(conn, client, capture, FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET))
