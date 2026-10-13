@@ -45,7 +45,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 env:
   IMAGE: ${{ vars.GCP_ARTIFACT_REPO }}/research:${{ github.sha }}
-  RUNTIME_SA: research-runtime@trycommish.iam.gserviceaccount.com
+  # The advisor's own identity: no Secret Manager, database or project role at all, so code
+  # running in the advisor can read nothing (research-runtime, which holds secretAccessor, is the
+  # nightly job's).
+  ADVISOR_SA: advisor-runtime@trycommish.iam.gserviceaccount.com
   # The api and room services' identity, the only callers the advisor admits.
   CALLER_SA: api-runtime@trycommish.iam.gserviceaccount.com
 jobs:
@@ -158,13 +161,19 @@ jobs:
       - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
         with: { project_id: '${{ vars.GCP_PROJECT }}' }
 
-        # THE ADVISOR (spec §2.3): called only by api and room, never by a browser. Internal
-        # ingress, and the invoker IAM check on: a caller needs the internal network path and an
-        # identity token for this service, and only api-runtime holds the invoker role. It reads
-        # no table and calls no provider (the room sends the whole pool with each call), so it
-        # mounts no secret; the nightly job is the image's command that reads RESEARCH_DATABASE_URL
-        # and AI_GATEWAY_API_KEY. Two processes on two vCPUs (ADVISOR_WORKERS), four calls an
-        # instance at once, ready only after a warm-up call (/readyz).
+        # THE ADVISOR (spec §2.3): called only by api and room, never by a browser.
+        # Ingress all behind IAM: the invoker check is on and only api-runtime holds the invoker
+        # role, so a call needs a Google identity token for this service minted by that account.
+        # Not internal ingress: api and room have no VPC egress, so an internal-only service would
+        # be unreachable from them; IAM, not the network path, is the gate.
+        # It runs as advisor-runtime, which holds no role: it reads no table and calls no provider
+        # (the room sends the whole pool with each call), so it mounts no secret and can read
+        # none; the nightly job is the image's command that reads RESEARCH_DATABASE_URL and
+        # AI_GATEWAY_API_KEY, as research-runtime.
+        # Two processes on two vCPUs (ADVISOR_WORKERS), four calls an instance at once, ready only
+        # after a warm-up call (/readyz). ADVISOR_MIN_INSTANCES is 1 in season (July through
+        # September, with the room's ROOM_MIN_INSTANCES) so the first room after an idle spell
+        # never waits on a cold start past the rooms' ADVISOR_TIMEOUT_MS, and 0 otherwise.
       - uses: google-github-actions/deploy-cloudrun@251330ba9a8a34bfbc1622895f42e1d53fd14522 # v2.7.6
         id: advisor
         with:
@@ -174,8 +183,9 @@ jobs:
           env_vars: ADVISOR_WORKERS=2
           env_vars_update_strategy: overwrite
           flags: >-
-            --service-account=${{ env.RUNTIME_SA }} --ingress=internal --no-allow-unauthenticated
-            --cpu=2 --memory=1Gi --concurrency=4 --min-instances=0 --max-instances=10
+            --service-account=${{ env.ADVISOR_SA }} --ingress=all --no-allow-unauthenticated
+            --cpu=2 --memory=1Gi --concurrency=4 --min-instances=${{ vars.ADVISOR_MIN_INSTANCES || '0' }}
+            --max-instances=10
             --cpu-boost --timeout=10 --port=8080
             --startup-probe=httpGet.path=/readyz,httpGet.port=8080,periodSeconds=2,failureThreshold=30,timeoutSeconds=2
             --liveness-probe=httpGet.path=/healthz,httpGet.port=8080,periodSeconds=30,timeoutSeconds=2
