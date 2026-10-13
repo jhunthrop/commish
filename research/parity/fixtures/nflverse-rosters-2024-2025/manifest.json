@@ -1,0 +1,27 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "The weekly roster release for 2024 and 2025, narrowed to four clubs' every row (every status a club's roster emits, every week).",
+  "responses": [
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/weekly_rosters/roster_weekly_2024.csv",
+      "status": 200,
+      "file": "roster_weekly_2024.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "rows whose team is one of BAL, BUF, HOU, KC",
+      "bytes": 2030458
+    },
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/weekly_rosters/roster_weekly_2025.csv",
+      "status": 200,
+      "file": "roster_weekly_2025.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "rows whose team is one of BAL, BUF, HOU, KC",
+      "bytes": 1974788
+    }
+  ]
+}

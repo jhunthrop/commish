@@ -1,0 +1,47 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "The modern per-player and per-team weekly releases for 2024 and 2025: the team file whole, the player file narrowed to every kicker plus four clubs.",
+  "responses": [
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_2024.csv",
+      "status": 200,
+      "file": "stats_player_week_2024.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "rows whose position is K, plus every row whose team is one of BAL, BUF, HOU, KC (so the kicker filter has non-kickers to refuse)",
+      "bytes": 1397551
+    },
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_2025.csv",
+      "status": 200,
+      "file": "stats_player_week_2025.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "rows whose position is K, plus every row whose team is one of BAL, BUF, HOU, KC (so the kicker filter has non-kickers to refuse)",
+      "bytes": 1327714
+    },
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/stats_team/stats_team_week_2024.csv",
+      "status": 200,
+      "file": "stats_team_week_2024.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 229712
+    },
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/stats_team/stats_team_week_2025.csv",
+      "status": 200,
+      "file": "stats_team_week_2025.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 229660
+    }
+  ]
+}

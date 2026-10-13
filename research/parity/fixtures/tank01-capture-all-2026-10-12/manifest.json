@@ -1,0 +1,427 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "Every Tank01 capture feed for a Monday (the game-day feeds due), recorded from the live API: the 32 team rosters, depth charts, changelog, news, the day's betting odds and DFS salaries, ADP, week-1 projections, injuries by date, week-1 inactives and the player list.",
+  "responses": [
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=ARI",
+      "status": 200,
+      "file": "tank01_injuries_ARI.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 60185
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=ATL",
+      "status": 200,
+      "file": "tank01_injuries_ATL.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 64981
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=BAL",
+      "status": 200,
+      "file": "tank01_injuries_BAL.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 61610
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=BUF",
+      "status": 200,
+      "file": "tank01_injuries_BUF.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 64338
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=CAR",
+      "status": 200,
+      "file": "tank01_injuries_CAR.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 60542
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=CHI",
+      "status": 200,
+      "file": "tank01_injuries_CHI.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 63825
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=CIN",
+      "status": 200,
+      "file": "tank01_injuries_CIN.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 59677
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=CLE",
+      "status": 200,
+      "file": "tank01_injuries_CLE.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 65650
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=DAL",
+      "status": 200,
+      "file": "tank01_injuries_DAL.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 59108
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=DEN",
+      "status": 200,
+      "file": "tank01_injuries_DEN.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 64598
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=DET",
+      "status": 200,
+      "file": "tank01_injuries_DET.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 64573
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=GB",
+      "status": 200,
+      "file": "tank01_injuries_GB.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 61684
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=HOU",
+      "status": 200,
+      "file": "tank01_injuries_HOU.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 62854
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=IND",
+      "status": 200,
+      "file": "tank01_injuries_IND.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 60023
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=JAX",
+      "status": 200,
+      "file": "tank01_injuries_JAX.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 61835
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=KC",
+      "status": 200,
+      "file": "tank01_injuries_KC.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 60268
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=LAC",
+      "status": 200,
+      "file": "tank01_injuries_LAC.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 61905
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=LAR",
+      "status": 200,
+      "file": "tank01_injuries_LAR.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 59684
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=LV",
+      "status": 200,
+      "file": "tank01_injuries_LV.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 63378
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=MIA",
+      "status": 200,
+      "file": "tank01_injuries_MIA.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 63159
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=MIN",
+      "status": 200,
+      "file": "tank01_injuries_MIN.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 62050
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=NE",
+      "status": 200,
+      "file": "tank01_injuries_NE.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 62661
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=NO",
+      "status": 200,
+      "file": "tank01_injuries_NO.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 65551
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=NYG",
+      "status": 200,
+      "file": "tank01_injuries_NYG.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 61228
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=NYJ",
+      "status": 200,
+      "file": "tank01_injuries_NYJ.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 61667
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=PHI",
+      "status": 200,
+      "file": "tank01_injuries_PHI.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 62670
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=PIT",
+      "status": 200,
+      "file": "tank01_injuries_PIT.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 64188
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=SEA",
+      "status": 200,
+      "file": "tank01_injuries_SEA.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 61177
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=SF",
+      "status": 200,
+      "file": "tank01_injuries_SF.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 65715
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=TB",
+      "status": 200,
+      "file": "tank01_injuries_TB.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 59747
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=TEN",
+      "status": 200,
+      "file": "tank01_injuries_TEN.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 60665
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeamRoster?getStats=false&teamAbv=WSH",
+      "status": 200,
+      "file": "tank01_injuries_WSH.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 61013
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLDepthCharts",
+      "status": 200,
+      "file": "tank01_depth_charts.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 92477
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLChangelog",
+      "status": 200,
+      "file": "tank01_changelog.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 9153
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLNews?fantasyNews=true",
+      "status": 200,
+      "file": "tank01_news.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 9197
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBettingOdds?gameDate=20261012",
+      "status": 200,
+      "file": "tank01_betting_odds.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 2323
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLDFS?date=20261012",
+      "status": 200,
+      "file": "tank01_dfs_salaries.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 229457
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLADP?adpType=PPR",
+      "status": 200,
+      "file": "tank01_adp.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 53732
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLProjections?week=1",
+      "status": 200,
+      "file": "tank01_projections.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 216117
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLInjuriesByDate",
+      "status": 200,
+      "file": "tank01_injuries_by_date.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 56687
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLInactiveList?week=1",
+      "status": 200,
+      "file": "tank01_inactives.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 111618
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLPlayerList",
+      "status": 200,
+      "file": "tank01_player_list.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 4400358
+    }
+  ]
+}

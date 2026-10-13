@@ -1,0 +1,17 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "nflverse/nfldata's games.csv, unfiltered: every game back to 1999.",
+  "responses": [
+    {
+      "url": "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv",
+      "status": 200,
+      "file": "games.csv.gz",
+      "headers": {
+        "content-type": "text/plain; charset=utf-8"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 2184053
+    }
+  ]
+}

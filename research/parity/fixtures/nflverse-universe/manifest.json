@@ -1,0 +1,17 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "The whole nflverse players release, unfiltered: every person back to 1999. The universe decides who resolves in every nflverse case, so a slice here would change resolution everywhere downstream.",
+  "responses": [
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/players/players.csv",
+      "status": 200,
+      "file": "players.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 7302710
+    }
+  ]
+}

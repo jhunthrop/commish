@@ -1,0 +1,27 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "The 2025 snap-count and weekly-stats assets as the release serves them (a 404 is recorded as a 404).",
+  "responses": [
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/snap_counts/snap_counts_2025.csv",
+      "status": 200,
+      "file": "snap_counts_2025.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "rows whose team is one of BAL, BUF, HOU, KC",
+      "bytes": 305531
+    },
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/player_stats/stats_player_week_2025.csv",
+      "status": 404,
+      "file": "stats_player_week_2025.csv.gz",
+      "headers": {
+        "content-type": "text/plain; charset=utf-8"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 9
+    }
+  ]
+}

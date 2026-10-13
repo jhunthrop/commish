@@ -1,0 +1,17 @@
+{
+  "provenance": "derived-from-recording",
+  "recordedAt": "2026-10-12",
+  "note": "A LATER week-one roster for the supersede pass, derived from preseason-2026's recording of the 2026 weekly roster release: the same rows byte for byte, Kansas City's removed, as a release published after those players left week one would read. The case runs preseason-2026 first at its clock, then this on top at a later clock, so a supersede that fails to retire the earlier claim leaves rows only one side holds (the 2026-09-01 stale-roster incident).",
+  "responses": [
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/weekly_rosters/roster_weekly_2026.csv",
+      "status": 200,
+      "file": "roster_weekly_2026.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "rows whose team is one of BAL, BUF, HOU, KC, then Kansas City's 324 rows removed",
+      "bytes": 404344
+    }
+  ]
+}
