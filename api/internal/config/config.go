@@ -302,7 +302,10 @@ func (l *loader) origins(env Env, site string) []string {
 		return out
 	}
 	var out []string
-	for _, part := range strings.Split(raw, ",") {
+	// Origins separate by comma or whitespace. The deploy passes every setting through gcloud's
+	// comma-delimited --set-env-vars, where a comma inside a value is a syntax error, so the
+	// workflow writes the list with spaces.
+	for _, part := range strings.FieldsFunc(raw, func(r rune) bool { return r == ',' || r == ' ' || r == '\t' || r == '\n' }) {
 		o := strings.TrimRight(strings.TrimSpace(part), "/")
 		if o == "" {
 			continue
