@@ -16,7 +16,9 @@ type RosteredPlayer struct {
 // Lineup is the greedy starting assignment: who started, and how many
 // starting slot instances the league defines.
 type Lineup struct {
-	StarterIDs         []string
+	StarterIDs []string
+	// StarterSlots is the slot each starter fills, parallel to StarterIDs.
+	StarterSlots       []draft.SlotType
 	StartingSlotsTotal int
 }
 
@@ -51,6 +53,7 @@ func AssignStartingLineup(roster []RosteredPlayer, slots []draft.SlotConfig, poi
 				if !taken[p.PlayerID] && accepts(c, p.Position) {
 					taken[p.PlayerID] = true
 					out.StarterIDs = append(out.StarterIDs, p.PlayerID)
+					out.StarterSlots = append(out.StarterSlots, c.Slot)
 					break
 				}
 			}

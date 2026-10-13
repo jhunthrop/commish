@@ -1,8 +1,8 @@
 // Package mocks persists solo mocks: the settings, the seed and the
 // action log a mock replays from (docs/design/2026-10-12-mock-room-rethink.md,
-// "the mock is a function"). The engine lane drives picks through
-// AppendActions; this package owns the shape and the HTTP surface for
-// creating, reading and deleting a mock.
+// "the mock is a function"), the card recorded at each turn, and the
+// cached report. The solo room (internal/solo) drives it; this package
+// also serves the account's list of mocks and deletes one.
 package mocks
 
 import (
@@ -46,18 +46,49 @@ func scan(row pgx.Row) (apitypes.Mock, error) {
 	return m, nil
 }
 
-// Create saves a new mock.
-func (s *Store) Create(ctx context.Context, accountID uuid.UUID, leagueID *uuid.UUID, settings apitypes.LeagueSettings, seed int64) (apitypes.Mock, error) {
-	raw, err := json.Marshal(leagues.Normalize(settings))
+// NewMock is a mock about to be saved with the start of its log.
+type NewMock struct {
+	ID       uuid.UUID
+	LeagueID *uuid.UUID
+	Settings apitypes.LeagueSettings
+	Seed     int64
+	// CreatedAt is the instant START_DRAFT is stamped with, the draft's
+	// kickoff in its engine config; whole milliseconds, so it reads back
+	// exactly.
+	CreatedAt time.Time
+	Actions   []Action
+}
+
+// Start saves a new mock and its first actions in one transaction: a
+// mock never exists without the log that starts it.
+func (s *Store) Start(ctx context.Context, accountID uuid.UUID, n NewMock) (apitypes.Mock, error) {
+	raw, err := json.Marshal(leagues.Normalize(n.Settings))
 	if err != nil {
 		return apitypes.Mock{}, fmt.Errorf("mocks: encode settings: %w", err)
 	}
-	m, err := scan(s.Pool.QueryRow(ctx, `insert into app.mocks (account_id, league_id, settings, seed)
-		values ($1, $2, $3, $4) returning `+columns, accountID, leagueID, raw, seed))
+	var m apitypes.Mock
+	err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		var err error
+		m, err = scan(tx.QueryRow(ctx, `insert into app.mocks (id, account_id, league_id, settings, seed, created_at, updated_at)
+			values ($1, $2, $3, $4, $5, $6, $6) returning `+columns, n.ID, accountID, n.LeagueID, raw, n.Seed, n.CreatedAt))
+		if err != nil {
+			return err
+		}
+		return copyActions(ctx, tx, n.ID, 0, n.Actions)
+	})
 	if err != nil {
-		return apitypes.Mock{}, fmt.Errorf("mocks: create for %s: %w", accountID, err)
+		return apitypes.Mock{}, fmt.Errorf("mocks: start for %s: %w", accountID, err)
 	}
 	return m, nil
+}
+
+func copyActions(ctx context.Context, tx pgx.Tx, id uuid.UUID, afterSeq int64, actions []Action) error {
+	_, err := tx.CopyFrom(ctx, pgx.Identifier{"app", "mock_actions"}, []string{"mock_id", "seq", "kind", "payload", "at"},
+		pgx.CopyFromSlice(len(actions), func(i int) ([]any, error) {
+			a := actions[i]
+			return []any{id, afterSeq + int64(i) + 1, a.Kind, a.Payload, a.At}, nil
+		}))
+	return err
 }
 
 // List is one page of the account's mocks, newest first, and the total.
@@ -76,33 +107,6 @@ func (s *Store) List(ctx context.Context, accountID uuid.UUID, limit, offset int
 		return nil, 0, fmt.Errorf("mocks: list %s: %w", accountID, err)
 	}
 	return out, total, nil
-}
-
-// Get reads one of the account's mocks with its whole log.
-func (s *Store) Get(ctx context.Context, accountID, id uuid.UUID) (apitypes.MockDetail, error) {
-	m, err := scan(s.Pool.QueryRow(ctx, `select `+columns+` from app.mocks where id = $1 and account_id = $2`, id, accountID))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return apitypes.MockDetail{}, ErrNotFound
-	}
-	if err != nil {
-		return apitypes.MockDetail{}, fmt.Errorf("mocks: get %s: %w", id, err)
-	}
-	rows, err := s.Pool.Query(ctx, `select seq, kind, payload, at from app.mock_actions where mock_id = $1 order by seq`, id)
-	if err != nil {
-		return apitypes.MockDetail{}, fmt.Errorf("mocks: actions %s: %w", id, err)
-	}
-	actions, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (apitypes.MockAction, error) {
-		var a apitypes.MockAction
-		err := r.Scan(&a.Seq, &a.Kind, &a.Payload, &a.At)
-		return a, err
-	})
-	if err != nil {
-		return apitypes.MockDetail{}, fmt.Errorf("mocks: actions %s: %w", id, err)
-	}
-	return apitypes.MockDetail{
-		Id: m.Id, LeagueId: m.LeagueId, Settings: m.Settings, Seed: m.Seed, Status: m.Status,
-		CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt, CompletedAt: m.CompletedAt, Actions: actions,
-	}, nil
 }
 
 // Delete removes one of the account's mocks and its log.
@@ -126,9 +130,11 @@ type Action struct {
 
 // AppendActions writes actions after afterSeq in one transaction: a
 // human pick and every bot pick it resolves land together or not at
-// all. afterSeq must be the log's current head, so two writers racing
-// on one mock cannot interleave: the loser gets ErrSeqConflict.
-func (s *Store) AppendActions(ctx context.Context, accountID, id uuid.UUID, afterSeq int64, actions []Action) error {
+// all, and completedAt, when the batch ends the draft, closes the mock in
+// the same commit. afterSeq must be the log's current head, so two
+// writers racing on one mock cannot interleave: the loser gets
+// ErrSeqConflict.
+func (s *Store) AppendActions(ctx context.Context, accountID, id uuid.UUID, afterSeq int64, actions []Action, completedAt *time.Time) error {
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		var head int64
 		err := tx.QueryRow(ctx, `
@@ -144,11 +150,7 @@ func (s *Store) AppendActions(ctx context.Context, accountID, id uuid.UUID, afte
 		if head != afterSeq {
 			return ErrSeqConflict
 		}
-		_, err = tx.CopyFrom(ctx, pgx.Identifier{"app", "mock_actions"}, []string{"mock_id", "seq", "kind", "payload", "at"},
-			pgx.CopyFromSlice(len(actions), func(i int) ([]any, error) {
-				a := actions[i]
-				return []any{id, afterSeq + int64(i) + 1, a.Kind, a.Payload, a.At}, nil
-			}))
+		err = copyActions(ctx, tx, id, afterSeq, actions)
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return ErrSeqConflict
@@ -156,24 +158,15 @@ func (s *Store) AppendActions(ctx context.Context, accountID, id uuid.UUID, afte
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, `update app.mocks set updated_at = now() where id = $1`, id)
+		if completedAt != nil {
+			_, err = tx.Exec(ctx, `update app.mocks set status = 'complete', completed_at = $2 where id = $1`, id, *completedAt)
+		} else {
+			_, err = tx.Exec(ctx, `update app.mocks set updated_at = now() where id = $1`, id)
+		}
 		return err
 	})
 	if err != nil && !errors.Is(err, ErrNotFound) && !errors.Is(err, ErrSeqConflict) {
 		return fmt.Errorf("mocks: append %s: %w", id, err)
 	}
 	return err
-}
-
-// Complete marks a mock finished.
-func (s *Store) Complete(ctx context.Context, accountID, id uuid.UUID, at time.Time) error {
-	tag, err := s.Pool.Exec(ctx, `update app.mocks set status = 'complete', completed_at = $3
-		where id = $1 and account_id = $2 and status = 'active'`, id, accountID, at)
-	if err != nil {
-		return fmt.Errorf("mocks: complete %s: %w", id, err)
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
-	}
-	return nil
 }

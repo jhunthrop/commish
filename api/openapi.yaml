@@ -459,7 +459,9 @@ paths:
     post:
       tags: [mocks]
       operationId: createMock
-      summary: Saves a solo mock's settings and seed. Picks are the engine lane's routes.
+      summary: >-
+        Starts a solo mock from a saved league or from settings. The answer is the room at the drafter's first
+        turn: every bot pick before it is already made, with the board the room drafts from.
       security: [{ session: [] }]
       requestBody:
         required: true
@@ -467,18 +469,20 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/MockCreate" }
       responses:
-        "201": { $ref: "#/components/responses/MockDetailResponse" }
+        "201": { $ref: "#/components/responses/MockRoomResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
         "403": { $ref: "#/components/responses/ErrorResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
   /mocks/{id}:
     parameters: [{ $ref: "#/components/parameters/ID" }]
     get:
       tags: [mocks]
       operationId: getMock
+      summary: The room as it stands, with the board.
       security: [{ session: [] }]
       responses:
-        "200": { $ref: "#/components/responses/MockDetailResponse" }
+        "200": { $ref: "#/components/responses/MockRoomResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
     delete:
       tags: [mocks]
@@ -487,6 +491,220 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
+  /mocks/{id}/picks:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    post:
+      tags: [mocks]
+      operationId: pickMock
+      summary: >-
+        The drafter's pick, and every bot pick to the drafter's next turn in the same transaction, stamped with no
+        delay. pick is the overall pick the drafter saw, so a second submit of the same click answers 409. The
+        answer carries no board.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MockPickInput" }
+      responses:
+        "200": { $ref: "#/components/responses/MockRoomResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+  /mocks/{id}/undo:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    post:
+      tags: [mocks]
+      operationId: undoMock
+      summary: >-
+        Takes back one of the drafter's picks and every pick after it. The draft replays from there with the same
+        seed, so the bots draft the same up to the change.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MockUndoInput" }
+      responses:
+        "200": { $ref: "#/components/responses/MockRoomResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+  /mocks/{id}/autopick:
+    parameters:
+      - { $ref: "#/components/parameters/ID" }
+      - name: to_round
+        in: query
+        required: true
+        schema: { type: integer, minimum: 1, maximum: 25 }
+    post:
+      tags: [mocks]
+      operationId: autopickMock
+      summary: >-
+        Pick for me to round N: the drafter's turns through that round draft from the queue first, then the
+        newest cheat sheet, then the board.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/MockRoomResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+  /mocks/{id}/finish:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    post:
+      tags: [mocks]
+      operationId: finishMock
+      summary: Finish the draft, every remaining turn by the same rule as autopick.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/MockRoomResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+  /mocks/{id}/queue:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    put:
+      tags: [mocks]
+      operationId: queueMock
+      summary: Replaces the drafter's queue, best first.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MockQueueInput" }
+      responses:
+        "200": { $ref: "#/components/responses/MockRoomResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+  /mocks/{id}/card:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    get:
+      tags: [mocks]
+      operationId: mockCard
+      summary: >-
+        Our call at the drafter's turn and every player's chance of lasting to the next one, from the advisor, or
+        from the engine's 200 runs when the advisor does not answer. Recorded the first time it is read and written
+        with the pick.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/RoomCardResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+  /mocks/{id}/report:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    get:
+      tags: [mocks]
+      operationId: mockReport
+      summary: The finished draft's report, computed once and kept until an undo reopens the draft.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/MockReportResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+  /shared/mocks/{code}:
+    parameters: [{ $ref: "#/components/parameters/ShareCode" }]
+    get:
+      tags: [mocks]
+      operationId: sharedMock
+      summary: A shared draft replayed from its settings, seed and picks, for anyone with the link.
+      responses:
+        "200": { $ref: "#/components/responses/MockRoomResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+  /shared/mocks/{code}/report:
+    parameters: [{ $ref: "#/components/parameters/ShareCode" }]
+    get:
+      tags: [mocks]
+      operationId: sharedMockReport
+      summary: The report of a shared, finished draft.
+      responses:
+        "200": { $ref: "#/components/responses/MockReportResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+
+  /lobbies:
+    get:
+      tags: [rooms]
+      operationId: listLobbies
+      summary: Each lobby format and how full its filling room is.
+      responses:
+        "200":
+          description: the formats, in the setup page's order
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/LobbyFilling" } } }
+  /lobbies/join:
+    post:
+      tags: [rooms]
+      operationId: joinLobby
+      summary: >-
+        Takes a seat in the format's filling room, or opens one. A room starts when it is full or 90 seconds after
+        its first drafter joined, with bots in the open seats. Needs a handle (409 with field handle without one).
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LobbyJoin" }
+      responses:
+        "200": { $ref: "#/components/responses/LobbySeatResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+  /lobbies/{id}:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    get:
+      tags: [rooms]
+      operationId: getLobby
+      summary: The room's settings, seats and board, for a drafter with a seat in it. Picks come over the socket.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/LobbyRoomResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+  /lobbies/{id}/leave:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    post:
+      tags: [rooms]
+      operationId: leaveLobby
+      summary: Gives the seat up. A filling room frees it; a drafting room hands it to a bot at once.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+  /lobbies/{id}/card:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    get:
+      tags: [rooms]
+      operationId: lobbyCard
+      summary: >-
+        On your turn, our call as in the solo room. Off it, the call if the board holds to your pick, with each
+        player's chance of reaching it.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/RoomCardResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+  /lobbies/{id}/report:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    get:
+      tags: [rooms]
+      operationId: lobbyReport
+      summary: The report of a finished lobby, for the caller's seat.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/MockReportResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
 
   /rooms/{id}/ws:
     servers:
@@ -497,12 +715,14 @@ paths:
       operationId: roomSocket
       summary: >-
         Upgrades to a WebSocket. The client's first message is RoomHello with the last seq it applied (0 for none).
-        The server answers RoomWelcome with every action after that seq, then streams RoomAction messages in seq
-        order. A reconnect sends the same hello with its last seq and loses nothing.
+        The server answers RoomWelcome with every action after that seq, then sends RoomUpdate with each new batch
+        in seq order. The client sends RoomCommand to pick, queue or leave; a refused command answers RoomError.
+        A reconnect sends the same hello with its last seq, loses nothing, and takes the seat back from its bot.
       security: [{ session: [] }]
       responses:
         "101": { description: switching protocols }
         "401": { $ref: "#/components/responses/ErrorResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
 
 components:
@@ -528,6 +748,12 @@ components:
       in: query
       required: false
       schema: { type: integer, minimum: 1, maximum: 10000, default: 1 }
+    ShareCode:
+      name: code
+      in: path
+      required: true
+      description: a shared draft's settings, seed and picks, deflated and base64url encoded
+      schema: { type: string, minLength: 8, maxLength: 2048, pattern: "^[A-Za-z0-9_-]+$" }
     PerPage:
       name: per_page
       in: query
@@ -601,14 +827,46 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/ExportLink" } }
-    MockDetailResponse:
-      description: a mock with its action log
+    MockRoomResponse:
+      description: a solo room as it stands
       content:
         application/json:
           schema:
             allOf:
               - $ref: "#/components/schemas/Envelope"
-              - properties: { data: { $ref: "#/components/schemas/MockDetail" } }
+              - properties: { data: { $ref: "#/components/schemas/MockRoom" } }
+    RoomCardResponse:
+      description: our call and the odds
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/RoomCard" } }
+    MockReportResponse:
+      description: a finished draft's report
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/MockReport" } }
+    LobbySeatResponse:
+      description: the seat taken
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/LobbySeat" } }
+    LobbyRoomResponse:
+      description: a lobby room
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/LobbyRoom" } }
 
   schemas:
     Envelope:
@@ -1000,23 +1258,253 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
         completed_at: { type: string, format: date-time, nullable: true }
-    MockAction:
+    PlayerPosition:
+      type: string
+      enum: [QB, RB, WR, TE, K, DEF]
+    BoardPlayer:
       type: object
-      required: [seq, kind, payload, at]
+      description: one player of the board a room drafts from
+      required: [id, name, position, team, headshot, adp, points, vor, position_rank, bye]
       properties:
+        id: { type: string }
+        name: { type: string }
+        position: { $ref: "#/components/schemas/PlayerPosition" }
+        team: { type: string }
+        headshot: { type: string }
+        adp: { type: number, format: double, nullable: true, description: where drafters take him, null with no source }
+        points: { type: number, format: double, nullable: true, description: projected season points, null for kickers and defenses }
+        vor: { type: number, format: double, nullable: true, description: points over replacement for this league, null when it has none }
+        position_rank: { type: integer }
+        bye: { type: integer, nullable: true }
+    RoomBoard:
+      type: object
+      required: [format, season, as_of, basis, players]
+      properties:
+        format: { type: string, enum: [ppr, half, std] }
+        season: { type: integer }
+        as_of: { type: string, format: date-time }
+        basis: { type: string, description: the sentence naming what the numbers are }
+        players:
+          type: array
+          description: every player in the order drafters take them
+          items: { $ref: "#/components/schemas/BoardPlayer" }
+    RoomPick:
+      type: object
+      required: [pick, round, seat, player_id, auto]
+      properties:
+        pick: { type: integer }
+        round: { type: integer }
+        seat: { type: integer, description: the 1-based draft slot that made it }
+        player_id: { type: string }
+        auto: { type: boolean, description: "the clock made it: an expired turn. In a lobby, who made a pick is the log row's pick.by" }
+    MockRoom:
+      type: object
+      required: [id, league_id, status, seed, settings, teams, rounds, slot, pick_number, on_clock, waiting, picks, queue, seq, share_code, created_at]
+      properties:
+        id: { type: string, format: uuid, nullable: true, description: null for a shared draft }
+        league_id: { type: string, format: uuid, nullable: true }
+        status: { $ref: "#/components/schemas/MockStatus" }
+        seed: { type: integer, format: int64 }
+        settings: { $ref: "#/components/schemas/LeagueSettings" }
+        teams: { type: integer }
+        rounds: { type: integer }
+        slot: { type: integer, description: the drafter's 1-based slot }
+        pick_number: { type: integer, description: the pick on the clock, past the last pick when the draft is over }
+        on_clock: { type: integer, nullable: true, description: the slot on the clock }
+        waiting: { type: boolean, description: the drafter is on the clock }
+        picks:
+          type: array
+          items: { $ref: "#/components/schemas/RoomPick" }
+        queue:
+          type: array
+          items: { type: string }
         seq: { type: integer, format: int64 }
-        kind: { type: string }
-        payload: { type: object }
-        at: { type: string, format: date-time }
-    MockDetail:
-      allOf:
-        - $ref: "#/components/schemas/Mock"
-        - type: object
-          required: [actions]
-          properties:
-            actions:
-              type: array
-              items: { $ref: "#/components/schemas/MockAction" }
+        share_code: { type: string, description: the link's code, the settings, seed and picks }
+        created_at: { type: string, format: date-time }
+        board:
+          description: the board, on a full read (create, get, shared) and absent on a pick's answer
+          allOf: [{ $ref: "#/components/schemas/RoomBoard" }]
+    MockPickInput:
+      type: object
+      required: [player_id, pick]
+      properties:
+        player_id: { type: string, minLength: 1, maxLength: 64 }
+        pick: { type: integer, minimum: 1, description: the overall pick the drafter saw on the clock }
+    MockUndoInput:
+      type: object
+      required: [pick]
+      properties:
+        pick: { type: integer, minimum: 1, description: the overall pick of the drafter's to take back }
+    MockQueueInput:
+      type: object
+      required: [player_ids]
+      properties:
+        player_ids:
+          type: array
+          maxItems: 50
+          items: { type: string, minLength: 1, maxLength: 64 }
+    CardCandidate:
+      type: object
+      required: [player_id]
+      properties:
+        player_id: { type: string }
+        why: { type: string, description: the advisor's sentence, absent from the engine }
+    RoomCard:
+      type: object
+      required: [pick_number, for_pick, next_pick, source, runs, call, shortlist, still_there, conditional]
+      properties:
+        pick_number: { type: integer, description: the pick on the clock when the card was made }
+        for_pick: { type: integer, description: the drafter's pick the call is for }
+        next_pick: { type: integer, nullable: true, description: the turn the odds look to }
+        source: { type: string, enum: [advisor, sim] }
+        runs: { type: integer, description: the runs the odds are over, 0 for the closed form }
+        call: { type: string, description: the player we would take }
+        shortlist:
+          type: array
+          items: { $ref: "#/components/schemas/CardCandidate" }
+        still_there:
+          type: object
+          description: >-
+            player id to his chance of still being there at next_pick, or, on a conditional card, of reaching
+            for_pick
+          additionalProperties: { type: number, format: double }
+        conditional: { type: boolean, description: a lobby card off your turn, the call if the board holds }
+    ReportTeam:
+      type: object
+      required: [seat, points, rank, starters_filled, starters_total, bye_collisions, value_captured]
+      properties:
+        seat: { type: integer }
+        points: { type: number, format: double, description: projected points from the starters }
+        rank: { type: integer }
+        starters_filled: { type: integer }
+        starters_total: { type: integer }
+        bye_collisions: { type: integer }
+        value_captured: { type: number, format: double }
+    ReportPick:
+      type: object
+      required: [pick, round, player_id, over_replacement, adp_gap, chip, still_there, could_wait, odds_source]
+      properties:
+        pick: { type: integer }
+        round: { type: integer }
+        player_id: { type: string }
+        over_replacement: { type: number, format: double, nullable: true }
+        adp_gap: { type: number, format: double, nullable: true, description: ADP less the pick, positive before drafters take him }
+        chip: { type: string, enum: [reach, steal, at_adp, none] }
+        still_there: { type: number, format: double, nullable: true, description: the chance he was there at your next turn, null at your last }
+        could_wait: { type: boolean }
+        odds_source: { type: string, description: "advisor or sim as recorded with the pick, or fallback_sim computed for the report" }
+    ReportStarter:
+      type: object
+      required: [slot, player_id]
+      properties:
+        slot: { type: string }
+        player_id: { type: string, nullable: true }
+    ReportExposure:
+      type: object
+      required: [player_id, share]
+      properties:
+        player_id: { type: string }
+        share: { type: number, format: double }
+    ReportRuns:
+      type: object
+      required: [runs, points, median, middle_low, middle_high, top_share, top_finish, rank_counts, exposure]
+      properties:
+        runs: { type: integer }
+        points:
+          type: array
+          description: your starting points in each run, ascending
+          items: { type: number, format: double }
+        median: { type: number, format: double }
+        middle_low: { type: number, format: double }
+        middle_high: { type: number, format: double }
+        top_share: { type: number, format: double }
+        top_finish: { type: integer, description: the rank top_share counts to }
+        rank_counts:
+          type: array
+          description: runs finishing at each rank, first place first
+          items: { type: integer }
+        exposure:
+          type: array
+          description: who you end up with, by share of runs, most first
+          items: { $ref: "#/components/schemas/ReportExposure" }
+    MockReport:
+      type: object
+      required: [teams, rounds, slot, seed, settings, could_wait_from, standings, picks, starters, runs, board, computed_ms]
+      properties:
+        teams: { type: integer }
+        rounds: { type: integer }
+        slot: { type: integer }
+        seed: { type: integer, format: int64 }
+        settings: { $ref: "#/components/schemas/LeagueSettings" }
+        could_wait_from: { type: number, format: double }
+        standings:
+          type: array
+          description: every team, best first
+          items: { $ref: "#/components/schemas/ReportTeam" }
+        picks:
+          type: array
+          items: { $ref: "#/components/schemas/ReportPick" }
+        starters:
+          type: array
+          items: { $ref: "#/components/schemas/ReportStarter" }
+        runs: { $ref: "#/components/schemas/ReportRuns" }
+        board:
+          description: the board, holding only the players the report names
+          allOf: [{ $ref: "#/components/schemas/RoomBoard" }]
+        computed_ms: { type: integer, description: how long the report took to compute }
+
+    LobbyFormat:
+      type: string
+      enum: [12_ppr, 12_half_superflex, 10_ppr]
+    LobbyFilling:
+      type: object
+      required: [format, teams, clock_seconds, scoring, lineup, filling]
+      properties:
+        format: { $ref: "#/components/schemas/LobbyFormat" }
+        teams: { type: integer }
+        clock_seconds: { type: integer }
+        scoring: { $ref: "#/components/schemas/ScoringPreset" }
+        lineup: { $ref: "#/components/schemas/Lineup" }
+        filling: { type: integer, description: drafters in the room filling now, 0 when none is }
+    LobbyJoin:
+      type: object
+      required: [format]
+      properties:
+        format: { $ref: "#/components/schemas/LobbyFormat" }
+    LobbySeat:
+      type: object
+      required: [room_id, seat, socket_url]
+      properties:
+        room_id: { type: string, format: uuid }
+        seat: { type: integer }
+        socket_url: { type: string, description: the room service's WebSocket for this room }
+    LobbySeatView:
+      type: object
+      required: [seat, handle, kind]
+      properties:
+        seat: { type: integer }
+        handle: { type: string, nullable: true }
+        kind: { type: string, enum: [drafter, bot, left, open] }
+    LobbyRoom:
+      type: object
+      required: [id, format, status, teams, rounds, clock_seconds, fill_deadline, started_at, solo_pace, you, settings, seats, board, socket_url]
+      properties:
+        id: { type: string, format: uuid }
+        format: { $ref: "#/components/schemas/LobbyFormat" }
+        status: { type: string, enum: [filling, drafting, complete, abandoned] }
+        teams: { type: integer }
+        rounds: { type: integer }
+        clock_seconds: { type: integer }
+        fill_deadline: { type: string, format: date-time, nullable: true }
+        started_at: { type: string, format: date-time, nullable: true }
+        solo_pace: { type: boolean, description: fewer than three people started it, so the bots pick at once }
+        you: { type: integer, description: your seat }
+        settings: { $ref: "#/components/schemas/LeagueSettings" }
+        seats:
+          type: array
+          items: { $ref: "#/components/schemas/LobbySeatView" }
+        board: { $ref: "#/components/schemas/RoomBoard" }
+        socket_url: { type: string }
 
     RoomHello:
       type: object
@@ -1026,16 +1514,43 @@ components:
         last_seq: { type: integer, format: int64, minimum: 0 }
     RoomWelcome:
       type: object
-      required: [type, room_id, seq, actions]
+      required: [type, room_id, seq, actions, now]
       properties:
         type: { type: string, enum: [welcome] }
         room_id: { type: string, format: uuid }
         seq: { type: integer, format: int64, description: the room's latest seq }
+        now: { type: string, format: date-time, description: the server's clock, so the client's clock reads the same }
         actions:
           type: array
           items: { $ref: "#/components/schemas/RoomAction" }
+    RoomUpdate:
+      type: object
+      required: [type, seq, actions]
+      properties:
+        type: { type: string, enum: [update] }
+        seq: { type: integer, format: int64 }
+        actions:
+          type: array
+          items: { $ref: "#/components/schemas/RoomAction" }
+    RoomCommand:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [pick, queue, leave] }
+        player_id: { type: string, maxLength: 64, description: pick }
+        pick: { type: integer, description: pick, the overall pick the drafter saw }
+        player_ids:
+          type: array
+          maxItems: 50
+          items: { type: string, maxLength: 64 }
+          description: queue, best first
     RoomAction:
       type: object
+      description: >-
+        One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT, SEAT_RETURNED, ROOM_STARTED
+        (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, or an engine action (START_DRAFT,
+        SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick,
+        pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out.
       required: [seq, kind, seat, payload, at]
       properties:
         seq: { type: integer, format: int64 }

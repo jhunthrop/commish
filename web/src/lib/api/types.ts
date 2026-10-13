@@ -450,7 +450,7 @@ export interface paths {
 		};
 		get: operations['listMocks'];
 		put?: never;
-		/** Saves a solo mock's settings and seed. Picks are the engine lane's routes. */
+		/** Starts a solo mock from a saved league or from settings. The answer is the room at the drafter's first turn: every bot pick before it is already made, with the board the room drafts from. */
 		post: operations['createMock'];
 		delete?: never;
 		options?: never;
@@ -467,10 +467,296 @@ export interface paths {
 			};
 			cookie?: never;
 		};
+		/** The room as it stands, with the board. */
 		get: operations['getMock'];
 		put?: never;
 		post?: never;
 		delete: operations['deleteMock'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/mocks/{id}/picks': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** The drafter's pick, and every bot pick to the drafter's next turn in the same transaction, stamped with no delay. pick is the overall pick the drafter saw, so a second submit of the same click answers 409. The answer carries no board. */
+		post: operations['pickMock'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/mocks/{id}/undo': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Takes back one of the drafter's picks and every pick after it. The draft replays from there with the same seed, so the bots draft the same up to the change. */
+		post: operations['undoMock'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/mocks/{id}/autopick': {
+		parameters: {
+			query: {
+				to_round: number;
+			};
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Pick for me to round N: the drafter's turns through that round draft from the queue first, then the newest cheat sheet, then the board. */
+		post: operations['autopickMock'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/mocks/{id}/finish': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Finish the draft, every remaining turn by the same rule as autopick. */
+		post: operations['finishMock'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/mocks/{id}/queue': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		get?: never;
+		/** Replaces the drafter's queue, best first. */
+		put: operations['queueMock'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/mocks/{id}/card': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		/** Our call at the drafter's turn and every player's chance of lasting to the next one, from the advisor, or from the engine's 200 runs when the advisor does not answer. Recorded the first time it is read and written with the pick. */
+		get: operations['mockCard'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/mocks/{id}/report': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		/** The finished draft's report, computed once and kept until an undo reopens the draft. */
+		get: operations['mockReport'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/shared/mocks/{code}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+				code: components['parameters']['ShareCode'];
+			};
+			cookie?: never;
+		};
+		/** A shared draft replayed from its settings, seed and picks, for anyone with the link. */
+		get: operations['sharedMock'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/shared/mocks/{code}/report': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+				code: components['parameters']['ShareCode'];
+			};
+			cookie?: never;
+		};
+		/** The report of a shared, finished draft. */
+		get: operations['sharedMockReport'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/lobbies': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** Each lobby format and how full its filling room is. */
+		get: operations['listLobbies'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/lobbies/join': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Takes a seat in the format's filling room, or opens one. A room starts when it is full or 90 seconds after its first drafter joined, with bots in the open seats. Needs a handle (409 with field handle without one). */
+		post: operations['joinLobby'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/lobbies/{id}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		/** The room's settings, seats and board, for a drafter with a seat in it. Picks come over the socket. */
+		get: operations['getLobby'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/lobbies/{id}/leave': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Gives the seat up. A filling room frees it; a drafting room hands it to a bot at once. */
+		post: operations['leaveLobby'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/lobbies/{id}/card': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		/** On your turn, our call as in the solo room. Off it, the call if the board holds to your pick, with each player's chance of reaching it. */
+		get: operations['lobbyCard'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/lobbies/{id}/report': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		/** The report of a finished lobby, for the caller's seat. */
+		get: operations['lobbyReport'];
+		put?: never;
+		post?: never;
+		delete?: never;
 		options?: never;
 		head?: never;
 		patch?: never;
@@ -485,7 +771,7 @@ export interface paths {
 			};
 			cookie?: never;
 		};
-		/** Upgrades to a WebSocket. The client's first message is RoomHello with the last seq it applied (0 for none). The server answers RoomWelcome with every action after that seq, then streams RoomAction messages in seq order. A reconnect sends the same hello with its last seq and loses nothing. */
+		/** Upgrades to a WebSocket. The client's first message is RoomHello with the last seq it applied (0 for none). The server answers RoomWelcome with every action after that seq, then sends RoomUpdate with each new batch in seq order. The client sends RoomCommand to pick, queue or leave; a refused command answers RoomError. A reconnect sends the same hello with its last seq, loses nothing, and takes the seat back from its bot. */
 		get: operations['roomSocket'];
 		put?: never;
 		post?: never;
@@ -792,16 +1078,253 @@ export interface components {
 			/** Format: date-time */
 			completed_at: string | null;
 		};
-		MockAction: {
+		/** @enum {string} */
+		PlayerPosition: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+		/** @description one player of the board a room drafts from */
+		BoardPlayer: {
+			id: string;
+			name: string;
+			position: components['schemas']['PlayerPosition'];
+			team: string;
+			headshot: string;
+			/**
+			 * Format: double
+			 * @description where drafters take him
+			 */
+			adp: number | null;
+			/**
+			 * Format: double
+			 * @description projected season points
+			 */
+			points: number | null;
+			/**
+			 * Format: double
+			 * @description points over replacement for this league
+			 */
+			vor: number | null;
+			position_rank: number;
+			bye: number | null;
+		};
+		RoomBoard: {
+			/** @enum {string} */
+			format: 'ppr' | 'half' | 'std';
+			season: number;
+			/** Format: date-time */
+			as_of: string;
+			/** @description the sentence naming what the numbers are */
+			basis: string;
+			/** @description every player in the order drafters take them */
+			players: components['schemas']['BoardPlayer'][];
+		};
+		RoomPick: {
+			pick: number;
+			round: number;
+			/** @description the 1-based draft slot that made it */
+			seat: number;
+			player_id: string;
+			/** @description the clock made it: an expired turn. In a lobby, who made a pick is the log row's pick.by */
+			auto: boolean;
+		};
+		MockRoom: {
+			/**
+			 * Format: uuid
+			 * @description null for a shared draft
+			 */
+			id: string | null;
+			/** Format: uuid */
+			league_id: string | null;
+			status: components['schemas']['MockStatus'];
+			/** Format: int64 */
+			seed: number;
+			settings: components['schemas']['LeagueSettings'];
+			teams: number;
+			rounds: number;
+			/** @description the drafter's 1-based slot */
+			slot: number;
+			/** @description the pick on the clock */
+			pick_number: number;
+			/** @description the slot on the clock */
+			on_clock: number | null;
+			/** @description the drafter is on the clock */
+			waiting: boolean;
+			picks: components['schemas']['RoomPick'][];
+			queue: string[];
 			/** Format: int64 */
 			seq: number;
-			kind: string;
-			payload: Record<string, never>;
+			/** @description the link's code */
+			share_code: string;
 			/** Format: date-time */
-			at: string;
+			created_at: string;
+			/** @description the board, on a full read (create, get, shared) and absent on a pick's answer */
+			board?: components['schemas']['RoomBoard'];
 		};
-		MockDetail: components['schemas']['Mock'] & {
-			actions: components['schemas']['MockAction'][];
+		MockPickInput: {
+			player_id: string;
+			/** @description the overall pick the drafter saw on the clock */
+			pick: number;
+		};
+		MockUndoInput: {
+			/** @description the overall pick of the drafter's to take back */
+			pick: number;
+		};
+		MockQueueInput: {
+			player_ids: string[];
+		};
+		CardCandidate: {
+			player_id: string;
+			/** @description the advisor's sentence */
+			why?: string;
+		};
+		RoomCard: {
+			/** @description the pick on the clock when the card was made */
+			pick_number: number;
+			/** @description the drafter's pick the call is for */
+			for_pick: number;
+			/** @description the turn the odds look to */
+			next_pick: number | null;
+			/** @enum {string} */
+			source: 'advisor' | 'sim';
+			/** @description the runs the odds are over */
+			runs: number;
+			/** @description the player we would take */
+			call: string;
+			shortlist: components['schemas']['CardCandidate'][];
+			/** @description player id to his chance of still being there at next_pick, or, on a conditional card, of reaching for_pick */
+			still_there: Record<string, number>;
+			/** @description a lobby card off your turn */
+			conditional: boolean;
+		};
+		ReportTeam: {
+			seat: number;
+			/**
+			 * Format: double
+			 * @description projected points from the starters
+			 */
+			points: number;
+			rank: number;
+			starters_filled: number;
+			starters_total: number;
+			bye_collisions: number;
+			/** Format: double */
+			value_captured: number;
+		};
+		ReportPick: {
+			pick: number;
+			round: number;
+			player_id: string;
+			/** Format: double */
+			over_replacement: number | null;
+			/**
+			 * Format: double
+			 * @description ADP less the pick
+			 */
+			adp_gap: number | null;
+			/** @enum {string} */
+			chip: 'reach' | 'steal' | 'at_adp' | 'none';
+			/**
+			 * Format: double
+			 * @description the chance he was there at your next turn
+			 */
+			still_there: number | null;
+			could_wait: boolean;
+			/** @description advisor or sim as recorded with the pick, or fallback_sim computed for the report */
+			odds_source: string;
+		};
+		ReportStarter: {
+			slot: string;
+			player_id: string | null;
+		};
+		ReportExposure: {
+			player_id: string;
+			/** Format: double */
+			share: number;
+		};
+		ReportRuns: {
+			runs: number;
+			/** @description your starting points in each run, ascending */
+			points: number[];
+			/** Format: double */
+			median: number;
+			/** Format: double */
+			middle_low: number;
+			/** Format: double */
+			middle_high: number;
+			/** Format: double */
+			top_share: number;
+			/** @description the rank top_share counts to */
+			top_finish: number;
+			/** @description runs finishing at each rank, first place first */
+			rank_counts: number[];
+			/** @description who you end up with, by share of runs, most first */
+			exposure: components['schemas']['ReportExposure'][];
+		};
+		MockReport: {
+			teams: number;
+			rounds: number;
+			slot: number;
+			/** Format: int64 */
+			seed: number;
+			settings: components['schemas']['LeagueSettings'];
+			/** Format: double */
+			could_wait_from: number;
+			/** @description every team, best first */
+			standings: components['schemas']['ReportTeam'][];
+			picks: components['schemas']['ReportPick'][];
+			starters: components['schemas']['ReportStarter'][];
+			runs: components['schemas']['ReportRuns'];
+			/** @description the board, holding only the players the report names */
+			board: components['schemas']['RoomBoard'];
+			/** @description how long the report took to compute */
+			computed_ms: number;
+		};
+		/** @enum {string} */
+		LobbyFormat: '12_ppr' | '12_half_superflex' | '10_ppr';
+		LobbyFilling: {
+			format: components['schemas']['LobbyFormat'];
+			teams: number;
+			clock_seconds: number;
+			scoring: components['schemas']['ScoringPreset'];
+			lineup: components['schemas']['Lineup'];
+			/** @description drafters in the room filling now */
+			filling: number;
+		};
+		LobbyJoin: {
+			format: components['schemas']['LobbyFormat'];
+		};
+		LobbySeat: {
+			/** Format: uuid */
+			room_id: string;
+			seat: number;
+			/** @description the room service's WebSocket for this room */
+			socket_url: string;
+		};
+		LobbySeatView: {
+			seat: number;
+			handle: string | null;
+			/** @enum {string} */
+			kind: 'drafter' | 'bot' | 'left' | 'open';
+		};
+		LobbyRoom: {
+			/** Format: uuid */
+			id: string;
+			format: components['schemas']['LobbyFormat'];
+			/** @enum {string} */
+			status: 'filling' | 'drafting' | 'complete' | 'abandoned';
+			teams: number;
+			rounds: number;
+			clock_seconds: number;
+			/** Format: date-time */
+			fill_deadline: string | null;
+			/** Format: date-time */
+			started_at: string | null;
+			/** @description fewer than three people started it */
+			solo_pace: boolean;
+			/** @description your seat */
+			you: number;
+			settings: components['schemas']['LeagueSettings'];
+			seats: components['schemas']['LobbySeatView'][];
+			board: components['schemas']['RoomBoard'];
+			socket_url: string;
 		};
 		RoomHello: {
 			/** @enum {string} */
@@ -819,8 +1342,31 @@ export interface components {
 			 * @description the room's latest seq
 			 */
 			seq: number;
+			/**
+			 * Format: date-time
+			 * @description the server's clock
+			 */
+			now: string;
 			actions: components['schemas']['RoomAction'][];
 		};
+		RoomUpdate: {
+			/** @enum {string} */
+			type: 'update';
+			/** Format: int64 */
+			seq: number;
+			actions: components['schemas']['RoomAction'][];
+		};
+		RoomCommand: {
+			/** @enum {string} */
+			type: 'pick' | 'queue' | 'leave';
+			/** @description pick */
+			player_id?: string;
+			/** @description pick */
+			pick?: number;
+			/** @description queue, best first */
+			player_ids?: string[];
+		};
+		/** @description One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT, SEAT_RETURNED, ROOM_STARTED (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, or an engine action (START_DRAFT, SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick, pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out. */
 		RoomAction: {
 			/** Format: int64 */
 			seq: number;
@@ -915,12 +1461,48 @@ export interface components {
 				};
 			};
 		};
-		/** @description a mock with its action log */
-		MockDetailResponse: {
+		/** @description a solo room as it stands */
+		MockRoomResponse: {
 			headers: Record<string, unknown>;
 			content: {
 				'application/json': components['schemas']['Envelope'] & {
-					data?: components['schemas']['MockDetail'];
+					data?: components['schemas']['MockRoom'];
+				};
+			};
+		};
+		/** @description our call and the odds */
+		RoomCardResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['RoomCard'];
+				};
+			};
+		};
+		/** @description a finished draft's report */
+		MockReportResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['MockReport'];
+				};
+			};
+		};
+		/** @description the seat taken */
+		LobbySeatResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['LobbySeat'];
+				};
+			};
+		};
+		/** @description a lobby room */
+		LobbyRoomResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['LobbyRoom'];
 				};
 			};
 		};
@@ -929,6 +1511,8 @@ export interface components {
 		ID: string;
 		ClaimCode: string;
 		Page: number;
+		/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+		ShareCode: string;
 		PerPage: number;
 	};
 	requestBodies: never;
@@ -1564,10 +2148,11 @@ export interface operations {
 			};
 		};
 		responses: {
-			201: components['responses']['MockDetailResponse'];
+			201: components['responses']['MockRoomResponse'];
 			400: components['responses']['ErrorResponse'];
 			403: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
 		};
 	};
 	getMock: {
@@ -1581,7 +2166,7 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			200: components['responses']['MockDetailResponse'];
+			200: components['responses']['MockRoomResponse'];
 			404: components['responses']['ErrorResponse'];
 		};
 	};
@@ -1598,6 +2183,277 @@ export interface operations {
 		responses: {
 			200: components['responses']['EmptyResponse'];
 			404: components['responses']['ErrorResponse'];
+		};
+	};
+	pickMock: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['MockPickInput'];
+			};
+		};
+		responses: {
+			200: components['responses']['MockRoomResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+		};
+	};
+	undoMock: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['MockUndoInput'];
+			};
+		};
+		responses: {
+			200: components['responses']['MockRoomResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+		};
+	};
+	autopickMock: {
+		parameters: {
+			query: {
+				to_round: number;
+			};
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['MockRoomResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+		};
+	};
+	finishMock: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['MockRoomResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+		};
+	};
+	queueMock: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['MockQueueInput'];
+			};
+		};
+		responses: {
+			200: components['responses']['MockRoomResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+		};
+	};
+	mockCard: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['RoomCardResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+		};
+	};
+	mockReport: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['MockReportResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+		};
+	};
+	sharedMock: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+				code: components['parameters']['ShareCode'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['MockRoomResponse'];
+			400: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+		};
+	};
+	sharedMockReport: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+				code: components['parameters']['ShareCode'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['MockReportResponse'];
+			400: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+		};
+	};
+	listLobbies: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the formats, in the setup page's order */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['LobbyFilling'][];
+					};
+				};
+			};
+		};
+	};
+	joinLobby: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['LobbyJoin'];
+			};
+		};
+		responses: {
+			200: components['responses']['LobbySeatResponse'];
+			400: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+		};
+	};
+	getLobby: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['LobbyRoomResponse'];
+			403: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+		};
+	};
+	leaveLobby: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['EmptyResponse'];
+			403: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+		};
+	};
+	lobbyCard: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['RoomCardResponse'];
+			403: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+		};
+	};
+	lobbyReport: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['MockReportResponse'];
+			403: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
 		};
 	};
 	roomSocket: {
@@ -1617,6 +2473,7 @@ export interface operations {
 				content?: never;
 			};
 			401: components['responses']['ErrorResponse'];
+			403: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
 		};
 	};
