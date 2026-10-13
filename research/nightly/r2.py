@@ -141,6 +141,9 @@ class R2RunStore:
             raise R2Error(f"PUT {key} answered {response.status_code}.")
 
     def claim(self, key: str, body: bytes, content_type: str) -> bool:
+        # A claim retried after a lost reply can meet its own first write and answer 412: the id is
+        # then orphaned (it holds this run's started.json) and the run takes the next suffix, which
+        # is harmless, since an id is only ever given up, never reused.
         response = self._send("PUT", key, body, {"content-type": content_type, "if-none-match": "*"})
         if response.status_code == _PRECONDITION_FAILED:
             return False

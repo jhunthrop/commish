@@ -22,9 +22,10 @@ from research.model.register.freeze import SERVED_SOURCE
 from research.model.register.grade import average_outcome_ranks, ordinal_ranks
 from research.season import REGULAR_SEASON_WEEKS
 
-# The one sentence a missed week prints. The 2026 misses (weeks 3 to 5) were the old weekly job
-# failing on every pass; from cutover a missed freeze fails the in-season job (`inseason`).
-MISSED_NOTE: Final = "Our nightly run failed that week."
+# The one sentence a missed week prints. The 2026 misses (weeks 3 to 5) were the old weekly register
+# job failing on every pass, not a nightly run (phase D review L1); from cutover a missed freeze fails
+# the in-season job (`inseason`) and alerts.
+MISSED_NOTE: Final = "Our weekly freeze failed that week."
 RECORD_POSITIONS: Final = ("QB", "RB", "WR", "TE", "K", "DST")
 ALL: Final = "All"
 STATISTIC: Final = {"agreement": "agreement with the finish", "placesOff": "places off, typical player"}

@@ -29,6 +29,9 @@ from research.nightly.config import HEADSHOT_REGISTRY_KEY
 from research.nightly.run_store import JSON_TYPE, RunStore
 
 _WORKERS: Final = 8
+# The provider's image host, the only one a stored URL may name, and the largest face kept.
+ALLOWED_HOSTS: Final = frozenset({"a.espncdn.com"})
+MAX_BYTES: Final = 2 * 1024 * 1024
 _TIMEOUT_SECONDS: Final = 20.0
 _OK: Final = 200
 _NOT_MODIFIED: Final = 304
@@ -50,6 +53,17 @@ class Fetched:
     reason: str | None = None
 
 
+def _bounded_get(http: httpx.Client, url: str, headers: dict[str, str]) -> httpx.Response:
+    """The image, never redirected off its host, and refused past `MAX_BYTES` while it streams."""
+    with http.stream("GET", url, headers=headers, timeout=_TIMEOUT_SECONDS, follow_redirects=False) as response:
+        body = b""
+        for chunk in response.iter_bytes():
+            body += chunk
+            if len(body) > MAX_BYTES:
+                raise ValueError(f"the image passed {MAX_BYTES} bytes")
+        return httpx.Response(response.status_code, headers=response.headers, content=body, request=response.request)
+
+
 def _fetch(http: httpx.Client, store: RunStore, face: Face, previous: Json | None) -> Fetched:
     headers = {}
     if previous is not None:
@@ -58,9 +72,11 @@ def _fetch(http: httpx.Client, store: RunStore, face: Face, previous: Json | Non
             for k, v in (("if-none-match", previous.get("etag")), ("if-modified-since", previous.get("lastModified")))
             if v
         }
+    if httpx.URL(face.source).host not in ALLOWED_HOSTS or httpx.URL(face.source).scheme != "https":
+        return Fetched(face, previous, "kept" if previous else "missing", "not the provider's image host")
     try:
-        response = http.get(face.source, headers=headers, timeout=_TIMEOUT_SECONDS, follow_redirects=True)
-    except httpx.HTTPError as error:
+        response = _bounded_get(http, face.source, headers)
+    except (httpx.HTTPError, ValueError) as error:
         return Fetched(face, previous, "kept" if previous else "missing", str(error))
     if response.status_code == _NOT_MODIFIED and previous is not None:
         return Fetched(face, previous, "unchanged")

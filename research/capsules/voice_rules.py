@@ -78,6 +78,10 @@ ASIDE_PATTERNS: Final = (
     _rule("a rewrite note", r"\bhere'?s (?:my|the|a) (?:rewrite|revision|draft|version)\b"),
     _rule("an editorial bracket", r"\[[^\]]*\]"),
     _rule("the model naming itself", r"\bas an? (?:AI|language model|assistant)\b"),
+    # The capsule speaks as "we" (our board, our projection); a single writer's "I" is an aside
+    # (phase D review L10: "I would still spend it elsewhere"). Case-sensitive, so "Week I" and a
+    # name's "III" never match a lone "I".
+    _rule("the first person singular", r"(?<![\w'])I(?:'d|'m|'ll|'ve)?(?![\w'])", 0),
 )
 
 # Betting words, named. Football's own senses (the offensive line, the line of scrimmage, the Las

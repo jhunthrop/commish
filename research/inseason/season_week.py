@@ -165,11 +165,16 @@ def grade(context: SeasonWeekContext) -> StepResult:
     failed = False
     for week in ungraded:
         last = last_kickoffs.get(week)
-        if last is None or context.now < last + GRADE_AFTER:
-            when = (
-                "no kickoff on file" if last is None else f"its last kickoff {js_iso(last)} is under {GRADE_AFTER} ago"
-            )
-            detail.append(f"week {week}: waits, {when}")
+        if last is None:
+            # No kickoff on file never grades; once the freeze is older than the overdue line it fails.
+            with context.engine.connect() as conn:
+                frozen_at = latest_freeze_for(conn, context.season, week)
+            stale = frozen_at is not None and context.now >= frozen_at + GRADE_OVERDUE
+            detail.append(f"week {week}: {'OVERDUE, ' if stale else ''}waits, no kickoff on file")
+            failed = failed or stale
+            continue
+        if context.now < last + GRADE_AFTER:
+            detail.append(f"week {week}: waits, its last kickoff {js_iso(last)} is under {GRADE_AFTER} ago")
             continue
         try:
             with context.engine.begin() as conn:

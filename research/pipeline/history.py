@@ -29,6 +29,7 @@ from typing import Final
 
 from sqlalchemy import Connection, text
 
+from research.errors import SchemaDriftError
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse import context, derived_stat_lines, ingest, ingest_schedule, injury_reports
 from research.pipeline.nflverse.client import NflverseClient
@@ -145,8 +146,15 @@ def rebuild_history(
         step(f"play-by-play {season}: {pbp.plays_read} plays, {pbp.observations_written} observations")
     step(f"coaches: {context.ingest_coaches(conn, client, context_seasons)} observations")
     step(f"opponent adjustment: {context.ingest_opponent_defence(conn, client, context_seasons)} observations")
-    filings = injury_reports.ingest_injury_reports(conn, client, injuries)
-    step(f"injury filings: {sum(r.observations_written for r in filings)} observations")
+    for season in injuries:
+        try:
+            with conn.begin_nested():
+                filings = injury_reports.ingest_injury_reports(conn, client, [season])
+            step(f"injury filings {season}: {sum(r.observations_written for r in filings)} observations")
+        except SchemaDriftError as error:
+            # nflverse's older injury files carry rows with no `date_modified`: a filing that cannot
+            # be stamped cannot be replayed, so the season is named and left out, as the ingest refuses it.
+            step(f"injury filings {season}: not ingested, {error}")
     for season in observations:
         step(f"depth chart {season}: {ingest_depth_charts(conn, client, season, now)} observations")
     for season in rosters:
