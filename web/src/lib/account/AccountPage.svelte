@@ -32,6 +32,7 @@
 		hasArrived,
 		type Arrival
 	} from './arrival.ts';
+	import AccountLeagues from '#lib/league/AccountLeagues.svelte';
 	import GroupPasses from './GroupPasses.svelte';
 	import { accountLinks } from './links.ts';
 	import { hasFeature } from './features.ts';
@@ -49,6 +50,7 @@
 			text: 'on every device you sign in on, with your notes and tiers'
 		},
 		{ lead: 'Your mock drafts', text: 'and the report on each one' },
+		{ lead: 'Your leagues', text: 'on Sleeper or MyFantasyLeague, kept up to date' },
 		{
 			lead: 'Your Draft Pass or Membership',
 			text: 'and the receipts for it',
@@ -230,6 +232,8 @@
 							<EmptyState level={3} title="No mock drafts yet" />
 						{/if}
 					</section>
+
+					<AccountLeagues />
 
 					{#if groupPasses.length > 0}
 						<GroupPasses

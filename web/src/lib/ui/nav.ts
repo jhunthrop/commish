@@ -1,6 +1,7 @@
 import type { IconName } from './icons.ts';
 
-export type Section = 'board' | 'players' | 'mock' | 'sheet' | 'advisor' | 'record' | 'account';
+export type Section =
+	'board' | 'players' | 'mock' | 'sheet' | 'league' | 'advisor' | 'record' | 'account';
 
 export interface RailItem {
 	section: Section;
@@ -19,6 +20,8 @@ export const HOME_HREF = '/';
 const MOCK_SETUP = '/mock/new';
 /** The advisor's own page: our call beside your real draft (the live draft companion). */
 export const COMPANION_START = '/companion/new' as const;
+/** Where a league on another host is attached. */
+export const LEAGUE_START = '/league/new' as const;
 
 /** The rail, top to bottom. The phone shows every item not marked wideOnly along the bottom.
  * A page lights the item whose `owns` holds its first path segment: the board's companions (ADP,
@@ -75,6 +78,30 @@ export const RAIL: readonly RailItem[] = [
 	}
 ];
 
+/** Your league, shown when /me names one (account/rail-league.svelte.ts), after the cheat sheet:
+ * the in-season half of the rail. It opens the account's newest league. */
+export function leagueItem(leagueId: string): RailItem {
+	return {
+		section: 'league',
+		label: 'League',
+		href: `/league/${encodeURIComponent(leagueId)}`,
+		icon: 'league',
+		wideOnly: false,
+		owns: ['league']
+	};
+}
+
+/** The rail with League in its place when the account has a league. The phone's bar holds five, so
+ * League takes Our record's place there; Our record stays on the desk's rail. */
+export function railItems(leagueId: string | null): readonly RailItem[] {
+	if (leagueId === null) return RAIL;
+	const at = RAIL.findIndex((item) => item.section === 'sheet') + 1;
+	const rest = RAIL.slice(at).map((item) =>
+		item.section === 'record' ? { ...item, wideOnly: true } : item
+	);
+	return [...RAIL.slice(0, at), leagueItem(leagueId), ...rest];
+}
+
 /** Pinned to the foot of the rail. */
 export const RAIL_FOOT: RailItem = {
 	section: 'account',
@@ -85,15 +112,18 @@ export const RAIL_FOOT: RailItem = {
 	owns: ['account', 'pass', 'claim']
 };
 
-/** How many items the phone's bottom rail draws, every item not marked wideOnly. The phone lays
- * its columns from this number, so a tab keeps its place while the rest of the rail is still
- * arriving. */
-export const PHONE_RAIL_COUNT = [...RAIL, RAIL_FOOT].filter((item) => !item.wideOnly).length;
+/** How many items the phone's bottom rail draws from a rail, every item not marked wideOnly. The
+ * phone lays its columns from this number, so a tab keeps its place while the rest of the rail is
+ * still arriving. With League in the rail it takes Our record's place, so the count holds. */
+export function phoneRailCount(items: readonly RailItem[]): number {
+	return [...items, RAIL_FOOT].filter((item) => !item.wideOnly).length;
+}
 
 /** The section a path belongs to, by the one rule above, or null for a page outside the sections
  * (the front door, the system page). */
 export function sectionOf(pathname: string): Section | null {
 	const [first = ''] = pathname.split('/').filter((segment) => segment !== '');
+	if (first === 'league') return 'league';
 	const item = [...RAIL, RAIL_FOOT].find((candidate) => candidate.owns.includes(first));
 	return item?.section ?? null;
 }

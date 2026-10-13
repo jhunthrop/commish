@@ -2,20 +2,28 @@ package companion
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/jhunthrop/commish/api/internal/poll"
 	"github.com/jhunthrop/commish/api/internal/sleeper"
 )
 
-// Polling discipline (Lane 8): one upstream read per draft per two
-// seconds whatever the number of viewers, the last snapshot answered
-// with its age when the host fails. The shared read is per process: with
-// N instances serving one draft the bound is N reads per two seconds.
+// Polling discipline (Lane 8, internal/poll): one upstream read per draft
+// per two seconds whatever the number of viewers, every viewer past the
+// gap waiting for the read, the last snapshot answered with its age when
+// the host fails. A disconnecting viewer never cancels the shared read:
+// it runs to its timeout for the draft's other viewers (poll's Outlive).
+// The shared read is per process: with N instances serving one draft the
+// bound is N reads per two seconds.
 const (
 	MinUpstreamGap = 2 * time.Second
 	// idleAfter drops a draft no viewer has asked about in this long.
 	idleAfter = 10 * time.Minute
+	// readTimeout bounds a read: two host requests of three seconds each.
+	readTimeout = 10 * time.Second
 )
 
 // Host is the host's draft as the companion reads it. *sleeper.Client
@@ -40,54 +48,27 @@ type Read struct {
 	Stale time.Duration
 }
 
-type entry struct {
-	mu   sync.Mutex
-	snap *Snapshot
-	// err is the last read's failure, answered inside the gap to every
-	// viewer of a draft that has no snapshot yet.
-	err      error
-	tried    time.Time
-	lastSeen time.Time
-}
-
 // Poller shares one upstream read per draft between every viewer.
 type Poller struct {
 	Host Host
 	Now  func() time.Time
 
-	mu      sync.Mutex
-	entries map[string]*entry
-	// Upstream counts the reads that reached the host, for the measured
-	// poll cost.
-	upstream int64
+	once  sync.Once
+	inner *poll.Poller[Snapshot]
+}
+
+func (p *Poller) shared() *poll.Poller[Snapshot] {
+	p.once.Do(func() {
+		p.inner = &poll.Poller[Snapshot]{
+			Now: p.Now, Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Idle: idleAfter, Timeout: readTimeout,
+			Outlive: true,
+		}
+	})
+	return p.inner
 }
 
 // Upstream is how many reads reached the host.
-func (p *Poller) Upstream() int64 {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.upstream
-}
-
-func (p *Poller) entryFor(id string, now time.Time) *entry {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.entries == nil {
-		p.entries = map[string]*entry{}
-	}
-	for key, e := range p.entries {
-		if now.Sub(e.lastSeen) > idleAfter && key != id {
-			delete(p.entries, key)
-		}
-	}
-	e, ok := p.entries[id]
-	if !ok {
-		e = &entry{}
-		p.entries[id] = e
-	}
-	e.lastSeen = now
-	return e
-}
+func (p *Poller) Upstream() int64 { return p.shared().Upstream() }
 
 // Read is the draft as of at most MinUpstreamGap ago. A viewer that
 // arrives while another's read is in flight waits for it and shares it.
@@ -95,45 +76,18 @@ func (p *Poller) entryFor(id string, now time.Time) *entry {
 // succeeded or not: each gets the last snapshot with its age, or, for a
 // draft never read, the last read's error.
 func (p *Poller) Read(ctx context.Context, id string) (Read, error) {
-	now := p.Now()
-	e := p.entryFor(id, now)
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if !e.tried.IsZero() && now.Sub(e.tried) < MinUpstreamGap {
-		return p.cached(e, now)
-	}
-	e.tried = now
-	p.mu.Lock()
-	p.upstream++
-	p.mu.Unlock()
-	// The read is shared, so it outlives the viewer who started it: the
-	// client's own timeout bounds it.
-	snap, err := p.fetch(context.WithoutCancel(ctx), id, now)
+	r, err := p.shared().Read(ctx, id, MinUpstreamGap, poll.Wait, func(ctx context.Context) (Snapshot, error) {
+		return p.fetch(ctx, id)
+	})
 	if err != nil {
-		e.err = err
-		return p.cached(e, now)
+		return Read{}, err
 	}
-	e.snap, e.err = &snap, nil
-	return Read{Snapshot: snap}, nil
+	snap := r.Value
+	snap.FetchedAt = r.At
+	return Read{Snapshot: snap, Stale: r.Stale}, nil
 }
 
-// cached is the entry's last snapshot with its age, or its last error.
-func (p *Poller) cached(e *entry, now time.Time) (Read, error) {
-	if e.snap == nil {
-		return Read{}, e.err
-	}
-	return p.answer(e, now), nil
-}
-
-func (p *Poller) answer(e *entry, now time.Time) Read {
-	r := Read{Snapshot: *e.snap}
-	if e.tried.After(e.snap.FetchedAt) {
-		r.Stale = now.Sub(e.snap.FetchedAt)
-	}
-	return r
-}
-
-func (p *Poller) fetch(ctx context.Context, id string, now time.Time) (Snapshot, error) {
+func (p *Poller) fetch(ctx context.Context, id string) (Snapshot, error) {
 	d, err := p.Host.Draft(ctx, id)
 	if err != nil {
 		return Snapshot{}, err
@@ -142,5 +96,5 @@ func (p *Poller) fetch(ctx context.Context, id string, now time.Time) (Snapshot,
 	if err != nil {
 		return Snapshot{}, err
 	}
-	return Snapshot{Draft: d, Picks: picks, FetchedAt: now}, nil
+	return Snapshot{Draft: d, Picks: picks}, nil
 }

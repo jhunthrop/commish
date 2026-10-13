@@ -159,6 +159,123 @@ paths:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
 
+  /leagues/attach/preview:
+    post:
+      tags: [league-sync]
+      operationId: previewAttach
+      summary: >-
+        Read a league on another host by its link (Sleeper, or a public MyFantasyLeague league) and answer its name and
+        teams, so the drafter can say which team is theirs. Free. Nothing is saved.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AttachPreviewInput" }
+      responses:
+        "200": { $ref: "#/components/responses/AttachPreviewResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attach:
+    post:
+      tags: [league-sync]
+      operationId: attachLeague
+      summary: >-
+        Attach the drafter's own league on another host by its link. Free. The league's roster and scoring become a
+        saved league (custom scoring, exactly as the host states it) a mock reruns from, when a mock room can draft
+        its shape. The drafter's seat is the team their Sleeper username runs, or the team they pick. Attaching the
+        same league again updates the seat.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AttachInput" }
+      responses:
+        "201": { $ref: "#/components/responses/LeagueSyncResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached:
+    get:
+      tags: [league-sync]
+      operationId: listAttached
+      summary: The account's attached leagues, newest first.
+      security: [{ session: [] }]
+      responses:
+        "200":
+          description: up to twenty
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/AttachedLeague" } } }
+  /leagues/attached/{id}:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    delete:
+      tags: [league-sync]
+      operationId: detachLeague
+      summary: >-
+        Stop following a league. The attachment is kept as detached, with the saved league it made, so the detach
+        can be undone (restore) and mocks saved from it keep their settings.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/restore:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    post:
+      tags: [league-sync]
+      operationId: restoreLeague
+      summary: Undo a detach. The league is followed again with the seat and saved league it had.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/sync:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+    get:
+      tags: [league-sync]
+      operationId: leagueSync
+      summary: >-
+        The attached league as it stands: standings, the drafter's roster, the week's matchup, the moves of this week
+        and last, and the unrostered pool on our board. One upstream read per league per minute whatever the viewer
+        count; when the host fails, the last good read with host_stale_seconds.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/LeagueSyncResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/refresh:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+    post:
+      tags: [league-sync]
+      operationId: refreshLeague
+      summary: >-
+        Read the league from its host now, shared with any read inside the last ten seconds. 30 an hour an account.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/LeagueSyncResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "429": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+
   /sheets:
     get:
       tags: [sheets]
@@ -978,6 +1095,22 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/Companion" } }
+    LeagueSyncResponse:
+      description: an attached league as it stands
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/LeagueSync" } }
+    AttachPreviewResponse:
+      description: a league's name and teams, before it is attached
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/AttachPreview" } }
     LobbySeatResponse:
       description: the seat taken
       content:
@@ -1044,7 +1177,7 @@ components:
 
     Feature:
       type: string
-      enum: [live_draft_advisor, custom_scoring, full_reasoning, range_of_outcomes, synced_sheet, early_run]
+      enum: [live_draft_advisor, custom_scoring, full_reasoning, range_of_outcomes, synced_sheet, early_run, start_sit, waiver_ranks, trade_finder]
     Product:
       type: string
       enum: [draft_pass, membership, group_pass]
@@ -1054,10 +1187,15 @@ components:
 
     Account:
       type: object
-      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, created_at]
+      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, league_id, created_at]
       properties:
         id: { type: string, format: uuid }
         email: { type: string }
+        league_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
         first_name: { type: string, nullable: true }
         last_name: { type: string, nullable: true }
         handle:
@@ -1883,3 +2021,200 @@ components:
         type: { type: string, enum: [error] }
         code: { type: string }
         message: { type: string }
+    LeagueHost:
+      type: string
+      description: the host a league runs on, named as a mechanism
+      enum: [sleeper, mfl]
+    AttachPreviewInput:
+      type: object
+      required: [link]
+      properties:
+        host: { $ref: "#/components/schemas/LeagueHost" }
+        link: { type: string, minLength: 1, maxLength: 300, description: the league link as pasted, or a Sleeper league id }
+    AttachInput:
+      type: object
+      required: [link, me]
+      properties:
+        host: { $ref: "#/components/schemas/LeagueHost" }
+        link: { type: string, minLength: 1, maxLength: 300, description: the league link as pasted, or a Sleeper league id }
+        me: { $ref: "#/components/schemas/AttachSeat" }
+    AttachSeat:
+      type: object
+      description: exactly one of username (Sleeper only) and roster_id
+      properties:
+        username: { type: string, nullable: true, maxLength: 40 }
+        roster_id: { type: integer, nullable: true, minimum: 1, maximum: 32 }
+    AttachPreview:
+      type: object
+      required: [host, host_league_id, season, name, teams, seat_by_username]
+      properties:
+        host: { $ref: "#/components/schemas/LeagueHost" }
+        host_league_id: { type: string }
+        season: { type: integer, description: the league's season, 0 when the host does not say }
+        name: { type: string }
+        teams: { type: array, items: { $ref: "#/components/schemas/LeagueTeam" } }
+        seat_by_username: { type: boolean, description: whether the host finds a seat by username (Sleeper does) }
+    AttachedLeague:
+      type: object
+      required: [id, host, host_league_id, season, name, roster_id, team_name, attached_at]
+      properties:
+        id: { type: string, format: uuid }
+        host: { $ref: "#/components/schemas/LeagueHost" }
+        host_league_id: { type: string }
+        season: { type: integer }
+        name: { type: string, description: the league's name at its last read }
+        roster_id: { type: integer }
+        team_name: { type: string, description: the drafter's team at the last read, empty when unread }
+        attached_at: { type: string, format: date-time }
+    LeagueTeam:
+      type: object
+      required: [roster_id, name, owner, wins, losses, ties, points_for]
+      properties:
+        roster_id: { type: integer }
+        name: { type: string, description: the team's name, or its owner's when it has none }
+        owner: { type: string, description: the owner's display name, empty where the host shows none }
+        wins: { type: integer }
+        losses: { type: integer }
+        ties: { type: integer }
+        points_for: { type: number, format: double }
+    LeaguePlayer:
+      type: object
+      required: [host_id, board_id, name, position, team]
+      properties:
+        host_id: { type: string }
+        board_id: { type: string, nullable: true, description: the player's id on our board, null when unplaced }
+        name: { type: string }
+        position: { type: string }
+        team: { type: string }
+    RosterSpot:
+      type: object
+      required: [player, slot]
+      properties:
+        player: { $ref: "#/components/schemas/LeaguePlayer" }
+        slot: { type: string, enum: [starter, bench, reserve, taxi] }
+    MatchupStarter:
+      type: object
+      required: [player, points]
+      properties:
+        player: { $ref: "#/components/schemas/LeaguePlayer" }
+        points: { type: number, format: double, description: his points so far this week }
+    MatchupSide:
+      type: object
+      required: [roster_id, points, starters]
+      properties:
+        roster_id: { type: integer }
+        points: { type: number, format: double }
+        starters: { type: array, items: { $ref: "#/components/schemas/MatchupStarter" } }
+    LeagueMatchup:
+      type: object
+      required: [week, mine, opponent]
+      properties:
+        week: { type: integer }
+        mine: { $ref: "#/components/schemas/MatchupSide" }
+        opponent: { allOf: [{ $ref: "#/components/schemas/MatchupSide" }], nullable: true }
+    LeagueMove:
+      type: object
+      required: [kind, at, roster_ids, adds, drops]
+      properties:
+        kind: { type: string, enum: [add, waiver, trade] }
+        at: { type: string, format: date-time }
+        roster_ids: { type: array, items: { type: integer } }
+        adds: { type: array, items: { $ref: "#/components/schemas/MovePlayer" } }
+        drops: { type: array, items: { $ref: "#/components/schemas/MovePlayer" } }
+    MovePlayer:
+      type: object
+      required: [player, roster_id]
+      properties:
+        player: { $ref: "#/components/schemas/LeaguePlayer" }
+        roster_id: { type: integer, description: the team that took him (adds) or let him go (drops) }
+    Placement:
+      type: object
+      description: how the league's rostered players were placed on our board, by rule
+      required: [by_espn_id, by_defense, by_name, unplaced]
+      properties:
+        by_espn_id: { type: integer }
+        by_defense: { type: integer }
+        by_name: { type: integer }
+        unplaced: { type: integer }
+    LeagueSync:
+      type: object
+      required:
+        - id
+        - host
+        - host_league_id
+        - season
+        - name
+        - status
+        - week
+        - me
+        - settings_league_id
+        - settings_note
+        - scoring_like
+        - scoring_dropped
+        - scoring_defaulted
+        - teams
+        - roster
+        - matchup
+        - moves
+        - rostered
+        - board_format
+        - byes
+        - placement
+        - read_at
+        - host_stale_seconds
+      properties:
+        id: { type: string, format: uuid }
+        host: { $ref: "#/components/schemas/LeagueHost" }
+        host_league_id: { type: string }
+        season: { type: integer }
+        name: { type: string }
+        status: { type: string, description: the host's league state (in_season and the like), empty where the host shows none }
+        week: { type: integer, description: the host's current week, 0 before the season or for a past one }
+        me: { type: integer, description: the drafter's roster id }
+        settings_league_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: the saved league a mock reruns from, null when a mock room cannot draft this league
+        settings_note: { type: string, nullable: true, description: why there is no saved league, in the drafter's words }
+        scoring_like:
+          allOf: [{ $ref: "#/components/schemas/ScoringPreset" }]
+          description: the preset the league's rules score most like, what a mock without custom scoring drafts on
+        scoring_dropped:
+          type: array
+          description: >-
+            the league's scoring rules the saved league (ScoringRules' 21 keys) does not carry, by the host's own
+            name and figure
+          items: { type: string }
+        scoring_defaulted:
+          type: array
+          description: the ScoringRules keys the league does not state, each at its standard figure ("key figure")
+          items: { type: string }
+        teams:
+          type: array
+          description: every team, in standings order (wins, then points for)
+          items: { $ref: "#/components/schemas/LeagueTeam" }
+        roster: { type: array, items: { $ref: "#/components/schemas/RosterSpot" } }
+        matchup: { allOf: [{ $ref: "#/components/schemas/LeagueMatchup" }], nullable: true }
+        moves:
+          type: array
+          description: the completed moves of this week and last, newest first
+          items: { $ref: "#/components/schemas/LeagueMove" }
+        rostered:
+          type: array
+          description: >-
+            the board id of every player a team in the league holds; the waiver pool is our board without them. The
+            board is the run's own (web data/league-board), not part of this answer
+          items: { type: string }
+        board_format:
+          allOf: [{ $ref: "#/components/schemas/BoardFormat" }]
+          description: the run's board the league reads on (ppr, half_ppr, standard or superflex)
+        byes:
+          type: object
+          description: each NFL team's bye week this season, by team code
+          additionalProperties: { type: integer }
+        placement: { $ref: "#/components/schemas/Placement" }
+        read_at: { type: string, format: date-time, description: when the host was last read for this league }
+        host_stale_seconds:
+          type: integer
+          description: how stale the answer is because the host failed since, 0 when the last read reached it

@@ -1,0 +1,177 @@
+package leaguesync
+
+import (
+	"context"
+	"errors"
+	"io"
+	"log/slog"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+// countingHost answers a fixed league and counts the reads that reach it.
+type countingHost struct {
+	Sleeper
+	reads atomic.Int64
+	down  atomic.Bool
+}
+
+func (h *countingHost) Read(_ context.Context, ref Ref) (Snapshot, error) {
+	h.reads.Add(1)
+	if h.down.Load() {
+		return Snapshot{}, ErrUnavailable
+	}
+	return Snapshot{Ref: ref, Name: "League", Teams: []Team{{RosterID: 1}}}, nil
+}
+
+type memorySnapshots struct {
+	mu    sync.Mutex
+	snaps map[string]Snapshot
+}
+
+func (m *memorySnapshots) LastSnapshot(_ context.Context, ref Ref) (Snapshot, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.snaps[ref.Key()]
+	return s, ok, nil
+}
+
+func (m *memorySnapshots) PutSnapshot(_ context.Context, s Snapshot) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.snaps == nil {
+		m.snaps = map[string]Snapshot{}
+	}
+	m.snaps[s.Ref.Key()] = s
+	return nil
+}
+
+type fakeClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func (c *fakeClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+func (c *fakeClock) Advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+}
+
+func quietLog() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
+
+func newPoller(host *countingHost, store SnapshotStore, clock *fakeClock) *Poller {
+	return &Poller{Hosts: Hosts{host}, Store: store, Now: clock.Now, Log: quietLog()}
+}
+
+var testRef = Ref{Host: HostSleeper, LeagueID: "1382163311038038016"}
+
+// readAll has n viewers read at once and fails on any error.
+func readAll(t *testing.T, p *Poller, n int) []Read {
+	t.Helper()
+	out := make([]Read, n)
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Go(func() { out[i], errs[i] = p.Read(context.Background(), testRef) })
+	}
+	wg.Wait()
+	for _, err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return out
+}
+
+// 25 viewers of one league make one upstream read a minute, the host up
+// or down, and past the minute a view answers the last read while the
+// next one goes upstream; a refresh reads at once but shares a read
+// inside ten seconds.
+func TestPollerOneReadPerLeaguePerMinute(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
+	host := &countingHost{}
+	p := newPoller(host, &memorySnapshots{}, clock)
+
+	readAll(t, p, 25)
+	clock.Advance(30 * time.Second)
+	readAll(t, p, 25)
+	if got := host.reads.Load(); got != 1 {
+		t.Fatalf("50 views in 30 s made %d upstream reads, want 1", got)
+	}
+	clock.Advance(31 * time.Second)
+	readAll(t, p, 25)
+	if got := host.reads.Load(); got != 2 {
+		t.Fatalf("a view past the minute made %d reads in all, want 2", got)
+	}
+
+	host.down.Store(true)
+	clock.Advance(time.Minute)
+	for _, r := range readAll(t, p, 25) {
+		if r.Name != "League" {
+			t.Fatalf("a view past the minute waited on the host instead of answering the last read")
+		}
+	}
+	if got := host.reads.Load(); got != 3 {
+		t.Fatalf("the host down: %d reads in all, want 3", got)
+	}
+	// A refresh inside the floor waits for the read in flight and shares it.
+	r, err := p.Refresh(context.Background(), testRef)
+	if err != nil || r.Stale != time.Minute || host.reads.Load() != 3 {
+		t.Fatalf("the host down answered %v stale %s after %d reads, want the last read a minute stale", err, r.Stale, host.reads.Load())
+	}
+
+	host.down.Store(false)
+	clock.Advance(5 * time.Second)
+	if _, err := p.Refresh(context.Background(), testRef); err != nil {
+		t.Fatal(err)
+	}
+	if got := host.reads.Load(); got != 3 {
+		t.Fatalf("a refresh 5 s after a read went upstream (%d reads)", got)
+	}
+	clock.Advance(6 * time.Second)
+	r, err = p.Refresh(context.Background(), testRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := host.reads.Load(); got != 4 || r.Stale != 0 {
+		t.Fatalf("a refresh 11 s after a read: %d reads, stale %s, want 4 and fresh", got, r.Stale)
+	}
+}
+
+// A restarted process answers the stored read while it is fresh, and a
+// league never read with its host down answers the host's error.
+func TestPollerStoredReadAndFirstFailure(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
+	store := &memorySnapshots{}
+	first := &countingHost{}
+	if _, err := newPoller(first, store, clock).Read(context.Background(), testRef); err != nil {
+		t.Fatal(err)
+	}
+	clock.Advance(20 * time.Second)
+	restarted := &countingHost{}
+	p := newPoller(restarted, store, clock)
+	readAll(t, p, 10)
+	if got := restarted.reads.Load(); got != 0 {
+		t.Fatalf("a restart inside the minute read the host %d times", got)
+	}
+
+	down := &countingHost{}
+	down.down.Store(true)
+	fresh := newPoller(down, &memorySnapshots{}, clock)
+	for range 5 {
+		if _, err := fresh.Read(context.Background(), testRef); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("a never-read league with the host down answered %v", err)
+		}
+	}
+	if got := down.reads.Load(); got != 1 {
+		t.Fatalf("five views of a failing league made %d reads, want 1", got)
+	}
+}

@@ -1,14 +1,15 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import { page } from '$app/state';
+	import { railLeague } from '#lib/account/rail-league.svelte.ts';
 	import Icon from './Icon.svelte';
 	import Stamp from './Stamp.svelte';
 	import ThemeSwitch from './ThemeSwitch.svelte';
 	import {
 		HOME_HREF,
-		PHONE_RAIL_COUNT,
-		RAIL,
 		RAIL_FOOT,
+		phoneRailCount,
+		railItems,
 		sectionOf,
 		type RailItem,
 		type Section
@@ -34,6 +35,9 @@
 	let { title, stamp, active, search, tail, children }: Props = $props();
 
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
+	// League joins the rail when /me names an attached league.
+	onMount(() => void railLeague.load());
+	const items = $derived(railItems(railLeague.id));
 </script>
 
 {#snippet railLink(item: RailItem)}
@@ -49,9 +53,9 @@
 {/snippet}
 
 <div class="app">
-	<nav class="rail" aria-label="Sections" style="--phone-items: {PHONE_RAIL_COUNT}">
+	<nav class="rail" aria-label="Sections" style="--phone-items: {phoneRailCount(items)}">
 		<a class="mark" href={HOME_HREF} aria-label="Commish"><b>C</b></a>
-		{#each RAIL as item (item.section)}
+		{#each items as item (item.section)}
 			{@render railLink(item)}
 		{/each}
 		<span class="spacer"></span>

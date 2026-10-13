@@ -26,7 +26,15 @@ type Entitlements interface {
 // Viewer builds Account answers.
 type Viewer struct {
 	Entitlements Entitlements
-	Now          func() time.Time
+	// Leagues answers the account's newest attached league, for the
+	// rail's League item. Nil answers none.
+	Leagues Leagues
+	Now     func() time.Time
+}
+
+// Leagues is the part of the league sync store the account answer reads.
+type Leagues interface {
+	Newest(ctx context.Context, accountID uuid.UUID) (*uuid.UUID, error)
 }
 
 // View is a's Account answer at now.
@@ -47,10 +55,16 @@ func (v *Viewer) View(ctx context.Context, a auth.Account) (apitypes.Account, er
 	if features == nil {
 		features = []entitlements.Feature{}
 	}
+	var league *uuid.UUID
+	if v.Leagues != nil {
+		if league, err = v.Leagues.Newest(ctx, a.ID); err != nil {
+			return apitypes.Account{}, fmt.Errorf("account: view %s: %w", a.ID, err)
+		}
+	}
 	return apitypes.Account{
 		Id: a.ID, Email: a.Email, FirstName: a.FirstName, LastName: a.LastName, Handle: a.Handle,
 		Features: features, DraftPass: passView(pass), Membership: membershipView(membership),
-		CreatedAt: a.CreatedAt,
+		LeagueId: league, CreatedAt: a.CreatedAt,
 	}, nil
 }
 

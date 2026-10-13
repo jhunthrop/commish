@@ -139,6 +139,135 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/leagues/attach/preview': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Read a league on another host by its link (Sleeper, or a public MyFantasyLeague league) and answer its name and teams, so the drafter can say which team is theirs. Free. Nothing is saved. */
+		post: operations['previewAttach'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/leagues/attach': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Attach the drafter's own league on another host by its link. Free. The league's roster and scoring become a saved league (custom scoring, exactly as the host states it) a mock reruns from, when a mock room can draft its shape. The drafter's seat is the team their Sleeper username runs, or the team they pick. Attaching the same league again updates the seat. */
+		post: operations['attachLeague'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/leagues/attached': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The account's attached leagues, newest first. */
+		get: operations['listAttached'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/leagues/attached/{id}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post?: never;
+		/** Stop following a league. The attachment is kept as detached, with the saved league it made, so the detach can be undone (restore) and mocks saved from it keep their settings. */
+		delete: operations['detachLeague'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/leagues/attached/{id}/restore': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Undo a detach. The league is followed again with the seat and saved league it had. */
+		post: operations['restoreLeague'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/leagues/attached/{id}/sync': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		/** The attached league as it stands: standings, the drafter's roster, the week's matchup, the moves of this week and last, and the unrostered pool on our board. One upstream read per league per minute whatever the viewer count; when the host fails, the last good read with host_stale_seconds. */
+		get: operations['leagueSync'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/leagues/attached/{id}/refresh': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Read the league from its host now, shared with any read inside the last ten seconds. 30 an hour an account. */
+		post: operations['refreshLeague'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/sheets': {
 		parameters: {
 			query?: never;
@@ -899,7 +1028,10 @@ export interface components {
 			| 'full_reasoning'
 			| 'range_of_outcomes'
 			| 'synced_sheet'
-			| 'early_run';
+			| 'early_run'
+			| 'start_sit'
+			| 'waiver_ranks'
+			| 'trade_finder';
 		/** @enum {string} */
 		Product: 'draft_pass' | 'membership' | 'group_pass';
 		/** @enum {string} */
@@ -908,6 +1040,11 @@ export interface components {
 			/** Format: uuid */
 			id: string;
 			email: string;
+			/**
+			 * Format: uuid
+			 * @description the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
+			 */
+			league_id: string | null;
 			first_name: string | null;
 			last_name: string | null;
 			/** @description the name shown in lobbies, 3 to 20 letters, digits or underscores, not starting with a digit */
@@ -1620,6 +1757,163 @@ export interface components {
 			code: string;
 			message: string;
 		};
+		/**
+		 * @description the host a league runs on, named as a mechanism
+		 * @enum {string}
+		 */
+		LeagueHost: 'sleeper' | 'mfl';
+		AttachPreviewInput: {
+			host?: components['schemas']['LeagueHost'];
+			/** @description the league link as pasted */
+			link: string;
+		};
+		AttachInput: {
+			host?: components['schemas']['LeagueHost'];
+			/** @description the league link as pasted */
+			link: string;
+			me: components['schemas']['AttachSeat'];
+		};
+		/** @description exactly one of username (Sleeper only) and roster_id */
+		AttachSeat: {
+			username?: string | null;
+			roster_id?: number | null;
+		};
+		AttachPreview: {
+			host: components['schemas']['LeagueHost'];
+			host_league_id: string;
+			/** @description the league's season */
+			season: number;
+			name: string;
+			teams: components['schemas']['LeagueTeam'][];
+			/** @description whether the host finds a seat by username (Sleeper does) */
+			seat_by_username: boolean;
+		};
+		AttachedLeague: {
+			/** Format: uuid */
+			id: string;
+			host: components['schemas']['LeagueHost'];
+			host_league_id: string;
+			season: number;
+			/** @description the league's name at its last read */
+			name: string;
+			roster_id: number;
+			/** @description the drafter's team at the last read */
+			team_name: string;
+			/** Format: date-time */
+			attached_at: string;
+		};
+		LeagueTeam: {
+			roster_id: number;
+			/** @description the team's name */
+			name: string;
+			/** @description the owner's display name */
+			owner: string;
+			wins: number;
+			losses: number;
+			ties: number;
+			/** Format: double */
+			points_for: number;
+		};
+		LeaguePlayer: {
+			host_id: string;
+			/** @description the player's id on our board */
+			board_id: string | null;
+			name: string;
+			position: string;
+			team: string;
+		};
+		RosterSpot: {
+			player: components['schemas']['LeaguePlayer'];
+			/** @enum {string} */
+			slot: 'starter' | 'bench' | 'reserve' | 'taxi';
+		};
+		MatchupStarter: {
+			player: components['schemas']['LeaguePlayer'];
+			/**
+			 * Format: double
+			 * @description his points so far this week
+			 */
+			points: number;
+		};
+		MatchupSide: {
+			roster_id: number;
+			/** Format: double */
+			points: number;
+			starters: components['schemas']['MatchupStarter'][];
+		};
+		LeagueMatchup: {
+			week: number;
+			mine: components['schemas']['MatchupSide'];
+			opponent: components['schemas']['MatchupSide'] | null;
+		};
+		LeagueMove: {
+			/** @enum {string} */
+			kind: 'add' | 'waiver' | 'trade';
+			/** Format: date-time */
+			at: string;
+			roster_ids: number[];
+			adds: components['schemas']['MovePlayer'][];
+			drops: components['schemas']['MovePlayer'][];
+		};
+		MovePlayer: {
+			player: components['schemas']['LeaguePlayer'];
+			/** @description the team that took him (adds) or let him go (drops) */
+			roster_id: number;
+		};
+		/** @description how the league's rostered players were placed on our board, by rule */
+		Placement: {
+			by_espn_id: number;
+			by_defense: number;
+			by_name: number;
+			unplaced: number;
+		};
+		LeagueSync: {
+			/** Format: uuid */
+			id: string;
+			host: components['schemas']['LeagueHost'];
+			host_league_id: string;
+			season: number;
+			name: string;
+			/** @description the host's league state (in_season and the like) */
+			status: string;
+			/** @description the host's current week */
+			week: number;
+			/** @description the drafter's roster id */
+			me: number;
+			/**
+			 * Format: uuid
+			 * @description the saved league a mock reruns from, null when a mock room cannot draft this league
+			 */
+			settings_league_id: string | null;
+			/** @description why there is no saved league */
+			settings_note: string | null;
+			/** @description the preset the league's rules score most like, what a mock without custom scoring drafts on */
+			scoring_like: components['schemas']['ScoringPreset'];
+			/** @description the league's scoring rules the saved league (ScoringRules' 21 keys) does not carry, by the host's own name and figure */
+			scoring_dropped: string[];
+			/** @description the ScoringRules keys the league does not state, each at its standard figure ("key figure") */
+			scoring_defaulted: string[];
+			/** @description every team, in standings order (wins, then points for) */
+			teams: components['schemas']['LeagueTeam'][];
+			roster: components['schemas']['RosterSpot'][];
+			matchup: components['schemas']['LeagueMatchup'] | null;
+			/** @description the completed moves of this week and last, newest first */
+			moves: components['schemas']['LeagueMove'][];
+			/** @description the board id of every player a team in the league holds; the waiver pool is our board without them. The board is the run's own (web data/league-board), not part of this answer */
+			rostered: string[];
+			/** @description the run's board the league reads on (ppr, half_ppr, standard or superflex) */
+			board_format: components['schemas']['BoardFormat'];
+			/** @description each NFL team's bye week this season, by team code */
+			byes: Record<string, number>;
+			placement: components['schemas']['Placement'];
+			/**
+			 * Format: date-time
+			 * @description when the host was last read for this league
+			 */
+			read_at: string;
+			/** @description how stale the answer is because the host failed since, 0 when the last read reached it */
+			host_stale_seconds: number;
+		};
 	};
 	responses: {
 		/** @description the error envelope */
@@ -1732,6 +2026,24 @@ export interface components {
 			content: {
 				'application/json': components['schemas']['Envelope'] & {
 					data?: components['schemas']['Companion'];
+				};
+			};
+		};
+		/** @description an attached league as it stands */
+		LeagueSyncResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['LeagueSync'];
+				};
+			};
+		};
+		/** @description a league's name and teams, before it is attached */
+		AttachPreviewResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['AttachPreview'];
 				};
 			};
 		};
@@ -1971,6 +2283,133 @@ export interface operations {
 		responses: {
 			200: components['responses']['EmptyResponse'];
 			404: components['responses']['ErrorResponse'];
+		};
+	};
+	previewAttach: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['AttachPreviewInput'];
+			};
+		};
+		responses: {
+			200: components['responses']['AttachPreviewResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	attachLeague: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['AttachInput'];
+			};
+		};
+		responses: {
+			201: components['responses']['LeagueSyncResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	listAttached: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description up to twenty */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['AttachedLeague'][];
+					};
+				};
+			};
+		};
+	};
+	detachLeague: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['EmptyResponse'];
+			404: components['responses']['ErrorResponse'];
+		};
+	};
+	restoreLeague: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['EmptyResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+		};
+	};
+	leagueSync: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['LeagueSyncResponse'];
+			404: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	refreshLeague: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['LeagueSyncResponse'];
+			404: components['responses']['ErrorResponse'];
+			429: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
 		};
 	};
 	listSheets: {

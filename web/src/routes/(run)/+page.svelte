@@ -45,6 +45,7 @@
 			{#snippet aside()}
 				<Verb href={sectionHref('mock')} size="lg" fill>Start a mock draft</Verb>
 				<Quiet href={sectionHref('sheet')} size="lg" fill>Build your cheat sheet</Quiet>
+				<Quiet href={links.leagueNew()} size="lg" fill>Follow your league</Quiet>
 			{/snippet}
 		</HeroCard>
 

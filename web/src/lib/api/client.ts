@@ -38,6 +38,12 @@ function cookie(name: string): string | null {
 	return pair ? decodeURIComponent(pair.slice(name.length + 1)) : null;
 }
 
+/** Whether this browser holds a signed-in session's CSRF cookie, which the API sets only with a
+ * session: a page can skip a call that would answer 401 to a signed-out reader. */
+export function hasSessionCookie(): boolean {
+	return cookie(CSRF_PAIRS[0][0]) !== null;
+}
+
 interface Envelope {
 	ok: boolean;
 	data: unknown;

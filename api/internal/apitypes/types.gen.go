@@ -145,7 +145,10 @@ const (
 	FeatureFullReasoning    Feature = "full_reasoning"
 	FeatureLiveDraftAdvisor Feature = "live_draft_advisor"
 	FeatureRangeOfOutcomes  Feature = "range_of_outcomes"
+	FeatureStartSit         Feature = "start_sit"
 	FeatureSyncedSheet      Feature = "synced_sheet"
+	FeatureTradeFinder      Feature = "trade_finder"
+	FeatureWaiverRanks      Feature = "waiver_ranks"
 )
 
 // Valid indicates whether the value is a known member of the Feature enum.
@@ -161,7 +164,13 @@ func (e Feature) Valid() bool {
 		return true
 	case FeatureRangeOfOutcomes:
 		return true
+	case FeatureStartSit:
+		return true
 	case FeatureSyncedSheet:
+		return true
+	case FeatureTradeFinder:
+		return true
+	case FeatureWaiverRanks:
 		return true
 	default:
 		return false
@@ -219,6 +228,45 @@ func (e Interval) Valid() bool {
 	case IntervalMonth:
 		return true
 	case IntervalYear:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LeagueHost.
+const (
+	LeagueHostMfl     LeagueHost = "mfl"
+	LeagueHostSleeper LeagueHost = "sleeper"
+)
+
+// Valid indicates whether the value is a known member of the LeagueHost enum.
+func (e LeagueHost) Valid() bool {
+	switch e {
+	case LeagueHostMfl:
+		return true
+	case LeagueHostSleeper:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LeagueMoveKind.
+const (
+	LeagueMoveKindAdd    LeagueMoveKind = "add"
+	LeagueMoveKindTrade  LeagueMoveKind = "trade"
+	LeagueMoveKindWaiver LeagueMoveKind = "waiver"
+)
+
+// Valid indicates whether the value is a known member of the LeagueMoveKind enum.
+func (e LeagueMoveKind) Valid() bool {
+	switch e {
+	case LeagueMoveKindAdd:
+		return true
+	case LeagueMoveKindTrade:
+		return true
+	case LeagueMoveKindWaiver:
 		return true
 	default:
 		return false
@@ -555,6 +603,30 @@ func (e RoomWelcomeType) Valid() bool {
 	}
 }
 
+// Defines values for RosterSpotSlot.
+const (
+	RosterSpotSlotBench   RosterSpotSlot = "bench"
+	RosterSpotSlotReserve RosterSpotSlot = "reserve"
+	RosterSpotSlotStarter RosterSpotSlot = "starter"
+	RosterSpotSlotTaxi    RosterSpotSlot = "taxi"
+)
+
+// Valid indicates whether the value is a known member of the RosterSpotSlot enum.
+func (e RosterSpotSlot) Valid() bool {
+	switch e {
+	case RosterSpotSlotBench:
+		return true
+	case RosterSpotSlotReserve:
+		return true
+	case RosterSpotSlotStarter:
+		return true
+	case RosterSpotSlotTaxi:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ScoringPreset.
 const (
 	ScoringPresetHalfPpr   ScoringPreset = "half_ppr"
@@ -636,15 +708,78 @@ type Account struct {
 	FirstName *string         `json:"first_name"`
 
 	// Handle the name shown in lobbies, 3 to 20 letters, digits or underscores, not starting with a digit
-	Handle     *string            `json:"handle"`
-	Id         openapi_types.UUID `json:"id"`
-	LastName   *string            `json:"last_name"`
-	Membership *MembershipState   `json:"membership"`
+	Handle   *string            `json:"handle"`
+	Id       openapi_types.UUID `json:"id"`
+	LastName *string            `json:"last_name"`
+
+	// LeagueId the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
+	LeagueId   *openapi_types.UUID `json:"league_id"`
+	Membership *MembershipState    `json:"membership"`
 }
 
 // AccountUpdate defines model for AccountUpdate.
 type AccountUpdate struct {
 	Handle string `json:"handle"`
+}
+
+// AttachInput defines model for AttachInput.
+type AttachInput struct {
+	// Host the host a league runs on, named as a mechanism
+	Host *LeagueHost `json:"host,omitempty"`
+
+	// Link the league link as pasted
+	Link string `json:"link"`
+
+	// Me exactly one of username (Sleeper only) and roster_id
+	Me AttachSeat `json:"me"`
+}
+
+// AttachPreview defines model for AttachPreview.
+type AttachPreview struct {
+	// Host the host a league runs on, named as a mechanism
+	Host         LeagueHost `json:"host"`
+	HostLeagueId string     `json:"host_league_id"`
+	Name         string     `json:"name"`
+
+	// Season the league's season
+	Season int `json:"season"`
+
+	// SeatByUsername whether the host finds a seat by username (Sleeper does)
+	SeatByUsername bool         `json:"seat_by_username"`
+	Teams          []LeagueTeam `json:"teams"`
+}
+
+// AttachPreviewInput defines model for AttachPreviewInput.
+type AttachPreviewInput struct {
+	// Host the host a league runs on, named as a mechanism
+	Host *LeagueHost `json:"host,omitempty"`
+
+	// Link the league link as pasted
+	Link string `json:"link"`
+}
+
+// AttachSeat exactly one of username (Sleeper only) and roster_id
+type AttachSeat struct {
+	RosterId *int    `json:"roster_id,omitempty"`
+	Username *string `json:"username,omitempty"`
+}
+
+// AttachedLeague defines model for AttachedLeague.
+type AttachedLeague struct {
+	AttachedAt time.Time `json:"attached_at"`
+
+	// Host the host a league runs on, named as a mechanism
+	Host         LeagueHost         `json:"host"`
+	HostLeagueId string             `json:"host_league_id"`
+	Id           openapi_types.UUID `json:"id"`
+
+	// Name the league's name at its last read
+	Name     string `json:"name"`
+	RosterId int    `json:"roster_id"`
+	Season   int    `json:"season"`
+
+	// TeamName the drafter's team at the last read
+	TeamName string `json:"team_name"`
 }
 
 // BoardFormat defines model for BoardFormat.
@@ -966,10 +1101,42 @@ type League struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 }
 
+// LeagueHost the host a league runs on, named as a mechanism
+type LeagueHost string
+
 // LeagueInput defines model for LeagueInput.
 type LeagueInput struct {
 	Name     string         `json:"name"`
 	Settings LeagueSettings `json:"settings"`
+}
+
+// LeagueMatchup defines model for LeagueMatchup.
+type LeagueMatchup struct {
+	Mine     MatchupSide  `json:"mine"`
+	Opponent *MatchupSide `json:"opponent"`
+	Week     int          `json:"week"`
+}
+
+// LeagueMove defines model for LeagueMove.
+type LeagueMove struct {
+	Adds      []MovePlayer   `json:"adds"`
+	At        time.Time      `json:"at"`
+	Drops     []MovePlayer   `json:"drops"`
+	Kind      LeagueMoveKind `json:"kind"`
+	RosterIds []int          `json:"roster_ids"`
+}
+
+// LeagueMoveKind defines model for LeagueMove.Kind.
+type LeagueMoveKind string
+
+// LeaguePlayer defines model for LeaguePlayer.
+type LeaguePlayer struct {
+	// BoardId the player's id on our board
+	BoardId  *string `json:"board_id"`
+	HostId   string  `json:"host_id"`
+	Name     string  `json:"name"`
+	Position string  `json:"position"`
+	Team     string  `json:"team"`
 }
 
 // LeagueSettings defines model for LeagueSettings.
@@ -987,6 +1154,81 @@ type LeagueSettings struct {
 	// Slot null drafts from a random slot
 	Slot  *int `json:"slot"`
 	Teams int  `json:"teams"`
+}
+
+// LeagueSync defines model for LeagueSync.
+type LeagueSync struct {
+	// BoardFormat the run's board the league reads on (ppr, half_ppr, standard or superflex)
+	BoardFormat BoardFormat `json:"board_format"`
+
+	// Byes each NFL team's bye week this season, by team code
+	Byes map[string]int `json:"byes"`
+
+	// Host the host a league runs on, named as a mechanism
+	Host         LeagueHost `json:"host"`
+	HostLeagueId string     `json:"host_league_id"`
+
+	// HostStaleSeconds how stale the answer is because the host failed since, 0 when the last read reached it
+	HostStaleSeconds int                `json:"host_stale_seconds"`
+	Id               openapi_types.UUID `json:"id"`
+	Matchup          *LeagueMatchup     `json:"matchup"`
+
+	// Me the drafter's roster id
+	Me int `json:"me"`
+
+	// Moves the completed moves of this week and last, newest first
+	Moves []LeagueMove `json:"moves"`
+	Name  string       `json:"name"`
+
+	// Placement how the league's rostered players were placed on our board, by rule
+	Placement Placement `json:"placement"`
+
+	// ReadAt when the host was last read for this league
+	ReadAt time.Time    `json:"read_at"`
+	Roster []RosterSpot `json:"roster"`
+
+	// Rostered the board id of every player a team in the league holds; the waiver pool is our board without them. The board is the run's own (web data/league-board), not part of this answer
+	Rostered []string `json:"rostered"`
+
+	// ScoringDefaulted the ScoringRules keys the league does not state, each at its standard figure ("key figure")
+	ScoringDefaulted []string `json:"scoring_defaulted"`
+
+	// ScoringDropped the league's scoring rules the saved league (ScoringRules' 21 keys) does not carry, by the host's own name and figure
+	ScoringDropped []string `json:"scoring_dropped"`
+
+	// ScoringLike the preset the league's rules score most like, what a mock without custom scoring drafts on
+	ScoringLike ScoringPreset `json:"scoring_like"`
+	Season      int           `json:"season"`
+
+	// SettingsLeagueId the saved league a mock reruns from, null when a mock room cannot draft this league
+	SettingsLeagueId *openapi_types.UUID `json:"settings_league_id"`
+
+	// SettingsNote why there is no saved league
+	SettingsNote *string `json:"settings_note"`
+
+	// Status the host's league state (in_season and the like)
+	Status string `json:"status"`
+
+	// Teams every team, in standings order (wins, then points for)
+	Teams []LeagueTeam `json:"teams"`
+
+	// Week the host's current week
+	Week int `json:"week"`
+}
+
+// LeagueTeam defines model for LeagueTeam.
+type LeagueTeam struct {
+	Losses int `json:"losses"`
+
+	// Name the team's name
+	Name string `json:"name"`
+
+	// Owner the owner's display name
+	Owner     string  `json:"owner"`
+	PointsFor float64 `json:"points_for"`
+	RosterId  int     `json:"roster_id"`
+	Ties      int     `json:"ties"`
+	Wins      int     `json:"wins"`
 }
 
 // Lineup defines model for Lineup.
@@ -1055,6 +1297,21 @@ type LobbySeatView struct {
 
 // LobbySeatViewKind defines model for LobbySeatView.Kind.
 type LobbySeatViewKind string
+
+// MatchupSide defines model for MatchupSide.
+type MatchupSide struct {
+	Points   float64          `json:"points"`
+	RosterId int              `json:"roster_id"`
+	Starters []MatchupStarter `json:"starters"`
+}
+
+// MatchupStarter defines model for MatchupStarter.
+type MatchupStarter struct {
+	Player LeaguePlayer `json:"player"`
+
+	// Points his points so far this week
+	Points float64 `json:"points"`
+}
 
 // MembershipState defines model for MembershipState.
 type MembershipState struct {
@@ -1168,6 +1425,14 @@ type MockUndoInput struct {
 	Pick int `json:"pick"`
 }
 
+// MovePlayer defines model for MovePlayer.
+type MovePlayer struct {
+	Player LeaguePlayer `json:"player"`
+
+	// RosterId the team that took him (adds) or let him go (drops)
+	RosterId int `json:"roster_id"`
+}
+
 // OutcomeRange defines model for OutcomeRange.
 type OutcomeRange struct {
 	Ceiling float64 `json:"ceiling"`
@@ -1180,6 +1445,14 @@ type PageMeta struct {
 	Page    int   `json:"page"`
 	PerPage int   `json:"per_page"`
 	Total   int64 `json:"total"`
+}
+
+// Placement how the league's rostered players were placed on our board, by rule
+type Placement struct {
+	ByDefense int `json:"by_defense"`
+	ByEspnId  int `json:"by_espn_id"`
+	ByName    int `json:"by_name"`
+	Unplaced  int `json:"unplaced"`
 }
 
 // PlanCatalog A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership). While checkout is not open the prices are the launch prices.
@@ -1439,6 +1712,15 @@ type RosterCounts struct {
 	Wr    int `json:"wr"`
 }
 
+// RosterSpot defines model for RosterSpot.
+type RosterSpot struct {
+	Player LeaguePlayer   `json:"player"`
+	Slot   RosterSpotSlot `json:"slot"`
+}
+
+// RosterSpotSlot defines model for RosterSpot.Slot.
+type RosterSpotSlot string
+
 // Scoring exactly one of preset and custom. custom needs the custom_scoring feature.
 type Scoring struct {
 	// Custom points per stat, keyed by stat (snake_case), at most 200 stats
@@ -1571,6 +1853,15 @@ type AccountResponse struct {
 	RequestId string     `json:"request_id"`
 }
 
+// AttachPreviewResponse defines model for AttachPreviewResponse.
+type AttachPreviewResponse struct {
+	Data      AttachPreview `json:"data"`
+	Error     *ErrorBody    `json:"error"`
+	Meta      *PageMeta     `json:"meta,omitempty"`
+	Ok        bool          `json:"ok"`
+	RequestId string        `json:"request_id"`
+}
+
 // CompanionResponse defines model for CompanionResponse.
 type CompanionResponse struct {
 	Data      Companion  `json:"data"`
@@ -1607,6 +1898,15 @@ type HealthResponse struct {
 // LeagueResponse defines model for LeagueResponse.
 type LeagueResponse struct {
 	Data      League     `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
+// LeagueSyncResponse defines model for LeagueSyncResponse.
+type LeagueSyncResponse struct {
+	Data      LeagueSync `json:"data"`
 	Error     *ErrorBody `json:"error"`
 	Meta      *PageMeta  `json:"meta,omitempty"`
 	Ok        bool       `json:"ok"`
@@ -1754,6 +2054,12 @@ type CreateCompanionJSONRequestBody = CompanionCreate
 
 // CreateLeagueJSONRequestBody defines body for CreateLeague for application/json ContentType.
 type CreateLeagueJSONRequestBody = LeagueInput
+
+// AttachLeagueJSONRequestBody defines body for AttachLeague for application/json ContentType.
+type AttachLeagueJSONRequestBody = AttachInput
+
+// PreviewAttachJSONRequestBody defines body for PreviewAttach for application/json ContentType.
+type PreviewAttachJSONRequestBody = AttachPreviewInput
 
 // ReplaceLeagueJSONRequestBody defines body for ReplaceLeague for application/json ContentType.
 type ReplaceLeagueJSONRequestBody = LeagueInput

@@ -33,6 +33,8 @@
 	import { forgetLeft, leftLobby } from '#lib/room/setup/left.ts';
 	import LobbyList from '#lib/room/setup/LobbyList.svelte';
 	import SavedLeagues from '#lib/room/setup/SavedLeagues.svelte';
+	import { rerunOf } from '#lib/room/setup/scoring.ts';
+	import { hasFeature } from '#lib/account/features.ts';
 	import {
 		LINEUP_CHOICES,
 		MAX_ROUNDS,
@@ -55,6 +57,8 @@
 
 	let settings = $state<LeagueSettings>(defaultSettings());
 	let leagues = $state<League[]>([]);
+	/** The account drafts a saved league's own scoring rules; without them, the nearest preset. */
+	let exactRules = $state(false);
 	let lobbies = $state<LobbyFilling[]>([]);
 	let players = $state<BoardPlayer[]>([]);
 	let keepersOpen = $state(false);
@@ -162,6 +166,7 @@
 	async function loadLeagues(): Promise<void> {
 		try {
 			leagues = await rooms.leagues();
+			exactRules = hasFeature((await rooms.me()).features, 'custom_scoring');
 		} catch (e) {
 			// Signed out: setup still works, a mock against bots starts, the other verbs ask to sign in.
 			if (isSignedOut(e)) signedOut = true;
@@ -345,7 +350,13 @@
 			<SavedLeagues
 				{leagues}
 				{busy}
-				onmock={(league: League) => run(() => startMock(league.settings, league.id))}
+				{exactRules}
+				onmock={(league: League) => {
+					const rerun = rerunOf(league.settings, exactRules);
+					return run(() =>
+						rerun.line === null ? startMock(league.settings, league.id) : startMock(rerun.settings)
+					);
+				}}
 			/>
 			<LobbyList
 				{lobbies}
