@@ -8,10 +8,15 @@ package poll
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
 )
+
+// ErrNoRead is a key with no read and no failure to report: its only
+// read was abandoned before it landed.
+var ErrNoRead = errors.New("poll: no read yet")
 
 // Mode is how a read past the gap answers.
 type Mode int
@@ -48,6 +53,12 @@ type flight struct {
 	done    chan struct{}
 	cancel  context.CancelFunc
 	waiters int
+	// abandoned is set when every waiter left and the read was cancelled
+	// for that: it is no word about the host.
+	abandoned bool
+	// before is the entry's tried mark before this read, put back when
+	// the read is abandoned, so it holds no gap.
+	before time.Time
 }
 
 type entry[S any] struct {
@@ -72,6 +83,11 @@ type Poller[S any] struct {
 	Idle time.Duration
 	// Timeout bounds a read nobody waits on.
 	Timeout time.Duration
+	// Outlive has a read run to its Timeout when every viewer waiting on
+	// it has gone (the companion's reads, shared by a draft's viewers).
+	// Without it the read is cancelled, and an abandoned read leaves no
+	// trace: no error recorded, no gap held.
+	Outlive bool
 
 	mu       sync.Mutex
 	entries  map[string]*entry[S]
@@ -125,6 +141,11 @@ func (p *Poller[S]) Read(ctx context.Context, key string, gap time.Duration, mod
 	e.mu.Lock()
 	p.warm(ctx, e, key)
 	f := e.inflight
+	if f != nil && f.abandoned {
+		// Every viewer left that read and it was cancelled: it holds no
+		// gap and is never joined, so this viewer sends its own.
+		e.tried, e.inflight, f = f.before, nil, nil
+	}
 	switch {
 	case f != nil:
 	case !e.tried.IsZero() && now.Sub(e.tried) < gap:
@@ -147,7 +168,8 @@ func (p *Poller[S]) Read(ctx context.Context, key string, gap time.Duration, mod
 	case <-ctx.Done():
 		e.mu.Lock()
 		f.waiters--
-		if f.waiters == 0 {
+		if f.waiters == 0 && !p.Outlive {
+			f.abandoned = true
 			f.cancel()
 		}
 		e.mu.Unlock()
@@ -162,7 +184,7 @@ func (p *Poller[S]) Read(ctx context.Context, key string, gap time.Duration, mod
 // start sends one read upstream, with e locked.
 func (p *Poller[S]) start(e *entry[S], key string, now time.Time, fetch Fetch[S]) *flight {
 	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout)
-	f := &flight{done: make(chan struct{}), cancel: cancel}
+	f := &flight{done: make(chan struct{}), cancel: cancel, before: e.tried}
 	e.inflight, e.tried = f, now
 	p.mu.Lock()
 	p.upstream++
@@ -171,12 +193,20 @@ func (p *Poller[S]) start(e *entry[S], key string, now time.Time, fetch Fetch[S]
 		defer cancel()
 		value, err := fetch(ctx)
 		e.mu.Lock()
-		if err != nil {
+		current := e.inflight == f
+		switch {
+		case err != nil && f.abandoned:
+			if current {
+				e.tried = f.before
+			}
+		case err != nil:
 			e.err = err
-		} else {
+		default:
 			e.value, e.has, e.at, e.err, e.stored = value, true, now, nil, false
 		}
-		e.inflight = nil
+		if current {
+			e.inflight = nil
+		}
 		close(f.done)
 		e.mu.Unlock()
 		if err == nil && p.Store != nil {
@@ -218,6 +248,9 @@ func (p *Poller[S]) warm(ctx context.Context, e *entry[S], key string) {
 func (e *entry[S]) answer(now time.Time, gap time.Duration) (Read[S], error) {
 	if !e.has {
 		var zero Read[S]
+		if e.err == nil {
+			return zero, ErrNoRead
+		}
 		return zero, e.err
 	}
 	r := Read[S]{Value: e.value, At: e.at}

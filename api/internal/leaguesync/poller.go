@@ -2,6 +2,8 @@ package leaguesync
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -18,7 +20,8 @@ import (
 // deliberate refresh waits for a read, but never sends two inside
 // RefreshFloor; the last good read of a linked league survives a restart
 // through the store. A read is cancelled when every viewer waiting on it
-// has gone, and one nobody waits on runs at most ReadTimeout.
+// has gone, leaving no trace (no failure, no gap held), and one nobody
+// waits on runs at most ReadTimeout.
 const (
 	MinUpstreamGap = time.Minute
 	RefreshFloor   = 10 * time.Second
@@ -86,6 +89,9 @@ func (p *Poller) read(ctx context.Context, ref Ref, gap time.Duration, mode poll
 	r, err := p.shared().Read(ctx, ref.Key(), gap, mode, func(ctx context.Context) (Snapshot, error) {
 		return host.Read(ctx, ref)
 	})
+	if errors.Is(err, poll.ErrNoRead) {
+		return Read{}, fmt.Errorf("%w: %v", ErrUnavailable, err)
+	}
 	if err != nil {
 		return Read{}, err
 	}

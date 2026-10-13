@@ -14,9 +14,10 @@ import (
 // Polling discipline (Lane 8, internal/poll): one upstream read per draft
 // per two seconds whatever the number of viewers, every viewer past the
 // gap waiting for the read, the last snapshot answered with its age when
-// the host fails. A read is cancelled when every viewer waiting on it has
-// gone. The shared read is per process: with N instances serving one
-// draft the bound is N reads per two seconds.
+// the host fails. A disconnecting viewer never cancels the shared read:
+// it runs to its timeout for the draft's other viewers (poll's Outlive).
+// The shared read is per process: with N instances serving one draft the
+// bound is N reads per two seconds.
 const (
 	MinUpstreamGap = 2 * time.Second
 	// idleAfter drops a draft no viewer has asked about in this long.
@@ -60,6 +61,7 @@ func (p *Poller) shared() *poll.Poller[Snapshot] {
 	p.once.Do(func() {
 		p.inner = &poll.Poller[Snapshot]{
 			Now: p.Now, Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Idle: idleAfter, Timeout: readTimeout,
+			Outlive: true,
 		}
 	})
 	return p.inner
