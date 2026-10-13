@@ -106,11 +106,15 @@ def figure_matches_value(figure: PullFigure) -> bool:
     return js_number(figure.text) == js_number(js_to_fixed(figure.value, decimals))
 
 
-def capsule_findings(player_id: str, body_compact: str, body_full: str, numbers: Sequence[PageNumber]) -> list[str]:
-    """`capsuleFindings` for a page the writer covers: the reasons the nightly would fail it for."""
+def capsule_findings(
+    player_id: str, bodies: tuple[str, str], numbers: Sequence[PageNumber], names: Sequence[str] = ()
+) -> list[str]:
+    """`capsuleFindings` for a page the writer covers: the reasons the nightly would fail it for.
+    `bodies` is (compact, full); `names` are the page's proper names, never read as banned words."""
+    body_compact, body_full = bodies
     figures = pull_figures_of(body_full, numbers)
     findings = [] if figures else [f"pull_figures_none:{player_id}"]
     findings += [f"pull_figure_not_in_prose:{player_id}:{f.text}" for f in figures if f.text not in body_full]
     findings += [f"pull_figure_off_page:{player_id}:{f.label}:{f.text}" for f in figures if not figure_matches_value(f)]
-    found = dict.fromkeys(hit.found for hit in (*gate_hits(body_full), *gate_hits(body_compact)))
+    found = dict.fromkeys(hit.found for hit in (*gate_hits(body_full, names), *gate_hits(body_compact, names)))
     return findings + [f"capsule_voice_rule:{player_id}:{text}" for text in found]

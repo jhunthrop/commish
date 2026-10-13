@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Final
 
 from research.capsules.facts.model import InjuryClean, InjuryDesignated, LawEvidence
 from research.capsules.render_words import whole
+from research.capsules.voice_rules import in_fantasy_words
 from research.model.jsmath import js_to_fixed
 from research.pipeline.jscompat import js_string
 
@@ -50,7 +51,7 @@ def render_template_capsule(facts: "PlayerFacts") -> str:
         (item for item in facts.evidence if isinstance(item, LawEvidence)), key=lambda law: -abs(law.net_effect_points)
     )
     if laws:
-        sentences.append(_law_sentence(laws[0].headline, laws[0].net_effect_points))
+        sentences.append(_law_sentence(in_fantasy_words(laws[0].headline), laws[0].net_effect_points))
     if facts.season is not None:
         games = "game" if facts.season.games_played == 1 else "games"
         sentences.append(

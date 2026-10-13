@@ -74,7 +74,9 @@ def write_chosen(engine: Engine, gateway: GatewayClient, as_of: datetime, choice
         result, _ = write_one(engine, subject, stored.get(subject.universe_id), gateway, worn)
         row = rows[subject.facts.identity.id]
         numbers = page_numbers(page_values_of(row))
-        findings = capsule_findings(subject.facts.identity.id, result.compact.text, result.full.text, numbers)
+        findings = capsule_findings(
+            subject.facts.identity.id, (result.compact.text, result.full.text), numbers, subject.facts.name_ledger
+        )
         written.append(Written(subject, row, result, tuple(findings)))
     return written
 
@@ -89,7 +91,9 @@ def gate_written(engine: Engine, written: Sequence[Written]) -> list[str]:
     for w in written:
         row = stored[w.subject.universe_id]
         numbers = page_numbers(page_values_of(w.row))
-        findings = capsule_findings(w.subject.facts.identity.id, row.body_compact, row.body_full, numbers)
+        findings = capsule_findings(
+            w.subject.facts.identity.id, (row.body_compact, row.body_full), numbers, w.subject.facts.name_ledger
+        )
         figures = ", ".join(f"{f.label} {f.text}" for f in pull_figures_of(row.body_full, numbers))
         usage = w.result.usage
         p, c, d = (

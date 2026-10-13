@@ -10,6 +10,7 @@ Each violation is worded to be handed back to the writer, and the soft ones say 
 """
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
@@ -36,6 +37,7 @@ from research.capsules.voice_rules import (
     TRADING_REPLACEMENTS,
     VoiceRuleHit,
     banned_term_pattern,
+    mask_names,
     voice_rule_hits,
 )
 from research.pipeline.jscompat import js_string
@@ -241,19 +243,19 @@ def soft_correction_for(violation: str) -> str | None:
     return None
 
 
-def _copy_violations(text: str) -> list[str]:
+def _copy_violations(text: str, names: Sequence[str]) -> list[str]:
     violations = []
     if EM_DASH in text:
         violations.append("The text contains an em-dash. Rewrite without one.")
     if SEMICOLON in text:
         violations.append("The text contains a semicolon. Split it into two sentences instead.")
-    term = banned_term_in(text)
+    term = banned_term_in(mask_names(text, names))
     if term is not None:
         violations.append(_banned_term_violation(term, text))
     competitor = _competitor_in(text)
     if competitor is not None:
         violations.append(f'The text names a competitor product ("{competitor}"). Remove it.')
-    violations += [_voice_violation(hit, text) for hit in voice_rule_hits(text)]
+    violations += [_voice_violation(hit, text) for hit in voice_rule_hits(text, names)]
     if _unframed_floor(text):
         violations.append(UNFRAMED_FLOOR_VIOLATION)
     return violations
@@ -285,7 +287,7 @@ def _validate(
     if not band[0] <= words <= band[1]:
         message = f"Word count {words} is outside the required {band[0]}-{band[1]} word band."
         return ValidationResult(False, (message,), BandFailure(words, band[0], band[1]))
-    violations = [*_copy_violations(trimmed), *_grounding_violations(trimmed, source)]
+    violations = [*_copy_violations(trimmed, source.name_ledger), *_grounding_violations(trimmed, source)]
     if tension and source.tension is not None and not _cites_tension(trimmed, source.tension):
         figure = js_string(round_half_up(source.tension, 1))
         violations.append(

@@ -19,6 +19,7 @@ validator's: set phrases, asides, then the register words, each named so a viola
 """
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final
@@ -208,11 +209,19 @@ def _normalise_apostrophes(text: str) -> str:
     return text.translate(_APOSTROPHES)
 
 
-def voice_rule_hits(text: str) -> list[VoiceRuleHit]:
+def mask_names(text: str, names: Sequence[str]) -> str:
+    """`text` with every proper name in `names` (a capitalised ledger entry) masked, so a player
+    called Price or Bet never reads as a banned word. Matched whole and case-sensitively."""
+    for name in sorted((n for n in names if n[:1].isupper()), key=len, reverse=True):
+        text = re.sub(rf"(?<![A-Za-z]){re.escape(name)}(?![A-Za-z])", "Him", text)
+    return text
+
+
+def voice_rule_hits(text: str, names: Sequence[str] = ()) -> list[VoiceRuleHit]:
     """Every set phrase, aside and betting word in `text`, in rule order. Empty is clean. The
     validator reads these as sentence rewrites; trading words it reads as banned terms, with the
     drafting phrase to use (`validate.py`)."""
-    normalised = _normalise_apostrophes(text)
+    normalised = _normalise_apostrophes(mask_names(text, names))
     hits = [VoiceRuleHit("set phrase", p.name) for p in _SET_PHRASE_PATTERNS if p.pattern.search(normalised)]
     honest = _HONEST_FRAME.pattern.search(normalised)
     if honest is not None and not any(hit.found == honest.group(0).lower() for hit in hits):
@@ -225,13 +234,27 @@ def voice_rule_hits(text: str) -> list[VoiceRuleHit]:
     return hits
 
 
-def gate_hits(text: str) -> list[VoiceRuleHit]:
+def gate_hits(text: str, names: Sequence[str] = ()) -> list[VoiceRuleHit]:
     """What the nightly gate refuses a stored capsule for: every voice-rule hit, and every trading
     word (fantasy words only, on the page as in the writer)."""
-    normalised = _normalise_apostrophes(text)
+    normalised = _normalise_apostrophes(mask_names(text, names))
     trading = [
         VoiceRuleHit("trading word", match.group(0))
         for term in TRADING_TERMS
         if (match := banned_term_pattern(term).search(normalised)) is not None
     ]
-    return [*voice_rule_hits(text), *trading]
+    return [*voice_rule_hits(text, names), *trading]
+
+
+# A law's own quantity, named in betting words by the law store ("incoming team win total"), said in
+# fantasy words wherever the writer or a reader sees it. The number is the same expectation.
+_HEADLINE_WORDS: Final = (
+    (re.compile(r"\b(?:incoming )?team win total\b|\bwin total\b", re.IGNORECASE), "expected team wins"),
+)
+
+
+def in_fantasy_words(headline: str) -> str:
+    """A law headline with any betting phrase in it said the fantasy way."""
+    for pattern, words in _HEADLINE_WORDS:
+        headline = pattern.sub(words, headline)
+    return headline

@@ -26,6 +26,7 @@ from research.capsules.validate import (
     validate_narrative_slot,
     voice_rule_correction_for,
 )
+from research.capsules.voice_rules import in_fantasy_words
 
 if TYPE_CHECKING:
     from research.capsules.facts.build import PlayerFacts
@@ -111,7 +112,7 @@ def with_rewritten_slot(result: NarrativeResult, key: str, text: str, model: str
 
 def _label(item: EvidenceItem) -> str:
     if isinstance(item, LawEvidence):
-        return item.headline
+        return in_fantasy_words(item.headline)
     if isinstance(item, ShareEvidence):
         return (
             "his role grew this offseason"

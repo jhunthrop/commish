@@ -24,6 +24,7 @@ from research.capsules.facts.model import (
 )
 from research.capsules.render_depth import render_depth_section
 from research.capsules.render_words import ranked_clause, signed, whole
+from research.capsules.voice_rules import in_fantasy_words
 from research.model.jsmath import js_round, js_to_fixed
 from research.pipeline.jscompat import js_string
 
@@ -75,7 +76,7 @@ def _availability_line(facts: PlayerFacts) -> str | None:
 def _evidence_line(item: EvidenceItem) -> str:
     if isinstance(item, LawEvidence):
         net = f" (net of {item.law_count} factors)" if item.law_count > 1 else ""
-        return f"{item.headline}: worth {signed(item.net_effect_points)} a game{net}."
+        return f"{in_fantasy_words(item.headline)}: worth {signed(item.net_effect_points)} a game{net}."
     if isinstance(item, ShareEvidence):
         verb = "grew" if item.kind == "offseason_share_gained" else "shrank"
         target, carry = _signed_percent(item.target_share_change), _signed_percent(item.carry_share_change)
