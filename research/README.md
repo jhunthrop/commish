@@ -588,7 +588,9 @@ advised. The service runs in the board's arithmetic (fused, `model/arithmetic.py
   totals, the week-one total and spread are not rendered); betting words, every "the honest ..."
   frame and every measured refrain are voice-rule violations, a sentence rewrite each; the long read
   must print one of the page's numbers (the pull-figure gate) or it is corrected, and a read may
-  take two corrections inside the player's four calls (the oracle stopped at one). The fact sheet
+  take two corrections inside the player's six calls (the oracle stopped at one correction inside
+four calls). A read asked for a shorter version may run up to 10% over its word cap, and every
+correction quotes the exact banned phrases the read was caught with. The fact sheet
   itself (`PlayerFacts`, its ledgers and its hash) is the oracle's, field for field, so the oracle's
   stored hashes stay valid.
 - **No prose template; the fallback is a facts block** (the founder's rule: every non-stat
@@ -596,10 +598,11 @@ advised. The service runs in the board's arithmetic (fused, `model/arithmetic.py
   sentence). A player the writer cannot serve within its ceiling gets his numbers with their basis
   as labelled facts, one `Label: value` line each and no sentence (the projection in his expected
   games, the middle and full ranges, the board rank, the ADP), on both sizes, stored
-  `source = 'facts'` (revision 0004) and rendered by the page as a facts list. The sweep retries
-  every unwritten row nightly. The nightly's capsule gate fails the run when facts blocks, the
-  oracle's leftover `template` rows and missing pages pass 2% of the board, or when a sentence of a
-  written capsule sits on two pages.
+  `source = 'facts'` (revision 0004) and rendered by the page as a facts list. The sweep writes
+  unwritten pages before changed ones, and the nightly then runs one retry pass over the pages still
+  unwritten before its capsule gate. The gate fails the run when facts blocks, the oracle's leftover
+  `template` rows and missing pages pass 2% of the board, or when a written sentence of four words
+  or more sits on two pages ("Draft him." and "Let him go." are vocabulary, exempt).
 - **The board reasons' order is stored** (`preseason_board_reasons.ordinal`, revision 0003). The
   oracle read a player's reasons in heap order, and a capsule's evidence depends on it.
 - **The narrow read places every depth-chart room by the served board**, and reads an archive team
