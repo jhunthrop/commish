@@ -17,7 +17,8 @@ from typing import Any, Final
 
 from research.capsules.pull_figures import PageValues, page_numbers, pull_figures_of
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule
-from research.nightly.config import PAGE_FORMAT, TEAMS
+from research.nightly.build.player_season import SeasonContext, season_block
+from research.nightly.config import PAGE_FORMAT, TEAMS, RunFormat
 from research.nightly.reads.board import BoardEntry, FormatBoard
 
 # The run names a team defense as the site does.
@@ -131,25 +132,33 @@ class PageInputs:
     entries: Mapping[str, Mapping[str, BoardEntry]]
     adp_by_format: Mapping[str, Mapping[str, float]]
     capsules: Mapping[str, StoredCapsule]  # by universe id
+    formats: Mapping[str, RunFormat]
+    season: SeasonContext
 
 
 def page_inputs(
     boards: Sequence[FormatBoard],
     adp_by_format: Mapping[str, Mapping[str, float]],
     capsules: Mapping[str, StoredCapsule],
+    season: SeasonContext,
 ) -> PageInputs:
     entries = {board.format.id: {entry.row.player_id: entry for entry in board.entries} for board in boards}
-    return PageInputs(entries, adp_by_format, capsules)
+    return PageInputs(entries, adp_by_format, capsules, {board.format.id: board.format for board in boards}, season)
 
 
 def player_json(who: Identity, inputs: PageInputs) -> Json:
     formats: Json = {}
     page_entry: BoardEntry | None = None
     universe_id: str | None = None
+    season: Json | None = None
     for format_id, by_player in inputs.entries.items():
         entry = by_player.get(who.id)
         if entry is None:
             continue
+        if season is None:
+            # His season is scored in the first format that ranks him, the run's default first.
+            row = entry.row
+            season = season_block(who.id, row.team, inputs.formats[format_id], row.position, inputs.season)
         formats[format_id] = numbers_of(entry, inputs.adp_by_format[format_id].get(who.id))
         universe_id = entry.row.universe_id
         if format_id == PAGE_FORMAT.id:
@@ -165,6 +174,7 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
         "headshot": who.headshot,
         "formats": formats,
         "capsule": capsule_json(stored, page),
+        "season": season,
     }
 
 

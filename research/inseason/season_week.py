@@ -33,7 +33,7 @@ from research.model.reads.teams import kickoff_instants_by_week
 from research.model.register.freeze import SERVED_SOURCE, take_freeze
 from research.model.register.grade import grade_week, latest_freeze_for
 from research.pipeline.http import Fetcher
-from research.pipeline.nflverse import ingest
+from research.pipeline.nflverse import ingest, ingest_schedule
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
 from research.pipeline.odds.ingest import run_odds_snapshot
@@ -93,6 +93,10 @@ def stats_ingest(context: SeasonWeekContext) -> StepResult:
         conn.commit()
         as_of = ingest.schedule_week_as_of(client, [context.season]).get(context.season)
         report = ingest.ingest_season(conn, client, universe, context.season, as_of)
+        conn.commit()
+        # Each game's result once nflverse posts its score: the feed's own final flag, which the
+        # nightly's game log reads (a week with no line is inactive only once his club's game is final).
+        ingest_schedule.ingest_game_results(conn, client, [context.season])
         conn.commit()
     if report.player_week_unavailable:
         return StepResult(
