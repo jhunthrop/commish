@@ -3,11 +3,13 @@
 The steps phase C owns, in the oracle's order (`research-ts/src/nightly/main.ts`): the fit step
 (check only, `research.model.fit_check`), then the capsule sweep, skipped by name when
 AI_GATEWAY_API_KEY is not set, because a sweep without the key would demote written reads to the
-template. Each step's line names what it did. The ingests, the run writer, the gates and the web
+template, then the capsule gate (`capsule_gate`), which fails the run when more than 2% of the
+board's pages are on the template or a template sentence sits on two pages. Each step's line names
+what it did; the run exits 1 when a step failed. The ingests, the run writer, the gates and the web
 dispatch are phase D's (this package's `__init__` names the whole chain); they extend this entry
 point rather than replace it.
 
-    uv run python -m research.nightly [--skip fit,capsules] [--capsule-budget N]
+    uv run python -m research.nightly [--skip fit,capsules,capsule-gate] [--capsule-budget N]
 """
 
 import argparse
@@ -15,6 +17,7 @@ import os
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import Final
 
 import httpx
 from sqlalchemy import Engine
@@ -27,8 +30,9 @@ from research.db.url import database_url_from_env
 from research.model.arithmetic import ARM64_BOARDS
 from research.model.fit_check import fit_step
 from research.model.priors import load_model_artifacts
+from research.nightly.capsule_gate import capsule_gate
 
-STEPS = ("fit", "capsules")
+STEPS: Final = ("fit", "capsules", "capsule-gate")
 
 
 def _line(text: str) -> None:
@@ -59,6 +63,13 @@ def _capsules(engine: Engine, now: datetime, budget: int) -> bool:
     return True
 
 
+def _capsule_gate(engine: Engine, now: datetime) -> bool:
+    with engine.connect() as conn:
+        result = capsule_gate(conn, now)
+    _line(result.summary())
+    return result.ok
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="research.nightly", description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--skip", default="", help=f"steps to skip, comma separated, of {', '.join(STEPS)}")
@@ -79,6 +90,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         _line("capsules: skipped by --skip")
     else:
         ok = _capsules(engine, now, args.capsule_budget) and ok
+    if "capsule-gate" in skip:
+        _line("capsule gate: skipped by --skip")
+    else:
+        ok = _capsule_gate(engine, now) and ok
     return 0 if ok else 1
 
 

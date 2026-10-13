@@ -1,10 +1,11 @@
-"""ONE PLAYER'S CAPSULE: one bundle call, the rejection pass, and the template as the permanent floor.
+"""ONE PLAYER'S CAPSULE: one bundle call, the rejection pass, and the template as the counted fallback.
 
 Ported from `research-ts/src/capsules/generate.ts`. The bundle (both reads and the narrative) comes
 from one call, retried once whole if it never came back or was not an object. Each read is then
 validated; a read that fails gets the correction its failure calls for (a length correction, a
-fresh draft after a second length miss, the soft points, or one rewrite), each a call, all within
-the player's ceiling (`max_gateway_calls_per_player`), and a read that still fails is the template.
+fresh draft after a second length miss, the soft points, or a rewrite), each a call, up to
+`corrections_per_read` of them (the oracle stopped at one) and all within the player's ceiling
+(`max_gateway_calls_per_player`), and a read that still fails is the template.
 Narrative slots refused only for their voice get one rewrite each from what calls are left. Nothing
 here raises for a gateway failure: the template is the answer, and the usage billed is kept.
 """
@@ -182,7 +183,7 @@ def _next_correction(read: _Read) -> PriorAttempt | None:
                 fresh_draft=FreshDraft(read.band_misses, failure.min_words, failure.max_words),
             )
         return None
-    if read.corrections != 0:
+    if read.corrections >= CAPSULE_CONFIG.corrections_per_read:
         return None
     soft = [soft_correction_for(v) for v in read.result.violations]
     corrections = tuple(c for c in soft if c is not None) if all(c is not None for c in soft) else None

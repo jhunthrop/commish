@@ -93,6 +93,11 @@ BETTING_PATTERNS: Final = (
         "the line as a bet",
         r"\bthe (?:posted |opening |closing )?line (?:on|for|at|sits|is set|was set|moved|opened|closed)\b",
     ),
+    _rule(
+        "a line as a number",
+        r"(?<!stat )(?<!offensive )(?<!defensive )\bline (?:is|was|of|at|sits at|sat at|set at|opened at|closed at)"
+        r" (?:about |around |roughly )?[0-9]",
+    ),
     _rule("over or under as a bet", r"\bthe (?:over|under)\b(?!-)|\bover/under\b|\bo/u\b|\b(?:over|under) [0-9]+\.5\b"),
     _rule("a win total", r"\bwin totals?\b"),
     _rule("a prop", r"\bprops?\b"),
@@ -217,7 +222,7 @@ def mask_names(text: str, names: Sequence[str]) -> str:
     return text
 
 
-def voice_rule_hits(text: str, names: Sequence[str] = ()) -> list[VoiceRuleHit]:
+def voice_rule_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
     """Every set phrase, aside and betting word in `text`, in rule order. Empty is clean. The
     validator reads these as sentence rewrites; trading words it reads as banned terms, with the
     drafting phrase to use (`validate.py`)."""
@@ -234,7 +239,7 @@ def voice_rule_hits(text: str, names: Sequence[str] = ()) -> list[VoiceRuleHit]:
     return hits
 
 
-def gate_hits(text: str, names: Sequence[str] = ()) -> list[VoiceRuleHit]:
+def gate_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
     """What the nightly gate refuses a stored capsule for: every voice-rule hit, and every trading
     word (fantasy words only, on the page as in the writer)."""
     normalised = _normalise_apostrophes(mask_names(text, names))

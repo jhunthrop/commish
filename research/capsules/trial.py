@@ -3,7 +3,9 @@
 Chooses board players (named, or every `spread`-th in board order so the trial runs from the top of
 the board to its tail), writes each through the sweep's own `write_one` (committed as written), then
 holds each stored capsule to the gate the nightly enforces (`pull_figures.capsule_findings`) with the
-page's own numbers from his served board row, and reports what each cost in calls and tokens.
+page's own numbers from his served board row, and the chosen pages together to the nightly's
+capsule gate (the template share and no template sentence on two pages), and reports what each
+cost in calls and tokens.
 """
 
 from collections.abc import Sequence
@@ -19,6 +21,7 @@ from research.capsules.generate import CapsuleResult, describe_fallback
 from research.capsules.pull_figures import PageValues, capsule_findings, page_numbers, pull_figures_of
 from research.capsules.store import stored_capsules_for
 from research.capsules.sweep import Subject, subjects_of, worn_phrases, write_one
+from research.nightly.capsule_gate import judge_capsules
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +113,8 @@ def gate_written(engine: Engine, written: Sequence[Written]) -> list[str]:
             f"completion tokens, ${d:.6f}; pull figures {figures or 'none'}; {verdict}; "
             f"narrative slots kept {len(w.result.narrative.slots)}, refused {len(w.result.narrative.refused)}"
         )
+    judged = judge_capsules([w.subject.universe_id for w in written], stored)
+    lines.append(f"the nightly's capsule gate over these pages alone: {judged.summary()}")
     n = max(1, len(written))
     lines.append(
         f"total: {len(written)} capsules, {calls} calls ({calls / n:.1f} a capsule), {prompt} prompt and {completion} "

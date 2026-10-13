@@ -107,7 +107,7 @@ def figure_matches_value(figure: PullFigure) -> bool:
 
 
 def capsule_findings(
-    player_id: str, bodies: tuple[str, str], numbers: Sequence[PageNumber], names: Sequence[str] = ()
+    player_id: str, bodies: tuple[str, str], numbers: Sequence[PageNumber], names: Sequence[str]
 ) -> list[str]:
     """`capsuleFindings` for a page the writer covers: the reasons the nightly would fail it for.
     `bodies` is (compact, full); `names` are the page's proper names, never read as banned words."""

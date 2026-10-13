@@ -91,6 +91,12 @@ class CapsuleConfig:
     full: Size = Size(240, 300, 1600)
     # A player's gateway calls: the bundle, its retry, and the corrections, never more.
     max_gateway_calls_per_player: int = 4
+    # Corrections one read may take inside that ceiling. The oracle stopped at one; a set phrase or
+    # a betting word the first correction leaves (or brings) is worth a second sentence rewrite
+    # before the read falls to the template, which the nightly counts against its 2% line.
+    corrections_per_read: int = 2
+    # The share of the board's pages the nightly lets fall to the template floor (missing counts).
+    template_share_max: float = 0.02
     narrative_voice_rewrites_per_slot: int = 1
     length_correction: LengthCorrection = LengthCorrection()
     narrative_target_share_of_cap: float = 0.75
