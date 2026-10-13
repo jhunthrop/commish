@@ -1745,6 +1745,7 @@ export interface components {
 		CompanionSummary: {
 			/** Format: uuid */
 			id: string;
+			host: components['schemas']['CompanionHost'];
 			host_draft_id: string;
 			/** @description the draft's name on the host, empty when it has none */
 			name: string;

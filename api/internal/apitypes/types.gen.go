@@ -1031,8 +1031,9 @@ type CompanionStatus string
 
 // CompanionSummary defines model for CompanionSummary.
 type CompanionSummary struct {
-	CreatedAt   time.Time `json:"created_at"`
-	HostDraftId string    `json:"host_draft_id"`
+	CreatedAt   time.Time     `json:"created_at"`
+	Host        CompanionHost `json:"host"`
+	HostDraftId string        `json:"host_draft_id"`
 
 	// HostUsername the Sleeper username the seat was found by
 	HostUsername *string            `json:"host_username"`

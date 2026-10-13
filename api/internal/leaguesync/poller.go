@@ -110,6 +110,10 @@ func (p *Poller) Keep(snap Snapshot) {
 	}
 }
 
+// Prime gives the poller a read made outside it (an FFPC attach, read as
+// the attaching member), so the first view answers it fresh.
+func (p *Poller) Prime(snap Snapshot) { p.shared().Prime(snap.Ref.Key(), snap, snap.ReadAt) }
+
 // snapshots is the store as poll keeps reads: by the league's key.
 type snapshots struct{ store SnapshotStore }
 

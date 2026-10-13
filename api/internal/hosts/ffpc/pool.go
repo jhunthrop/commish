@@ -90,10 +90,12 @@ func ParseMyTeams(page []byte) ([]MyLeague, error) {
 	return out, nil
 }
 
+var nameLeagueID = regexp.MustCompile(`#([0-9]{1,12})\s*$`)
+
 func myLeagueRow(tr *node) (MyLeague, bool) {
 	row := cells(tr)
 	if len(row) < 7 || !leagueIDCell.MatchString(text(row[0])) {
-		return MyLeague{}, false
+		return upcomingRow(tr)
 	}
 	l := MyLeague{LeagueID: text(row[0])}
 	if a := first(tr, idContains("lnkLeagueName_")); a != nil {
@@ -113,4 +115,28 @@ func myLeagueRow(tr *node) (MyLeague, bool) {
 		l.Place, _ = strconv.Atoi(strings.TrimSpace(text(row[6])))
 	}
 	return l, l.Name != ""
+}
+
+// upcomingRow reads a league whose draft is still ahead or running (My
+// Teams' second table: name, team, draft time). Its league id is the
+// "#104870" FFPC ends a league's name with; a row without one is left
+// out rather than guessed.
+func upcomingRow(tr *node) (MyLeague, bool) {
+	a := first(tr, func(n *node) bool { return isTag(n, "a") && strings.Contains(attr(n, "id"), "LeagueName") })
+	if a == nil {
+		return MyLeague{}, false
+	}
+	l := MyLeague{Name: Clean(text(a), maxName)}
+	m := nameLeagueID.FindStringSubmatch(l.Name)
+	if m == nil {
+		return MyLeague{}, false
+	}
+	l.LeagueID = m[1]
+	if p := postbackArg.FindStringSubmatch(attr(a, "href")); p != nil {
+		l.Target = p[1]
+	}
+	if t := first(tr, func(n *node) bool { return isTag(n, "a") && strings.Contains(attr(n, "id"), "TeamName") }); t != nil {
+		l.TeamName = Clean(text(t), maxName)
+	}
+	return l, true
 }

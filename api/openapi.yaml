@@ -2012,9 +2012,10 @@ components:
       enum: [pre_draft, drafting, paused, complete]
     CompanionSummary:
       type: object
-      required: [id, host_draft_id, name, slot, host_username, status, replay, created_at]
+      required: [id, host, host_draft_id, name, slot, host_username, status, replay, created_at]
       properties:
         id: { type: string, format: uuid }
+        host: { $ref: "#/components/schemas/CompanionHost" }
         host_draft_id: { type: string }
         name: { type: string, description: "the draft's name on the host, empty when it has none" }
         slot: { type: integer }

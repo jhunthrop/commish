@@ -127,12 +127,12 @@ func (c *Client) do(ctx context.Context, method, path string, form url.Values, j
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		// The error names the path only; the jar never reaches it.
-		return response{}, fmt.Errorf("%w: %s %s", ErrUnavailable, method, path)
+		return response{}, fmt.Errorf("%w: %s %s", ErrUnavailable, method, pathOnly(path))
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, MaxPage+1))
 	if err != nil || len(raw) > MaxPage {
-		return response{}, fmt.Errorf("%w: %s body", ErrUnavailable, path)
+		return response{}, fmt.Errorf("%w: %s body", ErrUnavailable, pathOnly(path))
 	}
 	out := response{status: resp.StatusCode, location: resp.Header.Get("Location"), body: raw, set: Cookies{}}
 	for _, ck := range resp.Cookies() {
@@ -321,4 +321,11 @@ func hiddenFields(page []byte, formID string) (url.Values, error) {
 		}
 	}
 	return out, nil
+}
+
+// pathOnly is a path without its query: a league-team id never reaches
+// an error or a log.
+func pathOnly(path string) string {
+	p, _, _ := strings.Cut(path, "?")
+	return p
 }

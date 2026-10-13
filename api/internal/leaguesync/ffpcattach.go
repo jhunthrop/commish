@@ -64,6 +64,7 @@ func (s *Service) attachFFPC(w http.ResponseWriter, r *http.Request, in apitypes
 		return
 	}
 	s.Poller.Keep(snap)
+	s.Poller.Prime(snap)
 	s.answer(w, r, http.StatusCreated, link, Read{Snapshot: snap})
 }
 

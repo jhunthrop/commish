@@ -38,6 +38,10 @@ func newFFPCWiring(cfg config.API, pool *pgxpool.Pool, log *slog.Logger) (ffpcWi
 	}
 	store := &hosts.Store{Pool: pool}
 	client := ffpc.New()
+	if cfg.Dev.FFPCBaseURL != "" {
+		client = ffpc.NewAt(cfg.Dev.FFPCBaseURL)
+		log.Warn("ffpc is the local stand-in", "base", cfg.Dev.FFPCBaseURL)
+	}
 	member := &ffpc.Member{Client: client, Store: store, Vault: vault, Now: time.Now, Log: log}
 	return ffpcWiring{vault: vault, store: store, client: client, member: member}, nil
 }
