@@ -4,8 +4,10 @@ The Python research lane (spec `docs/superpowers/specs/2026-10-12-prep-site-arch
 §2.3). Phase A is here: every ingest the TypeScript core runs, ported; the `research` schema,
 designed from scratch for the prep site and owned by alembic; the one-shot loader that carries the
 legacy tables' data into it; and the parity harness that proves each port row for row against the
-TypeScript on the same recorded input. Phases B to D (`model`, `capsules`, `advisor`, `nightly`)
-are empty packages whose docstrings say what lands in them.
+TypeScript on the same recorded input. Phase B is `model`: the preseason board, the market blend,
+the laws, the register and the backtest, proven against the oracle on the dev store (see "The
+model"). Phases C and D (`capsules`, `advisor`, `nightly`) are empty packages whose docstrings say
+what lands in them.
 
 ## Running
 
@@ -328,3 +330,99 @@ total counts each tested table per pass and each prerequisite table once, at its
 | win-totals-seed | rerun | team_week_observations 2,304 | 0 |
 | win-totals-job | first | team_week_observations 3,680 | 0 |
 | win-totals-job | rerun | team_week_observations 3,680 | 0 |
+
+## The model (phase B)
+
+The preseason board, the market blend, the laws, replacement levels and tiers, the outlook band,
+the register and the held-out backtest, ported from `research-ts/src/projections/` as pure
+functions over typed rows. Every float operation is the TypeScript's, in its order: a sum is a left
+fold, a sort is stable with the oracle's comparator, a map iterates in insertion order. Where V8's
+arithmetic is not the platform's, the port reproduces V8 (`model/fdlibm.py`, `model/jsmath.py`):
+
+- `Math.log`, `Math.exp` and `Math.sin` are fdlibm, not libm. On Apple silicon V8 was compiled
+  with clang's `-ffp-contract=on`, so every `a * b + c` inside one C expression is a fused
+  multiply-add; `madd(fused)` marks each place clang fuses. x86-64 builds have no FMA to fuse into.
+- `**` is libm's `pow`, except `x ** 2` is `x * x` and `x ** 0.5` is `sqrt(x)`.
+- `Math.round` rounds a tie up and keeps a negative zero.
+
+The `numerics` case proves all of it on 900,000 random inputs against the running node.
+
+### Data flow
+
+| | |
+|---|---|
+| Tables in | `player_week_observations` (box scores, usage, play-by-play touches, depth charts, injury filings), `team_week_observations` (schedule, kickoffs, pace and pass rate, coaches, win totals), `player_week_teams`, `players`, `preseason_rosters`, `preseason_rankings` (ADP per format, ECR), `nflverse_roster_weeks`, `nflverse_injuries`, `nfl_draft_picks`, `capture_snapshots` (the provider's roster sweep and player list), `player_crosswalk`, `player_prop_observations`, `props_player_map` |
+| Artifacts | `model_artifacts`, pinned in `model/artifacts.py`'s `CATALOG`: `model/weekly-priors`, `preseason/priors`, `preseason/rookie-curve`, `preseason/rookie-history`, `preseason/kdef-priors`, `preseason/game-variance-skill`, `preseason/game-variance-kdef`, `market/blend-constants`, `market/props-anchor-weight`, `market/curve-{ppr,half,std}`, `laws/{measured,discovered,discovery-quantiles}`. Nothing the board reads comes from a file. |
+| Tables out | `preseason_projections` and `preseason_board_reasons` (the fit step with `--persist-board`), `register_freeze_rows` (stamped `implementation = 'python'`), `register_grade_rows` |
+
+```sh
+# the oracle's committed fits into the artifact store, as version 1 (runs research-ts, stamps each
+# with the commit that last changed its constant; a re-seed is a no-op, a changed payload is refused)
+RESEARCH_DATABASE_URL=... uv run python -m research.model.seed
+
+# the fit step: check-only by default (rebuild and compare, 0.05 points); --persist-board retakes
+# the product season's live board, which replaces what is served and what the register freezes
+RESEARCH_DATABASE_URL=... uv run python -m research.model.fit_check [--persist-board] [--now ISO]
+
+# the per-game variance fit (2023-2024; --publish writes the next version, the pin does not move)
+RESEARCH_DATABASE_URL=... uv run python -m research.model.fits.game_variance [--publish]
+
+# the model parity cases (the store-backed ones read the dev copy, read only)
+export PARITY_SOURCE_DATABASE_URL=postgres://commish:commish@localhost:5432/commish
+uv run python -m research.parity model all            # or one case; --no-store for numerics only
+```
+
+| Path | What |
+|---|---|
+| `model/fdlibm.py`, `model/jsmath.py` | V8's transcendentals and number semantics |
+| `model/domain.py`, `model/instants.py` | stat lines, scoring rules, roster slots; millisecond instants |
+| `model/reads/` | the point-in-time reads: observations, stat lines, usage, team facts, rosters, rankings |
+| `model/weekly/` | layer 1 (opportunity), layer 2 (efficiency) and the scheme layer |
+| `model/preseason/` | the board's inputs and moments, candidates, availability, career, depth chart, offseason, rookies, roster status and the gate, the board, the build of every leg, persist |
+| `model/market/` | the ADP curves per format, the props anchor, the blend |
+| `model/laws/` | tribal and discovered law facts, the candidate generator, the registry and its reasons, the measurement harness |
+| `model/decide/value.py` | replacement levels, value over replacement, tiers |
+| `model/register/` | the freeze and the grade |
+| `model/backtest.py` | Spearman, the scorecard, the held-out backtest |
+| `model/fit_check.py`, `model/fits/` | the fit step; the fits that run on today's store |
+| `parity/model/` | the model cases: the store as it stood, both sides, the diff |
+
+### The store as it stood
+
+A board is rebuilt at a past moment, so each model case runs on a copy of the dev store as it
+stood then: every legacy row whose own write stamp (`ingested_at`, `fetched_at`, `captured_at`,
+`created_at`, `resolved_at`, `computed_at`, `frozen_at`) is at or before the moment, the boards by
+their own `as_of`, the artifacts whole. `as_of` alone is not enough: the win totals are stamped with
+the publisher's date, two days before the job that wrote them ran, and a board rebuilt on them
+gave one 2026 receiver a law the served board never had.
+
+### Model parity
+
+The latest run: **7 cases, 908,352 comparisons, 0 differences** (plus `fit-game-variance`, 0).
+
+| Case | Compared | Differences | Tolerance |
+|---|---|---|---|
+| numerics | log, exp, sin 100,000 each; pow 400,000; Math.round 100,000; mulberry32 100,000 | 0 | none |
+| board-2026-week2 | ppr, half, std and raw legs at 2026-09-09T02:20:29.697Z, oracle against port: 551 rows each, every column and reason; 132 exclusions each | 0 | none |
+| board-2026-week2 | each port leg against the stored generation (points, rank, value rank) | 0 | none |
+| board-2026-week2 | port ppr against register 2026 week 2 (551 players) | 0 | 0.05 points (the pages print one decimal); the actual worst is 0 |
+| board-2026-week1 | ppr leg at 2026-09-07T21:57:33.121Z, oracle against port: 669 rows; both refuse the half leg identically (no half-PPR ADP until 2026-09-08 21:49) | 0 | none |
+| register-freeze-week2 | the freeze retaken at 2026-09-10T18:00:17.177Z against the stored freeze and the oracle's: 1,097 rows (551 v9, 546 v7) | 0 | none (`implementation` excluded) |
+| register-grade | weeks 1 and 2 on today's store | both sides refuse alike: the store holds no 2026 outcomes | |
+| held-out-backtest | rho and n, 2023 and 2024 | 0 | none |
+| fit-check | the 2026 live board at its stored moment, 4 boards | max delta 0.0000 | 0.05 points |
+| fit-game-variance | the 2023-2024 refit, oracle against port | 0 | none |
+
+The register against week 1 is not a port difference: 561 of the 669 frozen board points differ
+from today's model by more than 0.05 (worst 66.79). The week-1 board was taken by the 2026-09-07
+model; on 2026-09-08 the availability priors were re-fit and the roster-status gate, per-format
+boards and designation cells landed, and the oracle today reproduces the port, not that board.
+
+### The backtest
+
+The stored served board against regular-season outcomes, in the held-out seasons:
+
+| Season | Spearman rho | n |
+|---|---|---|
+| 2023 | 0.7649 (0.7648668314705206) | 533 |
+| 2024 | 0.7848 (0.7848118119491571) | 537 |

@@ -28,6 +28,7 @@ import { takeFreeze } from "@research-ts/projections/register/freeze";
 import { gradeWeek } from "@research-ts/projections/register/grade";
 import type { Clock } from "@research-ts/domain/timing";
 import { heldOutScores } from "@research-ts/nightly/reads/held-out";
+import { fitGameVariance, loadGameVarianceObservations } from "@research-ts/projections/preseason/game-variance";
 
 const SCORED: readonly Position[] = ["QB", "RB", "WR", "TE"];
 const SLOTS: readonly RosterSlotConfig[] = STANDARD_ROSTER_SLOTS.filter(
@@ -123,6 +124,10 @@ async function main(): Promise<void> {
     else if (command === "freeze") await freeze(db, Number(season), Number(second), third!);
     else if (command === "grade") await grade(db, Number(season), Number(second), third!);
     else if (command === "held-out") await heldOut(db);
+    else if (command === "fit-game-variance") {
+      const observations = await loadGameVarianceObservations(db, [2023, 2024]);
+      process.stdout.write(`${JSON.stringify(fitGameVariance(observations, { heldOutSeasons: [2025, 2026] }))}\n`);
+    }
     else throw new Error(`no command ${command}`);
   } finally {
     await db.$client.end();

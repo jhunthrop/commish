@@ -16,6 +16,7 @@ from research.db.url import sqlalchemy_url
 from research.model.artifacts import read_artifact
 from research.model.backtest import held_out_scores
 from research.model.fit_check import fit_step
+from research.model.fits.game_variance import fit_skill_game_variance
 from research.model.instants import js_iso
 from research.model.priors import load_model_artifacts
 from research.model.register.freeze import take_freeze
@@ -293,6 +294,27 @@ def _fit_check() -> CaseResult:
     return CaseResult("fit-check", [], notes, before.status == "ran" and after.status == "skipped")
 
 
+def _fit_game_variance() -> CaseResult:
+    oracle = run_oracle(source_url(), "fit-game-variance")
+    engine = make_engine(sqlalchemy_url(source_url()))
+    with engine.connect() as conn:
+        port = fit_skill_game_variance(conn)
+        published = read_artifact(conn, "preseason/game-variance-skill").payload
+    engine.dispose()
+    theirs = oracle.lines[0] if oracle.lines else {}
+    against_published = diff_rows("port's refit against the published v1", published, port)
+    notes = [
+        f"published v1 against today's refit: {against_published.differing} cell(s) differ (worst {against_published.worst:.4f}); "
+        "the 2023-2024 inputs moved after the fit was published on 2026-09-05, and the store kept no write stamp old enough to rebuild them"
+    ]
+    return CaseResult(
+        "fit-game-variance",
+        [diff_rows("game variance refit, oracle against port", theirs, port)],
+        notes,
+        oracle.error is None,
+    )
+
+
 MODEL_CASES: Final = (
     ModelCase("numerics", "V8's log, exp, sin, pow, Math.round and mulberry32, bit for bit", False, _numerics),
     ModelCase(
@@ -316,5 +338,11 @@ MODEL_CASES: Final = (
     ModelCase("register-grade", "grading weeks 1 and 2 on today's store", True, _register_grade),
     ModelCase("held-out-backtest", "the stored served board against outcomes in the held-out seasons", True, _held_out),
     ModelCase("fit-check", "the fit step's check: the live board before kickoff, the archive after", True, _fit_check),
+    ModelCase(
+        "fit-game-variance",
+        "the per-game variance fit on 2023-2024, oracle against port, and the published v1",
+        True,
+        _fit_game_variance,
+    ),
 )
 MODEL_CASES_BY_NAME: Final[Mapping[str, ModelCase]] = {case.name: case for case in MODEL_CASES}

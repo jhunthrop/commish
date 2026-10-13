@@ -86,3 +86,10 @@ jobs:
         run: uv run python -m research.parity schema
       - name: Parity, every ingest, recorded inputs, empty and non-empty passes
         run: uv run python -m research.parity ingest all
+      # The model cases that need no store: V8's log, exp, sin, pow, Math.round and mulberry32
+      # against the Python reproductions, on this runner's own node (x86-64 has no fused
+      # multiply-add, so this proves the unfused arm the way the arm64 run proves the fused one).
+      # The board, register, backtest and fit cases read the dev copy of production
+      # (PARITY_SOURCE_DATABASE_URL), which never lives on a runner; they run where it is restored.
+      - name: Parity, the model's numerics
+        run: uv run python -m research.parity model all --no-store
