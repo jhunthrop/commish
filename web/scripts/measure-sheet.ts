@@ -41,7 +41,7 @@ async function startSheet(page: Page): Promise<void> {
 	await page.waitForSelector('[data-row-id]');
 }
 
-async function measureDrag(page: Page): Promise<FrameStats> {
+async function startFrameProbe(page: Page): Promise<void> {
 	await page.evaluate(() => {
 		const w = window as unknown as { __frames: number[]; __long: number; __run: boolean };
 		w.__frames = [];
@@ -58,28 +58,130 @@ async function measureDrag(page: Page): Promise<FrameStats> {
 		};
 		requestAnimationFrame(loop);
 	});
-	if (process.env.IDLE) {
-		await page.mouse.move(200, 400);
-		for (let step = 0; step < DRAG_STEPS; step += 1) {
-			await page.mouse.move(200, 400 + (step % 2));
-			await page.waitForTimeout(STEP_WAIT_MS);
+}
+
+/** One finger or the mouse, pressed, moved and lifted at a point. */
+interface Pointer {
+	down(x: number, y: number): Promise<void>;
+	move(x: number, y: number): Promise<void>;
+	up(): Promise<void>;
+	cancel(): Promise<void>;
+}
+
+function mouse(page: Page): Pointer {
+	return {
+		down: async (x, y) => {
+			await page.mouse.move(x, y);
+			await page.mouse.down();
+		},
+		move: (x, y) => page.mouse.move(x, y),
+		up: () => page.mouse.up(),
+		cancel: () => page.keyboard.press('Escape')
+	};
+}
+
+/** A finger through CDP touch events, which the page sees as pointerType touch. */
+function finger(cdp: CDPSession): Pointer {
+	const touch = (
+		type: 'touchStart' | 'touchMove' | 'touchEnd' | 'touchCancel',
+		x = 0,
+		y = 0
+	): Promise<unknown> =>
+		cdp.send('Input.dispatchTouchEvent', {
+			type,
+			touchPoints: type === 'touchEnd' || type === 'touchCancel' ? [] : [{ x, y }]
+		});
+	return {
+		down: async (x, y) => {
+			await touch('touchStart', x, y);
+		},
+		move: async (x, y) => {
+			await touch('touchMove', x, y);
+		},
+		up: async () => {
+			await touch('touchEnd');
+		},
+		cancel: async () => {
+			await touch('touchCancel');
 		}
-		return collect(page);
-	}
-	const grip = page.locator('[data-grip]').nth(2);
-	const box = await grip.boundingBox();
+	};
+}
+
+const rowOrder = (page: Page): Promise<string[]> =>
+	page.evaluate(() =>
+		Array.from(document.querySelectorAll<HTMLElement>('[data-row-id]')).map(
+			(el) => el.dataset.rowId ?? ''
+		)
+	);
+
+const handleCenter = async (page: Page, index: number): Promise<{ x: number; y: number }> => {
+	const box = await page.locator('[data-grip]').nth(index).boundingBox();
 	if (!box) throw new Error('No handle to drag.');
-	const x = box.x + box.width / 2;
-	let y = box.y + box.height / 2;
-	await page.mouse.move(x, y);
-	await page.mouse.down();
+	return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+};
+
+/** Drags the third row down past the bottom edge, so the list auto-scrolls, and lifts. */
+async function measureDrag(page: Page, pointer: Pointer): Promise<FrameStats & { moved: number }> {
+	await page.evaluate(() => {
+		window.scrollTo(0, 0);
+	});
+	const before = await rowOrder(page);
+	await startFrameProbe(page);
+	const { x, y: start } = await handleCenter(page, 2);
+	let y = start;
+	await pointer.down(x, y);
 	for (let step = 0; step < DRAG_STEPS; step += 1) {
 		y = Math.min(PHONE.height - 20, y + DRAG_STEP_PX);
-		await page.mouse.move(x, y);
+		await pointer.move(x, y);
 		await page.waitForTimeout(STEP_WAIT_MS);
 	}
-	await page.mouse.up();
-	return collect(page);
+	await pointer.up();
+	const stats = await collect(page);
+	const after = await rowOrder(page);
+	return { ...stats, moved: after.indexOf(before[2] ?? '') + 1 };
+}
+
+/** A drag the browser cancels part way leaves the order and every row where they were. */
+async function checkCancel(page: Page, pointer: Pointer): Promise<boolean> {
+	const before = await rowOrder(page);
+	const { x, y } = await handleCenter(page, 1);
+	await pointer.down(x, y);
+	for (let step = 1; step <= 10; step += 1) {
+		await pointer.move(x, y + step * 12);
+		await page.waitForTimeout(STEP_WAIT_MS);
+	}
+	await pointer.cancel();
+	await page.waitForTimeout(50);
+	const after = await rowOrder(page);
+	const transformed = await page.evaluate(
+		() =>
+			Array.from(document.querySelectorAll<HTMLElement>('[data-row-id]')).filter(
+				(el) => el.style.transform !== ''
+			).length
+	);
+	return before.join() === after.join() && transformed === 0;
+}
+
+/** A finger on a row's name scrolls the page and moves no one. */
+async function checkPan(page: Page, pointer: Pointer): Promise<boolean> {
+	await page.evaluate(() => {
+		window.scrollTo(0, 400);
+	});
+	const before = await rowOrder(page);
+	const scrollBefore = await page.evaluate(() => window.scrollY);
+	const box = await page.locator('[data-row-id] button[aria-expanded]').nth(8).boundingBox();
+	if (!box) throw new Error('No row to pan on.');
+	const x = box.x + 20;
+	await pointer.down(x, box.y + 200);
+	for (let step = 1; step <= 10; step += 1) {
+		await pointer.move(x, box.y + 200 - step * 20);
+		await page.waitForTimeout(STEP_WAIT_MS);
+	}
+	await pointer.up();
+	await page.waitForTimeout(300);
+	const after = await rowOrder(page);
+	const scrollAfter = await page.evaluate(() => window.scrollY);
+	return before.join() === after.join() && scrollAfter > scrollBefore;
 }
 
 async function collect(page: Page): Promise<FrameStats> {
@@ -178,20 +280,32 @@ async function measurePrint(
 	return { renderMs, pages, sections };
 }
 
+function dragLine(label: string, d: FrameStats & { moved: number }): string {
+	return `${label} drag ${String(d.frames)} frames, p50 ${d.p50.toFixed(1)} ms, p95 ${d.p95.toFixed(1)} ms, max ${d.max.toFixed(1)} ms, ${String(d.over)} over 25 ms, ${String(d.longTasks)} long tasks, row 3 landed at ${String(d.moved)}`;
+}
+
 const browser = await chromium.launch();
 try {
 	const report: string[] = [];
 	for (let run = 1; run <= RUNS; run += 1) {
-		const context = await browser.newContext({ viewport: PHONE, deviceScaleFactor: 2 });
+		const context = await browser.newContext({
+			viewport: PHONE,
+			deviceScaleFactor: 2,
+			hasTouch: true,
+			isMobile: true
+		});
 		const page = await context.newPage();
 		await startSheet(page);
-		await throttled(page);
-		const drag = await measureDrag(page);
+		const cdp = await throttled(page);
+		const drag = await measureDrag(page, mouse(page));
+		const touch = await measureDrag(page, finger(cdp));
+		const cancelled = await checkCancel(page, finger(cdp));
+		const panned = await checkPan(page, finger(cdp));
 		const imported = await measureImport(page);
 		const returning = await measureReturn(page);
 		const print = await measurePrint(page);
 		report.push(
-			`run ${String(run)}: drag ${String(drag.frames)} frames, p50 ${drag.p50.toFixed(1)} ms, p95 ${drag.p95.toFixed(1)} ms, max ${drag.max.toFixed(1)} ms, ${String(drag.over)} over 25 ms, ${String(drag.longTasks)} long tasks | import read ${imported.readMs.toFixed(0)} ms, render ${imported.renderMs.toFixed(0)} ms | return visit LCP ${returning.lcpMs.toFixed(0)} ms, 400 rows in ${returning.rowsMs.toFixed(0)} ms | print ${print.renderMs.toFixed(0)} ms to first paint after load, ${String(print.sections)} positions, ${String(print.pages)} PDF pages`
+			`run ${String(run)}: ${dragLine('mouse', drag)} | ${dragLine('touch', touch)} | touch cancel restores: ${String(cancelled)}, pan on a row scrolls: ${String(panned)} | import read ${imported.readMs.toFixed(0)} ms, render ${imported.renderMs.toFixed(0)} ms | return visit LCP ${returning.lcpMs.toFixed(0)} ms, 400 rows in ${returning.rowsMs.toFixed(0)} ms | print ${print.renderMs.toFixed(0)} ms to first paint after load, ${String(print.sections)} positions, ${String(print.pages)} PDF pages`
 		);
 		await context.close();
 	}

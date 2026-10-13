@@ -103,9 +103,12 @@ export function movePlayer(
 	if (from === -1) return sheet;
 	const target = Math.max(0, Math.min(sheet.rows.length - 1, to));
 	const moving = sheet.rows[from];
-	if (!moving || (target === from && moving.tier === null)) return sheet;
+	if (!moving) return sheet;
 	const rest = sheet.rows.filter((row) => row.id !== playerId);
 	const tier = landingTier(rest, target, moving, tierFrom);
+	// A tap on the handle, or a drop back where he was in the same tier, changes nothing: no undo
+	// entry and no save.
+	if (target === from && tier === moving.tier) return sheet;
 	const rows = [...rest.slice(0, target), { ...moving, tier }, ...rest.slice(target)];
 	return withRows(sheet, rows);
 }

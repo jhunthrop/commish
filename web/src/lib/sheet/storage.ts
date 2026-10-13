@@ -1,8 +1,10 @@
 /**
  * The sheet in this browser: the working copy, signed in or out. Signed out it is the only copy.
  * Signed in it is what the page shows at once while the account's copy loads, and what is kept
- * when a save cannot reach the account. Storage is outside data, so a read trusts nothing: a copy
- * that does not parse reads as no copy, and each row is checked and cut to the sheet's limits.
+ * when a save cannot reach the account. Beside it the browser keeps the sheet as the account held
+ * it at the last sync (the common ancestor merge.ts needs) and a shelf of sheets saved here that
+ * are not on the account yet. Storage is outside data, so a read trusts nothing: a copy that does
+ * not parse reads as no copy, and each row is checked and cut to the sheet's limits.
  */
 import type { StorageGetter } from '#lib/ui/theme.ts';
 import { SHEET_LIMITS } from './limits.ts';
@@ -12,7 +14,9 @@ import { normalizeTags } from './tags.ts';
 import { repairTiers } from './tiers.ts';
 
 export const SHEET_STORAGE_KEY = 'commish-sheet';
-const VERSION = 2;
+const VERSION = 3;
+/** How many sheets the shelf keeps, the account's limit. */
+export const SHELF_LIMIT = 50;
 
 /** Which account sheet this copy was last saved to, and that sheet's updated_at then. */
 export interface SyncMark {
@@ -27,13 +31,20 @@ export interface StoredSheet {
 	/** True while this browser has edits the account has not acknowledged. */
 	dirty: boolean;
 	sync: SyncMark | null;
+	/** The sheet as the account held it at the last successful sync, or null before one. */
+	base: Sheet | null;
+	/** Sheets saved in this browser beside this one (a saved draft while signed out or offline),
+	 * created on the account at the next sync. */
+	shelf: readonly Sheet[];
 }
 
 export const EMPTY_STORED: StoredSheet = {
 	sheet: emptySheet(),
 	editedAt: null,
 	dirty: false,
-	sync: null
+	sync: null,
+	base: null,
+	shelf: []
 };
 
 type Loose = Record<string, unknown>;
@@ -102,11 +113,21 @@ export function readStored(getStorage: StorageGetter): StoredSheet {
 		const sheet = readSheet(parsed.sheet);
 		if (sheet === null) return EMPTY_STORED;
 		const editedAt = text(parsed.editedAt, 64);
+		const sync = readSync(parsed.sync);
+		const shelf = Array.isArray(parsed.shelf)
+			? parsed.shelf
+					.map(readSheet)
+					.filter((kept): kept is Sheet => kept !== null)
+					.slice(0, SHELF_LIMIT)
+			: [];
 		return {
 			sheet,
 			editedAt: editedAt && !Number.isNaN(Date.parse(editedAt)) ? editedAt : null,
 			dirty: parsed.dirty === true,
-			sync: readSync(parsed.sync)
+			sync,
+			// An ancestor only means something beside the sheet it was synced with.
+			base: sync ? readSheet(parsed.base) : null,
+			shelf
 		};
 	} catch {
 		return EMPTY_STORED;

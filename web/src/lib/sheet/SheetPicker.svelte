@@ -6,7 +6,8 @@
 	import { FORMAT_LABELS } from './format.ts';
 	import type { SheetStore } from './store.svelte.ts';
 
-	/** Your account's sheets: open one, start one, delete one. */
+	/** Your sheets: the account's (open, start, delete) and any saved in this browser that are not
+	 * on the account yet (open, signed out). */
 	interface Props {
 		store: SheetStore;
 		onclose: () => void;
@@ -49,9 +50,32 @@
 				</span>
 			</li>
 		{/each}
+		{#each store.stored.shelf as sheet, index (index)}
+			<li>
+				<span class="who">
+					<b>{sheet.name}</b>
+					<Label
+						>{FORMAT_LABELS[sheet.format]} · {plural(sheet.rows.length, 'player')} · in this browser</Label
+					>
+				</span>
+				{#if !store.signedIn}
+					<span class="tools">
+						<Quiet
+							size="sm"
+							onclick={() => {
+								store.openShelved(index);
+								onclose();
+							}}>Open</Quiet
+						>
+					</span>
+				{/if}
+			</li>
+		{/each}
 	</ul>
 	<div class="foot">
-		<Quiet size="sm" onclick={() => void startNew()}>New sheet</Quiet>
+		{#if store.signedIn}
+			<Quiet size="sm" onclick={() => void startNew()}>New sheet</Quiet>
+		{/if}
 		<Quiet size="sm" onclick={onclose}>Done</Quiet>
 	</div>
 </Panel>

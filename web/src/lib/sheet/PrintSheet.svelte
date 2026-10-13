@@ -15,6 +15,9 @@
 
 	onMount(() => store.load());
 
+	/** The list runs in three columns, and each column says what its numbers are. */
+	const COLUMN_HEADS = [1, 2, 3] as const;
+
 	const sheet = $derived(store.sheet);
 	const ranks = $derived(ranksOf(sheet.rows));
 	const pages = $derived(
@@ -42,8 +45,14 @@
 				<p>
 					{sheet.name} · {FORMAT_LABELS[sheet.format]} · {plural(page.rows.length, 'player')}
 				</p>
-				<p class="basis">{page.position} rank on the left, overall rank on the right</p>
 			</header>
+			<div class="heads" aria-hidden="true">
+				{#each COLUMN_HEADS as column (column)}
+					<span class="head"
+						><span>{page.position}</span><span>Player</span><span>Overall</span></span
+					>
+				{/each}
+			</div>
 			<ol>
 				{#each page.rows as row, index (row.id)}
 					{@const previous = page.rows[index - 1]}
@@ -94,8 +103,8 @@
 		width: 8.5in;
 		min-height: 11in;
 		padding: 0.4in 0.45in;
-		background: #ffffff;
-		color: #15120f;
+		background: var(--paper);
+		color: var(--paper-ink);
 		box-shadow: var(--shadow-pop);
 		font-size: 8pt;
 		line-height: 1.2;
@@ -105,7 +114,7 @@
 		display: flex;
 		align-items: baseline;
 		gap: 12pt;
-		border-bottom: 1.5pt solid #15120f;
+		border-bottom: 1.5pt solid var(--paper-ink);
 		padding-bottom: 4pt;
 		margin-bottom: 6pt;
 	}
@@ -138,7 +147,7 @@
 	.tier {
 		margin: 5pt 0 1pt;
 		padding-top: 2pt;
-		border-top: 1pt solid #15120f;
+		border-top: 1pt solid var(--paper-ink);
 		font-weight: 700;
 		font-size: 7.5pt;
 		text-transform: uppercase;
@@ -150,7 +159,7 @@
 		grid-template-columns: 18pt minmax(0, 1fr);
 		column-gap: 4pt;
 		padding: 1pt 0;
-		border-bottom: 0.5pt solid #d8d3cd;
+		border-bottom: 0.5pt solid var(--paper-line);
 	}
 
 	.rk {
@@ -175,7 +184,7 @@
 	.team,
 	.all {
 		font-size: 7.5pt;
-		color: #48413b;
+		color: var(--paper-muted);
 	}
 
 	.all {
@@ -187,7 +196,7 @@
 	.note {
 		grid-column: 2;
 		font-size: 7.5pt;
-		color: #48413b;
+		color: var(--paper-muted);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -199,10 +208,27 @@
 		letter-spacing: 0.06em;
 	}
 
-	.basis {
-		margin-left: auto;
-		color: #6b635c;
-		font-size: 7.5pt;
+	.heads {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		column-gap: 0.25in;
+		margin-bottom: 2pt;
+	}
+
+	.head {
+		display: grid;
+		grid-template-columns: 18pt minmax(0, 1fr) auto;
+		column-gap: 4pt;
+		font-size: 6.5pt;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--paper-muted);
+	}
+
+	.head span:first-child {
+		text-align: right;
+		white-space: nowrap;
 	}
 
 	@page {

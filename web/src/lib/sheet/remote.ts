@@ -1,7 +1,7 @@
 /**
  * The account's sheets over the API: the calls the sync makes, and the one place a row is read
- * from or written to the API's shape. The API stores positions only in the spellings this site
- * reads (api/internal/sheets/validate.go), so every row it answers with is one we can show.
+ * from or written to the API's shape. The API stores positions only in the six spellings this
+ * site reads (api/internal/sheets/validate.go and the table's check).
  */
 import type { ApiClient } from '#lib/api/client.ts';
 import type { components } from '#lib/api/types.ts';
@@ -34,11 +34,12 @@ export interface SheetSummary {
 
 const SHEETS_PER_PAGE = 50;
 
-function fromApiRow(row: ApiRow): SheetRow {
+/** A row as this site reads it, or null for a position it does not rank. The database refuses
+ * those (migration 00007's sheet_rows_position_known), so null is a guard, not a path: one odd row
+ * never fails a whole sync. */
+function fromApiRow(row: ApiRow): SheetRow | null {
 	const position = parsePosition(row.position);
-	if (position === null) {
-		throw new Error(`The account's sheet holds ${row.name} at "${row.position}", not a position.`);
-	}
+	if (position === null) return null;
 	return {
 		id: row.player_id,
 		name: row.name,
@@ -71,7 +72,7 @@ function fromDetail(detail: ApiSheetDetail): RemoteSheet {
 		sheet: {
 			name: detail.name,
 			format: parseFormat(detail.format) ?? DEFAULT_FORMAT,
-			rows: detail.rows.map(fromApiRow)
+			rows: detail.rows.map(fromApiRow).filter((row): row is SheetRow => row !== null)
 		}
 	};
 }

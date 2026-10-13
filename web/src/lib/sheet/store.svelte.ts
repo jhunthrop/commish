@@ -26,8 +26,8 @@ import {
 } from './model.ts';
 import { queueSeed } from './queue.ts';
 import { sheetsApi, type Account, type SheetSummary, type SheetsApi } from './remote.ts';
-import { EMPTY_STORED, readStored, writeStored, type StoredSheet } from './storage.ts';
-import { push, reconcile } from './sync.ts';
+import { EMPTY_STORED, SHELF_LIMIT, readStored, writeStored, type StoredSheet } from './storage.ts';
+import { isOffline, push, reconcile, syncedFrom } from './sync.ts';
 import { moveTierStart, removeTierAt, startTierAt } from './tiers.ts';
 
 /** How long after the last edit a save goes out: a drag or a burst of typing is one save. */
@@ -66,6 +66,11 @@ export class SheetStore {
 	/** The API's sentence for the last save that failed. */
 	problem = $state<string | null>(null);
 	canUndo = $state(false);
+	/** True once the first reach for the account has settled, whatever it found: until then
+	 * nobody can tell a signed-out drafter from a signed-in one whose answer is on its way. */
+	resolved = $state(false);
+	/** Lines the page owes the drafter: a conflict the account's copy won, a shelf sheet saved. */
+	notices = $state.raw<readonly string[]>([]);
 
 	sheet = $derived(this.stored.sheet);
 	ids: ReadonlySet<string> = $derived(new SvelteSet(this.stored.sheet.rows.map((row) => row.id)));
@@ -154,6 +159,40 @@ export class SheetStore {
 		if (previous) this.#write(previous);
 	}
 
+	/** Keeps a sheet in this browser beside the one you have open, never replacing it. It goes to
+	 * your account as a new sheet at the next sync. */
+	shelve(sheet: Sheet): void {
+		if (this.stored.shelf.length >= SHELF_LIMIT) {
+			this.notices = [...this.notices, 'This browser holds as many sheets as it can'];
+			return;
+		}
+		this.#setStored({ ...this.stored, shelf: [...this.stored.shelf, sheet] });
+		void this.#reconcile();
+	}
+
+	/** Opens a sheet from this browser's shelf, putting the open one on the shelf in its place.
+	 * Signed out only: signed in, the shelf is on your account already. */
+	openShelved(index: number): void {
+		const chosen = this.stored.shelf[index];
+		if (!chosen || this.signedIn) return;
+		const rest = this.stored.shelf.filter((_, at) => at !== index);
+		const shelf = this.sheet.rows.length > 0 ? [this.sheet, ...rest] : rest;
+		this.#resetUndo();
+		this.#edits += 1;
+		this.#setStored({
+			sheet: chosen,
+			editedAt: this.#deps.now().toISOString(),
+			dirty: true,
+			sync: null,
+			base: null,
+			shelf
+		});
+	}
+
+	dismissNotice(index: number): void {
+		this.notices = this.notices.filter((_, at) => at !== index);
+	}
+
 	/** The queue a room opens with: your top players still available. */
 	queueFor(available: ReadonlySet<string>, size?: number): readonly string[] {
 		return queueSeed(this.sheet, available, size);
@@ -175,12 +214,7 @@ export class SheetStore {
 			try {
 				const remote = await this.#deps.api.get(sheetId);
 				this.#resetUndo();
-				this.#setStored({
-					sheet: remote.sheet,
-					editedAt: null,
-					dirty: false,
-					sync: { sheetId: remote.id, updatedAt: remote.updatedAt }
-				});
+				this.#setStored(syncedFrom(remote, { ...this.stored, editedAt: null }));
 				this.status = 'saved';
 			} catch (error) {
 				this.#fail(error);
@@ -200,18 +234,36 @@ export class SheetStore {
 			try {
 				const created = await this.#deps.api.create(fresh);
 				this.#resetUndo();
-				this.#setStored({
-					sheet: created.sheet,
-					editedAt: null,
-					dirty: false,
-					sync: { sheetId: created.id, updatedAt: created.updatedAt }
-				});
+				this.#setStored(syncedFrom(created, { ...this.stored, editedAt: null }));
 				this.sheets = await this.#deps.api.list();
 				this.status = 'saved';
 			} catch (error) {
 				this.#fail(error);
 			}
 		});
+	}
+
+	/** Saves a sheet beside the one you have open, never in its place: a new account sheet when
+	 * the account answers, this browser's shelf when it does not (signed out or offline), from
+	 * where the next sync puts it on the account. Call it once `resolved` is true. */
+	async saveAsNew(sheet: Sheet): Promise<'account' | 'browser'> {
+		if (!this.signedIn) {
+			this.shelve(sheet);
+			return 'browser';
+		}
+		const outcome = { saved: false };
+		await this.#serial(async () => {
+			try {
+				await this.#deps.api.create(sheet);
+				this.sheets = await this.#deps.api.list();
+				outcome.saved = true;
+			} catch (error) {
+				if (!isOffline(error)) this.#fail(error);
+			}
+		});
+		if (outcome.saved) return 'account';
+		this.shelve(sheet);
+		return 'browser';
 	}
 
 	/** Deletes one of your account's sheets, opening the next one when it is this one. */
@@ -298,35 +350,41 @@ export class SheetStore {
 
 	#reconcile(): Promise<void> {
 		return this.#serial(async () => {
-			this.status = this.signedIn ? 'saving' : 'checking';
-			const edits = this.#edits;
-			const outcome = await reconcile(this.#deps.api, this.stored);
-			switch (outcome.kind) {
-				case 'synced':
-					this.account = outcome.account;
-					this.sheets = outcome.sheets;
-					this.problem = null;
-					if (this.#edits === edits) {
-						this.#setStored(outcome.stored);
-						this.status = 'saved';
-					} else {
-						// You edited while the merge ran. Your copy is still marked unsaved, so the
-						// next pass merges it with what was just written and nothing is lost.
-						void this.#reconcile();
-					}
-					return;
-				case 'signed-out':
-					this.account = null;
-					this.status = 'local';
-					return;
-				case 'offline':
-					this.status = 'offline';
-					return;
-				case 'failed':
-					this.status = 'failed';
-					this.problem = outcome.message;
-			}
+			await this.#reconcileStep();
+			this.resolved = true;
 		});
+	}
+
+	async #reconcileStep(): Promise<void> {
+		this.status = this.signedIn ? 'saving' : 'checking';
+		const edits = this.#edits;
+		const outcome = await reconcile(this.#deps.api, this.stored);
+		switch (outcome.kind) {
+			case 'synced':
+				this.account = outcome.account;
+				this.sheets = outcome.sheets;
+				this.problem = null;
+				if (outcome.notices.length > 0) this.notices = [...this.notices, ...outcome.notices];
+				if (this.#edits === edits) {
+					this.#setStored(outcome.stored);
+					this.status = 'saved';
+				} else {
+					// You edited while the merge ran. Your copy is still marked unsaved, so the
+					// next pass merges it with what was just written and nothing is lost.
+					void this.#reconcile();
+				}
+				return;
+			case 'signed-out':
+				this.account = null;
+				this.status = 'local';
+				return;
+			case 'offline':
+				this.status = 'offline';
+				return;
+			case 'failed':
+				this.status = 'failed';
+				this.problem = outcome.message;
+		}
 	}
 
 	#save(): Promise<void> {
@@ -342,7 +400,13 @@ export class SheetStore {
 						this.#setStored(outcome.stored);
 						this.status = 'saved';
 					} else {
-						this.#setStored({ ...this.stored, sync: outcome.stored.sync });
+						// Edits landed while this one was out: the account now holds what was sent,
+						// so that is the new ancestor, and the newer edits stay unsaved.
+						this.#setStored({
+							...this.stored,
+							sync: outcome.stored.sync,
+							base: outcome.stored.base
+						});
 					}
 					return;
 				case 'reconcile':

@@ -1,89 +1,168 @@
 /**
- * How the sheet in this browser and the sheet on your account become one when you sign in, or
- * when a save finds the account's copy changed on another device. The rule never loses a row:
+ * How this browser's sheet and the account's become one sheet when both changed since they last
+ * agreed. A three-way merge against the ancestor this browser keeps: the sheet as the account held
+ * it at the last successful sync (storage.ts `base`).
  *
- * 1. If this browser has no edits the account has not seen, the account's sheet is the sheet,
- *    removals made on another device included.
- * 2. Otherwise every player on either sheet is on the merged sheet. The side edited last is the
- *    base: its order, its name and its tiers stand. A player only the other side has goes in
- *    right after the player he followed there (at the top if he led it).
- * 3. A player on both keeps the base side's tier, the base side's tags followed by the other
- *    side's (up to the limit), and the base side's note. When both have a note and they differ,
- *    neither is dropped: the base note, a middle dot, then the other, cut to the note limit.
- * 4. Tiers are then made whole within each position (tiers.ts), so an inserted player joins the
- *    tier of the player above him.
+ * - A player in the ancestor and missing on either side was removed there, and stays removed.
+ * - A player not in the ancestor was added on whichever side has him, and is kept.
+ * - A field (a player's tags, his note, the sheet's name, the order) changed on one side only
+ *   takes that side's value. Changed on both sides to different values, the account's copy stands
+ *   and the page says what this browser's value was ("Your note on X was replaced by the one saved
+ *   on another device").
+ * - Tiers travel with the order: they come from the side whose order stands, and are made whole
+ *   within each position after (tiers.ts), so an added player joins the tier above him.
+ *
+ * A replace in this browser (an import, a pasted list, our board) is this side's edit like any
+ * other: the ancestor's players it dropped are removals, its new players are additions. When the
+ * account has not changed since the ancestor, sync.ts writes this browser's copy as it is and never
+ * calls this.
  */
 import { SHEET_LIMITS } from './limits.ts';
 import type { Sheet, SheetRow } from './model.ts';
-import { normalizeTags } from './tags.ts';
 import { repairTiers } from './tiers.ts';
 
 export interface MergeSides {
+	/** The sheet both sides last agreed on. */
+	ancestor: Sheet;
+	/** This browser's copy. */
 	local: Sheet;
-	/** When this browser last edited its sheet, ISO, or null if never. */
-	localEditedAt: string | null;
-	/** Whether this browser has edits the account has not acknowledged. */
-	localDirty: boolean;
+	/** The account's copy. */
 	server: Sheet;
-	/** The account sheet's updated_at. */
-	serverUpdatedAt: string;
 }
 
-const NOTE_JOIN = ' · ';
-
-function mergeNote(base: string | null, other: string | null): string | null {
-	if (!other || other === base) return base;
-	if (!base) return other;
-	if (base.includes(other)) return base;
-	if (other.includes(base)) return other;
-	return `${base}${NOTE_JOIN}${other}`.slice(0, SHEET_LIMITS.note);
+export interface MergeResult {
+	sheet: Sheet;
+	/** One line per conflict the account's copy won, naming what this browser had. */
+	notices: readonly string[];
 }
 
-function mergeRow(base: SheetRow, other: SheetRow): SheetRow {
+const sameTags = (a: readonly string[], b: readonly string[]): boolean =>
+	a.length === b.length && a.every((tag, index) => tag === b[index]);
+
+/** Who appears where: the side's ids among those also in `other`, in the side's order. */
+function relativeOrder(side: Sheet, other: ReadonlySet<string>): readonly string[] {
+	return side.rows.filter((row) => other.has(row.id)).map((row) => row.id);
+}
+
+function orderChanged(ancestor: Sheet, side: Sheet): boolean {
+	const inAncestor = new Set(ancestor.rows.map((row) => row.id));
+	const inSide = new Set(side.rows.map((row) => row.id));
+	const mine = relativeOrder(side, inAncestor);
+	const theirs = relativeOrder(ancestor, inSide);
+	return mine.length !== theirs.length || mine.some((id, index) => id !== theirs[index]);
+}
+
+/** The value that stands for one field, and whether this browser's value lost a conflict. */
+function pick<T>(
+	ancestor: T | undefined,
+	local: T,
+	server: T,
+	same: (a: T, b: T) => boolean
+): { value: T; overruled: boolean } {
+	const localMoved = ancestor === undefined || !same(local, ancestor);
+	const serverMoved = ancestor === undefined || !same(server, ancestor);
+	if (localMoved && !serverMoved) return { value: local, overruled: false };
+	return { value: server, overruled: localMoved && serverMoved && !same(local, server) };
+}
+
+function mergeRow(
+	ancestor: SheetRow | undefined,
+	local: SheetRow,
+	server: SheetRow,
+	tierFrom: SheetRow,
+	notices: string[]
+): SheetRow {
+	const note = pick(ancestor?.note, local.note, server.note, (a, b) => a === b);
+	const tags = pick(ancestor?.tags, local.tags, server.tags, sameTags);
+	if (note.overruled) {
+		notices.push(`Your note on ${local.name} was replaced by the one saved on another device`);
+	}
+	if (tags.overruled) {
+		notices.push(`Your tags on ${local.name} were replaced by the ones saved on another device`);
+	}
 	return {
-		...base,
-		headshot: base.headshot ?? other.headshot,
-		team: base.team ?? other.team,
-		tags: normalizeTags([...base.tags, ...other.tags]),
-		note: mergeNote(base.note, other.note)
+		...server,
+		headshot: server.headshot ?? local.headshot,
+		team: server.team ?? local.team,
+		tier: tierFrom.tier,
+		tags: tags.value,
+		note: note.value
 	};
 }
 
-/** The base side's rows, with the other side's own players slotted in after their neighbours. */
-function unionRows(base: readonly SheetRow[], other: readonly SheetRow[]): readonly SheetRow[] {
-	const otherById = new Map(other.map((row) => [row.id, row]));
-	const merged: SheetRow[] = base.map((row) => {
-		const twin = otherById.get(row.id);
-		return twin ? mergeRow(row, twin) : row;
-	});
-	const placed = new Set(merged.map((row) => row.id));
+/** The rows of `primary` that stay, then the kept rows only `secondary` has, each slotted in after
+ * the player he followed there (at the top if he led it). */
+function weave(
+	primary: readonly SheetRow[],
+	secondary: readonly SheetRow[],
+	kept: (id: string) => boolean
+): SheetRow[] {
+	const out = primary.filter((row) => kept(row.id));
+	const placed = new Set(out.map((row) => row.id));
 	let anchor = -1;
-	for (const row of other) {
+	for (const row of secondary) {
 		if (placed.has(row.id)) {
-			anchor = merged.findIndex((candidate) => candidate.id === row.id);
+			anchor = out.findIndex((candidate) => candidate.id === row.id);
 			continue;
 		}
+		if (!kept(row.id)) continue;
 		anchor += 1;
-		merged.splice(anchor, 0, row);
+		out.splice(anchor, 0, row);
 		placed.add(row.id);
 	}
-	return merged;
+	return out;
 }
 
-function editedLater(localEditedAt: string | null, serverUpdatedAt: string): boolean {
-	if (localEditedAt === null) return false;
-	return Date.parse(localEditedAt) > Date.parse(serverUpdatedAt);
-}
+/** One sheet from the ancestor and both sides' copies. */
+export function mergeSheets({ ancestor, local, server }: MergeSides): MergeResult {
+	const notices: string[] = [];
+	const inAncestor = new Map(ancestor.rows.map((row) => [row.id, row]));
+	const inLocal = new Map(local.rows.map((row) => [row.id, row]));
+	const inServer = new Map(server.rows.map((row) => [row.id, row]));
+	const kept = (id: string): boolean =>
+		inAncestor.has(id) ? inLocal.has(id) && inServer.has(id) : inLocal.has(id) || inServer.has(id);
 
-/** The one sheet both sides become. */
-export function mergeSheets(sides: MergeSides): Sheet {
-	const { local, localDirty, server } = sides;
-	if (!localDirty || local.rows.length === 0) return server;
-	if (server.rows.length === 0) return { ...local, format: server.format };
-	const localIsBase = editedLater(sides.localEditedAt, sides.serverUpdatedAt);
-	const base = localIsBase ? local : server;
-	const other = localIsBase ? server : local;
-	return { ...base, rows: repairTiers(unionRows(base.rows, other.rows)) };
+	const localOrder = orderChanged(ancestor, local);
+	const serverOrder = orderChanged(ancestor, server);
+	const orderSide = localOrder && !serverOrder ? local : server;
+	const otherSide = orderSide === local ? server : local;
+	if (localOrder && serverOrder) {
+		const shared = new Set([...inLocal.keys()].filter((id) => inServer.has(id)));
+		const a = relativeOrder(local, shared);
+		const b = relativeOrder(server, shared);
+		if (a.some((id, index) => id !== b[index])) {
+			notices.push('Your order was replaced by the one saved on another device');
+		}
+	}
+
+	const rows = weave(orderSide.rows, otherSide.rows, kept).map((row) => {
+		const mine = inLocal.get(row.id);
+		const theirs = inServer.get(row.id);
+		if (!mine || !theirs) return row;
+		const tierFrom = orderSide === local ? mine : theirs;
+		return mergeRow(inAncestor.get(row.id), mine, theirs, tierFrom, notices);
+	});
+
+	const over = rows.length - SHEET_LIMITS.rows;
+	if (over > 0) {
+		const left = rows.slice(SHEET_LIMITS.rows).map((row) => row.name);
+		notices.push(
+			`Your sheet holds at most ${String(SHEET_LIMITS.rows)} players, so ${left.join(', ')} were left off`
+		);
+	}
+
+	const name = pick(ancestor.name, local.name, server.name, (a, b) => a === b);
+	if (name.overruled) {
+		notices.push(`Your sheet's name ${local.name} was replaced by the one saved on another device`);
+	}
+	return {
+		sheet: {
+			name: name.value,
+			format: server.format,
+			rows: repairTiers(rows.slice(0, SHEET_LIMITS.rows))
+		},
+		notices
+	};
 }
 
 /** Whether two sheets would store the same rows, names and annotations alike. */
@@ -95,8 +174,8 @@ export function sameSheet(a: Sheet, b: Sheet): boolean {
 			twin?.id === row.id &&
 			twin.tier === row.tier &&
 			twin.note === row.note &&
-			twin.tags.length === row.tags.length &&
-			twin.tags.every((tag, k) => tag === row.tags[k])
+			twin.headshot === row.headshot &&
+			sameTags(twin.tags, row.tags)
 		);
 	});
 }

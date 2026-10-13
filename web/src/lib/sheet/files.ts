@@ -10,7 +10,10 @@ export function downloadCsv(sheet: Sheet): void {
 	link.href = url;
 	link.download = csvFileName(sheet.name);
 	link.click();
-	URL.revokeObjectURL(url);
+	// The download starts from the link on its own task. Revoking in this one can cancel it.
+	setTimeout(() => {
+		URL.revokeObjectURL(url);
+	}, 0);
 }
 
 export class FileTooLargeError extends Error {}

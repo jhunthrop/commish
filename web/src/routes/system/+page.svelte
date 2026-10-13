@@ -42,6 +42,7 @@
 	import Part from '#lib/ui/system/Part.svelte';
 	import Parts from '#lib/ui/system/Parts.svelte';
 	import Specimen from '#lib/ui/system/Specimen.svelte';
+	import Swatch from '#lib/ui/system/Swatch.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -49,6 +50,12 @@
 	const ROW_MIN_WIDTH = 760;
 	const BAND_MIN_WIDTH = 520;
 	const PLAYER_HREF = '/players';
+	const PAPER_TOKENS = [
+		{ token: '--paper', about: 'The page.' },
+		{ token: '--paper-ink', about: 'Names, ranks and the rules between tiers.' },
+		{ token: '--paper-line', about: 'The hairline under each player.' },
+		{ token: '--paper-muted', about: 'Teams, tags, notes and the column heads.' }
+	] as const;
 	/** A drafter's own words, as the specimen's note. */
 	const SHEET_NOTE = 'Take him over any WR left in tier 3.';
 
@@ -209,6 +216,17 @@
 				<Part name="Field" about="A note, a pasted list, your own tag, a sheet's name.">
 					{#snippet show()}<Field label="Your own tag" placeholder="Your own tag" />{/snippet}
 				</Part>
+			</Parts>
+		</DocSection>
+
+		<DocSection
+			title="Paper"
+			sub="The printed sheet's tokens. They are the same in both themes, and print media puts every page on them."
+		>
+			<Parts>
+				{#each PAPER_TOKENS as { token, about } (token)}
+					<Swatch {token} {about} />
+				{/each}
 			</Parts>
 		</DocSection>
 

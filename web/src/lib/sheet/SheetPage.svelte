@@ -33,7 +33,7 @@
 	/** The undo key as this machine's keyboard prints it. */
 	const undoKey =
 		typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent)
-			? '⌘Z'
+			? 'Cmd Z'
 			: 'Ctrl Z';
 
 	let query = $state('');
@@ -188,9 +188,17 @@
 					{/if}
 				</p>
 			</div>
+			<!-- The account's buttons come first: they are drawn on the first response, and the ones
+				 that wait on your sheet are added after them, so nothing already drawn moves. -->
 			<div class="tools">
-				{#if store.canUndo}<Quiet size="sm" key={undoKey} onclick={() => store.undo()}>Undo</Quiet
-					>{/if}
+				{#if !store.signedIn}
+					<Quiet size="sm" href={store.signInUrl(resolve('/sheet'))}>Save it to your account</Quiet>
+				{/if}
+				{#if store.signedIn || store.stored.shelf.length > 0}
+					<Quiet size="sm" onclick={() => (panel = panel === 'sheets' ? null : 'sheets')}
+						>Your sheets</Quiet
+					>
+				{/if}
 				{#if rows.length > 0}
 					<Quiet size="sm" onclick={() => (panel = panel === 'import' ? null : 'import')}
 						>Import</Quiet
@@ -198,15 +206,21 @@
 					<Quiet size="sm" onclick={() => downloadCsv(sheet)}>Export CSV</Quiet>
 					<Quiet size="sm" href={resolve('/sheet/print')}>Print</Quiet>
 				{/if}
-				{#if store.signedIn}
-					<Quiet size="sm" onclick={() => (panel = panel === 'sheets' ? null : 'sheets')}
-						>Your sheets</Quiet
-					>
-				{:else}
-					<Quiet size="sm" href={store.signInUrl(resolve('/sheet'))}>Save it to your account</Quiet>
-				{/if}
+				{#if store.canUndo}<Quiet size="sm" key={undoKey} onclick={() => store.undo()}>Undo</Quiet
+					>{/if}
 			</div>
 		</div>
+
+		{#if store.notices.length > 0}
+			<ul class="notices" aria-live="polite">
+				{#each store.notices as notice, index (index)}
+					<li>
+						<span>{notice}</span>
+						<Quiet size="sm" onclick={() => store.dismissNotice(index)}>Got it</Quiet>
+					</li>
+				{/each}
+			</ul>
+		{/if}
 
 		{#if panel === 'import'}
 			<ImportPanel {store} {directory} onclose={() => (panel = null)} />
@@ -324,6 +338,26 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--s-3);
+	}
+
+	.notices {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
+	}
+
+	.notices li {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--s-3);
+		padding: var(--s-2) var(--s-3);
+		border-left: 4px solid var(--accent);
+		background: var(--surface);
+		font-size: var(--t-sm);
 	}
 
 	.problem {

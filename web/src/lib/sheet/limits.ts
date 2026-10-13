@@ -8,7 +8,6 @@ export const SHEET_LIMITS = {
 	sheetName: 60,
 	playerId: 64,
 	playerName: 80,
-	position: 8,
 	team: 8,
 	tier: 50,
 	note: 500,

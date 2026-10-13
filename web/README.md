@@ -87,5 +87,12 @@ Mount points for other lanes: `SheetRail.svelte` in the board's side column, `Ad
 report, and `sheetStore.queueFor(available)` with `QUEUE_SEED_SIZE` in `queue.ts` for a room's
 queue.
 
-`npm run measure:sheet -- <url>` measures the drag at the phone profile, a 400-row import and the
-print view against a running build.
+`npm run measure:sheet -- <url>` measures the drag at the phone profile with a mouse and with a
+finger (touch, a cancelled touch, a pan), a 400-row import and the print view against a running
+build. `npm run lighthouse:sheet` (part of `npm run lighthouse`) audits `/sheet` with 400 rows
+seeded into the browser before each cold run (`lighthouserc.sheet.cjs`,
+`scripts/lighthouse-seed-sheet.cjs`); `LH_SHEET_URL` points it at a build already being served.
+
+The paper tokens (`--paper`, `--paper-ink`, `--paper-line`, `--paper-muted`) are this lane's
+addition to `tokens.css`: the print view's colors in both themes, and the page ground under print
+media.
