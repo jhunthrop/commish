@@ -54,7 +54,7 @@ async function call<T>(who: Drafter, method: string, path: string, body?: unknow
 		},
 		body: body === undefined ? undefined : JSON.stringify(body)
 	});
-	const envelope = (await response.json()) as { ok: boolean; data: T; error: { message: string } };
+	const envelope = await response.json<{ ok: boolean; data: T; error: { message: string } }>();
 	if (!envelope.ok) throw new Error(`${method} ${path}: ${envelope.error.message}`);
 	return envelope.data;
 }
@@ -95,7 +95,10 @@ await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 
 async function context(theme: string, width: number, who: Drafter): Promise<BrowserContext> {
-	const ctx = await browser.newContext({ viewport: { width, height: VIEWPORT_HEIGHT }, colorScheme: theme as 'light' });
+	const ctx = await browser.newContext({
+		viewport: { width, height: VIEWPORT_HEIGHT },
+		colorScheme: theme as 'light'
+	});
 	await ctx.addCookies([
 		{ name: 'commish_session', value: who.session, domain: 'localhost', path: '/' },
 		{ name: 'commish_csrf', value: who.csrf, domain: 'localhost', path: '/' }
@@ -121,7 +124,11 @@ async function shoot(
 			const page = await ctx.newPage();
 			await page.goto(`${web}${to}`, { waitUntil: 'networkidle' });
 			if (waitMs > 0) await page.waitForTimeout(waitMs);
-			await page.getByText(ready).filter({ visible: true }).first().waitFor({ timeout: READY_TIMEOUT_MS });
+			await page
+				.getByText(ready)
+				.filter({ visible: true })
+				.first()
+				.waitFor({ timeout: READY_TIMEOUT_MS });
 			await page.evaluate(() => document.fonts.ready);
 			const file = new URL(`${name}-${theme}-${String(width)}.png`, out);
 			await page.screenshot({ path: file.pathname, fullPage: true });
@@ -139,9 +146,25 @@ const live = await call<Made>(holder, 'POST', '/companions', {
 });
 const at = (made: Made): string => `/companion/${made.id}`;
 await shoot('new-form', member, () => Promise.resolve('/companion/new'), 'Follow my draft');
-await shoot('new-no-pass', fresh, () => Promise.resolve('/companion/new'), 'comes with the Draft Pass');
+await shoot(
+	'new-no-pass',
+	fresh,
+	() => Promise.resolve('/companion/new'),
+	'comes with the Draft Pass'
+);
 await shoot('turn-pass', holder, async () => at(await replay(holder)), 'Make the pick on Sleeper');
-await shoot('turn-member', member, async () => at(await replay(member)), 'Make the pick on Sleeper');
-await shoot('between-turns', member, async () => at(await replay(member)), 'away', BETWEEN_TURNS_MS);
+await shoot(
+	'turn-member',
+	member,
+	async () => at(await replay(member)),
+	'Make the pick on Sleeper'
+);
+await shoot(
+	'between-turns',
+	member,
+	async () => at(await replay(member)),
+	'away',
+	BETWEEN_TURNS_MS
+);
 await shoot('report', holder, () => Promise.resolve(at(live)), 'Follow another draft');
 await browser.close();

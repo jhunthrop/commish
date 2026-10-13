@@ -47,7 +47,7 @@ async function claimPath(): Promise<string> {
 	const response = await fetch(`${api}/billing/group-passes`, {
 		headers: { Cookie: `commish_session=${buyer.session}` }
 	});
-	const body = (await response.json()) as { data: GroupPass[] };
+	const body = await response.json<{ data: GroupPass[] }>();
 	const first = body.data[0];
 	if (!first) throw new Error('BUYER has no group pass: run the walk first');
 	return new URL(first.claim_url).pathname;
@@ -77,7 +77,12 @@ async function context(
 	return ctx;
 }
 
-async function shoot(name: string, path: string, ready: string, who: Drafter | null): Promise<void> {
+async function shoot(
+	name: string,
+	path: string,
+	ready: string,
+	who: Drafter | null
+): Promise<void> {
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {
 			const ctx = await context(theme, width, who);
@@ -110,5 +115,10 @@ await shoot('claim-signed-out', claim, 'Sign in to claim your pass', null);
 await shoot('claim-open', claim, 'Claim my pass', fresh);
 await shoot('claim-yours', claim, 'Your Draft Pass is on', claimer);
 await shoot('claim-covered', claim, 'leave this one for a teammate', member);
-await shoot('claim-missing', '/claim/AAAAAAAAAAAAAAAAAAAAAA', 'This link does not open a pass', null);
+await shoot(
+	'claim-missing',
+	'/claim/AAAAAAAAAAAAAAAAAAAAAA',
+	'This link does not open a pass',
+	null
+);
 await browser.close();
