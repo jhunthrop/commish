@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { fixed } from '#lib/format/number.ts';
-	import type { Board } from '#lib/room/model.ts';
+	import type { LeagueBoard } from './board.ts';
 	import Label from '#lib/ui/Label.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
@@ -12,7 +12,7 @@
 	 * each side's total. Side by side on a desk, one above the other in a hand. */
 	interface Props {
 		sync: LeagueSync;
-		board: Board;
+		board: LeagueBoard;
 		tagsOf: (boardId: string | null) => readonly string[];
 	}
 

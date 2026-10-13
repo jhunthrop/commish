@@ -2077,7 +2077,7 @@ components:
       required: [host_id, board_id, name, position, team]
       properties:
         host_id: { type: string }
-        board_id: { type: string, nullable: true, description: the player on our board (LeagueSync.board), null when unplaced }
+        board_id: { type: string, nullable: true, description: the player's id on our board, null when unplaced }
         name: { type: string }
         position: { type: string }
         team: { type: string }
@@ -2151,8 +2151,9 @@ components:
         - roster
         - matchup
         - moves
-        - pool
-        - board
+        - rostered
+        - board_format
+        - byes
         - placement
         - read_at
         - host_stale_seconds
@@ -2194,11 +2195,19 @@ components:
           type: array
           description: the completed moves of this week and last, newest first
           items: { $ref: "#/components/schemas/LeagueMove" }
-        pool:
+        rostered:
           type: array
-          description: every player on our board no team in the league holds, by board id, in board order
+          description: >-
+            the board id of every player a team in the league holds; the waiver pool is our board without them. The
+            board is the run's own (web data/league-board), not part of this answer
           items: { type: string }
-        board: { $ref: "#/components/schemas/RoomBoard" }
+        board_format:
+          allOf: [{ $ref: "#/components/schemas/BoardFormat" }]
+          description: the run's board the league reads on (ppr, half_ppr, standard or superflex)
+        byes:
+          type: object
+          description: each NFL team's bye week this season, by team code
+          additionalProperties: { type: integer }
         placement: { $ref: "#/components/schemas/Placement" }
         read_at: { type: string, format: date-time, description: when the host was last read for this league }
         host_stale_seconds:

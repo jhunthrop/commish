@@ -1128,7 +1128,7 @@ type LeagueMoveKind string
 
 // LeaguePlayer defines model for LeaguePlayer.
 type LeaguePlayer struct {
-	// BoardId the player on our board (LeagueSync.board)
+	// BoardId the player's id on our board
 	BoardId  *string `json:"board_id"`
 	HostId   string  `json:"host_id"`
 	Name     string  `json:"name"`
@@ -1155,7 +1155,11 @@ type LeagueSettings struct {
 
 // LeagueSync defines model for LeagueSync.
 type LeagueSync struct {
-	Board RoomBoard `json:"board"`
+	// BoardFormat the run's board the league reads on (ppr, half_ppr, standard or superflex)
+	BoardFormat BoardFormat `json:"board_format"`
+
+	// Byes each NFL team's bye week this season, by team code
+	Byes map[string]int `json:"byes"`
 
 	// Host the host a league runs on, named as a mechanism
 	Host         LeagueHost `json:"host"`
@@ -1176,12 +1180,12 @@ type LeagueSync struct {
 	// Placement how the league's rostered players were placed on our board, by rule
 	Placement Placement `json:"placement"`
 
-	// Pool every player on our board no team in the league holds, by board id, in board order
-	Pool []string `json:"pool"`
-
 	// ReadAt when the host was last read for this league
 	ReadAt time.Time    `json:"read_at"`
 	Roster []RosterSpot `json:"roster"`
+
+	// Rostered the board id of every player a team in the league holds; the waiver pool is our board without them. The board is the run's own (web data/league-board), not part of this answer
+	Rostered []string `json:"rostered"`
 
 	// ScoringDefaulted the ScoringRules keys the league does not state, each at its standard figure ("key figure")
 	ScoringDefaulted []string `json:"scoring_defaulted"`

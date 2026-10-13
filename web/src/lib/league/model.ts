@@ -2,7 +2,8 @@
  * record, a move in words, and the drafter's roster and the pool as board players. Pure functions
  * over the API's answer. */
 import { plural } from '#lib/format/number.ts';
-import type { Board, RoomPlayer } from '#lib/room/model.ts';
+import type { RoomPlayer } from '#lib/room/model.ts';
+import type { LeagueBoard } from './board.ts';
 import type { LeagueHost, LeagueMove, LeaguePlayer, LeagueSync, LeagueTeam } from './api.ts';
 
 /** How often an open league page reads the league again. The API reads the host at most once a
@@ -77,7 +78,7 @@ export function moveLine(sync: LeagueSync, move: LeagueMove): { lead: string; te
 
 /** A league player as a board row: the board's numbers when we placed him, the host's own name,
  * position and team when we did not. */
-export function rowOf(board: Board, player: LeaguePlayer): RoomPlayer | null {
+export function rowOf(board: LeagueBoard, player: LeaguePlayer): RoomPlayer | null {
 	if (player.board_id !== null) {
 		const placed = board.byId.get(player.board_id);
 		if (placed) return placed;
@@ -85,10 +86,11 @@ export function rowOf(board: Board, player: LeaguePlayer): RoomPlayer | null {
 	return null;
 }
 
-/** The pool as board rows, in board order. */
-export function poolRows(board: Board, sync: LeagueSync): readonly RoomPlayer[] {
-	const free = new Set(sync.pool);
-	return board.players.filter((p) => free.has(p.id));
+/** The waiver pool: our board without every player a team in the league holds, in the board's own
+ * order, best first by points over replacement. */
+export function poolRows(board: LeagueBoard, sync: LeagueSync): readonly RoomPlayer[] {
+	const held = new Set(sync.rostered);
+	return board.players.filter((p) => !held.has(p.id));
 }
 
 /** The drafter's team. */

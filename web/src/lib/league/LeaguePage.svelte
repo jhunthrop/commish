@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { HTTP_STATUS, hasStatus, isSignedOut } from '#lib/api/status.ts';
-	import { boardOf, type Board } from '#lib/room/model.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
@@ -13,6 +12,7 @@
 	import { sectionHref } from '#lib/ui/nav.ts';
 	import { railLeague } from '#lib/ui/rail-league.svelte.ts';
 	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
+	import { loadBoard, type LeagueBoard } from './board.ts';
 	import MatchupPanel from './MatchupPanel.svelte';
 	import MovesPanel from './MovesPanel.svelte';
 	import RosterPanel from './RosterPanel.svelte';
@@ -30,15 +30,20 @@
 	let { id }: Props = $props();
 
 	let sync = $state<LeagueSync | null>(null);
-	let board = $state<Board | null>(null);
+	let board = $state<LeagueBoard | null>(null);
 	let failure = $state<'signed-out' | 'missing' | 'unreachable' | null>(null);
 	let problem = $state<string | null>(null);
 	let refreshing = $state(false);
 	let now = $state(new Date());
 
 	function take(answer: LeagueSync): void {
-		board = boardOf(answer.board, answer.teams.length);
 		sync = answer;
+		// The board is the run's own file: read once, and again only when the league reads on another.
+		if (board?.format !== answer.board_format) {
+			void loadBoard(answer.board_format, answer.byes)
+				.then((loaded) => (board = loaded))
+				.catch(() => (failure ??= 'unreachable'));
+		}
 		now = new Date();
 		problem = null;
 	}

@@ -176,8 +176,11 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 	if aliceSync.SettingsLeagueId == nil || len(aliceSync.Teams) != 12 || len(aliceSync.Roster) == 0 {
 		t.Fatalf("alice's league: settings %v, %d teams, %d on her roster", aliceSync.SettingsLeagueId, len(aliceSync.Teams), len(aliceSync.Roster))
 	}
-	if len(aliceSync.Pool) != 1 || aliceSync.Pool[0] != "9999999" {
-		t.Fatalf("pool %v, want only the player no team holds", aliceSync.Pool)
+	if !contains(aliceSync.Rostered, "8439") || !contains(aliceSync.Rostered, "DST-MIN") || contains(aliceSync.Rostered, "9999999") {
+		t.Fatalf("rostered %v, want the two held players and not the free one", aliceSync.Rostered)
+	}
+	if aliceSync.BoardFormat != apitypes.BoardFormatPpr || aliceSync.ScoringLike != apitypes.ScoringPresetTePremium {
+		t.Fatalf("board %s, scoring like %s", aliceSync.BoardFormat, aliceSync.ScoringLike)
 	}
 
 	if status, _ := a.do(svc.sync, http.MethodGet, "/", nil, bobSync.Id.String()); status != http.StatusNotFound {

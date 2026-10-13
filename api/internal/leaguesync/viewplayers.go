@@ -4,7 +4,6 @@ import (
 	"sort"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
-	"github.com/jhunthrop/commish/api/internal/boards"
 )
 
 // players turns host ids into the wire's players: the host's own name,
@@ -128,17 +127,6 @@ func (p players) moves(moves []Move) []apitypes.LeagueMove {
 		out = append(out, apitypes.LeagueMove{
 			Kind: apitypes.LeagueMoveKind(m.Kind), At: m.At, RosterIds: ids, Adds: p.movePlayers(m.Adds), Drops: p.movePlayers(m.Drops),
 		})
-	}
-	return out
-}
-
-// pool is every board player no team holds, in board order.
-func pool(board []boards.Player, rostered map[string]bool) []string {
-	out := make([]string, 0, len(board))
-	for _, pl := range board {
-		if !rostered[pl.ID] {
-			out = append(out, pl.ID)
-		}
 	}
 	return out
 }

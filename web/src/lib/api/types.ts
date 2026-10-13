@@ -1811,7 +1811,7 @@ export interface components {
 		};
 		LeaguePlayer: {
 			host_id: string;
-			/** @description the player on our board (LeagueSync.board) */
+			/** @description the player's id on our board */
 			board_id: string | null;
 			name: string;
 			position: string;
@@ -1894,9 +1894,12 @@ export interface components {
 			matchup: components['schemas']['LeagueMatchup'] | null;
 			/** @description the completed moves of this week and last, newest first */
 			moves: components['schemas']['LeagueMove'][];
-			/** @description every player on our board no team in the league holds, by board id, in board order */
-			pool: string[];
-			board: components['schemas']['RoomBoard'];
+			/** @description the board id of every player a team in the league holds; the waiver pool is our board without them. The board is the run's own (web data/league-board), not part of this answer */
+			rostered: string[];
+			/** @description the run's board the league reads on (ppr, half_ppr, standard or superflex) */
+			board_format: components['schemas']['BoardFormat'];
+			/** @description each NFL team's bye week this season, by team code */
+			byes: Record<string, number>;
 			placement: components['schemas']['Placement'];
 			/**
 			 * Format: date-time

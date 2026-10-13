@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Board } from '#lib/room/model.ts';
+	import type { LeagueBoard } from './board.ts';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { RosterSpot } from './api.ts';
@@ -10,7 +10,7 @@
 	 * the taxi squad, each player with his place on our board, his bye and your sheet's tags. */
 	interface Props {
 		roster: readonly RosterSpot[];
-		board: Board;
+		board: LeagueBoard;
 		tagsOf: (boardId: string | null) => readonly string[];
 		/** Whose numbers the rows carry. */
 		basis: string;

@@ -26,17 +26,8 @@
 	let position = $state<Position | null>(null);
 	let shown = $state(FIRST_ROWS);
 
-	/** Highest value over replacement first; a player with none (a kicker, a defense) after, in the
-	 * order drafters take them, which is the board's own order. */
-	const ranked = $derived(
-		[...rows].sort((a, b) => {
-			if (a.vor === null || b.vor === null) return a.vor === null ? (b.vor === null ? 0 : 1) : -1;
-			return b.vor - a.vor;
-		})
-	);
-	const visible = $derived(
-		position === null ? ranked : ranked.filter((r) => r.position === position)
-	);
+	/** The board's own order: best first by points over replacement. */
+	const visible = $derived(position === null ? rows : rows.filter((r) => r.position === position));
 
 	function choose(next: Position | null): void {
 		position = next;
@@ -47,7 +38,7 @@
 <Panel as="section" label="Waiver pool" padding="none">
 	<div class="head">
 		<PanelHead title="Waiver pool" aside={`${count(visible.length)} players`} level={2} />
-		<p class="basis">Unrostered in your league. {basis}</p>
+		<p class="basis">Unrostered in your league, ranked by points over replacement. {basis}</p>
 		<ChipGroup label="Position">
 			<Chip size="sm" pressed={position === null} onclick={() => choose(null)}>All</Chip>
 			{#each POSITIONS as p (p)}

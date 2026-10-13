@@ -6,7 +6,14 @@
  */
 import { apiFormatOf } from '#lib/run/catalog.ts';
 import type { DirectoryPlayer } from '#lib/sheet/directory.ts';
+import type { BoardRow, Format } from '#lib/run/schema.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
+
+/** A run's board as the league page reads it: its format, with its basis, and its rows. */
+export interface Board {
+	format: Format;
+	rows: readonly BoardRow[];
+}
 import { board, manifest } from './run.ts';
 
 /** The run's formats the sheet can read, by the sheet's name, each with its run format id. */
@@ -24,6 +31,16 @@ async function sheetFormats(): Promise<Map<BoardFormat, string>> {
 /** Every sheet format the run has a board for. */
 export async function sheetBoardFormats(): Promise<BoardFormat[]> {
 	return [...(await sheetFormats()).keys()];
+}
+
+/** The run's whole board for a sheet format, its format with it, or null when the run has none for
+ * it: the league page's board (data/league-board). */
+export async function runBoardFor(format: BoardFormat): Promise<Board | null> {
+	const id = (await sheetFormats()).get(format);
+	if (id === undefined) return null;
+	const [loaded, { formats }] = await Promise.all([board(id), manifest()]);
+	const run = formats.find((f) => f.id === id);
+	return run ? { format: run, rows: loaded.rows } : null;
 }
 
 /** Our board for a sheet format, best first by our rank, or null when the run has none for it. */

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
-	"github.com/jhunthrop/commish/api/internal/draftroom"
+	"github.com/jhunthrop/commish/api/internal/boards"
 )
 
 // unlistedName stands in for a player the host's directory does not
@@ -38,7 +38,7 @@ func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.Leag
 		Name: snap.Name, Status: snap.Status, Week: snap.Week, Me: link.RosterID, SettingsLeagueId: link.LeagueID,
 		ScoringDropped: nonNil(snap.Scoring.Dropped), ScoringDefaulted: nonNil(snap.Scoring.Defaulted),
 		ScoringLike: NearestPreset(snap.Scoring.Rules), Teams: standings(snap.Teams), Moves: p.moves(snap.Moves),
-		Pool: pool(board.Raw.Players, rosteredOnBoard(snap, placed)), Board: draftroom.BoardView(board, nil),
+		Rostered: rosteredIDs(rosteredOnBoard(snap, placed)), BoardFormat: boardFormat(snap), Byes: byes(board.Raw.Players),
 		Placement: placement(snap, placed), ReadAt: snap.ReadAt, HostStaleSeconds: int(math.Round(read.Stale.Seconds())),
 		Roster: []apitypes.RosterSpot{},
 	}
@@ -170,6 +170,43 @@ func standings(teams []Team) []apitypes.LeagueTeam {
 		out = append(out, apitypes.LeagueTeam{
 			RosterId: t.RosterID, Name: t.Name, Owner: t.Owner, Wins: t.Wins, Losses: t.Losses, Ties: t.Ties, PointsFor: t.PointsFor,
 		})
+	}
+	return out
+}
+
+// rosteredIDs is the rostered board ids, sorted.
+func rosteredIDs(set map[string]bool) []string {
+	out := make([]string, 0, len(set))
+	for id := range set {
+		out = append(out, id)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// boardFormat is the run's board the league reads on: superflex for a
+// league that starts one, otherwise its nearest scoring (TE premium has
+// no board of its own and reads on PPR's).
+func boardFormat(snap Snapshot) apitypes.BoardFormat {
+	if snap.Shape.SuperFlex > 0 {
+		return apitypes.BoardFormatSuperflex
+	}
+	switch NearestPreset(snap.Scoring.Rules) {
+	case apitypes.ScoringPresetHalfPpr:
+		return apitypes.BoardFormatHalfPpr
+	case apitypes.ScoringPresetStandard:
+		return apitypes.BoardFormatStandard
+	}
+	return apitypes.BoardFormatPpr
+}
+
+// byes is each team's bye week, from our board's schedule.
+func byes(players []boards.Player) map[string]int {
+	out := map[string]int{}
+	for _, p := range players {
+		if p.Bye > 0 && p.Team != "" {
+			out[p.Team] = p.Bye
+		}
 	}
 	return out
 }
