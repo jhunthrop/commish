@@ -222,7 +222,7 @@ func (m *MFL) Players(ctx context.Context, season int) ([]HostPlayer, error) {
 	}
 	out := make([]HostPlayer, 0, len(ps))
 	for _, p := range ps {
-		out = append(out, HostPlayer{ID: p.ID, Name: p.Name, Position: p.Position, Team: p.Team, ESPNID: p.ESPNID})
+		out = append(out, HostPlayer{ID: p.ID, Name: p.Name, Position: p.Position, Team: cleanTeam(p.Team), ESPNID: p.ESPNID})
 	}
 	return out, nil
 }

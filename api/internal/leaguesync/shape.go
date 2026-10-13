@@ -52,7 +52,9 @@ func sleeperShape(l sleeper.League) Shape {
 			s.Bench++
 		case posReserve, posTaxi:
 		default:
-			unfollowed[strings.ToUpper(p)] = true
+			if slot := cleanHostText(strings.ToUpper(p)); slot != "" {
+				unfollowed[slot] = true
+			}
 		}
 	}
 	s.Unfollowed = sortedKeys(unfollowed)

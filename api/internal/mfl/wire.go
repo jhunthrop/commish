@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -80,7 +81,9 @@ func number(s string, bound float64) (float64, bool) {
 		return 0, true
 	}
 	v, err := strconv.ParseFloat(s, 64)
-	if err != nil || v < -bound || v > bound {
+	// "NaN" parses with no error and passes every bound, and would make
+	// the answer impossible to encode: refused like any other bad figure.
+	if err != nil || math.IsNaN(v) || math.IsInf(v, 0) || v < -bound || v > bound {
 		return 0, false
 	}
 	return v, true

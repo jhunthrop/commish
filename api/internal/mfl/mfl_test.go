@@ -92,3 +92,14 @@ func TestGapAndRedirects(t *testing.T) {
 		t.Fatalf("a redirect off the host answered %v", err)
 	}
 }
+
+// A figure the host writes as NaN or Inf is refused, never carried into
+// an answer that cannot then be encoded.
+func TestNumberRefusesNaN(t *testing.T) {
+	for _, bad := range []string{"NaN", "nan", "Inf", "-Inf", "1e400"} {
+		body := []byte(`{"leagueStandings":{"franchise":{"id":"0001","h2hw":"1","h2hl":"0","h2ht":"0","pf":"` + bad + `"}}}`)
+		if _, err := DecodeStandings(body); !errors.Is(err, ErrMalformed) {
+			t.Errorf("points for %q answered %v", bad, err)
+		}
+	}
+}

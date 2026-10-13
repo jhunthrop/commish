@@ -233,8 +233,8 @@ func mflShape(l mfl.League) Shape {
 		case "Def":
 			s.DEF = p.Min
 		default:
-			if p.Max > 0 {
-				unfollowed[p.Position] = true
+			if slot := cleanHostText(p.Position); p.Max > 0 && slot != "" {
+				unfollowed[slot] = true
 			}
 		}
 	}
