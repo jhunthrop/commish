@@ -262,7 +262,7 @@
 							label="Choose a CSV"
 							accept=".csv,text/csv"
 							empty="No file chosen"
-							onpick={() => undefined}
+							onpick={() => Promise.resolve(false)}
 						/>{/snippet}
 				</Part>
 				<Part

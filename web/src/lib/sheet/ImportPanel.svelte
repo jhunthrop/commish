@@ -48,28 +48,33 @@
 		return rows.map((row) => ({ ...row, headshot: row.headshot ?? faces.get(row.id) ?? null }));
 	}
 
-	function settle(run: () => CsvRead | 'needs-board'): void {
+	/** True when the text read as a sheet. */
+	function settle(run: () => CsvRead | 'needs-board'): boolean {
 		problem = null;
 		try {
 			const result = run();
 			if (result === 'needs-board') {
 				problem = 'Our board is still loading';
-				return;
+				return false;
 			}
 			read = { ...result, rows: withFaces(result.rows) };
+			return true;
 		} catch (error) {
 			read = null;
 			problem = error instanceof CsvHeaderError ? error.message : 'That file does not read as CSV';
+			return false;
 		}
 	}
 
-	async function onFile(file: File): Promise<void> {
+	async function onFile(file: File): Promise<boolean> {
 		try {
 			const text = await readCsvFile(file);
 			await loadBoard();
-			settle(() => decodeCsv(text));
+			return settle(() => decodeCsv(text));
 		} catch (error) {
+			read = null;
 			problem = error instanceof Error ? error.message : 'That file did not open';
+			return false;
 		}
 	}
 
@@ -100,7 +105,7 @@
 					label="Choose a CSV"
 					accept=".csv,text/csv"
 					empty="No file chosen"
-					onpick={(file: File) => void onFile(file)}
+					onpick={onFile}
 				/>
 			</div>
 			<Field

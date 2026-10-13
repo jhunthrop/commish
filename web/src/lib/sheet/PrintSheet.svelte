@@ -52,9 +52,23 @@
 		);
 	}
 
-	// Measured again whenever the pages change, once they are drawn.
+	// Measured whenever the pages change, once they are drawn, and again in the printed layout:
+	// paper can fill a different number of columns than the screen's preview did.
 	$effect(() => {
 		if (pages.length > 0) void tick().then(measure);
+	});
+
+	onMount(() => {
+		const print = window.matchMedia('print');
+		const onMedia = (): void => {
+			measure();
+		};
+		print.addEventListener('change', onMedia);
+		window.addEventListener('beforeprint', onMedia);
+		return () => {
+			print.removeEventListener('change', onMedia);
+			window.removeEventListener('beforeprint', onMedia);
+		};
 	});
 </script>
 

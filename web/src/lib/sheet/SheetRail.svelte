@@ -11,7 +11,8 @@
 	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import TagChip from '#lib/ui/TagChip.svelte';
-	import { boardById, fileDirectory, type DirectoryPlayer } from './directory.ts';
+	import { fileDirectory } from './directory.ts';
+	import { OurBoard } from './our-board.svelte.ts';
 	import type { SheetRow } from './model.ts';
 	import { sheetStore } from './store.svelte.ts';
 	import { FIXED_TAGS, ownTags, sameTag, tagLabel, tagTone } from './tags.ts';
@@ -31,19 +32,16 @@
 
 	const NOTES = 'notes';
 	let filter = $state<string | null>(null);
-	let board = $state.raw<ReadonlyMap<string, DirectoryPlayer> | null>(null);
-
-	async function loadBoard(): Promise<void> {
-		try {
-			board = boardById(await fileDirectory().board(sheetStore.sheet.format));
-		} catch {
-			board = null;
-		}
-	}
+	/** Our board for the sheet's format, followed when the format changes. */
+	const ourBoard = new OurBoard(fileDirectory());
+	const board = $derived(ourBoard.byId);
 
 	onMount(() => {
 		sheetStore.load();
-		void loadBoard();
+	});
+
+	$effect(() => {
+		if (sheetStore.loaded) void ourBoard.follow(sheetStore.sheet.format);
 	});
 
 	const rows = $derived(sheetStore.sheet.rows);

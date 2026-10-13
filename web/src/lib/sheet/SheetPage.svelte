@@ -14,11 +14,12 @@
 	import Verb from '#lib/ui/Verb.svelte';
 	import { RAIL } from '#lib/ui/nav.ts';
 	import { POSITIONS, type Position } from '#lib/types/player.ts';
-	import { boardById, fileDirectory, type DirectoryPlayer } from './directory.ts';
+	import { fileDirectory } from './directory.ts';
 	import EmptySheet from './EmptySheet.svelte';
 	import { downloadCsv } from './files.ts';
 	import { FORMAT_LABELS } from './format.ts';
 	import ImportPanel from './ImportPanel.svelte';
+	import { OurBoard } from './our-board.svelte.ts';
 	import { SHEET_LIMITS } from './limits.ts';
 	import { rowFor, ranksOf, type SheetRow } from './model.ts';
 	import SheetList from './SheetList.svelte';
@@ -44,8 +45,8 @@
 	let panel = $state<'import' | 'sheets' | null>(null);
 	let renaming = $state(false);
 	let announcement = $state('');
-	/** Our board for the sheet's format, or null until it loads (or when we have none). */
-	let ourBoard = $state.raw<readonly DirectoryPlayer[] | null>(null);
+	/** Our board for the sheet's format, followed when the format changes. */
+	const ourBoard = new OurBoard(directory);
 	let starting = $state(false);
 	let boardProblem = $state<string | null>(null);
 
@@ -80,18 +81,9 @@
 	}
 
 	const visible = $derived(rows.filter(shows));
-	const boardIds = $derived(boardById(ourBoard));
 	const status = $derived(
 		statusWords({ status: store.status, problem: store.problem, savedAt: store.savedAt })
 	);
-
-	async function loadOurBoard(): Promise<void> {
-		try {
-			ourBoard = await directory.board(sheet.format);
-		} catch {
-			ourBoard = null;
-		}
-	}
 
 	async function startFromBoard(): Promise<void> {
 		starting = true;
@@ -135,7 +127,10 @@
 
 	onMount(() => {
 		store.load();
-		void loadOurBoard();
+	});
+
+	$effect(() => {
+		if (store.loaded) void ourBoard.follow(sheet.format);
 	});
 </script>
 
@@ -236,7 +231,8 @@
 
 		{#if store.loaded && rows.length === 0 && panel === null}
 			<EmptySheet
-				board={ourBoard}
+				board={ourBoard.players}
+				boardState={ourBoard.state}
 				format={sheet.format}
 				{starting}
 				problem={boardProblem}
@@ -282,7 +278,7 @@
 				rows={visible}
 				{position}
 				{ranks}
-				board={boardIds}
+				board={ourBoard.byId}
 				movable={needle === ''}
 				ownTags={own}
 				onannounce={(words: string) => (announcement = words)}

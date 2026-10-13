@@ -11,7 +11,8 @@
 		accept?: string;
 		/** Words beside the button until a file is chosen. */
 		empty?: string;
-		onpick: (file: File) => void;
+		/** Reads the chosen file. True when it read, which is when its name is shown. */
+		onpick: (file: File) => Promise<boolean>;
 	}
 
 	let { label, accept, empty = 'No file yet', onpick }: Props = $props();
@@ -19,11 +20,12 @@
 	let input: HTMLInputElement | undefined = $state();
 	let chosen = $state<string | null>(null);
 
-	function onChange(): void {
+	async function onChange(): Promise<void> {
 		const file = input?.files?.[0];
+		// Emptied at once, so choosing the same file again (a corrected re-export) is a new choice.
+		if (input) input.value = '';
 		if (!file) return;
-		chosen = file.name;
-		onpick(file);
+		chosen = (await onpick(file)) ? file.name : null;
 	}
 </script>
 
@@ -38,7 +40,7 @@
 		{accept}
 		tabindex="-1"
 		aria-hidden="true"
-		onchange={onChange}
+		onchange={() => void onChange()}
 	/>
 </span>
 

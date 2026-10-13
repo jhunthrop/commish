@@ -169,8 +169,10 @@ function readTags(raw: string): { tags: readonly string[] } | { reason: string }
 		if (!tags.some((kept) => sameTag(kept, tag))) tags.push(tag);
 	}
 	if (tags.length > SHEET_LIMITS.tags) return { reason: `Keep it to ${SHEET_LIMITS.tags} tags` };
-	// Target and Avoid never sit on one player: the first one written stands.
-	return { tags: normalizeTags(tags) };
+	// Target and Avoid never sit on one player. The line says which, rather than keep one quietly.
+	const kept = normalizeTags(tags);
+	if (kept.length < tags.length) return { reason: 'Target and Avoid are both set, pick one' };
+	return { tags: kept };
 }
 
 type Read = { rank: number; row: SheetRow } | { reason: string };
