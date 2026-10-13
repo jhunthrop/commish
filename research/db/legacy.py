@@ -148,6 +148,17 @@ _REASONS_BOARD: Final = Derived(
         "deleted and replaced both together, so the reasons are the stored generation's"
     ),
 )
+_REASON_ORDINAL: Final = Derived(
+    sql=(
+        f'(row_number() OVER (PARTITION BY {_ALIAS}."season", {_ALIAS}."source", {_ALIAS}."player_id" '
+        f"ORDER BY {_ALIAS}.ctid) - 1)"
+    ),
+    reads=("season", "source", "player_id"),
+    why=(
+        "the order the legacy readers took a player's reasons in: the heap's physical order, which is "
+        "the writer's emission order (revision 0003 stores it)"
+    ),
+)
 _ONE_GENERATION: Final = Invariant(
     violations=(
         f'(SELECT count(DISTINCT p."as_of") FROM "{LEGACY_SCHEMA}"."preseason_projections" AS p '
@@ -296,7 +307,7 @@ _ENTRIES: Final = (
     LegacyTable(
         "preseason_board_reasons",
         "preseason_board_reasons",
-        derived=MappingProxyType({"as_of": _REASONS_BOARD}),
+        derived=MappingProxyType({"as_of": _REASONS_BOARD, "ordinal": _REASON_ORDINAL}),
         invariants=(_ONE_GENERATION,),
     ),
     LegacyTable(

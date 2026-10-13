@@ -33,7 +33,8 @@ class ArchivedPropLine:
     fetched_at: datetime
 
 
-def _median(values: Sequence[float]) -> float:
+def median(values: Sequence[float]) -> float:
+    """`median`: the middle value, or the mean of the middle two."""
     ordered = sorted(values)
     middle = math.floor(len(ordered) / 2)
     return ordered[middle] if len(ordered) % 2 == 1 else (ordered[middle - 1] + ordered[middle]) / 2
@@ -60,7 +61,7 @@ def median_prop_lines_by_player(
         player_id, _, market = key.rpartition("|")
         if market not in PROP_MARKETS:
             continue
-        medians.setdefault(player_id, {})[market] = _median(values)
+        medians.setdefault(player_id, {})[market] = median(values)
     return medians
 
 

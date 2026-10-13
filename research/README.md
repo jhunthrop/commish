@@ -6,8 +6,9 @@ designed from scratch for the prep site and owned by alembic; the one-shot loade
 legacy tables' data into it; and the parity harness that proves each port row for row against the
 TypeScript on the same recorded input. Phase B is `model`: the preseason board, the market blend,
 the laws, the register and the backtest, proven against the oracle on the dev store (see "The
-model"). Phases C and D (`capsules`, `advisor`, `nightly`) are empty packages whose docstrings say
-what lands in them.
+model"). Phase C is `model/decide` (survival, the recommendation, tiers, lineup, outlook), the
+advisor service (`advisor`) and the capsule writer (`capsules`), see "The decide layer, the advisor
+and the capsules". Phase D (`nightly`) extends the nightly entry point phase C started.
 
 ## Running
 
@@ -46,7 +47,7 @@ tables in the dev Docker database (`localhost:5432/commish`), loaded from them b
 | Path | What |
 |---|---|
 | `db/schema/` | the 27 research tables by group: `identity`, `nflverse`, `observations`, `provider`, `market`, `boards` |
-| `db/migrations/`, `alembic/` | revision `0001` creates the schema, its DDL split by the same groups; `0002` adds the model provenance columns |
+| `db/migrations/`, `alembic/` | revision `0001` creates the schema, its DDL split by the same groups; `0002` adds the model provenance columns; `0003` the board reasons' `ordinal` |
 | `db/legacy.py` | each research table's legacy counterpart, column by column: the single map parity and the loader read |
 | `load_legacy.py` | the one-shot copy, the manifest, the per-table fingerprints |
 | `pipeline/http.py` | the HTTP boundary: a `Fetcher` protocol, httpx live; every ingest reaches a provider only through it |
@@ -508,3 +509,111 @@ The stored served board against regular-season outcomes, in the held-out seasons
 |---|---|---|
 | 2023 | 0.7649 (0.7648668314705206) | 533 |
 | 2024 | 0.7848 (0.7848118119491571) | 537 |
+
+## The decide layer, the advisor and the capsules (phase C)
+
+```sh
+# the advisor: POST /advise, GET /healthz, GET /readyz on $PORT (8080), ADVISOR_WORKERS processes (2)
+uv run python -m research.advisor
+uv run python -m research.advisor.bench --url http://localhost:8080 --drafts 3 --rooms 1
+
+# the capsules (RESEARCH_DATABASE_URL; AI_GATEWAY_API_KEY from the environment for write and sweep)
+uv run python -m research.capsules facts <provider id>      # one sheet, the narrow read
+uv run python -m research.capsules prompt <provider id>     # the user message the writer would get
+uv run python -m research.capsules write --count 10 --spread 50   # write and gate a few: paid calls
+uv run python -m research.capsules sweep                    # the nightly sweep
+uv run python -m research.nightly [--skip fit,capsules,capsule-gate]   # the image's nightly command
+
+# parity
+uv run python -m research.parity decide all                 # room states, refusals, startSit, the numerics
+uv run python -m research.parity decide record              # re-record the room states (dev copy)
+PARITY_SOURCE_DATABASE_URL=... uv run python -m research.parity capsules all   # the facts, dev copy
+```
+
+### Module map
+
+| TypeScript (research-ts/src) | Python |
+|---|---|
+| `projections/decide/normal.ts` | `model/decide/normal.py` |
+| `projections/decide/survival.ts` | `model/decide/survival.py` (memoised per queue place and gap) |
+| `projections/decide/draft.ts` (`recommendPick`, `fitFor`, `reasonsFor`) | `model/decide/{draft,roster_view,reasons,survivors,marginal}.py` |
+| `projections/decide/slots.ts` | `model/decide/slots.py` |
+| `projections/decide/tiers.ts` | `model/decide/tiers.py` (`value.py` re-exports it) |
+| `projections/decide/{lineup,outlook}.ts` | `model/decide/{lineup,outlook}.py` |
+| `draft-engine/{slotting,roster-need,order}.ts`, `domain/{roster-eligibility,must-pick,position-words}.ts`, `preseason/kdef-decision.ts` | `model/decide/roster.py` |
+| `advisor/{request,advise,why,server}.ts` | `advisor/{request,checks,advise,why,wire,server,warm,__main__}.py`, `advisor/bench.py` |
+| `capsules/{facts,facts/types}.ts` | `capsules/facts/{model,depth_model,build,evidence,ledger,depth_ledger}.py` |
+| `capsules/{collect,collect-one,peers,rank,trend}.ts`, `board/service.ts` (projected half), `reference/{injuries,news}.ts` | `capsules/facts/{collect,collect_one,color,board,rank,reference}.py` |
+| `capsules/facts/*.ts` (the depth pass) | `capsules/facts/{depth_collect,depth_reads,depth_absence,depth_role,depth_context}.py` |
+| `capsules/{config,voice-rules}.ts` | `capsules/config.py`, `capsules/voice_rules.py` (every voice rule, one file) |
+| `capsules/{validate,number-grounding}.ts` | `capsules/{validate,grounding}.py` |
+| `capsules/{render,render-depth,prompt,narrative,narrative-slots,bundle,template,write,generate}.ts` | `capsules/{render,render_depth,render_words,prompt,narrative,bundle,facts_block,gateway,generate}.py` (the oracle's prose template is gone: `facts_block`) |
+| `capsules/{repetition,sameness,store,sweep}.ts` | `capsules/{repetition,store,sweep}.py`, `capsules/trial.py` |
+| `nightly/build/pull-figures.ts`, `nightly/gates.ts` (`capsuleFindings`) | `capsules/pull_figures.py`, `nightly/capsule_gate.py` (the unwritten share and shared-sentence gate, this lane's) |
+
+### The advisor's contract
+
+The contract is the Go rooms' (`api/internal/advisor/http.go`): the request is `research-ts/README.md`'s
+(`teamCount`, `rosterSlots`, `pool` with `projectedPoints` null in market order, `picks`,
+`seatOnClock`, `shortlistSize`), and the rooms read `pickNumber`, `nextPickNumber`,
+`shortlist[].playerId`, `shortlist[].why` and `survival` from the envelope's `data`. The two agree, so
+research-ts's README is unchanged. `/readyz` is new: it answers once a shape-only room state has been
+advised. The service runs in the board's arithmetic (fused, `model/arithmetic.py`) on any host.
+
+- **Refusals are the oracle's, word for word.** `advisor/checks.py` is zod 4's checks and messages
+  for this schema (which issues abort and stop the `superRefine`, which do not, JavaScript's numbers),
+  proven on 54 bodies by `parity decide advise-refusals`. Past the oracle, the service refuses a pool
+  over 1,000 players, a slot count over 12 and a roster over 30 spots (400), so no body under the
+  1 MB cap holds a worker for long; the Go rooms send at most 400 undrafted plus the drafted.
+- **The closed form runs on the process's one advise thread**, never on the event loop, so
+  `/healthz` answers during a call; `server-timing` runs from the first byte read through the
+  response serialised.
+- **Deployed with ingress all behind IAM** (`research.yml`): the invoker check is on and only
+  `api-runtime` holds the invoker role, so a call needs a Google identity token for the service
+  (`idtoken.NewClient(ctx, ADVISOR_URL)` on the Go side). It runs as `advisor-runtime`, which holds
+  no role at all (no Secret Manager, no database). `ADVISOR_MIN_INSTANCES` is 1 in season, 0 otherwise.
+- **Rooms that leave the snake are refused, as the oracle refuses them.** The request carries each
+  pick's own number and the seat on the clock (`http.go`), and the oracle answers only a snake draft:
+  after a skipped or owed pick (a slow room's clock running out) the next call is a 422 ("pick 8
+  belongs to seat 8 ... not seat 9") and every later call a 400 ("picks must be numbered 1..n"), so
+  **a skipped pick turns the advisor off for the rest of that draft today**; the rooms fall back to
+  the engine's card. The recorded `slow2_10t_standard` shows it: 1 state 422, 15 states 400. This is
+  oracle behaviour and stays while parity holds. **Answering owed-pick rooms is the first improvement
+  after the oracle retires** (the pick numbers and the seat on the clock already arrive; the closed
+  form needs the turn order the room actually ran).
+
+### What changed from the oracle, and why
+
+- **The capsule writer's register.** No sportsbook number reaches the writer (props lines, win
+  totals, the week-one total and spread are not rendered); betting words, every "the honest ..."
+  frame and every measured refrain are voice-rule violations, a sentence rewrite each; the long read
+  must print one of the page's numbers (the pull-figure gate) or it is corrected, and a read may
+  take two corrections inside the player's six calls (the oracle stopped at one correction inside
+four calls). A read asked for a shorter version may run up to 10% over its word cap, and every
+correction quotes the exact banned phrases the read was caught with. The fact sheet
+  itself (`PlayerFacts`, its ledgers and its hash) is the oracle's, field for field, so the oracle's
+  stored hashes stay valid.
+- **No prose template; the fallback is a facts block** (the founder's rule: every non-stat
+  sentence comes from the writer, and a frame with the name and numbers swapped is a stock
+  sentence). A player the writer cannot serve within its ceiling gets his numbers with their basis
+  as labelled facts, one `Label: value` line each and no sentence (the projection in his expected
+  games, the middle and full ranges, the board rank, the ADP), on both sizes, stored
+  `source = 'facts'` (revision 0004) and rendered by the page as a facts list. The sweep writes
+  unwritten pages before changed ones, and the nightly then runs one retry pass over the pages still
+  unwritten before its capsule gate. The gate fails the run when facts blocks, the oracle's leftover
+  `template` rows and missing pages pass 2% of the board, or when a written sentence of four words
+  or more sits on two pages ("Draft him." and "Let him go." are vocabulary, exempt).
+- **The board reasons' order is stored** (`preseason_board_reasons.ordinal`, revision 0003). The
+  oracle read a player's reasons in heap order, and a capsule's evidence depends on it.
+- **The narrow read places every depth-chart room by the served board**, and reads an archive team
+  code as one: the oracle's `collectPlayerFacts` threw on `LA` and `WAS` for most players.
+- **Capsules key on the universe id** (`research.players.id`); the sheet's `identity.id` stays the
+  board's provider id, as the oracle's does.
+
+### Owed when the oracle retires
+
+- **Answer owed-pick rooms** (above): the first improvement once parity no longer binds.
+- **Ticket: the depth facts' injury history and college.** `capsules/facts/depth_reads.py` reproduces
+  the oracle's defect: it looks the provider-keyed injury and college captures up by the universe id,
+  so both fields are always empty and the writer never sees them. Read them through the crosswalk;
+  every facts hash changes with it, so it ships as one hash bump that regenerates the board.

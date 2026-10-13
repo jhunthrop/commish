@@ -16,10 +16,11 @@ as written:
 import functools
 import math
 from collections.abc import Callable, Iterable, Sequence
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Final
 
 from research.model.fdlibm import exp, log, sin
-from research.pipeline.jscompat import js_locale_compare, js_sum
+from research.pipeline.jscompat import js_locale_compare, js_string, js_sum
 
 __all__ = [
     "exp",
@@ -29,12 +30,14 @@ __all__ = [
     "js_round",
     "js_sorted",
     "js_sum",
+    "js_to_fixed",
     "locale_compare",
     "log",
     "sin",
 ]
 
 _SQUARE: Final = 2.0
+_TO_FIXED_LIMIT: Final = 1e21
 _ROOT: Final = 0.5
 
 
@@ -125,3 +128,14 @@ def js_sorted[T](items: Iterable[T], compare: Callable[[T, T], float]) -> list[T
 def fold(values: Sequence[float]) -> float:
     """A left fold from 0, the shape of every `reduce((sum, x) => sum + x, 0)` in the oracle."""
     return js_sum(values)
+
+
+def js_to_fixed(x: float, digits: int) -> str:
+    """`x.toFixed(digits)`: the exact binary value rounded half away from zero (the nearest n, the
+    larger on a tie, of the magnitude), the sign kept even when the digits round to zero
+    (`(-0.04).toFixed(1)` is "-0.0"). Python's `format` rounds the exact value half to even."""
+    if not math.isfinite(x) or abs(x) >= _TO_FIXED_LIMIT:
+        return js_string(x)
+    sign = "-" if x < 0 else ""
+    magnitude = abs(Decimal(x)).quantize(Decimal(1).scaleb(-digits), rounding=ROUND_HALF_UP)
+    return f"{sign}{magnitude:f}"

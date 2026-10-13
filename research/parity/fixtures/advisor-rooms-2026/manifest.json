@@ -1,0 +1,4 @@
+{
+  "rooms": "api/testdata/mocks/logs.json (scripts/export-mock-logs.ts): 26 rooms, final picks in order",
+  "board": "api/internal/boards/source.go boardQuery on the dev copy, schema research, season 2026, source commish_board_v9_ppr_12, as of 2026-09-09T02:20:29.697000+00:00: 1468 players"
+}
