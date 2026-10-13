@@ -106,6 +106,8 @@
 		width: var(--strip-w);
 		font-size: var(--t-xs);
 		line-height: var(--strip-line);
+		/* A name, a league member's handle among them, keeps its direction to itself. */
+		unicode-bidi: isolate;
 		color: var(--ink-3);
 		text-align: center;
 	}

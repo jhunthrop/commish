@@ -81,11 +81,28 @@
 
 	const SLEEPER_TAB = 'sleeper-draft';
 
+	/** The Sleeper tab this page opened, kept so every later turn returns to it. */
+	let sleeperTab: Window | null = null;
+
+	/**
+	 * One Sleeper tab for the whole draft. The first turn opens it by name and cuts its opener while
+	 * it is still about:blank (same origin), so Sleeper can never navigate this page. Every later turn
+	 * brings that same tab forward: it is already the draft room, and with its opener cut this page
+	 * may focus it but not navigate it (Chromium refuses with a SecurityError, measured). If the
+	 * drafter closed it, the next turn opens a new one. A tab left from before a reload is found by
+	 * its name, and cutting its opener then may be refused, which changes nothing the drafter sees.
+	 */
 	function openHost(): void {
-		// One named tab: every turn returns to the same Sleeper tab instead of opening another. The
-		// opener is cut after the open, since noopener would also drop the name.
-		const tab = window.open(hostDraftUrl(c), SLEEPER_TAB);
-		if (tab) tab.opener = null;
+		if (sleeperTab && !sleeperTab.closed) {
+			sleeperTab.focus();
+			return;
+		}
+		sleeperTab = window.open(hostDraftUrl(c), SLEEPER_TAB);
+		try {
+			if (sleeperTab) sleeperTab.opener = null;
+		} catch {
+			// Already on sleeper.com (a tab from before a reload): its opener is out of reach.
+		}
 	}
 </script>
 

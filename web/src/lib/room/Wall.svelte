@@ -90,6 +90,8 @@
 		   split mid-word. */
 		overflow: hidden;
 		text-overflow: ellipsis;
+		/* A league member's name keeps its direction to itself. */
+		unicode-bidi: isolate;
 		line-height: 1.25;
 		align-self: end;
 	}
