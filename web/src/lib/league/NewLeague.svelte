@@ -132,7 +132,7 @@
 			<div class="reserve"></div>
 		{:else if view === 'signed-out'}
 			<DisplayTitle size="page">Follow your league</DisplayTitle>
-			{@render gives()}
+			{@render gives(false)}
 			<ActionBar>
 				<!-- Back from sign-in on this same address, so a shared ?link= is still in it. -->
 				<Verb href={leagueApi.signInUrl(page.url.pathname + page.url.search)}
@@ -143,7 +143,7 @@
 			<EmptyState title="This page can't reach Commish right now" line="Reload in a moment." />
 		{:else}
 			<DisplayTitle size="page">Follow your league</DisplayTitle>
-			{@render gives()}
+			{@render gives(true)}
 			<div class="form">
 				<Field
 					label="Your league's link"
@@ -204,11 +204,13 @@
 	</main>
 </Shell>
 
-<!-- What following a league gives, and where from: the same two lines signed in and out. -->
-{#snippet gives()}
+<!-- What following a league gives, and where from: the same two lines signed in and out. Only the
+     form, which has the field, asks for the link. -->
+{#snippet gives(withField: boolean)}
 	<p class="lede">
-		Paste your league's link. We keep your roster, this week's matchup and every player nobody in
-		your league holds up to date, on our board. Free.
+		{#if withField}Paste your league's link.{/if}
+		We keep your roster, this week's matchup and every player nobody in your league holds up to date,
+		on our board. Free.
 	</p>
 	<p class="hosts">{HOSTS_LINE}</p>
 {/snippet}
