@@ -16,7 +16,7 @@
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
 	import FormatChips from './FormatChips.svelte';
-	import SheetAdd from './SheetAdd.svelte';
+	import RowSheetMark from './RowSheetMark.svelte';
 	import SiteShell from './SiteShell.svelte';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
 	import { links } from './links.ts';
@@ -82,7 +82,7 @@
 						eager={i < EAGER_ROWS}
 					>
 						{#snippet action()}
-							<SheetAdd {player} variant="row" />
+							<RowSheetMark {player} />
 						{/snippet}
 					</Row>
 				{/each}

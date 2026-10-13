@@ -5,7 +5,7 @@
 	import type { BoardPage } from '#lib/server/pages/board.ts';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
 	import FormatChips from './FormatChips.svelte';
-	import SheetAdd from './SheetAdd.svelte';
+	import RowSheetMark from './RowSheetMark.svelte';
 	import BasisList from '#lib/ui/BasisList.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -75,7 +75,7 @@
 		eager={i < EAGER_ROWS}
 	>
 		{#snippet action()}
-			<SheetAdd {player} variant="row" />
+			<RowSheetMark {player} />
 		{/snippet}
 	</Row>
 {/snippet}

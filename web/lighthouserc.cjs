@@ -22,7 +22,10 @@ module.exports = {
 			startServerCommand: 'npm run preview:static',
 			startServerReadyPattern: 'Accepting connections',
 			url: [`${ORIGIN}/`, `${ORIGIN}/board`, `${ORIGIN}${firstPlayerPath()}`, `${ORIGIN}/record`],
-			numberOfRuns: 7,
+			// Nine runs, asserted on the median (the fifth). Devtools throttling lands an occasional run
+			// near 1.65 s whatever the page; in seven runs one to four such runs were seen, so the
+			// median could flip on noise. In nine it takes five. The budgets themselves are unchanged.
+			numberOfRuns: 9,
 			settings: {
 				preset: 'perf',
 				formFactor: 'mobile',

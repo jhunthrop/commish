@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { runStampText } from '#lib/run/stamp.ts';
-	import SheetAdd from '#lib/site/SheetAdd.svelte';
+	import RowSheetMark from '#lib/site/RowSheetMark.svelte';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
@@ -67,7 +67,7 @@
 							range={false}
 							eager={i < EAGER_ROWS}
 						>
-							{#snippet action()}<SheetAdd {player} variant="row" />{/snippet}
+							{#snippet action()}<RowSheetMark {player} />{/snippet}
 						</Row>
 					{/each}
 				</div>
