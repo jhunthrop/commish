@@ -3,7 +3,7 @@
 	import { onMount } from 'svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
-	import { type LobbyRoom, rooms } from '../api.ts';
+	import { type LobbyRoom, isGone, rooms } from '../api.ts';
 	import { lobbyTitle } from './setup.ts';
 
 	interface Props {
@@ -23,10 +23,13 @@
 		try {
 			room = await rooms.lobby(id);
 			if (room.status === 'abandoned') ondone();
-		} catch {
-			// A seat freed before the draft started is not ours to return to.
-			room = null;
-			ondone();
+		} catch (e) {
+			// A seat freed before the draft started, or a room that is gone, is not ours to return to.
+			// Anything else (offline, a slow answer) keeps the way back for the next read.
+			if (isGone(e)) {
+				room = null;
+				ondone();
+			}
 		}
 	}
 

@@ -49,6 +49,12 @@ export function isFinalRefusal(error: unknown): boolean {
 	);
 }
 
+/** Whether an error is the API saying the thing is not there for this drafter at all: no seat in it
+ * (403) or no such room (404). Unlike a dropped connection, waiting never brings it back. */
+export function isGone(error: unknown): boolean {
+	return error instanceof ApiError && [HTTP_FORBIDDEN, HTTP_NOT_FOUND].includes(error.status);
+}
+
 /** Where a signed-out drafter goes to sign in, coming back to the page they were on. */
 export function signInHref(returnTo: string): string {
 	return client.signInUrl(returnTo);

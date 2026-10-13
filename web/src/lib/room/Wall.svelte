@@ -85,9 +85,10 @@
 		border-bottom: 1px solid var(--line);
 		text-transform: uppercase;
 		letter-spacing: var(--track-label);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		/* A handle is read whole: it wraps inside its column (a 20-letter handle takes two lines). */
+		overflow-wrap: anywhere;
+		line-height: 1.25;
+		align-self: end;
 	}
 
 	.h.you {

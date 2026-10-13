@@ -62,6 +62,11 @@
 
 	/** Leave asks once: what happens to the seat, then the way back from setup. */
 	let leaving = $state(false);
+	let confirmLeave = $state<HTMLElement | null>(null);
+
+	$effect(() => {
+		if (leaving) confirmLeave?.focus();
+	});
 
 	async function leave(): Promise<void> {
 		try {
@@ -134,15 +139,23 @@
 		</div>
 	{/if}
 	{#if leaving && lobby}
-		<div class="notice">
+		<!-- One quiet step: the room's own verb (Draft on your clock) stays the only solid one, and focus
+		     moves here so a keyboard or a screen reader lands on the question. -->
+		<div
+			class="notice"
+			role="group"
+			aria-labelledby="leave-question"
+			tabindex="-1"
+			bind:this={confirmLeave}
+		>
 			<Panel padding="sm" edge="quiet">
 				<div class="done">
-					<p class="line">
+					<p class="line" id="leave-question">
 						{lobby.drafting
 							? 'Leave? Your queue drafts your seat, then the board, and the report is yours when the draft ends.'
 							: 'Leave? Your seat opens for someone else.'}
 					</p>
-					<Verb onclick={leave}>Leave the lobby</Verb>
+					<Quiet onclick={leave}>Leave the lobby</Quiet>
 					<Quiet onclick={() => (leaving = false)}>Stay</Quiet>
 				</div>
 			</Panel>

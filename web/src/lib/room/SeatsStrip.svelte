@@ -45,12 +45,22 @@
 		else if (right > list.scrollLeft + list.clientWidth) list.scrollLeft = right - list.clientWidth;
 	}
 
-	// The seat on the clock, then yours, so both are in view whenever they fit and yours always is.
-	$effect(() => {
-		// A seat turning into a bot narrows the strip, so the seats are read here too.
-		if (seats.size < 0) return;
+	/** The seat on the clock, then yours, so both are in view whenever they fit and yours always is. */
+	function revealBoth(): void {
 		reveal(onClock);
 		reveal(you);
+	}
+
+	// When the clock moves to another seat.
+	$effect(revealBoth);
+
+	// When a cell changes width (a seat turning into a bot narrows, a handle arrives): every cell is
+	// watched, so the seats move into view after the layout they moved in.
+	$effect(() => {
+		if (!list) return;
+		const watch = new ResizeObserver(revealBoth);
+		for (const cell of list.children) watch.observe(cell);
+		return () => watch.disconnect();
 	});
 </script>
 
@@ -58,28 +68,25 @@
 	{#each Array.from({ length: teams }, (_, i) => i + 1) as seat (seat)}
 		{@const s = seats.get(seat)}
 		{@const name = seatName({ seat, handle: s?.handle ?? null, kind: kindOf(seat) }, you)}
-		{#if compact(seat)}
-			<li
-				class="bot"
-				class:open={kindOf(seat) === 'open'}
-				class:on={seat === onClock}
-				data-seat={seat}
-				aria-label="{name}{kindOf(seat) === 'open' ? ', open' : ''}{seat === onClock
-					? ', on the clock'
-					: ''}"
-			>
+		{@const small = compact(seat)}
+		<!-- One cell per seat for the room's life, so the strip's size watch keeps every cell. -->
+		<li
+			class:bot={small}
+			class:open={small && kindOf(seat) === 'open'}
+			class:you={seat === you}
+			class:on={seat === onClock}
+			class:left={s?.kind === 'left'}
+			data-seat={seat}
+			aria-label={small
+				? `${name}${kindOf(seat) === 'open' ? ', open' : ''}${seat === onClock ? ', on the clock' : ''}`
+				: undefined}
+		>
+			{#if small}
 				<i aria-hidden="true"></i><b aria-hidden="true">{seat}</b>
-			</li>
-		{:else}
-			<li
-				class:you={seat === you}
-				class:on={seat === onClock}
-				class:left={s?.kind === 'left'}
-				data-seat={seat}
-			>
+			{:else}
 				<b>{name}</b><span>{status(seat)}</span>
-			</li>
-		{/if}
+			{/if}
+		</li>
 	{/each}
 </ol>
 

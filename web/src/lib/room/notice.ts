@@ -68,13 +68,21 @@ function gone(subject: NoticeSubject): NoticeView | null {
 	}
 }
 
+/** The site's setup page from the address the API names, or null for anything that is not an http(s)
+ * origin: the link is built by the URL parser, so a trailing slash or a path never doubles up. */
+function siteSetup(site: string | undefined): { host: string; href: string } | null {
+	if (site === undefined || !URL.canParse(site)) return null;
+	const url = new URL(site);
+	if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+	return { host: url.host, href: new URL('/mock/new', url.origin).href };
+}
+
 function refused(error: ApiError, subject: NoticeSubject): NoticeView | null {
-	const site = error.fields[SITE_FIELD];
-	if (site) {
-		const host = new URL(site).host;
+	if (error.fields[SITE_FIELD] !== undefined) {
+		const setup = siteSetup(error.fields[SITE_FIELD]);
 		return {
 			text: `${error.message}. Start yours there, signed in or not.`,
-			verb: { label: `Open ${host}`, href: `${site}/mock/new` }
+			...(setup ? { verb: { label: `Open ${setup.host}`, href: setup.href } } : {})
 		};
 	}
 	if (subject === 'lobby')

@@ -70,8 +70,8 @@
 		.stepper {
 			height: auto;
 			min-height: var(--touch);
-			padding: 0 0 0 10px;
-			gap: 2px;
+			padding: 0 0 0 var(--s-2);
+			gap: var(--s-1);
 		}
 
 		button {
