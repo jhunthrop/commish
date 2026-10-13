@@ -52,8 +52,10 @@ type Minter interface {
 type Service struct {
 	Store  Repository
 	Tokens Minter
-	Now    func() time.Time
-	Log    *slog.Logger
+	// CodeKey keys the pairing codes' stored hashes (PurposeCodes).
+	CodeKey []byte
+	Now     func() time.Time
+	Log     *slog.Logger
 }
 
 // Routes is every route this package serves.
@@ -75,7 +77,7 @@ func (s *Service) code(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	expires := s.Now().Add(CodeTTL)
-	if err := s.Store.PutCode(r.Context(), auth.AccountID(r), codeHash(code), expires); err != nil {
+	if err := s.Store.PutCode(r.Context(), auth.AccountID(r), codeHash(s.CodeKey, code), expires); err != nil {
 		httpx.WriteInternal(w, r, s.Log, "devices: put code", err)
 		return
 	}
@@ -99,7 +101,7 @@ func (s *Service) pair(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	token, hash := s.Tokens.Mint()
-	_, dev, err := s.Store.Pair(r.Context(), codeHash(code), name, hash, auth.DeviceScopes(), s.Now())
+	_, dev, err := s.Store.Pair(r.Context(), codeHash(s.CodeKey, code), name, hash, auth.DeviceScopes(), s.Now())
 	switch {
 	case errors.Is(err, ErrBadCode):
 		httpx.WriteInvalid(w, r, map[string]string{"code": "That code has been used or is more than ten minutes old. Show a new one on your account page"})

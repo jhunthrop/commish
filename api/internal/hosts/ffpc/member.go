@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"log/slog"
 	"maps"
 	"sync"
@@ -17,23 +18,30 @@ import (
 // Host is this host's key in the connections table and the contract.
 const Host = "ffpc"
 
-// ErrNeedsSignIn is a connection FFPC no longer honors: signed out or
-// locked. The member signs in again on our form.
+// SignInEvery is the most often a kept sign-in is tried for one member:
+// a member's FFPC account is never hammered by us.
+const SignInEvery = 6 * time.Hour
+
+// ErrNeedsSignIn is a connection FFPC no longer honors: the member signs
+// in again on our form.
 var ErrNeedsSignIn = errors.New("ffpc: sign in again")
 
 // Connections is the part of hosts.Store a member read needs.
 type Connections interface {
 	Get(ctx context.Context, accountID uuid.UUID, host string) (hosts.Connection, error)
-	Renewed(ctx context.Context, accountID uuid.UUID, host string, sealed hosts.Sealed) error
-	Refused(ctx context.Context, accountID uuid.UUID, host string) (string, error)
+	SessionKept(ctx context.Context, accountID uuid.UUID, host string, sealed hosts.Sealed) error
+	SignInTried(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error
+	SignedOut(ctx context.Context, accountID uuid.UUID, host string) error
 	Read(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error
 }
 
-// Member reads FFPC as a connected member: it opens the member's kept
-// session (only here, in the sync worker), reads pages with it, and when
-// FFPC no longer honors the session, signs in again once with the kept
-// sign-in, the only way FFPC renews a session. A refused sign-in is
-// counted; the third locks the connection.
+// Member reads FFPC as a connected member. Every read opens only the
+// session. When FFPC no longer honors it, the kept sign-in is opened and
+// tried once, and only if none was tried for this member in SignInEvery.
+// Anything but a clean renewal followed by a clean read (a refusal, a
+// sign-in page that changed, a page we do not know, a read still sent
+// away) marks the connection signed out, with no retry, and the member is
+// told to sign in again.
 type Member struct {
 	Client *Client
 	Store  Connections
@@ -41,29 +49,45 @@ type Member struct {
 	Now    func() time.Time
 	Log    *slog.Logger
 
-	locks sync.Map // account id -> *sync.Mutex
+	// locks serialize one member's reads, a fixed set shared by hash so it
+	// never grows.
+	locks [64]sync.Mutex
 }
 
 func (m *Member) lock(accountID uuid.UUID) func() {
-	mu, _ := m.locks.LoadOrStore(accountID, &sync.Mutex{})
-	mu.(*sync.Mutex).Lock()
-	return mu.(*sync.Mutex).Unlock
+	h := fnv.New32a()
+	_, _ = h.Write(accountID[:])
+	mu := &m.locks[h.Sum32()%uint32(len(m.locks))]
+	mu.Lock()
+	return mu.Unlock
 }
 
-// session is the member's kept secret, for a connection that reads.
-func (m *Member) session(ctx context.Context, accountID uuid.UUID) (hosts.Secret, error) {
+// connection is the member's connection, for one that reads. A row that
+// no longer opens (the key rotated away) is marked signed out.
+func (m *Member) connection(ctx context.Context, accountID uuid.UUID) (hosts.Connection, Cookies, error) {
 	conn, err := m.Store.Get(ctx, accountID, Host)
 	if err != nil {
-		return hosts.Secret{}, err
+		return hosts.Connection{}, nil, err
 	}
 	if conn.Status != hosts.StatusConnected {
-		return hosts.Secret{}, ErrNeedsSignIn
+		return hosts.Connection{}, nil, ErrNeedsSignIn
 	}
-	secret, err := m.Vault.Open(accountID.String(), Host, conn.Sealed)
+	session, err := m.Vault.OpenSession(accountID.String(), Host, conn.Sealed)
+	if errors.Is(err, hosts.ErrSealed) {
+		m.signedOut(ctx, accountID, "the kept session no longer opens")
+		return hosts.Connection{}, nil, ErrNeedsSignIn
+	}
 	if err != nil {
-		return hosts.Secret{}, fmt.Errorf("ffpc: open connection: %w", err)
+		return hosts.Connection{}, nil, fmt.Errorf("ffpc: open session: %w", err)
 	}
-	return secret, nil
+	return conn, Cookies(session), nil
+}
+
+func (m *Member) signedOut(ctx context.Context, accountID uuid.UUID, why string) {
+	m.Log.Warn("ffpc: connection signed out", "account", accountID, "why", why)
+	if err := m.Store.SignedOut(ctx, accountID, Host); err != nil {
+		m.Log.Warn("ffpc: mark signed out", "account", accountID, "err", err)
+	}
 }
 
 // Pages reads the named league pages as the member, in order.
@@ -108,27 +132,30 @@ func (m *Member) OpenLeague(ctx context.Context, accountID uuid.UUID, leagueID s
 	return out, err
 }
 
-// as runs read with the member's session, renewing it once when FFPC
-// signs it out, and keeps any cookie FFPC changed.
+// as runs read with the member's session, renewing it at most once (and
+// at most once a SignInEvery), and keeps any cookie FFPC changed.
 func (m *Member) as(ctx context.Context, accountID uuid.UUID, read func(Cookies) (Cookies, error)) error {
 	defer m.lock(accountID)()
-	secret, err := m.session(ctx, accountID)
+	conn, kept, err := m.connection(ctx, accountID)
 	if err != nil {
 		return err
 	}
-	kept := Cookies(secret.Cookies)
 	jar, err := read(kept)
 	if errors.Is(err, ErrSignedOut) {
-		if jar, err = m.renew(ctx, accountID, secret); err == nil {
-			kept = jar
-			jar, err = read(jar)
+		if jar, err = m.renew(ctx, accountID, conn); err != nil {
+			return err
+		}
+		kept = jar
+		if jar, err = read(jar); errors.Is(err, ErrSignedOut) {
+			m.signedOut(ctx, accountID, "a read was still sent away after a fresh sign-in")
+			return ErrNeedsSignIn
 		}
 	}
 	if err != nil {
 		return err
 	}
 	if !maps.Equal(jar, kept) {
-		if err := m.keep(ctx, accountID, secret, jar); err != nil {
+		if err := m.keep(ctx, accountID, conn.Sealed, jar); err != nil {
 			m.Log.Warn("ffpc: keep session", "account", accountID, "err", err)
 		}
 	}
@@ -138,29 +165,38 @@ func (m *Member) as(ctx context.Context, accountID uuid.UUID, read func(Cookies)
 	return nil
 }
 
-// renew signs in again with the kept sign-in. A refusal is counted and
-// answered as ErrNeedsSignIn.
-func (m *Member) renew(ctx context.Context, accountID uuid.UUID, secret hosts.Secret) (Cookies, error) {
-	jar, _, err := m.Client.SignIn(ctx, secret.Username, secret.Password)
-	if errors.Is(err, ErrBadSignIn) {
-		status, rerr := m.Store.Refused(ctx, accountID, Host)
-		if rerr != nil {
-			return nil, rerr
-		}
-		m.Log.Warn("ffpc: kept sign-in refused", "account", accountID, "status", status)
+// renew signs in again with the kept sign-in, only if none was tried in
+// SignInEvery. The try is noted before it is sent. Every outcome but a
+// clean sign-in marks the connection signed out.
+func (m *Member) renew(ctx context.Context, accountID uuid.UUID, conn hosts.Connection) (Cookies, error) {
+	now := m.Now()
+	if conn.LastSignInAt != nil && now.Sub(*conn.LastSignInAt) < SignInEvery {
+		m.signedOut(ctx, accountID, "signed out again within six hours of a sign-in")
 		return nil, ErrNeedsSignIn
 	}
+	in, err := m.Vault.OpenSignIn(accountID.String(), Host, conn.Sealed)
 	if err != nil {
+		m.signedOut(ctx, accountID, "the kept sign-in no longer opens")
+		return nil, ErrNeedsSignIn
+	}
+	if err := m.Store.SignInTried(ctx, accountID, Host, now); err != nil {
 		return nil, err
 	}
-	return jar, m.keep(ctx, accountID, secret, jar)
+	jar, _, err := m.Client.SignIn(ctx, in.Username, in.Password)
+	switch {
+	case errors.Is(err, ErrBadSignIn), errors.Is(err, ErrFormChanged), errors.Is(err, ErrUnexpected):
+		m.signedOut(ctx, accountID, err.Error())
+		return nil, ErrNeedsSignIn
+	case err != nil:
+		return nil, err
+	}
+	return jar, m.keep(ctx, accountID, conn.Sealed, jar)
 }
 
-func (m *Member) keep(ctx context.Context, accountID uuid.UUID, secret hosts.Secret, jar Cookies) error {
-	secret.Cookies = jar
-	sealed, err := m.Vault.Seal(accountID.String(), Host, secret)
+func (m *Member) keep(ctx context.Context, accountID uuid.UUID, sealed hosts.Sealed, jar Cookies) error {
+	next, err := m.Vault.Reseal(accountID.String(), Host, sealed, hosts.Session(jar))
 	if err != nil {
 		return err
 	}
-	return m.Store.Renewed(ctx, accountID, Host, sealed)
+	return m.Store.SessionKept(ctx, accountID, Host, next)
 }

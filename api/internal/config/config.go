@@ -6,7 +6,6 @@
 package config
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -176,11 +175,8 @@ type API struct {
 	// deploy without the variable still signs, and links it signed keep
 	// opening after the variable is set.
 	ShareLinkKeys []string
-	// HostCredentialsKey is HOST_CREDENTIALS_KEY, the 32-byte key that
-	// wraps each connected host account's own data key (envelope
-	// encryption of a member's FFPC sign-in). Empty in development without
-	// it, where connecting a host answers that it is not set up.
-	HostCredentialsKey []byte
+	// Hosts is reading a member's own league on another host (FFPC).
+	Hosts Hosts
 	// Dev is what only a development API may do.
 	Dev Dev
 }
@@ -479,7 +475,7 @@ func LoadAPI(get Getenv) (API, error) {
 	c.Advisor = l.advisor()
 	c.RoomBaseURL = l.roomBaseURL(c.Env)
 	c.ShareLinkKeys = append(l.secrets("SHARE_LINK_KEYS"), c.Session.CookiePassword)
-	c.HostCredentialsKey = l.hostKey(c.Env)
+	c.Hosts = l.hosts(c.Env)
 	c.Dev = l.dev(c.Env)
 	return c, l.err()
 }
@@ -496,28 +492,6 @@ func (l *loader) secrets(name string) []string {
 		out = append(out, s)
 	}
 	return out
-}
-
-// hostKeyLen is the host credentials key's length: AES-256.
-const hostKeyLen = 32
-
-// hostKey reads HOST_CREDENTIALS_KEY, base64 of 32 random bytes, from
-// Secret Manager in production. Its value is never echoed.
-func (l *loader) hostKey(env Env) []byte {
-	raw := strings.TrimSpace(l.get("HOST_CREDENTIALS_KEY"))
-	if raw == "" {
-		if env == EnvProduction {
-			l.errs = append(l.errs, &VarError{Name: "HOST_CREDENTIALS_KEY", Err: ErrMissing,
-				Reason: "production keeps connected host accounts encrypted under it"})
-		}
-		return nil
-	}
-	key, err := base64.StdEncoding.DecodeString(raw)
-	if err != nil || len(key) != hostKeyLen {
-		l.invalid("HOST_CREDENTIALS_KEY", fmt.Sprintf("must be base64 of %d random bytes", hostKeyLen))
-		return nil
-	}
-	return key
 }
 
 // LoadRoom reads cmd/room's configuration.

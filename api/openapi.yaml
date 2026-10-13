@@ -1010,45 +1010,13 @@ paths:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
 
-  /leagues/attached/{id}/pages:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        description: the attached league's id (AttachedLeague.id)
-        schema: { type: string, format: uuid }
-    post:
-      tags: [league-sync]
-      operationId: pushLeaguePages
-      summary: >-
-        An attached FFPC league's pages as the member's own browser holds them, raw HTML, read by the same parsers as
-        the server's own read. The league home page names the league and the team; a page for another league or team
-        is refused. One batch a page per ten seconds a device; a page sent sooner is named in refused. Needs the
-        league:write scope. 8 MB a batch.
-      security: [{ device: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/LeaguePages" }
-      responses:
-        "200":
-          description: what was taken
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - properties: { data: { $ref: "#/components/schemas/PagesTaken" } }
-        "400": { $ref: "#/components/responses/ErrorResponse" }
-        "404": { $ref: "#/components/responses/ErrorResponse" }
-        "429": { $ref: "#/components/responses/ErrorResponse" }
-
   /hosts:
     get:
       tags: [hosts]
       operationId: listHostConnections
-      summary: The hosts the account is connected to, each with its state and when it was last read. No credential is ever answered.
+      summary: >-
+        The hosts connecting is open for here (HOST_FFPC_ENABLED), and the hosts the account is connected to, each with
+        its state and when it was last read. No credential is ever answered.
       security: [{ session: [] }]
       responses:
         "200":
@@ -1058,7 +1026,7 @@ paths:
               schema:
                 allOf:
                   - $ref: "#/components/schemas/Envelope"
-                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/HostConnection" } } }
+                  - properties: { data: { $ref: "#/components/schemas/HostConnections" } }
   /hosts/ffpc/connect:
     post:
       tags: [hosts]
@@ -1066,7 +1034,8 @@ paths:
       summary: >-
         Sign in to FFPC as the member, through FFPC's own sign-in form, and keep what FFPC hands back (its session, and
         the sign-in because FFPC offers no other way to renew a session), envelope encrypted. Answers the member's FFPC
-        leagues. Needs consent. Three refused sign-ins in an hour lock connecting for the hour. 5 an hour an account.
+        leagues. Needs consent, kept with its time and words. Three refused sign-ins in an hour pause connecting for the
+        hour (423). 5 an hour an account. 503 when FFPC is not open here or its sign-in page changed.
       security: [{ session: [] }]
       requestBody:
         required: true
@@ -2459,40 +2428,16 @@ components:
         token: { type: string, description: the device token, answered this once; send it as Authorization Bearer }
         device: { $ref: "#/components/schemas/Device" }
 
-    HostPage:
-      type: string
-      description: an FFPC league page, by the page its address names
-      enum: [league_home, standings, rosters, lineup, schedule, owners, rules]
-    LeaguePage:
-      type: object
-      required: [page, html]
-      properties:
-        page: { $ref: "#/components/schemas/HostPage" }
-        html: { type: string, maxLength: 3145728, description: the page's HTML as the member's browser holds it }
-    LeaguePages:
-      type: object
-      required: [pages]
-      properties:
-        pages: { type: array, minItems: 1, maxItems: 7, items: { $ref: "#/components/schemas/LeaguePage" } }
-    PagesTaken:
-      type: object
-      required: [taken, refused, read_at]
-      properties:
-        taken: { type: array, items: { $ref: "#/components/schemas/HostPage" } }
-        refused:
-          type: object
-          description: each page not taken and why, in our words
-          additionalProperties: { type: string }
-        read_at: { type: string, format: date-time }
-
     ConnectedHost:
       type: string
       description: a host the member connects their own account on, named as a mechanism
       enum: [ffpc]
     HostConnectionStatus:
       type: string
-      description: connected reads; signed_out needs a fresh sign-in; locked followed three refused sign-ins
-      enum: [connected, signed_out, locked]
+      description: >-
+        connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did
+        not mend it; the member signs in again on our form
+      enum: [connected, signed_out]
     HostConnection:
       type: object
       required: [host, status, connected_at, last_read_at]
@@ -2505,13 +2450,19 @@ components:
       type: object
       required: [email, password, consent]
       properties:
-        email: { type: string, minLength: 3, maxLength: 50, description: the member's FFPC sign-in email, as FFPC's form takes it }
-        password: { type: string, minLength: 1, maxLength: 50, description: sent to FFPC's sign-in only, never answered or logged }
+        email: { type: string, minLength: 1, maxLength: 128, description: "the member's FFPC sign-in (FFPC's form calls it the username)" }
+        password: { type: string, minLength: 1, maxLength: 128, description: sent to FFPC's sign-in only, never answered or logged }
         consent:
           type: boolean
           description: >-
             the member agrees that we sign in to FFPC as them to read their league, never make a move or a bid, and that
             they can disconnect any time; must be true
+    HostConnections:
+      type: object
+      required: [enabled, connections]
+      properties:
+        enabled: { type: array, items: { $ref: "#/components/schemas/ConnectedHost" }, description: the hosts connecting is open for }
+        connections: { type: array, items: { $ref: "#/components/schemas/HostConnection" } }
     HostLeague:
       type: object
       required: [league_id, name, team_name, record]

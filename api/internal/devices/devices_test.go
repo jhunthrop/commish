@@ -86,7 +86,11 @@ func newHarness(t *testing.T) (harness, auth.Account, auth.Account) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := &Service{Store: store, Tokens: bearer, Now: c.Now, Log: quiet()}
+	codeKey, err := auth.DeriveKey(testPassword, PurposeCodes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := &Service{Store: store, Tokens: bearer, CodeKey: codeKey, Now: c.Now, Log: quiet()}
 	routes := append(svc.Routes(), httpx.Route{Method: http.MethodGet, Path: "/session-only", Access: httpx.SignedIn,
 		Limit: httpx.PerMinute(60), Handler: func(w http.ResponseWriter, r *http.Request) { httpx.WriteOK(w, r, 200, nil) }})
 	mux := http.NewServeMux()

@@ -19,9 +19,11 @@ import (
 )
 
 // ffpcWiring is FFPC read as connected members: the vault that opens
-// their kept sign-in, the one client every read goes through (one
-// request a second across the process), and the member reader.
+// their kept session, the one client every read goes through (paced with
+// every other process by the database gate), and the member reader. On
+// is HOST_FFPC_ENABLED with the vault's key present.
 type ffpcWiring struct {
+	on     bool
 	vault  *hosts.Vault
 	store  *hosts.Store
 	client *ffpc.Client
@@ -29,12 +31,14 @@ type ffpcWiring struct {
 }
 
 func newFFPCWiring(cfg config.API, pool *pgxpool.Pool, log *slog.Logger) (ffpcWiring, error) {
-	vault, err := hosts.NewVault(cfg.HostCredentialsKey)
+	current, ring := cfg.Hosts.Ring()
+	vault, err := hosts.NewVault(hosts.Keys{Current: current, ByVer: ring})
 	if err != nil {
 		return ffpcWiring{}, err
 	}
-	if !vault.Ready() {
-		log.Warn("host credentials key not set", "effect", "connecting FFPC answers 503")
+	on := cfg.Hosts.FFPCEnabled && vault.Ready()
+	if !on {
+		log.Warn("ffpc is off", "enabled", cfg.Hosts.FFPCEnabled, "key", vault.Ready())
 	}
 	store := &hosts.Store{Pool: pool}
 	client := ffpc.New()
@@ -42,19 +46,20 @@ func newFFPCWiring(cfg config.API, pool *pgxpool.Pool, log *slog.Logger) (ffpcWi
 		client = ffpc.NewAt(cfg.Dev.FFPCBaseURL)
 		log.Warn("ffpc is the local stand-in", "base", cfg.Dev.FFPCBaseURL)
 	}
+	client.Pace = &hosts.Gate{Pool: pool, Host: ffpc.Host, Gap: ffpc.Gap, MaxWait: ffpc.MaxQueue}
 	member := &ffpc.Member{Client: client, Store: store, Vault: vault, Now: time.Now, Log: log}
-	return ffpcWiring{vault: vault, store: store, client: client, member: member}, nil
+	return ffpcWiring{on: on, vault: vault, store: store, client: client, member: member}, nil
 }
 
-// routes are connecting, listing and disconnecting FFPC.
+// routes are connecting, listing and disconnecting FFPC; off, the list
+// says so and connecting answers 503.
 func (f ffpcWiring) routes(log *slog.Logger) []httpx.Route {
-	return (&ffpc.Service{Signer: f.client, Store: f.store, Vault: f.vault, Leagues: f.member, Now: time.Now, Log: log}).Routes()
+	return (&ffpc.Service{Enabled: f.on, Signer: f.client, Store: f.store, Vault: f.vault, Leagues: f.member, Now: time.Now, Log: log}).Routes()
 }
 
-// host is the FFPC league host over the link store, nil when the vault
-// has no key (no connection could be opened).
+// host is the FFPC league host over the link store, nil when FFPC is off.
 func (f ffpcWiring) host(store *leaguesync.Store) *leaguesync.FFPC {
-	if !f.vault.Ready() {
+	if !f.on {
 		return nil
 	}
 	return &leaguesync.FFPC{Member: f.member, Readers: store, Now: time.Now}

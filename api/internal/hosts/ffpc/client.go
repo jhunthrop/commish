@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
+
+	"github.com/jhunthrop/commish/api/internal/hosts"
 )
 
 // The client reads FFPC as a connected member: it signs in through FFPC's
@@ -47,8 +49,47 @@ var (
 	// ErrUnavailable is FFPC failing or answering what we cannot read.
 	ErrUnavailable = errors.New("ffpc: not answering")
 	// ErrBusy is a read whose turn is more than maxQueue away.
-	ErrBusy = errors.New("ffpc: busy")
+	ErrBusy = hosts.ErrBusy
+	// ErrFormChanged is a sign-in page that is not the form we know: a
+	// field renamed, a challenge added. The password is not posted.
+	ErrFormChanged = errors.New("ffpc: sign-in form changed")
+	// ErrUnexpected is a sign-in that ends on a page we do not know.
+	ErrUnexpected = errors.New("ffpc: sign-in ended on an unknown page")
+	// ErrNoSuchLeague is a league id the member's My Teams page lacks.
+	ErrNoSuchLeague = errors.New("ffpc: not one of the member's leagues")
 )
+
+// Pace waits for a request's turn. *hosts.Gate paces every process
+// together; a local limiter paces one process (tests, a stand-in).
+type Pace interface {
+	Wait(ctx context.Context) error
+}
+
+// localPace is one process's pace.
+type localPace struct{ lim *rate.Limiter }
+
+func (p localPace) Wait(ctx context.Context) error {
+	r := p.lim.Reserve()
+	if d := r.Delay(); d > maxQueue {
+		r.Cancel()
+		return ErrBusy
+	}
+	t := time.NewTimer(r.Delay())
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		r.Cancel()
+		return ctx.Err()
+	}
+}
+
+// LocalPace is a pace of one request a gap within this process.
+func LocalPace(gap time.Duration) Pace { return localPace{lim: rate.NewLimiter(rate.Every(gap), 1)} }
+
+// MaxQueue is how long a read waits for its turn before it gives up.
+const MaxQueue = maxQueue
 
 // Cookies is a session as FFPC handed it back, by cookie name.
 type Cookies map[string]string
@@ -57,7 +98,7 @@ type Cookies map[string]string
 type Client struct {
 	Base string
 	HTTP *http.Client
-	gap  *rate.Limiter
+	Pace Pace
 }
 
 // New is the client for FFPC's site.
@@ -73,26 +114,11 @@ func NewAt(base string) *Client {
 			// page is a session FFPC no longer honors.
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},
-		gap: rate.NewLimiter(rate.Every(Gap), 1),
+		Pace: LocalPace(Gap),
 	}
 }
 
-func (c *Client) wait(ctx context.Context) error {
-	r := c.gap.Reserve()
-	if d := r.Delay(); d > maxQueue {
-		r.Cancel()
-		return ErrBusy
-	}
-	t := time.NewTimer(r.Delay())
-	defer t.Stop()
-	select {
-	case <-t.C:
-		return nil
-	case <-ctx.Done():
-		r.Cancel()
-		return ctx.Err()
-	}
-}
+func (c *Client) wait(ctx context.Context) error { return c.Pace.Wait(ctx) }
 
 // response is one answer: its status, where it sends us, its body and
 // the session cookies it set.
@@ -182,7 +208,7 @@ func (c *Client) SignIn(ctx context.Context, username, password string) (Cookies
 	if page.status != http.StatusOK {
 		return nil, nil, fmt.Errorf("%w: sign-in page %d", ErrUnavailable, page.status)
 	}
-	form, err := hiddenFields(page.body, "form1")
+	form, err := signInForm(page.body)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -198,10 +224,12 @@ func (c *Client) SignIn(ctx context.Context, username, password string) (Cookies
 	// Signed in is My Teams answering: FFPC sends a signed-out visitor
 	// from it to the public front page.
 	leagues, err := c.MyTeams(ctx, jar)
-	if err != nil {
-		if errors.Is(err, ErrSignedOut) {
-			return nil, nil, ErrBadSignIn
-		}
+	switch {
+	case errors.Is(err, ErrSignedOut):
+		return nil, nil, ErrBadSignIn
+	case errors.Is(err, ErrNotThisPage):
+		return nil, nil, ErrUnexpected
+	case err != nil:
 		return nil, nil, err
 	}
 	return jar, leagues, nil
@@ -282,7 +310,7 @@ func (c *Client) OpenLeague(ctx context.Context, jar Cookies, leagueID string) (
 		}
 	}
 	if target == "" {
-		return "", ErrNotThisPage
+		return "", ErrNoSuchLeague
 	}
 	form, err := hiddenFields(r.body, "form1")
 	if err != nil {

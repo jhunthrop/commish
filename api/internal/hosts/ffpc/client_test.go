@@ -12,8 +12,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"golang.org/x/time/rate"
 )
 
 // A stand-in for FFPC's site with the sign-in form's real field names:
@@ -29,6 +27,12 @@ type fakeFFPC struct {
 	agents []string
 	times  []time.Time
 	posted map[string]string
+	// signIns counts posts to the sign-in form.
+	signIns int
+	// stillOut sends every league page away, signed in or not.
+	stillOut bool
+	// challenge adds a field the known form lacks.
+	challenge bool
 }
 
 func (f *fakeFFPC) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -43,12 +47,17 @@ func (f *fakeFFPC) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.URL.Path == loginPath && r.Method == http.MethodGet:
 		http.SetCookie(w, &http.Cookie{Name: "BGSLMSession", Value: "sessionID=ABC"})
-		fmt.Fprint(w, `<form method="post" action="./Login.aspx" id="form1"><input type="hidden" name="__VIEWSTATE" value="vs1" />
+		extra := ""
+		if f.challenge {
+			extra = `<input name="txtSecurityCode" type="text" />`
+		}
+		fmt.Fprint(w, `<form method="post" action="./Login.aspx" id="form1">`+extra+`<input type="hidden" name="__VIEWSTATE" value="vs1" />
 			<input type="hidden" name="__EVENTVALIDATION" value="ev1" /><input name="txtExistingUsername" type="text" />
 			<input name="txtExistingPassword" type="password" /><input type="submit" name="btnSignIn" value="SIGN IN" /></form>`)
 	case r.URL.Path == loginPath && r.Method == http.MethodPost:
 		_ = r.ParseForm()
 		f.mu.Lock()
+		f.signIns++
 		f.posted = map[string]string{}
 		for k := range r.PostForm {
 			f.posted[k] = r.PostForm.Get(k)
@@ -77,7 +86,7 @@ func (f *fakeFFPC) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-	case r.URL.Path == "/Standings.aspx" && !signedIn:
+	case r.URL.Path == "/Standings.aspx" && (!signedIn || f.stillOut):
 		http.Redirect(w, r, "/MyTeams.aspx", http.StatusFound)
 	case r.URL.Path == "/Standings.aspx":
 		page, _ := os.ReadFile(filepath.Join("testdata", "ffpc-standings.html"))
@@ -93,7 +102,7 @@ func testClient(t *testing.T) (*Client, *fakeFFPC) {
 	srv := httptest.NewServer(fake)
 	t.Cleanup(srv.Close)
 	c := NewAt(srv.URL)
-	c.gap = rate.NewLimiter(rate.Every(20*time.Millisecond), 1)
+	c.Pace = LocalPace(20 * time.Millisecond)
 	return c, fake
 }
 
@@ -160,4 +169,16 @@ func keys[V any](m map[string]V) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// A sign-in page that is not the form we know never gets the password.
+func TestChangedFormIsNotPosted(t *testing.T) {
+	c, fake := testClient(t)
+	fake.challenge = true
+	if _, _, err := c.SignIn(context.Background(), testUser, testPass); !errors.Is(err, ErrFormChanged) {
+		t.Fatalf("a changed form: %v", err)
+	}
+	if fake.signIns != 0 {
+		t.Fatalf("the password was posted %d times", fake.signIns)
+	}
 }

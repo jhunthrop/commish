@@ -28,7 +28,15 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
 
 ### Connected host accounts (FFPC, Lane 14)
 
-- Secret Manager `HOST_CREDENTIALS_KEY`: base64 of 32 random bytes (`openssl rand -base64 32 | gcloud secrets create HOST_CREDENTIALS_KEY --data-file=-`). It wraps each member's own data key; the api refuses to start in production without it. Rotating it means re-wrapping every `app.host_connections.wrapped_key` under the new key (a one-shot job, not built yet); until then keep it.
+- `HOST_FFPC_ENABLED` (repository variable, default `true` in `api.yml`) is the one switch for FFPC: off, the connect routes answer 503, the league poller and the companion have no FFPC host, the refresh job reads nothing and the web hides the FFPC choice. The founder accepted FFPC's terms risk in writing on 2026-10-13.
+- Secret Manager `HOST_CREDENTIALS_KEY`: base64 of 32 random bytes (`openssl rand -base64 32 | gcloud secrets create HOST_CREDENTIALS_KEY --data-file=-`). It wraps each member's own data key; the api refuses to start in production without it while FFPC is on. `api.yml` pins it to a numbered version (`HOST_CREDENTIALS_KEY:1`, `HOST_CREDENTIALS_KEY_VERSION=1`), never `latest`, so adding a version never rotates it by accident.
+- Rotating it, in one sitting:
+  1. Add the new secret version.
+  2. Deploy with `HOST_CREDENTIALS_KEY` at the new version and `HOST_CREDENTIALS_KEY_VERSION` one higher. Set `HOST_CREDENTIALS_KEY_PREVIOUS` to the old version, added to `API_SECRETS`.
+  3. Run the `api-re-encrypt-host-connections` job once: it re-wraps every row's data key under the new key and opens no secret.
+  4. Deploy without the previous key. Only then disable the old version.
+  A row that no longer opens marks its connection signed out, and the member signs in again.
+- Rotating `WORKOS_COOKIE_PASSWORD` also unpairs every paired device: the device token key and the pairing code key derive from it. Tell members to pair again.
 - Cloud Scheduler runs the `api-ffpc-refresh` job (one read of every attached FFPC league with a connected member, at one FFPC request a second) on these schedules, all `America/New_York`:
   - hourly: `0 * * * *`
   - after Wednesday's waiver run: `0 6 * * 3`

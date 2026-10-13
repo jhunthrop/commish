@@ -1056,26 +1056,6 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
-	'/leagues/attached/{id}/pages': {
-		parameters: {
-			query?: never;
-			header?: never;
-			path: {
-				/** @description the attached league's id (AttachedLeague.id) */
-				id: string;
-			};
-			cookie?: never;
-		};
-		get?: never;
-		put?: never;
-		/** An attached FFPC league's pages as the member's own browser holds them, raw HTML, read by the same parsers as the server's own read. The league home page names the league and the team; a page for another league or team is refused. One batch a page per ten seconds a device; a page sent sooner is named in refused. Needs the league:write scope. 8 MB a batch. */
-		post: operations['pushLeaguePages'];
-		delete?: never;
-		options?: never;
-		head?: never;
-		patch?: never;
-		trace?: never;
-	};
 	'/hosts': {
 		parameters: {
 			query?: never;
@@ -1083,7 +1063,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** The hosts the account is connected to, each with its state and when it was last read. No credential is ever answered. */
+		/** The hosts connecting is open for here (HOST_FFPC_ENABLED), and the hosts the account is connected to, each with its state and when it was last read. No credential is ever answered. */
 		get: operations['listHostConnections'];
 		put?: never;
 		post?: never;
@@ -1102,7 +1082,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Sign in to FFPC as the member, through FFPC's own sign-in form, and keep what FFPC hands back (its session, and the sign-in because FFPC offers no other way to renew a session), envelope encrypted. Answers the member's FFPC leagues. Needs consent. Three refused sign-ins in an hour lock connecting for the hour. 5 an hour an account. */
+		/** Sign in to FFPC as the member, through FFPC's own sign-in form, and keep what FFPC hands back (its session, and the sign-in because FFPC offers no other way to renew a session), envelope encrypted. Answers the member's FFPC leagues. Needs consent, kept with its time and words. Three refused sign-ins in an hour pause connecting for the hour (423). 5 an hour an account. 503 when FFPC is not open here or its sign-in page changed. */
 		post: operations['connectFFPC'];
 		delete?: never;
 		options?: never;
@@ -2132,35 +2112,15 @@ export interface components {
 			device: components['schemas']['Device'];
 		};
 		/**
-		 * @description an FFPC league page, by the page its address names
-		 * @enum {string}
-		 */
-		HostPage: 'league_home' | 'standings' | 'rosters' | 'lineup' | 'schedule' | 'owners' | 'rules';
-		LeaguePage: {
-			page: components['schemas']['HostPage'];
-			/** @description the page's HTML as the member's browser holds it */
-			html: string;
-		};
-		LeaguePages: {
-			pages: components['schemas']['LeaguePage'][];
-		};
-		PagesTaken: {
-			taken: components['schemas']['HostPage'][];
-			/** @description each page not taken and why, in our words */
-			refused: Record<string, string>;
-			/** Format: date-time */
-			read_at: string;
-		};
-		/**
 		 * @description a host the member connects their own account on, named as a mechanism
 		 * @enum {string}
 		 */
 		ConnectedHost: 'ffpc';
 		/**
-		 * @description connected reads; signed_out needs a fresh sign-in; locked followed three refused sign-ins
+		 * @description connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did not mend it; the member signs in again on our form
 		 * @enum {string}
 		 */
-		HostConnectionStatus: 'connected' | 'signed_out' | 'locked';
+		HostConnectionStatus: 'connected' | 'signed_out';
 		HostConnection: {
 			host: components['schemas']['ConnectedHost'];
 			status: components['schemas']['HostConnectionStatus'];
@@ -2170,12 +2130,17 @@ export interface components {
 			last_read_at: string | null;
 		};
 		HostConnectInput: {
-			/** @description the member's FFPC sign-in email */
+			/** @description the member's FFPC sign-in (FFPC's form calls it the username) */
 			email: string;
 			/** @description sent to FFPC's sign-in only */
 			password: string;
 			/** @description the member agrees that we sign in to FFPC as them to read their league, never make a move or a bid, and that they can disconnect any time; must be true */
 			consent: boolean;
+		};
+		HostConnections: {
+			/** @description the hosts connecting is open for */
+			enabled: components['schemas']['ConnectedHost'][];
+			connections: components['schemas']['HostConnection'][];
 		};
 		HostLeague: {
 			league_id: string;
@@ -3624,36 +3589,6 @@ export interface operations {
 			404: components['responses']['ErrorResponse'];
 		};
 	};
-	pushLeaguePages: {
-		parameters: {
-			query?: never;
-			header?: never;
-			path: {
-				/** @description the attached league's id (AttachedLeague.id) */
-				id: string;
-			};
-			cookie?: never;
-		};
-		requestBody: {
-			content: {
-				'application/json': components['schemas']['LeaguePages'];
-			};
-		};
-		responses: {
-			/** @description what was taken */
-			200: {
-				headers: Record<string, unknown>;
-				content: {
-					'application/json': components['schemas']['Envelope'] & {
-						data?: components['schemas']['PagesTaken'];
-					};
-				};
-			};
-			400: components['responses']['ErrorResponse'];
-			404: components['responses']['ErrorResponse'];
-			429: components['responses']['ErrorResponse'];
-		};
-	};
 	listHostConnections: {
 		parameters: {
 			query?: never;
@@ -3668,7 +3603,7 @@ export interface operations {
 				headers: Record<string, unknown>;
 				content: {
 					'application/json': components['schemas']['Envelope'] & {
-						data?: components['schemas']['HostConnection'][];
+						data?: components['schemas']['HostConnections'];
 					};
 				};
 			};

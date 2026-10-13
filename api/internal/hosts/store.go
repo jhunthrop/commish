@@ -15,12 +15,11 @@ import (
 const (
 	StatusConnected = "connected"
 	StatusSignedOut = "signed_out"
-	StatusLocked    = "locked"
 )
 
-// MaxFailedSignIns locks a connection: after this many refusals in a row
-// no sign-in is tried again until the member connects anew.
-const MaxFailedSignIns = 3
+// ConsentVersion names the consent words a member agreed to on connect
+// (web/src/lib/hosts/api.ts FFPC_CONSENT). Raise it when the words change.
+const ConsentVersion = 2
 
 // ErrNotConnected is an account with no connection to the host.
 var ErrNotConnected = errors.New("hosts: not connected")
@@ -28,38 +27,42 @@ var ErrNotConnected = errors.New("hosts: not connected")
 // Connection is one account's connection to one host, as a row keeps it.
 // Sealed opens only through the Vault, in the sync worker.
 type Connection struct {
-	ID            uuid.UUID
-	AccountID     uuid.UUID
-	Host          string
-	Status        string
-	FailedSignIns int
-	CreatedAt     time.Time
-	LastReadAt    *time.Time
-	Sealed        Sealed
+	ID           uuid.UUID
+	AccountID    uuid.UUID
+	Host         string
+	Status       string
+	LastSignInAt *time.Time
+	CreatedAt    time.Time
+	LastReadAt   *time.Time
+	Sealed       Sealed
 }
 
 // Store reads and writes app.host_connections, every query scoped by
 // account and host.
 type Store struct{ Pool *pgxpool.Pool }
 
-const connColumns = `id, account_id, host, status, failed_signins, created_at, last_read_at, wrapped_key, ciphertext, key_version`
+const connColumns = `id, account_id, host, status, last_signin_at, created_at, last_read_at,
+	wrapped_key, session_ct, signin_ct, key_version`
 
 func scanConn(row pgx.Row) (Connection, error) {
 	var c Connection
-	err := row.Scan(&c.ID, &c.AccountID, &c.Host, &c.Status, &c.FailedSignIns, &c.CreatedAt, &c.LastReadAt,
-		&c.Sealed.WrappedKey, &c.Sealed.Ciphertext, &c.Sealed.KeyVersion)
+	err := row.Scan(&c.ID, &c.AccountID, &c.Host, &c.Status, &c.LastSignInAt, &c.CreatedAt, &c.LastReadAt,
+		&c.Sealed.WrappedKey, &c.Sealed.SessionCT, &c.Sealed.SignInCT, &c.Sealed.KeyVersion)
 	return c, err
 }
 
 // Put stores the account's connection to the host, connected, replacing
-// any earlier one (a new sign-in clears a lock).
-func (s *Store) Put(ctx context.Context, accountID uuid.UUID, host string, sealed Sealed) (Connection, error) {
+// any earlier one, with when and to which words the member consented. A
+// sign-in on our form counts as the latest sign-in.
+func (s *Store) Put(ctx context.Context, accountID uuid.UUID, host string, sealed Sealed, now time.Time) (Connection, error) {
 	c, err := scanConn(s.Pool.QueryRow(ctx, `insert into app.host_connections
-		(account_id, host, wrapped_key, ciphertext, key_version, status, failed_signins)
-		values ($1, $2, $3, $4, $5, 'connected', 0)
-		on conflict (account_id, host) do update set wrapped_key = excluded.wrapped_key, ciphertext = excluded.ciphertext,
-			key_version = excluded.key_version, status = 'connected', failed_signins = 0
-		returning `+connColumns, accountID, host, sealed.WrappedKey, sealed.Ciphertext, sealed.KeyVersion))
+		(account_id, host, wrapped_key, session_ct, signin_ct, key_version, status, last_signin_at, consented_at, consent_version)
+		values ($1, $2, $3, $4, $5, $6, 'connected', $7, $7, $8)
+		on conflict (account_id, host) do update set wrapped_key = excluded.wrapped_key, session_ct = excluded.session_ct,
+			signin_ct = excluded.signin_ct, key_version = excluded.key_version, status = 'connected',
+			last_signin_at = excluded.last_signin_at, consented_at = excluded.consented_at, consent_version = excluded.consent_version
+		returning `+connColumns,
+		accountID, host, sealed.WrappedKey, sealed.SessionCT, sealed.SignInCT, sealed.KeyVersion, now, ConsentVersion))
 	if err != nil {
 		return Connection{}, fmt.Errorf("hosts: put connection: %w", err)
 	}
@@ -82,14 +85,14 @@ func (s *Store) Get(ctx context.Context, accountID uuid.UUID, host string) (Conn
 // List is the account's connections, for the account page; the sealed
 // columns are not read.
 func (s *Store) List(ctx context.Context, accountID uuid.UUID) ([]Connection, error) {
-	rows, err := s.Pool.Query(ctx, `select id, account_id, host, status, failed_signins, created_at, last_read_at
+	rows, err := s.Pool.Query(ctx, `select id, account_id, host, status, last_signin_at, created_at, last_read_at
 		from app.host_connections where account_id = $1 order by host`, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("hosts: list connections: %w", err)
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Connection, error) {
 		var c Connection
-		err := r.Scan(&c.ID, &c.AccountID, &c.Host, &c.Status, &c.FailedSignIns, &c.CreatedAt, &c.LastReadAt)
+		err := r.Scan(&c.ID, &c.AccountID, &c.Host, &c.Status, &c.LastSignInAt, &c.CreatedAt, &c.LastReadAt)
 		return c, err
 	})
 	if err != nil {
@@ -111,32 +114,33 @@ func (s *Store) Delete(ctx context.Context, accountID uuid.UUID, host string) er
 	return nil
 }
 
-// Renewed keeps the session a fresh sign-in got.
-func (s *Store) Renewed(ctx context.Context, accountID uuid.UUID, host string, sealed Sealed) error {
-	_, err := s.Pool.Exec(ctx, `update app.host_connections set wrapped_key = $3, ciphertext = $4, key_version = $5,
-		status = 'connected', failed_signins = 0 where account_id = $1 and host = $2`,
-		accountID, host, sealed.WrappedKey, sealed.Ciphertext, sealed.KeyVersion)
+// SessionKept keeps a new session (the sign-in's ciphertext untouched).
+func (s *Store) SessionKept(ctx context.Context, accountID uuid.UUID, host string, sealed Sealed) error {
+	_, err := s.Pool.Exec(ctx, `update app.host_connections set wrapped_key = $3, session_ct = $4, key_version = $5
+		where account_id = $1 and host = $2`, accountID, host, sealed.WrappedKey, sealed.SessionCT, sealed.KeyVersion)
 	if err != nil {
-		return fmt.Errorf("hosts: renew connection: %w", err)
+		return fmt.Errorf("hosts: keep session: %w", err)
 	}
 	return nil
 }
 
-// Refused counts a refused sign-in and answers the status it leaves:
-// signed out, or locked at the third in a row.
-func (s *Store) Refused(ctx context.Context, accountID uuid.UUID, host string) (string, error) {
-	var status string
-	err := s.Pool.QueryRow(ctx, `update app.host_connections set
-			failed_signins = least(failed_signins + 1, $3),
-			status = case when failed_signins + 1 >= $3 then 'locked' else 'signed_out' end
-		where account_id = $1 and host = $2 returning status`, accountID, host, MaxFailedSignIns).Scan(&status)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", ErrNotConnected
+// SignInTried notes a kept sign-in before it is sent, so a crash between
+// the two still counts it against the six-hour allowance.
+func (s *Store) SignInTried(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error {
+	if _, err := s.Pool.Exec(ctx, `update app.host_connections set last_signin_at = $3 where account_id = $1 and host = $2`,
+		accountID, host, at); err != nil {
+		return fmt.Errorf("hosts: note sign-in: %w", err)
 	}
-	if err != nil {
-		return "", fmt.Errorf("hosts: refused sign-in: %w", err)
+	return nil
+}
+
+// SignedOut stops reading as the member until they sign in again.
+func (s *Store) SignedOut(ctx context.Context, accountID uuid.UUID, host string) error {
+	if _, err := s.Pool.Exec(ctx, `update app.host_connections set status = 'signed_out' where account_id = $1 and host = $2`,
+		accountID, host); err != nil {
+		return fmt.Errorf("hosts: signed out: %w", err)
 	}
-	return status, nil
+	return nil
 }
 
 // Read notes a good read as the member.
@@ -146,4 +150,65 @@ func (s *Store) Read(ctx context.Context, accountID uuid.UUID, host string, at t
 		return fmt.Errorf("hosts: note read: %w", err)
 	}
 	return nil
+}
+
+// Refused keeps a sign-in on our form the host refused.
+func (s *Store) Refused(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error {
+	if _, err := s.Pool.Exec(ctx, `insert into app.host_connect_refusals (account_id, host, at) values ($1, $2, $3)`,
+		accountID, host, at); err != nil {
+		return fmt.Errorf("hosts: keep refusal: %w", err)
+	}
+	return nil
+}
+
+// Refusals counts the account's refused sign-ins since a moment, and
+// drops the ones older than it.
+func (s *Store) Refusals(ctx context.Context, accountID uuid.UUID, host string, since time.Time) (int, error) {
+	if _, err := s.Pool.Exec(ctx, `delete from app.host_connect_refusals where account_id = $1 and host = $2 and at < $3`,
+		accountID, host, since); err != nil {
+		return 0, fmt.Errorf("hosts: trim refusals: %w", err)
+	}
+	var n int
+	if err := s.Pool.QueryRow(ctx, `select count(*) from app.host_connect_refusals where account_id = $1 and host = $2`,
+		accountID, host).Scan(&n); err != nil {
+		return 0, fmt.Errorf("hosts: count refusals: %w", err)
+	}
+	return n, nil
+}
+
+// Wrapped is one row's sealed data key, for the re-encrypt job.
+type Wrapped struct {
+	AccountID uuid.UUID
+	Host      string
+	Sealed    Sealed
+}
+
+// NotAt is every row wrapped under a key version other than current.
+func (s *Store) NotAt(ctx context.Context, current int) ([]Wrapped, error) {
+	rows, err := s.Pool.Query(ctx, `select account_id, host, wrapped_key, session_ct, signin_ct, key_version
+		from app.host_connections where key_version <> $1 order by account_id, host`, current)
+	if err != nil {
+		return nil, fmt.Errorf("hosts: rows to re-encrypt: %w", err)
+	}
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Wrapped, error) {
+		var w Wrapped
+		err := r.Scan(&w.AccountID, &w.Host, &w.Sealed.WrappedKey, &w.Sealed.SessionCT, &w.Sealed.SignInCT, &w.Sealed.KeyVersion)
+		return w, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("hosts: rows to re-encrypt: %w", err)
+	}
+	return out, nil
+}
+
+// Rewrapped keeps a row's data key wrapped under a new version, only if
+// the row is still at the version it was read at.
+func (s *Store) Rewrapped(ctx context.Context, w Wrapped, from int) (bool, error) {
+	tag, err := s.Pool.Exec(ctx, `update app.host_connections set wrapped_key = $3, key_version = $4
+		where account_id = $1 and host = $2 and key_version = $5`,
+		w.AccountID, w.Host, w.Sealed.WrappedKey, w.Sealed.KeyVersion, from)
+	if err != nil {
+		return false, fmt.Errorf("hosts: keep re-wrap: %w", err)
+	}
+	return tag.RowsAffected() == 1, nil
 }

@@ -27,7 +27,7 @@ func companionService(cfg config.API, pool *pgxpool.Pool, rooms *solo.Service, e
 		Conditional:   advisor.Engine{Runs: sim.RoomOddsRuns, Workers: runtime.GOMAXPROCS(0)},
 		ReportWorkers: runtime.GOMAXPROCS(0), Now: time.Now, Log: log,
 	}
-	if ff.vault.Ready() {
+	if ff.on {
 		s.FFPC = &companion.FFPCDrafts{Member: ff.member, Now: time.Now}
 	}
 	if cfg.Dev.CompanionReplay {

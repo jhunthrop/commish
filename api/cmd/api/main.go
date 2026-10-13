@@ -97,6 +97,10 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	if err != nil {
 		return nil, err
 	}
+	codeKey, err := auth.DeriveKey(cfg.Session.CookiePassword, devices.PurposeCodes)
+	if err != nil {
+		return nil, err
+	}
 	nameFilter, err := names.Default()
 	if err != nil {
 		return nil, err
@@ -164,7 +168,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		solo.Routes(),
 		lobbies.Routes(),
 		companions.Routes(),
-		(&devices.Service{Store: deviceStore, Tokens: bearer, Now: now, Log: log}).Routes(),
+		(&devices.Service{Store: deviceStore, Tokens: bearer, CodeKey: codeKey, Now: now, Log: log}).Routes(),
 		leagueSyncService(cfg, pool, draftBoards, leagueStore, ff, log).Routes(),
 		ff.routes(log),
 		devRoutes,

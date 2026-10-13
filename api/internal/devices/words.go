@@ -1,6 +1,7 @@
 package devices
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	_ "embed"
@@ -89,8 +90,14 @@ func NormalizeCode(typed string) (string, bool) {
 	return strings.Join(parts, " "), true
 }
 
-// codeHash is the stored form of a normalized code.
-func codeHash(code string) []byte {
-	sum := sha256.Sum256([]byte("pair:" + code))
-	return sum[:]
+// codeHash is the stored form of a normalized code: an HMAC under a key
+// of our own (derived from the cookie password), so a copy of the table
+// cannot be searched for 48-bit codes offline.
+func codeHash(key []byte, code string) []byte {
+	m := hmac.New(sha256.New, key)
+	m.Write([]byte("pair:" + code))
+	return m.Sum(nil)
 }
+
+// PurposeCodes derives the pairing code key (auth.DeriveKey).
+const PurposeCodes = "commish pair code v1"

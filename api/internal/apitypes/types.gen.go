@@ -255,7 +255,6 @@ func (e HealthStatus) Valid() bool {
 // Defines values for HostConnectionStatus.
 const (
 	HostConnectionStatusConnected HostConnectionStatus = "connected"
-	HostConnectionStatusLocked    HostConnectionStatus = "locked"
 	HostConnectionStatusSignedOut HostConnectionStatus = "signed_out"
 )
 
@@ -264,42 +263,7 @@ func (e HostConnectionStatus) Valid() bool {
 	switch e {
 	case HostConnectionStatusConnected:
 		return true
-	case HostConnectionStatusLocked:
-		return true
 	case HostConnectionStatusSignedOut:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for HostPage.
-const (
-	HostPageLeagueHome HostPage = "league_home"
-	HostPageLineup     HostPage = "lineup"
-	HostPageOwners     HostPage = "owners"
-	HostPageRosters    HostPage = "rosters"
-	HostPageRules      HostPage = "rules"
-	HostPageSchedule   HostPage = "schedule"
-	HostPageStandings  HostPage = "standings"
-)
-
-// Valid indicates whether the value is a known member of the HostPage enum.
-func (e HostPage) Valid() bool {
-	switch e {
-	case HostPageLeagueHome:
-		return true
-	case HostPageLineup:
-		return true
-	case HostPageOwners:
-		return true
-	case HostPageRosters:
-		return true
-	case HostPageRules:
-		return true
-	case HostPageSchedule:
-		return true
-	case HostPageStandings:
 		return true
 	default:
 		return false
@@ -1199,7 +1163,7 @@ type HostConnectInput struct {
 	// Consent the member agrees that we sign in to FFPC as them to read their league, never make a move or a bid, and that they can disconnect any time; must be true
 	Consent bool `json:"consent"`
 
-	// Email the member's FFPC sign-in email
+	// Email the member's FFPC sign-in (FFPC's form calls it the username)
 	Email string `json:"email"`
 
 	// Password sent to FFPC's sign-in only
@@ -1220,12 +1184,20 @@ type HostConnection struct {
 	Host       ConnectedHost `json:"host"`
 	LastReadAt *time.Time    `json:"last_read_at"`
 
-	// Status connected reads; signed_out needs a fresh sign-in; locked followed three refused sign-ins
+	// Status connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did not mend it; the member signs in again on our form
 	Status HostConnectionStatus `json:"status"`
 }
 
-// HostConnectionStatus connected reads; signed_out needs a fresh sign-in; locked followed three refused sign-ins
+// HostConnectionStatus connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did not mend it; the member signs in again on our form
 type HostConnectionStatus string
+
+// HostConnections defines model for HostConnections.
+type HostConnections struct {
+	Connections []HostConnection `json:"connections"`
+
+	// Enabled the hosts connecting is open for
+	Enabled []ConnectedHost `json:"enabled"`
+}
 
 // HostLeague defines model for HostLeague.
 type HostLeague struct {
@@ -1236,9 +1208,6 @@ type HostLeague struct {
 	Record   string `json:"record"`
 	TeamName string `json:"team_name"`
 }
-
-// HostPage an FFPC league page, by the page its address names
-type HostPage string
 
 // ImportSkip defines model for ImportSkip.
 type ImportSkip struct {
@@ -1295,20 +1264,6 @@ type LeagueMove struct {
 
 // LeagueMoveKind defines model for LeagueMove.Kind.
 type LeagueMoveKind string
-
-// LeaguePage defines model for LeaguePage.
-type LeaguePage struct {
-	// Html the page's HTML as the member's browser holds it
-	Html string `json:"html"`
-
-	// Page an FFPC league page, by the page its address names
-	Page HostPage `json:"page"`
-}
-
-// LeaguePages defines model for LeaguePages.
-type LeaguePages struct {
-	Pages []LeaguePage `json:"pages"`
-}
 
 // LeaguePlayer defines model for LeaguePlayer.
 type LeaguePlayer struct {
@@ -1626,15 +1581,6 @@ type PageMeta struct {
 	Page    int   `json:"page"`
 	PerPage int   `json:"per_page"`
 	Total   int64 `json:"total"`
-}
-
-// PagesTaken defines model for PagesTaken.
-type PagesTaken struct {
-	ReadAt time.Time `json:"read_at"`
-
-	// Refused each page not taken and why, in our words
-	Refused map[string]string `json:"refused"`
-	Taken   []HostPage        `json:"taken"`
 }
 
 // PairCode defines model for PairCode.
@@ -2280,9 +2226,6 @@ type AttachLeagueJSONRequestBody = AttachInput
 
 // PreviewAttachJSONRequestBody defines body for PreviewAttach for application/json ContentType.
 type PreviewAttachJSONRequestBody = AttachPreviewInput
-
-// PushLeaguePagesJSONRequestBody defines body for PushLeaguePages for application/json ContentType.
-type PushLeaguePagesJSONRequestBody = LeaguePages
 
 // ReplaceLeagueJSONRequestBody defines body for ReplaceLeague for application/json ContentType.
 type ReplaceLeagueJSONRequestBody = LeagueInput

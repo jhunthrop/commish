@@ -48,6 +48,9 @@ func jobTable() map[string]job {
 		// ffpc-refresh runs hourly and in bursts: every FFPC league read as
 		// a connected member (ffpcjob.go).
 		"ffpc-refresh": runFFPCRefresh,
+		// re-encrypt-host-connections runs by hand during a key rotation:
+		// every connection's data key re-wrapped under the current key.
+		"re-encrypt-host-connections": runRekey,
 		// grant runs by hand: a pass or membership for support.
 		"grant": runGrant,
 	}
