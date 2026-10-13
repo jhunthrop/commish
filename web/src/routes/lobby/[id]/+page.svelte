@@ -8,7 +8,7 @@
 	import Search from '#lib/ui/Search.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { type LobbyRoom, type RoomCard, rooms } from '#lib/room/api.ts';
+	import { type LobbyRoom, type RoomCard, isFinalRefusal, rooms } from '#lib/room/api.ts';
 	import { type LobbyState, applyActions, initialLobby } from '#lib/room/lobby.ts';
 	import { LobbySocket, type SocketStatus } from '#lib/room/lobby-socket.ts';
 	import LobbyRoomView from '#lib/room/LobbyRoomView.svelte';
@@ -67,7 +67,13 @@
 					},
 					onclock: (ms) => (offset = ms),
 					onstatus: (s) => (status = s),
-					onrefused: (message) => (refused = message)
+					onrefused: (message) => (refused = message),
+					probe: () =>
+						rooms.lobby(id).then(
+							() => null,
+							(e: unknown) => (isFinalRefusal(e) ? e : null)
+						),
+					onstopped: (reason) => (error = reason)
 				});
 				socket.connect();
 			} catch (e) {

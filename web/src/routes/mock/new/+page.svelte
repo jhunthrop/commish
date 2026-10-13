@@ -5,15 +5,17 @@
 	import { onMount } from 'svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
+	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
+	import Field from '#lib/ui/Field.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Stepper from '#lib/ui/Stepper.svelte';
-	import TextInput from '#lib/ui/TextInput.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { startMock } from '#lib/room/actions.ts';
 	import {
 		ApiError,
 		isSignedOut,
+		signInHref,
 		type BoardPlayer,
 		type League,
 		type LeagueSettings,
@@ -23,7 +25,7 @@
 	} from '#lib/room/api.ts';
 	import RoomLayout from '#lib/room/RoomLayout.svelte';
 	import RoomNotice from '#lib/room/RoomNotice.svelte';
-	import Field from '#lib/room/setup/Field.svelte';
+	import SetupRow from '#lib/room/setup/SetupRow.svelte';
 	import HandlePrompt from '#lib/room/setup/HandlePrompt.svelte';
 	import KeeperEditor from '#lib/room/setup/KeeperEditor.svelte';
 	import LobbyList from '#lib/room/setup/LobbyList.svelte';
@@ -54,6 +56,8 @@
 	let error = $state<unknown>(null);
 	let handleFor = $state<LobbyFormat | null>(null);
 	let handleProblem = $state<string | null>(null);
+	/** Signed out, a mock against bots still runs, kept with this browser until sign-in claims it. */
+	let signedOut = $state(false);
 
 	const rounds = $derived(roundsOf(settings));
 	const roundsOk = $derived(rounds >= MIN_ROUNDS && rounds <= MAX_ROUNDS);
@@ -141,20 +145,29 @@
 		players = (await rooms.board(boardFormat)).players;
 	}
 
+	async function loadLeagues(): Promise<void> {
+		try {
+			leagues = await rooms.leagues();
+		} catch (e) {
+			// Signed out: setup still works, a mock against bots starts, the other verbs ask to sign in.
+			if (isSignedOut(e)) signedOut = true;
+			else error = e;
+		}
+	}
+
+	async function loadFrom(from: string): Promise<void> {
+		try {
+			const mock = await rooms.mock(from);
+			settings = { ...mock.settings, slot: null };
+		} catch (e) {
+			error = e;
+		}
+	}
+
 	onMount(() => {
 		const from = page.url.searchParams.get('from');
-		void (async () => {
-			try {
-				leagues = await rooms.leagues();
-				if (from) {
-					const mock = await rooms.mock(from);
-					settings = { ...mock.settings, slot: null };
-				}
-			} catch (e) {
-				// Signed out: setup still works, and the verbs ask to sign in.
-				if (!isSignedOut(e)) error = e;
-			}
-		})();
+		void loadLeagues();
+		if (from) void loadFrom(from);
 		void loadLobbies();
 		const poll = setInterval(() => void loadLobbies(), LOBBY_POLL_MS);
 		return () => clearInterval(poll);
@@ -167,7 +180,7 @@
 
 <Shell title="Mock draft" active="mock">
 	<RoomLayout>
-		<h2>New mock</h2>
+		<DisplayTitle size="page">New mock</DisplayTitle>
 		<p class="lede">
 			Set it to your league once and save it. Against bots there is no clock, so a mock takes as
 			long as your own picks do. Against people it is 30 seconds a pick.
@@ -177,7 +190,7 @@
 			<HandlePrompt problem={handleProblem} {busy} onsave={saveHandle} />
 		{/if}
 		<div class="form">
-			<Field label="Scoring">
+			<SetupRow label="Scoring">
 				<ChipGroup label="Scoring">
 					{#each SCORING_CHOICES as c (c.preset)}
 						<Chip
@@ -186,18 +199,18 @@
 						>
 					{/each}
 				</ChipGroup>
-			</Field>
-			<Field label="Custom scoring" note="your league's exact points">
+			</SetupRow>
+			<SetupRow label="Custom scoring" note="your league's exact points">
 				<Quiet size="sm" href="/pass">Import from ESPN, Yahoo or Sleeper with the Draft Pass</Quiet>
-			</Field>
-			<Field label="Teams">
+			</SetupRow>
+			<SetupRow label="Teams">
 				<ChipGroup label="Teams">
 					{#each TEAM_CHOICES as n (n)}
 						<Chip pressed={settings.teams === n} onclick={() => setTeams(n)}>{n}</Chip>
 					{/each}
 				</ChipGroup>
-			</Field>
-			<Field label="Your slot">
+			</SetupRow>
+			<SetupRow label="Your slot">
 				<ChipGroup label="Your slot" variant="loose">
 					{#each Array.from({ length: settings.teams }, (_, i) => i + 1) as n (n)}
 						<Chip size="sm" pressed={settings.slot === n} onclick={() => set({ slot: n })}>{n}</Chip
@@ -207,8 +220,8 @@
 						>Random</Chip
 					>
 				</ChipGroup>
-			</Field>
-			<Field label="Roster" note="rounds follow from it: {rounds}">
+			</SetupRow>
+			<SetupRow label="Roster" note="rounds follow from it: {rounds}">
 				{#each ROSTER_FIELDS as f (f.key)}
 					<Stepper
 						label={f.label}
@@ -218,8 +231,8 @@
 						onchange={(v: number) => set({ roster: { ...settings.roster, [f.key]: v } })}
 					/>
 				{/each}
-			</Field>
-			<Field label="Lineup">
+			</SetupRow>
+			<SetupRow label="Lineup">
 				<ChipGroup label="Lineup">
 					{#each LINEUP_CHOICES as c (c.lineup)}
 						<Chip pressed={settings.lineup === c.lineup} onclick={() => set({ lineup: c.lineup })}
@@ -227,14 +240,14 @@
 						>
 					{/each}
 				</ChipGroup>
-			</Field>
-			<Field label="Bots" note="how the other {settings.teams - 1} draft">
+			</SetupRow>
+			<SetupRow label="Bots" note="how the other {settings.teams - 1} draft">
 				<ChipGroup label="Bots">
 					<Chip pressed>From where drafters take players</Chip>
 				</ChipGroup>
 				<span class="later">Your league's last draft comes with a league import</span>
-			</Field>
-			<Field label="Keepers">
+			</SetupRow>
+			<SetupRow label="Keepers">
 				{#if keepersOpen}
 					<KeeperEditor
 						keepers={settings.keepers}
@@ -252,7 +265,7 @@
 						>{settings.keepers.length > 0 ? `${settings.keepers.length} kept` : 'Add keepers'}</Chip
 					>
 				{/if}
-			</Field>
+			</SetupRow>
 		</div>
 		{#if !roundsOk}
 			<p class="warn">
@@ -263,11 +276,15 @@
 			<Verb disabled={busy || !roundsOk} onclick={() => run(() => startMock(settings))}
 				>Start against bots</Verb
 			>
+			{#if signedOut}
+				<Quiet href={signInHref(page.url.pathname)}>Sign in to keep this mock</Quiet>
+			{/if}
 			<Quiet disabled={busy} onclick={() => join(nearestLobby(settings))}
 				>Join a lobby with people</Quiet
 			>
 			{#if naming}
-				<TextInput
+				<Field
+					hideLabel
 					bind:value={leagueName}
 					maxlength={60}
 					placeholder="Tuesday night, 12 PPR"
@@ -291,15 +308,6 @@
 </Shell>
 
 <style>
-	h2 {
-		margin: var(--s-2) 0 0;
-		font-family: var(--font-num);
-		font-weight: 800;
-		font-size: 38px;
-		line-height: 0.95;
-		text-transform: uppercase;
-	}
-
 	.lede {
 		margin: 0;
 		color: var(--ink-2);
@@ -323,11 +331,5 @@
 		gap: var(--s-3);
 		align-items: center;
 		margin-top: var(--s-3);
-	}
-
-	@media (max-width: 760px) {
-		h2 {
-			font-size: 30px;
-		}
 	}
 </style>

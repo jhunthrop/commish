@@ -12,13 +12,13 @@
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Face from '#lib/ui/Face.svelte';
+	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
 	import GapChip from '#lib/ui/GapChip.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 	import Keys from '#lib/ui/Keys.svelte';
 	import OddsCell from '#lib/ui/OddsCell.svelte';
 	import PickStrip from '#lib/ui/PickStrip.svelte';
 	import Stepper from '#lib/ui/Stepper.svelte';
-	import TextInput from '#lib/ui/TextInput.svelte';
 	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
@@ -88,7 +88,6 @@
 	const sheetTags = ['Targets', 'Sleepers', 'Avoid', 'Notes'] as const;
 	let chosenTag = $state<(typeof sheetTags)[number]>('Targets');
 	let stepperValue = $state(2);
-	let fieldValue = $state('');
 </script>
 
 <svelte:head>
@@ -374,6 +373,16 @@
 						<ToneChip tone="even">at ADP</ToneChip>
 					{/snippet}
 				</Part>
+				<Part
+					name="Display title"
+					about="The number face, uppercase: a page's title at 38, a panel's name at 30, a section at 26 with what it counts beside it."
+				>
+					{#snippet show()}
+						<DisplayTitle size="page">New mock</DisplayTitle>
+						<DisplayTitle size="panel">Pool</DisplayTitle>
+						<DisplayTitle note="projected starting points, 12 teams">The field</DisplayTitle>
+					{/snippet}
+				</Part>
 				<Part name="Stepper" about="A roster count with its bounds.">
 					{#snippet show()}<Stepper
 							label="RB"
@@ -381,13 +390,6 @@
 							min={0}
 							max={6}
 							onchange={(v: number) => (stepperValue = v)}
-						/>{/snippet}
-				</Part>
-				<Part name="Text field" about="A name, a handle, a player to keep.">
-					{#snippet show()}<TextInput
-							bind:value={fieldValue}
-							label="League name"
-							placeholder="Tuesday night, 12 PPR"
 						/>{/snippet}
 				</Part>
 			</Parts>

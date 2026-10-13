@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Quiet from '#lib/ui/Quiet.svelte';
-	import TextInput from '#lib/ui/TextInput.svelte';
+	import Field from '#lib/ui/Field.svelte';
 	import type { BoardPlayer, LeagueSettings } from '../api.ts';
 
 	type Keeper = LeagueSettings['keepers'][number];
@@ -69,7 +69,8 @@
 					>{/each}
 			</select></label
 		>
-		<TextInput
+		<Field
+			hideLabel
 			list="keeper-names"
 			placeholder="Player"
 			label="Player to keep"

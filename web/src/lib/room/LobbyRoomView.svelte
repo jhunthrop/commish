@@ -6,7 +6,7 @@
 	import ScoreBug from '#lib/ui/ScoreBug.svelte';
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
 	import type { LobbyRoom, RoomCard } from './api.ts';
-	import { callView, oddsBasis } from './call.ts';
+	import { callView, poolBasis } from './call.ts';
 	import { LOBBY_KEYS, roomKeys } from './keys.ts';
 	import type { LobbyState } from './lobby.ts';
 	import LandingStrip from './LandingStrip.svelte';
@@ -157,7 +157,7 @@
 			left={board.players.length - drafted.size}
 			{odds}
 			{oddsLabel}
-			oddsBasis={oddsBasis(card, teams)}
+			basis={poolBasis(board, card, teams)}
 			pickNumber={lobby.pickNumber}
 			callId={call?.player.id ?? null}
 			{selectedId}

@@ -42,14 +42,24 @@ interface Envelope<T> {
 	error: { message: string } | null;
 }
 
-async function call<T>(who: { session: string; csrf: string }, method: string, path: string, body?: unknown): Promise<T> {
+async function call<T>(
+	who: { session: string; csrf: string },
+	method: string,
+	path: string,
+	body?: unknown
+): Promise<T> {
 	const response = await fetch(`${api}${path}`, {
 		method,
-		headers: { Cookie: `commish_session=${who.session}`, 'X-CSRF-Token': who.csrf, 'Content-Type': 'application/json' },
+		headers: {
+			Cookie: `commish_session=${who.session}`,
+			'X-CSRF-Token': who.csrf,
+			'Content-Type': 'application/json'
+		},
 		body: body === undefined ? undefined : JSON.stringify(body)
 	});
-	const envelope = (await response.json()) as Envelope<T>;
-	if (!envelope.ok) throw new Error(`${method} ${path}: ${envelope.error?.message ?? response.status}`);
+	const envelope = await response.json<Envelope<T>>();
+	if (!envelope.ok)
+		throw new Error(`${method} ${path}: ${envelope.error?.message ?? response.status}`);
 	return envelope.data;
 }
 
@@ -58,12 +68,18 @@ await mkdir(OUT_DIR, { recursive: true });
 const browser = await chromium.launch();
 
 async function context(theme: (typeof THEMES)[number], width: number): Promise<BrowserContext> {
-	const ctx = await browser.newContext({ viewport: { width, height: VIEWPORT_HEIGHT }, colorScheme: theme });
+	const ctx = await browser.newContext({
+		viewport: { width, height: VIEWPORT_HEIGHT },
+		colorScheme: theme
+	});
 	await ctx.addCookies([
 		{ name: 'commish_session', value: session, domain: 'localhost', path: '/' },
 		{ name: 'commish_csrf', value: csrf, domain: 'localhost', path: '/' }
 	]);
-	await ctx.addInitScript(([key, value]: readonly [string, string]) => localStorage.setItem(key, value), [THEME_STORAGE_KEY, theme] as const);
+	await ctx.addInitScript(
+		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
+		[THEME_STORAGE_KEY, theme] as const
+	);
 	return ctx;
 }
 
@@ -109,7 +125,8 @@ try {
 		room_id: string;
 	}
 	const seat = await call<Seat>(me, 'POST', '/lobbies/join', { format: '12_ppr' });
-	for (const helper of helpers) await call<Seat>(helper, 'POST', '/lobbies/join', { format: '12_ppr' });
+	for (const helper of helpers)
+		await call<Seat>(helper, 'POST', '/lobbies/join', { format: '12_ppr' });
 	await shoot('lobby-filling', `/lobby/${seat.room_id}`, 'The draft starts when');
 	await new Promise((done) => setTimeout(done, FILL_WAIT_MS));
 	// The helpers step away once the room starts, so their queues draft at a bot's pace.

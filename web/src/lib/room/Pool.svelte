@@ -2,6 +2,7 @@
 	import { adpWords } from '#lib/format/draft.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
+	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import PoolRow from './PoolRow.svelte';
@@ -15,8 +16,8 @@
 		odds: Readonly<Record<string, number>>;
 		/** What the odds are of: "still there at 6.05". */
 		oddsLabel: string;
-		/** Where the odds come from, in one line. */
-		oddsBasis: string;
+		/** Whose points rank the pool and where the odds come from. */
+		basis: string;
 		/** The pick the ADP sentence is read against. */
 		pickNumber: number;
 		callId: string | null;
@@ -36,7 +37,7 @@
 		left,
 		odds,
 		oddsLabel,
-		oddsBasis,
+		basis,
 		pickNumber,
 		callId,
 		selectedId,
@@ -64,7 +65,7 @@
 
 <section class="pool" aria-label="Pool">
 	<div class="head">
-		<h2>Pool</h2>
+		<DisplayTitle size="panel">Pool</DisplayTitle>
 		<Label>{left} left, ranked by points over replacement</Label>
 		<div class="chips">
 			<ChipGroup label="Position">
@@ -74,7 +75,7 @@
 			</ChipGroup>
 		</div>
 	</div>
-	<p class="basis">{oddsBasis}</p>
+	<p class="basis">{basis}</p>
 	<div class="cols" aria-hidden="true">
 		<span></span>
 		<Label>Player</Label>
@@ -121,15 +122,6 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--s-3);
-	}
-
-	h2 {
-		margin: 0;
-		font-family: var(--font-num);
-		font-weight: 800;
-		font-size: 30px;
-		line-height: 1;
-		text-transform: uppercase;
 	}
 
 	.chips {

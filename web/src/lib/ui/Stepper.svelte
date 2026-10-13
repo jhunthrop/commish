@@ -42,7 +42,7 @@
 	b {
 		font-family: var(--font-num);
 		font-variant-numeric: tabular-nums;
-		font-size: 18px;
+		font-size: var(--t-lg);
 		font-weight: 700;
 		min-width: 1ch;
 		text-align: center;
@@ -56,7 +56,7 @@
 		background: var(--surface-2);
 		color: var(--ink);
 		cursor: pointer;
-		font-size: 14px;
+		font-size: var(--t-sm);
 		line-height: 1;
 	}
 

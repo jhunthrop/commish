@@ -78,7 +78,7 @@
 		font-family: var(--font-num);
 		font-variant-numeric: tabular-nums;
 		font-weight: 700;
-		font-size: 18px;
+		font-size: var(--t-lg);
 		color: var(--ink-2);
 	}
 </style>

@@ -26,6 +26,14 @@ export interface SocketHandlers {
 	onstatus: (status: SocketStatus) => void;
 	/** A command the room refused, in its own words. */
 	onrefused: (message: string) => void;
+	/**
+	 * Asked when a connection closes before its welcome, since a browser never sees the upgrade's
+	 * status: answers why the room will not take this drafter (signed out, not seated, gone), or null
+	 * when a retry could work.
+	 */
+	probe: () => Promise<unknown>;
+	/** The retries stopped for good, with the probe's reason. */
+	onstopped: (reason: unknown) => void;
 }
 
 export class LobbySocket {
@@ -45,11 +53,14 @@ export class LobbySocket {
 		this.handlers.onstatus(this.attempt === 0 ? 'connecting' : 'reconnecting');
 		const socket = new WebSocket(this.url);
 		this.socket = socket;
+		let welcomed = false;
 		socket.onopen = () => {
 			socket.send(JSON.stringify({ type: 'hello', last_seq: this.seq }));
 		};
 		socket.onmessage = (event: MessageEvent<string>) => {
-			this.receive(JSON.parse(event.data) as Frame);
+			const frame = JSON.parse(event.data) as Frame;
+			if (frame.type === 'welcome') welcomed = true;
+			this.receive(frame);
 		};
 		socket.onclose = () => {
 			this.socket = null;
@@ -58,10 +69,27 @@ export class LobbySocket {
 				return;
 			}
 			this.handlers.onstatus('reconnecting');
-			const wait = RETRY_MS[Math.min(this.attempt, RETRY_MS.length - 1)];
-			this.attempt += 1;
-			this.retry = setTimeout(() => this.connect(), wait);
+			if (welcomed) {
+				this.schedule();
+				return;
+			}
+			void this.handlers.probe().then((reason) => {
+				if (this.stopped) return;
+				if (reason === null) {
+					this.schedule();
+					return;
+				}
+				this.stopped = true;
+				this.handlers.onstatus('closed');
+				this.handlers.onstopped(reason);
+			});
 		};
+	}
+
+	private schedule(): void {
+		const wait = RETRY_MS[Math.min(this.attempt, RETRY_MS.length - 1)];
+		this.attempt += 1;
+		this.retry = setTimeout(() => this.connect(), wait);
 	}
 
 	private receive(frame: Frame): void {

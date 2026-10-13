@@ -43,7 +43,7 @@
 	.n {
 		font-family: var(--font-num);
 		font-weight: 700;
-		font-size: 16px;
+		font-size: var(--t-md);
 		color: var(--ink-3);
 	}
 
@@ -77,7 +77,7 @@
 	.pts {
 		font-family: var(--font-num);
 		font-weight: 700;
-		font-size: 18px;
+		font-size: var(--t-lg);
 		text-align: right;
 		font-variant-numeric: tabular-nums;
 	}

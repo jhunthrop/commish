@@ -62,7 +62,7 @@
 		font-family: var(--font-num);
 		font-variant-numeric: tabular-nums;
 		font-weight: 800;
-		font-size: 26px;
+		font-size: var(--t-xl);
 		line-height: 1;
 	}
 
@@ -92,7 +92,7 @@
 		align-items: center;
 		gap: 3px;
 		width: var(--strip-w);
-		font-size: 10px;
+		font-size: var(--t-xs);
 		color: var(--ink-3);
 		text-align: center;
 	}
@@ -104,7 +104,7 @@
 		max-width: var(--strip-w);
 		overflow: hidden;
 		text-overflow: ellipsis;
-		font-size: 11px;
+		font-size: var(--t-xs);
 	}
 
 	li span {

@@ -5,7 +5,7 @@
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
 	import { botNames } from './actions.ts';
 	import type { MockRoom, RoomCard } from './api.ts';
-	import { callView, oddsBasis } from './call.ts';
+	import { callView, poolBasis } from './call.ts';
 	import { SOLO_KEYS, roomKeys } from './keys.ts';
 	import {
 		type Board,
@@ -160,7 +160,7 @@
 			{left}
 			{odds}
 			{oddsLabel}
-			oddsBasis={oddsBasis(card, teams)}
+			basis={poolBasis(board, card, teams)}
 			pickNumber={room.pick_number}
 			callId={call?.player.id ?? null}
 			{selectedId}

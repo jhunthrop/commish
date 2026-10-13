@@ -1,4 +1,5 @@
 <script lang="ts">
+	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
 	import type { Snippet } from 'svelte';
 	import { lastName } from '#lib/format/draft.ts';
 	import type { MockReport } from '../api.ts';
@@ -49,7 +50,7 @@
 			</div>
 		{/if}
 		<div>
-			<h2>Your draft from slot {report.slot}</h2>
+			<DisplayTitle size="page">Your draft from slot {report.slot}</DisplayTitle>
 			<p>
 				{report.teams} teams, {scoringWords(report.settings)}, {report.rounds} rounds, {field}.
 				Starters: {starters}. Points are our projections, the same numbers the board ranks by, so a
@@ -60,14 +61,14 @@
 		</div>
 	</div>
 	<section>
-		<h3>The field <span>projected starting points, {report.teams} teams</span></h3>
+		<DisplayTitle note="projected starting points, {report.teams} teams">The field</DisplayTitle>
 		<FieldBars standings={report.standings} {names} you={report.slot} />
 		<p class="basis">{board.basis}</p>
 	</section>
 	<section>
-		<h3>
-			Pick by pick <span>what you took, what drafters do, and whether he would have lasted</span>
-		</h3>
+		<DisplayTitle note="what you took, what drafters do, and whether he would have lasted">
+			Pick by pick
+		</DisplayTitle>
 		<PickReview
 			picks={report.picks}
 			{board}
@@ -76,10 +77,9 @@
 		/>
 	</section>
 	<section>
-		<h3>
+		<DisplayTitle note="your picks on autopick from the board, the bots reshuffled each run">
 			The same draft, {report.runs.runs} more times
-			<span>your picks on autopick from the board, the bots reshuffled each run</span>
-		</h3>
+		</DisplayTitle>
 		<RunsSection runs={report.runs} teams={report.teams} rank={mine?.rank ?? 0} />
 		<p class="basis">
 			Each run drafts the room again from pick one with a new seed, seeds {report.seed} to {report.seed +
@@ -121,17 +121,8 @@
 		max-width: 30ch;
 	}
 
-	h2 {
-		margin: 0 0 6px;
-		font-family: var(--font-num);
-		font-weight: 800;
-		font-size: 38px;
-		line-height: 0.95;
-		text-transform: uppercase;
-	}
-
 	.hero p {
-		margin: 0;
+		margin: var(--s-2) 0 0;
 		color: var(--ink-2);
 		max-width: 62ch;
 	}
@@ -143,32 +134,17 @@
 		margin-top: var(--s-3);
 	}
 
-	h3 {
-		margin: var(--s-5) 0 var(--s-3);
-		font-family: var(--font-num);
-		font-weight: 800;
-		font-size: 26px;
-		line-height: 1;
-		text-transform: uppercase;
+	section {
 		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
+		flex-direction: column;
 		gap: var(--s-3);
-	}
-
-	h3 span {
-		font-family: var(--font-ui);
-		font-weight: 500;
-		font-size: var(--t-xs);
-		text-transform: uppercase;
-		letter-spacing: var(--track-label);
-		color: var(--ink-3);
+		padding-top: var(--s-5);
 	}
 
 	.basis {
 		font-size: var(--t-xs);
 		color: var(--ink-3);
-		margin-top: var(--s-3);
+		margin: 0;
 		max-width: 70ch;
 	}
 
@@ -179,11 +155,7 @@
 		}
 
 		.big b {
-			font-size: 64px;
-		}
-
-		h2 {
-			font-size: 28px;
+			font-size: var(--t-2xl);
 		}
 	}
 </style>

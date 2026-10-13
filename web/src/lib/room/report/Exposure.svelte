@@ -94,7 +94,7 @@
 	.pct {
 		font-family: var(--font-num);
 		font-weight: 700;
-		font-size: 18px;
+		font-size: var(--t-lg);
 		text-align: right;
 	}
 

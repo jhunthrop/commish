@@ -4,14 +4,16 @@
 	interface Props {
 		/** gain is green (a steal, right on time), loss is rose (a reach, could have waited), even is grey. */
 		tone: 'gain' | 'loss' | 'even';
+		/** sm is a verdict in a room's row; md is a board row's gap, a step up on desktop. */
+		size?: 'sm' | 'md';
 		children: Snippet;
 	}
 
-	let { tone, children }: Props = $props();
+	let { tone, size = 'sm', children }: Props = $props();
 </script>
 
 <!-- A verdict in words on a tinted chip. The words carry the meaning, so the tint is never the only channel. -->
-<span class="chip {tone}">{@render children()}</span>
+<span class="chip {tone} {size}">{@render children()}</span>
 
 <style>
 	.chip {
@@ -23,6 +25,10 @@
 		font-size: var(--t-xs);
 		font-weight: 600;
 		white-space: nowrap;
+	}
+
+	.md {
+		font-size: var(--t-sm);
 	}
 
 	.gain {
@@ -38,5 +44,12 @@
 	.even {
 		background: var(--surface-2);
 		color: var(--ink-2);
+	}
+
+	@media (max-width: 760px) {
+		.md {
+			font-size: var(--t-xs);
+			padding: 0 6px;
+		}
 	}
 </style>

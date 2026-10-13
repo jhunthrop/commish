@@ -20,8 +20,13 @@ export interface CallView {
 	why: string | null;
 }
 
-/** The odds's basis, printed over the pool: every number names its basis in the same view. */
-export function oddsBasis(card: RoomCard | null, teams: number): string {
+/** The pool's basis, printed over it: whose points rank it, on which board, and where the odds come
+ * from. Every number names its basis in the same view. */
+export function poolBasis(board: Board, card: RoomCard | null, teams: number): string {
+	return `${board.basis} ${oddsBasis(card, teams)}`;
+}
+
+function oddsBasis(card: RoomCard | null, teams: number): string {
 	if (card === null) return 'The odds land with our call.';
 	const to = card.next_pick === null ? 'your last pick' : pickLabel(card.next_pick, teams);
 	if (card.source === 'advisor') {

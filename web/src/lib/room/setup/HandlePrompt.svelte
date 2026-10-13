@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Panel from '#lib/ui/Panel.svelte';
-	import TextInput from '#lib/ui/TextInput.svelte';
+	import Field from '#lib/ui/Field.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 
 	interface Props {
@@ -23,10 +23,10 @@
 			onsave(handle.trim());
 		}}
 	>
-		<label for="handle">The name the room shows the other drafters</label>
+		<p class="ask">The name the room shows the other drafters</p>
 		<div class="row">
-			<TextInput
-				id="handle"
+			<Field
+				hideLabel
 				bind:value={handle}
 				maxlength={20}
 				label="Handle"
@@ -34,7 +34,7 @@
 			/>
 			<Verb type="submit" disabled={busy || handle.trim().length < 3}>Save and join</Verb>
 		</div>
-		{#if problem}<p>{problem}</p>{/if}
+		{#if problem}<p class="problem">{problem}</p>{/if}
 	</form>
 </Panel>
 
@@ -45,7 +45,8 @@
 		gap: var(--s-2);
 	}
 
-	label {
+	.ask {
+		margin: 0;
 		font-weight: 600;
 	}
 
@@ -55,7 +56,7 @@
 		gap: var(--s-2);
 	}
 
-	p {
+	.problem {
 		margin: 0;
 		font-size: var(--t-sm);
 		color: var(--loss-ink);

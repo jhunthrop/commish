@@ -78,7 +78,7 @@
 		font-family: var(--font-num);
 		font-variant-numeric: tabular-nums;
 		font-weight: 800;
-		font-size: 30px;
+		font-size: var(--t-head);
 		line-height: 1;
 		text-transform: uppercase;
 	}
@@ -93,7 +93,7 @@
 		font-family: var(--font-num);
 		font-variant-numeric: tabular-nums;
 		font-weight: 700;
-		font-size: 22px;
+		font-size: var(--t-xl);
 		line-height: 1;
 	}
 

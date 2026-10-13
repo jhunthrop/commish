@@ -101,7 +101,7 @@
 	.no {
 		font-family: var(--font-num);
 		font-weight: 700;
-		font-size: 20px;
+		font-size: var(--t-lg);
 		color: var(--ink-2);
 	}
 
@@ -125,7 +125,7 @@
 	.vor {
 		font-family: var(--font-num);
 		font-weight: 700;
-		font-size: 20px;
+		font-size: var(--t-lg);
 		text-align: right;
 		font-variant-numeric: tabular-nums;
 	}

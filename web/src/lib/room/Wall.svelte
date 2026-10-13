@@ -1,4 +1,5 @@
 <script lang="ts">
+	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
 	import { lastName, pickLabel } from '#lib/format/draft.ts';
 	import Face from '#lib/ui/Face.svelte';
 	import Label from '#lib/ui/Label.svelte';
@@ -21,7 +22,7 @@
 
 <section aria-label="The wall">
 	<div class="head">
-		<h2>The wall</h2>
+		<DisplayTitle size="panel">The wall</DisplayTitle>
 		<Label>rounds 1 to {rows.length} of {rounds}</Label>
 	</div>
 	<div class="wrap">
@@ -61,15 +62,6 @@
 		margin-bottom: var(--s-3);
 	}
 
-	h2 {
-		margin: 0;
-		font-family: var(--font-num);
-		font-weight: 800;
-		font-size: 30px;
-		line-height: 1;
-		text-transform: uppercase;
-	}
-
 	.wrap {
 		overflow-x: auto;
 		border: 1px solid var(--line);
@@ -105,7 +97,7 @@
 		place-items: center;
 		font-family: var(--font-num);
 		font-weight: 700;
-		font-size: 18px;
+		font-size: var(--t-lg);
 		color: var(--ink-3);
 		border-bottom: 1px solid var(--line);
 	}
@@ -122,7 +114,7 @@
 		min-width: 0;
 		border-bottom: 1px solid var(--line);
 		border-left: 1px solid var(--line);
-		font-size: 12.5px;
+		font-size: var(--t-sm);
 	}
 
 	.cell b {
@@ -134,7 +126,7 @@
 	}
 
 	.s {
-		font-size: 10px;
+		font-size: var(--t-xs);
 		color: var(--ink-3);
 		white-space: nowrap;
 	}
@@ -157,7 +149,7 @@
 	}
 
 	.now span {
-		font-size: 10px;
+		font-size: var(--t-xs);
 		font-weight: 500;
 	}
 </style>

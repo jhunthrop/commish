@@ -107,7 +107,7 @@
 		display: block;
 		font-family: var(--font-num);
 		font-weight: 800;
-		font-size: 34px;
+		font-size: var(--t-head);
 		line-height: 0.9;
 		font-variant-numeric: tabular-nums;
 	}
@@ -136,7 +136,7 @@
 		display: block;
 		font-family: var(--font-num);
 		font-weight: 700;
-		font-size: 18px;
+		font-size: var(--t-lg);
 		color: var(--ink);
 	}
 

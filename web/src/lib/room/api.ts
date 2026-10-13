@@ -37,6 +37,17 @@ export function isSignedOut(error: unknown): boolean {
 }
 
 const HTTP_UNAUTHORIZED = 401;
+const HTTP_FORBIDDEN = 403;
+const HTTP_NOT_FOUND = 404;
+
+/** Whether an error is the API saying this drafter cannot be in the room at all: signed out, not
+ * seated in it, or no such room. A retry never fixes one of these. */
+export function isFinalRefusal(error: unknown): boolean {
+	return (
+		error instanceof ApiError &&
+		[HTTP_UNAUTHORIZED, HTTP_FORBIDDEN, HTTP_NOT_FOUND].includes(error.status)
+	);
+}
 
 /** Where a signed-out drafter goes to sign in, coming back to the page they were on. */
 export function signInHref(returnTo: string): string {
