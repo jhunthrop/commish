@@ -18,5 +18,5 @@ def all_positions(conn: Connection) -> dict[str, Position]:
 
 
 def known_player_ids(conn: Connection) -> frozenset[str]:
-    """Every id `nfl_players` holds: the foreign-key guard the archive tables need."""
+    """Every id `players` holds: the foreign-key guard the archive tables need."""
     return frozenset(conn.execute(select(PLAYERS.c.id)).scalars())

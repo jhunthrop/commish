@@ -87,7 +87,7 @@ def schedule_client(client: NflverseClient) -> NflverseClient:
 
 
 def ingest_player_universe(conn: Connection, client: NflverseClient) -> PlayerUniverse:
-    """`ingestPlayerUniverse`: fetch, upsert into `nfl_players`, return the lookup."""
+    """`ingestPlayerUniverse`: fetch, upsert into `players`, return the lookup."""
     players = map_nfl_players(client.get_csv(Releases.PLAYERS, Files.PLAYERS))
     record_nfl_players(conn, players)
     return PlayerUniverse(players)

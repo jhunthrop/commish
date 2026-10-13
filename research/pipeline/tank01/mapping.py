@@ -53,7 +53,7 @@ class GameSummary:
     kickoff_et: str
 
 
-# `player_stat_lines` column for each StatLine field this mapper fills, in the domain's order.
+# `provider_stat_lines` column for each StatLine field this mapper fills, in the domain's order.
 STAT_LINE_COLUMNS: Final = (
     "passing_yards", "passing_touchdowns", "interceptions", "rushing_yards", "rushing_touchdowns",
     "receiving_yards", "receiving_touchdowns", "receptions", "fumbles_lost", "field_goals_made",

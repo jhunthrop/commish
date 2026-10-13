@@ -2,8 +2,8 @@
 
 `ingest_roster_and_lines` is `seedPlayers` (`src/data/seed/seed-players.ts`): the roster upserted
 into `players` (ADP left alone: only the ADP feed writes it), then every week's box scores into
-`player_stat_lines`, one line per player, upserted. `ingest_schedule` is the stats pipeline's
-fixture walk into `nfl_games` (`stats-pipeline/schedule.ts`). `ingest_adp` is its ADP enrichment
+`provider_stat_lines`, one line per player, upserted. `ingest_schedule` is the stats pipeline's
+fixture walk into `provider_games` (`stats-pipeline/schedule.ts`). `ingest_adp` is its ADP enrichment
 (`stats-pipeline/adp.ts`): an UPDATE of `players.adp` and `pos_adp`, never an insert.
 
 NOT PORTED, ON PURPOSE: the live-scoring worker (`stats-pipeline/worker.ts`) that ticks a week

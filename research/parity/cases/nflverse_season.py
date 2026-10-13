@@ -93,7 +93,7 @@ SEASON_TABLES = (PLAYERS.as_setup(), PLAYER_WEEK_OBSERVATIONS, PLAYER_WEEK_TEAMS
 CASES: tuple[Case, ...] = (
     Case(
         name="nflverse-universe",
-        summary="nflverse players release to nfl_players (the universe upsert, moved ids released first)",
+        summary="nflverse players release to players (the universe upsert, moved ids released first)",
         fixture_sets=("nflverse-universe",),
         tables=(PLAYERS,),
         run_python=_universe_only,

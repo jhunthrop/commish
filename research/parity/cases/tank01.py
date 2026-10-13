@@ -122,7 +122,7 @@ def _crosswalk(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
 CASES: tuple[Case, ...] = (
     Case(
         name="tank01-roster-and-lines",
-        summary="the provider roster into players, then weeks 1-2 of box scores into player_stat_lines (seedPlayers)",
+        summary="the provider roster into provider_players, then weeks 1-2 of box scores into provider_stat_lines (seedPlayers)",
         fixture_sets=("tank01-2026",),
         tables=(PROVIDER_PLAYERS, PROVIDER_STAT_LINES),
         run_python=_roster_and_lines,
@@ -131,7 +131,7 @@ CASES: tuple[Case, ...] = (
     ),
     Case(
         name="tank01-schedule",
-        summary="every 2026 fixture, weeks 1-18, into nfl_games (the stats pipeline's schedule walk)",
+        summary="every 2026 fixture, weeks 1-18, into provider_games (the stats pipeline's schedule walk)",
         fixture_sets=("tank01-2026",),
         tables=(PROVIDER_GAMES,),
         run_python=_schedule,
