@@ -30,6 +30,8 @@ export interface RoomKeyActions {
 	undo?: () => void;
 }
 
+const DRAFTING_KEYS: ReadonlySet<string> = new Set(['Enter', 'd', 'D']);
+
 function isTyping(target: EventTarget | null): boolean {
 	return (
 		target instanceof HTMLElement &&
@@ -42,6 +44,11 @@ function isTyping(target: EventTarget | null): boolean {
 export function roomKeys(actions: RoomKeyActions): (event: KeyboardEvent) => void {
 	return (event) => {
 		if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
+		// A held drafting key is one pick, never a run of them.
+		if (event.repeat && DRAFTING_KEYS.has(event.key)) {
+			event.preventDefault();
+			return;
+		}
 		switch (event.key) {
 			case 'Enter':
 				actions.draftCall();

@@ -1195,6 +1195,8 @@ export interface components {
 			created_at: string;
 			/** @description the board, on a full read (create, get, shared) and absent on a pick's answer */
 			board?: components['schemas']['RoomBoard'];
+			/** @description the drafter's card at the turn on the clock, the one GET /mocks/{id}/card records, so the turn and its call arrive together. On a get, pick, undo or autopick that leaves the draft on the drafter; absent otherwise, and absent when it could not be made in the request (read it from /card then) */
+			card?: components['schemas']['RoomCard'];
 		};
 		MockPickInput: {
 			player_id: string;

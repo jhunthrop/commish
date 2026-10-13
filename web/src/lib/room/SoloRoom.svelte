@@ -3,10 +3,11 @@
 	import Keys from '#lib/ui/Keys.svelte';
 	import LiveRegion from '#lib/ui/LiveRegion.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
+	import Verb from '#lib/ui/Verb.svelte';
 	import SinceStrip from '#lib/ui/SinceStrip.svelte';
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
 	import type { MockRoom, RoomCard } from './api.ts';
-	import { callView, poolBasis } from './call.ts';
+	import { type CallView, callView, frameView, poolBasis } from './call.ts';
 	import { SOLO_KEYS, roomKeys } from './keys.ts';
 	import {
 		type Board,
@@ -46,6 +47,8 @@
 		notice?: string | null;
 		/** "Link copied" shows in place of Save and share for a moment. */
 		copied?: boolean;
+		/** The call for this turn could not be made: the room says so and drafts from the pool. */
+		callMissing?: boolean;
 		onpick?: (playerId: string) => void;
 		onundo?: (pick: number) => void;
 		onautopick?: (round: number) => void;
@@ -63,6 +66,7 @@
 		shared,
 		notice = null,
 		copied = false,
+		callMissing = false,
 		onpick,
 		onundo,
 		onautopick,
@@ -94,12 +98,60 @@
 	const call = $derived(
 		!readonly && card && room.waiting ? callView(card, board, drafted, teams) : null
 	);
+	/** The call's frame while the next one is on its way: the last call, or before any, the best
+	 * player left. The panel draws it as a skeleton, so it holds its place and nothing below moves. */
+	let lastCall = $state<CallView | null>(null);
+	$effect(() => {
+		if (call) lastCall = call;
+	});
+	/** The pick the drafter just drafted at, until the room moves past it. */
+	let draftedAt = $state<number | null>(null);
+	const inFlight = $derived(busy && draftedAt === room.pick_number);
+	/** No call is coming for this turn: the room never waits on it, Enter drafts from the pool. */
+	const noCall = $derived(
+		callMissing && !readonly && room.status === 'active' && room.waiting && !call && !inFlight
+	);
+	/** The pick whose call is on its way: the next turn while a pick is in flight, else this one. */
+	const readingFor = $derived(
+		readonly || room.status !== 'active' || !room.waiting || noCall
+			? null
+			: inFlight
+				? next
+				: call
+					? null
+					: room.pick_number
+	);
+	const frame = $derived(
+		call ??
+			(readingFor === null
+				? null
+				: (lastCall ?? frameView(board, drafted, teams, room.pick_number)))
+	);
+	/** The pick whose call has painted. Enter drafts our call only once the reader has seen it, so a
+	 * second Enter pressed before the next call paints is dropped on purpose. */
+	let paintedFor = $state<number | null>(null);
+	$effect(() => {
+		const pick = call ? room.pick_number : null;
+		if (pick === null) return;
+		// The first frame runs before the paint, the second after it.
+		let frameId = requestAnimationFrame(() => {
+			frameId = requestAnimationFrame(() => (paintedFor = pick));
+		});
+		return () => cancelAnimationFrame(frameId);
+	});
+	const callReady = $derived(call !== null && paintedFor === room.pick_number);
 	const odds = $derived(card?.still_there ?? {});
 	const oddsLabel = $derived(
 		card?.next_pick ? `still there at ${pickLabel(card.next_pick, teams)}` : 'your last pick'
 	);
+	/** The marked player, else our call, else with no call coming the pool's top row. */
 	const selectedId = $derived(
-		marked !== null && !drafted.has(marked) ? marked : (call?.player.id ?? null)
+		marked !== null && !drafted.has(marked)
+			? marked
+			: (call?.player.id ?? (noCall ? (rows[0]?.id ?? null) : null))
+	);
+	const selectedName = $derived(
+		selectedId === null ? null : (board.byId.get(selectedId)?.name ?? null)
 	);
 	const wallRounds = $derived(Math.min(room.rounds, round));
 	/** The drafter's seat on the wall: you, or in a shared draft the drafter by handle. */
@@ -114,7 +166,14 @@
 	function draft(id: string | null): void {
 		if (readonly || busy || !room.waiting || id === null) return;
 		marked = null;
+		draftedAt = room.pick_number;
 		onpick?.(id);
+	}
+
+	/** Undo, Pick for me and Finish are not a pick: the panel must not read as one in flight. */
+	function notAPick(run: () => void): void {
+		draftedAt = null;
+		run();
 	}
 
 	function toggleQueue(id: string | null): void {
@@ -132,12 +191,19 @@
 
 	const onkeydown = $derived(
 		roomKeys({
-			draftCall: () => draft(call?.player.id ?? null),
-			draftMarked: () => draft(selectedId),
+			draftCall: () => {
+				if (callReady) draft(call?.player.id ?? null);
+				else if (noCall) draft(selectedId);
+			},
+			draftMarked: () => {
+				// Unmarked, D drafts the call, so it waits on the call as Enter does.
+				if (marked !== null || callReady || noCall) draft(selectedId);
+			},
 			move,
 			queue: () => toggleQueue(selectedId),
 			undo: () => {
-				if (lastMine !== null && !busy) onundo?.(lastMine);
+				const pick = lastMine;
+				if (pick !== null && !busy) notAPick(() => onundo?.(pick));
 			}
 		})
 	);
@@ -159,9 +225,13 @@
 			canUndo={lastMine !== null}
 			{busy}
 			{copied}
-			onundo={() => lastMine !== null && onundo?.(lastMine)}
-			onautopick={() => onautopick?.(Math.min(room.rounds, round + AUTOPICK_ROUNDS))}
-			onfinish={() => onfinish?.()}
+			onundo={() => {
+				const pick = lastMine;
+				if (pick !== null) notAPick(() => onundo?.(pick));
+			}}
+			onautopick={() =>
+				notAPick(() => onautopick?.(Math.min(room.rounds, round + AUTOPICK_ROUNDS)))}
+			onfinish={() => notAPick(() => onfinish?.())}
 			onshare={() => onshare?.()}
 		/>
 	{/if}
@@ -172,14 +242,30 @@
 	{#if room.waiting && went.length > 0}
 		<SinceStrip since={prev} {went} {teams} {whose} />
 	{/if}
-	{#if call}
+	{#if noCall}
+		<Panel as="section" label="No call for this pick" padding="md" edge="quiet">
+			<div class="nocall" role="status">
+				<p>No call for this pick. Draft from the pool.</p>
+				{#if selectedId !== null && selectedName !== null}
+					<Verb key="Enter" disabled={busy} onclick={() => draft(selectedId)}
+						>Draft {lastName(selectedName)}</Verb
+					>
+				{/if}
+			</div>
+		</Panel>
+	{:else if frame}
 		<RoomCall
-			view={call}
+			view={frame}
 			pickNumber={room.pick_number}
+			reading={readingFor === null
+				? undefined
+				: `Reading the room for ${pickLabel(readingFor, teams)}`}
 			action={{
-				label: `Draft ${lastName(call.player.name)}`,
+				label: `Draft ${lastName(frame.player.name)}`,
 				key: 'Enter',
-				onclick: () => draft(call.player.id)
+				onclick: () => {
+					if (call) draft(call.player.id);
+				}
 			}}
 		/>
 	{/if}
@@ -190,7 +276,8 @@
 			{odds}
 			{oddsLabel}
 			oddsShown={!readonly}
-			basis={readonly ? board.basis : poolBasis(board, card, teams)}
+			basis={readonly ? board.basis : poolBasis(board, card, teams, noCall)}
+			oddsGone={noCall}
 			pickNumber={room.pick_number}
 			callId={call?.player.id ?? null}
 			{selectedId}
@@ -225,20 +312,27 @@
 			withCall={!readonly}
 		/>
 		{#if !readonly}<Keys bindings={SOLO_KEYS} />{/if}
-		<span class="seed">Seed {room.seed} · the same seed replays the same bots</span>
 	{/snippet}
 </RoomLayout>
 
 <style>
+	.nocall {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--s-3);
+	}
+
+	.nocall p {
+		margin: 0;
+		font-size: var(--t-md);
+		color: var(--ink-2);
+	}
+
 	.notice {
 		margin: 0;
 		font-size: var(--t-sm);
 		color: var(--ink-2);
-	}
-
-	.seed {
-		padding: 0 var(--s-1);
-		font-size: var(--t-xs);
-		color: var(--ink-3);
 	}
 </style>

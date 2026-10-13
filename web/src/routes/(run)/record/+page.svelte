@@ -29,7 +29,7 @@
 	function weekLine(week: RecordWeek): { lead: string; text: string; figure?: string } {
 		const lead = `Week ${String(week.week)}`;
 		const line = allLine(week.lines);
-		if (week.gradedAt === null || line?.ours.agreement == null) {
+		if (week.status !== 'graded' || line?.ours.agreement == null) {
 			return { lead, text: weekWords(week) };
 		}
 		const adp = line.adp.agreement === null ? '' : `, ADP ${fixed(line.adp.agreement, 2)}`;
@@ -69,7 +69,7 @@
 		{#if lines.length > 0}
 			<section aria-label="Week by week">
 				<PanelHead title="Week by week" level={2} />
-				<LineList label="Every frozen week" {lines} />
+				<LineList label="Every week of the season" {lines} />
 			</section>
 		{/if}
 

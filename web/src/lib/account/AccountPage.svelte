@@ -10,6 +10,7 @@
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import LineList from '#lib/ui/LineList.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
+	import ThemeSwitch from '#lib/ui/ThemeSwitch.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
@@ -210,6 +211,11 @@
 				</aside>
 			</div>
 		{/if}
+		<!-- The phone's top bar leaves the theme switch out. It lives here, signed in or out. -->
+		<section class="theme" aria-label="Theme">
+			<PanelHead title="Theme" level={2} />
+			<ThemeSwitch />
+		</section>
 	</main>
 </Shell>
 
@@ -224,6 +230,19 @@
 
 	.reserve {
 		min-height: 60vh;
+	}
+
+	.theme {
+		display: none;
+	}
+
+	@media (max-width: 760px) {
+		.theme {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+			gap: var(--s-3);
+		}
 	}
 
 	.grid {

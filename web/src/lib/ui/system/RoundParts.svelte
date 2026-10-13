@@ -130,7 +130,7 @@
 
 	<Specimen>
 		<LineList
-			label="Frozen weeks"
+			label="Every week of the season"
 			lines={nightly.record.weeks.map((week) => ({
 				lead: `Week ${String(week.week)}`,
 				text: weekWords(week)

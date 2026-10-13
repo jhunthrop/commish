@@ -31,9 +31,9 @@
 	.stepper {
 		display: inline-flex;
 		align-items: center;
-		gap: 6px;
+		gap: var(--s-2);
 		height: 32px;
-		padding: 0 6px 0 10px;
+		padding: 0 var(--s-2) 0 var(--s-3);
 		border: 1px solid var(--line-strong);
 		border-radius: var(--r-md);
 		font-size: var(--t-sm);
