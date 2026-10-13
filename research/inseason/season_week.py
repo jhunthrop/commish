@@ -40,6 +40,13 @@ from research.pipeline.odds.ingest import run_odds_snapshot
 
 LOG: Final = logging.getLogger(__name__)
 GRADE_AFTER: Final = timedelta(hours=36)
+# A week still ungradeable this long after its last kickoff fails the pass: nflverse publishes within
+# two days, so a refusal past this is an outage an operator must see, not a wait.
+GRADE_OVERDUE: Final = timedelta(days=4)
+# A week whose first kickoff passed with no freeze is missed for good (the register never re-freezes
+# a played week). The pass fails while the miss is this recent, so the operator sees it that week;
+# older misses are listed and the record marks them.
+MISSED_ALERT: Final = timedelta(days=7)
 LAST_POSSIBLE_WEEK: Final = 22
 STEPS: Final = ("stats-ingest", "props-snapshot", "grade", "freeze", "scoreboard")
 
@@ -153,6 +160,7 @@ def grade(context: SeasonWeekContext) -> StepResult:
         return StepResult("grade", "skipped", f"no ungraded weeks ({len(frozen)} frozen, all graded)")
     detail: list[str] = []
     count = 0
+    failed = False
     for week in ungraded:
         last = last_kickoffs.get(week)
         if last is None or context.now < last + GRADE_AFTER:
@@ -165,15 +173,16 @@ def grade(context: SeasonWeekContext) -> StepResult:
             with context.engine.begin() as conn:
                 result = grade_week(conn, context.season, week, context.now)
         except ValueError as error:
-            detail.append(f"week {week}: not graded, {error}")
+            overdue = context.now >= last + GRADE_OVERDUE
+            detail.append(f"week {week}: {'OVERDUE, ' if overdue else ''}not graded, {error}")
+            failed = failed or overdue
             continue
         count += 1
         boards = " ".join(f"{board.board_source}={board.population}" for board in result.boards)
         skipped = "".join(f" SKIPPED {board.board_source}" for board in result.skipped)
         detail.append(f"week {week}: graded {boards}{skipped}")
-    return StepResult(
-        "grade", "ok" if count else "skipped", f"{len(ungraded)} ungraded weeks, {count} graded", tuple(detail)
-    )
+    status: Status = "failed" if failed else ("ok" if count else "skipped")
+    return StepResult("grade", status, f"{len(ungraded)} ungraded weeks, {count} graded", tuple(detail))
 
 
 def week_to_freeze(kickoffs: Mapping[int, datetime], now: datetime) -> tuple[int, datetime] | None:
@@ -182,26 +191,48 @@ def week_to_freeze(kickoffs: Mapping[int, datetime], now: datetime) -> tuple[int
     return upcoming[0] if upcoming else None
 
 
+def missed_weeks(kickoffs: Mapping[int, datetime], frozen: set[int], now: datetime) -> list[tuple[int, datetime]]:
+    """Every week whose first kickoff has passed with no freeze."""
+    return sorted((week, kickoff) for week, kickoff in kickoffs.items() if kickoff <= now and week not in frozen)
+
+
 def freeze(context: SeasonWeekContext) -> StepResult:
-    """The coming week's freeze, unless one already holds it (a re-freeze is an operator's act)."""
+    """The coming week's freeze, unless one already holds it (a re-freeze is an operator's act), then
+    the missed weeks: a recent one fails the pass, so a freeze never fails silently."""
     with context.engine.connect() as conn:
-        candidate = week_to_freeze(kickoff_instants_by_week(conn, context.season), context.now)
-        if candidate is None:
-            return StepResult("freeze", "skipped", f"no week of {context.season} kicks off after {js_iso(context.now)}")
-        week, kickoff = candidate
+        kickoffs = kickoff_instants_by_week(conn, context.season)
+        candidate = week_to_freeze(kickoffs, context.now)
+        frozen, _ = _frozen_and_graded(conn, context.season)
+    taken = _take_freeze(context, candidate)
+    missed = missed_weeks(kickoffs, set(frozen), context.now)
+    recent = [week for week, kickoff in missed if context.now - kickoff < MISSED_ALERT]
+    detail = (
+        *taken.detail,
+        *(f"week {week}: MISSED, no freeze before its first kickoff {js_iso(k)}" for week, k in missed),
+    )
+    if recent:
+        weeks = ", ".join(str(week) for week in recent)
+        return StepResult("freeze", "failed", f"{taken.summary}; week {weeks} missed its freeze this week", detail)
+    return StepResult("freeze", taken.status, taken.summary, detail)
+
+
+def _take_freeze(context: SeasonWeekContext, candidate: tuple[int, datetime] | None) -> StepResult:
+    if candidate is None:
+        return StepResult("freeze", "skipped", f"no week of {context.season} kicks off after {js_iso(context.now)}")
+    week, kickoff = candidate
+    with context.engine.connect() as conn:
         existing = latest_freeze_for(conn, context.season, week)
     if existing is not None:
         return StepResult("freeze", "skipped", f"week {week} already frozen at {js_iso(existing)}")
     with context.engine.begin() as conn:
         result = take_freeze(conn, context.season, week, context.now)
     served = sum(1 for row in result.rows if row["board_source"] == SERVED_SOURCE)
-    detail = tuple(f"{source}: {counts}" for source, counts in result.coverage.items())
-    return StepResult(
-        "freeze",
-        "ok",
+    summary = (
         f"froze week {week} at {js_iso(result.frozen_at)}, kickoff {js_iso(kickoff)}, {len(result.rows)} rows "
-        f"({served} on the served board), implementation python",
-        detail,
+        f"({served} on the served board), implementation python"
+    )
+    return StepResult(
+        "freeze", "ok", summary, tuple(f"{source}: {counts}" for source, counts in result.coverage.items())
     )
 
 
