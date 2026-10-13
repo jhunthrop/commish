@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { BoardRow } from "./service";
+import type { BoardRow } from "@research-ts/board/service";
 import { boardCsvLines } from "./board-view";
 
 // Re-review round 2's regression, pinned: the exported file's auction column is computed from

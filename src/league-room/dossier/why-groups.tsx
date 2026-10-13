@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { MICRO_LABEL } from "@/components/ui/config";
-import type { Position } from "@/domain/player";
-import type { Law } from "@/projections/laws/types";
-import type { BoardReason } from "@/projections/preseason/board";
-import { rosterStatusObservation, rosterStatusPhrase } from "@/projections/preseason/roster-status-copy";
-import { narrativeSlot, whyGroupSlotKey, type NarrativeCarrier } from "@/capsules/narrative-slots";
-import { signedPoints } from "@/components/ui/event-feed-row";
+import type { Position } from "@research-ts/domain/player";
+import type { Law } from "@research-ts/projections/laws/types";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
+import { rosterStatusObservation, rosterStatusPhrase } from "@research-ts/projections/preseason/roster-status-copy";
+import { narrativeSlot, whyGroupSlotKey, type NarrativeCarrier } from "@research-ts/capsules/narrative-slots";
+import { signedPoints } from "@research-ts/lib/number-format";
 import { countWordCapitalized, formatTenth } from "../lib/format";
-import { groupReasons, type EvidenceGroup, type FactReason } from "../outlook/groups";
+import { groupReasons, type EvidenceGroup, type FactReason } from "@research-ts/capsules/outlook/groups";
 
 export interface WhyGroupsProps {
   readonly reasons: readonly BoardReason[];

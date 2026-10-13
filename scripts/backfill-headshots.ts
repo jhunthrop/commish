@@ -12,8 +12,8 @@
 // re-run refreshes and never duplicates. A player the feed no longer lists keeps whatever URL
 // (or NULL) it already has — this script adds facts, it never invents an absence.
 import { eq } from "drizzle-orm";
-import { getDb } from "@/db/client";
-import { players } from "@/db/schema";
+import { getDb } from "@research-ts/db/client";
+import { players } from "@research-ts/db/schema";
 import { getIngestionBudget, getStatsProvider } from "@/stats-pipeline";
 
 async function main(): Promise<void> {

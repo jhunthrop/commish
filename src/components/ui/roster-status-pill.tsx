@@ -1,5 +1,5 @@
-import type { RosterStatusNote } from "@/projections/preseason/roster-status";
-import { rosterStatusLabel, rosterStatusSentence } from "@/projections/preseason/roster-status-copy";
+import type { RosterStatusNote } from "@research-ts/projections/preseason/roster-status";
+import { rosterStatusLabel, rosterStatusSentence } from "@research-ts/projections/preseason/roster-status-copy";
 import { Badge, type BadgeTone } from "./badge";
 
 export interface RosterStatusPillProps {

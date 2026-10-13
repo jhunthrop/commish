@@ -1,10 +1,12 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import type { Db } from "@/db/client";
-import { auditEvents, draftActions, drafts, integrityFlags, leagues, players, sessionSignals, teams, users } from "@/db/schema";
-import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
-import type { DraftPoolEntry } from "@/domain/draft";
-import type { RosterSlotConfig } from "@/domain/roster";
+import type { Db } from "@research-ts/db/client";
+import { players } from "@research-ts/db/schema";
+import { auditEvents, draftActions, drafts, integrityFlags, leagues, sessionSignals, teams, users } from "@/db/schema";
+import { countingDb, createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import type { DraftPoolEntry } from "@research-ts/domain/draft";
+import type { RosterSlotConfig } from "@research-ts/domain/roster";
 import { DRAFT_SKIP_POLICY, teamOnClock } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { INTEGRITY_CONFIG } from "@/integrity/config";

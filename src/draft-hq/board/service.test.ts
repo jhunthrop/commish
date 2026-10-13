@@ -1,16 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { leagues, nflPlayers, nflverseTeamDefenseWeeks, playerCrosswalk, players, preseasonBoardReasons, preseasonProjections, scoringSettings, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { HALF_PPR_SCORING, PPR_SCORING } from "@/domain/scoring";
-import { roundPoints } from "@/scoring";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { nflPlayers, nflverseTeamDefenseWeeks, playerCrosswalk, players, preseasonBoardReasons, preseasonProjections } from "@research-ts/db/schema";
+import { leagues, scoringSettings, users } from "@/db/schema";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
+import { HALF_PPR_SCORING, PPR_SCORING } from "@research-ts/domain/scoring";
+import { roundPoints } from "@research-ts/scoring";
 import { valueOrderFor } from "@/draft-service/sim/value-order";
-import type { TeamDefenseWeekRow } from "@/projections/nflverse/team-defense-weeks";
-import { boardSourceFor } from "@/projections/preseason/board-formats";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { BOARD_LAST_SEASON, boardRows, isProjectedRow, resolveBoardFormat } from "./service";
+import type { TeamDefenseWeekRow } from "@research-ts/projections/nflverse/team-defense-weeks";
+import { boardSourceFor } from "@research-ts/projections/preseason/board-formats";
+import { BOARD_SOURCE } from "@research-ts/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import { leagueBoardFormat } from "@/league-service/board-format";
+import { BOARD_LAST_SEASON, boardRows, isProjectedRow, resolveBoardFormat } from "@research-ts/board/service";
 
 /** One archived defense week for the Rams, in the archive's OWN spelling (`LA`) — the fold onto
  *  the product's `DST-LAR` is the reader's job, and this fixture must not do it for it. */
@@ -327,15 +330,15 @@ describe("boardRows", () => {
 
       const shape = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS };
       const [pprRow] = await boardRows(db, { shape });
-      const [leagueRow] = await boardRows(db, { shape, leagueId: "half-league" });
+      const [leagueRow] = await boardRows(db, { shape, resolved: await leagueBoardFormat(db, "half-league") });
       const [chosenRow] = await boardRows(db, { shape, format: "half" });
       expect(pprRow!.projectedPoints).toBe(300);
       expect(leagueRow!.projectedPoints).toBe(255);
       expect(chosenRow!.projectedPoints).toBe(255);
       // Inside a league the league decides: a selector's format is ignored when a league is named.
-      const [ignored] = await boardRows(db, { shape, leagueId: "half-league", format: "std" });
+      const [ignored] = await boardRows(db, { shape, resolved: await leagueBoardFormat(db, "half-league"), format: "std" });
       expect(ignored!.projectedPoints).toBe(255);
-      expect((await resolveBoardFormat(db, { leagueId: "half-league" })).basisLine).toBe(`${PRODUCT_SEASON} board, 12-team half PPR, in board order`);
+      expect(resolveBoardFormat({ resolved: await leagueBoardFormat(db, "half-league") }).basisLine).toBe(`${PRODUCT_SEASON} board, 12-team half PPR, in board order`);
     });
 
     it("measures last season under the LEAGUE's own scoring when one is named", async () => {
@@ -347,7 +350,7 @@ describe("boardRows", () => {
 
       const shape = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS };
       const [generic] = await boardRows(db, { shape });
-      const [league] = await boardRows(db, { shape, leagueId: "l1" });
+      const [league] = await boardRows(db, { shape, resolved: await leagueBoardFormat(db, "l1") });
       expect(league!.lastSeason!.points - generic!.lastSeason!.points).toBe(4 * (10 - PPR_SCORING.pointsPerSack));
     });
   });

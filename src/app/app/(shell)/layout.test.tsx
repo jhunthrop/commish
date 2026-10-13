@@ -7,7 +7,7 @@ import { NoticesProvider } from "@/components/app-shell/notices-provider";
 // Route-level: the layout's own gate and its one call to `shellData` — every read is mocked, the
 // same discipline `admin/queue/page.test.tsx` uses for `withAdmin`'s own Server Component page.
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
-vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research-ts/db/client", () => ({ getDb: () => ({}) }));
 // The header's `SiteSearch` (site search round) reads the path and the router, which throw
 // outside a mounted App Router — stubbed the way `app-shell.test.tsx` stubs them.
 vi.mock("next/navigation", () => ({

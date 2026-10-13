@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
+import type { RosterSlot, RosterSlotConfig } from "@research-ts/domain/roster";
 import { DRAFT_CLOCK_SCHEDULE, DRAFT_VIEW_CONFIG } from "./config";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
-import { snakeTeamForPick } from "./order";
+import { snakeTeamForPick } from "@research-ts/draft-engine/order";
 import { draftClockView, upcomingOnClock } from "./selectors";
 
 const SLOTS: readonly RosterSlotConfig[] = [

@@ -1,5 +1,5 @@
-import type { Player } from "@/domain/player";
-import type { RosterStatusNote } from "@/projections/preseason/roster-status";
+import type { Player } from "@research-ts/domain/player";
+import type { RosterStatusNote } from "@research-ts/projections/preseason/roster-status";
 
 /**
  * WHAT A SEARCH ANSWERS WITH, on the wire and in the overlay. Browser-safe: types only.

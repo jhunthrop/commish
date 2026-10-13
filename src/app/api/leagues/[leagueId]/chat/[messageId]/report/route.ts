@@ -1,5 +1,5 @@
 import { chatMessageIdSchema, reportMessage, reportMessageSchema } from "@/chat-service";
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { withLeagueMemberActor } from "@/app/api/leagues/_shared";
 import { chatReportRateLimited } from "../../_shared";

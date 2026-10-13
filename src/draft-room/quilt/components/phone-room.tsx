@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, type ReactNode } from "react";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { UseAdvisorResult } from "../../advisor/use-advisor";
 import type { DraftRoom as DraftRoomState } from "../../hooks/use-draft-room";

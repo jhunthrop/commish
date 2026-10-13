@@ -10,7 +10,8 @@ vi.mock("@/lib/auth/current-user", () => ({
   requireCurrentUser: vi.fn(),
 }));
 
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { MOCK_REFUSALS } from "@/mock-draft-service/claim";

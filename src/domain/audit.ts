@@ -1,3 +1,7 @@
+import type { JsonObject } from "@research-ts/domain/json";
+
+export type { JsonObject, JsonValue } from "@research-ts/domain/json";
+
 /**
  * The audit vocabulary, as a runtime array with the union derived from it — the same shape
  * `REALTIME_EVENT_TYPES` uses, and for the same reason: the pg enum, the visibility record and
@@ -120,13 +124,9 @@ export const AUDIT_EVENT_TYPES = [
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 
+
 /** Who did it. `system` means the platform, and the audit row looks otherwise identical. */
 export type AuditActorType = "user" | "system";
-
-export type JsonValue = string | number | boolean | null | readonly JsonValue[] | JsonObject;
-export interface JsonObject {
-  readonly [key: string]: JsonValue;
-}
 
 /** One row of the chain, exactly as it is stored and exactly as it is hashed. */
 export interface AuditEvent {

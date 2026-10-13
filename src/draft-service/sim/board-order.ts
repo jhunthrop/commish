@@ -17,7 +17,7 @@
  * See `SIM_CONFIG.casualJitterRankSpread`'s own docblock for why the jitter is a documented
  * simple model rather than a measured one.
  */
-import type { DraftPoolEntry } from "@/domain/draft";
+import type { DraftPoolEntry } from "@research-ts/domain/draft";
 import type { Rng } from "@/mock-draft/rng";
 import { SIM_CONFIG } from "./config";
 

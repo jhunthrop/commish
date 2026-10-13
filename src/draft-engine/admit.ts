@@ -1,4 +1,4 @@
-import type { BidAction, DraftAction, MakePickAction, NominateAction, SetQueueAction, TimerExpireAction } from "@/domain/draft";
+import type { BidAction, DraftAction, MakePickAction, NominateAction, SetQueueAction, TimerExpireAction } from "@research-ts/domain/draft";
 import { auctionOf, totalRosterSlots, type DraftState } from "./state";
 import { AUCTION_CONFIG, DRAFT_QUEUE_CONFIG } from "./config";
 import { currentDeadline, maxBidFor, openSlotCount } from "./selectors";

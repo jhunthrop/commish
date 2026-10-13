@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { leagues, memberNotices, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import type { AuditEventInput } from "@/domain/audit";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { NOTICE_TEMPLATES } from "@/integrity/notices";

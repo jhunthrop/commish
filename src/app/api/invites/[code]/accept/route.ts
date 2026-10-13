@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { acceptInvite, acceptInviteSchema } from "@/league-service";
 import type { JoinBody } from "@/league-room/contract";

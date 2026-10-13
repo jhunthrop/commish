@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research-ts/db/client";
 import { users } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
 import { avatarRefValue, parseAvatarRef, presetByKey, type AvatarPresetKey } from "@/identity";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";

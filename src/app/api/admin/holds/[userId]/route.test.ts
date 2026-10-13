@@ -10,7 +10,8 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { moneyAccounts, moneyEntries, moneyTransactions, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { requireAdmin } from "@/lib/auth/current-user";
 import { accountIdFor } from "@/money/accounts";
 import { SETTLEMENT_REFUSALS } from "@/money-service/settlement";

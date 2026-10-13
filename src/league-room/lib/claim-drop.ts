@@ -7,7 +7,7 @@
  * with ADP as the tiebreak and the fallback when the projection snapshot is empty: a later
  * ADP reads as the lesser player, and a player nobody drafted ranks as the first to go.
  */
-import type { Position } from "@/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import type { LineupSlotView } from "../contract";
 
 export interface DropCandidate {

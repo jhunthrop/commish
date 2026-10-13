@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui";
-import type { PlayerFactsAvailability, PlayerFactsProjection } from "@/capsules/facts";
+import type { PlayerFactsAvailability, PlayerFactsProjection } from "@research-ts/capsules/facts";
 
 /** The five-point rail needs only the projection's own band and tail fields — never the raw
  *  season totals a caller might also be holding, so a `PlayerFactsProjection` satisfies this

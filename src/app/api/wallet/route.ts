@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { ok } from "@/lib/api/respond";
 import { walletSummary } from "@/money-service/read";
 import { withCurrentUser } from "@/app/api/leagues/_shared";

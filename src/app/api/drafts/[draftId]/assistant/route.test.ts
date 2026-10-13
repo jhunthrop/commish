@@ -10,10 +10,11 @@ vi.mock("@/lib/auth/current-user", () => ({
   requireCurrentUser: vi.fn(),
 }));
 
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@/db/schema";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@research-ts/db/schema";
+import { BOARD_SOURCE } from "@research-ts/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getDraftStore } from "@/draft-service";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";

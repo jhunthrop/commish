@@ -1,4 +1,4 @@
-import { envOr, envOrUndefined, parsePositiveInteger } from "@/lib/env";
+import { envOr, envOrUndefined, parsePositiveInteger } from "@research-ts/lib/env";
 import { isIngestionMode, INGESTION_MODES, STATS_INGESTION_CONFIG, type IngestionMode } from "./config";
 
 /** The three tunables an operator may move without a deploy, resolved once at the edge. */

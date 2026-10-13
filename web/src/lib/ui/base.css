@@ -1,0 +1,68 @@
+/* Element defaults for every page. Classes live in the components, never here.
+   The breakpoints, used as literals in component media queries because a custom property
+   cannot sit in a media query: 1180px (the right rail folds under), 960px (the range column
+   leaves the row), 760px (the phone layout, the rail moves to the bottom), 420px (the narrowest phones, where the score bug tightens). */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+html,
+body {
+	margin: 0;
+}
+
+body {
+	background: var(--bg);
+	color: var(--ink);
+	font-family: var(--font-ui);
+	font-size: var(--t-md);
+	line-height: 1.4;
+	-webkit-font-smoothing: antialiased;
+}
+
+a {
+	color: inherit;
+}
+
+button,
+input {
+	font: inherit;
+	color: inherit;
+}
+
+:focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 2px;
+}
+
+/* The board row's columns, shared by the row and its header so the two never drift. */
+:root {
+	--board-cols: 34px 44px minmax(170px, 1fr) 92px 132px minmax(140px, 190px) 150px;
+}
+
+@media (max-width: 960px) {
+	:root {
+		--board-cols: 28px 40px minmax(150px, 1fr) 84px 124px 140px;
+	}
+}
+
+@media (max-width: 760px) {
+	:root {
+		--row-h: 48px;
+		--board-cols: 36px minmax(0, 1fr) 110px 90px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	* {
+		transition: none !important;
+		animation: none !important;
+	}
+}

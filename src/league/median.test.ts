@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { roundPoints } from "@/scoring";
+import { roundPoints } from "@research-ts/scoring";
 import { leagueMedian, medianResultFor } from "./median";
 
 describe("leagueMedian", () => {

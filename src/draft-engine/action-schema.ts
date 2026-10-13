@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DRAFT_ACTION_VERSION, type DraftAction, type SetQueueAction } from "@/domain/draft";
+import { DRAFT_ACTION_VERSION, type DraftAction, type SetQueueAction } from "@research-ts/domain/draft";
 import { AUCTION_CONFIG, DRAFT_QUEUE_CONFIG, PERSISTED_QUEUE_MAX } from "./config";
 
 const version = z.literal(DRAFT_ACTION_VERSION);

@@ -5,8 +5,8 @@
  */
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import type { Db } from "@/db/client";
-import { isUniqueViolation } from "@/db/errors";
+import type { Db } from "@research-ts/db/client";
+import { isUniqueViolation } from "@research-ts/db/errors";
 import { simRuns } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
 import type { SimConfig, StoredSimSummary } from "./types";

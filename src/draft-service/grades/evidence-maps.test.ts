@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LeagueShape } from "@/projections/decide/replacement";
+import type { LeagueShape } from "@research-ts/projections/decide/replacement";
 import type { SimPlayerEvidence } from "@/draft-service/sim/types";
 import { gradeEvidenceMaps } from "./evidence-maps";
 

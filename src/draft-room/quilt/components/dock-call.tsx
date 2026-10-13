@@ -1,11 +1,11 @@
 "use client";
 
 import { memo, useMemo } from "react";
-import { mustPickLine } from "@/domain/must-pick";
-import type { Player } from "@/domain/player";
-import { positionLabel } from "@/domain/position-words";
-import type { RosterSlotType } from "@/domain/roster";
-import { restrictedPositions } from "@/domain/roster-eligibility";
+import { mustPickLine } from "@research-ts/domain/must-pick";
+import type { Player } from "@research-ts/domain/player";
+import { positionLabel } from "@research-ts/domain/position-words";
+import type { RosterSlotType } from "@research-ts/domain/roster";
+import { restrictedPositions } from "@research-ts/domain/roster-eligibility";
 import type { DraftStateView } from "@/draft-engine";
 import type { AdvisorView } from "@/draft-service/assistant/view";
 import { BigNumber, Button, PlayerFace, PositionBadge } from "@/components/ui";

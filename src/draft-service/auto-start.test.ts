@@ -1,9 +1,11 @@
 import { and, asc, eq } from "drizzle-orm";
 import { describe, expect, it, beforeEach, afterAll, vi } from "vitest";
-import { createDb } from "@/db/client";
-import { DB_POOL_CONFIG } from "@/db/config";
-import { createTestDb, truncateAll, TEST_DATABASE_URL } from "@/db/test-db";
-import { auditEvents, drafts, draftActions, memberNotices, players } from "@/db/schema";
+import { createDb } from "@research-ts/db/client";
+import { DB_POOL_CONFIG } from "@research-ts/db/config";
+import { createTestDb, TEST_DATABASE_URL } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players } from "@research-ts/db/schema";
+import { auditEvents, drafts, draftActions, memberNotices } from "@/db/schema";
 import { activityRowFor } from "@/integrity/activity-view";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { copyViolations } from "@/integrity/copy-rules";

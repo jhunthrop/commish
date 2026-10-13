@@ -2,9 +2,11 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { lineupSlots, rosterSlots, statWeeks, teams } from "@/db/schema";
-import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { statWeeks } from "@research-ts/db/schema";
+import { lineupSlots, rosterSlots, teams } from "@/db/schema";
+import type { RosterSlot, RosterSlotConfig } from "@research-ts/domain/roster";
 import { scoreTeamsForWeek } from "@/stats-pipeline/finalize";
 import { getLineup } from "./lineups";
 import { seasonThroughWeek, type SeasonThroughWeekLeague } from "./test-support";
@@ -359,7 +361,7 @@ describe("plannedTransfer", () => {
 
   /**
    * THE GAP-INDEX REGRESSION, at `plannedTransfer`'s own level (found by `reverseTradeInTx`'s
-   * lock-order proof, Task 7; the underlying fix lives in `assignSlot`, `@/draft-engine/slotting`
+   * lock-order proof, Task 7; the underlying fix lives in `assignSlot`, `@research-ts/draft-engine/slotting`
    * — see that test file's own regression case for the mechanism). A two-RB roster gives away the
    * LOWER-indexed occupant and keeps the higher-indexed one, then receives a new RB back — exactly
    * the shape a reversal produces when the trade it is undoing shares a position with something

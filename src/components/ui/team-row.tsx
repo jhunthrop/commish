@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import { PlayerFace } from "./player-face";
 import { ROW_META_CLASS, ROW_NAME_CLASS, rowShellClass } from "./player-row";
 import { Badge } from "./badge";

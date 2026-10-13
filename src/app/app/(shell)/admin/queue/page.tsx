@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { listPendingFlags } from "@/integrity-service/flags";
 import { formatFlagCursor, parseFlagCursor } from "@/integrity/queue-view";
 import { PageTitle } from "@/components/ui";

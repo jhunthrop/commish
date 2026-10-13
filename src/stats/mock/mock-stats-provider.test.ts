@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import type { Player, StatLine } from "@/domain/player";
-import { PPR_SCORING } from "@/domain/scoring";
-import { computeFantasyPoints } from "@/scoring";
+import type { Player, StatLine } from "@research-ts/domain/player";
+import { PPR_SCORING } from "@research-ts/domain/scoring";
+import { computeFantasyPoints } from "@research-ts/scoring";
 import { createMockStatsProvider } from "./mock-stats-provider";
 import { PLAYER_COUNT, type Dataset } from "./generate-dataset";
 import { describeStatsProviderContract } from "../test-support";

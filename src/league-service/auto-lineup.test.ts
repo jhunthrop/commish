@@ -1,9 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { auditEvents, leagues, lineupSlots, matchups, memberNotices, players, rosterSlots, statWeeks, teams, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import type { RosterSlot } from "@/domain/roster";
-import { validateLineup } from "@/domain/roster-eligibility";
+import { players, statWeeks } from "@research-ts/db/schema";
+import { auditEvents, leagues, lineupSlots, matchups, memberNotices, rosterSlots, teams, users } from "@/db/schema";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import type { RosterSlot } from "@research-ts/domain/roster";
+import { validateLineup } from "@research-ts/domain/roster-eligibility";
 import { startersOf } from "@/league";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { copyViolations } from "@/integrity/copy-rules";

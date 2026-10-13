@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { FixtureLabel } from "@/league-service/nfl-schedule";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import type { FixtureLabel } from "@research-ts/reference/nfl-schedule";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
 import type { LineupBody, LineupSlotView } from "../contract";
 import {
   fixCandidates,

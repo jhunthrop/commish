@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import type { Page } from "@playwright/test";
-import { createDb } from "../src/db/client";
+import { createDb } from "@research-ts/db/client";
 import { UI_CONFIG } from "../src/components/ui/config";
 import {
   ensureOpenHoldLeague,

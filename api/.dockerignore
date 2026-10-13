@@ -1,0 +1,14 @@
+# The image needs go.mod, go.sum, cmd/, internal/ and migrations/.
+bin
+.env
+.env.*
+**/*_test.go
+internal/db/dbtest
+docker-compose.test.yml
+Makefile
+openapi.yaml
+oapi-codegen.yaml
+Dockerfile
+.dockerignore
+.gitignore
+README.md

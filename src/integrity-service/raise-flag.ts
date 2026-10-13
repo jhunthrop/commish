@@ -1,5 +1,5 @@
 import { and, eq, isNull } from "drizzle-orm";
-import type { DbTx } from "@/db/client";
+import type { DbTx } from "@research-ts/db/client";
 import { integrityFlags } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
 import { SUBJECT_OF, type FlagSubjectType, type FlagType } from "@/integrity/flags";

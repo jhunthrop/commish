@@ -1,0 +1,6 @@
+// The repository's Go workspace. Adding a module is one line in the use
+// block. The Docker build runs with GOWORK=off from api/ alone, so every
+// module must also build without the workspace.
+go 1.25.0
+
+use ./api

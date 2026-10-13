@@ -1,5 +1,5 @@
-import type { Clock } from "@/domain/timing";
-import { envOr } from "@/lib/env";
+import type { Clock } from "@research-ts/domain/timing";
+import { envOr } from "@research-ts/lib/env";
 import type { KycProvider } from "./kyc-contract";
 import { createMockKycProvider } from "./mock/mock-kyc-provider";
 

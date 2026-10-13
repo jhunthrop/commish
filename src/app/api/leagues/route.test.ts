@@ -11,14 +11,15 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { leagues, scoringSettings, teams, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { ENFORCEMENT_REFUSALS } from "@/league-service/enforcement";
-import { SUPERFLEX_ROSTER_SLOTS } from "@/league/roster-shape";
-import { describeScoring } from "@/scoring/describe";
+import { SUPERFLEX_ROSTER_SLOTS } from "@research-ts/domain/roster-shape";
+import { describeScoring } from "@research-ts/scoring/describe";
 import { POST } from "./route";
 
 const db = createTestDb();

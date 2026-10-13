@@ -1,6 +1,6 @@
 "use client";
 
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import { BottomSheet, Button, PositionBadge } from "@/components/ui";
 import { QUILT_CONFIG } from "../state/config";
 

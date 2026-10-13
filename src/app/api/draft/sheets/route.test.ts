@@ -7,10 +7,11 @@ vi.hoisted(() => {
 
 vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn() }));
 
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { leagues, teams, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
 import { GET, POST } from "./route";
 
 const db = createTestDb();

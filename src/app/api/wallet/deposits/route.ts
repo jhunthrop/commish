@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { initiateDeposit } from "@/money-service/deposits";

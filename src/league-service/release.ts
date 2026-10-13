@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import { refundEntryFeeInTx } from "@/money-service/entry-fee";
@@ -71,7 +71,7 @@ export const DRAFT_FILL_REVERSED_SUMMARY = "A seat opened up, so we put this lea
  *
  * **WHAT A RELEASE DELETES, ENUMERATED (Step 2).** Deleting a `teams` row is only safe because of
  * what a pre-draft league does not have yet: `draft_picks` and `matchups` reference `teams`
- * WITHOUT `ON DELETE CASCADE` (`@/db/schema`), and both are structurally empty before a draft
+ * WITHOUT `ON DELETE CASCADE` (`@research-ts/db/schema`), and both are structurally empty before a draft
  * runs — `matchups` is generated at `commitDraftResults`, and `draft_picks` only grows once a
  * draft has started. The refusal on `status !== 'scheduled'` below is therefore not politeness,
  * it is the precondition that makes the delete legal, and Postgres itself is the backstop: a row

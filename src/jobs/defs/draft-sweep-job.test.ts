@@ -1,8 +1,10 @@
 import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, players } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players } from "@research-ts/db/schema";
+import { drafts } from "@/db/schema";
+import type { Clock } from "@research-ts/domain/timing";
 import { createDraftAdvancer } from "@/draft-service/advance";
 import { DRAFT_ADVANCE_CONFIG } from "@/draft-service/config";
 import { createDraftStore, type DraftStore } from "@/draft-service/store";

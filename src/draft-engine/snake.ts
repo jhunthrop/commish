@@ -1,6 +1,6 @@
-import type { MakePickAction } from "@/domain/draft";
+import type { MakePickAction } from "@research-ts/domain/draft";
 import { totalPickCount, type DraftReduceResult, type DraftState } from "./state";
-import { snakeTeamForPick } from "./order";
+import { snakeTeamForPick } from "@research-ts/draft-engine/order";
 import { applyPick, expectApplied, redeemOwedPick } from "./apply-pick";
 import { bestAvailableFor, catchUpTeamId, currentTier, hasOwedPicks, queueFor, teamOnClock } from "./selectors";
 

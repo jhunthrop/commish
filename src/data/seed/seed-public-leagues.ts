@@ -1,8 +1,8 @@
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { drafts, leagues, scoringSettings, teams } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { PPR_SCORING } from "@/domain/scoring";
-import type { Clock } from "@/domain/timing";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
+import { PPR_SCORING } from "@research-ts/domain/scoring";
+import type { Clock } from "@research-ts/domain/timing";
 import { DEV_SEED } from "./config";
 import { ensureDevUsers, preserveRealCommissioner, preserveRealTeamOwner } from "./dev-users";
 import { seedTierDemoIdentities } from "./seed-tier-demo";

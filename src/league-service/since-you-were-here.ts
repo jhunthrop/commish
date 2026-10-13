@@ -1,5 +1,5 @@
 import { asc, getTableColumns, inArray, lte, sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { auditEvents } from "@/db/schema";
 import type { AuditEvent } from "@/domain/audit";
 import { activityKindFor, activityRowFor, type ActivityKind } from "@/integrity/activity-view";

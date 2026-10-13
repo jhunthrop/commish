@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { jobRuns, jobRunSteps, jobs } from "@/db/schema";
-import { unwrapCauseChain } from "@/db/errors";
-import { createTestDb, expectRejectionMatching, truncateAll, truncateJobTables } from "@/db/test-db";
+import { unwrapCauseChain } from "@research-ts/db/errors";
+import { createTestDb, expectRejectionMatching } from "@research-ts/db/test-db";
+import { truncateAll, truncateJobTables } from "@/db/test-db";
 import { JOB_HISTORY_REWRITE_SQLSTATE } from "./store";
 
 /** The rejection's SQLSTATE, dug out of drizzle's wrapper — 0069's contract with

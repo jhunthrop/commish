@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import type { Clock } from "@/domain/timing";
-import { drafts, lineupSlots, matchups, statWeeks, teams, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import type { Clock } from "@research-ts/domain/timing";
+import { statWeeks } from "@research-ts/db/schema";
+import { drafts, lineupSlots, matchups, teams, users } from "@/db/schema";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { createLeague } from "@/league-service/creation";
 import { shellData } from "./shell-data";
 

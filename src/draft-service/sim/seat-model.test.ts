@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { DraftPoolEntry, MakePickAction, StartDraftAction, TimerExpireAction } from "@/domain/draft";
-import type { Position } from "@/domain/player";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import type { DraftPoolEntry, MakePickAction, StartDraftAction, TimerExpireAction } from "@research-ts/domain/draft";
+import type { Position } from "@research-ts/domain/player";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
 import { AUTOPICK_CONFIG, availablePool, DRAFT_CLOCK_SCHEDULE, initialDraftState, teamOnClock, type DraftConfig, type DraftState } from "@/draft-engine";
 import { assignArchetypes, BOT_ARCHETYPES } from "@/mock-draft/archetypes";
 import { chooseBotPick } from "@/mock-draft/bots";

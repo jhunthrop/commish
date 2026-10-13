@@ -1,8 +1,8 @@
-import type { Clock } from "../src/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { createDraftStore, type DraftStore } from "../src/draft-service/store";
 import { getPublisher } from "../src/lib/realtime/publisher";
 import { DEV_SEED } from "../src/data/seed/config";
-import { createDb, getDb } from "../src/db/client";
+import { createDb, getDb } from "@research-ts/db/client";
 import type { MockLifecycleDeps } from "../src/mock-draft-service/claim";
 import { createMockRoom } from "../src/mock-draft-service/creation";
 import { ensureOpenHoldLeague, ensureRoomJourneyLeague, expect, managerAUserId, SEEDED_SEASON_LEAGUE_ID, startDraftAndEnterRoom, test } from "./support/fixtures";

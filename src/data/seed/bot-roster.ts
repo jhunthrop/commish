@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research-ts/db/client";
 import { users } from "@/db/schema";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 
@@ -25,7 +25,7 @@ const BOT_EMAIL_DOMAIN = "bots.commish.internal";
  * earlybird`, ...) — never a generated id, because `rngFor` (`@/mock-draft/rng`) keys a bot's
  * seeded stream off this exact id, so a bot's id is load-bearing for replay the moment a draft
  * exists that seated it. The reserved `<id>@bots.commish.internal` address satisfies `users.
- * email`'s `NOT NULL UNIQUE` constraint (`@/db/schema`) without inventing a real mailbox.
+ * email`'s `NOT NULL UNIQUE` constraint (`@research-ts/db/schema`) without inventing a real mailbox.
  *
  * NOT GUARDED behind `assertLocalSeedTarget()` (unlike every other seeder in this directory):
  * every one of those creates placeholder DEVELOPER identities that must never exist in

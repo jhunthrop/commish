@@ -8,7 +8,7 @@
 // must still be free), so running this twice refuses in words the second time rather than
 // double-moving anybody. See `reverseClaimInTx`'s docblock for the whole account.
 import { eq } from "drizzle-orm";
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { auditEvents } from "@/db/schema";
 import { reverseClaimInTx } from "@/league-service/claims";
 

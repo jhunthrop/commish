@@ -1,4 +1,4 @@
-import type { Position } from "@/domain/player";
+import type { Position } from "@research-ts/domain/player";
 
 export type PositionBadgeSize = "sm" | "md";
 

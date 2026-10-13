@@ -31,9 +31,9 @@
 // transient weather (a dropped connection) and stays retryable. `maxAttempts: 2` with a short
 // backoff: a third attempt would only race the next minute's own fire.
 import { and, eq, gt, sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { drafts, mockRooms } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { getDraftAdvancer, getDraftStore, getMockBotDriver } from "@/draft-service";
 import { autoStartDueDrafts } from "@/draft-service/auto-start";
 import { DRAFT_ADVANCE_CONFIG } from "@/draft-service/config";

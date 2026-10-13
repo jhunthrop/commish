@@ -14,7 +14,7 @@
 // SAME writer (`grantAdmin`'s own `WHERE`-guarded UPDATE), never a second function.
 import { createInterface } from "node:readline/promises";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { users } from "@/db/schema";
 import { renderNotice } from "@/integrity/notices";
 import { grantAdmin } from "@/integrity-service/grant-admin";

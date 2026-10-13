@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { BigNumber, PageTitle, SeatStack } from "@/components/ui";
 import { seatSentence } from "@/components/ui/seat-meter";

@@ -15,7 +15,7 @@
  * starts, so every ask during that window awaits the one compute rather than starting another.
  * A compute that fails is forgotten, so the next ask computes again.
  */
-import type { Recommendation } from "@/projections/decide/draft";
+import type { Recommendation } from "@research-ts/projections/decide/draft";
 import type { RoomOddsTable } from "../sim/room-odds";
 import { ADVISOR_CONFIG } from "./config";
 import type { TierCollapse, TierStandingView } from "./view";

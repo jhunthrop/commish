@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { TeamCard } from "@/domain/league";
-import type { Player, Position } from "@/domain/player";
+import type { Player, Position } from "@research-ts/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { Button, ButtonLink, EYEBROW, PlayerFace, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";

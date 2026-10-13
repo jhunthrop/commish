@@ -1,6 +1,6 @@
 import type { DraftFormat } from "@/domain/league";
-import type { RosterShapeName } from "@/domain/roster";
-import type { ScoringPresetName } from "@/domain/scoring";
+import type { RosterShapeName } from "@research-ts/domain/roster";
+import type { ScoringPresetName } from "@research-ts/domain/scoring";
 import type { ExperienceTier } from "@/domain/user";
 import { LEAGUE_CONFIG } from "@/league/config";
 import type { PrizeTable } from "@/money/prize-table";
@@ -28,7 +28,7 @@ import type { PrizeTable } from "@/money/prize-table";
  */
 
 /** Whether a rung's draft fires at a chosen time or the moment its last seat fills — the same
- *  two-value vocabulary `drafts.start_trigger` already carries (`@/db/schema`), named here so
+ *  two-value vocabulary `drafts.start_trigger` already carries (`@research-ts/db/schema`), named here so
  *  `HouseRung.startTrigger` and `CreateLeagueInput.startTrigger` (`@/league-service/creation`)
  *  share one type instead of two hand-typed unions that could drift apart. */
 export type StartTrigger = "scheduled" | "when_full";
@@ -157,7 +157,7 @@ export type HouseRungName = keyof typeof HOUSE_CATALOG.rungs;
 
 /**
  * The member-facing name for a rung, exhaustive over `HouseRungName` so a rung added without a
- * label does not compile — the same shape `ROSTER_SHAPE_LABEL` (`@/domain/roster`) and
+ * label does not compile — the same shape `ROSTER_SHAPE_LABEL` (`@research-ts/domain/roster`) and
  * `TIER_COMPOSITION_LABEL` (`@/participation/composition`) already use. Swept for copy violations
  * in `house-catalog.test.ts`, this module's own "sweep coverage" `filter.test.ts`'s
  * `MATCHMAKING_CONFIG` describe block already models for `stakeDisclosure`.

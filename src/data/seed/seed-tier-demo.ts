@@ -1,6 +1,6 @@
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { users } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { DEV_SEED } from "./config";
 import { seedSeasonLeague, type SeasonLeagueConfig } from "./seed-season-league";
 

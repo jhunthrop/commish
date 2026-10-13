@@ -1,6 +1,6 @@
-import type { getDb } from "@/db/client";
-import { nflGames } from "@/db/schema";
-import { excludedSetFor } from "@/db/upsert";
+import type { getDb } from "@research-ts/db/client";
+import { nflGames } from "@research-ts/db/schema";
+import { excludedSetFor } from "@research-ts/db/upsert";
 import type { StatsProvider } from "@/stats/provider";
 import { reserveBackfillOrThrow, type RequestBudget } from "./budget";
 

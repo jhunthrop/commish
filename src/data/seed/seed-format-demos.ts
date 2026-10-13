@@ -1,17 +1,17 @@
 import { eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { drafts, leagues, scoringSettings, teams } from "@/db/schema";
-import { HALF_PPR_SCORING } from "@/domain/scoring";
-import type { Clock } from "@/domain/timing";
+import { HALF_PPR_SCORING } from "@research-ts/domain/scoring";
+import type { Clock } from "@research-ts/domain/timing";
 import { bestAvailableFor, teamOnClock, type DraftState } from "@/draft-engine";
-import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
+import { DRAFT_ACTION_VERSION, type DraftAction } from "@research-ts/domain/draft";
 import { getDraftStore } from "@/draft-service";
 import { draftOrderFor } from "@/draft-service/order";
 import type { DraftStore } from "@/draft-service/store";
 import { setSlotPreference } from "@/draft-service/slot-preference";
 import type { AuditLogger } from "@/integrity-service/audit-logger";
-import { SUPERFLEX_ROSTER_SLOTS } from "@/league/roster-shape";
-import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
+import { SUPERFLEX_ROSTER_SLOTS } from "@research-ts/domain/roster-shape";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research-ts/domain/roster";
 import type { ExperienceTier } from "@/domain/user";
 import { joinPublicLeague } from "@/league-service/join";
 import { ensureDevUsers, preserveRealCommissioner, preserveRealTeamOwner } from "./dev-users";
@@ -170,7 +170,7 @@ async function insertDemoLeagueShell(db: Db, input: DemoLeagueShellInput): Promi
 
 // -------------------------------------------------------------------------------------------
 // Arc A: superflex, through the real engine. A real second quarterback lands in the real
-// SUPERFLEX slot because `assignSlot` (`@/draft-engine/slotting`) fills the first eligible slot
+// SUPERFLEX slot because `assignSlot` (`@research-ts/draft-engine/slotting`) fills the first eligible slot
 // in `SUPERFLEX_ROSTER_SLOTS`' own row order — `QB` before `SUPERFLEX` — so team 1's FIRST two
 // quarterbacks (explicitly chosen below, never left to autopick's own ranking-driven luck) fill
 // QB then SUPERFLEX in that order, by construction of the config this league itself carries.

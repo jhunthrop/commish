@@ -9,8 +9,9 @@ vi.hoisted(() => {
 
 vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn() }));
 
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { players } from "@/db/schema";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players } from "@research-ts/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { SEARCH_CONFIG } from "@/search/config";
 import { GET } from "./route";

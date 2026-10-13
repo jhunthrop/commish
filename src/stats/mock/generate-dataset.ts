@@ -1,4 +1,4 @@
-import type { Player, Position, StatLine } from "@/domain/player";
+import type { Player, Position, StatLine } from "@research-ts/domain/player";
 import { mulberry32 } from "@/lib/random/mulberry32";
 
 export const DATASET_SEED = 20260817;

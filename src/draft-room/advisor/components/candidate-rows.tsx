@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useMemo } from "react";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import { MotionList, PlayerFace, PositionBadge, type MotionRowProps } from "@/components/ui";
 import { useStableList } from "@/design/use-stable-list";
 import type { AdvisorView, Candidate } from "@/draft-service/assistant/view";

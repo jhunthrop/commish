@@ -10,7 +10,8 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import Redis from "ioredis";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { PRESENCE_CONFIG, createPresenceStore } from "@/lib/realtime/presence";

@@ -1,7 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { matchups, teams, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { LEAGUE_CONFIG } from "@/league";
 import { advancePlayoffsInTx } from "./playoff-advance";
 import { createLeague } from "./creation";

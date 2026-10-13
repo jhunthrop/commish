@@ -1,6 +1,6 @@
 "use client";
 
-import type { Position } from "@/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import type { PlayerSeasonSummary } from "../../contract";
 import { Skeleton } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
