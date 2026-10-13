@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
+	import ActionBar from '#lib/ui/ActionBar.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
@@ -28,6 +29,8 @@
 	import SetupRow from '#lib/room/setup/SetupRow.svelte';
 	import HandlePrompt from '#lib/room/setup/HandlePrompt.svelte';
 	import KeeperEditor from '#lib/room/setup/KeeperEditor.svelte';
+	import LeftLobby from '#lib/room/setup/LeftLobby.svelte';
+	import { forgetLeft, leftLobby } from '#lib/room/setup/left.ts';
 	import LobbyList from '#lib/room/setup/LobbyList.svelte';
 	import SavedLeagues from '#lib/room/setup/SavedLeagues.svelte';
 	import {
@@ -38,8 +41,13 @@
 		SCORING_CHOICES,
 		TEAM_CHOICES,
 		defaultSettings,
+		flexCount,
+		flexMax,
+		lineupForFlex,
+		lineupForSuperflex,
 		nearestLobby,
-		roundsOf
+		roundsOf,
+		superflexCount
 	} from '#lib/room/setup/setup.ts';
 
 	/** How often the lobbies' fill is read while the page is open. */
@@ -58,6 +66,12 @@
 	let handleProblem = $state<string | null>(null);
 	/** Signed out, a mock against bots still runs, kept with this browser until sign-in claims it. */
 	let signedOut = $state(false);
+	/** The lobby Leave came from, offered back in the dock. */
+	let left = $state<string | null>(null);
+	/** The roster's steppers: the counts, then the flex spots the lineup makes, the bench last, so
+	 * they add up to the rounds line. */
+	const rosterHead = $derived(ROSTER_FIELDS.filter((f) => f.key !== 'bench'));
+	const bench = $derived(ROSTER_FIELDS.find((f) => f.key === 'bench'));
 
 	const rounds = $derived(roundsOf(settings));
 	const roundsOk = $derived(rounds >= MIN_ROUNDS && rounds <= MAX_ROUNDS);
@@ -166,6 +180,7 @@
 
 	onMount(() => {
 		const from = page.url.searchParams.get('from');
+		left = leftLobby();
 		void loadLeagues();
 		if (from) void loadFrom(from);
 		void loadLobbies();
@@ -185,7 +200,6 @@
 			Set it to your league once and save it. Against bots there is no clock, so a mock takes as
 			long as your own picks do. Against people it is 30 seconds a pick.
 		</p>
-		{#if error}<RoomNotice {error} returnTo={page.url.pathname} />{/if}
 		{#if handleFor}
 			<HandlePrompt problem={handleProblem} {busy} onsave={saveHandle} />
 		{/if}
@@ -222,7 +236,7 @@
 				</ChipGroup>
 			</SetupRow>
 			<SetupRow label="Roster" note="rounds follow from it: {rounds}">
-				{#each ROSTER_FIELDS as f (f.key)}
+				{#each rosterHead as f (f.key)}
 					<Stepper
 						label={f.label}
 						value={settings.roster[f.key]}
@@ -231,6 +245,31 @@
 						onchange={(v: number) => set({ roster: { ...settings.roster, [f.key]: v } })}
 					/>
 				{/each}
+				<Stepper
+					label="FLEX"
+					value={flexCount(settings.lineup)}
+					min={1}
+					max={flexMax(settings.lineup)}
+					onchange={(v: number) => set({ lineup: lineupForFlex(settings.lineup, v) })}
+				/>
+				{#if superflexCount(settings.lineup) > 0}
+					<Stepper
+						label="SFLX"
+						value={superflexCount(settings.lineup)}
+						min={0}
+						max={1}
+						onchange={(v: number) => set({ lineup: lineupForSuperflex(v) })}
+					/>
+				{/if}
+				{#if bench}
+					<Stepper
+						label={bench.label}
+						value={settings.roster.bench}
+						min={0}
+						max={bench.max}
+						onchange={(v: number) => set({ roster: { ...settings.roster, bench: v } })}
+					/>
+				{/if}
 			</SetupRow>
 			<SetupRow label="Lineup">
 				<ChipGroup label="Lineup">
@@ -272,17 +311,10 @@
 				The roster makes {rounds} rounds. Keep it from {MIN_ROUNDS} to {MAX_ROUNDS}.
 			</p>
 		{/if}
-		<div class="go">
-			<Verb disabled={busy || !roundsOk} onclick={() => run(() => startMock(settings))}
-				>Start against bots</Verb
-			>
+		<div class="save">
 			{#if signedOut}
-				<Quiet href={signInHref(page.url.pathname)}>Sign in to keep this mock</Quiet>
-			{/if}
-			<Quiet disabled={busy} onclick={() => join(nearestLobby(settings))}
-				>Join a lobby with people</Quiet
-			>
-			{#if naming}
+				<span class="later">Sign in to save this setup as a league</span>
+			{:else if naming}
 				<Field
 					hideLabel
 					bind:value={leagueName}
@@ -296,16 +328,50 @@
 				<Quiet disabled={!roundsOk} onclick={() => (naming = true)}>Save as a league</Quiet>
 			{/if}
 		</div>
+		<ActionBar alert={error ? refusal : undefined} note={signedOut ? keepNote : undefined}>
+			<Verb disabled={busy || !roundsOk} onclick={() => run(() => startMock(settings))}
+				>Start against bots</Verb
+			>
+			<Quiet disabled={busy} onclick={() => join(nearestLobby(settings))}
+				>Join a lobby with people</Quiet
+			>
+		</ActionBar>
 		{#snippet dock()}
+			{#if left}<LeftLobby
+					id={left}
+					pollMs={LOBBY_POLL_MS}
+					ondone={() => {
+						forgetLeft();
+						left = null;
+					}}
+				/>{/if}
 			<SavedLeagues
 				{leagues}
 				{busy}
 				onmock={(league: League) => run(() => startMock(league.settings, league.id))}
 			/>
-			<LobbyList {lobbies} {busy} onjoin={join} />
+			<LobbyList
+				{lobbies}
+				{busy}
+				signInHref={signedOut ? signInHref(page.url.pathname) : null}
+				onjoin={join}
+			/>
 		{/snippet}
 	</RoomLayout>
 </Shell>
+
+<!-- The action bar's two lines: a verb that went wrong, said above the verbs, and where a signed-out
+     mock is kept, under them. -->
+{#snippet refusal()}
+	<RoomNotice {error} subject="setup" returnTo={page.url.pathname} />
+{/snippet}
+
+{#snippet keepNote()}
+	<span class="keep">
+		Signed out, a mock is kept in this browser.
+		<Quiet size="sm" href={signInHref(page.url.pathname)}>Sign in to keep it</Quiet>
+	</span>
+{/snippet}
 
 <style>
 	.lede {
@@ -325,10 +391,17 @@
 		font-size: var(--t-sm);
 	}
 
-	.go {
+	.keep {
 		display: flex;
 		flex-wrap: wrap;
-		gap: var(--s-3);
+		align-items: center;
+		gap: var(--s-2);
+	}
+
+	.save {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--s-2);
 		align-items: center;
 		margin-top: var(--s-3);
 	}

@@ -2,7 +2,7 @@
 	import { pickLabel } from '#lib/format/draft.ts';
 	import PickStrip from '#lib/ui/PickStrip.svelte';
 	import type { StripPick } from '#lib/types/room.ts';
-	import type { LobbyPick, LobbySeatState } from './lobby.ts';
+	import { type LobbyPick, type LobbySeatState, pickCredit } from './lobby.ts';
 	import type { Board } from './model.ts';
 
 	interface Props {
@@ -16,14 +16,9 @@
 
 	let { picks, board, seats, you, teams }: Props = $props();
 
+	/** The count and the names beside it are on one basis: a pick is a person's only when his own
+	 * hand made it, and only then does the strip name him alone. */
 	const people = $derived(picks.filter((p) => p.by === 'drafter').length);
-
-	function who(pick: LobbyPick): string {
-		if (pick.seat === you) return 'you';
-		const seat = seats.get(pick.seat);
-		if (pick.by === 'bot' || seat?.kind === 'bot') return 'bot';
-		return seat?.handle ?? 'drafter';
-	}
 
 	const strip = $derived(
 		picks.flatMap((pick, i): StripPick[] => {
@@ -33,7 +28,7 @@
 						{
 							key: pick.pick,
 							player,
-							lines: [who(pick), pickLabel(pick.pick, teams)],
+							lines: [pickCredit(pick, seats, you), pickLabel(pick.pick, teams)],
 							ring: i === 0 ? 'ink' : undefined,
 							strong: pick.by === 'drafter'
 						}

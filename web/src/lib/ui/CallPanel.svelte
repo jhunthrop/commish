@@ -34,7 +34,7 @@
 
 <Panel as="section" label={tag} padding="none" edge={waiting ? 'quiet' : 'accent'}>
 	<div class="call" class:waiting>
-		<Face src={player.headshot} size={72} loading="eager" />
+		<Face src={player.headshot} name={player.name} size={72} loading="eager" />
 		<div class="what">
 			<span class="tag">{tag}</span>
 			<h2>Take {player.name}</h2>

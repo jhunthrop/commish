@@ -28,6 +28,7 @@
 				<li class:accent={pick.ring === 'accent'} class:strong={pick.strong}>
 					<Face
 						src={pick.player.headshot}
+						name={pick.player.name}
 						size={36}
 						ringed={pick.ring === 'accent'}
 						marked={pick.ring === 'ink'}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { pickLabel } from '#lib/format/draft.ts';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import { picksAwayWords } from './words.ts';
 
 	interface Props {
 		/** The pick on the clock. */
@@ -16,7 +17,7 @@
 		canUndo: boolean;
 		busy: boolean;
 		/** Set for a moment after the link is copied. */
-		shared: boolean;
+		copied: boolean;
 		onundo: () => void;
 		onautopick: () => void;
 		onfinish: () => void;
@@ -32,7 +33,7 @@
 		autopickTo,
 		canUndo,
 		busy,
-		shared,
+		copied,
 		onundo,
 		onautopick,
 		onfinish,
@@ -46,14 +47,16 @@
 	</div>
 	{#if next !== null}
 		<div class="next">
-			<span>Your next</span><b>{pickLabel(next, teams)}</b><span>{next - now - 1} picks away</span>
+			<span>Your next</span><b>{pickLabel(next, teams)}</b><span
+				>{picksAwayWords(next - now - 1)}</span
+			>
 		</div>
 	{/if}
 	<div class="acts">
 		<Quiet key="U" disabled={!canUndo || busy} onclick={onundo}>Undo</Quiet>
 		<Quiet disabled={busy} onclick={onautopick}>Pick for me to round {autopickTo}</Quiet>
 		<Quiet disabled={busy} onclick={onfinish}>Finish the draft</Quiet>
-		<Quiet onclick={onshare}>{shared ? 'Link copied' : 'Save and share'}</Quiet>
+		<Quiet onclick={onshare}>{copied ? 'Link copied' : 'Save and share'}</Quiet>
 	</div>
 </div>
 

@@ -7,8 +7,8 @@
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
 	import type { LobbyRoom, RoomCard } from './api.ts';
 	import { callView, poolBasis } from './call.ts';
-	import { LOBBY_KEYS, roomKeys } from './keys.ts';
-	import type { LobbyState } from './lobby.ts';
+	import { lobbyKeys, roomKeys } from './keys.ts';
+	import { type LobbyState, seatName, seatedPeople } from './lobby.ts';
 	import LandingStrip from './LandingStrip.svelte';
 	import {
 		type Board,
@@ -70,17 +70,19 @@
 			? 0
 			: Math.max(0, Math.ceil((Date.parse(room.fill_deadline) - now) / 1000))
 	);
-	const people = $derived([...lobby.seats.values()].filter((s) => s.kind === 'drafter').length);
-	const bots = $derived([...lobby.seats.values()].filter((s) => s.kind === 'bot').length);
+	const started = $derived(lobby.drafting || lobby.complete);
+	/** Everyone who holds a seat, here or gone with a stand-in drafting: counted from the start. */
+	const people = $derived(seatedPeople(lobby.seats.values()));
 	const selectedId = $derived(
 		marked !== null && !drafted.has(marked) ? marked : (call?.player.id ?? null)
 	);
 	const names = $derived(
 		Array.from({ length: teams }, (_, i) => {
 			const seat = lobby.seats.get(i + 1);
-			if (i + 1 === you) return 'You';
-			if (!seat || seat.kind === 'bot' || seat.kind === 'open') return 'Bot';
-			return seat.handle ?? 'Drafter';
+			return seatName(
+				{ seat: i + 1, handle: seat?.handle ?? null, kind: seat?.kind ?? 'open' },
+				you
+			);
 		})
 	);
 	const onClockName = $derived(onClock === null ? '' : (names[onClock - 1] ?? ''));
@@ -113,7 +115,12 @@
 	}
 
 	const onkeydown = $derived(
-		roomKeys({ draft: () => draft(selectedId), move, queue: () => toggleQueue(selectedId) })
+		roomKeys({
+			draftCall: () => draft(yourTurn ? (call?.player.id ?? null) : null),
+			draftMarked: () => draft(selectedId),
+			move,
+			queue: () => toggleQueue(selectedId)
+		})
 	);
 </script>
 
@@ -124,7 +131,7 @@
 		<ScoreBug now={lobby.pickNumber} onClock={onClockName} {secondsLeft} {yourPick} {teams} />
 	{/if}
 	<SeatsStrip seats={lobby.seats} {teams} {you} {onClock} />
-	{#if !lobby.drafting && !lobby.complete}
+	{#if !started}
 		<Panel>
 			<p class="wait">
 				<b>{people} of {teams} in.</b> The draft starts when {teams} are in, or in {clockLabel(
@@ -157,14 +164,17 @@
 			left={board.players.length - drafted.size}
 			{odds}
 			{oddsLabel}
+			oddsShown={card !== null}
 			basis={poolBasis(board, card, teams)}
 			pickNumber={lobby.pickNumber}
 			callId={call?.player.id ?? null}
 			{selectedId}
 			queue={new Set(queue)}
+			draftShown={yourTurn}
 			canDraft={yourTurn}
 			{filter}
 			filters={FILTERS}
+			{search}
 			onfilter={(f: PoolFilter) => (filter = f)}
 			ondraft={draft}
 			onqueue={toggleQueue}
@@ -185,12 +195,14 @@
 				<b>{teams} {presetWords(room.settings.scoring.preset ?? 'ppr')} lobby</b>, {plural(
 					people,
 					'drafter'
-				)} and {plural(bots, 'bot')}. {room.clock_seconds} seconds a pick, your queue drafts if you step
-				away, a bot takes any seat that closes the tab.
+				)}{started
+					? ` and ${plural(teams - people, 'bot')}`
+					: `, ${plural(teams - people, 'seat')} open`}. {room.clock_seconds} seconds a pick, your queue
+				drafts if you step away, a bot takes any seat that closes the tab.
 			</p>
 		</Panel>
 		<TeamPanel slots={teamSlots(room.settings, mine, board)} rosterSize={room.rounds} {teams} />
-		<Keys bindings={LOBBY_KEYS} />
+		<Keys bindings={lobbyKeys(yourTurn)} />
 	{/snippet}
 </RoomLayout>
 

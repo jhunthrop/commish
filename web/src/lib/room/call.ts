@@ -1,6 +1,7 @@
 /** Our call as the room shows it: the player, the one big number, the runner-up for the sentence, and
  * where the odds come from. Read off the card the API recorded for the turn. */
-import { pickLabel } from '#lib/format/draft.ts';
+import { lastName, oddsWords, pickLabel } from '#lib/format/draft.ts';
+import { signed } from '#lib/format/number.ts';
 import type { RoomCard } from './api.ts';
 import type { Board, RoomPlayer } from './model.ts';
 
@@ -33,6 +34,54 @@ function oddsBasis(card: RoomCard | null, teams: number): string {
 		return `Odds to ${to} from where drafters take each player and how far they stray from it.`;
 	}
 	return `Odds to ${to} from ${card.runs} runs of this room, every seat drafting the way it has so far.`;
+}
+
+/** The runner-up's sentence, his name in bold and the rest after it. */
+export interface RunnerWords {
+	name: string;
+	rest: string;
+}
+
+/** A contrast ("but he is still there...") is drawn only when the odds back it: the runner-up on one
+ * side of even and the call on the other. Otherwise both numbers are given plainly. */
+const EVEN = 0.5;
+
+/**
+ * The runner-up in a sentence, or null when there is none to compare. On your clock the call is the
+ * player who will not last, so the contrast is the runner-up lasting while the call does not. Off it
+ * (a conditional call) the odds are of reaching your pick, so the contrast is the runner-up not
+ * reaching it while the call does. Every sentence names both numbers.
+ */
+export function runnerWords(view: CallView): RunnerWords | null {
+	const { runner, runnerOdds, odds, player } = view;
+	if (!runner || runnerOdds === null || odds === null) return null;
+	const more = `has more over replacement at ${signed(runner.vor ?? 0)}`;
+	const call = lastName(player.name);
+	if (view.conditional) {
+		const at = view.forLabel;
+		if (runnerOdds < EVEN && odds >= EVEN) {
+			return {
+				name: runner.name,
+				rest: `${more}, but he reaches ${at} only ${oddsWords(runnerOdds)} of the time. ${call} reaches it ${oddsWords(odds)} of the time.`
+			};
+		}
+		return {
+			name: runner.name,
+			rest: `${more}. He reaches ${at} ${oddsWords(runnerOdds)} of the time, ${call} ${oddsWords(odds)}.`
+		};
+	}
+	if (view.nextLabel === null) return null;
+	const at = view.nextLabel;
+	if (runnerOdds >= EVEN && odds < EVEN) {
+		return {
+			name: runner.name,
+			rest: `${more}, but he is still there at ${at} ${oddsWords(runnerOdds)} of the time. ${call} is there ${oddsWords(odds)} of the time.`
+		};
+	}
+	return {
+		name: runner.name,
+		rest: `${more}. He is there at ${at} ${oddsWords(runnerOdds)} of the time, ${call} ${oddsWords(odds)}.`
+	};
 }
 
 export function callView(

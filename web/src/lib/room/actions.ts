@@ -3,12 +3,17 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { type LeagueSettings, rooms } from './api.ts';
 
-/** How long "Link copied" stays. */
-export const COPIED_MS = 2000;
+/** How long "Link copied" stays before the verb reads as itself again. */
+export const COPIED_MS = 3000;
 
-/** Starts a mock with these settings and goes to its room. */
-export async function startMock(settings: LeagueSettings, leagueId?: string): Promise<void> {
-	const room = await rooms.createMock(leagueId ? { league_id: leagueId } : { settings });
+/** Starts a mock with these settings and goes to its room. A seed replays a draft's bots: the same
+ * settings and seed draft the same until a pick goes another way. */
+export async function startMock(
+	settings: LeagueSettings,
+	leagueId?: string,
+	seed?: number
+): Promise<void> {
+	const room = await rooms.createMock(leagueId ? { league_id: leagueId } : { settings, seed });
 	if (!room.id) throw new Error('The new mock came back without an id.');
 	await goto(resolve('/mock/[id]', { id: room.id }));
 }
@@ -18,15 +23,12 @@ export function runAgain(settings: LeagueSettings, slot: number): Promise<void> 
 	return startMock({ ...settings, slot });
 }
 
-/** Copies a shared draft's link; true while "Link copied" shows. */
-export async function copyShareLink(code: string): Promise<boolean> {
-	await navigator.clipboard.writeText(`${location.origin}/mock/share/${code}`);
-	return true;
+/** "Run this draft from slot 11": a shared draft's settings and seed as the reader's own mock. */
+export function runShared(settings: LeagueSettings, slot: number, seed: number): Promise<void> {
+	return startMock({ ...settings, slot }, undefined, seed);
 }
 
-/** A solo room's seats: you, and the bots numbered around you. */
-export function botNames(teams: number, slot: number): string[] {
-	return Array.from({ length: teams }, (_, i) =>
-		i + 1 === slot ? 'You' : `Bot ${i + 1 < slot ? i + 1 : i}`
-	);
+/** Copies a shared draft's link. */
+export async function copyShareLink(code: string): Promise<void> {
+	await navigator.clipboard.writeText(`${location.origin}/mock/share/${code}`);
 }

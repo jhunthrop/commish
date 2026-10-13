@@ -24,12 +24,15 @@ export function lineupWords(s: LeagueSettings): string | null {
 	return null;
 }
 
+/** "12 teams · PPR · superflex". */
+export function formatLine(s: LeagueSettings): string {
+	const lineup = lineupWords(s);
+	return [`${s.teams} teams`, scoringWords(s), ...(lineup ? [lineup] : [])].join(' · ');
+}
+
 /** "12 teams · PPR · superflex · slot 8". */
 export function leagueLine(s: LeagueSettings, slot: number): string {
-	const lineup = lineupWords(s);
-	return [`${s.teams} teams`, scoringWords(s), ...(lineup ? [lineup] : []), `slot ${slot}`].join(
-		' · '
-	);
+	return `${formatLine(s)} · slot ${slot}`;
 }
 
 /** An engine slot as the room labels it: DEF is DST, SUPERFLEX is SFLX. */
@@ -39,10 +42,18 @@ export function slotLabel(slot: string): string {
 	return slot;
 }
 
-/** "1st", "2nd", "3rd", "12th". */
-export function ordinal(n: number): string {
-	const tens = n % 100;
-	if (tens >= 11 && tens <= 13) return `${n}th`;
-	const suffix = ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th';
-	return `${n}${suffix}`;
+/** A bot's name in every room: numbered by its seat, the way the wall and the field list it. */
+export function botName(seat: number): string {
+	return `Bot ${seat}`;
+}
+
+/** A solo room's seats: you, and the bots by seat. */
+export function botNames(teams: number, slot: number): string[] {
+	return Array.from({ length: teams }, (_, i) => (i + 1 === slot ? 'You' : botName(i + 1)));
+}
+
+/** How far your next pick is, after the one on the clock: "right after this one", "1 pick away". */
+export function picksAwayWords(between: number): string {
+	if (between <= 0) return 'right after this one';
+	return between === 1 ? '1 pick away' : `${between} picks away`;
 }
