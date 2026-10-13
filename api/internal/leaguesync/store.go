@@ -205,8 +205,9 @@ func (s *Store) Restore(ctx context.Context, accountID, id uuid.UUID) (Link, err
 }
 
 // Touch records when the account's link last answered from a read.
-func (s *Store) Touch(ctx context.Context, id uuid.UUID, at time.Time) error {
-	if _, err := s.Pool.Exec(ctx, `update app.league_links set last_read_at = $2 where id = $1`, id, at); err != nil {
+func (s *Store) Touch(ctx context.Context, accountID, id uuid.UUID, at time.Time) error {
+	if _, err := s.Pool.Exec(ctx, `update app.league_links set last_read_at = $3
+		where id = $1 and account_id = $2 and last_read_at is distinct from $3`, id, accountID, at); err != nil {
 		return fmt.Errorf("leaguesync: touch link %s: %w", id, err)
 	}
 	return nil

@@ -19,7 +19,8 @@ const client = apiClient(PUBLIC_API_URL);
 
 export { ApiError };
 
-const path = (id: string, tail: string): string => `/leagues/${encodeURIComponent(id)}/${tail}`;
+const path = (id: string, tail: string): string =>
+	`/leagues/attached/${encodeURIComponent(id)}/${tail}`;
 
 export const leagueApi = {
 	preview: (link: string) =>

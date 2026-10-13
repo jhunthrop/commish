@@ -228,7 +228,7 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
-	'/leagues/{id}/sync': {
+	'/leagues/attached/{id}/sync': {
 		parameters: {
 			query?: never;
 			header?: never;
@@ -248,7 +248,7 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
-	'/leagues/{id}/refresh': {
+	'/leagues/attached/{id}/refresh': {
 		parameters: {
 			query?: never;
 			header?: never;

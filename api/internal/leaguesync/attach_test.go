@@ -57,7 +57,7 @@ func (offlineMFL) Standings(context.Context, int, string) ([]mfl.Standing, error
 func (offlineMFL) LiveScoring(context.Context, int, string, int) ([]mfl.Matchup, error) {
 	return nil, errOffline
 }
-func (offlineMFL) Transactions(context.Context, int, string) ([]mfl.Transaction, error) {
+func (offlineMFL) Transactions(context.Context, int, string, int) ([]mfl.Transaction, error) {
 	return nil, errOffline
 }
 func (offlineMFL) SeasonStatus(context.Context, int) (mfl.Status, error) {

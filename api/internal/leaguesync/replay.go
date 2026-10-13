@@ -169,12 +169,17 @@ func (r MFLReplay) LiveScoring(ctx context.Context, season int, id string, week 
 	return r.Live.LiveScoring(ctx, season, id, week)
 }
 
-// Transactions reads the recording for the recorded league.
-func (r MFLReplay) Transactions(ctx context.Context, season int, id string) ([]mfl.Transaction, error) {
-	if r.recorded(season, id) {
-		return mfl.DecodeTransactions(replayFile("mfl/transactions.json"))
+// Transactions reads the recording for the recorded league: the moves of
+// its last fourteen days as this week's, none as last week's.
+func (r MFLReplay) Transactions(ctx context.Context, season int, id string, week int) ([]mfl.Transaction, error) {
+	if !r.recorded(season, id) {
+		return r.Live.Transactions(ctx, season, id, week)
 	}
-	return r.Live.Transactions(ctx, season, id)
+	status, err := r.SeasonStatus(ctx, season)
+	if err != nil || week != status.CurrentWeek {
+		return nil, err
+	}
+	return mfl.DecodeTransactions(replayFile("mfl/transactions.json"))
 }
 
 // SeasonStatus is the recording's for the recorded season.

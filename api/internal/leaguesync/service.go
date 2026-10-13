@@ -36,7 +36,7 @@ type Links interface {
 	Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, error)
 	Detach(ctx context.Context, accountID, id uuid.UUID) error
 	Restore(ctx context.Context, accountID, id uuid.UUID) (Link, error)
-	Touch(ctx context.Context, id uuid.UUID, at time.Time) error
+	Touch(ctx context.Context, accountID, id uuid.UUID, at time.Time) error
 	Linked(ctx context.Context, ref Ref) (bool, error)
 }
 
@@ -82,8 +82,8 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodGet, Path: "/leagues/attached", Access: httpx.SignedIn, Limit: read, Handler: s.attached},
 		{Method: http.MethodDelete, Path: "/leagues/attached/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDetachPerMinute), Handler: s.detach},
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/restore", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDetachPerMinute), Handler: s.restore},
-		{Method: http.MethodGet, Path: "/leagues/{id}/sync", Access: httpx.SignedIn, Limit: read, Handler: s.sync},
-		{Method: http.MethodPost, Path: "/leagues/{id}/refresh", Access: httpx.SignedIn, Limit: httpx.PerHour(limitRefreshPerHour), Handler: s.refresh},
+		{Method: http.MethodGet, Path: "/leagues/attached/{id}/sync", Access: httpx.SignedIn, Limit: read, Handler: s.sync},
+		{Method: http.MethodPost, Path: "/leagues/attached/{id}/refresh", Access: httpx.SignedIn, Limit: httpx.PerHour(limitRefreshPerHour), Handler: s.refresh},
 	}
 }
 
@@ -245,7 +245,11 @@ func (s *Service) answer(w http.ResponseWriter, r *http.Request, status int, lin
 		httpx.WriteInternal(w, r, s.Log, "leaguesync: view", err)
 		return
 	}
-	if err := s.Links.Touch(r.Context(), link.ID, read.ReadAt); err != nil {
+	if link.LastReadAt != nil && link.LastReadAt.Equal(read.ReadAt) {
+		httpx.WriteOK(w, r, status, view)
+		return
+	}
+	if err := s.Links.Touch(r.Context(), link.AccountID, link.ID, read.ReadAt); err != nil {
 		s.Log.Warn("leaguesync: touch", "link", link.ID, "err", err)
 	}
 	httpx.WriteOK(w, r, status, view)

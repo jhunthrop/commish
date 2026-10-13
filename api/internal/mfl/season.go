@@ -178,11 +178,10 @@ type Transaction struct {
 
 // Move kinds kept from the host's transactions.
 const (
-	MoveFreeAgent  = "FREE_AGENT"
-	MoveWaiver     = "WAIVER"
-	MoveBlindBid   = "BBID_WAIVER"
-	MoveTrade      = "TRADE"
-	moveDaysWindow = 14
+	MoveFreeAgent = "FREE_AGENT"
+	MoveWaiver    = "WAIVER"
+	MoveBlindBid  = "BBID_WAIVER"
+	MoveTrade     = "TRADE"
 )
 
 type wireTransactions struct {
@@ -199,10 +198,13 @@ type wireTransactions struct {
 	} `json:"transactions"`
 }
 
-// Transactions reads a league's moves of the last two weeks.
-func (c *Client) Transactions(ctx context.Context, season int, id string) ([]Transaction, error) {
+// Transactions reads a league's moves in one week.
+func (c *Client) Transactions(ctx context.Context, season int, id string, week int) ([]Transaction, error) {
+	if week < 1 || week > maxWeek {
+		return nil, ErrNotFound
+	}
 	var w wireTransactions
-	args := url.Values{"DAYS": {strconv.Itoa(moveDaysWindow)}}
+	args := url.Values{"W": {strconv.Itoa(week)}}
 	if err := c.export(ctx, season, id, "transactions", args, maxBody, &w); err != nil {
 		return nil, err
 	}

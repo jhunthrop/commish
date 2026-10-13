@@ -19,7 +19,7 @@ type MFLAPI interface {
 	Rules(ctx context.Context, season int, id string) ([]mfl.Rule, error)
 	Standings(ctx context.Context, season int, id string) ([]mfl.Standing, error)
 	LiveScoring(ctx context.Context, season int, id string, week int) ([]mfl.Matchup, error)
-	Transactions(ctx context.Context, season int, id string) ([]mfl.Transaction, error)
+	Transactions(ctx context.Context, season int, id string, week int) ([]mfl.Transaction, error)
 	SeasonStatus(ctx context.Context, season int) (mfl.Status, error)
 	Players(ctx context.Context, season int) ([]mfl.Player, error)
 }
@@ -119,9 +119,17 @@ func (m *MFL) Read(ctx context.Context, ref Ref) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, privateAfterSetup("live scoring", err)
 	}
-	txs, err := m.API.Transactions(ctx, ref.Season, ref.LeagueID)
-	if err != nil {
-		return Snapshot{}, privateAfterSetup("transactions", err)
+	var txs []mfl.Transaction
+	// This week's moves and last week's, as Sleeper's legs give them.
+	for _, week := range []int{snap.Week, snap.Week - 1} {
+		if week < 1 {
+			continue
+		}
+		moves, err := m.API.Transactions(ctx, ref.Season, ref.LeagueID, week)
+		if err != nil {
+			return Snapshot{}, privateAfterSetup("transactions", err)
+		}
+		txs = append(txs, moves...)
 	}
 	snap.Matchups, snap.Moves = mflSides(live), mflMoves(txs)
 	snap.Teams = withStarters(snap.Teams, snap.Matchups)
