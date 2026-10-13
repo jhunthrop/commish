@@ -41,13 +41,13 @@ func isClaimRefusal(err error) bool {
 // the last seat cannot both win. A pass whose season has ended at now
 // cannot be claimed: it would grant nothing. A claimer the Membership or
 // the season's own pass already covers is refused inside the same
-// transaction, under the account's lock, so two claims on two links (or a
-// claim and a checkout) cannot both take a seat.
+// transaction. The caller holds AccountLockKey around the call (billing
+// takes it with db.WithLock, on a connection outside the pool, as
+// checkout does), so two claims on two links, or a claim and a checkout,
+// cannot both take a seat, and a waiting claim never holds a pooled
+// connection.
 func (s *Store) ClaimGroupPass(ctx context.Context, groupPassID, accountID uuid.UUID, now time.Time, actor string) error {
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext($1))`, AccountLockKey(accountID)); err != nil {
-			return err
-		}
 		var seats, seasonYear int
 		var status string
 		err := tx.QueryRow(ctx, `
@@ -92,18 +92,22 @@ func (s *Store) ClaimGroupPass(ctx context.Context, groupPassID, accountID uuid.
 
 // coveredElsewhere refuses a claimer who already has what a seat grants
 // from somewhere other than this group pass. A seat already theirs is not
-// refused here: the unique claim index answers ErrAlreadyClaimed.
+// refused: it answers ErrAlreadyClaimed first, the no-op a repeat claim
+// gets, even for a claimer who has since become a member.
 func coveredElsewhere(ctx context.Context, tx pgx.Tx, groupPassID, accountID uuid.UUID, seasonYear int, now time.Time) error {
-	var member, pass bool
+	var mine, member, pass bool
 	err := tx.QueryRow(ctx, `
 		select
+		  exists (select 1 from app.entitlements e where e.account_id = $1 and e.group_pass_id = $4),
 		  exists (select 1 from app.entitlements e where e.account_id = $1 and e.product = 'membership' and `+liveClause+`),
 		  exists (select 1 from app.entitlements e where e.account_id = $1 and e.product = 'draft_pass' and e.season = $3
 		    and e.group_pass_id is distinct from $4 and `+liveClause+`)`,
-		accountID, now, seasonYear, groupPassID).Scan(&member, &pass)
+		accountID, now, seasonYear, groupPassID).Scan(&mine, &member, &pass)
 	switch {
 	case err != nil:
 		return err
+	case mine:
+		return ErrAlreadyClaimed
 	case member:
 		return ErrCoveredByMembership
 	case pass:

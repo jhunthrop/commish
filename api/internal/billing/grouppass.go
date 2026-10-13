@@ -1,6 +1,7 @@
 package billing
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -111,7 +112,11 @@ func (s *Service) claimGroupPass(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	accountID := auth.AccountID(r)
-	err := s.Entitlements.ClaimGroupPass(r.Context(), g.ID, accountID, s.Now(), "claim:"+accountID.String())
+	// The account's lock, held as checkout holds it: outside the pool, so
+	// claims queued behind a checkout never drain it.
+	err := s.Store.WithLock(r.Context(), entitlements.AccountLockKey(accountID), func(ctx context.Context) error {
+		return s.Entitlements.ClaimGroupPass(ctx, g.ID, accountID, s.Now(), "claim:"+accountID.String())
+	})
 	switch {
 	case errors.Is(err, entitlements.ErrAlreadyClaimed):
 		// Claiming twice is not a mistake worth an error: the pass is
