@@ -1,6 +1,7 @@
 import type { IconName } from './icons.ts';
 
-export type Section = 'board' | 'players' | 'mock' | 'sheet' | 'advisor' | 'record' | 'account';
+export type Section =
+	'board' | 'players' | 'mock' | 'sheet' | 'league' | 'advisor' | 'record' | 'account';
 
 export interface RailItem {
 	section: Section;
@@ -19,6 +20,8 @@ export const HOME_HREF = '/';
 const MOCK_SETUP = '/mock/new';
 /** The advisor's own page: our call beside your real draft (the live draft companion). */
 export const COMPANION_START = '/companion/new' as const;
+/** Where a league on another host is attached. */
+export const LEAGUE_START = '/league/new' as const;
 
 /** The rail, top to bottom. The phone shows every item not marked wideOnly along the bottom.
  * A page lights the item whose `owns` holds its first path segment: the board's companions (ADP,
@@ -75,6 +78,26 @@ export const RAIL: readonly RailItem[] = [
 	}
 ];
 
+/** Your league, shown once the account has one (rail-league.svelte.ts), after the cheat sheet:
+ * the in-season half of the rail. It opens the account's newest league. */
+export function leagueItem(leagueId: string): RailItem {
+	return {
+		section: 'league',
+		label: 'League',
+		href: `/league/${encodeURIComponent(leagueId)}`,
+		icon: 'league',
+		wideOnly: false,
+		owns: ['league']
+	};
+}
+
+/** The rail with League in its place when the account has a league. */
+export function railItems(leagueId: string | null): readonly RailItem[] {
+	if (leagueId === null) return RAIL;
+	const at = RAIL.findIndex((item) => item.section === 'sheet') + 1;
+	return [...RAIL.slice(0, at), leagueItem(leagueId), ...RAIL.slice(at)];
+}
+
 /** Pinned to the foot of the rail. */
 export const RAIL_FOOT: RailItem = {
 	section: 'account',
@@ -89,6 +112,7 @@ export const RAIL_FOOT: RailItem = {
  * (the front door, the system page). */
 export function sectionOf(pathname: string): Section | null {
 	const [first = ''] = pathname.split('/').filter((segment) => segment !== '');
+	if (first === 'league') return 'league';
 	const item = [...RAIL, RAIL_FOOT].find((candidate) => candidate.owns.includes(first));
 	return item?.section ?? null;
 }

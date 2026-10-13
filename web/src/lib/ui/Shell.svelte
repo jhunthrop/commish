@@ -1,10 +1,18 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import { page } from '$app/state';
+	import { railLeague } from './rail-league.svelte.ts';
 	import Icon from './Icon.svelte';
 	import Stamp from './Stamp.svelte';
 	import ThemeSwitch from './ThemeSwitch.svelte';
-	import { HOME_HREF, RAIL, RAIL_FOOT, sectionOf, type RailItem, type Section } from './nav.ts';
+	import {
+		HOME_HREF,
+		RAIL_FOOT,
+		railItems,
+		sectionOf,
+		type RailItem,
+		type Section
+	} from './nav.ts';
 
 	interface Props {
 		/** The page's name in the top bar. Hidden on the phone, where the rail names the section. */
@@ -26,6 +34,9 @@
 	let { title, stamp, active, search, tail, children }: Props = $props();
 
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
+	// League joins the rail once this browser has seen the account's league list hold one.
+	onMount(() => railLeague.read());
+	const items = $derived(railItems(railLeague.id));
 </script>
 
 {#snippet railLink(item: RailItem)}
@@ -43,7 +54,7 @@
 <div class="app">
 	<nav class="rail" aria-label="Sections">
 		<a class="mark" href={HOME_HREF} aria-label="Commish"><b>C</b></a>
-		{#each RAIL as item (item.section)}
+		{#each items as item (item.section)}
 			{@render railLink(item)}
 		{/each}
 		<span class="spacer"></span>

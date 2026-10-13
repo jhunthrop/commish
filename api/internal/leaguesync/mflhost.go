@@ -122,6 +122,7 @@ func (m *MFL) Read(ctx context.Context, ref Ref) (Snapshot, error) {
 		return Snapshot{}, privateAfterSetup("transactions", err)
 	}
 	snap.Matchups, snap.Moves = mflSides(live), mflMoves(txs)
+	snap.Teams = withStarters(snap.Teams, snap.Matchups)
 	return snap, nil
 }
 
@@ -152,6 +153,25 @@ func mflTeams(l mfl.League, rosters []mfl.Roster, standings []mfl.Standing) []Te
 		})
 	}
 	return teams
+}
+
+// withStarters sets each team's lineup from the week's live scoring:
+// the host's rosters export carries no lineup, its live scoring does.
+func withStarters(teams []Team, sides []Side) []Team {
+	starters := map[int][]string{}
+	for _, s := range sides {
+		if _, ok := starters[s.RosterID]; !ok || s.Game != 0 {
+			starters[s.RosterID] = s.Starters
+		}
+	}
+	out := make([]Team, len(teams))
+	for i, t := range teams {
+		out[i] = t
+		if st, ok := starters[t.RosterID]; ok {
+			out[i].Starters = st
+		}
+	}
+	return out
 }
 
 // mflSides numbers each game so its two sides pair, as Sleeper's

@@ -48,11 +48,11 @@ export const FEATURE_WORDS: Readonly<Record<Feature, FeatureWords>> = {
 	},
 	waiver_ranks: {
 		lead: 'Your waiver pickups, ranked',
-		text: "the players no one in your league holds, ranked by what each adds to your own roster"
+		text: 'the players no one in your league holds, ranked by what each adds to your own roster'
 	},
 	trade_finder: {
 		lead: 'Trades that help both teams',
-		text: "two rosters side by side, with the players who make each team better"
+		text: 'two rosters side by side, with the players who make each team better'
 	}
 };
 
