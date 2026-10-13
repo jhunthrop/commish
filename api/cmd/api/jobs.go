@@ -124,7 +124,7 @@ func runSweep(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpo
 		return err
 	}
 	log.Info("cleared billing event payloads", "cleared", cleared)
-	unclaimed, err := (&mocks.Store{Pool: pool}).SweepUnclaimed(ctx, now.Add(-auth.AnonTTL))
+	unclaimed, err := (&mocks.Store{Pool: pool}).SweepUnclaimed(ctx, now.Add(-auth.AnonTTL), now.Add(-auth.AnonEmptyTTL))
 	if err != nil {
 		return err
 	}

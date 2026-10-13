@@ -6,6 +6,7 @@
 //	go run ./tools/roommeasure solo   [-mocks 20]
 //	go run ./tools/roommeasure lobby  [-format 12_ppr] [-people 12]
 //	go run ./tools/roommeasure fill   [-format 10_ppr]
+//	go run ./tools/roommeasure failover -kill <pid of the room at -a> [-a ws://localhost:8081] [-b ws://localhost:8082]
 //
 // Environment: DATABASE_URL (the api's), WORKOS_COOKIE_PASSWORD (the api's),
 // API (default http://localhost:8080).
@@ -53,6 +54,15 @@ func main() {
 		if d, err = mint(ctx, env, *handle); err == nil {
 			fmt.Println(d.Session, d.CSRF, d.ID)
 		}
+	case "failover":
+		var setup failoverSetup
+		fs.StringVar(&setup.format, "format", "12_ppr", "the lobby format")
+		fs.StringVar(&setup.a, "a", "ws://localhost:8081", "the room instance the drafters start on, killed mid-clock")
+		fs.StringVar(&setup.b, "b", "ws://localhost:8082", "the room instance the drafters move to")
+		fs.IntVar(&setup.killPID, "kill", 0, "the pid of the instance at -a")
+		fs.DurationVar(&setup.lead, "lead", time.Second, "how long before the pick clock runs out the kill lands")
+		_ = fs.Parse(os.Args[2:])
+		err = measureFailover(ctx, env, setup)
 	case "fill":
 		format := fs.String("format", "10_ppr", "the lobby format")
 		_ = fs.Parse(os.Args[2:])

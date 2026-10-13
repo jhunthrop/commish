@@ -157,7 +157,7 @@ func SecurityHeaders() Middleware {
 // on the apex domain and the site is a different origin from the API.
 const (
 	corsMethods = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-	corsHeaders = "Content-Type, X-CSRF-Token, X-Request-Id"
+	corsHeaders = "Content-Type, X-CSRF-Token, X-Anon-CSRF-Token, X-Request-Id"
 	corsMaxAge  = "600"
 )
 

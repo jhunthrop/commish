@@ -126,7 +126,7 @@ func (c *Clock) start(ctx context.Context, id uuid.UUID) error {
 			return errNoChange
 		}
 		if people == 0 {
-			return w.setStatus(StatusAbandoned)
+			return w.abandon(AbandonedNobodyHere)
 		}
 		board, err := c.Boards.For(ctx, r.Settings)
 		if err != nil {

@@ -40,6 +40,7 @@ const sharedEpoch = "2026-08-15T18:00:00.000Z"
 type Repository interface {
 	Start(ctx context.Context, owner mocks.Owner, n mocks.NewMock) (apitypes.Mock, error)
 	LiveAnonymous(ctx context.Context, ownerToken []byte) (int, error)
+	CountAnonymousStart(ctx context.Context, at time.Time) (int, error)
 	ReadLog(ctx context.Context, owner mocks.Owner, id uuid.UUID) (mocks.Log, error)
 	AppendActions(ctx context.Context, owner mocks.Owner, id uuid.UUID, afterSeq int64, actions []mocks.Action, completedAt *time.Time) error
 	Truncate(ctx context.Context, owner mocks.Owner, id uuid.UUID, head, fromSeq int64) error

@@ -61,7 +61,7 @@ func (s *Service) ownerAndID(w http.ResponseWriter, r *http.Request) (mocks.Owne
 	if !ok {
 		return mocks.Owner{}, uuid.Nil, false
 	}
-	owner, ok := s.owner(w, r, false)
+	owner, ok := s.owner(w, r)
 	return owner, id, ok
 }
 
@@ -137,7 +137,10 @@ func (s *Service) handleCreate(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, map[string]string{"seed": "The seed is a whole number from 0 to 4294967295"})
 		return
 	}
-	owner, ok := s.owner(w, r, true)
+	// Who the request already is; a signed-out browser with no token gets
+	// one only after the settings and the caps pass, so a refused create
+	// never sets a cookie.
+	owner, found, ok := s.current(w, r)
 	if !ok {
 		return
 	}
@@ -146,15 +149,13 @@ func (s *Service) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if owner.Anonymous() {
-		live, err := s.Mocks.LiveAnonymous(r.Context(), owner.Token)
-		if err != nil {
-			httpx.WriteInternal(w, r, s.Log, "solo: count anonymous", err)
+		if !s.admitAnonymous(w, r, owner, found) {
 			return
 		}
-		if live >= MaxLiveAnonymous {
-			httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict,
-				"Sign in to keep more than 25 mocks going at once", nil)
-			return
+		if !found {
+			if owner, ok = s.mint(w, r); !ok {
+				return
+			}
 		}
 	}
 	seed := randomSeed()

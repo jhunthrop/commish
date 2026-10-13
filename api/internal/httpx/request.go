@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"strconv"
 
@@ -17,10 +18,20 @@ const (
 	MaxLargeBody = 512 << 10
 )
 
+// jsonMediaType is the only body type DecodeJSON reads.
+const jsonMediaType = "application/json"
+
 // DecodeJSON reads one JSON object of at most limit bytes into dst,
-// refusing unknown fields and trailing data. On failure it has already
-// answered and reports false.
+// refusing unknown fields and trailing data. The body must be sent as
+// application/json: an HTML form cannot send that type across sites
+// without a CORS preflight, so a cross-site form POST never reaches a
+// handler that reads a body (and so never changes a cookie it sets). On
+// failure it has already answered and reports false.
 func DecodeJSON(w http.ResponseWriter, r *http.Request, limit int64, dst any) bool {
+	if media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || media != jsonMediaType {
+		WriteError(w, r, http.StatusUnsupportedMediaType, CodeUnsupportedMedia, "Send the body as application/json", nil)
+		return false
+	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {

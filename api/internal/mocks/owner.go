@@ -70,12 +70,32 @@ func (s *Store) LiveAnonymous(ctx context.Context, ownerToken []byte) (int, erro
 	return n, nil
 }
 
-// SweepUnclaimed deletes the anonymous mocks nobody has touched or
-// claimed since before, with their logs and cards.
-func (s *Store) SweepUnclaimed(ctx context.Context, before time.Time) (int64, error) {
-	tag, err := s.Pool.Exec(ctx, `delete from app.mocks where owner_token is not null and updated_at < $1`, before)
+// CountAnonymousStart counts one signed-out start into its hour, across
+// every instance, and answers the hour's count including it.
+func (s *Store) CountAnonymousStart(ctx context.Context, at time.Time) (int, error) {
+	var n int
+	err := s.Pool.QueryRow(ctx, `insert into app.anon_mock_hours (hour, started) values (date_trunc('hour', $1::timestamptz), 1)
+		on conflict (hour) do update set started = app.anon_mock_hours.started + 1 returning started`, at).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("mocks: count anonymous start: %w", err)
+	}
+	return n, nil
+}
+
+// SweepUnclaimed deletes, with their logs and cards, the anonymous mocks
+// nobody has touched or claimed since idleBefore, and the ones nothing
+// happened in after their create (no pick, no autopick: every action is
+// the create's own) made before emptyBefore. It drops the start counts of
+// hours before emptyBefore too.
+func (s *Store) SweepUnclaimed(ctx context.Context, idleBefore, emptyBefore time.Time) (int64, error) {
+	tag, err := s.Pool.Exec(ctx, `delete from app.mocks m where m.owner_token is not null and (m.updated_at < $1
+		or (m.created_at < $2 and not exists (select 1 from app.mock_actions a where a.mock_id = m.id and a.at > m.created_at)))`,
+		idleBefore, emptyBefore)
 	if err != nil {
 		return 0, fmt.Errorf("mocks: sweep unclaimed: %w", err)
+	}
+	if _, err := s.Pool.Exec(ctx, `delete from app.anon_mock_hours where hour < $1`, emptyBefore); err != nil {
+		return 0, fmt.Errorf("mocks: sweep anonymous hours: %w", err)
 	}
 	return tag.RowsAffected(), nil
 }

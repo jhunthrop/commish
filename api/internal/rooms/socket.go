@@ -48,7 +48,9 @@ type Socket struct {
 	Lobby *lobby.Store
 	Hub   *Hub
 	// Adopt claims a room for this instance's clock when a drafter connects
-	// to a room no live clock holds.
+	// to a room no live lease holds; Owners also adopts every room in
+	// Serving on each pass, so a room whose instance died is taken over as
+	// soon as its lease lapses.
 	Adopt func(ctx context.Context, id uuid.UUID)
 	// OriginHosts are the hosts a browser may open a socket from, the
 	// same origins CORS allows.
@@ -57,7 +59,11 @@ type Socket struct {
 	Log         *slog.Logger
 
 	presence presence
+	limits   seatLimits
 }
+
+// Serving is every room this instance has a drafter's socket open on.
+func (s *Socket) Serving() []uuid.UUID { return s.presence.rooms() }
 
 // OriginHosts turns exact origins into the host patterns the WebSocket
 // library checks.
@@ -88,11 +94,6 @@ func (s *Socket) serve(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// A room nobody's clock holds (a new room, or one whose instance died)
-	// is adopted as its first drafter connects, rather than at the sweep.
-	if s.Adopt != nil {
-		s.Adopt(r.Context(), roomID)
-	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: s.OriginHosts})
 	if err != nil {
 		// Accept has already answered the request.
@@ -101,7 +102,22 @@ func (s *Socket) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	conn.SetReadLimit(maxMessage)
 	defer func() { _ = conn.CloseNow() }()
-	if err := s.session(r.Context(), conn, roomID, account, seat); err != nil && !isClosed(err) {
+	// The seat's socket budget: the newest socket past it is refused with
+	// the reason and closed, the seat's other sockets untouched.
+	key := seatKey{room: roomID, seat: seat}
+	budget, reason := s.limits.open(key, s.Now())
+	if budget == nil {
+		_ = s.refuse(r.Context(), conn, httpx.CodeRateLimited, reason)
+		_ = conn.Close(websocket.StatusPolicyViolation, "seat over its socket budget")
+		return
+	}
+	defer s.limits.close(key, s.Now())
+	// A room nobody's clock holds (a new room, or one whose instance died)
+	// is adopted as its drafter connects, rather than at the next pass.
+	if s.Adopt != nil {
+		s.Adopt(r.Context(), roomID)
+	}
+	if err := s.session(r.Context(), conn, roomID, account, seat, budget); err != nil && !isClosed(err) {
 		s.Log.Warn("rooms: session", "request_id", httpx.RequestIDFrom(r.Context()), "room", roomID, "err", err)
 	}
 }
@@ -172,7 +188,7 @@ func wire(rows []lobby.LogRow, seat int) []apitypes.RoomAction {
 // A drafter who left is given the seat back on connecting; the last
 // socket of a drafter on this instance closing hands the seat to its
 // stand-in at once.
-func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, account uuid.UUID, seat int) error {
+func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, account uuid.UUID, seat int, budget *seatBudget) error {
 	helloCtx, cancel := context.WithTimeout(ctx, helloTimeout)
 	var hello apitypes.RoomHello
 	err := wsjson.Read(helloCtx, conn, &hello)
@@ -221,14 +237,16 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, acco
 	go func() { readErr <- readCommands(ctx, conn, commands) }()
 	ticker := time.NewTicker(pingEvery)
 	defer ticker.Stop()
-	limits := newCommandLimits()
+	// Drops are this socket's own: one socket abusing the seat's budget is
+	// closed, the seat's other tabs stay.
+	dropped := 0
 	for {
 		select {
 		case err := <-readErr:
 			return err
 		case cmd := <-commands:
-			if !limits.allow(cmd.Type) {
-				if limits.abusive() {
+			if !budget.allow(cmd.Type) {
+				if dropped++; dropped >= abusiveDropped {
 					return conn.Close(websocket.StatusPolicyViolation, "too many commands")
 				}
 				if err := s.refuse(ctx, conn, httpx.CodeRateLimited, "Slow down: the room takes a few commands a second."); err != nil {
@@ -344,6 +362,21 @@ func (p *presence) enter(room, account uuid.UUID) {
 		p.open = map[[2]uuid.UUID]int{}
 	}
 	p.open[[2]uuid.UUID{room, account}]++
+}
+
+// rooms is every room with a socket open on this instance.
+func (p *presence) rooms() []uuid.UUID {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	seen := map[uuid.UUID]bool{}
+	out := make([]uuid.UUID, 0, len(p.open))
+	for k := range p.open {
+		if !seen[k[0]] {
+			seen[k[0]] = true
+			out = append(out, k[0])
+		}
+	}
+	return out
 }
 
 // leave reports whether that was the drafter's last socket here.

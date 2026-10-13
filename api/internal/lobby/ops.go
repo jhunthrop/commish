@@ -157,7 +157,7 @@ func (s *Store) Leave(ctx context.Context, id, account uuid.UUID) error {
 				return err
 			}
 			if w.room.People() == 0 {
-				return w.setStatus(StatusAbandoned)
+				return w.abandon(AbandonedEveryoneLeft)
 			}
 			return nil
 		case StatusDrafting:
@@ -271,6 +271,16 @@ func (w *writer) drafter(account uuid.UUID) (int, error) {
 		return 0, ErrNotDrafting
 	}
 	return n, nil
+}
+
+// abandon closes a room that never drafted and logs why, so every socket
+// on it (a drafter who joined and stepped away included, when they come
+// back) is told rather than left on a room that will never start.
+func (w *writer) abandon(reason string) error {
+	if err := w.setStatus(StatusAbandoned); err != nil {
+		return err
+	}
+	return w.log(KindRoomAbandoned, nil, map[string]string{"reason": reason})
 }
 
 func (w *writer) setStatus(status string) error {

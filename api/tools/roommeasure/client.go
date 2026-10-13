@@ -79,8 +79,8 @@ func (d *drafter) authorize(req *http.Request) {
 		return
 	}
 	for _, c := range d.http.Jar.Cookies(req.URL) {
-		if c.Name == auth.CSRFCookie {
-			req.Header.Set(auth.CSRFHeader, c.Value)
+		if c.Name == auth.AnonCSRFCookie {
+			req.Header.Set(auth.AnonCSRFHeader, c.Value)
 		}
 	}
 }

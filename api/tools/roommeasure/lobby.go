@@ -50,39 +50,12 @@ type lobbyRun struct {
 // a pick to every other drafter, a tab closed and its seat handed to a
 // stand-in before its clock, reconnects, and the report.
 func measureLobby(ctx context.Context, env environment, format string, people int) error {
-	drafters := make([]*drafter, people)
-	for i := range drafters {
-		d, err := mint(ctx, env, handleFor("lobby", i))
-		if err != nil {
-			return err
-		}
-		drafters[i] = d
-	}
-	seats := make([]apitypes.LobbySeat, people)
 	began := time.Now()
-	var wg sync.WaitGroup
-	errs := make(chan error, people)
-	for i, d := range drafters {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, _, err := d.call(ctx, http.MethodPost, "/lobbies/join", apitypes.LobbyJoin{Format: apitypes.LobbyFormat(format)}, &seats[i])
-			errs <- err
-		}()
-	}
-	wg.Wait()
-	close(errs)
-	for err := range errs {
-		if err != nil {
-			return err
-		}
+	drafters, seats, err := joinLobby(ctx, env, "lobby", format, people)
+	if err != nil {
+		return err
 	}
 	room := seats[0].RoomId
-	for _, s := range seats {
-		if s.RoomId != room {
-			return fmt.Errorf("the drafters landed in different rooms: %s and %s", room, s.RoomId)
-		}
-	}
 	var view apitypes.LobbyRoom
 	if _, _, err := drafters[0].call(ctx, http.MethodGet, "/lobbies/"+room.String(), nil, &view); err != nil {
 		return err
@@ -140,6 +113,43 @@ func measureLobby(ctx context.Context, env environment, format string, people in
 		fmt.Printf("%-44s %d x %q\n", "refused commands", n, msg)
 	}
 	return nil
+}
+
+// joinLobby mints people drafters and seats them all in one room of the
+// format at once.
+func joinLobby(ctx context.Context, env environment, prefix, format string, people int) ([]*drafter, []apitypes.LobbySeat, error) {
+	drafters := make([]*drafter, people)
+	for i := range drafters {
+		d, err := mint(ctx, env, handleFor(prefix, i))
+		if err != nil {
+			return nil, nil, err
+		}
+		drafters[i] = d
+	}
+	seats := make([]apitypes.LobbySeat, people)
+	var wg sync.WaitGroup
+	errs := make(chan error, people)
+	for i, d := range drafters {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _, err := d.call(ctx, http.MethodPost, "/lobbies/join", apitypes.LobbyJoin{Format: apitypes.LobbyFormat(format)}, &seats[i])
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	for _, s := range seats {
+		if s.RoomId != seats[0].RoomId {
+			return nil, nil, fmt.Errorf("the drafters landed in different rooms: %s and %s", seats[0].RoomId, s.RoomId)
+		}
+	}
+	return drafters, seats, nil
 }
 
 func lobbyPicks(ctx context.Context, env environment, room uuid.UUID) (int, error) {

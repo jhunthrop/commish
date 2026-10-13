@@ -2,7 +2,6 @@ package rooms
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -14,22 +13,32 @@ import (
 	"github.com/jhunthrop/commish/api/internal/lobby"
 )
 
-// Lease timings, and the database cadence they cost.
+// Lease timings, together under the shortest pick clock (10 seconds,
+// app.rooms.clock_seconds' floor; lobbies run 30 and 45).
 //
-// While this instance holds a live room it renews its leases every Renew
-// (well inside Lease, so a room is adopted within Lease of its instance
-// dying) and sweeps for rooms to adopt every Sweep. While it holds none it
-// sweeps every IdleSweep and never renews: a room's first drafter
-// connecting adopts it at once (Socket.Adopt), so the slow sweep only
-// catches a room whose instance died with nobody reconnecting. Out of
-// season an idle instance touches the database once every IdleSweep and
-// holds no LISTEN connection (Hub listens only while it has subscribers),
-// so Neon can suspend.
+// A room's clock runs on the instance holding its lease, renewed every
+// Renew to Lease from now. An instance that dies stops renewing, so its
+// lease lapses at most Lease after its last renewal; every instance that
+// is live (holding a room's clock or serving a room's sockets) runs a
+// pass every Sweep that adopts lapsed rooms, its own sockets' rooms first,
+// and an adopted room's clock acts at once on any event that fell due
+// while nobody held it. The worst case from an instance dying to the next
+// clock tick is therefore Lease + Sweep plus a query: 7 seconds, inside
+// even a 10 second clock (measured in the lane report). A drafter whose
+// socket died with the instance reconnects to a live instance, which
+// serves the room and so adopts it within that bound.
+//
+// Out of season the cost is nothing: an instance holding no room and
+// serving no socket makes no query at all (one claim at start aside) and
+// holds no LISTEN connection (Hub listens only while subscribed), so the
+// database can suspend. A lapsed room is then adopted when a drafter's
+// socket arrives (Socket.Adopt, a single update on the room's lease), or
+// by any instance that becomes live; a room nobody is connected to waits
+// for its next drafter, who catches it up at once.
 const (
-	DefaultLease     = 10 * time.Second
-	DefaultRenew     = 3 * time.Second
-	DefaultSweep     = time.Second
-	DefaultIdleSweep = time.Minute
+	DefaultLease = 6 * time.Second
+	DefaultRenew = 2 * time.Second
+	DefaultSweep = time.Second
 	// pollEvery bounds a live room's sleep: its clock re-reads the room at
 	// least this often, so a half-open LISTEN connection cannot stall it.
 	pollEvery = 2 * time.Second
@@ -44,17 +53,19 @@ const (
 // (the fill deadline, a bot's think time, a pick clock) or until the
 // room's log moves.
 type Owners struct {
-	Pool      *pgxpool.Pool
-	Store     *lobby.Store
-	Clock     *lobby.Clock
-	Hub       *Hub
-	Instance  string
-	Lease     time.Duration
-	Renew     time.Duration
-	Sweep     time.Duration
-	IdleSweep time.Duration
-	Now       func() time.Time
-	Log       *slog.Logger
+	Pool     *pgxpool.Pool
+	Store    *lobby.Store
+	Clock    *lobby.Clock
+	Hub      *Hub
+	Instance string
+	Lease    time.Duration
+	Renew    time.Duration
+	Sweep    time.Duration
+	// Serving is the rooms this instance has a drafter's socket open on;
+	// each pass adopts any of them whose lease has lapsed.
+	Serving func() []uuid.UUID
+	Now     func() time.Time
+	Log     *slog.Logger
 
 	mu      sync.Mutex
 	running map[uuid.UUID]context.CancelFunc
@@ -62,15 +73,15 @@ type Owners struct {
 	wg      sync.WaitGroup
 }
 
-// Run sweeps and renews until ctx ends, then gives its leases up so
-// another instance adopts the rooms at once.
+// Run keeps the leases until ctx ends, then gives them up so another
+// instance adopts the rooms at once.
 func (o *Owners) Run(ctx context.Context) {
 	o.mu.Lock()
 	o.running = map[uuid.UUID]context.CancelFunc{}
 	o.base = ctx
 	o.mu.Unlock()
 	o.claim(ctx)
-	lastSweep, lastRenew := o.Now(), o.Now()
+	lastRenew := o.Now()
 	tick := time.NewTicker(o.Sweep)
 	defer tick.Stop()
 	for {
@@ -81,21 +92,24 @@ func (o *Owners) Run(ctx context.Context) {
 			return
 		case <-tick.C:
 		}
-		now := o.Now()
-		live := o.holding() > 0
-		if live && now.Sub(lastRenew) >= o.Renew {
+		served := o.served()
+		if o.holding() == 0 && len(served) == 0 {
+			continue // idle: no query
+		}
+		if now := o.Now(); o.holding() > 0 && now.Sub(lastRenew) >= o.Renew {
 			o.renew(ctx)
 			lastRenew = now
 		}
-		sweepEvery := o.IdleSweep
-		if live {
-			sweepEvery = o.Sweep
-		}
-		if now.Sub(lastSweep) >= sweepEvery {
-			o.claim(ctx)
-			lastSweep = now
-		}
+		o.adopt(ctx, served)
+		o.claim(ctx)
 	}
+}
+
+func (o *Owners) served() []uuid.UUID {
+	if o.Serving == nil {
+		return nil
+	}
+	return o.Serving()
 }
 
 // holding is how many rooms this instance keeps the clock of.
@@ -105,19 +119,28 @@ func (o *Owners) holding() int {
 	return len(o.running)
 }
 
-// Adopt claims one room for this instance if no live lease holds it: the
-// room's first drafter connecting starts its clock without waiting on the
-// sweep.
+// Adopt claims one room for this instance if no live lease holds it: a
+// drafter connecting starts a lapsed room's clock without waiting a pass.
 func (o *Owners) Adopt(ctx context.Context, id uuid.UUID) {
-	var claimed bool
-	err := o.Pool.QueryRow(ctx, `update app.rooms set owner_instance = $1, lease_until = now() + $2::interval
-		where id = $3 and status in ('filling', 'drafting') and (lease_until is null or lease_until < now())
-		returning true`, o.Instance, o.Lease.String(), id).Scan(&claimed)
-	if errors.Is(err, pgx.ErrNoRows) {
+	o.adopt(ctx, []uuid.UUID{id})
+}
+
+// adopt claims each of ids that is live and whose lease is missing or
+// lapsed, and starts its clock.
+func (o *Owners) adopt(ctx context.Context, ids []uuid.UUID) {
+	if len(ids) == 0 {
 		return
 	}
+	rows, err := o.Pool.Query(ctx, `update app.rooms set owner_instance = $1, lease_until = now() + $2::interval
+		where id = any($3) and status in ('filling', 'drafting') and (lease_until is null or lease_until < now())
+		returning id`, o.Instance, o.Lease.String(), ids)
 	if err != nil {
-		o.Log.Warn("rooms: adopt", "room", id, "err", err)
+		o.Log.Warn("rooms: adopt", "err", err)
+		return
+	}
+	claimed, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		o.Log.Warn("rooms: adopt", "err", err)
 		return
 	}
 	o.mu.Lock()
@@ -126,7 +149,9 @@ func (o *Owners) Adopt(ctx context.Context, id uuid.UUID) {
 	if base == nil {
 		return
 	}
-	o.start(base, id)
+	for _, id := range claimed {
+		o.start(base, id)
+	}
 }
 
 // claim adopts live rooms with no lease or a lapsed one: new rooms, and

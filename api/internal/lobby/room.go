@@ -27,6 +27,17 @@ const (
 	KindSeatReturned = "SEAT_RETURNED"
 	KindRoomStarted  = "ROOM_STARTED"
 	KindRoomComplete = "ROOM_COMPLETE"
+	// KindRoomAbandoned closes a room that never drafted; its payload's
+	// reason is one of the Abandoned reasons below.
+	KindRoomAbandoned = "ROOM_ABANDONED"
+)
+
+// Why a room was abandoned, as its ROOM_ABANDONED row says.
+const (
+	// AbandonedNobodyHere: the fill deadline came with no drafter connected.
+	AbandonedNobodyHere = "nobody_here"
+	// AbandonedEveryoneLeft: the last drafter left while it filled.
+	AbandonedEveryoneLeft = "everyone_left"
 )
 
 // Who made a pick, as the log says it.
