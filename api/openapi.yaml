@@ -1388,14 +1388,21 @@ components:
         source: { type: string, enum: [purchase, group_pass, grant] }
     MembershipState:
       type: object
-      required: [status, interval, current_period_end, cancel_at_period_end]
+      description: >-
+        the account's Membership, from its live membership entitlement whatever its source, else its
+        latest subscription. A subscription carries its billing (interval, current_period_end and
+        cancel_at_period_end). A grant bought nothing, so those three are null.
+      required: [source, status, starts_at, ends_at, interval, current_period_end, cancel_at_period_end]
       properties:
+        source: { type: string, enum: [subscription, grant] }
         status: { type: string }
+        starts_at: { type: string, format: date-time }
+        ends_at: { type: string, format: date-time, nullable: true, description: "when access ends, null for a grant with no end" }
         interval:
           nullable: true
           allOf: [{ $ref: "#/components/schemas/Interval" }]
         current_period_end: { type: string, format: date-time, nullable: true }
-        cancel_at_period_end: { type: boolean }
+        cancel_at_period_end: { type: boolean, nullable: true }
     AccountUpdate:
       type: object
       required: [handle]
