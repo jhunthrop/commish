@@ -50,7 +50,9 @@ func (c *Client) LeagueUsers(ctx context.Context, leagueID string) ([]User, erro
 
 func cleanName(s string) string {
 	s = strings.TrimSpace(strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
+		// Control and format characters (Cc, Cf): a bidi override such as
+		// U+202E would turn a name around or spill its direction next door.
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return -1
 		}
 		return r
