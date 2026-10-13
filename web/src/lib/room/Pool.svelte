@@ -13,6 +13,8 @@
 		rows: readonly RoomPlayer[];
 		/** Players left in the pool, before the filter. */
 		left: number;
+		/** No call, so no odds, is coming for this turn. */
+		oddsGone?: boolean;
 		/** Each player's chance of lasting to your next pick. */
 		odds: Readonly<Record<string, number>>;
 		/** What the odds are of: "still there at 6.05". */
@@ -45,6 +47,7 @@
 	let {
 		rows,
 		left,
+		oddsGone = false,
 		odds,
 		oddsLabel,
 		oddsShown,
@@ -71,8 +74,10 @@
 	const MORE_ROWS = 25;
 
 	let shown = $state(FIRST_ROWS);
+	/** Under a row with no chance to show, in words that fit the column: not in this card's odds,
+	 * on their way with the call, or none at all when no call is coming. */
 	const oddsMissing = $derived(
-		Object.keys(odds).length > 0 ? 'not in the odds' : 'odds come with the call'
+		oddsGone ? 'no odds' : Object.keys(odds).length > 0 ? 'not in the odds' : 'odds to come'
 	);
 	const visible = $derived(Math.max(shown, rows.findIndex((p) => p.id === selectedId) + 1));
 	const empty = $derived.by(() => {

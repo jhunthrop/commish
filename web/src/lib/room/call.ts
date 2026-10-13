@@ -23,11 +23,17 @@ export interface CallView {
 
 /** The pool's basis, printed over it: whose points rank it, on which board, and where the odds come
  * from. Every number names its basis in the same view. */
-export function poolBasis(board: Board, card: RoomCard | null, teams: number): string {
-	return `${board.basis} ${oddsBasis(card, teams)}`;
+export function poolBasis(
+	board: Board,
+	card: RoomCard | null,
+	teams: number,
+	callMissing = false
+): string {
+	return `${board.basis} ${oddsBasis(card, teams, callMissing)}`;
 }
 
-function oddsBasis(card: RoomCard | null, teams: number): string {
+function oddsBasis(card: RoomCard | null, teams: number, callMissing: boolean): string {
+	if (card === null && callMissing) return 'No odds for this pick.';
 	if (card === null) return 'The odds land with our call.';
 	const to = card.next_pick === null ? 'your last pick' : pickLabel(card.next_pick, teams);
 	if (card.source === 'advisor') {

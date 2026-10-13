@@ -26,15 +26,22 @@
 	let branch = $state<string | null>(null);
 	const copied = new Flash(COPIED_MS);
 
+	/** The turn's call could not be made: the room says so and drafts from the pool. */
+	let cardMissing = $state(false);
+
 	async function loadCard(current: MockRoom): Promise<void> {
 		card = null;
+		cardMissing = false;
 		if (!current.waiting) return;
+		const stillHere = (): boolean => room?.pick_number === current.pick_number;
 		try {
 			const next = await rooms.card(id);
-			if (room?.pick_number === next.pick_number) card = next;
+			if (!stillHere()) return;
+			if (next.pick_number === current.pick_number) card = next;
+			else cardMissing = true;
 		} catch {
-			// The room drafts without a card; the call lands with the next one.
-			card = null;
+			// The room never waits on a call that is not coming: it drafts from the pool.
+			if (stillHere()) cardMissing = true;
 		}
 	}
 
@@ -48,8 +55,10 @@
 		// A queue change keeps the turn, and the turn keeps its card.
 		if (samePick) return;
 		// The turn brings its card, so the call paints with it. Without one, the room asks.
-		if (next.card?.pick_number === next.pick_number) card = next.card;
-		else await loadCard(next);
+		if (next.card?.pick_number === next.pick_number) {
+			card = next.card;
+			cardMissing = false;
+		} else await loadCard(next);
 	}
 
 	/** Every write to the room runs one after another, so a key pressed while another write is on
@@ -162,6 +171,7 @@
 			search={query}
 			{busy}
 			notice={branch}
+			callMissing={cardMissing}
 			copied={copied.on}
 			onpick={(player: string) => act(() => rooms.pick(id, player, room?.pick_number ?? 0))}
 			onundo={(pick: number) => act(() => rooms.undo(id, pick), undoneWords(pick))}
