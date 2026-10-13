@@ -73,7 +73,7 @@ def _sweep(engine: Engine, budget: int) -> int:
         report = sweep_capsules(engine, _gateway(http), datetime.now(UTC), budget)
     _out(
         f"capsule-sweep: {report.board_players} board players, {report.eligible} needed a fresh generation, "
-        f"{len(report.processed)} processed ({report.llm} llm, {report.template} template), {report.calls} calls, "
+        f"{len(report.processed)} processed ({report.llm} llm, {report.facts} facts blocks), {report.calls} calls, "
         f"{report.prompt_tokens} prompt and {report.completion_tokens} completion tokens, ${report.cost_usd:.6f}, "
         f"{report.queued} queued for regeneration"
     )

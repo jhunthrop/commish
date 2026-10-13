@@ -1,13 +1,14 @@
-"""ONE PLAYER'S CAPSULE: one bundle call, the rejection pass, and the template as the counted fallback.
+"""ONE PLAYER'S CAPSULE: one bundle call, the rejection pass, and the facts block as the counted fallback.
 
 Ported from `research-ts/src/capsules/generate.ts`. The bundle (both reads and the narrative) comes
 from one call, retried once whole if it never came back or was not an object. Each read is then
 validated; a read that fails gets the correction its failure calls for (a length correction, a
 fresh draft after a second length miss, the soft points, or a rewrite), each a call, up to
 `corrections_per_read` of them (the oracle stopped at one) and all within the player's ceiling
-(`max_gateway_calls_per_player`), and a read that still fails is the template.
+(`max_gateway_calls_per_player`), and a read that still fails is the facts block (`facts_block`):
+his numbers as labelled facts, no prose.
 Narrative slots refused only for their voice get one rewrite each from what calls are left. Nothing
-here raises for a gateway failure: the template is the answer, and the usage billed is kept.
+here raises for a gateway failure: the facts block is the answer, and the usage billed is kept.
 """
 
 from collections.abc import Sequence
@@ -16,6 +17,7 @@ from typing import TYPE_CHECKING, Final
 
 from research.capsules.bundle import CapsuleBundle, parse_bundle
 from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.facts_block import FACTS_SOURCE, render_facts_block
 from research.capsules.gateway import GatewayClient, GenerationError, Usage, add_usage
 from research.capsules.narrative import (
     NarrativeResult,
@@ -37,7 +39,6 @@ from research.capsules.prompt import (
     bundle_prompt_for,
     correction_prompt_for,
 )
-from research.capsules.template import render_template_capsule
 from research.capsules.validate import (
     NARRATIVE_MIN_WORDS,
     ValidationResult,
@@ -57,7 +58,7 @@ _NOT_WRITTEN: Final = "The answer carried no such read."
 
 @dataclass(frozen=True, slots=True)
 class Fallback:
-    """Why a read fell to the template: the gateway never answered, or the writer never validated."""
+    """Why a read fell to the facts block: the gateway never answered, or the writer never validated."""
 
     kind: str
     first_violation: str | None = None
@@ -190,8 +191,8 @@ def _next_correction(read: _Read) -> PriorAttempt | None:
     return PriorAttempt(read.text, read.result.violations, soft_corrections=corrections)
 
 
-def _template(facts: "PlayerFacts", read: _Read, fallback: Fallback) -> ReadResult:
-    return ReadResult(render_template_capsule(facts), "template", read.usage, fallback, read.attempts)
+def _facts_block(facts: "PlayerFacts", read: _Read, fallback: Fallback) -> ReadResult:
+    return ReadResult(render_facts_block(facts), FACTS_SOURCE, read.usage, fallback, read.attempts)
 
 
 def _settle(
@@ -203,14 +204,14 @@ def _settle(
         prior = _next_correction(read)
         if prior is None or read.calls >= budget:
             first = _NOT_WRITTEN if read.result is None or not read.result.violations else read.result.violations[0]
-            return _template(facts, read, Fallback("failed_validation", first)), read.calls
+            return _facts_block(facts, read, Fallback("failed_validation", first)), read.calls
         try:
             answer = gateway.complete(
                 _msgs(correction_prompt_for(facts, size, prior)), CAPSULE_CONFIG.size(size).max_tokens
             )
         except GenerationError as error:
             spent = replace(read, usage=add_usage(read.usage, error.billed))
-            return _template(facts, spent, Fallback("throttled")), read.calls + 1
+            return _facts_block(facts, spent, Fallback("throttled")), read.calls + 1
         text = answer.content.strip()
         read = read.graded(prior.kind, text, validate_capsule(text, facts, size), answer.usage, 1)
 
@@ -251,13 +252,24 @@ def _rewrite_voice_slots(
     return narrative, usage
 
 
+def _one_kind(facts: "PlayerFacts", reads: tuple[ReadResult, ReadResult]) -> tuple[ReadResult, ReadResult]:
+    """Both reads written, or both the facts block: a page is prose or a facts list, never half each."""
+    if all(read.source == "llm" for read in reads):
+        return reads
+    block = render_facts_block(facts)
+    compact, full = (replace(read, text=block, source=FACTS_SOURCE) for read in reads)
+    return compact, full
+
+
 def _assemble(
     reads: tuple[ReadResult, ReadResult], narrative: NarrativeResult, usage: Usage | None, model: str, calls: int
 ) -> CapsuleResult:
     compact, full = reads
     both = compact.source == "llm" and full.source == "llm"
     total = add_usage(add_usage(usage, compact.usage), full.usage)
-    return CapsuleResult(compact, full, narrative, "llm" if both else "template", model if both else None, total, calls)
+    return CapsuleResult(
+        compact, full, narrative, "llm" if both else FACTS_SOURCE, model if both else None, total, calls
+    )
 
 
 def describe_fallback(compact: ReadResult, full: ReadResult) -> str:
@@ -266,9 +278,9 @@ def describe_fallback(compact: ReadResult, full: ReadResult) -> str:
     if not reasons:
         return "llm"
     if any(r.kind == "throttled" for r in reasons):
-        return "template (throttled)"
+        return "facts (throttled)"
     failed = next((r for r in reasons if r.kind == "failed_validation"), None)
-    return "template (fell back)" if failed is None else f"template (failed validation: {failed.first_violation})"
+    return "facts (fell back)" if failed is None else f"facts (failed validation: {failed.first_violation})"
 
 
 def generate_capsule(
@@ -281,7 +293,7 @@ def generate_capsule(
     if outcome.bundle is None:
         failure = outcome.failure or Fallback("throttled")
         reason = "the gateway never returned a usable answer" if failure.kind == "throttled" else NOT_AN_OBJECT
-        floor = _template(facts, _Read(), failure)
+        floor = _facts_block(facts, _Read(), failure)
         return _assemble((floor, floor), failed_narrative(reason), outcome.usage, gateway.model, gateway.calls - before)
     remaining = CAPSULE_CONFIG.max_gateway_calls_per_player - outcome.calls
     full_start = _start(facts, "full", outcome.bundle.full)
@@ -297,5 +309,9 @@ def generate_capsule(
     left = CAPSULE_CONFIG.max_gateway_calls_per_player - outcome.calls - compact_calls - full_calls
     narrative, voice_usage = _rewrite_voice_slots(settled, facts, requests, gateway, left)
     return _assemble(
-        (compact, full), narrative, add_usage(outcome.usage, voice_usage), gateway.model, gateway.calls - before
+        _one_kind(facts, (compact, full)),
+        narrative,
+        add_usage(outcome.usage, voice_usage),
+        gateway.model,
+        gateway.calls - before,
     )

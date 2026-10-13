@@ -2,7 +2,8 @@
 check over the board as it then stands.
 
 Ported from `research-ts/src/capsules/sweep.ts`. A player is written when his row is missing, his
-facts hash moved, or his row is still the template (a throttled or refused read keeps retrying);
+facts hash moved, or his row is not written (a facts block, or the oracle's template: a throttled or
+refused read keeps retrying);
 players demoted from a written read go first. Each player is committed as he is written, so a run
 stopped part way loses at most the one in hand. The worn language the board already carries is
 quoted into every prompt; the check runs again at the end and queues anyone over a line. Capsules
@@ -19,6 +20,7 @@ from sqlalchemy import Connection, Engine
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts.build import PlayerFacts
 from research.capsules.facts.collect import collect_board_facts
+from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway import GatewayClient
 from research.capsules.generate import CapsuleResult, describe_fallback, generate_capsule
 from research.capsules.prompt import WornPhrases
@@ -48,7 +50,7 @@ class Subject:
 
 
 def _needs_generation(subject: Subject, stored: StoredCapsule | None) -> bool:
-    return stored is None or stored.facts_hash != subject.facts.facts_hash or stored.source == "template"
+    return stored is None or stored.facts_hash != subject.facts.facts_hash or stored.source != "llm"
 
 
 def _rows(subjects: Sequence[Subject], stored: dict[str, StoredCapsule]) -> list[CapsuleRow]:
@@ -82,7 +84,7 @@ class SweepReport:
     eligible: int
     processed: list[str] = field(default_factory=list)
     llm: int = 0
-    template: int = 0
+    facts: int = 0
     demoted: int = 0
     calls: int = 0
     prompt_tokens: int = 0
@@ -105,7 +107,7 @@ def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted
         report.llm += 1
         report.detail.append(f"{name}: llm, {result.calls} calls, ${(usage.cost_usd or 0.0) if usage else 0.0:.6f}")
         return
-    report.template += 1
+    report.facts += 1
     report.demoted += int(demoted)
     suffix = ", kept nothing, was written" if demoted else ""
     report.detail.append(f"{name}: {describe_fallback(result.compact, result.full)}{suffix}")
@@ -116,7 +118,7 @@ def write_one(
 ) -> tuple[CapsuleResult, bool]:
     """One player's capsule, generated and committed on its own."""
     result = generate_capsule(subject.facts, gateway, worn)
-    demoted = stored is not None and stored.source == "llm" and result.source == "template"
+    demoted = stored is not None and stored.source == "llm" and result.source == FACTS_SOURCE
     row = CapsuleWrite(
         subject.universe_id,
         RETRY_FIRST_FACTS_HASH if demoted else subject.facts.facts_hash,

@@ -2,10 +2,10 @@
 
 The steps phase C owns, in the oracle's order (`research-ts/src/nightly/main.ts`): the fit step
 (check only, `research.model.fit_check`), then the capsule sweep, skipped by name when
-AI_GATEWAY_API_KEY is not set, because a sweep without the key would demote written reads to the
-template, then the capsule gate (`capsule_gate`), which fails the run when more than 2% of the
-board's pages are on the template or a template sentence sits on two pages. Each step's line names
-what it did; the run exits 1 when a step failed. The ingests, the run writer, the gates and the web
+AI_GATEWAY_API_KEY is not set, because a sweep without the key would demote written reads to facts
+blocks, then the capsule gate (`capsule_gate`), which fails the run when more than 2% of the
+board's pages are unwritten (facts blocks, missing) or a written sentence sits on two pages. Each
+step's line names what it did; the run exits 1 when a step failed. The ingests, the run writer, the gates and the web
 dispatch are phase D's (this package's `__init__` names the whole chain); they extend this entry
 point rather than replace it.
 
@@ -57,7 +57,7 @@ def _capsules(engine: Engine, now: datetime, budget: int) -> bool:
         report = sweep_capsules(engine, GatewayClient(key, http), now, budget)
     _line(
         f"capsules: ran, {report.board_players} board players, {report.eligible} needed a fresh generation, "
-        f"{len(report.processed)} processed ({report.llm} llm, {report.template} template), {report.calls} calls, "
+        f"{len(report.processed)} processed ({report.llm} llm, {report.facts} facts blocks), {report.calls} calls, "
         f"${report.cost_usd:.6f}, {report.queued} queued for regeneration"
     )
     return True

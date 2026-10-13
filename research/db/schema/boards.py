@@ -9,7 +9,8 @@ from research.db.schema._base import METADATA, RESEARCH_SCHEMA, one_of, recorded
 
 MOMENT_KINDS: Final = ("replay", "live")
 IMPLEMENTATIONS: Final = ("typescript", "python")
-CAPSULE_SOURCES: Final = ("llm", "template")
+# `template` is the oracle's prose floor, carried by the loader and never written here (revision 0004).
+CAPSULE_SOURCES: Final = ("llm", "facts", "template")
 
 
 def _player_fk(table: str, ondelete: str = "CASCADE") -> ForeignKeyConstraint:

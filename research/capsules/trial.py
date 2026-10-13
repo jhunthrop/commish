@@ -4,7 +4,7 @@ Chooses board players (named, or every `spread`-th in board order so the trial r
 the board to its tail), writes each through the sweep's own `write_one` (committed as written), then
 holds each stored capsule to the gate the nightly enforces (`pull_figures.capsule_findings`) with the
 page's own numbers from his served board row, and the chosen pages together to the nightly's
-capsule gate (the template share and no template sentence on two pages), and reports what each
+capsule gate (the unwritten share and no written sentence on two pages), and reports what each
 cost in calls and tokens.
 """
 
