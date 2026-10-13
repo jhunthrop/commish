@@ -12,6 +12,8 @@
 //     nfl_games: the 2026 slate, the byes and the first kickoff
 //     team_week_observations (vegas_win_totals): each club's latest published season win total
 //     register_freeze_rows and register_grade_rows: the record as it stands
+//     research.player_week_observations and friends: each player's season so far
+//     (standin-season.ts, scored with fantasy-points.ts)
 //   research-ts/src/domain/nfl-team-names.ts for each club's city and nickname
 //
 // Vendors and feeds go in the manifest's sources block as provenance. No screen names them.
@@ -63,6 +65,8 @@ import {
 } from '../src/lib/run/schema.ts';
 import { POSITIONS, type Position } from '../src/lib/types/player.ts';
 import { bucketUrl, credentialsFromToken } from './r2.ts';
+import { seasonBlocks } from './standin-season.ts';
+import type { PlayerSeason } from '../src/lib/run/season.ts';
 
 const RUN_ID = '2026-10-12T00-standin';
 const SEASON = 2026;
@@ -214,9 +218,15 @@ function boardRows(csv: readonly BoardCsv[], adpByGsis: ReadonlyMap<string, numb
 	});
 }
 
-function playerPages(rows: readonly BoardRow[], capsules: readonly CapsuleCsv[]): Player[] {
+function playerPages(
+	rows: readonly BoardRow[],
+	capsules: readonly CapsuleCsv[],
+	seasons: ReadonlyMap<string, PlayerSeason>
+): Player[] {
 	const byId = new Map(capsules.map((capsule) => [capsule.player_id, capsule]));
 	return rows.map((row) => {
+		const season = seasons.get(row.id);
+		if (!season) throw new Error(`${row.name} has no season block.`);
 		const { id, slug, name, position, team, headshot, ...numbers } = row;
 		const written = byId.get(id);
 		const capsule: Capsule | null =
@@ -231,7 +241,8 @@ function playerPages(rows: readonly BoardRow[], capsules: readonly CapsuleCsv[])
 			team,
 			headshot,
 			formats: { [FORMAT.id]: numbers },
-			capsule
+			capsule,
+			season
 		};
 	});
 }
@@ -583,7 +594,17 @@ async function main(): Promise<void> {
 		const codes = [...new Set(rows.map((row) => row.team))].sort();
 		if (codes.length !== CLUB_COUNT)
 			throw new Error(`The board names ${String(codes.length)} clubs.`);
-		const players = playerPages(rows, capsuleCsv);
+		const clubs = clubList(codes, games);
+		const schedule = scheduleFrom(codes, games, winTotals);
+		const seasons = await seasonBlocks(sql, rows, {
+			season: SEASON,
+			format: FORMAT.id,
+			lastWeek: LAST_WEEK,
+			canonicalClub,
+			schedule,
+			clubs
+		});
+		const players = playerPages(rows, capsuleCsv, seasons);
 		const index: IndexEntry[] = rows.map(({ id, slug, name, team, position, headshot }) => ({
 			id,
 			slug,
@@ -608,8 +629,8 @@ async function main(): Promise<void> {
 			adp: adpFrom(rows, adp.window),
 			record,
 			index,
-			clubs: clubList(codes, games),
-			schedule: scheduleFrom(codes, games, winTotals)
+			clubs,
+			schedule
 		});
 		await writeLocal(files);
 		if (process.argv.includes('--upload')) await upload(files);
