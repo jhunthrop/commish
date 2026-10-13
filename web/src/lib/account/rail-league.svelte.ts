@@ -1,10 +1,11 @@
 /**
  * The rail's League item answers from /me: the account's newest attached league, read once per page
- * load and again after an attach, a detach or an undo. Signed out, or with no league, the rail has no
- * League item. Nothing is kept in the browser, so another account on the same browser never sees it.
+ * load and again after an attach, a detach or an undo. A browser with no signed-in session cookie
+ * asks nothing, so a signed-out reader of the public pages makes no API call. Nothing is kept in the
+ * browser, so another account on the same browser never sees it.
  */
 import { PUBLIC_API_URL } from '$app/env/public';
-import { apiClient } from '#lib/api/client.ts';
+import { apiClient, hasSessionCookie } from '#lib/api/client.ts';
 import type { components } from '#lib/api/types.ts';
 
 type Account = components['schemas']['Account'];
@@ -24,6 +25,10 @@ class RailLeague {
 
 	/** Reads /me again: after the account's leagues change. */
 	async refresh(): Promise<void> {
+		if (!hasSessionCookie()) {
+			this.id = null;
+			return;
+		}
 		try {
 			this.id = (await client.call<Account>('/me')).league_id;
 		} catch {
