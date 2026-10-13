@@ -76,6 +76,10 @@ type PickReview struct {
 	// OddsSource is where StillThere came from: OddsAdvisor or OddsSim as
 	// recorded at the pick, or "fallback_" plus the source computed now.
 	OddsSource string `json:"oddsSource,omitempty"`
+	// MadeBy is who made the pick: MadeByYou, or the stand-in that made it
+	// for you. A pick you did not make carries no hindsight, since nobody
+	// chose it.
+	MadeBy string `json:"madeBy"`
 }
 
 // fallbackPrefix marks hindsight computed for the report, not recorded.
@@ -163,11 +167,17 @@ func reviewOne(ctx context.Context, in ReportInput, keepers sim.Keepers, before 
 	pos, _ := before.Pool.PositionOf(playerID)
 	r := PickReview{
 		PickNumber: before.PickNumber, Round: draft.RoundForPick(len(before.DraftOrder), before.PickNumber),
-		PlayerID: playerID, Position: pos, OverReplacement: in.Board.Values[playerID],
+		PlayerID: playerID, Position: pos, OverReplacement: in.Board.Values[playerID], MadeBy: MadeByYou,
+	}
+	if by, ok := in.Draft.By[seq]; ok {
+		r.MadeBy = by
 	}
 	if adp, ok := in.Board.ADP[playerID]; ok {
 		gap := adp - float64(before.PickNumber)
 		r.ADPGap, r.Chip = &gap, chipFor(gap)
+	}
+	if r.MadeBy != MadeByYou {
+		return r, nil
 	}
 	if _, hasNext := sim.NextTurnFor(before, in.Draft.HumanTeamID); !hasNext {
 		return r, nil

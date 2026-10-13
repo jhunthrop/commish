@@ -16,6 +16,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/lobby"
 	"github.com/jhunthrop/commish/api/internal/mock"
 	"github.com/jhunthrop/commish/api/internal/mocks"
+	"github.com/jhunthrop/commish/api/internal/names"
 	"github.com/jhunthrop/commish/api/internal/sheets"
 	"github.com/jhunthrop/commish/api/internal/sim"
 	"github.com/jhunthrop/commish/api/internal/solo"
@@ -26,7 +27,7 @@ import (
 // engine's own runs for the report. The board's pool, when it has one of
 // its own, lives as long as the process.
 func rooms(cfg config.API, pool *pgxpool.Pool, mockStore *mocks.Store, anon *auth.Anon, gate *leagues.Gate, leagueStore *leagues.Store, sheetStore *sheets.Store,
-	authStore *auth.Store, log *slog.Logger) (*solo.Service, *lobby.Handler, error) {
+	authStore *auth.Store, nameFilter *names.Filter, log *slog.Logger) (*solo.Service, *lobby.Handler, error) {
 	draftBoards, _, err := draftroom.OpenBoards(pool, cfg.Board, time.Now)
 	if err != nil {
 		return nil, nil, err
@@ -42,7 +43,7 @@ func rooms(cfg config.API, pool *pgxpool.Pool, mockStore *mocks.Store, anon *aut
 	hindsight := mock.SimOdds{Runs: sim.RoomOddsRuns, Workers: workers}
 	soloService := &solo.Service{
 		Mocks: mockStore, Anon: anon, Leagues: leagueStore, Gate: gate, Sheets: sheetStore, Boards: draftBoards,
-		Advisor: card, Hindsight: hindsight, ReportWorkers: workers, Site: cfg.HTTP.PublicBaseURL, Now: time.Now, Log: log,
+		Advisor: card, Hindsight: hindsight, ReportWorkers: workers, Site: cfg.HTTP.PublicBaseURL, Names: nameFilter, Now: time.Now, Log: log,
 	}
 	lobbyHandler := &lobby.Handler{
 		Store: &lobby.Store{Pool: pool, Now: time.Now}, Boards: draftBoards, Advisor: card, Engine: engine,

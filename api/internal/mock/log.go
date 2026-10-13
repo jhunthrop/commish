@@ -10,8 +10,12 @@ import (
 )
 
 // oddsKey is where a MAKE_PICK row's payload carries the odds the room
-// showed with the pick. draft.ParseAction ignores it.
-const oddsKey = "odds"
+// showed with the pick, and byKey who made a pick the drafter's own hand
+// did not. draft.ParseAction ignores both.
+const (
+	oddsKey = "odds"
+	byKey   = "by"
+)
 
 // LogEntries is the mock's actions as app.mock_actions rows for
 // mocks.Store.AppendActions, from the 1-based sequence from on (1 for the
@@ -35,6 +39,9 @@ func LogEntries(d Draft, from int) ([]mocks.Action, error) {
 		}
 		if odds, ok := d.Odds[seq]; ok {
 			payload[oddsKey] = odds
+		}
+		if by, ok := d.By[seq]; ok {
+			payload[byKey] = by
 		}
 		ms, err := draft.ParseMillis(a.Timestamp)
 		if err != nil {
@@ -63,6 +70,7 @@ func FromLog(s Settings, seed uint32, payloads []json.RawMessage) (Draft, error)
 		d.Actions = append(d.Actions, a)
 		var carried struct {
 			Odds *PickOdds `json:"odds"`
+			By   string    `json:"by"`
 		}
 		if err := json.Unmarshal(raw, &carried); err != nil {
 			return Draft{}, fmt.Errorf("mock: log row %d odds: %w", i+1, err)
@@ -72,6 +80,12 @@ func FromLog(s Settings, seed uint32, payloads []json.RawMessage) (Draft, error)
 				d.Odds = map[int]PickOdds{}
 			}
 			d.Odds[i+1] = *carried.Odds
+		}
+		if carried.By != "" {
+			if d.By == nil {
+				d.By = map[int]string{}
+			}
+			d.By[i+1] = carried.By
 		}
 	}
 	if d.State, err = draft.Replay(config, d.Actions); err != nil {

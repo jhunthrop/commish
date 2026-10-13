@@ -23,9 +23,12 @@ type Log struct {
 	// Branch counts the undos: a card belongs to the branch it was
 	// computed on.
 	Branch int
+	// Handle is the owning account's handle, empty for none or a
+	// signed-out owner: a shared link names the drafter with it.
+	Handle string
 }
 
-const logColumns = columns + `, branch`
+const logColumns = columns + `, branch, coalesce((select a.handle from app.accounts a where a.id = m.account_id), '')`
 
 // ReadLog reads one of the owner's mocks and its whole log.
 func (s *Store) ReadLog(ctx context.Context, owner Owner, id uuid.UUID) (Log, error) {
@@ -34,7 +37,7 @@ func (s *Store) ReadLog(ctx context.Context, owner Owner, id uuid.UUID) (Log, er
 	var raw []byte
 	m := &out.Mock
 	err := s.Pool.QueryRow(ctx, `select `+logColumns+` from app.mocks m where m.id = $1 and `+match, id, arg).
-		Scan(&m.Id, &m.LeagueId, &raw, &m.Seed, &m.Status, &m.CreatedAt, &m.UpdatedAt, &m.CompletedAt, &out.Branch)
+		Scan(&m.Id, &m.LeagueId, &raw, &m.Seed, &m.Status, &m.CreatedAt, &m.UpdatedAt, &m.CompletedAt, &out.Branch, &out.Handle)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Log{}, ErrNotFound
 	}

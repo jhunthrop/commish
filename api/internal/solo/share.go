@@ -27,11 +27,15 @@ var errBadCode = errors.New("solo: that link does not hold a draft")
 
 // share is what a link carries: the mock is a function of its settings,
 // its seed and the drafter's picks, so these three replay it exactly.
+// ForYou (the places in Picks a stand-in made) and Sharer (the drafter's
+// handle) are optional, so every earlier link still opens.
 type share struct {
 	V        int                     `json:"v"`
 	Settings apitypes.LeagueSettings `json:"s"`
 	Seed     int64                   `json:"seed"`
 	Picks    []string                `json:"p"`
+	ForYou   []int                   `json:"a,omitempty"`
+	Sharer   string                  `json:"n,omitempty"`
 }
 
 func encodeShare(s share) (string, error) {
@@ -63,6 +67,25 @@ func shareKey(s share) (string, error) {
 	}
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+// NameCheck refuses a name strangers should not see. *names.Filter
+// implements it.
+type NameCheck interface {
+	Check(name string) error
+}
+
+// decode is a link's draft, refusing a link whose sharer's name the
+// account layer would not have allowed, since a link is anyone's to write.
+func (s *Service) decode(code string) (share, error) {
+	sh, err := decodeShare(code)
+	if err != nil {
+		return share{}, err
+	}
+	if sh.Sharer != "" && s.Names.Check(sh.Sharer) != nil {
+		return share{}, errBadCode
+	}
+	return sh, nil
 }
 
 func decodeShare(code string) (share, error) {

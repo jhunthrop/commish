@@ -1189,6 +1189,8 @@ export interface components {
 			seq: number;
 			/** @description the link's code */
 			share_code: string;
+			/** @description the drafter's handle, when he has one: a shared draft names whose it is */
+			shared_by?: string;
 			/** Format: date-time */
 			created_at: string;
 			/** @description the board, on a full read (create, get, shared) and absent on a pick's answer */
@@ -1265,6 +1267,11 @@ export interface components {
 			could_wait: boolean;
 			/** @description advisor or sim as recorded with the pick, or fallback_sim computed for the report */
 			odds_source: string;
+			/**
+			 * @description who made the pick: you, Pick for me or Finish the draft (for_you), a lobby seat's stand-in after you left (queue), or the stand-in when your clock ran out (clock). A pick you did not make carries no hindsight.
+			 * @enum {string}
+			 */
+			made_by: 'you' | 'for_you' | 'queue' | 'clock';
 		};
 		ReportStarter: {
 			slot: string;
