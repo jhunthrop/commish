@@ -72,8 +72,13 @@
 		].filter((n): n is string => n !== null)
 	);
 
+	const SLEEPER_TAB = 'sleeper-draft';
+
 	function openHost(): void {
-		window.open(hostDraftUrl(c), '_blank', 'noopener');
+		// One named tab: every turn returns to the same Sleeper tab instead of opening another. The
+		// opener is cut after the open, since noopener would also drop the name.
+		const tab = window.open(hostDraftUrl(c), SLEEPER_TAB);
+		if (tab) tab.opener = null;
 	}
 </script>
 
@@ -82,8 +87,8 @@
 	{#if c.lost_at !== null}
 		<Panel edge="loss" padding="sm">
 			<p class="note">
-				Pick {c.lost_at} on Sleeper does not fit how our draft is set up, so our call stops there. The
-				picks keep landing below.
+				Pick {pickLabel(c.lost_at, teams)} on Sleeper does not fit how our draft is set up, so our call
+				stops there. The picks keep landing below.
 			</p>
 		</Panel>
 	{/if}
@@ -99,7 +104,7 @@
 		/>
 	{/if}
 	{#if call && card}
-		{#if went.length > 0}<SinceStrip since={prev} {went} {teams} />{/if}
+		{#if went.length > 0}<SinceStrip since={prev} {went} {teams} queue={false} />{/if}
 		<RoomCall
 			view={call}
 			pickNumber={now}
