@@ -250,11 +250,13 @@ async function main(): Promise<void> {
   } else {
     console.log("Completed every requested season within budget.");
   }
-
-  await db.$client.end();
 }
 
-main().catch((error: unknown) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+// The client closes on every path. A thrown error used to leave the pool open, and the process hung
+// instead of exiting 1, which is how the Python parity harness found it on 2026-10-13.
+main()
+  .catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => db.$client.end());
