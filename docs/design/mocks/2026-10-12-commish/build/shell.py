@@ -2,7 +2,7 @@
 from html import escape
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parent.parent / "brand-mocks" / "commish"
+OUT = Path(__file__).resolve().parent.parent
 TOKENS_PATH = OUT / "tokens.css"
 TOKENS = TOKENS_PATH.read_text()
 FONT_FAMILIES = "family=Big+Shoulders+Display:wght@500;700;800&family=Outfit:wght@400;500;600;700"

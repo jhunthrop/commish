@@ -61,12 +61,13 @@ REPORT_CSS = """
 .ranks span{flex:1;text-align:center;font-size:var(--t-xs);color:var(--ink-3)}
 .ranks span b{display:block;font-family:var(--font-num);font-weight:700;font-size:18px;color:var(--ink)}
 .ranks span.you b{color:var(--accent-text)}
-@media (max-width: 1180px){.report{grid-template-columns:minmax(0,1fr) 300px}.pk{grid-template-columns:48px 36px minmax(0,1fr) 90px 130px}.pk .gapc{display:none}}
+.pk .chips{display:contents}
+@media (max-width: 1180px){.report{grid-template-columns:minmax(0,1fr) 300px}.pk{grid-template-columns:48px 36px minmax(0,1fr) 90px;row-gap:6px}.pk.head .gapc,.pk.head .hind{display:none}.pk .chips{grid-column:3/-1;display:flex;flex-wrap:wrap;gap:6px}}
 @media (max-width: 760px){
   .report{grid-template-columns:minmax(0,1fr);padding:var(--s-3) var(--s-4) var(--s-6)}
   .hero{grid-template-columns:minmax(0,1fr);gap:var(--s-3)}
   .hero .big b{font-size:64px}.hero h2{font-size:28px}
-  .pk{grid-template-columns:44px 32px minmax(0,1fr) 70px}.pk .hind,.pk .gapc{display:none}
+  .pk{grid-template-columns:44px 32px minmax(0,1fr) 70px}
   .stats{grid-template-columns:1fr 1fr}
 }
 """
@@ -102,7 +103,7 @@ def pick_rows(players, picks):
         odds = survival_probabilities(pool, n, nxt, adp_or_sentinel)[p["id"]] if nxt <= len(picks) else None
         rows.append(f"""<div class="pk"><span class="no">{pick_label(n)}</span>{face(p, 36)}
   <span class="who"><b>{escape(p['name'])}</b><span>{p['pos']} {p['pos_rank']} · {p['team']}</span></span>
-  <span class="vor">{signed(p['vor'])}</span><span class="gapc">{gap_tag(p, n)}</span><span class="hind">{hind_tag(odds)}</span></div>""")
+  <span class="vor">{signed(p['vor'])}</span><span class="chips"><span class="gapc">{gap_tag(p, n)}</span><span class="hind">{hind_tag(odds)}</span></span></div>""")
     return "".join(rows)
 
 

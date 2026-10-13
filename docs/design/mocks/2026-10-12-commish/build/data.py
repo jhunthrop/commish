@@ -3,7 +3,7 @@ import csv
 import math
 from pathlib import Path
 
-MOCKS = Path(__file__).resolve().parent.parent / "brand-mocks"
+MOCKS = Path(__file__).resolve().parent.parent
 TEAMS_PER_ROUND = 12
 TINTED_ROUNDS = 4
 NO_ADP_SENTINEL = 250.0

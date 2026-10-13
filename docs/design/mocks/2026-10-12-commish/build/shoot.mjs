@@ -1,5 +1,5 @@
-import { chromium } from '../brand-mocks/../flock/node_modules/playwright/index.mjs';
-const dir = new URL('../brand-mocks/commish/', import.meta.url).pathname;
+import { chromium } from '../../../../../web/node_modules/playwright/index.mjs';
+const dir = new URL('../', import.meta.url).pathname;
 const pages = (process.argv[2] || 'board,player,setup,mock,lobby,report,system,direction').split(',');
 const b = await chromium.launch();
 for (const theme of ['dark','light']) for (const [w,h] of [[1440,900],[390,844]]) {
