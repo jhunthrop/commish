@@ -147,6 +147,22 @@ async function measureImport(page: Page): Promise<{ readMs: number; renderMs: nu
 	return { readMs: t1 - t0, renderMs: t2 - t1 };
 }
 
+/** A returning drafter: 400 rows already in this browser, the page opened cold. */
+async function measureReturn(page: Page): Promise<{ lcpMs: number; rowsMs: number }> {
+	await page.goto(`${base}/sheet`, { waitUntil: 'commit' });
+	await page.locator('[data-row-id]').nth(399).waitFor({ state: 'attached' });
+	return page.evaluate(
+		() =>
+			new Promise<{ lcpMs: number; rowsMs: number }>((done) => {
+				const rowsMs = performance.now();
+				new PerformanceObserver((list) => {
+					const last = list.getEntries().at(-1);
+					done({ lcpMs: last?.startTime ?? 0, rowsMs });
+				}).observe({ type: 'largest-contentful-paint', buffered: true });
+			})
+	);
+}
+
 async function measurePrint(
 	page: Page
 ): Promise<{ renderMs: number; pages: number; sections: number }> {
@@ -172,9 +188,10 @@ try {
 		await throttled(page);
 		const drag = await measureDrag(page);
 		const imported = await measureImport(page);
+		const returning = await measureReturn(page);
 		const print = await measurePrint(page);
 		report.push(
-			`run ${String(run)}: drag ${String(drag.frames)} frames, p50 ${drag.p50.toFixed(1)} ms, p95 ${drag.p95.toFixed(1)} ms, max ${drag.max.toFixed(1)} ms, ${String(drag.over)} over 25 ms, ${String(drag.longTasks)} long tasks | import read ${imported.readMs.toFixed(0)} ms, render ${imported.renderMs.toFixed(0)} ms | print ${print.renderMs.toFixed(0)} ms to first paint after load, ${String(print.sections)} positions, ${String(print.pages)} PDF pages`
+			`run ${String(run)}: drag ${String(drag.frames)} frames, p50 ${drag.p50.toFixed(1)} ms, p95 ${drag.p95.toFixed(1)} ms, max ${drag.max.toFixed(1)} ms, ${String(drag.over)} over 25 ms, ${String(drag.longTasks)} long tasks | import read ${imported.readMs.toFixed(0)} ms, render ${imported.renderMs.toFixed(0)} ms | return visit LCP ${returning.lcpMs.toFixed(0)} ms, 400 rows in ${returning.rowsMs.toFixed(0)} ms | print ${print.renderMs.toFixed(0)} ms to first paint after load, ${String(print.sections)} positions, ${String(print.pages)} PDF pages`
 		);
 		await context.close();
 	}

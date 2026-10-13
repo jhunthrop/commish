@@ -3,7 +3,7 @@
 		"collect": {
 			"startServerCommand": "npm run preview:static",
 			"startServerReadyPattern": "Accepting connections",
-			"url": ["http://localhost:4173/system"],
+			"url": ["http://localhost:4173/system", "http://localhost:4173/sheet"],
 			"numberOfRuns": 7,
 			"settings": {
 				"preset": "perf",

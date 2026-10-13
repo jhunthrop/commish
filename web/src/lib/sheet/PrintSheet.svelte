@@ -93,12 +93,12 @@
 	.page {
 		width: 8.5in;
 		min-height: 11in;
-		padding: 0.45in 0.5in;
+		padding: 0.4in 0.45in;
 		background: #ffffff;
 		color: #15120f;
 		box-shadow: var(--shadow-pop);
-		font-size: 9pt;
-		line-height: 1.25;
+		font-size: 8pt;
+		line-height: 1.2;
 	}
 
 	header {
@@ -149,7 +149,7 @@
 		display: grid;
 		grid-template-columns: 18pt minmax(0, 1fr);
 		column-gap: 4pt;
-		padding: 1.5pt 0;
+		padding: 1pt 0;
 		border-bottom: 0.5pt solid #d8d3cd;
 	}
 

@@ -1,3 +1,2 @@
-/** The print view, drawn in the browser from your sheet like the sheet page. */
+/** The print view: its frame is prerendered, your sheet is drawn into it in the browser. */
 export const prerender = true;
-export const ssr = false;

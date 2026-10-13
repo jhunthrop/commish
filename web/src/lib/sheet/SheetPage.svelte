@@ -148,13 +148,16 @@
 <Shell title="Cheat sheet" active="sheet">
 	{#snippet search()}
 		<Search
-			placeholder="Search your {plural(rows.length, 'player')}"
+			placeholder={rows.length > 0
+				? `Search your ${plural(rows.length, 'player')}`
+				: 'Search your sheet'}
 			label="Search your sheet"
 			bind:value={query}
 		/>
 	{/snippet}
 	{#snippet tail()}
-		{#if rows.length > 0}
+		<!-- One solid verb per viewport: an open panel carries its own. -->
+		{#if rows.length > 0 && panel === null}
 			<Verb href={mockHref}>Start a mock draft</Verb>
 		{/if}
 	{/snippet}
@@ -178,17 +181,20 @@
 					<h2><button type="button" onclick={() => (renaming = true)}>{sheet.name}</button></h2>
 				{/if}
 				<p>
-					{FORMAT_LABELS[sheet.format]} · {plural(rows.length, 'player')} ·
-					<span aria-live="polite">{statusWords}</span>
+					{FORMAT_LABELS[sheet.format]}
+					{#if store.loaded}
+						· {plural(rows.length, 'player')} ·
+						<span aria-live="polite">{statusWords}</span>
+					{/if}
 				</p>
 			</div>
 			<div class="tools">
 				{#if store.canUndo}<Quiet size="sm" key={undoKey} onclick={() => store.undo()}>Undo</Quiet
 					>{/if}
-				<Quiet size="sm" onclick={() => (panel = panel === 'import' ? null : 'import')}
-					>Import</Quiet
-				>
 				{#if rows.length > 0}
+					<Quiet size="sm" onclick={() => (panel = panel === 'import' ? null : 'import')}
+						>Import</Quiet
+					>
 					<Quiet size="sm" onclick={() => downloadCsv(sheet)}>Export CSV</Quiet>
 					<Quiet size="sm" href={resolve('/sheet/print')}>Print</Quiet>
 				{/if}
@@ -196,7 +202,7 @@
 					<Quiet size="sm" onclick={() => (panel = panel === 'sheets' ? null : 'sheets')}
 						>Your sheets</Quiet
 					>
-				{:else if store.loaded}
+				{:else}
 					<Quiet size="sm" href={store.signInUrl(resolve('/sheet'))}>Save it to your account</Quiet>
 				{/if}
 			</div>
@@ -309,6 +315,8 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--s-2);
+		/* Its quiet buttons arrive with your sheet. The row is held open so nothing below moves. */
+		min-height: 34px;
 	}
 
 	.start {
@@ -334,6 +342,13 @@
 	@media (max-width: 760px) {
 		.sheet {
 			padding: var(--s-4) var(--s-3);
+		}
+
+		/* The tools take their own line, so the status words growing beside the name never
+		   wrap them down after the page has painted. */
+		.lead {
+			flex-direction: column;
+			align-items: flex-start;
 		}
 
 		h2 button {
