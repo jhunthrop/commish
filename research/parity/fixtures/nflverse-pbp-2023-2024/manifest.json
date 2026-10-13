@@ -1,0 +1,27 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "Play-by-play for 2023 and 2024, every game two clubs played, every column as published.",
+  "responses": [
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2023.csv",
+      "status": 200,
+      "file": "play_by_play_2023.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "every play of every game BUF or KC played in, home or away (whole games, so drive pace and both sides of each defence are intact)",
+      "bytes": 13216130
+    },
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2024.csv",
+      "status": 200,
+      "file": "play_by_play_2024.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "every play of every game BUF or KC played in, home or away (whole games, so drive pace and both sides of each defence are intact)",
+      "bytes": 13134697
+    }
+  ]
+}

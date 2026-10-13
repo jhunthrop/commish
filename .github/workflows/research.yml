@@ -1,0 +1,88 @@
+# .github/workflows/research.yml
+# The Python research lane: lint, types, the smoke tests, the schema gate and the parity harness.
+# No deploy in phase A. The parity run replays recorded provider responses only (no secrets, no
+# network beyond the package registries), against a Postgres service the harness creates its own
+# parity_* scratch databases in. The TypeScript oracle runs from research-ts/ (and the app modules
+# under src/ it still imports, and the root drizzle journal that builds its legacy tables) with the
+# repository's own node_modules, so any change to an oracle path reruns parity too.
+name: research
+on:
+  push:
+    paths:
+      - "research/**"
+      - "research-ts/**"
+      - "drizzle/**"
+      - "src/data/seed/**"
+      - "src/lib/**"
+      - "src/domain/**"
+      - "src/stats/**"
+      - "src/stats-pipeline/**"
+      - "scripts/*.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - ".github/workflows/research.yml"
+  pull_request:
+    paths:
+      - "research/**"
+      - "research-ts/**"
+      - "drizzle/**"
+      - "src/data/seed/**"
+      - "src/lib/**"
+      - "src/domain/**"
+      - "src/stats/**"
+      - "src/stats-pipeline/**"
+      - "scripts/*.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - ".github/workflows/research.yml"
+permissions: { contents: read }
+concurrency:
+  group: research-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    # Every case runs in two to four passes; the whole harness takes about half an hour.
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: parity
+          POSTGRES_PASSWORD: parity
+          POSTGRES_DB: parity
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U parity -d parity"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      PARITY_DATABASE_URL: postgres://parity:parity@localhost:5432/parity
+      TZ: UTC
+    defaults: { run: { working-directory: research } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: The TypeScript oracle's dependencies
+        working-directory: .
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy -p research
+      - name: mypy, the alembic environment and revisions (not a package)
+        run: uv run mypy alembic/env.py alembic/versions
+      - run: uv run pytest -q
+      - name: The committed seeds validate
+        run: |
+          uv run python -m research.pipeline coaches --check
+          uv run python -m research.pipeline win-totals-seed --check
+      - name: Schema gate (the migrations against the declared schema, and the legacy map)
+        run: uv run python -m research.parity schema
+      - name: Parity, every ingest, recorded inputs, empty and non-empty passes
+        run: uv run python -m research.parity ingest all

@@ -1,0 +1,39 @@
+"""Every parity case, by name, and every fixture set's recording recipe."""
+
+from collections.abc import Mapping
+from types import MappingProxyType
+
+from research.parity.case import Case, Recording
+from research.parity.cases import (
+    capture,
+    nflverse_context,
+    nflverse_pbp,
+    nflverse_season,
+    odds,
+    preseason,
+    tank01,
+    vegas,
+)
+
+ALL_CASES: tuple[Case, ...] = (
+    *nflverse_season.CASES,
+    *nflverse_context.CASES,
+    *nflverse_pbp.CASES,
+    *tank01.CASES,
+    *capture.CASES,
+    *preseason.CASES,
+    *odds.CASES,
+    *vegas.CASES,
+)
+
+CASES_BY_NAME: Mapping[str, Case] = MappingProxyType({case.name: case for case in ALL_CASES})
+
+
+def all_recordings() -> dict[str, Recording]:
+    recordings: dict[str, Recording] = {}
+    for case in ALL_CASES:
+        for recording in case.recordings:
+            recordings[recording.fixture_set] = recording
+    for recording in nflverse_season.ALSO_RECORDED:
+        recordings[recording.fixture_set] = recording
+    return recordings

@@ -1,0 +1,537 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "Tank01, season 2026, recorded from the live API: the player list and teams feed, the fixtures of every week 1 to 18, the box scores of weeks 1 and 2, and the PPR ADP feed. Request headers (the key) are never recorded.",
+  "responses": [
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLPlayerList",
+      "status": 200,
+      "file": "player_list.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 4399889
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLTeams",
+      "status": 200,
+      "file": "teams.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 17901
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLADP?adpType=PPR",
+      "status": 200,
+      "file": "adp_ppr.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 53732
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=1",
+      "status": 200,
+      "file": "games_week_1.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 8001
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=2",
+      "status": 200,
+      "file": "games_week_2.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 8005
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=3",
+      "status": 200,
+      "file": "games_week_3.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 7998
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=4",
+      "status": 200,
+      "file": "games_week_4.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 7998
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=5",
+      "status": 200,
+      "file": "games_week_5.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 7512
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=6",
+      "status": 200,
+      "file": "games_week_6.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 7055
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=7",
+      "status": 200,
+      "file": "games_week_7.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 7055
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=8",
+      "status": 200,
+      "file": "games_week_8.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 7061
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=9",
+      "status": 200,
+      "file": "games_week_9.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 7558
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=10",
+      "status": 200,
+      "file": "games_week_10.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 7072
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=11",
+      "status": 200,
+      "file": "games_week_11.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 6571
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=12",
+      "status": 200,
+      "file": "games_week_12.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 8079
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=13",
+      "status": 200,
+      "file": "games_week_13.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 7073
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=14",
+      "status": 200,
+      "file": "games_week_14.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 7576
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=15",
+      "status": 200,
+      "file": "games_week_15.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 8079
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=16",
+      "status": 200,
+      "file": "games_week_16.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 8023
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=17",
+      "status": 200,
+      "file": "games_week_17.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 8023
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLGamesForWeek?season=2026&seasonType=reg&week=18",
+      "status": 200,
+      "file": "games_week_18.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 7855
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260909_NE%40SEA",
+      "status": 200,
+      "file": "box_20260909_NE_at_SEA.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 43753
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260910_SF%40LAR",
+      "status": 200,
+      "file": "box_20260910_SF_at_LAR.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 46424
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_ARI%40LAC",
+      "status": 200,
+      "file": "box_20260913_ARI_at_LAC.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 45481
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_ATL%40PIT",
+      "status": 200,
+      "file": "box_20260913_ATL_at_PIT.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 47034
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_BAL%40IND",
+      "status": 200,
+      "file": "box_20260913_BAL_at_IND.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 50044
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_BUF%40HOU",
+      "status": 200,
+      "file": "box_20260913_BUF_at_HOU.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 52097
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_CHI%40CAR",
+      "status": 200,
+      "file": "box_20260913_CHI_at_CAR.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 56084
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_CLE%40JAX",
+      "status": 200,
+      "file": "box_20260913_CLE_at_JAX.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 50120
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_DAL%40NYG",
+      "status": 200,
+      "file": "box_20260913_DAL_at_NYG.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 49032
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_GB%40MIN",
+      "status": 200,
+      "file": "box_20260913_GB_at_MIN.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 51972
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_MIA%40LV",
+      "status": 200,
+      "file": "box_20260913_MIA_at_LV.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 47008
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_NO%40DET",
+      "status": 200,
+      "file": "box_20260913_NO_at_DET.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 51296
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_NYJ%40TEN",
+      "status": 200,
+      "file": "box_20260913_NYJ_at_TEN.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 45067
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_TB%40CIN",
+      "status": 200,
+      "file": "box_20260913_TB_at_CIN.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 49043
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260913_WSH%40PHI",
+      "status": 200,
+      "file": "box_20260913_WSH_at_PHI.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 47838
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260914_DEN%40KC",
+      "status": 200,
+      "file": "box_20260914_DEN_at_KC.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 49084
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260917_DET%40BUF",
+      "status": 200,
+      "file": "box_20260917_DET_at_BUF.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 52300
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_CAR%40ATL",
+      "status": 200,
+      "file": "box_20260920_CAR_at_ATL.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 49404
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_CIN%40HOU",
+      "status": 200,
+      "file": "box_20260920_CIN_at_HOU.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 45398
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_CLE%40TB",
+      "status": 200,
+      "file": "box_20260920_CLE_at_TB.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 47429
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_GB%40NYJ",
+      "status": 200,
+      "file": "box_20260920_GB_at_NYJ.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 46847
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_IND%40KC",
+      "status": 200,
+      "file": "box_20260920_IND_at_KC.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 51210
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_JAX%40DEN",
+      "status": 200,
+      "file": "box_20260920_JAX_at_DEN.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 46277
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_LV%40LAC",
+      "status": 200,
+      "file": "box_20260920_LV_at_LAC.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 48462
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_MIA%40SF",
+      "status": 200,
+      "file": "box_20260920_MIA_at_SF.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 49243
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_MIN%40CHI",
+      "status": 200,
+      "file": "box_20260920_MIN_at_CHI.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 43740
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_NO%40BAL",
+      "status": 200,
+      "file": "box_20260920_NO_at_BAL.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 46250
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_PHI%40TEN",
+      "status": 200,
+      "file": "box_20260920_PHI_at_TEN.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 47181
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_PIT%40NE",
+      "status": 200,
+      "file": "box_20260920_PIT_at_NE.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 45390
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_SEA%40ARI",
+      "status": 200,
+      "file": "box_20260920_SEA_at_ARI.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 47223
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260920_WSH%40DAL",
+      "status": 200,
+      "file": "box_20260920_WSH_at_DAL.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 51771
+    },
+    {
+      "url": "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com/getNFLBoxScore?gameID=20260921_NYG%40LAR",
+      "status": 200,
+      "file": "box_20260921_NYG_at_LAR.json.gz",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 46475
+    }
+  ]
+}
