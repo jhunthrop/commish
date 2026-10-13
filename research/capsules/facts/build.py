@@ -15,6 +15,7 @@ from research.capsules.facts.depth_ledger import depth_names, depth_numbers, dep
 from research.capsules.facts.depth_model import EMPTY_DEPTH, Depth
 from research.capsules.facts.evidence import availability_from, evidence_from, market_from
 from research.capsules.facts.ledger import name_ledger, number_ledger
+from research.capsules.facts.market_adp import PageRanks
 from research.capsules.facts.model import (
     Availability,
     BooksNumbers,
@@ -72,6 +73,9 @@ class FactsInput:
     usage: Usage | None
     trend: Trend | None
     depth: Depth = EMPTY_DEPTH
+    # The page's overall and position rank (`market_adp`), which replace the oracle's board rank and
+    # the scarcity reason's position rank; None keeps the oracle's (the parity cases).
+    page_ranks: PageRanks | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,6 +132,12 @@ def facts_hash(facts: PlayerFacts) -> str:
     return hashlib.sha256(js_json_stringify(content_json(facts)).encode("utf-8")).hexdigest()
 
 
+def _market(given: FactsInput) -> Market:
+    market = market_from(given.reasons, given.adp, given.position_adp, given.board_rank)
+    page = given.page_ranks
+    return market if page is None else replace(market, board_rank=page.overall, position_rank=page.position)
+
+
 def build_player_facts(given: FactsInput) -> PlayerFacts:
     """`buildPlayerFacts`."""
     low, high = _quartiles(given.median_points, given.floor_points, given.ceiling_points)
@@ -135,7 +145,7 @@ def build_player_facts(given: FactsInput) -> PlayerFacts:
         given.identity,
         given.product_season,
         evidence_from(given.reasons, given.laws),
-        market_from(given.reasons, given.adp, given.position_adp, given.board_rank),
+        _market(given),
         Projection(given.projected_points, given.floor_points, given.median_points, given.ceiling_points, low, high),
         availability_from(given.reasons),
         given.season,

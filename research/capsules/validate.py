@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
+from research.capsules.board_ranks import rank_claims_off_page
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts.model import LawEvidence
 from research.capsules.grounding import (
@@ -111,6 +112,10 @@ class Grounding:
     page_numbers: tuple[tuple[str, float], ...]
     # The page's ADP (the run's, `facts.market_adp`): any ADP or pick a read states must be it.
     adp: float | None = None
+    # His position code and the page's position and overall rank: any board rank a read states must be them.
+    position: str = ""
+    position_rank: int | None = None
+    board_rank: int | None = None
 
 
 def word_count(text: str) -> int:
@@ -205,6 +210,9 @@ def grounding_of(facts: "PlayerFacts") -> Grounding:
         strongest_negative_law_effect(facts),
         facts_page_numbers(facts),
         facts.market.adp,
+        facts.identity.position,
+        facts.market.position_rank,
+        facts.market.board_rank,
     )
 
 
@@ -327,7 +335,21 @@ def _validate(
     if page_number and not pull_figures_of(trimmed, source.page_numbers, 1):
         violations.append(no_page_number_violation(source.page_numbers))
     violations += [adp_figure_violation(claim, source.adp) for claim in adp_figures_off_page(trimmed, source.adp)]
+    violations += [
+        rank_violation(claim, source)
+        for claim in rank_claims_off_page(trimmed, source.position, source.position_rank, source.board_rank)
+    ]
     return ValidationResult(not violations, tuple(violations))
+
+
+RANK_VIOLATION: Final = "The text states a board rank that is not his rank on the page"
+
+
+def rank_violation(claim: str, source: Grounding) -> str:
+    ranks = [f"{source.position}{source.position_rank}"] if source.position_rank is not None else []
+    ranks += [f"rank {source.board_rank} overall"] if source.board_rank is not None else []
+    allowed = " and ".join(ranks) or "no board rank"
+    return f'{RANK_VIOLATION}: "{claim}". His ranks on our board are {allowed}. Say exactly that, or no rank.'
 
 
 ADP_FIGURE_VIOLATION: Final = "The text states an ADP or a pick that is not his ADP on the page"

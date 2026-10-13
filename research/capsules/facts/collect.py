@@ -130,6 +130,7 @@ def facts_input_for(row: BoardRow, shared: SharedReads) -> FactsInput:
         None if gsis is None else color.usage.usage.get(gsis),
         None if gsis is None else color.usage.trend.get(gsis),
         EMPTY_DEPTH if gsis is None else color.depth.get(gsis, EMPTY_DEPTH),
+        shared.market.page_ranks(row.player_id),
     )
 
 
