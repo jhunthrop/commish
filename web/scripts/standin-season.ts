@@ -9,12 +9,17 @@
 //   the run's own schedule and clubs    each week's opponent and the byes, and nfl_games' kickoffs
 //
 // The rules, which the nightly keeps through the same fields:
-//   A club's game is in the records when it is final (four hours past its kickoff) and the store
-//     holds lines for that club that week. `through` is the last week whose games are all in.
+//   A club's game is in the records when it is final and the store holds lines for that club that
+//     week. `through` is the last week whose games are all in. "Final" here is the stand-in's own
+//     estimate, four hours past the kickoff, because the dev copy's nfl_games marks every game
+//     scheduled. The nightly uses the feed's final flag instead.
+//   The player-week feed lands in two ingests: the stat line (the scoring stats and completions)
+//     and the usage line (carries, targets, pass attempts and the team totals).
 //   A week is played when he has a stat line, inactive when he has none and his club's game is in
 //     the records, upcoming otherwise, and a bye when his club does not play.
-//   Within a played week, a stat with no row is zero when the store holds that metric for the week,
-//     and null when it does not (a metric not yet loaded). A week with no line is never zeros.
+//   Within a played week, a stat with no row is zero only when that week has his row from the same
+//     ingest and the store holds that metric for the week. Otherwise it is null (his usage line
+//     never landed, or the metric is not loaded yet). A week with no stat line is never zeros.
 //   A total is null when any played week's value is null, snap share included.
 import type postgres from 'postgres';
 import {
@@ -33,8 +38,28 @@ const STAT_SOURCE = 'nflverse_player_week';
 const SNAP_SOURCE = 'nflverse_snap_counts';
 const SNAPS = 'offensive_snaps';
 const TEAM_SNAPS = 'team_offensive_snaps';
-/** A game is final this long after its kickoff. */
+/** The stand-in's own estimate of when a game is final: four hours after its kickoff. The dev
+ * copy's nfl_games marks every game scheduled, so there is no final flag to read. The nightly reads
+ * the feed's final flag and drops this. */
 const GAME_LENGTH_MS = 4 * 60 * 60 * 1000;
+/** The usage ingest's metrics. Every other metric of the player-week feed is the stat ingest's. */
+const USAGE_METRICS: ReadonlySet<string> = new Set([
+	'carries',
+	'targets',
+	'pass_attempts',
+	'team_carries',
+	'team_targets',
+	'team_pass_attempts'
+]);
+
+function isUsage(metric: string): boolean {
+	return USAGE_METRICS.has(metric);
+}
+
+/** Whether his week holds any row from the ingest that writes this metric. */
+function hasIngest(line: Metrics, usage: boolean): boolean {
+	return [...line.keys()].some((metric) => isUsage(metric) === usage);
+}
 
 /** The fourteen fields every points line carries, the rest of STAT_FIELDS being counts only. */
 const POINTS_FIELDS = [
@@ -178,8 +203,8 @@ function snapShareOf(snaps: Metrics | undefined): number | null {
 	return mine === undefined || team === undefined || team === 0 ? null : mine / team;
 }
 
-/** A played week's line: what the store holds, zero for a metric the store holds that week but has
- * no row of for him, null for a metric the store does not hold that week. */
+/** A played week's line: what the store holds, zero for a metric with no row when his week has a
+ * row from the same ingest and the store holds the metric that week, null otherwise. */
 function lineOf(
 	line: Metrics,
 	snaps: Metrics | undefined,
@@ -187,7 +212,7 @@ function lineOf(
 	score: (line: PointsLine) => number
 ): StatLine {
 	const value = (field: string): number | null =>
-		line.get(field) ?? (carried.has(field) ? 0 : null);
+		line.get(field) ?? (hasIngest(line, isUsage(field)) && carried.has(field) ? 0 : null);
 	const counts = Object.fromEntries(STAT_FIELDS.map((field) => [field, value(field)])) as Record<
 		StatField,
 		number | null
@@ -240,7 +265,9 @@ function weekRow(week: number, player: PlayerRead, context: Context): GameLogRow
 	const game = inputs.schedule.slates
 		.find((slate) => slate.abbr === team)
 		?.games.find((candidate) => candidate.week === week);
-	const line = player.lines.get(week);
+	// Played means a stat line. A week with only his usage line has no stat line to score.
+	const found = player.lines.get(week);
+	const line = found && hasIngest(found, false) ? found : undefined;
 	if (!game) {
 		if (context.byes.get(team) !== week)
 			throw new Error(`${team} has no week ${String(week)} game and it is not their bye.`);
