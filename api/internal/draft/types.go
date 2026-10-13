@@ -27,6 +27,29 @@ const (
 	DEF Position = "DEF"
 )
 
+// PositionCount is the number of positions, the size of a per-position table.
+const PositionCount = 6
+
+// Index is p's place in a per-position table: QB, RB, WR, TE, K, DEF.
+// An unknown position (never in a validated pool) is -1.
+func (p Position) Index() int {
+	switch p {
+	case QB:
+		return 0
+	case RB:
+		return 1
+	case WR:
+		return 2
+	case TE:
+		return 3
+	case K:
+		return 4
+	case DEF:
+		return 5
+	}
+	return -1
+}
+
 // Valid reports whether p is one of the six positions.
 func (p Position) Valid() bool {
 	switch p {

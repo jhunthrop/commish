@@ -11,43 +11,40 @@ import (
 type placement struct {
 	roster []RosterSlot
 	slots  []SlotConfig
-	known  map[Position]Assignment
+	known  [PositionCount]Assignment
+	has    [PositionCount]bool
 }
 
 func newPlacement(roster []RosterSlot, slots []SlotConfig) *placement {
-	return &placement{roster: roster, slots: slots, known: make(map[Position]Assignment, 6)}
+	return &placement{roster: roster, slots: slots}
 }
 
 func (p *placement) of(pos Position) Assignment {
-	if a, ok := p.known[pos]; ok {
-		return a
+	i := pos.Index()
+	if i < 0 {
+		return AssignSlot(pos, p.roster, p.slots)
 	}
-	a := AssignSlot(pos, p.roster, p.slots)
-	p.known[pos] = a
-	return a
+	if !p.has[i] {
+		p.known[i], p.has[i] = AssignSlot(pos, p.roster, p.slots), true
+	}
+	return p.known[i]
 }
 
-// autopickContext is what both autopick selectors share: the eligible
-// undrafted board and the first legal queued player.
+// autopickContext is what both autopick selectors share: the board with
+// what is drafted marked, and the first legal queued player.
 type autopickContext struct {
-	roster    []RosterSlot
-	available []PoolEntry
-	place     *placement
-	queued    *PoolEntry
+	pool   Pool
+	taken  Taken
+	roster []RosterSlot
+	place  *placement
+	queued *PoolEntry
 }
 
 func newAutopickContext(s State, teamID string) autopickContext {
 	roster := RosterFor(s, teamID)
-	drafted := draftedSet(s)
-	available := make([]PoolEntry, 0, s.Pool.Len())
-	for i := 0; i < s.Pool.Len(); i++ {
-		if e := s.Pool.At(i); !drafted[e.PlayerID] && e.AutopickEligible() {
-			available = append(available, e)
-		}
-	}
-	ctx := autopickContext{roster: roster, available: available, place: newPlacement(roster, s.Config.SlotConfig)}
+	ctx := autopickContext{pool: s.Pool, taken: TakenOn(s), roster: roster, place: newPlacement(roster, s.Config.SlotConfig)}
 	for _, e := range QueuedEntries(s, teamID) {
-		if !drafted[e.PlayerID] && e.AutopickEligible() && ctx.place.of(e.Position).OK {
+		if !ctx.taken.Has(e.PlayerID) && e.AutopickEligible() && ctx.place.of(e.Position).OK {
 			queued := e
 			ctx.queued = &queued
 			break
@@ -56,9 +53,14 @@ func newAutopickContext(s State, teamID string) autopickContext {
 	return ctx
 }
 
+// available is whether board index i is undrafted and the room's to take.
+func (c autopickContext) available(i int) bool {
+	return !c.taken.At(i) && c.pool.At(i).AutopickEligible()
+}
+
 func (c autopickContext) firstLegal() (PoolEntry, bool) {
-	for _, e := range c.available {
-		if c.place.of(e.Position).OK {
+	for i := 0; i < c.pool.Len(); i++ {
+		if e := c.pool.At(i); c.available(i) && c.place.of(e.Position).OK {
 			return e, true
 		}
 	}
@@ -100,7 +102,8 @@ func BestAvailableFor(s State, teamID string) (PoolEntry, bool) {
 	} else {
 		score = rosterCeilingScorer(s, ctx.roster, *policy, ramp)
 	}
-	needs := make(map[Position]candidateNeed, 6)
+	var needs [PositionCount]candidateNeed
+	var scored [PositionCount]bool
 	type best struct {
 		entry PoolEntry
 		score float64
@@ -111,15 +114,23 @@ func BestAvailableFor(s State, teamID string) (PoolEntry, bool) {
 		top[b].score = math.Inf(-1)
 	}
 	legalIndex := 0
-	for _, e := range ctx.available {
+	for i := 0; i < ctx.pool.Len(); i++ {
+		if !ctx.available(i) {
+			continue
+		}
+		e := ctx.pool.At(i)
 		a := ctx.place.of(e.Position)
 		if !a.OK {
 			continue
 		}
-		n, ok := needs[e.Position]
-		if !ok {
+		var n candidateNeed
+		if i := e.Position.Index(); i >= 0 && scored[i] {
+			n = needs[i]
+		} else {
 			n = score(e.Position, a.Slot)
-			needs[e.Position] = n
+			if i >= 0 {
+				needs[i], scored[i] = n, true
+			}
 		}
 		value := RankWeight(legalIndex, policy.Temperature) * n.need
 		legalIndex++

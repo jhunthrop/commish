@@ -17,9 +17,6 @@ func fromWords(hi, lo uint32) float64 {
 	return math.Float64frombits(uint64(hi)<<32 | uint64(lo))
 }
 
-// withLowWord is x with its low 32 bits replaced.
-func withLowWord(x float64, lo uint32) float64 { return fromWords(highWord(x), lo) }
-
 // withHighWord is x with its high 32 bits replaced.
 func withHighWord(x float64, hi uint32) float64 { return fromWords(hi, lowWord(x)) }
 

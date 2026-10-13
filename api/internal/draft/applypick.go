@@ -29,15 +29,6 @@ func refusalFor(s State, roster []RosterSlot, slottingReason string) string {
 	return MustPickLine(owed)
 }
 
-// draftedSet is the ids already picked.
-func draftedSet(s State) map[string]bool {
-	out := make(map[string]bool, len(s.Picks))
-	for _, p := range s.Picks {
-		out[p.PlayerID] = true
-	}
-	return out
-}
-
 func isDrafted(s State, playerID string) bool {
 	for _, p := range s.Picks {
 		if p.PlayerID == playerID {
@@ -76,7 +67,7 @@ func applyPick(s State, in pickInput) (State, error) {
 		Slot: a.Slot, SlotIndex: a.SlotIndex, Price: in.price, Timestamp: in.timestamp, Auto: in.auto,
 	}
 	next := s
-	next.Picks = appendPick(s.Picks, pick)
+	next.Picks, next.tail = appendPick(s, pick)
 	slots := make([]RosterSlot, len(roster), len(roster)+1)
 	copy(slots, roster)
 	next.Rosters = withRoster(s.Rosters, in.teamID, append(slots, RosterSlot{Slot: a.Slot, SlotIndex: a.SlotIndex, PlayerID: in.playerID}))

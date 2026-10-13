@@ -44,13 +44,14 @@ type sampler struct {
 	roleOf   draft.RoleReader
 	enforce  bool
 	strategy Strategy
-	known    map[draft.Position]placed
+	known    [draft.PositionCount]placed
+	has      [draft.PositionCount]bool
 }
 
 func newSampler(s draft.State, teamID string, strategy Strategy, o WeightOptions) *sampler {
 	sm := &sampler{
 		state: s, roster: draft.RosterFor(s, teamID), slots: s.Config.SlotConfig,
-		enforce: !o.Observe, strategy: strategy, known: make(map[draft.Position]placed, 6),
+		enforce: !o.Observe, strategy: strategy,
 	}
 	if o.Ceilings == RoomCeilings && s.Config.Autopick != nil && s.Config.Autopick.RosterCeilings != nil {
 		sm.roleOf = draft.NewRoleReader(sm.roster, sm.slots, s.Pool, *s.Config.Autopick.RosterCeilings)
@@ -59,8 +60,9 @@ func newSampler(s draft.State, teamID string, strategy Strategy, o WeightOptions
 }
 
 func (sm *sampler) place(p draft.Position) placed {
-	if got, ok := sm.known[p]; ok {
-		return got
+	i := p.Index()
+	if i >= 0 && sm.has[i] {
+		return sm.known[i]
 	}
 	out := placed{assignment: draft.AssignSlot(p, sm.roster, sm.slots)}
 	if out.assignment.OK {
@@ -70,18 +72,20 @@ func (sm *sampler) place(p draft.Position) placed {
 		}
 		out.ok = out.role == nil || !sm.enforce || !out.role.Capped
 	}
-	sm.known[p] = out
+	if i >= 0 {
+		sm.known[i], sm.has[i] = out, true
+	}
 	return out
 }
 
 // topEligible is the first ReachDepth undrafted, autopick-eligible entries
 // keep accepts, in board order: nothing deeper is ever sampled.
-func (sm *sampler) topEligible(drafted map[string]bool, keep func(draft.PoolEntry) bool) []draft.PoolEntry {
+func (sm *sampler) topEligible(taken draft.Taken, keep func(draft.PoolEntry) bool) []draft.PoolEntry {
 	out := make([]draft.PoolEntry, 0, sm.strategy.ReachDepth)
 	pool := sm.state.Pool
 	for i := 0; i < pool.Len() && len(out) < sm.strategy.ReachDepth; i++ {
 		e := pool.At(i)
-		if !drafted[e.PlayerID] && e.AutopickEligible() && keep(e) {
+		if !taken.At(i) && e.AutopickEligible() && keep(e) {
 			out = append(out, e)
 		}
 	}
@@ -93,11 +97,11 @@ func (sm *sampler) topEligible(drafted map[string]bool, keep func(draft.PoolEntr
 // rankWeight x posBias x need x run for the archetype.
 func CandidateWeights(s draft.State, teamID string, a Archetype, strategy Strategy, o WeightOptions) []CandidateWeight {
 	sm := newSampler(s, teamID, strategy, o)
-	drafted := draft.DraftedIDs(s)
-	window := sm.topEligible(drafted, func(e draft.PoolEntry) bool { return sm.place(e.Position).ok })
+	taken := draft.TakenOn(s)
+	window := sm.topEligible(taken, func(e draft.PoolEntry) bool { return sm.place(e.Position).ok })
 	if len(window) == 0 {
 		// The cap is a preference; a bot that returned nobody would stall a room.
-		window = sm.topEligible(drafted, func(e draft.PoolEntry) bool { return sm.place(e.Position).assignment.OK })
+		window = sm.topEligible(taken, func(e draft.PoolEntry) bool { return sm.place(e.Position).assignment.OK })
 	}
 	type row struct {
 		entry draft.PoolEntry
@@ -195,9 +199,9 @@ func legalQueuedPick(s draft.State, teamID string) (string, bool) {
 		return "", false
 	}
 	roster := draft.RosterFor(s, teamID)
-	drafted := draft.DraftedIDs(s)
+	taken := draft.TakenOn(s)
 	for _, e := range draft.QueuedEntries(s, teamID) {
-		if e.AutopickEligible() && !drafted[e.PlayerID] && draft.AssignSlot(e.Position, roster, s.Config.SlotConfig).OK {
+		if e.AutopickEligible() && !taken.Has(e.PlayerID) && draft.AssignSlot(e.Position, roster, s.Config.SlotConfig).OK {
 			return e.PlayerID, true
 		}
 	}

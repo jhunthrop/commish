@@ -2,16 +2,13 @@ package draft
 
 import "math"
 
-// DraftedIDs is the set of players already picked.
-func DraftedIDs(s State) map[string]bool { return draftedSet(s) }
-
 // AvailablePool is the undrafted pool in ranking order.
 func AvailablePool(s State) []PoolEntry {
-	drafted := draftedSet(s)
-	out := make([]PoolEntry, 0, max(0, s.Pool.Len()-len(drafted)))
+	taken := TakenOn(s)
+	out := make([]PoolEntry, 0, s.Pool.Len()-taken.Count())
 	for i := 0; i < s.Pool.Len(); i++ {
-		if e := s.Pool.At(i); !drafted[e.PlayerID] {
-			out = append(out, e)
+		if !taken.At(i) {
+			out = append(out, s.Pool.At(i))
 		}
 	}
 	return out
