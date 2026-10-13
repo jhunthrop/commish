@@ -22,14 +22,14 @@ type Source interface {
 // never input, and is still checked before it reaches a query.
 var schemaName = regexp.MustCompile(`^[a-z_][a-z0-9_]{0,62}$`)
 
-// PGSource reads the research tables: the directory (players), the
-// stored board (preseason_projections, one source per scoring format,
-// keyed on the universe id), the crosswalk between the two, and the
-// schedule for byes.
+// PGSource reads the research schema (research/README.md): the
+// provider's roster (provider_players, the ids rooms and sheets name
+// players by), the stored board (preseason_projections, one source per
+// scoring format, keyed on the universe id), the crosswalk between them,
+// and the provider's schedule for byes.
 type PGSource struct {
 	Pool *pgxpool.Pool
-	// Schema holds the research tables: "research" in the prep site's
-	// database, "public" in the legacy copy used for development.
+	// Schema holds the research tables, "research".
 	Schema string
 	// Season is the season the board drafts for.
 	Season int
@@ -47,27 +47,33 @@ func NewPGSource(pool *pgxpool.Pool, schema string, season int, sourcePrefix str
 
 func (s *PGSource) table(name string) string { return pgx.Identifier{s.Schema, name}.Sanitize() }
 
+// boardQuery is the provider's roster (the ids the product names
+// players by) in ADP order, each with the stored board's points through
+// the crosswalk to the universe id the board keys on.
 func (s *PGSource) boardQuery() string {
 	return `with latest as (
   select max(as_of) as as_of from ` + s.table("preseason_projections") + ` where season = $1 and source = $2
 ), proj as (
-  select c.player_id, p.projected_points
+  select c.provider_player_id, p.projected_points
   from ` + s.table("preseason_projections") + ` p
   join latest l on p.as_of = l.as_of
-  join ` + s.table("player_crosswalk") + ` c on c.nfl_player_id = p.player_id
+  join ` + s.table("player_crosswalk") + ` c on c.player_id = p.player_id
   where p.season = $1 and p.source = $2
 )
-select pl.id, pl.name, pl.position::text, pl.nfl_team, coalesce(pl.headshot_url, ''), pl.adp::float8, proj.projected_points,
+select pp.id, pp.name, pp.position, pp.team, coalesce(pp.headshot_url, ''), pp.adp, proj.projected_points,
   (select as_of from latest)
-from ` + s.table("players") + ` pl left join proj on proj.player_id = pl.id
-order by pl.adp asc nulls last, pl.id collate "C"`
+from ` + s.table("provider_players") + ` pp left join proj on proj.provider_player_id = pp.id
+order by pp.adp asc nulls last, pp.id collate "C"`
 }
 
+// byeQuery is each team's bye: the first week of the season's schedule
+// it plays no game.
 func (s *PGSource) byeQuery() string {
-	games := s.table("nfl_games")
-	return `with played as (
-  select home_nfl_team as team, week from ` + games + ` union select away_nfl_team, week from ` + games + `
-), weeks as (select distinct week from ` + games + ` where week between 1 and 18),
+	games := s.table("provider_games")
+	return `with season_games as (select home_team, away_team, week from ` + games + ` where season = $1),
+played as (
+  select home_team as team, week from season_games union select away_team, week from season_games
+), weeks as (select distinct week from season_games where week between 1 and 18),
 teams as (select distinct team from played)
 select t.team, min(w.week) from teams t cross join weeks w
 where not exists (select 1 from played p where p.team = t.team and p.week = w.week)
@@ -112,7 +118,7 @@ func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 }
 
 func (s *PGSource) byes(ctx context.Context) (map[string]int, error) {
-	rows, err := s.Pool.Query(ctx, s.byeQuery())
+	rows, err := s.Pool.Query(ctx, s.byeQuery(), s.Season)
 	if err != nil {
 		return nil, fmt.Errorf("boards: read byes: %w", err)
 	}
