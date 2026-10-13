@@ -76,6 +76,18 @@
 		color: var(--ink-2);
 	}
 
+	/* On the phone every line sets its text under its lead, whatever the lengths, so a list reads
+	   one way down the page. */
+	@media (max-width: 760px) {
+		li {
+			row-gap: var(--s-1);
+		}
+
+		.text {
+			flex-basis: 100%;
+		}
+	}
+
 	.figure {
 		margin-left: auto;
 		font-family: var(--font-num);
