@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { windowLabel } from '#lib/format/date.ts';
-	import { fixed, scheduleRankWords } from '#lib/format/number.ts';
+	import { fixed, hardestWords } from '#lib/format/number.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
 	import Crumb from '#lib/ui/Crumb.svelte';
@@ -21,7 +21,7 @@
 	const name = $derived(`${club.city} ${club.nickname}`);
 	const names = $derived(new Map(page.clubs.map((other) => [other.abbr, other])));
 	const caption = $derived(
-		`${scheduleRankWords(page.slate.rank)} of 32, the ${page.slate.method}, read ${windowLabel(page.slate.window)}`
+		`${page.slate.unit}, ${hardestWords(page.slate.rank, page.clubs.length)}, the ${page.slate.method}, read ${windowLabel(page.slate.window)}`
 	);
 </script>
 

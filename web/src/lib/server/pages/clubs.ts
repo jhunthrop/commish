@@ -3,8 +3,14 @@
 import { error } from '@sveltejs/kit';
 import { rangeScale } from '#lib/run/derive.ts';
 import type { BoardRow, Club, Format, Game, Schedule, Slate } from '#lib/run/schema.ts';
+import { fixed } from '#lib/format/number.ts';
+import { links } from '#lib/site/links.ts';
+import type { ScheduleRow } from '#lib/ui/schedule-grid.ts';
 import type { RangeScale } from '#lib/types/player.ts';
 import { board, clubs, defaultFormat, schedule } from '../run.ts';
+
+/** The share of opponents the schedule grid shades as the strongest: the top third of the league. */
+const STRONG_SHARE = 1 / 3;
 
 const NOT_FOUND = 404;
 
@@ -37,9 +43,25 @@ export interface ClubPage {
 }
 
 export interface SchedulePage {
-	schedule: Schedule;
-	clubs: Club[];
+	season: number;
+	/** Every club's slate, hardest first, as the grid prints it. */
+	rows: ScheduleRow[];
 	weeks: number[];
+	/** How strength is measured, its unit, and when its inputs were read, from the run. */
+	method: string;
+	unit: string;
+	window: Slate['window'];
+	/** What one opponent's number is: "Published season win total". */
+	opponentBasis: string;
+	/** How many opponents are shaded as the strongest, and the number they reach. */
+	strong: { count: number; atLeast: string };
+}
+
+/** The opponent values that count as the strongest: the top share of the league, ties kept in. */
+function strongFloor(values: readonly number[]): { count: number; floor: number } {
+	const sorted = [...values].sort((a, b) => b - a);
+	const floor = sorted[Math.max(0, Math.ceil(sorted.length * STRONG_SHARE) - 1)] ?? Infinity;
+	return { count: sorted.filter((value) => value >= floor).length, floor };
 }
 
 /** An opponent's value. The run's schema guarantees one for every opponent on a slate. */
@@ -99,13 +121,47 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 }
 
 export async function schedulePage(): Promise<SchedulePage> {
-	const [loaded, list] = await Promise.all([schedule(), clubs()]);
+	const format = await defaultFormat();
+	const [loaded, list, rows] = await Promise.all([schedule(), clubs(), board(format.id)]);
 	const lastWeek = Math.max(
 		...loaded.slates.flatMap((slate) => slate.games.map((game) => game.week))
 	);
+	const weeks = Array.from({ length: lastWeek }, (_, i) => i + 1);
+	const strong = strongFloor(Object.values(loaded.opponentValues));
+	const slates = [...loaded.slates].sort((a, b) => a.rank - b.rank);
+	const [first] = slates;
+	if (!first) throw new Error('schedule.json has no slates.');
 	return {
-		schedule: { ...loaded, slates: [...loaded.slates].sort((a, b) => a.rank - b.rank) },
-		clubs: list,
-		weeks: Array.from({ length: lastWeek }, (_, i) => i + 1)
+		season: loaded.season,
+		weeks,
+		method: first.method,
+		unit: first.unit,
+		window: first.window,
+		opponentBasis: loaded.opponentBasis,
+		strong: { count: strong.count, atLeast: fixed(strong.floor, 1) },
+		rows: slates.map((slate) => {
+			const club = list.find((candidate) => candidate.abbr === slate.abbr);
+			const lead = rows.rows.find((row) => row.team === slate.abbr);
+			return {
+				abbr: slate.abbr,
+				name: club ? `${club.city} ${club.nickname}` : slate.abbr,
+				href: links.club(slate.abbr),
+				face: lead?.headshot ?? null,
+				rank: slate.rank,
+				strength: fixed(slate.strength, 2),
+				cells: weeks.map((week) => {
+					const game = slate.games.find((candidate) => candidate.week === week);
+					if (!game) return { week, opponent: null, home: false, value: '', hard: false };
+					const value = opponentValue(loaded, game.opponent);
+					return {
+						week,
+						opponent: game.opponent,
+						home: game.home,
+						value: fixed(value, 1),
+						hard: value >= strong.floor
+					};
+				})
+			};
+		})
 	};
 }

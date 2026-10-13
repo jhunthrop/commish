@@ -253,6 +253,8 @@ export const slateSchema = z.object({
 	rank: z.number().int().min(1).max(32),
 	/** How strength is measured, as the page prints it beside the number. */
 	method: phrase,
+	/** The strength's unit as a short caption under the number: "opponents' average win total". */
+	unit: phrase,
 	/** When the inputs were read, from their own stamps. */
 	window: windowSchema
 });

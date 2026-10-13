@@ -362,6 +362,7 @@ function scheduleFrom(
 			...slate,
 			rank: ordered.findIndex((other) => other.abbr === slate.abbr) + 1,
 			method: "average of its opponents' published season win totals",
+			unit: "opponents' average win total",
 			window: winTotals.window
 		}))
 	};

@@ -1,0 +1,25 @@
+/** One club's row of the schedule grid, every value already in the words and digits it prints. */
+export interface ScheduleCell {
+	week: number;
+	/** The opponent's code, or null on the bye. */
+	opponent: string | null;
+	home: boolean;
+	/** The opponent's own number, formatted: "11.5". */
+	value: string;
+	/** One of the strongest opponents, by the population the page states. */
+	hard: boolean;
+}
+
+export interface ScheduleRow {
+	abbr: string;
+	/** "Arizona Cardinals". */
+	name: string;
+	href: string;
+	/** The face that leads the row: the club's top player on our board, or null for none. */
+	face: string | null;
+	/** 1 is the hardest slate. */
+	rank: number;
+	/** The strength, formatted: "9.26". */
+	strength: string;
+	cells: ScheduleCell[];
+}
