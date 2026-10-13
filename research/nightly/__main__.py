@@ -3,7 +3,8 @@
 The steps phase C owns, in the oracle's order (`research-ts/src/nightly/main.ts`): the fit step
 (check only, `research.model.fit_check`), then the capsule sweep, skipped by name when
 AI_GATEWAY_API_KEY is not set, because a sweep without the key would demote written reads to facts
-blocks, then the capsule gate (`capsule_gate`), which fails the run when more than 2% of the
+blocks, then one retry pass over the pages still unwritten (`SweepPlan(unwritten_only=True)`,
+from the budget left), then the capsule gate (`capsule_gate`), which fails the run when more than 2% of the
 board's pages are unwritten (facts blocks, missing) or a written sentence sits on two pages. Each
 step's line names what it did; the run exits 1 when a step failed. The ingests, the run writer, the gates and the web
 dispatch are phase D's (this package's `__init__` names the whole chain); they extend this entry
@@ -24,7 +25,7 @@ from sqlalchemy import Engine
 
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.gateway import GatewayClient
-from research.capsules.sweep import sweep_capsules
+from research.capsules.sweep import SweepPlan, SweepReport, sweep_capsules
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
 from research.model.arithmetic import ARM64_BOARDS
@@ -54,13 +55,24 @@ def _capsules(engine: Engine, now: datetime, budget: int) -> bool:
         )
         return True
     with httpx.Client() as http:
-        report = sweep_capsules(engine, GatewayClient(key, http), now, budget)
-    _line(
-        f"capsules: ran, {report.board_players} board players, {report.eligible} needed a fresh generation, "
+        gateway = GatewayClient(key, http)
+        report = sweep_capsules(engine, gateway, now, SweepPlan(budget))
+        _line(f"capsules: ran, {_sweep_line(report)}")
+        left = budget - len(report.processed)
+        if left <= 0 or report.facts == 0:
+            _line("capsule retries: none (no budget left)" if left <= 0 else "capsule retries: none needed")
+            return True
+        retries = sweep_capsules(engine, gateway, now, SweepPlan(left, unwritten_only=True))
+    _line(f"capsule retries: ran, {_sweep_line(retries)}")
+    return True
+
+
+def _sweep_line(report: SweepReport) -> str:
+    return (
+        f"{report.board_players} board players, {report.eligible} needed a generation, "
         f"{len(report.processed)} processed ({report.llm} llm, {report.facts} facts blocks), {report.calls} calls, "
         f"${report.cost_usd:.6f}, {report.queued} queued for regeneration"
     )
-    return True
 
 
 def _capsule_gate(engine: Engine, now: datetime) -> bool:

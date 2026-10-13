@@ -89,8 +89,12 @@ class CapsuleConfig:
     gateway: Gateway = Gateway()
     compact: Size = Size(75, 120, 500)
     full: Size = Size(240, 300, 1600)
-    # A player's gateway calls: the bundle, its retry, and the corrections, never more.
-    max_gateway_calls_per_player: int = 4
+    # A player's gateway calls: the bundle, its retry, and the corrections, never more (the oracle
+    # had four; ruled up to six in phase C's fix round 3).
+    max_gateway_calls_per_player: int = 6
+    # How far over its word cap a read may run once it has been asked for a shorter read: accepted,
+    # not failed (ruled in phase C's fix round 3). A first draft is held to the cap itself.
+    overrun_percent_after_length_correction: int = 10
     # Corrections one read may take inside that ceiling. The oracle stopped at one; a set phrase or
     # a betting word the first correction leaves (or brings) is worth a second sentence rewrite
     # before the read falls to the facts block, which the nightly counts against its 2% line.
@@ -98,6 +102,9 @@ class CapsuleConfig:
     # The share of the board's pages the nightly lets go unwritten: facts blocks, the oracle's
     # template rows and missing pages together.
     unwritten_share_max: float = 0.02
+    # A written sentence this long or longer may sit on one page only; shorter ones ("Draft him.",
+    # "Let him go.") are the product's vocabulary, not stock prose (ruled in phase C's fix round 3).
+    shared_sentence_min_words: int = 4
     narrative_voice_rewrites_per_slot: int = 1
     length_correction: LengthCorrection = LengthCorrection()
     narrative_target_share_of_cap: float = 0.75

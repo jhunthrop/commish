@@ -5,8 +5,10 @@ across players is a defect. The run fails when
 - the board's unwritten pages pass `unwritten_share_max` (2%) of the board: a facts block (the
   fallback for a player the writer could not serve, `capsules.facts_block`), a row still on the
   oracle's template, or no row at all; or
-- any sentence of a written capsule appears on two players' pages (compared normalized, as the
-  repetition measures compare, across both sizes of every written read on the board).
+- any sentence of four words or more (`shared_sentence_min_words`) of a written capsule appears on
+  two players' pages (compared normalized, as the repetition measures compare, across both sizes of
+  every written read on the board). Shorter ones, "Draft him." and "Let him go.", are the
+  product's vocabulary, not stock prose.
 
 Phase D extends this gate (the page findings of `capsules.pull_figures`, the run's other gates);
 the nightly's capsule step runs it after the sweep.
@@ -68,11 +70,13 @@ class CapsuleGateResult:
 
 
 def _sentences(row: StoredCapsule) -> set[str]:
-    return {normalize_sentence(s) for body in (row.body_compact, row.body_full) for s in sentences_verbatim(body)}
+    """The read's sentences held to uniqueness: normalized, and of at least the minimum length."""
+    normalized = {normalize_sentence(s) for body in (row.body_compact, row.body_full) for s in sentences_verbatim(body)}
+    return {s for s in normalized if len(s.split()) >= CAPSULE_CONFIG.shared_sentence_min_words}
 
 
 def shared_written_sentences(rows: Mapping[str, StoredCapsule]) -> tuple[SharedSentence, ...]:
-    """Every sentence of a written capsule that another written page carries too."""
+    """Every sentence of four words or more of a written capsule that another written page carries too."""
     pages: dict[str, list[str]] = {}
     for player_id, row in rows.items():
         if row.source == WRITTEN_SOURCE:

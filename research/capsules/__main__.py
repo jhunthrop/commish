@@ -26,7 +26,7 @@ from research.capsules.facts.model import to_js
 from research.capsules.gateway import GatewayClient
 from research.capsules.narrative import narrative_requests_for
 from research.capsules.prompt import NO_WORN_PHRASES, bundle_prompt_for
-from research.capsules.sweep import sweep_capsules
+from research.capsules.sweep import SweepPlan, sweep_capsules
 from research.capsules.trial import Choice, gate_written, write_chosen
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
@@ -70,7 +70,7 @@ def _write(engine: Engine, players: Sequence[str], count: int, spread: int) -> i
 
 def _sweep(engine: Engine, budget: int) -> int:
     with httpx.Client() as http:
-        report = sweep_capsules(engine, _gateway(http), datetime.now(UTC), budget)
+        report = sweep_capsules(engine, _gateway(http), datetime.now(UTC), SweepPlan(budget))
     _out(
         f"capsule-sweep: {report.board_players} board players, {report.eligible} needed a fresh generation, "
         f"{len(report.processed)} processed ({report.llm} llm, {report.facts} facts blocks), {report.calls} calls, "

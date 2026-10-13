@@ -49,8 +49,13 @@ class Subject:
     universe_id: str
 
 
+def _unwritten(stored: StoredCapsule | None) -> bool:
+    """No row, or a row the writer did not write (a facts block, or the oracle's template)."""
+    return stored is None or stored.source != "llm"
+
+
 def _needs_generation(subject: Subject, stored: StoredCapsule | None) -> bool:
-    return stored is None or stored.facts_hash != subject.facts.facts_hash or stored.source != "llm"
+    return _unwritten(stored) or stored is None or stored.facts_hash != subject.facts.facts_hash
 
 
 def _rows(subjects: Sequence[Subject], stored: dict[str, StoredCapsule]) -> list[CapsuleRow]:
@@ -143,30 +148,45 @@ def subjects_of(conn: Connection, as_of: datetime) -> list[Subject]:
     ]
 
 
-def sweep_capsules(
-    engine: Engine,
-    gateway: GatewayClient,
-    as_of: datetime,
-    budget: int = CAPSULE_CONFIG.sweep_generation_budget,
-    deadline: Callable[[], bool] | None = None,
-) -> SweepReport:
-    """`sweepCapsules`: write every eligible player (retry-first, then board order) up to `budget`,
-    stopping before a player when `deadline` says time is up, then run the repetition check."""
-    with engine.connect() as conn:
-        subjects = subjects_of(conn, as_of)
-        stored = stored_capsules_for(conn, [s.universe_id for s in subjects])
-    eligible = [s for s in subjects if _needs_generation(s, stored.get(s.universe_id))]
-    demoted_first = [
+@dataclass(frozen=True, slots=True)
+class SweepPlan:
+    """How much one sweep may do: `budget` players, stopping before a player once `deadline` says
+    time is up; `unwritten_only` is the retry pass the nightly runs before its gate, over only the
+    pages the writer has not served."""
+
+    budget: int = CAPSULE_CONFIG.sweep_generation_budget
+    deadline: Callable[[], bool] | None = None
+    unwritten_only: bool = False
+
+
+def _eligible(subject: Subject, row: StoredCapsule | None, unwritten_only: bool) -> bool:
+    return _unwritten(row) if unwritten_only else _needs_generation(subject, row)
+
+
+def _ordered(subjects: Sequence[Subject], stored: dict[str, StoredCapsule], unwritten_only: bool) -> list[Subject]:
+    """The demoted first, then every unwritten page, then the rest in board order."""
+    eligible = [s for s in subjects if _eligible(s, stored.get(s.universe_id), unwritten_only)]
+    demoted = [
         s
         for s in eligible
         if (row := stored.get(s.universe_id)) is not None and row.facts_hash == RETRY_FIRST_FACTS_HASH
     ]
-    ordered = [*demoted_first, *(s for s in eligible if s not in demoted_first)]
+    unwritten = [s for s in eligible if s not in demoted and _unwritten(stored.get(s.universe_id))]
+    return [*demoted, *unwritten, *(s for s in eligible if s not in demoted and s not in unwritten)]
+
+
+def sweep_capsules(engine: Engine, gateway: GatewayClient, as_of: datetime, plan: SweepPlan) -> SweepReport:
+    """`sweepCapsules`: write every eligible player in `_ordered`'s order within `plan`, then run
+    the repetition check."""
+    with engine.connect() as conn:
+        subjects = subjects_of(conn, as_of)
+        stored = stored_capsules_for(conn, [s.universe_id for s in subjects])
+    ordered = _ordered(subjects, stored, plan.unwritten_only)
     worn = worn_phrases(subjects, stored)
     report = SweepReport(as_of, len(subjects), len(ordered))
     stopped = False
-    for subject in ordered[:budget]:
-        if deadline is not None and deadline():
+    for subject in ordered[: plan.budget]:
+        if plan.deadline is not None and plan.deadline():
             stopped = True
             break
         if report.processed and CAPSULE_CONFIG.sweep_pacing_ms > 0:

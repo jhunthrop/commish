@@ -197,9 +197,12 @@ def grounding_of(facts: "PlayerFacts") -> Grounding:
 
 
 def _voice_violation(hit: VoiceRuleHit, text: str) -> str:
-    lowered = hit.found.lower()
+    """The violation, naming the sentence that holds the hit as a whole word or phrase: a bare
+    substring would name "between" for a "bet" elsewhere, and the rewrite would miss the hit."""
+    whole = re.compile(rf"(?<![a-z0-9]){re.escape(hit.found.lower())}(?![a-z0-9])")
     sentence = next(
-        (s for s in split_sentences(text) if lowered in s.replace("\u2019", "'").replace("\u2018", "'").lower()), text
+        (s for s in split_sentences(text) if whole.search(s.replace("\u2019", "'").replace("\u2018", "'").lower())),
+        text,
     )
     article = "an" if hit.rule.startswith("aside") else "a"
     return f'The text carries {article} {hit.rule}, "{hit.found}", in the sentence "{sentence}". Rewrite that sentence.'
@@ -298,12 +301,29 @@ def _validate(
     return ValidationResult(not violations, tuple(violations))
 
 
-def validate_capsule(body: str, facts: "PlayerFacts", size: str) -> ValidationResult:
-    """`validateCapsule`: one read at its size's band, with the tension mandate."""
+def overrun_cap(max_words: int) -> int:
+    """The word cap a read is held to once it has been asked for a shorter read."""
+    return max_words + max_words * CAPSULE_CONFIG.overrun_percent_after_length_correction // 100
+
+
+def validate_capsule(body: str, facts: "PlayerFacts", size: str, *, asked_shorter: bool = False) -> ValidationResult:
+    """`validateCapsule`: one read at its size's band, with the tension mandate. A read already asked
+    for a shorter version may run `overrun_percent_after_length_correction` over the cap."""
     band = CAPSULE_CONFIG.size(size)
-    return _validate(
-        body, grounding_of(facts), (band.min_words, band.max_words), tension=True, page_number=size == "full"
-    )
+    cap = overrun_cap(band.max_words) if asked_shorter else band.max_words
+    return _validate(body, grounding_of(facts), (band.min_words, cap), tension=True, page_number=size == "full")
+
+
+def banned_phrases_in(violations: Sequence[str]) -> tuple[str, ...]:
+    """The exact banned words and phrases these violations found (voice rules and trading words)."""
+    found: list[str] = []
+    for violation in violations:
+        voice = _VOICE_RULE_VIOLATION.match(violation)
+        banned = _BANNED_TERM_VIOLATION.match(violation)
+        phrase = voice.group(2) if voice is not None else banned.group(1) if banned is not None else None
+        if phrase is not None and phrase.lower() not in (f.lower() for f in found):
+            found.append(phrase)
+    return tuple(found)
 
 
 def validate_narrative_slot(body: str, source: Grounding, max_words: int) -> ValidationResult:

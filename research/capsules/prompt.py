@@ -55,6 +55,8 @@ class PriorAttempt:
     fresh_draft: FreshDraft | None = None
     soft_corrections: tuple[str, ...] | None = None
     missing: bool = False
+    # Every banned phrase this read has been caught with, on any attempt: quoted in every correction.
+    banned_phrases: tuple[str, ...] = ()
     kind: str = field(init=False, default="")
 
     def __post_init__(self) -> None:
@@ -188,12 +190,23 @@ def _correction(size: str, prior: PriorAttempt) -> str:
     return f"{quoted}\n\nIt broke these rules:\n{broken}\n\nWrite the {label} again from scratch, {_length(size)}, {shape}, fixing every point above."
 
 
+def _never_again(prior: PriorAttempt) -> list[str]:
+    if not prior.banned_phrases:
+        return []
+    listed = ", ".join(f'"{phrase}"' for phrase in prior.banned_phrases)
+    return [
+        f"These exact words were caught in this note and are banned: {listed}. None of them may appear anywhere in what you return, in any form."
+    ]
+
+
 def correction_prompt_for(facts: "PlayerFacts", size: str, prior: PriorAttempt) -> str:
-    """`correctionPromptFor`: the sheet, the prior attempt, what to fix, a plain-text return."""
+    """`correctionPromptFor`: the sheet, the prior attempt, what to fix, the exact banned phrases the
+    read has been caught with, a plain-text return."""
     return "\n\n".join(
         [
             f"Fact sheet:\n{render_facts_for_model(facts)}",
             _correction(size, prior),
+            *_never_again(prior),
             f"Return only the corrected {_READ_LABEL[size]}: no JSON, no quotes, no heading.",
         ]
     )

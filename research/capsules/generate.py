@@ -5,8 +5,10 @@ from one call, retried once whole if it never came back or was not an object. Ea
 validated; a read that fails gets the correction its failure calls for (a length correction, a
 fresh draft after a second length miss, the soft points, or a rewrite), each a call, up to
 `corrections_per_read` of them (the oracle stopped at one) and all within the player's ceiling
-(`max_gateway_calls_per_player`), and a read that still fails is the facts block (`facts_block`):
-his numbers as labelled facts, no prose.
+(`max_gateway_calls_per_player`, six; the oracle had four). Once a read has been asked for a shorter
+version it may run 10% over its cap. Every correction quotes the exact banned phrases the read has
+been caught with on any attempt. A read that still fails is the facts block (`facts_block`): his
+numbers as labelled facts, no prose.
 Narrative slots refused only for their voice get one rewrite each from what calls are left. Nothing
 here raises for a gateway failure: the facts block is the answer, and the usage billed is kept.
 """
@@ -42,6 +44,7 @@ from research.capsules.prompt import (
 from research.capsules.validate import (
     NARRATIVE_MIN_WORDS,
     ValidationResult,
+    banned_phrases_in,
     grounding_of,
     soft_correction_for,
     validate_capsule,
@@ -170,25 +173,32 @@ def _start(facts: "PlayerFacts", size: str, drafted: str | None) -> _Read:
     )
 
 
+def _asked_shorter(read: _Read, size: str) -> bool:
+    """A length correction has asked this read for fewer words."""
+    return any(words > CAPSULE_CONFIG.size(size).max_words for words in read.band_misses)
+
+
 def _next_correction(read: _Read) -> PriorAttempt | None:
     if read.text is None or read.result is None:
         return PriorAttempt("", missing=True)
+    banned = banned_phrases_in([v for attempt in read.attempts for v in attempt.violations])
     failure = read.result.band_failure
     if failure is not None:
         if len(read.band_misses) == 1:
-            return PriorAttempt(read.text, read.result.violations, length_correction=failure)
+            return PriorAttempt(read.text, read.result.violations, length_correction=failure, banned_phrases=banned)
         if len(read.band_misses) == 2:  # noqa: PLR2004 - a second miss is answered by a fresh draft
             return PriorAttempt(
                 read.text,
                 read.result.violations,
                 fresh_draft=FreshDraft(read.band_misses, failure.min_words, failure.max_words),
+                banned_phrases=banned,
             )
         return None
     if read.corrections >= CAPSULE_CONFIG.corrections_per_read:
         return None
     soft = [soft_correction_for(v) for v in read.result.violations]
     corrections = tuple(c for c in soft if c is not None) if all(c is not None for c in soft) else None
-    return PriorAttempt(read.text, read.result.violations, soft_corrections=corrections)
+    return PriorAttempt(read.text, read.result.violations, soft_corrections=corrections, banned_phrases=banned)
 
 
 def _facts_block(facts: "PlayerFacts", read: _Read, fallback: Fallback) -> ReadResult:
@@ -213,7 +223,8 @@ def _settle(
             spent = replace(read, usage=add_usage(read.usage, error.billed))
             return _facts_block(facts, spent, Fallback("throttled")), read.calls + 1
         text = answer.content.strip()
-        read = read.graded(prior.kind, text, validate_capsule(text, facts, size), answer.usage, 1)
+        result = validate_capsule(text, facts, size, asked_shorter=_asked_shorter(read, size))
+        read = read.graded(prior.kind, text, result, answer.usage, 1)
 
 
 def _rewrite_voice_slots(
