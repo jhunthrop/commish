@@ -27,7 +27,7 @@ const helpers = (process.env.HELPERS ?? '')
 	.filter((pair) => pair !== '')
 	.map((pair) => {
 		const [s = '', c = ''] = pair.split(':');
-		return { session: s, csrf: c };
+		return { session: s, csrf: c } satisfies Drafter;
 	});
 
 function required(name: string): string {
@@ -36,18 +36,18 @@ function required(name: string): string {
 	return value;
 }
 
+interface Drafter {
+	session: string;
+	csrf: string;
+}
+
 interface Envelope<T> {
 	ok: boolean;
 	data: T;
 	error: { message: string } | null;
 }
 
-async function call<T>(
-	who: { session: string; csrf: string },
-	method: string,
-	path: string,
-	body?: unknown
-): Promise<T> {
+async function call<T>(who: Drafter, method: string, path: string, body?: unknown): Promise<T> {
 	const response = await fetch(`${api}${path}`, {
 		method,
 		headers: {
@@ -63,19 +63,24 @@ async function call<T>(
 	return envelope.data;
 }
 
-const me = { session, csrf };
+const me: Drafter = { session, csrf };
 await mkdir(OUT_DIR, { recursive: true });
 const browser = await chromium.launch();
 
-async function context(theme: (typeof THEMES)[number], width: number): Promise<BrowserContext> {
+async function context(
+	theme: (typeof THEMES)[number],
+	width: number,
+	who: Drafter | null
+): Promise<BrowserContext> {
 	const ctx = await browser.newContext({
 		viewport: { width, height: VIEWPORT_HEIGHT },
 		colorScheme: theme
 	});
-	await ctx.addCookies([
-		{ name: 'commish_session', value: session, domain: 'localhost', path: '/' },
-		{ name: 'commish_csrf', value: csrf, domain: 'localhost', path: '/' }
-	]);
+	if (who)
+		await ctx.addCookies([
+			{ name: 'commish_session', value: who.session, domain: 'localhost', path: '/' },
+			{ name: 'commish_csrf', value: who.csrf, domain: 'localhost', path: '/' }
+		]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
 		[THEME_STORAGE_KEY, theme] as const
@@ -83,10 +88,15 @@ async function context(theme: (typeof THEMES)[number], width: number): Promise<B
 	return ctx;
 }
 
-async function shoot(name: string, path: string, ready: string): Promise<void> {
+async function shoot(
+	name: string,
+	path: string,
+	ready: string,
+	who: Drafter | null = me
+): Promise<void> {
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {
-			const ctx = await context(theme, width);
+			const ctx = await context(theme, width, who);
 			const page = await ctx.newPage();
 			await page.goto(`${web}${path}`, { waitUntil: 'networkidle' });
 			await page.getByText(ready).first().waitFor({ timeout: 20_000 });
@@ -99,8 +109,17 @@ async function shoot(name: string, path: string, ready: string): Promise<void> {
 	}
 }
 
+/** A drafter's tab open on the lobby, its socket connected, until the context closes. */
+async function hold(roomId: string, who: Drafter): Promise<BrowserContext> {
+	const ctx = await context('dark', WIDTHS[0], who);
+	const page = await ctx.newPage();
+	await page.goto(`${web}/lobby/${roomId}`, { waitUntil: 'networkidle' });
+	return ctx;
+}
+
 try {
 	await shoot('mock-new', '/mock/new', 'Start against bots');
+	await shoot('mock-new-signed-out', '/mock/new', 'Sign in to keep this mock', null);
 
 	interface Room {
 		id: string;
@@ -127,12 +146,17 @@ try {
 	const seat = await call<Seat>(me, 'POST', '/lobbies/join', { format: '12_ppr' });
 	for (const helper of helpers)
 		await call<Seat>(helper, 'POST', '/lobbies/join', { format: '12_ppr' });
+	// Every drafter holds the lobby open in a tab, as a person waiting in it does: a seat with no
+	// socket at the fill deadline is not counted as there.
+	const present = await Promise.all([me, ...helpers].map((who) => hold(seat.room_id, who)));
 	await shoot('lobby-filling', `/lobby/${seat.room_id}`, 'The draft starts when');
 	await new Promise((done) => setTimeout(done, FILL_WAIT_MS));
 	// The helpers step away once the room starts, so their queues draft at a bot's pace.
 	for (const helper of helpers) await call<null>(helper, 'POST', `/lobbies/${seat.room_id}/leave`);
+	await Promise.all(present.slice(1).map((ctx) => ctx.close()));
 	await new Promise((done) => setTimeout(done, DRAFT_WAIT_MS));
 	await shoot('lobby-room', `/lobby/${seat.room_id}`, 'just taken, newest first');
+	await present[0]?.close();
 } finally {
 	await browser.close();
 }
