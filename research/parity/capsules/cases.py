@@ -22,6 +22,9 @@ from sqlalchemy import Connection, create_engine
 
 from research.capsules.facts.collect import collect_board_facts
 from research.capsules.facts.collect_one import ServedBoardCache, collect_player_facts
+
+# The oracle's ADP (the stats provider's): the one declared divergence of the product's sheets.
+from research.capsules.facts.market_adp import MarketAdp
 from research.capsules.facts.model import to_js
 from research.db.url import sqlalchemy_url
 from research.parity.model.compare import diff_rows
@@ -75,7 +78,7 @@ def facts_board() -> CaseResult:
     oracle_lines = _oracle("board", AS_OF.isoformat().replace("+00:00", "Z"))
     oracle_facts = [line["facts"] for line in oracle_lines if "facts" in line]
     oracle_pass = next(line["pass"] for line in oracle_lines if "pass" in line)
-    port = _read_only(lambda conn: collect_board_facts(conn, AS_OF))
+    port = _read_only(lambda conn: collect_board_facts(conn, AS_OF, MarketAdp.ORACLE))
     port_facts = [to_js(facts) for facts in port.facts]
     left = _sections({f["identity"]["id"]: f for f in oracle_facts})
     right = _sections({f["identity"]["id"]: f for f in port_facts})
@@ -112,7 +115,7 @@ class _Sample:
 
 
 def _sample() -> _Sample:
-    board = _read_only(lambda conn: collect_board_facts(conn, AS_OF))
+    board = _read_only(lambda conn: collect_board_facts(conn, AS_OF, MarketAdp.ORACLE))
     sheets = {facts.identity.id: to_js(facts) for facts in board.facts}
     chosen = list(sheets)[::_SAMPLE_EVERY]
     kicker = _read_only(
@@ -143,7 +146,7 @@ def facts_one() -> CaseResult:
     def port_one(conn: Connection) -> dict[str, Any]:
         out: dict[str, Any] = {}
         for player_id in sample.ids:
-            facts = collect_player_facts(conn, player_id, AS_OF, served)
+            facts = collect_player_facts(conn, player_id, AS_OF, served, MarketAdp.ORACLE)
             out[player_id] = None if facts is None else to_js(facts)
         return out
 

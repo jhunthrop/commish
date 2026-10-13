@@ -35,6 +35,7 @@ from research.capsules.facts.collect import (
     facts_input_for,
 )
 from research.capsules.facts.color import current_season_summaries
+from research.capsules.facts.market_adp import MarketAdp, run_market_adp
 from research.capsules.facts.reference import injury_snapshot, news_for_players
 from research.model.laws.registry import chip_eligible_laws
 from research.model.priors import load_model_artifacts
@@ -71,7 +72,7 @@ class ServedBoardCache:
 
 
 def collect_player_facts(
-    conn: Connection, player_id: str, as_of: datetime, served: ServedBoardCache
+    conn: Connection, player_id: str, as_of: datetime, served: ServedBoardCache, market: MarketAdp | None = None
 ) -> PlayerFacts | None:
     """`collectPlayerFacts`: his sheet, or None when the board does not rank him."""
     identity = conn.execute(
@@ -99,6 +100,7 @@ def collect_player_facts(
         news_for_players(conn, [identity.name]),
         current_season_summaries(conn, PRODUCT_SEASON, [player_id], {player_id: identity.position}),
         color,
+        run_market_adp(conn, as_of) if market is None else market,
     )
     rank = board.ranks.get(player_id)
     row = BoardRow(

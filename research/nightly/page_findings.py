@@ -16,7 +16,7 @@ from sqlalchemy import Connection
 
 from research.capsules.facts.board import board_rows
 from research.capsules.facts.collect import PRODUCT_SEASON
-from research.capsules.pull_figures import PageValues, capsule_findings, page_numbers
+from research.capsules.pull_figures import PageValues, adp_figures_off_page, capsule_findings, page_numbers
 from research.capsules.store import stored_capsules_for
 from research.capsules.sweep import subjects_of
 from research.model.reads.teams import first_kickoff_for
@@ -54,6 +54,12 @@ def page_findings(conn: Connection, as_of: datetime) -> PageFindings:
         reasons = capsule_findings(
             row.player_id, (capsule.body_compact, capsule.body_full), page_numbers(values), subject.facts.name_ledger
         )
+        page_adp = adp.get(row.player_id)
+        reasons += [
+            f"adp_figure_off_page:{row.player_id}:{claim}"
+            for body in (capsule.body_compact, capsule.body_full)
+            for claim in adp_figures_off_page(body, page_adp)
+        ]
         if reasons:
             found[subject.universe_id] = tuple(reasons)
     return PageFindings(found)

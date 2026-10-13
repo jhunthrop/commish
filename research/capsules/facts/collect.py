@@ -26,6 +26,7 @@ from research.capsules.facts.color import (
 )
 from research.capsules.facts.depth_collect import DepthOptions, collect_depth_facts, depth_prior_seasons
 from research.capsules.facts.depth_model import EMPTY_DEPTH, Depth
+from research.capsules.facts.market_adp import MarketAdp, run_market_adp
 from research.capsules.facts.model import BooksNumbers, Identity, NewsItem, PropsLine, SeasonSummary
 from research.capsules.facts.reference import InjurySnapshot, injury_snapshot, news_for_players
 from research.model.domain import Position
@@ -98,6 +99,8 @@ class SharedReads:
     news: Mapping[str, Sequence[NewsItem]]
     seasons: Mapping[str, SeasonSummary]
     color: ColorFacts
+    # The ADP the sheets carry (`market_adp`): the run's own, or the oracle's in the parity cases.
+    market: MarketAdp
 
 
 def facts_input_for(row: BoardRow, shared: SharedReads) -> FactsInput:
@@ -113,8 +116,8 @@ def facts_input_for(row: BoardRow, shared: SharedReads) -> FactsInput:
         PRODUCT_SEASON,
         row.reasons,
         shared.laws,
-        row.market_adp,
-        row.market_position_adp,
+        shared.market.adp(row.player_id, row.market_adp),
+        shared.market.position_adp(row.market_position_adp),
         row.overall_rank,
         row.projected_points,
         row.floor_points,
@@ -186,8 +189,9 @@ class BoardFactsPass:
     as_of: datetime
 
 
-def collect_board_facts(conn: Connection, as_of: datetime) -> BoardFactsPass:
-    """`collectBoardFacts`: every projected board player's facts, in the board's served order."""
+def collect_board_facts(conn: Connection, as_of: datetime, market: MarketAdp | None = None) -> BoardFactsPass:
+    """`collectBoardFacts`: every projected board player's facts, in the board's served order, with
+    the run's ADP unless `market` says otherwise."""
     prior = PRODUCT_SEASON - 1
     rows = board_rows(conn, PRODUCT_SEASON, as_of)
     if not rows:
@@ -205,6 +209,7 @@ def collect_board_facts(conn: Connection, as_of: datetime) -> BoardFactsPass:
             conn, PRODUCT_SEASON, [row.player_id for row in rows], {r.player_id: r.position for r in rows}
         ),
         color,
+        run_market_adp(conn, as_of) if market is None else market,
     )
     facts = tuple(build_player_facts(facts_input_for(row, shared)) for row in rows)
     peers: dict[Position, int] = {}

@@ -25,7 +25,7 @@ from research.capsules.grounding import (
     proper_name_phrases,
     round_half_up,
 )
-from research.capsules.pull_figures import facts_page_numbers, pull_figures_of, renderings_of
+from research.capsules.pull_figures import adp_figures_off_page, facts_page_numbers, pull_figures_of, renderings_of
 from research.capsules.render import render_facts_for_model
 from research.capsules.voice_rules import (
     BANNED_VOCABULARY,
@@ -109,6 +109,8 @@ class Grounding:
     prompt_text: str
     tension: float | None
     page_numbers: tuple[tuple[str, float], ...]
+    # The page's ADP (the run's, `facts.market_adp`): any ADP or pick a read states must be it.
+    adp: float | None = None
 
 
 def word_count(text: str) -> int:
@@ -202,6 +204,7 @@ def grounding_of(facts: "PlayerFacts") -> Grounding:
         render_facts_for_model(facts),
         strongest_negative_law_effect(facts),
         facts_page_numbers(facts),
+        facts.market.adp,
     )
 
 
@@ -232,16 +235,26 @@ def voice_rule_correction_for(violation: str) -> str | None:
     )
 
 
-def soft_correction_for(violation: str) -> str | None:
-    """The correction a soft violation is handed back with, or None for one that costs a rewrite."""
-    if violation in SOFT_CORRECTIONS:
-        return SOFT_CORRECTIONS[violation]
+def _page_correction(violation: str) -> str | None:
+    """The corrections that hand the writer the page's own numbers: its ADP, or the renderings that count."""
+    if violation.startswith(ADP_FIGURE_VIOLATION):
+        return f"{violation.removeprefix(ADP_FIGURE_VIOLATION + ': ')} Rewrite only that sentence and leave everything else as it is."
     if violation.startswith(NO_PAGE_NUMBER_VIOLATION):
         choices = violation.removeprefix(NO_PAGE_NUMBER_VIOLATION).removeprefix(": ").removesuffix(".")
         return (
             "Work one of these numbers into one sentence, printed exactly as written here, in your own words: "
             f"{choices}. Leave everything else as it is."
         )
+    return None
+
+
+def soft_correction_for(violation: str) -> str | None:
+    """The correction a soft violation is handed back with, or None for one that costs a rewrite."""
+    if violation in SOFT_CORRECTIONS:
+        return SOFT_CORRECTIONS[violation]
+    page = _page_correction(violation)
+    if page is not None:
+        return page
     banned = _BANNED_TERM_VIOLATION.match(violation)
     if banned is not None and banned.group(1) in TRADING_REPLACEMENTS:
         return (
@@ -313,7 +326,18 @@ def _validate(
         )
     if page_number and not pull_figures_of(trimmed, source.page_numbers, 1):
         violations.append(no_page_number_violation(source.page_numbers))
+    violations += [adp_figure_violation(claim, source.adp) for claim in adp_figures_off_page(trimmed, source.adp)]
     return ValidationResult(not violations, tuple(violations))
+
+
+ADP_FIGURE_VIOLATION: Final = "The text states an ADP or a pick that is not his ADP on the page"
+
+
+def adp_figure_violation(claim: str, adp: float | None) -> str:
+    if adp is None:
+        return f'{ADP_FIGURE_VIOLATION}: "{claim}", and the page has no ADP for him. Say no ADP or pick at all.'
+    choices = " or ".join(renderings_of(adp))
+    return f'{ADP_FIGURE_VIOLATION}: "{claim}". His ADP is {choices}. Say exactly that, or say no ADP.'
 
 
 def overrun_cap(max_words: int) -> int:
