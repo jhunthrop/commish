@@ -33,6 +33,8 @@
 		type Arrival
 	} from './arrival.ts';
 	import AccountLeagues from '#lib/league/AccountLeagues.svelte';
+	import AccountConnections from '#lib/hosts/AccountConnections.svelte';
+	import AccountDevices from '#lib/hosts/AccountDevices.svelte';
 	import GroupPasses from './GroupPasses.svelte';
 	import { accountLinks } from './links.ts';
 	import { hasFeature } from './features.ts';
@@ -234,6 +236,8 @@
 					</section>
 
 					<AccountLeagues />
+					<AccountConnections />
+					<AccountDevices />
 
 					{#if groupPasses.length > 0}
 						<GroupPasses

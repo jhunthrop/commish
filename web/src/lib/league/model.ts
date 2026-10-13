@@ -12,7 +12,8 @@ export const POLL_MS = 60_000;
 
 const HOST_WORDS: Readonly<Record<LeagueHost, string>> = {
 	sleeper: 'Sleeper',
-	mfl: 'MyFantasyLeague'
+	mfl: 'MyFantasyLeague',
+	ffpc: 'FFPC'
 };
 
 /** The host as a sentence names it. */
@@ -21,7 +22,8 @@ export function hostWords(host: LeagueHost): string {
 }
 
 /** Hosts a link may come from today, as the attach page says it. */
-export const HOSTS_LINE = 'Works with Sleeper leagues and public MyFantasyLeague leagues.';
+export const HOSTS_LINE =
+	'Works with Sleeper leagues, public MyFantasyLeague leagues and FFPC leagues.';
 
 const SECOND = 1;
 const MINUTE = 60;
@@ -42,7 +44,9 @@ export function readLine(sync: LeagueSync, now: Date): string {
 	if (sync.host_stale_seconds > 0) {
 		return `${host} is not answering. This is our last read, ${agoWords(age)}.`;
 	}
-	return `Read from ${host} ${agoWords(age)}.`;
+	// FFPC is read signed in as the member, so the line says whose eyes it is read with.
+	const as = sync.host === 'ffpc' ? ' as you' : '';
+	return `Read from ${host}${as} ${agoWords(age)}.`;
 }
 
 /** "5-1", or "5-1-1" with ties. */

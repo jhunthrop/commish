@@ -17,6 +17,8 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { railLeague } from '#lib/account/rail-league.svelte.ts';
+	import FFPCLeagues from '#lib/hosts/FFPCLeagues.svelte';
+	import type { HostLeague } from '#lib/hosts/api.ts';
 	import { ApiError, leagueApi, type AttachPreview, type AttachedLeague } from './api.ts';
 	import { HOSTS_LINE, hostWords } from './model.ts';
 
@@ -29,6 +31,8 @@
 	type View = 'loading' | 'signed-out' | 'form' | 'unreachable';
 
 	let view = $state<View>('loading');
+	/** How the league comes in: a pasted link (Sleeper, MyFantasyLeague), or FFPC read as you. */
+	let way = $state<'link' | 'ffpc'>('link');
 	let link = $state('');
 	let preview = $state<AttachPreview | null>(null);
 	let reading = $state(false);
@@ -112,6 +116,12 @@
 		}
 	}
 
+	async function followFFPC(league: HostLeague): Promise<void> {
+		const made = await leagueApi.attach({ host: 'ffpc', link: league.league_id, me: {} });
+		void railLeague.refresh();
+		await goto(resolve('/league/[id]', { id: made.id }));
+	}
+
 	const attachedLines = $derived(
 		attached.map((a) => ({
 			key: a.id,
@@ -143,60 +153,71 @@
 		{:else}
 			<DisplayTitle size="page">Follow your league</DisplayTitle>
 			<p class="lede">
-				Paste your league's link. We keep your roster, this week's matchup and every player nobody
-				in your league holds up to date, on our board. Free.
+				We keep your roster, this week's matchup and every player nobody in your league holds up to
+				date, on our board. Free.
 			</p>
 			<p class="hosts">{HOSTS_LINE}</p>
-			<div class="form">
-				<Field
-					label="Your league's link"
-					value={link}
-					oninput={typed}
-					placeholder="sleeper.com/leagues/1234567890"
-					maxlength={300}
-					onenter={() => void follow()}
-				/>
-				{#if reading}
-					<p class="lede" role="status">Reading your league.</p>
-				{:else if preview}
-					<div class="seat">
-						<PanelHead
-							title={preview.name || `Your ${hostWords(preview.host)} league`}
-							aside={`${String(preview.teams.length)} teams on ${hostWords(preview.host)}`}
-							level={2}
-						/>
-						{#if preview.seat_by_username}
-							<ChipGroup label="Find your team by">
-								<Chip pressed={by === 'team'} onclick={() => (by = 'team')}>From the list</Chip>
-								<Chip pressed={by === 'username'} onclick={() => (by = 'username')}
-									>My Sleeper username</Chip
-								>
-							</ChipGroup>
-						{/if}
-						{#if by === 'team'}
-							<ChipGroup label="Your team" variant="loose">
-								{#each preview.teams as team (team.roster_id)}
-									<Chip
-										pressed={rosterId === team.roster_id}
-										onclick={() => (rosterId = team.roster_id)}
-										label={team.owner ? `${team.name}, ${team.owner}` : team.name}>{team.name}</Chip
-									>
-								{/each}
-							</ChipGroup>
-						{:else}
-							<Field
-								label="Sleeper username"
-								bind:value={username}
-								maxlength={40}
-								onenter={() => void follow()}
+			<ChipGroup label="Your league is on">
+				<Chip pressed={way === 'link'} onclick={() => (way = 'link')}
+					>Sleeper or MyFantasyLeague</Chip
+				>
+				<Chip pressed={way === 'ffpc'} onclick={() => (way = 'ffpc')}>FFPC</Chip>
+			</ChipGroup>
+			{#if way === 'ffpc'}
+				<FFPCLeagues verb="Follow my league" onpick={followFFPC} />
+			{:else}
+				<div class="form">
+					<Field
+						label="Your league's link"
+						value={link}
+						oninput={typed}
+						placeholder="sleeper.com/leagues/1234567890"
+						maxlength={300}
+						onenter={() => void follow()}
+					/>
+					{#if reading}
+						<p class="lede" role="status">Reading your league.</p>
+					{:else if preview}
+						<div class="seat">
+							<PanelHead
+								title={preview.name || `Your ${hostWords(preview.host)} league`}
+								aside={`${String(preview.teams.length)} teams on ${hostWords(preview.host)}`}
+								level={2}
 							/>
-						{/if}
-					</div>
-				{/if}
-			</div>
-			<ActionBar alert={problem ? alert : undefined}>
-				<Verb disabled={!ready} onclick={() => void follow()}>Follow my league</Verb>
-			</ActionBar>
+							{#if preview.seat_by_username}
+								<ChipGroup label="Find your team by">
+									<Chip pressed={by === 'team'} onclick={() => (by = 'team')}>From the list</Chip>
+									<Chip pressed={by === 'username'} onclick={() => (by = 'username')}
+										>My Sleeper username</Chip
+									>
+								</ChipGroup>
+							{/if}
+							{#if by === 'team'}
+								<ChipGroup label="Your team" variant="loose">
+									{#each preview.teams as team (team.roster_id)}
+										<Chip
+											pressed={rosterId === team.roster_id}
+											onclick={() => (rosterId = team.roster_id)}
+											label={team.owner ? `${team.name}, ${team.owner}` : team.name}
+											>{team.name}</Chip
+										>
+									{/each}
+								</ChipGroup>
+							{:else}
+								<Field
+									label="Sleeper username"
+									bind:value={username}
+									maxlength={40}
+									onenter={() => void follow()}
+								/>
+							{/if}
+						</div>
+					{/if}
+				</div>
+				<ActionBar alert={problem ? alert : undefined}>
+					<Verb disabled={!ready} onclick={() => void follow()}>Follow my league</Verb>
+				</ActionBar>
+			{/if}
 			{#if attached.length > 0}
 				<section aria-label="Leagues you follow">
 					<PanelHead title="Leagues you follow" level={2} />
