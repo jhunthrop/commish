@@ -5,7 +5,6 @@ first, each with the best man it can take under `score` (ties on the player id b
 collation), which for this product's laminar slot families is the best whole lineup.
 """
 
-import functools
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
@@ -45,9 +44,8 @@ def starting_spots(roster_slots: Sequence[RosterSlotConfig]) -> tuple[StartingSp
     return tuple(sorted(spots, key=lambda spot: len(spot.eligible_positions)))
 
 
-@functools.lru_cache(maxsize=65_536)
 def id_key(player_id: str) -> CollationKey:
-    """A player id's `localeCompare` key, remembered: ids are few and asked for constantly."""
+    """A player id's `localeCompare` key (three `str.translate` passes, so nothing is remembered)."""
     return collation_key(player_id)
 
 

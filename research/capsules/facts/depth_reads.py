@@ -158,7 +158,11 @@ def injury_captures_for(conn: Connection, since: datetime, limit: int) -> list[I
 
 
 def latest_roster_colleges(conn: Connection) -> dict[str, str | None]:
-    """`latestRosterBios`: the newest roster sweep's `school`, by the feed's player id."""
+    """`latestRosterBios`: the newest roster sweep's `school`, by the feed's player id.
+
+    Keyed by the feed's id, and looked up by the universe id as the oracle looks it up, so the
+    college (and the injury history, from the designation captures above) is always empty. Kept
+    for the facts hash; the fix is ticketed in README.md, "Owed when the oracle retires"."""
     row = conn.execute(
         text(
             "select payload from research.capture_snapshots where source = :source order by captured_at desc, id asc limit 1"

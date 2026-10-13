@@ -238,8 +238,16 @@ def _primary_weights() -> Mapping[str, int]:
 
 
 _PRIMARY = _primary_weights()
+# The same weights as `str.translate` tables, so a key is three C-speed passes over the string: each
+# character to its primary weight, each to its case (upper 1, lower and caseless 0), and every
+# verified character deleted, which leaves exactly the characters no weight was read for.
+_PRIMARY_TABLE: Final = MappingProxyType({ord(c): chr(_PRIMARY[c.lower()]) for c in _ASCII_COLLATION_ORDER})
+_CASE_TABLE: Final = MappingProxyType({ord(c): chr(c != c.lower()) for c in _ASCII_COLLATION_ORDER})
+_VERIFIED_TABLE: Final = MappingProxyType(dict.fromkeys(map(ord, _ASCII_COLLATION_ORDER)))
 
-CollationKey = tuple[tuple[int, ...], tuple[int, ...]]
+# Primary weights, then case weights, one character per weight: strings compare by code point,
+# element by element with a prefix first, exactly as the weight sequences do.
+CollationKey = tuple[str, str]
 
 
 class UnverifiedCollationError(ValueError):
@@ -256,18 +264,13 @@ def collation_key(value: str) -> CollationKey:
     approximated order would reorder rows silently, and a refusal can be fixed by verifying the
     character against V8 and adding it here.
     """
-    primary: list[int] = []
-    tertiary: list[int] = []
-    for char in value:
-        lowered = char.lower()
-        weight = _PRIMARY.get(lowered)
-        if weight is None:
-            raise UnverifiedCollationError(
-                f"localeCompare order is verified for printable ASCII only; {value!r} holds {char!r} (U+{ord(char):04X})."
-            )
-        primary.append(weight)
-        tertiary.append(1 if char != lowered else 0)
-    return tuple(primary), tuple(tertiary)
+    unverified = value.translate(_VERIFIED_TABLE)
+    if unverified:
+        char = unverified[0]
+        raise UnverifiedCollationError(
+            f"localeCompare order is verified for printable ASCII only; {value!r} holds {char!r} (U+{ord(char):04X})."
+        )
+    return value.translate(_PRIMARY_TABLE), value.translate(_CASE_TABLE)
 
 
 def js_locale_compare(left: str, right: str) -> int:

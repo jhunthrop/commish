@@ -7,6 +7,16 @@ from typing import Any, Final
 POINT_COLUMNS: Final = ("projectedPoints", "floorPoints", "medianPoints", "ceilingPoints", "expectedGames")
 
 
+class _Absent:
+    """A column one side's row does not carry: never equal to anything, None included."""
+
+    def __repr__(self) -> str:
+        return "<absent>"
+
+
+_ABSENT: Final = _Absent()
+
+
 @dataclass(frozen=True, slots=True)
 class Diff:
     """One comparison: rows on each side, differing cells, the largest numeric gap, and examples."""
@@ -38,15 +48,18 @@ def diff_rows(
     tolerance: float = 0.0,
     may_be_empty: bool = False,
 ) -> Diff:
-    """Keyed rows compared cell by cell: a number within `tolerance`, anything else equal."""
+    """Keyed rows compared cell by cell, both ways: a number within `tolerance`, anything else
+    equal, and a column only one side carries a difference."""
     differing = 0
     worst = 0.0
     examples: list[str] = []
     for key in sorted(set(left) & set(right)):
-        for column, value in left[key].items():
-            other = right[key].get(column)
+        for column in [*left[key], *(c for c in right[key] if c not in left[key])]:
+            value, other = left[key].get(column, _ABSENT), right[key].get(column, _ABSENT)
             a, b = _number(value), _number(other)
-            if a is not None and b is not None:
+            if value is _ABSENT or other is _ABSENT:
+                same = False
+            elif a is not None and b is not None:
                 gap = abs(a - b)
                 worst = max(worst, gap)
                 same = gap <= tolerance

@@ -79,7 +79,10 @@ def facts_board() -> CaseResult:
     port_facts = [to_js(facts) for facts in port.facts]
     left = _sections({f["identity"]["id"]: f for f in oracle_facts})
     right = _sections({f["identity"]["id"]: f for f in port_facts})
-    diffs = [diff_rows(f"sheet {key}", left[key], right.get(key, {})) for key in left]
+    diffs = [
+        diff_rows(f"sheet {key}", left.get(key, {}), right.get(key, {}))
+        for key in [*left, *(k for k in right if k not in left)]
+    ]
     peers = {str(position): count for position, count in port.peer_count_by_position.items()}
     claims = [
         Claim(
@@ -165,7 +168,13 @@ def facts_one() -> CaseResult:
         ),
     ]
     notes = [f"oracle narrow read threw for {pid}: {message[:120]}" for pid, message in errors.items()]
-    return CaseResult("facts-one", [diff_rows("collectPlayerFacts sheets", left, right)], notes, claims=claims)
+    direct = len(sample.ids) - len(errors) - len(absent)
+    what = (
+        f"collectPlayerFacts sheets: {len(errors)} of {len(sample.ids)} against the oracle's board-pass sheet "
+        f"(its narrow read threw), {len(absent)} None on both sides ({', '.join(absent)}), "
+        f"{direct} against the oracle's narrow read"
+    )
+    return CaseResult("facts-one", [diff_rows(what, left, right)], notes, claims=claims)
 
 
 @dataclass(frozen=True, slots=True)
