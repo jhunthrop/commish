@@ -47,6 +47,9 @@ from pg_constraint k
 join pg_class c on c.oid = k.conrelid
 join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = %s
+  -- Postgres 18 catalogues NOT NULL as a named constraint (contype 'n'); 17 does not. Nullability is
+  -- compared through the columns query, so these rows would only differ by server version.
+  and k.contype <> 'n'
 """
 
 INDEXES_SQL = "select tablename, indexname, indexdef from pg_indexes where schemaname = %s"
