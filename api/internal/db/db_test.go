@@ -66,4 +66,25 @@ func TestMigrationsApplyCleanly(t *testing.T) {
 			t.Errorf("table %s.%s is missing", db.Schema, table)
 		}
 	}
+
+	// 00014: the companion keeps the username a seat was found by and each
+	// slot's name, the username held to Sleeper's own pattern.
+	for _, column := range []string{"host_username", "seat_names"} {
+		var ok bool
+		if err := pool.QueryRow(ctx, `select exists (select 1 from information_schema.columns
+			where table_schema = $1 and table_name = 'companions' and column_name = $2)`, db.Schema, column).Scan(&ok); err != nil {
+			t.Fatal(err)
+		}
+		if !ok {
+			t.Errorf("app.companions.%s is missing", column)
+		}
+	}
+	var checked bool
+	if err := pool.QueryRow(ctx, `select exists (select 1 from pg_constraint
+		where conrelid = 'app.companions'::regclass and pg_get_constraintdef(oid) like '%host_username%')`).Scan(&checked); err != nil {
+		t.Fatal(err)
+	}
+	if !checked {
+		t.Error("app.companions.host_username has no check")
+	}
 }
