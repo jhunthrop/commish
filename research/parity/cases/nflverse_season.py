@@ -79,7 +79,8 @@ class SeasonRunner:
         client = NflverseClient(ctx.fetcher)
         universe = ingest_player_universe(conn, client)
         schedule_as_of = schedule_week_as_of(client, [self.season]).get(self.season)
-        ingest_season(conn, client, universe, self.season, schedule_as_of)
+        # The oracle's release tag, so both sides read the same recording (`player_week_release`).
+        ingest_season(conn, client, universe, self.season, schedule_as_of, release=Releases.PLAYER_WEEK)
         return ()
 
 
