@@ -17,7 +17,8 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
 - Service accounts:
   - `deployer@trycommish.iam.gserviceaccount.com`: GitHub Actions. Roles `run.admin`, `artifactregistry.writer`, `run.jobsExecutorWithOverrides`, and `iam.serviceAccountUser` on the two runtime accounts.
   - `api-runtime@trycommish.iam.gserviceaccount.com`: the `api` and `room` services.
-  - `research-runtime@trycommish.iam.gserviceaccount.com`: the `nightly` job and the `advisor` service.
+  - `research-runtime@trycommish.iam.gserviceaccount.com`: the `nightly` and in-season jobs.
+  - `advisor-runtime@trycommish.iam.gserviceaccount.com`: the `advisor` service, no roles; `deployer` has `iam.serviceAccountUser` on it. The service runs with ingress all behind IAM; `api-runtime` holds `run.invoker` on it and the Go rooms call it with a Google identity token (`ADVISOR_URL` repository variable; unset means the engine's own odds).
   - Both runtime accounts: `secretmanager.secretAccessor`, `logging.logWriter`, `monitoring.metricWriter`.
 - Cloud Run services as deployed by `api.yml`: `api` at https://api-mgq3rq4xbq-ue.a.run.app and `room` at https://room-mgq3rq4xbq-ue.a.run.app (us-east1, runtime `api-runtime`, scale to zero), the migrate job `api-migrate` run from the workflow when `APP_SCHEMA_READY` is true. The organization policy `iam.allowedPolicyMemberDomains` restricts IAM members to the derbee.ai customer, so `allUsers` cannot be granted `run.invoker`; public access comes from the invoker IAM check being disabled on the service, the same way foreversixty's API is public.
 - Custom hostnames: `api.trycommish.app` and `room.trycommish.app` map to the services with `gcloud beta run domain-mappings create` once the domain is verified for the GCP account (`gcloud domains verify trycommish.app`, a Search Console step the founder does once), then DNS-only CNAME records in Cloudflare as the mapping prints them. Until then the run.app URLs serve.
