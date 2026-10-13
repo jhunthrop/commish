@@ -4,21 +4,26 @@
 // Sources, all real, read from the store's own rows:
 //   research.player_week_observations   the stat lines (nflverse_player_week) and snap counts
 //     (nflverse_snap_counts), the latest capture of each metric per week
-//   research.player_week_teams          the club he played for each week he has a line
+//   research.player_week_teams          the club each player played for in each week he has a line
 //   research.player_crosswalk           the board's provider ids to the store's gsis ids
-//   the run's own schedule and clubs    each week's opponent and the byes
+//   the run's own schedule and clubs    each week's opponent and the byes, and nfl_games' kickoffs
 //
-// Rules the stand-in chose, which the nightly replaces through the same fields:
-//   The records reach the last week any stat line is stored for. A week up to it with no line is
-//     inactive, a week after it is upcoming.
-//   In a played week, a metric the store carries but has no row for is zero (the feed writes no row
-//     for a stat a player did not record). A metric the store does not carry at all is null.
-//   A total is null when any played week's value is null.
+// The rules, which the nightly keeps through the same fields:
+//   A club's game is in the records when it is final (four hours past its kickoff) and the store
+//     holds lines for that club that week. `through` is the last week whose games are all in.
+//   A week is played when he has a stat line, inactive when he has none and his club's game is in
+//     the records, upcoming otherwise, and a bye when his club does not play.
+//   Within a played week, a stat with no row is zero when the store holds that metric for the week,
+//     and null when it does not (a metric not yet loaded). A week with no line is never zeros.
+//   A total is null when any played week's value is null, snap share included.
 import type postgres from 'postgres';
 import {
 	STAT_FIELDS,
+	pointsPerGameOf,
+	pointsTotalOf,
 	type GameLogRow,
 	type PlayerSeason,
+	type StatField,
 	type StatLine
 } from '../src/lib/run/season.ts';
 import type { BoardRow, Club, Schedule } from '../src/lib/run/schema.ts';
@@ -28,6 +33,8 @@ const STAT_SOURCE = 'nflverse_player_week';
 const SNAP_SOURCE = 'nflverse_snap_counts';
 const SNAPS = 'offensive_snaps';
 const TEAM_SNAPS = 'team_offensive_snaps';
+/** A game is final this long after its kickoff. */
+const GAME_LENGTH_MS = 4 * 60 * 60 * 1000;
 
 /** The fourteen fields every points line carries, the rest of STAT_FIELDS being counts only. */
 const POINTS_FIELDS = [
@@ -51,34 +58,51 @@ export interface SeasonInputs {
 	season: number;
 	/** The format every point is scored in. */
 	format: string;
-	lastWeek: number;
+	/** The regular season's length. */
+	weeks: number;
 	/** nflverse spells some clubs differently from the board. */
 	canonicalClub: (code: string) => string;
 	schedule: Schedule;
 	clubs: readonly Club[];
+	/** A club's kickoff in a week, from the slate, or null when it does not play. */
+	kickoff: (club: string, week: number) => Date | null;
+	now: Date;
 }
 
-type Metrics = Map<string, number>;
+type Metrics = ReadonlyMap<string, number>;
+type ByWeek<T> = ReadonlyMap<number, T>;
 
 interface StoreRead {
-	/** By provider id, then week: every metric captured for the week. */
-	weeks: Map<string, Map<number, Metrics>>;
+	/** By provider id, then week, per source: every metric captured for the week. */
+	lines: Map<string, Map<number, Map<string, number>>>;
+	snaps: Map<string, Map<number, Map<string, number>>>;
 	/** By provider id, then week: the club he played for. */
 	teams: Map<string, Map<number, string>>;
-	/** The metrics the store carries this season. */
-	carried: Set<string>;
-	/** The last week any stat line is stored for. */
-	throughWeek: number;
+	/** By week: the stat metrics the store holds for that week. */
+	carried: Map<number, Set<string>>;
+	/** "CLUB:week" for every club with lines in the store that week. */
+	clubWeeks: Set<string>;
+}
+
+function nest<T>(map: Map<string, Map<number, T>>, id: string, week: number, make: () => T): T {
+	const byWeek = map.get(id) ?? new Map<number, T>();
+	map.set(id, byWeek);
+	const found = byWeek.get(week) ?? make();
+	byWeek.set(week, found);
+	return found;
 }
 
 async function readStore(
 	sql: postgres.Sql,
 	ids: readonly string[],
-	season: number
+	inputs: SeasonInputs
 ): Promise<StoreRead> {
-	const lines = await sql<{ id: string; week: number; metric: string; value: number }[]>`
+	const { season } = inputs;
+	const rows = await sql<
+		{ id: string; week: number; source: string; metric: string; value: number }[]
+	>`
 		select distinct on (o.player_id, o.week, o.source, o.metric)
-			c.provider_player_id as id, o.week, o.metric, o.value
+			c.provider_player_id as id, o.week, o.source, o.metric, o.value
 		from research.player_week_observations o
 		join research.player_crosswalk c on c.player_id = o.player_id
 		where o.season = ${season} and o.source in (${STAT_SOURCE}, ${SNAP_SOURCE})
@@ -90,134 +114,147 @@ async function readStore(
 		join research.player_crosswalk c on c.player_id = t.player_id
 		where t.season = ${season} and c.provider_player_id = any(${ids as string[]})
 		order by t.player_id, t.week, t.as_of desc`;
-	const carried = await sql<{ metric: string }[]>`
-		select distinct metric from research.player_week_observations
-		where season = ${season} and source in (${STAT_SOURCE}, ${SNAP_SOURCE})`;
-	const [through] = await sql<{ week: number | null }[]>`
-		select max(week) as week from research.player_week_observations
+	const carried = await sql<{ week: number; metric: string }[]>`
+		select distinct week, metric from research.player_week_observations
 		where season = ${season} and source = ${STAT_SOURCE}`;
-	const weeks = new Map<string, Map<number, Metrics>>();
-	for (const row of lines) {
-		const byWeek = weeks.get(row.id) ?? new Map<number, Metrics>();
-		const metrics = byWeek.get(row.week) ?? new Map<string, number>();
-		metrics.set(row.metric, row.value);
-		byWeek.set(row.week, metrics);
-		weeks.set(row.id, byWeek);
-	}
-	const teamWeeks = new Map<string, Map<number, string>>();
-	for (const row of teams) {
-		const byWeek = teamWeeks.get(row.id) ?? new Map<number, string>();
-		byWeek.set(row.week, row.team);
-		teamWeeks.set(row.id, byWeek);
-	}
-	return {
-		weeks,
-		teams: teamWeeks,
-		carried: new Set(carried.map((row) => row.metric)),
-		throughWeek: through?.week ?? 0
+	const clubWeeks = await sql<{ week: number; team: string }[]>`
+		select distinct week, team from research.player_week_teams where season = ${season}`;
+	const read: StoreRead = {
+		lines: new Map(),
+		snaps: new Map(),
+		teams: new Map(),
+		carried: new Map(),
+		clubWeeks: new Set(
+			clubWeeks.map((row) => `${inputs.canonicalClub(row.team)}:${String(row.week)}`)
+		)
 	};
+	for (const row of rows) {
+		const into = row.source === STAT_SOURCE ? read.lines : read.snaps;
+		nest(into, row.id, row.week, () => new Map<string, number>()).set(row.metric, row.value);
+	}
+	for (const row of teams) {
+		const byWeek = read.teams.get(row.id) ?? new Map<number, string>();
+		byWeek.set(row.week, inputs.canonicalClub(row.team));
+		read.teams.set(row.id, byWeek);
+	}
+	for (const row of carried) {
+		const metrics = read.carried.get(row.week) ?? new Set<string>();
+		metrics.add(row.metric);
+		read.carried.set(row.week, metrics);
+	}
+	return read;
 }
 
 const EMPTY_LINE: StatLine = {
-	...(Object.fromEntries(STAT_FIELDS.map((field) => [field, null])) as Record<
-		(typeof STAT_FIELDS)[number],
-		null
-	>),
+	...(Object.fromEntries(STAT_FIELDS.map((field) => [field, null])) as Record<StatField, null>),
 	snapShare: null,
 	points: null
 };
 
-function round(value: number, places: number): number {
-	const factor = 10 ** places;
-	return Math.round(value * factor) / factor;
+/** A club's game is in the records once it is final and the store holds that club's lines. */
+function inRecords(club: string, week: number, inputs: SeasonInputs, store: StoreRead): boolean {
+	const kickoff = inputs.kickoff(club, week);
+	if (kickoff === null) return false;
+	const final = kickoff.getTime() + GAME_LENGTH_MS <= inputs.now.getTime();
+	return final && store.clubWeeks.has(`${club}:${String(week)}`);
 }
 
-/** A played week's line: what the store holds, zero for a carried metric with no row, null for one
- * the store does not carry. */
+/** The last week whose games are all in the records, counting from week 1 without a gap. */
+function throughOf(inputs: SeasonInputs, store: StoreRead): number {
+	let through = 0;
+	for (let week = 1; week <= inputs.weeks; week += 1) {
+		const playing = inputs.schedule.slates.filter((slate) =>
+			slate.games.some((game) => game.week === week)
+		);
+		if (!playing.every((slate) => inRecords(slate.abbr, week, inputs, store))) break;
+		through = week;
+	}
+	return through;
+}
+
+function snapShareOf(snaps: Metrics | undefined): number | null {
+	const mine = snaps?.get(SNAPS);
+	const team = snaps?.get(TEAM_SNAPS);
+	return mine === undefined || team === undefined || team === 0 ? null : mine / team;
+}
+
+/** A played week's line: what the store holds, zero for a metric the store holds that week but has
+ * no row of for him, null for a metric the store does not hold that week. */
 function lineOf(
-	metrics: Metrics,
+	line: Metrics,
+	snaps: Metrics | undefined,
 	carried: ReadonlySet<string>,
 	score: (line: PointsLine) => number
 ): StatLine {
 	const value = (field: string): number | null =>
-		metrics.get(field) ?? (carried.has(field) ? 0 : null);
+		line.get(field) ?? (carried.has(field) ? 0 : null);
 	const counts = Object.fromEntries(STAT_FIELDS.map((field) => [field, value(field)])) as Record<
-		(typeof STAT_FIELDS)[number],
+		StatField,
 		number | null
 	>;
 	const pointsLine = Object.fromEntries(
 		POINTS_FIELDS.map((field) => [field, counts[field] ?? 0])
 	) as unknown as PointsLine;
-	const snaps = metrics.get(SNAPS);
-	const teamSnaps = metrics.get(TEAM_SNAPS);
-	return {
-		...counts,
-		snapShare:
-			snaps === undefined || teamSnaps === undefined || teamSnaps === 0 ? null : snaps / teamSnaps,
-		points: score(pointsLine)
-	};
+	return { ...counts, snapShare: snapShareOf(snaps), points: score(pointsLine) };
 }
 
-function totalsOf(played: readonly Metrics[], lines: readonly StatLine[]): StatLine {
-	if (lines.length === 0) return EMPTY_LINE;
-	const sum = (field: (typeof STAT_FIELDS)[number] | 'points'): number | null =>
-		lines.some((line) => line[field] === null)
+/** The played weeks summed, each field null when any played week's is null. */
+function totalsOf(played: readonly StatLine[], snaps: readonly (Metrics | undefined)[]): StatLine {
+	if (played.length === 0) return EMPTY_LINE;
+	const sum = (field: StatField): number | null =>
+		played.some((line) => line[field] === null)
 			? null
-			: round(
-					lines.reduce((total, line) => total + (line[field] ?? 0), 0),
-					2
-				);
-	const snapWeeks = played.filter((metrics) => metrics.has(SNAPS) && metrics.has(TEAM_SNAPS));
-	const teamSnaps = snapWeeks.reduce((total, metrics) => total + (metrics.get(TEAM_SNAPS) ?? 0), 0);
-	const snaps = snapWeeks.reduce((total, metrics) => total + (metrics.get(SNAPS) ?? 0), 0);
+			: played.reduce((total, line) => total + (line[field] ?? 0), 0);
+	const snapped = snaps.every((week) => snapShareOf(week) !== null);
+	const of = (metric: string): number =>
+		snaps.reduce((total, week) => total + (week?.get(metric) ?? 0), 0);
 	return {
 		...(Object.fromEntries(STAT_FIELDS.map((field) => [field, sum(field)])) as Record<
-			(typeof STAT_FIELDS)[number],
+			StatField,
 			number | null
 		>),
-		snapShare: teamSnaps === 0 ? null : snaps / teamSnaps,
-		points: sum('points')
+		snapShare: snapped ? of(SNAPS) / of(TEAM_SNAPS) : null,
+		points: pointsTotalOf(played.map((line) => line.points ?? 0))
 	};
 }
 
 interface PlayerRead {
 	row: BoardRow;
-	byWeek: ReadonlyMap<number, Metrics>;
-	teamByWeek: ReadonlyMap<number, string>;
+	lines: ByWeek<Metrics>;
+	snaps: ByWeek<Metrics>;
+	teams: ByWeek<string>;
 }
 
-/** One week for him: a bye when his club has no game (as clubs.json says), played with a line,
- * inactive with none once the records reach the week, upcoming after. */
-function weekRow(
-	week: number,
-	player: PlayerRead,
-	inputs: SeasonInputs,
-	context: {
-		store: StoreRead;
-		byes: ReadonlyMap<string, number | null>;
-		score: (line: PointsLine) => number;
-	}
-): GameLogRow {
-	const { row, byWeek, teamByWeek } = player;
-	const team = inputs.canonicalClub(teamByWeek.get(week) ?? row.team);
+interface Context {
+	inputs: SeasonInputs;
+	store: StoreRead;
+	byes: ReadonlyMap<string, number | null>;
+	score: (line: PointsLine) => number;
+}
+
+/** One week for him, by the rules in the header. */
+function weekRow(week: number, player: PlayerRead, context: Context): GameLogRow {
+	const { inputs, store } = context;
+	const { row } = player;
+	const team = player.teams.get(week) ?? row.team;
 	const game = inputs.schedule.slates
 		.find((slate) => slate.abbr === team)
 		?.games.find((candidate) => candidate.week === week);
-	const metrics = byWeek.get(week);
+	const line = player.lines.get(week);
 	if (!game) {
 		if (context.byes.get(team) !== week)
 			throw new Error(`${team} has no week ${String(week)} game and it is not their bye.`);
-		if (metrics) throw new Error(`${row.name} has a week ${String(week)} line on ${team}'s bye.`);
+		if (line) throw new Error(`${row.name} has a week ${String(week)} line on ${team}'s bye.`);
 		return { ...EMPTY_LINE, week, opponent: null, home: null, status: 'bye' };
 	}
 	const where = { week, opponent: game.opponent, home: game.home };
-	if (metrics)
-		return { ...lineOf(metrics, context.store.carried, context.score), ...where, status: 'played' };
-	return {
-		...EMPTY_LINE,
-		...where,
-		status: week <= context.store.throughWeek ? 'inactive' : 'upcoming'
-	};
+	if (line) {
+		const carried = store.carried.get(week) ?? new Set<string>();
+		const stats = lineOf(line, player.snaps.get(week), carried, context.score);
+		return { ...stats, ...where, status: 'played' };
+	}
+	const status = inRecords(team, week, inputs, store) ? 'inactive' : 'upcoming';
+	return { ...EMPTY_LINE, ...where, status };
 }
 
 /** Each board player's season block, keyed by his id. */
@@ -229,33 +266,35 @@ export async function seasonBlocks(
 	const store = await readStore(
 		sql,
 		rows.map((row) => row.id),
-		inputs.season
+		inputs
 	);
 	const rules = rulesFor(inputs.format);
 	const byes = new Map(inputs.clubs.map((club) => [club.abbr, club.bye]));
-	const weeks = Array.from({ length: inputs.lastWeek }, (_, i) => i + 1);
+	const through = throughOf(inputs, store);
+	const weeks = Array.from({ length: inputs.weeks }, (_, i) => i + 1);
+	const empty = new Map<number, never>();
 	return new Map(
 		rows.map((row) => {
 			const player: PlayerRead = {
 				row,
-				byWeek: store.weeks.get(row.id) ?? new Map<number, Metrics>(),
-				teamByWeek: store.teams.get(row.id) ?? new Map<number, string>()
+				lines: store.lines.get(row.id) ?? empty,
+				snaps: store.snaps.get(row.id) ?? empty,
+				teams: store.teams.get(row.id) ?? empty
 			};
 			const score = (line: PointsLine): number => computeFantasyPoints(line, row.position, rules);
-			const log = weeks.map((week) => weekRow(week, player, inputs, { store, byes, score }));
-			const playedRows = log.filter((entry) => entry.status === 'played');
-			const totals = totalsOf(
-				playedRows.flatMap((entry) => player.byWeek.get(entry.week) ?? []),
-				playedRows
-			);
-			const games = playedRows.length;
+			const log = weeks.map((week) => weekRow(week, player, { inputs, store, byes, score }));
+			const played = log.filter((entry) => entry.status === 'played');
 			const season: PlayerSeason = {
 				season: inputs.season,
 				format: inputs.format,
-				games,
-				pointsPerGame:
-					games === 0 || totals.points === null ? null : round(totals.points / games, 2),
-				totals,
+				weeks: inputs.weeks,
+				through,
+				games: played.length,
+				pointsPerGame: pointsPerGameOf(played.map((entry) => entry.points ?? 0)),
+				totals: totalsOf(
+					played,
+					played.map((entry) => player.snaps.get(entry.week))
+				),
 				log
 			};
 			return [row.id, season];

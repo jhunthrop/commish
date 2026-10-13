@@ -298,6 +298,17 @@ function kickoffOf(game: GameRow): Date {
 	return new Date(`${date}T${String(hour).padStart(2, '0')}:${minute}:00${easternOffset(date)}`);
 }
 
+/** Each club's kickoff in a week, for the season block's "is his game final". */
+function clubKickoffs(games: readonly GameRow[]): (club: string, week: number) => Date | null {
+	const byClubWeek = new Map(
+		games.flatMap((game) => [
+			[`${game.home_nfl_team}:${String(game.week)}`, kickoffOf(game)] as const,
+			[`${game.away_nfl_team}:${String(game.week)}`, kickoffOf(game)] as const
+		])
+	);
+	return (club, week) => byClubWeek.get(`${club}:${String(week)}`) ?? null;
+}
+
 /** A week's first kickoff. */
 function weekKickoff(games: readonly GameRow[], week: number): Date {
 	const kickoffs = games.filter((game) => game.week === week).map(kickoffOf);
@@ -599,10 +610,12 @@ async function main(): Promise<void> {
 		const seasons = await seasonBlocks(sql, rows, {
 			season: SEASON,
 			format: FORMAT.id,
-			lastWeek: LAST_WEEK,
+			weeks: LAST_WEEK,
 			canonicalClub,
 			schedule,
-			clubs
+			clubs,
+			kickoff: clubKickoffs(games),
+			now
 		});
 		const players = playerPages(rows, capsuleCsv, seasons);
 		const index: IndexEntry[] = rows.map(({ id, slug, name, team, position, headshot }) => ({

@@ -76,8 +76,27 @@ export function board(format: string): Promise<Board> {
 	});
 }
 
+/** The regular season's length: the last week any club plays on the run's schedule. */
+function seasonWeeks(): Promise<number> {
+	return once('schedule:weeks', async () =>
+		Math.max(...(await schedule()).slates.flatMap((slate) => slate.games.map((game) => game.week)))
+	);
+}
+
+/** A player's file, its game log held to the run's own schedule: one row per regular-season week. */
 function readPlayer(id: string): Promise<Player> {
-	return once(`player:${id}`, () => read(RUN_PATHS.player(id), playerSchema));
+	return once(`player:${id}`, async () => {
+		const [loaded, weeks] = await Promise.all([
+			read(RUN_PATHS.player(id), playerSchema),
+			seasonWeeks()
+		]);
+		if (loaded.season.weeks !== weeks) {
+			throw new Error(
+				`players/${id}.json logs ${String(loaded.season.weeks)} weeks, the schedule runs ${String(weeks)}.`
+			);
+		}
+		return loaded;
+	});
 }
 
 /** Pages prerender one at a time, so the first player read starts every player's read at once,
