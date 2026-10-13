@@ -70,7 +70,8 @@ export default defineConfig(
 		files: [
 			'src/routes/(run)/**/*.svelte',
 			'src/lib/site/**/*.svelte',
-			'src/lib/account/**/*.svelte'
+			'src/lib/account/**/*.svelte',
+			'src/lib/league/**/*.svelte'
 		],
 		rules: {
 			'svelte/no-navigation-without-resolve': [

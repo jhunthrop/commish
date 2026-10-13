@@ -15,7 +15,6 @@
 	import { plural } from '#lib/format/number.ts';
 	import { presetWords } from '#lib/room/setup/scoring.ts';
 	import { droppedKinds } from './scoring-words.ts';
-	import { sectionHref } from '#lib/ui/nav.ts';
 	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
 	import { loadBoard, type LeagueBoard } from './board.ts';
 	import MatchupPanel from './MatchupPanel.svelte';
@@ -98,6 +97,10 @@
 	const here = $derived(links.league(id));
 	const dropped = $derived(sync ? droppedKinds(sync.scoring_dropped) : []);
 	const team = $derived(sync ? myTeam(sync) : undefined);
+	/** What every row's numbers are: the season's first, then the preseason board's. */
+	const basis = $derived(
+		board ? `${board.seasonBasis} Proj and over repl are our preseason board's: ${board.basis}` : ''
+	);
 </script>
 
 <svelte:head>
@@ -107,7 +110,7 @@
 
 <Shell title="League" active="league">
 	{#snippet tail()}
-		<Quiet href={links.leagueNew()}>Follow another league</Quiet>
+		{#if sync && failure === null}<Quiet href={links.leagueNew()}>Follow another league</Quiet>{/if}
 	{/snippet}
 	{#if failure === 'signed-out'}
 		<div class="pad">
@@ -160,10 +163,10 @@
 			<div class="grid">
 				<div class="col">
 					<MatchupPanel {sync} {board} {tagsOf} />
-					<RosterPanel roster={sync.roster} {board} {tagsOf} basis={board.basis} />
+					<RosterPanel roster={sync.roster} {board} {tagsOf} {basis} />
 				</div>
 				<div class="col">
-					<WaiverPool rows={poolRows(board, sync)} {tagsOf} basis={board.basis} />
+					<WaiverPool rows={poolRows(board, sync)} {tagsOf} {basis} />
 					<MovesPanel {sync} />
 				</div>
 			</div>
@@ -173,7 +176,9 @@
 						Your league's roster and scoring are saved for mock drafts, under its name in your saved
 						leagues. It scores like {presetWords(sync.scoring_like)}.
 					</Footnote>
-					<Quiet href={sectionHref('mock')} size="sm">Start a mock draft</Quiet>
+					<Quiet href={links.mockLeague(sync.settings_league_id)} size="sm"
+						>Start a mock draft</Quiet
+					>
 				{:else if sync.settings_note}
 					<Footnote>{sync.settings_note}</Footnote>
 				{/if}

@@ -4,7 +4,7 @@
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { LeagueSync } from './api.ts';
-	import { moveLine } from './model.ts';
+	import { moveWords } from './model.ts';
 
 	/** The league's moves this week and last, newest first, each in a sentence. */
 	interface Props {
@@ -15,14 +15,11 @@
 
 	const SHOWN = 12;
 	const lines = $derived(
-		sync.moves.slice(0, SHOWN).map((move, i) => {
-			const line = moveLine(sync, move);
-			return {
-				key: `${move.at}-${String(i)}`,
-				lead: line.lead,
-				text: `${line.text} on ${dayLabel(move.at)}.`
-			};
-		})
+		sync.moves.slice(0, SHOWN).map((move, i) => ({
+			key: `${move.at}-${String(i)}`,
+			lead: dayLabel(move.at),
+			text: `${moveWords(sync, move)}.`
+		}))
 	);
 </script>
 
