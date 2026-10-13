@@ -82,8 +82,13 @@ def carried_note(frozen_by: FrozenBy, season: int, run_id: str) -> str | None:
     )
 
 
-def save_frozen_by(store: RunStore, frozen_by: FrozenBy) -> None:
-    _write(store, FROZEN_BY_KEY, dict(frozen_by.by_week))
+def save_frozen_by(store: RunStore, frozen_by: FrozenBy, season: int) -> None:
+    """Adds the weeks this run carried to the trail as it stands now, never over an entry: a weekly
+    freeze recorded while the run was gating stays its own pass's (review N10)."""
+    entries = _read(store, FROZEN_BY_KEY)
+    for week in frozen_by.carried:
+        entries.setdefault(_key(season, week), dict(frozen_by.by_week[_key(season, week)]))
+    _write(store, FROZEN_BY_KEY, entries)
 
 
 def record_freeze(store: RunStore, season: int, week: int, run_id: str, frozen_at: datetime) -> None:

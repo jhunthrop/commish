@@ -83,7 +83,11 @@ def _copy_run(staging: LocalRunStore, store: RunStore, run_id: str, paths: list[
 def _failed(deps: RunDeps, run_id: str, steps: list[StepOutcome], error: BaseException) -> RunOutcome:
     """A run that could not be assembled: its report alone, no pointer moved."""
     report = {"runId": run_id, "status": "failed", "steps": [s.record.json() for s in steps], "error": str(error)}
-    deps.store.put(run_key(run_id, "report.json"), encode(report), "application/json")
+    try:
+        deps.store.put(run_key(run_id, "report.json"), encode(report), "application/json")
+    except Exception as unwritten:
+        # The bucket itself may be what failed; the log line below still carries the error.
+        deps.log(f"run {run_id}: the failure report could not be written ({unwritten})")
     deps.log(f"run {run_id} FAILED: {error}")
     return RunOutcome(run_id, False, str(error))
 
@@ -132,8 +136,13 @@ def run_nightly(deps: RunDeps, options: RunOptions) -> RunOutcome:
         return _failed(deps, run_id, steps, error)
     for line in assembled.dropped:
         deps.log(f"format not carried tonight, {line}")
-    with tempfile.TemporaryDirectory(prefix="nightly-") as root:
-        return _finish(deps, options, run_id, started, steps, assembled, frozen_by, Path(root))
+    try:
+        with tempfile.TemporaryDirectory(prefix="nightly-") as root:
+            return _finish(deps, options, run_id, started, steps, assembled, frozen_by, Path(root))
+    except Exception as error:
+        # Review N11: a held-out read, the face mirror or the copy to the bucket that raises fails the
+        # run with its report, as an assembly error does; no pointer has moved.
+        return _failed(deps, run_id, steps, error)
 
 
 def _finish(  # noqa: PLR0913, PLR0917 - the run's parts, handed on from `run_nightly`
@@ -201,7 +210,7 @@ def _promote(  # noqa: PLR0913, PLR0917 - the verdict and what it moves
         f"{len(assembled.people)} players, {pages} capsules, {len(assembled.files) + 3} files"
     )
     if passed:
-        save_frozen_by(deps.store, frozen_by)
+        save_frozen_by(deps.store, frozen_by, PRODUCT_SEASON)
         line += f"; early access now, public at {js_iso(promote_early(deps.store, run_id, finished))}"
     else:
         failed = [g.gate for g in judged.gates if not g.passed] + [
