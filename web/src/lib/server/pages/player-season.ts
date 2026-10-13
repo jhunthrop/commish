@@ -12,10 +12,11 @@ export interface SeasonView {
 	/** The format's chip word: "PPR". */
 	scoring: string;
 	heads: LogHead[];
-	/** Null when he has no game yet, and the page prints `none` instead of the log. */
+	/** Null when he has no game yet, and the log prints `none` in its place. */
 	line: SeasonLine | null;
 	rows: LogRow[];
-	none: string | null;
+	/** The one sentence a player with no line gets. */
+	none: string;
 	basis: string;
 }
 
@@ -27,12 +28,6 @@ const NOTES: Readonly<Record<GameLogRow['status'], string>> = {
 	bye: '',
 	upcoming: ''
 };
-
-/** The last week the records reach: the week before his first upcoming one. */
-function throughWeek(log: readonly GameLogRow[]): number {
-	const upcoming = log.findIndex((row) => row.status === 'upcoming');
-	return upcoming === -1 ? log.length : upcoming;
-}
 
 function opponentWords(row: GameLogRow): string {
 	if (row.opponent === null) return 'Bye';
@@ -53,12 +48,8 @@ function logRow(row: GameLogRow, columns: readonly StatColumn[]): LogRow {
 	};
 }
 
-function basisWords(
-	season: PlayerSeason,
-	position: Position,
-	format: Format,
-	through: number
-): string {
+function basisWords(season: PlayerSeason, position: Position, format: Format): string {
+	const { through } = season;
 	const reach = through === 0 ? '' : ` through week ${String(through)}`;
 	const parts = [`Stat lines from the league's own records${reach}, scored in ${format.label}.`];
 	if (season.games > 0) {
@@ -71,7 +62,8 @@ function basisWords(
 	return parts.join(' ');
 }
 
-function noneWords(season: PlayerSeason, through: number): string {
+function noneWords(season: PlayerSeason): string {
+	const { through } = season;
 	return through === 0
 		? `The ${String(season.season)} season has not reached its first week.`
 		: `He has no ${String(season.season)} stat line through week ${String(through)}.`;
@@ -85,7 +77,6 @@ export function seasonView(
 	const format = formats.find((candidate) => candidate.id === season.format);
 	if (!format) throw new Error(`The season block is scored in ${season.format}, not on this run.`);
 	const columns = STAT_COLUMNS[position];
-	const through = throughWeek(season.log);
 	const played = season.games > 0 && season.pointsPerGame !== null;
 	return {
 		season: season.season,
@@ -106,13 +97,13 @@ export function seasonView(
 							})),
 							{
 								value: fixed(season.pointsPerGame, POINTS_PER_GAME_DECIMALS),
-								caption: `${format.unit} a game`
+								caption: `${format.label} points a game`
 							}
 						]
 					}
 				: null,
 		rows: season.log.map((row) => logRow(row, columns)),
-		none: played ? null : noneWords(season, through),
-		basis: basisWords(season, position, format, through)
+		none: noneWords(season),
+		basis: basisWords(season, position, format)
 	};
 }
