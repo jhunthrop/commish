@@ -52,6 +52,9 @@ type Snapshot struct {
 	Scoring  Scoring   `json:"scoring"`
 	Shape    Shape     `json:"shape"`
 	ReadAt   time.Time `json:"read_at"`
+	// Players names the players of a pushed host's league, from its own
+	// pages: a pushed host has no directory of ours to read.
+	Players map[string]HostPlayer `json:"players,omitempty"`
 }
 
 // Team is one roster in the league.
