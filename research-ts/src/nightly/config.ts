@@ -33,6 +33,14 @@ export const NIGHTLY_CONFIG = {
   outputDirEnv: "NIGHTLY_OUTPUT_DIR",
   /** Pull figures printed beside a capsule on the player page (the approved mock shows three). */
   pullFiguresPerCapsule: 3,
+  /**
+   * THE FIT CHECK'S POINT TOLERANCE: half a tenth of a point. The board and the player page print
+   * points to one decimal, so a rebuilt number within 0.05 of the stored one can never print
+   * differently, while anything at or past it can. A rebuild of the stored generation at its own
+   * moment from the same code and the same point-in-time inputs reproduces it to the last bit
+   * (the columns are double precision), so the margin is for nothing but float noise.
+   */
+  fitPointTolerance: 0.05,
   gates: {
     /** The largest drop in a held-out season's rank correlation, against the last clean run, that
      *  does not fail the run. Stored boards for a held-out season move only when the fit rewrites

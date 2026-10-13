@@ -3,6 +3,7 @@ import { ROSTER_SHAPES } from "@research-ts/domain/roster-shape";
 import { totalRosterSlots } from "@research-ts/draft-engine/order";
 import { voiceRuleHits } from "@research-ts/capsules/voice-rules";
 import type { BoardFile, GateRecord, HeldOutScore, PlayerFile } from "./artifacts";
+import { figureMatchesValue } from "./build/pull-figures";
 import { NIGHTLY_CONFIG } from "./config";
 
 /**
@@ -12,12 +13,23 @@ import { NIGHTLY_CONFIG } from "./config";
  * be grepped and two runs diffed.
  */
 
-function gate(name: string, reasons: readonly string[], passedSummary: string): GateRecord {
-  return { gate: name, passed: reasons.length === 0, reasons, summary: reasons.length === 0 ? passedSummary : `${reasons.length} failure${reasons.length === 1 ? "" : "s"}` };
+/** `capsule_missing: 3, capsule_voice_rule: 17`: a failing gate's reasons counted by their name. */
+function reasonCounts(reasons: readonly string[]): string {
+  const counts = new Map<string, number>();
+  for (const reason of reasons) {
+    const name = reason.split(":")[0]!;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts].map(([name, count]) => `${name}: ${count}`).join(", ");
 }
 
-/** 1. The held-out backtest does not regress against the last clean run. The first run has nothing
- *  to compare with and records the baseline. A season that cannot be scored at all is a failure. */
+function gate(name: string, reasons: readonly string[], context: string): GateRecord {
+  const summary = reasons.length === 0 ? context : `${reasons.length} failure${reasons.length === 1 ? "" : "s"} (${reasonCounts(reasons)}); ${context}`;
+  return { gate: name, passed: reasons.length === 0, reasons, summary };
+}
+
+/** 1. The held-out backtest does not regress against its baseline (the newest run whose backtest
+ *  passed, `publish.ts`). The first run has nothing to compare with and records the baseline. A season that cannot be scored at all is a failure. */
 export function heldOutGate(current: readonly HeldOutScore[], previous: readonly HeldOutScore[] | null): GateRecord {
   const reasons: string[] = [];
   for (const score of current) {
@@ -63,18 +75,47 @@ export function boardDepthGate(boards: readonly BoardFile[]): GateRecord {
   return gate("board_depth", boards.flatMap(depthFindings), `${boards.length} boards, every slot covered`);
 }
 
-/** 3. Every player page has a capsule, every pull figure is in its prose word for word, and no
- *  capsule ships a set phrase or a writer's aside (`capsules/voice-rules.ts`). */
+/** A page the writer covers: one with a projection. A page without one (kickers and defenses in
+ *  market order, the kdef decision, and a man the board does not project) has nothing for the
+ *  writer to ground, so the sweep never writes it a capsule and none is required. */
+function writerCovers(player: PlayerFile): boolean {
+  return player.formats.some((line) => line.projectedPoints !== null);
+}
+
+/** One page's capsule findings. */
+function capsuleFindings(player: PlayerFile): readonly string[] {
+  if (player.capsule === null) return writerCovers(player) ? [`capsule_missing:${player.id}`] : [];
+  const { bodyFull, bodyCompact, pullFigures } = player.capsule;
+  const none = writerCovers(player) && pullFigures.length === 0 ? [`pull_figures_none:${player.id}`] : [];
+  const absent = pullFigures.filter((figure) => !bodyFull.includes(figure.text)).map((figure) => `pull_figure_not_in_prose:${player.id}:${figure.text}`);
+  const offPage = pullFigures.filter((figure) => !figureMatchesValue(figure)).map((figure) => `pull_figure_off_page:${player.id}:${figure.label}:${figure.text}`);
+  const voice = [...new Set([...voiceRuleHits(bodyFull), ...voiceRuleHits(bodyCompact)].map((hit) => hit.found))].map((found) => `capsule_voice_rule:${player.id}:${found}`);
+  return [...none, ...absent, ...offPage, ...voice];
+}
+
+/**
+ * 3. Every page the writer covers has a capsule; the capsule prints at least one of the numbers its
+ * page shows (its pull figures, drawn from the page's board row, `build/pull-figures.ts`), each
+ * word for word and equal to the page's value at the precision printed; and no capsule ships a set
+ * phrase or a writer's aside (`capsules/voice-rules.ts`). A capsule that quotes none of its page's
+ * numbers is not grounded in the board the page shows.
+ */
 export function capsuleGate(players: readonly PlayerFile[]): GateRecord {
-  const reasons = players.flatMap((player) => {
-    if (player.capsule === null) return [`capsule_missing:${player.id}`];
-    const { bodyFull, bodyCompact, pullFigures } = player.capsule;
-    const figures = pullFigures.filter((figure) => !bodyFull.includes(figure.text)).map((figure) => `pull_figure_not_in_prose:${player.id}:${figure.text}`);
-    const voice = [...voiceRuleHits(bodyFull), ...voiceRuleHits(bodyCompact)].map((hit) => `capsule_voice_rule:${player.id}:${hit.found}`);
-    return [...figures, ...new Set(voice)];
-  });
-  const written = players.filter((player) => player.capsule?.source === "llm").length;
-  return gate("capsules", reasons, `${players.length} pages with a capsule, ${written} written, ${players.length - written} on the template floor`);
+  const reasons = players.flatMap(capsuleFindings);
+  const covered = players.filter(writerCovers);
+  const written = covered.filter((player) => player.capsule?.source === "llm").length;
+  const unprojected = players.length - covered.length;
+  return gate(
+    "capsules",
+    reasons,
+    `${covered.length} pages the writer covers, ${written} written, ${covered.length - written} on the template floor; ${unprojected} pages without a projection, no capsule required`,
+  );
+}
+
+/** 5. Every format the board ships has tonight's ADP, read from a capture with its source named. */
+export function adpGate(formats: readonly { readonly format: string; readonly capturedAt: string | null; readonly players: readonly unknown[] }[]): GateRecord {
+  const reasons = formats.flatMap((entry) => (entry.capturedAt === null || entry.players.length === 0 ? [`adp_missing:${entry.format}`] : []));
+  return gate("adp", reasons, formats.map((entry) => `${entry.format} ${entry.players.length} players at ${entry.capturedAt}`).join(", "));
 }
 
 /** 4. Every number carries its basis in the same object: the board's two basis sentences, each

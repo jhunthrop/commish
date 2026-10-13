@@ -22,7 +22,7 @@ async function newestCapture(db: Db, source: string, snapshotFormat: string): Pr
 }
 
 /** The newest capture of every format the ADP snapshot job records (`adp_snapshots`). A format with
- *  no capture yet comes back empty with a null instant, which the ADP gate names. */
+ *  no capture yet comes back empty with a null instant, which the ADP gate (`gates.ts`, `adp_missing`) fails the run on. */
 export async function readLatestAdp(db: Db): Promise<readonly AdpCapture[]> {
   const captures: AdpCapture[] = [];
   for (const capture of ADP_SNAPSHOT_CAPTURES) {

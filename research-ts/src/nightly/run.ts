@@ -8,13 +8,13 @@ import type { AdpFile, ArtifactRecord, BoardFile, GateRecord, Manifest, PlayerFi
 import { boardFileOf } from "./build/boards";
 import { formatLabel, indexEntryOf, pageBoardsOf, pagePlayerIds, playerFileOf } from "./build/players";
 import { BOARD_VARIANTS, PAGE_BOARD_VARIANT, boardKeyOf } from "./config";
-import { basisGate, boardDepthGate, capsuleGate, heldOutGate } from "./gates";
-import { manifestSummary, previousHeldOut, promote, writeArtifact } from "./publish";
+import { adpGate, basisGate, boardDepthGate, capsuleGate, heldOutGate } from "./gates";
+import { manifestSummary, previousHeldOut, promote, recordHeldOutBaseline, writeArtifact } from "./publish";
 import { readLatestAdp, type AdpCapture } from "./reads/adp";
 import { readBoards } from "./reads/boards";
 import { heldOutScores } from "./reads/held-out";
 import { readRecord } from "./reads/record";
-import { nextRunId } from "./run-id";
+import { nextRunId, runKey, STARTED_FILE } from "./run-id";
 import type { RunStore } from "./run-store";
 import { capsuleStep, fitStep, ingestStep, type StepContext } from "./steps";
 
@@ -77,6 +77,7 @@ export async function runNightly(deps: NightlyDeps, options: NightlyOptions): Pr
   const { db, store, clock, log } = deps;
   const startedAt = new Date(clock.now());
   const runId = await nextRunId(store, startedAt);
+  await store.put(runKey(runId, STARTED_FILE), `${JSON.stringify({ runId, startedAt: startedAt.toISOString() }, null, 2)}\n`);
   log(`run ${runId}: season ${PRODUCT_SEASON}, writing to ${store.locate(`runs/${runId}`)}`);
   const context: StepContext = { db, clock, log };
 
@@ -100,13 +101,15 @@ export async function runNightly(deps: NightlyDeps, options: NightlyOptions): Pr
   const playerFiles: PlayerFile[] = playerIds.map((id) =>
     playerFileOf(id, { runId, season: PRODUCT_SEASON, pageVariant: PAGE_BOARD_VARIANT, boards: pageBoards, adp, capsules }),
   );
-  const gates: GateRecord[] = [heldOutGate(heldOut, previous), boardDepthGate(boardFiles), capsuleGate(playerFiles), basisGate(boardFiles, playerFiles)];
+  const adpFile = adpFileOf(runId, adp);
+  const backtest = heldOutGate(heldOut, previous);
+  const gates: GateRecord[] = [backtest, boardDepthGate(boardFiles), capsuleGate(playerFiles), basisGate(boardFiles, playerFiles), adpGate(adpFile.formats)];
   for (const gate of gates) log(`gate ${gate.gate}: ${gate.passed ? "passed" : "FAILED"}, ${gate.summary}`);
 
   const artifacts: ArtifactRecord[] = [];
   for (const board of boardFiles) artifacts.push(await writeArtifact(store, runId, `boards/${board.key}.json`, board));
   for (const player of playerFiles) artifacts.push(await writeArtifact(store, runId, `players/${player.id}.json`, player));
-  artifacts.push(await writeArtifact(store, runId, "adp.json", adpFileOf(runId, adp)));
+  artifacts.push(await writeArtifact(store, runId, "adp.json", adpFile));
   artifacts.push(await writeArtifact(store, runId, "record.json", record));
   artifacts.push(await writeArtifact(store, runId, "index.json", playerFiles.map(indexEntryOf)));
 
@@ -129,6 +132,7 @@ export async function runNightly(deps: NightlyDeps, options: NightlyOptions): Pr
     artifacts,
   };
   await writeArtifact(store, runId, "manifest.json", manifest);
+  if (backtest.passed) await recordHeldOutBaseline(store, runId, heldOut);
   if (passed) await promote(store, manifest);
   log(manifestSummary(manifest));
   return manifest;

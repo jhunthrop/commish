@@ -51,10 +51,15 @@ export interface PlayerAdpLine {
   readonly capturedAt: string;
 }
 
-/** A number lifted out of the capsule prose to print large beside it, exactly as the prose prints it. */
+/** One of the page's own numbers that the capsule prose prints, to print large beside it. */
 export interface PullFigure {
+  /** As the prose prints it ("274", "16.8"). */
   readonly text: string;
-  /** The sentence it was lifted from, so the page can caption it in the writer's own words. */
+  /** What the page calls the number ("projected points", "drop to the next tier"). */
+  readonly label: string;
+  /** The page's own value, from the board row. */
+  readonly value: number;
+  /** The sentence that prints it, so the page can caption it in the writer's own words. */
   readonly sentence: string;
 }
 

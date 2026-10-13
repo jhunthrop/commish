@@ -5,7 +5,7 @@ import type { IndexEntry, PlayerAdpLine, PlayerCapsuleArtifact, PlayerFile, Play
 import { NIGHTLY_CONFIG, type BoardVariant } from "../config";
 import type { AdpCapture } from "../reads/adp";
 import { valueBasisOf } from "./boards";
-import { pullFiguresOf } from "./pull-figures";
+import { pageNumbersOf, pullFiguresOf } from "./pull-figures";
 
 /** Each format's page board (the standard shape at the page's team count): format, then player id
  *  to row, in served order. */
@@ -39,13 +39,14 @@ function adpLinesOf(playerId: string, adp: readonly AdpCapture[]): readonly Play
   });
 }
 
-function capsuleOf(stored: StoredPlayerCapsule | undefined): PlayerCapsuleArtifact | null {
+/** The capsule as the page prints it, its pull figures drawn from the page's own board row. */
+function capsuleOf(stored: StoredPlayerCapsule | undefined, pageRow: BoardRow | undefined): PlayerCapsuleArtifact | null {
   if (stored === undefined) return null;
   return {
     bodyCompact: stored.bodyCompact,
     bodyFull: stored.bodyFull,
     source: stored.source,
-    pullFigures: pullFiguresOf(stored.bodyFull, NIGHTLY_CONFIG.pullFiguresPerCapsule),
+    pullFigures: pageRow === undefined ? [] : pullFiguresOf(stored.bodyFull, pageNumbersOf(pageRow), NIGHTLY_CONFIG.pullFiguresPerCapsule),
   };
 }
 
@@ -84,7 +85,7 @@ export function playerFileOf(playerId: string, inputs: PlayerPageInputs): Player
     byeWeek: identity.byeWeek,
     formats: rowsByFormat.map(([format, row]) => formatLineOf(format, row, inputs.season, inputs.pageVariant)),
     adp: adpLinesOf(playerId, inputs.adp),
-    capsule: capsuleOf(inputs.capsules.get(playerId)),
+    capsule: capsuleOf(inputs.capsules.get(playerId), inputs.boards.get(inputs.pageVariant.format)?.get(playerId)),
     reasons: identity.reasons,
   };
 }

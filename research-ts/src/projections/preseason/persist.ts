@@ -68,7 +68,15 @@ import { loadModelArtifact } from "@research-ts/projections/model/artifacts";
 import { preseasonBoard, type BoardEntry, type BoardReason } from "@research-ts/projections/preseason/board";
 import type { GameVariancePriors } from "@research-ts/projections/preseason/game-variance";
 import { loadShippedGameVariance } from "@research-ts/projections/preseason/game-variance-artifacts";
-import { boardReasons, BOARD_SOURCE_V1_RAW, writePreseasonBoard, type BoardWriteCounts } from "@research-ts/projections/preseason/board-store";
+import {
+  boardReasons,
+  BOARD_SOURCE_V1_RAW,
+  preseasonProjectionsAsOf,
+  projectionRows,
+  writePreseasonBoard,
+  type BoardWriteCounts,
+  type PreseasonProjectionRow,
+} from "@research-ts/projections/preseason/board-store";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
@@ -111,12 +119,65 @@ export interface PersistSeasonOptions {
   readonly diffOnly?: boolean;
   /** Where the operator lines go. Default: stdout. */
   readonly log?: (line: string) => void;
+  /** A diff-only take's point tolerance (`diffPoints`). Default: exact. */
+  readonly pointTolerance?: number;
 }
 
-/** One leg's comparison in a diff-only take: the stored reasons a write would add, drop or change. */
+/** The point fields a rebuilt board is compared on, against the stored generation it should equal. */
+export const COMPARED_POINT_FIELDS = ["projectedPoints", "floorPoints", "medianPoints", "ceilingPoints", "expectedGames"] as const;
+type ComparedPointField = (typeof COMPARED_POINT_FIELDS)[number];
+
+/** How far a rebuilt board's numbers sit from the stored generation's, player by player. */
+export interface PointDrift {
+  /** Players on both, compared field by field. */
+  readonly compared: number;
+  /** Stored players the rebuild left off, and rebuilt players the store does not hold. */
+  readonly missingFromRebuild: readonly string[];
+  readonly missingFromStore: readonly string[];
+  /** The largest absolute difference over every compared field, with where it is. */
+  readonly maxAbsDelta: number;
+  readonly worst: { readonly playerId: string; readonly field: ComparedPointField } | null;
+  /** Player-field pairs whose difference exceeds the caller's tolerance. */
+  readonly overTolerance: number;
+}
+
+/** Compares rebuilt projection rows with stored ones. Pure. */
+export function diffPoints(stored: readonly PreseasonProjectionRow[], rebuilt: readonly PreseasonProjectionRow[], tolerance: number): PointDrift {
+  const storedById = new Map(stored.map((row) => [row.playerId, row] as const));
+  const rebuiltById = new Map(rebuilt.map((row) => [row.playerId, row] as const));
+  let maxAbsDelta = 0;
+  let worst: PointDrift["worst"] = null;
+  let overTolerance = 0;
+  let compared = 0;
+  for (const [playerId, fresh] of rebuiltById) {
+    const prior = storedById.get(playerId);
+    if (prior === undefined) continue;
+    compared += 1;
+    for (const field of COMPARED_POINT_FIELDS) {
+      const delta = Math.abs(fresh[field] - prior[field]);
+      if (delta > tolerance) overTolerance += 1;
+      if (delta > maxAbsDelta) {
+        maxAbsDelta = delta;
+        worst = { playerId, field };
+      }
+    }
+  }
+  return {
+    compared,
+    missingFromRebuild: [...storedById.keys()].filter((id) => !rebuiltById.has(id)).sort(),
+    missingFromStore: [...rebuiltById.keys()].filter((id) => !storedById.has(id)).sort(),
+    maxAbsDelta,
+    worst,
+    overTolerance,
+  };
+}
+
+/** One leg's comparison in a diff-only take: the stored reasons a write would add, drop or change,
+ *  and how far the rebuilt points sit from the stored generation at the same moment. */
 export interface LegReasonDiff {
   readonly source: string;
   readonly diffs: readonly ReasonDiff[];
+  readonly points: PointDrift;
 }
 
 /** What one season's take did. `diffs` is filled on a diff-only take, `written` on a write. */
@@ -385,7 +446,7 @@ export async function persistSeason(
   names: ReadonlyMap<string, string>,
   options: PersistSeasonOptions = {},
 ): Promise<SeasonTake> {
-  const { unfrozen = false, formats = BOARD_FORMATS, diffOnly = false, log = defaultLog } = options;
+  const { unfrozen = false, formats = BOARD_FORMATS, diffOnly = false, log = defaultLog, pointTolerance = 0 } = options;
   const boardMoment = await boardMomentFor(db, season, clock);
   const inputs = await loadPreseason(db, season, { boardMoment });
   log(`${season}  moment kind: ${boardMoment.kind}  taken at ${inputs.moment.toISOString()}`);
@@ -440,7 +501,16 @@ export async function persistSeason(
       ]);
       const legDiffs = diffReasons(stored, freshReasons);
       printReasonDiff(log, season, leg.source, legDiffs);
-      diffs.push({ source: leg.source, diffs: legDiffs });
+      // THE POINTS, at the same moment the stored generation was taken (`inputs.moment`), so a
+      // rebuild that reproduces the store compares equal and any drift is code or inputs moving.
+      const stamp = { season, source: leg.source, asOf: inputs.moment };
+      const storedRows = await preseasonProjectionsAsOf(db, stamp);
+      const points = diffPoints(storedRows, projectionRows(fresh.board, { ...stamp, momentKind: boardMoment.kind }), pointTolerance);
+      log(
+        `      points: ${points.compared} compared, max |delta| ${points.maxAbsDelta.toFixed(4)}${points.worst === null ? "" : ` (${points.worst.playerId} ${points.worst.field})`}, ` +
+          `${points.overTolerance} over ${pointTolerance}, ${points.missingFromRebuild.length} stored not rebuilt, ${points.missingFromStore.length} rebuilt not stored`,
+      );
+      diffs.push({ source: leg.source, diffs: legDiffs, points });
     }
     return { season, momentKind: boardMoment.kind, diffs, written: [] };
   }

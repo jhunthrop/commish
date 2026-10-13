@@ -18,15 +18,26 @@ export async function writeArtifact(store: RunStore, runId: string, path: string
   return { key, bytes: Buffer.byteLength(body, "utf8"), sha256: createHash("sha256").update(body).digest("hex") };
 }
 
-/** The last clean run's held-out scores, the baseline the backtest gate compares against, or `null`
- *  when no run has passed yet. */
+/** Where the held-out backtest's baseline lives: the scores of the newest run whose backtest gate
+ *  passed. Kept apart from `runs/latest.json` on purpose: a run failed by another gate (a capsule
+ *  missing tonight) still measured the backtest, and the baseline should not stall behind it. */
+export const HELD_OUT_BASELINE_KEY = "runs/held-out-baseline.json";
+
+interface HeldOutBaseline {
+  readonly runId: string;
+  readonly heldOut: readonly HeldOutScore[];
+}
+
+/** The backtest baseline the held-out gate compares against, or `null` before any run set one. */
 export async function previousHeldOut(store: RunStore): Promise<readonly HeldOutScore[] | null> {
-  const pointer = await store.get(LATEST_KEY);
-  if (pointer === null) return null;
-  const { runId } = JSON.parse(pointer) as LatestPointer;
-  const manifest = await store.get(runKey(runId, "manifest.json"));
-  if (manifest === null) throw new Error(`${LATEST_KEY} points at ${runId}, which has no manifest.`);
-  return (JSON.parse(manifest) as Manifest).heldOut;
+  const body = await store.get(HELD_OUT_BASELINE_KEY);
+  return body === null ? null : (JSON.parse(body) as HeldOutBaseline).heldOut;
+}
+
+/** Records a run's held-out scores as the new baseline. Called only when its backtest gate passed. */
+export async function recordHeldOutBaseline(store: RunStore, runId: string, heldOut: readonly HeldOutScore[]): Promise<void> {
+  const baseline: HeldOutBaseline = { runId, heldOut };
+  await store.put(HELD_OUT_BASELINE_KEY, `${JSON.stringify(baseline, null, 2)}\n`);
 }
 
 /** Moves `runs/latest.json` to a run that passed. A failed run never calls this, so the previous
