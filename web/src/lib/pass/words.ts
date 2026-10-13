@@ -26,12 +26,12 @@ export const FEATURE_WORDS: Readonly<Record<Feature, FeatureWords>> = {
 		text: 'the board rebuilt from your own points per stat, imported from your league or entered by hand'
 	},
 	full_reasoning: {
-		lead: 'The why on every player',
-		text: 'our reasoning on each player we would take next, not only the first'
+		lead: 'The why on each player we would take next',
+		text: 'beside your real draft, not only on our call'
 	},
 	range_of_outcomes: {
-		lead: 'Floor, median and ceiling everywhere',
-		text: 'the range of outcomes on every player we would take next'
+		lead: 'Floor, median and ceiling in your draft',
+		text: 'on every player we would take next, beside your real draft'
 	},
 	synced_sheet: {
 		lead: 'Your sheet beside your real draft',
@@ -44,9 +44,14 @@ export const FEATURE_WORDS: Readonly<Record<Feature, FeatureWords>> = {
 };
 
 /** Features a product grants that are not built yet, kept off every screen until they ship, so
- * the page never sells what is not there: custom scoring comes back with Lane 8 part A, the early
- * run with the nightly's early-access build. */
-const NOT_BUILT: ReadonlySet<Feature> = new Set<Feature>(['custom_scoring', 'early_run']);
+ * the page never sells what is not there: custom scoring comes back with Lane 8 part A, the why on
+ * each row once the advisor writes it as the row's contrast to the call (part A), the early run with
+ * the nightly's early-access build. */
+const NOT_BUILT: ReadonlySet<Feature> = new Set<Feature>([
+	'custom_scoring',
+	'full_reasoning',
+	'early_run'
+]);
 
 /** The feature lines a product's list prints, in the contract's order, built ones only. */
 export function featureLines(features: readonly Feature[]): FeatureWords[] {
