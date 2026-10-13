@@ -741,7 +741,9 @@ type SheetRowInput struct {
 	Name     string  `json:"name"`
 	Note     *string `json:"note,omitempty"`
 	PlayerId string  `json:"player_id"`
-	Position string  `json:"position"`
+
+	// Position QB, RB, WR, TE, K or DST, in any case. DEF and D/ST are stored as DST, PK as K.
+	Position string `json:"position"`
 
 	// Tags Up to four tags, each one of the fixed SheetTag values or the drafter's own word: 1 to 20 letters, digits, spaces, apostrophes, periods or hyphens, starting with a letter or digit. A word that matches a fixed tag in any case is stored as the fixed tag. No tag appears twice in any case.
 	Tags *SheetTags `json:"tags,omitempty"`

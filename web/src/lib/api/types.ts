@@ -670,6 +670,7 @@ export interface components {
 		SheetRowInput: {
 			player_id: string;
 			name: string;
+			/** @description QB, RB, WR, TE, K or DST, in any case. DEF and D/ST are stored as DST, PK as K. */
 			position: string;
 			team?: string | null;
 			/** @description an https URL */

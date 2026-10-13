@@ -184,7 +184,7 @@ func decodeRecord(rec []string, col map[string]int) (ranked, string) {
 	}
 	row := apitypes.SheetRowInput{
 		PlayerId: field(rec, col, "player_id"), Name: field(rec, col, "name"),
-		Position: field(rec, col, "position"), Team: optional(rec, col, "team"), Note: optional(rec, col, "note"),
+		Position: canonicalPosition(field(rec, col, "position")), Team: optional(rec, col, "team"), Note: optional(rec, col, "note"),
 	}
 	if v := field(rec, col, "tier"); v != "" {
 		t, err := strconv.Atoi(v)
