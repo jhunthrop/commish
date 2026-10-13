@@ -44,7 +44,7 @@ export const FEATURE_WORDS: Readonly<Record<Feature, FeatureWords>> = {
 	},
 	start_sit: {
 		lead: 'Who to start this week',
-		text: 'your lineup from your own roster, scored on our weekly numbers, with the odds for each call'
+		text: 'your lineup from your own roster, scored on our weekly numbers, with how sure we are on each call'
 	},
 	waiver_ranks: {
 		lead: 'Your waiver pickups, ranked',

@@ -19,6 +19,7 @@ const READY_TIMEOUT_MS = 30_000;
 const SLEEPER_LINK = 'https://sleeper.com/leagues/1382163311038038016/team';
 const MFL_LINK = 'https://www43.myfantasyleague.com/2026/home/10010';
 const TAGGED = 6;
+const SHEET_NAME = 'In season';
 
 const web = process.argv[2] ?? 'http://localhost:5173';
 const out = new URL(process.argv[3] ?? '../screenshots/league/', import.meta.url);
@@ -90,7 +91,11 @@ async function seed(): Promise<{ sleeper: string; mfl: string }> {
 				]
 			: [];
 	});
-	await call(owner, 'POST', '/sheets', { name: 'In season', format: 'ppr', rows });
+	// One tagged sheet however many times the shots run: an earlier run's is kept.
+	const sheets = await call<{ name: string }[]>(owner, 'GET', '/sheets');
+	if (!sheets.some((sheet) => sheet.name === SHEET_NAME)) {
+		await call(owner, 'POST', '/sheets', { name: SHEET_NAME, format: 'ppr', rows });
+	}
 	return { sleeper: sleeper.id, mfl: mfl.id };
 }
 

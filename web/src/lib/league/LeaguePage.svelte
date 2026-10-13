@@ -9,6 +9,12 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
+	import Footnote from '#lib/ui/Footnote.svelte';
+	import ProblemLine from '#lib/ui/ProblemLine.svelte';
+	import { listWords } from '#lib/format/list.ts';
+	import { plural } from '#lib/format/number.ts';
+	import { presetWords } from '#lib/room/setup/scoring.ts';
+	import { droppedKinds } from './scoring-words.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
 	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
 	import { loadBoard, type LeagueBoard } from './board.ts';
@@ -84,6 +90,7 @@
 	}
 
 	const here = $derived(links.league(id));
+	const dropped = $derived(sync ? droppedKinds(sync.scoring_dropped) : []);
 	const team = $derived(sync ? myTeam(sync) : undefined);
 </script>
 
@@ -137,7 +144,7 @@
 				>
 			</header>
 			{#if problem}
-				<Panel edge="loss" padding="sm"><p class="note" role="alert">{problem}</p></Panel>
+				<Panel edge="loss" padding="sm"><ProblemLine>{problem}</ProblemLine></Panel>
 			{/if}
 			<StandingsStrip teams={sync.teams} me={sync.me} />
 			<div class="grid">
@@ -152,25 +159,31 @@
 			</div>
 			<footer class="foot">
 				{#if sync.settings_league_id}
-					<p class="note">
+					<Footnote>
 						Your league's roster and scoring are saved for mock drafts, under its name in your saved
-						leagues.
-					</p>
+						leagues. It scores like {presetWords(sync.scoring_like)}.
+					</Footnote>
 					<Quiet href={sectionHref('mock')} size="sm">Start a mock draft</Quiet>
 				{:else if sync.settings_note}
-					<p class="note">{sync.settings_note}</p>
+					<Footnote>{sync.settings_note}</Footnote>
 				{/if}
-				{#if sync.scoring_dropped.length > 0}
-					<p class="note">
-						Scoring we could not carry into mock drafts: {sync.scoring_dropped.join(', ')}.
-					</p>
+				{#if dropped.length > 0}
+					<Footnote>
+						Your league also scores {listWords(dropped)}, which mock drafts do not use yet.
+					</Footnote>
+				{/if}
+				{#if sync.scoring_defaulted.length > 0}
+					<Footnote>
+						For {plural(sync.scoring_defaulted.length, 'rule')} your league does not state, mock drafts
+						use our standard points.
+					</Footnote>
 				{/if}
 				{#if sync.placement.unplaced > 0}
-					<p class="note">
+					<Footnote>
 						{sync.placement.unplaced} rostered
 						{sync.placement.unplaced === 1 ? 'player is' : 'players are'} not on our board, so the waiver
 						pool cannot rule them out.
-					</p>
+					</Footnote>
 				{/if}
 			</footer>
 		</main>
@@ -232,13 +245,6 @@
 		flex-direction: column;
 		gap: var(--s-2);
 		align-items: flex-start;
-	}
-
-	.note {
-		margin: 0;
-		font-size: var(--t-sm);
-		color: var(--ink-2);
-		max-width: 80ch;
 	}
 
 	.reserve {

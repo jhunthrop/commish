@@ -13,6 +13,7 @@
 	import Field from '#lib/ui/Field.svelte';
 	import LineList from '#lib/ui/LineList.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
+	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { railLeague } from '#lib/account/rail-league.svelte.ts';
@@ -207,7 +208,7 @@
 </Shell>
 
 {#snippet alert()}
-	<p class="problem" role="alert">{problem}</p>
+	<ProblemLine>{problem}</ProblemLine>
 {/snippet}
 
 <style>
@@ -235,12 +236,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-3);
-	}
-
-	.problem {
-		margin: 0;
-		color: var(--loss-ink);
-		font-size: var(--t-sm);
 	}
 
 	.reserve {

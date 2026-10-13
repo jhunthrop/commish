@@ -4,6 +4,7 @@
 	import { links } from '#lib/site/links.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
+	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import { railLeague } from '#lib/account/rail-league.svelte.ts';
 	import { ApiError, leagueApi, type AttachedLeague } from './api.ts';
@@ -102,7 +103,7 @@
 				</li>
 			{/each}
 		</ul>
-		{#if problem}<p class="problem" role="alert">{problem}</p>{/if}
+		{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 	{:else if leagues}
 		<EmptyState level={3} title="No leagues yet">
 			{#snippet actions()}<Quiet href={links.leagueNew()}>Follow your league</Quiet>{/snippet}
@@ -155,11 +156,5 @@
 		display: flex;
 		align-items: center;
 		gap: var(--s-2);
-	}
-
-	.problem {
-		margin: var(--s-2) 0 0;
-		color: var(--loss-ink);
-		font-size: var(--t-sm);
 	}
 </style>
