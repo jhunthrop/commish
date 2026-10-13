@@ -84,7 +84,10 @@ type Service struct {
 	// Hindsight answers a report's pick that recorded no odds.
 	Hindsight mock.Odds
 	// Anon is the signed-out owner's cookies.
-	Anon          AnonOwners
+	Anon AnonOwners
+	// Site is the web's own origin (PUBLIC_BASE_URL), where a refused
+	// signed-out start is sent.
+	Site          string
 	ReportWorkers int
 	Now           func() time.Time
 	Log           *slog.Logger

@@ -2,6 +2,7 @@ package solo
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -22,8 +23,9 @@ const (
 // *auth.Anon implements it.
 type AnonOwners interface {
 	Owner(r *http.Request) ([]byte, bool)
-	Issue(w http.ResponseWriter) []byte
+	Issue(w http.ResponseWriter, r *http.Request) []byte
 	ValidCSRF(r *http.Request, hash []byte) bool
+	Admits(r *http.Request) bool
 }
 
 func safeMethod(m string) bool {
@@ -65,15 +67,28 @@ func (s *Service) owner(w http.ResponseWriter, r *http.Request) (mocks.Owner, bo
 }
 
 // mint issues a new anonymous owner for a create whose input has
-// validated and whose request had no valid session or token. A request
-// the browser marks cross-site never mints, so another site cannot plant
-// or replace this browser's cookies. On false it has already answered.
+// validated and whose request had no valid session or token. A cross-site
+// request mints only from an origin on the allow-list, so another site
+// cannot plant or replace this browser's cookies. On false it has already
+// answered with where a signed-out mock does start: the sentence, and the
+// site's address in the field "site".
 func (s *Service) mint(w http.ResponseWriter, r *http.Request) (mocks.Owner, bool) {
-	if auth.CrossSite(r) {
-		httpx.WriteError(w, r, http.StatusForbidden, httpx.CodeForbidden, "Start the mock from this site", nil)
+	if !s.Anon.Admits(r) {
+		httpx.WriteError(w, r, http.StatusForbidden, httpx.CodeForbidden, startHere(s.Site), map[string]string{refusedSiteField: s.Site})
 		return mocks.Owner{}, false
 	}
-	return mocks.TokenOwner(s.Anon.Issue(w)), true
+	return mocks.TokenOwner(s.Anon.Issue(w, r)), true
+}
+
+// refusedSiteField names the site a refused signed-out start points to.
+const refusedSiteField = "site"
+
+// startHere is the refusal's sentence: where a signed-out mock starts.
+func startHere(site string) string {
+	if u, err := url.Parse(site); err == nil && u.Host != "" {
+		return "Mocks start on " + u.Host
+	}
+	return "Mocks start on our own site"
 }
 
 // admitAnonymous applies the signed-out caps to a create: the browser's

@@ -42,7 +42,7 @@ func rooms(cfg config.API, pool *pgxpool.Pool, mockStore *mocks.Store, anon *aut
 	hindsight := mock.SimOdds{Runs: sim.RoomOddsRuns, Workers: workers}
 	soloService := &solo.Service{
 		Mocks: mockStore, Anon: anon, Leagues: leagueStore, Gate: gate, Sheets: sheetStore, Boards: draftBoards,
-		Advisor: card, Hindsight: hindsight, ReportWorkers: workers, Now: time.Now, Log: log,
+		Advisor: card, Hindsight: hindsight, ReportWorkers: workers, Site: cfg.HTTP.PublicBaseURL, Now: time.Now, Log: log,
 	}
 	lobbyHandler := &lobby.Handler{
 		Store: &lobby.Store{Pool: pool, Now: time.Now}, Boards: draftBoards, Advisor: card, Engine: engine,

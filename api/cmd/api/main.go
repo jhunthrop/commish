@@ -92,7 +92,7 @@ func build(cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Log
 	if err != nil {
 		return nil, err
 	}
-	anon, err := auth.NewAnon(cfg.Session)
+	anon, err := auth.NewAnon(cfg.Session, cfg.HTTP.CORSOrigins)
 	if err != nil {
 		return nil, err
 	}
