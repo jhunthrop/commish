@@ -26,8 +26,13 @@
 		eager?: boolean;
 		/** The floor to ceiling column, on unless the view switches it off. Match the RowHead above. */
 		range?: boolean;
-		/** The row's one action at its end, Add to my sheet. Off the phone. Match the RowHead's action. */
+		/** The row's sheet control at its end (SheetMark). Off the phone, where the whole row opens his
+		 * page and the page carries the verb. Anything in it marked data-reveal shows only while the row is
+		 * hovered or holds focus, so a board of 400 rows does not print 400 verbs. Match the RowHead's action. */
 		action?: Snippet;
+		/** What the row is ordered by. board leads with our rank and names his ADP at the end. adp
+		 * leads with his ADP, the order drafters take players in, and names our rank at the end. */
+		order?: 'board' | 'adp';
 	}
 
 	let {
@@ -38,10 +43,18 @@
 		unit,
 		eager = false,
 		range = true,
-		action
+		action,
+		order = 'board'
 	}: Props = $props();
 
-	const adpLabel = $derived(player.adp === null ? 'Not in ADP' : `ADP ${fixed(player.adp)}`);
+	const lead = $derived(
+		order === 'adp' && player.adp !== null ? fixed(player.adp) : String(player.ourRank)
+	);
+	/** The other order's number, under the gap chip. With no ADP the chip already says so. */
+	const against = $derived.by(() => {
+		if (order === 'adp') return `Our rank ${String(player.ourRank)}`;
+		return player.adp === null ? null : `ADP ${fixed(player.adp)}`;
+	});
 </script>
 
 <div
@@ -50,14 +63,14 @@
 	class:act={action !== undefined}
 	class:act-flat={action !== undefined && !range}
 >
-	<span class="rk">{player.ourRank}</span>
+	<span class="rk">{lead}</span>
 	<Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />
 	<span class="who">
 		<a class="name" {href}>{player.name}</a>
 		<span class="meta">
 			<PositionPill position={player.position} rank={player.positionRank} />
-			{#if showTier}<span class="wide"><TierChip tier={player.tier} /></span>{/if}
-			<span class="wide">{player.team}</span>
+			{#if showTier}<span class="wide tier"><TierChip tier={player.tier} /></span>{/if}
+			<span class="wide team">{player.team}</span>
 			<span class="wide">{fixed(player.expectedGames)} games</span>
 			<span class="narrow">{fixed(player.projected)} pts</span>
 		</span>
@@ -71,13 +84,16 @@
 	{/if}
 	<span class="adp">
 		<GapChip gap={draftersGap(player.adp, player.ourRank)} />
-		<Label size="cell">{adpLabel}</Label>
+		{#if against}<Label size="cell">{against}</Label>{/if}
 	</span>
 	{#if action}<span class="action">{@render action()}</span>{/if}
 </div>
 
 <style>
+	/* The name's link stretches over the whole row, so the face, the numbers and the empty space all
+	   open his page. The action sits above it. */
 	.row {
+		position: relative;
 		display: grid;
 		grid-template-columns: var(--board-cols);
 		align-items: center;
@@ -100,8 +116,25 @@
 	}
 
 	.action {
+		position: relative;
+		z-index: 1;
 		display: flex;
 		justify-content: flex-end;
+	}
+
+	.action :global([data-reveal]) {
+		opacity: 0;
+	}
+
+	.row:hover .action :global([data-reveal]),
+	.row:focus-within .action :global([data-reveal]) {
+		opacity: 1;
+	}
+
+	@media (hover: none) {
+		.action :global([data-reveal]) {
+			opacity: 1;
+		}
 	}
 
 	.row:hover {
@@ -117,6 +150,7 @@
 
 	.who {
 		min-width: 0;
+		container-type: inline-size;
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
@@ -131,18 +165,41 @@
 		text-decoration: none;
 	}
 
-	.name:hover {
+	.name::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+	}
+
+	.row:hover .name {
 		text-decoration: underline;
 	}
 
+	/* Every item keeps its whole width: a unit is never clipped. When the line runs short, the team
+	   steps out first (the pill and the club page still carry it), then the tier chip. */
 	.meta {
 		display: flex;
 		align-items: center;
 		gap: 6px;
-		overflow: hidden;
 		font-size: var(--t-sm);
 		color: var(--ink-3);
 		white-space: nowrap;
+	}
+
+	.meta > :global(*) {
+		flex: none;
+	}
+
+	@container (max-width: 230px) {
+		.team {
+			display: none;
+		}
+	}
+
+	@container (max-width: 170px) {
+		.tier {
+			display: none;
+		}
 	}
 
 	.narrow {

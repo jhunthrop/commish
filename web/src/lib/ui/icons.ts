@@ -43,7 +43,11 @@ export const ICONS = {
 		{ tag: 'circle', cx: 9, cy: 18, r: 1.2 },
 		{ tag: 'circle', cx: 15, cy: 18, r: 1.2 }
 	],
-	close: [{ tag: 'path', d: 'M6 6l12 12M18 6L6 18' }]
+	close: [{ tag: 'path', d: 'M6 6l12 12M18 6L6 18' }],
+	/** Add him: the board row's sheet control before he is on your sheet. */
+	plus: [{ tag: 'path', d: 'M12 5v14M5 12h14' }],
+	/** He is on your sheet. */
+	check: [{ tag: 'path', d: 'M5 12.5l4.5 4.5L19 7.5' }]
 } as const satisfies Record<string, readonly IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

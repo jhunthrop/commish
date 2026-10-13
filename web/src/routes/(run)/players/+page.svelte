@@ -21,7 +21,11 @@
 			lead="
 				Every player on our {data.format.label} board · by position · our rank overall at the right
 			"
-		/>
+		>
+			{#snippet actions()}
+				<Quiet href={links.clubs()} size="sm">Clubs</Quiet>
+			{/snippet}
+		</PageHead>
 		<div class="groups">
 			{#each data.groups as group (group.position)}
 				<Panel as="section" label={POSITION_NAMES[group.position].many}>

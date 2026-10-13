@@ -32,7 +32,7 @@
 	let chosen = $state<Record<Slot, PlayerData | null>>({ a: null, b: null });
 	let failed = $state(false);
 
-	const format = $derived(data.formats[0]);
+	const format = $derived(data.format);
 	const both = $derived(
 		SLOTS.flatMap((slot) => {
 			const player = chosen[slot];

@@ -1,21 +1,23 @@
 <script lang="ts">
-	import { draftersGap } from '#lib/format/draft.ts';
+	import { onMount } from 'svelte';
 	import { windowLabel } from '#lib/format/date.ts';
-	import { fixed, plural } from '#lib/format/number.ts';
+	import { plural } from '#lib/format/number.ts';
+	import { rangeScale } from '#lib/run/derive.ts';
 	import type { AdpPage } from '#lib/server/pages/adp.ts';
 	import type { RunStamp } from '#lib/run/stamp.ts';
-	import Chip from '#lib/ui/Chip.svelte';
-	import ChipGroup from '#lib/ui/ChipGroup.svelte';
-	import GapChip from '#lib/ui/GapChip.svelte';
+	import BasisList from '#lib/ui/BasisList.svelte';
+	import FilterBar from '#lib/ui/FilterBar.svelte';
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
-	import PlayerLine from '#lib/ui/PlayerLine.svelte';
-	import BasisList from '#lib/ui/BasisList.svelte';
-	import Table from '#lib/ui/Table.svelte';
+	import Row from '#lib/ui/Row.svelte';
+	import RowHead from '#lib/ui/RowHead.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
+	import FormatChips from './FormatChips.svelte';
+	import SheetAdd from './SheetAdd.svelte';
 	import SiteShell from './SiteShell.svelte';
+	import { lazySheet } from './lazy-sheet.svelte.ts';
 	import { links } from './links.ts';
 
 	interface Props {
@@ -25,6 +27,12 @@
 
 	let { page, run }: Props = $props();
 
+	/** Faces in the first screen load eagerly so they count toward the first paint. */
+	const EAGER_ROWS = 8;
+
+	onMount(() => lazySheet.armOnFirstIntent(window));
+
+	const scale = $derived(rangeScale(page.rows));
 	const sourceNames = $derived(
 		page.sources.map((source) => `${source.drafts}, ${windowLabel(source.window)}`)
 	);
@@ -51,47 +59,42 @@
 						.label} board · earliest pick first"
 				/>
 			</div>
-			{#if page.formats.length > 1}
-				<div class="filters">
-					<ChipGroup label="Scoring">
-						{#each page.formats as format (format.id)}
-							<Chip href={links.adp(format.id)} pressed={format.id === page.format.id}
-								>{format.label}</Chip
-							>
-						{/each}
-					</ChipGroup>
-				</div>
-			{/if}
-			<Table
-				caption="{page.format.label} ADP"
-				minWidth={340}
-				columns={[
-					{ label: 'ADP', align: 'end' },
-					{ label: 'Player' },
-					{ label: 'Our rank', align: 'end', wideOnly: true },
-					{ label: 'Drafters vs us' },
-					{ label: 'Projected', align: 'end', wideOnly: true }
-				]}
-			>
-				{#each page.rows as row (row.id)}
-					<tr>
-						<td class="num">{fixed(row.adp)}</td>
-						<td>
-							<PlayerLine
-								name={row.name}
-								position={row.position}
-								positionRank={row.positionRank}
-								team={row.team}
-								headshot={row.headshot}
-								href={links.player(row.slug)}
+			<div class="filters">
+				<FilterBar>
+					<FormatChips
+						formats={page.formats}
+						current={page.format.id}
+						href={(chip) => links.adp(chip.id)}
+					/>
+				</FilterBar>
+			</div>
+			<section aria-label="{page.format.label} ADP">
+				<RowHead action order="adp" />
+				{#each page.rows as player, i (player.id)}
+					<Row
+						{player}
+						href={links.player(player.slug)}
+						{scale}
+						showTier
+						unit={page.format.unit}
+						order="adp"
+						eager={i < EAGER_ROWS}
+					>
+						{#snippet action()}
+							<SheetAdd
+								player={{
+									id: player.id,
+									name: player.name,
+									position: player.position,
+									team: player.team,
+									headshot: player.headshot
+								}}
+								variant="row"
 							/>
-						</td>
-						<td class="num wide">{row.ourRank}</td>
-						<td><GapChip gap={draftersGap(row.adp, row.ourRank)} /></td>
-						<td class="num wide">{fixed(row.projected)}</td>
-					</tr>
+						{/snippet}
+					</Row>
 				{/each}
-			</Table>
+			</section>
 		</div>
 		<aside class="side" aria-label="Sources">
 			<Panel>
@@ -117,13 +120,9 @@
 
 	.content {
 		min-width: 0;
-		max-width: 900px;
 	}
 
-	.lead {
-		margin-bottom: var(--s-4);
-	}
-
+	.lead,
 	.filters {
 		margin-bottom: var(--s-4);
 	}

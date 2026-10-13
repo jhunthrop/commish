@@ -52,6 +52,13 @@ class LazySheet {
 		return this.parts?.store.has(playerId) ?? false;
 	}
 
+	/** His place on your sheet, 1-based, or null while he is not on it or the sheet is not in. */
+	place(playerId: string): number | null {
+		const store = this.parts?.store;
+		if (!store?.has(playerId)) return null;
+		return store.sheet.rows.findIndex((row) => row.id === playerId) + 1;
+	}
+
 	/** Starts the load on the first sign the reader is doing more than reading. Returns the disarm. */
 	armOnFirstIntent(target: Window): () => void {
 		const start = (): void => {

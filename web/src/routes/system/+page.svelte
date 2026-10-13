@@ -37,6 +37,7 @@
 	import { TINTED_ROUNDS, heatFor, vorCell } from '#lib/ui/heat.ts';
 	import type { BoardPlayer } from '#lib/types/player.ts';
 	import { ICON_NAMES } from '#lib/ui/icons.ts';
+	import { sectionHref } from '#lib/ui/nav.ts';
 	import DocPage from '#lib/ui/system/DocPage.svelte';
 	import DocSection from '#lib/ui/system/DocSection.svelte';
 	import Part from '#lib/ui/system/Part.svelte';
@@ -253,7 +254,7 @@
 
 		<DocSection title="The verb">
 			<Specimen frame="none" layout="row">
-				<Verb href="/mock">Start a mock draft</Verb>
+				<Verb href={sectionHref('mock')}>Start a mock draft</Verb>
 				<Quiet>Queue</Quiet>
 				<Quiet key="U">Undo</Quiet>
 				<ChipGroup label="Position">

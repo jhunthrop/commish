@@ -4,27 +4,18 @@
  * format id and team count ("ppr-12"). A run format reaches the sheet when its id without the
  * team count, hyphens read as underscores, is a sheet format: "ppr-12" is the sheet's "ppr".
  */
-import { DEFAULT_TEAMS } from '#lib/format/draft.ts';
+import { apiFormatOf } from '#lib/run/catalog.ts';
 import type { DirectoryPlayer } from '#lib/sheet/directory.ts';
-import { parseFormat } from '#lib/sheet/format.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
-import type { Format } from '#lib/run/schema.ts';
 import { board, manifest } from './run.ts';
-
-/** The sheet's name for a run format, or null when the sheet has none for it. Boards for the
- * default league size only: the sheet keeps one board per scoring. */
-function sheetFormatOf(format: Format): BoardFormat | null {
-	const suffix = `-${String(DEFAULT_TEAMS)}`;
-	if (format.teams !== DEFAULT_TEAMS || !format.id.endsWith(suffix)) return null;
-	return parseFormat(format.id.slice(0, -suffix.length).replaceAll('-', '_'));
-}
 
 /** The run's formats the sheet can read, by the sheet's name, each with its run format id. */
 async function sheetFormats(): Promise<Map<BoardFormat, string>> {
 	const { formats } = await manifest();
 	return new Map(
 		formats.flatMap((format) => {
-			const named = sheetFormatOf(format);
+			// Boards for the default league size only: the sheet keeps one board per scoring.
+			const named = apiFormatOf(format);
 			return named === null ? [] : [[named, format.id] as const];
 		})
 	);
