@@ -98,55 +98,68 @@ def _within(seasons: tuple[int, ...], window: range | None) -> list[int]:
     return [s for s in seasons if window is None or s in window]
 
 
-def rebuild_history(
-    conn: Connection, fetcher: Fetcher, now: datetime, checkpoint: Callable[[], None], window: range | None = None
-) -> HistoryReport:
-    """Every step in the table's order, committing after each; `window` limits it to those seasons."""
-    schedule, teams, context_seasons = (
+@dataclass(frozen=True, slots=True)
+class _Windows:
+    """Each step's seasons, cut to the requested window."""
+
+    schedule: list[int]
+    teams: list[int]
+    context: list[int]
+    observations: list[int]
+    injuries: list[int]
+    rosters: list[int]
+
+    @property
+    def counted(self) -> list[int]:
+        return sorted({*self.schedule, *self.teams, *self.rosters})
+
+
+def _windows(window: range | None) -> _Windows:
+    return _Windows(
         _within(SCHEDULE_SEASONS, window),
         _within(PLAYER_TEAM_SEASONS, window),
         _within(CONTEXT_SEASONS, window),
-    )
-    observations, injuries, rosters = (
         _within(OBSERVATION_SEASONS, window),
         _within(INJURY_SEASONS, window),
         _within(ROSTER_SEASONS, window),
     )
-    seasons = sorted({*schedule, *teams, *rosters})
-    before = season_counts(conn, seasons)
-    report = HistoryReport()
-    client = NflverseClient(fetcher)
 
-    def step(line: str) -> None:
-        checkpoint()
-        report.steps.append(line)
 
+Step = Callable[[str], None]
+
+
+def _schedule_and_seasons(conn: Connection, client: NflverseClient, seasons: _Windows, step: Step) -> None:
     universe = ingest.ingest_player_universe(conn, client)
     step("universe: refreshed")
-    written = sum(
-        writer(conn, client, schedule)
-        for writer in (
-            ingest_schedule.ingest_schedule,
-            ingest_schedule.ingest_game_results,
-            ingest_schedule.ingest_points_allowed,
-        )
+    schedule = seasons.schedule
+    writers = (
+        ingest_schedule.ingest_schedule,
+        ingest_schedule.ingest_game_results,
+        ingest_schedule.ingest_points_allowed,
     )
+    written = sum(writer(conn, client, schedule) for writer in writers)
     step(f"schedule {schedule[0]}-{schedule[-1]}: {written} team-week observations" if schedule else "schedule: none")
-    as_of = ingest.schedule_week_as_of(client, teams)
-    for season in teams:
+    as_of = ingest.schedule_week_as_of(client, seasons.teams)
+    for season in seasons.teams:
         result = ingest.ingest_season(conn, client, universe, season, as_of.get(season))
         step(
             f"season {season}: {result.observations_written} observations, {result.player_team_edges} player-team edges"
         )
-    for season in (s for s in observations if s in STAT_LINE_GAPS):
+    for season in (s for s in seasons.observations if s in STAT_LINE_GAPS):
         derived = derived_stat_lines.ingest_derived_stat_lines(conn, client, season)
         step(f"derived stat lines {season}: {derived.stat_lines} lines, {derived.observations_written} observations")
-    for season in context_seasons:
+
+
+def _context(conn: Connection, client: NflverseClient, seasons: list[int], step: Step) -> None:
+    for season in seasons:
         pbp = context.ingest_play_by_play(conn, client, season)
         step(f"play-by-play {season}: {pbp.plays_read} plays, {pbp.observations_written} observations")
-    step(f"coaches: {context.ingest_coaches(conn, client, context_seasons)} observations")
-    step(f"opponent adjustment: {context.ingest_opponent_defence(conn, client, context_seasons)} observations")
-    for season in injuries:
+    step(f"coaches: {context.ingest_coaches(conn, client, seasons)} observations")
+    step(f"opponent adjustment: {context.ingest_opponent_defence(conn, client, seasons)} observations")
+
+
+def _injuries(conn: Connection, client: NflverseClient, seasons: list[int], step: Step) -> None:
+    for season in seasons:
         try:
             with conn.begin_nested():
                 filings = injury_reports.ingest_injury_reports(conn, client, [season])
@@ -156,15 +169,37 @@ def rebuild_history(
             # statuses (2017): a filing that cannot be stamped, or contradicts itself, cannot
             # be replayed, so the season is named and left out, as the ingest refuses it.
             step(f"injury filings {season}: not ingested, {error}")
-    for season in observations:
+
+
+def _depth_and_rosters(conn: Connection, client: NflverseClient, seasons: _Windows, now: datetime, step: Step) -> None:
+    for season in seasons.observations:
         step(f"depth chart {season}: {ingest_depth_charts(conn, client, season, now)} observations")
-    for season in rosters:
+    for season in seasons.rosters:
         roster = ingest_week1_rosters(conn, client, season, now)
         step(f"week-one rosters {season}: {roster.written} written of {roster.entries_read} read")
-    after = season_counts(conn, seasons)
+
+
+def rebuild_history(
+    conn: Connection, fetcher: Fetcher, now: datetime, checkpoint: Callable[[], None], window: range | None = None
+) -> HistoryReport:
+    """Every step in the table's order, committing after each; `window` limits it to those seasons."""
+    seasons = _windows(window)
+    before = season_counts(conn, seasons.counted)
+    report = HistoryReport()
+    client = NflverseClient(fetcher)
+
+    def step(line: str) -> None:
+        checkpoint()
+        report.steps.append(line)
+
+    _schedule_and_seasons(conn, client, seasons, step)
+    _context(conn, client, seasons.context, step)
+    _injuries(conn, client, seasons.injuries, step)
+    _depth_and_rosters(conn, client, seasons, now, step)
+    after = season_counts(conn, seasons.counted)
     report.counts = [
         TableCount(table, season, before.get((table, season), 0), after.get((table, season), 0))
         for table in COUNTED_TABLES
-        for season in seasons
+        for season in seasons.counted
     ]
     return report
