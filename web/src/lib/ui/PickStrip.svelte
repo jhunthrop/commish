@@ -46,15 +46,12 @@
 		display: flex;
 		align-items: center;
 		gap: var(--s-3);
-		padding: var(--s-3) var(--s-4);
+		padding: var(--s-3) var(--fade-w) var(--s-3) var(--s-4);
 		overflow-x: auto;
-	}
-
-	@media (max-width: 760px) {
-		.strip {
-			padding-right: var(--fade-w);
-			mask-image: var(--fade-end);
-		}
+		min-block-size: var(--pick-strip-h);
+		box-sizing: border-box;
+		/* At every width the last face fades, the cue that more of the strip scrolls in. */
+		mask-image: var(--fade-end);
 	}
 
 	.lead {

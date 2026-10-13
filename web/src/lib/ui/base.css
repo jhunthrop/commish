@@ -78,6 +78,9 @@ input {
    and ends with that much room so its last item scrolls clear of the fade. */
 :root {
 	--fade-w: var(--s-6);
+	/* A strip of picks' height: a face, a name and two lines under it, with the strip's padding. A
+	   view reserves it where a strip is about to appear, so nothing below moves when it does. */
+	--pick-strip-h: 97px;
 	--fade-end: linear-gradient(to right, #000 calc(100% - var(--fade-w)), transparent);
 }
 
