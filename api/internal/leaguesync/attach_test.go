@@ -132,8 +132,8 @@ func intp(n int) *int { return &n }
 
 // Two members of one league each attach it and each see their own seat;
 // one read reaches the host for both; neither can read, list or detach
-// the other's attachment or saved league; a detach takes its saved
-// league with it.
+// the other's attachment or saved league; a detach keeps the saved league
+// and can be undone, by its own account only.
 func TestAttachIsScopedToTheAccount(t *testing.T) {
 	pool := dbtest.Pool(t)
 	ctx := context.Background()
@@ -210,11 +210,26 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 	if status, _ := a.do(svc.detach, http.MethodDelete, "/", nil, aliceSync.Id.String()); status != http.StatusOK {
 		t.Fatalf("alice detach: %d", status)
 	}
-	if _, err := saved.Get(ctx, alice.ID, *aliceSync.SettingsLeagueId); !errors.Is(err, leagues.ErrNotFound) {
-		t.Fatalf("the saved league outlived its detach: %v", err)
+	if _, err := saved.Get(ctx, alice.ID, *aliceSync.SettingsLeagueId); err != nil {
+		t.Fatalf("the detach took the saved league with it: %v", err)
+	}
+	if status, _ := a.do(svc.sync, http.MethodGet, "/", nil, aliceSync.Id.String()); status != http.StatusNotFound {
+		t.Fatalf("a detached league still read: %d", status)
+	}
+	if status, _ := b.do(svc.restore, http.MethodPost, "/", nil, aliceSync.Id.String()); status != http.StatusNotFound {
+		t.Fatalf("bob undid alice's detach: %d", status)
 	}
 	if status, _ := b.do(svc.sync, http.MethodGet, "/", nil, bobSync.Id.String()); status != http.StatusOK {
 		t.Fatalf("bob's league after alice detached: %d", status)
+	}
+	if status, _ := a.do(svc.restore, http.MethodPost, "/", nil, aliceSync.Id.String()); status != http.StatusOK {
+		t.Fatalf("alice's undo: %d", status)
+	}
+	var back apitypes.LeagueSync
+	status, body = a.do(svc.sync, http.MethodGet, "/", nil, aliceSync.Id.String())
+	if status != http.StatusOK || json.Unmarshal(body, &back) != nil || back.Me != 1 ||
+		back.SettingsLeagueId == nil || *back.SettingsLeagueId != *aliceSync.SettingsLeagueId {
+		t.Fatalf("after the undo: %d %s", status, body)
 	}
 }
 

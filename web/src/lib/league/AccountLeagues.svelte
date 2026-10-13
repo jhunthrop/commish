@@ -9,12 +9,18 @@
 	import { ApiError, leagueApi, type AttachedLeague } from './api.ts';
 	import { hostWords } from './model.ts';
 
-	/** The account's leagues on other hosts, each with a quiet way to stop following it. It reads
-	 * its own list, so the account page's other reads never wait on it. */
+	/** The account's leagues on other hosts, each with a quiet way to stop following it and, for a
+	 * few seconds after, to take that back. It reads its own list, so the account page's other reads
+	 * never wait on it. A detached league keeps its saved settings either way. */
 	let leagues = $state<AttachedLeague[] | null>(null);
 	let failed = $state(false);
 	let busy = $state<string | null>(null);
 	let problem = $state<string | null>(null);
+	/** Leagues detached a moment ago, still on the list with their undo. */
+	let detached = $state<ReadonlySet<string>>(new Set());
+
+	/** How long a detached league stays on the list with its undo. */
+	const UNDO_MS = 10_000;
 
 	onMount(() => {
 		leagueApi
@@ -26,19 +32,42 @@
 			.catch(() => (failed = true));
 	});
 
-	async function detach(league: AttachedLeague): Promise<void> {
-		busy = league.id;
+	function without(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
+		return new Set([...set].filter((x) => x !== id));
+	}
+
+	async function act(id: string, step: () => Promise<void>): Promise<void> {
+		busy = id;
 		problem = null;
 		try {
-			await leagueApi.detach(league.id);
-			const rest = (leagues ?? []).filter((l) => l.id !== league.id);
-			leagues = rest;
-			railLeague.note(rest[0]?.id ?? null);
+			await step();
 		} catch (error) {
 			problem = error instanceof ApiError ? error.message : 'That did not go through. Try again.';
 		} finally {
 			busy = null;
 		}
+	}
+
+	function detach(league: AttachedLeague): Promise<void> {
+		return act(league.id, async () => {
+			await leagueApi.detach(league.id);
+			detached = new Set([...detached, league.id]);
+			const rest = (leagues ?? []).filter((l) => !detached.has(l.id));
+			railLeague.note(rest[0]?.id ?? null);
+			setTimeout(() => {
+				if (!detached.has(league.id)) return;
+				detached = without(detached, league.id);
+				leagues = (leagues ?? []).filter((l) => l.id !== league.id);
+			}, UNDO_MS);
+		});
+	}
+
+	function undo(league: AttachedLeague): Promise<void> {
+		return act(league.id, async () => {
+			await leagueApi.restore(league.id);
+			detached = without(detached, league.id);
+			railLeague.note((leagues ?? []).find((l) => !detached.has(l.id))?.id ?? null);
+		});
 	}
 
 	function name(league: AttachedLeague): string {
@@ -60,9 +89,18 @@
 							{league.team_name !== '' ? `as ${league.team_name}, ` : ''}on {hostWords(league.host)}
 						</span>
 					</span>
-					<Quiet size="sm" disabled={busy !== null} onclick={() => void detach(league)}
-						>{busy === league.id ? 'Detaching' : 'Detach'}</Quiet
-					>
+					{#if detached.has(league.id)}
+						<span class="undo" role="status">
+							<span class="text">Detached.</span>
+							<Quiet size="sm" disabled={busy !== null} onclick={() => void undo(league)}
+								>Undo</Quiet
+							>
+						</span>
+					{:else}
+						<Quiet size="sm" disabled={busy !== null} onclick={() => void detach(league)}
+							>{busy === league.id ? 'Detaching' : 'Detach'}</Quiet
+						>
+					{/if}
 				</li>
 			{/each}
 		</ul>
@@ -113,6 +151,12 @@
 		font-size: var(--t-sm);
 		color: var(--ink-2);
 		unicode-bidi: isolate;
+	}
+
+	.undo {
+		display: flex;
+		align-items: center;
+		gap: var(--s-2);
 	}
 
 	.problem {

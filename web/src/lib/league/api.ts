@@ -29,6 +29,8 @@ export const leagueApi = {
 	attached: () => client.call<AttachedLeague[]>('/leagues/attached'),
 	detach: (id: string) =>
 		client.call<null>(`/leagues/attached/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+	restore: (id: string) =>
+		client.call<null>(`/leagues/attached/${encodeURIComponent(id)}/restore`, { method: 'POST' }),
 	sync: (id: string) => client.call<LeagueSync>(path(id, 'sync')),
 	refresh: (id: string) => client.call<LeagueSync>(path(id, 'refresh'), { method: 'POST' }),
 	signInUrl: (returnTo: string) => client.signInUrl(returnTo)

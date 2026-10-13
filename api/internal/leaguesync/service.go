@@ -34,7 +34,8 @@ type Links interface {
 	Save(ctx context.Context, l Link) (Link, error)
 	Get(ctx context.Context, accountID, id uuid.UUID) (Link, error)
 	Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, error)
-	Delete(ctx context.Context, accountID, id uuid.UUID) error
+	Detach(ctx context.Context, accountID, id uuid.UUID) error
+	Restore(ctx context.Context, accountID, id uuid.UUID) (Link, error)
 	Touch(ctx context.Context, id uuid.UUID, at time.Time) error
 	Linked(ctx context.Context, ref Ref) (bool, error)
 }
@@ -80,6 +81,7 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodPost, Path: "/leagues/attach", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitAttachPerMinute), Handler: s.attach},
 		{Method: http.MethodGet, Path: "/leagues/attached", Access: httpx.SignedIn, Limit: read, Handler: s.attached},
 		{Method: http.MethodDelete, Path: "/leagues/attached/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDetachPerMinute), Handler: s.detach},
+		{Method: http.MethodPost, Path: "/leagues/attached/{id}/restore", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDetachPerMinute), Handler: s.restore},
 		{Method: http.MethodGet, Path: "/leagues/{id}/sync", Access: httpx.SignedIn, Limit: read, Handler: s.sync},
 		{Method: http.MethodPost, Path: "/leagues/{id}/refresh", Access: httpx.SignedIn, Limit: httpx.PerHour(limitRefreshPerHour), Handler: s.refresh},
 	}
@@ -264,7 +266,7 @@ func (s *Service) detach(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	err := s.Links.Delete(r.Context(), auth.AccountID(r), id)
+	err := s.Links.Detach(r.Context(), auth.AccountID(r), id)
 	if errors.Is(err, ErrLinkNotFound) {
 		httpx.WriteNotFound(w, r)
 		return
@@ -290,4 +292,25 @@ func (s *Service) savedSettings(ctx context.Context, link Link) (*apitypes.Leagu
 		return nil, err
 	}
 	return &l.Settings, nil
+}
+
+// restore undoes a detach: the league is followed again with the seat
+// and the saved league it had.
+func (s *Service) restore(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.PathUUID(w, r, "id")
+	if !ok {
+		return
+	}
+	_, err := s.Links.Restore(r.Context(), auth.AccountID(r), id)
+	switch {
+	case errors.Is(err, ErrLinkNotFound):
+		httpx.WriteNotFound(w, r)
+	case errors.Is(err, ErrTooMany):
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict,
+			fmt.Sprintf("You follow %d leagues, the most allowed. Detach one first", MaxLinksPerAccount), nil)
+	case err != nil:
+		httpx.WriteInternal(w, r, s.Log, "leaguesync: restore", err)
+	default:
+		httpx.WriteOK(w, r, http.StatusOK, nil)
+	}
 }

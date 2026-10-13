@@ -220,11 +220,24 @@ paths:
     delete:
       tags: [league-sync]
       operationId: detachLeague
-      summary: Detach a league, and delete the saved league it made. Mocks saved from it keep their own copy.
+      summary: >-
+        Stop following a league. The attachment is kept as detached, with the saved league it made, so the detach
+        can be undone (restore) and mocks saved from it keep their settings.
       security: [{ session: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/restore:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    post:
+      tags: [league-sync]
+      operationId: restoreLeague
+      summary: Undo a detach. The league is followed again with the seat and saved league it had.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/{id}/sync:
     parameters:
       - name: id

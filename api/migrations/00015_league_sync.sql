@@ -17,10 +17,14 @@ create table app.league_links (
   -- The drafter's team in the league, by the host's roster id.
   roster_id      smallint not null check (roster_id between 1 and 32),
   attached_at    timestamptz not null default now(),
-  last_read_at   timestamptz
+  last_read_at   timestamptz,
+  -- When the drafter detached the league: the row is kept, with the saved
+  -- league it made, so a detach can be undone and a mock saved from it
+  -- keeps its settings. Attaching the league again clears it.
+  detached_at    timestamptz
 );
 create unique index league_links_account_league_key on app.league_links (account_id, host, host_league_id, host_season);
-create index league_links_account_idx on app.league_links (account_id, attached_at desc);
+create index league_links_account_idx on app.league_links (account_id, attached_at desc) where detached_at is null;
 
 -- The last good read of each host league, whole, so a restart or a host
 -- outage answers what was last seen with how old it is. One row per

@@ -67,7 +67,7 @@ func (s *Store) Save(ctx context.Context, l Link) (Link, error) {
 			return err
 		}
 		var n int
-		if err := tx.QueryRow(ctx, `select count(*) from app.league_links where account_id = $1
+		if err := tx.QueryRow(ctx, `select count(*) from app.league_links where account_id = $1 and detached_at is null
 			and not (host = $2 and host_league_id = $3 and host_season = $4)`,
 			l.AccountID, l.Ref.Host, l.Ref.LeagueID, l.Ref.Season).Scan(&n); err != nil {
 			return err
@@ -79,7 +79,8 @@ func (s *Store) Save(ctx context.Context, l Link) (Link, error) {
 			(account_id, league_id, host, host_league_id, host_season, roster_id, last_read_at)
 			values ($1, $2, $3, $4, $5, $6, $7)
 			on conflict (account_id, host, host_league_id, host_season)
-			do update set league_id = excluded.league_id, roster_id = excluded.roster_id, last_read_at = excluded.last_read_at
+			do update set league_id = excluded.league_id, roster_id = excluded.roster_id, last_read_at = excluded.last_read_at,
+				detached_at = null
 			returning `+linkColumns,
 			l.AccountID, l.LeagueID, l.Ref.Host, l.Ref.LeagueID, l.Ref.Season, l.RosterID, l.LastReadAt))
 		out = saved
@@ -96,7 +97,8 @@ func (s *Store) Save(ctx context.Context, l Link) (Link, error) {
 
 // Get is one of the account's links.
 func (s *Store) Get(ctx context.Context, accountID, id uuid.UUID) (Link, error) {
-	l, err := scanLink(s.Pool.QueryRow(ctx, `select `+linkColumns+` from app.league_links where id = $1 and account_id = $2`, id, accountID))
+	l, err := scanLink(s.Pool.QueryRow(ctx, `select `+linkColumns+` from app.league_links
+		where id = $1 and account_id = $2 and detached_at is null`, id, accountID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Link{}, ErrLinkNotFound
 	}
@@ -126,7 +128,7 @@ func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, 
 		from app.league_links l
 		left join app.league_snapshots sn
 			on sn.host = l.host and sn.host_league_id = l.host_league_id and sn.host_season = l.host_season
-		where l.account_id = $1 order by l.attached_at desc, l.id limit $2`, accountID, MaxLinksPerAccount)
+		where l.account_id = $1 and l.detached_at is null order by l.attached_at desc, l.id limit $2`, accountID, MaxLinksPerAccount)
 	if err != nil {
 		return nil, fmt.Errorf("leaguesync: attached: %w", err)
 	}
@@ -142,25 +144,50 @@ func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, 
 	return out, nil
 }
 
-// Delete removes the account's link and the saved league it made, in
-// one transaction. Mocks saved from it keep their own copy.
-func (s *Store) Delete(ctx context.Context, accountID, id uuid.UUID) error {
-	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		var league *uuid.UUID
-		err := tx.QueryRow(ctx, `delete from app.league_links where id = $1 and account_id = $2 returning league_id`, id, accountID).Scan(&league)
+// Detach marks the account's link detached. The row and the saved league
+// it made stay, so the detach can be undone (Restore) and mocks saved
+// from the league keep their settings.
+func (s *Store) Detach(ctx context.Context, accountID, id uuid.UUID) error {
+	tag, err := s.Pool.Exec(ctx, `update app.league_links set detached_at = now()
+		where id = $1 and account_id = $2 and detached_at is null`, id, accountID)
+	if err != nil {
+		return fmt.Errorf("leaguesync: detach %s: %w", id, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrLinkNotFound
+	}
+	return nil
+}
+
+// Restore undoes a detach of the account's link, within the attach cap.
+func (s *Store) Restore(ctx context.Context, accountID, id uuid.UUID) (Link, error) {
+	var out Link
+	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext('league_links:' || $1::text))`, accountID); err != nil {
+			return err
+		}
+		var n int
+		if err := tx.QueryRow(ctx, `select count(*) from app.league_links where account_id = $1 and detached_at is null`, accountID).Scan(&n); err != nil {
+			return err
+		}
+		if n >= MaxLinksPerAccount {
+			return ErrTooMany
+		}
+		l, err := scanLink(tx.QueryRow(ctx, `update app.league_links set detached_at = null
+			where id = $1 and account_id = $2 and detached_at is not null returning `+linkColumns, id, accountID))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrLinkNotFound
 		}
-		if err != nil {
-			return fmt.Errorf("leaguesync: delete link %s: %w", id, err)
-		}
-		if league != nil {
-			if _, err := tx.Exec(ctx, `delete from app.leagues where id = $1 and account_id = $2`, *league, accountID); err != nil {
-				return fmt.Errorf("leaguesync: delete saved league %s: %w", *league, err)
-			}
-		}
-		return nil
+		out = l
+		return err
 	})
+	if errors.Is(err, ErrLinkNotFound) || errors.Is(err, ErrTooMany) {
+		return Link{}, err
+	}
+	if err != nil {
+		return Link{}, fmt.Errorf("leaguesync: restore %s: %w", id, err)
+	}
+	return out, nil
 }
 
 // Touch records when the account's link last answered from a read.
@@ -193,7 +220,8 @@ func (s *Store) LastSnapshot(ctx context.Context, ref Ref) (Snapshot, bool, erro
 func (s *Store) Linked(ctx context.Context, ref Ref) (bool, error) {
 	var linked bool
 	err := s.Pool.QueryRow(ctx, `select exists (select 1 from app.league_links
-		where host = $1 and host_league_id = $2 and host_season = $3)`, ref.Host, ref.LeagueID, ref.Season).Scan(&linked)
+		where host = $1 and host_league_id = $2 and host_season = $3 and detached_at is null)`,
+		ref.Host, ref.LeagueID, ref.Season).Scan(&linked)
 	if err != nil {
 		return false, fmt.Errorf("leaguesync: linked %s: %w", ref.Key(), err)
 	}
@@ -211,7 +239,8 @@ func (s *Store) PutSnapshot(ctx context.Context, snap Snapshot) error {
 	ref := snap.Ref
 	_, err = s.Pool.Exec(ctx, `insert into app.league_snapshots (host, host_league_id, host_season, snapshot, read_at)
 		select $1, $2, $3, $4, $5
-		where exists (select 1 from app.league_links where host = $1 and host_league_id = $2 and host_season = $3)
+		where exists (select 1 from app.league_links where host = $1 and host_league_id = $2 and host_season = $3
+			and detached_at is null)
 		on conflict (host, host_league_id, host_season) do update set snapshot = excluded.snapshot, read_at = excluded.read_at`,
 		ref.Host, ref.LeagueID, ref.Season, raw, snap.ReadAt)
 	if err != nil {

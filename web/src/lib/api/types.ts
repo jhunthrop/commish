@@ -202,8 +202,27 @@ export interface paths {
 		get?: never;
 		put?: never;
 		post?: never;
-		/** Detach a league, and delete the saved league it made. Mocks saved from it keep their own copy. */
+		/** Stop following a league. The attachment is kept as detached, with the saved league it made, so the detach can be undone (restore) and mocks saved from it keep their settings. */
 		delete: operations['detachLeague'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/leagues/attached/{id}/restore': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Undo a detach. The league is followed again with the seat and saved league it had. */
+		post: operations['restoreLeague'];
+		delete?: never;
 		options?: never;
 		head?: never;
 		patch?: never;
@@ -2328,6 +2347,22 @@ export interface operations {
 		responses: {
 			200: components['responses']['EmptyResponse'];
 			404: components['responses']['ErrorResponse'];
+		};
+	};
+	restoreLeague: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['EmptyResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
 		};
 	};
 	leagueSync: {
