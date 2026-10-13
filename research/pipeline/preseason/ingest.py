@@ -1,15 +1,12 @@
-"""THE PRESEASON INGESTS (`src/projections/preseason/{ingest,store,adp-benchmark,current}.ts`,
-`market/adp-snapshot.ts`, and the operator scripts `preseason-ingest`, `kdef-adp-ingest`,
-`ingest-current-ecr`).
+"""THE PRESEASON STORE AND THE WEEK-ONE INGESTS (`preseason/{ingest,store,current}.ts`). The
+published boards, the thin-run gate and the nightly ADP capture are in `boards.py`.
 
 Week-one rosters into `preseason_rosters` (a LIVE season's capture supersedes the season's stored
 rows in one transaction; a past season only appends what is absent), the week-one depth chart into
-`player_week_observations`, the published boards into `preseason_rankings`, and the nightly ADP
-capture in all three formats into the append-only `adp_snapshots`.
+`player_week_observations`, and the store's reads the boards resolve against.
 """
 
 import logging
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -17,7 +14,6 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import Connection, delete, select, text
 
 from research.db.schema import (
-    ADP_SNAPSHOTS,
     NFL_PLAYERS,
     PLAYER_CROSSWALK,
     PLAYERS,
@@ -25,23 +21,17 @@ from research.db.schema import (
     PRESEASON_ROSTERS,
 )
 from research.errors import ResearchError
-from research.pipeline.http import Fetcher
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.config import Releases
 from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
 from research.pipeline.nflverse.universe_reads import all_positions, known_player_ids
 from research.pipeline.observations import insert_ignoring_conflicts, record_observations
 from research.pipeline.preseason.benchmarks import (
-    BENCHMARK_BOARD_FLOOR,
     BenchmarkSource,
     RosterIdentity,
-    resolve_rankings,
 )
 from research.pipeline.preseason.publishers import (
     FfcAdpFormat,
-    PublishedBoard,
-    fetch_average_draft_position,
-    fetch_expert_consensus,
 )
 from research.pipeline.preseason.rosters import (
     HISTORICAL_ROSTER_FLOOR,
@@ -54,7 +44,6 @@ from research.pipeline.preseason.rosters import (
 )
 
 LOG = logging.getLogger(__name__)
-_NOT_PUBLISHED = re.compile(r"published no \d{4} board")
 FINAL = datetime(9999, 12, 31, tzinfo=UTC)
 PRODUCT_SEASON = 2026
 
@@ -225,103 +214,3 @@ def crossed_roster_identities(conn: Connection) -> list[RosterIdentity]:
         .where(PLAYER_CROSSWALK.c.nfl_player_id.is_not(None))
     )
     return [RosterIdentity(r[0], r[1], r[2], r[3]) for r in conn.execute(query)]
-
-
-def record_board(
-    conn: Connection, season: int, source: str, board: PublishedBoard, identities: Sequence[RosterIdentity]
-) -> int:
-    resolution = resolve_rankings(board.candidates, identities)
-    return record_preseason_rankings(
-        conn, [RankingRow(season, source, r.player_id, r.rank, board.published_at) for r in resolution.resolved]
-    )
-
-
-def ingest_preseason(conn: Connection, fetcher: Fetcher, season: int, now: datetime) -> None:
-    """`preseason-ingest.ts` for one season: rosters, depth chart, the three ADP formats, the ECR.
-    A secondary ADP format the publisher has not posted is skipped, as the script skips it."""
-    client = NflverseClient(fetcher)
-    ingest_week1_rosters(conn, client, season, now)
-    ingest_depth_charts(conn, client, season, now)
-    if season < BENCHMARK_BOARD_FLOOR:
-        return
-    identities = roster_identities_for(conn, season)
-    # Each board in its own savepoint and any failure a logged line, as the script catches every
-    # error per board and carries on to the next (exit status 2 marks the run thin).
-    for board_format, source, _snapshot, feed in BOARD_FORMATS:
-        try:
-            with conn.begin_nested():
-                record_board(conn, season, source, fetch_average_draft_position(fetcher, season, now, feed), identities)
-        except Exception as error:
-            if board_format != DEFAULT_BOARD_FORMAT and _NOT_PUBLISHED.search(str(error)):
-                continue
-            LOG.error("%s FAILED: %s", source, error)
-    try:
-        with conn.begin_nested():
-            record_board(conn, season, BenchmarkSource.ECR, fetch_expert_consensus(fetcher, season, now), identities)
-    except Exception as error:
-        LOG.error("%s FAILED: %s", BenchmarkSource.ECR, error)
-
-
-_KDEF_POSITIONS = frozenset({"PK", "K", "DEF", "DST", "D/ST"})
-
-
-def ingest_kdef_adp(conn: Connection, fetcher: Fetcher, season: int, now: datetime) -> int:
-    """`kdef-adp-ingest.ts`: the PPR board's kickers and defenses alone, onto the roster spine."""
-    board = fetch_average_draft_position(fetcher, season, now)
-    candidates = [c for c in board.candidates if c.position.strip().upper() in _KDEF_POSITIONS]
-    narrowed = PublishedBoard(candidates, board.published_at, board.publisher_stamp)
-    return record_board(conn, season, BenchmarkSource.ADP, narrowed, roster_identities_for(conn, season))
-
-
-def ingest_current_ecr(conn: Connection, fetcher: Fetcher, now: datetime, season: int = PRODUCT_SEASON) -> int:
-    """`ingest-current-ecr.ts`: the live season's consensus onto the crossed provider roster."""
-    identities = crossed_roster_identities(conn)
-    if not identities:
-        raise ResearchError("The crosswalk is empty. Run `npm run projections:crosswalk` first.")
-    return record_board(conn, season, BenchmarkSource.ECR, fetch_expert_consensus(fetcher, season, now), identities)
-
-
-# --- the nightly ADP capture ----------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class AdpSnapshotFormat:
-    format: str
-    candidates_read: int
-    written: int
-    error: str | None
-
-
-def ingest_adp_snapshot(
-    conn: Connection, fetcher: Fetcher, captured_at: datetime, season: int = PRODUCT_SEASON
-) -> list[AdpSnapshotFormat]:
-    """`ingestAdpSnapshot`: three formats, one capture instant; only the PPR capture's failure raises."""
-    identities = roster_identities_for(conn, season)
-    results: list[AdpSnapshotFormat] = []
-    for board_format, source, snapshot_format, feed in BOARD_FORMATS:
-        try:
-            board = fetch_average_draft_position(fetcher, season, captured_at, feed)
-            resolution = resolve_rankings(board.candidates, identities)
-            written = 0
-            if resolution.resolved:
-                written = insert_ignoring_conflicts(
-                    conn,
-                    ADP_SNAPSHOTS,
-                    [
-                        {
-                            "player_id": r.player_id,
-                            "source": source,
-                            "format": snapshot_format,
-                            "adp": r.rank,
-                            "captured_at": captured_at,
-                        }
-                        for r in resolution.resolved
-                    ],
-                )
-            results.append(AdpSnapshotFormat(board_format, len(board.candidates), written, None))
-        except Exception as error:
-            results.append(AdpSnapshotFormat(board_format, 0, 0, str(error)))
-    primary = next(r for r in results if r.format == DEFAULT_BOARD_FORMAT)
-    if primary.error is not None:
-        raise ResearchError(f"adp-snapshot: the {DEFAULT_BOARD_FORMAT} capture failed ({primary.error}).")
-    return results

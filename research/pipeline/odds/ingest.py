@@ -7,23 +7,23 @@ twenty, and stores each one's two-sided lines under one fetched-at instant. THE 
 every observed prop name to a universe player active that season, exact name first, a unique
 first-initial-and-surname second, and never guesses between two. THE BACKFILL walks a season's
 weeks, reading the historical archive eight hours before each week's first kickoff, skipping any
-event already archived, and stops before it spends past its credit budget.
+event already archived, and stops before it spends past its credit budget (`backfill.py`).
 """
 
 import logging
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from sqlalchemy import Connection, and_, select, text
+from sqlalchemy import Connection, and_, select
 
 from research.db.schema import NFL_PLAYERS, PLAYER_PROP_OBSERVATIONS, PROPS_PLAYER_MAP
 from research.pipeline.crosswalk import comparable_name
 from research.pipeline.http import Fetcher
-from research.pipeline.jscompat import js_date_parse, js_is_finite, js_iso, js_number
+from research.pipeline.jscompat import js_iso
 from research.pipeline.observations import insert_ignoring_conflicts
 from research.pipeline.odds.props import (
-    PROP_MARKETS,
+    ODDS_PARAMS,
     SPORT_KEY,
     CreditStatus,
     OddsEvent,
@@ -39,7 +39,6 @@ _WINDOW_DAYS = 14
 _MAX_EVENTS_PER_RUN = 20
 _SNAPSHOT_OFFSET_HOURS = 8
 _WEEK_WINDOW_DAYS = 8
-_ODDS_PARAMS = {"regions": "us", "markets": ",".join(PROP_MARKETS), "oddsFormat": "american"}
 
 
 # --- the live snapshot ----------------------------------------------------------------------------
@@ -73,7 +72,7 @@ def run_odds_snapshot(conn: Connection, fetcher: Fetcher, api_key: str, now: dat
     skipped = 0
     for event in selected:
         path = f"/sports/{SPORT_KEY}/events/{event.id}/odds"
-        payload, credits = get_json(fetcher, odds_url(path, api_key, _ODDS_PARAMS), f"/events/{event.id}/odds")
+        payload, credits = get_json(fetcher, odds_url(path, api_key, dict(ODDS_PARAMS)), f"/events/{event.id}/odds")
         parsed = parse_event_odds_response(payload, now)
         written += record_prop_observations(conn, parsed.observations)
         skipped += len(parsed.skipped)
@@ -182,104 +181,3 @@ def run_props_preseason_snapshot(
     summary = run_odds_snapshot(conn, fetcher, api_key, fired_at)
     resolve_all_prop_names(conn)
     return f"fetched {summary.total_events} event(s), wrote {summary.total_written}"
-
-
-# --- the historical backfill ----------------------------------------------------------------------
-
-
-def kickoff_instants_by_week(conn: Connection, season: int) -> dict[int, datetime]:
-    rows = conn.execute(
-        text(
-            "select week, min(as_of) from team_week_observations where season = :season "
-            "and source = 'nflverse_kickoff' and metric = 'kickoff_instant' group by week"
-        ),
-        {"season": season},
-    )
-    return {int(week): earliest for week, earliest in rows if earliest is not None}
-
-
-def to_historical_date_param(instant: datetime) -> str:
-    return js_iso(instant)[:-5] + "Z"
-
-
-@dataclass
-class CreditTracker:
-    used_this_run: float = 0.0
-    last_remaining: str = "unknown"
-    used_at_start: float | None = field(default=None)
-
-    def track(self, credits: CreditStatus) -> None:
-        self.last_remaining = credits.remaining
-        used = js_number(credits.used) if credits.used != "unknown" else float("nan")
-        if not js_is_finite(used):
-            return
-        if self.used_at_start is None:
-            self.used_at_start = used
-        self.used_this_run = used - self.used_at_start
-
-
-def backfill_props(
-    conn: Connection, fetcher: Fetcher, api_key: str, seasons: Sequence[int], budget: float,
-    on_week: Callable[[str], None] = LOG.info,
-) -> bool:  # fmt: skip
-    """`odds-props-backfill.ts`: returns True when the budget stopped the run."""
-    archived = set(conn.execute(select(PLAYER_PROP_OBSERVATIONS.c.event_id)).scalars())
-    tracker = CreditTracker()
-    for season in seasons:
-        kickoffs = kickoff_instants_by_week(conn, season)
-        if not kickoffs:
-            on_week(f"season {season}: no kickoff instants in the store. Skipped.")
-            continue
-        for week in sorted(kickoffs):
-            if tracker.used_this_run >= budget:
-                return True
-            first_kickoff = kickoffs[week]
-            snapshot_at = to_historical_date_param(first_kickoff - timedelta(hours=_SNAPSHOT_OFFSET_HOURS))
-            events_payload, credits = get_json(
-                fetcher,
-                odds_url(f"/historical/sports/{SPORT_KEY}/events", api_key, {"date": snapshot_at}),
-                "/historical/events",
-            )
-            tracker.track(credits)
-            page = events_payload if isinstance(events_payload, dict) else None
-            if page is None:
-                raise ValueError("historical /events response was not an object.")
-            _require_timestamp(page.get("timestamp"), "historical /events response.timestamp")
-            if not isinstance(page.get("data"), list):
-                raise ValueError("historical /events response.data was not an array.")
-            events = [
-                parse_odds_event(raw, f"historical /events response.data[{i}]") for i, raw in enumerate(page["data"])
-            ]
-            window_end = first_kickoff + timedelta(days=_WEEK_WINDOW_DAYS)
-            in_week = [e for e in events if first_kickoff <= e.commence_time < window_end]
-            for event in (e for e in in_week if e.id not in archived):
-                if tracker.used_this_run >= budget:
-                    return True
-                odds_payload, credits = get_json(
-                    fetcher,
-                    odds_url(
-                        f"/historical/sports/{SPORT_KEY}/events/{event.id}/odds",
-                        api_key,
-                        {"date": snapshot_at, **_ODDS_PARAMS},
-                    ),
-                    f"/historical/events/{event.id}/odds",
-                )
-                tracker.track(credits)
-                if not isinstance(odds_payload, dict):
-                    raise ValueError("historical event-odds response was not an object.")
-                timestamp = _require_timestamp(
-                    odds_payload.get("timestamp"), "historical event-odds response.timestamp"
-                )
-                parsed = parse_event_odds_response(odds_payload.get("data"), timestamp)
-                record_prop_observations(conn, parsed.observations)
-                archived.add(event.id)
-    return False
-
-
-def _require_timestamp(value: object, path: str) -> datetime:
-    if not isinstance(value, str):
-        raise ValueError(f"{path} is missing.")
-    parsed = js_date_parse(value)
-    if parsed is None:
-        raise ValueError(f'{path} is unparseable ("{value}").')
-    return parsed

@@ -21,7 +21,8 @@ from sqlalchemy.dialects.postgresql import insert
 from research.db.schema import NFL_GAMES, PLAYER_STAT_LINES, PLAYERS
 from research.db.upsert import excluded_set
 from research.pipeline.budget import RequestBudget, UnmeteredBudget, reserve_or_raise
-from research.pipeline.tank01.mapping import StatLine, deduped_by_player_id
+from research.pipeline.checkpoint import Checkpoint, no_checkpoint
+from research.pipeline.tank01.mapping import Player, StatLine, deduped_by_player_id
 from research.pipeline.tank01.provider import LIST_ADP_REQUEST_COST, LIST_PLAYERS_REQUEST_COST, Tank01Provider
 
 _SEED_BATCH = 500
@@ -47,32 +48,41 @@ class SeedReport:
     stat_lines: int
 
 
+def _upsert_roster(conn: Connection, players: list[Player]) -> None:
+    for batch in _chunks(players, _SEED_BATCH):
+        rows = [
+            {"id": p.id, "name": p.name, "position": p.position, "nfl_team": p.nfl_team, "headshot_url": p.headshot_url}
+            for p in batch
+        ]
+        statement = insert(PLAYERS).values(rows)
+        update_set = excluded_set(statement, PLAYERS, ("id", "adp"))
+        conn.execute(statement.on_conflict_do_update(index_elements=[PLAYERS.c.id], set_=update_set))
+
+
+def _upsert_week(conn: Connection, week_lines: list[StatLine]) -> None:
+    for batch in _chunks(week_lines, _SEED_BATCH):
+        statement = insert(PLAYER_STAT_LINES).values([_stat_line_row(line) for line in batch])
+        keys = [PLAYER_STAT_LINES.c.player_id, PLAYER_STAT_LINES.c.week]
+        update_set = excluded_set(statement, PLAYER_STAT_LINES, ("player_id", "week"))
+        conn.execute(statement.on_conflict_do_update(index_elements=keys, set_=update_set))
+
+
 def ingest_roster_and_lines(
-    conn: Connection, provider: Tank01Provider, budget: RequestBudget | None = None
+    conn: Connection,
+    provider: Tank01Provider,
+    budget: RequestBudget | None = None,
+    checkpoint: Checkpoint = no_checkpoint,
 ) -> SeedReport:
-    """`seedPlayers`: the roster, then weeks 1 through the provider's last week of box scores."""
+    """`seedPlayers`: the roster, then weeks 1 through the provider's last week of box scores.
+
+    NOT ATOMIC, AS THE TYPESCRIPT IS NOT: `checkpoint` is called after the roster and after each
+    week, so a run stopped mid-season keeps every week it wrote and a re-run finishes the rest
+    (every write is an idempotent upsert)."""
     ledger = budget if budget is not None else UnmeteredBudget()
     reserve_or_raise(ledger, LIST_PLAYERS_REQUEST_COST, "the player list")
     players = provider.list_players()
-    for batch in _chunks(players, _SEED_BATCH):
-        statement = insert(PLAYERS).values(
-            [
-                {
-                    "id": p.id,
-                    "name": p.name,
-                    "position": p.position,
-                    "nfl_team": p.nfl_team,
-                    "headshot_url": p.headshot_url,
-                }
-                for p in batch
-            ]
-        )
-        conn.execute(
-            statement.on_conflict_do_update(
-                index_elements=[PLAYERS.c.id], set_=excluded_set(statement, PLAYERS, ("id", "adp"))
-            )
-        )
-
+    _upsert_roster(conn, players)
+    checkpoint()
     stat_count = 0
     for week in range(1, provider.last_week_of_season + 1):
         reserve_or_raise(ledger, 1, f"week {week}'s schedule")
@@ -80,20 +90,12 @@ def ingest_roster_and_lines(
         if not games:
             continue
         reserve_or_raise(ledger, len(games), f"week {week}'s {len(games)} box scores")
-        lines: list[StatLine] = []
-        for game in games:
-            lines.extend(provider.get_game_stat_lines(game))
+        lines = [line for game in games for line in provider.get_game_stat_lines(game)]
         if not lines:
             continue
         week_lines = deduped_by_player_id(lines)
-        for line_batch in _chunks(week_lines, _SEED_BATCH):
-            lines_statement = insert(PLAYER_STAT_LINES).values([_stat_line_row(line) for line in line_batch])
-            conn.execute(
-                lines_statement.on_conflict_do_update(
-                    index_elements=[PLAYER_STAT_LINES.c.player_id, PLAYER_STAT_LINES.c.week],
-                    set_=excluded_set(lines_statement, PLAYER_STAT_LINES, ("player_id", "week")),
-                )
-            )
+        _upsert_week(conn, week_lines)
+        checkpoint()
         stat_count += len(week_lines)
     return SeedReport(players=len(players), stat_lines=stat_count)
 

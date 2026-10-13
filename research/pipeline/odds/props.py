@@ -31,6 +31,8 @@ PROP_MARKETS: Final = (
     "player_rush_yds",
     "player_pass_tds",
 )
+# The query an event-odds request carries, live or historical: US books, the five markets, American prices.
+ODDS_PARAMS: Final = (("regions", "us"), ("markets", ",".join(PROP_MARKETS)), ("oddsFormat", "american"))
 _INSERT_CHUNK_ROWS = 2_000
 
 

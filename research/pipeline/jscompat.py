@@ -10,9 +10,9 @@ function here instead of the Python builtin. Each one names the builtin it repro
 import json
 import math
 import re
-import unicodedata
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime, timedelta
+from types import MappingProxyType
 
 # ECMAScript WhiteSpace and LineTerminator code points: what `String.prototype.trim` removes.
 _JS_WHITESPACE = "".join(
@@ -225,34 +225,44 @@ _ASCII_COLLATION_ORDER = (
 )
 
 
-def _primary_weights() -> dict[str, int]:
+def _primary_weights() -> Mapping[str, int]:
     weights: dict[str, int] = {}
     for char in _ASCII_COLLATION_ORDER:
         weights.setdefault(char.lower(), len(weights))
-    return weights
+    return MappingProxyType(weights)
 
 
 _PRIMARY = _primary_weights()
 
-CollationKey = tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]]
+CollationKey = tuple[tuple[int, ...], tuple[int, ...]]
+
+
+class UnverifiedCollationError(ValueError):
+    """A string holds a character whose ICU collation weight this module has not verified."""
 
 
 def collation_key(value: str) -> CollationKey:
-    """A sort key that orders strings the way `localeCompare` does (three UCA levels)."""
+    """A sort key that orders strings exactly as V8's `localeCompare` does, for printable ASCII.
+
+    Printable ASCII is the alphabet whose root-collation order was read off V8 itself (see
+    `_ASCII_COLLATION_ORDER`): primary weights first, then case at the tertiary level, lowercase
+    first. Every id, team code and coach name these mappers sort is ASCII today. Anything else
+    (an accent, a typographic apostrophe, a letter like `ø`) raises, naming the character: an
+    approximated order would reorder rows silently, and a refusal can be fixed by verifying the
+    character against V8 and adding it here.
+    """
     primary: list[int] = []
-    secondary: list[int] = []
     tertiary: list[int] = []
-    for char in unicodedata.normalize("NFD", value):
-        if unicodedata.combining(char):
-            # A combining accent carries no primary weight: it only breaks ties at the second level.
-            secondary.append(ord(char))
-            continue
+    for char in value:
         lowered = char.lower()
         weight = _PRIMARY.get(lowered)
-        primary.append(weight if weight is not None else len(_PRIMARY) + ord(lowered))
-        secondary.append(0)
+        if weight is None:
+            raise UnverifiedCollationError(
+                f"localeCompare order is verified for printable ASCII only; {value!r} holds {char!r} (U+{ord(char):04X})."
+            )
+        primary.append(weight)
         tertiary.append(1 if char != lowered else 0)
-    return tuple(primary), tuple(secondary), tuple(tertiary)
+    return tuple(primary), tuple(tertiary)
 
 
 def js_locale_compare(left: str, right: str) -> int:

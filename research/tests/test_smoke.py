@@ -8,7 +8,7 @@ import importlib
 
 from research.db.schema import METADATA
 from research.parity.cases import ALL_CASES
-from research.pipeline.__main__ import COMMANDS
+from research.pipeline.commands import COMMANDS
 
 
 def test_every_package_imports() -> None:
@@ -25,4 +25,4 @@ def test_schema_holds_the_research_tables() -> None:
 def test_every_case_names_tables_and_every_command_runs_something() -> None:
     assert all(case.tables for case in ALL_CASES)
     assert len({case.name for case in ALL_CASES}) == len(ALL_CASES)
-    assert all(callable(run) for _, run in COMMANDS.values())
+    assert all(callable(command.run) for command in COMMANDS.values())

@@ -25,6 +25,7 @@ from research.pipeline.jscompat import js_iso, js_json_stringify, js_object_keys
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
 from research.pipeline.tank01.client import Paths, Tank01Client
 from research.pipeline.tank01.mapping import ADP_TYPE
+from research.pipeline.tolerated import TOLERATED_FAILURES
 
 Cadence = Literal["daily", "game-day", "weekly"]
 Status = Literal["captured", "unchanged", "fresh", "off-cadence", "budget-refused", "failed"]
@@ -132,29 +133,65 @@ _INSERT = text(
 )
 
 
-def capture_once(
-    conn: Connection,
-    client: Tank01Client,
-    captured_at: datetime,
-    budget: RequestBudget,
-    season: int,
-    week: int,
-    feeds: Sequence[CaptureFeed] = CAPTURE_FEEDS,
-    teams: Sequence[str] = NFL_TEAM_ABBREVIATIONS,
-    is_fresh: Callable[[str], bool] = lambda _key: False,
-) -> CaptureResult:
-    """`captureOnce`: due feeds, one budget reservation, each feed captured or left unchanged."""
-    day = js_iso(captured_at)[:10].replace("-", "")
-    context = CaptureContext(season, week, day, tuple(teams))
+@dataclass(frozen=True)
+class CapturePass:
+    """One capture pass's fixed inputs: when it captures, for which season and week, which clubs."""
+
+    captured_at: datetime
+    season: int
+    week: int
+    teams: tuple[str, ...] = NFL_TEAM_ABBREVIATIONS
+
+
+def _due(
+    feeds: Sequence[CaptureFeed], at: datetime, is_fresh: Callable[[str], bool]
+) -> tuple[list[CaptureFeed], list[FeedOutcome]]:
     due: list[CaptureFeed] = []
     skipped: list[FeedOutcome] = []
     for feed in feeds:
-        if not cadence_allows(feed.cadence, captured_at):
+        if not cadence_allows(feed.cadence, at):
             skipped.append(FeedOutcome(feed.source, "off-cadence", 0))
         elif is_fresh(f"commish:capture:attempted:{feed.source}"):
             skipped.append(FeedOutcome(feed.source, "fresh", 0))
         else:
             due.append(feed)
+    return due, skipped
+
+
+def _capture_feed(
+    conn: Connection, client: Tank01Client, feed: CaptureFeed, context: CaptureContext, at: datetime
+) -> FeedOutcome:
+    """One feed, in its own savepoint: a database refusal rolls back this feed alone, and a
+    tolerated failure (the provider, the payload, the database) is this feed's outcome, as the
+    TypeScript records it and carries on. Anything else is a bug and is re-raised."""
+    requests = feed.requests(context)
+    try:
+        with conn.begin_nested():
+            bodies = [client.get(r.path, r.query) for r in requests]
+            payload: object = bodies[0] if len(bodies) == 1 else bodies
+            digest = digest_of(payload)
+            if digest == _latest_digest(conn, feed.source):
+                return FeedOutcome(feed.source, "unchanged", len(requests))
+            row = {"source": feed.source, "captured_at": at, "digest": digest, "payload": js_json_stringify(payload)}
+            conn.execute(_INSERT, row)
+            return FeedOutcome(feed.source, "captured", len(requests))
+    except TOLERATED_FAILURES as error:
+        return FeedOutcome(feed.source, "failed", len(requests), str(error))
+
+
+def capture_once(
+    conn: Connection,
+    client: Tank01Client,
+    capture: CapturePass,
+    budget: RequestBudget,
+    feeds: Sequence[CaptureFeed] = CAPTURE_FEEDS,
+    is_fresh: Callable[[str], bool] = lambda _key: False,
+) -> CaptureResult:
+    """`captureOnce`: due feeds, one budget reservation, each feed captured, unchanged or failed."""
+    context = CaptureContext(
+        capture.season, capture.week, js_iso(capture.captured_at)[:10].replace("-", ""), capture.teams
+    )
+    due, skipped = _due(feeds, capture.captured_at, is_fresh)
     if not due:
         return CaptureResult(skipped)
     reservation = budget.reserve(sum(len(feed.requests(context)) for feed in due))
@@ -163,29 +200,7 @@ def capture_once(
             [*skipped, *(FeedOutcome(feed.source, "budget-refused", 0) for feed in due)],
             f"The upstream request budget refused the capture pass ({reservation.denial or 'denied'}).",
         )
-    outcomes = list(skipped)
-    for feed in due:
-        requests = feed.requests(context)
-        try:
-            bodies = [client.get(r.path, r.query) for r in requests]
-            payload: object = bodies[0] if len(bodies) == 1 else bodies
-            digest = digest_of(payload)
-            if digest == _latest_digest(conn, feed.source):
-                outcomes.append(FeedOutcome(feed.source, "unchanged", len(requests)))
-                continue
-            conn.execute(
-                _INSERT,
-                {
-                    "source": feed.source,
-                    "captured_at": captured_at,
-                    "digest": digest,
-                    "payload": js_json_stringify(payload),
-                },
-            )
-            outcomes.append(FeedOutcome(feed.source, "captured", len(requests)))
-        except Exception as error:
-            outcomes.append(FeedOutcome(feed.source, "failed", len(requests), str(error)))
-    return CaptureResult(outcomes)
+    return CaptureResult([*skipped, *(_capture_feed(conn, client, feed, context, capture.captured_at) for feed in due)])
 
 
 def current_nfl_week(conn: Connection) -> int:
@@ -197,12 +212,5 @@ def current_nfl_week(conn: Connection) -> int:
 
 def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: datetime, season: int) -> CaptureResult:
     """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys."""
-    return capture_once(
-        conn,
-        client,
-        fired_at,
-        FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET),
-        season,
-        current_nfl_week(conn),
-        feeds=harvest_feeds(),
-    )
+    capture = CapturePass(fired_at, season, current_nfl_week(conn))
+    return capture_once(conn, client, capture, FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET), feeds=harvest_feeds())

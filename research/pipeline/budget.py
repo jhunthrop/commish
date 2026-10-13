@@ -6,7 +6,7 @@ carries the interface both use (`reserve` and the operator-facing refusal) and t
 ceiling; the nightly chain (phase D) decides where a durable daily ledger lives.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol
 
 from research.errors import ResearchError
@@ -26,22 +26,20 @@ class BudgetRefusedError(ResearchError):
     """The budget could not cover the next upstream request(s)."""
 
 
-@dataclass
+@dataclass(frozen=True)
 class FixedBudget:
     """A per-run ceiling that never persists (`fixedBudget` in capture-harvest-job.ts): each
     reservation is judged against the limit alone, exactly as the TypeScript judges it."""
 
     limit: int
-    spent: int = field(default=0)
 
     def reserve(self, count: int) -> Reservation:
         if count > self.limit:
             return Reservation(False, f"requested {count} request(s) exceeds this run's budget of {self.limit}")
-        self.spent += count
         return Reservation(True)
 
 
-@dataclass
+@dataclass(frozen=True)
 class UnmeteredBudget:
     """Grants everything: the seed's default when no ledger is handed in."""
 

@@ -10,7 +10,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Literal
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, text
 from sqlalchemy.dialects.postgresql import insert
 
 from research.db.schema import NFL_PLAYERS
@@ -184,10 +184,40 @@ def is_projected_candidate(universe: PlayerUniverse, ref: PlayerRef, file_positi
     return projected_position(position) is not None
 
 
+_SECONDARY_IDS = (("pfr_id", "pfr_id"), ("espn_id", "espn_id"))
+
+
+def release_moved_ids(conn: Connection, players: Sequence[NflPlayer]) -> None:
+    """`releaseMovedIds`: the release owns the secondary ids.
+
+    `pfr_id` and `espn_id` are unique, and nflverse does move them (on 2026-09-23 it gave two ESPN
+    ids held by legacy rows to two 2026 rookies, and the upsert, conflicting on `id` only, was
+    refused by the unique index until this existed). Any row holding a secondary id the release
+    now gives to a different `id` gives it up first; the row itself stays.
+    """
+    for column, attribute in _SECONDARY_IDS:
+        pairs = [(p.id, getattr(p, attribute)) for p in players if getattr(p, attribute) is not None]
+        for start in range(0, len(pairs), _CHUNK_ROWS):
+            chunk = pairs[start : start + _CHUNK_ROWS]
+            values = ", ".join(f"(:id{i}, :secondary{i})" for i in range(len(chunk)))
+            params: dict[str, object] = {}
+            for i, (player_id, secondary) in enumerate(chunk):
+                params[f"id{i}"] = player_id
+                params[f"secondary{i}"] = secondary
+            conn.execute(
+                text(
+                    f"update nfl_players as p set {column} = null from (values {values}) as v(id, secondary) "
+                    f"where p.{column} = v.secondary and p.id <> v.id"
+                ),
+                params,
+            )
+
+
 def record_nfl_players(conn: Connection, players: Sequence[NflPlayer]) -> int:
-    """`recordNflPlayers`: upsert on id, every column refreshed from the fresh release."""
+    """`recordNflPlayers`: release any moved secondary id, then upsert on id, every column refreshed."""
     if not players:
         return 0
+    release_moved_ids(conn, players)
     written = 0
     for start in range(0, len(players), _CHUNK_ROWS):
         chunk = [
