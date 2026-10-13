@@ -1,13 +1,12 @@
 import { defineEnvVars } from '@sveltejs/kit/env';
+import { parseApiUrl } from '#lib/api/config.ts';
 
-/** The site's environment, read from `$app/env/public`. Every variable is public and set at build:
- * the site holds no secret. */
+/** The build's inputs. The API's origin is fixed at build, so a deploy talks to one API. */
 export const variables = defineEnvVars({
-	PUBLIC_API_BASE_URL: {
+	PUBLIC_API_URL: {
 		public: true,
 		static: true,
-		description:
-			'The Go API the user pages call, https://api.trycommish.app in production. Set http://localhost:8080 to develop against a local api.',
-		schema: (value) => (value === undefined || value === '' ? 'https://api.trycommish.app' : value)
+		schema: parseApiUrl,
+		description: 'The request API the user pages call, like https://api.trycommish.app.'
 	}
 });

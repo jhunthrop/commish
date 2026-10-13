@@ -1034,7 +1034,7 @@ type ReportTeam struct {
 	ValueCaptured  float64 `json:"value_captured"`
 }
 
-// RoomAction One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT, SEAT_RETURNED, ROOM_STARTED (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, or an engine action (START_DRAFT, SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick, pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out.
+// RoomAction One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT (payload freed when a filling room gave the seat up, otherwise its stand-in drafts), SEAT_RETURNED, ROOM_STARTED (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, or an engine action (START_DRAFT, SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick, pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out.
 type RoomAction struct {
 	At      time.Time              `json:"at"`
 	Kind    string                 `json:"kind"`
@@ -1219,41 +1219,61 @@ type SheetImportResult struct {
 
 // SheetRow defines model for SheetRow.
 type SheetRow struct {
-	Name     string    `json:"name"`
-	Note     *string   `json:"note"`
-	PlayerId string    `json:"player_id"`
-	Position string    `json:"position"`
-	Rank     int       `json:"rank"`
-	Tag      *SheetTag `json:"tag"`
-	Team     *string   `json:"team"`
-	Tier     *int      `json:"tier"`
+	// Headshot the face the drafter saw when the row was added
+	Headshot *string `json:"headshot"`
+	Name     string  `json:"name"`
+	Note     *string `json:"note"`
+	PlayerId string  `json:"player_id"`
+	Position string  `json:"position"`
+	Rank     int     `json:"rank"`
+
+	// Tags Up to four tags, each one of the fixed SheetTag values or the drafter's own word: 1 to 20 letters, digits, spaces, apostrophes, periods or hyphens, starting with a letter or digit. A word that matches a fixed tag in any case is stored as the fixed tag. No tag appears twice in any case.
+	Tags SheetTags `json:"tags"`
+	Team *string   `json:"team"`
+	Tier *int      `json:"tier"`
 }
 
 // SheetRowInput defines model for SheetRowInput.
 type SheetRowInput struct {
-	Name     string    `json:"name"`
-	Note     *string   `json:"note,omitempty"`
-	PlayerId string    `json:"player_id"`
-	Position string    `json:"position"`
-	Tag      *SheetTag `json:"tag,omitempty"`
-	Team     *string   `json:"team,omitempty"`
-	Tier     *int      `json:"tier,omitempty"`
+	// Headshot an https URL
+	Headshot *string `json:"headshot,omitempty"`
+	Name     string  `json:"name"`
+	Note     *string `json:"note,omitempty"`
+	PlayerId string  `json:"player_id"`
+
+	// Position QB, RB, WR, TE, K or DST, in any case. DEF and D/ST are stored as DST, PK as K.
+	Position string `json:"position"`
+
+	// Tags Up to four tags, each one of the fixed SheetTag values or the drafter's own word: 1 to 20 letters, digits, spaces, apostrophes, periods or hyphens, starting with a letter or digit. A word that matches a fixed tag in any case is stored as the fixed tag. No tag appears twice in any case.
+	Tags *SheetTags `json:"tags,omitempty"`
+	Team *string    `json:"team,omitempty"`
+	Tier *int       `json:"tier,omitempty"`
 }
 
 // SheetRowUpdate defines model for SheetRowUpdate.
 type SheetRowUpdate struct {
-	Note *string   `json:"note"`
-	Tag  *SheetTag `json:"tag"`
+	Note *string `json:"note"`
+
+	// Tags Up to four tags, each one of the fixed SheetTag values or the drafter's own word: 1 to 20 letters, digits, spaces, apostrophes, periods or hyphens, starting with a letter or digit. A word that matches a fixed tag in any case is stored as the fixed tag. No tag appears twice in any case.
+	Tags SheetTags `json:"tags"`
 	Tier *int      `json:"tier"`
 }
 
 // SheetRowsReplace defines model for SheetRowsReplace.
 type SheetRowsReplace struct {
+	// IfUpdatedAt The sheet's updated_at as the writer last read it. When given and the sheet has changed since, nothing is written and the answer is 409 conflict, so a second device never overwrites the first unseen.
+	IfUpdatedAt *time.Time `json:"if_updated_at,omitempty"`
+
+	// Name The sheet's name, written in the same guarded write as the rows, so a rename can never pass a stale if_updated_at. Absent or null keeps the name.
+	Name *string         `json:"name,omitempty"`
 	Rows []SheetRowInput `json:"rows"`
 }
 
-// SheetTag defines model for SheetTag.
+// SheetTag The fixed tags. A row's tags may also hold the drafter's own words (SheetTags).
 type SheetTag string
+
+// SheetTags Up to four tags, each one of the fixed SheetTag values or the drafter's own word: 1 to 20 letters, digits, spaces, apostrophes, periods or hyphens, starting with a letter or digit. A word that matches a fixed tag in any case is stored as the fixed tag. No tag appears twice in any case.
+type SheetTags = []string
 
 // SheetUpdate defines model for SheetUpdate.
 type SheetUpdate struct {

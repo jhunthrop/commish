@@ -224,7 +224,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Replaces the rows from a CSV in the export's columns (rank, player_id, name, position, team, tier, tag, note). rank and player_id and name and position are required. Rows are ordered by rank. */
+		/** Replaces the rows from a CSV in the export's columns (rank, player_id, name, position, team, tier, tags, note). rank and player_id and name and position are required. tags holds up to four tags separated by commas, bars or semicolons, and a header named tag is read as tags. Rows are ordered by rank. */
 		post: operations['importSheet'];
 		delete?: never;
 		options?: never;
@@ -939,8 +939,13 @@ export interface components {
 			/** Format: date-time */
 			updated_at: string;
 		};
-		/** @enum {string} */
+		/**
+		 * @description The fixed tags. A row's tags may also hold the drafter's own words (SheetTags).
+		 * @enum {string}
+		 */
 		SheetTag: 'target' | 'sleeper' | 'breakout' | 'avoid' | 'injury' | 'handcuff';
+		/** @description Up to four tags, each one of the fixed SheetTag values or the drafter's own word: 1 to 20 letters, digits, spaces, apostrophes, periods or hyphens, starting with a letter or digit. A word that matches a fixed tag in any case is stored as the fixed tag. No tag appears twice in any case. */
+		SheetTags: string[];
 		Sheet: {
 			/** Format: uuid */
 			id: string;
@@ -957,9 +962,11 @@ export interface components {
 			name: string;
 			position: string;
 			team: string | null;
+			/** @description the face the drafter saw when the row was added */
+			headshot: string | null;
 			rank: number;
 			tier: number | null;
-			tag: components['schemas']['SheetTag'] | null;
+			tags: components['schemas']['SheetTags'];
 			note: string | null;
 		};
 		SheetDetail: components['schemas']['Sheet'] & {
@@ -968,10 +975,13 @@ export interface components {
 		SheetRowInput: {
 			player_id: string;
 			name: string;
+			/** @description QB, RB, WR, TE, K or DST, in any case. DEF and D/ST are stored as DST, PK as K. */
 			position: string;
 			team?: string | null;
+			/** @description an https URL */
+			headshot?: string | null;
 			tier?: number | null;
-			tag?: components['schemas']['SheetTag'] | null;
+			tags?: components['schemas']['SheetTags'];
 			note?: string | null;
 		};
 		SheetCreate: {
@@ -984,10 +994,17 @@ export interface components {
 		};
 		SheetRowsReplace: {
 			rows: components['schemas']['SheetRowInput'][];
+			/** @description The sheet's name, written in the same guarded write as the rows, so a rename can never pass a stale if_updated_at. Absent or null keeps the name. */
+			name?: string | null;
+			/**
+			 * Format: date-time
+			 * @description The sheet's updated_at as the writer last read it. When given and the sheet has changed since, nothing is written and the answer is 409 conflict, so a second device never overwrites the first unseen.
+			 */
+			if_updated_at?: string | null;
 		};
 		SheetRowUpdate: {
 			tier: number | null;
-			tag: components['schemas']['SheetTag'] | null;
+			tags: components['schemas']['SheetTags'];
 			note: string | null;
 		};
 		ImportSkip: {
@@ -1856,6 +1873,7 @@ export interface operations {
 			200: components['responses']['SheetDetailResponse'];
 			400: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
 		};
 	};
 	updateSheetRow: {

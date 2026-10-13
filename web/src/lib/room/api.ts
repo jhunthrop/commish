@@ -1,6 +1,7 @@
 /** The rooms' calls to the Go API: the solo room, the lobby, saved leagues. Every answer is the envelope
  * (ok, data, error), and every type is the one generated from api/openapi.yaml. */
-import { PUBLIC_API_BASE_URL } from '$app/env/public';
+import { PUBLIC_API_URL } from '$app/env/public';
+import { ApiError, apiClient, type RequestOptions } from '#lib/api/client.ts';
 import type { components } from '#lib/api/types.ts';
 
 type Schemas = components['schemas'];
@@ -19,73 +20,27 @@ export type LobbySeat = Schemas['LobbySeat'];
 export type RoomAction = Schemas['RoomAction'];
 export type Account = Schemas['Account'];
 
-const CSRF_COOKIE = 'commish_csrf';
-const CSRF_HEADER = 'X-CSRF-Token';
-const SAFE_METHODS = new Set(['GET', 'HEAD']);
+/** The site's one API client (Lane 7's), at the origin the build names. */
+const client = apiClient(PUBLIC_API_URL);
 
-export function apiBase(): string {
-	return PUBLIC_API_BASE_URL.replace(/\/$/, '');
+export { ApiError };
+
+type Method = NonNullable<RequestOptions['method']>;
+
+function call<T>(method: Method, path: string, body?: unknown): Promise<T> {
+	return client.call<T>(path, { method, body });
 }
 
-/** An answer that was not ok, with the API's own code and words. */
-export class ApiError extends Error {
-	readonly status: number;
-	readonly code: string;
-	readonly fields: Record<string, string>;
-
-	constructor(status: number, code: string, message: string, fields: Record<string, string> = {}) {
-		super(message);
-		this.status = status;
-		this.code = code;
-		this.fields = fields;
-	}
-
-	get signedOut(): boolean {
-		return this.status === 401;
-	}
+/** Whether an error is the API saying nobody is signed in. */
+export function isSignedOut(error: unknown): boolean {
+	return error instanceof ApiError && error.status === HTTP_UNAUTHORIZED;
 }
 
-function csrfToken(): string | undefined {
-	return document.cookie
-		.split('; ')
-		.find((part) => part.startsWith(`${CSRF_COOKIE}=`))
-		?.slice(CSRF_COOKIE.length + 1);
-}
-
-interface Envelope {
-	ok: boolean;
-	data: unknown;
-	error: Schemas['ErrorBody'] | null;
-}
-
-/** One call: the session cookie rides along, a state change carries the CSRF token. */
-export async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-	const headers: Record<string, string> = {};
-	if (body !== undefined) headers['Content-Type'] = 'application/json';
-	const token = csrfToken();
-	if (!SAFE_METHODS.has(method) && token !== undefined) headers[CSRF_HEADER] = token;
-	const response = await fetch(`${apiBase()}${path}`, {
-		method,
-		credentials: 'include',
-		headers,
-		body: body === undefined ? undefined : JSON.stringify(body)
-	});
-	const envelope = await response.json<Envelope>();
-	if (!response.ok || !envelope.ok) {
-		const error = envelope.error;
-		throw new ApiError(
-			response.status,
-			error?.code ?? 'internal',
-			error?.message ?? 'Something went wrong on our side',
-			error?.fields ?? {}
-		);
-	}
-	return envelope.data as T;
-}
+const HTTP_UNAUTHORIZED = 401;
 
 /** Where a signed-out drafter goes to sign in, coming back to the page they were on. */
 export function signInHref(returnTo: string): string {
-	return `${apiBase()}/auth/login?return_to=${encodeURIComponent(returnTo)}`;
+	return client.signInUrl(returnTo);
 }
 
 export const rooms = {

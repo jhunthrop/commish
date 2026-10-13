@@ -13,6 +13,7 @@
 	import { startMock } from '#lib/room/actions.ts';
 	import {
 		ApiError,
+		isSignedOut,
 		type BoardPlayer,
 		type League,
 		type LeagueSettings,
@@ -151,7 +152,7 @@
 				}
 			} catch (e) {
 				// Signed out: setup still works, and the verbs ask to sign in.
-				if (!(e instanceof ApiError && e.signedOut)) error = e;
+				if (!isSignedOut(e)) error = e;
 			}
 		})();
 		void loadLobbies();

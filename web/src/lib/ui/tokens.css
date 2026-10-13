@@ -39,6 +39,7 @@
 	--s-6: 32px;
 	--s-7: 48px;
 	--row-h: 52px;
+	--verb-h: 42px; /* the one solid verb, and the top bar slot that holds it */
 	--rail-w: 84px;
 	--side-w: 296px;
 	--r-sm: 4px;
@@ -105,6 +106,14 @@
 	--scoreboard-ink-2: #b9b0a7; /* labels on the board */
 	--scoreboard-num: #ff7130;
 	--scoreboard-num-ink: #170802; /* text on an orange segment of the bug */
+
+	/* Paper: what a printed page is in either theme. Never redefined for dark, so the print
+     preview reads as the page that will come out of the printer, and print media below
+     puts every page on it. */
+	--paper: #ffffff;
+	--paper-ink: #15120f;
+	--paper-line: #d8d3cd;
+	--paper-muted: #5c544d; /* 7.4:1 on --paper */
 
 	--shadow-pop: 0 1px 2px rgb(21 18 15 / 0.06), 0 8px 24px rgb(21 18 15 / 0.08);
 	color-scheme: light;
@@ -201,4 +210,19 @@
 	--scoreboard-num-ink: #170802;
 	--shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
 	color-scheme: dark;
+}
+
+/* Printed, every page is paper, whatever the theme on screen. Last, so it outranks both dark blocks. */
+@media print {
+	:root,
+	:root:not([data-theme='light']),
+	:root[data-theme='dark'] {
+		--bg: var(--paper);
+		--surface: var(--paper);
+		--ink: var(--paper-ink);
+		--ink-2: var(--paper-muted);
+		--ink-3: var(--paper-muted);
+		--line: var(--paper-line);
+		color-scheme: light;
+	}
 }

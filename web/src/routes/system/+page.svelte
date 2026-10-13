@@ -26,7 +26,12 @@
 	import Row from '#lib/ui/Row.svelte';
 	import RowHead from '#lib/ui/RowHead.svelte';
 	import ScoreBug from '#lib/ui/ScoreBug.svelte';
+	import Field from '#lib/ui/Field.svelte';
+	import NoteLine from '#lib/ui/NoteLine.svelte';
 	import Search from '#lib/ui/Search.svelte';
+	import SheetRow from '#lib/ui/SheetRow.svelte';
+	import SheetTier from '#lib/ui/SheetTier.svelte';
+	import TagChip from '#lib/ui/TagChip.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import SinceStrip from '#lib/ui/SinceStrip.svelte';
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
@@ -42,6 +47,7 @@
 	import Part from '#lib/ui/system/Part.svelte';
 	import Parts from '#lib/ui/system/Parts.svelte';
 	import Specimen from '#lib/ui/system/Specimen.svelte';
+	import Swatch from '#lib/ui/system/Swatch.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -49,6 +55,14 @@
 	const ROW_MIN_WIDTH = 760;
 	const BAND_MIN_WIDTH = 520;
 	const PLAYER_HREF = '/players';
+	const PAPER_TOKENS = [
+		{ token: '--paper', about: 'The page.' },
+		{ token: '--paper-ink', about: 'Names, ranks and the rules between tiers.' },
+		{ token: '--paper-line', about: 'The hairline under each player.' },
+		{ token: '--paper-muted', about: 'Teams, tags, notes and the column heads.' }
+	] as const;
+	/** A drafter's own words, as the specimen's note. */
+	const SHEET_NOTE = 'Take him over any WR left in tier 3.';
 
 	/** What a value cell's tint says about this player, from his own round and sign. */
 	function valueNote(player: BoardPlayer, boardSize: number): string {
@@ -168,6 +182,58 @@
 						{#each [1, 2, 3, 4, 5, 6, 7] as tier (tier)}<TierChip {tier} />{/each}
 					{/snippet}
 				</Part>
+			</Parts>
+		</DocSection>
+
+		<DocSection
+			title="Your sheet"
+			sub="Chris Olave on a cheat sheet in the WR view: your rank, your tier strip with its handle, your tags and your note."
+		>
+			<Specimen minWidth={ROW_MIN_WIDTH}>
+				<SheetTier tier={2} count={6} group="WRs" startId="system-tier" movable />
+				<SheetRow
+					id={row.id}
+					name={row.name}
+					position={row.position}
+					positionRank={row.positionRank}
+					team={row.team}
+					headshot={row.headshot}
+					rank={18}
+					tags={['Target', 'Value']}
+					note={SHEET_NOTE}
+					ourRank={row.ourRank}
+					eager
+				/>
+			</Specimen>
+			<Parts>
+				<Part
+					name="The handle"
+					about="Drag by it, or focus it and press Space, then the arrows. The row slides, everything else waits for the drop."
+				/>
+				<Part
+					name="Your tier strip"
+					about="The board's strip, drawn within a position. Its handle moves where the tier starts. The cross joins it to the tier above."
+				/>
+				<Part name="Tags" about="The fixed six and your own words, in your color.">
+					{#snippet show()}<TagChip label="Target" /><TagChip label="Value" />{/snippet}
+				</Part>
+				<Part name="The note" about="One line until the row opens.">
+					{#snippet show()}<NoteLine note={SHEET_NOTE} />{/snippet}
+				</Part>
+				<Part name="Field" about="A note, a pasted list, your own tag, a sheet's name.">
+					{#snippet show()}<Field label="Your own tag" placeholder="Your own tag" />{/snippet}
+				</Part>
+			</Parts>
+		</DocSection>
+
+		<DocSection
+			title="Paper"
+			sub="The printed sheet's tokens. They are the same in both themes, and print media puts every page on them."
+		>
+			<Parts>
+				{#each PAPER_TOKENS as { token, about } (token)}
+					<Swatch {token} {about} />
+				{/each}
 			</Parts>
 		</DocSection>
 

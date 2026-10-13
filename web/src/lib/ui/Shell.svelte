@@ -157,6 +157,9 @@
 		display: flex;
 		align-items: center;
 		gap: var(--s-3);
+		/* A verb's height whether or not the page has drawn its verb yet: a user page draws it
+		   once the browser's data is read, and the bar must not grow then. */
+		min-height: var(--verb-h);
 	}
 
 	@media (max-width: 760px) {

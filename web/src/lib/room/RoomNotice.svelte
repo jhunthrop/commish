@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Panel from '#lib/ui/Panel.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { ApiError, signInHref } from './api.ts';
+	import { ApiError, isSignedOut, signInHref } from './api.ts';
 
 	interface Props {
 		/** What went wrong; a signed-out answer becomes the way to sign in. */
@@ -12,7 +12,7 @@
 
 	let { error, returnTo }: Props = $props();
 
-	const signedOut = $derived(error instanceof ApiError && error.signedOut);
+	const signedOut = $derived(isSignedOut(error));
 	const message = $derived(
 		error instanceof ApiError
 			? error.message
