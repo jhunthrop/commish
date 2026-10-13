@@ -1,6 +1,7 @@
 // Lighthouse CI: the spec's budgets (§2.1) on the pages a run builds. The audited pages come from the
-// build itself, so a new run needs no edit here: the rail's board (the run's default format), the
-// first player in the run's index (our top-ranked player), and the record. Read after the build.
+// build itself, so a new run needs no edit here: the front door, the rail's board (the run's default
+// format), the first player in the run's index (our top-ranked player), and the record. Read after
+// the build.
 const { readFileSync } = require('node:fs');
 
 const ORIGIN = 'http://localhost:4173';
@@ -20,7 +21,7 @@ module.exports = {
 		collect: {
 			startServerCommand: 'npm run preview:static',
 			startServerReadyPattern: 'Accepting connections',
-			url: [`${ORIGIN}/board`, `${ORIGIN}${firstPlayerPath()}`, `${ORIGIN}/record`],
+			url: [`${ORIGIN}/`, `${ORIGIN}/board`, `${ORIGIN}${firstPlayerPath()}`, `${ORIGIN}/record`],
 			numberOfRuns: 7,
 			settings: {
 				preset: 'perf',

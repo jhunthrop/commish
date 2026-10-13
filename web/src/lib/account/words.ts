@@ -21,7 +21,7 @@ export interface PlanWords {
 }
 
 const PASS_SOURCES = {
-	purchase: 'Bought',
+	purchase: 'Yours',
 	group_pass: 'From a group pass',
 	grant: 'Given to you'
 } as const;
