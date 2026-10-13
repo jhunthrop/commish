@@ -5,12 +5,20 @@
 	interface Props {
 		/** The floor to ceiling column, on unless the view switches it off. Rows under it take the same. */
 		range?: boolean;
+		/** The rows under it carry an action column at their end. */
+		action?: boolean;
 	}
 
-	let { range = true }: Props = $props();
+	let { range = true, action = false }: Props = $props();
 </script>
 
-<div class="head" class:flat={!range} aria-hidden="true">
+<div
+	class="head"
+	class:flat={!range}
+	class:act={action}
+	class:act-flat={action && !range}
+	aria-hidden="true"
+>
 	<span></span>
 	<span></span>
 	<Label>Player</Label>
@@ -18,6 +26,7 @@
 	<span class="end"><Label align="end">Over replacement</Label></span>
 	{#if range}<span class="rng"><Label>Floor to ceiling</Label></span>{/if}
 	<Label>Drafters vs us</Label>
+	{#if action}<span></span>{/if}
 </div>
 
 <style>
@@ -32,6 +41,14 @@
 
 	.flat {
 		grid-template-columns: var(--board-cols-flat);
+	}
+
+	.act {
+		grid-template-columns: var(--board-cols-act);
+	}
+
+	.act-flat {
+		grid-template-columns: var(--board-cols-act-flat);
 	}
 
 	.proj,

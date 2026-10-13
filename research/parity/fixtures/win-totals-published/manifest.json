@@ -1,0 +1,17 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "The win-totals publisher's own file (greerreNFL/nfelosrs), every season it carries, unfiltered.",
+  "responses": [
+    {
+      "url": "https://raw.githubusercontent.com/greerreNFL/nfelosrs/main/nfelosrs/Manual%20Data/win_totals.csv",
+      "status": 200,
+      "file": "win_totals.csv.gz",
+      "headers": {
+        "content-type": "text/plain; charset=utf-8"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 54761
+    }
+  ]
+}

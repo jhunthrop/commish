@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { draftersGap, lastName } from '#lib/format/draft.ts';
+	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, plural, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
-	import AddToSheet from '#lib/site/AddToSheet.svelte';
+	import AddToSheet from '#lib/sheet/AddToSheet.svelte';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
 	import Capsule from '#lib/ui/Capsule.svelte';
@@ -84,7 +84,16 @@
 						n.expectedGames
 					)} expected games"
 				/>
-				<AddToSheet playerId={page.id} name={lastName(page.name)} fill />
+				<AddToSheet
+					player={{
+						id: page.id,
+						name: page.name,
+						position: page.position,
+						team: page.team,
+						headshot: page.headshot
+					}}
+					fill
+				/>
 			{/snippet}
 		</HeroCard>
 

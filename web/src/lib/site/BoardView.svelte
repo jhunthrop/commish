@@ -2,7 +2,9 @@
 	import { onMount } from 'svelte';
 	import { POSITION_NAMES, tierGroups } from '#lib/run/derive.ts';
 	import type { BoardPage } from '#lib/server/pages/board.ts';
-	import { sheet } from '#lib/sheet/sheet.svelte.ts';
+	import AddToSheet from '#lib/sheet/AddToSheet.svelte';
+	import SheetRail from '#lib/sheet/SheetRail.svelte';
+	import { sheetStore } from '#lib/sheet/store.svelte.ts';
 	import BasisList from '#lib/ui/BasisList.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -17,7 +19,6 @@
 	import Toggle from '#lib/ui/Toggle.svelte';
 	import type { BoardRow } from '#lib/run/schema.ts';
 	import { links, tierAnchor } from './links.ts';
-	import SheetRail from './SheetRail.svelte';
 
 	interface Props {
 		page: BoardPage;
@@ -34,12 +35,12 @@
 	let onlySheet = $state(false);
 
 	onMount(() => {
-		if (!sheet.loaded) sheet.load();
+		sheetStore.load();
 	});
 
 	function shown(row: BoardRow): boolean {
 		if (!belowReplacement && row.vor < 0) return false;
-		return !onlySheet || sheet.has(row.id);
+		return !onlySheet || sheetStore.has(row.id);
 	}
 
 	const groups = $derived(page.position === null ? [] : tierGroups(page.rows, page.position));
@@ -66,7 +67,20 @@
 		{unit}
 		{range}
 		eager={i < EAGER_ROWS}
-	/>
+	>
+		{#snippet action()}
+			<AddToSheet
+				player={{
+					id: player.id,
+					name: player.name,
+					position: player.position,
+					team: player.team,
+					headshot: player.headshot
+				}}
+				variant="row"
+			/>
+		{/snippet}
+	</Row>
 {/snippet}
 
 <main class="board">
@@ -102,7 +116,7 @@
 		</div>
 
 		<section aria-label="{page.position ?? 'All'} {page.format.label} board">
-			<RowHead {range} />
+			<RowHead {range} action />
 			{#if page.position === null}
 				{#each visible as player, i (player.id)}
 					{@render row(player, i)}
@@ -145,7 +159,7 @@
 				/>
 			</Panel>
 		{/if}
-		<SheetRail format={page.format.id} />
+		<SheetRail />
 		<Panel>
 			<PanelHead title="Show" />
 			<Toggle label="Players below replacement" bind:checked={belowReplacement} />

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed } from '#lib/format/number.ts';
+	import type { Snippet } from 'svelte';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import Face from './Face.svelte';
 	import GapChip from './GapChip.svelte';
@@ -25,14 +26,30 @@
 		eager?: boolean;
 		/** The floor to ceiling column, on unless the view switches it off. Match the RowHead above. */
 		range?: boolean;
+		/** The row's one action at its end, Add to my sheet. Off the phone. Match the RowHead's action. */
+		action?: Snippet;
 	}
 
-	let { player, href, scale, showTier, unit, eager = false, range = true }: Props = $props();
+	let {
+		player,
+		href,
+		scale,
+		showTier,
+		unit,
+		eager = false,
+		range = true,
+		action
+	}: Props = $props();
 
 	const adpLabel = $derived(player.adp === null ? 'Not in ADP' : `ADP ${fixed(player.adp)}`);
 </script>
 
-<div class="row" class:flat={!range}>
+<div
+	class="row"
+	class:flat={!range}
+	class:act={action !== undefined}
+	class:act-flat={action !== undefined && !range}
+>
 	<span class="rk">{player.ourRank}</span>
 	<Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />
 	<span class="who">
@@ -56,6 +73,7 @@
 		<GapChip gap={draftersGap(player.adp, player.ourRank)} />
 		<Label size="cell">{adpLabel}</Label>
 	</span>
+	{#if action}<span class="action">{@render action()}</span>{/if}
 </div>
 
 <style>
@@ -71,6 +89,19 @@
 
 	.flat {
 		grid-template-columns: var(--board-cols-flat);
+	}
+
+	.act {
+		grid-template-columns: var(--board-cols-act);
+	}
+
+	.act-flat {
+		grid-template-columns: var(--board-cols-act-flat);
+	}
+
+	.action {
+		display: flex;
+		justify-content: flex-end;
 	}
 
 	.row:hover {
@@ -140,7 +171,8 @@
 
 		.rk,
 		.proj,
-		.wide {
+		.wide,
+		.action {
 			display: none;
 		}
 

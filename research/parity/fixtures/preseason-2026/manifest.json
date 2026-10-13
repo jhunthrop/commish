@@ -1,0 +1,67 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "2026: the weekly roster and depth chart releases narrowed to four clubs, Fantasy Football Calculator's ADP in all three formats, and FantasyPros' PPR cheat-sheet page, as served.",
+  "responses": [
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/weekly_rosters/roster_weekly_2026.csv",
+      "status": 200,
+      "file": "roster_weekly_2026.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "rows whose team is one of BAL, BUF, HOU, KC",
+      "bytes": 509221
+    },
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_2026.csv",
+      "status": 200,
+      "file": "depth_charts_2026.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "rows whose team is one of BAL, BUF, HOU, KC",
+      "bytes": 7535463
+    },
+    {
+      "url": "https://fantasyfootballcalculator.com/api/v1/adp/ppr?position=all&teams=12&year=2026",
+      "status": 200,
+      "file": "ffc_ppr_2026.json.gz",
+      "headers": {
+        "content-type": "text/html; charset=utf-8"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 5541
+    },
+    {
+      "url": "https://fantasyfootballcalculator.com/api/v1/adp/half-ppr?position=all&teams=12&year=2026",
+      "status": 200,
+      "file": "ffc_half-ppr_2026.json.gz",
+      "headers": {
+        "content-type": "text/html; charset=utf-8"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 10187
+    },
+    {
+      "url": "https://fantasyfootballcalculator.com/api/v1/adp/standard?position=all&teams=12&year=2026",
+      "status": 200,
+      "file": "ffc_standard_2026.json.gz",
+      "headers": {
+        "content-type": "text/html; charset=utf-8"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 22170
+    },
+    {
+      "url": "https://www.fantasypros.com/nfl/rankings/ppr-cheatsheets.php?year=2026",
+      "status": 200,
+      "file": "fantasypros_ecr_2026.html.gz",
+      "headers": {
+        "content-type": "text/html; charset=UTF-8"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 885488
+    }
+  ]
+}

@@ -2,8 +2,8 @@
 	import { FACE_OVERFILL, headshotSources } from './headshot.ts';
 
 	interface Props {
-		/** The headshot URL. */
-		src: string;
+		/** The headshot URL, or null for a player with none: the empty circle holds his place. */
+		src: string | null;
 		/** Diameter in pixels: 22 on the wall, 32 in a list, 36 on a strip, 40 on a row, 72 on a call. */
 		size: number;
 		/** Empty when the name sits beside the face, which is everywhere a face appears today. */
@@ -28,7 +28,7 @@
 		phoneSize
 	}: Props = $props();
 
-	const sources = $derived(headshotSources(src, size));
+	const sources = $derived(src === null ? null : headshotSources(src, size));
 </script>
 
 <span
@@ -39,15 +39,17 @@
 	style:--face-phone-size={phoneSize === undefined ? undefined : `${String(phoneSize)}px`}
 	style:--face-overfill="{FACE_OVERFILL * 100}%"
 >
-	<img
-		src={sources.src}
-		srcset={sources.srcset}
-		{alt}
-		{loading}
-		width={size}
-		height={size}
-		decoding="async"
-	/>
+	{#if sources}
+		<img
+			src={sources.src}
+			srcset={sources.srcset}
+			{alt}
+			{loading}
+			width={size}
+			height={size}
+			decoding="async"
+		/>
+	{/if}
 </span>
 
 <style>

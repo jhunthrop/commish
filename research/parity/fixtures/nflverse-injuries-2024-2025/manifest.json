@@ -1,0 +1,27 @@
+{
+  "provenance": "recorded-from-live-provider",
+  "recordedAt": "2026-10-12",
+  "note": "The official injury report for 2024 (the stamped shape) and 2025 (the shape with no date_modified column), both unfiltered.",
+  "responses": [
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_2024.csv",
+      "status": 200,
+      "file": "injuries_2024.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 816989
+    },
+    {
+      "url": "https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_2025.csv",
+      "status": 200,
+      "file": "injuries_2025.csv.gz",
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 696006
+    }
+  ]
+}

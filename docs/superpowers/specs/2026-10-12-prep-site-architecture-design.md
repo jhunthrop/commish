@@ -78,6 +78,10 @@ The draft engine, the bots and the continue/room-odds sim are ported to Go in `a
 
 The one piece of new engineering: reading a draft in progress on another host. Sleeper first, because its draft and picks endpoints are public by draft id and need no sign-in, which makes a polling companion a request-time feature: paste the draft link, the advisor runs against the host's picks with our board and your sheet. ESPN and Yahoo require the drafter's own session, so they are a browser extension lane that ships after Sleeper, measured on a real draft of each before it is sold. The pass page says which hosts work today, by name of the host, which is a mechanism and not a competitor claim.
 
+### 2.8 A phone app, later
+
+Founder question 2026-10-13: "did we keep in mind a future mobile app - does svelte have something like react native?" Svelte has no first-class native runtime; Svelte Native on NativeScript is a small community project and not a foundation. The planned path is Capacitor: the same SvelteKit app in a native shell with store presence, push and native plugins, chosen when the Draft Pass companion (the advisor beside a live draft on another host) needs to sit on a phone beside the host's app. A separate native app stays possible because everything is behind the Go API with an OpenAPI contract, the web lane holds no secret, and the rooms speak WebSocket with a reconnect handshake. Two things are built now so that day is a new client, not a rewrite: a bearer-token session path in `api/internal/auth` beside the cookie session (WorkOS's mobile flow), and an installable web app (manifest, offline shell, phone-first layouts) so the site is a home-screen app at launch. Not at launch: a store listing.
+
 ## 3. The mock rooms
 
 Specified in `docs/design/2026-10-12-mock-room-rethink.md`. The targets to measure: solo pick round trip under 50 ms p90 including the batch, lobby fill under 90 seconds, the report's 200 runs under 300 ms, reconnect after a tab close under two seconds, a leaver replaced by a bot before the next clock expires.

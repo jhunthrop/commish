@@ -70,7 +70,7 @@
 
 	/* The one solid verb per viewport. */
 	.verb {
-		height: 42px;
+		height: var(--verb-h);
 		padding: 0 var(--s-5);
 		border: 0;
 		background: var(--accent);
