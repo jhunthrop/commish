@@ -689,6 +689,8 @@ export interface components {
 		};
 		SheetRowsReplace: {
 			rows: components['schemas']['SheetRowInput'][];
+			/** @description The sheet's name, written in the same guarded write as the rows, so a rename can never pass a stale if_updated_at. Absent or null keeps the name. */
+			name?: string | null;
 			/**
 			 * Format: date-time
 			 * @description The sheet's updated_at as the writer last read it. When given and the sheet has changed since, nothing is written and the answer is 409 conflict, so a second device never overwrites the first unseen.

@@ -34,7 +34,7 @@ type Repository interface {
 	Create(ctx context.Context, accountID uuid.UUID, in apitypes.SheetCreate) (apitypes.SheetDetail, error)
 	Rename(ctx context.Context, accountID, id uuid.UUID, name string) (apitypes.Sheet, error)
 	Delete(ctx context.Context, accountID, id uuid.UUID) error
-	ReplaceRows(ctx context.Context, accountID, id uuid.UUID, rows []apitypes.SheetRowInput, ifUpdatedAt *time.Time) (apitypes.SheetDetail, error)
+	ReplaceRows(ctx context.Context, accountID, id uuid.UUID, rows []apitypes.SheetRowInput, name *string, ifUpdatedAt *time.Time) (apitypes.SheetDetail, error)
 	UpdateRow(ctx context.Context, accountID, id uuid.UUID, playerID string, in apitypes.SheetRowUpdate) (apitypes.SheetRow, error)
 }
 
@@ -169,11 +169,20 @@ func (h *Handler) replaceRows(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows := normalizeRows(in.Rows)
-	if errs := validateRows(rows); errs != nil {
+	errs := validateRows(rows)
+	if in.Name != nil {
+		if nameErrs := validateName(*in.Name); nameErrs != nil {
+			if errs == nil {
+				errs = map[string]string{}
+			}
+			errs["name"] = nameErrs["name"]
+		}
+	}
+	if errs != nil {
 		httpx.WriteInvalid(w, r, errs)
 		return
 	}
-	d, err := h.Store.ReplaceRows(r.Context(), auth.AccountID(r), id, rows, in.IfUpdatedAt)
+	d, err := h.Store.ReplaceRows(r.Context(), auth.AccountID(r), id, rows, in.Name, in.IfUpdatedAt)
 	if err != nil {
 		h.fail(w, r, "sheets: replace rows", err)
 		return
@@ -223,7 +232,7 @@ func (h *Handler) importCSV(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, h.Log, "sheets: import", err)
 		return
 	}
-	d, err := h.Store.ReplaceRows(r.Context(), auth.AccountID(r), id, rows, nil)
+	d, err := h.Store.ReplaceRows(r.Context(), auth.AccountID(r), id, rows, nil, nil)
 	if err != nil {
 		h.fail(w, r, "sheets: import", err)
 		return

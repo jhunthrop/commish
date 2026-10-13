@@ -163,11 +163,13 @@ func (s *Store) Delete(ctx context.Context, accountID, id uuid.UUID) error {
 }
 
 // lockOwned locks one of the account's sheets for a row write and
-// stamps it changed. With ifUpdatedAt it writes only when the sheet is
-// as the writer last read it, and answers ErrChanged otherwise.
-func lockOwned(ctx context.Context, tx pgx.Tx, accountID, id uuid.UUID, ifUpdatedAt *time.Time) error {
-	tag, err := tx.Exec(ctx, `update app.sheets set updated_at = now()
-		where id = $1 and account_id = $2 and ($3::timestamptz is null or updated_at = $3)`, id, accountID, ifUpdatedAt)
+// stamps it changed, setting its name too when name is given. With
+// ifUpdatedAt it writes only when the sheet is as the writer last read
+// it, and answers ErrChanged otherwise: the name and the rows pass the
+// same guard in the same statement.
+func lockOwned(ctx context.Context, tx pgx.Tx, accountID, id uuid.UUID, name *string, ifUpdatedAt *time.Time) error {
+	tag, err := tx.Exec(ctx, `update app.sheets set updated_at = now(), name = coalesce($4, name)
+		where id = $1 and account_id = $2 and ($3::timestamptz is null or updated_at = $3)`, id, accountID, ifUpdatedAt, name)
 	if err != nil {
 		return err
 	}
@@ -197,13 +199,13 @@ func insertRows(ctx context.Context, tx pgx.Tx, sheetID uuid.UUID, rows []apityp
 	return err
 }
 
-// ReplaceRows replaces every row, ranked by order from 1. With
-// ifUpdatedAt it refuses with ErrChanged when the sheet has changed since
-// the writer read it.
-func (s *Store) ReplaceRows(ctx context.Context, accountID, id uuid.UUID, rows []apitypes.SheetRowInput, ifUpdatedAt *time.Time) (apitypes.SheetDetail, error) {
+// ReplaceRows replaces every row, ranked by order from 1, and the name
+// when one is given. With ifUpdatedAt it refuses with ErrChanged when the
+// sheet has changed since the writer read it.
+func (s *Store) ReplaceRows(ctx context.Context, accountID, id uuid.UUID, rows []apitypes.SheetRowInput, name *string, ifUpdatedAt *time.Time) (apitypes.SheetDetail, error) {
 	var out apitypes.SheetDetail
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		if err := lockOwned(ctx, tx, accountID, id, ifUpdatedAt); err != nil {
+		if err := lockOwned(ctx, tx, accountID, id, name, ifUpdatedAt); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `delete from app.sheet_rows where sheet_id = $1`, id); err != nil {
@@ -226,7 +228,7 @@ func (s *Store) ReplaceRows(ctx context.Context, accountID, id uuid.UUID, rows [
 func (s *Store) UpdateRow(ctx context.Context, accountID, id uuid.UUID, playerID string, in apitypes.SheetRowUpdate) (apitypes.SheetRow, error) {
 	var out apitypes.SheetRow
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		if err := lockOwned(ctx, tx, accountID, id, nil); err != nil {
+		if err := lockOwned(ctx, tx, accountID, id, nil, nil); err != nil {
 			return err
 		}
 		row, err := scanRow(tx.QueryRow(ctx, `update app.sheet_rows set tier = $3, tags = $4, note = $5

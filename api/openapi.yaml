@@ -871,6 +871,14 @@ components:
           type: array
           maxItems: 1000
           items: { $ref: "#/components/schemas/SheetRowInput" }
+        name:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 60
+          description: >-
+            The sheet's name, written in the same guarded write as the rows, so a rename can never pass a stale
+            if_updated_at. Absent or null keeps the name.
         if_updated_at:
           type: string
           format: date-time

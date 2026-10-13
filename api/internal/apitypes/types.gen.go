@@ -763,8 +763,11 @@ type SheetRowUpdate struct {
 // SheetRowsReplace defines model for SheetRowsReplace.
 type SheetRowsReplace struct {
 	// IfUpdatedAt The sheet's updated_at as the writer last read it. When given and the sheet has changed since, nothing is written and the answer is 409 conflict, so a second device never overwrites the first unseen.
-	IfUpdatedAt *time.Time      `json:"if_updated_at,omitempty"`
-	Rows        []SheetRowInput `json:"rows"`
+	IfUpdatedAt *time.Time `json:"if_updated_at,omitempty"`
+
+	// Name The sheet's name, written in the same guarded write as the rows, so a rename can never pass a stale if_updated_at. Absent or null keeps the name.
+	Name *string         `json:"name,omitempty"`
+	Rows []SheetRowInput `json:"rows"`
 }
 
 // SheetTag The fixed tags. A row's tags may also hold the drafter's own words (SheetTags).
