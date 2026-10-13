@@ -17,5 +17,11 @@ export const SHEET_LIMITS = {
 	headshot: 300
 } as const;
 
+/** A text's length in characters as the API counts them (Unicode code points, Go's
+ * utf8.RuneCountInString), not in UTF-16 units. */
+export function characterCount(text: string): number {
+	return Array.from(text).length;
+}
+
 /** The name a sheet starts with. */
 export const DEFAULT_SHEET_NAME = 'My sheet';

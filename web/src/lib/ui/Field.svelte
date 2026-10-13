@@ -51,8 +51,7 @@
 			use:focusOnMount
 			onchange={() => onchange?.(value)}
 			oninput={() => oninput?.(value)}
-			{onkeydown}
-		></textarea>
+			{onkeydown}></textarea>
 	{:else}
 		<input
 			bind:value

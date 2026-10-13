@@ -145,6 +145,7 @@ export function attachDrag(container: HTMLElement, handlers: DragHandlers): () =
 		window.removeEventListener('pointerup', onUp);
 		window.removeEventListener('pointercancel', onCancel);
 		window.removeEventListener('keydown', onKey);
+		container.style.pointerEvents = '';
 		drag = null;
 		handlers.onActive?.(false);
 	}
@@ -199,6 +200,9 @@ export function attachDrag(container: HTMLElement, handlers: DragHandlers): () =
 		});
 		el.dataset.dragging = '';
 		el.style.willChange = 'transform';
+		// The pointer is captured by the window, so the list need not hit-test or restyle hovers
+		// under a moving finger.
+		container.style.pointerEvents = 'none';
 		drag = {
 			pointerId: event.pointerId,
 			items,

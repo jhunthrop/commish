@@ -44,7 +44,9 @@
 	const runByStart = $derived(new Map(runs.map((run) => [run.startId, run])));
 
 	function restIndex(playerId: string, neighbour: string): number {
-		return store.sheet.rows.filter((row) => row.id !== playerId).findIndex((row) => row.id === neighbour);
+		return store.sheet.rows
+			.filter((row) => row.id !== playerId)
+			.findIndex((row) => row.id === neighbour);
 	}
 
 	/** A drop among this view's rows, as a place in the whole order. */
@@ -153,45 +155,45 @@
 				startId={row.id}
 				movable={movable && run.tier > 1}
 				lifted={liftedTier === run.tier}
-				ongripkeydown={(event) => onTierKey(event, row.id, run.tier)}
+				ongripkeydown={(event: KeyboardEvent) => onTierKey(event, row.id, run.tier)}
 				onjoin={() => store.removeTier(row.id)}
 			/>
 		{/if}
 		<SheetRow
-				id={row.id}
-				name={row.name}
-				position={row.position}
-				positionRank={rank?.position ?? 0}
-				team={row.team}
-				headshot={row.headshot}
-				rank={rank?.overall ?? index + 1}
-				tier={position === null ? row.tier : null}
-				tags={row.tags.map(tagLabel)}
-				note={row.note}
-				ourRank={ourRanks ? (ourRanks.get(row.id) ?? null) : undefined}
-				open={openId === row.id}
-				lifted={liftedRow?.id === row.id}
-				{movable}
-				eager={index < EAGER_ROWS}
-				ontoggle={() => (openId = openId === row.id ? null : row.id)}
-				ongripkeydown={(event) => onRowKey(event, row)}
-			>
-				{#snippet editor()}
-					<RowEditor
-						{row}
-						{ownTags}
-						canStartTier={canStartTierAt(store.sheet.rows, row.id)}
-						startsTier={startsTier(store.sheet.rows, row.id)}
-						onnote={(note) => store.setNote(row.id, note)}
-						ontags={(tags) => store.setTags(row.id, tags)}
-						onstarttier={() => store.startTier(row.id)}
-						onremove={() => {
-							openId = null;
-							store.remove(row.id);
-						}}
-					/>
-				{/snippet}
-			</SheetRow>
+			id={row.id}
+			name={row.name}
+			position={row.position}
+			positionRank={rank?.position ?? 0}
+			team={row.team}
+			headshot={row.headshot}
+			rank={rank?.overall ?? index + 1}
+			tier={position === null ? row.tier : null}
+			tags={row.tags.map(tagLabel)}
+			note={row.note}
+			ourRank={ourRanks ? (ourRanks.get(row.id) ?? null) : undefined}
+			open={openId === row.id}
+			lifted={liftedRow?.id === row.id}
+			{movable}
+			eager={index < EAGER_ROWS}
+			ontoggle={() => (openId = openId === row.id ? null : row.id)}
+			ongripkeydown={(event: KeyboardEvent) => onRowKey(event, row)}
+		>
+			{#snippet editor()}
+				<RowEditor
+					{row}
+					{ownTags}
+					canStartTier={canStartTierAt(store.sheet.rows, row.id)}
+					startsTier={startsTier(store.sheet.rows, row.id)}
+					onnote={(note: string) => store.setNote(row.id, note)}
+					ontags={(tags: readonly string[]) => store.setTags(row.id, tags)}
+					onstarttier={() => store.startTier(row.id)}
+					onremove={() => {
+						openId = null;
+						store.remove(row.id);
+					}}
+				/>
+			{/snippet}
+		</SheetRow>
 	{/each}
 </div>
 

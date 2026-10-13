@@ -14,7 +14,7 @@ export interface Tiered {
 	tier: number | null;
 }
 
-function indicesOf<T extends Tiered>(rows: readonly T[], position: Position): number[] {
+function indicesOf(rows: readonly Tiered[], position: Position): number[] {
 	const out: number[] = [];
 	rows.forEach((row, index) => {
 		if (row.position === position) out.push(index);
@@ -58,11 +58,7 @@ export function repairTiers<T extends Tiered>(rows: readonly T[]): readonly T[] 
 	let out = rows;
 	for (const position of positionsOf(rows)) {
 		const indices = indicesOf(out, position);
-		out = writeTiers(
-			out,
-			indices,
-			repairedTiers(indices.map((index) => out[index]?.tier ?? null))
-		);
+		out = writeTiers(out, indices, repairedTiers(indices.map((index) => out[index]?.tier ?? null)));
 	}
 	return out;
 }

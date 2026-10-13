@@ -13,7 +13,15 @@ import type { DirectoryPlayer } from '#lib/sheet/directory.ts';
 /** The formats we have a board for. */
 export const SHEET_BOARD_FORMATS: readonly BoardFormat[] = ['ppr'];
 
-const COLUMNS = ['rank', 'position_rank', 'name', 'position', 'nfl_team', 'headshot_url', 'player_id'];
+const COLUMNS = [
+	'rank',
+	'position_rank',
+	'name',
+	'position',
+	'nfl_team',
+	'headshot_url',
+	'player_id'
+];
 
 function rowsOf(csv: string): readonly Record<string, string>[] {
 	const [header = '', ...lines] = csv.trim().split(/\r?\n/);

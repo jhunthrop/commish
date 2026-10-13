@@ -92,8 +92,7 @@ export function sameSheet(a: Sheet, b: Sheet): boolean {
 	return a.rows.every((row, index) => {
 		const twin = b.rows[index];
 		return (
-			twin !== undefined &&
-			twin.id === row.id &&
+			twin?.id === row.id &&
 			twin.tier === row.tier &&
 			twin.note === row.note &&
 			twin.tags.length === row.tags.length &&

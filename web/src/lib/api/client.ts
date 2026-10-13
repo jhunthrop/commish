@@ -30,9 +30,7 @@ export class ApiError extends Error {
 }
 
 function csrfToken(): string | null {
-	const pair = document.cookie
-		.split('; ')
-		.find((entry) => entry.startsWith(`${CSRF_COOKIE}=`));
+	const pair = document.cookie.split('; ').find((entry) => entry.startsWith(`${CSRF_COOKIE}=`));
 	return pair ? decodeURIComponent(pair.slice(CSRF_COOKIE.length + 1)) : null;
 }
 
@@ -96,7 +94,10 @@ export function apiClient(origin: string, fetcher: typeof fetch = fetch): ApiCli
 				});
 			} catch (cause) {
 				if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
-				throw new ApiError(0, { code: CLIENT_CODES.offline, message: 'We could not reach Commish' });
+				throw new ApiError(0, {
+					code: CLIENT_CODES.offline,
+					message: 'We could not reach Commish'
+				});
 			}
 			const parsed: unknown = await response.json().catch(() => null);
 			if (!isEnvelope(parsed)) {

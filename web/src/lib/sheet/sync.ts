@@ -72,7 +72,11 @@ async function writeMerged(
 	let written = remote;
 	if (merged.name !== remote.sheet.name) {
 		const renamed = await api.rename(remote.id, merged.name);
-		written = { ...remote, updatedAt: renamed.updatedAt, sheet: { ...remote.sheet, name: renamed.name } };
+		written = {
+			...remote,
+			updatedAt: renamed.updatedAt,
+			sheet: { ...remote.sheet, name: renamed.name }
+		};
 	}
 	if (sameSheet(merged, written.sheet)) return written;
 	return api.replace(remote.id, merged, written.updatedAt);

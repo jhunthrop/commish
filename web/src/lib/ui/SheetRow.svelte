@@ -64,7 +64,7 @@
 
 <!-- data-row-id and data-grip are how the drag controller (lib/sheet/drag.ts) finds the rows and
 	 their handles without a reactive update per frame. -->
-<div class="row" class:open class:lifted data-row-id={id}>
+<div class="row" class:open class:lifted class:noted={note !== null} data-row-id={id}>
 	{#if movable}
 		<button
 			type="button"
@@ -116,6 +116,16 @@
 		border-bottom: 1px solid var(--line);
 		background: var(--bg);
 		position: relative;
+		/* A sheet is hundreds of rows. Rows off screen skip layout and paint, which keeps a drag's
+		   auto-scroll inside the frame on a phone. */
+		content-visibility: auto;
+		/* The content box of a row never drawn yet: 52px less its padding and line. The drag
+		   reads every row's height at the start, so the estimate has to match the drawn row. */
+		contain-intrinsic-size: auto 43px;
+	}
+
+	.noted {
+		contain-intrinsic-size: auto 61px;
 	}
 
 	.row:hover {

@@ -5,7 +5,7 @@
  * most SHEET_LIMITS.tags.
  */
 import type { components } from '#lib/api/types.ts';
-import { SHEET_LIMITS } from './limits.ts';
+import { SHEET_LIMITS, characterCount } from './limits.ts';
 
 export type FixedTag = components['schemas']['SheetTag'];
 
@@ -37,7 +37,7 @@ export function canonicalTag(raw: string): string {
 
 /** Why a tag cannot be used, or null when it can. */
 export function tagProblem(tag: string): string | null {
-	const length = [...tag].length;
+	const length = characterCount(tag);
 	if (length < 1 || length > SHEET_LIMITS.tagLength || !OWN_TAG.test(tag)) {
 		return `A tag is 1 to ${SHEET_LIMITS.tagLength} letters or numbers`;
 	}

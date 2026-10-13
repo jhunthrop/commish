@@ -68,7 +68,7 @@ export function fileDirectory(fetcher: typeof fetch = fetch): PlayerDirectory {
 		const response = await fetcher(boardFileUrl(format));
 		if (response.status === NOT_FOUND) return null;
 		if (!response.ok) throw new Error(`Our ${format} board answered ${String(response.status)}.`);
-		const entries = (await response.json()) as DirectoryEntry[];
+		const entries: DirectoryEntry[] = await response.json();
 		return entries.map(fromEntry).filter((player): player is DirectoryPlayer => player !== null);
 	}
 	return {

@@ -1,4 +1,4 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { toEntry } from '#lib/sheet/directory.ts';
 import { parseFormat } from '#lib/sheet/format.ts';
 import { SHEET_BOARD_FORMATS, sheetBoard } from '#lib/server/sheet-board.ts';
@@ -15,5 +15,5 @@ export const GET: RequestHandler = ({ params }) => {
 	const format = parseFormat(params.format);
 	const board = format === null ? null : sheetBoard(format);
 	if (board === null) error(NOT_FOUND, 'We have no board for that format.');
-	return json(board.map(toEntry));
+	return Response.json(board.map(toEntry));
 };

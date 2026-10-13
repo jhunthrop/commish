@@ -55,8 +55,11 @@ export function parsePosition(raw: string): Position | null {
 	return POSITIONS.find((position) => position === upper) ?? null;
 }
 
+/** A new row for him, keeping only who he is from whatever the caller holds (a board row, a
+ * room's player), so nothing else rides into storage or the API. */
 export function rowFor(player: SheetPlayer): SheetRow {
-	return { ...player, tier: null, tags: [], note: null };
+	const { id, name, position, team, headshot } = player;
+	return { id, name, position, team, headshot, tier: null, tags: [], note: null };
 }
 
 export function indexOfPlayer(sheet: Sheet, playerId: string): number {

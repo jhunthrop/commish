@@ -9,7 +9,7 @@
  * A read needs rank, player_id, name and position in any order and case, skips a bad line with
  * its reason, and orders what it keeps by rank.
  */
-import { SHEET_LIMITS } from './limits.ts';
+import { SHEET_LIMITS, characterCount } from './limits.ts';
 import { parsePosition, type SheetRow } from './model.ts';
 import { canonicalTag, joinTagCell, sameTag, splitTagCell, tagProblem } from './tags.ts';
 
@@ -149,7 +149,7 @@ function cell(record: readonly string[], index: ColumnIndex, column: Column): st
 }
 
 function lengthProblem(label: string, value: string, min: number, max: number): string | null {
-	const length = [...value].length;
+	const length = characterCount(value);
 	return length < min || length > max ? `The ${label} runs ${min} to ${max} characters` : null;
 }
 
@@ -169,7 +169,8 @@ type Read = { rank: number; row: SheetRow } | { reason: string };
 
 function readRecord(record: readonly string[], index: ColumnIndex): Read {
 	const rank = Number(cell(record, index, 'rank'));
-	if (!Number.isInteger(rank) || rank < 1) return { reason: 'The rank is not a whole number from 1' };
+	if (!Number.isInteger(rank) || rank < 1)
+		return { reason: 'The rank is not a whole number from 1' };
 	const id = cell(record, index, 'player_id');
 	const name = cell(record, index, 'name');
 	const team = cell(record, index, 'team');

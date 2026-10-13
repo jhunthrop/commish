@@ -4,6 +4,7 @@
  * once (storage.ts) and, when you are signed in, is saved to your account a moment later
  * (sync.ts), so the sheet works the same signed out, offline or on a slow phone.
  */
+import { SvelteSet } from 'svelte/reactivity';
 import { PUBLIC_API_URL } from '$app/env/public';
 import { apiClient } from '#lib/api/client.ts';
 import { browserStorage, type StorageGetter } from '#lib/ui/theme.ts';
@@ -35,13 +36,7 @@ export const SAVE_DELAY_MS = 900;
 const UNDO_DEPTH = 50;
 
 export type SyncStatus =
-	| 'local'
-	| 'checking'
-	| 'saving'
-	| 'saved'
-	| 'offline'
-	| 'failed'
-	| 'storage-blocked';
+	'local' | 'checking' | 'saving' | 'saved' | 'offline' | 'failed' | 'storage-blocked';
 
 /** What the store does when the page's world changes. */
 export interface PageEvents {
@@ -73,7 +68,7 @@ export class SheetStore {
 	canUndo = $state(false);
 
 	sheet = $derived(this.stored.sheet);
-	ids = $derived(new Set(this.stored.sheet.rows.map((row) => row.id)));
+	ids: ReadonlySet<string> = $derived(new SvelteSet(this.stored.sheet.rows.map((row) => row.id)));
 	signedIn = $derived(this.account !== null);
 
 	readonly #deps: SheetStoreDeps;

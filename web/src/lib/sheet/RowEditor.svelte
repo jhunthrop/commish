@@ -20,16 +20,8 @@
 		onremove: () => void;
 	}
 
-	let {
-		row,
-		ownTags,
-		canStartTier,
-		startsTier,
-		onnote,
-		ontags,
-		onstarttier,
-		onremove
-	}: Props = $props();
+	let { row, ownTags, canStartTier, startsTier, onnote, ontags, onstarttier, onremove }: Props =
+		$props();
 
 	// The field starts from his note when the row opens and is written back on change.
 	let note = $state(untrack(() => row.note ?? ''));
