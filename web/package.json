@@ -21,6 +21,8 @@
 		"standin": "node --env-file-if-exists=.env scripts/run-from-mock-data.ts"
 	},
 	"devDependencies": {
+		"@capsizecss/metrics": "^4.3.0",
+		"@capsizecss/unpack": "^4.0.1",
 		"@eslint/js": "^10.0.1",
 		"@lhci/cli": "^0.15.1",
 		"@sveltejs/adapter-cloudflare": "^8.0.0",
