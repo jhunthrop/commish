@@ -17,6 +17,10 @@ running node on random inputs; x86-64 builds have no FMA instruction to contract
 `sqrt` needs nothing: IEEE 754 requires it correctly rounded everywhere.
 """
 
+# fdlibm compares and masks IEEE 754 words against its own bit patterns, and returns early at each
+# special case; naming every pattern or folding the returns would hide the transcription it is.
+# ruff: noqa: PLR2004, PLR0911
+
 import math
 import platform
 import struct
@@ -179,7 +183,7 @@ def _exp_reduce(x: float, hx: int, xsb: int, fused: bool) -> tuple[float, float,
     return x, 0.0, 0.0, 0
 
 
-def exp(x: float, fused: bool = V8_FUSES_MULTIPLY_ADD) -> float:  # noqa: PLR0911 - fdlibm's own early returns
+def exp(x: float, fused: bool = V8_FUSES_MULTIPLY_ADD) -> float:
     """V8's `Math.exp` (fdlibm `__ieee754_exp`, with V8's exact `exp(1)`)."""
     hx = _hi(x)
     xsb = (hx >> 31) & 1

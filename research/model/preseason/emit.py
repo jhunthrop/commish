@@ -10,7 +10,7 @@ from research.model.domain import Position, StatLine
 from research.model.jsmath import js_max, js_min, js_sorted, locale_compare
 from research.model.laws.discovery import CandidateLaw
 from research.model.laws.registry import Law, law_reasons_for
-from research.model.preseason.adjustments import apply_career_stage, experience_band_for
+from research.model.preseason.adjustments import OffseasonMove, ShareDelta, apply_career_stage, experience_band_for
 from research.model.preseason.availability import (
     AvailabilityInput,
     GamesPlayedOutlook,
@@ -50,6 +50,7 @@ from research.model.preseason.roster_status import (
     is_excluded_roster_status,
     roster_status_reason,
 )
+from research.model.reads.preseason import PreseasonRosterRow
 from research.model.reads.teams import WeekRef, index_team_metrics
 from research.model.weekly.efficiency import compose_stat_line, predict_rates
 from research.model.weekly.opportunity import PredictedOpportunity
@@ -69,13 +70,13 @@ class _Context:
     tenure: Mapping[str, float | None]
 
 
-def _games(
+def _games(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     ctx: _Context,
     player_id: str,
     position: Position,
     predicted: PredictedOpportunity,
     baseline: float | None,
-    roster_row: object,
+    roster_row: PreseasonRosterRow,
 ) -> GamesPlayedOutlook:
     inputs = ctx.inputs
     if not ctx.features.availability:
@@ -101,7 +102,7 @@ def _games(
     )
 
 
-def _emit(
+def _emit(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     ctx: _Context,
     player_id: str,
     position: Position,
@@ -138,15 +139,15 @@ def _emit(
     return BoardCandidate(player_id, position, team, per_game, games, tuple(everything))
 
 
-def _veteran_reasons(move: object | None, delta: object | None) -> list[Reason]:
+def _veteran_reasons(move: OffseasonMove | None, delta: ShareDelta | None) -> list[Reason]:
     reasons: list[Reason] = []
-    source = getattr(move, "source_team", None)
-    destination = getattr(move, "destination_team", None)
+    source = None if move is None else move.source_team
+    destination = None if move is None else move.destination_team
     if move is not None and source is not None and destination is not None and source != destination:
         reasons.append({"code": "changed_team", "from": source, "to": destination})
     if delta is not None:
-        target = float(delta.target_share)
-        carry = float(delta.carry_share)
+        target = delta.target_share
+        carry = delta.carry_share
         if abs(target) > 0 or abs(carry) > 0:
             if target + carry >= 0:
                 reasons.append({"code": "offseason_share_gained", "targetShare": target, "carryShare": carry})

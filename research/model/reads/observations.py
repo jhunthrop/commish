@@ -6,6 +6,7 @@ because the order rows arrive in is the order the model's maps are filled in, an
 map is only reproducible in one order.
 """
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -170,7 +171,7 @@ class ShareError(ValueError):
 def share(part: float, whole: float, part_label: str, whole_label: str) -> float | None:
     """`share` (`features/opportunity.ts`)."""
     for value, label in ((part, part_label), (whole, whole_label)):
-        if value != value or value in (float("inf"), float("-inf")):
+        if not math.isfinite(value):
             raise ShareError(f"{label} must be a finite number; got {value}.")
         if value < 0:
             raise ShareError(f"{label} must not be negative; got {value}.")

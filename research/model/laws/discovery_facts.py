@@ -165,7 +165,7 @@ def _actual_wins(conn: Connection, season: int, as_of: datetime) -> dict[str, fl
     return {team: wins for team, (wins, games) in tallies.items() if games == required}
 
 
-def _quantities_for_season(
+def _quantities_for_season(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     conn: Connection,
     season: int,
     as_of: datetime,
@@ -234,7 +234,7 @@ def _quantities_for_season(
     return out
 
 
-def discovery_facts_for_season(
+def discovery_facts_for_season(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     conn: Connection,
     season: int,
     positions: Mapping[str, Position],

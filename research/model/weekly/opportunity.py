@@ -5,8 +5,9 @@ Ported from `research-ts/src/projections/model/opportunity.ts` and the rolling m
 season's form second, exactly as the TypeScript nests it.
 """
 
+import math
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Final
 
@@ -44,7 +45,7 @@ def rolling_opportunity(
             continue
         weight = js_pow(decay, weeks_ago)
         value = entry.value
-        if value is None or value != value or value < 0 or value in (float("inf"), float("-inf")):
+        if value is None or not math.isfinite(value) or value < 0:
             raise ValueError(f"week {entry.week} value must be a finite, non-negative number; got {value}.")
         weighted += weight * value
         weights += weight
@@ -125,9 +126,6 @@ class PredictedOpportunity:
     team_carries: float
     team_pass_attempts: float
 
-    def but(self, **changes: float) -> "PredictedOpportunity":
-        return replace(self, **changes)
-
 
 def clamp_share(value: float) -> float:
     return js_min(1.0, js_max(0.0, value))
@@ -153,7 +151,7 @@ def _level(rows: list[WeeklyValue], decay: float, anchor: int) -> tuple[float | 
     return rolling_opportunity(rows, _WINDOW, decay, anchor), rolling_weight(rows, _WINDOW, decay, anchor)
 
 
-def _predict_share(
+def _predict_share(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     history: _History,
     read: Callable[[PlayerWeekUsage], float | None],
     role_prior: float,

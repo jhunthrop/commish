@@ -123,7 +123,7 @@ def _capital_curve_weight(
     return js_min(1.0, js_max(0.0, (above_value - pick_value) / span))
 
 
-def _along_the_capital_curve[T](
+def _along_the_capital_curve[T](  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     cells: Mapping[DraftBucket, T],
     position: Position,
     overall_pick: int | None,
@@ -245,7 +245,7 @@ def historical_rookie_expected_games(
     position: Position,
     overall_pick: int | None,
     team_games: float,
-    by_bucket: Mapping[Position, Mapping[DraftBucket, float]],
+    by_bucket: Mapping[Position, Mapping[str, float]],
 ) -> float:
     """`historicalRookieExpectedGames`, with `teamGamesIn(season)` passed in."""
     if position not in CURVE_POSITIONS:

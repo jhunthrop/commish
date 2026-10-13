@@ -237,7 +237,7 @@ def _clamp_share(value: float) -> float:
     return js_min(1.0, js_max(0.0, value))
 
 
-def _shrunk_term(
+def _shrunk_term(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     rookie_input: AvailabilityInput,
     priors: AvailabilityPriors,
     prior: float,

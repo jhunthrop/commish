@@ -91,7 +91,7 @@ def read_artifact(conn: Connection, name: str, version: int | None = None) -> Pu
 PublishOutcome = Literal["inserted", "unchanged"]
 
 
-def publish_artifact(
+def publish_artifact(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     conn: Connection, name: str, version: int, payload: Any, fit_stamp: datetime, fitted_on: str
 ) -> PublishOutcome:
     """`publishModelArtifact`: inserts a new version, accepts an identical re-publish, refuses a change."""

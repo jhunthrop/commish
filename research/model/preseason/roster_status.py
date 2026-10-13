@@ -175,7 +175,7 @@ def _active_detail(designation: str | None) -> str | None:
     return "out" if designation is not None and _OUT.search(designation.strip()) else None
 
 
-def current_status_from_tank01(
+def current_status_from_tank01(  # noqa: PLR0911 - one return per status rule, in the oracle's order
     espn_id: str, sweep: RosterSweep | None, listing: Tank01Listing | None, list_at: datetime | None
 ) -> CurrentRosterStatus | None:
     """`currentStatusFromTank01`."""
@@ -301,7 +301,7 @@ class CurrentStatusRead:
     sweep: RosterSweep | None
 
 
-def current_statuses_as_of(
+def current_statuses_as_of(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     conn: Connection, season: int, as_of: datetime, player_ids: Sequence[str], week_one_stamped_at: datetime, phase: str
 ) -> CurrentStatusRead:
     """`currentStatusesAsOf`."""

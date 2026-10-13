@@ -146,7 +146,7 @@ class WriteCounts:
     retired_reasons: int
 
 
-def write_board(
+def write_board(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     conn: Connection, season: int, source: str, inputs: PreseasonInputs, built: BuiltBoard, unfrozen: bool = False
 ) -> WriteCounts:
     """`writePreseasonBoard`: a live board replaces its season's generation, a replay appends."""

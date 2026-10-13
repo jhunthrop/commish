@@ -91,8 +91,8 @@ def _copy_table(source: psycopg.Connection, target: psycopg.Connection, table: s
         f'copy (select {listed} from public."{table}"{_filter_for(table, columns)}{order}) to stdout (format binary)'
     )
     with (
-        source.cursor().copy(query, {"moment": moment}) as out,  # type: ignore[arg-type]
-        target.cursor().copy(f'copy "{table}" ({listed}) from stdin (format binary)') as into,  # type: ignore[arg-type]
+        source.cursor().copy(query, {"moment": moment}) as out,
+        target.cursor().copy(f'copy "{table}" ({listed}) from stdin (format binary)') as into,
     ):
         for chunk in out:
             into.write(chunk)
@@ -104,7 +104,7 @@ def _copy_table(source: psycopg.Connection, target: psycopg.Connection, table: s
     if sequence is not None and sequence[0] is not None:
         # The copied ids are the dev copy's; the sequence moves past them so a new row can land.
         target.execute(
-            f'select setval(%s, coalesce((select max(id) from public."{table}"), 0) + 1, false)',  # type: ignore[arg-type]
+            f'select setval(%s, coalesce((select max(id) from public."{table}"), 0) + 1, false)',
             (sequence[0],),
         )
 

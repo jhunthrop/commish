@@ -8,7 +8,7 @@ of floats is only reproducible in the order it was written.
 import math
 from dataclasses import dataclass, fields, replace
 from types import MappingProxyType
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 from research.model.jsmath import js_round
 
@@ -54,7 +54,8 @@ class StatLine:
     safeties: float | None = None
 
     def with_values(self, **values: float | None) -> "StatLine":
-        return replace(self, **values)
+        changes: dict[str, Any] = dict(values)
+        return replace(self, **changes)
 
 
 # `STAT_FIELDS`, in the TypeScript's canonical order.

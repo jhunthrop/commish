@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from types import MappingProxyType
-from typing import Final, Literal
+from typing import Final, Literal, cast
 
 from sqlalchemy import Connection
 
@@ -52,7 +52,7 @@ MarketCurvePriors = Mapping[Position, tuple[MarketCurveKnot, ...]]
 def parse_market_curve(raw: Mapping[str, Sequence[Mapping[str, float]]]) -> MarketCurvePriors:
     return MappingProxyType(
         {
-            position: tuple(MarketCurveKnot(float(k["adpRank"]), float(k["points"])) for k in knots)
+            cast("Position", position): tuple(MarketCurveKnot(float(k["adpRank"]), float(k["points"])) for k in knots)
             for position, knots in raw.items()
         }
     )

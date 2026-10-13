@@ -7,6 +7,7 @@ board runs without (`PRESEASON_MODEL_FEATURES`); `contextualise_rates` refuses t
 than pretending to apply them.
 """
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import Final
@@ -63,7 +64,7 @@ PRESEASON_MODEL_FEATURES: Final = FeatureFlags(
 
 def bounded(multiplier: float) -> float:
     """`bounded`: a context multiplier clamped to [0.8, 1.25]; a non-finite one is 1."""
-    if multiplier != multiplier or multiplier in (float("inf"), float("-inf")):
+    if not math.isfinite(multiplier):
         return 1.0
     return js_min(CONTEXT_MULTIPLIER_MAX, js_max(CONTEXT_MULTIPLIER_MIN, multiplier))
 
@@ -156,7 +157,7 @@ class _Factors:
     pass_attempts: float
 
 
-def contextualise_opportunity(
+def contextualise_opportunity(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     opportunity: Mapping[str, PredictedOpportunity],
     season: int,
     week: int,

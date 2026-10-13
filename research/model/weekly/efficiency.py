@@ -106,7 +106,7 @@ def _empty_totals() -> _Totals:
     return _Totals(dict.fromkeys(RATE_NAMES, 0.0), dict.fromkeys(DENOMINATORS))
 
 
-def predict_rates(
+def predict_rates(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     history: Sequence[SeasonStatLine],
     usage: Sequence[PlayerWeekUsage],
     season: int,

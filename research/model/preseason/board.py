@@ -6,7 +6,7 @@ Ported from `research-ts/src/projections/preseason/{board,game-variance}.ts` (th
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Final
+from typing import Any, Final
 
 from research.model.decide.value import (
     LeagueShape,
@@ -45,7 +45,8 @@ def scale_stat_line(line: StatLine, games: float) -> StatLine:
         value = getattr(line, name)
         if value is not None:
             scaled[name] = value * games
-    return replace(line, **scaled)
+    changes: dict[str, Any] = dict(scaled)
+    return replace(line, **changes)
 
 
 def season_points_interval(

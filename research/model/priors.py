@@ -7,7 +7,7 @@ parser refuses a payload missing a field the model reads rather than defaulting 
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import Connection
 
@@ -150,7 +150,9 @@ def parse_rookies(raw: Mapping[str, Any]) -> RookiePriors:
 def parse_rookie_curve(raw: Mapping[str, Any]) -> Mapping[Position, tuple[RookieCurveKnot, ...]]:
     return MappingProxyType(
         {
-            position: tuple(RookieCurveKnot(float(knot["pick"]), float(knot["points"])) for knot in knots)
+            cast("Position", position): tuple(
+                RookieCurveKnot(float(knot["pick"]), float(knot["points"])) for knot in knots
+            )
             for position, knots in raw.items()
         }
     )

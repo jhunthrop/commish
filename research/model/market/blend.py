@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any, Final
 
 from research.model.domain import PPR_SCORING, STAT_FIELDS, Position, ScoringRules, StatLine, compute_fantasy_points
+from research.model.instants import js_iso
 from research.model.jsmath import js_max, js_min
 from research.model.laws.registry import Law, cluster_key_for, pricing_eligible_law_ids
 from research.model.market.curve import CURVE_POSITIONS, MarketPriorEntry
@@ -177,7 +178,7 @@ def _admitted_delta(candidate: BoardCandidate, anchor_points: float, context: Bl
     return clamp_abs(law_total + _admit_availability(candidate, anchor_points, constants), constants.total_cap_points)
 
 
-def blend_context(
+def blend_context(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     laws: Sequence[Law],
     constants: BlendConstants,
     props_anchor: Mapping[str, float],
@@ -276,9 +277,7 @@ def assert_live_market_coverage(
     if kind != "live":
         return
     if not market:
-        raise DegenerateMarketError(
-            f"{season}'s LIVE board resolved ZERO listed market players at {moment.isoformat()}."
-        )
+        raise DegenerateMarketError(f"{season}'s LIVE board resolved ZERO listed market players at {js_iso(moment)}.")
     listed: dict[str, int] = {}
     for entry in market:
         listed[entry.position] = listed.get(entry.position, 0) + 1

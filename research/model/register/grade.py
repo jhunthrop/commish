@@ -86,7 +86,7 @@ def score_columns(rows: Sequence[Mapping[str, Any]]) -> list[ColumnScore]:
     return scores
 
 
-def _grade_board(
+def _grade_board(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     key: tuple[int, int, datetime],
     graded_at: datetime,
     source: str,

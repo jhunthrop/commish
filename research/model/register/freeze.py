@@ -180,7 +180,7 @@ def take_freeze(conn: Connection, season: int, week: int, now: datetime) -> Free
     return FreezeResult(season, week, frozen_at, kickoff, rows, coverage)
 
 
-def _freeze_row(
+def _freeze_row(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
     season: int,
     week: int,
     frozen_at: datetime,

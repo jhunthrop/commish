@@ -164,7 +164,7 @@ def _and_condition(left: Condition, right: Condition) -> Condition:
 QuantileTable = Mapping[str, Mapping[str, Mapping[float, float]]]
 
 
-def generate_candidates_from(quantiles: QuantileTable) -> list[CandidateLaw]:
+def generate_candidates_from(quantiles: QuantileTable) -> list[CandidateLaw]:  # noqa: PLR0912 - one branch per template, as the oracle generates them
     """`generateCandidatesFrom`: thresholds, then deltas, then conjunctions of high-side thresholds
     within a position, the whole list sorted by id and capped."""
     thresholds: list[CandidateLaw] = []
