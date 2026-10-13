@@ -153,7 +153,7 @@
 					void read();
 				}}
 			/>
-			<Quiet href={links.accountLeagues()} size="sm">Your leagues</Quiet>
+			<div class="out"><Quiet href={links.accountLeagues()} size="sm">Your leagues</Quiet></div>
 		</main>
 	{:else if failure === 'unreachable'}
 		<div class="pad">
@@ -258,6 +258,11 @@
 
 	.title {
 		min-width: 0;
+	}
+
+	/* The quiet way out sits at its own width under the form, never a full-width bar. */
+	.out {
+		align-self: flex-start;
 	}
 
 	.sub {
