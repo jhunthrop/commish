@@ -156,9 +156,10 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
         if entry is None:
             continue
         if season is None:
-            # His season is scored in the first format that ranks him, the run's default first.
+            # Every season block is scored in the page format, whichever board ranks him (the web
+            # holds every block to one format, review N15).
             row = entry.row
-            season = season_block(who.id, row.team, inputs.formats[format_id], row.position, inputs.season)
+            season = season_block(who.id, row.team, inputs.formats[PAGE_FORMAT.id], row.position, inputs.season)
         formats[format_id] = numbers_of(entry, inputs.adp_by_format[format_id].get(who.id))
         universe_id = entry.row.universe_id
         if format_id == PAGE_FORMAT.id:
