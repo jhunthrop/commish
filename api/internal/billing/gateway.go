@@ -81,6 +81,26 @@ type Price struct {
 	Interval string
 }
 
+// Launch prices in cents. The seat is the provisional Lane 8 ruling:
+// $29 a team, at least eight teams.
+const (
+	centsDraftPass         = 3900
+	centsMembershipYearly  = 9900
+	centsMembershipMonthly = 1499
+	centsGroupPassSeat     = 2900
+)
+
+// LaunchPrices are the products and prices stripe-setup makes sure
+// exist, and the ones the development fake checkout sells.
+func LaunchPrices() []PriceSpec {
+	return []PriceSpec{
+		{ProductID: ProductIDDraftPass, ProductName: "Commish Draft Pass", LookupKey: LookupDraftPass, AmountCents: centsDraftPass},
+		{ProductID: ProductIDMembership, ProductName: "Commish Membership", LookupKey: LookupMembershipYearly, AmountCents: centsMembershipYearly, Interval: "year"},
+		{ProductID: ProductIDMembership, ProductName: "Commish Membership", LookupKey: LookupMembershipMonthly, AmountCents: centsMembershipMonthly, Interval: "month"},
+		{ProductID: ProductIDGroupPass, ProductName: "Commish Group Draft Pass", LookupKey: LookupGroupPassSeat, AmountCents: centsGroupPassSeat},
+	}
+}
+
 // PriceSpec is a product and price stripe-setup makes sure exist.
 type PriceSpec struct {
 	ProductID   string

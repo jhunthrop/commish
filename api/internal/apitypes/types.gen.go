@@ -129,6 +129,27 @@ func (e Feature) Valid() bool {
 	}
 }
 
+// Defines values for GroupPassStatus.
+const (
+	GroupPassStatusActive   GroupPassStatus = "active"
+	GroupPassStatusDisputed GroupPassStatus = "disputed"
+	GroupPassStatusRefunded GroupPassStatus = "refunded"
+)
+
+// Valid indicates whether the value is a known member of the GroupPassStatus enum.
+func (e GroupPassStatus) Valid() bool {
+	switch e {
+	case GroupPassStatusActive:
+		return true
+	case GroupPassStatusDisputed:
+		return true
+	case GroupPassStatusRefunded:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	HealthStatusOk          HealthStatus = "ok"
@@ -625,7 +646,7 @@ type CheckoutRequest struct {
 	LeagueName *string `json:"league_name,omitempty"`
 	Product    Product `json:"product"`
 
-	// Seats group_pass only
+	// Seats group_pass only: one pass per team, the league bounds
 	Seats *int `json:"seats,omitempty"`
 }
 
@@ -695,13 +716,28 @@ type Feature string
 
 // GroupPass defines model for GroupPass.
 type GroupPass struct {
-	ClaimUrl   string             `json:"claim_url"`
-	Claimed    int                `json:"claimed"`
+	ClaimUrl string `json:"claim_url"`
+	Claimed  int    `json:"claimed"`
+
+	// Claims each claimed seat, first claim first; the seats past these are open
+	Claims     []GroupPassClaim   `json:"claims"`
 	CreatedAt  time.Time          `json:"created_at"`
 	Id         openapi_types.UUID `json:"id"`
 	LeagueName string             `json:"league_name"`
 	Season     int                `json:"season"`
 	Seats      int                `json:"seats"`
+	Status     GroupPassStatus    `json:"status"`
+}
+
+// GroupPassStatus defines model for GroupPass.Status.
+type GroupPassStatus string
+
+// GroupPassClaim defines model for GroupPassClaim.
+type GroupPassClaim struct {
+	ClaimedAt time.Time `json:"claimed_at"`
+
+	// Handle the claimer's lobby handle
+	Handle *string `json:"handle"`
 }
 
 // GroupPassPreview defines model for GroupPassPreview.
@@ -964,9 +1000,14 @@ type PageMeta struct {
 	Total   int64 `json:"total"`
 }
 
-// PlanCatalog A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership).
+// PlanCatalog A product whose price is not set in Stripe yet, or every product while checkout is not open, is null (draft_pass, group_pass) or missing from the list (membership).
 type PlanCatalog struct {
-	DraftPass *Price          `json:"draft_pass"`
+	// CheckoutOpen false while Stripe is not configured
+	CheckoutOpen bool   `json:"checkout_open"`
+	DraftPass    *Price `json:"draft_pass"`
+
+	// Features what each product unlocks, from app.product_features. A group pass seat is a draft_pass.
+	Features  PlanFeatures    `json:"features"`
 	GroupPass *GroupPassPrice `json:"group_pass"`
 
 	// Membership annual first
@@ -974,6 +1015,12 @@ type PlanCatalog struct {
 
 	// Season the season a pass bought now is for
 	Season int `json:"season"`
+}
+
+// PlanFeatures what each product unlocks, from app.product_features. A group pass seat is a draft_pass.
+type PlanFeatures struct {
+	DraftPass  []Feature `json:"draft_pass"`
+	Membership []Feature `json:"membership"`
 }
 
 // PlayerPosition defines model for PlayerPosition.

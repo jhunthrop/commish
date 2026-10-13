@@ -142,30 +142,23 @@ func runSweep(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpo
 	return err
 }
 
-// priceSpecs are the launch prices from spec §1 part 7. stripe-setup
-// creates a price only when its lookup key has none, so repricing is a
-// new price under the key in the Stripe dashboard, never this list. The
-// Group Draft Pass seat has no price in the spec and is set by hand.
-func priceSpecs() []billing.PriceSpec {
-	return []billing.PriceSpec{
-		{ProductID: billing.ProductIDDraftPass, ProductName: "Commish Draft Pass", LookupKey: billing.LookupDraftPass, AmountCents: 3900},
-		{ProductID: billing.ProductIDMembership, ProductName: "Commish Membership", LookupKey: billing.LookupMembershipYearly, AmountCents: 9900, Interval: "year"},
-		{ProductID: billing.ProductIDMembership, ProductName: "Commish Membership", LookupKey: billing.LookupMembershipMonthly, AmountCents: 1499, Interval: "month"},
-	}
-}
-
+// runStripeSetup makes sure every launch price exists (billing.
+// LaunchPrices: spec §1 part 7, and the Group Draft Pass seat at $29, the
+// Lane 8 ruling recorded as provisional in launch-items; the founder sets
+// every 2027 price against the 2026 record). A price is created only when
+// its lookup key has none, so repricing is a new price under the key in
+// the Stripe dashboard, never this list.
 func runStripeSetup(ctx context.Context, log *slog.Logger, cfg config.API, _ *pgxpool.Pool, _ []string) error {
 	if err := requireStripe(cfg); err != nil {
 		return err
 	}
 	g := billing.NewStripeGateway(cfg.Stripe.SecretKey, cfg.Stripe.AutomaticTax)
-	for _, spec := range priceSpecs() {
+	for _, spec := range billing.LaunchPrices() {
 		if err := g.EnsurePrice(ctx, spec); err != nil {
 			return err
 		}
 		log.Info("price ready", "lookup_key", spec.LookupKey, "environment", cfg.Stripe.Environment)
 	}
-	log.Warn("group pass seat not created", "lookup_key", billing.LookupGroupPassSeat, "reason", "no price in the spec")
 	return nil
 }
 

@@ -293,7 +293,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** What is for sale and for how much, read from Stripe. The Membership lists the annual price first. */
+		/** What is for sale, for how much and what each product unlocks. Prices are read from Stripe, the annual Membership first; what each product unlocks is read from app.product_features. With checkout not open (Stripe not configured) the prices are null and the features still answer. */
 		get: operations['getPlans'];
 		put?: never;
 		post?: never;
@@ -1047,14 +1047,22 @@ export interface components {
 			currency: string;
 			interval: components['schemas']['Interval'] | null;
 		};
-		/** @description A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership). */
+		/** @description A product whose price is not set in Stripe yet, or every product while checkout is not open, is null (draft_pass, group_pass) or missing from the list (membership). */
 		PlanCatalog: {
 			/** @description the season a pass bought now is for */
 			season: number;
+			/** @description false while Stripe is not configured */
+			checkout_open: boolean;
+			features: components['schemas']['PlanFeatures'];
 			draft_pass: components['schemas']['Price'] | null;
 			/** @description annual first */
 			membership: components['schemas']['Price'][];
 			group_pass: components['schemas']['GroupPassPrice'] | null;
+		};
+		/** @description what each product unlocks, from app.product_features. A group pass seat is a draft_pass. */
+		PlanFeatures: {
+			draft_pass: components['schemas']['Feature'][];
+			membership: components['schemas']['Feature'][];
 		};
 		GroupPassPrice: {
 			per_seat: components['schemas']['Price'];
@@ -1064,7 +1072,7 @@ export interface components {
 		CheckoutRequest: {
 			product: components['schemas']['Product'];
 			interval?: components['schemas']['Interval'] | null;
-			/** @description group_pass only */
+			/** @description group_pass only: one pass per team, the league bounds */
 			seats?: number | null;
 			/** @description group_pass only */
 			league_name?: string | null;
@@ -1076,9 +1084,19 @@ export interface components {
 			season: number;
 			seats: number;
 			claimed: number;
+			/** @description each claimed seat, first claim first; the seats past these are open */
+			claims: components['schemas']['GroupPassClaim'][];
 			claim_url: string;
+			/** @enum {string} */
+			status: 'active' | 'refunded' | 'disputed';
 			/** Format: date-time */
 			created_at: string;
+		};
+		GroupPassClaim: {
+			/** @description the claimer's lobby handle */
+			handle: string | null;
+			/** Format: date-time */
+			claimed_at: string;
 		};
 		GroupPassPreview: {
 			league_name: string;
@@ -2016,7 +2034,6 @@ export interface operations {
 					};
 				};
 			};
-			503: components['responses']['ErrorResponse'];
 		};
 	};
 	checkout: {
@@ -2140,6 +2157,7 @@ export interface operations {
 				};
 			};
 			404: components['responses']['ErrorResponse'];
+			410: components['responses']['ErrorResponse'];
 		};
 	};
 	claimGroupPass: {
@@ -2156,6 +2174,7 @@ export interface operations {
 			200: components['responses']['AccountResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
+			410: components['responses']['ErrorResponse'];
 		};
 	};
 	listMocks: {

@@ -1,15 +1,20 @@
 package billing
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
+
+	"github.com/google/uuid"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/httpx"
+	"github.com/jhunthrop/commish/api/internal/season"
 )
 
 // claimCodeBytes is the claim link's entropy: 128 bits, unguessable,
@@ -30,11 +35,24 @@ func (s *Service) listGroupPasses(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, s.Log, "billing: group passes", err)
 		return
 	}
+	ids := make([]uuid.UUID, len(passes))
+	for i, g := range passes {
+		ids[i] = g.ID
+	}
+	claims, err := s.Store.GroupPassClaims(r.Context(), ids)
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "billing: group pass claims", err)
+		return
+	}
 	out := make([]apitypes.GroupPass, 0, len(passes))
 	for _, g := range passes {
+		seats := make([]apitypes.GroupPassClaim, 0, len(claims[g.ID]))
+		for _, c := range claims[g.ID] {
+			seats = append(seats, apitypes.GroupPassClaim{Handle: c.Handle, ClaimedAt: c.ClaimedAt})
+		}
 		out = append(out, apitypes.GroupPass{
-			Id: g.ID, LeagueName: g.LeagueName, Season: g.Season, Seats: g.Seats, Claimed: g.Claimed,
-			ClaimUrl: s.claimURL(g.ClaimCode), CreatedAt: g.CreatedAt,
+			Id: g.ID, LeagueName: g.LeagueName, Season: g.Season, Seats: g.Seats, Claimed: g.Claimed, Claims: seats,
+			ClaimUrl: s.claimURL(g.ClaimCode), Status: apitypes.GroupPassStatus(g.Status), CreatedAt: g.CreatedAt,
 		})
 	}
 	httpx.WriteOK(w, r, http.StatusOK, out)
@@ -55,9 +73,19 @@ func (s *Service) groupPassByCode(w http.ResponseWriter, r *http.Request) (Group
 	return g, true
 }
 
+// seasonEnded is the 410 a link answers once its season is over: the
+// pass would grant nothing, so the page says so before anyone signs in.
+func seasonEnded(w http.ResponseWriter, r *http.Request) {
+	httpx.WriteError(w, r, http.StatusGone, httpx.CodeConflict, "This pass was for a season that has ended", nil)
+}
+
 func (s *Service) previewGroupPass(w http.ResponseWriter, r *http.Request) {
 	g, ok := s.groupPassByCode(w, r)
 	if !ok {
+		return
+	}
+	if !s.Now().Before(season.End(g.Season)) {
+		seasonEnded(w, r)
 		return
 	}
 	handle, err := s.Handles.HandleOf(r.Context(), g.PurchaserID)
@@ -84,7 +112,17 @@ func (s *Service) claimGroupPass(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	accountID := auth.AccountID(r)
-	err := s.Entitlements.ClaimGroupPass(r.Context(), g.ID, accountID, s.Now(), "claim:"+accountID.String())
+	covered, err := s.coveredElsewhere(r.Context(), g, accountID)
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "billing: claim", err)
+		return
+	}
+	if covered {
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict,
+			fmt.Sprintf("You already have the %d Draft Pass, so this seat stays open for your league", g.Season), nil)
+		return
+	}
+	err = s.Entitlements.ClaimGroupPass(r.Context(), g.ID, accountID, s.Now(), "claim:"+accountID.String())
 	switch {
 	case errors.Is(err, entitlements.ErrAlreadyClaimed):
 		// Claiming twice is not a mistake worth an error: the pass is
@@ -93,7 +131,7 @@ func (s *Service) claimGroupPass(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "Every pass on this link is taken", nil)
 		return
 	case errors.Is(err, entitlements.ErrGroupPassExpired):
-		httpx.WriteError(w, r, http.StatusGone, httpx.CodeConflict, "This pass was for a season that has ended", nil)
+		seasonEnded(w, r)
 		return
 	case errors.Is(err, entitlements.ErrNoGroupPass), errors.Is(err, entitlements.ErrGroupPassClosed):
 		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "This link does not open a pass", nil)
@@ -103,4 +141,22 @@ func (s *Service) claimGroupPass(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeAccount(w, r)
+}
+
+// coveredElsewhere reports whether the claimer already has what a seat
+// grants from somewhere else (their own pass for the season, or the
+// Membership), so a claim would only take a seat a teammate needs. A
+// claimer who holds this pass's seat already is not covered elsewhere:
+// claiming again answers as before.
+func (s *Service) coveredElsewhere(ctx context.Context, g GroupPass, accountID uuid.UUID) (bool, error) {
+	mine, err := s.Store.ClaimedBy(ctx, g.ID, accountID)
+	if err != nil || mine {
+		return false, err
+	}
+	now := s.Now()
+	m, err := s.Entitlements.LiveMembership(ctx, accountID, now)
+	if err != nil || m != nil {
+		return m != nil, err
+	}
+	return s.Entitlements.HasLivePass(ctx, accountID, g.Season, now)
 }

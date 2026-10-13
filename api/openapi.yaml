@@ -330,7 +330,10 @@ paths:
     get:
       tags: [billing]
       operationId: getPlans
-      summary: What is for sale and for how much, read from Stripe. The Membership lists the annual price first.
+      summary: >-
+        What is for sale, for how much and what each product unlocks. Prices are read from Stripe, the annual
+        Membership first; what each product unlocks is read from app.product_features. With checkout not open (Stripe
+        not configured) the prices are null and the features still answer.
       responses:
         "200":
           description: the catalog
@@ -340,7 +343,6 @@ paths:
                 allOf:
                   - $ref: "#/components/schemas/Envelope"
                   - properties: { data: { $ref: "#/components/schemas/PlanCatalog" } }
-        "503": { $ref: "#/components/responses/ErrorResponse" }
   /billing/checkout:
     post:
       tags: [billing]
@@ -432,6 +434,7 @@ paths:
                   - $ref: "#/components/schemas/Envelope"
                   - properties: { data: { $ref: "#/components/schemas/GroupPassPreview" } }
         "404": { $ref: "#/components/responses/ErrorResponse" }
+        "410": { $ref: "#/components/responses/ErrorResponse" }
   /group-passes/{code}/claim:
     parameters: [{ $ref: "#/components/parameters/ClaimCode" }]
     post:
@@ -442,6 +445,7 @@ paths:
         "200": { $ref: "#/components/responses/AccountResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
         "409": { $ref: "#/components/responses/ErrorResponse" }
+        "410": { $ref: "#/components/responses/ErrorResponse" }
 
   /mocks:
     get:
@@ -1251,10 +1255,14 @@ components:
           allOf: [{ $ref: "#/components/schemas/Interval" }]
     PlanCatalog:
       type: object
-      description: A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership).
-      required: [season, draft_pass, membership, group_pass]
+      description: >-
+        A product whose price is not set in Stripe yet, or every product while checkout is not open, is null
+        (draft_pass, group_pass) or missing from the list (membership).
+      required: [season, checkout_open, features, draft_pass, membership, group_pass]
       properties:
         season: { type: integer, description: the season a pass bought now is for }
+        checkout_open: { type: boolean, description: false while Stripe is not configured, and checkout answers 503 }
+        features: { $ref: "#/components/schemas/PlanFeatures" }
         draft_pass:
           nullable: true
           allOf: [{ $ref: "#/components/schemas/Price" }]
@@ -1265,6 +1273,17 @@ components:
         group_pass:
           nullable: true
           allOf: [{ $ref: "#/components/schemas/GroupPassPrice" }]
+    PlanFeatures:
+      type: object
+      description: what each product unlocks, from app.product_features. A group pass seat is a draft_pass.
+      required: [draft_pass, membership]
+      properties:
+        draft_pass:
+          type: array
+          items: { $ref: "#/components/schemas/Feature" }
+        membership:
+          type: array
+          items: { $ref: "#/components/schemas/Feature" }
     GroupPassPrice:
       type: object
       required: [per_seat, min_seats, max_seats]
@@ -1280,19 +1299,30 @@ components:
         interval:
           nullable: true
           allOf: [{ $ref: "#/components/schemas/Interval" }]
-        seats: { type: integer, nullable: true, description: group_pass only }
+        seats: { type: integer, nullable: true, minimum: 8, maximum: 14, description: "group_pass only: one pass per team, the league bounds" }
         league_name: { type: string, nullable: true, maxLength: 60, description: group_pass only }
     GroupPass:
       type: object
-      required: [id, league_name, season, seats, claimed, claim_url, created_at]
+      required: [id, league_name, season, seats, claimed, claims, claim_url, status, created_at]
       properties:
         id: { type: string, format: uuid }
         league_name: { type: string }
         season: { type: integer }
         seats: { type: integer }
         claimed: { type: integer }
+        claims:
+          type: array
+          description: each claimed seat, first claim first; the seats past these are open
+          items: { $ref: "#/components/schemas/GroupPassClaim" }
         claim_url: { type: string }
+        status: { type: string, enum: [active, refunded, disputed] }
         created_at: { type: string, format: date-time }
+    GroupPassClaim:
+      type: object
+      required: [handle, claimed_at]
+      properties:
+        handle: { type: string, nullable: true, description: the claimer's lobby handle, null before they choose one }
+        claimed_at: { type: string, format: date-time }
     GroupPassPreview:
       type: object
       required: [league_name, season, seats, claimed, purchaser_handle, claimed_by_me]

@@ -114,8 +114,15 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	}
 	billingService := &billing.Service{
 		Store: &billing.Store{Pool: pool}, Entitlements: ents, Gateway: gateway(cfg, log),
-		WebhookSecret: cfg.Stripe.WebhookSecret, Viewer: viewer, Handles: authStore,
+		WebhookSecret: cfg.Stripe.WebhookSecret, Viewer: viewer, Handles: authStore, Catalog: ents,
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, Now: now, Log: log,
+	}
+	var devRoutes []httpx.Route
+	if cfg.Dev.FakeBilling {
+		fake, secret := billing.NewDevGateway(cfg.HTTP.APIBaseURL)
+		billingService.Gateway, billingService.WebhookSecret = fake, secret
+		devRoutes = billingService.DevRoutes(fake)
+		log.Warn("billing is the development fake", "checkout", cfg.HTTP.APIBaseURL+"/billing/dev-checkout/")
 	}
 	exportHandler := &exports.Handler{Store: &exports.Store{Pool: pool}, Sheets: sheetStore, Objects: objects(cfg, log), Now: now, Log: log}
 	solo, lobbies, err := rooms(ctx, cfg, pool, mockStore, anon, gate, leagueStore, sheetStore, authStore, log)
@@ -133,6 +140,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		(&mocks.Handler{Store: mockStore, Log: log}).Routes(),
 		solo.Routes(),
 		lobbies.Routes(),
+		devRoutes,
 	)
 	mux := http.NewServeMux()
 	if err := server.Mount(mux, routes, sessions, now); err != nil {

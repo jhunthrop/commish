@@ -19,40 +19,6 @@ type errRefused struct{ msg string }
 
 func (e errRefused) Error() string { return e.msg }
 
-func (s *Service) plans(w http.ResponseWriter, r *http.Request) {
-	if !s.available(w, r) {
-		return
-	}
-	ctx := r.Context()
-	out := apitypes.PlanCatalog{Season: season.Of(s.Now()), Membership: []apitypes.Price{}}
-	var err error
-	if out.DraftPass, err = s.lookupPrice(ctx, LookupDraftPass); err != nil {
-		httpx.WriteInternal(w, r, s.Log, "billing: plans", err)
-		return
-	}
-	// Annual first, always (spec §2.6).
-	for _, key := range []string{LookupMembershipYearly, LookupMembershipMonthly} {
-		p, err := s.lookupPrice(ctx, key)
-		if err != nil {
-			httpx.WriteInternal(w, r, s.Log, "billing: plans", err)
-			return
-		}
-		if p != nil {
-			out.Membership = append(out.Membership, *p)
-		}
-	}
-	seat, err := s.lookupPrice(ctx, LookupGroupPassSeat)
-	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "billing: plans", err)
-		return
-	}
-	if seat != nil {
-		out.GroupPass = &apitypes.GroupPassPrice{PerSeat: *seat, MinSeats: MinGroupSeats, MaxSeats: MaxGroupSeats}
-	}
-	w.Header().Set("Cache-Control", "public, max-age=300")
-	httpx.WriteOK(w, r, http.StatusOK, out)
-}
-
 // checkoutPlan is a validated request: what to sell and how.
 type checkoutPlan struct {
 	mode      Mode
