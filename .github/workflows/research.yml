@@ -8,6 +8,7 @@
 # repository's own node_modules, so any change to an oracle path reruns parity too.
 name: research
 on:
+  workflow_dispatch:
   push:
     paths:
       - "research/**"
@@ -118,7 +119,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: { contents: read, id-token: write }
     env:
-      PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      PUSH: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
@@ -148,7 +149,7 @@ jobs:
 
   deploy:
     needs: image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions: { contents: read, id-token: write }
     env:
