@@ -2,8 +2,14 @@
 # THE RESEARCH ALERTS: a failed research job, or a scheduler firing that never started one, emails the
 # founder. Weeks 3 to 5 of 2026 died silently; a freeze that fails must reach someone.
 #
-#   infra/research-alerts.sh apply     create the email channel and the two policies, or leave them as they are
-#   infra/research-alerts.sh verify    list them and fail unless both policies are enabled on the channel
+#   infra/research-alerts.sh apply           create the email channel and the policies, or bring each to this file
+#   infra/research-alerts.sh verify          list them and fail unless each is on the channel as this file says
+#   infra/research-alerts.sh enable-absence  turn the absence policies on (the cutover step that resumes the schedule)
+#
+# THE ABSENCE POLICIES (fix round 2, N5; one condition each, as PromQL requires) are what catch a schedule that never fires: a paused or
+# deleted scheduler job starts no execution and logs no error, so the two failure policies stay
+# silent. They are created DISABLED, because the schedule is paused until cutover and it would fire at
+# once; the cutover's last step, after resuming the six scheduler jobs, is `enable-absence`.
 #
 # Run by hand (bash). It calls the Cloud Monitoring API with the caller's own token, because the
 # monitoring policy commands are only in gcloud's alpha component.
@@ -16,9 +22,14 @@ GCLOUD="${GCLOUD:-gcloud}"
 API="https://monitoring.googleapis.com/v3/projects/${PROJECT}"
 TOKEN="$("${GCLOUD}" auth print-access-token)"
 
-call() { # method, path, [body]
-  curl --silent --show-error --fail-with-body -X "$1" "${API}/$2" \
-    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" ${3:+--data "$3"}
+call() { # method, path, [body]; a refused call prints the API's own error
+  local out
+  out="$(curl --silent --show-error --fail-with-body -X "$1" "${API}/$2" \
+    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" ${3:+--data "$3"})" || {
+    echo "$1 $2 refused: ${out}" >&2
+    return 1
+  }
+  printf '%s' "${out}"
 }
 
 channel() {
@@ -44,11 +55,14 @@ PY
 }
 
 # The two policies, by display name. Each is created once; a policy already present is left alone.
-policy_body() { # display name, channel
-  python3 - "$1" "$2" <<'PY'
+policy_body() { # display name, channel, absence enabled (true|false)
+  python3 - "$1" "$2" "${3:-false}" <<'PY'
 import json, sys
-name, channel = sys.argv[1], sys.argv[2]
+name, channel, enabled = sys.argv[1], sys.argv[2], sys.argv[3] == "true"
 jobs = 'resource.label.job_name = one_of("nightly", "nightly-publish", "inseason", "inseason-capture")'
+# The selector without its closing brace: each query adds its job_name and closes it.
+succeeded = 'run_googleapis_com:job_completed_execution_count{monitored_resource="cloud_run_job",result="succeeded"'
+in_season = "and on() (month() >= 9 or month() <= 2)"
 policies = {
     "Research job execution failed": {
         "displayName": "A research Cloud Run Job execution failed",
@@ -61,6 +75,30 @@ policies = {
             "trigger": {"count": 1},
         },
     },
+    "Research nightly absent": {
+            "displayName": "No successful nightly run in 36 hours",
+            "conditionPrometheusQueryLanguage": {
+                "query": f'absent_over_time({succeeded},job_name="nightly"}}[36h])',
+                "duration": "0s",
+                "evaluationInterval": "3600s",
+            },
+    },
+    "Research in-season absent": {
+            "displayName": "No successful in-season run (weekly pass or capture) in 72 hours, September through February",
+            "conditionPrometheusQueryLanguage": {
+                "query": f'absent_over_time({succeeded},job_name=~"inseason|inseason-capture"}}[72h]) {in_season}',
+                "duration": "0s",
+                "evaluationInterval": "3600s",
+            },
+    },
+    "Research weekly pass absent": {
+            "displayName": "No successful weekly pass in 120 hours (its longest gap, Thursday to Tuesday, is 114), September through February",
+            "conditionPrometheusQueryLanguage": {
+                "query": f'absent_over_time({succeeded},job_name="inseason"}}[120h]) {in_season}',
+                "duration": "0s",
+                "evaluationInterval": "3600s",
+            },
+    },
     "Research schedule firing failed": {
         "displayName": "A research scheduler firing did not start its job",
         "conditionMatchedLog": {
@@ -68,26 +106,31 @@ policies = {
         },
     },
 }
-condition = policies[name]
+conditions = [policies[name]]
 policy = {
     "displayName": name,
     "combiner": "OR",
-    "enabled": True,
+    "enabled": not name.endswith(" absent") or enabled,
     "notificationChannels": [channel],
     "documentation": {
         "content": "A research job failed or never started. Read its execution's log in Cloud Run (or the scheduler job's log); "
         "a failed weekly pass names the step, and a missed freeze is permanent. infra/README.md, The research schedule.",
         "mimeType": "text/markdown",
     },
-    "conditions": [{"displayName": condition.pop("displayName"), **condition}],
+    "conditions": conditions,
 }
-if "conditionMatchedLog" in condition:
+if "conditionMatchedLog" in conditions[0]:
     policy["alertStrategy"] = {"notificationRateLimit": {"period": "3600s"}, "autoClose": "86400s"}
+else:
+    # The failure count is sparse: with no data after a failure the incident would stay open for the
+    # default seven days and a second failure of the same job would email nothing (fix round 2, N4).
+    # It closes after half an hour with no new failure instead, so the next one opens a new incident.
+    policy["alertStrategy"] = {"autoClose": "1800s"}
 print(json.dumps(policy))
 PY
 }
 
-POLICIES=("Research job execution failed" "Research schedule firing failed")
+POLICIES=("Research job execution failed" "Research schedule firing failed" "Research nightly absent" "Research in-season absent" "Research weekly pass absent")
 
 existing_policy() { # display name
   call GET alertPolicies | python3 -c "
@@ -97,13 +140,20 @@ for p in json.load(sys.stdin).get('alertPolicies', []):
         print(p['name'], p.get('enabled', False), ','.join(p.get('notificationChannels', []))); break" "$1"
 }
 
-apply() {
-  local ch name
+apply() { # absence enabled (true|false)
+  local ch name line
   ch="$(channel create)"
   echo "channel ${ch} (${EMAIL})"
   for name in "${POLICIES[@]}"; do
-    if [[ -z "$(existing_policy "${name}")" ]]; then
-      call POST alertPolicies "$(policy_body "${name}" "${ch}")" >/dev/null
+    line="$(existing_policy "${name}")"
+    if [[ -z "${line}" ]]; then
+      call POST alertPolicies "$(policy_body "${name}" "${ch}" "$1")" >/dev/null
+    else
+      # Brought to this file's body, the absence policy keeping its enabled state unless asked.
+      local enabled="$1"
+      [[ "${name}" == *" absent" && "${enabled}" == "false" && "${line}" == *" True "* ]] && enabled="true"
+      local id="${line%% *}"
+      call PATCH "alertPolicies/${id##*/}" "$(policy_body "${name}" "${ch}" "${enabled}")" >/dev/null
     fi
   done
   verify
@@ -115,13 +165,18 @@ verify() {
   [[ -n "${ch}" ]] || { echo "FAIL no email channel for ${EMAIL}" >&2; exit 1; }
   for name in "${POLICIES[@]}"; do
     line="$(existing_policy "${name}")"
-    if [[ "${line}" == *" True "*"${ch}"* ]]; then echo "ok   ${name}: ${line}"; else echo "FAIL ${name}: ${line:-missing}" >&2; failed=1; fi
+    if [[ "${line}" == *"${ch}"* && ( "${line}" == *" True "* || "${name}" == *" absent" ) ]]; then
+      echo "ok   ${name}: ${line}"
+    else
+      echo "FAIL ${name}: ${line:-missing}" >&2; failed=1
+    fi
   done
   exit "${failed}"
 }
 
 case "${1:-verify}" in
-  apply) apply ;;
+  apply) apply false ;;
+  enable-absence) apply true ;;
   verify) verify ;;
-  *) echo "usage: $0 apply|verify" >&2; exit 2 ;;
+  *) echo "usage: $0 apply|verify|enable-absence" >&2; exit 2 ;;
 esac
