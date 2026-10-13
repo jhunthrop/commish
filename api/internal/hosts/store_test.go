@@ -167,13 +167,28 @@ func TestKeptSessionNeverUndoesARekey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.SessionKept(ctx, acct.ID, "ffpc", kept.SessionCT); err != nil {
+	// The stale read's wrapped key no longer matches the row's, so it keeps
+	// nothing: the row stays on version 2 with its session intact.
+	if err := store.SessionKept(ctx, acct.ID, "ffpc", stale.Sealed.WrappedKey, kept.SessionCT); err != nil {
 		t.Fatal(err)
 	}
 	row, _ := store.Get(ctx, acct.ID, "ffpc")
 	v2, _ := NewVault(Keys{Current: 2, ByVer: map[int][]byte{2: k2}})
 	s, err := v2.OpenSession(acct.ID.String(), "ffpc", row.Sealed)
-	if row.Sealed.KeyVersion != 2 || err != nil || s["c"] != "2" {
+	if row.Sealed.KeyVersion != 2 || err != nil || s["c"] != "1" {
 		t.Fatalf("row at version %d, session %v, %v", row.Sealed.KeyVersion, s, err)
+	}
+	// A read that began after the job keeps its session, still at version 2.
+	current, err := v2.Reseal(acct.ID.String(), "ffpc", row.Sealed, Session{"c": "3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SessionKept(ctx, acct.ID, "ffpc", row.Sealed.WrappedKey, current.SessionCT); err != nil {
+		t.Fatal(err)
+	}
+	row, _ = store.Get(ctx, acct.ID, "ffpc")
+	s, err = v2.OpenSession(acct.ID.String(), "ffpc", row.Sealed)
+	if row.Sealed.KeyVersion != 2 || err != nil || s["c"] != "3" {
+		t.Fatalf("after a current keep: version %d, session %v, %v", row.Sealed.KeyVersion, s, err)
 	}
 }

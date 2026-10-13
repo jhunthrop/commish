@@ -1,6 +1,7 @@
 package ffpc
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -27,8 +28,12 @@ func (m *memoryConnections) Get(_ context.Context, accountID uuid.UUID, _ string
 	return m.conn, nil
 }
 
-func (m *memoryConnections) SessionKept(_ context.Context, _ uuid.UUID, _ string, sessionCT []byte) error {
+func (m *memoryConnections) SessionKept(_ context.Context, _ uuid.UUID, _ string, wrappedKey, sessionCT []byte) error {
+	if !bytes.Equal(m.conn.Sealed.WrappedKey, wrappedKey) {
+		return nil
+	}
 	m.conn.Sealed.SessionCT = sessionCT
+	m.conn.Status = hosts.StatusConnected
 	m.kept++
 	return nil
 }
@@ -185,5 +190,34 @@ func TestTwoProcessesOneSignIn(t *testing.T) {
 	}
 	if h.fake.signIns != 1 || h.store.conn.Status != hosts.StatusConnected {
 		t.Fatalf("%d sign-ins, status %s", h.fake.signIns, h.store.conn.Status)
+	}
+}
+
+// A read that loses the claim while the winner's sign-in is still in
+// flight gives way with a transient error: the member is not signed out,
+// and nothing signs in twice.
+func TestLoserGivesWayToASignInInFlight(t *testing.T) {
+	h := newMember(t, testPass)
+	claimed := h.clock.Add(-10 * time.Second) // another process claimed it ten seconds ago
+	h.store.conn.LastSignInAt = &claimed
+	err := h.read()
+	if !errors.Is(err, ErrUnavailable) || errors.Is(err, ErrNeedsSignIn) {
+		t.Fatalf("the loser's read: %v", err)
+	}
+	if h.store.conn.Status != hosts.StatusConnected || h.fake.signIns != 0 {
+		t.Fatalf("status %s after %d sign-ins", h.store.conn.Status, h.fake.signIns)
+	}
+	// Past the in-flight minute with the session still unchanged, the
+	// winner never kept one: the member is signed out.
+	*h.clock = h.clock.Add(SignInInFlight)
+	if err := h.read(); !errors.Is(err, ErrNeedsSignIn) {
+		t.Fatalf("after the minute: %v", err)
+	}
+	// A session kept afterwards (the winner landing late) signs the member
+	// back in.
+	resealed, _ := h.m.Vault.Reseal(h.acct.String(), Host, h.store.conn.Sealed, hosts.Session{"BGSLMAuthenticated": "yes"})
+	_ = h.store.SessionKept(context.Background(), h.acct, Host, h.store.conn.Sealed.WrappedKey, resealed.SessionCT)
+	if h.store.conn.Status != hosts.StatusConnected {
+		t.Fatalf("a kept session left status %s", h.store.conn.Status)
 	}
 }

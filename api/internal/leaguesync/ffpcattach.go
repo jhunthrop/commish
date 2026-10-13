@@ -14,6 +14,7 @@ import (
 const (
 	ffpcPickWords      = "Pick your league from your FFPC list"
 	ffpcConnectWords   = "No one in this league is signed in to FFPC on Commish right now. Sign in to read it"
+	ffpcAttachWords    = "Connect FFPC first: sign in to FFPC above"
 	ffpcSignInWords    = "FFPC signed you out. Sign in to FFPC again to keep reading your league"
 	ffpcNotConfigured  = "FFPC leagues are not open here right now"
 	ffpcNotInListWords = "That league is not in your FFPC list. " + ffpcPickWords
@@ -42,12 +43,12 @@ func (s *Service) attachFFPC(w http.ResponseWriter, r *http.Request, in apitypes
 			httpx.WriteInvalid(w, r, map[string]string{fieldLink: ffpcNotInListWords})
 			return
 		}
-		s.writeHostError(w, r, HostFFPC, err)
+		s.writeAttachError(w, r, err)
 		return
 	}
 	snap, teamID, err := s.FFPC.ReadAs(ctx, accountID, ltuid)
 	if err != nil {
-		s.writeHostError(w, r, HostFFPC, err)
+		s.writeAttachError(w, r, err)
 		return
 	}
 	if snap.Ref.LeagueID != ref.LeagueID || teamID < 1 {
@@ -86,4 +87,14 @@ func writeFFPCError(w http.ResponseWriter, r *http.Request, err error) bool {
 // tooManyWords is the attach cap's sentence.
 func tooManyWords() string {
 	return fmt.Sprintf("You have attached %d leagues, the most allowed. Detach one first", MaxLinksPerAccount)
+}
+
+// writeAttachError answers an attach that could not read as the member:
+// the attacher is the one to sign in, so the words are theirs.
+func (s *Service) writeAttachError(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, ErrNotConnected) {
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, ffpcAttachWords, nil)
+		return
+	}
+	s.writeHostError(w, r, HostFFPC, err)
 }

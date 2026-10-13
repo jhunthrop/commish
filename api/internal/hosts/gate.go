@@ -13,6 +13,9 @@ import (
 // ErrBusy is a request whose turn is further away than the caller waits.
 var ErrBusy = errors.New("hosts: host busy")
 
+// ErrNoGate is a host with no row in app.host_request_gate.
+var ErrNoGate = errors.New("hosts: no request gate for the host")
+
 // Gate paces requests to one host across every process that reads it
 // (the api's instances and the refresh job): each request takes the next
 // slot, one gap after the last, in one statement against
@@ -45,6 +48,16 @@ func (g *Gate) take(ctx context.Context) (slot, now time.Time, err error) {
 		where host = $1 and greatest(next_at, clock_timestamp()) - clock_timestamp() <= $3::interval
 		returning next_at - $2::interval, clock_timestamp()`, g.Host, interval(g.Gap), interval(limit)).Scan(&slot, &now)
 	if errors.Is(err, pgx.ErrNoRows) {
+		// No row taken: the turn is past the wait, or the host has no gate
+		// row at all (a host added without its migration), which is not a
+		// backlog and must not read as one.
+		var exists bool
+		if err := g.Pool.QueryRow(ctx, `select exists (select 1 from app.host_request_gate where host = $1)`, g.Host).Scan(&exists); err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("hosts: gate: %w", err)
+		}
+		if !exists {
+			return time.Time{}, time.Time{}, fmt.Errorf("%w: %s", ErrNoGate, g.Host)
+		}
 		return time.Time{}, time.Time{}, ErrBusy
 	}
 	if err != nil {

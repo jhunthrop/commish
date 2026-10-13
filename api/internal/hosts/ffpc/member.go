@@ -23,6 +23,11 @@ const Host = "ffpc"
 // a member's FFPC account is never hammered by us.
 const SignInEvery = 6 * time.Hour
 
+// SignInInFlight is how long after a claim another process takes the
+// claimed sign-in to still be on its way (a few FFPC requests at one a
+// second), during which a read that lost the claim gives way.
+const SignInInFlight = time.Minute
+
 // ErrNeedsSignIn is a connection FFPC no longer honors: the member signs
 // in again on our form.
 var ErrNeedsSignIn = errors.New("ffpc: sign in again")
@@ -30,7 +35,7 @@ var ErrNeedsSignIn = errors.New("ffpc: sign in again")
 // Connections is the part of hosts.Store a member read needs.
 type Connections interface {
 	Get(ctx context.Context, accountID uuid.UUID, host string) (hosts.Connection, error)
-	SessionKept(ctx context.Context, accountID uuid.UUID, host string, sessionCT []byte) error
+	SessionKept(ctx context.Context, accountID uuid.UUID, host string, wrappedKey, sessionCT []byte) error
 	ClaimSignIn(ctx context.Context, accountID uuid.UUID, host string, at time.Time, every time.Duration) (bool, error)
 	SignedOut(ctx context.Context, accountID uuid.UUID, host string) error
 	Read(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error
@@ -192,13 +197,20 @@ func (m *Member) fresher(ctx context.Context, accountID uuid.UUID, conn hosts.Co
 	if err != nil {
 		return nil, nil, err
 	}
-	if fresh.Status == hosts.StatusConnected && !bytes.Equal(fresh.Sealed.SessionCT, conn.Sealed.SessionCT) {
+	unchanged := bytes.Equal(fresh.Sealed.SessionCT, conn.Sealed.SessionCT)
+	if fresh.Status == hosts.StatusConnected && !unchanged {
 		if s, err := m.Vault.OpenSession(accountID.String(), Host, fresh.Sealed); err == nil {
 			jar, err := read(Cookies(s))
 			if !errors.Is(err, ErrSignedOut) {
 				return jar, Cookies(s), err
 			}
 		}
+	}
+	// Another process claimed the sign-in moments ago and has not kept its
+	// session yet: its sign-in is in flight. This read gives way, leaving
+	// the member signed in, and the next read uses the mended session.
+	if unchanged && fresh.LastSignInAt != nil && m.Now().Sub(*fresh.LastSignInAt) < SignInInFlight {
+		return nil, nil, fmt.Errorf("%w: a sign-in is in flight", ErrUnavailable)
 	}
 	m.signedOut(ctx, accountID, "signed out again within six hours of a sign-in")
 	return nil, nil, ErrNeedsSignIn
@@ -230,5 +242,5 @@ func (m *Member) keep(ctx context.Context, accountID uuid.UUID, sealed hosts.Sea
 	if err != nil {
 		return err
 	}
-	return m.Store.SessionKept(ctx, accountID, Host, next.SessionCT)
+	return m.Store.SessionKept(ctx, accountID, Host, sealed.WrappedKey, next.SessionCT)
 }

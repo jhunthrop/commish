@@ -118,9 +118,16 @@ func (s *Store) Delete(ctx context.Context, accountID uuid.UUID, host string) er
 // session is sealed under the row's own data key, so the wrapped key and
 // its version are never written here, and a re-encrypt that lands while a
 // read is in flight is never undone by it.
-func (s *Store) SessionKept(ctx context.Context, accountID uuid.UUID, host string, sessionCT []byte) error {
-	_, err := s.Pool.Exec(ctx, `update app.host_connections set session_ct = $3 where account_id = $1 and host = $2`,
-		accountID, host, sessionCT)
+//
+// It is guarded by the wrapped key the read began with: after a reconnect
+// (a new data key) a stale read keeps nothing, so a session never lands
+// under a key that cannot open it. A kept session is a working one, so it
+// puts the connection back to connected (a process that lost the sign-in
+// claim may have signed it out while the winner's sign-in was in flight).
+func (s *Store) SessionKept(ctx context.Context, accountID uuid.UUID, host string, wrappedKey, sessionCT []byte) error {
+	_, err := s.Pool.Exec(ctx, `update app.host_connections set session_ct = $3, status = 'connected'
+		where account_id = $1 and host = $2 and wrapped_key = $4`,
+		accountID, host, sessionCT, wrappedKey)
 	if err != nil {
 		return fmt.Errorf("hosts: keep session: %w", err)
 	}
