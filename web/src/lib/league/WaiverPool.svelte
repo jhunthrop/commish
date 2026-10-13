@@ -29,6 +29,9 @@
 	/** The board's own order: best first by points over replacement. */
 	const visible = $derived(position === null ? rows : rows.filter((r) => r.position === position));
 
+	/** Only the positions the board ranks: a run without kickers offers no K chip. */
+	const positions = $derived(POSITIONS.filter((p) => rows.some((r) => r.position === p)));
+
 	function choose(next: Position | null): void {
 		position = next;
 		shown = FIRST_ROWS;
@@ -38,10 +41,10 @@
 <Panel as="section" label="Waiver pool" padding="none">
 	<div class="head">
 		<PanelHead title="Waiver pool" aside={`${count(visible.length)} players`} level={2} />
-		<p class="basis">Unrostered in your league, ranked by points over replacement. {basis}</p>
+		<p class="basis">Unrostered in your league. {basis}</p>
 		<ChipGroup label="Position">
 			<Chip size="sm" pressed={position === null} onclick={() => choose(null)}>All</Chip>
-			{#each POSITIONS as p (p)}
+			{#each positions as p (p)}
 				<Chip size="sm" pressed={position === p} onclick={() => choose(p)}>{p}</Chip>
 			{/each}
 		</ChipGroup>

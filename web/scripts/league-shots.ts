@@ -56,9 +56,13 @@ async function call<T>(who: Drafter, method: string, path: string, body?: unknow
 
 interface Sync {
 	id: string;
-	pool: string[];
+	rostered: string[];
+	board_format: string;
 	roster: { player: { board_id: string | null; name: string; position: string } }[];
-	board: { players: { id: string; name: string; position: string; team: string }[] };
+}
+
+interface RunBoard {
+	rows: { id: string; name: string; position: string; team: string }[];
 }
 
 /** Both recorded leagues, and a sheet tagging the roster's first players and the pool's top. */
@@ -71,10 +75,17 @@ async function seed(): Promise<{ sleeper: string; mfl: string }> {
 		link: MFL_LINK,
 		me: { roster_id: 7 }
 	});
-	const byId = new Map(sleeper.board.players.map((p) => [p.id, p] as const));
+	// The board is the run's own file, as the page reads it.
+	const response = await fetch(`${web}/data/league-board/${sleeper.board_format}.json`);
+	const board = await response.json<RunBoard>();
+	const byId = new Map(board.rows.map((p) => [p.id, p] as const));
+	const held = new Set(sleeper.rostered);
 	const ids = [
 		...sleeper.roster.flatMap((r) => (r.player.board_id ? [r.player.board_id] : [])).slice(0, 3),
-		...sleeper.pool.slice(0, TAGGED)
+		...board.rows
+			.filter((p) => !held.has(p.id))
+			.slice(0, TAGGED)
+			.map((p) => p.id)
 	];
 	const tags = ['target', 'breakout', 'sleeper', 'avoid', 'injury', 'handcuff'];
 	const rows = ids.flatMap((id, i) => {

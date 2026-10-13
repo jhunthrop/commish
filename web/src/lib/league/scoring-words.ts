@@ -13,7 +13,8 @@ const KINDS: readonly (readonly [RegExp, string])[] = [
 	[/^bonus_|^(PY|RY|CY)$/, 'yardage bonuses'],
 	[/^(def_st_|st_)|^FLS$/, 'special teams scoring'],
 	[/^idp_/, 'defensive players'],
-	[/_2pt$|^D2$/, 'two-point plays'],
+	[/_2pt$|^(P2|R2|C2|D2)$/, 'two-point plays'],
+	[/^(fum_rec_td|#FR|#FT)$/, 'fumble return touchdowns'],
 	[/^(ff|blk_kick)$/, 'forced fumbles and blocked kicks'],
 	[/^(kr_|pr_)/, 'kick and punt returns'],
 	[/^fum/, 'fumbles']
