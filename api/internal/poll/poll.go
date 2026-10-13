@@ -39,11 +39,13 @@ type Store[S any] interface {
 // Read is a value, when it was read, and how stale it is: zero when this
 // read reached the host or a read within the gap did; its age when the
 // host failed since, or when it was kept from before this process and
-// none has landed since.
+// none has landed since. Err is the failure since, nil when none, so a
+// reader can say why the value is stale.
 type Read[S any] struct {
 	Value S
 	At    time.Time
 	Stale time.Duration
+	Err   error
 }
 
 // Fetch is one whole read upstream.
@@ -266,7 +268,7 @@ func (e *entry[S]) answer(now time.Time, gap time.Duration) (Read[S], error) {
 		}
 		return zero, e.err
 	}
-	r := Read[S]{Value: e.value, At: e.at}
+	r := Read[S]{Value: e.value, At: e.at, Err: e.err}
 	age := now.Sub(e.at)
 	if e.err != nil || (e.stored && age >= gap) {
 		r.Stale = age

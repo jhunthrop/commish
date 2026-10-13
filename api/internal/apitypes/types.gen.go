@@ -1304,6 +1304,9 @@ type LeagueSync struct {
 	Host         LeagueHost `json:"host"`
 	HostLeagueId string     `json:"host_league_id"`
 
+	// HostSignedOut the stale answer's last read failed because no member of the league is signed in to the host (FFPC), so a sign-in mends it. False when fresh
+	HostSignedOut bool `json:"host_signed_out"`
+
 	// HostStaleSeconds how stale the answer is because the host failed since, 0 when the last read reached it
 	HostStaleSeconds int                `json:"host_stale_seconds"`
 	Id               openapi_types.UUID `json:"id"`

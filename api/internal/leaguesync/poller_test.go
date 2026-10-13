@@ -3,6 +3,7 @@ package leaguesync
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"sync"
@@ -173,5 +174,53 @@ func TestPollerStoredReadAndFirstFailure(t *testing.T) {
 	}
 	if got := down.reads.Load(); got != 1 {
 		t.Fatalf("five views of a failing league made %d reads, want 1", got)
+	}
+}
+
+// failingHost answers a league until it is down, then fails with err.
+type failingHost struct {
+	countingHost
+	err error
+}
+
+func (h *failingHost) Read(ctx context.Context, ref Ref) (Snapshot, error) {
+	if h.down.Load() {
+		h.reads.Add(1)
+		return Snapshot{}, h.err
+	}
+	return h.countingHost.Read(ctx, ref)
+}
+
+// A stale read says it is stale for want of a signed-in member only when
+// the last try failed that way: a host that is down is not signed out.
+func TestPollerStaleReadSaysSignedOut(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"no member signed in", ErrNotConnected, true},
+		{"the member signed out", ErrSignInAgain, true},
+		{"the host down", ErrUnavailable, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			clock := &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
+			host := &failingHost{err: fmt.Errorf("%w: test", c.err)}
+			p := &Poller{Hosts: Hosts{host}, Store: &memorySnapshots{}, Now: clock.Now, Log: quietLog()}
+			fresh, err := p.Read(context.Background(), testRef)
+			if err != nil || fresh.Stale != 0 || fresh.SignedOut {
+				t.Fatalf("a fresh read answered %v, stale %s, signed out %v", err, fresh.Stale, fresh.SignedOut)
+			}
+			host.down.Store(true)
+			clock.Advance(time.Minute)
+			r, err := p.Refresh(context.Background(), testRef)
+			if err != nil || r.Stale != time.Minute {
+				t.Fatalf("a failed refresh answered %v, stale %s, want the last read a minute stale", err, r.Stale)
+			}
+			if r.SignedOut != c.want {
+				t.Fatalf("signed out %v, want %v", r.SignedOut, c.want)
+			}
+		})
 	}
 }

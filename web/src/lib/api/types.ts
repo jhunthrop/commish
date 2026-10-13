@@ -1063,7 +1063,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** The hosts connecting is open for here (HOST_FFPC_ENABLED), and the hosts the account is connected to, each with its state and when it was last read. No credential is ever answered. */
+		/** The hosts connecting is open for here (HOST_FFPC_ENABLED), and the hosts the account is connected to, each with its state and when it was last read. No credential is ever answered. Signed out it answers the switches with no connections: a switch is not account data. */
 		get: operations['listHostConnections'];
 		put?: never;
 		post?: never;
@@ -2069,6 +2069,8 @@ export interface components {
 			read_at: string;
 			/** @description how stale the answer is because the host failed since, 0 when the last read reached it */
 			host_stale_seconds: number;
+			/** @description the stale answer's last read failed because no member of the league is signed in to the host (FFPC), so a sign-in mends it. False when fresh */
+			host_signed_out: boolean;
 		};
 		/**
 		 * @description what a paired browser may write

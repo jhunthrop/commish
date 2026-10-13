@@ -12,11 +12,11 @@ import (
 
 // Words for an FFPC league.
 const (
-	ffpcPickWords      = "Pick your league from your FFPC list"
-	ffpcConnectWords   = "No one in this league is signed in to FFPC on Commish right now. Sign in to read it"
-	ffpcAttachWords    = "Connect FFPC first: sign in to FFPC above"
-	ffpcSignInWords    = "FFPC signed you out. Sign in to FFPC again to keep reading your league"
-	ffpcNotConfigured  = "FFPC leagues are not open here right now"
+	ffpcPickWords      = "Pick your league from your FFPC list."
+	ffpcConnectWords   = "No one in this league is signed in to FFPC on Commish right now. Sign in to read it."
+	ffpcAttachWords    = "Connect FFPC first. Sign in to FFPC above."
+	ffpcSignInWords    = "FFPC signed you out. Sign in to FFPC again to keep reading your league."
+	ffpcNotConfigured  = "FFPC leagues are not open here right now."
 	ffpcNotInListWords = "That league is not in your FFPC list. " + ffpcPickWords
 )
 

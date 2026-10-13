@@ -1016,8 +1016,9 @@ paths:
       operationId: listHostConnections
       summary: >-
         The hosts connecting is open for here (HOST_FFPC_ENABLED), and the hosts the account is connected to, each with
-        its state and when it was last read. No credential is ever answered.
-      security: [{ session: [] }]
+        its state and when it was last read. No credential is ever answered. Signed out it answers the switches with no
+        connections: a switch is not account data.
+      security: [{ session: [] }, {}]
       responses:
         "200":
           description: the connections
@@ -2329,6 +2330,7 @@ components:
         - placement
         - read_at
         - host_stale_seconds
+        - host_signed_out
       properties:
         id: { type: string, format: uuid }
         host: { $ref: "#/components/schemas/LeagueHost" }
@@ -2385,6 +2387,11 @@ components:
         host_stale_seconds:
           type: integer
           description: how stale the answer is because the host failed since, 0 when the last read reached it
+        host_signed_out:
+          type: boolean
+          description: >-
+            the stale answer's last read failed because no member of the league is signed in to the host (FFPC), so a
+            sign-in mends it. False when fresh
 
     DeviceScope:
       type: string
