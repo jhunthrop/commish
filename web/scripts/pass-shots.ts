@@ -121,4 +121,6 @@ await shoot(
 	'This link does not open a pass',
 	null
 );
+await shoot('account-signed-out', '/account', 'Sign in to keep your prep', null);
+await shoot('companion-new-signed-out', '/companion/new', 'I have a pass, sign in', null);
 await browser.close();

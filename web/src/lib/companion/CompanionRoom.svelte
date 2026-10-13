@@ -59,7 +59,7 @@
 	const onTurn = $derived(call !== null && c.your_turn);
 	const oddsLabel = $derived(
 		card?.conditional
-			? `reaches your pick at ${pickLabel(card.for_pick, teams)}`
+			? `reaches ${pickLabel(card.for_pick, teams)}`
 			: card?.next_pick
 				? `still there at ${pickLabel(card.next_pick, teams)}`
 				: 'your last pick'
