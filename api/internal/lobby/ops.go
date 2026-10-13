@@ -62,7 +62,7 @@ func (s *Store) Join(ctx context.Context, account uuid.UUID, handle string, f Fo
 	var room uuid.UUID
 	var seat int
 	err := s.Pool.QueryRow(ctx, `select r.id, st.seat from app.room_seats st join app.rooms r on r.id = st.room_id
-		where st.account_id = $1 and r.queue = $2 and r.status in ('filling', 'drafting') and st.left_at is null
+		where st.account_id = $1 and r.queue = $2 and r.status in ('filling', 'drafting')
 		order by r.created_at desc limit 1`, account, string(f.Key)).Scan(&room, &seat)
 	if err == nil {
 		return room, seat, nil
@@ -152,7 +152,7 @@ func (s *Store) Leave(ctx context.Context, id, account uuid.UUID) error {
 				return fmt.Errorf("lobby: free seat %d in %s: %w", n, id, err)
 			}
 			delete(w.room.Seats, n)
-			if err := w.log(KindSeatLeft, &n, struct{}{}); err != nil {
+			if err := w.log(KindSeatLeft, &n, map[string]bool{"freed": true}); err != nil {
 				return err
 			}
 			if w.room.People() == 0 {
@@ -163,20 +163,45 @@ func (s *Store) Leave(ctx context.Context, id, account uuid.UUID) error {
 			if seat.LeftAt != nil {
 				return errNoChange
 			}
-			if _, err := w.tx.Exec(w.ctx, `update app.room_seats set left_at = $3 where room_id = $1 and seat = $2`, id, n, w.now); err != nil {
-				return fmt.Errorf("lobby: leave seat %d in %s: %w", n, id, err)
-			}
-			at := w.now
-			seat.LeftAt = &at
-			w.room.Seats[n] = seat
-			return w.log(KindSeatLeft, &n, struct{}{})
+			return w.markLeft(n, seat)
 		}
 		return errNoChange
 	})
 	return err
 }
 
-// Return gives a drafter who left a drafting room the seat back from its
+// Disconnect is a drafter's last socket closing: the seat is marked left
+// at once and goes to its stand-in. A filling room keeps the seat for the
+// drafter (a reload takes it straight back) but no longer counts them
+// toward a full room, and a drafter who does not come back is a seat
+// whose queue drafts once the room starts.
+func (s *Store) Disconnect(ctx context.Context, id, account uuid.UUID) error {
+	_, err := s.Write(ctx, id, func(w *writer) error {
+		n := w.room.SeatOf(account)
+		if n == 0 {
+			return ErrNoSeat
+		}
+		seat := w.room.Seats[n]
+		if seat.LeftAt != nil || (w.room.Status != StatusFilling && w.room.Status != StatusDrafting) {
+			return errNoChange
+		}
+		return w.markLeft(n, seat)
+	})
+	return err
+}
+
+// markLeft stamps a seat's drafter as gone and logs it.
+func (w *writer) markLeft(n int, seat Seat) error {
+	if _, err := w.tx.Exec(w.ctx, `update app.room_seats set left_at = $3 where room_id = $1 and seat = $2`, w.room.ID, n, w.now); err != nil {
+		return fmt.Errorf("lobby: leave seat %d in %s: %w", n, w.room.ID, err)
+	}
+	at := w.now
+	seat.LeftAt = &at
+	w.room.Seats[n] = seat
+	return w.log(KindSeatLeft, &n, struct{}{})
+}
+
+// Return gives a drafter who left a live room the seat back from its
 // stand-in, as the socket reconnects.
 func (s *Store) Return(ctx context.Context, id, account uuid.UUID) error {
 	_, err := s.Write(ctx, id, func(w *writer) error {
@@ -185,7 +210,8 @@ func (s *Store) Return(ctx context.Context, id, account uuid.UUID) error {
 			return ErrNoSeat
 		}
 		seat := w.room.Seats[n]
-		if w.room.Status != StatusDrafting || seat.LeftAt == nil {
+		live := w.room.Status == StatusFilling || w.room.Status == StatusDrafting
+		if !live || seat.LeftAt == nil {
 			return errNoChange
 		}
 		if _, err := w.tx.Exec(w.ctx, `update app.room_seats set left_at = null where room_id = $1 and seat = $2`, id, n); err != nil {

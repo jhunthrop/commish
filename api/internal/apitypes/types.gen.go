@@ -876,7 +876,10 @@ type MockReport struct {
 	Runs          ReportRuns     `json:"runs"`
 	Seed          int64          `json:"seed"`
 	Settings      LeagueSettings `json:"settings"`
-	Slot          int            `json:"slot"`
+
+	// ShareCode a solo draft's link code
+	ShareCode *string `json:"share_code,omitempty"`
+	Slot      int     `json:"slot"`
 
 	// Standings every team, best first
 	Standings []ReportTeam    `json:"standings"`

@@ -1295,6 +1295,8 @@ export interface components {
 			board: components['schemas']['RoomBoard'];
 			/** @description how long the report took to compute */
 			computed_ms: number;
+			/** @description a solo draft's link code */
+			share_code?: string;
 		};
 		/** @enum {string} */
 		LobbyFormat: '12_ppr' | '12_half_superflex' | '10_ppr';

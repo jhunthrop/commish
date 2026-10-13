@@ -1474,6 +1474,7 @@ components:
           description: the board, holding only the players the report names
           allOf: [{ $ref: "#/components/schemas/RoomBoard" }]
         computed_ms: { type: integer, description: how long the report took to compute }
+        share_code: { type: string, description: a solo draft's link code, absent for a lobby }
 
     LobbyFormat:
       type: string
@@ -1569,7 +1570,7 @@ components:
     RoomAction:
       type: object
       description: >-
-        One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT, SEAT_RETURNED, ROOM_STARTED
+        One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT (payload freed when a filling room gave the seat up, otherwise its stand-in drafts), SEAT_RETURNED, ROOM_STARTED
         (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, or an engine action (START_DRAFT,
         SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick,
         pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out.

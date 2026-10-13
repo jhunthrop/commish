@@ -1,0 +1,131 @@
+/** A lobby as its log replays in the browser: who sits where, every pick with who made it, the pick on
+ * the clock and when its clock runs out, your queue. Built from the room's own rows, so a reconnect
+ * that sends the rows since the last seq brings the page to exactly where the room is. */
+import type { LobbyRoom, RoomAction, RoomPick } from './api.ts';
+
+export type SeatKind = 'drafter' | 'bot' | 'left' | 'open';
+
+export interface LobbySeatState {
+	handle: string | null;
+	kind: SeatKind;
+}
+
+/** Who made a pick: a drafter's own hand, a bot, a stand-in for a drafter who left, an expired clock. */
+export type PickBy = 'drafter' | 'bot' | 'queue' | 'clock';
+
+export interface LobbyPick extends RoomPick {
+	by: PickBy;
+}
+
+export interface LobbyState {
+	seq: number;
+	seats: ReadonlyMap<number, LobbySeatState>;
+	picks: readonly LobbyPick[];
+	/** The pick on the clock, 1 until the draft starts. */
+	pickNumber: number;
+	/** When the turn on the clock runs out, in milliseconds on the server's clock. */
+	deadline: number | null;
+	drafting: boolean;
+	complete: boolean;
+	soloPace: boolean;
+	/** Your queue, best first, as the room last stored it. */
+	queue: readonly string[];
+}
+
+export function initialLobby(room: LobbyRoom): LobbyState {
+	return {
+		seq: 0,
+		seats: new Map(),
+		picks: [],
+		pickNumber: 1,
+		deadline: null,
+		drafting: false,
+		complete: room.status === 'complete',
+		soloPace: room.solo_pace,
+		queue: []
+	};
+}
+
+interface EnginePayload {
+	action?: { playerIds?: string[]; teamId?: string };
+	pick?: LobbyPick;
+	deadline?: string;
+}
+
+function teamOf(seat: number): string {
+	return `seat${String(seat).padStart(2, '0')}`;
+}
+
+/** The log's rows applied in order; rows already applied are passed over. */
+export function applyActions(
+	state: LobbyState,
+	actions: readonly RoomAction[],
+	you: number
+): LobbyState {
+	let next = state;
+	for (const action of actions) {
+		if (action.seq <= next.seq) continue;
+		next = applyOne({ ...next, seq: action.seq }, action, you);
+	}
+	return next;
+}
+
+function withSeat(state: LobbyState, seat: number, patch: Partial<LobbySeatState>): LobbyState {
+	const seats = new Map(state.seats);
+	const current = seats.get(seat) ?? { handle: null, kind: 'open' as const };
+	seats.set(seat, { ...current, ...patch });
+	return { ...state, seats };
+}
+
+function applyOne(state: LobbyState, action: RoomAction, you: number): LobbyState {
+	const seat = action.seat;
+	const payload = action.payload as EnginePayload & {
+		handle?: string;
+		bots?: number[];
+		solo_pace?: boolean;
+		freed?: boolean;
+	};
+	switch (action.kind) {
+		case 'SEAT_JOINED':
+			return seat === null
+				? state
+				: withSeat(state, seat, { handle: payload.handle ?? null, kind: 'drafter' });
+		case 'SEAT_LEFT':
+			return seat === null
+				? state
+				: withSeat(state, seat, { kind: payload.freed ? 'open' : 'left' });
+		case 'SEAT_RETURNED':
+			return seat === null ? state : withSeat(state, seat, { kind: 'drafter' });
+		case 'ROOM_STARTED': {
+			let next: LobbyState = { ...state, soloPace: payload.solo_pace ?? false };
+			for (const bot of payload.bots ?? [])
+				next = withSeat(next, bot, { handle: null, kind: 'bot' });
+			return next;
+		}
+		case 'START_DRAFT':
+			return { ...state, drafting: true, pickNumber: 1, deadline: deadlineOf(payload) };
+		case 'SET_QUEUE':
+			return seat === you || payload.action?.teamId === teamOf(you)
+				? { ...state, queue: payload.action?.playerIds ?? [] }
+				: state;
+		case 'MAKE_PICK':
+		case 'TIMER_EXPIRE': {
+			const pick = payload.pick;
+			if (!pick) return state;
+			return {
+				...state,
+				picks: [...state.picks, pick],
+				pickNumber: pick.pick + 1,
+				deadline: deadlineOf(payload)
+			};
+		}
+		case 'ROOM_COMPLETE':
+			return { ...state, complete: true, drafting: false, deadline: null };
+		default:
+			return state;
+	}
+}
+
+function deadlineOf(payload: EnginePayload): number | null {
+	return payload.deadline ? Date.parse(payload.deadline) : null;
+}

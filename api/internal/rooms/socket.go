@@ -173,7 +173,7 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, acco
 		if s.presence.leave(roomID, account) {
 			leaveCtx, cancel := context.WithTimeout(context.Background(), commandTimeout)
 			defer cancel()
-			if err := s.Lobby.Leave(leaveCtx, roomID, account); err != nil && !errors.Is(err, lobby.ErrNoSeat) {
+			if err := s.Lobby.Disconnect(leaveCtx, roomID, account); err != nil && !errors.Is(err, lobby.ErrNoSeat) {
 				s.Log.Warn("rooms: leave on close", "room", roomID, "err", err)
 			}
 		}

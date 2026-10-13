@@ -366,6 +366,9 @@ func (s *Service) report(ctx context.Context, accountID, id uuid.UUID) (json.Raw
 	if err != nil {
 		return nil, err
 	}
+	if out.ShareCode, err = shareCodeOf(r); err != nil {
+		return nil, err
+	}
 	if err := s.Mocks.PutReport(ctx, accountID, id, r.head, out, s.Now()); err != nil {
 		return nil, err
 	}
@@ -451,6 +454,7 @@ func (s *Service) sharedReport(ctx context.Context, code string) (apitypes.MockR
 	if err != nil {
 		return apitypes.MockReport{}, err
 	}
+	out.ShareCode = &code
 	s.shared.put(code, out)
 	return out, nil
 }

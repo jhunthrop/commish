@@ -16,11 +16,11 @@ import (
 // view is the room on the wire. withBoard adds the board, which a page
 // reads once; a pick's answer leaves it off.
 func view(r room, withBoard bool) (apitypes.MockRoom, error) {
-	s := r.draft.State
-	code, err := encodeShare(share{V: shareVersion, Settings: r.settings.League, Seed: int64(r.seed), Picks: sharedPicks(r)})
+	code, err := shareCodeOf(r)
 	if err != nil {
 		return apitypes.MockRoom{}, err
 	}
+	s := r.draft.State
 	status := apitypes.MockStatusActive
 	if draft.IsComplete(s) {
 		status = apitypes.MockStatusComplete
@@ -28,7 +28,7 @@ func view(r room, withBoard bool) (apitypes.MockRoom, error) {
 	out := apitypes.MockRoom{
 		LeagueId: r.mock.LeagueId, Status: status, Seed: int64(r.seed), Settings: r.settings.League,
 		Teams: len(s.DraftOrder), Rounds: leagues.Rounds(r.settings.League), Slot: r.draft.Slot, PickNumber: s.PickNumber,
-		OnClock: draftroom.OnClock(s), Waiting: r.draft.Waiting, Picks: draftroom.Picks(s), Seq: r.head, ShareCode: code,
+		OnClock: draftroom.OnClock(s), Waiting: r.draft.Waiting, Picks: draftroom.Picks(s), Seq: r.head, ShareCode: *code,
 		CreatedAt: r.mock.CreatedAt, Queue: append([]string{}, draft.QueueFor(s, r.draft.HumanTeamID)...),
 	}
 	if r.mock.Id != uuid.Nil {
@@ -40,6 +40,15 @@ func view(r room, withBoard bool) (apitypes.MockRoom, error) {
 		out.Board = &b
 	}
 	return out, nil
+}
+
+// shareCodeOf is the link that replays the room as it stands.
+func shareCodeOf(r room) (*string, error) {
+	code, err := encodeShare(share{V: shareVersion, Settings: r.settings.League, Seed: int64(r.seed), Picks: sharedPicks(r)})
+	if err != nil {
+		return nil, err
+	}
+	return &code, nil
 }
 
 // sharedPicks is the drafter's own picks in order, keepers left out
