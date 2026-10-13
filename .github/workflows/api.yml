@@ -34,7 +34,7 @@ env:
     RESEND_API_KEY=RESEND_API_KEY:latest
   # The room reads only the database and the session cookie.
   ROOM_ENV_VARS: >-
-    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,TRUSTED_PROXY_HOPS=1
+    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '1' }}
   ROOM_SECRETS: >-
     DATABASE_URL=DATABASE_URL:latest,WORKOS_COOKIE_PASSWORD=WORKOS_COOKIE_PASSWORD:latest
 

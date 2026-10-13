@@ -27,17 +27,22 @@ var statKey = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)
 
 // flexSpots is how many flex starters each lineup adds to the roster
 // counts: standard has one flex, superflex a flex and a superflex, two
-// flex two.
-var flexSpots = map[apitypes.Lineup]int{
-	apitypes.LineupStandard:  1,
-	apitypes.LineupSuperflex: 2,
-	apitypes.LineupTwoFlex:   2,
+// flex two. ok is false for a lineup that is not one of the three.
+func flexSpots(l apitypes.Lineup) (n int, ok bool) {
+	switch l {
+	case apitypes.LineupStandard:
+		return 1, true
+	case apitypes.LineupSuperflex, apitypes.LineupTwoFlex:
+		return 2, true
+	}
+	return 0, false
 }
 
 // Rounds is the draft's round count: every roster spot, flex included.
 func Rounds(s apitypes.LeagueSettings) int {
 	r := s.Roster
-	return r.Qb + r.Rb + r.Wr + r.Te + r.K + r.Dst + r.Bench + flexSpots[s.Lineup]
+	flex, _ := flexSpots(s.Lineup)
+	return r.Qb + r.Rb + r.Wr + r.Te + r.K + r.Dst + r.Bench + flex
 }
 
 // UsesCustomScoring reports whether s needs the custom_scoring feature.
@@ -58,7 +63,7 @@ func Validate(s apitypes.LeagueSettings, prefix string) map[string]string {
 	if s.Slot != nil && (*s.Slot < 1 || *s.Slot > s.Teams) {
 		add("slot", "Pick a slot in the league, or none for a random one")
 	}
-	if _, ok := flexSpots[s.Lineup]; !ok {
+	if _, ok := flexSpots(s.Lineup); !ok {
 		add("lineup", "Pick standard, superflex or two flex")
 	}
 	if !s.BotStyle.Valid() {
