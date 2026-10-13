@@ -57,7 +57,7 @@
 			means: `The round his points over replacement rank in, among ${String(page.boardSize)}`
 		},
 		{ term: 'Rose', means: 'Below replacement' },
-		{ term: 'Drafters', means: 'Their ADP against our rank' }
+		{ term: 'Drafters', means: `Their ADP from ${page.adpBasis.join(' and ')}, against our rank` }
 	]);
 </script>
 
