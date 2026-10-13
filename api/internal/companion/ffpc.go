@@ -60,17 +60,22 @@ func (f *FFPCDrafts) shared() *poll.Poller[Snapshot] {
 // the process's one-a-second gap.
 const ffpcReadTimeout = 20 * time.Second
 
-// Read is the draft as of at most MinUpstreamGap ago.
+// FFPCGap is an FFPC board's read cadence: one read per draft per five
+// seconds whatever the number of members following it, kinder to FFPC's
+// one-request-a-second pace than Sleeper's two.
+const FFPCGap = 5 * time.Second
+
+// Read is the draft as of at most FFPCGap ago: one read per league,
+// shared by every member following it, read as whichever member asked
+// first. The board's own marks (whose picks are whose) are the reader's,
+// so a member's seat comes from their companion row, never from a read.
 func (f *FFPCDrafts) Read(ctx context.Context, accountID uuid.UUID, leagueID, ltuid string) (Read, error) {
-	// Keyed by member too: the board marks the reader's own picks.
-	r, err := f.shared().Read(ctx, HostFFPC+"/"+leagueID+"/"+accountID.String(), MinUpstreamGap, poll.Wait, func(ctx context.Context) (Snapshot, error) {
+	r, err := f.shared().Read(ctx, HostFFPC+"/"+leagueID, FFPCGap, poll.Wait, func(ctx context.Context) (Snapshot, error) {
 		d, err := f.Member.ReadDraft(ctx, accountID, ltuid)
 		if err != nil {
 			return Snapshot{}, err
 		}
-		snap := ffpcSnapshot(leagueID, d)
-		snap.MySlot, snap.SlotNames = d.MySlot, d.SlotNames
-		return snap, nil
+		return ffpcSnapshot(leagueID, d), nil
 	})
 	if err != nil {
 		return Read{}, err
@@ -148,17 +153,20 @@ func (s *Service) createFFPC(w http.ResponseWriter, r *http.Request, in apitypes
 		s.writeHostError(w, r, err)
 		return
 	}
-	read, err := s.FFPC.Read(ctx, accountID, leagueID, ltuid)
+	// The seat is read once, as the member, from their own view of the
+	// board; the shared reads that follow never decide it.
+	board, err := s.FFPC.Member.ReadDraft(ctx, accountID, ltuid)
 	if err != nil {
 		s.writeHostError(w, r, err)
 		return
 	}
+	read := Read{Snapshot: ffpcSnapshot(leagueID, board)}
 	league, err := s.FFPC.Member.ReadLeague(ctx, accountID, ltuid, true)
 	if err != nil {
 		s.writeHostError(w, r, err)
 		return
 	}
-	seat := read.MySlot
+	seat := board.MySlot
 	if seat == 0 && in.Seat.Slot != nil {
 		seat = *in.Seat.Slot
 	}
@@ -179,7 +187,7 @@ func (s *Service) createFFPC(w http.ResponseWriter, r *http.Request, in apitypes
 	}
 	row, err := s.Store.Upsert(ctx, Row{
 		AccountID: accountID, Host: HostFFPC, HostDraftID: leagueID, HostLeagueID: leagueID, Seat: seat,
-		Settings: settings, Status: d.Status, SeatNames: read.SlotNames, DraftName: cleanName(d.Name), TeamKey: ltuid,
+		Settings: settings, Status: d.Status, SeatNames: board.SlotNames, DraftName: cleanName(d.Name), TeamKey: ltuid,
 	})
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "companion: create ffpc", err)
@@ -208,11 +216,14 @@ func writeFFPCError(w http.ResponseWriter, r *http.Request, log *slog.Logger, er
 	case errors.Is(err, errFFPCNotSetUp):
 		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "FFPC drafts are not set up here", nil)
 	case errors.Is(err, hosts.ErrNotConnected):
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "Connect FFPC first: sign in on the companion page", nil)
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "Connect FFPC first, on Follow your draft", nil)
 	case errors.Is(err, ffpc.ErrNeedsSignIn):
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "FFPC signed you out. Sign in to FFPC again to keep following your draft", nil)
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "FFPC signed you out. Sign in to FFPC again on Follow your draft", nil)
+	case errors.Is(err, ffpc.ErrNoSuchLeague):
+		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "That league is not in your FFPC list", nil)
 	case errors.Is(err, ffpc.ErrNotThisPage):
-		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "That league is not in your FFPC list, or its draft board is not up yet", nil)
+		log.Warn("companion: ffpc page", "err", err)
+		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "FFPC answered with a page we do not read. Its draft board may not be up yet", nil)
 	case errors.Is(err, ffpc.ErrUnavailable), errors.Is(err, ffpc.ErrBusy), errors.Is(err, ffpc.ErrSignedOut):
 		log.Warn("companion: ffpc", "err", err)
 		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "FFPC is not answering right now. Try again in a moment", nil)

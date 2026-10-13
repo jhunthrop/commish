@@ -38,11 +38,6 @@ type Snapshot struct {
 	Draft     sleeper.Draft
 	Picks     []sleeper.Pick
 	FetchedAt time.Time
-	// MySlot and SlotNames are what a host's board says of the member's
-	// seat and each slot's team (FFPC), empty where the host's draft
-	// says them another way.
-	MySlot    int
-	SlotNames []string
 }
 
 // Read is a snapshot and how stale it is: zero when this read reached
