@@ -78,7 +78,7 @@ func TeamOnClock(s State) (string, bool) {
 	auction := AuctionOf(s)
 	if auction == nil {
 		if s.PickNumber <= TotalPickCount(s) {
-			return snakeTeam(s.DraftOrder, s.PickNumber), true
+			return snakeTeam(s.DraftOrder, s.PickNumber)
 		}
 		return CatchUpTeamID(s)
 	}
@@ -117,7 +117,11 @@ func UpcomingOnClock(s State, count int) []string {
 	if auction == nil {
 		last := TotalPickCount(s)
 		for pick := s.PickNumber; pick <= last && len(out) < count; pick++ {
-			out = append(out, snakeTeam(s.DraftOrder, pick))
+			team, ok := snakeTeam(s.DraftOrder, pick)
+			if !ok {
+				break
+			}
+			out = append(out, team)
 		}
 		return out
 	}

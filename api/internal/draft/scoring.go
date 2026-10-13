@@ -41,13 +41,13 @@ type NeedOptions struct {
 	RosteredAtPosition *int
 }
 
-func extraSurplusBodies(p Position, roster []RosterSlot, slots []SlotConfig, rosteredAt *int) int {
+func extraSurplusBodies(p Position, roster []RosterSlot, slots []SlotConfig, rosteredAt *int) uint {
 	configured := dedicatedSlots(p, slots)
 	rostered := filledIn(roster, SlotType(p))
 	if rosteredAt != nil {
 		rostered = *rosteredAt
 	}
-	return max(0, rostered-configured+1)
+	return uint(max(0, rostered-configured+1))
 }
 
 // NeedMultiplier warms a position per open dedicated starter and cools a

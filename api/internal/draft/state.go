@@ -38,15 +38,20 @@ type AuctionState struct {
 }
 
 // State is the whole draft, rebuilt by replaying its log. Every field is
-// shared between states and never written after a state is returned: a
-// reducer copies what it changes.
+// shared between states and nothing a state can see is ever written after
+// it is returned: a reducer copies what it changes. The slices and maps are
+// read-only to every caller; copy one before sorting or editing it.
 type State struct {
 	Config     Config   `json:"config"`
 	Phase      Phase    `json:"phase"`
 	Sequence   int      `json:"sequence"`
 	DraftOrder []string `json:"draftOrder"`
 	Pool       Pool     `json:"pool"`
-	Picks      []Pick   `json:"picks"`
+	// Picks is every pick so far, in the order made. Read-only: states share
+	// one backing array (see appendPick), and Picks is capped at its own
+	// length, so an append by a caller always copies, but a caller must not
+	// sort or assign into it either.
+	Picks []Pick `json:"picks"`
 	// Rosters is team id to filled slots; an empty slot is absent.
 	Rosters map[string][]RosterSlot `json:"rosters"`
 	// Budgets is team id to remaining auction dollars; empty for snake.
@@ -118,34 +123,35 @@ func (s State) WithPool(p Pool) State {
 
 func stringPtr(v string) *string { return &v }
 
-// pickTail is the shared claim on one picks array's spare capacity.
+// pickTail is one picks array and the shared claim on its spare capacity.
 type pickTail struct {
-	base    *Pick
+	array   []Pick
 	claimed atomic.Int64
 }
 
 // appendPick is s.Picks plus one without disturbing any other state. A
 // draft appends a pick per action, and copying the whole list each time is
-// quadratic over a draft and over every simulated run, so a states' picks
-// share one array with spare capacity: the first state to extend it at its
-// own length claims the next element atomically and writes it in place;
-// any other state extending at the same length (a branch: an undo, two
-// runs from one room) loses the claim and copies. No state ever sees an
-// element past its own length, so a shared array is never observed to
-// change. Callers treat Picks as read-only.
+// quadratic over a draft and over every simulated run, so successive
+// states' picks share one array with spare capacity: the first state to
+// extend it at its own length claims the next element atomically and
+// writes it in place; any other state extending at the same length (a
+// branch: an undo, two runs from one room) loses the claim and copies. No
+// state ever sees an element past its own length, so a shared array is
+// never observed to change, and the slice each state holds is capped at
+// its length, so only this function can reach the spare capacity.
 func appendPick(s State, p Pick) ([]Pick, *pickTail) {
 	n := len(s.Picks)
-	if t := s.tail; t != nil && cap(s.Picks) > n && &s.Picks[:cap(s.Picks)][0] == t.base && t.claimed.CompareAndSwap(int64(n), int64(n+1)) {
-		out := s.Picks[:n+1]
+	if t := s.tail; t != nil && n > 0 && n < cap(t.array) && &s.Picks[0] == &t.array[0] && t.claimed.CompareAndSwap(int64(n), int64(n+1)) {
+		out := t.array[:n+1]
 		out[n] = p
-		return out, t
+		return out[: n+1 : n+1], t
 	}
-	out := make([]Pick, n+1, max(16, 2*n+1))
-	copy(out, s.Picks)
-	out[n] = p
-	t := &pickTail{base: &out[0]}
+	array := make([]Pick, n+1, max(16, 2*n+1))
+	copy(array, s.Picks)
+	array[n] = p
+	t := &pickTail{array: array}
 	t.claimed.Store(int64(n + 1))
-	return out, t
+	return array[: n+1 : n+1], t
 }
 
 // withRoster is rosters with one team's slots replaced, in a new map.

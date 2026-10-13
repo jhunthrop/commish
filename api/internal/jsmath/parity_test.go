@@ -83,7 +83,7 @@ func powMismatches(t *testing.T, rows [][]any, report bool) int {
 	t.Helper()
 	bad := 0
 	for _, row := range rows {
-		x, n, want := fromHex(t, row[0].(string)), int(row[1].(float64)), fromHex(t, row[2].(string))
+		x, n, want := fromHex(t, row[0].(string)), uint(row[1].(float64)), fromHex(t, row[2].(string))
 		if got := jsmath.PowInt(x, n); !sameBits(got, want) {
 			bad++
 			if report && bad <= 5 {

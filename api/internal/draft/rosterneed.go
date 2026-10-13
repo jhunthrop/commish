@@ -144,7 +144,7 @@ func countByPosition(spots []RosterSlot, pool Pool, benchOnly bool) map[Position
 type CandidateRole struct {
 	Starts            bool
 	OpenStartingSlots int
-	BenchBodies       int
+	BenchBodies       uint
 	Capped            bool
 	WaitsForStarters  bool
 }
@@ -176,7 +176,7 @@ func NewRoleReader(roster []RosterSlot, slots []SlotConfig, pool Pool, policy Ce
 		facts := known[p]
 		role := CandidateRole{
 			Starts:           starts,
-			BenchBodies:      bench[p],
+			BenchBodies:      uint(bench[p]),
 			Capped:           facts.capped,
 			WaitsForStarters: !starts && starterOpen,
 		}

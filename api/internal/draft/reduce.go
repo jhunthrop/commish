@@ -83,7 +83,7 @@ func reduceStart(s State, a Action) (State, error) {
 	next.Phase = PhaseInProgress
 	// The one reducer-side read of a policy: it reads the ACTION, this
 	// draft's own frozen history, never a package constant.
-	next.Config.SkipPolicy, next.Config.Autopick = a.SkipPolicy, a.Autopick
+	next.Config.SkipPolicy, next.Config.Autopick = copySkipPolicy(a.SkipPolicy), copyAutopick(a.Autopick)
 	next.DraftOrder = append([]string{}, a.DraftOrder...)
 	next.Pool = NewPool(a.Pool)
 	next.Rosters = make(map[string][]RosterSlot, len(a.DraftOrder))
@@ -112,4 +112,35 @@ func hasDuplicate(ids []string) bool {
 		seen[id] = true
 	}
 	return false
+}
+
+// copySkipPolicy is a state's own copy of the action's snapshot, so the
+// state never shares a pointer with the action that started it.
+func copySkipPolicy(p *SkipPolicy) *SkipPolicy {
+	if p == nil {
+		return nil
+	}
+	own := *p
+	return &own
+}
+
+// copyAutopick is a deep copy of the action's autopick snapshot.
+func copyAutopick(p *AutopickPolicy) *AutopickPolicy {
+	if p == nil {
+		return nil
+	}
+	own := *p
+	if p.SurplusDamp != nil {
+		v := *p.SurplusDamp
+		own.SurplusDamp = &v
+	}
+	if p.LateRoundOnlyRoundsFromEnd != nil {
+		v := *p.LateRoundOnlyRoundsFromEnd
+		own.LateRoundOnlyRoundsFromEnd = &v
+	}
+	if p.RosterCeilings != nil {
+		v := *p.RosterCeilings
+		own.RosterCeilings = &v
+	}
+	return &own
 }

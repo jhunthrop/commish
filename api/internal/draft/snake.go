@@ -1,5 +1,7 @@
 package draft
 
+import "fmt"
+
 // settleCatchUp gives the next owed pick a fresh clock, or ends the draft
 // once nothing is owed.
 func settleCatchUp(s State, timestamp string) State {
@@ -61,7 +63,10 @@ func reduceSnakeExpiry(s State, timestamp string) (State, error) {
 	if s.PickNumber > TotalPickCount(s) {
 		return reduceCatchUpExpiry(s, timestamp)
 	}
-	teamID := snakeTeam(s.DraftOrder, s.PickNumber)
+	teamID, ok := snakeTeam(s.DraftOrder, s.PickNumber)
+	if !ok {
+		return State{}, fmt.Errorf("draft: invariant violated: no team for pick %d", s.PickNumber)
+	}
 	if skipEligible(s, teamID) {
 		return advanceSnake(addOwedPick(s, teamID, s.PickNumber), timestamp), nil
 	}
