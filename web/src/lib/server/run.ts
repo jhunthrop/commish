@@ -4,7 +4,6 @@
  * the index matches the manifest, slugs are unique), so a page can trust what it is handed.
  */
 import { PUBLIC_RUN_BASE_URL, PUBLIC_RUN_ID } from '$app/env/public';
-import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } from '$app/env/private';
 import { locationFor, type EnvRecord } from '#lib/run/config.ts';
 import {
 	RUN_PATHS,
@@ -30,7 +29,13 @@ import { openRun, type RunReader } from '#lib/run/source.ts';
 import type { RunStamp } from '#lib/run/stamp.ts';
 import type { z } from 'zod';
 
-const credentialsEnv: EnvRecord = { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY };
+/** The R2 keys sign run reads during the build and nowhere else, so they are read from the build's
+ * own environment when the first read starts, and never declared as app env: no bundle, no Worker
+ * and no generated env module ever holds them. */
+function buildCredentialsEnv(): EnvRecord {
+	const env = globalThis.process.env;
+	return { R2_ACCESS_KEY_ID: env.R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY: env.R2_SECRET_ACCESS_KEY };
+}
 
 const memo = new Map<string, Promise<unknown>>();
 
@@ -48,7 +53,7 @@ function reader(): Promise<RunReader> {
 	return once('reader', () =>
 		openRun({
 			runId: PUBLIC_RUN_ID,
-			location: locationFor(PUBLIC_RUN_BASE_URL, credentialsEnv)
+			location: locationFor(PUBLIC_RUN_BASE_URL, buildCredentialsEnv())
 		})
 	);
 }

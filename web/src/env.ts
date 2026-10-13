@@ -2,7 +2,8 @@ import { defineEnvVars } from '@sveltejs/kit/env';
 import { parseBaseUrl, parseRunId } from '#lib/run/config.ts';
 
 /** The build's inputs. The run is chosen at build, so both run variables are static: a deploy is one
- * run, and the Worker never reads a run at request time. The R2 keys are read during the build only. */
+ * run, and the Worker never reads a run at request time. The R2 keys that sign the build's reads are not app env
+ * at all: src/lib/server/run.ts reads them from the build's environment. */
 export const variables = defineEnvVars({
 	PUBLIC_RUN_ID: {
 		public: true,
@@ -15,13 +16,5 @@ export const variables = defineEnvVars({
 		static: true,
 		schema: parseBaseUrl,
 		description: 'The folder holding runs/: an https URL, or a directory relative to web/.'
-	},
-	R2_ACCESS_KEY_ID: {
-		schema: (value) => value,
-		description: 'Signs run reads from R2 at build. Unset for a local run directory.'
-	},
-	R2_SECRET_ACCESS_KEY: {
-		schema: (value) => value,
-		description: 'Signs run reads from R2 at build. Unset for a local run directory.'
 	}
 });
