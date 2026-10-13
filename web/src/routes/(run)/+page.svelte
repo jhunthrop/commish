@@ -38,14 +38,14 @@
 
 <SiteShell title="Draft prep" run={data.run}>
 	<main class="front">
-		<HeroCard title="Our {data.run.season} board, ready for your draft">
+		<HeroCard title="Our {data.run.season} board, for your draft and your league">
 			{#snippet meta()}
 				<span>{format.basis.join(' · ')} · {runStampText(data.run)}</span>
 			{/snippet}
 			{#snippet aside()}
 				<Verb href={sectionHref('mock')} size="lg" fill>Start a mock draft</Verb>
-				<Quiet href={sectionHref('sheet')} size="lg" fill>Build your cheat sheet</Quiet>
 				<Quiet href={links.leagueNew()} size="lg" fill>Follow your league</Quiet>
+				<Quiet href={sectionHref('sheet')} size="lg" fill>Build your cheat sheet</Quiet>
 			{/snippet}
 		</HeroCard>
 

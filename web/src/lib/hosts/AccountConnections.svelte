@@ -12,13 +12,15 @@
 	import { ApiError, ffpcOpen, hostsApi, type HostConnection } from './api.ts';
 
 	/** The hosts the account reads as the member (FFPC), each with its state, a one-tap disconnect
-	 * that deletes the kept sign-in and session at once, and, when FFPC has signed the member out,
+	 * that deletes the kept password and session at once, and, when FFPC has signed the member out,
 	 * the sign-in form right here. It reads its own list. */
 	let connections = $state<HostConnection[] | null>(null);
 	let open = $state(false);
 	let failed = $state(false);
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
+	/** Set once Disconnect went through: one line stands where the row was. */
+	let disconnected = $state(false);
 
 	function load(): void {
 		hostsApi
@@ -26,6 +28,7 @@
 			.then((hosts) => {
 				connections = hosts.connections;
 				open = ffpcOpen(hosts);
+				disconnected = false;
 			})
 			.catch(() => (failed = true));
 	}
@@ -34,12 +37,13 @@
 
 	const STATUS: Readonly<Record<HostConnection['status'], string>> = {
 		connected: 'Signed in',
-		signed_out: 'FFPC signed you out. Sign in again below'
+		signed_out: 'Signed out by FFPC'
 	};
 
+	/** "Signed out by FFPC. Last read Oct 12." */
 	function line(c: HostConnection): string {
-		const read = c.last_read_at ? `, last read ${dayLabel(c.last_read_at)}` : '';
-		return `${STATUS[c.status]}${read}`;
+		const read = c.last_read_at ? ` Last read ${dayLabel(c.last_read_at)}.` : '';
+		return `${STATUS[c.status]}.${read}`;
 	}
 
 	async function disconnect(gone: HostConnection): Promise<void> {
@@ -48,6 +52,7 @@
 		try {
 			await hostsApi.disconnectFFPC();
 			connections = (connections ?? []).filter((c) => c !== gone);
+			disconnected = true;
 		} catch (error) {
 			problem = error instanceof ApiError ? error.message : 'That did not go through. Try again.';
 		} finally {
@@ -55,14 +60,22 @@
 		}
 	}
 
-	const signedOut = $derived((connections ?? []).some((c) => c.status === 'signed_out'));
+	/** FFPC signed the member out here, so the form shows, and it carries the consent itself. */
+	const signingIn = $derived(open && (connections ?? []).some((c) => c.status === 'signed_out'));
 </script>
 
-{#if failed || (connections !== null && (connections.length > 0 || open))}
+{#if failed || disconnected || (connections !== null && (connections.length > 0 || open))}
 	<section aria-label="Connected accounts">
 		<PanelHead title="Connected accounts" level={2} />
 		{#if failed}
 			<p class="note">Your connected accounts can't be read right now.</p>
+		{:else if disconnected}
+			<p class="done" role="status">
+				FFPC disconnected. Your password and session are deleted. Your FFPC league keeps its last
+				read.
+			</p>
+			<!-- The way back in stays, as the empty state has it. -->
+			{#if open}<div class="again">{@render follow()}</div>{/if}
 		{:else if connections && connections.length > 0}
 			<ActionRows label="Connected accounts">
 				{#each connections as c (c.host)}
@@ -75,28 +88,37 @@
 					</ActionRow>
 				{/each}
 			</ActionRows>
-			{#if signedOut && open}
+			{#if signingIn}
 				<div class="again"><FFPCSignIn onconnected={load} /></div>
+			{:else}
+				<p class="note">
+					We sign in to FFPC as you to read your league. We never make a move or a bid. Disconnect
+					deletes your FFPC password and session at once.
+				</p>
 			{/if}
-			<p class="note">
-				We sign in to FFPC as you to read your league. We never make a move or a bid. Disconnecting
-				deletes your FFPC sign-in from Commish at once.
-			</p>
 			{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 		{:else if connections && open}
 			<EmptyState level={3} title="No connected accounts">
-				{#snippet actions()}<Quiet href={links.leagueNew()}>Follow an FFPC league</Quiet>{/snippet}
+				{#snippet actions()}{@render follow()}{/snippet}
 			</EmptyState>
 		{/if}
 	</section>
 {/if}
 
+{#snippet follow()}
+	<Quiet href={links.leagueNew('ffpc')}>Follow an FFPC league</Quiet>
+{/snippet}
+
 <style>
-	.note {
+	.note,
+	.done {
 		margin: var(--s-2) 0 0;
+		max-width: 60ch;
+	}
+
+	.note {
 		font-size: var(--t-sm);
 		color: var(--ink-2);
-		max-width: 60ch;
 	}
 
 	.again {

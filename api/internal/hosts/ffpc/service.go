@@ -71,7 +71,7 @@ type Service struct {
 // Routes is every route this package serves.
 func (s *Service) Routes() []httpx.Route {
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/hosts", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitListPerMin), Handler: s.list},
+		{Method: http.MethodGet, Path: "/hosts", Access: httpx.Public, Limit: httpx.PerMinute(limitListPerMin), Handler: s.list},
 		{Method: http.MethodPost, Path: "/hosts/ffpc/connect", Access: httpx.SignedIn, Limit: httpx.PerHour(limitConnectPerHour), Handler: s.connect},
 		{Method: http.MethodGet, Path: "/hosts/ffpc/leagues", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitLeaguesPerMin), Handler: s.leagues},
 		{Method: http.MethodDelete, Path: "/hosts/ffpc", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDisconnectPerMn), Handler: s.disconnect},
@@ -94,20 +94,20 @@ func (s *Service) allowSend() bool {
 }
 
 func off(w http.ResponseWriter, r *http.Request) {
-	httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "FFPC leagues are not open here right now", nil)
+	httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "FFPC leagues are not open here right now.", nil)
 }
 
 func checkConnect(in apitypes.HostConnectInput) (string, map[string]string) {
 	login := strings.TrimSpace(in.Email)
 	errs := map[string]string{}
 	if login == "" || len(login) > maxField {
-		errs["email"] = "Your FFPC sign-in"
+		errs["email"] = "Type your FFPC email or username."
 	}
 	if in.Password == "" || len(in.Password) > maxField {
-		errs["password"] = "Your FFPC password"
+		errs["password"] = "Type your FFPC password."
 	}
 	if !in.Consent {
-		errs["consent"] = "Agree that we sign in to FFPC as you to read your league"
+		errs["consent"] = "Tick the box to agree to how we sign in to FFPC as you."
 	}
 	if len(errs) > 0 {
 		return "", errs
@@ -137,11 +137,11 @@ func (s *Service) connect(w http.ResponseWriter, r *http.Request) {
 	}
 	if n >= maxRefusals {
 		httpx.WriteError(w, r, http.StatusLocked, httpx.CodeForbidden,
-			"FFPC refused three sign-ins, so connecting is paused for an hour. Check your sign-in on FFPC first", nil)
+			"FFPC refused three sign-ins, so connecting is paused for an hour. Check your email and password on FFPC first.", nil)
 		return
 	}
 	if !s.allowSend() {
-		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "Connecting FFPC is busy right now. Try again in a few minutes", nil)
+		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "Connecting FFPC is busy right now. Try again in a few minutes.", nil)
 		return
 	}
 	jar, leagues, err := s.Signer.SignIn(ctx, login, in.Password)
@@ -172,15 +172,15 @@ func (s *Service) answerSignIn(w http.ResponseWriter, r *http.Request, accountID
 		if rerr := s.Store.Refused(r.Context(), accountID, Host, s.Now()); rerr != nil {
 			s.Log.Warn("ffpc: keep refusal", "err", rerr)
 		}
-		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, "FFPC did not accept that sign-in", nil)
+		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, "FFPC did not accept that sign-in.", nil)
 	case errors.Is(err, ErrFormChanged):
 		s.Log.Error("ffpc: sign-in form changed")
 		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable,
-			"FFPC changed its sign-in page. We have paused connecting while we look", nil)
+			"FFPC changed its sign-in page. We have paused connecting while we look.", nil)
 	default:
 		// The error names a path at most, never the sign-in.
 		s.Log.Warn("ffpc: connect", "err", err)
-		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "FFPC is not answering right now. Try again in a moment", nil)
+		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "FFPC is not answering right now. Try again in a moment.", nil)
 	}
 	return true
 }
@@ -193,26 +193,33 @@ func (s *Service) leagues(w http.ResponseWriter, r *http.Request) {
 	list, err := s.Leagues.Leagues(r.Context(), auth.AccountID(r))
 	switch {
 	case errors.Is(err, hosts.ErrNotConnected):
-		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "Connect FFPC first", nil)
+		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "Connect FFPC first.", nil)
 	case errors.Is(err, ErrNeedsSignIn):
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "FFPC signed you out. Sign in again to keep reading your leagues", nil)
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "FFPC signed you out. Sign in again to keep reading your leagues.", nil)
 	case err != nil:
 		s.Log.Warn("ffpc: leagues", "err", err)
-		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "FFPC is not answering right now. Try again in a moment", nil)
+		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "FFPC is not answering right now. Try again in a moment.", nil)
 	default:
 		httpx.WriteOK(w, r, http.StatusOK, leagueViews(list))
 	}
 }
 
+// list answers the switches to anyone, since a switch is not account
+// data, and the account's own connections when signed in.
 func (s *Service) list(w http.ResponseWriter, r *http.Request) {
-	list, err := s.Store.List(r.Context(), auth.AccountID(r))
+	out := apitypes.HostConnections{Enabled: []apitypes.ConnectedHost{}, Connections: []apitypes.HostConnection{}}
+	if s.Enabled {
+		out.Enabled = append(out.Enabled, apitypes.ConnectedHostFfpc)
+	}
+	account, signedIn := auth.AccountFrom(r.Context())
+	if !signedIn {
+		httpx.WriteOK(w, r, http.StatusOK, out)
+		return
+	}
+	list, err := s.Store.List(r.Context(), account.ID)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "hosts: list", err)
 		return
-	}
-	out := apitypes.HostConnections{Enabled: []apitypes.ConnectedHost{}, Connections: make([]apitypes.HostConnection, 0, len(list))}
-	if s.Enabled {
-		out.Enabled = append(out.Enabled, apitypes.ConnectedHostFfpc)
 	}
 	for _, c := range list {
 		out.Connections = append(out.Connections, connectionView(c))

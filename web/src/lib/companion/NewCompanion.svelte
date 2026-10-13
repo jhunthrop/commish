@@ -142,7 +142,7 @@
 				At each of your picks you get our call, against the picks your league actually makes.
 			</p>
 			{#if ffpcOn}
-				<ChipGroup label="Your draft is on">
+				<ChipGroup label="Your draft is on" fit>
 					<Chip pressed={way === 'sleeper'} onclick={() => (way = 'sleeper')}>Sleeper</Chip>
 					<Chip pressed={way === 'ffpc'} onclick={() => (way = 'ffpc')}>FFPC</Chip>
 				</ChipGroup>

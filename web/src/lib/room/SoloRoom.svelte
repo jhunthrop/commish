@@ -257,11 +257,11 @@
 		     back. -->
 		<div class="since" class:straight>
 			{#if room.waiting && !inFlight}
-				<SinceStrip since={prev} {went} {teams} {whose} />
+				<SinceStrip since={prev} {went} {teams} {whose} queue={queueAll.size > 0} />
 			{/if}
 		</div>
 	{:else if room.waiting && went.length > 0}
-		<SinceStrip since={prev} {went} {teams} {whose} />
+		<SinceStrip since={prev} {went} {teams} {whose} queue={queueAll.size > 0} />
 	{/if}
 	{#if noCall}
 		<Panel as="section" label="No call for this pick" padding="md" edge="quiet">

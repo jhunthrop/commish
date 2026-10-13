@@ -60,6 +60,7 @@ export const RAIL: readonly RailItem[] = [
 		wideOnly: false,
 		owns: ['sheet']
 	},
+	leagueItem(null),
 	{
 		section: 'advisor',
 		label: 'Advisor',
@@ -73,14 +74,15 @@ export const RAIL: readonly RailItem[] = [
 		label: 'Our record',
 		href: '/record',
 		icon: 'record',
-		wideOnly: false,
+		wideOnly: true,
 		owns: ['record']
 	}
 ];
 
-/** Your league, shown to a signed-in account (account/rail-league.svelte.ts), after the cheat
- * sheet: the in-season half of the rail. It opens the account's newest league, or, with none yet,
- * the page that attaches one. */
+/** Your league, on the rail for everyone after the cheat sheet: the in-season half of the rail. It
+ * opens the account's newest league (account/rail-league.svelte.ts), or, with none yet or signed
+ * out, the page that attaches one, which signed out leads to sign in. The phone's bar holds five, so
+ * League has Our record's place there; Our record stays on the desk's rail. */
 export function leagueItem(leagueId: string | null): RailItem {
 	return {
 		section: 'league',
@@ -97,16 +99,11 @@ export interface RailAccount {
 	leagueId: string | null;
 }
 
-/** The rail with League in its place for a signed-in account, null signed out. The phone's bar holds
- * five, so League takes Our record's place there; Our record stays on the desk's rail. */
+/** The rail, with League opening the account's newest league once /me names one. */
 export function railItems(account: RailAccount | null): readonly RailItem[] {
-	if (account === null) return RAIL;
-	const { leagueId } = account;
-	const at = RAIL.findIndex((item) => item.section === 'sheet') + 1;
-	const rest = RAIL.slice(at).map((item) =>
-		item.section === 'record' ? { ...item, wideOnly: true } : item
-	);
-	return [...RAIL.slice(0, at), leagueItem(leagueId), ...rest];
+	const leagueId = account?.leagueId ?? null;
+	if (leagueId === null) return RAIL;
+	return RAIL.map((item) => (item.section === 'league' ? leagueItem(leagueId) : item));
 }
 
 /** Pinned to the foot of the rail. */
@@ -121,7 +118,7 @@ export const RAIL_FOOT: RailItem = {
 
 /** How many items the phone's bottom rail draws from a rail, every item not marked wideOnly. The
  * phone lays its columns from this number, so a tab keeps its place while the rest of the rail is
- * still arriving. With League in the rail it takes Our record's place, so the count holds. */
+ * still arriving. */
 export function phoneRailCount(items: readonly RailItem[]): number {
 	return [...items, RAIL_FOOT].filter((item) => !item.wideOnly).length;
 }
@@ -130,7 +127,6 @@ export function phoneRailCount(items: readonly RailItem[]): number {
  * (the front door, the system page). */
 export function sectionOf(pathname: string): Section | null {
 	const [first = ''] = pathname.split('/').filter((segment) => segment !== '');
-	if (first === 'league') return 'league';
 	const item = [...RAIL, RAIL_FOOT].find((candidate) => candidate.owns.includes(first));
 	return item?.section ?? null;
 }

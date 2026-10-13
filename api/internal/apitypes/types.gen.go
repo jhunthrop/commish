@@ -1301,8 +1301,14 @@ type LeagueSync struct {
 	Byes map[string]int `json:"byes"`
 
 	// Host the host a league runs on, named as a mechanism
-	Host         LeagueHost `json:"host"`
-	HostLeagueId string     `json:"host_league_id"`
+	Host LeagueHost `json:"host"`
+
+	// HostFailed the stale answer's last read failed. False for a read kept from before this process while the next one goes to the host, so a stale answer names a failure only when there was one
+	HostFailed   bool   `json:"host_failed"`
+	HostLeagueId string `json:"host_league_id"`
+
+	// HostSignedOut the stale answer's last read failed because no member of the league is signed in to the host (FFPC), so a sign-in mends it. False when fresh
+	HostSignedOut bool `json:"host_signed_out"`
 
 	// HostStaleSeconds how stale the answer is because the host failed since, 0 when the last read reached it
 	HostStaleSeconds int                `json:"host_stale_seconds"`

@@ -4,6 +4,12 @@ import { positionSegment } from '#lib/run/derive.ts';
 import type { Position } from '#lib/types/player.ts';
 import { COMPANION_START, LEAGUE_START, sectionHref } from '#lib/ui/nav.ts';
 
+/** The attach page's search parameter naming the way in it starts from: `?host=ffpc`. */
+export const LEAGUE_HOST_PARAM = 'host';
+
+/** The anchor of the account page's Your leagues. */
+export const LEAGUES_ANCHOR = 'your-leagues';
+
 /** The anchor of a player page's This season block. */
 export const SEASON_ANCHOR = 'this-season';
 
@@ -34,14 +40,19 @@ export const links = {
 	/** Your cheat sheet. Every page outside the sheet links it through here. */
 	sheet: (): string => resolve('/sheet'),
 	account: (): string => resolve('/account'),
+	/** The account page at Your leagues, every league the account follows. */
+	accountLeagues: (): string => `${resolve('/account')}#${LEAGUES_ANCHOR}`,
 	/** The Draft Pass, the Membership and the Group Draft Pass. */
 	pass: (): string => resolve('/pass'),
 	/** Where a live draft starts being followed. */
 	companionNew: (): string => resolve(COMPANION_START),
 	companion: (id: string): string => resolve('/companion/[id]', { id }),
 	claim: (code: string): string => resolve('/claim/[code]', { code }),
-	/** Where a league on another host is attached. */
-	leagueNew: (): string => resolve(LEAGUE_START),
+	/** Where a league on another host is attached, opened on FFPC's way in when asked. */
+	leagueNew: (host?: 'ffpc'): string =>
+		host === undefined
+			? resolve(LEAGUE_START)
+			: `${resolve(LEAGUE_START)}?${new URLSearchParams({ [LEAGUE_HOST_PARAM]: host }).toString()}`,
 	league: (id: string): string => resolve('/league/[id]', { id }),
 	/** A new mock with a saved league's settings filled in, so drafting it is one tap. */
 	mockLeague: (savedId: string): string =>

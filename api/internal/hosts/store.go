@@ -19,7 +19,8 @@ const (
 
 // ConsentVersion names the consent words a member agreed to on connect
 // (web/src/lib/hosts/api.ts FFPC_CONSENT). Raise it when the words change.
-const ConsentVersion = 2
+// Version 3 names what is kept, the password, inside the ticked words.
+const ConsentVersion = 3
 
 // ErrNotConnected is an account with no connection to the host.
 var ErrNotConnected = errors.New("hosts: not connected")

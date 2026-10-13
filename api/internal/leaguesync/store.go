@@ -123,16 +123,18 @@ type Attached struct {
 }
 
 // Attached is the account's links, newest first, each with its league's
-// name and team from the last read.
+// name and team from the last read. With no read kept, the name is the
+// saved league's the attach made, so a league is never nameless.
 func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, error) {
 	rows, err := s.Pool.Query(ctx, `select l.id, l.account_id, l.league_id, l.host, l.host_league_id, l.host_season,
 		l.roster_id, l.attached_at, l.last_read_at,
-		coalesce((sn.snapshot->>'season')::int, l.host_season), coalesce(sn.snapshot->>'name', ''),
+		coalesce((sn.snapshot->>'season')::int, l.host_season), coalesce(nullif(sn.snapshot->>'name', ''), saved.name, ''),
 		coalesce((select t->>'name' from jsonb_array_elements(sn.snapshot->'teams') t
 			where (t->>'roster_id')::int = l.roster_id limit 1), '')
 		from app.league_links l
 		left join app.league_snapshots sn
 			on sn.host = l.host and sn.host_league_id = l.host_league_id and sn.host_season = l.host_season
+		left join app.leagues saved on saved.id = l.league_id and saved.account_id = l.account_id
 		where l.account_id = $1 and l.detached_at is null order by l.attached_at desc, l.id limit $2`, accountID, MaxLinksPerAccount)
 	if err != nil {
 		return nil, fmt.Errorf("leaguesync: attached: %w", err)

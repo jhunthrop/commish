@@ -37,10 +37,15 @@ type SnapshotStore interface {
 	PutSnapshot(ctx context.Context, snap Snapshot) error
 }
 
-// Read is a snapshot and how stale it is (poll.Read's rule).
+// Read is a snapshot and how stale it is (poll.Read's rule). Failed is a
+// stale read whose last try failed, never a kept read waiting on the next;
+// SignedOut is one that failed because no member of the league is signed
+// in to the host, so a sign-in mends it.
 type Read struct {
 	Snapshot
-	Stale time.Duration
+	Stale     time.Duration
+	Failed    bool
+	SignedOut bool
 }
 
 // Poller shares one upstream read per league between every viewer.
@@ -100,7 +105,13 @@ func (p *Poller) read(ctx context.Context, ref Ref, gap time.Duration, mode poll
 	}
 	snap := r.Value
 	snap.ReadAt = r.At
-	return Read{Snapshot: snap, Stale: r.Stale}, nil
+	failed := r.Stale > 0 && r.Err != nil
+	return Read{Snapshot: snap, Stale: r.Stale, Failed: failed, SignedOut: failed && signedOut(r.Err)}, nil
+}
+
+// signedOut reports whether a read failed for want of a signed-in member.
+func signedOut(err error) bool {
+	return errors.Is(err, ErrNotConnected) || errors.Is(err, ErrSignInAgain)
 }
 
 // Keep stores a good read; the store keeps it only for a linked league,

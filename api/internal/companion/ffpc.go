@@ -143,7 +143,7 @@ func (s *Service) createFFPC(w http.ResponseWriter, r *http.Request, in apitypes
 	}
 	leagueID := strings.TrimSpace(in.Draft)
 	if !ffpcLeague(leagueID) {
-		httpx.WriteInvalid(w, r, map[string]string{fieldDraft: "Pick your league from your FFPC list"})
+		httpx.WriteInvalid(w, r, map[string]string{fieldDraft: "Pick your league from your FFPC list."})
 		return
 	}
 	ctx := r.Context()
@@ -214,19 +214,19 @@ func cleanName(s string) string { return ffpc.Clean(s, 80) }
 func writeFFPCError(w http.ResponseWriter, r *http.Request, log *slog.Logger, err error) bool {
 	switch {
 	case errors.Is(err, errFFPCNotSetUp):
-		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "FFPC drafts are not set up here", nil)
+		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "FFPC drafts are not set up here.", nil)
 	case errors.Is(err, hosts.ErrNotConnected):
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "Connect FFPC first, on Follow your draft", nil)
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "Connect FFPC first, on Follow your draft.", nil)
 	case errors.Is(err, ffpc.ErrNeedsSignIn):
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "FFPC signed you out. Sign in to FFPC again on Follow your draft", nil)
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "FFPC signed you out. Sign in to FFPC again on Follow your draft.", nil)
 	case errors.Is(err, ffpc.ErrNoSuchLeague):
-		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "That league is not in your FFPC list", nil)
+		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "That league is not in your FFPC list.", nil)
 	case errors.Is(err, ffpc.ErrNotThisPage):
 		log.Warn("companion: ffpc page", "err", err)
-		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "FFPC answered with a page we do not read. Its draft board may not be up yet", nil)
+		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "FFPC answered with a page we do not read. Its draft board may not be up yet.", nil)
 	case errors.Is(err, ffpc.ErrUnavailable), errors.Is(err, ffpc.ErrBusy), errors.Is(err, ffpc.ErrSignedOut):
 		log.Warn("companion: ffpc", "err", err)
-		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "FFPC is not answering right now. Try again in a moment", nil)
+		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "FFPC is not answering right now. Try again in a moment.", nil)
 	default:
 		return false
 	}

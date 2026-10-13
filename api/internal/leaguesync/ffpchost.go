@@ -92,7 +92,7 @@ func (f *FFPC) Read(ctx context.Context, ref Ref) (Snapshot, error) {
 			return snap, err
 		}
 	}
-	return Snapshot{}, fmt.Errorf("%w: two members signed out in one read", ErrUnavailable)
+	return Snapshot{}, fmt.Errorf("%w: two members signed out in one read", ErrSignInAgain)
 }
 
 // ReadAs reads the league as one member, answering it and the member's

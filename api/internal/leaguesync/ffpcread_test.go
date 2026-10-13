@@ -56,6 +56,25 @@ func TestFFPCReadMovesPastASignedOutMember(t *testing.T) {
 	if _, err := alone.Read(context.Background(), ref); !errors.Is(err, ErrNotConnected) {
 		t.Fatalf("no member left: %v", err)
 	}
+	// Two members found signed out in one read is a sign-out, so the stale
+	// read says no one is signed in rather than that FFPC is not answering.
+	second := uuid.New()
+	both := &FFPC{Member: allSignedOut{}, Readers: &readersInTurn{ids: []uuid.UUID{out, second}}, Now: clock.Now}
+	_, err := both.Read(context.Background(), ref)
+	if !errors.Is(err, ErrSignInAgain) || !signedOut(err) {
+		t.Fatalf("two members signed out in one read: %v", err)
+	}
+}
+
+// allSignedOut signs every member out.
+type allSignedOut struct{}
+
+func (allSignedOut) ReadLeague(context.Context, uuid.UUID, string, bool) (ffpc.League, error) {
+	return ffpc.League{}, ffpc.ErrNeedsSignIn
+}
+
+func (allSignedOut) OpenLeague(context.Context, uuid.UUID, string) (string, error) {
+	return fixtureLTUID, nil
 }
 
 // With FFPC switched off, an FFPC league reads as off, never as a bad link.
