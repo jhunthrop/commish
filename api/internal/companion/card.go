@@ -92,6 +92,25 @@ func (s *Service) cardFor(ctx context.Context, f followed) (*apitypes.RoomCard, 
 	return &view, &ranges, nil
 }
 
+// conditionalFor is the call if the board holds to the drafter's next
+// pick, made on each new pick and kept for every viewer of it.
+func (s *Service) conditionalFor(ctx context.Context, f followed) (*apitypes.RoomCard, error) {
+	key := conditionalKey{companion: f.row.ID, picks: len(f.read.Picks)}
+	if card, ok := s.conditional.Get(key); ok {
+		return &card, nil
+	}
+	st := f.built.Draft.State
+	c, err := s.Engine.Conditional(ctx, advisor.Request{
+		State: st, TeamID: f.built.Draft.HumanTeamID, Board: f.board, Teams: len(st.DraftOrder), Seed: seedOf(f.row.HostDraftID),
+	})
+	if err != nil {
+		return nil, err
+	}
+	view := draftroom.CardView(draftroom.Trim(c, st), *c.NextPick, true)
+	s.conditional.Put(key, view)
+	return &view, nil
+}
+
 func round1(v float64) float64 { return float64(int64(v*10+0.5)) / 10 }
 
 func (s *Service) can(ctx context.Context, accountID uuid.UUID, f entitlements.Feature) (bool, error) {

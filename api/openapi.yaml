@@ -1713,7 +1713,9 @@ components:
         card:
           nullable: true
           description: >-
-            our call at the drafter's turn. The why is on the call only, or on every shortlist row with full_reasoning.
+            our call at the drafter's turn, or between turns the conditional call (conditional true): the player to
+            take if the board holds to your_next_pick. The why is on the call only, or on every shortlist row with
+            full_reasoning.
           allOf: [{ $ref: "#/components/schemas/RoomCard" }]
         board:
           nullable: true

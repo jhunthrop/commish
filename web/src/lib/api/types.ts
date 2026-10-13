@@ -1480,7 +1480,7 @@ export interface components {
 			lost_at: number | null;
 			/** @description picks made by a team other than the slot's own */
 			traded: number;
-			/** @description our call at the drafter's turn. The why is on the call only, or on every shortlist row with full_reasoning. */
+			/** @description our call at the drafter's turn, or between turns the conditional call (conditional true): the player to take if the board holds to your_next_pick. The why is on the call only, or on every shortlist row with full_reasoning. */
 			card: components['schemas']['RoomCard'] | null;
 			/** @description the board valued for this league, sent only when since is 0 */
 			board: components['schemas']['RoomBoard'] | null;

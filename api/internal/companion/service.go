@@ -23,6 +23,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/httpx"
+	"github.com/jhunthrop/commish/api/internal/memo"
 	"github.com/jhunthrop/commish/api/internal/sleeper"
 )
 
@@ -67,18 +68,29 @@ type Directory interface {
 
 // Service serves the companion's routes.
 type Service struct {
-	Store        Repository
-	Poller       *Poller
-	Directory    Directory
-	Boards       BoardSource
-	Matcher      Matcher
-	Advisor      advisor.Advisor
+	Store     Repository
+	Poller    *Poller
+	Directory Directory
+	Boards    BoardSource
+	Matcher   Matcher
+	Advisor   advisor.Advisor
+	// Engine makes the conditional call between turns, the lobby's.
+	Engine       advisor.Engine
 	Entitlements Checker
 	// Replay is the recorded draft, nil unless COMPANION_REPLAY is on.
 	Replay        *Replay
 	ReportWorkers int
 	Now           func() time.Time
 	Log           *slog.Logger
+
+	// conditional keeps the between-turns card per companion and pick
+	// count: every viewer of one pick costs one computation.
+	conditional memo.Map[conditionalKey, apitypes.RoomCard]
+}
+
+type conditionalKey struct {
+	companion uuid.UUID
+	picks     int
 }
 
 // Routes is every route this package serves.

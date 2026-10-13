@@ -80,6 +80,15 @@ func (s *Service) answer(w http.ResponseWriter, r *http.Request, row Row, since 
 		return
 	}
 	out := s.view(f, since)
+	if !out.YourTurn && out.YourNextPick != nil && out.OnClock != nil && f.built.LostAt == nil {
+		// Between turns, the lobby's conditional call: the player to take
+		// if the board holds to your next pick. Left off when it fails.
+		if card, err := s.conditionalFor(ctx, f); err != nil {
+			s.Log.Warn("companion: conditional card", "companion", row.ID, "err", err)
+		} else {
+			out.Card = card
+		}
+	}
 	if out.YourTurn && f.built.LostAt == nil {
 		// A card that fails is logged and left off: the picks keep coming.
 		card, ranges, err := s.cardFor(ctx, f)

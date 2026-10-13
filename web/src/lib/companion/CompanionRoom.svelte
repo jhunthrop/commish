@@ -51,9 +51,18 @@
 	const round = $derived(snakeSlot(Math.min(now, c.total_picks), teams).round);
 	const prev = $derived(turnBefore(now, c.slot, teams));
 	const card = $derived(c.card);
-	const call = $derived(card && c.your_turn ? callView(card, board, drafted, teams) : null);
+	/** At your turn our call; between turns the lobby's conditional call, the player to take if the
+	 * board holds to your next pick. */
+	const call = $derived(
+		card && (c.your_turn || card.conditional) ? callView(card, board, drafted, teams) : null
+	);
+	const onTurn = $derived(call !== null && c.your_turn);
 	const oddsLabel = $derived(
-		card?.next_pick ? `still there at ${pickLabel(card.next_pick, teams)}` : 'your last pick'
+		card?.conditional
+			? `reaches your pick at ${pickLabel(card.for_pick, teams)}`
+			: card?.next_pick
+				? `still there at ${pickLabel(card.next_pick, teams)}`
+				: 'your last pick'
 	);
 	const rows = $derived(poolRows(board, drafted, filter, [], search));
 	const strip = $derived(landingStrip(picks, board, teams, c.slot));
@@ -95,7 +104,7 @@
 	{#each notes as note (note)}
 		<p class="note">{note}</p>
 	{/each}
-	{#if strip.length > 0 && !call}
+	{#if strip.length > 0 && !onTurn}
 		<PickStrip
 			lead={pickLabel(picks.at(-1)?.pick ?? 1, teams)}
 			leadLines={['just taken on Sleeper', 'newest first']}
@@ -103,7 +112,7 @@
 			width="md"
 		/>
 	{/if}
-	{#if call && card}
+	{#if call && card && onTurn}
 		{#if went.length > 0}<SinceStrip since={prev} {went} {teams} queue={false} />{/if}
 		<RoomCall
 			view={call}
@@ -111,6 +120,12 @@
 			action={{ label: 'Make the pick on Sleeper', onclick: openHost }}
 		/>
 		<Shortlist {card} {board} {oddsLabel} ranges={c.ranges} />
+	{:else if call}
+		<RoomCall
+			view={call}
+			pickNumber={now}
+			action={{ label: 'Queue him on Sleeper', onclick: openHost }}
+		/>
 	{/if}
 	{#if c.status !== 'complete'}
 		<Pool

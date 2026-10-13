@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"sync"
 
 	"github.com/google/uuid"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leagues"
+	"github.com/jhunthrop/commish/api/internal/memo"
 	"github.com/jhunthrop/commish/api/internal/mock"
 	"github.com/jhunthrop/commish/api/internal/sim"
 )
@@ -50,8 +50,8 @@ type Handler struct {
 	RoomBaseURL string
 	Log         *slog.Logger
 
-	cards   memo[apitypes.RoomCard]
-	reports memo[apitypes.MockReport]
+	cards   memo.Map[memoKey, apitypes.RoomCard]
+	reports memo.Map[memoKey, apitypes.MockReport]
 }
 
 // Routes is every route the lobby serves from the api.
@@ -212,7 +212,7 @@ func (h *Handler) card(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	key := memoKey{room: room.ID, seq: room.Seq, seat: seat}
-	if out, ok := h.cards.get(key); ok {
+	if out, ok := h.cards.Get(key); ok {
 		httpx.WriteOK(w, r, http.StatusOK, out)
 		return
 	}
@@ -239,7 +239,7 @@ func (h *Handler) card(w http.ResponseWriter, r *http.Request) {
 		}
 		out = draftroom.CardView(draftroom.Trim(c, room.State), *c.NextPick, true)
 	}
-	h.cards.put(key, out)
+	h.cards.Put(key, out)
 	httpx.WriteOK(w, r, http.StatusOK, out)
 }
 
@@ -276,7 +276,7 @@ func (h *Handler) report(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	key := memoKey{room: room.ID, seq: room.Seq, seat: seat}
-	if out, ok := h.reports.get(key); ok {
+	if out, ok := h.reports.Get(key); ok {
 		httpx.WriteOK(w, r, http.StatusOK, out)
 		return
 	}
@@ -294,7 +294,7 @@ func (h *Handler) report(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, "lobby: report", err)
 		return
 	}
-	h.reports.put(key, out)
+	h.reports.Put(key, out)
 	httpx.WriteOK(w, r, http.StatusOK, out)
 }
 
@@ -303,30 +303,4 @@ type memoKey struct {
 	room uuid.UUID
 	seq  int64
 	seat int
-}
-
-// maxMemo bounds a memo; past it the memo starts over.
-const maxMemo = 512
-
-// memo keeps answers that depend only on a room's seq and a seat: twelve
-// drafters asking at once cost one computation each.
-type memo[T any] struct {
-	mu      sync.Mutex
-	entries map[memoKey]T
-}
-
-func (m *memo[T]) get(k memoKey) (T, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	v, ok := m.entries[k]
-	return v, ok
-}
-
-func (m *memo[T]) put(k memoKey, v T) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.entries == nil || len(m.entries) >= maxMemo {
-		m.entries = map[memoKey]T{}
-	}
-	m.entries[k] = v
 }

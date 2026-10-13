@@ -697,7 +697,7 @@ type Companion struct {
 	// Board the board valued for this league, sent only when since is 0
 	Board *RoomBoard `json:"board"`
 
-	// Card our call at the drafter's turn. The why is on the call only, or on every shortlist row with full_reasoning.
+	// Card our call at the drafter's turn, or between turns the conditional call (conditional true): the player to take if the board holds to your_next_pick. The why is on the call only, or on every shortlist row with full_reasoning.
 	Card        *RoomCard     `json:"card"`
 	CreatedAt   time.Time     `json:"created_at"`
 	Host        CompanionHost `json:"host"`
