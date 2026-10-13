@@ -29,7 +29,7 @@ type AuctionLot struct {
 // AuctionState is the auction sub-state.
 type AuctionState struct {
 	// NominatingTeamID is the team due to nominate, nil once every roster is full.
-	NominatingTeamID *string    `json:"nominatingTeamId"`
+	NominatingTeamID *string     `json:"nominatingTeamId"`
 	Lot              *AuctionLot `json:"lot"`
 	// MinBid is the opening price for auto-nominated lots, from START_DRAFT.
 	MinBid int `json:"minBid"`
@@ -39,9 +39,9 @@ type AuctionState struct {
 // shared between states and never written after a state is returned: a
 // reducer copies what it changes.
 type State struct {
-	Config     Config `json:"config"`
-	Phase      Phase  `json:"phase"`
-	Sequence   int    `json:"sequence"`
+	Config     Config   `json:"config"`
+	Phase      Phase    `json:"phase"`
+	Sequence   int      `json:"sequence"`
 	DraftOrder []string `json:"draftOrder"`
 	Pool       Pool     `json:"pool"`
 	Picks      []Pick   `json:"picks"`
