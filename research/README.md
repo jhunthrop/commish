@@ -77,16 +77,16 @@ need; every `player_id` means a row of `players`.
 | observations | `player_week_observations` | `season, week, player_id, source, metric, as_of` | same name |
 | observations | `team_week_observations` | `season, week, team, source, metric, as_of` | same name |
 | observations | `player_week_teams` | `season, week, player_id, team, as_of` | same name |
-| provider | `provider_stat_lines` | `provider_player_id, week` | `player_stat_lines` |
-| provider | `provider_games` | `game_id` | `nfl_games` |
-| provider | `provider_weeks` | `week` | `stat_weeks` |
+| provider | `provider_stat_lines` | `season, week, provider_player_id` | `player_stat_lines` |
+| provider | `provider_games` | `game_id` (indexed `season, week`) | `nfl_games` |
+| provider | `provider_weeks` | `season, week` | `stat_weeks` |
 | provider | `capture_snapshots`, `player_prop_observations` | `id` (identity) | same names |
 | market | `preseason_rosters` | `season, player_id, as_of` | same name |
 | market | `preseason_rankings` | `season, source, player_id, as_of` | same name |
 | market | `adp_snapshots` | `player_id, source, captured_at` | same name |
 | boards | `model_artifacts` | `name, version` | same name |
 | boards | `preseason_projections` | `season, source, player_id, as_of` | same name |
-| boards | `preseason_board_reasons` | `source, season, player_id, code, detail` | same name |
+| boards | `preseason_board_reasons` | `season, source, as_of, player_id, code, detail` | same name |
 | boards | `register_freeze_rows` | `season, week, frozen_at, board_source, player_id` | same name |
 | boards | `register_grade_rows` | `season, week, frozen_at, graded_at, board_source, player_id` | same name |
 | boards | `player_capsules` | `player_id` (gsis) | same name |
@@ -115,29 +115,63 @@ What changed from the legacy tables, and why:
    the column is gone (the loader verifies the constant before dropping it).
 6. **No defaults that hide a missing value.** `adp_snapshots.captured_at`,
    `preseason_projections.moment_kind`, `preseason_board_reasons.detail`,
-   `nflverse_roster_weeks.status_detail` and the provider games' `game_date` and `kickoff_et` lost
-   their defaults: every writer sets them, and a writer that forgot should fail, not store a guess.
+   `nflverse_roster_weeks.status_detail`, every `provider_stat_lines` stat and every
+   `provider_weeks` column lost their defaults: every writer sets them, and a writer that forgot
+   should fail, not store a guess. A box-score stat Tank01 leaves out is one the player did not
+   record, so the writer states the zero; a game's date and kickoff time are nullable because the
+   provider can omit them (the legacy default stored `''`, which the loader reads as no value).
+   The bookkeeping instants (`ingested_at` and kin) keep `now()`: they are the database's own record
+   of when a row landed, which no writer knows better.
 7. **The register says who froze it.** `register_freeze_rows.implementation` is required and
    checked (`typescript`, `python`): 2026 weeks 1 and 2 were frozen by the TypeScript, and the
    record page says so. The loader sets `typescript` on every legacy row.
 8. **Names by role.** `nfl_games` and `stat_weeks` were the provider's fixtures and its week state,
    so they are `provider_games` and `provider_weeks`; their columns `home_nfl_team`, `away_nfl_team`
-   and `players.nfl_team` are `home_team`, `away_team` and `team`.
+   and `players.nfl_team` are `home_team`, `away_team` and `team`. The freeze rows' `adp_rank` and
+   `ecr_rank` held what the market and the panel published (fractional), so they are `adp` and
+   `ecr`; the grade rows' `adp_rank` and `ecr_rank` are ordinal places among the graded, integers.
+9. **The provider store names its season.** The Tank01 tables hold one season (the founder's
+   2026-09-04 ruling) but every row carries `season`, keyed by `(season, week)`, and a writer
+   retires every other season before it writes (`retire_other_seasons`, the rollover rule in
+   `db/schema/provider.py`, tested in `tests/test_rollover.py`): a new season starts clean, and a
+   read by week can never mix two seasons. Legacy rows are the 2026 season's (checked by fixture
+   date on load).
+10. **A board's reasons name their board.** `preseason_board_reasons` carries the `as_of` of the
+    board generation it explains, so a frozen board's reasons survive a later generation. It is not
+    a foreign key onto a projection row, because a reason can explain an exclusion (`roster_status`:
+    528 dev reasons explain a player the roster gate kept off the board). Legacy reasons take the one
+    generation their `(season, source)` holds; the loader checks there is exactly one.
+11. **Types, each on purpose.**
+    - `real` is gone: every float is `double precision`. The legacy `real` columns (ADP, sacks, snap
+      share) are read through their shortest decimal text, which is the value the provider published
+      (`12.3`, not the float4 12.300000190734863).
+    - Dates are `date`: the provider's `YYYYMMDD` and nflverse's `birth_date`. The one text time
+      left, `provider_games.kickoff_et` (`8:20p`), is the provider's display string, kept verbatim:
+      research reads kickoff instants from the nflverse schedule's observations.
+    - Instants are `timestamptz`; counts, ranks, weeks and seasons are `integer`; ids and names are
+      `text`; payloads and per-market detail are `jsonb`; `preseason_rankings.rank` is a double
+      because a consensus rank is published fractional.
 
 Not carried: `player_peek_documents` and `player_peek_facts`, the old app's peek page cache and its
 facts; research-ts neither reads nor writes them, and the capsule sweep recomputes facts from the
-store. Kept on purpose: the provider tables stay current-season only (no `season` column), by the
-founder's 2026-09-04 ruling that the stat store holds only the current season.
+store.
 
 ## The legacy loader
 
 `python -m research.load_legacy` copies every research table from its legacy table through
-`db/legacy.py`, in foreign-key order, in one target transaction, after checking that the entry
-accounts for every legacy column. It prints per table the legacy rows, the rows kept by design and
-the rows that landed, and a fingerprint check (an md5 over each row's text, sorted, hashed again,
-on both sides). Any landed count that differs from what the legacy table holds, unless a stated
-row filter explains it exactly, or any fingerprint that differs, fails the load and writes
-nothing. Run 2026-10-12 against the dev copy of production:
+`db/legacy.py`, in foreign-key order, in one target transaction. It reads the source in one
+REPEATABLE READ, READ ONLY transaction, so every table is copied from the same snapshot; a snapshot
+that cannot be held fails with `SnapshotError` and writes nothing. Before each table it checks that
+the entry accounts for every legacy column, that a dropped constant column is constant, and that
+every invariant a derivation relies on holds (one board generation per reason's `(season, source)`;
+every legacy fixture dated in 2026). It prints per table the legacy rows, the rows kept by design
+and the rows that landed, and a fingerprint check (an md5 over each row's text, sorted, hashed
+again, on both sides). Any landed count that differs from what the legacy table holds, unless a
+stated row filter explains it exactly, or any fingerprint that differs, fails the load.
+
+Cutover, in order: stop the legacy writers (the Vercel cron's jobs and the operator scripts);
+`alembic upgrade head` against `RESEARCH_DATABASE_URL`; `load_legacy` from production; `parity schema
+--against` the Neon database; start the Python nightly. Run 2026-10-12 against the dev copy:
 
 ```
 research table                 legacy table                      legacy      kept    landed  rows  result
@@ -186,8 +220,11 @@ fills with `now()` that neither side sets.
 
 Each case runs in passes: `first` into empty databases, `rerun` on top of its own first pass from
 the same recordings (every upsert's conflict branch, every changed-row check, every insert-or-ignore,
-the live season's roster supersede, and the props backfill's resume), and, where an earlier
-nflverse release is recorded, `prior` then `later` on a second pair. A pass also fails on a declared
+and the props backfill's resume), and, where an earlier recording exists, `prior` then `later` on
+a second pair. The live roster supersede has its own: the four-club week-one roster at August 20,
+then a later release without Kansas City at August 27 (`preseason-2026-later`, derived from the
+recording with the filter stated in its manifest), so a supersede that does not retire the earlier
+claim leaves rows only one side holds. Proven: with the retire line removed, the case fails. A pass also fails on a declared
 table empty on both sides, on the two sides asking for different recordings, or on different exit
 statuses from the operator scripts. Every scratch database is dropped when its case ends, and any
 `parity_*` leftover when a run starts.
@@ -205,9 +242,9 @@ library ingests the remaining scripts are one-line wrappers around are called di
 Run 2026-10-12 against the recorded fixtures (`parity/fixtures/`, every response recorded from the live
 provider, a large CSV narrowed by rows kept byte for byte with the filter stated in its manifest).
 
-**Schema gate:** a database migrated by alembic from nothing equals the declared schema (alembic's metadata comparison finds no difference; 649 catalog facts); every legacy column of the 27 mapped legacy tables, as the root drizzle journal builds them, is read or dropped with a reason; the dev database's `research` schema equals the migrated one, 649 of 649.
+**Schema gate:** a database migrated by alembic from nothing equals the declared schema two ways: alembic's metadata comparison finds no difference, and its catalog (658 facts: columns, every `pg_constraint` row including the CHECK constraints, indexes) equals that of a database built by `METADATA.create_all`, line for line (proven: widening `coaches_role_ck` in the declaration alone fails the gate); every legacy column of the 27 mapped legacy tables, as the root drizzle journal builds them, is read or dropped with a reason; the dev database's `research` schema equals the migrated one, 658 of 658.
 
-**Ingests:** `parity: 31 ingest case(s) in 74 passes, 31 matching; 1379904 rows compared per case, 940388 deduplicated; 0 differences`
+**Ingests:** `parity: 31 ingest case(s) in 76 passes, 31 matching; 1382755 rows compared per case, 943239 deduplicated; 0 differences`
 
 Rows compared per case add every table of every pass of every case, so a shared prerequisite (the
 25,000-person universe several cases land first) counts once per case and pass; the deduplicated
@@ -273,16 +310,18 @@ total counts each tested table per pass and each prerequisite table once, at its
 | tank01-capture-harvest | rerun | capture_snapshots 5 | 0 |
 | preseason-2025 | first | preseason_rosters 363; player_week_observations 73; preseason_rankings 230 | 0 |
 | preseason-2025 | rerun | preseason_rosters 363; player_week_observations 73; preseason_rankings 230 | 0 |
-| preseason-2026-live | first | preseason_rosters 341; player_week_observations 109; preseason_rankings 127 | 0 |
-| preseason-2026-live | rerun | preseason_rosters 341; player_week_observations 109; preseason_rankings 127 | 0 |
+| preseason-2026-live | first | preseason_rosters 260; player_week_observations 109; preseason_rankings 104 | 0 |
+| preseason-2026-live | rerun | preseason_rosters 260; player_week_observations 109; preseason_rankings 104 | 0 |
+| preseason-2026-live | prior | preseason_rosters 341; player_week_observations 109; preseason_rankings 127 | 0 |
+| preseason-2026-live | later | preseason_rosters 260; player_week_observations 220; preseason_rankings 231 | 0 |
 | adp-snapshot | first | preseason_rosters 341 (setup); adp_snapshots 36 | 0 |
 | adp-snapshot | rerun | preseason_rosters 341 (setup); adp_snapshots 36 | 0 |
 | current-ecr | first | player_crosswalk 1,373 (setup); preseason_rankings 545 | 0 |
 | current-ecr | rerun | player_crosswalk 1,373 (setup); preseason_rankings 545 | 0 |
 | odds-snapshot-and-resolve | first | players 24,853 (setup); player_prop_observations 551; props_player_map 59 | 0 |
 | odds-snapshot-and-resolve | rerun | players 24,853 (setup); player_prop_observations 1,102; props_player_map 59 | 0 |
-| props-preseason-job | first | players 24,853 (setup); team_week_observations 3,584 (setup) | 0 |
-| props-preseason-job | rerun | players 24,853 (setup); team_week_observations 3,584 (setup) | 0 |
+| props-preseason-job | first | players 24,853 (setup); team_week_observations 3,584 (setup); player_prop_observations 551; props_player_map 59 | 0 |
+| props-preseason-job | rerun | players 24,853 (setup); team_week_observations 3,584 (setup); player_prop_observations 1,102; props_player_map 59 | 0 |
 | odds-backfill | first | team_week_observations 5,604 (setup); player_prop_observations 209 | 0 |
 | odds-backfill | rerun | team_week_observations 5,604 (setup); player_prop_observations 466 | 0 |
 | win-totals-seed | first | team_week_observations 2,304 | 0 |

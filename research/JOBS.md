@@ -25,6 +25,10 @@ how a stopped run finishes: `season`, `context`, `derived-stat-lines`, `kdef`, `
 command, each capture feed and each published board runs in its own savepoint, so one failed feed
 or board is reported and the rest are kept, as the TypeScript carries on.
 
+The Tank01 store holds one season: `tank01-roster` and `tank01-schedule` first retire every row
+of any other season (`retire_other_seasons`, in the same transaction as the write), so the first
+write of a new season starts it clean.
+
 ## Scheduled jobs (the registry)
 
 | Job | Schedule today | What it ingests or does | Python destination |
