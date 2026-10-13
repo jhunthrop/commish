@@ -31,7 +31,7 @@ The market gap is real on both sides. FantasyPros removed live mocks with people
 
 - **No clock and no reveal.** On your pick, every bot pick until your next turn is resolved in one commit, as today, and stamped with no delay instead of a 450 to 950 ms think time. The client reveals everything at once. The measured round trip for the batch is 32 ms p50 in a 12-team room, so the next turn is on screen before the hand leaves the key.
 - **What went since your pick.** The picks between your turns are one strip: the count, the faces in order, and anyone from your queue ringed in orange with "queued" under him. It replaces the ticker, the pacing message and the reveal animation. A drafter learns what the room did to them without scrolling the wall.
-- **Our call, as a panel, not a lower third.** His face, the survival odds as the one big number, the runner-up in a sentence ("Prescott has more over replacement at +22.2, but he is still there at 6.05 97% of the time. Williams is not."), and the verb with its key. A Press Box panel with an orange edge above the pool, so nothing covers the rows. The lower third from the Broadcast direction is retired.
+- **Our call, as a panel, not a lower third.** His face, the survival odds as the one big number, the runner-up in a sentence that states both odds ("Prescott has more over replacement at +22.2 and is still there at 6.05 97% of the time. Williams is there under 1% of the time."; the product never says "is not" when the odds are only lower, ruling 2026-10-14 after the rooms design review), and the verb with its key. A Press Box panel with an orange edge above the pool, so nothing covers the rows. The lower third from the Broadcast direction is retired.
 - **The pool** ranked by points over replacement with the survival odds to your next pick on every row, the ADP sentence ("drafters take him 22 later"), Queue and Draft on each row, position chips and a Queue chip.
 - **Undo** any of your picks. The draft is truncated to that pick and replays from there with the same seed, so the bots behave the same up to the change and the room shows the branch. Later picks cannot stand, because a removed pick changes the pool (ruling 2026-10-13, after the Go port). **Pick for me to round N** and **Finish the draft** autopick from your queue first, then your sheet, then the board. **Save and share** gives a link that carries the seed and your picks, so anyone opens the same draft.
 - **Keyboard.** Enter drafts our call, arrows move through the pool, Q queues, U undoes, / searches. Listed in the dock, not as a tip: the keys panel is the control, the way a menu shows its shortcuts.
@@ -88,7 +88,8 @@ From a read of the code on 2026-10-12, no code run:
 2. The mock data pulled for the screens has no kickers or defenses. The real room has them, and the report's lineup includes them.
 3. "Your league's last draft" as a bot style needs the league import that the Draft Pass carries, so it is greyed until then.
 4. The 200-run report's rank line reads as a boast when the bots are ADP-only. Keep the basis sentence, and re-measure once the archetype bots are in.
-5. Lobby abuse: handles are shown to strangers, so names go through the same filter as account names, and a lobby with fewer than three people falls back to the solo room's rules.
+5. The phone report keeps Against ADP and Hindsight as a second line under each pick; the mock page report.html drops them at 390 and should be updated to match the product (rooms design review, 2026-10-14).
+6. Lobby abuse: handles are shown to strangers, so names go through the same filter as account names, and a lobby with fewer than three people falls back to the solo room's rules.
 
 ## Persona walk
 
