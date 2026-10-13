@@ -4,7 +4,9 @@ import { error } from '@sveltejs/kit';
 import { positionFromSegment, positionsIn, rangeScale, rowsAt } from '#lib/run/derive.ts';
 import type { BoardRow, Format } from '#lib/run/schema.ts';
 import type { Position, RangeScale } from '#lib/types/player.ts';
-import { board, formatById, manifest } from '../run.ts';
+import { links } from '#lib/site/links.ts';
+import { board, manifest } from '../run.ts';
+import { formatForRoute, formatSlugs } from './format-route.ts';
 
 const NOT_FOUND = 404;
 
@@ -30,10 +32,10 @@ export async function formatChips(): Promise<FormatChip[]> {
 }
 
 export async function boardPage(formatId: string, segment: string | null): Promise<BoardPage> {
-	const format = await formatById(formatId).catch(() => error(NOT_FOUND, 'No such board.'));
-	const [loaded, formats] = await Promise.all([board(format.id), formatChips()]);
 	const position = segment === null ? null : positionFromSegment(segment);
 	if (segment !== null && position === null) error(NOT_FOUND, 'No such position.');
+	const format = await formatForRoute(formatId, (id) => links.board(id, position));
+	const [loaded, formats] = await Promise.all([board(format.id), formatChips()]);
 	const rows = position === null ? loaded.rows : rowsAt(loaded.rows, position);
 	if (rows.length === 0) error(NOT_FOUND, 'This board ranks nobody at that position.');
 	return {
@@ -47,16 +49,19 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 	};
 }
 
-/** Every board view the build prerenders: each format, its All view and each of its positions. */
+/** Every format slug a board route answers: canonical ids, and short slugs that redirect. */
+export async function boardFormatEntries(): Promise<{ format: string }[]> {
+	return (await formatSlugs()).map((format) => ({ format }));
+}
+
+/** Every position view the build prerenders: each format slug, each position its board ranks. */
 export async function boardEntries(): Promise<{ format: string; position: string }[]> {
-	const { formats } = await manifest();
-	const views = await Promise.all(
-		formats.map(async (format) =>
-			positionsIn((await board(format.id)).rows).map((position) => ({
-				format: format.id,
-				position: position.toLowerCase()
-			}))
-		)
-	);
-	return views.flat();
+	const [{ formats }, slugs] = await Promise.all([manifest(), formatSlugs()]);
+	const positions = new Set<string>();
+	for (const format of formats) {
+		for (const position of positionsIn((await board(format.id)).rows)) {
+			positions.add(position.toLowerCase());
+		}
+	}
+	return slugs.flatMap((format) => [...positions].map((position) => ({ format, position })));
 }

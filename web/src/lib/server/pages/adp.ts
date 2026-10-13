@@ -1,11 +1,10 @@
 /** ADP for one format: every player its named sources have, in the order drafters take them, beside
  * where our board has him. */
-import { error } from '@sveltejs/kit';
 import type { AdpSource, BoardRow, Format } from '#lib/run/schema.ts';
-import { adp, board, formatById, manifest } from '../run.ts';
+import { links } from '#lib/site/links.ts';
+import { adp, board } from '../run.ts';
+import { formatForRoute, formatSlugs } from './format-route.ts';
 import { formatChips, type FormatChip } from './board.ts';
-
-const NOT_FOUND = 404;
 
 export interface AdpPage {
 	format: Format;
@@ -18,11 +17,11 @@ export interface AdpPage {
 }
 
 export async function adpEntries(): Promise<{ format: string }[]> {
-	return (await manifest()).formats.map((format) => ({ format: format.id }));
+	return (await formatSlugs()).map((format) => ({ format }));
 }
 
 export async function adpPage(formatId: string): Promise<AdpPage> {
-	const format = await formatById(formatId).catch(() => error(NOT_FOUND, 'No such format.'));
+	const format = await formatForRoute(formatId, (id) => links.adp(id));
 	const [loaded, all, formats] = await Promise.all([board(format.id), adp(), formatChips()]);
 	const rows = loaded.rows
 		.flatMap((row) => (row.adp === null ? [] : [{ ...row, adp: row.adp }]))
