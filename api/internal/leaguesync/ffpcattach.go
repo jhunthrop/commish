@@ -13,9 +13,9 @@ import (
 // Words for an FFPC league.
 const (
 	ffpcPickWords      = "Pick your league from your FFPC list"
-	ffpcConnectWords   = "Connect FFPC first: sign in on the league page"
+	ffpcConnectWords   = "No one in this league is signed in to FFPC on Commish right now. Sign in to read it"
 	ffpcSignInWords    = "FFPC signed you out. Sign in to FFPC again to keep reading your league"
-	ffpcNotConfigured  = "FFPC leagues are not set up here"
+	ffpcNotConfigured  = "FFPC leagues are not open here right now"
 	ffpcNotInListWords = "That league is not in your FFPC list. " + ffpcPickWords
 )
 
@@ -71,6 +71,8 @@ func (s *Service) attachFFPC(w http.ResponseWriter, r *http.Request, in apitypes
 // writeFFPCError answers the FFPC-only errors, and reports whether it did.
 func writeFFPCError(w http.ResponseWriter, r *http.Request, err error) bool {
 	switch {
+	case errors.Is(err, ErrHostOff):
+		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, ffpcNotConfigured, nil)
 	case errors.Is(err, ErrNotConnected):
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, ffpcConnectWords, nil)
 	case errors.Is(err, ErrSignInAgain):

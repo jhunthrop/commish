@@ -83,6 +83,9 @@ func (p *Poller) Refresh(ctx context.Context, ref Ref) (Read, error) {
 
 func (p *Poller) read(ctx context.Context, ref Ref, gap time.Duration, mode poll.Mode) (Read, error) {
 	host, ok := p.Hosts.ByKey(ref.Host)
+	if !ok && ref.Host == HostFFPC {
+		return Read{}, ErrHostOff
+	}
 	if !ok {
 		return Read{}, ErrNotALink
 	}

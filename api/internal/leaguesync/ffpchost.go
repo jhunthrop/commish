@@ -75,13 +75,24 @@ func (f *FFPC) Parse(pasted string) (Ref, error) {
 }
 
 // Read reads the league as a connected member who attached it.
+//
+// The read is shared by every member viewing the league, so one member's
+// signed-out connection is not the viewer's news: the next connected
+// member is tried once (the signed-out one is no longer a reader). Only
+// when no connected member is left does the answer ask for a sign-in,
+// which is then the viewer's own to give.
 func (f *FFPC) Read(ctx context.Context, ref Ref) (Snapshot, error) {
-	accountID, ltuid, err := f.Readers.FFPCReader(ctx, ref)
-	if err != nil {
-		return Snapshot{}, err
+	for range 2 {
+		accountID, ltuid, err := f.Readers.FFPCReader(ctx, ref)
+		if err != nil {
+			return Snapshot{}, err
+		}
+		snap, _, err := f.ReadAs(ctx, accountID, ltuid)
+		if !errors.Is(err, ErrSignInAgain) && !errors.Is(err, ErrNotConnected) {
+			return snap, err
+		}
 	}
-	snap, _, err := f.ReadAs(ctx, accountID, ltuid)
-	return snap, err
+	return Snapshot{}, fmt.Errorf("%w: two members signed out in one read", ErrUnavailable)
 }
 
 // ReadAs reads the league as one member, answering it and the member's
@@ -130,6 +141,8 @@ func (f *FFPC) Players(context.Context, int) ([]HostPlayer, error) { return nil,
 var (
 	// ErrNotConnected is an account with no FFPC connection.
 	ErrNotConnected = errors.New("leaguesync: host not connected")
+	// ErrHostOff is an FFPC league while FFPC is switched off here.
+	ErrHostOff = errors.New("leaguesync: host is off here")
 	// ErrSignInAgain is a connection FFPC signed out or locked.
 	ErrSignInAgain = errors.New("leaguesync: sign in to the host again")
 )
