@@ -13,6 +13,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leagues"
 	"github.com/jhunthrop/commish/api/internal/mocks"
@@ -42,6 +43,7 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodPut, Path: "/mocks/{id}/queue", Access: in, Limit: perMin(limitPickPerMinute), Handler: s.handleQueue},
 		{Method: http.MethodGet, Path: "/mocks/{id}/card", Access: in, Limit: perMin(limitPickPerMinute), Handler: s.handleCard},
 		{Method: http.MethodGet, Path: "/mocks/{id}/report", Access: in, Limit: perMin(limitReportPerMinute), Handler: s.handleReport},
+		{Method: http.MethodGet, Path: "/boards/{format}", Access: httpx.Public, Limit: perMin(limitReadPerMinute), Handler: s.handleBoard},
 		{Method: http.MethodGet, Path: "/shared/mocks/{code}", Access: httpx.Public, Limit: perMin(limitSharedPerMinute), Handler: s.handleShared},
 		{Method: http.MethodGet, Path: "/shared/mocks/{code}/report", Access: httpx.Public, Limit: perMin(limitSharedReportPerMinute), Handler: s.handleSharedReport},
 	}
@@ -258,6 +260,41 @@ func (s *Service) handleReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteOK(w, r, http.StatusOK, json.RawMessage(raw))
+}
+
+// standardTeams is the league the setup page's player list is valued for.
+const standardTeams = 12
+
+// boardPreset is the preset a board format reads as.
+func boardPreset(format string) (apitypes.ScoringPreset, bool) {
+	switch format {
+	case "ppr":
+		return apitypes.ScoringPresetPpr, true
+	case "half":
+		return apitypes.ScoringPresetHalfPpr, true
+	case "std":
+		return apitypes.ScoringPresetStandard, true
+	}
+	return "", false
+}
+
+func (s *Service) handleBoard(w http.ResponseWriter, r *http.Request) {
+	preset, ok := boardPreset(r.PathValue("format"))
+	if !ok {
+		httpx.WriteInvalid(w, r, map[string]string{"format": "Pick ppr, half or std"})
+		return
+	}
+	league := apitypes.LeagueSettings{
+		Scoring: apitypes.Scoring{Preset: &preset}, Teams: standardTeams, Lineup: apitypes.LineupStandard,
+		Roster:  apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 2, Te: 1, K: 1, Dst: 1, Bench: 6},
+		Keepers: []apitypes.Keeper{}, BotStyle: apitypes.BotStyleAdp,
+	}
+	b, err := s.Boards.For(r.Context(), league)
+	if err != nil {
+		s.fail(w, r, "solo: board", err)
+		return
+	}
+	httpx.WriteOK(w, r, http.StatusOK, draftroom.BoardView(b, nil))
 }
 
 func (s *Service) handleShared(w http.ResponseWriter, r *http.Request) {

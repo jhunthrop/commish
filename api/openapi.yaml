@@ -604,6 +604,28 @@ paths:
         "200": { $ref: "#/components/responses/MockReportResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
         "409": { $ref: "#/components/responses/ErrorResponse" }
+  /boards/{format}:
+    parameters:
+      - name: format
+        in: path
+        required: true
+        schema: { type: string, enum: [ppr, half, std] }
+    get:
+      tags: [mocks]
+      operationId: roomBoard
+      summary: >-
+        The board a room drafts from in a scoring format, valued for 12 teams on the standard roster: the setup
+        page's player list for keepers. A room values its own league.
+      responses:
+        "200":
+          description: the board
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/RoomBoard" } }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
   /shared/mocks/{code}:
     parameters: [{ $ref: "#/components/parameters/ShareCode" }]
     get:

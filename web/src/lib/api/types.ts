@@ -612,6 +612,25 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/boards/{format}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				format: 'ppr' | 'half' | 'std';
+			};
+			cookie?: never;
+		};
+		/** The board a room drafts from in a scoring format, valued for 12 teams on the standard roster: the setup page's player list for keepers. A room values its own league. */
+		get: operations['roomBoard'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/shared/mocks/{code}': {
 		parameters: {
 			query?: never;
@@ -2315,6 +2334,29 @@ export interface operations {
 			200: components['responses']['MockReportResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
+		};
+	};
+	roomBoard: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				format: 'ppr' | 'half' | 'std';
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the board */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['RoomBoard'];
+					};
+				};
+			};
+			400: components['responses']['ErrorResponse'];
 		};
 	};
 	sharedMock: {
