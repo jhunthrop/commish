@@ -26,8 +26,9 @@ concurrency:
 permissions:
   contents: read
 
+# The Cloudflare token is set on the two steps that use it (the run inputs and the deploy), never on
+# the job, so no install script, check or browser ever sees it.
 env:
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
   PUBLIC_RUN_ID: ${{ github.event.client_payload.runId || inputs.runId || 'latest' }}
   # The full set of nightly pages builds in under four minutes (spec §2.1).
@@ -55,6 +56,8 @@ jobs:
 
       - name: The run inputs
         # Appends R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (masked) and PUBLIC_RUN_BASE_URL to the job's env.
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/r2-env.ts
 
       - name: svelte-check
@@ -75,7 +78,7 @@ jobs:
             exit 1
           fi
 
-      - name: Lighthouse budgets on the board, a player page, the record and the system page
+      - name: Lighthouse budgets on the board, the run's top-ranked player and the record
         # Real (devtools) throttling at the mobile profile, seven runs, asserted on the median, from
         # a static server of the build. A failed budget stops the deploy.
         run: npm run lighthouse
@@ -89,4 +92,6 @@ jobs:
           if-no-files-found: ignore
 
       - name: Deploy to the workers.dev preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx wrangler deploy

@@ -1,11 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import Search from '#lib/ui/Search.svelte';
-	import SearchMenu from '#lib/ui/SearchMenu.svelte';
-	import type { SearchHit } from '#lib/ui/search-hit.ts';
-	import type { IndexEntry } from '#lib/run/schema.ts';
-	import { SEARCH_INDEX_URL, searchPlayers, searchable, type SearchablePlayer } from './search.ts';
+	import type SearchMenuType from '#lib/ui/SearchMenu.svelte';
+	import type { SearchSession } from './search-session.svelte.ts';
 
 	interface Props {
 		/** How many players the run has pages for, for the placeholder. */
@@ -16,87 +13,55 @@
 
 	const MENU_ID = 'player-search-menu';
 	let query = $state('');
-	let index = $state<SearchablePlayer[] | null>(null);
-	let failed = $state(false);
-	let active = $state(-1);
-	let open = $state(false);
+	let session = $state<SearchSession | null>(null);
+	let Menu = $state<typeof SearchMenuType | null>(null);
 
-	const hits = $derived<SearchHit[]>(
-		index === null
-			? []
-			: searchPlayers(index, query).map((player) => ({
-					id: player.id,
-					name: player.name,
-					position: player.position,
-					team: player.team,
-					href: resolve('/(run)/players/[slug]', { slug: player.slug })
-				}))
-	);
-	const empty = $derived.by(() => {
-		if (failed) return 'Search is not loading. Try again in a moment.';
-		if (index === null) return undefined;
-		return query.trim() === '' ? undefined : `Nobody named ${query.trim()} on this board`;
-	});
-	const showing = $derived(open && query.trim() !== '' && (hits.length > 0 || empty !== undefined));
-
-	async function loadIndex(): Promise<void> {
-		try {
-			const response = await fetch(SEARCH_INDEX_URL);
-			if (!response.ok) throw new Error(`The search index answered ${String(response.status)}.`);
-			index = searchable(await response.json<IndexEntry[]>());
-			failed = false;
-		} catch {
-			failed = true;
-		}
-	}
-
-	function onInput(): void {
-		open = true;
-		active = hits.length > 0 ? 0 : -1;
-		if (failed) void loadIndex();
+	/** The search's logic and its menu load on the first focus, so a page only read never pays for them. */
+	async function start(): Promise<void> {
+		const [{ SearchSession: Session }, menu] = await Promise.all([
+			import('./search-session.svelte.ts'),
+			import('#lib/ui/SearchMenu.svelte')
+		]);
+		const next = new Session();
+		next.typed(query);
+		next.open = query.trim() !== '';
+		session = next;
+		Menu = menu.default;
+		await next.load();
 	}
 
 	function onKeydown(event: KeyboardEvent): void {
-		if (event.key === 'Escape') {
-			open = false;
-			return;
-		}
-		if (!showing || hits.length === 0) return;
-		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-			event.preventDefault();
-			const step = event.key === 'ArrowDown' ? 1 : -1;
-			active = (active + step + hits.length) % hits.length;
-		} else if (event.key === 'Enter') {
-			const hit = hits[Math.max(active, 0)];
-			if (hit) {
-				event.preventDefault();
-				open = false;
-				void goto(hit.href);
-			}
-		}
+		const hit = session?.key(event);
+		if (hit) void goto(hit.href);
 	}
 
 	function onFocusOut(event: FocusEvent): void {
 		const next = event.relatedTarget;
-		if (!(next instanceof Node) || !(event.currentTarget as HTMLElement).contains(next))
-			open = false;
+		const inside = next instanceof Node && (event.currentTarget as HTMLElement).contains(next);
+		if (!inside && session) session.open = false;
+	}
+
+	function onFocusIn(): void {
+		if (session) session.open = true;
 	}
 </script>
 
-<div class="find" onfocusout={onFocusOut} onfocusin={() => (open = true)}>
+<div class="find" onfocusout={onFocusOut} onfocusin={onFocusIn}>
 	<Search
 		bind:value={query}
 		placeholder="Search {count} players"
 		label="Search players"
-		onfirstfocus={() => void loadIndex()}
-		oninput={onInput}
+		onfirstfocus={() => void start()}
+		oninput={(value: string) => session?.typed(value)}
 		controls={MENU_ID}
-		expanded={showing}
-		activeOption={showing && active >= 0 ? `${MENU_ID}-${String(active)}` : undefined}
+		expanded={session?.showing ?? false}
+		activeOption={session?.showing && session.active >= 0
+			? `${MENU_ID}-${String(session.active)}`
+			: undefined}
 		onkeydown={onKeydown}
 	/>
-	{#if showing}
-		<SearchMenu id={MENU_ID} {hits} {active} {empty} />
+	{#if Menu && session?.showing}
+		<Menu id={MENU_ID} hits={session.hits} active={session.active} empty={session.empty} />
 	{/if}
 </div>
 

@@ -76,5 +76,20 @@ export default defineConfig(
 		rules: {
 			'svelte/no-navigation-without-resolve': ['error', { ignoreLinks: true }]
 		}
+	},
+	{
+		// Lighthouse CI loads its config with require(), so the one CommonJS file is plain JavaScript,
+		// linted without type information.
+		files: ['**/*.cjs'],
+		languageOptions: {
+			sourceType: 'commonjs',
+			parserOptions: { projectService: false, program: null }
+		},
+		rules: {
+			...ts.configs.disableTypeChecked.rules,
+			'@typescript-eslint/no-require-imports': 'off',
+			// The Svelte plugin's copy of this core rule has no scope for a CommonJS file.
+			'svelte/no-inner-declarations': 'off'
+		}
 	}
 );

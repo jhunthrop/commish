@@ -34,9 +34,20 @@ The format is `src/lib/run/schema.ts`, one zod schema per artifact under `runs/<
 fails naming the file and field, so a malformed run never deploys. A run's writer uploads its
 folder, moves `runs/latest.json` last, and dispatches the `nightly-run` event with the run id.
 
+Every basis a page prints comes from the run: ADP's drafts and their window, schedule strength's
+method and the date its inputs were read, the record's statistic, method and frozen runs. The
+manifest's `sources` block names each feed's vendor and window as provenance; no screen shows it.
+
 `scripts/run-from-mock-data.ts` (`npm run standin`, `-- --upload` to put it in R2) is the stand-in
-until the first real run: the approved mocks' 2026 board and capsules, plus the dev database's 2026
-slate, win totals and register state. Delete it once a real run exists.
+until the first real run: the approved mocks' 2026 board and capsules, plus the dev database's
+preseason ADP captures, 2026 slate, published win totals and register state.
+
+### At cutover
+
+- Delete `scripts/run-from-mock-data.ts` in the change that moves `runs/latest.json` to the first
+  real run, so nothing in `web/` reads `research-ts/` or the dev database once `src/` and the
+  oracle are gone.
+- The Worker is `commish-web`; the custom domain route on `trycommish.app` is added to that name.
 
 ## Build and gates
 
