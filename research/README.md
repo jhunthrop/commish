@@ -381,7 +381,8 @@ Python of another platform.
 
 ```sh
 # the oracle's committed fits into the artifact store, as version 1 (runs research-ts; each is
-# stamped with the commit that last changed its numbers, followed through renames, and fitted_on
+# stamped with the commit that last changed its fitted numbers (model/fit_history.py compares the
+# numbers across the file's history, so a rename or a refactor never stamps a fit), and fitted_on
 # names the oracle module, the seasons, the inputs the store lost and the re-fit path). A re-seed is
 # a no-op, a changed payload is refused; --restamp corrects the provenance of identical v1 rows
 RESEARCH_DATABASE_URL=... uv run python -m research.model.seed [--restamp]
@@ -446,7 +447,7 @@ names none.
 
 ### Model parity
 
-The latest run: **9 cases, 1,085,028 comparisons, 0 differences, every claim holding.** Every
+The latest run: **10 cases, 1,085,041 comparisons, 0 differences, every claim holding.** Every
 comparison is exact; a refusal is compared whole, after a declared wording map for the names that
 differ by design (`blend.REFUSAL_WORDING`, `grade.REFUSAL_WORDING`).
 
@@ -454,10 +455,11 @@ differ by design (`blend.REFUSAL_WORDING`, `grade.REFUSAL_WORDING`).
 |---|---|---|
 | numerics | the running node: log, exp, sin, round, mulberry32 100,000 each, pow 400,000, max/min 10,000 each, the ordinal comparator 10,000 pairs (with NaN), 100 whole sorts; the arm64 vectors: log, exp, sin, pow 20,000 each (fused); the x86-64 vectors: log, exp, sin 20,000 each (unfused), pow skipped | 0; each source matches its arm and the other arm differs on 122 lines |
 | board-2026-week2 | at 2026-09-09T02:20:29.697Z, all four legs (551 rows, every stored column and reason; 132 exclusions): the stored generation against the tree at `7af71283` run unmodified, against today's oracle (`persistSeason` itself), and the oracle against the port; the port's ppr against the register's week 2 | 0 |
-| board-2026-week1 | the register's week 1 (669 points, ranks, value ranks) against the tree at `800aef34` with the restatement; the 668 other players against it without; oracle against port on the ppr leg, both refusing the half leg with the same words | 0; without the restatement only `00-0037745` moves |
+| board-2026-week1 | the register's week 1 (669 points, ranks, value ranks) against the tree at `800aef34` with the restatement; the 668 other players against it without; oracle against port on the ppr leg, both refusing the half leg with the same words | 0; without the restatement only `00-0037745`'s points move, no rank moves, and exactly 122 value ranks move |
 | register-freeze-week2 | the freeze retaken at 2026-09-10T18:00:17.177Z against the stored freeze and the oracle's, 1,097 rows; each row quotes its board's model | 0 (`implementation`, `model_version` excluded) |
 | register-grade | 2026 weeks 1 and 2 on today's store | both refuse alike, compared whole: the store holds no 2026 outcomes |
-| register-grade-2024-week2 | a scratch freeze of 2024 week 2 at 2024-09-10T12:00Z (1,317 rows) and its grade (660 rows, every field), both sides | 0 |
+| register-grade-2024-week2 | a scratch freeze of 2024 week 2 at 2024-09-10T12:00Z (1,317 rows) and every output of its grade, both sides: the rows (every field), the boards in order with their populations, each board's four column scores (Spearman, mean absolute rank error, graded), the skipped boards with their reasons, the served population | 0 |
+| register-freeze-unknown-model | the 2024 served board with its model version removed: the freeze refuses (`unknown_model`, the message whole) and writes nothing | |
 | held-out-backtest | rho and n, 2023 and 2024 | 0 |
 | fit-check | the 2026 live board at its stored moment, 4 boards; after kickoff, no archived board is rebuildable | max delta 0.0000 |
 | fit-game-variance | the 2023-2024 refit, oracle against port | 0 |
