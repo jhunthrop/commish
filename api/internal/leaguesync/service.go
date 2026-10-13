@@ -73,9 +73,8 @@ type Service struct {
 	// otherwise; it is also among Hosts, which reads it on the poll.
 	FFPC *FFPC
 
-	pushes pushGate
-	Now    func() time.Time
-	Log    *slog.Logger
+	Now func() time.Time
+	Log *slog.Logger
 }
 
 // Routes is every route this package serves.
@@ -89,7 +88,6 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/restore", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDetachPerMinute), Handler: s.restore},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/sync", Access: httpx.SignedIn, Limit: read, Handler: s.sync},
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/refresh", Access: httpx.SignedIn, Limit: httpx.PerHour(limitRefreshPerHour), Handler: s.refresh},
-		s.pushRoute(),
 	}
 }
 
