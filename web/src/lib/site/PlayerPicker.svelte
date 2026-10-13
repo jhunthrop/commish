@@ -2,8 +2,7 @@
 	import Search from '#lib/ui/Search.svelte';
 	import SearchMenu from '#lib/ui/SearchMenu.svelte';
 	import type { SearchHit } from '#lib/ui/search-hit.ts';
-	import { searchPlayers, type SearchablePlayer } from './search.ts';
-	import { links } from './links.ts';
+	import { searchHit, searchPlayers, type SearchablePlayer } from './search.ts';
 
 	interface Props {
 		/** Names the field: "First player". */
@@ -21,15 +20,7 @@
 	let open = $state(false);
 
 	const found = $derived(searchPlayers(players, query));
-	const hits = $derived<SearchHit[]>(
-		found.map((player) => ({
-			id: player.id,
-			name: player.name,
-			position: player.position,
-			team: player.team,
-			href: links.player(player.slug)
-		}))
-	);
+	const hits = $derived<SearchHit[]>(found.map(searchHit));
 	const showing = $derived(open && query.trim() !== '' && hits.length > 0);
 
 	function pick(index: number): void {

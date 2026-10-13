@@ -25,7 +25,7 @@
 	<link rel="canonical" href={links.board(page.format.id, page.position)} />
 </svelte:head>
 
-<SiteShell {title} active="board" {run}>
+<SiteShell {title} {run}>
 	{#snippet tail()}<Verb href={sectionHref('mock')}>Start a mock draft</Verb>{/snippet}
 	<BoardView {page} season={run.season} />
 </SiteShell>

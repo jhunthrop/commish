@@ -47,12 +47,14 @@
 	import { TINTED_ROUNDS, heatFor, vorCell } from '#lib/ui/heat.ts';
 	import type { BoardPlayer } from '#lib/types/player.ts';
 	import { ICON_NAMES } from '#lib/ui/icons.ts';
+	import { sectionHref } from '#lib/ui/nav.ts';
 	import DocPage from '#lib/ui/system/DocPage.svelte';
 	import DocSection from '#lib/ui/system/DocSection.svelte';
 	import Part from '#lib/ui/system/Part.svelte';
 	import Parts from '#lib/ui/system/Parts.svelte';
 	import Specimen from '#lib/ui/system/Specimen.svelte';
 	import NightlyParts from '#lib/ui/system/NightlyParts.svelte';
+	import RoundParts from '#lib/ui/system/RoundParts.svelte';
 	import Swatch from '#lib/ui/system/Swatch.svelte';
 	import { SOLO_KEYS } from '#lib/room/keys.ts';
 	import type { PageProps } from './$types';
@@ -88,7 +90,8 @@
 		return `Round ${vorRound} green. ${rank} One green per round, paler each round, through round ${TINTED_ROUNDS}.`;
 	}
 
-	const row = $derived(data.rowPlayer);
+	const row = $derived(data.nightly.row);
+	const unit = $derived(data.nightly.page.format.unit);
 	const call = $derived(data.soloRoom.call);
 	const runner = $derived(data.soloRoom.runner);
 	const nextLabel = $derived(pickLabel(data.soloRoom.next));
@@ -110,15 +113,18 @@
 	{/snippet}
 
 	<DocPage title="System">
-		<DocSection title="Row" sub="A real board row, Chris Olave in the WR view, taken apart.">
+		<DocSection
+			title="Row"
+			sub="A real board row from the run the board reads, {row.name} in the {row.position} view, taken apart."
+		>
 			<Specimen minWidth={ROW_MIN_WIDTH}>
 				<RowHead />
 				<Row
 					player={row}
 					href={PLAYER_HREF}
-					scale={data.wrRangeScale}
+					scale={data.nightly.rowScale}
 					showTier={false}
-					unit={data.scoringUnit}
+					{unit}
 					eager
 				/>
 			</Specimen>
@@ -179,7 +185,7 @@
 					count={data.wrTier.count}
 					group={data.wrTier.group}
 					cliff={data.wrTier.cliff}
-					unit={data.scoringUnit}
+					{unit}
 				/>
 			</Specimen>
 			<Parts>
@@ -206,7 +212,7 @@
 
 		<DocSection
 			title="Your sheet"
-			sub="Chris Olave on a cheat sheet in the WR view: your tier strip with its handle, his face and our board's pill, your note and tags, your place, where drafters take him, and the row's disclosure."
+			sub="{row.name} on a cheat sheet in the {row.position} view: your tier strip with its handle, his face and our board's pill, your note and tags, your place, where drafters take him, and the row's disclosure."
 		>
 			<Specimen minWidth={ROW_MIN_WIDTH}>
 				<SheetTier
@@ -322,7 +328,7 @@
 
 		<DocSection title="The verb">
 			<Specimen frame="none" layout="row">
-				<Verb href="/mock">Start a mock draft</Verb>
+				<Verb href={sectionHref('mock')}>Start a mock draft</Verb>
 				<Quiet>Queue</Quiet>
 				<Quiet key="U">Undo</Quiet>
 				<ChipGroup label="Position">
@@ -498,6 +504,7 @@
 		</DocSection>
 
 		<NightlyParts nightly={data.nightly} run={data.run} />
+		<RoundParts nightly={data.nightly} run={data.run} />
 
 		<DocSection title="Rail icons" sub="A 24 grid, a 1.8 stroke, in the color of the text.">
 			<Parts>

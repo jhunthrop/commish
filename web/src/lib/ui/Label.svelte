@@ -4,7 +4,7 @@
 	interface Props {
 		/** muted is the label grey, inherit takes the color of what it labels (a tinted cell). */
 		tone?: 'muted' | 'inherit' | 'accent';
-		/** cell sets the 10px label under a number in a cell. */
+		/** cell sets the label under a number in a cell, at the type scale's 11px floor. */
 		size?: 'xs' | 'cell';
 		align?: 'start' | 'end';
 		children: Snippet;
@@ -39,7 +39,7 @@
 	}
 
 	.cell {
-		font-size: 10px;
+		font-size: var(--t-xs);
 		margin-top: 3px;
 	}
 

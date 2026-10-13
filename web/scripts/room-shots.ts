@@ -130,7 +130,7 @@ async function context(
 interface ShotOptions {
 	who?: Drafter | null;
 	/** Runs in each fresh context before the page opens: a route, a stored value. */
-	before?: (ctx: BrowserContext) => Promise<void>;
+	before?: (ctx: BrowserContext) => Promise<unknown>;
 	/** Runs on the open page before the shot: a key, a click. */
 	act?: (page: Page) => Promise<void>;
 	/** The text the shot waits for after `act`, when it differs from the page's own. */

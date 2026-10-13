@@ -1,10 +1,15 @@
 /** The top bar search once someone uses it: the run's index, the matches for the query, the option
  * the arrow keys are on. Loaded on the field's first focus with the menu it drives, so a page that
  * is only read never downloads either. */
-import { resolve } from '$app/paths';
 import type { IndexEntry } from '#lib/run/schema.ts';
 import type { SearchHit } from '#lib/ui/search-hit.ts';
-import { SEARCH_INDEX_URL, searchPlayers, searchable, type SearchablePlayer } from './search.ts';
+import {
+	SEARCH_INDEX_URL,
+	searchHit,
+	searchPlayers,
+	searchable,
+	type SearchablePlayer
+} from './search.ts';
 
 export class SearchSession {
 	query = $state('');
@@ -14,15 +19,7 @@ export class SearchSession {
 	private failed = $state(false);
 
 	hits = $derived<SearchHit[]>(
-		this.index === null
-			? []
-			: searchPlayers(this.index, this.query).map((player) => ({
-					id: player.id,
-					name: player.name,
-					position: player.position,
-					team: player.team,
-					href: resolve('/(run)/players/[slug]', { slug: player.slug })
-				}))
+		this.index === null ? [] : searchPlayers(this.index, this.query).map(searchHit)
 	);
 
 	empty = $derived.by(() => {

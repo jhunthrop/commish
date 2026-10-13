@@ -55,7 +55,7 @@
 	);
 </script>
 
-<SiteShell title={page.name} active="players" run={data.run}>
+<SiteShell title={page.name} run={data.run}>
 	{#snippet tail()}<Quiet href={links.compare(page.slug)}>Compare</Quiet>{/snippet}
 	<main class="player">
 		<Crumb

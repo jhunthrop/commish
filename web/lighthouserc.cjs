@@ -1,6 +1,7 @@
 // Lighthouse CI: the spec's budgets (§2.1) on the pages a run builds. The audited pages come from the
-// build itself, so a new run needs no edit here: the rail's board (the run's default format), the
-// first player in the run's index (our top-ranked player), and the record. Read after the build.
+// build itself, so a new run needs no edit here: the front door, the rail's board (the run's default
+// format), the first player in the run's index (our top-ranked player), and the record. Read after
+// the build.
 const { readFileSync } = require('node:fs');
 
 const ORIGIN = 'http://localhost:4173';
@@ -20,8 +21,11 @@ module.exports = {
 		collect: {
 			startServerCommand: 'npm run preview:static',
 			startServerReadyPattern: 'Accepting connections',
-			url: [`${ORIGIN}/board`, `${ORIGIN}${firstPlayerPath()}`, `${ORIGIN}/record`],
-			numberOfRuns: 7,
+			url: [`${ORIGIN}/`, `${ORIGIN}/board`, `${ORIGIN}${firstPlayerPath()}`, `${ORIGIN}/record`],
+			// Nine runs, asserted on the median (the fifth). Devtools throttling lands an occasional run
+			// near 1.65 s whatever the page; in seven runs one to four such runs were seen, so the
+			// median could flip on noise. In nine it takes five. The budgets themselves are unchanged.
+			numberOfRuns: 9,
 			settings: {
 				preset: 'perf',
 				formFactor: 'mobile',

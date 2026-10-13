@@ -1,12 +1,15 @@
 <script lang="ts">
+	import type { FormatChip } from '#lib/server/pages/format-route.ts';
 	import { onMount } from 'svelte';
 	import { POSITION_NAMES, tierGroups } from '#lib/run/derive.ts';
 	import type { BoardPage } from '#lib/server/pages/board.ts';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
-	import SheetAdd from './SheetAdd.svelte';
+	import FormatChips from './FormatChips.svelte';
+	import RowSheetMark from './RowSheetMark.svelte';
 	import BasisList from '#lib/ui/BasisList.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
+	import FilterBar from '#lib/ui/FilterBar.svelte';
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
@@ -72,16 +75,7 @@
 		eager={i < EAGER_ROWS}
 	>
 		{#snippet action()}
-			<SheetAdd
-				player={{
-					id: player.id,
-					name: player.name,
-					position: player.position,
-					team: player.team,
-					headshot: player.headshot
-				}}
-				variant="row"
-			/>
+			<RowSheetMark {player} />
 		{/snippet}
 	</Row>
 {/snippet}
@@ -93,29 +87,25 @@
 				{#snippet actions()}
 					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
 					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
-					<Quiet href={links.clubs()} size="sm">Clubs</Quiet>
 				{/snippet}
 			</PageHead>
 		</div>
 		<div class="filters">
-			{#if page.formats.length > 1}
-				<ChipGroup label="Scoring">
-					{#each page.formats as format (format.id)}
-						<Chip
-							href={links.board(format.id, page.position)}
-							pressed={format.id === page.format.id}>{format.label}</Chip
+			<FilterBar>
+				<FormatChips
+					formats={page.formats}
+					current={page.format.id}
+					href={(chip: FormatChip) => links.board(chip.id, chip.onRun ? page.position : null)}
+				/>
+				<ChipGroup label="Position">
+					<Chip href={links.board(page.format.id)} pressed={page.position === null}>All</Chip>
+					{#each page.positions as position (position)}
+						<Chip href={links.board(page.format.id, position)} pressed={page.position === position}
+							>{position}</Chip
 						>
 					{/each}
 				</ChipGroup>
-			{/if}
-			<ChipGroup label="Position">
-				<Chip href={links.board(page.format.id)} pressed={page.position === null}>All</Chip>
-				{#each page.positions as position (position)}
-					<Chip href={links.board(page.format.id, position)} pressed={page.position === position}
-						>{position}</Chip
-					>
-				{/each}
-			</ChipGroup>
+			</FilterBar>
 		</div>
 
 		<section aria-label="{page.position ?? 'All'} {page.format.label} board">
@@ -194,9 +184,6 @@
 	}
 
 	.filters {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--s-3);
 		margin-bottom: var(--s-4);
 	}
 
@@ -229,14 +216,6 @@
 		.board {
 			padding: var(--s-4);
 			gap: var(--s-4);
-		}
-
-		.filters {
-			flex-wrap: nowrap;
-			overflow-x: auto;
-			margin-inline: calc(-1 * var(--s-4));
-			padding-inline: var(--s-4);
-			scrollbar-width: none;
 		}
 
 		.side {

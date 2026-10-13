@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Face from './Face.svelte';
 	import Label from './Label.svelte';
 	import PositionPill from './PositionPill.svelte';
 	import type { SearchHit } from './search-hit.ts';
@@ -22,6 +23,7 @@
 			{#each hits as hit, i (hit.id)}
 				<li id="{id}-{String(i)}" role="option" aria-selected={i === active}>
 					<a href={hit.href} tabindex="-1">
+						<Face src={hit.headshot} size={24} />
 						<span class="name">{hit.name}</span>
 						<PositionPill position={hit.position} />
 						<Label>{hit.team}</Label>
@@ -55,7 +57,7 @@
 
 	a {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto 40px;
+		grid-template-columns: 24px minmax(0, 1fr) auto 40px;
 		align-items: center;
 		gap: var(--s-2);
 		padding: 8px var(--s-3);

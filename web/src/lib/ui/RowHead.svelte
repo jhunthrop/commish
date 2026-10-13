@@ -7,9 +7,11 @@
 		range?: boolean;
 		/** The rows under it carry an action column at their end. */
 		action?: boolean;
+		/** What the rows under it are ordered by. Match the Rows' order. */
+		order?: 'board' | 'adp';
 	}
 
-	let { range = true, action = false }: Props = $props();
+	let { range = true, action = false, order = 'board' }: Props = $props();
 </script>
 
 <div
@@ -19,7 +21,9 @@
 	class:act-flat={action && !range}
 	aria-hidden="true"
 >
-	<span></span>
+	<span class="lead"
+		>{#if order === 'adp'}<Label align="end">ADP</Label>{/if}</span
+	>
 	<span></span>
 	<Label>Player</Label>
 	<span class="proj"><Label align="end">Projected</Label></span>
@@ -51,6 +55,7 @@
 		grid-template-columns: var(--board-cols-act-flat);
 	}
 
+	.lead,
 	.proj,
 	.end {
 		text-align: right;

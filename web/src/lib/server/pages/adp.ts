@@ -3,8 +3,15 @@
 import type { AdpSource, BoardRow, Format } from '#lib/run/schema.ts';
 import { links } from '#lib/site/links.ts';
 import { adp, board } from '../run.ts';
-import { formatForRoute, formatSlugs } from './format-route.ts';
-import { formatChips, type FormatChip } from './board.ts';
+import {
+	absentFormatPage,
+	formatChips,
+	formatForRoute,
+	formatRoute,
+	formatSlugs,
+	type AbsentFormatPage,
+	type FormatChip
+} from './format-route.ts';
 
 export interface AdpPage {
 	format: Format;
@@ -14,6 +21,17 @@ export interface AdpPage {
 	rows: (BoardRow & { adp: number })[];
 	/** Players our board ranks that no source has yet. */
 	unpriced: number;
+}
+
+/** A format's ADP, or the page saying the run lacks the format. */
+export type AdpRoute = { kind: 'adp'; page: AdpPage } | { kind: 'absent'; page: AbsentFormatPage };
+
+/** /adp/<format>: ADP for a format the run carries, or the page for one it lacks. */
+export async function adpRoute(formatId: string): Promise<AdpRoute> {
+	const route = await formatRoute(formatId, (id) => links.adp(id));
+	return route.kind === 'run'
+		? { kind: 'adp', page: await adpPage(route.format.id) }
+		: { kind: 'absent', page: await absentFormatPage(route.format) };
 }
 
 export async function adpEntries(): Promise<{ format: string }[]> {

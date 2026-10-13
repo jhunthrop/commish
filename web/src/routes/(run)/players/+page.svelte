@@ -13,7 +13,7 @@
 	let { data }: PageProps = $props();
 </script>
 
-<SiteShell title="Players" active="players" run={data.run}>
+<SiteShell title="Players" run={data.run}>
 	{#snippet tail()}<Quiet href={links.compare()}>Compare two players</Quiet>{/snippet}
 	<main class="players">
 		<PageHead
@@ -21,7 +21,11 @@
 			lead="
 				Every player on our {data.format.label} board · by position · our rank overall at the right
 			"
-		/>
+		>
+			{#snippet actions()}
+				<Quiet href={links.clubs()} size="sm">Clubs</Quiet>
+			{/snippet}
+		</PageHead>
 		<div class="groups">
 			{#each data.groups as group (group.position)}
 				<Panel as="section" label={POSITION_NAMES[group.position].many}>
