@@ -9,7 +9,8 @@
 		position: Position;
 		/** Rank at the position, printed after it: "WR 6". */
 		positionRank?: number;
-		team: string;
+		/** His team, or null when he has none to print. */
+		team: string | null;
 		/** The headshot. Omitted where a list has no faces, the search menu. */
 		headshot?: string;
 		/** His page. */
@@ -35,7 +36,9 @@
 	}: Props = $props();
 
 	const meta = $derived(
-		`${position}${positionRank === undefined ? '' : ` ${String(positionRank)}`} · ${team}`
+		[`${position}${positionRank === undefined ? '' : ` ${String(positionRank)}`}`, team]
+			.filter((part) => part !== null)
+			.join(' · ')
 	);
 </script>
 

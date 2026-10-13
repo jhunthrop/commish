@@ -43,7 +43,20 @@ export const ICONS = {
 		{ tag: 'circle', cx: 9, cy: 18, r: 1.2 },
 		{ tag: 'circle', cx: 15, cy: 18, r: 1.2 }
 	],
-	close: [{ tag: 'path', d: 'M6 6l12 12M18 6L6 18' }]
+	close: [{ tag: 'path', d: 'M6 6l12 12M18 6L6 18' }],
+	/** A row that opens: points down, turned up by the row when it is open. */
+	chevron: [{ tag: 'path', d: 'M6 9l6 6 6-6' }],
+	/** A row holds a note. */
+	note: [
+		{ tag: 'path', d: 'M5 4h14v12l-4 4H5z' },
+		{ tag: 'path', d: 'M15 20v-4h4M8 9h8M8 13h5' }
+	],
+	/** More actions, folded into a menu. */
+	more: [
+		{ tag: 'circle', cx: 5, cy: 12, r: 1.4 },
+		{ tag: 'circle', cx: 12, cy: 12, r: 1.4 },
+		{ tag: 'circle', cx: 19, cy: 12, r: 1.4 }
+	]
 } as const satisfies Record<string, readonly IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

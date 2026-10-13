@@ -1,7 +1,6 @@
 <script lang="ts">
-	import Chip from '#lib/ui/Chip.svelte';
-	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Field from '#lib/ui/Field.svelte';
+	import FilePick from '#lib/ui/FilePick.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
@@ -26,7 +25,6 @@
 	const SKIPS_SHOWN = 12;
 	const PASTE_EXAMPLE = "1. Puka Nacua\n2. Ja'Marr Chase, WR";
 
-	let mode = $state<'file' | 'paste'>('file');
 	let pasted = $state('');
 	let read = $state.raw<CsvRead | null>(null);
 	let problem = $state<string | null>(null);
@@ -65,10 +63,7 @@
 		}
 	}
 
-	async function onFile(event: Event): Promise<void> {
-		const input = event.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
+	async function onFile(file: File): Promise<void> {
 		try {
 			const text = await readCsvFile(file);
 			await loadBoard();
@@ -98,26 +93,26 @@
 
 <Panel as="section" label="Import">
 	<div class="import">
-		<ChipGroup label="Import from">
-			<Chip pressed={mode === 'file'} onclick={() => (mode = 'file')}>A CSV file</Chip>
-			<Chip pressed={mode === 'paste'} onclick={() => (mode = 'paste')}>Paste</Chip>
-		</ChipGroup>
-		{#if mode === 'file'}
-			<label class="file">
-				<span>Choose a CSV</span>
-				<input type="file" accept=".csv,text/csv" onchange={onFile} />
-			</label>
-		{:else}
+		<div class="sources">
+			<div class="file">
+				<Label>A CSV file</Label>
+				<FilePick
+					label="Choose a CSV"
+					accept=".csv,text/csv"
+					empty="No file chosen"
+					onpick={(file: File) => void onFile(file)}
+				/>
+			</div>
 			<Field
-				label="A CSV or a list of names, one per line"
+				label="Or paste a CSV or a list of names, one per line"
 				multiline
 				mono
-				rows={8}
+				rows={6}
 				bind:value={pasted}
 				oninput={(text: string) => void onPaste(text)}
 				placeholder={PASTE_EXAMPLE}
 			/>
-		{/if}
+		</div>
 		{#if problem}<p class="problem" role="alert">{problem}</p>{/if}
 		{#if read}
 			<div class="result" aria-live="polite">
@@ -150,16 +145,27 @@
 		align-items: flex-start;
 	}
 
-	.import > :global(label) {
+	/* The file and the paste box side by side, two ways in to one sheet. */
+	.sources {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+		gap: var(--s-5);
 		width: 100%;
+		align-items: start;
 	}
 
 	.file {
-		display: inline-flex;
-		align-items: center;
-		gap: var(--s-3);
-		font-size: var(--t-sm);
-		color: var(--ink-2);
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		min-width: 0;
+	}
+
+	@media (max-width: 760px) {
+		.sources {
+			grid-template-columns: minmax(0, 1fr);
+			gap: var(--s-4);
+		}
 	}
 
 	.problem {

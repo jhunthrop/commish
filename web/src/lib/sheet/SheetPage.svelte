@@ -7,14 +7,15 @@
 	import Field from '#lib/ui/Field.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import LiveRegion from '#lib/ui/LiveRegion.svelte';
-	import Panel from '#lib/ui/Panel.svelte';
+	import Menu from '#lib/ui/Menu.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Search from '#lib/ui/Search.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { RAIL } from '#lib/ui/nav.ts';
 	import { POSITIONS, type Position } from '#lib/types/player.ts';
-	import { fileDirectory } from './directory.ts';
+	import { boardById, fileDirectory, type DirectoryPlayer } from './directory.ts';
+	import EmptySheet from './EmptySheet.svelte';
 	import { downloadCsv } from './files.ts';
 	import { FORMAT_LABELS } from './format.ts';
 	import ImportPanel from './ImportPanel.svelte';
@@ -22,7 +23,8 @@
 	import { rowFor, ranksOf, type SheetRow } from './model.ts';
 	import SheetList from './SheetList.svelte';
 	import SheetPicker from './SheetPicker.svelte';
-	import { sheetStore as store, type SyncStatus } from './store.svelte.ts';
+	import { statusWords } from './status.ts';
+	import { sheetStore as store } from './store.svelte.ts';
 	import { FIXED_TAGS, ownTags, sameTag, tagLabel } from './tags.ts';
 
 	const directory = fileDirectory();
@@ -42,7 +44,8 @@
 	let panel = $state<'import' | 'sheets' | null>(null);
 	let renaming = $state(false);
 	let announcement = $state('');
-	let ourRanks = $state.raw<ReadonlyMap<string, number> | null>(null);
+	/** Our board for the sheet's format, or null until it loads (or when we have none). */
+	let ourBoard = $state.raw<readonly DirectoryPlayer[] | null>(null);
 	let starting = $state(false);
 	let boardProblem = $state<string | null>(null);
 
@@ -58,6 +61,9 @@
 		...own
 	]);
 	const hasNotes = $derived(rows.some((row) => row.note !== null));
+	const hasSheetTools = $derived(
+		store.signedIn || store.stored.shelf.length > 0 || rows.length > 0
+	);
 	const needle = $derived(query.trim().toLowerCase());
 
 	function shows(row: SheetRow): boolean {
@@ -74,26 +80,16 @@
 	}
 
 	const visible = $derived(rows.filter(shows));
-
-	const STATUS_WORDS: Record<SyncStatus, string> = {
-		local: 'Saved in this browser',
-		checking: 'Saved in this browser',
-		saving: 'Saving to your account',
-		saved: 'Saved to your account',
-		offline: 'Offline, saved in this browser',
-		failed: 'Not saved to your account',
-		'storage-blocked': 'This browser is not keeping it'
-	};
-	const statusWords = $derived(
-		store.status === 'failed' && store.problem ? store.problem : STATUS_WORDS[store.status]
+	const boardIds = $derived(boardById(ourBoard));
+	const status = $derived(
+		statusWords({ status: store.status, problem: store.problem, savedAt: store.savedAt })
 	);
 
-	async function loadOurRanks(): Promise<void> {
+	async function loadOurBoard(): Promise<void> {
 		try {
-			const board = await directory.board(sheet.format);
-			ourRanks = board ? new Map(board.map((player) => [player.id, player.rank])) : null;
+			ourBoard = await directory.board(sheet.format);
 		} catch {
-			ourRanks = null;
+			ourBoard = null;
 		}
 	}
 
@@ -112,6 +108,10 @@
 		} finally {
 			starting = false;
 		}
+	}
+
+	function togglePanel(name: 'import' | 'sheets'): void {
+		panel = panel === name ? null : name;
 	}
 
 	function isTyping(target: EventTarget | null): boolean {
@@ -135,11 +135,22 @@
 
 	onMount(() => {
 		store.load();
-		void loadOurRanks();
+		void loadOurBoard();
 	});
 </script>
 
 <svelte:window onkeydown={onKeydown} />
+
+{#snippet sheetTools()}
+	{#if store.signedIn || store.stored.shelf.length > 0}
+		<Quiet size="sm" onclick={() => togglePanel('sheets')}>Your sheets</Quiet>
+	{/if}
+	{#if rows.length > 0}
+		<Quiet size="sm" onclick={() => togglePanel('import')}>Import</Quiet>
+		<Quiet size="sm" onclick={() => downloadCsv(sheet)}>Export CSV</Quiet>
+		<Quiet size="sm" href={resolve('/sheet/print')}>Print</Quiet>
+	{/if}
+{/snippet}
 
 <svelte:head>
 	<title>Your cheat sheet · Commish</title>
@@ -184,30 +195,25 @@
 					{FORMAT_LABELS[sheet.format]}
 					{#if store.loaded}
 						· {plural(rows.length, 'player')} ·
-						<span aria-live="polite">{statusWords}</span>
+						<span aria-live="polite">{status}</span>
 					{/if}
 				</p>
 			</div>
 			<!-- The account's buttons come first: they are drawn on the first response, and the ones
-				 that wait on your sheet are added after them, so nothing already drawn moves. -->
+				 that wait on your sheet are added after them, so nothing already drawn moves. On the
+				 phone the sheet's own tools fold into More, so the bar is one line. -->
 			<div class="tools">
 				{#if !store.signedIn}
 					<Quiet size="sm" href={store.signInUrl(resolve('/sheet'))}>Save it to your account</Quiet>
 				{/if}
-				{#if store.signedIn || store.stored.shelf.length > 0}
-					<Quiet size="sm" onclick={() => (panel = panel === 'sheets' ? null : 'sheets')}
-						>Your sheets</Quiet
-					>
-				{/if}
-				{#if rows.length > 0}
-					<Quiet size="sm" onclick={() => (panel = panel === 'import' ? null : 'import')}
-						>Import</Quiet
-					>
-					<Quiet size="sm" onclick={() => downloadCsv(sheet)}>Export CSV</Quiet>
-					<Quiet size="sm" href={resolve('/sheet/print')}>Print</Quiet>
-				{/if}
+				<span class="spread">{@render sheetTools()}</span>
 				{#if store.canUndo}<Quiet size="sm" key={undoKey} onclick={() => store.undo()}>Undo</Quiet
 					>{/if}
+				{#if hasSheetTools}
+					<span class="folded"
+						><Menu label="More" id="sheet-tools">{@render sheetTools()}</Menu></span
+					>
+				{/if}
 			</div>
 		</div>
 
@@ -229,15 +235,14 @@
 		{/if}
 
 		{#if store.loaded && rows.length === 0 && panel === null}
-			<Panel as="section" label="Start your sheet">
-				<div class="start">
-					<Verb size="lg" disabled={starting} onclick={() => void startFromBoard()}
-						>Start from our board</Verb
-					>
-					<Quiet size="lg" onclick={() => (panel = 'import')}>Import a sheet</Quiet>
-					{#if boardProblem}<p class="problem" role="alert">{boardProblem}</p>{/if}
-				</div>
-			</Panel>
+			<EmptySheet
+				board={ourBoard}
+				format={sheet.format}
+				{starting}
+				problem={boardProblem}
+				onstart={() => void startFromBoard()}
+				onimport={() => (panel = 'import')}
+			/>
 		{/if}
 
 		{#if rows.length > 0}
@@ -251,13 +256,19 @@
 				{#if tagsHere.length > 0 || hasNotes}
 					<ChipGroup label="Tags" variant="loose">
 						{#each tagsHere as tag (tag)}
-							<Chip size="sm" pressed={tagFilter === tag} onclick={() => pickTag(tag)}
-								>{tagLabel(tag)}</Chip
+							<Chip
+								size="sm"
+								label="Show {tagLabel(tag)}"
+								pressed={tagFilter === tag}
+								onclick={() => pickTag(tag)}>{tagLabel(tag)}</Chip
 							>
 						{/each}
 						{#if hasNotes}
-							<Chip size="sm" pressed={tagFilter === NOTES} onclick={() => pickTag(NOTES)}
-								>Notes</Chip
+							<Chip
+								size="sm"
+								label="Show Notes"
+								pressed={tagFilter === NOTES}
+								onclick={() => pickTag(NOTES)}>Notes</Chip
 							>
 						{/if}
 					</ChipGroup>
@@ -271,7 +282,7 @@
 				rows={visible}
 				{position}
 				{ranks}
-				{ourRanks}
+				board={boardIds}
 				movable={needle === ''}
 				ownTags={own}
 				onannounce={(words: string) => (announcement = words)}
@@ -287,7 +298,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-4);
-		max-width: 1180px;
 	}
 
 	.lead {
@@ -333,11 +343,12 @@
 		min-height: 34px;
 	}
 
-	.start {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: var(--s-3);
+	.spread {
+		display: contents;
+	}
+
+	.folded {
+		display: none;
 	}
 
 	.notices {
@@ -360,12 +371,6 @@
 		font-size: var(--t-sm);
 	}
 
-	.problem {
-		margin: 0;
-		color: var(--loss-ink);
-		font-size: var(--t-sm);
-	}
-
 	.filters {
 		display: flex;
 		flex-wrap: wrap;
@@ -375,7 +380,37 @@
 
 	@media (max-width: 760px) {
 		.sheet {
-			padding: var(--s-4) var(--s-3);
+			padding: var(--s-3) var(--s-4) var(--s-4);
+			gap: var(--s-3);
+		}
+
+		.tools {
+			flex-wrap: nowrap;
+		}
+
+		/* The filters stay one line a thumb slides, so the first rows are on the first screen. */
+		.filters {
+			flex-wrap: nowrap;
+			overflow-x: auto;
+			margin: 0 calc(-1 * var(--s-4));
+			padding: 0 var(--s-4);
+			scrollbar-width: none;
+		}
+
+		.filters > :global(*) {
+			flex-shrink: 0;
+		}
+
+		.filters :global(.loose) {
+			flex-wrap: nowrap;
+		}
+
+		.spread {
+			display: none;
+		}
+
+		.folded {
+			display: inline-flex;
 		}
 
 		/* The tools take their own line, so the status words growing beside the name never

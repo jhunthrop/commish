@@ -22,6 +22,9 @@
 	import RowHead from '#lib/ui/RowHead.svelte';
 	import ScoreBug from '#lib/ui/ScoreBug.svelte';
 	import Field from '#lib/ui/Field.svelte';
+	import FilePick from '#lib/ui/FilePick.svelte';
+	import Menu from '#lib/ui/Menu.svelte';
+	import Place from '#lib/ui/Place.svelte';
 	import NoteLine from '#lib/ui/NoteLine.svelte';
 	import Search from '#lib/ui/Search.svelte';
 	import SheetRow from '#lib/ui/SheetRow.svelte';
@@ -59,6 +62,8 @@
 	] as const;
 	/** A drafter's own words, as the specimen's note. */
 	const SHEET_NOTE = 'Take him over any WR left in tier 3.';
+	/** His place on the specimen's sheet. */
+	const SHEET_PLACE = 18;
 
 	/** What a value cell's tint says about this player, from his own round and sign. */
 	function valueNote(player: BoardPlayer, boardSize: number): string {
@@ -182,7 +187,7 @@
 
 		<DocSection
 			title="Your sheet"
-			sub="Chris Olave on a cheat sheet in the WR view: your rank, your tier strip with its handle, your tags and your note."
+			sub="Chris Olave on a cheat sheet in the WR view: your tier strip with its handle, his face and our board's pill, your note and tags, your place, where drafters take him, and the row's disclosure."
 		>
 			<Specimen minWidth={ROW_MIN_WIDTH}>
 				<SheetTier
@@ -196,13 +201,15 @@
 					id={row.id}
 					name={row.name}
 					position={row.position}
-					positionRank={row.positionRank}
 					team={row.team}
 					headshot={row.headshot}
-					rank={18}
-					tags={['Target', 'Value']}
+					place={SHEET_PLACE}
+					board={{ rank: row.ourRank, positionRank: row.positionRank, adp: row.adp }}
+					tags={[
+						{ label: 'Target', tone: 'you' },
+						{ label: 'Value', tone: 'you' }
+					]}
 					note={SHEET_NOTE}
-					ourRank={row.ourRank}
 					eager
 				/>
 			</Specimen>
@@ -215,11 +222,54 @@
 					name="Your tier strip"
 					about="The board's strip, drawn within a position. Its handle moves where the tier starts. The cross joins it to the tier above."
 				/>
-				<Part name="Tags" about="The fixed six and your own words, in your color.">
-					{#snippet show()}<TagChip label="Target" /><TagChip label="Value" />{/snippet}
+				<Part
+					name="Tags"
+					about="The fixed six and your own words, in your color. Avoid warns, so it takes the loss tone, and it never sits beside Target."
+				>
+					{#snippet show()}<TagChip label="Target" /><TagChip label="Value" /><TagChip
+							label="Avoid"
+							tone="loss"
+						/>{/snippet}
 				</Part>
-				<Part name="The note" about="One line until the row opens.">
-					{#snippet show()}<NoteLine note={SHEET_NOTE} />{/snippet}
+				<Part
+					name="The note"
+					about="One line beside him on a wide screen and under his name on a narrower one. The phone shows the note mark beside his name."
+				>
+					{#snippet show()}<NoteLine note={SHEET_NOTE} /><Icon name="note" size={14} />{/snippet}
+				</Part>
+				<Part
+					name="Your place"
+					about="Quiet, in the number face, after the person. The position pill carries our board's rank on every page, so your order never borrows it."
+				>
+					{#snippet show()}<Place place={SHEET_PLACE} />{/snippet}
+				</Part>
+				<Part
+					name="The disclosure"
+					about="Opens the row to its note, tags and tier. A tap anywhere on the row does the same."
+				>
+					{#snippet show()}<Icon name="chevron" size={18} />{/snippet}
+				</Part>
+				<Part
+					name="More"
+					about="The phone folds the sheet's quiet tools behind one button, so the bar stays one line."
+				>
+					{#snippet show()}<Menu label="More" id="system-more"
+							><Quiet size="sm">Import</Quiet><Quiet size="sm">Export CSV</Quiet></Menu
+						>{/snippet}
+				</Part>
+				<Part name="File pick" about="The site's own button for a file, with its name once chosen.">
+					{#snippet show()}<FilePick
+							label="Choose a CSV"
+							accept=".csv,text/csv"
+							empty="No file chosen"
+							onpick={() => undefined}
+						/>{/snippet}
+				</Part>
+				<Part
+					name="Unavailable"
+					about="A verb you cannot press yet is the outline in the quietest ink, never a faded orange."
+				>
+					{#snippet show()}<Verb disabled>Replace my sheet</Verb>{/snippet}
 				</Part>
 				<Part name="Field" about="A note, a pasted list, your own tag, a sheet's name.">
 					{#snippet show()}<Field label="Your own tag" placeholder="Your own tag" />{/snippet}

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { plural } from '#lib/format/number.ts';
 	import Quiet from '#lib/ui/Quiet.svelte';
@@ -15,17 +15,47 @@
 
 	onMount(() => store.load());
 
-	/** The list runs in three columns, and each column says what its numbers are. */
-	const COLUMN_HEADS = [1, 2, 3] as const;
+	/** The list runs in up to three columns, and each column with players says what its numbers
+	 * are. A column the list does not reach gets no heading. */
+	const COLUMNS = 3;
 
 	const sheet = $derived(store.sheet);
 	const ranks = $derived(ranksOf(sheet.rows));
 	const pages = $derived(
-		POSITIONS.map((position) => ({
-			position,
-			rows: sheet.rows.filter((row) => row.position === position)
-		})).filter((page) => page.rows.length > 0)
+		POSITIONS.map((position) => {
+			const rows = sheet.rows.filter((row) => row.position === position);
+			return { position, count: rows.length, rows };
+		}).filter((page) => page.count > 0)
 	);
+
+	let paper: HTMLElement | undefined = $state();
+	/** How many columns each position's list fills, read from the drawn page. */
+	let filled = $state.raw<ReadonlyMap<string, number>>(new Map());
+
+	/** The columns a list reaches: one per distinct left edge among its players. */
+	function columnsReached(list: HTMLElement): number {
+		const lefts = new Set(
+			Array.from(list.querySelectorAll<HTMLElement>('.row'), (row) =>
+				Math.round(row.getBoundingClientRect().left)
+			)
+		);
+		return Math.min(COLUMNS, Math.max(1, lefts.size));
+	}
+
+	function measure(): void {
+		if (!paper) return;
+		filled = new Map(
+			Array.from(paper.querySelectorAll<HTMLElement>('[data-position]'), (list) => [
+				list.dataset.position ?? '',
+				columnsReached(list)
+			])
+		);
+	}
+
+	// Measured again whenever the pages change, once they are drawn.
+	$effect(() => {
+		if (pages.length > 0) void tick().then(measure);
+	});
 </script>
 
 <svelte:head>
@@ -37,39 +67,44 @@
 	<Verb onclick={() => window.print()} disabled={pages.length === 0}>Print</Verb>
 </div>
 
-<main class="paper">
+<main class="paper" bind:this={paper}>
 	{#each pages as page (page.position)}
+		{@const heads = filled.get(page.position) ?? 0}
 		<section class="page">
 			<header>
 				<h1>{page.position}</h1>
 				<p>
-					{sheet.name} · {FORMAT_LABELS[sheet.format]} · {plural(page.rows.length, 'player')}
+					{sheet.name} · {FORMAT_LABELS[sheet.format]} · {plural(page.count, 'player')}
 				</p>
 			</header>
 			<div class="heads" aria-hidden="true">
-				{#each COLUMN_HEADS as column (column)}
+				{#each Array.from({ length: heads }, (_, column) => column) as column (column)}
 					<span class="head"
 						><span>{page.position}</span><span>Player</span><span>Overall</span></span
 					>
 				{/each}
 			</div>
-			<ol>
+			<!-- A tier's heading is drawn inside its first player's line, which never breaks, so the
+				 heading can never sit at a column's foot apart from him. -->
+			<ol class="list" data-position={page.position}>
 				{#each page.rows as row, index (row.id)}
 					{@const previous = page.rows[index - 1]}
-					{#if row.tier !== null && previous?.tier !== row.tier}
-						<li class="tier">Tier {row.tier}</li>
-					{/if}
 					<li class="row">
-						<span class="rk">{ranks.get(row.id)?.position}</span>
-						<span class="who">
-							<b>{row.name}</b>
-							<span class="team">{row.team ?? ''}</span>
-							<span class="all">{ranks.get(row.id)?.overall}</span>
-						</span>
-						{#if row.tags.length > 0}
-							<span class="tags">{row.tags.map(tagLabel).join(', ')}</span>
+						{#if row.tier !== null && previous?.tier !== row.tier}
+							<p class="tier">Tier {row.tier}</p>
 						{/if}
-						{#if row.note}<span class="note">{row.note}</span>{/if}
+						<span class="line">
+							<span class="rk">{ranks.get(row.id)?.position}</span>
+							<span class="who">
+								<b>{row.name}</b>
+								<span class="team">{row.team ?? ''}</span>
+								<span class="all">{ranks.get(row.id)?.overall}</span>
+							</span>
+							{#if row.tags.length > 0}
+								<span class="tags">{row.tags.map(tagLabel).join(', ')}</span>
+							{/if}
+							{#if row.note}<span class="note">{row.note}</span>{/if}
+						</span>
 					</li>
 				{/each}
 			</ol>
@@ -136,12 +171,11 @@
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		columns: 3;
-		column-gap: 0.25in;
 	}
 
-	li {
-		break-inside: avoid;
+	.list {
+		columns: 3;
+		column-gap: 0.25in;
 	}
 
 	.tier {
@@ -155,6 +189,10 @@
 	}
 
 	.row {
+		break-inside: avoid;
+	}
+
+	.line {
 		display: grid;
 		grid-template-columns: 18pt minmax(0, 1fr);
 		column-gap: 4pt;

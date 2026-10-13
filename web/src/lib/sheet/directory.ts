@@ -11,6 +11,8 @@ export interface DirectoryPlayer extends SheetPlayer {
 	/** Our rank on this format's board. */
 	rank: number;
 	positionRank: number;
+	/** Where drafters take him on average, or null when he is not in our ADP window. */
+	adp: number | null;
 }
 
 /** The file's row: short keys, because it is downloaded whole. */
@@ -22,6 +24,14 @@ export interface DirectoryEntry {
 	h: string | null;
 	r: number;
 	pr: number;
+	a: number | null;
+}
+
+/** Our board by player id, for the pages that print our numbers beside yours. */
+export function boardById(
+	board: readonly DirectoryPlayer[] | null
+): ReadonlyMap<string, DirectoryPlayer> | null {
+	return board ? new Map(board.map((player) => [player.id, player])) : null;
 }
 
 export interface PlayerDirectory {
@@ -37,7 +47,8 @@ export function toEntry(player: DirectoryPlayer): DirectoryEntry {
 		t: player.team,
 		h: player.headshot,
 		r: player.rank,
-		pr: player.positionRank
+		pr: player.positionRank,
+		a: player.adp
 	};
 }
 
@@ -51,7 +62,8 @@ function fromEntry(entry: DirectoryEntry): DirectoryPlayer | null {
 		team: entry.t,
 		headshot: entry.h,
 		rank: entry.r,
-		positionRank: entry.pr
+		positionRank: entry.pr,
+		adp: entry.a
 	};
 }
 
