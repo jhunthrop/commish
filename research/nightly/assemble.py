@@ -140,7 +140,7 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> Assemble
     files |= {
         "adp.json": season.adp_json(formats, captures),
         "record.json": record,
-        "index.json": pages.index_json(people),
+        "index.json": pages.index_json(people, {page["id"]: page for page in players}),
         "clubs.json": clubs,
         "schedule.json": schedule,
     }

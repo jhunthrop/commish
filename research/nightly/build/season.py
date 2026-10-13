@@ -108,7 +108,10 @@ def schedule_json(
         "slates": [
             {
                 "abbr": slate.club,
-                "games": [{"week": g.week, "opponent": g.opponent, "home": g.home} for g in slate.games],
+                "games": [
+                    {"week": g.week, "opponent": g.opponent, "home": g.home, "kickoff": iso(g.kickoff)}
+                    for g in slate.games
+                ],
                 "strength": slate.strength,
                 "rank": slate.rank,
                 "method": schedule_read.METHOD,

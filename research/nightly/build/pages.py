@@ -178,8 +178,14 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
     }
 
 
-def index_json(people: Sequence[Identity]) -> list[Json]:
+def index_json(people: Sequence[Identity], players: Mapping[str, Json]) -> list[Json]:
+    """The search index; each entry's season is his page's own games and points a game, read from it."""
     return [
-        {"id": p.id, "slug": p.slug, "name": p.name, "team": p.team, "position": p.position, "headshot": p.headshot}
+        {"id": p.id, "slug": p.slug, "name": p.name, "team": p.team, "position": p.position, "headshot": p.headshot,
+         "season": season_summary(players[p.id]["season"])}
         for p in people
-    ]
+    ]  # fmt: skip
+
+
+def season_summary(season: Json) -> Json:
+    return {"games": season["games"], "pointsPerGame": season["pointsPerGame"]}

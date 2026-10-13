@@ -9,12 +9,18 @@ before the kickoff, by the publisher's own date). A slate's strength is the mean
 values, one per game, so a club met twice counts twice. Rank 1 is the hardest slate. The window of a
 slate is the earliest and latest publication date among its opponents' values: the source window per
 club. The publisher is provenance (the manifest's sources block); no screen names a sportsbook word.
+
+KICKOFF. A game's kickoff is the fixture's own date and Eastern time ("8:20p"), as the slate and the
+player card's game log read the same rows. A kickoff the league has not set yet ("TBD") counts from
+the start of its day in Eastern time, the earliest it can be, as the web's stand-in counts it.
 """
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, time
 from typing import Final
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import Connection, text
 
@@ -28,6 +34,10 @@ WIN_TOTAL_SOURCE: Final = "vegas_win_totals"
 WIN_TOTAL_METRIC: Final = "vegas_win_total"
 OPPONENT_BASIS: Final = "Expected wins, set before the season"
 UNIT: Final = "opponents' average expected wins"
+EASTERN: Final = ZoneInfo("America/New_York")
+KICKOFF_NOT_SET: Final = "TBD"
+_KICKOFF_TIME: Final = re.compile(r"^(\d{1,2}):(\d{2})([ap])$")
+_HALF_DAY: Final = 12
 METHOD: Final = "the average of its opponents' expected wins for the season, one per game, set before the first kickoff"
 
 
@@ -40,6 +50,7 @@ class Game:
     week: int
     opponent: str
     home: bool
+    kickoff: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,20 +76,34 @@ class Club:
     bye: int | None
 
 
+def kickoff_of(week: int, game_date: date | None, kickoff_et: str | None) -> datetime:
+    """A fixture's kickoff instant from its date and Eastern time; a TBD time is the day's start."""
+    if game_date is None or kickoff_et is None:
+        raise ScheduleError(f"A week {week} fixture has no date or kickoff time on file.")
+    if kickoff_et == KICKOFF_NOT_SET:
+        return datetime.combine(game_date, time(), EASTERN)
+    match = _KICKOFF_TIME.match(kickoff_et)
+    if match is None:
+        raise ScheduleError(f"A week {week} fixture has an unreadable kickoff {kickoff_et!r}.")
+    hour = int(match[1]) % _HALF_DAY + (_HALF_DAY if match[3] == "p" else 0)
+    return datetime.combine(game_date, time(hour, int(match[2])), EASTERN)
+
+
 def slates_by_club(conn: Connection, season: int) -> dict[str, list[Game]]:
     rows = conn.execute(
         text(
-            "select week, home_team, away_team from research.provider_games "
+            "select week, home_team, away_team, game_date, kickoff_et from research.provider_games "
             "where season = :s and week between 1 and :last order by week, game_id"
         ),
         {"s": season, "last": REGULAR_SEASON_WEEKS},
     )
     games: dict[str, list[Game]] = {club: [] for club in NFL_TEAM_ABBREVIATIONS}
     for row in rows:
+        kickoff = kickoff_of(int(row.week), row.game_date, row.kickoff_et)
         for club, opponent, home in ((row.home_team, row.away_team, True), (row.away_team, row.home_team, False)):
             if club not in games:
                 raise ScheduleError(f"{season} fixture names {club}, which is not one of the 32 clubs.")
-            games[club].append(Game(int(row.week), opponent, home))
+            games[club].append(Game(int(row.week), opponent, home, kickoff))
     return games
 
 
