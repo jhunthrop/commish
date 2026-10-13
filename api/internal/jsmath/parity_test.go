@@ -12,9 +12,12 @@ import (
 
 // floatVectors is V8's own answers, recorded by scripts/export-pins.ts.
 type floatVectors struct {
-	Node string     `json:"node"`
-	Exp  [][]string `json:"exp"`
-	Log  [][]string `json:"log"`
+	Node     string     `json:"node"`
+	V8       string     `json:"v8"`
+	Arch     string     `json:"arch"`
+	Platform string     `json:"platform"`
+	Exp      [][]string `json:"exp"`
+	Log      [][]string `json:"log"`
 	// PowReachable is every base and exponent the engine raises; PowOther
 	// is a spread beyond them, reported but not gated.
 	PowReachable [][]any `json:"powReachable"`
@@ -31,6 +34,9 @@ func loadVectors(t *testing.T) floatVectors {
 	var v floatVectors
 	if err := json.Unmarshal(raw, &v); err != nil {
 		t.Fatalf("decode vectors: %v", err)
+	}
+	if v.Arch == "" || v.Node == "" || v.V8 == "" {
+		t.Fatal("vectors carry no provenance: rerun scripts/export-pins.ts")
 	}
 	return v
 }
@@ -71,7 +77,7 @@ func TestFloatParityWithV8(t *testing.T) {
 				}
 			}
 		}
-		t.Logf("%s: %d vectors, %d differ (V8 of node %s)", u.name, len(u.rows), bad, v.Node)
+		t.Logf("%s: %d vectors, %d differ (V8 %s, node %s, %s/%s)", u.name, len(u.rows), bad, v.V8, v.Node, v.Platform, v.Arch)
 	}
 	if bad := powMismatches(t, v.PowReachable, true); bad != 0 {
 		t.Errorf("pow over the engine's reachable bases: %d of %d differ from V8", bad, len(v.PowReachable))

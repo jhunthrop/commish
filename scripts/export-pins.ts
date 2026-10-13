@@ -115,6 +115,9 @@ function floatDocument(): Record<string, unknown> {
   return {
     source: "V8 (Node) Math.exp, Math.log, the ** operator and String.prototype.localeCompare",
     node: process.version,
+    v8: process.versions.v8,
+    arch: process.arch,
+    platform: process.platform,
     exp: expInputs.map((x) => [bits(x), bits(Math.exp(x))]),
     log: logInputs.map((x) => [bits(x), bits(Math.log(x))]),
     powReachable: reachablePow.map(([x, y]) => [bits(x), y, bits(x ** y)]),
