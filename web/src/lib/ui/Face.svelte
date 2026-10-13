@@ -35,7 +35,9 @@
 	/** The URL that failed to load, so a new src gets its own try. */
 	let failed = $state<string | null>(null);
 
-	const sources = $derived(src === null || src === '' ? null : headshotSources(src, size));
+	const sources = $derived(
+		src === null || src === '' ? null : headshotSources(src, size, phoneSize)
+	);
 	const showImage = $derived(sources !== null && failed !== src);
 	const initials = $derived(name === undefined ? '' : initialsOf(name));
 </script>
@@ -54,6 +56,7 @@
 		<img
 			src={sources.src}
 			srcset={sources.srcset}
+			sizes={sources.sizes}
 			{alt}
 			{loading}
 			width={size}

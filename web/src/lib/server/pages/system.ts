@@ -18,7 +18,7 @@ const SPECIMEN_WEEKS = 6;
 export interface SystemNightly {
 	page: PlayerPage;
 	rows: BoardRow[];
-	hits: IndexEntry[];
+	hits: Omit<IndexEntry, 'season'>[];
 	/** The specimen player's own board row, the one the board draws, and his position's range scale. */
 	row: BoardRow;
 	rowScale: RangeScale;

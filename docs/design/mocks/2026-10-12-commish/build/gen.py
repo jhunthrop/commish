@@ -1,5 +1,6 @@
 import board
 import direction
+import league
 import lobby
 import mock
 import report
@@ -16,6 +17,7 @@ def main():
     pages = {
         "board.html": board.build(players),
         "player.html": player.build(players, capsules),
+        "league.html": league.build(),
         "setup.html": setup.build(),
         "mock.html": mock.build(players),
         "lobby.html": lobby.build(players),

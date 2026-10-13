@@ -19,19 +19,25 @@
 	let { sync, board, tagsOf }: Props = $props();
 
 	const matchup = $derived(sync.matchup);
+
+	/** A side has started once any starter has a point: before that its zeros would read as duds, so
+	 * its points stay blank. */
+	function hasStarted(s: MatchupSide): boolean {
+		return s.starters.some((p) => p.points !== 0);
+	}
+
 	const started = $derived(
 		matchup !== null &&
-			[matchup.mine, ...(matchup.opponent ? [matchup.opponent] : [])].some((s) =>
-				s.starters.some((p) => p.points !== 0)
-			)
+			[matchup.mine, ...(matchup.opponent ? [matchup.opponent] : [])].some(hasStarted)
 	);
 </script>
 
 {#snippet side(s: MatchupSide, mine: boolean)}
+	{@const live = hasStarted(s)}
 	<section class="side" class:mine aria-label={teamName(sync, s.roster_id)}>
 		<header>
 			<span class="team">{teamName(sync, s.roster_id)}</span>
-			<span class="total">{fixed(s.points)}</span>
+			{#if live}<span class="total">{fixed(s.points)}</span>{/if}
 		</header>
 		{#each s.starters as starter (starter.player.host_id)}
 			<LeagueRow
@@ -40,7 +46,7 @@
 				tags={mine ? tagsOf(starter.player.board_id) : []}
 			>
 				{#snippet trailing()}
-					<span class="pts">{fixed(starter.points)}</span>
+					{#if live}<span class="pts">{fixed(starter.points)}</span>{/if}
 				{/snippet}
 			</LeagueRow>
 		{/each}

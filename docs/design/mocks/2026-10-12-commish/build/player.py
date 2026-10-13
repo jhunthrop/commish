@@ -1,6 +1,7 @@
 from html import escape
 
 from data import drafters_gap, heat_class, tier_cliffs
+from inseason import SEASON_CSS, season_block
 from shell import face, gap_chip, page, signed, tier_class
 
 # Chris Olave, because his capsule agrees with the board: WR6, 274 points, nine in tier 3 before a
@@ -129,10 +130,11 @@ def build(players, capsules):
     </div>
     <div class="big">
       <b>{p['proj']:.1f}</b>
-      <span>projected PPR points in 2026, over {p['games']:.1f} expected games</span>
+      <span>PPR points in 2026, projected preseason over {p['games']:.1f} games</span>
       <button class="verb" type="button">Add to my sheet</button>
     </div>
   </section>
+  {season_block(PLAYER)}
   <section class="facts">
     <div class="fact panel">
       <span class="label">Where drafters take him</span>
@@ -166,6 +168,6 @@ def build(players, capsules):
         "Players",
         '<a class="quiet" href="draft.html">Queue in a mock</a>',
         body,
-        CSS,
+        CSS + SEASON_CSS,
         with_read=True,
     )

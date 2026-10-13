@@ -28,7 +28,7 @@
 
 <Panel as="section" label="Your roster" padding="none">
 	<div class="head">
-		<PanelHead title="Your roster" aside="Over replacement" level={2} />
+		<PanelHead title="Your roster" aside="Points a game" level={2} />
 		<p class="basis">{basis}</p>
 	</div>
 	{#each roster as spot (spot.player.host_id)}

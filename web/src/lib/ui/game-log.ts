@@ -7,24 +7,46 @@ export interface LogHead {
 	full: string;
 }
 
-/** The season line, the log's first row: the games, then a total or a rate under each head. */
+/** A number of the season line and the words under it. */
+export interface LineCell {
+	value: string;
+	caption: string;
+}
+
+/** The season line, the log's first row: the games, his points a game, then a total or a rate under
+ * each stat head. */
 export interface SeasonLine {
 	lead: string;
 	sub: string;
-	/** One per head, in order: the number and its full words. */
-	cells: readonly { value: string; caption: string }[];
+	points: LineCell;
+	/** One per stat head, in order. */
+	cells: readonly LineCell[];
 }
 
-/** played prints its line, quiet is a week with no line (inactive, upcoming), bye is his bye. */
+/** played prints its line, quiet is a week he did not play, bye is his bye. */
 export type LogTone = 'played' | 'quiet' | 'bye';
 
+/** A week of the season so far. */
 export interface LogRow {
 	week: number;
 	/** "vs SF", "at PHI", "Bye". */
 	opponent: string;
-	tone: LogTone;
-	/** One per head for a played week, null for a week with no line. */
-	cells: readonly string[] | null;
-	/** A week with no line says why, across the stat columns: "Did not play". */
+	/** Why a week has no line, under its opponent: "Did not play". Empty otherwise. */
 	note: string;
+	tone: LogTone;
+	/** His points, null for a week with no line. */
+	points: string | null;
+	/** One per stat head for a played week, null for a week with no line. */
+	cells: readonly string[] | null;
+}
+
+/** A week still to play, on one compact line. */
+export interface AheadRow {
+	week: number;
+	/** "vs SF", "at PHI", "Bye". */
+	opponent: string;
+	/** His bye week, drawn on the surface tint. */
+	bye: boolean;
+	/** His kickoff's day, "Sun Oct 18", empty on his bye. */
+	day: string;
 }
