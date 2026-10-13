@@ -3,6 +3,7 @@
 Ported from `research-ts/src/projections/register/grade.ts`. Each tracked board in the freeze is
 graded on the players who have a stat line: their actual points (twelve-team PPR, the register's
 own scoring), each column's ordinal rank of its stance, and the running scoreboard over weeks.
+Each grade row records `implementation = 'python'` and the model version its freeze row quotes.
 """
 
 from collections.abc import Mapping, Sequence
@@ -15,11 +16,19 @@ from sqlalchemy import Connection, text
 from research.model.backtest import Observation, spearman, sum_left
 from research.model.domain import PPR_SCORING, Position, StatLine, compute_fantasy_points
 from research.model.instants import js_iso, ms_instant
-from research.model.jsmath import js_sorted, locale_compare
+from research.model.jsmath import js_or, js_sorted, locale_compare
 from research.model.reads.observations import ObservationQuery, stat_lines_as_of
-from research.model.register.freeze import SERVED_SOURCE
+from research.model.register.freeze import IMPLEMENTATION, SERVED_SOURCE
 
 REGISTER_COLUMNS: Final = ("board", "adp", "ecr", "props")
+# The refusals are the oracle's sentences word for word, but for two names that differ by design:
+# the oracle's remediation command and its universe table. The grade parity case maps the oracle's
+# words through this table and then compares each refusal whole.
+STATS_INGEST_COMMAND: Final = "python -m research.pipeline tank01-roster"
+REFUSAL_WORDING: Final = (
+    ("npm run stats:ingest", STATS_INGEST_COMMAND),
+    ("nfl_players row", "players row"),
+)
 
 
 def _stance(row: Mapping[str, Any], column: str) -> float | None:
@@ -32,9 +41,19 @@ def _stance(row: Mapping[str, Any], column: str) -> float | None:
     return None if row["props_points"] is None else float(row["props_points"])
 
 
+def ordinal_compare(a: tuple[str, float], b: tuple[str, float]) -> float:
+    """`ordinalRanks`' comparator, `(b.value - a.value) || a.key.localeCompare(b.key)`: a NaN
+    difference falls through to the key, as JavaScript's `||` does."""
+    return js_or(b[1] - a[1], lambda: locale_compare(a[0], b[0]))
+
+
 def ordinal_ranks(entries: Sequence[tuple[str, float]]) -> dict[str, int]:
-    """`ordinalRanks`: highest value first, ties by id."""
-    ordered = js_sorted(entries, lambda a, b: (b[1] - a[1]) or locale_compare(a[0], b[0]))
+    """`ordinalRanks`: highest value first, ties by id. Without a NaN the comparator is a total
+    order and the ranks are the oracle's under any stable sort. With a NaN it is not one (a NaN
+    stance is ordered against each neighbour by key alone), and the order then depends on V8's own
+    sort algorithm, which changed between engine versions (TimSort, then PowerSort in V8 14); the
+    numerics case proves the comparator pair by pair, and the register never ranks a NaN stance."""
+    ordered = js_sorted(entries, ordinal_compare)
     return {key: index + 1 for index, (key, _) in enumerate(ordered)}
 
 
@@ -126,6 +145,8 @@ def _grade_board(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in it
             "adp_rank": by_column["adp"].get(row["player_id"]),
             "ecr_rank": by_column["ecr"].get(row["player_id"]),
             "props_rank": by_column["props"].get(row["player_id"]),
+            "implementation": IMPLEMENTATION,
+            "model_version": row["model_version"],
         }
         for row in graded
     ]
@@ -157,7 +178,8 @@ def grade_week(conn: Connection, season: int, week: int, now: datetime, write: b
     lines = {row.line.player_id: row.line for row in stat_lines_as_of(conn, ObservationQuery(season, week, graded_at))}
     if not lines:
         raise ValueError(
-            f"The store holds no outcomes for {season} week {week} at or before {js_iso(graded_at)}, so it cannot be graded yet."
+            f"The store holds no outcomes for {season} week {week} at or before {js_iso(graded_at)}, so it cannot be graded yet. "
+            f"Run `{STATS_INGEST_COMMAND}` first."
         )
     ids = [row["player_id"] for row in frozen]
     positions = {
@@ -166,7 +188,7 @@ def grade_week(conn: Connection, season: int, week: int, now: datetime, write: b
     }
     sources = js_sorted(
         sorted({row["board_source"] for row in frozen}),
-        lambda a, b: ((a != SERVED_SOURCE) - (b != SERVED_SOURCE)) or locale_compare(a, b),
+        lambda a, b: js_or((a != SERVED_SOURCE) - (b != SERVED_SOURCE), lambda: locale_compare(a, b)),
     )
     rows: list[dict[str, Any]] = []
     for source in sources:
@@ -174,7 +196,8 @@ def grade_week(conn: Connection, season: int, week: int, now: datetime, write: b
         if not graded:
             if source == SERVED_SOURCE:
                 raise ValueError(
-                    f"No served-board player for {season} week {week} has a stat line. Refusing to grade an empty intersection."
+                    f"{season} week {week} has outcomes, but none of them belong to a player the {js_iso(frozen_at)} freeze carried "
+                    f'under "{source}". Refusing to grade an empty intersection.'
                 )
             continue
         rows.extend(_grade_board((season, week, frozen_at), graded_at, source, graded, positions, lines))
@@ -186,8 +209,9 @@ def grade_week(conn: Connection, season: int, week: int, now: datetime, write: b
 def _record(conn: Connection, rows: Sequence[Mapping[str, Any]]) -> None:
     statement = text(
         "insert into research.register_grade_rows (season, week, frozen_at, graded_at, board_source, player_id, actual_points, actual_rank, "
-        "board_rank, adp_rank, ecr_rank, props_rank) values (:season, :week, :frozen_at, :graded_at, :board_source, :player_id, "
-        ":actual_points, :actual_rank, :board_rank, :adp_rank, :ecr_rank, :props_rank)"
+        "board_rank, adp_rank, ecr_rank, props_rank, implementation, model_version) values (:season, :week, :frozen_at, :graded_at, "
+        ":board_source, :player_id, :actual_points, :actual_rank, :board_rank, :adp_rank, :ecr_rank, :props_rank, :implementation, "
+        ":model_version)"
     )
     for row in rows:
         conn.execute(statement, row)

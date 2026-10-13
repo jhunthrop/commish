@@ -8,12 +8,12 @@ publication (20 May).
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from types import MappingProxyType
 from typing import Final
 
 from sqlalchemy import Connection
 
 from research.model.domain import Position, ScoringRules, StatLine, compute_fantasy_points, round_points
-from research.model.instants import FAR_FUTURE
 from research.model.reads.observations import (
     STAT_LINE_SOURCE,
     ObservationQuery,
@@ -174,7 +174,7 @@ LAW_ENTRIES: Final = (
         "research-ts/src/projections/model/efficiency.ts#TOUCHDOWN_RATES",
     ),
 )
-LAW_BY_ID: Final = {entry.id: entry for entry in LAW_ENTRIES}
+LAW_BY_ID: Final = MappingProxyType({entry.id: entry for entry in LAW_ENTRIES})
 
 
 def magnitude_for_law(law_id: str, facts: LawConditionFacts) -> float | None:  # noqa: PLR0911 - one return per law
@@ -245,18 +245,6 @@ def season_scoring(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in 
 def points_per_game(entry: SeasonScoring | None) -> float | None:
     """`pointsPerGame`."""
     return round_points(entry.points / entry.games) if entry is not None and entry.games > 0 else None
-
-
-def actual_points_per_game(
-    conn: Connection, season: int, positions: Mapping[str, Position], rules: ScoringRules, admit_derived: bool
-) -> dict[str, float]:
-    """`actualPointsPerGame`."""
-    out: dict[str, float] = {}
-    for player_id, entry in season_scoring(conn, season, FAR_FUTURE, positions, rules, admit_derived).items():
-        ppg = points_per_game(entry)
-        if ppg is not None:
-            out[player_id] = ppg
-    return out
 
 
 @dataclass(frozen=True, slots=True)

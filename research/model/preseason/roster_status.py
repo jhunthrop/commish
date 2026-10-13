@@ -9,6 +9,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
+from types import MappingProxyType
 from typing import Any, Final
 
 from sqlalchemy import Connection, text
@@ -19,29 +20,33 @@ from research.model.preseason.adjustments import depth_chart_listed_at
 _CAPPED: Final = frozenset(("injured_reserve", "pup", "nfi", "suspended", "exempt"))
 _EXCLUDED: Final = frozenset(("practice_squad", "off_active_roster", "no_roster", "retired"))
 _NUMBERED_EXEMPTION: Final = re.compile(r"^E\d{2}$")
-_RESERVE_DETAIL_CODES: Final = {
-    "R01": ("injured_reserve", None),
-    "R48": ("injured_reserve", "designated_to_return"),
-    "R04": ("pup", None),
-    "R05": ("nfi", None),
-    "R06": ("nfi", None),
-    "R27": ("nfi", None),
-    "R40": ("suspended", "suspended_term"),
-    "R30": ("suspended", "suspended_indefinite"),
-    "R33": ("suspended", "suspended_club"),
-}
-_SIMPLE_CODES: Final = {
-    "ACT": "active",
-    "INA": "active",
-    "PUP": "pup",
-    "NON": "nfi",
-    "EXE": "exempt",
-    "DEV": "practice_squad",
-    "CUT": "no_roster",
-    "RET": "retired",
-}
+_RESERVE_DETAIL_CODES: Final = MappingProxyType(
+    {
+        "R01": ("injured_reserve", None),
+        "R48": ("injured_reserve", "designated_to_return"),
+        "R04": ("pup", None),
+        "R05": ("nfi", None),
+        "R06": ("nfi", None),
+        "R27": ("nfi", None),
+        "R40": ("suspended", "suspended_term"),
+        "R30": ("suspended", "suspended_indefinite"),
+        "R33": ("suspended", "suspended_club"),
+    }
+)
+_SIMPLE_CODES: Final = MappingProxyType(
+    {
+        "ACT": "active",
+        "INA": "active",
+        "PUP": "pup",
+        "NON": "nfi",
+        "EXE": "exempt",
+        "DEV": "practice_squad",
+        "CUT": "no_roster",
+        "RET": "retired",
+    }
+)
 SWEEP_CLUB_COUNT: Final = 32
-SWEEP_MINIMUM_CLUB_SIZE: Final = {"cutdown": 45, "in_season": 40}
+SWEEP_MINIMUM_CLUB_SIZE: Final = MappingProxyType({"cutdown": 45, "in_season": 40})
 _SWEEP_FEED: Final = "tank01_injuries"
 _PLAYER_LIST_FEED: Final = "tank01_player_list"
 _DESIGNATION_RULES: Final = (

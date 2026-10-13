@@ -11,8 +11,9 @@ ONE MORE THING DECIDES THE LAST BIT: the C compiler. clang's default `-ffp-contr
 every `a * b + c` written inside one C expression into a single fused multiply-add, and the V8
 node ships on Apple silicon was built that way. `madd` marks each place clang fuses (the left
 operand's product when the left operand is one, else the right's: clang's `tryEmitFMulAdd`), and
-`fused` says whether this build fused it. The `fdlibm` parity case proves the choice against the
-running node on random inputs; x86-64 builds have no FMA instruction to contract into.
+`fused` says which arm to compute: the caller passes it from the board's arithmetic
+(`research.model.arithmetic`), never from the host. The numerics case proves the fused arm against
+the running arm64 node and both arms against committed V8 vectors from arm64 and x86-64.
 
 `sqrt` needs nothing: IEEE 754 requires it correctly rounded everywhere.
 """
@@ -22,12 +23,8 @@ running node on random inputs; x86-64 builds have no FMA instruction to contract
 # ruff: noqa: PLR2004, PLR0911
 
 import math
-import platform
 import struct
 from typing import Final
-
-# The machine this process runs on: arm64 builds of V8 fuse, x86-64 builds cannot.
-V8_FUSES_MULTIPLY_ADD: Final = platform.machine().lower() in ("arm64", "aarch64")
 
 _PACK: Final = struct.Struct(">d")
 _WORDS: Final = struct.Struct(">iI")
@@ -97,7 +94,7 @@ def _log_tiny_f(f: float, k: int, fused: bool) -> float:
     return madd(dk, _LN2_HI, -(madd(-dk, _LN2_LO, r, fused) - f), fused)
 
 
-def log(x: float, fused: bool = V8_FUSES_MULTIPLY_ADD) -> float:
+def log(x: float, *, fused: bool) -> float:
     """V8's `Math.log` (fdlibm `__ieee754_log`)."""
     hx = _hi(x)
     k = 0
@@ -183,7 +180,7 @@ def _exp_reduce(x: float, hx: int, xsb: int, fused: bool) -> tuple[float, float,
     return x, 0.0, 0.0, 0
 
 
-def exp(x: float, fused: bool = V8_FUSES_MULTIPLY_ADD) -> float:
+def exp(x: float, *, fused: bool) -> float:
     """V8's `Math.exp` (fdlibm `__ieee754_exp`, with V8's exact `exp(1)`)."""
     hx = _hi(x)
     xsb = (hx >> 31) & 1
@@ -329,7 +326,7 @@ def _rem_pio2(x: float, fused: bool) -> tuple[int, float, float]:
     return n, y0, y1
 
 
-def sin(x: float, fused: bool = V8_FUSES_MULTIPLY_ADD) -> float:
+def sin(x: float, *, fused: bool) -> float:
     """V8's `Math.sin` (fdlibm `sin`)."""
     ix = _hi(x) & 0x7FFFFFFF
     if ix <= 0x3FE921FB:

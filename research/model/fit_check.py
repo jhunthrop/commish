@@ -1,6 +1,7 @@
 """THE FIT STEP: rebuild the stored boards and compare, or (deliberately) retake the product season.
 
     RESEARCH_DATABASE_URL=... uv run python -m research.model.fit_check [--persist-board] [--now ISO]
+        [--arithmetic fused|unfused]
 
 Ported from `research-ts/src/nightly/steps.ts` (`fitStep`, `checkTargets`, `driftOf`). CHECK-ONLY BY
 DEFAULT: each board the store can rebuild is rebuilt at its stored moment and compared, writing
@@ -15,6 +16,10 @@ One deliberate difference from the oracle, named in the report: a reason is comp
 and law id, and by value. `diffReasons` (`persist.ts`) keys by code alone, so a player's law
 reasons collapse to the last one, and compares `JSON.stringify` text, so a stored payload (jsonb
 keeps its own key order) never equals a fresh one even when every value does.
+
+`--arithmetic` defaults to `fused`, the arithmetic every stored board was made in
+(`research.model.arithmetic`); it is a property of the boards, never of the host, so a nightly on
+x86-64 runs fused too. `unfused` exists to rebuild a board an x86-64 V8 made.
 """
 
 import argparse
@@ -28,6 +33,7 @@ from sqlalchemy import Connection, text
 
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
+from research.model.arithmetic import ARITHMETIC_BY_NAME, Arithmetic, Provenance, model_version
 from research.model.instants import js_iso, ms_instant
 from research.model.market.curve import BOARD_FORMATS, BoardFormat, board_source_for
 from research.model.preseason.inputs import MissingInputError
@@ -125,10 +131,12 @@ def check_targets(conn: Connection, now: datetime) -> tuple[list[Target], list[s
     return targets, skipped
 
 
-def check_target(conn: Connection, target: Target, artifacts: ModelArtifacts, tolerance: float) -> list[LegCheck] | str:
+def check_target(
+    conn: Connection, target: Target, artifacts: ModelArtifacts, arithmetic: Arithmetic, tolerance: float
+) -> list[LegCheck] | str:
     """One target's legs against the store, or the store's own refusal for want of an input."""
     try:
-        season = build_season(conn, target.season, target.now, artifacts, target.formats)
+        season = build_season(conn, target.season, target.now, artifacts, arithmetic, target.formats)
     except MissingInputError as refusal:
         return str(refusal).split(". ")[0]
     checks: list[LegCheck] = []
@@ -160,7 +168,11 @@ def _findings(check: LegCheck, tolerance: float) -> list[str]:
 
 
 def fit_step(
-    conn: Connection, now: datetime, artifacts: ModelArtifacts, tolerance: float = FIT_POINT_TOLERANCE
+    conn: Connection,
+    now: datetime,
+    artifacts: ModelArtifacts,
+    arithmetic: Arithmetic,
+    tolerance: float = FIT_POINT_TOLERANCE,
 ) -> StepRecord:
     """`fitStep` in its default, check-only mode."""
     plan = check_targets(conn, now)
@@ -171,7 +183,7 @@ def fit_step(
     legs: list[LegCheck] = []
     compared: list[str] = []
     for target in targets:
-        result = check_target(conn, target, artifacts, tolerance)
+        result = check_target(conn, target, artifacts, arithmetic, tolerance)
         if isinstance(result, str):
             unbuildable.append(f"{target.season} ({result})")
             continue
@@ -190,12 +202,14 @@ def fit_step(
     )
 
 
-def persist_product_season(conn: Connection, now: datetime, artifacts: ModelArtifacts) -> StepRecord:
+def persist_product_season(
+    conn: Connection, now: datetime, artifacts: ModelArtifacts, provenance: Provenance
+) -> StepRecord:
     """`--persist-board`: retake the product season's boards and write them."""
-    season = build_season(conn, PRODUCT_SEASON, now, artifacts)
+    season = build_season(conn, PRODUCT_SEASON, now, artifacts, provenance.arithmetic)
     written = []
     for leg in legs_for(BOARD_FORMATS):
-        counts = write_board(conn, PRODUCT_SEASON, leg.source, season.inputs, season.boards[leg.source])
+        counts = write_board(conn, PRODUCT_SEASON, leg.source, season.inputs, season.boards[leg.source], provenance)
         written.append(f"{leg.source} {counts.written} rows")
     return StepRecord("ran", f"{PRODUCT_SEASON} {season.inputs.moment_kind} board written: {', '.join(written)}")
 
@@ -206,12 +220,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--persist-board", action="store_true", help="retake and write the product season's live board")
     parser.add_argument("--now", help="the instant to act at (ISO 8601); defaults to the wall clock")
+    parser.add_argument(
+        "--arithmetic",
+        choices=tuple(ARITHMETIC_BY_NAME),
+        default="fused",
+        help="the boards' arithmetic (default fused, what every stored board was made in)",
+    )
     args = parser.parse_args(argv)
     now = datetime.fromisoformat(args.now.replace("Z", "+00:00")) if args.now else datetime.now(UTC)
     engine = make_engine(database_url_from_env())
     with engine.begin() as conn:
         artifacts = load_model_artifacts(conn)
-        record = persist_product_season(conn, now, artifacts) if args.persist_board else fit_step(conn, now, artifacts)
+        arithmetic = ARITHMETIC_BY_NAME[args.arithmetic]
+        record = (
+            persist_product_season(conn, now, artifacts, Provenance(model_version(), arithmetic))
+            if args.persist_board
+            else fit_step(conn, now, artifacts, arithmetic)
+        )
     sys.stdout.write(f"fit: {record.status}, {record.summary}\n")
     return 1 if record.status == "failed" else 0
 

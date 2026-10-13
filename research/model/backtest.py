@@ -15,7 +15,7 @@ from sqlalchemy import Connection, text
 
 from research.model.domain import PPR_SCORING, Position, ScoringRules, compute_fantasy_points
 from research.model.instants import FAR_FUTURE
-from research.model.jsmath import js_sorted, locale_compare
+from research.model.jsmath import js_or, js_sorted, locale_compare
 from research.model.reads.observations import ObservationQuery, WeekRange, stat_lines_as_of
 from research.model.reads.preseason import all_positions
 
@@ -133,8 +133,8 @@ def score_ordering(
 
     def compare(a: tuple[str, float, float], b: tuple[str, float, float]) -> float:
         if band_by is None:
-            return (b[1] - a[1]) or locale_compare(a[0], b[0])
-        return (band_by.get(a[0], math.inf) - band_by.get(b[0], math.inf)) or locale_compare(a[0], b[0])
+            return js_or(b[1] - a[1], lambda: locale_compare(a[0], b[0]))
+        return js_or(band_by.get(a[0], math.inf) - band_by.get(b[0], math.inf), lambda: locale_compare(a[0], b[0]))
 
     band_of = {row[0]: index + 1 for index, row in enumerate(js_sorted(rows, compare))}
     overall = score_card([Observation(value, outcome) for _, value, outcome in rows])

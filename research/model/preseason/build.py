@@ -10,6 +10,7 @@ from typing import Final
 
 from sqlalchemy import Connection
 
+from research.model.arithmetic import Arithmetic
 from research.model.decide.value import LeagueShape
 from research.model.domain import BENCH_SLOT, PPR_SCORING, STANDARD_ROSTER_SLOTS, RosterSlotConfig
 from research.model.market.blend import (
@@ -76,10 +77,11 @@ class GatedInputs:
     sweep: RosterSweep | None
 
 
-def gated(
+def gated(  # noqa: PLR0913, PLR0917 - the oracle's parameters, and the arithmetic it took from its host
     conn: Connection,
     inputs: PreseasonInputs,
     artifacts: ModelArtifacts,
+    arithmetic: Arithmetic,
     priors: PreseasonPriors | None = None,
     features: PreseasonFeatures = SHIPPED_PRESEASON_FEATURES,
 ) -> GatedInputs:
@@ -94,7 +96,7 @@ def gated(
     )
     statused = replace(inputs, current_status=read.statuses)
     candidates = preseason_candidates(
-        statused, features, priors or artifacts.preseason, artifacts.laws, artifacts.candidates
+        statused, features, priors or artifacts.preseason, artifacts.laws, artifacts.candidates, arithmetic
     )
     kept, excluded = gate_candidates(candidates, read.statuses, inputs.season)
     return GatedInputs(statused, kept, excluded, read.sweep)
@@ -107,9 +109,11 @@ class BuiltBoard:
     sweep: RosterSweep | None
 
 
-def raw_board(conn: Connection, inputs: PreseasonInputs, artifacts: ModelArtifacts) -> BuiltBoard:
+def raw_board(
+    conn: Connection, inputs: PreseasonInputs, artifacts: ModelArtifacts, arithmetic: Arithmetic
+) -> BuiltBoard:
     """The raw model board (v1): no market, PPR."""
-    built = gated(conn, inputs, artifacts)
+    built = gated(conn, inputs, artifacts, arithmetic)
     board = preseason_board(built.candidates, PPR_SCORING, BOARD_SHAPE, artifacts.game_variance)
     return BuiltBoard(board, built.exclusions, built.sweep)
 
@@ -138,12 +142,13 @@ def blend_evidence(conn: Connection, inputs: PreseasonInputs, artifacts: ModelAr
     return BlendEvidence(with_props_anchor(base, artifacts.raw["market/props-anchor-weight"]), anchor)
 
 
-def blended_board(
+def blended_board(  # noqa: PLR0913, PLR0917 - the oracle's parameters, and the arithmetic it took from its host
     conn: Connection,
     inputs: PreseasonInputs,
     artifacts: ModelArtifacts,
     board_format: BoardFormat,
     evidence: BlendEvidence,
+    arithmetic: Arithmetic,
 ) -> BuiltBoard:
     """One blended leg (`shippedPreseasonBoardInputs` with a format), valued under that format."""
     curves = {name: parse_market_curve(artifacts.raw[f"market/curve-{name}"]) for name in BOARD_FORMATS}
@@ -155,7 +160,7 @@ def blended_board(
                 constants.market_tail_by_position, curves["ppr"], curves[board_format]
             ),
         )
-    built = gated(conn, inputs, artifacts, blend_priors(artifacts.preseason, constants))
+    built = gated(conn, inputs, artifacts, arithmetic, blend_priors(artifacts.preseason, constants))
     market, _ = market_board(conn, inputs.season, inputs.moment, curves[board_format], ADP_SOURCES[board_format])
     assert_live_market_coverage(inputs.season, inputs.moment, inputs.moment_kind, built.candidates, market)
     rules = FORMAT_RULES[board_format]

@@ -81,7 +81,7 @@ def read_artifact(conn: Connection, name: str, version: int | None = None) -> Pu
     ).first()
     if row is None:
         raise MissingArtifactError(
-            f"model_artifacts holds no {name} v{pinned}, which this code pins. Run `python -m research.model.artifacts seed`."
+            f"model_artifacts holds no {name} v{pinned}, which this code pins. Run `python -m research.model.seed`."
         )
     return PublishedArtifact(
         row.name, row.version, row.payload, ms_instant(row.fit_stamp), row.fitted_on, ms_instant(row.published_at)

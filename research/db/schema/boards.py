@@ -49,6 +49,11 @@ PRESEASON_PROJECTIONS: Final = Table(
     Column("median_points", Double(53), nullable=False),
     Column("ceiling_points", Double(53), nullable=False),
     recorded_at("computed_at"),
+    # Which model made the board (`research@<sha>`, `research-ts@<sha>`) and in which floating point
+    # (`research.model.arithmetic`). NULL only on a legacy board whose writer recorded neither and
+    # which nothing has rebuilt (`research.db.provenance`).
+    Column("model_version", Text),
+    Column("arithmetic", Text),
     one_of("moment_kind", MOMENT_KINDS, "preseason_projections_moment_kind_ck"),
     _player_fk("preseason_projections"),
     Index("preseason_projections_as_of_idx", "season", "source", "as_of"),
@@ -96,6 +101,9 @@ REGISTER_FREEZE_ROWS: Final = Table(
     Column("ecr", Double(53)),
     Column("props_points", Double(53)),
     Column("props_markets", JSONB),
+    # The model that made the board the freeze quotes, which is not the process that froze it: a
+    # Python freeze of a board the TypeScript persisted is implementation python, model research-ts.
+    Column("model_version", Text, nullable=False),
     one_of("implementation", IMPLEMENTATIONS, "register_freeze_rows_implementation_ck"),
     _player_fk("register_freeze_rows", "RESTRICT"),
 )
@@ -115,6 +123,10 @@ REGISTER_GRADE_ROWS: Final = Table(
     Column("adp_rank", Integer),
     Column("ecr_rank", Integer),
     Column("props_rank", Integer),
+    # Which implementation graded, and the model of the board graded (copied from its freeze rows).
+    Column("implementation", Text, nullable=False),
+    Column("model_version", Text, nullable=False),
+    one_of("implementation", IMPLEMENTATIONS, "register_grade_rows_implementation_ck"),
     _player_fk("register_grade_rows", "RESTRICT"),
     Index("register_grade_rows_graded_idx", "season", "week", "graded_at"),
 )

@@ -78,7 +78,9 @@ def js_max(*values: float) -> float:
     for value in values:
         if math.isnan(value):
             return math.nan
-        result = max(result, value)
+        # Math.max(-0, 0) is +0: a zero beats a negative zero.
+        if value > result or (value == 0 and result == 0 and math.copysign(1.0, result) < 0):
+            result = value
     return result
 
 
@@ -88,8 +90,16 @@ def js_min(*values: float) -> float:
     for value in values:
         if math.isnan(value):
             return math.nan
-        result = min(result, value)
+        # Math.min(0, -0) is -0: a negative zero beats a zero.
+        if value < result or (value == 0 and result == 0 and math.copysign(1.0, value) < 0):
+            result = value
     return result
+
+
+def js_or(value: float, fallback: Callable[[], float]) -> float:
+    """`value || fallback()` for a number: 0, -0 and NaN fall through, as JavaScript's `||` does
+    (Python's `or` keeps a NaN, which is truthy there)."""
+    return fallback() if value == 0 or math.isnan(value) else value
 
 
 def locale_compare(left: str, right: str) -> int:

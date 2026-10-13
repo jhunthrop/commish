@@ -266,6 +266,11 @@ def blend_board(
     return [blend_candidate(candidate, by_player.get(candidate.player_id), context, season) for candidate in model]
 
 
+# The refusals are the oracle's sentences word for word, but for the module they point a reader to.
+ADP_DOCSTRING: Final = "publishers.py's fetch_average_draft_position docstring"
+REFUSAL_WORDING: Final = (("publishers.ts's fetchAverageDraftPosition docblock", ADP_DOCSTRING),)
+
+
 class DegenerateMarketError(ValueError):
     """`assertLiveMarketCoverage`'s refusal: a live board whose market is too thin to anchor."""
 
@@ -277,7 +282,13 @@ def assert_live_market_coverage(
     if kind != "live":
         return
     if not market:
-        raise DegenerateMarketError(f"{season}'s LIVE board resolved ZERO listed market players at {js_iso(moment)}.")
+        raise DegenerateMarketError(
+            f"{season}'s LIVE board resolved ZERO listed market players at {js_iso(moment)}. "
+            "Every candidate would fall back to the position tail cap, degenerately tying every player at a "
+            "position to the identical value -- this board must not be persisted. The usual cause is the ADP "
+            f"benchmark's own publication stamp sitting after the live moment ({ADP_DOCSTRING}): verify the "
+            "benchmark is ingested AND visible at this moment before persisting again."
+        )
     listed: dict[str, int] = {}
     for entry in market:
         listed[entry.position] = listed.get(entry.position, 0) + 1
@@ -286,5 +297,9 @@ def assert_live_market_coverage(
     if thin:
         named = ", ".join(f"{position} ({listed.get(position, 0)} listed)" for position in thin)
         raise DegenerateMarketError(
-            f"{season}'s LIVE board resolves fewer than {MINIMUM_LISTED_PER_POSITION} listed market players at {named}."
+            f"{season}'s LIVE board resolves fewer than {MINIMUM_LISTED_PER_POSITION} listed market players at "
+            f"{named} at {js_iso(moment)}. Every unlisted candidate at a position this thin would fall "
+            "back to the SAME position tail cap, degenerately tying most or all of that position's own board rows "
+            "-- this board must not be persisted. Verify the ADP benchmark is ingested AND visible at this moment "
+            "for the named position(s) before persisting again."
         )

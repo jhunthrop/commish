@@ -1,5 +1,6 @@
-"""`factsForSeason` and `buildPopulations` (`laws/populations.ts`): each player's completed season
-as the tribal laws' conditions read it, and the matched populations the laws are measured on."""
+"""`factsForSeason` (`laws/populations.ts`): each player's completed season as the tribal laws'
+conditions read it. `buildPopulations`, the matched populations the laws are measured on, serves only
+the law discovery fit, which is not ported (see `harness`), so it is not kept here."""
 
 import math
 from collections.abc import Mapping
@@ -8,15 +9,13 @@ from datetime import datetime
 
 from sqlalchemy import Connection
 
-from research.model.domain import PPR_SCORING, Position, ScoringRules
+from research.model.domain import Position, ScoringRules
 from research.model.laws.tribal import (
-    LAW_ENTRIES,
     MIN_GAMES_FOR_TD_MEDIAN,
     TD_REGRESSION_MULTIPLIER,
     LawConditionFacts,
     SeasonParticipation,
     SeasonScoring,
-    actual_points_per_game,
     is_skill_position,
     points_per_game,
     schedule_published_as_of,
@@ -168,47 +167,4 @@ def facts_for_season(
                 touchdown_points_share_threshold=thresholds.get(position),
             ),
         )
-    return out
-
-
-@dataclass(frozen=True, slots=True)
-class PlayerSeasonPoint:
-    player_id: str
-    season: int
-    position: Position
-    points_per_game: float
-    next_points_per_game: float | None
-    match_key: float
-    condition: bool
-
-
-def build_populations(
-    conn: Connection, seasons: list[int], positions: Mapping[str, Position]
-) -> dict[str, list[PlayerSeasonPoint]]:
-    """`buildPopulations`: every eligible player-season with a decidable condition, per law, in
-    (season, position, player id) order."""
-    out: dict[str, list[PlayerSeasonPoint]] = {entry.id: [] for entry in LAW_ENTRIES}
-    for season in seasons:
-        facts = facts_for_season(conn, season, positions, PPR_SCORING, True)
-        next_actual = actual_points_per_game(conn, season + 1, positions, PPR_SCORING, True)
-        for player_id, entry in facts.items():
-            for law in LAW_ENTRIES:
-                if not law.eligible(entry.position):
-                    continue
-                condition = law.condition(entry.facts)
-                if condition is None:
-                    continue
-                out[law.id].append(
-                    PlayerSeasonPoint(
-                        player_id,
-                        season,
-                        entry.position,
-                        entry.points_per_game,
-                        next_actual.get(player_id),
-                        entry.points_per_game,
-                        condition,
-                    )
-                )
-    for points in out.values():
-        points.sort(key=lambda point: (point.season, point.position, point.player_id))
     return out

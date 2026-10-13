@@ -1,134 +1,58 @@
-// THE ORACLE'S BOARDS, ROW BY ROW: the TypeScript side of the model parity cases.
+// THE ORACLE, CALLED AS IT RUNS: the TypeScript side of the model parity cases.
 //
-//   DATABASE_URL=<legacy scratch> npx tsx research/parity/ts/model.ts board <season> <nowIso> [legs]
+//   DATABASE_URL=<legacy scratch> npx tsx research/parity/ts/model.ts persist <season> <nowIso>
+//   DATABASE_URL=<legacy scratch> npx tsx research/parity/ts/model.ts freeze|grade <season> <week> <nowIso>
+//   DATABASE_URL=<legacy scratch> npx tsx research/parity/ts/model.ts held-out | fit-game-variance
 //
-// Builds every leg `persistSeason` builds (the three blended formats, then the raw v1) through the
-// same exported calls in the same order, at the moment `persistSeason` would take for `now`, and
-// prints one JSON line per leg: every board row with every field the store keeps, the reasons, and
-// the roster gate's exclusions. Nothing is written. `persist.ts` keeps `buildBoard`, its league
-// shape and its priors private, so they are restated here from the same exported constants.
+// `persist` is the oracle's own `persistSeason`, the one board builder its operator script and its
+// nightly fit step call, writing into the scratch copy it is pointed at; nothing about the board is
+// restated here. Its operator lines are printed as `{"log": ...}` JSON lines (the moment, and each
+// leg it wrote, are read from them), and the harness reads the written rows back from the scratch.
+// A refusal (a degenerate live market) exits non-zero after the legs already written.
 import { createDb, type Db } from "@research-ts/db/client";
-import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research-ts/domain/roster";
-import type { Position } from "@research-ts/domain/player";
-import { PPR_SCORING } from "@research-ts/domain/scoring";
-import type { LeagueShape } from "@research-ts/projections/decide/replacement";
-import { shippedPreseasonBoardInputs, type BlendConstants } from "@research-ts/projections/market/blend";
-import { FITTED_BLEND_CONSTANTS } from "@research-ts/projections/market/blend-fitted";
-import { marketBoard } from "@research-ts/projections/market/curve";
-import { propsAnchorForSeason } from "@research-ts/projections/market/props-anchor";
-import { blendConstantsWithPropsAnchor, PROPS_ANCHOR_WEIGHT_ARTIFACT } from "@research-ts/projections/market/props-anchor-artifact";
-import { loadModelArtifact } from "@research-ts/projections/model/artifacts";
-import { FITTED_MODEL } from "@research-ts/projections/model/source";
-import { preseasonBoard } from "@research-ts/projections/preseason/board";
-import { BOARD_FORMAT_SPECS, BOARD_FORMATS, type BoardFormat } from "@research-ts/projections/preseason/board-formats";
-import { FITTED_AVAILABILITY_PRIORS, FITTED_CAREER_PRIORS, FITTED_DEPTH_PRIORS, FITTED_ROOKIE_PRIORS } from "@research-ts/projections/preseason/fitted";
-import { loadShippedGameVariance } from "@research-ts/projections/preseason/game-variance-artifacts";
-import { liveMomentFor, loadPreseason, replayMomentFor, type BoardMoment, type PreseasonPriors } from "@research-ts/projections/preseason/source";
-import { takeFreeze } from "@research-ts/projections/register/freeze";
-import { gradeWeek } from "@research-ts/projections/register/grade";
 import type { Clock } from "@research-ts/domain/timing";
 import { heldOutScores } from "@research-ts/nightly/reads/held-out";
 import { fitGameVariance, loadGameVarianceObservations } from "@research-ts/projections/preseason/game-variance";
-
-const SCORED: readonly Position[] = ["QB", "RB", "WR", "TE"];
-const SLOTS: readonly RosterSlotConfig[] = STANDARD_ROSTER_SLOTS.filter(
-  (slot) => slot.slot === BENCH_SLOT || slot.eligiblePositions.every((position) => SCORED.includes(position)),
-).map((slot) => ({ ...slot, eligiblePositions: slot.eligiblePositions.filter((position) => SCORED.includes(position)) }));
-const SHAPE: LeagueShape = { teamCount: 12, rosterSlots: SLOTS };
-const PRIORS: PreseasonPriors = {
-  model: FITTED_MODEL,
-  availability: FITTED_AVAILABILITY_PRIORS,
-  rookies: FITTED_ROOKIE_PRIORS,
-  depth: FITTED_DEPTH_PRIORS,
-  career: FITTED_CAREER_PRIORS,
-};
-
-async function boardMomentFor(db: Db, season: number, now: Date): Promise<BoardMoment> {
-  try {
-    return await liveMomentFor(db, season, { now: () => now.getTime() } as never);
-  } catch (error: unknown) {
-    if (error instanceof Error && /has already started/.test(error.message)) return await replayMomentFor(db, season);
-    throw error;
-  }
-}
-
-async function boards(db: Db, season: number, now: Date, legs: readonly string[]): Promise<void> {
-  const moment = await boardMomentFor(db, season, now);
-  const inputs = await loadPreseason(db, season, { boardMoment: moment });
-  const { entries } = await marketBoard(db, season, inputs.moment);
-  const propsAnchor = await propsAnchorForSeason(
-    db,
-    season,
-    inputs.positions,
-    new Map(entries.map((entry) => [entry.playerId, entry.marketPoints] as const)),
-    FITTED_BLEND_CONSTANTS.impliedGamesByPosition,
-  );
-  const constants: BlendConstants = blendConstantsWithPropsAnchor(FITTED_BLEND_CONSTANTS, await loadModelArtifact(db, PROPS_ANCHOR_WEIGHT_ARTIFACT));
-  const gameVariance = await loadShippedGameVariance(db);
-  const order: readonly (BoardFormat | "raw")[] = [...BOARD_FORMATS, "raw"];
-  for (const leg of order) {
-    if (!legs.includes(leg)) continue;
-    const raw = leg === "raw";
-    const { candidates, exclusions } = await shippedPreseasonBoardInputs(db, inputs, PRIORS, {
-      raw,
-      ...(raw ? {} : { format: leg, constants, propsAnchor }),
-    });
-    const rules = raw ? PPR_SCORING : BOARD_FORMAT_SPECS[leg].rules;
-    const board = preseasonBoard(candidates, { season, asOf: inputs.moment, rules, shape: SHAPE, gameVariance });
-    const rows = board.map((entry) => ({
-      playerId: entry.playerId,
-      position: entry.position,
-      team: entry.team,
-      rank: entry.rank,
-      positionRank: entry.positionRank,
-      valueRank: entry.valueRank,
-      tier: entry.tier,
-      projectedPoints: entry.projectedPoints,
-      valueOverReplacement: entry.valueOverReplacement,
-      expectedGames: entry.expectedGames,
-      floorPoints: entry.outlook.floor,
-      medianPoints: entry.outlook.median,
-      ceilingPoints: entry.outlook.ceiling,
-      reasons: entry.reasons,
-    }));
-    const excluded = exclusions.map((entry) => ({ playerId: entry.playerId, status: entry.status.kind, source: entry.status.source }));
-    process.stdout.write(`${JSON.stringify({ leg, moment: inputs.moment.toISOString(), momentKind: inputs.momentKind, rows, excluded })}\n`);
-  }
-}
+import { persistSeason } from "@research-ts/projections/preseason/persist";
+import { takeFreeze } from "@research-ts/projections/register/freeze";
+import { gradeWeek } from "@research-ts/projections/register/grade";
 
 const at = (iso: string): Clock => ({ now: () => Date.parse(iso) }) as Clock;
+const emit = (value: unknown): void => {
+  process.stdout.write(`${JSON.stringify(value)}\n`);
+};
+
+async function persist(db: Db, season: number, nowIso: string): Promise<void> {
+  const take = await persistSeason(db, season, at(nowIso), new Map(), { log: (line) => emit({ log: line }) });
+  emit({ momentKind: take.momentKind, written: take.written.map((leg) => leg.source) });
+}
 
 async function freeze(db: Db, season: number, week: number, nowIso: string): Promise<void> {
   const result = await takeFreeze(db, { season, week }, at(nowIso));
-  process.stdout.write(`${JSON.stringify({ frozenAt: result.frozenAt.toISOString(), rows: result.rows })}\n`);
+  emit({ frozenAt: result.frozenAt.toISOString(), rows: result.rows });
 }
 
 async function grade(db: Db, season: number, week: number, nowIso: string): Promise<void> {
   const result = await gradeWeek(db, { season, week }, at(nowIso));
-  process.stdout.write(`${JSON.stringify({ gradedAt: result.gradedAt.toISOString(), rows: result.rows })}\n`);
-}
-
-async function heldOut(db: Db): Promise<void> {
-  process.stdout.write(`${JSON.stringify(await heldOutScores(db))}\n`);
+  emit({ gradedAt: result.gradedAt.toISOString(), rows: result.rows });
 }
 
 async function main(): Promise<void> {
   const [command, season, second, third] = process.argv.slice(2);
   const url = process.env.DATABASE_URL;
   if (command === undefined || url === undefined) {
-    throw new Error("usage: DATABASE_URL=... tsx model.ts board <season> <nowIso> [legs] | freeze|grade <season> <week> <nowIso> | held-out");
+    throw new Error("usage: DATABASE_URL=... tsx model.ts persist <season> <nowIso> | freeze|grade <season> <week> <nowIso> | held-out | fit-game-variance");
   }
   const db = createDb(url, { max: 2 });
   try {
-    if (command === "board") await boards(db, Number(season), new Date(second!), (third ?? "ppr,half,std,raw").split(","));
+    if (command === "persist") await persist(db, Number(season), second!);
     else if (command === "freeze") await freeze(db, Number(season), Number(second), third!);
     else if (command === "grade") await grade(db, Number(season), Number(second), third!);
-    else if (command === "held-out") await heldOut(db);
+    else if (command === "held-out") emit(await heldOutScores(db));
     else if (command === "fit-game-variance") {
       const observations = await loadGameVarianceObservations(db, [2023, 2024]);
-      process.stdout.write(`${JSON.stringify(fitGameVariance(observations, { heldOutSeasons: [2025, 2026] }))}\n`);
-    }
-    else throw new Error(`no command ${command}`);
+      emit(fitGameVariance(observations, { heldOutSeasons: [2025, 2026] }));
+    } else throw new Error(`no command ${command}`);
   } finally {
     await db.$client.end();
   }

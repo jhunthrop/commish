@@ -1,6 +1,6 @@
 // THE ORACLE'S COMMITTED FITS, AS JSON: every fitted constant the TypeScript board reads from a
 // committed file rather than from `model_artifacts`, printed under the artifact name the Python
-// lane stores it as. `python -m research.model.artifacts seed` reads this output and publishes each
+// lane stores it as. `python -m research.model.seed` reads this output and publishes each
 // payload as version 1 of its artifact, so the Python board reads its fits from the store (no file-
 // sourced data at runtime) and the values are the oracle's own, number for number: a JavaScript
 // double printed by `JSON.stringify` parses back to the same double in Python.

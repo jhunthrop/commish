@@ -9,6 +9,7 @@ matched to its candidate by id.
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Final, Literal
 
 from research.model.domain import Position, camel_to_snake
@@ -17,7 +18,7 @@ from research.model.laws.discovery_facts import DiscoveryFacts, DiscoveryQuantit
 LOW_QUANTILE_LEVELS: Final = (0.1, 0.2, 0.3)
 HIGH_QUANTILE_LEVELS: Final = (0.7, 0.8, 0.9)
 QUANTILE_LEVELS: Final = (*LOW_QUANTILE_LEVELS, *HIGH_QUANTILE_LEVELS)
-QUANTILE_TAG: Final = {0.1: "q10", 0.2: "q20", 0.3: "q30", 0.7: "q70", 0.8: "q80", 0.9: "q90"}
+QUANTILE_TAG: Final = MappingProxyType({0.1: "q10", 0.2: "q20", 0.3: "q30", 0.7: "q70", 0.8: "q80", 0.9: "q90"})
 CANDIDATE_CAP: Final = 6000
 MIN_QUANTILE_SAMPLE: Final = 20
 Side = Literal["low", "high"]
@@ -67,7 +68,7 @@ QUANTITY_DEFS: Final = (
     QuantityDef("draftPick", _ALL, False),
     QuantityDef("pointsPerGame", _ALL, True, is_match_key_quantity=True),
 )
-QUANTITY_BY_ID: Final = {definition.id: definition for definition in QUANTITY_DEFS}
+QUANTITY_BY_ID: Final = MappingProxyType({definition.id: definition for definition in QUANTITY_DEFS})
 
 
 @dataclass(frozen=True, slots=True)

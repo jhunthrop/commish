@@ -15,6 +15,7 @@ from typing import Final
 
 from sqlalchemy import Table
 
+from research.db.provenance import board_model_sql
 from research.db.schema import METADATA
 
 LEGACY_SCHEMA: Final = "public"
@@ -154,6 +155,35 @@ _ONE_GENERATION: Final = Invariant(
     ),
     why="a reason's board is only known when its (season, source) holds exactly one generation",
 )
+_BOARD_MODEL_VERSION: Final = Derived(
+    board_model_sql(f'{_ALIAS}."source"', f'{_ALIAS}."as_of"', "model_version"),
+    ("source", "as_of"),
+    "the model that made the board, where research.db.provenance establishes it; NULL where nothing rebuilt it",
+)
+_BOARD_ARITHMETIC: Final = Derived(
+    board_model_sql(f'{_ALIAS}."source"', f'{_ALIAS}."as_of"', "arithmetic"),
+    ("source", "as_of"),
+    "the floating point the board was made in, where a bit-for-bit rebuild established it",
+)
+_FREEZE_MODEL_VERSION: Final = Derived(
+    board_model_sql(f'{_ALIAS}."board_source"', f'{_ALIAS}."board_as_of"', "model_version"),
+    ("board_source", "board_as_of"),
+    "the model of the board the freeze quotes (research.db.provenance)",
+)
+_FREEZE_MODEL_KNOWN: Final = Invariant(
+    violations=f"{_FREEZE_MODEL_VERSION.sql} IS NULL",
+    why="every legacy freeze quotes a board research.db.provenance names; a freeze without a model cannot be carried",
+)
+_GRADE_FREEZE_MODEL: Final = board_model_sql('f."board_source"', 'f."board_as_of"', "model_version")
+_GRADE_MODEL_VERSION: Final = Derived(
+    (
+        f'(SELECT {_GRADE_FREEZE_MODEL} FROM "{LEGACY_SCHEMA}"."register_freeze_rows" AS f '
+        f'WHERE f."season" = {_ALIAS}."season" AND f."week" = {_ALIAS}."week" AND f."frozen_at" = {_ALIAS}."frozen_at" '
+        f'AND f."board_source" = {_ALIAS}."board_source" AND f."player_id" = {_ALIAS}."player_id")'
+    ),
+    ("season", "week", "frozen_at", "board_source", "player_id"),
+    "the model of the freeze the grade grades",
+)
 _ONE_SEASON_OF_GAMES: Final = Invariant(
     violations=(
         f"left({_ALIAS}.\"game_id\", 8) NOT BETWEEN '{LEGACY_PROVIDER_SEASON}0301' "
@@ -257,7 +287,12 @@ _ENTRIES: Final = (
         dropped=_surrogate(),
     ),
     LegacyTable("model_artifacts", "model_artifacts", dropped=_surrogate()),
-    LegacyTable("preseason_projections", "preseason_projections", dropped=_surrogate()),
+    LegacyTable(
+        "preseason_projections",
+        "preseason_projections",
+        derived=MappingProxyType({"model_version": _BOARD_MODEL_VERSION, "arithmetic": _BOARD_ARITHMETIC}),
+        dropped=_surrogate(),
+    ),
     LegacyTable(
         "preseason_board_reasons",
         "preseason_board_reasons",
@@ -276,12 +311,24 @@ _ENTRIES: Final = (
             {
                 "implementation": Derived(
                     "'typescript'", (), "every legacy freeze was taken by the TypeScript (2026 weeks 1 and 2)"
-                )
+                ),
+                "model_version": _FREEZE_MODEL_VERSION,
+            }
+        ),
+        dropped=_surrogate(),
+        invariants=(_FREEZE_MODEL_KNOWN,),
+    ),
+    LegacyTable(
+        "register_grade_rows",
+        "register_grade_rows",
+        derived=MappingProxyType(
+            {
+                "implementation": Derived("'typescript'", (), "every legacy grade was taken by the TypeScript"),
+                "model_version": _GRADE_MODEL_VERSION,
             }
         ),
         dropped=_surrogate(),
     ),
-    LegacyTable("register_grade_rows", "register_grade_rows", dropped=_surrogate()),
     LegacyTable(
         "player_capsules",
         "player_capsules",

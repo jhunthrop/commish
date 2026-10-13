@@ -6,6 +6,7 @@ the ones on a reserve list."""
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 
+from research.model.arithmetic import Arithmetic
 from research.model.domain import Position, StatLine
 from research.model.jsmath import js_max, js_min, js_sorted, locale_compare
 from research.model.laws.discovery import CandidateLaw
@@ -68,6 +69,7 @@ class _Context:
     laws: Sequence[Law]
     candidates: Mapping[str, CandidateLaw]
     tenure: Mapping[str, float | None]
+    arithmetic: Arithmetic
 
 
 def _games(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
@@ -99,6 +101,7 @@ def _games(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its orde
         ),
         inputs.season,
         ctx.priors.availability,
+        ctx.arithmetic.fused_multiply_add,
     )
 
 
@@ -156,12 +159,13 @@ def _veteran_reasons(move: OffseasonMove | None, delta: ShareDelta | None) -> li
     return reasons
 
 
-def preseason_candidates(
+def preseason_candidates(  # noqa: PLR0913, PLR0917 - the oracle's parameters, and the arithmetic it took from its host
     inputs: PreseasonInputs,
     features: PreseasonFeatures,
     priors: PreseasonPriors,
     laws: Sequence[Law],
     candidates: Mapping[str, CandidateLaw],
+    arithmetic: Arithmetic,
 ) -> list[BoardCandidate]:
     """`preseasonCandidates`: veterans with usage, then the rookie class, sorted by id."""
     roster_by_player = {row.player_id: row for row in inputs.roster}
@@ -174,7 +178,7 @@ def preseason_candidates(
     tenure: dict[str, float | None] = {}
     for row in inputs.roster:
         tenure.setdefault(row.team, lookup(row.team, WeekRef(inputs.season, BOARD_WEEK), CoachMetric.TENURE_SEASONS))
-    ctx = _Context(inputs, features, priors, rates, laws, candidates, tenure)
+    ctx = _Context(inputs, features, priors, rates, laws, candidates, tenure, arithmetic)
     out: list[BoardCandidate] = []
     claims = incumbent_claims(inputs, board.opportunity)
     moves = {move.player_id: move for move in board.moves}

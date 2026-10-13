@@ -3,7 +3,7 @@
 import sys
 from collections.abc import Sequence
 
-from research.parity.model.cases import CaseResult
+from research.parity.model.outcome import CaseResult
 
 
 def _line(text: str = "") -> None:
@@ -26,6 +26,8 @@ def report_model(results: Sequence[CaseResult]) -> None:
             )
             for example in diff.examples:
                 _line(f"{'':<24}   {example}")
+        for claim in result.claims:
+            _line(f"{result.name:<24} claim: {claim.what}: {'holds' if claim.holds else 'DOES NOT HOLD'}")
         for note in result.notes:
             _line(f"{result.name:<24} note: {note}")
         if not result.refusals_agree:

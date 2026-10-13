@@ -18,7 +18,7 @@ from research.model.decide.value import (
     value_board,
 )
 from research.model.domain import STAT_FIELDS, Position, ScoringRules, StatLine, compute_fantasy_points
-from research.model.jsmath import js_max, js_sorted, locale_compare
+from research.model.jsmath import js_max, js_or, js_sorted, locale_compare
 from research.model.preseason.availability import GamesPlayedOutlook, ProjectionDistribution
 from research.model.preseason.candidates import BoardCandidate, Reason
 
@@ -131,7 +131,8 @@ def preseason_board(
         ):
             standings[player.player_id] = (tier, left, drop)
     ordered = js_sorted(
-        valued, lambda a, b: (b.projected_points - a.projected_points) or locale_compare(a.player_id, b.player_id)
+        valued,
+        lambda a, b: js_or(b.projected_points - a.projected_points, lambda: locale_compare(a.player_id, b.player_id)),
     )
     return [_entry(player, index, value_ranks, held, standings) for index, player in enumerate(ordered)]
 

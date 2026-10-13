@@ -14,6 +14,7 @@ from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
+from research.model.arithmetic import Arithmetic, Provenance
 from research.model.instants import ms_instant
 from research.model.market.curve import BOARD_FORMATS, RAW_BOARD_SOURCE, BoardFormat, board_source_for
 from research.model.preseason.board import BoardEntry
@@ -48,22 +49,24 @@ class SeasonBoards:
     boards: dict[str, BuiltBoard]
 
 
-def build_season(
+def build_season(  # noqa: PLR0913, PLR0917 - the oracle's parameters, and the arithmetic it took from its host
     conn: Connection,
     season: int,
     now: datetime,
     artifacts: ModelArtifacts,
+    arithmetic: Arithmetic,
     formats: Sequence[BoardFormat] = BOARD_FORMATS,
 ) -> SeasonBoards:
-    """Every leg of one season at the moment `now` gives it (live before kickoff, replay after)."""
+    """Every leg of one season at the moment `now` gives it (live before kickoff, replay after),
+    computed in `arithmetic` (`research.model.arithmetic`)."""
     inputs = load_preseason(conn, season, board_moment_for(conn, season, now))
     evidence: BlendEvidence = blend_evidence(conn, inputs, artifacts)
     boards: dict[str, BuiltBoard] = {}
     for leg in legs_for(formats):
         boards[leg.source] = (
-            raw_board(conn, inputs, artifacts)
+            raw_board(conn, inputs, artifacts, arithmetic)
             if leg.board_format is None
-            else blended_board(conn, inputs, artifacts, leg.board_format, evidence)
+            else blended_board(conn, inputs, artifacts, leg.board_format, evidence, arithmetic)
         )
     return SeasonBoards(inputs, boards)
 
@@ -126,9 +129,10 @@ class FrozenBoardError(ValueError):
 
 _INSERT_PROJECTION: Final = text(
     "insert into research.preseason_projections (season, source, player_id, as_of, moment_kind, rank, position_rank, value_rank, tier, "
-    "projected_points, value_over_replacement, expected_games, floor_points, median_points, ceiling_points) values (:season, :source, "
-    ":player_id, :as_of, :moment_kind, :rank, :position_rank, :value_rank, :tier, :projected_points, :value_over_replacement, "
-    ":expected_games, :floor_points, :median_points, :ceiling_points) on conflict do nothing"
+    "projected_points, value_over_replacement, expected_games, floor_points, median_points, ceiling_points, model_version, arithmetic) "
+    "values (:season, :source, :player_id, :as_of, :moment_kind, :rank, :position_rank, :value_rank, :tier, :projected_points, "
+    ":value_over_replacement, :expected_games, :floor_points, :median_points, :ceiling_points, :model_version, :arithmetic) "
+    "on conflict do nothing"
 )
 _UPSERT_REASON: Final = text(
     "insert into research.preseason_board_reasons (season, source, as_of, player_id, code, detail, payload) values (:season, :source, "
@@ -147,14 +151,24 @@ class WriteCounts:
 
 
 def write_board(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its order, for a line-by-line read
-    conn: Connection, season: int, source: str, inputs: PreseasonInputs, built: BuiltBoard, unfrozen: bool = False
+    conn: Connection,
+    season: int,
+    source: str,
+    inputs: PreseasonInputs,
+    built: BuiltBoard,
+    provenance: Provenance,
+    unfrozen: bool = False,
 ) -> WriteCounts:
-    """`writePreseasonBoard`: a live board replaces its season's generation, a replay appends."""
+    """`writePreseasonBoard`: a live board replaces its season's generation, a replay appends. Each
+    row records the model version and arithmetic that made it (the oracle's rows record neither)."""
     if source in FROZEN_BOARD_SOURCES and not unfrozen:
         raise FrozenBoardError(
             f"refusing to write {source}: the register's shadow track reads it and this tree cannot rebuild it"
         )
-    projections = projection_rows(built.board, season, source, inputs.moment, inputs.moment_kind)
+    stamp = {"model_version": provenance.model_version, "arithmetic": provenance.arithmetic.label}
+    projections = [
+        {**row, **stamp} for row in projection_rows(built.board, season, source, inputs.moment, inputs.moment_kind)
+    ]
     reasons = [
         {**row, "payload": json.dumps(row["payload"])} for row in reason_rows(built, season, source, inputs.moment)
     ]

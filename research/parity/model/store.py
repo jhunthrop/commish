@@ -2,13 +2,32 @@
 
 The model cases run on real data, the dev copy restored from the production dump
 (`PARITY_SOURCE_DATABASE_URL`, opened read only, `public`), because no recording could stand in for
-four seasons of observations. A board is rebuilt at a past moment, so the copy is the store AS IT
-STOOD at that moment: every legacy row whose own write stamp (`ingested_at`, `fetched_at`,
-`captured_at`, `created_at`, `resolved_at`, `computed_at`, `frozen_at`) is at or before it. An
-`as_of` alone is not enough: the win totals are stamped with the publisher's date, two days
-before the job that wrote them ran, and a box score is stamped after its game but written later
-still. `model_artifacts` is copied whole, because the fits it holds are inputs the code pins, not
-facts the store learned.
+four seasons of observations. A board is rebuilt at a past moment, so the copy is the store as it
+stood at that moment, table by table:
+
+- BY WRITE STAMP, every row stamped at or before the moment: `ingested_at` (nfl_games,
+  player_week_observations, team_week_observations, player_week_teams, the four nflverse_* tables,
+  nfl_draft_picks, coaches, preseason_rosters, preseason_rankings), `created_at` (props_player_map),
+  `fetched_at` (player_prop_observations), `captured_at` (capture_snapshots, adp_snapshots),
+  `resolved_at` (player_crosswalk), `graded_at` (register_grade_rows), `frozen_at`
+  (register_freeze_rows). An `as_of` alone is not enough: the win totals are stamped with the
+  publisher's date, two days before the job that wrote them ran.
+- BY ITS MOMENT: preseason_projections by `as_of` (a board is the claim made at its moment and
+  written seconds later), and preseason_board_reasons with the generation they belong to.
+- WHOLE, because they carry no write stamp: nfl_players, players, player_stat_lines,
+  player_capsules, stat_weeks, and model_artifacts (the fits are inputs the code pins, not facts
+  the store learned).
+
+WHERE A STAMP DOES NOT TELL THE TRUTH, and what the copy does about it:
+
+- nfl_players is rewritten in place by the universe ingest, with no stamp, so a copy holds today's
+  universe. One fact the week-1 board read has since changed (Velus Jones Jr., `00-0037745`, was a
+  WR on 2026-09-07 and is an RB today); the week-1 case restates it (`restate`) and says why.
+- nfl_draft_picks were all re-ingested at 2026-09-08 00:48, so a copy at the week-1 moment
+  (2026-09-07 21:57) holds none, although the picks existed then.
+- player_week_teams for 2024 and 2025 were all re-ingested at 2026-09-07 22:04, so the week-1 copy
+  holds none of them either. That is correct for the week-1 board: copying them makes 592 of its
+  rows differ from the board the register froze, so the board was taken before they landed.
 
 The TypeScript side reads the copy as it is (the drizzle-built legacy schema); the Python side
 reads the same rows through phase A's loader, in a research schema migrated by alembic, with the
@@ -29,9 +48,7 @@ from research.db.engine import make_engine
 from research.db.legacy import LEGACY_TABLES
 from research.db.url import database_url_from_env, sqlalchemy_url
 from research.load_legacy import load
-from research.model.artifacts import publish_artifact
-from research.model.instants import js_iso
-from research.model.seed import committed_at
+from research.model.seed import seed_into
 from research.parity import databases
 
 SOURCE_VARIABLE: Final = "PARITY_SOURCE_DATABASE_URL"
@@ -42,6 +59,7 @@ _WRITE_STAMPS: Final = (
     "captured_at",
     "resolved_at",
     "computed_at",
+    "graded_at",
     "frozen_at",
 )
 _COPIED_WHOLE: Final = frozenset(("model_artifacts",))
@@ -121,6 +139,20 @@ def legacy_copy_at(moment: datetime, database: str) -> str:
     return url
 
 
+@dataclass(frozen=True, slots=True)
+class Restatement:
+    """A fact the store has since rewritten without a stamp, put back as it stood, and why."""
+
+    statement: str
+    why: str
+
+
+def restate(url: str, restatement: Restatement) -> None:
+    """Applies one restatement to a scratch copy (never to the source, which is opened read only)."""
+    with psycopg.connect(url) as conn:
+        conn.execute(restatement.statement)
+
+
 def oracle_fits() -> dict[str, dict[str, object]]:
     """The oracle's committed fits, as `ts/artifacts.ts` prints them."""
     completed = subprocess.run(["npx", "tsx", str(_EXPORTER)], cwd=_REPO, check=True, capture_output=True, text=True)
@@ -147,15 +179,6 @@ def scratch_pair_at(moment: datetime, label: str, fits: dict[str, dict[str, obje
     load(sqlalchemy_url(legacy), sqlalchemy_url(research), replace=False)
     engine = make_engine(sqlalchemy_url(research))
     with engine.begin() as conn:
-        for name, entry in fits.items():
-            file = str(entry["file"])
-            publish_artifact(
-                conn,
-                name,
-                1,
-                entry["payload"],
-                committed_at(file),
-                f"the committed constant {file} (parity seed at {js_iso(moment)})",
-            )
+        seed_into(conn, fits)
     engine.dispose()
     return ScratchPair(moment, legacy, research)

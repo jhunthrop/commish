@@ -161,23 +161,23 @@ _LANCZOS: Final = (
 _HALF: Final = 0.5
 
 
-def log_gamma(x: float) -> float:
+def log_gamma(x: float, fused: bool) -> float:
     """Lanczos, as `availability.ts` writes it, with V8's `log` and `sin`."""
     if x < _HALF:
-        return log(math.pi / sin(math.pi * x)) - log_gamma(1 - x)
+        return log(math.pi / sin(math.pi * x, fused=fused), fused=fused) - log_gamma(1 - x, fused)
     z = x - 1
     series = 0.99999999999980993
     for index, coefficient in enumerate(_LANCZOS):
         series += coefficient / (z + index + 1)
     t = z + len(_LANCZOS) - 0.5
-    return 0.5 * log(2 * math.pi) + (z + 0.5) * log(t) - t + log(series)
+    return 0.5 * log(2 * math.pi, fused=fused) + (z + 0.5) * log(t, fused=fused) - t + log(series, fused=fused)
 
 
-def _log_beta(a: float, b: float) -> float:
-    return log_gamma(a) + log_gamma(b) - log_gamma(a + b)
+def _log_beta(a: float, b: float, fused: bool) -> float:
+    return log_gamma(a, fused) + log_gamma(b, fused) - log_gamma(a + b, fused)
 
 
-def games_played_probabilities(team_games: int, rate: float, concentration: float) -> tuple[float, ...]:
+def games_played_probabilities(team_games: int, rate: float, concentration: float, fused: bool) -> tuple[float, ...]:
     """`gamesPlayedProbabilities`: P(games = k), k = 0..teamGames."""
     if team_games < 1:
         raise ValueError(f"A season has a whole number of games; got {team_games}.")
@@ -191,11 +191,11 @@ def games_played_probabilities(team_games: int, rate: float, concentration: floa
         return tuple(1.0 if k == team_games else 0.0 for k in range(team_games + 1))
     alpha = rate * concentration
     beta = (1 - rate) * concentration
-    denominator = _log_beta(alpha, beta)
+    denominator = _log_beta(alpha, beta, fused)
     raw = []
     for k in range(team_games + 1):
-        choose = log_gamma(team_games + 1) - log_gamma(k + 1) - log_gamma(team_games - k + 1)
-        raw.append(exp(choose + _log_beta(k + alpha, team_games - k + beta) - denominator))
+        choose = log_gamma(team_games + 1, fused) - log_gamma(k + 1, fused) - log_gamma(team_games - k + 1, fused)
+        raw.append(exp(choose + _log_beta(k + alpha, team_games - k + beta, fused) - denominator, fused=fused))
     total = 0.0
     for value in raw:
         total += value
@@ -211,9 +211,9 @@ def _quantile_of(probabilities: Sequence[float], quantile: float) -> float:
     return float(len(probabilities) - 1)
 
 
-def outlook_from_rate(team_games: int, rate: float, concentration: float) -> GamesPlayedOutlook:
+def outlook_from_rate(team_games: int, rate: float, concentration: float, fused: bool) -> GamesPlayedOutlook:
     """`outlookFromRate`."""
-    probabilities = games_played_probabilities(team_games, rate, concentration)
+    probabilities = games_played_probabilities(team_games, rate, concentration, fused)
     expected = 0.0
     for games, probability in enumerate(probabilities):
         expected += probability * games
@@ -282,7 +282,9 @@ def status_multiplier_for(status: str, designation: str | None, priors: Availabi
     return priors.status_multiplier[status] if cell is None else cell
 
 
-def expected_games_played(player: AvailabilityInput, season: int, priors: AvailabilityPriors) -> GamesPlayedOutlook:
+def expected_games_played(
+    player: AvailabilityInput, season: int, priors: AvailabilityPriors, fused: bool
+) -> GamesPlayedOutlook:
     """`expectedGamesPlayed`."""
     shrunk = shrunk_availability_rate(player, priors)
     multiplied = (
@@ -293,7 +295,7 @@ def expected_games_played(player: AvailabilityInput, season: int, priors: Availa
     rate = js_min(1.0, js_max(0.0, multiplied))
     seasons = len(_recent_history(player.history, priors.history_seasons))
     return outlook_from_rate(
-        team_games_in(season), rate, priors.concentration + priors.concentration_per_season * seasons
+        team_games_in(season), rate, priors.concentration + priors.concentration_per_season * seasons, fused
     )
 
 

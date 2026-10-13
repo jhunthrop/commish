@@ -4,13 +4,16 @@ down strictly before the week's first kickoff, and stamped as the Python's.
 Ported from `research-ts/src/projections/register/{freeze,props,sources,store}.ts`. The board column
 is a READ of the stored board, never a recompute: the register records the claim a manager could
 have been shown. A freeze taken at or after the week's first kickoff is refused. Every row this
-writes carries `implementation = 'python'`; the TypeScript's rows are never touched.
+writes carries `implementation = 'python'`; the TypeScript's rows are never touched. Every row also
+carries the `model_version` of the board it quotes; a board that names no model is refused, since a
+claim whose maker is unknown cannot be graded as anyone's.
 """
 
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from types import MappingProxyType
 from typing import Any, Final
 
 from sqlalchemy import Connection, text
@@ -27,12 +30,14 @@ REGISTER_BOARD_SOURCES: Final = ((SERVED_SOURCE, "served"), (SHADOW_SOURCE, "sha
 ADP_SOURCE: Final = "ffc_adp_ppr_12"
 ECR_SOURCE: Final = "fantasypros_ecr_ppr"
 IMPLEMENTATION: Final = "python"
-_MARKET_WEIGHT: Final = {
-    "player_pass_yds": PPR_SCORING.points_per_passing_yard,
-    "player_rush_yds": PPR_SCORING.points_per_rushing_yard,
-    "player_reception_yds": PPR_SCORING.points_per_receiving_yard,
-    "player_receptions": PPR_SCORING.points_per_reception,
-}
+_MARKET_WEIGHT: Final = MappingProxyType(
+    {
+        "player_pass_yds": PPR_SCORING.points_per_passing_yard,
+        "player_rush_yds": PPR_SCORING.points_per_rushing_yard,
+        "player_reception_yds": PPR_SCORING.points_per_receiving_yard,
+        "player_receptions": PPR_SCORING.points_per_reception,
+    }
+)
 
 
 class RegisterRefusalError(ValueError):
@@ -121,7 +126,8 @@ def _stored_board(conn: Connection, season: int, source: str, as_of: datetime) -
     return list(
         conn.execute(
             text(
-                "select distinct on (player_id) player_id, source, as_of, projected_points, rank, value_rank from research.preseason_projections "
+                "select distinct on (player_id) player_id, source, as_of, projected_points, rank, value_rank, model_version "
+                "from research.preseason_projections "
                 "where season = :s and source = :source and as_of <= :a order by player_id asc, as_of desc"
             ),
             {"s": season, "source": source, "a": as_of},
@@ -164,6 +170,12 @@ def take_freeze(conn: Connection, season: int, week: int, now: datetime) -> Free
             _freeze_row(season, week, frozen_at, entry, adp, ecr, props)
             for entry in _stored_board(conn, season, source, frozen_at)
         ]
+        unnamed = sorted({js_iso(row["board_as_of"]) for row in board_rows if row["model_version"] is None})
+        if unnamed:
+            raise RegisterRefusalError(
+                "unknown_model",
+                f"{season} {source} at {', '.join(unnamed)} names no model version, so its claim cannot be frozen as anyone's.",
+            )
         if role == "served" and not board_rows:
             raise RegisterRefusalError(
                 "empty_served_board",
@@ -205,6 +217,7 @@ def _freeze_row(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its
         "ecr": ecr.get(entry.player_id),
         "props_points": None if stance is None else stance.points,
         "props_markets": None if stance is None else stance.markets,
+        "model_version": entry.model_version,
     }
 
 
@@ -212,9 +225,9 @@ def _record(conn: Connection, rows: Sequence[Mapping[str, Any]]) -> None:
     """`recordFreezeRows`: a plain insert, no conflict clause; a second claim at an instant is refused."""
     statement = text(
         "insert into research.register_freeze_rows (season, week, frozen_at, board_source, player_id, implementation, board_as_of, "
-        "board_points, board_rank, board_value_rank, adp, ecr, props_points, props_markets) values (:season, :week, :frozen_at, "
-        ":board_source, :player_id, :implementation, :board_as_of, :board_points, :board_rank, :board_value_rank, :adp, :ecr, "
-        ":props_points, cast(:props_markets as jsonb))"
+        "board_points, board_rank, board_value_rank, adp, ecr, props_points, props_markets, model_version) values (:season, :week, "
+        ":frozen_at, :board_source, :player_id, :implementation, :board_as_of, :board_points, :board_rank, :board_value_rank, :adp, "
+        ":ecr, :props_points, cast(:props_markets as jsonb), :model_version)"
     )
     for row in rows:
         conn.execute(

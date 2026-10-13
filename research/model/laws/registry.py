@@ -8,6 +8,7 @@ own measurement before it is believed, exactly as the TypeScript refuses a drift
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Final
 
 from research.model.domain import Position
@@ -188,21 +189,25 @@ def pricing_eligible_law_ids(laws: Sequence[Law]) -> frozenset[str]:
     return frozenset(law.id for law in chip_eligible_laws(laws) if law.id not in SUSPECT_LAW_IDS)
 
 
-_CLUSTER_FAMILY_BY_QUANTITY: Final = {
-    "touchdownPointsShare": "goal_line",
-    "insideTenTouchShare": "goal_line",
-    "redZoneTouchShare": "goal_line",
-    "age": "age_experience",
-    "experienceYear": "age_experience",
-}
-_TRIBAL_CLUSTER_FAMILY: Final = {
-    "td_regression": "goal_line",
-    "rb_age_curve": "age_experience",
-    "rb_workload_cliff": "touches",
-    "target_share_persistence": "targetShare",
-    "wr_target_competition": "bestTeammateTargetShare",
-    "play_caller_fingerprint": "incomingCoachPriorPassRateOverExpected",
-}
+_CLUSTER_FAMILY_BY_QUANTITY: Final = MappingProxyType(
+    {
+        "touchdownPointsShare": "goal_line",
+        "insideTenTouchShare": "goal_line",
+        "redZoneTouchShare": "goal_line",
+        "age": "age_experience",
+        "experienceYear": "age_experience",
+    }
+)
+_TRIBAL_CLUSTER_FAMILY: Final = MappingProxyType(
+    {
+        "td_regression": "goal_line",
+        "rb_age_curve": "age_experience",
+        "rb_workload_cliff": "touches",
+        "target_share_persistence": "targetShare",
+        "wr_target_competition": "bestTeammateTargetShare",
+        "play_caller_fingerprint": "incomingCoachPriorPassRateOverExpected",
+    }
+)
 _THRESHOLD_PARTS: Final = 4
 _DELTA_PARTS: Final = 5
 _AND_MIN_PARTS: Final = 2

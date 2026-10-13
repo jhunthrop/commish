@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from research.model.domain import BENCH_SLOT, Position, RosterSlotConfig
-from research.model.jsmath import js_max, js_sorted, locale_compare
+from research.model.jsmath import js_max, js_or, js_sorted, locale_compare
 
 GAMES_PER_SEASON: Final = 17
 TIER_BREAK_GAMES: Final = 1
@@ -41,7 +41,7 @@ class ValuedPlayer:
 
 
 def _by_points_descending(a: SeasonProjection, b: SeasonProjection) -> float:
-    return (b.projected_points - a.projected_points) or locale_compare(a.player_id, b.player_id)
+    return js_or(b.projected_points - a.projected_points, lambda: locale_compare(a.player_id, b.player_id))
 
 
 def _pools(projections: Sequence[SeasonProjection]) -> dict[Position, list[SeasonProjection]]:
@@ -118,7 +118,9 @@ def value_board(projections: Sequence[SeasonProjection], shape: LeagueShape) -> 
             )
     return js_sorted(
         board,
-        lambda a, b: (b.value_over_replacement - a.value_over_replacement) or locale_compare(a.player_id, b.player_id),
+        lambda a, b: js_or(
+            b.value_over_replacement - a.value_over_replacement, lambda: locale_compare(a.player_id, b.player_id)
+        ),
     )
 
 
