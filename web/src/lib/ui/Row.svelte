@@ -1,11 +1,9 @@
 <script lang="ts">
-	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
+	import AdpCell from './AdpCell.svelte';
 	import Face from './Face.svelte';
-	import GapChip from './GapChip.svelte';
-	import Label from './Label.svelte';
 	import PositionPill from './PositionPill.svelte';
 	import RangeBar from './RangeBar.svelte';
 	import TierChip from './TierChip.svelte';
@@ -50,11 +48,6 @@
 	const lead = $derived(
 		order === 'adp' && player.adp !== null ? fixed(player.adp) : String(player.ourRank)
 	);
-	/** The other order's number, under the gap chip. With no ADP the chip already says so. */
-	const against = $derived.by(() => {
-		if (order === 'adp') return `Our rank ${String(player.ourRank)}`;
-		return player.adp === null ? null : `ADP ${fixed(player.adp)}`;
-	});
 </script>
 
 <div
@@ -82,10 +75,7 @@
 			<RangeBar floor={player.floor} median={player.median} ceiling={player.ceiling} {scale} />
 		</span>
 	{/if}
-	<span class="adp">
-		<GapChip gap={draftersGap(player.adp, player.ourRank)} />
-		{#if against}<Label size="cell">{against}</Label>{/if}
-	</span>
+	<AdpCell adp={player.adp} ourRank={player.ourRank} under={order === 'adp' ? 'rank' : 'adp'} />
 	{#if action}<span class="action">{@render action()}</span>{/if}
 </div>
 
@@ -204,14 +194,6 @@
 
 	.narrow {
 		display: none;
-	}
-
-	.adp {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: flex-start;
-		gap: 3px;
 	}
 
 	@media (max-width: 960px) {

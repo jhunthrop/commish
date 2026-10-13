@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { MediaQuery } from 'svelte/reactivity';
 	import SheetRow from '#lib/ui/SheetRow.svelte';
 	import SheetTier from '#lib/ui/SheetTier.svelte';
 	import type { Position } from '#lib/types/player.ts';
+	import type { DirectoryPlayer } from './directory.ts';
 	import { attachDrag, type RowDrop, type StripDrop } from './drag.ts';
 	import type { Ranks, SheetRow as Row } from './model.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import RowEditor from './RowEditor.svelte';
 	import type { SheetStore } from './store.svelte.ts';
-	import { tagLabel } from './tags.ts';
+	import { tagMarks } from './tags.ts';
 	import { canStartTierAt, startsTier, tierRuns, tierStartRange } from './tiers.ts';
 
 	interface Props {
@@ -18,8 +20,8 @@
 		/** A position view draws your tier strips. All draws tiers as chips. */
 		position: Position | null;
 		ranks: ReadonlyMap<string, Ranks>;
-		/** Our board's rank by id, or null until our board is loaded. */
-		ourRanks: ReadonlyMap<string, number> | null;
+		/** Our board by id, or null until our board is loaded. */
+		board: ReadonlyMap<string, DirectoryPlayer> | null;
 		/** False while a search narrows the sheet: an order is set on the whole list. */
 		movable: boolean;
 		/** Your own tags anywhere on the sheet. */
@@ -28,10 +30,12 @@
 		onannounce: (words: string) => void;
 	}
 
-	let { store, rows, position, ranks, ourRanks, movable, ownTags, onannounce }: Props = $props();
+	let { store, rows, position, ranks, board, movable, ownTags, onannounce }: Props = $props();
 
 	/** How many rows load their faces at once: the first screen on a tall desktop. */
 	const EAGER_ROWS = 14;
+	/** The phone's row, decided once for the whole list, so each row draws its parts once. */
+	const phone = new MediaQuery('max-width: 760px');
 
 	let list: HTMLElement | undefined = $state();
 	let openId = $state<string | null>(null);
@@ -163,14 +167,14 @@
 			id={row.id}
 			name={row.name}
 			position={row.position}
-			positionRank={rank?.position ?? 0}
 			team={row.team}
 			headshot={row.headshot}
-			rank={rank?.overall ?? index + 1}
+			place={rank?.overall ?? index + 1}
+			board={board ? (board.get(row.id) ?? null) : undefined}
 			tier={position === null ? row.tier : null}
-			tags={row.tags.map(tagLabel)}
+			tags={tagMarks(row.tags)}
 			note={row.note}
-			ourRank={ourRanks ? (ourRanks.get(row.id) ?? null) : undefined}
+			compact={phone.current}
 			open={openId === row.id}
 			lifted={liftedRow?.id === row.id}
 			{movable}
@@ -185,7 +189,7 @@
 					canStartTier={canStartTierAt(store.sheet.rows, row.id)}
 					startsTier={startsTier(store.sheet.rows, row.id)}
 					onnote={(note: string) => store.setNote(row.id, note)}
-					ontags={(tags: readonly string[]) => store.setTags(row.id, tags)}
+					ontag={(tag: string) => store.toggleTag(row.id, tag)}
 					onstarttier={() => store.startTier(row.id)}
 					onremove={() => {
 						openId = null;

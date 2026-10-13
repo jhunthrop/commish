@@ -47,7 +47,25 @@ export const ICONS = {
 	/** Add him: the board row's sheet control before he is on your sheet. */
 	plus: [{ tag: 'path', d: 'M12 5v14M5 12h14' }],
 	/** He is on your sheet. */
-	check: [{ tag: 'path', d: 'M5 12.5l4.5 4.5L19 7.5' }]
+	check: [{ tag: 'path', d: 'M5 12.5l4.5 4.5L19 7.5' }],
+	/** A row that opens: points down, turned up by the row when it is open. */
+	chevron: [{ tag: 'path', d: 'M6 9l6 6 6-6' }],
+	/** A row holds a note. */
+	note: [
+		{ tag: 'path', d: 'M5 4h14v12l-4 4H5z' },
+		{ tag: 'path', d: 'M15 20v-4h4M8 9h8M8 13h5' }
+	],
+	/** Tags: a phone row's count of your tags. */
+	tag: [
+		{ tag: 'path', d: 'M3 12V4h8l10 10-8 8z' },
+		{ tag: 'circle', cx: 7.5, cy: 8.5, r: 1.3 }
+	],
+	/** More actions, folded into a menu. */
+	more: [
+		{ tag: 'circle', cx: 5, cy: 12, r: 1.4 },
+		{ tag: 'circle', cx: 12, cy: 12, r: 1.4 },
+		{ tag: 'circle', cx: 19, cy: 12, r: 1.4 }
+	]
 } as const satisfies Record<string, readonly IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

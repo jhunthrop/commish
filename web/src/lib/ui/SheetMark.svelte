@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ordinal } from '#lib/format/number.ts';
 	import Icon from './Icon.svelte';
+	import Place from './Place.svelte';
 
 	/** A board row's sheet control. Before he is on your sheet: a quiet plus that a Row shows on its
 	 * hover and focus, opening to the words "Add to my sheet". After: a state, not a button, an ink
@@ -26,7 +27,7 @@
 {:else}
 	<a class="on" href={sheetHref} aria-label="{name} is {ordinal(place)} on your sheet">
 		<span class="disc"><Icon name="check" size={16} /></span>
-		<span class="place">{ordinal(place)}</span>
+		<Place {place} />
 	</a>
 {/if}
 
@@ -98,12 +99,8 @@
 		color: var(--bg);
 	}
 
-	.place {
-		font-variant-numeric: tabular-nums;
-	}
-
-	.on:hover .place {
-		color: var(--ink);
-		text-decoration: underline;
+	.on:hover .disc {
+		outline: 2px solid var(--line-strong);
+		outline-offset: 1px;
 	}
 </style>

@@ -11,7 +11,14 @@
  */
 import { SHEET_LIMITS, characterCount } from './limits.ts';
 import { parsePosition, type SheetRow } from './model.ts';
-import { canonicalTag, joinTagCell, sameTag, splitTagCell, tagProblem } from './tags.ts';
+import {
+	canonicalTag,
+	joinTagCell,
+	normalizeTags,
+	sameTag,
+	splitTagCell,
+	tagProblem
+} from './tags.ts';
 
 export const CSV_COLUMNS = [
 	'rank',
@@ -162,7 +169,10 @@ function readTags(raw: string): { tags: readonly string[] } | { reason: string }
 		if (!tags.some((kept) => sameTag(kept, tag))) tags.push(tag);
 	}
 	if (tags.length > SHEET_LIMITS.tags) return { reason: `Keep it to ${SHEET_LIMITS.tags} tags` };
-	return { tags };
+	// Target and Avoid never sit on one player. The line says which, rather than keep one quietly.
+	const kept = normalizeTags(tags);
+	if (kept.length < tags.length) return { reason: 'Target and Avoid are both set, pick one' };
+	return { tags: kept };
 }
 
 type Read = { rank: number; row: SheetRow } | { reason: string };

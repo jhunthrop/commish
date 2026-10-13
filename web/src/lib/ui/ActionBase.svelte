@@ -14,6 +14,8 @@
 		fill = false,
 		disabled = false,
 		type = 'button',
+		expanded,
+		controls,
 		children
 	}: Props = $props();
 </script>
@@ -34,6 +36,8 @@
 		{type}
 		{disabled}
 		aria-keyshortcuts={key}
+		aria-expanded={expanded}
+		aria-controls={controls}
 		{onclick}
 	>
 		{@render body()}
@@ -52,9 +56,14 @@
 		white-space: nowrap;
 	}
 
+	/* Unavailable reads as unavailable in both themes: the outline with the quietest ink, never a
+	   faded fill that could pass for a pressed verb. Orange is never spent on what you cannot press. */
 	.action:disabled {
 		cursor: not-allowed;
-		opacity: 0.5;
+		background: transparent;
+		border: 1px solid var(--line);
+		color: var(--ink-3);
+		filter: none;
 	}
 
 	.fill {

@@ -37,6 +37,7 @@ export async function sheetBoard(format: BoardFormat): Promise<readonly Director
 		team: row.team,
 		headshot: row.headshot,
 		rank: row.ourRank,
-		positionRank: row.positionRank
+		positionRank: row.positionRank,
+		adp: row.adp
 	}));
 }

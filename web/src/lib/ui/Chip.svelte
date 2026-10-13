@@ -13,7 +13,8 @@
 		/** A choice this page cannot show yet, like a format the run does not carry: drawn with a
 		 * dashed edge in quiet ink, still a link to the page that says so. Never pressed. */
 		absent?: boolean;
-		/** The chip's name for assistive tech when its words alone would mislead: "Half PPR, not on this run". */
+		/** The chip's name for assistive tech when its words alone would mislead or repeat another
+		 * control's: "Half PPR, not on this run", "Show Target" beside a row's Target. */
 		label?: string;
 		onclick?: (event: MouseEvent) => void;
 		children: Snippet;
