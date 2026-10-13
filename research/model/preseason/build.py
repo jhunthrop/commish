@@ -4,14 +4,34 @@ Ported from `research-ts/src/projections/preseason/persist.ts` (`buildBoard`, th
 and `market/blend.ts` (`shippedPreseasonBoardInputs`'s raw arm, `gated`).
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
-from datetime import datetime
 from typing import Final
 
 from sqlalchemy import Connection
 
 from research.model.decide.value import LeagueShape
 from research.model.domain import BENCH_SLOT, PPR_SCORING, STANDARD_ROSTER_SLOTS, RosterSlotConfig
+from research.model.market.blend import (
+    BlendConstants,
+    assert_live_market_coverage,
+    blend_board,
+    blend_context,
+    blend_priors,
+    parse_blend_constants,
+    with_props_anchor,
+)
+from research.model.market.curve import (
+    ADP_SOURCES,
+    BOARD_FORMATS,
+    DEFAULT_BOARD_FORMAT,
+    FORMAT_RULES,
+    BoardFormat,
+    market_board,
+    market_tail_at_exchange_rate,
+    parse_market_curve,
+)
+from research.model.market.props_anchor import props_anchor_for_season
 from research.model.preseason.board import BoardEntry, preseason_board
 from research.model.preseason.candidates import (
     SHIPPED_PRESEASON_FEATURES,
@@ -94,5 +114,61 @@ def raw_board(conn: Connection, inputs: PreseasonInputs, artifacts: ModelArtifac
     return BuiltBoard(board, built.exclusions, built.sweep)
 
 
-def moment_of(inputs: PreseasonInputs) -> datetime:
-    return inputs.moment
+@dataclass(frozen=True, slots=True)
+class BlendEvidence:
+    """What every blended leg of one season shares: the merged constants and the props anchor."""
+
+    constants: BlendConstants
+    props_anchor: Mapping[str, float]
+
+
+def blend_evidence(conn: Connection, inputs: PreseasonInputs, artifacts: ModelArtifacts) -> BlendEvidence:
+    """`persistSeason`'s props anchor (read once, against the PPR market) and merged constants."""
+    base = parse_blend_constants(artifacts.raw["market/blend-constants"])
+    ppr_market, _ = market_board(
+        conn, inputs.season, inputs.moment, parse_market_curve(artifacts.raw["market/curve-ppr"]), ADP_SOURCES["ppr"]
+    )
+    anchor = props_anchor_for_season(
+        conn,
+        inputs.season,
+        inputs.positions,
+        {entry.player_id: entry.market_points for entry in ppr_market},
+        base.implied_games_by_position,
+    )
+    return BlendEvidence(with_props_anchor(base, artifacts.raw["market/props-anchor-weight"]), anchor)
+
+
+def blended_board(
+    conn: Connection,
+    inputs: PreseasonInputs,
+    artifacts: ModelArtifacts,
+    board_format: BoardFormat,
+    evidence: BlendEvidence,
+) -> BuiltBoard:
+    """One blended leg (`shippedPreseasonBoardInputs` with a format), valued under that format."""
+    curves = {name: parse_market_curve(artifacts.raw[f"market/curve-{name}"]) for name in BOARD_FORMATS}
+    constants = evidence.constants
+    if board_format != DEFAULT_BOARD_FORMAT:
+        constants = replace(
+            constants,
+            market_tail_by_position=market_tail_at_exchange_rate(
+                constants.market_tail_by_position, curves["ppr"], curves[board_format]
+            ),
+        )
+    built = gated(conn, inputs, artifacts, blend_priors(artifacts.preseason, constants))
+    market, _ = market_board(conn, inputs.season, inputs.moment, curves[board_format], ADP_SOURCES[board_format])
+    assert_live_market_coverage(inputs.season, inputs.moment, inputs.moment_kind, built.candidates, market)
+    rules = FORMAT_RULES[board_format]
+    context = blend_context(
+        artifacts.laws,
+        constants,
+        evidence.props_anchor,
+        rules,
+        artifacts.preseason.rookie_curve,
+        artifacts.rookie_history.games_rate,
+        artifacts.rookie_history.curve_evidence,
+    )
+    blended = blend_board(market, built.candidates, context, inputs.season)
+    return BuiltBoard(
+        preseason_board(blended, rules, BOARD_SHAPE, artifacts.game_variance), built.exclusions, built.sweep
+    )
