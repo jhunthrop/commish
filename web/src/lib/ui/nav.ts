@@ -112,6 +112,13 @@ export const RAIL_FOOT: RailItem = {
 	owns: ['account', 'pass', 'claim']
 };
 
+/** How many items the phone's bottom rail draws from a rail, every item not marked wideOnly. The
+ * phone lays its columns from this number, so a tab keeps its place while the rest of the rail is
+ * still arriving. With League in the rail it takes Our record's place, so the count holds. */
+export function phoneRailCount(items: readonly RailItem[]): number {
+	return [...items, RAIL_FOOT].filter((item) => !item.wideOnly).length;
+}
+
 /** The section a path belongs to, by the one rule above, or null for a page outside the sections
  * (the front door, the system page). */
 export function sectionOf(pathname: string): Section | null {
