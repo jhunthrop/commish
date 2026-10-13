@@ -11,6 +11,8 @@ const DRAG_STEPS = 150;
 const DRAG_STEP_PX = Number(process.env.STEP_PX ?? 6);
 const STEP_WAIT_MS = 16;
 const RUNS = 3;
+/** Inside a row past its 44px handle: on the face and the name. */
+const ROW_BODY_X = 100;
 
 const base = process.argv[2] ?? 'http://localhost:4173';
 
@@ -162,16 +164,16 @@ async function checkCancel(page: Page, pointer: Pointer): Promise<boolean> {
 	return before.join() === after.join() && transformed === 0;
 }
 
-/** A finger on a row's name scrolls the page and moves no one. */
+/** A finger on a row's body (its face and name) scrolls the page and moves no one. */
 async function checkPan(page: Page, pointer: Pointer): Promise<boolean> {
 	await page.evaluate(() => {
 		window.scrollTo(0, 400);
 	});
 	const before = await rowOrder(page);
 	const scrollBefore = await page.evaluate(() => window.scrollY);
-	const box = await page.locator('[data-row-id] button[aria-expanded]').nth(8).boundingBox();
+	const box = await page.locator('[data-row-id]').nth(8).boundingBox();
 	if (!box) throw new Error('No row to pan on.');
-	const x = box.x + 20;
+	const x = box.x + ROW_BODY_X;
 	await pointer.down(x, box.y + 200);
 	for (let step = 1; step <= 10; step += 1) {
 		await pointer.move(x, box.y + 200 - step * 20);

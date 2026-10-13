@@ -206,11 +206,14 @@
 		background: var(--surface);
 	}
 
-	.row:active:not(:has(.editor:active)) {
+	/* The pressed state of a tap that opens the row. An open row holds still under a press in
+	   its editor. */
+	.row:active {
 		background: var(--surface-2);
 	}
 
-	.open {
+	.open,
+	.open:active {
 		background: var(--surface);
 		cursor: default;
 	}
@@ -385,9 +388,10 @@
 			padding: 0;
 		}
 
+		/* The phone's row is the token's height with no padding, less its line. */
 		.row,
 		.noted {
-			contain-intrinsic-size: auto 51px;
+			contain-intrinsic-size: auto calc(var(--row-h) - 1px);
 		}
 
 		.grip,

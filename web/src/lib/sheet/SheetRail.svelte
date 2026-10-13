@@ -78,7 +78,7 @@
 	{#if sheetStore.loaded && rows.length === 0}
 		<p class="none">No one yet</p>
 	{/if}
-	<ul>
+	<ol>
 		{#each top as row (row.id)}
 			<li>
 				<Face src={row.headshot} size={32} />
@@ -95,7 +95,7 @@
 				<Place place={places.get(row.id) ?? 0} />
 			</li>
 		{/each}
-	</ul>
+	</ol>
 	{#if tagsInUse.length > 0 || hasNotes}
 		<div class="tags">
 			<ChipGroup label="Show" variant="loose">
@@ -138,7 +138,7 @@
 		color: var(--ink-3);
 	}
 
-	ul {
+	ol {
 		list-style: none;
 		margin: 0;
 		padding: 0;
