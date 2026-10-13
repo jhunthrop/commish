@@ -21,3 +21,15 @@ alter table app.sheet_rows
 update app.sheet_rows set tags = array[tag] where tag is not null;
 
 alter table app.sheet_rows drop column tag;
+
+-- A position is one of the six a sheet ranks, spelled the sheet's way,
+-- as internal/sheets/validate.go canonicalizes them on every write.
+update app.sheet_rows set position = case upper(trim(position))
+    when 'DEF' then 'DST'
+    when 'D/ST' then 'DST'
+    when 'PK' then 'K'
+    else upper(trim(position))
+  end;
+
+alter table app.sheet_rows
+  add constraint sheet_rows_position_known check (position in ('QB', 'RB', 'WR', 'TE', 'K', 'DST'));
