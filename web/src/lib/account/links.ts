@@ -1,6 +1,4 @@
-/** Every link the account page makes. The mock room's pages (Lane 6) are /mock/<id> and its report
- * /mock/<id>/report. Those routes are not on this branch yet, so resolve() cannot type them; they
- * are spelled here, the one place, and move to resolve() once the room's routes merge. */
+/** Every link the account page makes, each built with resolve(). */
 import { resolve } from '$app/paths';
 import type { AccountMock } from './account-api.ts';
 
@@ -9,5 +7,7 @@ export const accountLinks = {
 	sheet: (): string => resolve('/sheet'),
 	/** A finished mock opens on its report, one in progress on its room. */
 	mock: (mock: AccountMock): string =>
-		`/mock/${encodeURIComponent(mock.id)}${mock.status === 'complete' ? '/report' : ''}`
+		mock.status === 'complete'
+			? resolve('/mock/[id]/report', { id: mock.id })
+			: resolve('/mock/[id]', { id: mock.id })
 } as const;

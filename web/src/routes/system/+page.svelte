@@ -12,9 +12,14 @@
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Face from '#lib/ui/Face.svelte';
+	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
 	import GapChip from '#lib/ui/GapChip.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 	import Keys from '#lib/ui/Keys.svelte';
+	import OddsCell from '#lib/ui/OddsCell.svelte';
+	import PickStrip from '#lib/ui/PickStrip.svelte';
+	import Stepper from '#lib/ui/Stepper.svelte';
+	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
@@ -86,6 +91,7 @@
 	let chosenPosition = $state<(typeof positionView)[number]>('WR');
 	const sheetTags = ['Targets', 'Sleepers', 'Avoid', 'Notes'] as const;
 	let chosenTag = $state<(typeof sheetTags)[number]>('Targets');
+	let stepperValue = $state(2);
 </script>
 
 <svelte:head>
@@ -336,6 +342,71 @@
 			<Parts as="div">
 				<TeamPanel slots={data.soloTeam} rosterSize={data.soloRoom.rosterSize} />
 				<Keys bindings={data.roomKeys} />
+			</Parts>
+		</DocSection>
+
+		<DocSection
+			title="Odds, verdicts and the setup's controls"
+			sub="The pool's odds cell, the strip every room shares, the report's verdict chips, and the setup page's stepper and field."
+		>
+			<Specimen frame="dashed">
+				<PickStrip
+					lead={pickLabel(data.soloRoom.now)}
+					leadLines={['just taken, newest first', '2 of the last 3 by people']}
+					picks={data.soloRoom.went.slice(-3).map((w, i) => ({
+						key: w.pick,
+						player: w.player,
+						lines: [i === 0 ? 'jpk88' : 'bot', pickLabel(w.pick)],
+						ring: i === 0 ? 'ink' : undefined,
+						strong: i === 0
+					}))}
+					width="md"
+				/>
+			</Specimen>
+			<Parts>
+				<Part
+					name="Odds cell"
+					about="The chance he lasts to your next pick, a meter under it, and what the chance is of."
+				>
+					{#snippet show()}<OddsCell
+							odds={data.soloRoom.runnerOdds}
+							label="still there at {nextLabel}"
+						/><OddsCell odds={null} label="" />{/snippet}
+				</Part>
+				<Part
+					name="Pick strip"
+					about="Faces in the order they went. SinceStrip is this strip in the solo room; in a lobby the newest is ringed in ink and a person's pick names its handle."
+				/>
+				<Part
+					name="Verdict chips"
+					about="Green for a steal or a pick right on time, rose for a reach or a pick that could have waited, grey for even. The words carry it."
+				>
+					{#snippet show()}
+						<ToneChip tone="gain">3 after drafters</ToneChip>
+						<ToneChip tone="loss">could wait, 82% there next turn</ToneChip>
+						<ToneChip tone="even">at ADP</ToneChip>
+					{/snippet}
+				</Part>
+				<Part
+					name="Display title"
+					about="The number face, uppercase: a nightly page's head at 44 (PageHead), a room's title at 38, a panel's name at 30, a section at 26 with what it counts beside it."
+				>
+					{#snippet show()}
+						<DisplayTitle size="hero">2026 Board</DisplayTitle>
+						<DisplayTitle size="page">New mock</DisplayTitle>
+						<DisplayTitle size="panel">Pool</DisplayTitle>
+						<DisplayTitle note="projected starting points, 12 teams">The field</DisplayTitle>
+					{/snippet}
+				</Part>
+				<Part name="Stepper" about="A roster count with its bounds.">
+					{#snippet show()}<Stepper
+							label="RB"
+							value={stepperValue}
+							min={0}
+							max={6}
+							onchange={(v: number) => (stepperValue = v)}
+						/>{/snippet}
+				</Part>
 			</Parts>
 		</DocSection>
 

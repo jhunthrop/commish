@@ -4,8 +4,10 @@ The Python research lane (spec `docs/superpowers/specs/2026-10-12-prep-site-arch
 §2.3). Phase A is here: every ingest the TypeScript core runs, ported; the `research` schema,
 designed from scratch for the prep site and owned by alembic; the one-shot loader that carries the
 legacy tables' data into it; and the parity harness that proves each port row for row against the
-TypeScript on the same recorded input. Phases B to D (`model`, `capsules`, `advisor`, `nightly`)
-are empty packages whose docstrings say what lands in them.
+TypeScript on the same recorded input. Phase B is `model`: the preseason board, the market blend,
+the laws, the register and the backtest, proven against the oracle on the dev store (see "The
+model"). Phases C and D (`capsules`, `advisor`, `nightly`) are empty packages whose docstrings say
+what lands in them.
 
 ## Running
 
@@ -44,7 +46,7 @@ tables in the dev Docker database (`localhost:5432/commish`), loaded from them b
 | Path | What |
 |---|---|
 | `db/schema/` | the 27 research tables by group: `identity`, `nflverse`, `observations`, `provider`, `market`, `boards` |
-| `db/migrations/`, `alembic/` | revision `0001` creates the schema, its DDL split by the same groups |
+| `db/migrations/`, `alembic/` | revision `0001` creates the schema, its DDL split by the same groups; `0002` adds the model provenance columns |
 | `db/legacy.py` | each research table's legacy counterpart, column by column: the single map parity and the loader read |
 | `load_legacy.py` | the one-shot copy, the manifest, the per-table fingerprints |
 | `pipeline/http.py` | the HTTP boundary: a `Fetcher` protocol, httpx live; every ingest reaches a provider only through it |
@@ -124,7 +126,10 @@ What changed from the legacy tables, and why:
    of when a row landed, which no writer knows better.
 7. **The register says who froze it.** `register_freeze_rows.implementation` is required and
    checked (`typescript`, `python`): 2026 weeks 1 and 2 were frozen by the TypeScript, and the
-   record page says so. The loader sets `typescript` on every legacy row.
+   record page says so. The loader sets `typescript` on every legacy row. Who froze a row is not
+   who made the board it quotes, so freeze and grade rows also carry the board's `model_version`
+   (and a grade row its own `implementation`), and a board row its `model_version` and
+   `arithmetic` (revision `0002`, backfilled from `research.db.provenance`).
 8. **Names by role.** `nfl_games` and `stat_weeks` were the provider's fixtures and its week state,
    so they are `provider_games` and `provider_weeks`; their columns `home_nfl_team`, `away_nfl_team`
    and `players.nfl_team` are `home_team`, `away_team` and `team`. The freeze rows' `adp_rank` and
@@ -328,3 +333,178 @@ total counts each tested table per pass and each prerequisite table once, at its
 | win-totals-seed | rerun | team_week_observations 2,304 | 0 |
 | win-totals-job | first | team_week_observations 3,680 | 0 |
 | win-totals-job | rerun | team_week_observations 3,680 | 0 |
+
+## The model (phase B)
+
+The preseason board, the market blend, the laws, replacement levels and tiers, the outlook band,
+the register and the held-out backtest, ported from `research-ts/src/projections/` as pure
+functions over typed rows. Every float operation is the TypeScript's, in its order: a sum is a left
+fold, a sort is stable with the oracle's comparator, a map iterates in insertion order. Where V8's
+arithmetic is not the platform's, the port reproduces V8 (`model/fdlibm.py`, `model/jsmath.py`):
+
+- `Math.log`, `Math.exp` and `Math.sin` are fdlibm, not libm. On Apple silicon V8 was compiled
+  with clang's `-ffp-contract=on`, so every `a * b + c` inside one C expression is a fused
+  multiply-add; `madd(fused)` marks each place clang fuses. x86-64 builds have no FMA to fuse into.
+- `**` is libm's `pow`, except `x ** 2` is `x * x` and `x ** 0.5` is `sqrt(x)`.
+- `Math.round` rounds a tie up and keeps a negative zero; `Math.max(-0, 0)` is `+0` and
+  `Math.min(0, -0)` is `-0`; `a || b` on a number falls through on `0`, `-0` and `NaN` (`js_or`).
+
+**The arithmetic is a property of the boards, never of the host** (`model/arithmetic.py`). Every
+stored 2026 board was made on arm64 and reproduces only with the fused arm, so `ARM64_BOARDS`
+(fused) is what every board, the fit check and the nightly compute with, on any machine: a nightly
+on x86-64 Cloud Run runs fused too. `fit_check --arithmetic unfused` exists to rebuild a board an
+x86-64 V8 made. Each board this lane writes records `model_version` (`research@<sha>`) and
+`arithmetic` (`v8-fdlibm-fused/pow-<host libm>`) on its rows.
+
+`pow` is the one call the policy cannot pin: Python takes it from the host libm, as V8 on macOS
+does. Apple's libm and glibc differ on 96 of 50,000 random inputs, so a Linux host can differ from
+an Apple-made board by an ulp at a `pow` call (`decay ** weeks`, the scheme elasticities); never by
+a printed decimal, and the recorded `arithmetic` names the libm. V8 on x86-64 Linux computes a
+`pow` that matches neither glibc, nor Apple's libm, nor a correctly rounded `pow` (4,916 of 50,000
+differ from glibc); no board was made there.
+
+The `numerics` case proves all of it: the running node, judged with both arms, must match exactly
+one; the committed vectors from an arm64 macOS node (`parity/fixtures/numerics-v8-arm64`) must
+match the fused arm and those from an x86-64 Linux node (`numerics-v8-x64`, made in
+`node:22-slim --platform linux/amd64` by `parity/ts/numerics-vectors.mjs`) the unfused arm. A
+source's `pow` lines are judged only where its `**` is this host's libm, and are otherwise counted
+as skipped. `parity/ts/check-pow-vectors.py` checks a vector file's `pow` lines against a bare
+Python of another platform.
+
+### Data flow
+
+| | |
+|---|---|
+| Tables in | `player_week_observations` (box scores, usage, play-by-play touches, depth charts, injury filings), `team_week_observations` (schedule, kickoffs, pace and pass rate, coaches, win totals), `player_week_teams`, `players`, `preseason_rosters`, `preseason_rankings` (ADP per format, ECR), `nflverse_roster_weeks`, `nflverse_injuries`, `nfl_draft_picks`, `capture_snapshots` (the provider's roster sweep and player list), `player_crosswalk`, `player_prop_observations`, `props_player_map` |
+| Artifacts | `model_artifacts`, pinned in `model/artifacts.py`'s `CATALOG`: `model/weekly-priors`, `preseason/priors`, `preseason/rookie-curve`, `preseason/rookie-history`, `preseason/kdef-priors`, `preseason/game-variance-skill`, `preseason/game-variance-kdef`, `market/blend-constants`, `market/props-anchor-weight`, `market/curve-{ppr,half,std}`, `laws/{measured,discovered,discovery-quantiles}`. Nothing the board reads comes from a file. |
+| Tables out | `preseason_projections` (with `model_version` and `arithmetic`) and `preseason_board_reasons` (the fit step with `--persist-board`), `register_freeze_rows` (`implementation = 'python'`, and the `model_version` of the board each row quotes), `register_grade_rows` (`implementation`, and the `model_version` of its freeze row) |
+
+```sh
+# the oracle's committed fits into the artifact store, as version 1 (runs research-ts; each is
+# stamped with the commit that last changed its fitted numbers (model/fit_history.py compares the
+# numbers across the file's history, so a rename or a refactor never stamps a fit), and fitted_on
+# names the oracle module, the seasons, the inputs the store lost and the re-fit path). A re-seed is
+# a no-op, a changed payload is refused; --restamp corrects the provenance of identical v1 rows
+RESEARCH_DATABASE_URL=... uv run python -m research.model.seed [--restamp]
+
+# the fit step: check-only by default (rebuild and compare, 0.05 points); --persist-board retakes
+# the product season's live board, which replaces what is served and what the register freezes
+RESEARCH_DATABASE_URL=... uv run python -m research.model.fit_check [--persist-board] [--now ISO] [--arithmetic fused|unfused]
+
+# the per-game variance fit (2023-2024; --publish writes the next version, the pin does not move)
+RESEARCH_DATABASE_URL=... uv run python -m research.model.fits.game_variance [--publish]
+
+# the model parity cases (the store-backed ones read the dev copy, read only)
+export PARITY_SOURCE_DATABASE_URL=postgres://commish:commish@localhost:5432/commish
+uv run python -m research.parity model all            # or one case; --no-store for numerics only
+```
+
+| Path | What |
+|---|---|
+| `model/fdlibm.py`, `model/jsmath.py` | V8's transcendentals and number semantics |
+| `model/domain.py`, `model/instants.py` | stat lines, scoring rules, roster slots; millisecond instants |
+| `model/reads/` | the point-in-time reads: observations, stat lines, usage, team facts, rosters, rankings |
+| `model/weekly/` | layer 1 (opportunity), layer 2 (efficiency) and the scheme layer |
+| `model/preseason/` | the board's inputs and moments, candidates, availability, career, depth chart, offseason, rookies, roster status and the gate, the board, the build of every leg, persist |
+| `model/market/` | the ADP curves per format, the props anchor, the blend |
+| `model/laws/` | tribal and discovered law facts, the candidate generator, the registry and its reasons, the measurement harness |
+| `model/decide/value.py` | replacement levels, value over replacement, tiers |
+| `model/register/` | the freeze and the grade |
+| `model/backtest.py` | Spearman, the scorecard, the held-out backtest |
+| `model/fit_check.py`, `model/fits/` | the fit step; the fits that run on today's store |
+| `parity/model/` | the model cases: the store as it stood, both sides, the diff |
+
+### The store as it stood
+
+A board is rebuilt at a past moment, so each model case runs on a copy of the dev store as it
+stood then (`parity/model/store.py` lists every table and how it is cut): each row whose own write
+stamp is at or before the moment, the boards by their own `as_of`, and whole the tables that carry
+no stamp (`nfl_players`, `players`, `player_stat_lines`, `player_capsules`, `stat_weeks`,
+`model_artifacts`). `as_of` alone is not enough: the win totals are stamped with the publisher's
+date, two days before the job that wrote them ran.
+
+Where a stamp does not tell the truth, the copy says so. `nfl_players` is rewritten in place with
+no stamp, so a copy holds today's universe; the one fact the week-1 board read that has changed
+since (Velus Jones Jr. was a WR, now an RB) is restated by the week-1 case. `nfl_draft_picks` were
+all re-ingested at 2026-09-08 00:48 and `player_week_teams` for 2024-2025 at 2026-09-07 22:04, so
+the week-1 copy holds neither; for the teams that is correct (copying them makes 592 rows of the
+week-1 board differ from what the register froze).
+
+### Which model made each board
+
+`research.db.provenance` names the tree behind every legacy board the store or the register still
+holds, and how that is known; the loader and migration `0002` write it onto the rows:
+
+| Board | Model | Known by |
+|---|---|---|
+| 2026 v9 ppr/half/std and v1 raw, 2026-09-09T02:20:29.697Z (register week 2, served) | `research-ts@7af71283`, fused | rebuilt bit for bit by that tree, unmodified, on the store as it stood |
+| 2026 v9 ppr, 2026-09-07T21:57:33.121Z (register week 1, retired from the store) | `research-ts@800aef34`, fused | its points, ranks and value ranks rebuilt exactly by that tree, with the one restated fact |
+| 2026 v7 ppr, 2026-09-02T03:20:39.21Z (the register's shadow) | `research-ts@6603c2ac` | main's last commit before it; not rebuilt |
+| 2024 v9 and v7 ppr replay boards | `research-ts@5240ed99`, `research-ts@5b0a0ddd` | main's last commit before each `computed_at`; the store lost their inputs |
+
+Any other legacy board keeps a NULL model version, and the freeze refuses to quote a board that
+names none.
+
+### Model parity
+
+The latest run: **10 cases, 1,085,041 comparisons, 0 differences, every claim holding.** Every
+comparison is exact; a refusal is compared whole, after a declared wording map for the names that
+differ by design (`blend.REFUSAL_WORDING`, `grade.REFUSAL_WORDING`).
+
+| Case | Compared | Differences |
+|---|---|---|
+| numerics | the running node: log, exp, sin, round, mulberry32 100,000 each, pow 400,000, max/min 10,000 each, the ordinal comparator 10,000 pairs (with NaN), 100 whole sorts; the arm64 vectors: log, exp, sin, pow 20,000 each (fused); the x86-64 vectors: log, exp, sin 20,000 each (unfused), pow skipped | 0; each source matches its arm and the other arm differs on 122 lines |
+| board-2026-week2 | at 2026-09-09T02:20:29.697Z, all four legs (551 rows, every stored column and reason; 132 exclusions): the stored generation against the tree at `7af71283` run unmodified, against today's oracle (`persistSeason` itself), and the oracle against the port; the port's ppr against the register's week 2 | 0 |
+| board-2026-week1 | the register's week 1 (669 points, ranks, value ranks) against the tree at `800aef34` with the restatement; the 668 other players against it without; oracle against port on the ppr leg, both refusing the half leg with the same words | 0; without the restatement only `00-0037745`'s points move, no rank moves, and exactly 122 value ranks move |
+| register-freeze-week2 | the freeze retaken at 2026-09-10T18:00:17.177Z against the stored freeze and the oracle's, 1,097 rows; each row quotes its board's model | 0 (`implementation`, `model_version` excluded) |
+| register-grade | 2026 weeks 1 and 2 on today's store | both refuse alike, compared whole: the store holds no 2026 outcomes |
+| register-grade-2024-week2 | a scratch freeze of 2024 week 2 at 2024-09-10T12:00Z (1,317 rows) and every output of its grade, both sides: the rows (every field), the boards in order with their populations, each board's four column scores (Spearman, mean absolute rank error, graded), the skipped boards with their reasons, the served population | 0 |
+| register-freeze-unknown-model | the 2024 served board with its model version removed: the freeze refuses (`unknown_model`, the message whole) and writes nothing | |
+| held-out-backtest | rho and n, 2023 and 2024 | 0 |
+| fit-check | the 2026 live board at its stored moment, 4 boards; after kickoff, no archived board is rebuildable | max delta 0.0000 |
+| fit-game-variance | the 2023-2024 refit, oracle against port | 0 |
+
+The register's week 1 is a different model, proven by construction in `board-2026-week1`: the
+tree at `800aef34` (main's last commit before that board), run unmodified on the store as it stood
+with the clock at the board's moment, reproduces all 669 frozen points, ranks and value ranks
+exactly once one universe fact is restated (Velus Jones Jr., `00-0037745`, was a WR then and is an
+RB now; `nfl_players` was rewritten in place). Without the restatement exactly that player's
+points move (1.59 against 1.56) and his move shifts 122 value ranks; the case checks that he is the
+only one. Today's oracle and the port are the 2026-09-09 model and agree with each other there.
+
+### Unported fits
+
+The nine fits behind the seeded version-1 artifacts, and the three the oracle published to the
+store itself, except the per-game variance fit (ported, `model/fits/game_variance.py`), are carried
+as their numbers, not as code. None can be re-run on the store as it stands: it no longer holds
+`preseason_rosters` for 2021-2024, `player_week_observations` before 2023, `player_week_teams`
+before 2024, or the schedule, kickoffs, play-by-play and coaches in `team_week_observations` before
+2024. The re-fit path for each is the same: rebuild that history with phase A's ingests (phase D),
+port the fit, compare its output with the version-1 numbers, and publish the result as version 2.
+
+| Artifact | Oracle fit | Fitted on | The store lacks |
+|---|---|---|---|
+| `model/weekly-priors` | `npm run projections:fit` | 2021-2022 (2020 as history) | 2020-2022 weekly observations, teams, schedule |
+| `preseason/priors` | `npm run projections:preseason:fit` | 2021-2022; the rookie games rate 2023-2024 | 2021-2024 preseason rosters, 2018-2022 weekly observations, 2018-2023 player teams |
+| `preseason/rookie-curve` | `npm run projections:rookie-curve:fit` | rookie classes 2003-2021 | rookie-season outcomes before 2023 |
+| `preseason/rookie-history` | `npm run projections:rookie-historical-games:fit` | rookie classes 2003-2021 | rookie-season games before 2023 |
+| `preseason/kdef-priors` | `npm run projections:kdef:fit` | 2013-2024 | schedule and kickoffs before 2024 |
+| `market/blend-constants` | `npm run projections:blend:fit` | predictor seasons 2013-2021 | the raw boards' inputs (preseason rosters, weekly observations) for 2013-2021 |
+| `market/curve-{ppr,half,std}` | `npm run projections:market:fit [-- --format=half/std]` | ADP 2013-2021 (half 2018-2021) | season outcomes before 2023 |
+| `laws/measured` | `npm run laws:measure` | 2003-2023 | weekly observations before 2023, player teams before 2024, coaches and schedule before 2024 |
+| `laws/discovered`, `laws/discovery-quantiles` | `npm run laws:discover`, `npm run laws:discover:quantiles` | discovery 2003-2021, replication 2021-2023 | as `laws/measured` |
+| `preseason/game-variance-kdef` | `research-ts/scripts/game-variance-fit.ts` (its kicker and defense arm) | 2023-2024 | schedule before 2024 |
+| `market/props-anchor-weight` | `research-ts/scripts/props-anchor-fit.ts` | the props archive's seasons, 2023-2024 | the raw boards' inputs for 2023-2024 |
+
+The law measurement harness's measuring half (`matchedPairs`, `bootstrapStatistics`,
+`measureEffect`) serves only the law fits, so it is not ported either; `model/laws/harness.py`
+keeps the verdict the board reads and the mulberry32 stream the numerics case proves.
+
+### The backtest
+
+The stored served board against regular-season outcomes, in the held-out seasons:
+
+| Season | Spearman rho | n |
+|---|---|---|
+| 2023 | 0.7649 (0.7648668314705206) | 533 |
+| 2024 | 0.7848 (0.7848118119491571) | 537 |

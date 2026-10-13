@@ -3,6 +3,7 @@
     uv run python -m research.parity ingest <case>|all   run the TypeScript and Python ingests, diff the rows
     uv run python -m research.parity schema              the migrations against the declared schema, and the legacy map
     uv run python -m research.parity record <set>|all    re-record a fixture set from the live provider
+    uv run python -m research.parity model <case>|all    the model: boards, register, backtest, fit check
     uv run python -m research.parity list                every case and fixture set
 
 `ingest` and `schema` need PARITY_DATABASE_URL (a Postgres where the harness may create its own
@@ -20,7 +21,10 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from research.parity import databases
 from research.parity.cases import ALL_CASES, CASES_BY_NAME, all_recordings
+from research.parity.model.cases import MODEL_CASES, MODEL_CASES_BY_NAME
+from research.parity.model.report import report_model
 from research.parity.record import record_case
 from research.parity.report import report
 from research.parity.runner import close_harness, open_harness, run_case
@@ -41,6 +45,23 @@ def _ingest(names: Sequence[str]) -> int:
         close_harness(harness)
     report(results)
     return 0 if all(r.matches for r in results) else 1
+
+
+def _model(names: Sequence[str], store: bool) -> int:
+    """The model cases. Those reading the store need PARITY_SOURCE_DATABASE_URL (the dev copy,
+    opened read only) beside PARITY_DATABASE_URL; `--no-store` runs only the ones that do not."""
+    cases = MODEL_CASES if names == ["all"] else tuple(MODEL_CASES_BY_NAME[name] for name in names)
+    chosen = [case for case in cases if store or not case.needs_store]
+    for case in cases:
+        if case not in chosen:
+            _print(f"{case.name:<24} skipped: it reads the dev store and --no-store was given")
+    try:
+        results = [case.run() for case in chosen]
+    finally:
+        if any(case.needs_store for case in chosen):
+            databases.drop_scratch_databases()
+    report_model(results)
+    return 0 if all(result.matches for result in results) else 1
 
 
 def _schema(against: str | None) -> int:
@@ -95,6 +116,8 @@ def _record(names: Sequence[str], env_file: str | None) -> int:
 def _list() -> int:
     for case in ALL_CASES:
         _print(f"{case.name:<32} {case.summary}")
+    for model_case in MODEL_CASES:
+        _print(f"model {model_case.name:<26} {model_case.summary}")
     _print()
     for name in sorted(all_recordings()):
         _print(f"fixture set {name}")
@@ -111,11 +134,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     record = sub.add_parser("record", help="re-record fixture sets from the live provider")
     record.add_argument("names", nargs="+", help="fixture set names, or all")
     record.add_argument("--env-file", help="a dotenv file holding the provider keys a recording needs")
+    model = sub.add_parser("model", help="the model's numeric entry points, oracle against port")
+    model.add_argument("names", nargs="+", help="model case names, or all")
+    model.add_argument("--no-store", action="store_true", help="run only the cases that need no dev store")
     sub.add_parser("list", help="every case and fixture set")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     if args.command == "ingest":
         return _ingest(args.names)
+    if args.command == "model":
+        return _model(args.names, not args.no_store)
     if args.command == "schema":
         return _schema(args.against)
     if args.command == "record":

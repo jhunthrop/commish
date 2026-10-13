@@ -92,6 +92,11 @@ func build(cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Log
 	if err != nil {
 		return nil, err
 	}
+	anon, err := auth.NewAnon(cfg.Session)
+	if err != nil {
+		return nil, err
+	}
+	mockStore := &mocks.Store{Pool: pool}
 	stateSealer, err := auth.NewStateSealer(cfg.Session.CookiePassword)
 	if err != nil {
 		return nil, err
@@ -105,6 +110,7 @@ func build(cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Log
 		Store: authStore, Sessions: sessions, Viewer: viewer, Names: nameFilter, StateSealer: stateSealer,
 		IdP:           auth.NewWorkOS(cfg.WorkOS.APIKey, cfg.WorkOS.ClientID, cfg.WorkOS.RedirectURI),
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, TrustedHops: cfg.HTTP.TrustedProxyHops, Now: now, Log: log,
+		Anon: anon, Claimer: mockStore,
 	}
 	billingService := &billing.Service{
 		Store: &billing.Store{Pool: pool}, Entitlements: ents, Gateway: gateway(cfg, log),
@@ -112,6 +118,10 @@ func build(cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Log
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, Now: now, Log: log,
 	}
 	exportHandler := &exports.Handler{Store: &exports.Store{Pool: pool}, Sheets: sheetStore, Objects: objects(cfg, log), Now: now, Log: log}
+	solo, lobbies, err := rooms(cfg, pool, mockStore, anon, gate, leagueStore, sheetStore, authStore, log)
+	if err != nil {
+		return nil, err
+	}
 
 	routes := slices.Concat(
 		server.Health(pool, version),
@@ -120,7 +130,9 @@ func build(cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Log
 		(&sheets.Handler{Store: sheetStore, Log: log}).Routes(),
 		exportHandler.Routes(),
 		billingService.Routes(),
-		(&mocks.Handler{Store: &mocks.Store{Pool: pool}, Leagues: leagueStore, Gate: gate, Log: log}).Routes(),
+		(&mocks.Handler{Store: mockStore, Log: log}).Routes(),
+		solo.Routes(),
+		lobbies.Routes(),
 	)
 	mux := http.NewServeMux()
 	if err := server.Mount(mux, routes, sessions, now); err != nil {

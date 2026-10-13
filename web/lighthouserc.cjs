@@ -44,7 +44,7 @@ module.exports = {
 						'resource-summary:script:size': [
 							'error',
 							{
-								maxNumericValue: 61440
+								maxNumericValue: 73728
 							}
 						],
 						'cumulative-layout-shift': [

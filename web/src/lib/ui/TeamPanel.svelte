@@ -47,9 +47,9 @@
 	</ol>
 	<div class="need">
 		{#if open.length > 0}
-			Still open: <b>{open.join(', ')}</b>
+			Still open: <b>{open.join(', ')}</b>. The board already weighs that in the call.
 		{:else}
-			Every starter filled
+			Every starter filled. From here the call is depth.
 		{/if}
 	</div>
 </Panel>
@@ -119,7 +119,7 @@
 		font-family: var(--font-num);
 		font-variant-numeric: tabular-nums;
 		font-weight: 700;
-		font-size: 16px;
+		font-size: var(--t-md);
 		color: var(--ink-2);
 	}
 

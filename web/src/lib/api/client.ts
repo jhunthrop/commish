@@ -8,8 +8,12 @@ import type { components } from './types.ts';
 
 type ErrorBody = components['schemas']['ErrorBody'];
 
-const CSRF_COOKIE = 'commish_csrf';
-const CSRF_HEADER = 'X-CSRF-Token';
+/** Each CSRF cookie and the header that echoes it: the session's, and a signed-out browser's (a
+ * solo mock drafted before sign-in). The API reads the one that matches who is calling. */
+const CSRF_PAIRS = [
+	['commish_csrf', 'X-CSRF-Token'],
+	['commish_anon_csrf', 'X-Anon-CSRF-Token']
+] as const;
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /** Codes the client names itself, for an answer that never arrived or was not the envelope. */
@@ -29,9 +33,9 @@ export class ApiError extends Error {
 	}
 }
 
-function csrfToken(): string | null {
-	const pair = document.cookie.split('; ').find((entry) => entry.startsWith(`${CSRF_COOKIE}=`));
-	return pair ? decodeURIComponent(pair.slice(CSRF_COOKIE.length + 1)) : null;
+function cookie(name: string): string | null {
+	const pair = document.cookie.split('; ').find((entry) => entry.startsWith(`${name}=`));
+	return pair ? decodeURIComponent(pair.slice(name.length + 1)) : null;
 }
 
 interface Envelope {
@@ -65,8 +69,10 @@ function headersFor(method: string, options: RequestOptions): Headers {
 		headers.set('Content-Type', options.contentType ?? 'application/json');
 	}
 	if (!SAFE_METHODS.has(method)) {
-		const token = csrfToken();
-		if (token) headers.set(CSRF_HEADER, token);
+		for (const [cookieName, header] of CSRF_PAIRS) {
+			const token = cookie(cookieName);
+			if (token) headers.set(header, token);
+		}
 	}
 	return headers;
 }

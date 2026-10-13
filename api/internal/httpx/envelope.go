@@ -23,6 +23,7 @@ const (
 	CodeRateLimited        = "rate_limited"
 	CodeCSRF               = "csrf"
 	CodePayloadTooLarge    = "payload_too_large"
+	CodeUnsupportedMedia   = "unsupported_media_type"
 	CodeBillingUnavailable = "billing_unavailable"
 	CodeStorageUnavailable = "storage_unavailable"
 	CodeUnavailable        = "unavailable"

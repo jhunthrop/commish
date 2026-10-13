@@ -65,8 +65,8 @@ export default defineConfig(
 	},
 	{
 		// Pages and site components link only through src/lib/site/links.ts (the account page through
-		// src/lib/account/links.ts), which build every href and navigation target with resolve() or
-		// the base path. The rule cannot see through those modules.
+		// src/lib/account/links.ts), which build every href and navigation target with resolve(). The
+		// rule cannot see through those modules.
 		files: [
 			'src/routes/(run)/**/*.svelte',
 			'src/lib/site/**/*.svelte',

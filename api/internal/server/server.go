@@ -106,6 +106,7 @@ func Stack(mux http.Handler, log *slog.Logger, obs httpx.Observer, origins []str
 		httpx.Recover(log),
 		httpx.SecurityHeaders(),
 		httpx.CORS(origins),
+		httpx.Gzip(),
 	)
 }
 

@@ -68,7 +68,13 @@
 		background: var(--heat-neg);
 	}
 
+	/* On a phone the basis wraps under the number, so the cell grows with it. */
 	@media (max-width: 760px) {
+		.cell {
+			height: auto;
+			min-height: calc(var(--row-h) - 8px);
+		}
+
 		b {
 			font-size: 22px;
 		}

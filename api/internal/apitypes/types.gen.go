@@ -186,6 +186,75 @@ func (e Lineup) Valid() bool {
 	}
 }
 
+// Defines values for LobbyFormat.
+const (
+	LobbyFormatN10Ppr           LobbyFormat = "10_ppr"
+	LobbyFormatN12HalfSuperflex LobbyFormat = "12_half_superflex"
+	LobbyFormatN12Ppr           LobbyFormat = "12_ppr"
+)
+
+// Valid indicates whether the value is a known member of the LobbyFormat enum.
+func (e LobbyFormat) Valid() bool {
+	switch e {
+	case LobbyFormatN10Ppr:
+		return true
+	case LobbyFormatN12HalfSuperflex:
+		return true
+	case LobbyFormatN12Ppr:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LobbyRoomStatus.
+const (
+	LobbyRoomStatusAbandoned LobbyRoomStatus = "abandoned"
+	LobbyRoomStatusComplete  LobbyRoomStatus = "complete"
+	LobbyRoomStatusDrafting  LobbyRoomStatus = "drafting"
+	LobbyRoomStatusFilling   LobbyRoomStatus = "filling"
+)
+
+// Valid indicates whether the value is a known member of the LobbyRoomStatus enum.
+func (e LobbyRoomStatus) Valid() bool {
+	switch e {
+	case LobbyRoomStatusAbandoned:
+		return true
+	case LobbyRoomStatusComplete:
+		return true
+	case LobbyRoomStatusDrafting:
+		return true
+	case LobbyRoomStatusFilling:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LobbySeatViewKind.
+const (
+	LobbySeatViewKindBot     LobbySeatViewKind = "bot"
+	LobbySeatViewKindDrafter LobbySeatViewKind = "drafter"
+	LobbySeatViewKindLeft    LobbySeatViewKind = "left"
+	LobbySeatViewKindOpen    LobbySeatViewKind = "open"
+)
+
+// Valid indicates whether the value is a known member of the LobbySeatViewKind enum.
+func (e LobbySeatViewKind) Valid() bool {
+	switch e {
+	case LobbySeatViewKindBot:
+		return true
+	case LobbySeatViewKindDrafter:
+		return true
+	case LobbySeatViewKindLeft:
+		return true
+	case LobbySeatViewKindOpen:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MockStatus.
 const (
 	MockStatusActive   MockStatus = "active"
@@ -198,6 +267,36 @@ func (e MockStatus) Valid() bool {
 	case MockStatusActive:
 		return true
 	case MockStatusComplete:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlayerPosition.
+const (
+	PlayerPositionDEF PlayerPosition = "DEF"
+	PlayerPositionK   PlayerPosition = "K"
+	PlayerPositionQB  PlayerPosition = "QB"
+	PlayerPositionRB  PlayerPosition = "RB"
+	PlayerPositionTE  PlayerPosition = "TE"
+	PlayerPositionWR  PlayerPosition = "WR"
+)
+
+// Valid indicates whether the value is a known member of the PlayerPosition enum.
+func (e PlayerPosition) Valid() bool {
+	switch e {
+	case PlayerPositionDEF:
+		return true
+	case PlayerPositionK:
+		return true
+	case PlayerPositionQB:
+		return true
+	case PlayerPositionRB:
+		return true
+	case PlayerPositionTE:
+		return true
+	case PlayerPositionWR:
 		return true
 	default:
 		return false
@@ -219,6 +318,90 @@ func (e Product) Valid() bool {
 	case ProductGroupPass:
 		return true
 	case ProductMembership:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReportPickChip.
+const (
+	ReportPickChipAtAdp ReportPickChip = "at_adp"
+	ReportPickChipNone  ReportPickChip = "none"
+	ReportPickChipReach ReportPickChip = "reach"
+	ReportPickChipSteal ReportPickChip = "steal"
+)
+
+// Valid indicates whether the value is a known member of the ReportPickChip enum.
+func (e ReportPickChip) Valid() bool {
+	switch e {
+	case ReportPickChipAtAdp:
+		return true
+	case ReportPickChipNone:
+		return true
+	case ReportPickChipReach:
+		return true
+	case ReportPickChipSteal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RoomBoardFormat.
+const (
+	RoomBoardFormatHalf RoomBoardFormat = "half"
+	RoomBoardFormatPpr  RoomBoardFormat = "ppr"
+	RoomBoardFormatStd  RoomBoardFormat = "std"
+)
+
+// Valid indicates whether the value is a known member of the RoomBoardFormat enum.
+func (e RoomBoardFormat) Valid() bool {
+	switch e {
+	case RoomBoardFormatHalf:
+		return true
+	case RoomBoardFormatPpr:
+		return true
+	case RoomBoardFormatStd:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RoomCardSource.
+const (
+	RoomCardSourceAdvisor RoomCardSource = "advisor"
+	RoomCardSourceSim     RoomCardSource = "sim"
+)
+
+// Valid indicates whether the value is a known member of the RoomCardSource enum.
+func (e RoomCardSource) Valid() bool {
+	switch e {
+	case RoomCardSourceAdvisor:
+		return true
+	case RoomCardSourceSim:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RoomCommandType.
+const (
+	RoomCommandTypeLeave RoomCommandType = "leave"
+	RoomCommandTypePick  RoomCommandType = "pick"
+	RoomCommandTypeQueue RoomCommandType = "queue"
+)
+
+// Valid indicates whether the value is a known member of the RoomCommandType enum.
+func (e RoomCommandType) Valid() bool {
+	switch e {
+	case RoomCommandTypeLeave:
+		return true
+	case RoomCommandTypePick:
+		return true
+	case RoomCommandTypeQueue:
 		return true
 	default:
 		return false
@@ -249,6 +432,21 @@ const (
 func (e RoomHelloType) Valid() bool {
 	switch e {
 	case RoomHelloTypeHello:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RoomUpdateType.
+const (
+	RoomUpdateTypeUpdate RoomUpdateType = "update"
+)
+
+// Valid indicates whether the value is a known member of the RoomUpdateType enum.
+func (e RoomUpdateType) Valid() bool {
+	switch e {
+	case RoomUpdateTypeUpdate:
 		return true
 	default:
 		return false
@@ -365,8 +563,35 @@ type AccountUpdate struct {
 // BoardFormat defines model for BoardFormat.
 type BoardFormat string
 
+// BoardPlayer one player of the board a room drafts from
+type BoardPlayer struct {
+	// Adp where drafters take him
+	Adp      *float64 `json:"adp"`
+	Bye      *int     `json:"bye"`
+	Headshot string   `json:"headshot"`
+	Id       string   `json:"id"`
+	Name     string   `json:"name"`
+
+	// Points projected season points
+	Points       *float64       `json:"points"`
+	Position     PlayerPosition `json:"position"`
+	PositionRank int            `json:"position_rank"`
+	Team         string         `json:"team"`
+
+	// Vor points over replacement for this league
+	Vor *float64 `json:"vor"`
+}
+
 // BotStyle defines model for BotStyle.
 type BotStyle string
+
+// CardCandidate defines model for CardCandidate.
+type CardCandidate struct {
+	PlayerId string `json:"player_id"`
+
+	// Why the advisor's sentence
+	Why *string `json:"why,omitempty"`
+}
 
 // CheckoutRequest defines model for CheckoutRequest.
 type CheckoutRequest struct {
@@ -402,7 +627,7 @@ type Envelope struct {
 
 // ErrorBody defines model for ErrorBody.
 type ErrorBody struct {
-	// Code invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, billing_unavailable, storage_unavailable, unavailable, internal
+	// Code invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal
 	Code    string             `json:"code"`
 	Feature *Feature           `json:"feature,omitempty"`
 	Fields  *map[string]string `json:"fields,omitempty"`
@@ -535,6 +760,70 @@ type LeagueSettings struct {
 // Lineup defines model for Lineup.
 type Lineup string
 
+// LobbyFilling defines model for LobbyFilling.
+type LobbyFilling struct {
+	ClockSeconds int `json:"clock_seconds"`
+
+	// Filling drafters in the room filling now
+	Filling int           `json:"filling"`
+	Format  LobbyFormat   `json:"format"`
+	Lineup  Lineup        `json:"lineup"`
+	Scoring ScoringPreset `json:"scoring"`
+	Teams   int           `json:"teams"`
+}
+
+// LobbyFormat defines model for LobbyFormat.
+type LobbyFormat string
+
+// LobbyJoin defines model for LobbyJoin.
+type LobbyJoin struct {
+	Format LobbyFormat `json:"format"`
+}
+
+// LobbyRoom defines model for LobbyRoom.
+type LobbyRoom struct {
+	Board        RoomBoard          `json:"board"`
+	ClockSeconds int                `json:"clock_seconds"`
+	FillDeadline *time.Time         `json:"fill_deadline"`
+	Format       LobbyFormat        `json:"format"`
+	Id           openapi_types.UUID `json:"id"`
+	Rounds       int                `json:"rounds"`
+	Seats        []LobbySeatView    `json:"seats"`
+	Settings     LeagueSettings     `json:"settings"`
+	SocketUrl    string             `json:"socket_url"`
+
+	// SoloPace fewer than three people started it
+	SoloPace  bool            `json:"solo_pace"`
+	StartedAt *time.Time      `json:"started_at"`
+	Status    LobbyRoomStatus `json:"status"`
+	Teams     int             `json:"teams"`
+
+	// You your seat
+	You int `json:"you"`
+}
+
+// LobbyRoomStatus defines model for LobbyRoom.Status.
+type LobbyRoomStatus string
+
+// LobbySeat defines model for LobbySeat.
+type LobbySeat struct {
+	RoomId openapi_types.UUID `json:"room_id"`
+	Seat   int                `json:"seat"`
+
+	// SocketUrl the room service's WebSocket for this room
+	SocketUrl string `json:"socket_url"`
+}
+
+// LobbySeatView defines model for LobbySeatView.
+type LobbySeatView struct {
+	Handle *string           `json:"handle"`
+	Kind   LobbySeatViewKind `json:"kind"`
+	Seat   int               `json:"seat"`
+}
+
+// LobbySeatViewKind defines model for LobbySeatView.Kind.
+type LobbySeatViewKind string
+
 // MembershipState defines model for MembershipState.
 type MembershipState struct {
 	CancelAtPeriodEnd bool       `json:"cancel_at_period_end"`
@@ -555,14 +844,6 @@ type Mock struct {
 	UpdatedAt   time.Time           `json:"updated_at"`
 }
 
-// MockAction defines model for MockAction.
-type MockAction struct {
-	At      time.Time              `json:"at"`
-	Kind    string                 `json:"kind"`
-	Payload map[string]interface{} `json:"payload"`
-	Seq     int64                  `json:"seq"`
-}
-
 // MockCreate exactly one of league_id and settings
 type MockCreate struct {
 	LeagueId *openapi_types.UUID `json:"league_id,omitempty"`
@@ -570,21 +851,84 @@ type MockCreate struct {
 	Settings *LeagueSettings     `json:"settings,omitempty"`
 }
 
-// MockDetail defines model for MockDetail.
-type MockDetail struct {
-	Actions     []MockAction        `json:"actions"`
-	CompletedAt *time.Time          `json:"completed_at"`
-	CreatedAt   time.Time           `json:"created_at"`
-	Id          openapi_types.UUID  `json:"id"`
-	LeagueId    *openapi_types.UUID `json:"league_id"`
-	Seed        int64               `json:"seed"`
-	Settings    LeagueSettings      `json:"settings"`
-	Status      MockStatus          `json:"status"`
-	UpdatedAt   time.Time           `json:"updated_at"`
+// MockPickInput defines model for MockPickInput.
+type MockPickInput struct {
+	// Pick the overall pick the drafter saw on the clock
+	Pick     int    `json:"pick"`
+	PlayerId string `json:"player_id"`
+}
+
+// MockQueueInput defines model for MockQueueInput.
+type MockQueueInput struct {
+	PlayerIds []string `json:"player_ids"`
+}
+
+// MockReport defines model for MockReport.
+type MockReport struct {
+	// Board the board, holding only the players the report names
+	Board RoomBoard `json:"board"`
+
+	// ComputedMs how long the report took to compute
+	ComputedMs    int            `json:"computed_ms"`
+	CouldWaitFrom float64        `json:"could_wait_from"`
+	Picks         []ReportPick   `json:"picks"`
+	Rounds        int            `json:"rounds"`
+	Runs          ReportRuns     `json:"runs"`
+	Seed          int64          `json:"seed"`
+	Settings      LeagueSettings `json:"settings"`
+
+	// ShareCode a solo draft's link code
+	ShareCode *string `json:"share_code,omitempty"`
+	Slot      int     `json:"slot"`
+
+	// Standings every team, best first
+	Standings []ReportTeam    `json:"standings"`
+	Starters  []ReportStarter `json:"starters"`
+	Teams     int             `json:"teams"`
+}
+
+// MockRoom defines model for MockRoom.
+type MockRoom struct {
+	// Board the board, on a full read (create, get, shared) and absent on a pick's answer
+	Board     *RoomBoard `json:"board,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+
+	// Id null for a shared draft
+	Id       *openapi_types.UUID `json:"id"`
+	LeagueId *openapi_types.UUID `json:"league_id"`
+
+	// OnClock the slot on the clock
+	OnClock *int `json:"on_clock"`
+
+	// PickNumber the pick on the clock
+	PickNumber int            `json:"pick_number"`
+	Picks      []RoomPick     `json:"picks"`
+	Queue      []string       `json:"queue"`
+	Rounds     int            `json:"rounds"`
+	Seed       int64          `json:"seed"`
+	Seq        int64          `json:"seq"`
+	Settings   LeagueSettings `json:"settings"`
+
+	// ShareCode the link's code
+	ShareCode string `json:"share_code"`
+
+	// Slot the drafter's 1-based slot
+	Slot   int        `json:"slot"`
+	Status MockStatus `json:"status"`
+	Teams  int        `json:"teams"`
+
+	// Waiting the drafter is on the clock
+	Waiting bool `json:"waiting"`
 }
 
 // MockStatus defines model for MockStatus.
 type MockStatus string
+
+// MockUndoInput defines model for MockUndoInput.
+type MockUndoInput struct {
+	// Pick the overall pick of the drafter's to take back
+	Pick int `json:"pick"`
+}
 
 // PageMeta defines model for PageMeta.
 type PageMeta struct {
@@ -605,6 +949,9 @@ type PlanCatalog struct {
 	Season int `json:"season"`
 }
 
+// PlayerPosition defines model for PlayerPosition.
+type PlayerPosition string
+
 // Price defines model for Price.
 type Price struct {
 	AmountCents int64     `json:"amount_cents"`
@@ -621,7 +968,73 @@ type Redirect struct {
 	Url string `json:"url"`
 }
 
-// RoomAction defines model for RoomAction.
+// ReportExposure defines model for ReportExposure.
+type ReportExposure struct {
+	PlayerId string  `json:"player_id"`
+	Share    float64 `json:"share"`
+}
+
+// ReportPick defines model for ReportPick.
+type ReportPick struct {
+	// AdpGap ADP less the pick
+	AdpGap    *float64       `json:"adp_gap"`
+	Chip      ReportPickChip `json:"chip"`
+	CouldWait bool           `json:"could_wait"`
+
+	// OddsSource advisor or sim as recorded with the pick, or fallback_sim computed for the report
+	OddsSource      string   `json:"odds_source"`
+	OverReplacement *float64 `json:"over_replacement"`
+	Pick            int      `json:"pick"`
+	PlayerId        string   `json:"player_id"`
+	Round           int      `json:"round"`
+
+	// StillThere the chance he was there at your next turn
+	StillThere *float64 `json:"still_there"`
+}
+
+// ReportPickChip defines model for ReportPick.Chip.
+type ReportPickChip string
+
+// ReportRuns defines model for ReportRuns.
+type ReportRuns struct {
+	// Exposure who you end up with, by share of runs, most first
+	Exposure   []ReportExposure `json:"exposure"`
+	Median     float64          `json:"median"`
+	MiddleHigh float64          `json:"middle_high"`
+	MiddleLow  float64          `json:"middle_low"`
+
+	// Points your starting points in each run, ascending
+	Points []float64 `json:"points"`
+
+	// RankCounts runs finishing at each rank, first place first
+	RankCounts []int `json:"rank_counts"`
+	Runs       int   `json:"runs"`
+
+	// TopFinish the rank top_share counts to
+	TopFinish int     `json:"top_finish"`
+	TopShare  float64 `json:"top_share"`
+}
+
+// ReportStarter defines model for ReportStarter.
+type ReportStarter struct {
+	PlayerId *string `json:"player_id"`
+	Slot     string  `json:"slot"`
+}
+
+// ReportTeam defines model for ReportTeam.
+type ReportTeam struct {
+	ByeCollisions int `json:"bye_collisions"`
+
+	// Points projected points from the starters
+	Points         float64 `json:"points"`
+	Rank           int     `json:"rank"`
+	Seat           int     `json:"seat"`
+	StartersFilled int     `json:"starters_filled"`
+	StartersTotal  int     `json:"starters_total"`
+	ValueCaptured  float64 `json:"value_captured"`
+}
+
+// RoomAction One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT (payload freed when a filling room gave the seat up, otherwise its stand-in drafts), SEAT_RETURNED, ROOM_STARTED (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, ROOM_ABANDONED (payload reason, nobody_here when the fill deadline found no drafter connected or everyone_left), or an engine action (START_DRAFT, SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick, pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out. A socket receives only its own seat's SET_QUEUE payload; another seat's arrives empty, with its seq and kind.
 type RoomAction struct {
 	At      time.Time              `json:"at"`
 	Kind    string                 `json:"kind"`
@@ -629,6 +1042,67 @@ type RoomAction struct {
 	Seat    *int                   `json:"seat"`
 	Seq     int64                  `json:"seq"`
 }
+
+// RoomBoard defines model for RoomBoard.
+type RoomBoard struct {
+	AsOf time.Time `json:"as_of"`
+
+	// Basis the sentence naming what the numbers are
+	Basis  string          `json:"basis"`
+	Format RoomBoardFormat `json:"format"`
+
+	// Players every player in the order drafters take them
+	Players []BoardPlayer `json:"players"`
+	Season  int           `json:"season"`
+}
+
+// RoomBoardFormat defines model for RoomBoard.Format.
+type RoomBoardFormat string
+
+// RoomCard defines model for RoomCard.
+type RoomCard struct {
+	// Call the player we would take
+	Call string `json:"call"`
+
+	// Conditional a lobby card off your turn
+	Conditional bool `json:"conditional"`
+
+	// ForPick the drafter's pick the call is for
+	ForPick int `json:"for_pick"`
+
+	// NextPick the turn the odds look to
+	NextPick *int `json:"next_pick"`
+
+	// PickNumber the pick on the clock when the card was made
+	PickNumber int `json:"pick_number"`
+
+	// Runs the runs the odds are over
+	Runs      int             `json:"runs"`
+	Shortlist []CardCandidate `json:"shortlist"`
+	Source    RoomCardSource  `json:"source"`
+
+	// StillThere player id to his chance of still being there at next_pick, or, on a conditional card, of reaching for_pick
+	StillThere map[string]float64 `json:"still_there"`
+}
+
+// RoomCardSource defines model for RoomCard.Source.
+type RoomCardSource string
+
+// RoomCommand defines model for RoomCommand.
+type RoomCommand struct {
+	// Pick pick
+	Pick *int `json:"pick,omitempty"`
+
+	// PlayerId pick
+	PlayerId *string `json:"player_id,omitempty"`
+
+	// PlayerIds queue, best first
+	PlayerIds *[]string       `json:"player_ids,omitempty"`
+	Type      RoomCommandType `json:"type"`
+}
+
+// RoomCommandType defines model for RoomCommand.Type.
+type RoomCommandType string
 
 // RoomError defines model for RoomError.
 type RoomError struct {
@@ -649,10 +1123,35 @@ type RoomHello struct {
 // RoomHelloType defines model for RoomHello.Type.
 type RoomHelloType string
 
+// RoomPick defines model for RoomPick.
+type RoomPick struct {
+	// Auto the clock made it: an expired turn. In a lobby, who made a pick is the log row's pick.by
+	Auto     bool   `json:"auto"`
+	Pick     int    `json:"pick"`
+	PlayerId string `json:"player_id"`
+	Round    int    `json:"round"`
+
+	// Seat the 1-based draft slot that made it
+	Seat int `json:"seat"`
+}
+
+// RoomUpdate defines model for RoomUpdate.
+type RoomUpdate struct {
+	Actions []RoomAction   `json:"actions"`
+	Seq     int64          `json:"seq"`
+	Type    RoomUpdateType `json:"type"`
+}
+
+// RoomUpdateType defines model for RoomUpdate.Type.
+type RoomUpdateType string
+
 // RoomWelcome defines model for RoomWelcome.
 type RoomWelcome struct {
-	Actions []RoomAction       `json:"actions"`
-	RoomId  openapi_types.UUID `json:"room_id"`
+	Actions []RoomAction `json:"actions"`
+
+	// Now the server's clock
+	Now    time.Time          `json:"now"`
+	RoomId openapi_types.UUID `json:"room_id"`
 
 	// Seq the room's latest seq
 	Seq  int64           `json:"seq"`
@@ -793,6 +1292,9 @@ type Page = int
 // PerPage defines model for PerPage.
 type PerPage = int
 
+// ShareCode defines model for ShareCode.
+type ShareCode = string
+
 // AccountResponse defines model for AccountResponse.
 type AccountResponse struct {
 	Data      Account    `json:"data"`
@@ -835,9 +1337,36 @@ type LeagueResponse struct {
 	RequestId string     `json:"request_id"`
 }
 
-// MockDetailResponse defines model for MockDetailResponse.
-type MockDetailResponse struct {
-	Data      MockDetail `json:"data"`
+// LobbyRoomResponse defines model for LobbyRoomResponse.
+type LobbyRoomResponse struct {
+	Data      LobbyRoom  `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
+// LobbySeatResponse defines model for LobbySeatResponse.
+type LobbySeatResponse struct {
+	Data      LobbySeat  `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
+// MockReportResponse defines model for MockReportResponse.
+type MockReportResponse struct {
+	Data      MockReport `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
+// MockRoomResponse defines model for MockRoomResponse.
+type MockRoomResponse struct {
+	Data      MockRoom   `json:"data"`
 	Error     *ErrorBody `json:"error"`
 	Meta      *PageMeta  `json:"meta,omitempty"`
 	Ok        bool       `json:"ok"`
@@ -847,6 +1376,15 @@ type MockDetailResponse struct {
 // RedirectResponse defines model for RedirectResponse.
 type RedirectResponse struct {
 	Data      Redirect   `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
+// RoomCardResponse defines model for RoomCardResponse.
+type RoomCardResponse struct {
+	Data      RoomCard   `json:"data"`
 	Error     *ErrorBody `json:"error"`
 	Meta      *PageMeta  `json:"meta,omitempty"`
 	Ok        bool       `json:"ok"`
@@ -912,6 +1450,11 @@ type ListMocksParams struct {
 	PerPage *PerPage `form:"per_page,omitempty" json:"per_page,omitempty"`
 }
 
+// AutopickMockParams defines parameters for AutopickMock.
+type AutopickMockParams struct {
+	ToRound int `form:"to_round" json:"to_round"`
+}
+
 // ListSheetsParams defines parameters for ListSheets.
 type ListSheetsParams struct {
 	Page    *Page    `form:"page,omitempty" json:"page,omitempty"`
@@ -930,11 +1473,23 @@ type CreateLeagueJSONRequestBody = LeagueInput
 // ReplaceLeagueJSONRequestBody defines body for ReplaceLeague for application/json ContentType.
 type ReplaceLeagueJSONRequestBody = LeagueInput
 
+// JoinLobbyJSONRequestBody defines body for JoinLobby for application/json ContentType.
+type JoinLobbyJSONRequestBody = LobbyJoin
+
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = AccountUpdate
 
 // CreateMockJSONRequestBody defines body for CreateMock for application/json ContentType.
 type CreateMockJSONRequestBody = MockCreate
+
+// PickMockJSONRequestBody defines body for PickMock for application/json ContentType.
+type PickMockJSONRequestBody = MockPickInput
+
+// QueueMockJSONRequestBody defines body for QueueMock for application/json ContentType.
+type QueueMockJSONRequestBody = MockQueueInput
+
+// UndoMockJSONRequestBody defines body for UndoMock for application/json ContentType.
+type UndoMockJSONRequestBody = MockUndoInput
 
 // CreateSheetJSONRequestBody defines body for CreateSheet for application/json ContentType.
 type CreateSheetJSONRequestBody = SheetCreate

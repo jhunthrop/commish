@@ -16,6 +16,10 @@
 		onchange?: (value: string) => void;
 		oninput?: (value: string) => void;
 		onkeydown?: (event: KeyboardEvent) => void;
+		/** A datalist's id, to offer names while typing. */
+		list?: string;
+		/** Enter in a one-line field does this. */
+		onenter?: () => void;
 		/** Takes focus when it appears, for a field opened by a tap. */
 		autofocus?: boolean;
 	}
@@ -32,7 +36,9 @@
 		onchange,
 		oninput,
 		onkeydown,
-		autofocus = false
+		autofocus = false,
+		list,
+		onenter
 	}: Props = $props();
 
 	function focusOnMount(node: HTMLElement): void {
@@ -58,10 +64,17 @@
 			type="text"
 			{maxlength}
 			{placeholder}
+			{list}
 			use:focusOnMount
 			onchange={() => onchange?.(value)}
 			oninput={() => oninput?.(value)}
-			{onkeydown}
+			onkeydown={(event) => {
+				onkeydown?.(event);
+				if (event.key === 'Enter' && onenter) {
+					event.preventDefault();
+					onenter();
+				}
+			}}
 		/>
 	{/if}
 </label>
