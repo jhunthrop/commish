@@ -3,8 +3,13 @@ import { resolve } from '$app/paths';
 import { links } from '#lib/site/links.ts';
 import type { AccountMock } from './account-api.ts';
 
+const COMPANION_START = '/companion/new';
+
 export const accountLinks = {
 	account: (): string => resolve('/account'),
+	pass: (): string => resolve('/pass'),
+	/** The live draft companion's start. */
+	companion: (): string => COMPANION_START,
 	sheet: links.sheet,
 	/** A finished mock opens on its report, one in progress on its room. */
 	mock: (mock: AccountMock): string =>

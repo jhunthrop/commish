@@ -1258,9 +1258,10 @@ components:
       description: >-
         A product whose price is not set in Stripe yet, or every product while checkout is not open, is null
         (draft_pass, group_pass) or missing from the list (membership).
-      required: [season, checkout_open, features, draft_pass, membership, group_pass]
+      required: [season, pass_ends_at, checkout_open, features, draft_pass, membership, group_pass]
       properties:
         season: { type: integer, description: the season a pass bought now is for }
+        pass_ends_at: { type: string, format: date-time, description: "when a pass bought now ends: its season's end, March 1 UTC" }
         checkout_open: { type: boolean, description: false while Stripe is not configured, and checkout answers 503 }
         features: { $ref: "#/components/schemas/PlanFeatures" }
         draft_pass:

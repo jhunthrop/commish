@@ -16,7 +16,14 @@ type Store struct{ Pool *pgxpool.Pool }
 
 // liveClause is the one definition of a row that grants its features
 // at $now: a live status, started, and not yet ended.
-const liveClause = `e.status in ` + liveStatuses + ` and e.starts_at <= $2 and (e.ends_at is null or e.ends_at > $2)`
+//
+// A row is started once either clock says so: starts_at is stamped by
+// the database's now() and $now is the API's clock, and the two drift
+// by milliseconds. Read against $now alone, a pass granted a moment ago
+// by a database clock running ahead is not yet live, so a second
+// checkout or the webhook's duplicate guard misses it (measured: 40 to
+// 60 ms locally, enough for two passes in one season to both grant).
+const liveClause = `e.status in ` + liveStatuses + ` and e.starts_at <= greatest($2, statement_timestamp()) and (e.ends_at is null or e.ends_at > $2)`
 
 // Can answers whether the account may use feature at now, from the
 // tables alone.

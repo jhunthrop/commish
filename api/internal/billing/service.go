@@ -23,7 +23,9 @@ const (
 	MaxGroupSeats = leagues.MaxTeams
 )
 
-// Where checkout returns the browser on the site (Lane 8's pages).
+// Where checkout returns the browser on the site (Lane 8's pages). The
+// done page is told what was bought (&bought=draft_pass), so it knows
+// what to wait for while the webhook lands.
 const (
 	pathCheckoutDone     = "/account?checkout=done"
 	pathCheckoutCanceled = "/pass?checkout=canceled"

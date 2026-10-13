@@ -1013,6 +1013,9 @@ type PlanCatalog struct {
 	// Membership annual first
 	Membership []Price `json:"membership"`
 
+	// PassEndsAt when a pass bought now ends: its season's end, March 1 UTC
+	PassEndsAt time.Time `json:"pass_ends_at"`
+
 	// Season the season a pass bought now is for
 	Season int `json:"season"`
 }

@@ -117,9 +117,8 @@ func (s *Service) claimGroupPass(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, s.Log, "billing: claim", err)
 		return
 	}
-	if covered {
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict,
-			fmt.Sprintf("You already have the %d Draft Pass, so this seat stays open for your league", g.Season), nil)
+	if covered != "" {
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, covered, nil)
 		return
 	}
 	err = s.Entitlements.ClaimGroupPass(r.Context(), g.ID, accountID, s.Now(), "claim:"+accountID.String())
@@ -143,20 +142,27 @@ func (s *Service) claimGroupPass(w http.ResponseWriter, r *http.Request) {
 	s.writeAccount(w, r)
 }
 
-// coveredElsewhere reports whether the claimer already has what a seat
-// grants from somewhere else (their own pass for the season, or the
-// Membership), so a claim would only take a seat a teammate needs. A
-// claimer who holds this pass's seat already is not covered elsewhere:
-// claiming again answers as before.
-func (s *Service) coveredElsewhere(ctx context.Context, g GroupPass, accountID uuid.UUID) (bool, error) {
+// coveredElsewhere says why the claimer already has what a seat grants
+// from somewhere else (the Membership, or their own pass for the
+// season), so a claim would only take a seat a teammate needs; empty
+// when they do not. A claimer who holds this pass's seat already is not
+// covered elsewhere: claiming again answers as before.
+func (s *Service) coveredElsewhere(ctx context.Context, g GroupPass, accountID uuid.UUID) (string, error) {
 	mine, err := s.Store.ClaimedBy(ctx, g.ID, accountID)
 	if err != nil || mine {
-		return false, err
+		return "", err
 	}
 	now := s.Now()
 	m, err := s.Entitlements.LiveMembership(ctx, accountID, now)
-	if err != nil || m != nil {
-		return m != nil, err
+	if err != nil {
+		return "", err
 	}
-	return s.Entitlements.HasLivePass(ctx, accountID, g.Season, now)
+	if m != nil {
+		return "Your Membership already includes the Draft Pass, so this seat stays open for your league", nil
+	}
+	has, err := s.Entitlements.HasLivePass(ctx, accountID, g.Season, now)
+	if err != nil || !has {
+		return "", err
+	}
+	return fmt.Sprintf("You already have the %d Draft Pass, so this seat stays open for your league", g.Season), nil
 }

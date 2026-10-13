@@ -178,7 +178,7 @@ func (s *Service) openCheckout(ctx context.Context, a auth.Account, product stri
 	}
 	session, err := s.Gateway.CreateCheckout(ctx, CheckoutParams{
 		Mode: p.mode, CustomerID: customerID, PriceID: price.ID, Quantity: p.quantity, Metadata: p.meta,
-		SuccessURL: s.site(pathCheckoutDone), CancelURL: s.site(pathCheckoutCanceled),
+		SuccessURL: s.site(pathCheckoutDone + "&bought=" + product), CancelURL: s.site(pathCheckoutCanceled),
 	})
 	if err != nil {
 		return "", err

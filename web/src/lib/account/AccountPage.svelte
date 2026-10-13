@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { PUBLIC_API_URL } from '$app/env/public';
 	import { ApiError, apiClient } from '#lib/api/client.ts';
 	import { dayLabel } from '#lib/format/date.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import Fact from '#lib/ui/Fact.svelte';
+	import Panel from '#lib/ui/Panel.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import LineList from '#lib/ui/LineList.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
@@ -20,8 +23,17 @@
 		type AccountSheet,
 		type AccountState
 	} from './account-api.ts';
+	import {
+		ARRIVAL_POLL_MS,
+		ARRIVAL_TRIES,
+		arrivalWords,
+		boughtFrom,
+		hasArrived,
+		type Arrival
+	} from './arrival.ts';
+	import GroupPasses from './GroupPasses.svelte';
 	import { accountLinks } from './links.ts';
-	import { displayName, mockLine, planWords, sheetLine } from './words.ts';
+	import { displayName, hasLiveMembership, mockLine, planWords, sheetLine } from './words.ts';
 
 	/** Your account: who you are, your sheets and mocks, your pass or membership with its one-click
 	 * cancel, and sign out. Signed out, the sign-in verb and what an account keeps. The shell is
@@ -42,6 +54,8 @@
 	/** The API's sentence for an action that failed, shown beside the action. */
 	let problem = $state<string | null>(null);
 	let busy = $state(false);
+	/** Back from checkout: what was bought, and whether it shows on the account yet. */
+	let arrival = $state<Arrival>({ kind: 'none' });
 
 	async function load(): Promise<void> {
 		try {
@@ -51,8 +65,28 @@
 		}
 	}
 
+	/** Reads the account until what checkout bought is on it, or says it is slow. */
+	async function awaitArrival(): Promise<void> {
+		if (arrival.kind === 'none') return;
+		const { bought } = arrival;
+		for (let tries = 0; tries < ARRIVAL_TRIES; tries++) {
+			if (view && hasArrived(view, bought, Date.now())) {
+				arrival = { kind: 'on', bought };
+				return;
+			}
+			await new Promise((done) => setTimeout(done, ARRIVAL_POLL_MS));
+			await load();
+		}
+		arrival = { kind: 'slow', bought };
+	}
+
 	onMount(() => {
-		void load();
+		const bought = boughtFrom(page.url.searchParams);
+		if (bought) {
+			arrival = { kind: 'waiting', bought };
+			void goto(resolve('/account'), { replace: true, shallow: true });
+		}
+		void load().then(awaitArrival);
 		const again = (): void => void load();
 		window.addEventListener('online', again);
 		return () => window.removeEventListener('online', again);
@@ -153,8 +187,14 @@
 				{#snippet actions()}<Quiet onclick={() => void load()}>Try again</Quiet>{/snippet}
 			</EmptyState>
 		{:else}
-			{@const { account, sheets, mocks } = view}
+			{@const { account, sheets, mocks, groupPasses } = view}
 			{@const plan = planWords(account)}
+			{@const arrived = arrivalWords(arrival)}
+			{#if arrived}
+				<Panel edge={arrival.kind === 'slow' ? 'loss' : 'accent'} padding="sm">
+					<p class="arrival" role="status">{arrived}</p>
+				</Panel>
+			{/if}
 			<HeroCard title={displayName(account)}>
 				{#snippet meta()}
 					<span>{account.email} · with us since {dayLabel(account.created_at)}</span>
@@ -184,6 +224,10 @@
 							<EmptyState level={3} title="No mock drafts yet" />
 						{/if}
 					</section>
+
+					{#if groupPasses.length > 0}
+						<GroupPasses passes={groupPasses} />
+					{/if}
 				</div>
 
 				<aside class="side" aria-label="Your plan">
@@ -201,7 +245,12 @@
 								Keep my membership
 							</Quiet>
 						{/if}
-						{#if account.membership}
+						{#if account.draft_pass !== null || hasLiveMembership(account)}
+							<Quiet href={accountLinks.companion()}>Open the live draft companion</Quiet>
+						{:else}
+							<Quiet href={accountLinks.pass()}>See the Draft Pass</Quiet>
+						{/if}
+						{#if account.membership !== null || account.draft_pass?.source === 'purchase' || groupPasses.length > 0}
 							<Quiet disabled={busy} onclick={() => void billing()}>Billing and receipts</Quiet>
 						{/if}
 						<Quiet disabled={busy} onclick={() => void signOut()}>Sign out</Quiet>
@@ -248,6 +297,11 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-2);
+	}
+
+	.arrival {
+		margin: 0;
+		font-size: var(--t-md);
 	}
 
 	.problem {

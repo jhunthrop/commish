@@ -9,6 +9,7 @@ import type { components } from '#lib/api/types.ts';
 export type Account = components['schemas']['Account'];
 export type AccountSheet = components['schemas']['Sheet'];
 export type AccountMock = components['schemas']['Mock'];
+export type AccountGroupPass = components['schemas']['GroupPass'];
 
 const UNAUTHORIZED = 401;
 /** How many of each list the page shows: the most recent first. */
@@ -17,7 +18,14 @@ export const LIST_SIZE = 20;
 /** What the page knows about the reader once the first call settles. */
 export type AccountState =
 	| { kind: 'signed-out' }
-	| { kind: 'signed-in'; account: Account; sheets: AccountSheet[]; mocks: AccountMock[] }
+	| {
+			kind: 'signed-in';
+			account: Account;
+			sheets: AccountSheet[];
+			mocks: AccountMock[];
+			/** The group passes this account bought, newest first. */
+			groupPasses: AccountGroupPass[];
+	  }
 	/** The browser has no connection. */
 	| { kind: 'offline' }
 	/** The browser is online and the API did not answer or answered with a fault. */
@@ -53,11 +61,12 @@ export function accountApi(client: ApiClient, online: () => boolean): AccountApi
 				if (error instanceof ApiError || error instanceof TypeError) return unreachableKind(online);
 				throw error;
 			}
-			const [sheets, mocks] = await Promise.all([
+			const [sheets, mocks, groupPasses] = await Promise.all([
 				client.call<AccountSheet[]>(`/sheets?per_page=${String(LIST_SIZE)}`),
-				client.call<AccountMock[]>(`/mocks?per_page=${String(LIST_SIZE)}`)
+				client.call<AccountMock[]>(`/mocks?per_page=${String(LIST_SIZE)}`),
+				client.call<AccountGroupPass[]>('/billing/group-passes')
 			]);
-			return { kind: 'signed-in', account, sheets, mocks };
+			return { kind: 'signed-in', account, sheets, mocks, groupPasses };
 		},
 		cancelMembership: () => client.call<Account>('/billing/membership/cancel', { method: 'POST' }),
 		resumeMembership: () => client.call<Account>('/billing/membership/resume', { method: 'POST' }),

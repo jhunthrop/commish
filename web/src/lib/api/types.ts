@@ -1051,6 +1051,11 @@ export interface components {
 		PlanCatalog: {
 			/** @description the season a pass bought now is for */
 			season: number;
+			/**
+			 * Format: date-time
+			 * @description when a pass bought now ends: its season's end, March 1 UTC
+			 */
+			pass_ends_at: string;
 			/** @description false while Stripe is not configured */
 			checkout_open: boolean;
 			features: components['schemas']['PlanFeatures'];

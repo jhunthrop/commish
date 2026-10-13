@@ -24,8 +24,9 @@ func (s *Service) plans(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, s.Log, "billing: plan features", err)
 		return
 	}
+	yr := season.Of(s.Now())
 	out := apitypes.PlanCatalog{
-		Season: season.Of(s.Now()), CheckoutOpen: s.Gateway != nil, Features: features, Membership: []apitypes.Price{},
+		Season: yr, PassEndsAt: season.End(yr), CheckoutOpen: s.Gateway != nil, Features: features, Membership: []apitypes.Price{},
 	}
 	if s.Gateway != nil {
 		if err := s.planPrices(ctx, &out); err != nil {
