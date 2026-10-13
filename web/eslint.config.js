@@ -59,6 +59,17 @@ export default defineConfig(
 		rules: { '@typescript-eslint/no-confusing-void-expression': 'off' }
 	},
 	{
+		// Pages and site components link only through src/lib/site/links.ts, which builds every
+		// href and navigation target with resolve(). The rule cannot see through that module.
+		files: ['src/routes/(run)/**/*.svelte', 'src/lib/site/**/*.svelte'],
+		rules: {
+			'svelte/no-navigation-without-resolve': [
+				'error',
+				{ ignoreLinks: true, ignoreGoto: true, ignorePushState: true, ignoreReplaceState: true }
+			]
+		}
+	},
+	{
 		// Primitives render hrefs their callers hand them. A route resolves its own links with
 		// resolve() from $app/paths, so the check belongs at the call site, not in the primitive.
 		files: ['src/lib/ui/**/*.svelte'],
