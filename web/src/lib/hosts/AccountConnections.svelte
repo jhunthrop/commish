@@ -74,6 +74,8 @@
 				FFPC disconnected. Your password and session are deleted. Your FFPC league keeps its last
 				read.
 			</p>
+			<!-- The way back in stays, as the empty state has it. -->
+			{#if open}<div class="again">{@render follow()}</div>{/if}
 		{:else if connections && connections.length > 0}
 			<ActionRows label="Connected accounts">
 				{#each connections as c (c.host)}
@@ -97,12 +99,15 @@
 			{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 		{:else if connections && open}
 			<EmptyState level={3} title="No connected accounts">
-				{#snippet actions()}<Quiet href={links.leagueNew('ffpc')}>Follow an FFPC league</Quiet
-					>{/snippet}
+				{#snippet actions()}{@render follow()}{/snippet}
 			</EmptyState>
 		{/if}
 	</section>
 {/if}
+
+{#snippet follow()}
+	<Quiet href={links.leagueNew('ffpc')}>Follow an FFPC league</Quiet>
+{/snippet}
 
 <style>
 	.note,

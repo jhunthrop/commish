@@ -70,6 +70,8 @@
 				// An FFPC league with no member signed in to read it as: sign in right here, under the
 				// league's saved name.
 				failure = 'host-sign-in';
+				// The name is a nicety: a failed list read leaves the generic title, and the form works
+				// without it, so the failure is shown as that floor and not as an error.
 				if (savedName === '') {
 					void leagueApi
 						.attached()

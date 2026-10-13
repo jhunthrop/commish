@@ -46,7 +46,7 @@
 			<span class="team">{teamName(sync, s.roster_id)}</span>
 			{#if live}<span class="total">{fixed(s.points)}</span>{/if}
 		</header>
-		{#if s.starters.length === 0 && sync.host === 'ffpc'}
+		{#if s.starters.length === 0 && sync.host === 'ffpc' && !mine}
 			<!-- FFPC is read as one member, so the API keeps only the viewer's own starters. -->
 			<p class="none">{hostWords(sync.host)} shows us your lineup only.</p>
 		{/if}

@@ -1,7 +1,7 @@
 // Screenshots of every state UX fix 6 touched, against a local api run with FFPC_BASE_URL at the
 // stand-in (api/tools/ffpcfake), in both themes at 1440 and 390 (touch, DPR 2), full page.
 //
-//   node scripts/ux-fix-6-shots.ts [web origin] [out dir]
+//   node scripts/ux-fix-6-shots.ts [web origin] [out dir, default the ledger's ux-fix-6-shots/]
 //
 // OWNER and FRESH are session:csrf pairs from `go run ./tools/roommeasure session -handle <name>` in
 // api/. OWNER is connected to the stand-in, follows FFPC league 104870 (LEAGUE) and has one paired
@@ -21,9 +21,15 @@ const PHONE_WIDTH = 390;
 const READY_TIMEOUT_MS = 30_000;
 
 const web = process.argv[2] ?? 'http://localhost:5173';
-const out = new URL(process.argv[3] ?? '../screenshots/ux-fix-6/', import.meta.url);
+const out = new URL(
+	process.argv[3] ?? '../../.superpowers/sdd/2026-10-12-prep-site/ux-fix-6-shots/',
+	import.meta.url
+);
 const api = process.env.API ?? 'http://localhost:8080';
-const db = need('DB');
+/** The only database this script writes to: a local scratch one on the compose port. */
+const SCRATCH_HOSTS = new Set(['localhost', '127.0.0.1']);
+const SCRATCH_PORT = '5433';
+const db = scratchDatabase(need('DB'));
 const league = need('LEAGUE');
 const orphan = need('ORPHAN');
 
@@ -36,6 +42,15 @@ function need(name: string): string {
 	const value = process.env[name];
 	if (!value) throw new Error(`${name} is required`);
 	return value;
+}
+
+/** Refuses any database but a local one on 5433: the script flips rows and makes a table. */
+function scratchDatabase(url: string): string {
+	const parsed = new URL(url);
+	if (!SCRATCH_HOSTS.has(parsed.hostname) || parsed.port !== SCRATCH_PORT) {
+		throw new Error(`DB must be a local scratch database on port ${SCRATCH_PORT}`);
+	}
+	return url;
 }
 
 function drafter(name: string): Drafter {
