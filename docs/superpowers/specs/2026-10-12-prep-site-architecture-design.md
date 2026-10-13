@@ -65,7 +65,7 @@ The draft engine, the bots and the continue/room-odds sim are ported to Go in `a
 
 ### 2.5 Data
 
-- **Neon Postgres**, one database, two schemas. `app` is owned by Go and migrated with goose from `api/migrations`: accounts, sessions, leagues, sheets, sheet rows, mocks, mock actions, rooms, room actions, entitlements, billing events, exports, lobby picks (the start of our own ADP). `research` is owned by the TypeScript core and migrated with Drizzle from `research/drizzle`: everything the nightly job reads and writes. Neither lane writes the other's schema. Production is for one-shot backfills and one verification read (`prod-db-is-for-backfills-only`); every measurement runs against a dev branch.
+- **Neon Postgres, a fresh database, designed clean.** Founder ruling 2026-10-13: "we don't need to worry about migrations - no one is using the site - just rip and replace - don't leave tech debt for migration purposes." So the prep site gets a new database `commish` in the Neon project with two schemas designed from scratch: `app`, owned by the role `commish_app` and migrated with goose from `api/migrations` (accounts, sessions, leagues, sheets, sheet rows, mocks, mock actions, rooms, room actions, room seats, entitlements, billing, exports, lobby picks), and `research`, owned by `commish_research` and migrated with alembic from revision 1 (only the tables the pipeline, the model, the capsules, the nightly run and the advisor need, with the legacy schema's quirks gone). The data worth keeping (the 2026 register, observations, projections, boards, capsules, the universe and crosswalk, captures, model artifacts) is copied once by `research/load_legacy.py` with a manifest of counts. The legacy database `neondb` keeps serving the league app and the TypeScript oracle until cutover and is deleted then. Nothing is baselined, nothing is "migrated later". Production is for one-shot loads and one verification read (`prod-db-is-for-backfills-only`); every measurement runs locally against the Docker copy.
 - **R2** for the nightly runs and exports. **No file-sourced data at runtime** anywhere (`no-file-sourced-data-at-runtime`): the web build reads a run from R2, the API reads tables.
 - **Headshots** from the provider's public URLs at launch, behind an image route with caching, so a provider change is one line.
 
@@ -119,7 +119,7 @@ Lane 0, Lane 2 and Lane 2P phase A start now. Lane 1 starts when the founder has
 - Monorepo, not a new repository: the research core, the migrations, the design docs and the memory of why stay in one history. The old `src/` is deleted in Lane 9, not moved aside.
 - One Go image, two services, so the room's minimum instance does not keep the API warm for nothing.
 - Prerender, not edge SSR, for the nightly pages: a nightly product has a nightly build.
-- Two schemas in one Neon database, not two databases: the lobby picks feed the research ADP and a join should not cross a network.
+- One fresh database with two clean schemas, not a baseline of the legacy one: the lobby picks feed the research ADP and a join should not cross a network, and the founder ruled out migration debt.
 - Sleeper first for the live draft, by the shape of its API, not by preference.
 - Lobbies at launch, per the founder on 2026-10-12.
 
