@@ -24,7 +24,7 @@ func companionService(cfg config.API, pool *pgxpool.Pool, rooms *solo.Service, e
 	s := &companion.Service{
 		Store: &companion.Store{Pool: pool}, Poller: &companion.Poller{Host: host, Now: time.Now}, Directory: host,
 		Boards: rooms.Boards, Matcher: &companion.NameMatcher{}, Advisor: rooms.Advisor, Entitlements: ents,
-		Engine:        advisor.Engine{Runs: sim.RoomOddsRuns, Workers: runtime.GOMAXPROCS(0)},
+		Conditional:   advisor.Engine{Runs: sim.RoomOddsRuns, Workers: runtime.GOMAXPROCS(0)},
 		ReportWorkers: runtime.GOMAXPROCS(0), Now: time.Now, Log: log,
 	}
 	if cfg.Dev.CompanionReplay {

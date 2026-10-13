@@ -10,11 +10,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/jhunthrop/commish/api/internal/advisor"
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -60,6 +62,12 @@ type BoardSource interface {
 	For(ctx context.Context, s apitypes.LeagueSettings) (boards.Board, error)
 }
 
+// ConditionalAdvisor is the call for a seat off the clock: the player to
+// take if the board holds to its next pick.
+type ConditionalAdvisor interface {
+	Conditional(ctx context.Context, req advisor.Request) (advisor.Card, error)
+}
+
 // Directory is what the companion reads from the host beyond the draft:
 // a drafter's user id by username, and a league's scoring.
 type Directory interface {
@@ -76,8 +84,9 @@ type Service struct {
 	Boards    BoardSource
 	Matcher   Matcher
 	Advisor   advisor.Advisor
-	// Engine makes the conditional call between turns, the lobby's.
-	Engine       advisor.Engine
+	// Conditional makes the call between turns, the lobby's.
+	// advisor.Engine implements it.
+	Conditional  ConditionalAdvisor
 	Entitlements Checker
 	// Replay is the recorded draft, nil unless COMPANION_REPLAY is on.
 	Replay        *Replay
@@ -85,14 +94,24 @@ type Service struct {
 	Now           func() time.Time
 	Log           *slog.Logger
 
-	// conditional keeps the between-turns card per companion and pick
-	// count: every viewer of one pick costs one computation.
+	// conditional keeps the between-turns card per companion, seat and
+	// pick count, and building singles the work out: every viewer of one
+	// pick costs one computation, and a seat changed by a re-follow is a
+	// new card.
 	conditional memo.Map[conditionalKey, apitypes.RoomCard]
+	building    singleflight.Group
 }
 
 type conditionalKey struct {
 	companion uuid.UUID
-	picks     int
+	seat      int
+	// started is the row's created_at: a replay restarted is a new draft.
+	started int64
+	picks   int
+}
+
+func (k conditionalKey) String() string {
+	return fmt.Sprintf("%s/%d/%d/%d", k.companion, k.seat, k.started, k.picks)
 }
 
 // Routes is every route this package serves.
