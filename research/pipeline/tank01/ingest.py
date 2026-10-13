@@ -181,7 +181,7 @@ def ingest_adp(conn: Connection, provider: Tank01Provider, budget: RequestBudget
     updated = conn.execute(
         text(
             f"update {PROVIDER_PLAYERS.fullname} as p set adp = data.adp, pos_adp = data.pos_adp "
-            "from jsonb_to_recordset(cast(:feed as jsonb)) as data(id text, adp real, pos_adp text) "
+            "from jsonb_to_recordset(cast(:feed as jsonb)) as data(id text, adp double precision, pos_adp text) "
             "where p.id = data.id returning p.id"
         ),
         {"feed": feed},
