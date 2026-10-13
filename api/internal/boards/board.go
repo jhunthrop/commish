@@ -111,8 +111,11 @@ type Board struct {
 	// PositionRanks is his place at his position by points over
 	// replacement, then by ADP for a market-order position.
 	PositionRanks map[string]int
-	byID          map[string]int
-	teams         int
+	// RankedFor is set when the league's scoring has no board of its own
+	// (see the function RankedFor); the basis then names the board used.
+	RankedFor string
+	byID      map[string]int
+	teams     int
 }
 
 // For values raw under a league of teams starting slots.
@@ -193,6 +196,23 @@ func (b Board) Byes() map[string]int {
 // Basis is the sentence that names what the numbers are: whose points,
 // over replacement for what league.
 func (b Board) Basis() string {
-	return fmt.Sprintf("Points are our %d %s projections, over replacement for %d teams on this roster. Kickers and defenses carry no projection and sit where drafters take them.",
-		b.Raw.Season, b.Raw.Format.Words(), b.teams)
+	ranked := ""
+	if b.RankedFor != "" {
+		ranked = fmt.Sprintf("%s is ranked on our %s board. ", b.RankedFor, b.Raw.Format.Words())
+	}
+	return fmt.Sprintf("%sPoints are our %d %s projections, over replacement for %d teams on this roster. Kickers and defenses carry no projection and sit where drafters take them.",
+		ranked, b.Raw.Season, b.Raw.Format.Words(), b.teams)
+}
+
+// RankedFor names a league's scoring when no board of its own exists
+// yet and the room ranks it on the nearest stored board: "TE premium",
+// "Your custom scoring". Empty when the board is the scoring's own.
+func RankedFor(s apitypes.Scoring) string {
+	switch {
+	case s.Custom != nil:
+		return "Your custom scoring"
+	case s.Preset != nil && *s.Preset == apitypes.ScoringPresetTePremium:
+		return "TE premium"
+	}
+	return ""
 }

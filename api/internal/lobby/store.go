@@ -131,14 +131,14 @@ func (s *Store) read(ctx context.Context, q querier, id uuid.UUID, lock bool) (*
 }
 
 func readSeats(ctx context.Context, q querier, id uuid.UUID) (map[int]Seat, error) {
-	rows, err := q.Query(ctx, `select seat, account_id, handle, is_bot, left_at from app.room_seats where room_id = $1`, id)
+	rows, err := q.Query(ctx, `select seat, account_id, handle, is_bot, left_at, joined_at, last_seen from app.room_seats where room_id = $1`, id)
 	if err != nil {
 		return nil, fmt.Errorf("lobby: seats %s: %w", id, err)
 	}
 	out := map[int]Seat{}
 	for rows.Next() {
 		var st Seat
-		if err := rows.Scan(&st.Number, &st.AccountID, &st.Handle, &st.IsBot, &st.LeftAt); err != nil {
+		if err := rows.Scan(&st.Number, &st.AccountID, &st.Handle, &st.IsBot, &st.LeftAt, &st.JoinedAt, &st.LastSeen); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("lobby: seats %s: %w", id, err)
 		}
@@ -273,6 +273,9 @@ func (w *writer) engine(a draft.Action, seat int, by string) error {
 	payload := enginePayload{Action: raw}
 	picked := len(next.Picks) > len(before.Picks)
 	if picked {
+		if payload.Odds, err = w.recordedOdds(before.PickNumber); err != nil {
+			return err
+		}
 		p := next.Picks[len(next.Picks)-1]
 		payload.Pick = &PickNote{By: by, RoomPick: apitypes.RoomPick{
 			Pick: p.PickNumber, Round: p.Round, Seat: draftroom.SeatNumber(next.DraftOrder, p.TeamID), PlayerId: p.PlayerID, Auto: p.Auto,

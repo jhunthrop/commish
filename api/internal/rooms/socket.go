@@ -47,6 +47,9 @@ const limitConnectPerMinute = 30
 type Socket struct {
 	Lobby *lobby.Store
 	Hub   *Hub
+	// Adopt claims a room for this instance's clock when a drafter connects
+	// to a room no live clock holds.
+	Adopt func(ctx context.Context, id uuid.UUID)
 	// OriginHosts are the hosts a browser may open a socket from, the
 	// same origins CORS allows.
 	OriginHosts []string
@@ -81,8 +84,14 @@ func (s *Socket) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	account := auth.AccountID(r)
-	if !s.admit(w, r, roomID, account) {
+	seat, ok := s.admit(w, r, roomID, account)
+	if !ok {
 		return
+	}
+	// A room nobody's clock holds (a new room, or one whose instance died)
+	// is adopted as its first drafter connects, rather than at the sweep.
+	if s.Adopt != nil {
+		s.Adopt(r.Context(), roomID)
 	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: s.OriginHosts})
 	if err != nil {
@@ -92,7 +101,7 @@ func (s *Socket) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	conn.SetReadLimit(maxMessage)
 	defer func() { _ = conn.CloseNow() }()
-	if err := s.session(r.Context(), conn, roomID, account); err != nil && !isClosed(err) {
+	if err := s.session(r.Context(), conn, roomID, account, seat); err != nil && !isClosed(err) {
 		s.Log.Warn("rooms: session", "request_id", httpx.RequestIDFrom(r.Context()), "room", roomID, "err", err)
 	}
 }
@@ -102,21 +111,22 @@ func (s *Socket) serve(w http.ResponseWriter, r *http.Request) {
 // who closed the tab comes back to the draft they were part of). A
 // missing room answers 404, a room the caller has no seat in 403, and in
 // either case nothing is sent.
-func (s *Socket) admit(w http.ResponseWriter, r *http.Request, roomID, account uuid.UUID) bool {
+func (s *Socket) admit(w http.ResponseWriter, r *http.Request, roomID, account uuid.UUID) (int, bool) {
 	room, err := s.Lobby.Load(r.Context(), roomID)
 	if errors.Is(err, lobby.ErrNotFound) {
 		httpx.WriteNotFound(w, r)
-		return false
+		return 0, false
 	}
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "rooms: open", err)
-		return false
+		return 0, false
 	}
-	if room.SeatOf(account) == 0 {
+	seat := room.SeatOf(account)
+	if seat == 0 {
 		httpx.WriteError(w, r, http.StatusForbidden, httpx.CodeForbidden, "You do not have a seat in this room", nil)
-		return false
+		return 0, false
 	}
-	return true
+	return seat, true
 }
 
 func isClosed(err error) bool {
@@ -132,11 +142,20 @@ func (s *Socket) send(ctx context.Context, conn *websocket.Conn, v any) error {
 
 // wire is the log's rows as the client reads them. START_DRAFT's pool is
 // left off: the page holds the board, and the pool is most of the bytes.
-func wire(rows []lobby.LogRow) []apitypes.RoomAction {
+//
+// A seat reads only its own queue: another seat's SET_QUEUE goes out as
+// the row with its seq and kind and an empty payload, so the client's seq
+// stays whole and nobody's plan leaves the server. The odds a pick
+// recorded stay on the server too; the report reads them.
+func wire(rows []lobby.LogRow, seat int) []apitypes.RoomAction {
 	out := make([]apitypes.RoomAction, 0, len(rows))
 	for _, row := range rows {
 		payload := map[string]any{}
-		_ = json.Unmarshal(row.Payload, &payload)
+		ownQueue := row.Kind == string(draft.SetQueue) && row.Seat != nil && *row.Seat == seat
+		if row.Kind != string(draft.SetQueue) || ownQueue {
+			_ = json.Unmarshal(row.Payload, &payload)
+		}
+		delete(payload, "odds")
 		if row.Kind == string(draft.StartDraft) {
 			if a, ok := payload["action"].(map[string]any); ok {
 				delete(a, "pool")
@@ -153,7 +172,7 @@ func wire(rows []lobby.LogRow) []apitypes.RoomAction {
 // A drafter who left is given the seat back on connecting; the last
 // socket of a drafter on this instance closing hands the seat to its
 // stand-in at once.
-func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, account uuid.UUID) error {
+func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, account uuid.UUID, seat int) error {
 	helloCtx, cancel := context.WithTimeout(ctx, helloTimeout)
 	var hello apitypes.RoomHello
 	err := wsjson.Read(helloCtx, conn, &hello)
@@ -181,6 +200,9 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, acco
 	if err := s.Lobby.Return(ctx, roomID, account); err != nil && !errors.Is(err, lobby.ErrNoSeat) {
 		return err
 	}
+	if err := s.Lobby.Touch(ctx, roomID, account); err != nil {
+		return err
+	}
 	rows, err := s.Lobby.LogSince(ctx, roomID, hello.LastSeq)
 	if err != nil {
 		return err
@@ -190,7 +212,7 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, acco
 		sent = rows[len(rows)-1].Seq
 	}
 	if err := s.send(ctx, conn, apitypes.RoomWelcome{
-		Type: apitypes.RoomWelcomeTypeWelcome, RoomId: roomID, Seq: sent, Now: s.Now().UTC(), Actions: wire(rows),
+		Type: apitypes.RoomWelcomeTypeWelcome, RoomId: roomID, Seq: sent, Now: s.Now().UTC(), Actions: wire(rows, seat),
 	}); err != nil {
 		return err
 	}
@@ -199,16 +221,26 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, acco
 	go func() { readErr <- readCommands(ctx, conn, commands) }()
 	ticker := time.NewTicker(pingEvery)
 	defer ticker.Stop()
+	limits := newCommandLimits()
 	for {
 		select {
 		case err := <-readErr:
 			return err
 		case cmd := <-commands:
+			if !limits.allow(cmd.Type) {
+				if limits.abusive() {
+					return conn.Close(websocket.StatusPolicyViolation, "too many commands")
+				}
+				if err := s.refuse(ctx, conn, httpx.CodeRateLimited, "Slow down: the room takes a few commands a second."); err != nil {
+					return err
+				}
+				continue
+			}
 			if err := s.command(ctx, conn, roomID, account, cmd); err != nil {
 				return err
 			}
 		case <-moved:
-			if sent, err = s.catchUp(ctx, conn, roomID, sent); err != nil {
+			if sent, err = s.catchUp(ctx, conn, roomID, seat, sent); err != nil {
 				return err
 			}
 		case <-ticker.C:
@@ -218,23 +250,31 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, acco
 			if err != nil {
 				return err
 			}
+			// The seat is present while a socket pings (see lobby.Seat).
+			if err := s.Lobby.Touch(ctx, roomID, account); err != nil {
+				return err
+			}
 			// A notification lost while the hub was reconnecting is caught
 			// up here, at the latest one ping later.
-			if sent, err = s.catchUp(ctx, conn, roomID, sent); err != nil {
+			if sent, err = s.catchUp(ctx, conn, roomID, seat, sent); err != nil {
 				return err
 			}
 		}
 	}
 }
 
+func (s *Socket) refuse(ctx context.Context, conn *websocket.Conn, code, message string) error {
+	return s.send(ctx, conn, apitypes.RoomError{Type: apitypes.RoomErrorTypeError, Code: code, Message: message})
+}
+
 // catchUp sends every row after sent, returning the new last seq sent.
-func (s *Socket) catchUp(ctx context.Context, conn *websocket.Conn, roomID uuid.UUID, sent int64) (int64, error) {
+func (s *Socket) catchUp(ctx context.Context, conn *websocket.Conn, roomID uuid.UUID, seat int, sent int64) (int64, error) {
 	rows, err := s.Lobby.LogSince(ctx, roomID, sent)
 	if err != nil || len(rows) == 0 {
 		return sent, err
 	}
 	last := rows[len(rows)-1].Seq
-	return last, s.send(ctx, conn, apitypes.RoomUpdate{Type: apitypes.RoomUpdateTypeUpdate, Seq: last, Actions: wire(rows)})
+	return last, s.send(ctx, conn, apitypes.RoomUpdate{Type: apitypes.RoomUpdateTypeUpdate, Seq: last, Actions: wire(rows, seat)})
 }
 
 func readCommands(ctx context.Context, conn *websocket.Conn, out chan<- apitypes.RoomCommand) error {

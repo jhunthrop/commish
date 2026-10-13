@@ -2,8 +2,8 @@ package rooms
 
 import (
 	"context"
+	"errors"
 	"log/slog"
-	"math"
 	"sync"
 	"time"
 
@@ -14,14 +14,25 @@ import (
 	"github.com/jhunthrop/commish/api/internal/lobby"
 )
 
-// Lease timings. An instance renews its rooms well inside the lease, so
-// a room is adopted within Lease of its instance dying, and the sweep
-// looks for rooms to adopt often enough that a new room's fill clock
-// starts within a second.
+// Lease timings, and the database cadence they cost.
+//
+// While this instance holds a live room it renews its leases every Renew
+// (well inside Lease, so a room is adopted within Lease of its instance
+// dying) and sweeps for rooms to adopt every Sweep. While it holds none it
+// sweeps every IdleSweep and never renews: a room's first drafter
+// connecting adopts it at once (Socket.Adopt), so the slow sweep only
+// catches a room whose instance died with nobody reconnecting. Out of
+// season an idle instance touches the database once every IdleSweep and
+// holds no LISTEN connection (Hub listens only while it has subscribers),
+// so Neon can suspend.
 const (
-	DefaultLease = 10 * time.Second
-	DefaultRenew = 3 * time.Second
-	DefaultSweep = time.Second
+	DefaultLease     = 10 * time.Second
+	DefaultRenew     = 3 * time.Second
+	DefaultSweep     = time.Second
+	DefaultIdleSweep = time.Minute
+	// pollEvery bounds a live room's sleep: its clock re-reads the room at
+	// least this often, so a half-open LISTEN connection cannot stall it.
+	pollEvery = 2 * time.Second
 	// retryAfter is the pause after a clock event that failed.
 	retryAfter = time.Second
 	// claimBatch is the most rooms one sweep adopts.
@@ -33,19 +44,21 @@ const (
 // (the fill deadline, a bot's think time, a pick clock) or until the
 // room's log moves.
 type Owners struct {
-	Pool     *pgxpool.Pool
-	Store    *lobby.Store
-	Clock    *lobby.Clock
-	Hub      *Hub
-	Instance string
-	Lease    time.Duration
-	Renew    time.Duration
-	Sweep    time.Duration
-	Now      func() time.Time
-	Log      *slog.Logger
+	Pool      *pgxpool.Pool
+	Store     *lobby.Store
+	Clock     *lobby.Clock
+	Hub       *Hub
+	Instance  string
+	Lease     time.Duration
+	Renew     time.Duration
+	Sweep     time.Duration
+	IdleSweep time.Duration
+	Now       func() time.Time
+	Log       *slog.Logger
 
 	mu      sync.Mutex
 	running map[uuid.UUID]context.CancelFunc
+	base    context.Context
 	wg      sync.WaitGroup
 }
 
@@ -54,24 +67,66 @@ type Owners struct {
 func (o *Owners) Run(ctx context.Context) {
 	o.mu.Lock()
 	o.running = map[uuid.UUID]context.CancelFunc{}
+	o.base = ctx
 	o.mu.Unlock()
-	sweep := time.NewTicker(o.Sweep)
-	renew := time.NewTicker(o.Renew)
-	defer sweep.Stop()
-	defer renew.Stop()
 	o.claim(ctx)
+	lastSweep, lastRenew := o.Now(), o.Now()
+	tick := time.NewTicker(o.Sweep)
+	defer tick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			o.wg.Wait()
 			o.release()
 			return
-		case <-sweep.C:
-			o.claim(ctx)
-		case <-renew.C:
+		case <-tick.C:
+		}
+		now := o.Now()
+		live := o.holding() > 0
+		if live && now.Sub(lastRenew) >= o.Renew {
 			o.renew(ctx)
+			lastRenew = now
+		}
+		sweepEvery := o.IdleSweep
+		if live {
+			sweepEvery = o.Sweep
+		}
+		if now.Sub(lastSweep) >= sweepEvery {
+			o.claim(ctx)
+			lastSweep = now
 		}
 	}
+}
+
+// holding is how many rooms this instance keeps the clock of.
+func (o *Owners) holding() int {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return len(o.running)
+}
+
+// Adopt claims one room for this instance if no live lease holds it: the
+// room's first drafter connecting starts its clock without waiting on the
+// sweep.
+func (o *Owners) Adopt(ctx context.Context, id uuid.UUID) {
+	var claimed bool
+	err := o.Pool.QueryRow(ctx, `update app.rooms set owner_instance = $1, lease_until = now() + $2::interval
+		where id = $3 and status in ('filling', 'drafting') and (lease_until is null or lease_until < now())
+		returning true`, o.Instance, o.Lease.String(), id).Scan(&claimed)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return
+	}
+	if err != nil {
+		o.Log.Warn("rooms: adopt", "room", id, "err", err)
+		return
+	}
+	o.mu.Lock()
+	base := o.base
+	o.mu.Unlock()
+	if base == nil {
+		return
+	}
+	o.start(base, id)
 }
 
 // claim adopts live rooms with no lease or a lapsed one: new rooms, and
@@ -167,15 +222,26 @@ func (o *Owners) keep(ctx context.Context, id uuid.UUID) {
 			o.Store.Forget(id)
 			return
 		}
-		due := lobby.NextDue(room)
-		if due.Kind == lobby.DueNothing {
-			if !o.wait(ctx, moved, untilMoved) {
-				return
+		// A drafter past the presence window goes to the stand-in first.
+		if room.AnyAbsent(o.Now()) {
+			if _, err := o.Store.MarkAbsent(ctx, id); err != nil && ctx.Err() == nil {
+				o.Log.Warn("rooms: presence", "room", id, "err", err)
 			}
 			continue
 		}
-		if !o.wait(ctx, moved, due.At.Sub(o.Now())) {
+		due := lobby.NextDue(room)
+		// A live room re-reads itself at least every pollEvery, whatever the
+		// hub says: a half-open LISTEN connection cannot stall its clock,
+		// and a drafter's presence lapsing is seen within a poll.
+		sleep := pollEvery
+		if due.Kind != lobby.DueNothing {
+			sleep = min(sleep, due.At.Sub(o.Now()))
+		}
+		if !o.wait(ctx, moved, sleep) {
 			return
+		}
+		if due.Kind == lobby.DueNothing {
+			continue
 		}
 		if o.Now().Before(due.At) {
 			continue // the log moved first; read the room again
@@ -189,29 +255,20 @@ func (o *Owners) keep(ctx context.Context, id uuid.UUID) {
 	}
 }
 
-// untilMoved is a wait with no timeout: the room has nothing due until
-// its log moves.
-const untilMoved time.Duration = math.MinInt64
-
 // wait sleeps for d, or until the room's log moves; false when the clock
 // should stop. A due time already past does not wait at all.
 func (o *Owners) wait(ctx context.Context, moved <-chan struct{}, d time.Duration) bool {
-	var timer <-chan time.Time
-	switch {
-	case d == untilMoved:
-	case d <= 0:
+	if d <= 0 {
 		return true
-	default:
-		t := time.NewTimer(d)
-		defer t.Stop()
-		timer = t.C
 	}
+	t := time.NewTimer(d)
+	defer t.Stop()
 	select {
 	case <-ctx.Done():
 		return false
 	case <-moved:
 		return true
-	case <-timer:
+	case <-t.C:
 		return true
 	}
 }

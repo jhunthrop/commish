@@ -464,7 +464,7 @@ paths:
       summary: >-
         Starts a solo mock from a saved league or from settings. The answer is the room at the drafter's first
         turn: every bot pick before it is already made, with the board the room drafts from.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { anon: [] }, {}]
       requestBody:
         required: true
         content:
@@ -482,7 +482,7 @@ paths:
       tags: [mocks]
       operationId: getMock
       summary: The room as it stands, with the board.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { anon: [] }]
       responses:
         "200": { $ref: "#/components/responses/MockRoomResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -502,7 +502,7 @@ paths:
         The drafter's pick, and every bot pick to the drafter's next turn in the same transaction, stamped with no
         delay. pick is the overall pick the drafter saw, so a second submit of the same click answers 409. The
         answer carries no board.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { anon: [] }]
       requestBody:
         required: true
         content:
@@ -522,7 +522,7 @@ paths:
       summary: >-
         Takes back one of the drafter's picks and every pick after it. The draft replays from there with the same
         seed, so the bots draft the same up to the change.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { anon: [] }]
       requestBody:
         required: true
         content:
@@ -546,7 +546,7 @@ paths:
       summary: >-
         Pick for me to round N: the drafter's turns through that round draft from the queue first, then the
         newest cheat sheet, then the board.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { anon: [] }]
       responses:
         "200": { $ref: "#/components/responses/MockRoomResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
@@ -558,7 +558,7 @@ paths:
       tags: [mocks]
       operationId: finishMock
       summary: Finish the draft, every remaining turn by the same rule as autopick.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { anon: [] }]
       responses:
         "200": { $ref: "#/components/responses/MockRoomResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -569,7 +569,7 @@ paths:
       tags: [mocks]
       operationId: queueMock
       summary: Replaces the drafter's queue, best first.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { anon: [] }]
       requestBody:
         required: true
         content:
@@ -590,7 +590,7 @@ paths:
         Our call at the drafter's turn and every player's chance of lasting to the next one, from the advisor, or
         from the engine's 200 runs when the advisor does not answer. Recorded the first time it is read and written
         with the pick.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { anon: [] }]
       responses:
         "200": { $ref: "#/components/responses/RoomCardResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -601,7 +601,7 @@ paths:
       tags: [mocks]
       operationId: mockReport
       summary: The finished draft's report, computed once and kept until an undo reopens the draft.
-      security: [{ session: [] }]
+      security: [{ session: [] }, { anon: [] }]
       responses:
         "200": { $ref: "#/components/responses/MockReportResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
@@ -740,7 +740,9 @@ paths:
       summary: >-
         Upgrades to a WebSocket. The client's first message is RoomHello with the last seq it applied (0 for none).
         The server answers RoomWelcome with every action after that seq, then sends RoomUpdate with each new batch
-        in seq order. The client sends RoomCommand to pick, queue or leave; a refused command answers RoomError.
+        in seq order. The client sends RoomCommand to pick, queue or leave; a refused command answers RoomError, and a command
+        over its budget (queue 5 a second, pick 2, leave 1) answers RoomError with code rate_limited; a socket that keeps
+        sending past it is closed.
         A reconnect sends the same hello with its last seq, loses nothing, and takes the seat back from its bot.
       security: [{ session: [] }]
       responses:
@@ -755,6 +757,14 @@ components:
       type: apiKey
       in: cookie
       name: commish_session
+    anon:
+      type: apiKey
+      in: cookie
+      name: commish_anon
+      description: >-
+        A signed-out browser's solo mocks: a random token sealed in an HttpOnly cookie on the apex domain for 90 days,
+        minted by the first POST /mocks without a session. A state-changing request echoes commish_csrf (bound to the
+        token) in X-CSRF-Token. Sign-in moves the token's mocks to the account.
 
   parameters:
     ID:
@@ -1599,7 +1609,8 @@ components:
         One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT (payload freed when a filling room gave the seat up, otherwise its stand-in drafts), SEAT_RETURNED, ROOM_STARTED
         (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, or an engine action (START_DRAFT,
         SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick,
-        pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out.
+        pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out. A
+        socket receives only its own seat's SET_QUEUE payload; another seat's arrives empty, with its seq and kind.
       required: [seq, kind, seat, payload, at]
       properties:
         seq: { type: integer, format: int64 }

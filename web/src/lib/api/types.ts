@@ -790,7 +790,7 @@ export interface paths {
 			};
 			cookie?: never;
 		};
-		/** Upgrades to a WebSocket. The client's first message is RoomHello with the last seq it applied (0 for none). The server answers RoomWelcome with every action after that seq, then sends RoomUpdate with each new batch in seq order. The client sends RoomCommand to pick, queue or leave; a refused command answers RoomError. A reconnect sends the same hello with its last seq, loses nothing, and takes the seat back from its bot. */
+		/** Upgrades to a WebSocket. The client's first message is RoomHello with the last seq it applied (0 for none). The server answers RoomWelcome with every action after that seq, then sends RoomUpdate with each new batch in seq order. The client sends RoomCommand to pick, queue or leave; a refused command answers RoomError, and a command over its budget (queue 5 a second, pick 2, leave 1) answers RoomError with code rate_limited; a socket that keeps sending past it is closed. A reconnect sends the same hello with its last seq, loses nothing, and takes the seat back from its bot. */
 		get: operations['roomSocket'];
 		put?: never;
 		post?: never;
@@ -1404,7 +1404,7 @@ export interface components {
 			/** @description queue, best first */
 			player_ids?: string[];
 		};
-		/** @description One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT, SEAT_RETURNED, ROOM_STARTED (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, or an engine action (START_DRAFT, SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick, pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out. */
+		/** @description One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT (payload freed when a filling room gave the seat up, otherwise its stand-in drafts), SEAT_RETURNED, ROOM_STARTED (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, or an engine action (START_DRAFT, SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick, pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out. A socket receives only its own seat's SET_QUEUE payload; another seat's arrives empty, with its seq and kind. */
 		RoomAction: {
 			/** Format: int64 */
 			seq: number;

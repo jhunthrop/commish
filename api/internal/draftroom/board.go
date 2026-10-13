@@ -31,9 +31,10 @@ type Boards struct {
 }
 
 type shapeKey struct {
-	raw   *boards.Raw
-	teams int
-	slots string
+	raw    *boards.Raw
+	teams  int
+	slots  string
+	ranked string
 }
 
 // maxShapes bounds the valued boards kept; past it the map starts over.
@@ -49,7 +50,7 @@ func (b *Boards) For(ctx context.Context, s apitypes.LeagueSettings) (boards.Boa
 	if err != nil {
 		return boards.Board{}, err
 	}
-	key := shapeKey{raw: raw, teams: s.Teams, slots: slotKey(slots)}
+	key := shapeKey{raw: raw, teams: s.Teams, slots: slotKey(slots), ranked: boards.RankedFor(s.Scoring)}
 	b.mu.Lock()
 	if v, ok := b.valued[key]; ok {
 		b.mu.Unlock()
@@ -57,6 +58,7 @@ func (b *Boards) For(ctx context.Context, s apitypes.LeagueSettings) (boards.Boa
 	}
 	b.mu.Unlock()
 	v, err := boards.For(raw, s.Teams, slots)
+	v.RankedFor = boards.RankedFor(s.Scoring)
 	if err != nil {
 		return boards.Board{}, fmt.Errorf("draftroom: value the board: %w", err)
 	}

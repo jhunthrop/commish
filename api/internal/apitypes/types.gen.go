@@ -1034,7 +1034,7 @@ type ReportTeam struct {
 	ValueCaptured  float64 `json:"value_captured"`
 }
 
-// RoomAction One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT (payload freed when a filling room gave the seat up, otherwise its stand-in drafts), SEAT_RETURNED, ROOM_STARTED (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, or an engine action (START_DRAFT, SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick, pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out.
+// RoomAction One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT (payload freed when a filling room gave the seat up, otherwise its stand-in drafts), SEAT_RETURNED, ROOM_STARTED (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, or an engine action (START_DRAFT, SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick, pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out. A socket receives only its own seat's SET_QUEUE payload; another seat's arrives empty, with its seq and kind.
 type RoomAction struct {
 	At      time.Time              `json:"at"`
 	Kind    string                 `json:"kind"`

@@ -86,9 +86,9 @@ func run(ctx context.Context, log *slog.Logger) error {
 	owners := &rooms.Owners{
 		Pool: pool, Store: store, Hub: hub, Instance: instanceName(cfg.Instance), Now: time.Now, Log: log,
 		Clock: &lobby.Clock{Store: store, Boards: draftBoards, Sheets: &sheets.Store{Pool: pool}},
-		Lease: rooms.DefaultLease, Renew: rooms.DefaultRenew, Sweep: rooms.DefaultSweep,
+		Lease: rooms.DefaultLease, Renew: rooms.DefaultRenew, Sweep: rooms.DefaultSweep, IdleSweep: rooms.DefaultIdleSweep,
 	}
-	socket := &rooms.Socket{Lobby: store, Hub: hub, OriginHosts: rooms.OriginHosts(cfg.HTTP.CORSOrigins), Now: time.Now, Log: log}
+	socket := &rooms.Socket{Lobby: store, Hub: hub, Adopt: owners.Adopt, OriginHosts: rooms.OriginHosts(cfg.HTTP.CORSOrigins), Now: time.Now, Log: log}
 
 	mux := http.NewServeMux()
 	routes := slices.Concat(server.Health(pool, version), socket.Routes())

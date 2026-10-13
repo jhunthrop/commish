@@ -40,16 +40,43 @@ const (
 )
 
 // Seat is one seat of a room.
+//
+// Presence: a drafter's seat is held by its sockets, on any instance.
+// Every open socket stamps LastSeen when it connects and at each ping
+// (every 10 s). A seat whose drafter has not been seen within
+// PresenceWindow (counted from JoinedAt when no socket ever arrived) is
+// gone: the room's clock marks it left and its stand-in drafts it, the
+// same as a closed tab, whether the socket never connected or the
+// instance holding it died. A socket closing marks it left at once.
 type Seat struct {
 	Number    int
 	AccountID *uuid.UUID
 	Handle    *string
 	IsBot     bool
 	LeftAt    *time.Time
+	JoinedAt  time.Time
+	LastSeen  *time.Time
 }
+
+// PresenceWindow is two pings and a margin: well inside the 30 second
+// pick clock, so a drafter who is gone is replaced before the next expiry.
+const PresenceWindow = 25 * time.Second
 
 // Person reports whether a drafter sits here now.
 func (s Seat) Person() bool { return s.AccountID != nil && !s.IsBot && s.LeftAt == nil }
+
+// Absent reports whether a seated drafter has not been seen within the
+// presence window at now.
+func (s Seat) Absent(now time.Time) bool {
+	if !s.Person() {
+		return false
+	}
+	seen := s.JoinedAt
+	if s.LastSeen != nil && s.LastSeen.After(seen) {
+		seen = *s.LastSeen
+	}
+	return now.Sub(seen) > PresenceWindow
+}
 
 // Left reports whether a drafter sat here and has gone.
 func (s Seat) Left() bool { return s.AccountID != nil && s.LeftAt != nil }
@@ -72,6 +99,9 @@ type Room struct {
 	Config  draft.Config
 	State   draft.State
 	Actions []draft.Action
+	// Odds is the odds recorded with picks, by the 1-based place of the
+	// MAKE_PICK in Actions (mock.Draft.Odds's key).
+	Odds map[int]mock.PickOdds
 }
 
 // TeamID is a seat's team in the engine: seat01 and on, as the solo room.
@@ -137,6 +167,9 @@ type enginePayload struct {
 	Action   json.RawMessage `json:"action"`
 	Pick     *PickNote       `json:"pick,omitempty"`
 	Deadline *string         `json:"deadline,omitempty"`
+	// Odds is the card the drafter on the clock saw, recorded with the
+	// pick as the solo room records it, for the report's hindsight.
+	Odds *mock.PickOdds `json:"odds,omitempty"`
 }
 
 // PickNote is a pick as the room shows it.
@@ -180,6 +213,14 @@ func (r *Room) apply(row LogRow) error {
 	// clone a write works on never share the tail.
 	n := len(r.Actions)
 	r.Actions = append(r.Actions[:n:n], a)
+	if p.Odds != nil {
+		odds := make(map[int]mock.PickOdds, len(r.Odds)+1)
+		for k, v := range r.Odds {
+			odds[k] = v
+		}
+		odds[len(r.Actions)] = *p.Odds
+		r.Odds = odds
+	}
 	return nil
 }
 

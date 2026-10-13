@@ -13,8 +13,8 @@ import (
 // the card at each turn, take a pick, read the report at the end. A pick
 // is the first legal player in the order drafters take them, the
 // card's call when it has one.
-func measureSolo(ctx context.Context, env environment, mocks int) error {
-	d, err := mint(ctx, env, handleFor("solo", 0))
+func measureSolo(ctx context.Context, env environment, mocks int, anon bool) error {
+	d, err := soloDrafter(ctx, env, anon)
 	if err != nil {
 		return err
 	}

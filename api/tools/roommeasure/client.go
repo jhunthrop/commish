@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"time"
 
 	"github.com/google/uuid"
@@ -65,6 +66,38 @@ func mint(ctx context.Context, env environment, handle string) (*drafter, error)
 
 func (d *drafter) cookie() string { return auth.SessionCookie + "=" + d.Session }
 
+// authorize puts the drafter's credentials on a request: the session
+// cookie and its CSRF token, or, signed out, the CSRF token the API set
+// in the jar beside the anonymous cookie (the jar sends the cookies).
+func (d *drafter) authorize(req *http.Request) {
+	if d.Session != "" {
+		req.Header.Set("Cookie", d.cookie())
+		req.Header.Set(auth.CSRFHeader, d.CSRF)
+		return
+	}
+	if d.http.Jar == nil {
+		return
+	}
+	for _, c := range d.http.Jar.Cookies(req.URL) {
+		if c.Name == auth.CSRFCookie {
+			req.Header.Set(auth.CSRFHeader, c.Value)
+		}
+	}
+}
+
+// soloDrafter is a signed-in drafter, or a signed-out browser with a
+// cookie jar that the first create fills.
+func soloDrafter(ctx context.Context, env environment, anon bool) (*drafter, error) {
+	if !anon {
+		return mint(ctx, env, handleFor("solo", 0))
+	}
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, err
+	}
+	return &drafter{Handle: "anonymous", api: env.API, http: &http.Client{Timeout: 30 * time.Second, Jar: jar}}, nil
+}
+
 // call is one API request; out receives the envelope's data. It answers
 // the status and the wall time of the round trip, body read included.
 func (d *drafter) call(ctx context.Context, method, path string, in, out any) (int, time.Duration, error) {
@@ -80,8 +113,7 @@ func (d *drafter) call(ctx context.Context, method, path string, in, out any) (i
 	if err != nil {
 		return 0, 0, err
 	}
-	req.Header.Set("Cookie", d.cookie())
-	req.Header.Set(auth.CSRFHeader, d.CSRF)
+	d.authorize(req)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept-Encoding", "gzip")
 	began := time.Now()

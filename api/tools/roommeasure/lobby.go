@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,15 +20,22 @@ const reconnects = 8
 
 // lobbyRun is what every drafter's goroutine shares.
 type lobbyRun struct {
-	teams   int
-	board   []string
-	leaver  int // the seat whose drafter closes the tab
-	again   int // the seat whose drafter closes and reopens
-	leaveAt int
+	teams      int
+	board      []string
+	positions  map[string]string
+	leaver     int // the seat whose drafter closes the tab
+	again      int // the seat whose drafter closes and reopens
+	leaveAt    int
+	ghost      int // the seat whose drafter joins and never connects
+	ghostLeft  time.Duration
+	ghostWorst time.Duration
+	ghostPicks int
+	began      time.Time
 
 	mu          sync.Mutex
 	started     time.Time
 	sent        map[int]time.Time
+	refusals    map[string]int
 	broadcast   []time.Duration
 	leftAt      time.Time
 	replaced    time.Duration
@@ -78,11 +87,24 @@ func measureLobby(ctx context.Context, env environment, format string, people in
 	if _, _, err := drafters[0].call(ctx, http.MethodGet, "/lobbies/"+room.String(), nil, &view); err != nil {
 		return err
 	}
-	run := &lobbyRun{teams: view.Teams, board: ids(view.Board.Players), sent: map[int]time.Time{}, standInSeen: make(chan struct{})}
+	run := &lobbyRun{teams: view.Teams, board: ids(view.Board.Players), positions: positionsOf(view.Board.Players), sent: map[int]time.Time{}, refusals: map[string]int{}, standInSeen: make(chan struct{})}
 	run.leaveAt = 2*run.teams + 1
 	run.leaver = snakeSeat(run.leaveAt+3, run.teams)
 	run.again = snakeSeat(run.leaveAt+run.teams/2, run.teams)
+	run.began = began
+	ghost := -1
+	for i := len(seats) - 1; i >= 0 && people >= 4; i-- {
+		if s := seats[i].Seat; s != run.leaver && s != run.again && i != 0 {
+			ghost, run.ghost = i, s
+			break
+		}
+	}
 	for i, d := range drafters {
+		// The ghost joined and never opens a socket: the presence rule
+		// must hand its seat to a stand-in before its clock runs out.
+		if i == ghost {
+			continue
+		}
 		run.done.Add(1)
 		go func() {
 			defer run.done.Done()
@@ -107,9 +129,16 @@ func measureLobby(ctx context.Context, env environment, format string, people in
 	line("broadcast, pick sent to every other drafter", summarize(run.broadcast))
 	fmt.Printf("%-44s %.0f ms (clock %d s)\n", "tab closed to the seat handed to a stand-in", float64(run.replaced.Microseconds())/1000, view.ClockSeconds)
 	fmt.Printf("%-44s %.0f ms after the turn began\n", "the stand-in's pick", float64(run.standIn.Microseconds())/1000)
+	if run.ghost != 0 {
+		fmt.Printf("%-44s left %.1f s after joining; %d picks by its stand-in, the slowest %.1f s into a %d s clock\n",
+			"a seat whose socket never connected", run.ghostLeft.Seconds(), run.ghostPicks, run.ghostWorst.Seconds(), view.ClockSeconds)
+	}
 	line("reconnect, dial to the welcome", summarize(run.reconnected))
 	fmt.Printf("%-44s %.0f ms (computed %d ms)\n", "report", float64(reportTook.Microseconds())/1000, report.ComputedMs)
 	fmt.Printf("%-44s %d of %d\n", "picks written to lobby_picks", written, run.teams*view.Rounds)
+	for msg, n := range run.refusals {
+		fmt.Printf("%-44s %d x %q\n", "refused commands", n, msg)
+	}
 	return nil
 }
 
@@ -124,6 +153,41 @@ func lobbyPicks(ctx context.Context, env environment, room uuid.UUID) (int, erro
 	return n, err
 }
 
+func positionsOf(players []apitypes.BoardPlayer) map[string]string {
+	out := make(map[string]string, len(players))
+	for _, p := range players {
+		out[p.Id] = string(p.Position)
+	}
+	return out
+}
+
+// mustPick reads the positions a "Your next pick must be a TE, a K or a
+// D/ST." refusal allows, nil for any other refusal.
+func mustPick(message string) map[string]bool {
+	_, list, ok := strings.Cut(message, "must be ")
+	if !ok {
+		return nil
+	}
+	out := map[string]bool{}
+	list = strings.NewReplacer(" or ", ", ", ".", "", "D/ST", "DEF").Replace(list)
+	for _, part := range strings.Split(list, ", ") {
+		out[strings.TrimPrefix(strings.TrimPrefix(part, "an "), "a ")] = true
+	}
+	return out
+}
+
+// observer is the one seat that counts the ghost's picks, so each is
+// counted once: the lowest seat that is neither the ghost, the leaver nor
+// the reconnecting drafter.
+func (run *lobbyRun) observer() int {
+	for s := 1; s <= run.teams; s++ {
+		if s != run.ghost && s != run.leaver && s != run.again {
+			return s
+		}
+	}
+	return 0
+}
+
 // play is one drafter: pick the first player left in the order drafters
 // take them whenever on the clock, measure what the run asks of this seat.
 func (run *lobbyRun) play(ctx context.Context, env environment, d *drafter, seat apitypes.LobbySeat) error {
@@ -132,7 +196,7 @@ func (run *lobbyRun) play(ctx context.Context, env environment, d *drafter, seat
 	if err != nil {
 		return err
 	}
-	st := &drafterState{seat: seat.Seat, drafted: map[string]bool{}, tried: map[int]int{}}
+	st := &drafterState{seat: seat.Seat, drafted: map[string]bool{}, tried: map[int]int{}, sentAt: map[int]int{}, allowed: map[int]map[string]bool{}, d: d, room: seat.RoomId.String()}
 	if err := run.apply(ctx, sock, st, welcome); err != nil {
 		return err
 	}
@@ -142,9 +206,26 @@ func (run *lobbyRun) play(ctx context.Context, env environment, d *drafter, seat
 			return nil
 		}
 		if f.Type == "error" {
-			st.tried[st.next]++
-			if err := run.maybePick(ctx, sock, st); err != nil {
-				return err
+			run.mu.Lock()
+			run.refusals[f.Message]++
+			// A refused pick is not a pick sent: the broadcast is timed from
+			// the command the room took.
+			delete(run.sent, st.next)
+			if run.refusals[f.Message] <= 3 {
+				fmt.Fprintf(os.Stderr, "seat %d at pick %d refused: %s\n", st.seat, st.next, f.Message)
+			}
+			run.mu.Unlock()
+			// Only a refused player (one this roster cannot take) is worth the
+			// next player; anything else waits for the room to move.
+			if strings.Contains(f.Message, "roster") || strings.Contains(f.Message, "slot") || strings.Contains(f.Message, "must be") {
+				st.tried[st.next]++
+				if allowed := mustPick(f.Message); allowed != nil {
+					st.allowed[st.next] = allowed
+					st.tried[st.next], st.sentAt[st.next] = 0, 0
+				}
+				if err := run.maybePick(ctx, sock, st); err != nil {
+					return err
+				}
 			}
 			continue
 		}
@@ -204,7 +285,12 @@ func (run *lobbyRun) closeAndReturn(ctx context.Context, d *drafter, url string,
 }
 
 type drafterState struct {
-	seat      int
+	seat int
+	// d reads the on-clock card before each pick, as the page does, so the
+	// pick records its odds.
+	d         *drafter
+	room      string
+	cardFor   int
 	seq       int64
 	next      int
 	drafting  bool
@@ -213,6 +299,8 @@ type drafterState struct {
 	reopened  int
 	drafted   map[string]bool
 	tried     map[int]int
+	sentAt    map[int]int
+	allowed   map[int]map[string]bool
 	turnBegan time.Time
 }
 
@@ -234,6 +322,13 @@ func (run *lobbyRun) apply(ctx context.Context, sock *socket, st *drafterState, 
 		case "START_DRAFT":
 			st.drafting, st.next = true, 1
 		case "SEAT_LEFT":
+			if a.Seat != nil && *a.Seat == run.ghost && run.ghost != 0 {
+				run.mu.Lock()
+				if run.ghostLeft == 0 {
+					run.ghostLeft = a.At.Sub(run.began)
+				}
+				run.mu.Unlock()
+			}
 			if a.Seat != nil && *a.Seat == run.leaver && st.seat != run.leaver {
 				run.mu.Lock()
 				if run.replaced == 0 && !run.leftAt.IsZero() {
@@ -254,6 +349,10 @@ func (run *lobbyRun) apply(ctx context.Context, sock *socket, st *drafterState, 
 			if sent, ok := run.sent[n.Pick]; ok && n.Seat != st.seat {
 				run.broadcast = append(run.broadcast, f.At.Sub(sent))
 			}
+			if n.Seat == run.ghost && st.seat == run.observer() && n.By != "drafter" {
+				run.ghostPicks++
+				run.ghostWorst = max(run.ghostWorst, a.At.Sub(st.turnBegan))
+			}
 			if n.Seat == run.leaver && n.By == "queue" && run.standIn == 0 && st.seat != run.leaver {
 				run.standIn = a.At.Sub(st.turnBegan)
 				close(run.standInSeen)
@@ -273,9 +372,18 @@ func (run *lobbyRun) maybePick(ctx context.Context, sock *socket, st *drafterSta
 	if !st.drafting || st.complete || snakeSeat(st.next, run.teams) != st.seat {
 		return nil
 	}
+	if st.cardFor != st.next {
+		st.cardFor = st.next
+		_, _, _ = st.d.call(ctx, http.MethodGet, "/lobbies/"+st.room+"/card", nil, nil)
+	}
+	// One pick command per pick and try, as a person clicks once.
+	if st.sentAt[st.next] > st.tried[st.next] {
+		return nil
+	}
+	st.sentAt[st.next] = st.tried[st.next] + 1
 	skip := st.tried[st.next]
 	for _, id := range run.board {
-		if st.drafted[id] {
+		if st.drafted[id] || (st.allowed[st.next] != nil && !st.allowed[st.next][run.positions[id]]) {
 			continue
 		}
 		if skip > 0 {

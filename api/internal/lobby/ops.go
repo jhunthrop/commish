@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -130,7 +131,7 @@ func (s *Store) takeSeat(ctx context.Context, id, account uuid.UUID, handle stri
 			return fmt.Errorf("lobby: seat %d in %s: %w", n, id, err)
 		}
 		h := handle
-		w.room.Seats[n] = Seat{Number: n, AccountID: &account, Handle: &h}
+		w.room.Seats[n] = Seat{Number: n, AccountID: &account, Handle: &h, JoinedAt: w.now}
 		seat = n
 		return w.log(KindSeatJoined, &n, map[string]string{"handle": handle})
 	})
@@ -250,7 +251,12 @@ func (s *Store) Queue(ctx context.Context, id, account uuid.UUID, ids []string) 
 		if err != nil {
 			return err
 		}
-		return w.engine(draft.NewSetQueue(w.stamp(), TeamID(n), dedupe(ids)), n, "")
+		queue := dedupe(ids)
+		// The same queue again writes nothing: no row, no broadcast.
+		if slices.Equal(queue, draft.QueueFor(w.room.State, TeamID(n))) {
+			return errNoChange
+		}
+		return w.engine(draft.NewSetQueue(w.stamp(), TeamID(n), queue), n, "")
 	})
 	return err
 }
@@ -290,7 +296,7 @@ func dedupe(ids []string) []string {
 // Filling is, per format, how many drafters sit in its filling room.
 func (s *Store) Filling(ctx context.Context) (map[apitypes.LobbyFormat]int, error) {
 	rows, err := s.Pool.Query(ctx, `select r.queue, count(st.seat) from app.rooms r
-		left join app.room_seats st on st.room_id = r.id and st.account_id is not null
+		left join app.room_seats st on st.room_id = r.id and st.account_id is not null and st.left_at is null
 		where r.status = 'filling' and r.fill_deadline > now()
 		group by r.id, r.queue, r.created_at order by r.created_at`)
 	if err != nil {

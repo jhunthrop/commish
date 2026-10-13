@@ -46,7 +46,9 @@ func NextDue(r *Room) Due {
 		if r.FillDeadline != nil {
 			at = *r.FillDeadline
 		}
-		if r.People() >= r.Format.Teams {
+		// Every seat taken: the room starts now. A seat whose drafter is gone
+		// is marked left first and drafts by its stand-in.
+		if len(r.Seats) >= r.Format.Teams {
 			at = r.CreatedAt
 		}
 		return Due{Kind: DueStart, At: at, Seq: r.Seq}
@@ -119,7 +121,7 @@ func (c *Clock) start(ctx context.Context, id uuid.UUID) error {
 			return errNoChange
 		}
 		people := r.People()
-		full := people >= r.Format.Teams
+		full := len(r.Seats) >= r.Format.Teams
 		if !full && r.FillDeadline != nil && w.now.Before(*r.FillDeadline) {
 			return errNoChange
 		}
@@ -138,7 +140,7 @@ func (c *Clock) start(ctx context.Context, id uuid.UUID) error {
 			if _, err := w.tx.Exec(ctx, `insert into app.room_seats (room_id, seat, is_bot, joined_at) values ($1, $2, true, $3)`, id, n, w.now); err != nil {
 				return fmt.Errorf("lobby: bot seat %d in %s: %w", n, id, err)
 			}
-			r.Seats[n] = Seat{Number: n, IsBot: true}
+			r.Seats[n] = Seat{Number: n, IsBot: true, JoinedAt: w.now}
 			botSeats = append(botSeats, n)
 		}
 		solo := people < SoloPaceBelow

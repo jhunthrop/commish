@@ -225,12 +225,12 @@ func (h *Handler) card(w http.ResponseWriter, r *http.Request) {
 	req := advisor.Request{State: room.State, TeamID: team, Board: board, Teams: room.Format.Teams, Seed: room.Seed}
 	var out apitypes.RoomCard
 	if onClock, ok := draft.TeamOnClock(room.State); ok && onClock == team {
-		c, err := h.Advisor.Card(r.Context(), req)
+		c, err := h.onClockCard(r.Context(), room, req)
 		if err != nil {
 			h.fail(w, r, "lobby: card", err)
 			return
 		}
-		out = draftroom.CardView(draftroom.Trim(c, room.State), room.State.PickNumber, false)
+		out = draftroom.CardView(c, room.State.PickNumber, false)
 	} else {
 		c, err := h.Engine.Conditional(r.Context(), req)
 		if err != nil {
@@ -243,8 +243,28 @@ func (h *Handler) card(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, http.StatusOK, out)
 }
 
-// report is the finished room's report for the caller's seat. A lobby
-// records no odds with its picks, so the hindsight is the engine's.
+// onClockCard is the card for the seat on the clock, computed once and
+// stored, so the pick that follows records the odds this drafter saw.
+func (h *Handler) onClockCard(ctx context.Context, room *Room, req advisor.Request) (advisor.Card, error) {
+	pick := room.State.PickNumber
+	if c, ok, err := h.Store.Card(ctx, room.ID, pick); err != nil || ok {
+		return c, err
+	}
+	c, err := h.Advisor.Card(ctx, req)
+	if err != nil {
+		return advisor.Card{}, err
+	}
+	if err := h.Store.PutCard(ctx, room.ID, pick, draftroom.Trim(c, room.State)); err != nil {
+		return advisor.Card{}, err
+	}
+	// Two tabs asking at once: the first card written is the one both see.
+	stored, _, err := h.Store.Card(ctx, room.ID, pick)
+	return stored, err
+}
+
+// report is the finished room's report for the caller's seat. Its
+// hindsight reads the odds each pick recorded (the on-clock card); a
+// pick made with no card read falls back to the engine's runs.
 func (h *Handler) report(w http.ResponseWriter, r *http.Request) {
 	room, seat, err := h.seated(r.Context(), r)
 	if err != nil {
@@ -268,7 +288,7 @@ func (h *Handler) report(w http.ResponseWriter, r *http.Request) {
 	out, err := draftroom.Report(r.Context(), draftroom.ReportInput{
 		Settings: mock.Settings{League: room.Settings, Pool: board.Pool(), StartedAt: room.Config.KickoffAt},
 		Seed:     room.Seed, Board: board, Odds: h.Hindsight, Runs: sim.RoomOddsRuns, Workers: h.Workers,
-		Draft: mock.Draft{Config: room.Config, Actions: room.Actions, State: room.State, HumanTeamID: TeamID(seat), Slot: seat},
+		Draft: mock.Draft{Config: room.Config, Actions: room.Actions, State: room.State, HumanTeamID: TeamID(seat), Slot: seat, Odds: room.Odds},
 	})
 	if err != nil {
 		h.fail(w, r, "lobby: report", err)

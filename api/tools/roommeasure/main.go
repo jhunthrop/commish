@@ -36,8 +36,9 @@ func main() {
 	switch os.Args[1] {
 	case "solo":
 		mocks := fs.Int("mocks", 20, "mocks to draft start to finish")
+		anon := fs.Bool("anon", false, "draft signed out, under an anonymous browser token")
 		_ = fs.Parse(os.Args[2:])
-		err = measureSolo(ctx, env, *mocks)
+		err = measureSolo(ctx, env, *mocks, *anon)
 	case "lobby":
 		format := fs.String("format", "12_ppr", "the lobby format")
 		people := fs.Int("people", 12, "drafters to seat")
