@@ -9,13 +9,13 @@ moments see them as the archive did.
 
 | What the store lost | Seasons | Ingest |
 |---|---|---|
-| schedule, kickoffs, results, points allowed | 2018-2023 | `ingest_schedule`, `ingest_game_results`, `ingest_points_allowed` |
-| box scores, snap counts (`player_week_observations`) | 2018-2022 | `ingest_season`; 2019, which nflverse never published weekly stats for (`STAT_LINE_GAPS`), from play-by-play (`ingest_derived_stat_lines`) |
-| player teams (`player_week_teams`) | 2018-2023 | `ingest_season` |
-| play-by-play touches and team context, coaches, opponent adjustment | 2018-2023 | `ingest_play_by_play`, `ingest_coaches`, `ingest_opponent_defence` |
-| injury filings | 2018-2022 | `ingest_injury_reports` |
-| depth charts | 2018-2022 | `ingest_depth_charts` |
-| week-one rosters (`preseason_rosters`) | 2021-2024 | `ingest_week1_rosters` |
+| schedule, kickoffs, results, points allowed | 2003-2023 | `ingest_schedule`, `ingest_game_results`, `ingest_points_allowed` |
+| box scores, snap counts (`player_week_observations`) | 2003-2022 (snap counts from 2012, nflverse's first) | `ingest_season`; 2019, which nflverse never published weekly stats for (`STAT_LINE_GAPS`), from play-by-play (`ingest_derived_stat_lines`) |
+| player teams (`player_week_teams`) | 2003-2023 | `ingest_season` |
+| play-by-play touches and team context, coaches, opponent adjustment | 2003-2023 | `ingest_play_by_play`, `ingest_coaches`, `ingest_opponent_defence` |
+| injury filings | 2009-2022 (nflverse's first is 2009) | `ingest_injury_reports` |
+| depth charts | 2003-2022 | `ingest_depth_charts` |
+| week-one rosters (`preseason_rosters`) | 2003-2024 | `ingest_week1_rosters` |
 
 The schedule goes first: a week-one roster's stamp and a season's week stamps are read from it. Each
 step commits on its own (the rebuild is a re-runnable operator ingest; every write is idempotent), so
@@ -35,11 +35,17 @@ from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.stat_lines import STAT_LINE_GAPS
 from research.pipeline.preseason.ingest import ingest_depth_charts, ingest_week1_rosters
 
-SCHEDULE_SEASONS: Final = tuple(range(2018, 2024))
-OBSERVATION_SEASONS: Final = tuple(range(2018, 2023))
-PLAYER_TEAM_SEASONS: Final = tuple(range(2018, 2024))
-CONTEXT_SEASONS: Final = tuple(range(2018, 2024))
-ROSTER_SEASONS: Final = tuple(range(2021, 2025))
+# The seasons each table needs for every fit phase B carries as constants (`research/README.md`,
+# "Unported fits"; `model/fit_inputs.py` checks them): the laws and the rookie curves reach back to
+# 2003, the blend and the market curves to 2013, the kicker and defense priors to 2013. nflverse's
+# injury filings start in 2009, so that is as far back as they go.
+FIRST_SEASON: Final = 2003
+SCHEDULE_SEASONS: Final = tuple(range(FIRST_SEASON, 2024))
+OBSERVATION_SEASONS: Final = tuple(range(FIRST_SEASON, 2023))
+PLAYER_TEAM_SEASONS: Final = tuple(range(FIRST_SEASON, 2024))
+CONTEXT_SEASONS: Final = tuple(range(FIRST_SEASON, 2024))
+INJURY_SEASONS: Final = tuple(range(2009, 2023))
+ROSTER_SEASONS: Final = tuple(range(FIRST_SEASON, 2025))
 
 # The tables the rebuild writes, and the season column each is counted by.
 COUNTED_TABLES: Final = (
@@ -87,9 +93,25 @@ def season_counts(conn: Connection, seasons: Sequence[int]) -> dict[tuple[str, i
     return counts
 
 
-def rebuild_history(conn: Connection, fetcher: Fetcher, now: datetime, checkpoint: Callable[[], None]) -> HistoryReport:
-    """Every step in the table's order, committing after each."""
-    seasons = sorted({*SCHEDULE_SEASONS, *OBSERVATION_SEASONS, *ROSTER_SEASONS})
+def _within(seasons: tuple[int, ...], window: range | None) -> list[int]:
+    return [s for s in seasons if window is None or s in window]
+
+
+def rebuild_history(
+    conn: Connection, fetcher: Fetcher, now: datetime, checkpoint: Callable[[], None], window: range | None = None
+) -> HistoryReport:
+    """Every step in the table's order, committing after each; `window` limits it to those seasons."""
+    schedule, teams, context_seasons = (
+        _within(SCHEDULE_SEASONS, window),
+        _within(PLAYER_TEAM_SEASONS, window),
+        _within(CONTEXT_SEASONS, window),
+    )
+    observations, injuries, rosters = (
+        _within(OBSERVATION_SEASONS, window),
+        _within(INJURY_SEASONS, window),
+        _within(ROSTER_SEASONS, window),
+    )
+    seasons = sorted({*schedule, *teams, *rosters})
     before = season_counts(conn, seasons)
     report = HistoryReport()
     client = NflverseClient(fetcher)
@@ -101,35 +123,35 @@ def rebuild_history(conn: Connection, fetcher: Fetcher, now: datetime, checkpoin
     universe = ingest.ingest_player_universe(conn, client)
     step("universe: refreshed")
     written = sum(
-        writer(conn, client, SCHEDULE_SEASONS)
+        writer(conn, client, schedule)
         for writer in (
             ingest_schedule.ingest_schedule,
             ingest_schedule.ingest_game_results,
             ingest_schedule.ingest_points_allowed,
         )
     )
-    step(f"schedule {SCHEDULE_SEASONS[0]}-{SCHEDULE_SEASONS[-1]}: {written} team-week observations")
-    as_of = ingest.schedule_week_as_of(client, list(PLAYER_TEAM_SEASONS))
-    for season in PLAYER_TEAM_SEASONS:
+    step(f"schedule {schedule[0]}-{schedule[-1]}: {written} team-week observations" if schedule else "schedule: none")
+    as_of = ingest.schedule_week_as_of(client, teams)
+    for season in teams:
         result = ingest.ingest_season(conn, client, universe, season, as_of.get(season))
         step(
             f"season {season}: {result.observations_written} observations, {result.player_team_edges} player-team edges"
         )
-    for season in (s for s in OBSERVATION_SEASONS if s in STAT_LINE_GAPS):
+    for season in (s for s in observations if s in STAT_LINE_GAPS):
         derived = derived_stat_lines.ingest_derived_stat_lines(conn, client, season)
         step(f"derived stat lines {season}: {derived.stat_lines} lines, {derived.observations_written} observations")
-    for season in CONTEXT_SEASONS:
+    for season in context_seasons:
         pbp = context.ingest_play_by_play(conn, client, season)
         step(f"play-by-play {season}: {pbp.plays_read} plays, {pbp.observations_written} observations")
-    step(f"coaches: {context.ingest_coaches(conn, client, list(CONTEXT_SEASONS))} observations")
-    step(f"opponent adjustment: {context.ingest_opponent_defence(conn, client, list(CONTEXT_SEASONS))} observations")
-    filings = injury_reports.ingest_injury_reports(conn, client, list(OBSERVATION_SEASONS))
+    step(f"coaches: {context.ingest_coaches(conn, client, context_seasons)} observations")
+    step(f"opponent adjustment: {context.ingest_opponent_defence(conn, client, context_seasons)} observations")
+    filings = injury_reports.ingest_injury_reports(conn, client, injuries)
     step(f"injury filings: {sum(r.observations_written for r in filings)} observations")
-    for season in OBSERVATION_SEASONS:
+    for season in observations:
         step(f"depth chart {season}: {ingest_depth_charts(conn, client, season, now)} observations")
-    for season in ROSTER_SEASONS:
-        rosters = ingest_week1_rosters(conn, client, season, now)
-        step(f"week-one rosters {season}: {rosters.written} written of {rosters.entries_read} read")
+    for season in rosters:
+        roster = ingest_week1_rosters(conn, client, season, now)
+        step(f"week-one rosters {season}: {roster.written} written of {roster.entries_read} read")
     after = season_counts(conn, seasons)
     report.counts = [
         TableCount(table, season, before.get((table, season), 0), after.get((table, season), 0))
