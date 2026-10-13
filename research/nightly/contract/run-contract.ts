@@ -4,7 +4,8 @@
 // parses it with (`web/src/lib/run/schema.ts`, copied from the repository into the research image at
 // build), then the cross-file checks the build makes (`web/src/lib/server/run.ts`: the manifest names
 // its own run, the index matches the manifest, ids and slugs are unique, every format has its board,
-// every index entry has its page). A run this refuses is one the web build would refuse.
+// every index entry has its page, each page's log runs the schedule's weeks and its season is the
+// index's two numbers for him, and the rules across season blocks, `season-checks.ts`). A run this refuses is one the web build would refuse.
 //
 //   node --experimental-strip-types run-contract.ts <web dir> <runs root> <run id>
 //
@@ -22,6 +23,7 @@ if (!webDir || !root || !runId) {
 const lib = (path: string): string => pathToFileURL(resolve(webDir, 'src/lib/run', path)).href;
 const schema = await import(lib('schema.ts'));
 const { openRun } = await import(lib('source.ts'));
+const { checkRunSeasons } = await import(lib('season-checks.ts'));
 const run = await openRun({ runId, location: { kind: 'directory', path: resolve(root) } });
 
 const refusals: string[] = [];
@@ -41,6 +43,15 @@ async function read<T>(path: string, parser: unknown): Promise<T | null> {
 interface Entry {
 	id: string;
 	slug: string;
+	season: { games: number; pointsPerGame: number | null };
+}
+interface Page {
+	id: string;
+	team: string;
+	season: { weeks: number; games: number; pointsPerGame: number | null };
+}
+interface Slates {
+	slates: { games: { week: number }[] }[];
 }
 interface Format {
 	id: string;
@@ -66,17 +77,37 @@ for (const format of manifest?.formats ?? []) {
 	if (board && board.format !== format.id) refuse(`boards/${format.id}.json`, `says it is the ${board.format} board`);
 	rows += board?.rows.length ?? 0;
 }
-let pages = 0;
+const players: Page[] = [];
 for (const entry of index ?? []) {
-	if (await read(schema.RUN_PATHS.player(entry.id), schema.playerSchema)) pages += 1;
+	const page = await read<Page>(schema.RUN_PATHS.player(entry.id), schema.playerSchema);
+	if (!page) continue;
+	players.push(page);
+	const { games, pointsPerGame } = page.season;
+	if (entry.season.games !== games || entry.season.pointsPerGame !== pointsPerGame) {
+		refuse('index.json', `the season for ${entry.id} is not his file's: ${games} games`);
+	}
 }
+const pages = players.length;
 for (const [path, parser] of [
 	[schema.RUN_PATHS.adp, schema.adpSchema],
 	[schema.RUN_PATHS.record, schema.recordSchema],
-	[schema.RUN_PATHS.clubs, schema.clubsSchema],
-	[schema.RUN_PATHS.schedule, schema.scheduleSchema]
+	[schema.RUN_PATHS.clubs, schema.clubsSchema]
 ] as const) {
 	await read(path, parser);
+}
+const slate = await read<Slates>(schema.RUN_PATHS.schedule, schema.scheduleSchema);
+if (slate) {
+	const weeks = Math.max(...slate.slates.flatMap((s) => s.games.map((game) => game.week)));
+	for (const page of players) {
+		if (page.season.weeks !== weeks) {
+			refuse(`players/${page.id}.json`, `logs ${page.season.weeks} weeks, the schedule runs ${weeks}`);
+		}
+	}
+	try {
+		checkRunSeasons(players, slate);
+	} catch (error) {
+		refuse('players', error instanceof Error ? error.message : String(error));
+	}
 }
 for (const line of refusals) process.stdout.write(`${line}\n`);
 process.stdout.write(
