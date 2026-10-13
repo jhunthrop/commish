@@ -27,7 +27,7 @@
 {:else}
 	<a class="on" href={sheetHref} aria-label="{name} is {ordinal(place)} on your sheet">
 		<span class="disc"><Icon name="check" size={16} /></span>
-		<Place {place} />
+		<Place {place} ordinal />
 	</a>
 {/if}
 

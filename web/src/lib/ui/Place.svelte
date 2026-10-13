@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ordinal } from '#lib/format/number.ts';
 	/**
 	 * A player's place on your sheet: quiet, in the number face, after the person. It is never
 	 * printed inside a position pill, which carries our board's rank on every page. It carries no
@@ -7,12 +8,14 @@
 	 */
 	interface Props {
 		place: number;
+		/** Print it as a place, "2nd", where it stands alone beside a mark rather than in an ordered list. */
+		ordinal?: boolean;
 	}
 
-	let { place }: Props = $props();
+	let { place, ordinal: asOrdinal = false }: Props = $props();
 </script>
 
-<span class="place">{place}</span>
+<span class="place">{asOrdinal ? ordinal(place) : place}</span>
 
 <style>
 	.place {
