@@ -57,12 +57,16 @@
 	function hindsight(pick: Pick): { tone: Tone; text: string } {
 		if (pick.made_by !== 'you') return { tone: 'even', text: MADE_FOR[whose][pick.made_by] };
 		const odds = pick.still_there;
-		if (odds === null) return { tone: 'even', text: 'last pick' };
+		// No chance recorded: at the last pick there is no next turn, anywhere else the player was
+		// deeper than the odds the room computed.
+		if (odds === null)
+			return { tone: 'even', text: pick.pick === lastPick ? 'last pick' : 'not in the odds' };
 		if (odds >= couldWaitFrom)
 			return { tone: 'loss', text: `could wait, ${oddsShort(odds)} there next turn` };
 		return { tone: 'gain', text: `right on time, ${oddsShort(odds)} there next turn` };
 	}
 
+	const lastPick = $derived(picks.at(-1)?.pick ?? null);
 	const fellBack = $derived(picks.some((p) => p.odds_source.startsWith('fallback')));
 	const madeFor = $derived(picks.filter((p) => p.made_by !== 'you').length);
 </script>

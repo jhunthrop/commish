@@ -183,6 +183,11 @@ func reviewOne(ctx context.Context, in ReportInput, keepers sim.Keepers, before 
 		return r, nil
 	}
 	odds, recorded := in.Draft.Odds[seq]
+	// A recorded card covers the players nearest the top of the pool; a pick from deeper than that
+	// has no chance in it, so his hindsight is computed the way an unrecorded pick's is.
+	if _, covered := odds.StillThere[playerID]; recorded && !covered {
+		recorded = false
+	}
 	if !recorded {
 		if in.Odds == nil {
 			return r, nil
