@@ -26,6 +26,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/exports"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leagues"
+	"github.com/jhunthrop/commish/api/internal/leaguesync"
 	"github.com/jhunthrop/commish/api/internal/metrics"
 	"github.com/jhunthrop/commish/api/internal/mocks"
 	"github.com/jhunthrop/commish/api/internal/names"
@@ -103,7 +104,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	if err != nil {
 		return nil, err
 	}
-	viewer := &account.Viewer{Entitlements: ents, Now: now}
+	viewer := &account.Viewer{Entitlements: ents, Leagues: &leaguesync.Store{Pool: pool}, Now: now}
 	gate := &leagues.Gate{Entitlements: ents, Now: now, Log: log}
 	leagueStore := &leagues.Store{Pool: pool}
 	sheetStore := &sheets.Store{Pool: pool}
@@ -153,6 +154,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		solo.Routes(),
 		lobbies.Routes(),
 		companions.Routes(),
+		leagueSyncService(cfg, pool, draftBoards, leagueStore, log).Routes(),
 		devRoutes,
 	)
 	mux := http.NewServeMux()

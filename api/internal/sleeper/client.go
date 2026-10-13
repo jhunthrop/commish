@@ -66,13 +66,19 @@ func New() *Client {
 // get reads one path into out. A JSON null body (Sleeper's answer for an
 // unknown id) is ErrNotFound.
 func (c *Client) get(ctx context.Context, path string, limit int64, out any) error {
+	return c.getWith(ctx, c.HTTP, path, limit, out)
+}
+
+// getWith is get through a given HTTP client, for a read with a longer
+// timeout.
+func (c *Client) getWith(ctx context.Context, hc *http.Client, path string, limit int64, out any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+path, nil)
 	if err != nil {
 		return fmt.Errorf("sleeper: request: %w", err)
 	}
 	req.Header.Set("User-Agent", UserAgent)
 	req.Header.Set("Accept", "application/json")
-	resp, err := c.HTTP.Do(req)
+	resp, err := hc.Do(req)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrUnavailable, err)
 	}

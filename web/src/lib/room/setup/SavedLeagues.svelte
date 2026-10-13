@@ -3,14 +3,17 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import type { League } from '../api.ts';
 	import { lineupWords } from '../words.ts';
+	import { rerunOf } from './scoring.ts';
 
 	interface Props {
 		leagues: readonly League[];
 		busy: boolean;
+		/** The account drafts a league's own scoring rules (the Draft Pass's custom_scoring). */
+		exactRules: boolean;
 		onmock: (league: League) => void;
 	}
 
-	let { leagues, busy, onmock }: Props = $props();
+	let { leagues, busy, exactRules, onmock }: Props = $props();
 </script>
 
 {#if leagues.length > 0}
@@ -19,6 +22,7 @@
 		<ul>
 			{#each leagues as league (league.id)}
 				{@const lineup = lineupWords(league.settings)}
+				{@const rerun = rerunOf(league.settings, exactRules)}
 				<li>
 					<div>
 						<b>{league.name}</b>
@@ -27,6 +31,7 @@
 								? 'random slot'
 								: `slot ${league.settings.slot}`}{lineup ? ` · ${lineup}` : ''}</span
 						>
+						{#if rerun.line}<span class="line">{rerun.line}</span>{/if}
 					</div>
 					<Quiet size="sm" disabled={busy} onclick={() => onmock(league)}>Mock</Quiet>
 				</li>
@@ -36,6 +41,12 @@
 {/if}
 
 <style>
+	.line {
+		display: block;
+		font-size: var(--t-xs);
+		color: var(--ink-3);
+	}
+
 	h3 {
 		margin: 0 0 var(--s-3);
 		font-size: var(--t-md);

@@ -24,6 +24,11 @@ const (
 	RangeOfOutcomes  = apitypes.FeatureRangeOfOutcomes
 	SyncedSheet      = apitypes.FeatureSyncedSheet
 	EarlyRun         = apitypes.FeatureEarlyRun
+	// The in-season tier (spec §2.9), granted by the Membership. Data
+	// only until their tools ship (Lane 13): nothing checks them yet.
+	StartSit    = apitypes.FeatureStartSit
+	WaiverRanks = apitypes.FeatureWaiverRanks
+	TradeFinder = apitypes.FeatureTradeFinder
 )
 
 // Product is what a row grants. app.product_features maps it to

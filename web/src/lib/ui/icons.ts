@@ -24,6 +24,7 @@ export const ICONS = {
 		{ tag: 'circle', cx: 12, cy: 12, r: 9 },
 		{ tag: 'path', d: 'M12 7v5l3 2' }
 	],
+	league: [{ tag: 'path', d: 'M5 21V4M5 4h13l-3 4.5L18 13H5' }],
 	record: [{ tag: 'path', d: 'M4 20V10M10 20V4M16 20v-7M22 20H2' }],
 	account: [
 		{ tag: 'circle', cx: 12, cy: 12, r: 9 },

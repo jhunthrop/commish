@@ -60,7 +60,7 @@ func buildIndex(raw *boards.Raw) nameIndex {
 			continue
 		}
 		put(idx.exact, string(p.Position)+"|"+p.Name, p.ID)
-		put(idx.folded, string(p.Position)+"|"+fold(p.Name), p.ID)
+		put(idx.folded, string(p.Position)+"|"+FoldName(p.Name), p.ID)
 	}
 	return idx
 }
@@ -86,7 +86,7 @@ func (m *NameMatcher) Match(raw *boards.Raw, p sleeper.Pick) (string, string, bo
 	if id := idx.exact[string(pos)+"|"+p.Name]; id != ambiguous {
 		return id, MatchExact, true
 	}
-	id := idx.folded[string(pos)+"|"+fold(p.Name)]
+	id := idx.folded[string(pos)+"|"+FoldName(p.Name)]
 	return id, MatchNormalized, id != ambiguous
 }
 
@@ -100,9 +100,9 @@ func suffixes() map[string]bool {
 	return map[string]bool{"jr": true, "sr": true, "ii": true, "iii": true, "iv": true, "v": true}
 }
 
-// fold is a name with case, punctuation and a trailing generational
+// FoldName is a name with case, punctuation and a trailing generational
 // suffix taken off: "D.J. Moore Jr." reads "dj moore".
-func fold(name string) string {
+func FoldName(name string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(name) {
 		switch {

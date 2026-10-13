@@ -1,0 +1,152 @@
+// Package leaguesync attaches a drafter's own league on another host and
+// keeps it fresh (spec §2.9, lane 1 of the in-season tools): rosters,
+// standings, the week's matchup, recent moves, the league's scoring as a
+// saved league's custom rules, and the unrostered pool on our board.
+//
+// Two hosts sit behind one Host interface and one polling discipline:
+// Sleeper (public by league id) and MyFantasyLeague (public leagues by
+// season and id). A league is read upstream at most once a minute per
+// process whatever the viewer count, the last good read is kept per host
+// league and answered with how stale it is when the host fails, and
+// nothing a caller sends reaches the host but an id this package parsed.
+package leaguesync
+
+import (
+	"errors"
+	"fmt"
+	"time"
+)
+
+// Host keys, as the contract (openapi.yaml LeagueHost) spells them.
+const (
+	HostSleeper = "sleeper"
+	HostMFL     = "mfl"
+)
+
+// Ref names one league on one host. Season is part of the name on
+// MyFantasyLeague, where a league keeps its id from season to season, and
+// 0 on Sleeper, where a league has a new id each season.
+type Ref struct {
+	Host     string `json:"host"`
+	LeagueID string `json:"league_id"`
+	Season   int    `json:"season"`
+}
+
+// Key is the poller's and the store's key for the league.
+func (r Ref) Key() string { return fmt.Sprintf("%s/%d/%s", r.Host, r.Season, r.LeagueID) }
+
+// Snapshot is a league as one read found it, the same shape for every
+// host. It is persisted whole per host league (app.league_snapshots).
+type Snapshot struct {
+	Ref    Ref    `json:"ref"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	// Season is the league's season, 0 when the host does not say.
+	Season int `json:"season"`
+	// Week is the host's current week for this league's season, 0 when
+	// the season has no current week (before it starts, or a past season).
+	Week     int       `json:"week"`
+	Teams    []Team    `json:"teams"`
+	Matchups []Side    `json:"matchups"`
+	Moves    []Move    `json:"moves"`
+	Scoring  Scoring   `json:"scoring"`
+	Shape    Shape     `json:"shape"`
+	ReadAt   time.Time `json:"read_at"`
+}
+
+// Team is one roster in the league.
+type Team struct {
+	RosterID int    `json:"roster_id"`
+	Name     string `json:"name"`
+	Owner    string `json:"owner"`
+	// OwnerIDs are the host's user ids that run the team, for finding a
+	// drafter's seat by username (Sleeper only).
+	OwnerIDs  []string `json:"owner_ids"`
+	Players   []string `json:"players"`
+	Starters  []string `json:"starters"`
+	Reserve   []string `json:"reserve"`
+	Taxi      []string `json:"taxi"`
+	Wins      int      `json:"wins"`
+	Losses    int      `json:"losses"`
+	Ties      int      `json:"ties"`
+	PointsFor float64  `json:"points_for"`
+}
+
+// Side is one team's side of the week's matchup.
+type Side struct {
+	RosterID int `json:"roster_id"`
+	// Game pairs two sides; sides with the same Game play each other. 0
+	// is a team with no opponent this week.
+	Game         int                `json:"game"`
+	Points       float64            `json:"points"`
+	Starters     []string           `json:"starters"`
+	PlayerPoints map[string]float64 `json:"player_points"`
+}
+
+// Move kinds, the same for every host.
+const (
+	MoveAdd    = "add"
+	MoveWaiver = "waiver"
+	MoveTrade  = "trade"
+)
+
+// Move is one completed roster move.
+type Move struct {
+	Kind      string         `json:"kind"`
+	RosterIDs []int          `json:"roster_ids"`
+	Adds      map[string]int `json:"adds"`
+	Drops     map[string]int `json:"drops"`
+	At        time.Time      `json:"at"`
+}
+
+// Scoring is the league's points per stat as ScoringRules (rules.go),
+// every host rule that does not land there in the host's own words, and
+// every rule key the host does not state, at the standard figure.
+type Scoring struct {
+	Rules     map[string]float64 `json:"rules"`
+	Dropped   []string           `json:"dropped"`
+	Defaulted []string           `json:"defaulted"`
+}
+
+// Shape is the league's starting lineup and bench, by our slot names.
+type Shape struct {
+	Teams     int `json:"teams"`
+	QB        int `json:"qb"`
+	RB        int `json:"rb"`
+	WR        int `json:"wr"`
+	TE        int `json:"te"`
+	K         int `json:"k"`
+	DEF       int `json:"def"`
+	Flex      int `json:"flex"`
+	SuperFlex int `json:"super_flex"`
+	Bench     int `json:"bench"`
+	// Unfollowed names the slots a mock room cannot draft (a defensive
+	// player, a receiver-only flex), empty when every slot is followed.
+	Unfollowed []string `json:"unfollowed"`
+}
+
+// TeamByRoster is the team with the roster id, and whether there is one.
+func (s Snapshot) TeamByRoster(id int) (Team, bool) {
+	for _, t := range s.Teams {
+		if t.RosterID == id {
+			return t, true
+		}
+	}
+	return Team{}, false
+}
+
+// Errors a caller tells apart.
+var (
+	// ErrNotALink is pasted text that names no league on a host we follow.
+	ErrNotALink = errors.New("leaguesync: not a league link")
+	// ErrNotFound is a league the host does not know.
+	ErrNotFound = errors.New("leaguesync: no such league")
+	// ErrPrivate is a league that answers only to its own members.
+	ErrPrivate = errors.New("leaguesync: private league")
+	// ErrUnavailable is the host failing, with no earlier read to answer.
+	ErrUnavailable = errors.New("leaguesync: host unavailable")
+	// ErrNoSeat is a username or roster the league does not hold.
+	ErrNoSeat = errors.New("leaguesync: not in this league")
+	// ErrSeatByName is a host that cannot find a seat by username.
+	ErrSeatByName = errors.New("leaguesync: host has no usernames")
+)

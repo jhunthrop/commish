@@ -75,6 +75,12 @@ type League struct {
 	Name            string
 	Scoring         map[string]float64
 	RosterPositions []string
+	// Season is the league's season ("2026" on the host), 0 when absent.
+	Season int
+	// Status is pre_draft, drafting, in_season or complete.
+	Status string
+	// TotalRosters is the league's team count.
+	TotalRosters int
 }
 
 type wireDraft struct {
@@ -220,7 +226,24 @@ type wireLeague struct {
 	Name            string             `json:"name"`
 	ScoringSettings map[string]float64 `json:"scoring_settings"`
 	RosterPositions []string           `json:"roster_positions"`
+	Season          string             `json:"season"`
+	Status          string             `json:"status"`
+	TotalRosters    int                `json:"total_rosters"`
 }
+
+// League states as Sleeper names them.
+const (
+	LeaguePreDraft = "pre_draft"
+	LeagueDrafting = "drafting"
+	LeagueInSeason = "in_season"
+	LeagueComplete = "complete"
+)
+
+// Seasons a league may name.
+const (
+	minSeason = 2000
+	maxSeason = 2100
+)
 
 func (w wireLeague) validate(id string) (League, error) {
 	if w.LeagueID != id {
@@ -229,9 +252,28 @@ func (w wireLeague) validate(id string) (League, error) {
 	if len(w.ScoringSettings) > maxScoring || len(w.RosterPositions) > maxPosition {
 		return League{}, malformed("%d scoring settings, %d roster positions", len(w.ScoringSettings), len(w.RosterPositions))
 	}
-	name := w.Name
-	if utf8.RuneCountInString(name) > maxNameLen {
-		name = ""
+	for _, p := range w.RosterPositions {
+		if len(p) == 0 || len(p) > maxTextLen {
+			return League{}, malformed("roster position %q", p)
+		}
 	}
-	return League{ID: id, Name: name, Scoring: w.ScoringSettings, RosterPositions: w.RosterPositions}, nil
+	l := League{ID: id, Name: cleanText(w.Name, maxNameLen), Scoring: w.ScoringSettings, RosterPositions: w.RosterPositions, TotalRosters: w.TotalRosters}
+	if w.TotalRosters < 0 || w.TotalRosters > maxTeams {
+		return League{}, malformed("%d rosters", w.TotalRosters)
+	}
+	if w.Season != "" {
+		n, err := strconv.Atoi(w.Season)
+		if err != nil || n < minSeason || n > maxSeason {
+			return League{}, malformed("season %q", w.Season)
+		}
+		l.Season = n
+	}
+	switch w.Status {
+	case "", LeaguePreDraft, LeagueDrafting, LeagueInSeason, LeagueComplete:
+		l.Status = w.Status
+	default:
+		// A state the host adds later is kept out rather than trusted.
+		l.Status = ""
+	}
+	return l, nil
 }
