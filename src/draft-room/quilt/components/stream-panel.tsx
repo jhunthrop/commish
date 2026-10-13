@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessageView } from "@/chat/contract";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { ChatComposer } from "@/chat-room/components/chat-composer";

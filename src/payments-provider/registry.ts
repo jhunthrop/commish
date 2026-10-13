@@ -1,5 +1,5 @@
-import type { Clock } from "@/domain/timing";
-import { envOr } from "@/lib/env";
+import type { Clock } from "@research-ts/domain/timing";
+import { envOr } from "@research-ts/lib/env";
 import { isPaymentsProviderName, PAYMENTS_PROVIDER_CONFIG, type PaymentsProviderName } from "./config";
 import type { PaymentsProvider } from "./contract";
 import { createMockPaymentsProvider } from "./mock/mock-payments-provider";

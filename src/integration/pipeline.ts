@@ -1,6 +1,6 @@
-import type { Db } from "@/db/client";
-import { players, playerStatLines } from "@/db/schema";
-import { DRAFT_ACTION_VERSION } from "@/domain/draft";
+import type { Db } from "@research-ts/db/client";
+import { players, playerStatLines } from "@research-ts/db/schema";
+import { DRAFT_ACTION_VERSION } from "@research-ts/domain/draft";
 import type { DraftFormat } from "@/domain/league";
 import { AUCTION_CONFIG, currentDeadline } from "@/draft-engine";
 import { createDraftStore, type DraftStore } from "@/draft-service/store";

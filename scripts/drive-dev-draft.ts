@@ -4,7 +4,7 @@
 // "Never in production" is enforced, not asserted: `assertLocalSeedTarget` refuses unless the
 // operator opted in AND `DATABASE_URL` is loopback. This script applies up to 200 real
 // `MAKE_PICK` actions to a real draft — the hardcoded ids are not a guard.
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { assertLocalSeedTarget } from "@/data/seed/guard";
 import { createDraftStore } from "@/draft-service/store";
 import { getPublisher } from "@/lib/realtime/publisher";

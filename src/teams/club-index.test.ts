@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NFL_TEAM_ABBREVIATIONS } from "@/projections/capture-feeds";
+import { NFL_TEAM_ABBREVIATIONS } from "@research-ts/projections/capture-feeds";
 import { clubIndex } from "./club-index";
 import { resolveTeamRoute } from "./route";
 

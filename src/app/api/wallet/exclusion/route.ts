@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
 import { fail, ok, parseJson, parseQuery } from "@/lib/api/respond";
 import { clearSelfExclusion, exclusionPreview, setSelfExclusion } from "@/money-service/exclusion";

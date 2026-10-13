@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
 import { auctionOf, initialDraftState, rosterFor, totalRosterSlots, type DraftConfig } from "./state";
 import { DRAFT_CLOCK_SCHEDULE } from "./config";
 

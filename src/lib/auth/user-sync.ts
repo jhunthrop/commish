@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { users } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import type { User } from "@/domain/user";
 import { isProviderPlaceholder } from "@/identity/avatars";
 import { stripHiddenCharacters } from "@/identity/display-name";

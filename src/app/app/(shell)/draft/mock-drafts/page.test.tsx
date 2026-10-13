@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
-vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research-ts/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/mock-draft-service/creation", () => ({ createMockRoom: vi.fn() }));
 vi.mock("@/mock-draft-service/lobby", () => ({ listOpenMockRooms: vi.fn(), myMockRooms: vi.fn() }));
 vi.mock("@/mock-draft-service/debrief", () => ({ completedMockDebriefs: vi.fn() }));

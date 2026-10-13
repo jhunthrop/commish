@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { auditEvents, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import type { Clock } from "@/domain/timing";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import type { Clock } from "@research-ts/domain/timing";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { MONEY_REFUSALS } from "@/money/config";
 import { MONEY_STATES, type MoneyStatesConfig } from "@/money/states";

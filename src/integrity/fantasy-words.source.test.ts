@@ -49,13 +49,13 @@ const EXCLUDED_COMPONENT_DIRS: Readonly<Record<string, string>> = {
  * allowlisted literal in any of them is an identifier (`market_unlisted`, a `BoardReason` code).
  */
 const MANAGER_FILES = [
-  "src/capsules/template.ts",
-  "src/capsules/render.ts",
-  "src/capsules/render-depth.ts",
-  "src/capsules/narrative.ts",
-  "src/capsules/prompt.ts",
-  "src/capsules/bundle.ts",
-  "src/capsules/write.ts",
+  "research-ts/src/capsules/template.ts",
+  "research-ts/src/capsules/render.ts",
+  "research-ts/src/capsules/render-depth.ts",
+  "research-ts/src/capsules/narrative.ts",
+  "research-ts/src/capsules/prompt.ts",
+  "research-ts/src/capsules/bundle.ts",
+  "research-ts/src/capsules/write.ts",
 ];
 
 const REPO_ROOT = process.cwd();
@@ -78,9 +78,9 @@ describe("every manager-facing surface speaks fantasy football, never trading", 
     expect(files.some((file) => file.startsWith("src/help"))).toBe(true);
     expect(files.some((file) => file.startsWith("src/teams"))).toBe(true);
     expect(files.some((file) => file.startsWith("src/search"))).toBe(true);
-    expect(files).toContain("src/capsules/template.ts");
-    expect(files).toContain("src/capsules/render.ts");
-    expect(files).toContain("src/capsules/prompt.ts");
+    expect(files).toContain("research-ts/src/capsules/template.ts");
+    expect(files).toContain("research-ts/src/capsules/render.ts");
+    expect(files).toContain("research-ts/src/capsules/prompt.ts");
     expect(files.some((file) => file.includes(".test."))).toBe(false);
   });
 

@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { adpSnapshots, nflPlayers, preseasonRosters } from "@/db/schema";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import type { FfcResponse } from "@/projections/preseason/publishers";
-import * as ingestModule from "@/projections/market/adp-snapshot";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { adpSnapshots, nflPlayers, preseasonRosters } from "@research-ts/db/schema";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import type { FfcResponse } from "@research-ts/projections/preseason/publishers";
+import * as ingestModule from "@research-ts/projections/market/adp-snapshot";
 import { parseAdpSnapshotPayload, runAdpSnapshotStep } from "./adp-snapshot-job";
 
 function fixtureFetch(body: FfcResponse): typeof globalThis.fetch {

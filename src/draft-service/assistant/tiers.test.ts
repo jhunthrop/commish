@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { availablePool } from "@/draft-engine";
-import { tiersOf } from "@/projections/decide/tiers";
-import { shipsProjectedRows } from "@/projections/preseason/kdef-decision";
+import { tiersOf } from "@research-ts/projections/decide/tiers";
+import { shipsProjectedRows } from "@research-ts/projections/preseason/kdef-decision";
 import { tierStandings } from "./tiers";
 import { FIXTURE_POOL, fixtureAdvance, fixtureStart, fixtureValued } from "./test-fixture";
 

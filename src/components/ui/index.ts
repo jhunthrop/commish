@@ -78,7 +78,8 @@ export type { ScoreBugProps, ScoreBugSide } from "./score-bug";
 export { Scoreboard } from "./scoreboard";
 export { PointsShareBar } from "./points-share-bar";
 export { GameStateChip, pointsForGameState, NOT_STARTED_DASH, type GameState } from "./game-state-chip";
-export { EventFeedRow, signedPoints } from "./event-feed-row";
+export { EventFeedRow } from "./event-feed-row";
+export { signedPoints } from "@research-ts/lib/number-format";
 export { Pill } from "./pill";
 /** SIDELINE (2026-09-10): the primitives the league front page is built from, and the vocabulary
  *  every later round migrates onto. `Manager` is the only way a manager's face renders (beside a
@@ -98,5 +99,6 @@ export { PresenceDot } from "./presence-dot";
 export { LiveChip } from "./live-chip";
 /** The law-backed explanation chip (Task 8): one `BoardReason` rendered as structured copy, plus
  *  the pure ranking helper (`strongestLawReasons`) a compact row uses to pick its top two. */
-export { ReasonChip, strongestLawReasons, type LawReason } from "./reason-chip";
+export { ReasonChip, strongestLawReasons } from "./reason-chip";
+export type { LawReason } from "@research-ts/projections/laws/headline";
 export { RosterStatusPill } from "./roster-status-pill";

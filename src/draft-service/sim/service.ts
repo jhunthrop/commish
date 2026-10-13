@@ -6,12 +6,12 @@
  */
 import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { leagues } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research-ts/domain/roster";
 import { enqueueJob } from "@/jobs/store";
 import { leagueBoardFormat } from "@/league-service/board-format";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
+import { BOARD_SOURCE } from "@research-ts/projections/preseason/board-store";
 import { simJob, SIM_JOB_NAME } from "@/jobs/defs/sim-job";
 import { SIM_CONFIG } from "./config";
 import { evidencePoolFor } from "./evidence";

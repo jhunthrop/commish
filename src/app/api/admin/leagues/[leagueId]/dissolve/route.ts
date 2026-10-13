@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { dissolutionPreview, dissolveLeague } from "@/money-service/dissolution";
 import { fail, ok } from "@/lib/api/respond";
 import { withAdmin } from "../../../_shared";

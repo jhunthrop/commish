@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { axe } from "vitest-axe";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import { renderSurface } from "./test-utils";
 import { PlayerObject, splitName } from "./player-object";
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { CreateLeagueBody } from "../contract";
 import { Button, Input, Select } from "@/components/ui";
-import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
+import { ROSTER_SHAPE_LABEL } from "@research-ts/domain/roster";
 import { LEAGUE_EXPERIENCE_TIER_HINT, LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import { MATCHMAKING_CONFIG, SIT_AND_GO_GRACE_MINUTES } from "@/matchmaking/config";
 import { useLeagueRoomDeps } from "../hooks/deps";
@@ -37,9 +37,9 @@ export const PRESETS = [
 /**
  * Superflex is a TOGGLE on the canonical format here, not a separate browse queue (the
  * liquidity ruling) — one more select beside scoring, words from `ROSTER_SHAPE_LABEL`
- * (`@/domain/roster`) rather than typed at this call site, the same discipline `EXPERIENCE_TIERS`
- * below already holds `LEAGUE_EXPERIENCE_TIER_LABEL` to. `@/domain/roster` (not
- * `@/league/roster-shape`, where the actual slot ROWS live) is what a client component may
+ * (`@research-ts/domain/roster`) rather than typed at this call site, the same discipline `EXPERIENCE_TIERS`
+ * below already holds `LEAGUE_EXPERIENCE_TIER_LABEL` to. `@research-ts/domain/roster` (not
+ * `@research-ts/domain/roster-shape`, where the actual slot ROWS live) is what a client component may
  * value-import at all — the client boundary, `eslint.config.mjs`.
  */
 const ROSTER_SHAPE_OPTIONS = Object.entries(ROSTER_SHAPE_LABEL).map(([value, label]) => ({ value, label }));

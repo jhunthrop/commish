@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { ChatPageBody, PostChatBody, ReactionBody } from "@/chat/contract";
 import { CHAT_CONFIG } from "@/chat/config";
@@ -9,8 +10,8 @@ import { chatLeagueFixture } from "./test-support";
 const db: Db = createTestDb();
 const currentUser = vi.fn<() => Promise<{ readonly id: string } | null>>();
 
-vi.mock("@/db/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/db/client")>();
+vi.mock("@research-ts/db/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@research-ts/db/client")>();
   return { ...actual, getDb: () => db };
 });
 vi.mock("@/lib/auth/current-user", () => ({

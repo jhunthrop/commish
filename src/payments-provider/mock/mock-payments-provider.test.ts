@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import type { PaymentsProviderHarness } from "../contract-suite";
 import { runPaymentsProviderContractSuite } from "../contract-suite";
 import { ingestProviderCallback, type PaymentsEvent } from "../ingest";

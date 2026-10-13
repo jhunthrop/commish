@@ -1,6 +1,6 @@
-import type { Player, Position, StatLine } from "@/domain/player";
+import type { Player, Position, StatLine } from "@research-ts/domain/player";
 import type { AdpEntry, GameStatus, GameSummary } from "../provider";
-import { TANK01_CONFIG } from "./config";
+import { TANK01_CONFIG } from "@research-ts/stats/tank01/config";
 
 /**
  * Tank01 returns EVERY value as a JSON string — `statusCode` on the envelope is the only number

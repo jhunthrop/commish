@@ -16,9 +16,9 @@
 // extra one deduped by its idempotency key. The row therefore never lags further than the
 // schedule's own last fire, so a cold instance starts exactly where the last fire left it.
 import { eq, inArray } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { scheduleCursors } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { JOBS_CONFIG } from "./config";
 import type { AnyJobDefinition } from "./contract";
 import { fireInstantsBetween } from "./cron";

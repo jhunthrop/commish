@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok } from "@/lib/api/respond";
 import { RELEASE_REFUSALS, releaseSeat } from "@/league-service/release";
 import { withLeagueMemberActor, type LeagueRouteContext } from "@/app/api/leagues/_shared";

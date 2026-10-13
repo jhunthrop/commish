@@ -1,9 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import type { Db, DbTx } from "@/db/client";
-import { players, playerStatLines, statWeeks } from "@/db/schema";
-import type { StatLine } from "@/domain/player";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import type { Db, DbTx } from "@research-ts/db/client";
+import { players, playerStatLines, statWeeks } from "@research-ts/db/schema";
+import type { StatLine } from "@research-ts/domain/player";
 import type { WeekStatus } from "./contract";
 import { dedupedByPlayerId, persistTick, type PersistTickInput } from "./persist";
 

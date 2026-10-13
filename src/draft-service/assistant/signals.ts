@@ -14,13 +14,14 @@
  * else. Both reads are facts about the room state, not the viewer, so the service memoises them
  * beside the odds table.
  */
-import type { Position } from "@/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import { draftedPlayerIds, type DraftState } from "@/draft-engine";
-import { isRealTierCliff, tierStanding } from "@/projections/decide/tiers";
-import { shipsProjectedRows } from "@/projections/preseason/kdef-decision";
+import { isRealTierCliff, tierStanding } from "@research-ts/projections/decide/tiers";
+import { shipsProjectedRows } from "@research-ts/projections/preseason/kdef-decision";
 import { ADVISOR_CONFIG } from "./config";
 import type { ValuedEntry } from "./recommend";
-import type { PositionRun, TierCollapse } from "./view";
+import type { TierCollapse } from "./view";
+import type { PositionRun } from "@research-ts/advisor/why";
 
 /** The run read over the room's own last `runWindow` picks. */
 export function detectRun(state: DraftState): PositionRun | null {

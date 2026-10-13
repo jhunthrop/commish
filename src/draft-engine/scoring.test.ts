@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
+import type { RosterSlot, RosterSlotConfig } from "@research-ts/domain/roster";
 import { rankWeight, openStartingSlots, needMultiplier, deferredLateRoundPosition } from "./scoring";
 
 const SLOTS: readonly RosterSlotConfig[] = [

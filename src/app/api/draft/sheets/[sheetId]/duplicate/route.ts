@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { duplicateSheet } from "@/draft-hq/sheet/service";
 import { duplicateSheetSchema } from "@/draft-hq/sheet/schemas";

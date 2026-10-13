@@ -4,7 +4,7 @@ import { axe } from "vitest-axe";
 import { renderSurface } from "./test-utils";
 import { PlayerFace, type PlayerFaceSize } from "./player-face";
 import { TOKENS } from "@/design/tokens";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 
 const CROFT: Player = { id: "rb1", name: "Jalen Croft", position: "RB", nflTeam: "KC", headshotUrl: null, adp: 1.6 };
 

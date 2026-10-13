@@ -1,4 +1,4 @@
-import type { RosterSlotType } from "@/domain/roster";
+import type { RosterSlotType } from "@research-ts/domain/roster";
 import type { ValuedPlayer } from "@/trades/fairness";
 
 /**

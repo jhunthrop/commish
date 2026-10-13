@@ -1,5 +1,5 @@
-import { collectPlayerFacts } from "@/capsules/collect-one";
-import { rankWithinGroups, type RankableStat } from "@/capsules/rank";
+import { collectPlayerFacts } from "@research-ts/capsules/collect-one";
+import { rankWithinGroups, type RankableStat } from "@research-ts/capsules/rank";
 import type {
   PlayerFacts,
   PlayerFactsAvailability,
@@ -10,15 +10,15 @@ import type {
   PlayerFactsProjection,
   PlayerFactsTrend,
   PlayerFactsUsage,
-} from "@/capsules/facts";
-import type { Db } from "@/db/client";
-import type { Position } from "@/domain/player";
-import { PPR_SCORING } from "@/domain/scoring";
-import { allPositions } from "@/projections/backtest";
-import { nflPlayerIdFor } from "@/projections/crosswalk";
-import { BOARD_SOURCE, preseasonProjectionsAsOf, type PreseasonProjectionRow } from "@/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { describeScoring, roundPoints } from "@/scoring";
+} from "@research-ts/capsules/facts";
+import type { Db } from "@research-ts/db/client";
+import type { Position } from "@research-ts/domain/player";
+import { PPR_SCORING } from "@research-ts/domain/scoring";
+import { allPositions } from "@research-ts/projections/backtest";
+import { nflPlayerIdFor } from "@research-ts/projections/crosswalk";
+import { BOARD_SOURCE, preseasonProjectionsAsOf, type PreseasonProjectionRow } from "@research-ts/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import { describeScoring, roundPoints } from "@research-ts/scoring";
 
 /** A per-game rank, honestly qualified — `rankWithinGroups`' own `RankedStat` minus
  *  `namedNeighbor`: a per-game rank has no consumer asking for the peer just above him (unlike
@@ -119,7 +119,7 @@ function perGamePointsRanksFor(rows: readonly PreseasonProjectionRow[], position
 
 /** The whole-board read `perGamePointsRanksFor` needs — bundled into its own function so
  *  `dossierFactsFor` runs it exactly once regardless of whether the target player himself ends up
- *  ranked. Exported for the precompute writer (`capsules/peek-facts.ts`), which needs the same map
+ *  ranked. Exported for the precompute writer (`league-service/peek/peek-facts.ts`), which needs the same map
  *  ONCE for a whole sweep rather than once per player. */
 export async function boardWidePerGameFacts(db: Db, asOf: Date): Promise<ReadonlyMap<string, PlayerDossierRank>> {
   const rows = await preseasonProjectionsAsOf(db, { season: PRODUCT_SEASON, source: BOARD_SOURCE, asOf });
@@ -132,7 +132,7 @@ export async function boardWidePerGameFacts(db: Db, asOf: Date): Promise<Readonl
  * THE SHAPE, WITH NO READS OF ITS OWN — `PlayerFacts` plus the one rank that is not on it, reshaped
  * for the client. Pure on purpose (peek-facts round, 2026-09-07): it has TWO callers now and they
  * must produce byte-identical objects or the precomputed row and the live computation would render
- * differently for the same player. `dossierFactsFor` below is the live one, `capsules/peek-facts.ts`
+ * differently for the same player. `dossierFactsFor` below is the live one, `league-service/peek/peek-facts.ts`
  * the precompute one, and neither has a copy of this mapping.
  */
 export function dossierFactsFrom(facts: PlayerFacts, perGamePositionRank: PlayerDossierRank | null): PlayerDossierFacts {

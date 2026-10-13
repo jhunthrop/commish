@@ -55,7 +55,7 @@ export const createLeagueSchema = z.object({
   /**
    * A TOGGLE on the canonical format, not a separate browse queue (the liquidity ruling) —
    * `createLeague` (`@/league-service/creation`) resolves this to slot rows through
-   * `ROSTER_SHAPES` (`@/league/roster-shape`) when no explicit `rosterSlots` are given.
+   * `ROSTER_SHAPES` (`@research-ts/domain/roster-shape`) when no explicit `rosterSlots` are given.
    */
   rosterShape: z.enum(["standard", "superflex"]).default(LEAGUE_CONFIG.defaults.rosterShape),
   /**

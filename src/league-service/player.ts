@@ -18,21 +18,22 @@
 // build has reached, is served by the SAME builder the writer uses (`peekDocumentRowsFor`), for one
 // player, and the whole-hash build is enqueued so the next open is one statement again.
 import { and, desc, eq, lte, or, sql } from "drizzle-orm";
-import { peekDocumentRowsFor } from "@/capsules/peek-document-store";
-import type { PeekDocumentRequest } from "@/capsules/peek-document-inputs";
-import { buildPeekDocument, hydratePeekDocument } from "@/capsules/peek-document";
-import type { PeekDocument } from "@/capsules/peek-document-row";
-import type { Db } from "@/db/client";
-import { leagues, matchups, playerCrosswalk, playerPeekDocuments, players, preseasonProjections, scoringSettings, teams } from "@/db/schema";
-import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
-import type { Clock } from "@/domain/timing";
+import { peekDocumentRowsFor } from "@/league-service/peek/peek-document-store";
+import type { PeekDocumentRequest } from "@/league-service/peek/peek-document-inputs";
+import { buildPeekDocument, hydratePeekDocument } from "@/league-service/peek/peek-document";
+import type { PeekDocument } from "@/league-service/peek/peek-document-row";
+import type { Db } from "@research-ts/db/client";
+import { playerCrosswalk, players, preseasonProjections } from "@research-ts/db/schema";
+import { leagues, matchups, playerPeekDocuments, scoringSettings, teams } from "@/db/schema";
+import { PPR_SCORING, type ScoringSettings } from "@research-ts/domain/scoring";
+import type { Clock } from "@research-ts/domain/timing";
 import { enqueuePeekDocumentRebuildsQuietly } from "@/jobs/defs/peek-document-job";
 import { LEAGUE_CONFIG } from "@/league";
-import type { Player } from "@/domain/player";
-import { boardFormatForRules, boardSourceFor } from "@/projections/preseason/board-formats";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { type ScoringRules } from "@/scoring";
-import { scoringHashOf } from "@/scoring/hash";
+import type { Player } from "@research-ts/domain/player";
+import { boardFormatForRules, boardSourceFor } from "@research-ts/projections/preseason/board-formats";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import { type ScoringRules } from "@research-ts/scoring";
+import { scoringHashOf } from "@research-ts/scoring/hash";
 import type { PlayerLeagueDraftPhase, PlayerOwner, PlayerOwnerRelation, PlayerSeasonBody } from "./player-body";
 import { currentWeekOf } from "./schedule";
 import { writeLeagueScoringHash } from "./scoring-hash";

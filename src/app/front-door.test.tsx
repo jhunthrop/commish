@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import type { BrowseBody, ProofStats, WireItem } from "@/matchmaking/contract";
 
 vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@research-ts/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/league-service/browse", () => ({ listPublicLeagues: vi.fn() }));
 vi.mock("@/league-service/proof", () => ({ proofStats: vi.fn() }));
 vi.mock("@/league-service/proof-cache-instance", () => ({ getProofCache: vi.fn() }));

@@ -1,9 +1,10 @@
-import type { Db } from "@/db/client";
-import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import { BOARD_FORMAT_QUERY_KEY, DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
-import type { LeagueBoardFormat } from "@/league-service/board-format";
+import type { Db } from "@research-ts/db/client";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research-ts/domain/roster";
+import { BOARD_FORMAT_QUERY_KEY, DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@research-ts/projections/preseason/board-formats";
+import type { LeagueBoardFormat } from "@research-ts/board/format-resolution";
+import { leagueBoardFormat } from "@/league-service/board-format";
 import { myDraftLeagues, nextDraftingLeague, type DraftLeagueRow } from "@/draft-hq/league-context";
-import { resolveBoardFormat } from "./service";
+import { resolveBoardFormat } from "@research-ts/board/service";
 
 /**
  * WHOSE RULES THE DRAFT AREA'S NUMBERS ARE UNDER — resolved ONCE, read by the Board and by Your
@@ -65,8 +66,9 @@ export async function draftAreaContext(db: Db, userId: string, params: PageParam
   const explicitFormat = formatParam !== undefined && isBoardFormat(formatParam);
   const format = explicitFormat ? (formatParam as BoardFormat) : DEFAULT_BOARD_FORMAT;
 
-  const boardOptions = { leagueId: selected?.leagueId, format: isGeneric ? format : undefined };
-  const resolved = await resolveBoardFormat(db, boardOptions);
+  // The league's own scoring row is read here, in the league app; the board service only ever
+  // receives the resolution (`BoardOptions.resolved`).
+  const resolved = selected === null ? resolveBoardFormat({ format: isGeneric ? format : undefined }) : await leagueBoardFormat(db, selected.leagueId);
 
   const query: Record<string, string> = {};
   if (leagueParam !== undefined) query.league = leagueParam;
@@ -86,8 +88,8 @@ export async function draftAreaContext(db: Db, userId: string, params: PageParam
 }
 
 /** What `boardRows` needs from a context, in one place so no caller assembles it twice. */
-export function boardOptionsFor(context: DraftAreaContext): { readonly shape: DraftAreaContext["shape"]; readonly leagueId?: string; readonly format?: BoardFormat } {
-  return { shape: context.shape, leagueId: context.selected?.leagueId, format: context.isGeneric ? context.format : undefined };
+export function boardOptionsFor(context: DraftAreaContext): { readonly shape: DraftAreaContext["shape"]; readonly resolved: LeagueBoardFormat } {
+  return { shape: context.shape, resolved: context.resolved };
 }
 
 /**

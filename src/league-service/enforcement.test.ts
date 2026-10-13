@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { leagues, teams, users } from "@/db/schema";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { copyViolations } from "@/integrity/copy-rules";

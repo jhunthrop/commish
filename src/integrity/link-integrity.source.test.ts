@@ -31,7 +31,9 @@ import { sourceFilesIn } from "./test-support";
  * join the inventory here.
  */
 
-const SWEPT_DIRS = ["src"] as const;
+/** `research-ts/src` joined at the carve-out (2026-10-12): the research core still holds strings a
+ *  link sweep has to account for (the vendor endpoint suffixes below). */
+const SWEPT_DIRS = ["src", "research-ts/src"] as const;
 
 /** Comments are stripped before extraction, so a docblock retelling a retired route's history
  *  (there are many) is prose, not a link — the carve-out every source sweep here makes. */
@@ -192,8 +194,9 @@ function matchesServedRoute(segments: readonly string[]): boolean {
  * path SUFFIXES joined onto a vendor base URL. Swept-dir-shaped exemption, with the reason.
  */
 const NOT_ROUTE_FILES: ReadonlyMap<string, string> = new Map([
-  ["src/stats/tank01/config.ts", "Tank01 RapidAPI endpoint suffixes (/getNFLPlayerList, ...), joined onto the vendor base URL — no internal navigation."],
-  ["src/projections/odds/snapshot.ts", "The Odds API endpoint suffixes (/events, /events/${eventId}/odds), joined onto the vendor base URL — no internal navigation."],
+  ["research-ts/src/stats/tank01/config.ts", "Tank01 RapidAPI endpoint suffixes (/getNFLPlayerList, ...), joined onto the vendor base URL — no internal navigation."],
+  ["research-ts/src/projections/odds/snapshot.ts", "The Odds API endpoint suffixes (/events, /events/${eventId}/odds), joined onto the vendor base URL — no internal navigation."],
+  ["research-ts/src/advisor/server.ts", "The advisor service's own routes (/advise, /healthz), served by its own Node server to the API and the room service, never a page link."],
 ]);
 
 /**

@@ -1,4 +1,4 @@
-import type { Player, Position } from "@/domain/player";
+import type { Player, Position } from "@research-ts/domain/player";
 import type { CompletedPick } from "@/draft-engine";
 
 /**

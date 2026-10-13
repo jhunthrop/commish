@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research-ts/db/client";
 import { memberNotices } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
 import { stripHiddenCharacters } from "@/identity/display-name";

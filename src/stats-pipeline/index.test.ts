@@ -15,7 +15,7 @@ vi.mock("@/lib/realtime/publisher", () => ({
   getPublisher: vi.fn(() => ({ publish: publishSpy })),
 }));
 
-import { DB_POOL_CONFIG } from "@/db/config";
+import { DB_POOL_CONFIG } from "@research-ts/db/config";
 import { getIngestionWorker, ingestionPoolOptions, publishViaSharedPublisher, systemClock } from "./index";
 
 describe("stats-pipeline edge wiring", () => {

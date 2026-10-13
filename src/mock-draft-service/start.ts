@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research-ts/db/client";
 import { drafts, leagues, mockRooms, teams } from "@/db/schema";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 import { rngFor, seededShuffle } from "@/mock-draft/rng";

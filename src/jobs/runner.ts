@@ -13,8 +13,8 @@
 // idle minute therefore issues zero statements, which is what lets Neon's compute suspend. The
 // ungated set (`UNGATED_WAKE_SET`, what an uninstalled process and the local runner use) reports
 // everything due, which is exactly the tick as it was before the gate.
-import type { Db } from "@/db/client";
-import type { Clock } from "@/domain/timing";
+import type { Db } from "@research-ts/db/client";
+import type { Clock } from "@research-ts/domain/timing";
 import type { AnyJobDefinition } from "./contract";
 import { executeClaimedJob, type ExecutionReport } from "./execute";
 import { tickSchedules, type ScheduleMemory, type ScheduleTickReport } from "./schedule";

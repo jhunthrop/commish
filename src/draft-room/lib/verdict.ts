@@ -1,4 +1,4 @@
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { CompletedPick } from "@/draft-engine";
 import type { StatComparison } from "@/components/ui/stat";
 import { boardRanks } from "../state/pick-review";

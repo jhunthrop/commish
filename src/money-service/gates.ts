@@ -1,4 +1,4 @@
-import type { ReadonlyDb } from "@/db/client";
+import type { ReadonlyDb } from "@research-ts/db/client";
 import type { KycStatus } from "@/db/schema";
 import { accountBalance } from "@/money-service/read";
 import { accountIdFor } from "@/money/accounts";

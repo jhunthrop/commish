@@ -2,9 +2,9 @@
 // attempt budget, a per-attempt timeout, and a backoff policy. Definitions live in code
 // (src/jobs/defs/, collected by src/jobs/registry.ts); the queue rows (src/db/schema.ts `jobs`)
 // carry only what scheduling needs. Spec: docs/superpowers/specs/2026-09-02-job-system-design.md.
-import type { Db } from "@/db/client";
-import type { JsonObject } from "@/domain/audit";
-import type { Clock } from "@/domain/timing";
+import type { Db } from "@research-ts/db/client";
+import type { JsonObject } from "@research-ts/domain/json";
+import type { Clock } from "@research-ts/domain/timing";
 
 /**
  * A failure the job itself is REFUSING, not suffering — retrying would either be useless or would

@@ -5,7 +5,7 @@ import { renderSurface } from "./test-utils";
 import { TeamRow } from "./team-row";
 import { PlayerRow } from "./player-row";
 import { BigNumber } from "./big-number";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 
 const GIBBS: Player = { id: "rb1", name: "Jahmyr Gibbs", position: "RB", nflTeam: "DET", headshotUrl: null, adp: 4.1 };
 

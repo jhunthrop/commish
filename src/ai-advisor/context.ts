@@ -1,11 +1,12 @@
 import { and, eq, gte, lt } from "drizzle-orm";
-import type { ReadonlyDb } from "@/db/client";
-import { leagues, matchups, players, playerStatLines, scoringSettings, teams, weeks } from "@/db/schema";
+import type { ReadonlyDb } from "@research-ts/db/client";
+import { players, playerStatLines } from "@research-ts/db/schema";
+import { leagues, matchups, scoringSettings, teams, weeks } from "@/db/schema";
 import { ADVISOR_CONFIG } from "@/domain/advisor";
-import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
+import { PPR_SCORING, type ScoringSettings } from "@research-ts/domain/scoring";
 import { computeStandings, type StandingsRow } from "@/league";
 import { getLineup } from "@/league-service/lineups";
-import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
+import { computeFantasyPoints, roundPoints, type ScoringRules } from "@research-ts/scoring";
 import type { StartSitCandidate, ValuedPlayer } from "./valuation";
 
 export interface AdvisorPlayerContext extends StartSitCandidate {

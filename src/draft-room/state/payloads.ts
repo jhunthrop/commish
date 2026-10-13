@@ -7,7 +7,7 @@ import type { DraftClockView } from "@/draft-engine";
  * applied in the other direction.
  */
 const clockSchema = z.object({
-  // `"dissolved"` (Phase 4, Task 9, `@/domain/draft`'s own `DraftStatus`) joins this enum for the
+  // `"dissolved"` (Phase 4, Task 9, `@research-ts/domain/draft`'s own `DraftStatus`) joins this enum for the
   // bidirectional check below alone, never because the wire actually sends it: a dissolved
   // league's draft never reaches `"scheduled"`'s live session at all (dissolution is pre-draft
   // only), so this stream never opens for one and `phase` never carries the value in practice.
@@ -57,7 +57,7 @@ const pickPayloadSchema = z.object({
   round: z.number().int().positive(),
   teamId: z.string().min(1),
   playerId: z.string().min(1),
-  // Every `RosterSlotType` (`@/domain/roster`), the superflex included: a pick into a slot this
+  // Every `RosterSlotType` (`@research-ts/domain/roster`), the superflex included: a pick into a slot this
   // list lacked failed the parse and cost the room a resync it never needed.
   slot: z.enum(["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "DEF", "BENCH"]),
   slotIndex: z.number().int().nonnegative(),

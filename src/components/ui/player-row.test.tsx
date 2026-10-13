@@ -5,7 +5,7 @@ import { renderSurface } from "./test-utils";
 import { PlayerRow } from "./player-row";
 import { Button } from "./button";
 import { Stat } from "./stat";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 
 const CROFT: Player = { id: "rb1", name: "Jalen Croft", position: "RB", nflTeam: "IND", headshotUrl: null, adp: 1.6 };
 

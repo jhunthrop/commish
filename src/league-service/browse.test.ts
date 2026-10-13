@@ -1,9 +1,10 @@
 import { describe, it, expect, afterEach, beforeEach, afterAll } from "vitest";
 import { eq, isNotNull } from "drizzle-orm";
-import type { Db } from "@/db/client";
-import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import { countingDb, createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
-import { STANDARD_SCORING, type ScoringSettings } from "@/domain/scoring";
+import { STANDARD_SCORING, type ScoringSettings } from "@research-ts/domain/scoring";
 import { SUPERFLEX_ROSTER_SLOTS } from "@/league";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { EMPTY_BROWSE_FILTER, hasOpenSeat, matchesBrowseFilter } from "@/matchmaking/filter";

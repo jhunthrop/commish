@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
-import type { DbTx, ReadonlyDb } from "@/db/client";
+import type { DbTx, ReadonlyDb } from "@research-ts/db/client";
 import { leagues, matchups, teams } from "@/db/schema";
 
 /**

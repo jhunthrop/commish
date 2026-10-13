@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { fail } from "@/lib/api/respond";
 import { requireLeagueMember, resolveLeagueMembership } from "@/lib/leagues/membership";

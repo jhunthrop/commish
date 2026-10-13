@@ -1,8 +1,8 @@
 import { and, desc, eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { auditEvents, draftActions, draftSlotPreferences, drafts, leagues, teams } from "@/db/schema";
-import type { DraftStatus } from "@/domain/draft";
-import type { Clock } from "@/domain/timing";
+import type { DraftStatus } from "@research-ts/domain/draft";
+import type { Clock } from "@research-ts/domain/timing";
 import { draftActionSchema } from "@/draft-engine";
 import { LEAGUE_CONFIG } from "@/league";
 import type { DraftScheduleBody, SlotPreferenceView } from "@/league-room/contract";
@@ -73,7 +73,7 @@ interface DraftRow {
 }
 
 /** One league's draft row, joined to the one fact about its league every caller here needs:
- *  who commissions it. `drafts_league_id_idx` (`@/db/schema`) makes this a unique lookup. */
+ *  who commissions it. `drafts_league_id_idx` (`@research-ts/db/schema`) makes this a unique lookup. */
 async function draftRowForLeague(db: Db, leagueId: string): Promise<DraftRow | undefined> {
   const [row] = await db
     .select({

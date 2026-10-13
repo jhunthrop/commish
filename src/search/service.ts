@@ -1,9 +1,9 @@
-import type { Db } from "@/db/client";
-import { genericBoardRows } from "@/draft-hq/board/generic-board";
-import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
-import { BOARD_MEMO_GROUP, createTtlMemo } from "@/lib/cache/ttl-memo";
-import { NFL_TEAM_ABBREVIATIONS } from "@/projections/capture-feeds";
-import { BOARD_REASONS_MEMO_TTL_MS } from "@/projections/preseason/reasons-by-player";
+import type { Db } from "@research-ts/db/client";
+import { genericBoardRows } from "@research-ts/board/generic-board";
+import { byeWeeksByTeam } from "@research-ts/reference/nfl-schedule";
+import { BOARD_MEMO_GROUP, createTtlMemo } from "@research-ts/lib/cache/ttl-memo";
+import { NFL_TEAM_ABBREVIATIONS } from "@research-ts/projections/capture-feeds";
+import { BOARD_REASONS_MEMO_TTL_MS } from "@research-ts/projections/preseason/reasons-by-player";
 import { SEARCH_CONFIG } from "./config";
 import type { SearchBody } from "./contract";
 import { searchEntriesFor } from "./entries";

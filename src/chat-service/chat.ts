@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import type { ChatGif, ChatMessageRemoval, ChatMessageView, ChatReactionView } from "@/chat/contract";
 import { CHAT_CONFIG } from "@/chat/config";
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { chatMessages, chatReactions, teams, users } from "@/db/schema";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";

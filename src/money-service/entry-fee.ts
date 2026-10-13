@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
-import type { DbTx } from "@/db/client";
+import type { DbTx } from "@research-ts/db/client";
 import { moneyEntries, moneyTransactions, users } from "@/db/schema";
 import { accountIdFor } from "@/money/accounts";
 import { MONEY_REFUSALS } from "@/money/config";
@@ -17,7 +17,7 @@ import { ensureAndLockMoneyAccounts, postMoneyTransaction, type PostDeps } from 
  *
  * THE FREE-SEASON LAW lives one level up, on purpose: a league whose `entry_fee_cents` is `0`
  * never calls into this module at all — the caller's own short-circuit is what the statement-log
- * spy (`recordStatements`, `@/db/test-db`) proves as "a free join touches zero `money_*`
+ * spy (`recordStatements`, `@research-ts/db/test-db`) proves as "a free join touches zero `money_*`
  * tables", and a gate inside this module could never make that claim, because reaching it is
  * already a money-table read away.
  */

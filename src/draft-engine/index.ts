@@ -6,10 +6,10 @@ export {
   initialDraftState, totalRosterSlots, totalPickCount, rosterFor, auctionOf,
   type DraftConfig, type DraftState, type CompletedPick, type AuctionLot, type AuctionState, type DraftReduceResult,
 } from "./state";
-export { assignSlot, type SlotAssignment } from "./slotting";
+export { assignSlot, type SlotAssignment } from "@research-ts/draft-engine/slotting";
 export { rankWeight, openStartingSlots, needMultiplier, type NeedMultiplierOptions } from "./scoring";
-export { positionCeiling, isSingleStarterPosition, anyStarterOpen, candidateRoleReader, type CandidateRole, type RosterCeilingPolicy } from "./roster-need";
-export { snakeTeamForPick, roundForPick } from "./order";
+export { positionCeiling, isSingleStarterPosition, anyStarterOpen, candidateRoleReader, type CandidateRole, type RosterCeilingPolicy } from "@research-ts/draft-engine/roster-need";
+export { snakeTeamForPick, roundForPick } from "@research-ts/draft-engine/order";
 export { reduceDraft } from "./reduce";
 export { admitCommand, type AdmitResult } from "./admit";
 export { reduceSetQueue, queuedEntriesFor } from "./queue";

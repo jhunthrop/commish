@@ -26,7 +26,8 @@ vi.mock("@/money/states", async (importOriginal) => {
 });
 
 import { users } from "@/db/schema";
-import { createTestDb, truncateAll, truncateMoneyTables } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll, truncateMoneyTables } from "@/db/test-db";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { postMoneyTransaction, type PostDeps } from "@/money-service/post";
 import { expectNoPostingTookPlace, snapshotMoneyBook } from "@/money-service/test-support";

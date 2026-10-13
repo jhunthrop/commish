@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { leagues } from "@/db/schema";
 import { fail, ok, parseJson } from "@/lib/api/respond";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { boardRows } from "@/draft-hq/board/service";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
+import { boardRows } from "@research-ts/board/service";
 import { getSheet, replaceEntries } from "@/draft-hq/sheet/service";
 import { seedFromBoard, seedFromMockHistory } from "@/draft-hq/sheet/seed";
 import { seedSheetSchema } from "@/draft-hq/sheet/schemas";

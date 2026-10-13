@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import type { BoardReason } from "@/projections/preseason/board";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
 import { Button, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { formatAdp } from "../../lib/tiers";

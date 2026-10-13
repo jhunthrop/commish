@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button, Input, SegmentGroup } from "@/components/ui";
 import { chipClassName } from "@/components/ui/chip";
-import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
+import { ROSTER_SHAPE_LABEL } from "@research-ts/domain/roster";
 import { formatOrdinal } from "@/draft-room/state/format";
 import {
   tableChips,
