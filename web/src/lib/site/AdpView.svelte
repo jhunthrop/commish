@@ -40,7 +40,7 @@
 	<link rel="canonical" href={links.adp(page.format.id)} />
 </svelte:head>
 
-<SiteShell title="{page.format.label} ADP" active="board" {run}>
+<SiteShell title="{page.format.label} ADP" {run}>
 	{#snippet tail()}<Verb href={sectionHref('mock')}>Start a mock draft</Verb>{/snippet}
 	<main class="adp">
 		<div class="content">

@@ -63,7 +63,7 @@
 
 	kbd {
 		font-family: var(--font-ui);
-		font-size: 10px;
+		font-size: var(--t-xs);
 		border-radius: 3px;
 		padding: 0 5px;
 	}

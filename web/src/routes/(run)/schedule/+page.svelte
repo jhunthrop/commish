@@ -34,7 +34,7 @@
 	}
 </script>
 
-<SiteShell title="Schedule strength" active="board" run={data.run}>
+<SiteShell title="Schedule strength" run={data.run}>
 	<main class="schedule">
 		<PageHead title="{page.schedule.season} schedule strength" {lead} />
 		<Table caption="Every club's schedule, hardest first" minWidth={340} {columns}>

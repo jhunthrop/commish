@@ -29,8 +29,13 @@ export async function systemNightly(): Promise<SystemNightly> {
 	return {
 		page,
 		rows: rows.slice(0, SPECIMEN_ROWS),
-		hits: rows
-			.slice(0, SPECIMEN_ROWS)
-			.map(({ id, slug, name, team, position }) => ({ id, slug, name, team, position }))
+		hits: rows.slice(0, SPECIMEN_ROWS).map(({ id, slug, name, team, position, headshot }) => ({
+			id,
+			slug,
+			name,
+			team,
+			position,
+			headshot
+		}))
 	};
 }

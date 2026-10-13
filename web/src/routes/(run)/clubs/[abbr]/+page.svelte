@@ -25,7 +25,7 @@
 	);
 </script>
 
-<SiteShell title={name} active="players" run={data.run}>
+<SiteShell title={name} run={data.run}>
 	<main class="club">
 		<Crumb trail={[{ label: 'Clubs', href: links.clubs() }, { label: name }]} />
 		<HeroCard title={name}>

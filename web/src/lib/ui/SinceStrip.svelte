@@ -83,7 +83,7 @@
 		align-items: center;
 		gap: 3px;
 		width: 58px;
-		font-size: 10px;
+		font-size: var(--t-xs);
 		color: var(--ink-3);
 		text-align: center;
 	}
@@ -95,7 +95,7 @@
 		max-width: 58px;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		font-size: 11px;
+		font-size: var(--t-xs);
 	}
 
 	.queued span {

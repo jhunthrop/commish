@@ -10,11 +10,24 @@
 		href?: string;
 		/** A compact chip for a side panel's tag row. */
 		size?: 'md' | 'sm';
+		/** A choice this page cannot show yet, like a format the run does not carry: drawn with a
+		 * dashed edge in quiet ink, still a link to the page that says so. Never pressed. */
+		absent?: boolean;
+		/** The chip's name for assistive tech when its words alone would mislead: "Half PPR, not on this run". */
+		label?: string;
 		onclick?: (event: MouseEvent) => void;
 		children: Snippet;
 	}
 
-	let { pressed = false, href, size = 'md', onclick, children }: Props = $props();
+	let {
+		pressed = false,
+		href,
+		size = 'md',
+		absent = false,
+		label,
+		onclick,
+		children
+	}: Props = $props();
 
 	const grouped = inChipGroup();
 </script>
@@ -25,7 +38,9 @@
 		class:grouped
 		class:sm={size === 'sm'}
 		class:on={pressed}
+		class:absent
 		{href}
+		aria-label={label}
 		aria-current={pressed ? 'page' : undefined}
 		{onclick}
 	>
@@ -38,6 +53,8 @@
 		class:grouped
 		class:sm={size === 'sm'}
 		class:on={pressed}
+		class:absent
+		aria-label={label}
 		aria-pressed={pressed}
 		{onclick}
 	>
@@ -47,6 +64,7 @@
 
 <style>
 	.chip {
+		position: relative;
 		display: inline-flex;
 		align-items: center;
 		height: 32px;
@@ -83,5 +101,25 @@
 
 	.on:hover {
 		color: var(--bg);
+	}
+
+	.absent,
+	.grouped.absent {
+		border: 1px dashed var(--line-strong);
+		color: var(--ink-3);
+	}
+
+	/* A thumb's 44px on the phone: the chip draws at its size and its hit area reaches 44 tall. */
+	@media (max-width: 760px) {
+		.chip {
+			min-width: 44px;
+			justify-content: center;
+		}
+
+		.chip::after {
+			content: '';
+			position: absolute;
+			inset: -8px 0;
+		}
 	}
 </style>

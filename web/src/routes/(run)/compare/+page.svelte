@@ -92,7 +92,7 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
-<SiteShell title="Compare" active="players" run={data.run}>
+<SiteShell title="Compare" run={data.run}>
 	<main class="compare">
 		<PageHead
 			title="Compare"

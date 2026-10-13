@@ -13,7 +13,7 @@
 	let { data }: PageProps = $props();
 </script>
 
-<SiteShell title="Players" active="players" run={data.run}>
+<SiteShell title="Players" run={data.run}>
 	{#snippet tail()}<Quiet href={links.compare()}>Compare two players</Quiet>{/snippet}
 	<main class="players">
 		<PageHead

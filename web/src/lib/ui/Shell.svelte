@@ -1,17 +1,19 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { page } from '$app/state';
 	import Icon from './Icon.svelte';
 	import Stamp from './Stamp.svelte';
 	import ThemeSwitch from './ThemeSwitch.svelte';
-	import { HOME_HREF, RAIL, RAIL_FOOT, type RailItem, type Section } from './nav.ts';
+	import { HOME_HREF, RAIL, RAIL_FOOT, sectionOf, type RailItem, type Section } from './nav.ts';
 
 	interface Props {
 		/** The page's name in the top bar. Hidden on the phone, where the rail names the section. */
 		title: string;
 		/** What the page's numbers are as of, beside the title: the nightly run's date. Kept on the phone. */
 		stamp?: string;
-		/** The rail item for this page, or null for a page outside the sections. */
-		active: Section | null;
+		/** The rail item for this page, or null for a page outside the sections. Left out, the page's
+		 * path picks it by nav.ts's one rule. */
+		active?: Section | null;
 		/** The top bar's search, usually a Search. */
 		search?: Snippet;
 		/** The top bar's right end, after the theme switch: the page's verb or a quiet action. */
@@ -20,6 +22,8 @@
 	}
 
 	let { title, stamp, active, search, tail, children }: Props = $props();
+
+	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
 </script>
 
 {#snippet railLink(item: RailItem)}
@@ -27,7 +31,7 @@
 		class="item"
 		class:wide-only={item.wideOnly}
 		href={item.href}
-		aria-current={item.section === active ? 'page' : undefined}
+		aria-current={item.section === current ? 'page' : undefined}
 	>
 		<Icon name={item.icon} />
 		<span>{item.label}</span>

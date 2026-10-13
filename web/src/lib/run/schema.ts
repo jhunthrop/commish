@@ -221,7 +221,9 @@ export const indexEntrySchema = z.object({
 	slug,
 	name: phrase,
 	team: club,
-	position
+	position,
+	/** His face, so a search hit leads with it like every other list. */
+	headshot: z.url()
 });
 
 export const indexSchema = z.array(indexEntrySchema).min(1);

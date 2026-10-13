@@ -64,7 +64,7 @@
 	}
 </script>
 
-<SiteShell title="Our record" active="record" run={data.run}>
+<SiteShell title="Our record" run={data.run}>
 	<main class="record">
 		<div class="content">
 			<PageHead

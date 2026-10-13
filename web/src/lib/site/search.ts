@@ -1,5 +1,7 @@
 /** The top bar's player search over the run's index: matching and ordering, no DOM. */
 import type { IndexEntry } from '#lib/run/schema.ts';
+import type { SearchHit } from '#lib/ui/search-hit.ts';
+import { links } from './links.ts';
 
 /** Where the browser fetches the index, prerendered from the run at build. */
 export const SEARCH_INDEX_URL = '/data/index.json';
@@ -43,4 +45,16 @@ export function searchPlayers(
 		.sort((a, b) => a.rank - b.rank || a.order - b.order)
 		.slice(0, limit)
 		.map((hit) => hit.player);
+}
+
+/** A player as a line of the search menu, linking to his page. */
+export function searchHit(player: IndexEntry): SearchHit {
+	return {
+		id: player.id,
+		name: player.name,
+		position: player.position,
+		team: player.team,
+		headshot: player.headshot,
+		href: links.player(player.slug)
+	};
 }

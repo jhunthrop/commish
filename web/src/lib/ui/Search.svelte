@@ -96,8 +96,15 @@
 		color: var(--ink-3);
 	}
 
+	/* One ring for the whole field: the label draws it, and the input inside keeps none of its own. */
 	.search:focus-within {
 		border-color: var(--focus);
+		outline: 2px solid var(--focus);
+		outline-offset: 2px;
+	}
+
+	input:focus-visible {
+		outline: none;
 	}
 
 	input {

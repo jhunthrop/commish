@@ -530,12 +530,13 @@ async function main(): Promise<void> {
 		if (codes.length !== CLUB_COUNT)
 			throw new Error(`The board names ${String(codes.length)} clubs.`);
 		const players = playerPages(rows, capsuleCsv);
-		const index: IndexEntry[] = rows.map(({ id, slug, name, team, position }) => ({
+		const index: IndexEntry[] = rows.map(({ id, slug, name, team, position, headshot }) => ({
 			id,
 			slug,
 			name,
 			team,
-			position
+			position,
+			headshot
 		}));
 		const files = artifacts({
 			manifest: {

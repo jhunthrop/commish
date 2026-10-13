@@ -22,7 +22,7 @@
 	});
 </script>
 
-<SiteShell title="Clubs" active="players" run={data.run}>
+<SiteShell title="Clubs" run={data.run}>
 	<main class="clubs">
 		<PageHead title="Clubs" {lead} />
 		<ul>
