@@ -9,15 +9,16 @@
 	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import TagChip from '#lib/ui/TagChip.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
+	import { vorCell } from '#lib/ui/heat.ts';
 	import type { LeaguePlayer } from './api.ts';
 	import type { LeagueBoardPlayer } from './board.ts';
 	import { projectionWords, seasonWords } from './model.ts';
 
 	/** One player of the league as a board row: his name, which opens his game log, his place on our
 	 * board at his position, his team and bye, his preseason projection, your sheet's tags on him,
-	 * and the row's number at its end: his points a game this season, unless the row brings its own
-	 * number, when his season sits beside the projection. A player we could not place on our board
-	 * keeps the host's name, position and team, and says so. */
+	 * and the row's number at its end: his points a game this season, unless the row ends on its own
+	 * number or on his value over replacement, when his season sits beside the projection. A player
+	 * we could not place on our board keeps the host's name, position and team, and says so. */
 	interface Props {
 		/** The board's row for him, null when we could not place him. */
 		player: LeagueBoardPlayer | null;
@@ -29,11 +30,21 @@
 		slot?: string;
 		/** The row's number, at its end. Left out, the row ends on his points a game this season. */
 		trailing?: Snippet;
+		/** End on his value over replacement, the order of a list ranked by it (the waiver pool). */
+		endsOnValue?: boolean;
 	}
 
-	let { player, host, tags = [], slot, trailing }: Props = $props();
+	let { player, host, tags = [], slot, trailing, endsOnValue = false }: Props = $props();
 
 	const name = $derived(player?.name ?? host.name);
+	/** His value cell when the row ends on it, null otherwise or without a value. */
+	const valueEnd = $derived.by(() => {
+		if (!endsOnValue || player === null) return null;
+		const { vor, vorRound } = player;
+		return vor !== null && vorRound !== null ? vorCell(vor, vorRound) : null;
+	});
+	/** The season moves beside the projection whenever the end holds another number. */
+	const seasonInMeta = $derived(trailing !== undefined || endsOnValue);
 </script>
 
 <div class="row" class:slotted={slot !== undefined}>
@@ -50,8 +61,10 @@
 				<PositionPill position={player.position} rank={player.positionRank} />
 				<span>{player.team}</span>
 				{#if player.bye !== null}<span>bye {player.bye}</span>{/if}
-				{#if trailing}<span class="figures">{seasonWords(player.season)}</span>{/if}
-				<span class="figures">{projectionWords(player)}</span>
+				{#if seasonInMeta}<span class="figures">{seasonWords(player.season)}</span>{/if}
+				<span class="figures"
+					>{projectionWords(endsOnValue ? { points: player.points, vor: null } : player)}</span
+				>
 			{:else}
 				<span>{host.position} {host.team}</span>
 				<span>not on our board</span>
@@ -69,6 +82,10 @@
 	<span class="end">
 		{#if trailing}
 			{@render trailing()}
+		{:else if valueEnd}
+			<ValueCell {...valueEnd} />
+		{:else if endsOnValue}
+			<Label size="cell">no projection</Label>
 		{:else if player?.season.pointsPerGame != null}
 			<ValueCell
 				value={player.season.pointsPerGame}

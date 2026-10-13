@@ -60,6 +60,7 @@
 				team: player.team
 			}}
 			tags={tagsOf(player.id)}
+			endsOnValue
 		/>
 	{:else}
 		<p class="none">Every player we rank at this position is on a roster in your league.</p>
