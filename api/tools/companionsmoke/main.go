@@ -18,6 +18,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	nethttp "net/http"
 	"os"
 	"runtime"
 	"sort"
@@ -61,15 +62,16 @@ func main() {
 	dbURL := flag.String("db", "", "the local database holding the research board")
 	slot := flag.Int("slot", 5, "the drafter's slot")
 	viewers := flag.Int("viewers", 25, "browsers polling one draft")
+	advisorURL := flag.String("advisor", "", "a local advisor service, to check a card with an unplaced pick in it")
 	seconds := flag.Int("seconds", 30, "how long they poll")
 	flag.Parse()
-	if err := run(*dbURL, *slot, *viewers, *seconds); err != nil {
+	if err := run(*dbURL, *slot, *viewers, *seconds, *advisorURL); err != nil {
 		fmt.Fprintln(os.Stderr, "companionsmoke:", err)
 		os.Exit(1)
 	}
 }
 
-func run(dbURL string, slot, viewers, seconds int) error {
+func run(dbURL string, slot, viewers, seconds int, advisorURL string) error {
 	replay, err := companion.LoadReplay()
 	if err != nil {
 		return err
@@ -95,6 +97,11 @@ func run(dbURL string, slot, viewers, seconds int) error {
 		return err
 	}
 	placement(replay, board.Raw)
+	if advisorURL != "" {
+		if err := unplacedCard(ctx, replay, slot, settings, board, advisorURL); err != nil {
+			return err
+		}
+	}
 	return walk(ctx, replay, slot, settings, board)
 }
 
@@ -176,4 +183,43 @@ func pct(xs []time.Duration, q float64) time.Duration {
 	}
 	i := int(q*float64(len(s))+0.5) - 1
 	return s[min(max(i, 0), len(s)-1)].Round(10 * time.Microsecond)
+}
+
+// dropMatcher leaves one pick unplaced, the way a player our board does
+// not carry would be.
+type dropMatcher struct {
+	inner companion.Matcher
+	drop  int
+}
+
+func (d dropMatcher) Match(raw *boards.Raw, p sleeper.Pick) (string, string, bool) {
+	if p.PickNo == d.drop {
+		return "", "", false
+	}
+	return d.inner.Match(raw, p)
+}
+
+// unplacedCard asks the advisor service for the drafter's first card with
+// pick 1 left unplaced, and says whether it answered with its why.
+func unplacedCard(ctx context.Context, replay companion.Replay, slot int, settings apitypes.LeagueSettings, board boards.Board, url string) error {
+	built, err := companion.Build(mock.Settings{League: settings, Pool: board.Pool()}, board.Raw, slot, replay.Picks[:slot-1],
+		dropMatcher{inner: &companion.NameMatcher{}, drop: 1})
+	if err != nil {
+		return err
+	}
+	http := advisor.HTTP{BaseURL: url, Client: &nethttp.Client{Timeout: 5 * time.Second}}
+	card, err := http.Card(ctx, advisor.Request{State: built.Draft.State, TeamID: built.Draft.HumanTeamID, Board: board, Teams: settings.Teams})
+	if err != nil {
+		fmt.Printf("advisor with %d unplaced: refused: %v\n", built.Unplaced, err)
+		return nil
+	}
+	whys := 0
+	for _, c := range card.Shortlist {
+		if c.Why != "" {
+			whys++
+		}
+	}
+	fmt.Printf("advisor with %d unplaced: answered at pick %d, call %s, %d of %d shortlist rows with a why\n",
+		built.Unplaced, card.PickNumber, card.Call, whys, len(card.Shortlist))
+	return nil
 }
