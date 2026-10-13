@@ -16,6 +16,9 @@ interface Frame {
 /** Reconnect waits, growing to the last one and staying there. */
 const RETRY_MS = [250, 500, 1000, 2000, 5000] as const;
 
+/** The close code the room ends a socket with when it refuses it on purpose. */
+const POLICY_VIOLATION = 1008;
+
 export type SocketStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
 export interface SocketHandlers {
@@ -62,8 +65,11 @@ export class LobbySocket {
 			if (frame.type === 'welcome') welcomed = true;
 			this.receive(frame);
 		};
-		socket.onclose = () => {
+		socket.onclose = (event: CloseEvent) => {
 			this.socket = null;
+			// The room refused this socket on purpose (too many tabs on the seat, reconnecting too
+			// fast) and said why in an error frame; a retry would only be refused again.
+			if (event.code === POLICY_VIOLATION) this.stopped = true;
 			if (this.stopped) {
 				this.handlers.onstatus('closed');
 				return;

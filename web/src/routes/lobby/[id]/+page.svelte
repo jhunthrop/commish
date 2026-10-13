@@ -44,6 +44,18 @@
 		}
 	}
 
+	/** A closed lobby's verb: a seat in the next one filling in the same format. A full page load,
+	 * since this page's socket and state belong to the room it was opened on. */
+	async function joinAnother(format: LobbyRoom['format']): Promise<void> {
+		try {
+			const seat = await rooms.join(format);
+			socket?.close();
+			location.assign(resolve('/lobby/[id]', { id: seat.room_id }));
+		} catch (e) {
+			error = e;
+		}
+	}
+
 	async function leave(): Promise<void> {
 		socket?.close();
 		await rooms.leave(id).catch(() => undefined);
@@ -96,7 +108,7 @@
 		<Search placeholder="Search the pool" label="Search the pool" bind:value={query} />
 	{/snippet}
 	{#snippet tail()}
-		{#if lobby && !lobby.complete}<Quiet onclick={leave}>Leave</Quiet>{/if}
+		{#if lobby && !lobby.complete && !lobby.abandoned}<Quiet onclick={leave}>Leave</Quiet>{/if}
 	{/snippet}
 	{#if error}
 		<div class="notice"><RoomNotice {error} returnTo={page.url.pathname} /></div>
@@ -120,7 +132,19 @@
 			</Panel>
 		</div>
 	{/if}
-	{#if room && board && lobby}
+	{#if room && lobby?.abandoned}
+		{@const format = room.format}
+		<div class="notice">
+			<Panel padding="sm">
+				<div class="done">
+					<p class="line">
+						This lobby closed because nobody was here when it filled. Join another.
+					</p>
+					<Verb onclick={() => joinAnother(format)}>Join another lobby</Verb>
+				</div>
+			</Panel>
+		</div>
+	{:else if room && board && lobby}
 		<LobbyRoomView
 			{room}
 			{board}

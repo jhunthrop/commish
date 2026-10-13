@@ -27,6 +27,8 @@ export interface LobbyState {
 	deadline: number | null;
 	drafting: boolean;
 	complete: boolean;
+	/** The room closed before it drafted: nobody was here when it filled. */
+	abandoned: boolean;
 	soloPace: boolean;
 	/** Your queue, best first, as the room last stored it. */
 	queue: readonly string[];
@@ -41,6 +43,7 @@ export function initialLobby(room: LobbyRoom): LobbyState {
 		deadline: null,
 		drafting: false,
 		complete: room.status === 'complete',
+		abandoned: room.status === 'abandoned',
 		soloPace: room.solo_pace,
 		queue: []
 	};
@@ -119,6 +122,8 @@ function applyOne(state: LobbyState, action: RoomAction, you: number): LobbyStat
 				deadline: deadlineOf(payload)
 			};
 		}
+		case 'ROOM_ABANDONED':
+			return { ...state, abandoned: true, drafting: false, deadline: null };
 		case 'ROOM_COMPLETE':
 			return { ...state, complete: true, drafting: false, deadline: null };
 		default:

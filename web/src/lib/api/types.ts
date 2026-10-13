@@ -450,7 +450,7 @@ export interface paths {
 		};
 		get: operations['listMocks'];
 		put?: never;
-		/** Starts a solo mock from a saved league or from settings. The answer is the room at the drafter's first turn: every bot pick before it is already made, with the board the room drafts from. */
+		/** Starts a solo mock from a saved league or from settings. The answer is the room at the drafter's first turn: every bot pick before it is already made, with the board the room drafts from. Signed out, a browser keeps 25 unfinished mocks (409 past that) and every signed-out browser together starts 2,000 an hour (429 past that). */
 		post: operations['createMock'];
 		delete?: never;
 		options?: never;
@@ -790,7 +790,7 @@ export interface paths {
 			};
 			cookie?: never;
 		};
-		/** Upgrades to a WebSocket. The client's first message is RoomHello with the last seq it applied (0 for none). The server answers RoomWelcome with every action after that seq, then sends RoomUpdate with each new batch in seq order. The client sends RoomCommand to pick, queue or leave; a refused command answers RoomError, and a command over its budget (queue 5 a second, pick 2, leave 1) answers RoomError with code rate_limited; a socket that keeps sending past it is closed. A reconnect sends the same hello with its last seq, loses nothing, and takes the seat back from its bot. */
+		/** Upgrades to a WebSocket. The client's first message is RoomHello with the last seq it applied (0 for none). The server answers RoomWelcome with every action after that seq, then sends RoomUpdate with each new batch in seq order. The client sends RoomCommand to pick, queue or leave; a refused command answers RoomError, and a command over its budget (queue 5 a second, pick 2, leave 1, per seat across all its sockets) answers RoomError with code rate_limited; a socket that keeps sending past it is closed. A seat holds at most 3 sockets and opens at most 12 a minute after a burst of 6; past either, the newest socket gets RoomError (rate_limited, with the reason) and is closed with 1008, and the client should not retry it. A reconnect sends the same hello with its last seq, loses nothing, and takes the seat back from its bot. */
 		get: operations['roomSocket'];
 		put?: never;
 		post?: never;
@@ -813,7 +813,7 @@ export interface components {
 			request_id: string;
 		};
 		ErrorBody: {
-			/** @description invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, billing_unavailable, storage_unavailable, unavailable, internal */
+			/** @description invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal */
 			code: string;
 			message: string;
 			fields?: Record<string, string>;
@@ -1404,7 +1404,7 @@ export interface components {
 			/** @description queue, best first */
 			player_ids?: string[];
 		};
-		/** @description One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT (payload freed when a filling room gave the seat up, otherwise its stand-in drafts), SEAT_RETURNED, ROOM_STARTED (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, or an engine action (START_DRAFT, SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick, pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out. A socket receives only its own seat's SET_QUEUE payload; another seat's arrives empty, with its seq and kind. */
+		/** @description One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT (payload freed when a filling room gave the seat up, otherwise its stand-in drafts), SEAT_RETURNED, ROOM_STARTED (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, ROOM_ABANDONED (payload reason, nobody_here when the fill deadline found no drafter connected or everyone_left), or an engine action (START_DRAFT, SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick, pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out. A socket receives only its own seat's SET_QUEUE payload; another seat's arrives empty, with its seq and kind. */
 		RoomAction: {
 			/** Format: int64 */
 			seq: number;
@@ -2189,8 +2189,12 @@ export interface operations {
 		responses: {
 			201: components['responses']['MockRoomResponse'];
 			400: components['responses']['ErrorResponse'];
+			401: components['responses']['ErrorResponse'];
 			403: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			415: components['responses']['ErrorResponse'];
+			429: components['responses']['ErrorResponse'];
 			503: components['responses']['ErrorResponse'];
 		};
 	};

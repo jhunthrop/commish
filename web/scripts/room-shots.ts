@@ -1,6 +1,6 @@
 // Screenshots of the rooms signed in, against a local api and room service: setup, the solo room at
-// round 5, its report, and a lobby filling and drafting, in both themes at 1440 and 390, into
-// screenshots/ (git-ignored).
+// round 5, its report, a lobby filling and drafting, and one closed unattended, in both themes at
+// 1440 and 390, into screenshots/ (git-ignored).
 //
 //   node scripts/room-shots.ts [web origin]
 //
@@ -143,6 +143,9 @@ try {
 	interface Seat {
 		room_id: string;
 	}
+	// A lobby joined and left unattended: nobody is here when it fills, so it closes, and opening it
+	// after the fill window shows the closed state with the verb to join another.
+	const lonely = await call<Seat>(me, 'POST', '/lobbies/join', { format: '10_ppr' });
 	const seat = await call<Seat>(me, 'POST', '/lobbies/join', { format: '12_ppr' });
 	for (const helper of helpers)
 		await call<Seat>(helper, 'POST', '/lobbies/join', { format: '12_ppr' });
@@ -151,6 +154,7 @@ try {
 	const present = await Promise.all([me, ...helpers].map((who) => hold(seat.room_id, who)));
 	await shoot('lobby-filling', `/lobby/${seat.room_id}`, 'The draft starts when');
 	await new Promise((done) => setTimeout(done, FILL_WAIT_MS));
+	await shoot('lobby-abandoned', `/lobby/${lonely.room_id}`, 'Join another lobby');
 	// The helpers step away once the room starts, so their queues draft at a bot's pace.
 	for (const helper of helpers) await call<null>(helper, 'POST', `/lobbies/${seat.room_id}/leave`);
 	await Promise.all(present.slice(1).map((ctx) => ctx.close()));
