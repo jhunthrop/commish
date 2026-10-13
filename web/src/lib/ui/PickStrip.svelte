@@ -15,6 +15,9 @@
 	}
 
 	let { lead, leadLines, picks, width = 'sm' }: Props = $props();
+
+	/** The face's size, base.css's --strip-face, which the strip's reserved height counts. */
+	const STRIP_FACE = 36;
 </script>
 
 <Panel padding="none">
@@ -29,7 +32,7 @@
 					<Face
 						src={pick.player.headshot}
 						name={pick.player.name}
-						size={36}
+						size={STRIP_FACE}
 						ringed={pick.ring === 'accent'}
 						marked={pick.ring === 'ink'}
 					/>
@@ -99,9 +102,10 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 3px;
+		gap: var(--strip-gap);
 		width: var(--strip-w);
 		font-size: var(--t-xs);
+		line-height: var(--strip-line);
 		color: var(--ink-3);
 		text-align: center;
 	}
