@@ -23,9 +23,19 @@
 		shared?: { by: string | null };
 		/** The verbs under the headline. */
 		verbs: Snippet;
+		/** Who stands in for the other seats in the 200 runs, and how they draft there: the room's
+		 * bots, or for a draft on another host our model of its league. */
+		others?: { who: string; how: string };
 	}
 
-	let { report, names, field, shared, verbs }: Props = $props();
+	let {
+		report,
+		names,
+		field,
+		shared,
+		verbs,
+		others = { who: 'the bots', how: "the way this room's bots do" }
+	}: Props = $props();
 
 	const board = $derived(boardOf(report.board, report.teams));
 	const head = $derived(headline(report.standings, report.slot, report.teams));
@@ -79,16 +89,16 @@
 		/>
 	</section>
 	<section>
-		<DisplayTitle note="{their} picks on autopick from the board, the bots reshuffled each run">
+		<DisplayTitle note="{their} picks on autopick from the board, {others.who} reshuffled each run">
 			The same draft, {report.runs.runs} more times
 		</DisplayTitle>
 		<RunsSection runs={report.runs} teams={report.teams} rank={head?.rank ?? 0} />
 		<p class="basis">
 			Each run drafts the room again from pick one with a new seed, seeds {report.seed} to {report.seed +
 				report.runs.runs -
-				1}, the bots drafting the way this room's bots do and {their} seat taking the best player the
-			board has for the roster. Our projections lead the board, so a seat drafting off it finishes high
-			in most runs. The spread is the useful read.
+				1}, {others.who} drafting {others.how} and {their} seat taking the best player the board has for
+			the roster. Our projections lead the board, so a seat drafting off it finishes high in most runs.
+			The spread is the useful read.
 		</p>
 	</section>
 	{#snippet dock()}

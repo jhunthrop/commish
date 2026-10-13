@@ -128,6 +128,10 @@
 				{report}
 				{names}
 				field="your league drafting on Sleeper, read pick by pick as it happened"
+				others={{
+					who: 'stand-ins for your league',
+					how: 'from where drafters take players'
+				}}
 			>
 				{#snippet verbs()}
 					<Verb href={links.companionNew()}>Follow another draft</Verb>
