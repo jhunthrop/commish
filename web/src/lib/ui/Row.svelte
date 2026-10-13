@@ -1,11 +1,9 @@
 <script lang="ts">
-	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
+	import AdpCell from './AdpCell.svelte';
 	import Face from './Face.svelte';
-	import GapChip from './GapChip.svelte';
-	import Label from './Label.svelte';
 	import PositionPill from './PositionPill.svelte';
 	import RangeBar from './RangeBar.svelte';
 	import TierChip from './TierChip.svelte';
@@ -40,8 +38,6 @@
 		range = true,
 		action
 	}: Props = $props();
-
-	const adpLabel = $derived(player.adp === null ? 'Not in ADP' : `ADP ${fixed(player.adp)}`);
 </script>
 
 <div
@@ -69,10 +65,7 @@
 			<RangeBar floor={player.floor} median={player.median} ceiling={player.ceiling} {scale} />
 		</span>
 	{/if}
-	<span class="adp">
-		<GapChip gap={draftersGap(player.adp, player.ourRank)} />
-		<Label size="cell">{adpLabel}</Label>
-	</span>
+	<AdpCell adp={player.adp} ourRank={player.ourRank} />
 	{#if action}<span class="action">{@render action()}</span>{/if}
 </div>
 
@@ -147,14 +140,6 @@
 
 	.narrow {
 		display: none;
-	}
-
-	.adp {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: flex-start;
-		gap: 3px;
 	}
 
 	@media (max-width: 960px) {

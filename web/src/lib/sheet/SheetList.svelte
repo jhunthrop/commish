@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { MediaQuery } from 'svelte/reactivity';
 	import SheetRow from '#lib/ui/SheetRow.svelte';
 	import SheetTier from '#lib/ui/SheetTier.svelte';
 	import type { Position } from '#lib/types/player.ts';
@@ -33,6 +34,8 @@
 
 	/** How many rows load their faces at once: the first screen on a tall desktop. */
 	const EAGER_ROWS = 14;
+	/** The phone's row, decided once for the whole list, so each row draws its parts once. */
+	const phone = new MediaQuery('max-width: 760px');
 
 	let list: HTMLElement | undefined = $state();
 	let openId = $state<string | null>(null);
@@ -171,6 +174,7 @@
 			tier={position === null ? row.tier : null}
 			tags={tagMarks(row.tags)}
 			note={row.note}
+			compact={phone.current}
 			open={openId === row.id}
 			lifted={liftedRow?.id === row.id}
 			{movable}

@@ -51,6 +51,11 @@ export const ICONS = {
 		{ tag: 'path', d: 'M5 4h14v12l-4 4H5z' },
 		{ tag: 'path', d: 'M15 20v-4h4M8 9h8M8 13h5' }
 	],
+	/** Tags: a phone row's count of your tags. */
+	tag: [
+		{ tag: 'path', d: 'M3 12V4h8l10 10-8 8z' },
+		{ tag: 'circle', cx: 7.5, cy: 8.5, r: 1.3 }
+	],
 	/** More actions, folded into a menu. */
 	more: [
 		{ tag: 'circle', cx: 5, cy: 12, r: 1.4 },
