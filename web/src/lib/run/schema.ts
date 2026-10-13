@@ -201,8 +201,9 @@ export const recordWeekSchema = z
 	.object({
 		week: z.number().int().min(1),
 		status: recordWeekStatus,
-		/** When our board was frozen for the week, before its first kickoff. For an upcoming week, the
-		 * day it is set to freeze, or null when no date is set yet. Null for a missed week. */
+		/** When our board was frozen for the week, before its first kickoff. For an upcoming week, its
+		 * first kickoff, the day it freezes by (the page prints only the day), or null when no date is
+		 * set yet. Null for a missed week. */
 		frozenAt: isoTime.nullable(),
 		/** The run whose board was frozen, by its run id. Null unless the week froze. */
 		frozenBy: runIdSchema.nullable(),

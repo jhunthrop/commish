@@ -60,6 +60,13 @@ export function recordHeadline(record: RunRecord): RecordHeadline {
 	};
 }
 
+/** A missed week's reason as the end of its line: "our nightly run failed that week". */
+function reason(week: RecordWeek): string {
+	if (week.note === undefined) throw new Error(`Week ${String(week.week)} is missed with no note.`);
+	const text = week.note.replace(/\.$/, '');
+	return `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+}
+
 /** A time the schema guarantees for the status, read without a fallback that could print. */
 function stamp(iso: string | null, week: RecordWeek): string {
 	if (iso === null) throw new Error(`Week ${String(week.week)} is ${week.status} with no date.`);
@@ -67,7 +74,7 @@ function stamp(iso: string | null, week: RecordWeek): string {
 }
 
 /** Each week as a person says it, by its status: "frozen Sep 8, waiting on the stat lines",
- * "not frozen. Our nightly run failed that week", "freezes Thu Oct 15". */
+ * "not frozen, our nightly run failed that week", "freezes Thu Oct 15". */
 export function weekWords(week: RecordWeek): string {
 	switch (week.status) {
 		case 'graded':
@@ -75,7 +82,7 @@ export function weekWords(week: RecordWeek): string {
 		case 'frozen':
 			return `frozen ${stamp(week.frozenAt, week)}, waiting on the stat lines`;
 		case 'missed':
-			return `not frozen. ${(week.note ?? '').replace(/\.$/, '')}`;
+			return `not frozen, ${reason(week)}`;
 		case 'upcoming':
 			return week.frozenAt === null
 				? 'freezes before its first kickoff'

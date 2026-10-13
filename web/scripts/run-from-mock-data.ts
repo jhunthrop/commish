@@ -80,7 +80,8 @@ const WIN_TOTALS_FEED = 'vegas_win_totals';
 const WIN_TOTALS_VENDOR =
 	'Published preseason season win totals, the nfelo win_totals.csv (greerreNFL/nfelosrs)';
 /** Why the record lists a week whose first kickoff passed with no board frozen. The ledger records
- * the nightly run's failures over weeks 3 to 5. */
+ * the nightly run's failures over weeks 3 to 5, the only weeks the stand-in finds missed. The
+ * nightly writes the real reason for each week it misses. */
 const MISSED_WEEK_NOTE = 'Our nightly run failed that week.';
 
 const FORMAT: Format = {
@@ -440,6 +441,7 @@ function seasonWeeks(
 				note: MISSED_WEEK_NOTE
 			};
 		}
+		// The next week names its first kickoff, the day it freezes by.
 		const frozenAt = week === next ? kickoff.toISOString() : null;
 		return { week, status: 'upcoming', frozenAt, frozenBy: null, ...empty };
 	});
