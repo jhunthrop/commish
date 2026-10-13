@@ -20,21 +20,27 @@ const (
 	// Anonymous routes never resolve a session: the health probes, which
 	// must not touch the database, and the catch-all 404.
 	Anonymous
+	// Device routes answer only a paired device's bearer token carrying
+	// the route's Scope (auth.Bearer), never the session cookie, so they
+	// need no CSRF token: no browser sends the token on its own.
+	Device
 )
 
 // ResolvesSession reports whether the route looks up the caller's
 // session before its handler runs.
-func (a Access) ResolvesSession() bool { return a != Webhook && a != Anonymous }
+func (a Access) ResolvesSession() bool { return a == Public || a == SignedIn }
 
 // Route is one endpoint with its access rule and its rate limit. Every
 // package declares its routes as a list of these, so the whole surface,
 // with its limits, reads in one place per package and is mounted by one
 // function (internal/server).
 type Route struct {
-	Method  string
-	Path    string
-	Access  Access
-	Limit   Limit
+	Method string
+	Path   string
+	Access Access
+	Limit  Limit
+	// Scope is the device scope a Device route requires ("league:write").
+	Scope   string
 	Handler http.HandlerFunc
 }
 

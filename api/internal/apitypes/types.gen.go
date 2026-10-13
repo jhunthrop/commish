@@ -65,12 +65,15 @@ func (e BotStyle) Valid() bool {
 
 // Defines values for CompanionHost.
 const (
+	CompanionHostFfpc    CompanionHost = "ffpc"
 	CompanionHostSleeper CompanionHost = "sleeper"
 )
 
 // Valid indicates whether the value is a known member of the CompanionHost enum.
 func (e CompanionHost) Valid() bool {
 	switch e {
+	case CompanionHostFfpc:
+		return true
 	case CompanionHostSleeper:
 		return true
 	default:
@@ -96,6 +99,45 @@ func (e CompanionStatus) Valid() bool {
 	case CompanionStatusPaused:
 		return true
 	case CompanionStatusPreDraft:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeviceScope.
+const (
+	DeviceScopeDraftWrite  DeviceScope = "draft:write"
+	DeviceScopeLeagueWrite DeviceScope = "league:write"
+)
+
+// Valid indicates whether the value is a known member of the DeviceScope enum.
+func (e DeviceScope) Valid() bool {
+	switch e {
+	case DeviceScopeDraftWrite:
+		return true
+	case DeviceScopeLeagueWrite:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DraftPageStatus.
+const (
+	DraftPageStatusComplete DraftPageStatus = "complete"
+	DraftPageStatusDrafting DraftPageStatus = "drafting"
+	DraftPageStatusPreDraft DraftPageStatus = "pre_draft"
+)
+
+// Valid indicates whether the value is a known member of the DraftPageStatus enum.
+func (e DraftPageStatus) Valid() bool {
+	switch e {
+	case DraftPageStatusComplete:
+		return true
+	case DraftPageStatusDrafting:
+		return true
+	case DraftPageStatusPreDraft:
 		return true
 	default:
 		return false
@@ -236,6 +278,7 @@ func (e Interval) Valid() bool {
 
 // Defines values for LeagueHost.
 const (
+	LeagueHostFfpc    LeagueHost = "ffpc"
 	LeagueHostMfl     LeagueHost = "mfl"
 	LeagueHostSleeper LeagueHost = "sleeper"
 )
@@ -243,6 +286,8 @@ const (
 // Valid indicates whether the value is a known member of the LeagueHost enum.
 func (e LeagueHost) Valid() bool {
 	switch e {
+	case LeagueHostFfpc:
+		return true
 	case LeagueHostMfl:
 		return true
 	case LeagueHostSleeper:
@@ -381,6 +426,36 @@ func (e MockStatus) Valid() bool {
 	}
 }
 
+// Defines values for PageFamily.
+const (
+	PageFamilyHome      PageFamily = "home"
+	PageFamilyMatchup   PageFamily = "matchup"
+	PageFamilyMoves     PageFamily = "moves"
+	PageFamilyRosters   PageFamily = "rosters"
+	PageFamilyScoring   PageFamily = "scoring"
+	PageFamilyStandings PageFamily = "standings"
+)
+
+// Valid indicates whether the value is a known member of the PageFamily enum.
+func (e PageFamily) Valid() bool {
+	switch e {
+	case PageFamilyHome:
+		return true
+	case PageFamilyMatchup:
+		return true
+	case PageFamilyMoves:
+		return true
+	case PageFamilyRosters:
+		return true
+	case PageFamilyScoring:
+		return true
+	case PageFamilyStandings:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PlayerPosition.
 const (
 	PlayerPositionDEF PlayerPosition = "DEF"
@@ -426,6 +501,72 @@ func (e Product) Valid() bool {
 	case ProductGroupPass:
 		return true
 	case ProductMembership:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PushedHost.
+const (
+	PushedHostFfpc PushedHost = "ffpc"
+)
+
+// Valid indicates whether the value is a known member of the PushedHost enum.
+func (e PushedHost) Valid() bool {
+	switch e {
+	case PushedHostFfpc:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PushedMoveKind.
+const (
+	PushedMoveKindAdd    PushedMoveKind = "add"
+	PushedMoveKindTrade  PushedMoveKind = "trade"
+	PushedMoveKindWaiver PushedMoveKind = "waiver"
+)
+
+// Valid indicates whether the value is a known member of the PushedMoveKind enum.
+func (e PushedMoveKind) Valid() bool {
+	switch e {
+	case PushedMoveKindAdd:
+		return true
+	case PushedMoveKindTrade:
+		return true
+	case PushedMoveKindWaiver:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PushedPosition.
+const (
+	PushedPositionDEF PushedPosition = "DEF"
+	PushedPositionK   PushedPosition = "K"
+	PushedPositionQB  PushedPosition = "QB"
+	PushedPositionRB  PushedPosition = "RB"
+	PushedPositionTE  PushedPosition = "TE"
+	PushedPositionWR  PushedPosition = "WR"
+)
+
+// Valid indicates whether the value is a known member of the PushedPosition enum.
+func (e PushedPosition) Valid() bool {
+	switch e {
+	case PushedPositionDEF:
+		return true
+	case PushedPositionK:
+		return true
+	case PushedPositionQB:
+		return true
+	case PushedPositionRB:
+		return true
+	case PushedPositionTE:
+		return true
+	case PushedPositionWR:
 		return true
 	default:
 		return false
@@ -952,6 +1093,69 @@ type CompanionSummary struct {
 	Status CompanionStatus `json:"status"`
 }
 
+// Device defines model for Device.
+type Device struct {
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// LastUsedAt when it last sent a page, to the hour; null when it never has
+	LastUsedAt *time.Time `json:"last_used_at"`
+
+	// Name what the browser called itself at pairing
+	Name   string        `json:"name"`
+	Scopes []DeviceScope `json:"scopes"`
+}
+
+// DeviceMe defines model for DeviceMe.
+type DeviceMe struct {
+	Device Device `json:"device"`
+
+	// Handle the account's public name
+	Handle *string `json:"handle"`
+}
+
+// DeviceScope what a paired browser may write
+type DeviceScope string
+
+// DraftPage defines model for DraftPage.
+type DraftPage struct {
+	League PushedLeagueRef `json:"league"`
+	Lineup PushedLineup    `json:"lineup"`
+
+	// MySlot the member's own draft slot
+	MySlot int             `json:"my_slot"`
+	Name   string          `json:"name"`
+	Picks  []DraftPagePick `json:"picks"`
+
+	// ReversalRound the round a third-round reversal starts
+	ReversalRound int `json:"reversal_round"`
+	Rounds        int `json:"rounds"`
+
+	// Rules the league's scoring as the extension last read it, in Sleeper's key names, when it has
+	Rules *map[string]float64 `json:"rules,omitempty"`
+
+	// SlotNames the team's name in each draft slot, slot 1 first
+	SlotNames []string `json:"slot_names"`
+
+	// Snake the order turns each round
+	Snake  bool            `json:"snake"`
+	Status DraftPageStatus `json:"status"`
+	Teams  int             `json:"teams"`
+}
+
+// DraftPagePick defines model for DraftPagePick.
+type DraftPagePick struct {
+	Pick   int          `json:"pick"`
+	Player PushedPlayer `json:"player"`
+	Round  int          `json:"round"`
+
+	// Slot the draft slot whose turn it was
+	Slot int `json:"slot"`
+}
+
+// DraftPageStatus defines model for DraftPageStatus.
+type DraftPageStatus string
+
 // DraftPassState defines model for DraftPassState.
 type DraftPassState struct {
 	EndsAt time.Time            `json:"ends_at"`
@@ -1073,6 +1277,16 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// HomePage defines model for HomePage.
+type HomePage struct {
+	// Name the league's name
+	Name string `json:"name"`
+
+	// TeamId the team the page is for
+	TeamId   int    `json:"team_id"`
+	TeamName string `json:"team_name"`
+}
+
 // ImportSkip defines model for ImportSkip.
 type ImportSkip struct {
 	Line   int    `json:"line"`
@@ -1128,6 +1342,23 @@ type LeagueMove struct {
 
 // LeagueMoveKind defines model for LeagueMove.Kind.
 type LeagueMoveKind string
+
+// LeaguePage one page the member had open; exactly the object its family names is set
+type LeaguePage struct {
+	Family    PageFamily      `json:"family"`
+	Home      *HomePage       `json:"home,omitempty"`
+	League    PushedLeagueRef `json:"league"`
+	Matchup   *MatchupPage    `json:"matchup,omitempty"`
+	Moves     *MovesPage      `json:"moves,omitempty"`
+	Rosters   *[]PushedTeam   `json:"rosters,omitempty"`
+	Scoring   *ScoringPage    `json:"scoring,omitempty"`
+	Standings *[]PushedTeam   `json:"standings,omitempty"`
+}
+
+// LeaguePages defines model for LeaguePages.
+type LeaguePages struct {
+	Pages []LeaguePage `json:"pages"`
+}
 
 // LeaguePlayer defines model for LeaguePlayer.
 type LeaguePlayer struct {
@@ -1298,6 +1529,12 @@ type LobbySeatView struct {
 // LobbySeatViewKind defines model for LobbySeatView.Kind.
 type LobbySeatViewKind string
 
+// MatchupPage defines model for MatchupPage.
+type MatchupPage struct {
+	Sides []PushedSide `json:"sides"`
+	Week  int          `json:"week"`
+}
+
 // MatchupSide defines model for MatchupSide.
 type MatchupSide struct {
 	Points   float64          `json:"points"`
@@ -1433,6 +1670,11 @@ type MovePlayer struct {
 	RosterId int `json:"roster_id"`
 }
 
+// MovesPage defines model for MovesPage.
+type MovesPage struct {
+	Moves []PushedMove `json:"moves"`
+}
+
 // OutcomeRange defines model for OutcomeRange.
 type OutcomeRange struct {
 	Ceiling float64 `json:"ceiling"`
@@ -1440,11 +1682,55 @@ type OutcomeRange struct {
 	Median  float64 `json:"median"`
 }
 
+// PageFamily defines model for PageFamily.
+type PageFamily string
+
 // PageMeta defines model for PageMeta.
 type PageMeta struct {
 	Page    int   `json:"page"`
 	PerPage int   `json:"per_page"`
 	Total   int64 `json:"total"`
+}
+
+// PagesTaken defines model for PagesTaken.
+type PagesTaken struct {
+	ReadAt time.Time `json:"read_at"`
+
+	// Refused each page family not taken and why, in our words
+	Refused map[string]string `json:"refused"`
+	Taken   []PageFamily      `json:"taken"`
+}
+
+// PairCode defines model for PairCode.
+type PairCode struct {
+	// Code six words separated by spaces
+	Code      string    `json:"code"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// PairInput defines model for PairInput.
+type PairInput struct {
+	// Code the six words as typed
+	Code string `json:"code"`
+
+	// Name what the browser calls itself
+	Name *string `json:"name,omitempty"`
+}
+
+// Paired defines model for Paired.
+type Paired struct {
+	Device Device `json:"device"`
+
+	// Token the device token
+	Token string `json:"token"`
+}
+
+// PicksTaken defines model for PicksTaken.
+type PicksTaken struct {
+	// Id the companion
+	Id        openapi_types.UUID `json:"id"`
+	PickCount int                `json:"pick_count"`
+	ReadAt    time.Time          `json:"read_at"`
 }
 
 // Placement how the league's rostered players were placed on our board, by rule
@@ -1494,6 +1780,95 @@ type Price struct {
 
 // Product defines model for Product.
 type Product string
+
+// PushedHost a host whose pages arrive from the member's own browser through the extension
+type PushedHost string
+
+// PushedLeagueAttach defines model for PushedLeagueAttach.
+type PushedLeagueAttach struct {
+	Home   HomePage        `json:"home"`
+	League PushedLeagueRef `json:"league"`
+}
+
+// PushedLeagueRef defines model for PushedLeagueRef.
+type PushedLeagueRef struct {
+	// Host a host whose pages arrive from the member's own browser through the extension
+	Host         PushedHost `json:"host"`
+	HostLeagueId string     `json:"host_league_id"`
+	Season       int        `json:"season"`
+}
+
+// PushedLineup defines model for PushedLineup.
+type PushedLineup struct {
+	Bench     int `json:"bench"`
+	Def       int `json:"def"`
+	Flex      int `json:"flex"`
+	K         int `json:"k"`
+	Qb        int `json:"qb"`
+	Rb        int `json:"rb"`
+	SuperFlex int `json:"super_flex"`
+	Te        int `json:"te"`
+	Wr        int `json:"wr"`
+}
+
+// PushedMove defines model for PushedMove.
+type PushedMove struct {
+	Adds  *[]PushedMovePlayer `json:"adds,omitempty"`
+	At    time.Time           `json:"at"`
+	Drops *[]PushedMovePlayer `json:"drops,omitempty"`
+	Kind  PushedMoveKind      `json:"kind"`
+}
+
+// PushedMoveKind defines model for PushedMove.Kind.
+type PushedMoveKind string
+
+// PushedMovePlayer defines model for PushedMovePlayer.
+type PushedMovePlayer struct {
+	Player PushedPlayer `json:"player"`
+	TeamId int          `json:"team_id"`
+}
+
+// PushedPlayer defines model for PushedPlayer.
+type PushedPlayer struct {
+	// Id the host's player id (FFPC's own ids, kept for a future crosswalk); empty only in a move, where the host's page names the player without one
+	Id   string `json:"id"`
+	Name string `json:"name"`
+
+	// NameCut the host showed the name cut short (a draft board cell), so it is matched by its start
+	NameCut  *bool          `json:"name_cut,omitempty"`
+	Position PushedPosition `json:"position"`
+
+	// Team the NFL team code as the host writes it
+	Team string `json:"team"`
+}
+
+// PushedPosition defines model for PushedPosition.
+type PushedPosition string
+
+// PushedSide defines model for PushedSide.
+type PushedSide struct {
+	// Game sides with the same game play each other
+	Game         int                 `json:"game"`
+	PlayerPoints *map[string]float64 `json:"player_points,omitempty"`
+	Points       float64             `json:"points"`
+	Starters     []PushedPlayer      `json:"starters"`
+	TeamId       int                 `json:"team_id"`
+}
+
+// PushedTeam defines model for PushedTeam.
+type PushedTeam struct {
+	Losses    *int            `json:"losses,omitempty"`
+	Name      string          `json:"name"`
+	Owner     *string         `json:"owner,omitempty"`
+	Players   *[]PushedPlayer `json:"players,omitempty"`
+	PointsFor *float64        `json:"points_for,omitempty"`
+
+	// Reserve player ids on injured reserve
+	Reserve *[]string `json:"reserve,omitempty"`
+	TeamId  int       `json:"team_id"`
+	Ties    *int      `json:"ties,omitempty"`
+	Wins    *int      `json:"wins,omitempty"`
+}
 
 // Redirect defines model for Redirect.
 type Redirect struct {
@@ -1726,6 +2101,18 @@ type Scoring struct {
 	// Custom points per stat, keyed by stat (snake_case), at most 200 stats
 	Custom *map[string]float64 `json:"custom,omitempty"`
 	Preset *ScoringPreset      `json:"preset,omitempty"`
+}
+
+// ScoringPage defines model for ScoringPage.
+type ScoringPage struct {
+	Lineup *PushedLineup `json:"lineup,omitempty"`
+
+	// Rules the league's points per stat as the extension read them, in Sleeper's key names (pass_yd, rec, bonus_rec_te), mapped by the api into ScoringRules' 21 keys with every other rule named as dropped
+	Rules map[string]float64 `json:"rules"`
+	Teams *int               `json:"teams,omitempty"`
+
+	// Unread the host's own words for each scoring rule the extension could not put in a key
+	Unread []string `json:"unread"`
 }
 
 // ScoringPreset defines model for ScoringPreset.
@@ -2052,6 +2439,15 @@ type StripeWebhookJSONRequestBody = StripeWebhookJSONBody
 // CreateCompanionJSONRequestBody defines body for CreateCompanion for application/json ContentType.
 type CreateCompanionJSONRequestBody = CompanionCreate
 
+// CreatePushedCompanionJSONRequestBody defines body for CreatePushedCompanion for application/json ContentType.
+type CreatePushedCompanionJSONRequestBody = DraftPage
+
+// PushCompanionPicksJSONRequestBody defines body for PushCompanionPicks for application/json ContentType.
+type PushCompanionPicksJSONRequestBody = DraftPage
+
+// PairDeviceJSONRequestBody defines body for PairDevice for application/json ContentType.
+type PairDeviceJSONRequestBody = PairInput
+
 // CreateLeagueJSONRequestBody defines body for CreateLeague for application/json ContentType.
 type CreateLeagueJSONRequestBody = LeagueInput
 
@@ -2060,6 +2456,12 @@ type AttachLeagueJSONRequestBody = AttachInput
 
 // PreviewAttachJSONRequestBody defines body for PreviewAttach for application/json ContentType.
 type PreviewAttachJSONRequestBody = AttachPreviewInput
+
+// PushLeaguePagesJSONRequestBody defines body for PushLeaguePages for application/json ContentType.
+type PushLeaguePagesJSONRequestBody = LeaguePages
+
+// AttachPushedLeagueJSONRequestBody defines body for AttachPushedLeague for application/json ContentType.
+type AttachPushedLeagueJSONRequestBody = PushedLeagueAttach
 
 // ReplaceLeagueJSONRequestBody defines body for ReplaceLeague for application/json ContentType.
 type ReplaceLeagueJSONRequestBody = LeagueInput

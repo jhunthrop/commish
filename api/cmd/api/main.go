@@ -21,6 +21,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/billing"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/db"
+	"github.com/jhunthrop/commish/api/internal/devices"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/exports"
@@ -91,6 +92,11 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	if err != nil {
 		return nil, err
 	}
+	deviceStore := &devices.Store{Pool: pool}
+	bearer, err := auth.NewBearer(cfg.Session.CookiePassword, cfg.HTTP.TrustedProxyHops, deviceStore, now, log)
+	if err != nil {
+		return nil, err
+	}
 	nameFilter, err := names.Default()
 	if err != nil {
 		return nil, err
@@ -154,11 +160,12 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		solo.Routes(),
 		lobbies.Routes(),
 		companions.Routes(),
+		(&devices.Service{Store: deviceStore, Tokens: bearer, Now: now, Log: log}).Routes(),
 		leagueSyncService(cfg, pool, draftBoards, leagueStore, log).Routes(),
 		devRoutes,
 	)
 	mux := http.NewServeMux()
-	if err := server.Mount(mux, routes, sessions, now); err != nil {
+	if err := server.Mount(mux, routes, sessions, bearer, now); err != nil {
 		return nil, err
 	}
 	return server.Stack(mux, log, obs, cfg.HTTP.CORSOrigins), nil
