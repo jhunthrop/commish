@@ -70,11 +70,19 @@ func validateTags(errs map[string]string, field string, tags apitypes.SheetTags,
 		errs[field] = fmt.Sprintf("Keep it to %d tags", MaxTags)
 		return
 	}
+	has := map[string]bool{}
 	for _, t := range tags {
 		if n := utf8.RuneCountInString(t); n < 1 || n > maxTagLen || !shape.MatchString(t) {
 			errs[field] = fmt.Sprintf("A tag is 1 to %d letters or numbers", maxTagLen)
 			return
 		}
+		has[t] = true
+	}
+	// Target and Avoid say opposite things about one player, so a sheet never holds both. The
+	// browser already refuses the pair; the table refuses it too, because a merge across two
+	// devices could otherwise store it (sheet UX round 2, 2026-10-14).
+	if has[string(apitypes.SheetTagTarget)] && has[string(apitypes.SheetTagAvoid)] {
+		errs[field] = "Target and Avoid are both set, pick one"
 	}
 }
 
