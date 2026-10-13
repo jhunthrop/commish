@@ -24,8 +24,9 @@
 			flex-wrap: nowrap;
 			overflow-x: auto;
 			margin: calc(-1 * var(--s-2)) calc(-1 * var(--s-4));
-			padding: var(--s-2) var(--s-4);
+			padding: var(--s-2) var(--fade-w) var(--s-2) var(--s-4);
 			scrollbar-width: none;
+			mask-image: var(--fade-end);
 		}
 	}
 </style>

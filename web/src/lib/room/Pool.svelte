@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { adpWords } from '#lib/format/draft.ts';
+	import { count } from '#lib/format/number.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
@@ -86,7 +87,7 @@
 <section class="pool" class:no-odds={!oddsShown} class:readonly aria-label="Pool">
 	<div class="head">
 		<DisplayTitle size="panel">Pool</DisplayTitle>
-		<Label>{left} left, ranked by points over replacement</Label>
+		<Label>{count(left)} left, ranked by points over replacement</Label>
 		<div class="chips">
 			<ChipGroup label="Position">
 				{#each filters as f (f)}
@@ -180,6 +181,11 @@
 		column-gap: var(--s-3);
 		padding: var(--s-3) var(--s-3) var(--s-2);
 		border-bottom: 1px solid var(--line-strong);
+	}
+
+	.cols > .adp {
+		display: flex;
+		justify-content: flex-end;
 	}
 
 	.more {

@@ -146,7 +146,8 @@
 			/>{/if}
 	{/snippet}
 	{#snippet tail()}
-		<Quiet href={resolve('/mock/new')}>New mock</Quiet>
+		<!-- A room that never loaded shows its notice with New mock, so the bar leaves it out. -->
+		{#if room !== null || !error}<Quiet href={resolve('/mock/new')}>New mock</Quiet>{/if}
 	{/snippet}
 	{#if error}
 		<div class="notice">

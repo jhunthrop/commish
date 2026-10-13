@@ -271,7 +271,6 @@
 			withCall={!readonly}
 		/>
 		{#if !readonly}<Keys bindings={SOLO_KEYS} />{/if}
-		<span class="seed">Seed {room.seed} · the same seed replays the same bots</span>
 	{/snippet}
 </RoomLayout>
 
@@ -280,11 +279,5 @@
 		margin: 0;
 		font-size: var(--t-sm);
 		color: var(--ink-2);
-	}
-
-	.seed {
-		padding: 0 var(--s-1);
-		font-size: var(--t-xs);
-		color: var(--ink-3);
 	}
 </style>

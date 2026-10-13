@@ -11,6 +11,13 @@ export function fixed(value: number, decimals = 1): string {
 	return value.toFixed(decimals);
 }
 
+const WHOLE = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+
+/** A count as a reader reads it: "1,467". */
+export function count(value: number): string {
+	return WHOLE.format(value);
+}
+
 /** "1 pick", "9 picks". */
 export function plural(count: number, one: string, many = `${one}s`): string {
 	return `${count} ${count === 1 ? one : many}`;

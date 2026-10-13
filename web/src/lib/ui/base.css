@@ -74,6 +74,13 @@ input {
 	}
 }
 
+/* A row that scrolls sideways on the phone fades at its right edge, so the cut says there is more,
+   and ends with that much room so its last item scrolls clear of the fade. */
+:root {
+	--fade-w: var(--s-6);
+	--fade-end: linear-gradient(to right, #000 calc(100% - var(--fade-w)), transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
 	* {
 		transition: none !important;

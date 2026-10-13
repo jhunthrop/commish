@@ -7,7 +7,7 @@
 		odds: number | null;
 		/** What the chance is of, printed under it: "still there at 6.05". */
 		label: string;
-		/** What prints under the dash when there is no chance to show: "not in the odds". */
+		/** What prints in place of a chance when there is none to show: "not in the odds". */
 		missing?: string;
 	}
 
@@ -17,9 +17,13 @@
 </script>
 
 <span class="cell">
-	<b>{odds === null ? '–' : oddsShort(odds)}</b>
-	<span class="meter" aria-hidden="true"><i style:width="{percent}%"></i></span>
-	<Label size="cell">{odds === null ? missing : label}</Label>
+	{#if odds === null}
+		<Label size="cell">{missing}</Label>
+	{:else}
+		<b>{oddsShort(odds)}</b>
+		<span class="meter" aria-hidden="true"><i style:width="{percent}%"></i></span>
+		<Label size="cell">{label}</Label>
+	{/if}
 </span>
 
 <style>

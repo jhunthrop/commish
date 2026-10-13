@@ -73,7 +73,7 @@
 	{#if player.vor !== null && player.vorRound !== null}
 		<ValueCell {...vorCell(player.vor, player.vorRound)} />
 	{:else}
-		<span class="none"><b>–</b><Label size="cell">no projection</Label></span>
+		<span class="none"><Label size="cell">no projection</Label></span>
 	{/if}
 	{#if odds !== undefined}<OddsCell {odds} label={oddsLabel} missing={oddsMissing} />{/if}
 	<span class="adp">{adp}</span>
@@ -134,12 +134,6 @@
 		align-items: flex-end;
 		padding: 0 var(--s-3);
 		color: var(--ink-3);
-	}
-
-	.none b {
-		font-family: var(--font-num);
-		font-size: var(--t-xl);
-		line-height: 1;
 	}
 
 	.adp {

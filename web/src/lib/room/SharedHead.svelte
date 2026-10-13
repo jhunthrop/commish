@@ -25,13 +25,13 @@
 <header class="head">
 	<div>
 		<DisplayTitle size="page">{whose} from slot {room.slot}</DisplayTitle>
-		<p>{formatLine(room.settings)} · {at} · seed {room.seed}</p>
+		<p>{formatLine(room.settings)} · {at}</p>
 	</div>
 	<div class="act">
 		<Verb onclick={onrun} disabled={starting}>Run this draft from slot {room.slot}</Verb>
 		<p class="note">
-			The same settings and seed, so the bots draft the same way until a pick of yours changes the
-			board.
+			It starts from the first pick with the same settings and bots, so they draft the same way
+			until a pick of yours changes the board.
 		</p>
 	</div>
 </header>
