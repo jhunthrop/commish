@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Final
 
+from research.model.decide.normal import Z_NINETIETH
 from research.model.decide.value import (
     LeagueShape,
     SeasonProjection,
@@ -22,7 +23,6 @@ from research.model.jsmath import js_max, js_or, js_sorted, locale_compare
 from research.model.preseason.availability import GamesPlayedOutlook, ProjectionDistribution
 from research.model.preseason.candidates import BoardCandidate, Reason
 
-Z90: Final = 1.2815515655446004
 VARIANCE_POSITIONS: Final = ("QB", "RB", "WR", "TE", "K", "DEF")
 _SCALED_OPTIONAL_FIELDS: Final = (
     "two_point_conversions",
@@ -115,7 +115,7 @@ def preseason_board(
             per_game_points,
             candidate.games,
             _game_variance_for(candidate, game_variance),
-            Z90,
+            Z_NINETIETH,
             candidate.season_projection_error_variance or 0.0,
         )
         held[candidate.player_id] = (candidate, season_line, outlook)
