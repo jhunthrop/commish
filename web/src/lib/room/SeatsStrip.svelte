@@ -61,9 +61,12 @@
 		{#if compact(seat)}
 			<li
 				class="bot"
+				class:open={kindOf(seat) === 'open'}
 				class:on={seat === onClock}
 				data-seat={seat}
-				aria-label="{name}{seat === onClock ? ', on the clock' : ''}"
+				aria-label="{name}{kindOf(seat) === 'open' ? ', open' : ''}{seat === onClock
+					? ', on the clock'
+					: ''}"
 			>
 				<i aria-hidden="true"></i><b aria-hidden="true">{seat}</b>
 			</li>
@@ -134,6 +137,12 @@
 		height: 10px;
 		border-radius: 50%;
 		background: var(--ink-3);
+	}
+
+	/* An open seat while the lobby fills: a hollow dot, nobody and no bot there yet. */
+	.open i {
+		background: transparent;
+		border: 1.5px solid var(--ink-3);
 	}
 
 	.bot b {

@@ -45,9 +45,14 @@ interface SeatLike {
  * the seat is still his), or Bot and its seat number. */
 export function seatName(seat: SeatLike & { seat: number }, you: number): string {
 	if (seat.seat === you) return 'You';
-	if (seat.kind === 'bot' || seat.kind === 'open' || seat.handle === null)
-		return botName(seat.seat);
+	if (seat.kind === 'open') return openSeatName(seat.seat);
+	if (seat.kind === 'bot' || seat.handle === null) return botName(seat.seat);
 	return seat.handle;
+}
+
+/** A seat nobody holds yet, while the lobby fills: a bot takes it only when the draft starts. */
+export function openSeatName(seat: number): string {
+	return `Seat ${seat}`;
 }
 
 /** The people a lobby drafted with: everyone who held a seat when it started, whether he is still

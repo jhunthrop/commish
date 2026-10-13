@@ -1,6 +1,6 @@
 // Screenshots of the rooms signed in, against a local api and room service: setup, the solo room at
-// round 5, its report, a lobby filling and drafting, and one closed unattended, in both themes at
-// 1440 and 390, into screenshots/ (git-ignored).
+// round 5, its shared link, its report, a lobby filling and drafting, and one closed unattended, in
+// both themes at 1440 and 390, into screenshots/ (git-ignored).
 //
 //   node scripts/room-shots.ts [web origin]
 //
@@ -124,6 +124,7 @@ try {
 	interface Room {
 		id: string;
 		pick_number: number;
+		share_code: string;
 	}
 	const settings = {
 		scoring: { preset: 'ppr' },
@@ -137,6 +138,9 @@ try {
 	const created = await call<Room>(me, 'POST', '/mocks', { settings, seed: 2026 });
 	await call<Room>(me, 'POST', `/mocks/${created.id}/autopick?to_round=4`);
 	await shoot('mock-room', `/mock/${created.id}`, 'Our call at');
+	// The same draft as a friend opens its link, signed out in a fresh browser.
+	const midway = await call<Room>(me, 'GET', `/mocks/${created.id}`);
+	await shoot('mock-shared', `/mock/share/${midway.share_code}`, 'Run this draft from slot', null);
 	await call<Room>(me, 'POST', `/mocks/${created.id}/finish`);
 	await shoot('mock-report', `/mock/${created.id}/report`, 'The field');
 

@@ -10,8 +10,8 @@
 		/** The two lines under it. */
 		leadLines: readonly string[];
 		picks: readonly StripPick[];
-		/** Wider faces' columns when each carries more lines. */
-		width?: 'sm' | 'md';
+		/** Wider faces' columns when each carries more lines, widest when a line names a handle. */
+		width?: 'sm' | 'md' | 'lg';
 	}
 
 	let { lead, leadLines, picks, width = 'sm' }: Props = $props();
@@ -84,6 +84,10 @@
 
 	.run.md {
 		--strip-w: 66px;
+	}
+
+	.run.lg {
+		--strip-w: 88px;
 	}
 
 	li {

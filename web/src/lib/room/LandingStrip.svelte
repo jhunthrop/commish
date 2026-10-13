@@ -44,6 +44,6 @@
 		lead={pickLabel(picks[0]?.pick ?? 1, teams)}
 		leadLines={['just taken, newest first', `${people} of the last ${picks.length} by people`]}
 		picks={strip}
-		width="md"
+		width="lg"
 	/>
 {/if}
