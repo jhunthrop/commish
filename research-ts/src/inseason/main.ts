@@ -58,10 +58,16 @@ async function seasonWeek(db: Db, clock: Clock, argv: readonly string[]): Promis
   return run.exitCode === 0;
 }
 
+/** A refused capture (`CaptureResult.reason`: no budget, no key, nothing the provider would serve)
+ *  captured nothing, so it fails the run with its reason, as a failed feed does. */
 async function captureHarvest(db: Db, clock: Clock): Promise<boolean> {
   const report = await harvestCaptures(db, clock, {});
   write(`${report.summary}. ${report.moved.length} player(s) moved`);
   for (const line of report.detail) write(`  ${line}`);
+  if (report.result.reason !== undefined) {
+    process.stderr.write(`inseason: capture-harvest REFUSED, ${report.result.reason}\n`);
+    return false;
+  }
   return report.result.feeds.every((feed) => feed.status !== "failed");
 }
 

@@ -38,7 +38,7 @@ npm run nightly -- [--out=<dir>] [--skip=ingest,fit,capsules] [--persist-board]
 npm run inseason -- --task=season-week [--season=2026] [--dry-run]
 npm run inseason -- --task=capture-harvest
 npm run advisor                   POST /advise on $PORT (8080)
-npm run advisor:measure           a whole 12-team draft against the advisor, p50 and p90
+npm run advisor:measure -- <runs/<runId>/boards/ppr-12.json>   a whole 12-team draft against the advisor, p50 and p90
 npm run db:generate               migrations from src/db/schema.ts into drizzle/
 ```
 
@@ -47,17 +47,19 @@ npm run db:generate               migrations from src/db/schema.ts into drizzle/
 `src/nightly/main.ts` runs, in order:
 
 1. **ingest**: the provider capture (injuries, news, depth charts, inactives, betting odds) when `TANK01_API_KEY` is set, tonight's ADP in PPR, half and standard, the pre-kickoff props snapshot when `ODDS_API_KEY` is set, the win totals. The last two are no-ops after the season's first kickoff.
-2. **fit**: the product season's boards through `persistSeason`, the same builder the operator script uses. By default it builds and compares with what is stored and writes nothing, because retaking the live board replaces what is served and what the register freezes. `--persist-board` takes it.
+2. **fit**: the boards through `persistSeason`, the same builder the operator script uses. By default it CHECKS and writes nothing: before the product season's first kickoff it rebuilds the live board at the moment the stored generation was taken (the clock pinned to its `as_of`); after kickoff, when the engine refuses to rebuild a live board at all, it rebuilds the archived replay boards it still holds the inputs for. Each rebuild is compared with the stored generation at the same moment, points (projected, floor, median, ceiling, expected games) and reasons. Any point field more than 0.05 away (`NIGHTLY_CONFIG.fitPointTolerance`: the pages print one decimal, so a smaller difference can never print differently), any player on one side only, or any changed reason fails the step. When nothing can be rebuilt (after kickoff, with archives whose inputs the store no longer holds) the step is skipped and says why. Retaking the live board replaces what is served and what the register freezes, so `--persist-board` is the only way to write.
 3. **capsules**: every stored capsule carrying a set phrase or a writer's aside is queued for a rewrite, then the sweep regenerates every player whose facts moved. Skipped by name when `AI_GATEWAY_API_KEY` is not set, because a sweep without the key would demote written reads to the template.
 
 Then it reads every board variant, ADP, capsules, the register's running score and the held-out backtest, writes the run, checks the gates and writes the manifest last. A run that passes moves `runs/latest.json`; a run that fails is kept for diagnosis and moves nothing, so the previous clean run stays the one a site builds from.
 
 ### The run format
 
-Under the output directory (default `./nightly-out`, gitignored; `--out` or `NIGHTLY_OUTPUT_DIR` override), one run id per run, the UTC hour it started (`2026-10-12T05`, `.2` for a second run in the same hour):
+Under the output directory (default `./nightly-out`, gitignored; `--out` or `NIGHTLY_OUTPUT_DIR` override), one run id per run, the UTC hour it started (`2026-10-12T05`, `.2` for a second run in the same hour). A run claims its id with `started.json` the moment it starts, so a run that crashed keeps its partial files and is never overwritten:
 
 ```
 runs/latest.json                                   { runId, finishedAt } of the newest passing run
+runs/held-out-baseline.json                        { runId, heldOut } of the newest run whose backtest gate passed
+runs/<runId>/started.json                          written first, claims the id
 runs/<runId>/boards/<format>-<teams>.json          standard roster shape, e.g. ppr-12.json
 runs/<runId>/boards/<format>-superflex-<teams>.json
 runs/<runId>/players/<id>.json                     one page per player, every format inlined
@@ -75,10 +77,11 @@ The run is written through a `RunStore` (`src/nightly/run-store.ts`): `LocalRunS
 
 | Gate | Fails with |
 |---|---|
-| `held_out_backtest`: each held-out season's served board against what players scored, no worse than the last clean run by more than 0.005 rank correlation | `held_out_regressed:<season>:<before>-><now>`, `held_out_unscored:<season>` |
+| `held_out_backtest`: each held-out season's served board against what players scored, no worse than the baseline (the newest run whose backtest passed) by more than 0.005 rank correlation | `held_out_regressed:<season>:<before>-><now>`, `held_out_unscored:<season>` |
 | `board_depth`: every starting slot's eligible pool covers the whole league's demand for it, and the board fills every roster spot | `board_depth_short:<board>:<slot>:<have>/<need>` |
-| `capsules`: every player page has a capsule, every pull figure appears word for word in its prose, no set phrase or aside | `capsule_missing:<id>`, `pull_figure_not_in_prose:<id>:<figure>`, `capsule_voice_rule:<id>:<text>` |
+| `capsules`: every page the writer covers (every page with a projection; a page without one, kickers and defenses in market order or a man the board does not project, needs none) has a capsule; the capsule prints at least one of its page's own numbers (the pull figures, drawn from the page's board row: projection, ceiling, floor, median, points over replacement, drop to the next tier, ADP, at the tenth or the whole point), each word for word and equal to the page's value at the precision printed; no set phrase or aside | `capsule_missing:<id>`, `pull_figures_none:<id>`, `pull_figure_not_in_prose:<id>:<figure>`, `pull_figure_off_page:<id>:<label>:<figure>`, `capsule_voice_rule:<id>:<text>` |
 | `basis`: every number names its basis | `basis_missing:<where>` |
+| `adp`: every format has tonight's ADP from a named capture | `adp_missing:<format>` |
 
 A failed step also fails the run.
 
@@ -115,7 +118,7 @@ A failed step also fails the run.
 }
 ```
 
-- `pool` is every player in the room, drafted or not. `projectedPoints` is `null` for a position the board ships in market order (kickers and defenses): such a man has survival odds but no value, and is never recommended.
+- `pool` is every player in the room, drafted or not. `projectedPoints` is `null` for a position the board ships in market order (kickers and defenses): such a man has survival odds but no value. When the valued board has nothing legal (the late rounds, only a kicker or defense slot open), the advisor answers with the legal market-order players by ADP, each with zero value and the slot he fills as his reason; `recommendPick` itself is not changed.
 - `picks` are numbered 1 to n in order; `seat` is the 1-based draft slot that made the pick. A seat's roster is its picks.
 - `seatOnClock` must be the seat a snake draft puts on the clock at pick n + 1, or the call is refused with 422.
 - `rosterSlots` uses the slot types `QB RB WR TE FLEX SUPERFLEX K DEF BENCH`.
@@ -151,9 +154,9 @@ It returns (the numbers here show the shape and are not a measured room):
 - `shortlist` is best first; the first is the recommended pick. `reasons` is `recommendPick`'s own `PickReason` union (`src/projections/decide/draft.ts`).
 - `survival` is the closed form (`src/projections/decide/survival.ts`) for every undrafted man to `nextPickNumber`; zero for everyone at the seat's last pick.
 - `tiers` groups each position's undrafted, projected pool by the board's tier rule (`src/projections/decide/tiers.ts`).
-- Errors: 400 for a body that is not JSON or not the shape above (each issue named), 405, 404, 413 over 1 MB, 422 for a room state that cannot be (the wrong seat on the clock, a finished draft), 500 with the detail only in the log.
+- Errors: 400 for a body that is not JSON or not the shape above (each issue named), 405, 404, 413 over 1 MB, 422 for a room state that cannot be (the wrong seat on the clock, a finished draft, a pool with no legal player for the open slots), 500 with the detail only in the log.
 
-Measured on 2026-10-12 with `npm run advisor:measure` (a whole 12-team draft by ADP from the stored 2026 PPR board export, 180 calls): server time p90 35.5 ms on a quiet machine and 52 ms with other lanes running (load average near 7). `recommendPick` is about 20 ms of it on an empty roster.
+Measured on 2026-10-12 with `npm run advisor:measure`, a whole 12-team draft by ADP, 180 calls: from the mocks' 351-player CSV export, server time p90 35.5 ms on a quiet machine and 52 ms at load average near 7; from a real nightly run's `ppr-12.json` (486 players with ADP, kickers and defenses included), p90 61.6 to 63.1 ms at load average near 4.4. The cost is `recommendPick` (about 20 ms on an empty roster), which grows with the pool, and is oracle code left unchanged: the spec's 50 ms is not met on the full pool.
 
 ## Tables
 

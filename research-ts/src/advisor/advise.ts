@@ -1,7 +1,7 @@
 import { snakeTeamForPick, totalRosterSlots } from "@research-ts/draft-engine/order";
 import type { Position } from "@research-ts/domain/player";
 import { restrictedPositions } from "@research-ts/domain/roster-eligibility";
-import { landingSlot, recommendPick, rosterSlotsOf, type DraftCandidate, type PickReason, type Recommendation, type RosteredPlayer } from "@research-ts/projections/decide/draft";
+import { DEFAULT_SHORTLIST, landingSlot, recommendPick, rosterSlotsOf, type DraftCandidate, type PickReason, type Recommendation, type RosteredPlayer } from "@research-ts/projections/decide/draft";
 import { valueBoardIndexed, type LeagueShape, type ValuedPlayer } from "@research-ts/projections/decide/replacement";
 import { survivalProbabilities } from "@research-ts/projections/decide/survival";
 import { tiersOf } from "@research-ts/projections/decide/tiers";
@@ -44,6 +44,46 @@ export interface AdviseResponse {
   readonly tiers: Readonly<Partial<Record<Position, readonly PositionTier[]>>>;
   /** The basis the numbers above are read on, in one sentence. */
   readonly basis: string;
+}
+
+/**
+ * WHEN THE VALUED BOARD HAS NOTHING LEGAL: the late rounds, bench full, only a kicker or a defense
+ * slot open. Those positions ship in market order with no projection (the kdef decision), so
+ * `recommendPick`, which ranks by value, has no candidate; the advisor answers with the legal
+ * market-order players by where drafters take them, never an empty shortlist. `recommendPick`
+ * itself is the oracle's and is not changed. Each carries no value (zero, honestly: there is no
+ * projection above replacement to count) and the slot he fills as his reason.
+ */
+function marketOrderFallback(
+  undrafted: readonly PoolEntry[],
+  roster: readonly RosteredPlayer[],
+  shape: LeagueShape,
+  survival: ReadonlyMap<string, number>,
+  shortlistSize: number,
+): readonly Recommendation[] {
+  return undrafted
+    .filter((entry) => entry.projectedPoints === null)
+    .flatMap((entry) => {
+      const slot = landingSlot(roster, entry.position, shape.rosterSlots);
+      return slot === null ? [] : [{ entry, slot }];
+    })
+    .sort((a, b) => a.entry.adp - b.entry.adp || a.entry.id.localeCompare(b.entry.id))
+    .slice(0, shortlistSize)
+    .map(({ entry, slot }) => ({
+      playerId: entry.id,
+      position: entry.position,
+      expectedValueAdded: 0,
+      valueOverReplacement: 0,
+      rosterAdjustedValue: 0,
+      survivalProbability: survival.get(entry.id) ?? 0,
+      reasons: [{ code: "fills_starting_slot", slot }],
+    }));
+}
+
+/** A market-order man's rank at his position: his place by ADP among the undrafted at it. */
+function marketOrderRankOf(playerId: string, position: Position, undrafted: readonly PoolEntry[]): number {
+  const atPosition = undrafted.filter((entry) => entry.position === position).sort((a, b) => a.adp - b.adp || a.id.localeCompare(b.id));
+  return atPosition.findIndex((entry) => entry.id === playerId) + 1;
 }
 
 /** A refused room state: well-formed JSON whose draft cannot be where it says it is. */
@@ -133,13 +173,20 @@ export function advise(request: AdviseRequest): AdviseResponse {
     const value = valued.byPlayerId.get(entry.id);
     return value === undefined ? [] : [{ ...value, averageDraftPosition: entry.adp }];
   });
-  const recommendations = recommendPick({ board, roster, shape, pickNumber, nextPickNumber, shortlistSize: request.shortlistSize });
+  const valuedRecommendations = recommendPick({ board, roster, shape, pickNumber, nextPickNumber, shortlistSize: request.shortlistSize });
+  const recommendations =
+    valuedRecommendations.length > 0
+      ? valuedRecommendations
+      : marketOrderFallback(undraftedPool, roster, shape, survival, request.shortlistSize ?? DEFAULT_SHORTLIST);
+  if (recommendations.length === 0) {
+    throw new RoomStateError(`no player left in the pool can fill seat ${request.seatOnClock}'s open slots at pick ${pickNumber}; the pool is missing a position the roster rules start.`);
+  }
   const mustPick = restrictedPositions(shape.rosterSlots, rosterSlotsOf(roster, shape.rosterSlots));
   const shortlist = recommendations.map((recommendation) => {
     const him = himSentence(
       {
         position: recommendation.position,
-        positionRank: valued.byPlayerId.get(recommendation.playerId)?.positionRank ?? 0,
+        positionRank: valued.byPlayerId.get(recommendation.playerId)?.positionRank ?? marketOrderRankOf(recommendation.playerId, recommendation.position, undraftedPool),
         fillsSlot: fillsSlotOf(recommendation.reasons, roster, recommendation.position, shape),
         reasons: recommendation.reasons,
         mustPick,

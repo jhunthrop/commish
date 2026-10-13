@@ -1,10 +1,13 @@
 // THE ADVISOR'S LATENCY, MEASURED (spec §2.3: under 50 ms per call at p90). Starts the advisor's own
 // handler on an ephemeral port in this process, drafts a whole 12-team room by ADP from a stored
-// board export, asks `POST /advise` at every pick, and prints p50, p90 and the slowest call, server
-// time and round trip both. The board is real data, exported from the board the product served
-// (docs/design/mocks/2026-10-12-commish/data/board-ppr.csv by default), never synthesized.
+// board, asks `POST /advise` at every pick, and prints p50, p90 and the slowest call, server time and
+// round trip both. The board is real data, never synthesized: a nightly run's board file
+// (`runs/<runId>/boards/ppr-12.json`, which carries the kickers and defenses in market order), or
+// the CSV export the approved mocks were built from. That export has no kickers or defenses, so its
+// last rounds have no legal player for those slots and the advisor refuses them (422): measure a
+// whole draft from a run's board file.
 //
-//   npx tsx scripts/advisor-measure.ts [path/to/board.csv]
+//   npx tsx scripts/advisor-measure.ts <path/to/runs/<runId>/boards/ppr-12.json | path/to/board.csv>
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -14,11 +17,29 @@ import { snakeSeat } from "@research-ts/advisor/advise";
 import type { AdviseRequest, PoolEntry } from "@research-ts/advisor/request";
 import { totalRosterSlots } from "@research-ts/draft-engine/order";
 
-const DEFAULT_BOARD = "../docs/design/mocks/2026-10-12-commish/data/board-ppr.csv";
 const TEAM_COUNT = 12;
 const POSITIONS = new Set(["QB", "RB", "WR", "TE", "K", "DEF"]);
+/** The positions the served board ships in market order, with no projection (the kdef decision):
+ *  the room sends them as the board does, so the late rounds exercise the advisor's fallback. */
+const MARKET_ORDER_POSITIONS = new Set(["K", "DEF"]);
 
-function poolFrom(csvPath: string): readonly PoolEntry[] {
+interface BoardFileRow {
+  readonly playerId: string;
+  readonly position: PoolEntry["position"];
+  readonly marketAdp: number | null;
+  readonly projectedPoints: number | null;
+}
+
+function poolFromRun(jsonPath: string): readonly PoolEntry[] {
+  const { rows } = JSON.parse(readFileSync(jsonPath, "utf8")) as { readonly rows: readonly BoardFileRow[] };
+  return rows.flatMap((row) => (row.marketAdp === null ? [] : [{ id: row.playerId, position: row.position, adp: row.marketAdp, projectedPoints: row.projectedPoints }]));
+}
+
+function poolFrom(path: string): readonly PoolEntry[] {
+  return path.endsWith(".json") ? poolFromRun(path) : poolFromCsv(path);
+}
+
+function poolFromCsv(csvPath: string): readonly PoolEntry[] {
   const [header, ...lines] = readFileSync(csvPath, "utf8").trim().split("\n");
   const columns = header!.split(",");
   const at = (name: string): number => columns.indexOf(name);
@@ -28,7 +49,8 @@ function poolFrom(csvPath: string): readonly PoolEntry[] {
     const position = cells[at("position")]!;
     if (!Number.isFinite(adp) || adp <= 0 || !POSITIONS.has(position)) return [];
     const points = Number(cells[at("projected_points")]);
-    return [{ id: cells[at("player_id")]!, position: position as PoolEntry["position"], adp, projectedPoints: Number.isFinite(points) ? points : null }];
+    const projected = Number.isFinite(points) && !MARKET_ORDER_POSITIONS.has(position);
+    return [{ id: cells[at("player_id")]!, position: position as PoolEntry["position"], adp, projectedPoints: projected ? points : null }];
   });
 }
 
@@ -38,7 +60,9 @@ function percentile(values: readonly number[], share: number): number {
 }
 
 async function main(): Promise<void> {
-  const pool = poolFrom(process.argv[2] ?? DEFAULT_BOARD);
+  const path = process.argv[2];
+  if (path === undefined) throw new Error("advisor-measure: name a board, a run's boards/ppr-12.json or the mocks' board-ppr.csv.");
+  const pool = poolFrom(path);
   const server = createServer((request, response) => void handle(request, response));
   await new Promise<void>((resolve) => server.listen(0, resolve));
   const { port } = server.address() as AddressInfo;
@@ -55,8 +79,9 @@ async function main(): Promise<void> {
     const envelope = (await response.json()) as { ok: boolean; error: string | null; data: { shortlist: { playerId: string; why: string }[] } };
     roundTripMs.push(performance.now() - started);
     if (!envelope.ok) throw new Error(`pick ${pickNumber}: ${envelope.error}`);
+    if (envelope.data.shortlist.length === 0) throw new Error(`pick ${pickNumber}: the advisor answered with an empty shortlist`);
     serverMs.push(Number(/dur=([\d.]+)/.exec(response.headers.get("server-timing") ?? "")?.[1]));
-    if (pickNumber === 1 || pickNumber === 49) process.stdout.write(`pick ${pickNumber}, seat ${seat}: ${envelope.data.shortlist[0]?.playerId} because ${envelope.data.shortlist[0]?.why}\n`);
+    if (pickNumber === 1 || pickNumber === 49 || pickNumber > totalPicks - TEAM_COUNT) process.stdout.write(`pick ${pickNumber}, seat ${seat}: ${envelope.data.shortlist[0]?.playerId} because ${envelope.data.shortlist[0]?.why}\n`);
     // The room drafts by ADP: the cheapest man left.
     const taken = new Set(picks.map((pick) => pick.playerId));
     const next = byAdp.find((entry) => !taken.has(entry.id))!;
