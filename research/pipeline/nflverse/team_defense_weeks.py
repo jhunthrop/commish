@@ -8,6 +8,7 @@ points it allowed from the schedule. A null points-allowed never erases a stored
 import functools
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from sqlalchemy import Connection
 from sqlalchemy.dialects.postgresql import insert
@@ -23,29 +24,32 @@ from research.pipeline.nflverse.kicking_weeks import count, parse_season_week
 from research.pipeline.nflverse.schedule import SCHEDULE_FILE, SCHEDULE_RELEASE, TeamGame, map_schedule
 from research.pipeline.nflverse.team_codes import team_week_key
 
-TEAM_DEFENSE_WEEK_SOURCE = "nflverse_team_defense_weeks"
 _INSERT_CHUNK_ROWS = 1_000
 _NATURAL_KEYS = ("season", "week", "team", "ingested_at")
 _COALESCED = ("points_allowed",)
 
 # Table column -> release column, the club's own row.
-_OWN_COLUMNS = {
-    "def_sacks": "def_sacks",
-    "def_interceptions": "def_interceptions",
-    "fumble_recovery_opp": "fumble_recovery_opp",
-    "def_tds": "def_tds",
-    "def_safeties": "def_safeties",
-    "def_punt_blocks": "def_punt_blocks",
-    "def_pat_blocks": "def_pat_blocks",
-    "def_fg_blocks": "def_fg_blocks",
-    "special_teams_tds": "special_teams_tds",
-}
+_OWN_COLUMNS = MappingProxyType(
+    {
+        "def_sacks": "def_sacks",
+        "def_interceptions": "def_interceptions",
+        "fumble_recovery_opp": "fumble_recovery_opp",
+        "def_tds": "def_tds",
+        "def_safeties": "def_safeties",
+        "def_punt_blocks": "def_punt_blocks",
+        "def_pat_blocks": "def_pat_blocks",
+        "def_fg_blocks": "def_fg_blocks",
+        "special_teams_tds": "special_teams_tds",
+    }
+)
 # Table column -> release column, read off the OPPONENT's row.
-_OPPONENT_COLUMNS = {
-    "passing_yards_allowed": "passing_yards",
-    "rushing_yards_allowed": "rushing_yards",
-    "sack_yards_lost_allowed": "sack_yards_lost",
-}
+_OPPONENT_COLUMNS = MappingProxyType(
+    {
+        "passing_yards_allowed": "passing_yards",
+        "rushing_yards_allowed": "rushing_yards",
+        "sack_yards_lost_allowed": "sack_yards_lost",
+    }
+)
 _REQUIRED = (
     "season",
     "week",
@@ -149,7 +153,6 @@ def record_team_defense_week_rows(conn: Connection, rows: Sequence[TeamDefenseWe
                 "opponent_team": row.opponent_team,
                 **row.counts,
                 "points_allowed": row.points_allowed,
-                "source": TEAM_DEFENSE_WEEK_SOURCE,
             }
             for row in rows[start : start + _INSERT_CHUNK_ROWS]
         ]

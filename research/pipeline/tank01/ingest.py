@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from sqlalchemy import Connection, text, update
 from sqlalchemy.dialects.postgresql import insert
 
-from research.db.schema import NFL_GAMES, PLAYER_STAT_LINES, PLAYERS
+from research.db.schema import PROVIDER_GAMES, PROVIDER_PLAYERS, PROVIDER_STAT_LINES
 from research.db.upsert import excluded_set
 from research.pipeline.budget import RequestBudget, UnmeteredBudget, reserve_or_raise
 from research.pipeline.checkpoint import Checkpoint, no_checkpoint
@@ -32,14 +32,19 @@ def _chunks[T](items: list[T], size: int) -> list[list[T]]:
     return [items[i : i + size] for i in range(0, len(items), size)]
 
 
-_STAT_COLUMNS = tuple(c.name for c in PLAYER_STAT_LINES.columns if c.name not in ("player_id", "week"))
+_STAT_LINE_KEY = ("provider_player_id", "week")
+_STAT_COLUMNS = tuple(c.name for c in PROVIDER_STAT_LINES.columns if c.name not in _STAT_LINE_KEY)
 
 
 def _stat_line_row(line: StatLine) -> dict[str, object]:
     """Every column named, a field the source said nothing about at the column's own default of
     zero (a multi-row VALUES needs one shape; the TypeScript leaves the field out and Postgres
     fills the same zero)."""
-    return {"player_id": line.player_id, "week": line.week, **{c: line.values.get(c, 0.0) for c in _STAT_COLUMNS}}
+    return {
+        "provider_player_id": line.player_id,
+        "week": line.week,
+        **{c: line.values.get(c, 0.0) for c in _STAT_COLUMNS},
+    }
 
 
 @dataclass(frozen=True)
@@ -51,19 +56,19 @@ class SeedReport:
 def _upsert_roster(conn: Connection, players: list[Player]) -> None:
     for batch in _chunks(players, _SEED_BATCH):
         rows = [
-            {"id": p.id, "name": p.name, "position": p.position, "nfl_team": p.nfl_team, "headshot_url": p.headshot_url}
+            {"id": p.id, "name": p.name, "position": p.position, "team": p.nfl_team, "headshot_url": p.headshot_url}
             for p in batch
         ]
-        statement = insert(PLAYERS).values(rows)
-        update_set = excluded_set(statement, PLAYERS, ("id", "adp"))
-        conn.execute(statement.on_conflict_do_update(index_elements=[PLAYERS.c.id], set_=update_set))
+        statement = insert(PROVIDER_PLAYERS).values(rows)
+        update_set = excluded_set(statement, PROVIDER_PLAYERS, ("id", "adp"))
+        conn.execute(statement.on_conflict_do_update(index_elements=[PROVIDER_PLAYERS.c.id], set_=update_set))
 
 
 def _upsert_week(conn: Connection, week_lines: list[StatLine]) -> None:
     for batch in _chunks(week_lines, _SEED_BATCH):
-        statement = insert(PLAYER_STAT_LINES).values([_stat_line_row(line) for line in batch])
-        keys = [PLAYER_STAT_LINES.c.player_id, PLAYER_STAT_LINES.c.week]
-        update_set = excluded_set(statement, PLAYER_STAT_LINES, ("player_id", "week"))
+        statement = insert(PROVIDER_STAT_LINES).values([_stat_line_row(line) for line in batch])
+        keys = [PROVIDER_STAT_LINES.c[c] for c in _STAT_LINE_KEY]
+        update_set = excluded_set(statement, PROVIDER_STAT_LINES, _STAT_LINE_KEY)
         conn.execute(statement.on_conflict_do_update(index_elements=keys, set_=update_set))
 
 
@@ -115,13 +120,13 @@ def ingest_schedule(conn: Connection, provider: Tank01Provider, budget: RequestB
         fixtures = provider.list_games(week)
         if not fixtures:
             continue
-        statement = insert(NFL_GAMES).values(
+        statement = insert(PROVIDER_GAMES).values(
             [
                 {
                     "game_id": game.game_id,
                     "week": game.week,
-                    "home_nfl_team": game.home_nfl_team,
-                    "away_nfl_team": game.away_nfl_team,
+                    "home_team": game.home_nfl_team,
+                    "away_team": game.away_nfl_team,
                     "game_date": game.game_date,
                     "kickoff_et": game.kickoff_et,
                     "status": game.status,
@@ -131,7 +136,7 @@ def ingest_schedule(conn: Connection, provider: Tank01Provider, budget: RequestB
         )
         conn.execute(
             statement.on_conflict_do_update(
-                index_elements=[NFL_GAMES.c.game_id], set_=excluded_set(statement, NFL_GAMES, ("game_id",))
+                index_elements=[PROVIDER_GAMES.c.game_id], set_=excluded_set(statement, PROVIDER_GAMES, ("game_id",))
             )
         )
         weeks += 1
@@ -156,9 +161,9 @@ def ingest_adp(conn: Connection, provider: Tank01Provider, budget: RequestBudget
     feed = json.dumps([{"id": e.player_id, "adp": e.adp, "pos_adp": e.pos_adp} for e in entries])
     updated = conn.execute(
         text(
-            "update players set adp = data.adp, pos_adp = data.pos_adp "
+            f"update {PROVIDER_PLAYERS.fullname} as p set adp = data.adp, pos_adp = data.pos_adp "
             "from jsonb_to_recordset(cast(:feed as jsonb)) as data(id text, adp real, pos_adp text) "
-            "where players.id = data.id returning players.id"
+            "where p.id = data.id returning p.id"
         ),
         {"feed": feed},
     ).all()
@@ -172,10 +177,10 @@ def backfill_headshots(conn: Connection, provider: Tank01Provider) -> int:
         if player.headshot_url is None:
             continue
         statement = (
-            update(PLAYERS)
-            .where(PLAYERS.c.id == player.id)
+            update(PROVIDER_PLAYERS)
+            .where(PROVIDER_PLAYERS.c.id == player.id)
             .values(headshot_url=player.headshot_url)
-            .returning(PLAYERS.c.id)
+            .returning(PROVIDER_PLAYERS.c.id)
         )
         updated += len(conn.execute(statement).all())
     return updated

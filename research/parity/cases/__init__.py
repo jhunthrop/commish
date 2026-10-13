@@ -1,5 +1,8 @@
 """Every parity case, by name, and every fixture set's recording recipe."""
 
+from collections.abc import Mapping
+from types import MappingProxyType
+
 from research.parity.case import Case, Recording
 from research.parity.cases import (
     capture,
@@ -23,7 +26,7 @@ ALL_CASES: tuple[Case, ...] = (
     *vegas.CASES,
 )
 
-CASES_BY_NAME: dict[str, Case] = {case.name: case for case in ALL_CASES}
+CASES_BY_NAME: Mapping[str, Case] = MappingProxyType({case.name: case for case in ALL_CASES})
 
 
 def all_recordings() -> dict[str, Recording]:

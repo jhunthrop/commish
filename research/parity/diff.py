@@ -1,11 +1,17 @@
 """THE ROW DIFF: what the TypeScript ingest wrote against what the Python ingest wrote.
 
-Each compared table is read whole from both scratch databases, keyed by its natural key (the
-columns of its unique fact index, as a typed tuple, so `None` and `"None"` never collide), and
-compared column by column. Three things are excluded, and only these: a surrogate serial `id` (a
-sequence draw, not a fact), and a bookkeeping timestamp the DATABASE fills with `now()` that
-neither implementation sets (`ingested_at` and its kin). Every other column must be equal. A float
-column may carry a tolerance only where a `Tolerance` names it and says why; there are none.
+The two sides write different schemas: the TypeScript oracle the legacy `public` tables, the
+Python the `research` schema. Each compared research table is read whole from the Python database,
+and its legacy counterpart from the TypeScript database through `research.db.legacy` (every
+research column under its research name), so the comparison is of research rows on both sides.
+Before reading, the legacy entry must account for every column the legacy table has, read or
+dropped with a reason; a column it does not account for fails the table.
+
+Rows are keyed by the table's natural key (a typed tuple, so `None` and `"None"` never collide)
+and compared column by column. Excluded, and only these: an identity `id` (a sequence draw, not a
+fact) and a bookkeeping timestamp the DATABASE fills with `now()` that neither implementation sets
+(`ingested_at` and its kin). A float column may carry a tolerance only where a `Tolerance` names it
+and says why; there are none.
 """
 
 import json
@@ -18,7 +24,8 @@ from typing import Final
 
 import psycopg
 
-from research.db.schema import METADATA
+from research.db.legacy import LEGACY_SCHEMA, LEGACY_TABLES
+from research.db.schema import METADATA, RESEARCH_SCHEMA
 
 # Bookkeeping columns Postgres fills with now(); neither implementation writes them.
 DATABASE_STAMPED: Final = frozenset({"ingested_at", "created_at", "computed_at", "published_at", "generated_at"})
@@ -64,6 +71,7 @@ class TableDiff:
     only_py: tuple[str, ...] = ()
     differing: tuple[str, ...] = ()
     duplicate_keys: tuple[str, ...] = ()
+    mapping_problems: tuple[str, ...] = ()
 
     @property
     def empty(self) -> bool:
@@ -72,7 +80,9 @@ class TableDiff:
 
     @property
     def matches(self) -> bool:
-        return not (self.only_ts or self.only_py or self.differing or self.duplicate_keys or self.empty)
+        return not (
+            self.only_ts or self.only_py or self.differing or self.duplicate_keys or self.mapping_problems or self.empty
+        )
 
     @property
     def rows(self) -> int:
@@ -88,9 +98,9 @@ class _Collector:
 
 
 def compared_columns(spec: TableSpec) -> list[str]:
-    table = METADATA.tables[spec.table]
-    serial = {c.name for c in table.primary_key.columns if c.name == "id" and c.autoincrement is True}
-    excluded = DATABASE_STAMPED | serial | set(spec.also_excluded)
+    table = METADATA.tables[f"{RESEARCH_SCHEMA}.{spec.table}"]
+    identity = {c.name for c in table.columns if c.identity is not None}
+    excluded = DATABASE_STAMPED | identity | set(spec.also_excluded)
     return [c.name for c in table.columns if c.name not in excluded]
 
 
@@ -104,11 +114,29 @@ def _normalize(value: object) -> object:
     return value
 
 
-def read_table(url: str, spec: TableSpec, columns: Sequence[str]) -> list[Row]:
-    column_sql = ", ".join(f'"{c}"' for c in columns)
+def _read(url: str, sql: str, columns: Sequence[str]) -> list[Row]:
     with psycopg.connect(url) as conn:
-        cursor = conn.execute(f'select {column_sql} from "{spec.table}"')
-        return [{c: _normalize(v) for c, v in zip(columns, row, strict=True)} for row in cursor.fetchall()]
+        return [{c: _normalize(v) for c, v in zip(columns, row, strict=True)} for row in conn.execute(sql).fetchall()]
+
+
+def read_research(url: str, spec: TableSpec, columns: Sequence[str]) -> list[Row]:
+    column_sql = ", ".join(f'"{c}"' for c in columns)
+    return _read(url, f'select {column_sql} from "{RESEARCH_SCHEMA}"."{spec.table}"', columns)
+
+
+def read_legacy(url: str, spec: TableSpec, columns: Sequence[str]) -> list[Row]:
+    return _read(url, LEGACY_TABLES[spec.table].select_sql(columns), columns)
+
+
+def legacy_mapping_problems(url: str, spec: TableSpec) -> tuple[str, ...]:
+    """What the legacy entry fails to account for in the legacy table the oracle actually built."""
+    entry = LEGACY_TABLES[spec.table]
+    with psycopg.connect(url) as conn:
+        rows = conn.execute(
+            "select column_name from information_schema.columns where table_schema = %s and table_name = %s",
+            (LEGACY_SCHEMA, entry.legacy),
+        ).fetchall()
+    return entry.unaccounted([str(row[0]) for row in rows])
 
 
 def _equal(a: object, b: object, tolerance: Tolerance | None) -> bool:
@@ -139,12 +167,14 @@ def _shown(lines: list[str]) -> tuple[str, ...]:
 
 def _compare_key(
     key: Key,
-    ts_rows: list[Row],
-    py_rows: list[Row],
+    rows: tuple[list[Row], list[Row]],
+    *,
     columns: Sequence[str],
     tolerances: Mapping[str, Tolerance],
     out: _Collector,
 ) -> None:
+    """One key's rows, TypeScript's then Python's, compared as multisets column by column."""
+    ts_rows, py_rows = rows
     if len(ts_rows) != len(py_rows):
         out.differing.append(f"{key!r}: ts holds {len(ts_rows)} row(s), py holds {len(py_rows)}")
         return
@@ -157,8 +187,11 @@ def _compare_key(
 
 def diff_table(ts_url: str, py_url: str, spec: TableSpec) -> TableDiff:
     columns = compared_columns(spec)
-    ts_rows = read_table(ts_url, spec, columns)
-    py_rows = read_table(py_url, spec, columns)
+    problems = legacy_mapping_problems(ts_url, spec)
+    if problems:
+        return TableDiff(table=spec.table, setup=spec.setup, ts_rows=0, py_rows=0, mapping_problems=problems)
+    ts_rows = read_legacy(ts_url, spec, columns)
+    py_rows = read_research(py_url, spec, columns)
     ts = _index(ts_rows, spec.key)
     py = _index(py_rows, spec.key)
     out = _Collector()
@@ -169,7 +202,7 @@ def diff_table(ts_url: str, py_url: str, spec: TableSpec) -> TableDiff:
     out.only_py.extend(repr(k) for k in sorted(py.keys() - ts.keys(), key=repr))
     tolerances = {t.column: t for t in spec.tolerances}
     for key in sorted(ts.keys() & py.keys(), key=repr):
-        _compare_key(key, ts[key], py[key], columns, tolerances, out)
+        _compare_key(key, (ts[key], py[key]), columns=columns, tolerances=tolerances, out=out)
     return TableDiff(
         table=spec.table,
         setup=spec.setup,

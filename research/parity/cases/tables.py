@@ -1,8 +1,10 @@
-"""The compared tables, each with its natural key (the columns of its unique fact index)."""
+"""The compared research tables, each with its natural key (its primary key, or for the two
+append-only archives the columns that name one capture). The TypeScript side of each is read out of
+the legacy tables through `research.db.legacy`."""
 
 from research.parity.diff import TableSpec
 
-NFL_PLAYERS = TableSpec("nfl_players", ("id",))
+PLAYERS = TableSpec("players", ("id",))
 PLAYER_WEEK_OBSERVATIONS = TableSpec(
     "player_week_observations", ("season", "week", "player_id", "source", "metric", "as_of")
 )
@@ -15,7 +17,7 @@ NFLVERSE_TEAM_DEFENSE_WEEKS = TableSpec("nflverse_team_defense_weeks", ("season"
 NFL_DRAFT_PICKS = TableSpec("nfl_draft_picks", ("season", "pick"))
 PRESEASON_ROSTERS = TableSpec("preseason_rosters", ("season", "player_id", "as_of"))
 PRESEASON_RANKINGS = TableSpec("preseason_rankings", ("season", "source", "player_id", "as_of"))
-PLAYER_CROSSWALK = TableSpec("player_crosswalk", ("player_id",))
+PLAYER_CROSSWALK = TableSpec("player_crosswalk", ("provider_player_id",))
 CAPTURE_SNAPSHOTS = TableSpec("capture_snapshots", ("source", "captured_at"))
 ADP_SNAPSHOTS = TableSpec("adp_snapshots", ("player_id", "source", "captured_at"))
 PLAYER_PROP_OBSERVATIONS = TableSpec(
@@ -23,7 +25,7 @@ PLAYER_PROP_OBSERVATIONS = TableSpec(
 )
 PROPS_PLAYER_MAP = TableSpec("props_player_map", ("prop_name", "season"))
 COACHES = TableSpec("coaches", ("season", "team", "role", "start_week"))
-PLAYERS = TableSpec("players", ("id",))
-NFL_GAMES = TableSpec("nfl_games", ("game_id",))
-PLAYER_STAT_LINES = TableSpec("player_stat_lines", ("player_id", "week"))
-STAT_WEEKS = TableSpec("stat_weeks", ("week",))
+PROVIDER_PLAYERS = TableSpec("provider_players", ("id",))
+PROVIDER_GAMES = TableSpec("provider_games", ("game_id",))
+PROVIDER_STAT_LINES = TableSpec("provider_stat_lines", ("provider_player_id", "week"))
+PROVIDER_WEEKS = TableSpec("provider_weeks", ("week",))

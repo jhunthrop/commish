@@ -9,6 +9,7 @@ twice. A team defense resolves by its club code onto the synthetic universe row.
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Final
 
 from research.errors import SchemaDriftError
 from research.pipeline.crosswalk import comparable_name
@@ -51,6 +52,10 @@ class RankingResolution:
 normalize_name = comparable_name
 
 
+# A name needs a first and a last part to have a loose key.
+_FIRST_AND_LAST: Final = 2
+
+
 def position_group(position: str) -> str:
     upper = js_trim(position).upper()
     if upper in ("FB", "HB"):
@@ -68,7 +73,7 @@ def _key(name: str, position: str) -> str:
 
 def _loose_key(name: str, position: str) -> str | None:
     parts = normalize_name(name).split(" ")
-    if len(parts) < 2:
+    if len(parts) < _FIRST_AND_LAST:
         return None
     return f"{parts[0][:1]}|{parts[-1]}|{position_group(position)}"
 

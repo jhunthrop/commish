@@ -3,14 +3,14 @@
 
 from sqlalchemy import Connection, select
 
-from research.db.schema import NFL_PLAYERS
+from research.db.schema import PLAYERS
 from research.pipeline.nflverse.players import Position, projected_position
 
 
 def all_positions(conn: Connection) -> dict[str, Position]:
     """Every stored player the engine projects, with his projected position."""
     positions: dict[str, Position] = {}
-    for player_id, position in conn.execute(select(NFL_PLAYERS.c.id, NFL_PLAYERS.c.position)):
+    for player_id, position in conn.execute(select(PLAYERS.c.id, PLAYERS.c.position)):
         projected = projected_position(position)
         if projected is not None:
             positions[player_id] = projected
@@ -19,4 +19,4 @@ def all_positions(conn: Connection) -> dict[str, Position]:
 
 def known_player_ids(conn: Connection) -> frozenset[str]:
     """Every id `nfl_players` holds: the foreign-key guard the archive tables need."""
-    return frozenset(conn.execute(select(NFL_PLAYERS.c.id)).scalars())
+    return frozenset(conn.execute(select(PLAYERS.c.id)).scalars())

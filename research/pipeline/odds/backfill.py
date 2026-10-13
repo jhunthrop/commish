@@ -14,7 +14,7 @@ from typing import Final
 
 from sqlalchemy import Connection, select, text
 
-from research.db.schema import PLAYER_PROP_OBSERVATIONS
+from research.db.schema import PLAYER_PROP_OBSERVATIONS, TEAM_WEEK_OBSERVATIONS
 from research.errors import SchemaDriftError
 from research.pipeline.checkpoint import Checkpoint, no_checkpoint
 from research.pipeline.http import Fetcher
@@ -39,7 +39,7 @@ def kickoff_instants_by_week(conn: Connection, season: int) -> dict[int, datetim
     """`kickoffInstantsByWeek`: each week's earliest stored kickoff instant."""
     rows = conn.execute(
         text(
-            "select week, min(as_of) from team_week_observations where season = :season "
+            f"select week, min(as_of) from {TEAM_WEEK_OBSERVATIONS.fullname} where season = :season "
             "and source = 'nflverse_kickoff' and metric = 'kickoff_instant' group by week"
         ),
         {"season": season},

@@ -1,7 +1,7 @@
 """THE PARITY HARNESS.
 
     uv run python -m research.parity ingest <case>|all   run the TypeScript and Python ingests, diff the rows
-    uv run python -m research.parity schema              the alembic baseline against drizzle's catalog
+    uv run python -m research.parity schema              the migrations against the declared schema, and the legacy map
     uv run python -m research.parity record <set>|all    re-record a fixture set from the live provider
     uv run python -m research.parity list                every case and fixture set
 
@@ -45,22 +45,20 @@ def _ingest(names: Sequence[str]) -> int:
 
 def _schema(against: str | None) -> int:
     if against is not None:
-        only_live, only_baseline = against_live(against)
+        only_live, only_migrated = against_live(against)
         for line in sorted(only_live):
             _print(f"  only the live database: {line}")
-        for line in sorted(only_baseline):
-            _print(f"  only the baseline: {line}")
-        _print("schema against the live database: " + ("match" if not (only_live or only_baseline) else "DIFFERENT"))
-        if only_live or only_baseline:
+        for line in sorted(only_migrated):
+            _print(f"  only the migration: {line}")
+        _print("schema against the live database: " + ("match" if not (only_live or only_migrated) else "DIFFERENT"))
+        if only_live or only_migrated:
             return 1
     result = run_schema_gate()
-    _print(f"schema: {result.facts_compared} catalog facts compared, baseline and head")
-    for line in sorted(result.baseline_only_drizzle):
-        _print(f"  only drizzle: {line}")
-    for line in sorted(result.baseline_only_alembic):
-        _print(f"  only alembic: {line}")
-    for line in sorted(result.head_unexpected):
-        _print(f"  head unexpected: {line}")
+    _print(f"schema: {result.facts} catalog facts in the migrated research schema")
+    for line in result.metadata_differences:
+        _print(f"  migration against the declared schema: {line}")
+    for line in result.legacy_map_problems:
+        _print(f"  legacy map: {line}")
     _print("schema: match" if result.passed else "schema: DIFFERENT")
     return 0 if result.passed else 1
 
@@ -106,8 +104,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     ingest = sub.add_parser("ingest", help="run both ingests on the recorded input and diff the rows")
     ingest.add_argument("names", nargs="+", help="case names, or all")
-    schema = sub.add_parser("schema", help="the alembic baseline against drizzle's catalog")
-    schema.add_argument("--against", help="also compare a live database (read only, e.g. the dev copy) to the baseline")
+    schema = sub.add_parser("schema", help="the migrations against the declared schema, and the legacy map")
+    schema.add_argument("--against", help="also compare a live database's research schema (read only) to the migration")
     record = sub.add_parser("record", help="re-record fixture sets from the live provider")
     record.add_argument("names", nargs="+", help="fixture set names, or all")
     record.add_argument("--env-file", help="a dotenv file holding the provider keys a recording needs")

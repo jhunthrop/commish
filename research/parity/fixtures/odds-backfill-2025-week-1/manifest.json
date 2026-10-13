@@ -1,7 +1,7 @@
 {
   "provenance": "recorded-from-live-provider",
-  "recordedAt": "2026-10-12",
-  "note": "The Odds API's historical archive at eight hours before 2025's first kickoff: the events page and the first in-window event's five prop markets, which is exactly what a run with a budget of one credit reads.",
+  "recordedAt": "2026-10-13",
+  "note": "The Odds API's historical archive at eight hours before 2025's first kickoff: the events page and the first two in-window events' five prop markets. A run with a budget of one credit reads the first; the same command run again resumes past the archived event and reads the second (the rerun pass).",
   "responses": [
     {
       "url": "https://api.the-odds-api.com/v4/historical/sports/americanfootball_nfl/events?date=2025-09-04T16%3A20%3A00Z",
@@ -9,8 +9,8 @@
       "file": "historical_events_week_1.json.gz",
       "headers": {
         "content-type": "application/json; charset=utf-8",
-        "x-requests-remaining": "99975",
-        "x-requests-used": "25",
+        "x-requests-remaining": "99923",
+        "x-requests-used": "77",
         "x-requests-last": "1"
       },
       "filtered": "the whole response, unfiltered",
@@ -22,12 +22,25 @@
       "file": "historical_event_odds_f1bc532dff946d15cb85654b5c4b246e.json.gz",
       "headers": {
         "content-type": "application/json; charset=utf-8",
-        "x-requests-remaining": "99925",
-        "x-requests-used": "75",
+        "x-requests-remaining": "99873",
+        "x-requests-used": "127",
         "x-requests-last": "50"
       },
       "filtered": "the whole response, unfiltered",
       "bytes": 34091
+    },
+    {
+      "url": "https://api.the-odds-api.com/v4/historical/sports/americanfootball_nfl/events/9535d3e3ee9d9fc83ea2b500ad0b587c/odds?date=2025-09-04T16%3A20%3A00Z&markets=player_pass_yds%2Cplayer_reception_yds%2Cplayer_receptions%2Cplayer_rush_yds%2Cplayer_pass_tds&oddsFormat=american&regions=us",
+      "status": 200,
+      "file": "historical_event_odds_9535d3e3ee9d9fc83ea2b500ad0b587c.json.gz",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "x-requests-remaining": "99823",
+        "x-requests-used": "177",
+        "x-requests-last": "50"
+      },
+      "filtered": "the whole response, unfiltered",
+      "bytes": 41443
     }
   ]
 }

@@ -10,6 +10,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from types import MappingProxyType
 
 from research.errors import SchemaDriftError
 from research.pipeline.jscompat import js_is_finite, js_number, js_string, js_trim
@@ -43,22 +44,24 @@ STAT_FIELDS: tuple[str, ...] = (
 
 # nflverse's columns for each field, or none for the fields deliberately left at zero (the
 # defensive three are TEAM stats in this product, nflverse's are per person).
-_NFLVERSE_COLUMN: Mapping[str, tuple[str, ...]] = {
-    "passingYards": ("passing_yards",),
-    "passingTouchdowns": ("passing_tds",),
-    "interceptions": ("passing_interceptions",),
-    "rushingYards": ("rushing_yards",),
-    "rushingTouchdowns": ("rushing_tds",),
-    "receivingYards": ("receiving_yards",),
-    "receivingTouchdowns": ("receiving_tds",),
-    "receptions": ("receptions",),
-    "fumblesLost": ("sack_fumbles_lost", "rushing_fumbles_lost", "receiving_fumbles_lost"),
-    "fieldGoalsMade": (),
-    "extraPointsMade": (),
-    "sacks": (),
-    "defensiveInterceptions": (),
-    "defensiveTouchdowns": (),
-}
+_NFLVERSE_COLUMN: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {
+        "passingYards": ("passing_yards",),
+        "passingTouchdowns": ("passing_tds",),
+        "interceptions": ("passing_interceptions",),
+        "rushingYards": ("rushing_yards",),
+        "rushingTouchdowns": ("rushing_tds",),
+        "receivingYards": ("receiving_yards",),
+        "receivingTouchdowns": ("receiving_tds",),
+        "receptions": ("receptions",),
+        "fumblesLost": ("sack_fumbles_lost", "rushing_fumbles_lost", "receiving_fumbles_lost"),
+        "fieldGoalsMade": (),
+        "extraPointsMade": (),
+        "sacks": (),
+        "defensiveInterceptions": (),
+        "defensiveTouchdowns": (),
+    }
+)
 
 STAT_LINE_SOURCE = NflverseSource.PLAYER_WEEK
 _CAPITAL = re.compile(r"[A-Z]")

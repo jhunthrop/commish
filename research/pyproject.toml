@@ -40,14 +40,11 @@ exclude = [".venv", "parity/fixtures", "parity/ts"]
 [tool.ruff]
 line-length = 120
 target-version = "py313"
-extend-exclude = ["parity/ts", "alembic/versions"]
+extend-exclude = ["parity/ts"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "N", "C4", "PL", "PERF"]
 ignore = [
-    # Ported mappers keep the TypeScript's own branch structure on purpose: a parity port that
-    # restructures control flow is a port nobody can diff against its oracle line by line.
-    "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917", "PLR2004",
     # The formatter owns line length; what it cannot wrap is a string, and a split message is worse.
     "E501",
     # A loop that appends reads closer to the TypeScript it ports than a comprehension does.
@@ -64,7 +61,7 @@ python_version = "3.13"
 mypy_path = ".."
 explicit_package_bases = true
 plugins = ["pydantic.mypy"]
-exclude = ["^\\.venv/", "^alembic/versions/", "^parity/ts/"]
+exclude = ["^\\.venv/", "^parity/ts/"]
 
 [[tool.mypy.overrides]]
 module = ["pyarrow.*"]

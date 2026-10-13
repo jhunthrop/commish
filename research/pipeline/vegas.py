@@ -18,6 +18,7 @@ from typing import Final
 
 from sqlalchemy import Connection, text
 
+from research.db.schema import TEAM_WEEK_OBSERVATIONS
 from research.errors import ResearchError, SchemaDriftError
 from research.pipeline.http import Fetcher
 from research.pipeline.jscompat import js_date_parse, js_is_finite, js_iso, js_number, js_string, js_trim
@@ -50,6 +51,10 @@ class WinTotalRow:
     actual_wins: float | None
     source: str
     source_date: str
+
+
+# The first season the Raiders played as Las Vegas.
+_RAIDERS_TO_LAS_VEGAS: Final = 2020
 
 
 def _required(raw: str, column: str, season: str, team: str) -> float:
@@ -103,7 +108,7 @@ def win_total_observations(rows: Sequence[WinTotalRow]) -> list[TeamWeekObservat
 def normalize_published_team(team: str, season: int) -> str:
     if team == "LAR":
         return "LA"
-    if team == "OAK" and season >= 2020:
+    if team == "OAK" and season >= _RAIDERS_TO_LAS_VEGAS:
         return "LV"
     return team
 
@@ -149,7 +154,8 @@ def fetch_published_win_totals(fetcher: Fetcher, season: int) -> PublishedWinTot
 
 
 _READ_BACK = text(
-    "select distinct on (week, team, source, metric) season, team, metric, value from team_week_observations "
+    "select distinct on (week, team, source, metric) season, team, metric, value "
+    f"from {TEAM_WEEK_OBSERVATIONS.fullname} "
     "where season = :season and week = :week and as_of <= :as_of and source = :source "
     "order by week asc, team asc, source asc, metric asc, as_of desc"
 )

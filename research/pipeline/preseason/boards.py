@@ -160,14 +160,20 @@ class AdpSnapshotFormat:
     error: str | None
 
 
+@dataclass(frozen=True)
+class SnapshotPass:
+    """One fire of the ADP snapshot: the season, the instant every format is stamped with, and the
+    roster identities each board resolves against."""
+
+    season: int
+    captured_at: datetime
+    identities: Sequence[RosterIdentity]
+
+
 def _capture_format(
-    conn: Connection,
-    fetcher: Fetcher,
-    season: int,
-    captured_at: datetime,
-    identities: Sequence[RosterIdentity],
-    spec: tuple[str, str, str, FfcAdpFormat],
+    conn: Connection, fetcher: Fetcher, snapshot: SnapshotPass, spec: tuple[str, str, str, FfcAdpFormat]
 ) -> AdpSnapshotFormat:
+    season, captured_at, identities = snapshot.season, snapshot.captured_at, snapshot.identities
     board_format, source, snapshot_format, feed = spec
     board = fetch_average_draft_position(fetcher, season, captured_at, feed)
     resolution = resolve_rankings(board.candidates, identities)
@@ -190,12 +196,12 @@ def ingest_adp_snapshot(
 ) -> list[AdpSnapshotFormat]:
     """`ingestAdpSnapshot`: three formats at one instant, each in its own savepoint; only the PPR
     capture's failure raises, a secondary format's is a detail line."""
-    identities = roster_identities_for(conn, season)
+    snapshot = SnapshotPass(season, captured_at, roster_identities_for(conn, season))
     results: list[AdpSnapshotFormat] = []
     for spec in BOARD_FORMATS:
         try:
             with conn.begin_nested():
-                results.append(_capture_format(conn, fetcher, season, captured_at, identities, spec))
+                results.append(_capture_format(conn, fetcher, snapshot, spec))
         except TOLERATED_FAILURES as error:
             results.append(AdpSnapshotFormat(spec[0], 0, 0, str(error)))
     primary = next(r for r in results if r.format == DEFAULT_BOARD_FORMAT)

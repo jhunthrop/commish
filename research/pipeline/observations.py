@@ -168,4 +168,4 @@ def delete_observations_by_source(
     condition = and_(table.c.season == season, table.c.source == source)
     if metrics is not None:
         condition = and_(condition, table.c.metric.in_(list(metrics)))
-    return len(conn.execute(delete(table).where(condition).returning(table.c.id)).all())
+    return len(conn.execute(delete(table).where(condition).returning(table.c.season)).all())

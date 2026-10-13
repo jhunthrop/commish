@@ -4,6 +4,7 @@ roster supersedes), `kdef-adp-ingest.ts`, the nightly ADP capture in three forma
 `ingest-current-ecr.ts` onto the crossed provider roster."""
 
 from datetime import UTC, datetime
+from types import MappingProxyType
 
 from sqlalchemy import Connection
 
@@ -31,7 +32,7 @@ from research.pipeline.tank01.ingest import ingest_roster_and_lines
 
 # Before the 2026 opener: the week-one roster is a live season's, and supersedes.
 PRESEASON_NOW = datetime(2026, 8, 20, 12, 0, tzinfo=UTC)
-_ECR_HEADERS = {"user-agent": "commish-projection-engine/1.0"}
+_ECR_HEADERS = MappingProxyType({"user-agent": "commish-projection-engine/1.0"})
 
 
 def _board_specs(season: int) -> list[RecordSpec]:

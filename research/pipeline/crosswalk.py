@@ -15,7 +15,7 @@ from datetime import datetime
 from sqlalchemy import Connection, select
 from sqlalchemy.dialects.postgresql import insert
 
-from research.db.schema import NFL_PLAYERS, PLAYER_CROSSWALK, PLAYERS
+from research.db.schema import PLAYER_CROSSWALK, PLAYERS, PROVIDER_PLAYERS
 from research.errors import CoherenceError
 from research.pipeline.nflverse.team_codes import (
     TEAM_DEFENSE_UNIVERSE_PREFIX,
@@ -84,58 +84,65 @@ def comparable_name(name: str) -> str:
     return " ".join(part for index, part in enumerate(parts) if index == 0 or part not in _NAME_SUFFIXES)
 
 
-def resolve_crosswalk(
-    providers: Sequence[ProviderPlayer],
-    universe: Sequence[UniversePlayer],
-    team_defense_ids: frozenset[str] = frozenset(),
-) -> CrosswalkResolution:
+def _by_espn(universe: Sequence[UniversePlayer]) -> dict[str, list[UniversePlayer]]:
     by_espn: dict[str, list[UniversePlayer]] = {}
     for person in universe:
         if person.espn_id is None or person.espn_id == "":
             continue
         by_espn.setdefault(person.espn_id, []).append(person)
+    return by_espn
 
+
+def _resolve_defense(provider: ProviderPlayer, team_defense_ids: frozenset[str]) -> CrosswalkMatch | CrosswalkMiss:
+    universe_id = team_defense_universe_id_for_provider_id(provider.id)
+    if universe_id is None:
+        return CrosswalkMiss(provider.id, provider.name, provider.position, "not_an_nfl_player")
+    if universe_id not in team_defense_ids:
+        return CrosswalkMiss(provider.id, provider.name, provider.position, "no_team_defense_row")
+    return CrosswalkMatch(provider.id, universe_id, CrosswalkMethod.TEAM_DEFENSE, True, provider.name, universe_id)
+
+
+def _resolve_person(
+    provider: ProviderPlayer, by_espn: dict[str, list[UniversePlayer]]
+) -> tuple[UniversePlayer | None, CrosswalkMatch | CrosswalkMiss]:
+    claimants = by_espn.get(provider.id, [])
+    if not claimants:
+        return None, CrosswalkMiss(provider.id, provider.name, provider.position, "no_espn_id")
+    if len(claimants) > 1:
+        return None, CrosswalkMiss(provider.id, provider.name, provider.position, "ambiguous_espn_id")
+    person = claimants[0]
+    same_name = comparable_name(provider.name) == comparable_name(person.name)
+    return person, CrosswalkMatch(
+        provider.id, person.id, CrosswalkMethod.ESPN_ID, same_name, provider.name, person.name
+    )
+
+
+def resolve_crosswalk(
+    providers: Sequence[ProviderPlayer],
+    universe: Sequence[UniversePlayer],
+    team_defense_ids: frozenset[str] = frozenset(),
+) -> CrosswalkResolution:
+    by_espn = _by_espn(universe)
     matched: list[CrosswalkMatch] = []
     unmatched: list[CrosswalkMiss] = []
     claimed: dict[str, str] = {}
     for provider in providers:
         if provider.position == TEAM_DEFENSE_POSITION:
-            universe_id = team_defense_universe_id_for_provider_id(provider.id)
-            if universe_id is None:
-                unmatched.append(CrosswalkMiss(provider.id, provider.name, provider.position, "not_an_nfl_player"))
-                continue
-            if universe_id not in team_defense_ids:
-                unmatched.append(CrosswalkMiss(provider.id, provider.name, provider.position, "no_team_defense_row"))
-                continue
-            matched.append(
-                CrosswalkMatch(provider.id, universe_id, CrosswalkMethod.TEAM_DEFENSE, True, provider.name, universe_id)
-            )
-            continue
-        claimants = by_espn.get(provider.id, [])
-        if not claimants:
-            unmatched.append(CrosswalkMiss(provider.id, provider.name, provider.position, "no_espn_id"))
-            continue
-        if len(claimants) > 1:
-            unmatched.append(CrosswalkMiss(provider.id, provider.name, provider.position, "ambiguous_espn_id"))
-            continue
-        person = claimants[0]
-        already = claimed.get(person.id)
-        if already is not None:
-            raise CoherenceError(
-                f"Two league players resolve to {person.name} ({person.id}): {already} and {provider.id}. "
-                "One man's projection would be rendered on another man's screen."
-            )
-        claimed[person.id] = provider.id
-        matched.append(
-            CrosswalkMatch(
-                provider.id,
-                person.id,
-                CrosswalkMethod.ESPN_ID,
-                comparable_name(provider.name) == comparable_name(person.name),
-                provider.name,
-                person.name,
-            )
-        )
+            outcome = _resolve_defense(provider, team_defense_ids)
+        else:
+            person, outcome = _resolve_person(provider, by_espn)
+            if person is not None:
+                already = claimed.get(person.id)
+                if already is not None:
+                    raise CoherenceError(
+                        f"Two league players resolve to {person.name} ({person.id}): {already} and {provider.id}. "
+                        "One man's projection would be rendered on another man's screen."
+                    )
+                claimed[person.id] = provider.id
+        if isinstance(outcome, CrosswalkMatch):
+            matched.append(outcome)
+        else:
+            unmatched.append(outcome)
     people = sum(1 for p in providers if p.position != TEAM_DEFENSE_POSITION)
     matched_people = sum(1 for m in matched if m.method != CrosswalkMethod.TEAM_DEFENSE)
     return CrosswalkResolution(
@@ -168,8 +175,8 @@ def record_crosswalk(conn: Connection, rows: Sequence[CrosswalkRow]) -> int:
     for start in range(0, len(rows), INSERT_CHUNK_ROWS):
         chunk = [
             {
-                "player_id": r.player_id,
-                "nfl_player_id": r.nfl_player_id,
+                "provider_player_id": r.player_id,
+                "player_id": r.nfl_player_id,
                 "method": r.method,
                 "unmatched_reason": r.unmatched_reason,
                 "resolved_at": r.resolved_at,
@@ -178,9 +185,9 @@ def record_crosswalk(conn: Connection, rows: Sequence[CrosswalkRow]) -> int:
         ]
         statement = insert(PLAYER_CROSSWALK).values(chunk)
         upsert = statement.on_conflict_do_update(
-            index_elements=[PLAYER_CROSSWALK.c.player_id],
-            set_={c: statement.excluded[c] for c in ("nfl_player_id", "method", "unmatched_reason", "resolved_at")},
-        ).returning(PLAYER_CROSSWALK.c.player_id)
+            index_elements=[PLAYER_CROSSWALK.c.provider_player_id],
+            set_={c: statement.excluded[c] for c in ("player_id", "method", "unmatched_reason", "resolved_at")},
+        ).returning(PLAYER_CROSSWALK.c.provider_player_id)
         written += len(conn.execute(upsert).all())
     return written
 
@@ -195,17 +202,15 @@ class CrosswalkInputs:
 def crosswalk_inputs(conn: Connection) -> CrosswalkInputs:
     providers = [
         ProviderPlayer(row.id, row.name, row.position)
-        for row in conn.execute(select(PLAYERS.c.id, PLAYERS.c.name, PLAYERS.c.position))
+        for row in conn.execute(select(PROVIDER_PLAYERS.c.id, PROVIDER_PLAYERS.c.name, PROVIDER_PLAYERS.c.position))
     ]
     universe = [
         UniversePlayer(row.id, row.espn_id, row.name)
         for row in conn.execute(
-            select(NFL_PLAYERS.c.id, NFL_PLAYERS.c.espn_id, NFL_PLAYERS.c.name).where(
-                NFL_PLAYERS.c.espn_id.is_not(None)
-            )
+            select(PLAYERS.c.id, PLAYERS.c.espn_id, PLAYERS.c.name).where(PLAYERS.c.espn_id.is_not(None))
         )
     ]
-    seeded = conn.execute(select(NFL_PLAYERS.c.id).where(NFL_PLAYERS.c.id.in_(team_defense_universe_ids()))).scalars()
+    seeded = conn.execute(select(PLAYERS.c.id).where(PLAYERS.c.id.in_(team_defense_universe_ids()))).scalars()
     return CrosswalkInputs(providers, universe, frozenset(seeded))
 
 
@@ -224,7 +229,7 @@ def seed_team_defense_universe(conn: Connection) -> int:
         }
         for universe_id in team_defense_universe_ids()
     ]
-    statement = insert(NFL_PLAYERS).values(rows).on_conflict_do_nothing().returning(NFL_PLAYERS.c.id)
+    statement = insert(PLAYERS).values(rows).on_conflict_do_nothing().returning(PLAYERS.c.id)
     return len(conn.execute(statement).all())
 
 

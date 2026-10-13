@@ -38,6 +38,7 @@ def _details(results: Sequence[CaseResult]) -> None:
         for run in result.passes:
             for diff in run.diffs:
                 lines = [
+                    *(f"mapping: {m}" for m in diff.mapping_problems),
                     *diff.duplicate_keys,
                     *(f"only ts: {k}" for k in diff.only_ts),
                     *(f"only py: {k}" for k in diff.only_py),
@@ -68,11 +69,13 @@ def report(results: Sequence[CaseResult]) -> None:
     for result in results:
         for run in result.passes:
             _pass_lines(result, run)
+        if result.error is not None:
+            _print(f"{result.case.name:<28} FAILED TO RUN: {result.error}")
     _details(results)
     matching = sum(1 for r in results if r.matches)
     passes = sum(len(r.passes) for r in results)
     differences = sum(
-        len(d.only_ts) + len(d.only_py) + len(d.differing) + len(d.duplicate_keys)
+        len(d.only_ts) + len(d.only_py) + len(d.differing) + len(d.duplicate_keys) + len(d.mapping_problems)
         for r in results
         for p in r.passes
         for d in p.diffs

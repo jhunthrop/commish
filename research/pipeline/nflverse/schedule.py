@@ -162,52 +162,48 @@ def map_schedule(
         season = _integer(row, "season")
         if season not in wanted:
             continue
-        week = _integer(row, "week")
-        gameday = _required(row, "gameday")
-        stamp = kickoff_as_of(gameday, lag_hours)
-        gametime = row.get("gametime")
-        kickoff_at = None if gametime is None else kickoff_instant(gameday, gametime)
-        home_spread = _optional(row, "spread_line")
-        total_line = _optional(row, "total_line")
-        home_score = _optional(row, "home_score")
-        away_score = _optional(row, "away_score")
-        indoors = (row.get("roof") or "") in _INDOOR_ROOFS
-        division = _optional(row, "div_game") == 1
-        temperature = _optional(row, "temp")
-        wind = _optional(row, "wind")
-
-        home = TeamGame(
-            season=int(season),
-            week=int(week),
-            team=_required(row, "home_team"),
-            opponent=_required(row, "away_team"),
-            home=True,
-            rest_days=_integer(row, "home_rest"),
-            indoors=indoors,
-            division_game=division,
-            coach=_required(row, "home_coach"),
-            points_for=home_score,
-            points_against=away_score,
-            point_spread=home_spread,
-            total_line=total_line,
-            temperature=temperature,
-            wind_speed=wind,
-            kickoff_as_of=stamp,
-            kickoff_at=kickoff_at,
-        )
-        away = replace(
-            home,
-            team=_required(row, "away_team"),
-            opponent=_required(row, "home_team"),
-            home=False,
-            rest_days=_integer(row, "away_rest"),
-            coach=_required(row, "away_coach"),
-            points_for=away_score,
-            points_against=home_score,
-            point_spread=None if home_spread is None else -home_spread,
-        )
-        games.extend([home, away])
+        home = _home_side(row, int(season), lag_hours)
+        games.extend([home, _away_side(row, home)])
     return games
+
+
+def _home_side(row: CsvRow, season: int, lag_hours: int) -> TeamGame:
+    gameday = _required(row, "gameday")
+    gametime = row.get("gametime")
+    return TeamGame(
+        season=season,
+        week=int(_integer(row, "week")),
+        team=_required(row, "home_team"),
+        opponent=_required(row, "away_team"),
+        home=True,
+        rest_days=_integer(row, "home_rest"),
+        indoors=(row.get("roof") or "") in _INDOOR_ROOFS,
+        division_game=_optional(row, "div_game") == 1,
+        coach=_required(row, "home_coach"),
+        points_for=_optional(row, "home_score"),
+        points_against=_optional(row, "away_score"),
+        point_spread=_optional(row, "spread_line"),
+        total_line=_optional(row, "total_line"),
+        temperature=_optional(row, "temp"),
+        wind_speed=_optional(row, "wind"),
+        kickoff_as_of=kickoff_as_of(gameday, lag_hours),
+        kickoff_at=None if gametime is None else kickoff_instant(gameday, gametime),
+    )
+
+
+def _away_side(row: CsvRow, home: TeamGame) -> TeamGame:
+    """The same game from the visitor's side: teams, rest, coach and score swapped, spread negated."""
+    return replace(
+        home,
+        team=home.opponent,
+        opponent=home.team,
+        home=False,
+        rest_days=_integer(row, "away_rest"),
+        coach=_required(row, "away_coach"),
+        points_for=home.points_against,
+        points_against=home.points_for,
+        point_spread=None if home.point_spread is None else -home.point_spread,
+    )
 
 
 def _game_result(game: TeamGame) -> float | None:

@@ -10,6 +10,7 @@ import json
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from http import HTTPStatus
 from typing import Final, Literal
 from urllib.parse import urlencode, urljoin
 
@@ -76,7 +77,7 @@ class Tank01Client:
         url = self.url(path, query)
         headers = {"x-rapidapi-key": self.api_key, "x-rapidapi-host": self.host}
         response = self.fetcher.get(url, headers)
-        if response.status == 429:
+        if response.status == HTTPStatus.TOO_MANY_REQUESTS:
             self.sleep(BURST_RETRY_DELAY_SECONDS)
             response = self.fetcher.get(url, headers)
         _assert_status(response, path)
@@ -84,11 +85,11 @@ class Tank01Client:
 
 
 def _assert_status(response: HttpResponse, path: str) -> None:
-    if response.status == 401:
+    if response.status == HTTPStatus.UNAUTHORIZED:
         raise Tank01Error("unauthorized", path, f"Tank01 rejected the API key. Check {API_KEY_ENV}.")
-    if response.status == 403:
+    if response.status == HTTPStatus.FORBIDDEN:
         raise Tank01Error("forbidden", path, "This RapidAPI key is not subscribed to the Tank01 NFL API.")
-    if response.status == 429:
+    if response.status == HTTPStatus.TOO_MANY_REQUESTS:
         raise Tank01Error("rate_limited", path, "Tank01 request quota exhausted. Back off and retry later.")
     if not response.ok:
         raise Tank01Error("upstream", path, f"Tank01 returned HTTP {response.status} for {path}.")

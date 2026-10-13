@@ -1,40 +1,40 @@
-"""THE SCHEMA GATE: a database built by alembic must equal one built by drizzle, catalog for catalog.
+"""THE SCHEMA GATE: the migrations build exactly the declared schema, and the legacy map is whole.
 
-Read from Postgres's own catalog rather than from either tool's idea of the schema, so the
-comparison is of what each actually created: column order, types, nullability and defaults;
-every constraint's definition; every index's definition; every enum's labels; every sequence and
-what owns it. At `0001_baseline` the two must be identical for the research tables. At head the
-only allowed difference is the one this lane's second revision makes on purpose.
+Three checks, each against a real Postgres:
+
+1. A database migrated by alembic from nothing holds what `research.db.schema` declares: alembic's
+   own metadata comparison finds no difference (tables, columns, types, nullability, defaults,
+   keys, indexes, constraints).
+2. Every research table's legacy entry (`research.db.legacy`) accounts for every column of the
+   legacy table as the drizzle journal builds it: read into the research table or dropped with a
+   reason. A legacy column added on main without a decision here fails the gate.
+3. With `--against URL`, a live database's `research` schema equals the migrated one, catalog line
+   for catalog line (Postgres's own catalog, so what was actually created is what is compared).
 """
 
-from collections.abc import Iterable
 from dataclasses import dataclass
 
 import psycopg
+from alembic.autogenerate import compare_metadata
+from alembic.migration import MigrationContext
+from sqlalchemy import create_engine, pool
 
-from research.db.schema import METADATA
+from research.db.legacy import LEGACY_SCHEMA, LEGACY_TABLES, NOT_CARRIED, check_complete
+from research.db.schema import METADATA, RESEARCH_SCHEMA
+from research.db.url import sqlalchemy_url
 from research.parity import databases
 
-RESEARCH_TABLES: tuple[str, ...] = tuple(sorted(METADATA.tables))
-ENUM_TYPES: tuple[str, ...] = ("board_moment_kind", "capsule_source", "player_position", "week_status")
-
-# The deliberate head-only difference: revision 0002 adds the implementation tag to the register.
-HEAD_ONLY: frozenset[str] = frozenset(
-    {
-        "column register_freeze_rows.implementation text null default 'typescript'::text",
-        "ordinal register_freeze_rows.15 implementation",
-    }
-)
+_MIGRATED = "parity_schema_alembic"
+_LEGACY = "parity_schema_drizzle"
 
 COLUMNS_SQL = """
 select c.relname, a.attnum, a.attname, format_type(a.atttypid, a.atttypmod), a.attnotnull,
-       pg_get_expr(d.adbin, d.adrelid)
+       pg_get_expr(d.adbin, d.adrelid), a.attidentity
 from pg_attribute a
 join pg_class c on c.oid = a.attrelid
 join pg_namespace n on n.oid = c.relnamespace
 left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
-where n.nspname = 'public' and c.relname = any(%s) and a.attnum > 0 and not a.attisdropped
-order by c.relname, a.attnum
+where n.nspname = %s and c.relkind = 'r' and a.attnum > 0 and not a.attisdropped
 """
 
 CONSTRAINTS_SQL = """
@@ -42,82 +42,105 @@ select c.relname, k.conname, pg_get_constraintdef(k.oid)
 from pg_constraint k
 join pg_class c on c.oid = k.conrelid
 join pg_namespace n on n.oid = c.relnamespace
-where n.nspname = 'public' and c.relname = any(%s)
+where n.nspname = %s
 """
 
-INDEXES_SQL = """
-select tablename, indexname, indexdef from pg_indexes where schemaname = 'public' and tablename = any(%s)
-"""
+INDEXES_SQL = "select tablename, indexname, indexdef from pg_indexes where schemaname = %s"
 
-ENUMS_SQL = """
-select t.typname, string_agg(e.enumlabel, ',' order by e.enumsortorder)
-from pg_type t join pg_enum e on e.enumtypid = t.oid
-where t.typname = any(%s) group by t.typname
-"""
-
-SEQUENCES_SQL = """
-select s.relname, t.relname, a.attname
-from pg_class s
-join pg_depend d on d.objid = s.oid and d.deptype = 'a'
-join pg_class t on t.oid = d.refobjid
-join pg_attribute a on a.attrelid = t.oid and a.attnum = d.refobjsubid
-where s.relkind = 'S' and t.relname = any(%s)
+LEGACY_COLUMNS_SQL = """
+select table_name, column_name from information_schema.columns where table_schema = %s
 """
 
 
-def catalog(url: str, tables: Iterable[str] = RESEARCH_TABLES) -> frozenset[str]:
-    """Every catalog fact about `tables` as one comparable line each."""
-    names = list(tables)
+def catalog(url: str, schema: str = RESEARCH_SCHEMA) -> frozenset[str]:
+    """Every catalog fact about one schema's tables as one comparable line each."""
     facts: set[str] = set()
     with psycopg.connect(url) as conn:
-        for table, ordinal, column, type_, notnull, default in conn.execute(COLUMNS_SQL, (names,)):
+        for table, ordinal, column, type_, notnull, default, identity in conn.execute(COLUMNS_SQL, (schema,)):
             null = "not null" if notnull else "null"
-            facts.add(f"column {table}.{column} {type_} {null} default {default}".replace(" default None", ""))
+            facts.add(f"column {table}.{column} {type_} {null} default {default} identity {identity!r}")
             facts.add(f"ordinal {table}.{ordinal} {column}")
-        for table, name, definition in conn.execute(CONSTRAINTS_SQL, (names,)):
+        for table, name, definition in conn.execute(CONSTRAINTS_SQL, (schema,)):
             facts.add(f"constraint {table}.{name} {definition}")
-        for table, name, definition in conn.execute(INDEXES_SQL, (names,)):
+        for table, name, definition in conn.execute(INDEXES_SQL, (schema,)):
             facts.add(f"index {table}.{name} {definition}")
-        for name, labels in conn.execute(ENUMS_SQL, (list(ENUM_TYPES),)):
-            facts.add(f"enum {name} {labels}")
-        for sequence, table, column in conn.execute(SEQUENCES_SQL, (names,)):
-            facts.add(f"sequence {sequence} owned by {table}.{column}")
     return frozenset(facts)
+
+
+def _declared(name: str | None, kind: str, _parent: object) -> bool:
+    """The research schema's own tables: not other schemas, not alembic's version table."""
+    if kind == "schema":
+        return name == RESEARCH_SCHEMA
+    return not (kind == "table" and name == "alembic_version")
+
+
+def metadata_differences(url: str) -> tuple[str, ...]:
+    """What alembic's comparison finds between a migrated database and the declared metadata."""
+    engine = create_engine(sqlalchemy_url(url), poolclass=pool.NullPool)
+    try:
+        with engine.connect() as conn:
+            context = MigrationContext.configure(
+                conn,
+                opts={
+                    "compare_type": True,
+                    "compare_server_default": True,
+                    "include_schemas": True,
+                    "include_name": _declared,
+                },
+            )
+            return tuple(repr(diff) for diff in compare_metadata(context, METADATA))
+    finally:
+        engine.dispose()
+
+
+def legacy_map_problems(url: str) -> tuple[str, ...]:
+    """Every legacy column no entry accounts for, every stale entry, every missing legacy table."""
+    check_complete()
+    columns: dict[str, set[str]] = {}
+    with psycopg.connect(url) as conn:
+        for table, column in conn.execute(LEGACY_COLUMNS_SQL, (LEGACY_SCHEMA,)):
+            columns.setdefault(str(table), set()).add(str(column))
+    problems: list[str] = []
+    for entry in LEGACY_TABLES.values():
+        if entry.legacy not in columns:
+            problems.append(f"legacy table {entry.legacy} (for {entry.table}) does not exist")
+            continue
+        problems.extend(entry.unaccounted(columns[entry.legacy]))
+    problems.extend(
+        f"legacy table {name} is listed as not carried but does not exist"
+        for name in NOT_CARRIED
+        if name not in columns
+    )
+    return tuple(problems)
 
 
 @dataclass(frozen=True)
 class SchemaGateResult:
-    """What the gate found: catalog lines only one side has, at the baseline and at head."""
-
-    facts_compared: int
-    baseline_only_drizzle: frozenset[str]
-    baseline_only_alembic: frozenset[str]
-    head_unexpected: frozenset[str]
+    facts: int
+    metadata_differences: tuple[str, ...]
+    legacy_map_problems: tuple[str, ...]
 
     @property
     def passed(self) -> bool:
-        return not (self.baseline_only_drizzle or self.baseline_only_alembic or self.head_unexpected)
+        return not (self.metadata_differences or self.legacy_map_problems)
 
 
 def run_schema_gate() -> SchemaGateResult:
-    drizzle = catalog(databases.build_with_drizzle("parity_schema_drizzle"))
-    baseline = catalog(databases.build_with_alembic("parity_schema_alembic", "0001_baseline"))
-    head = catalog(databases.build_with_alembic("parity_schema_alembic", "head"))
-    # Head may differ from drizzle only by HEAD_ONLY, and only by adding it.
-    unexpected = ((head - drizzle) - HEAD_ONLY) | (drizzle - head)
-    missing = HEAD_ONLY - head
-    unexpected |= frozenset(f"missing at head: {line}" for line in missing)
-    return SchemaGateResult(
-        facts_compared=len(drizzle),
-        baseline_only_drizzle=drizzle - baseline,
-        baseline_only_alembic=baseline - drizzle,
-        head_unexpected=frozenset(unexpected),
-    )
+    try:
+        migrated = databases.build_with_alembic(_MIGRATED)
+        legacy = databases.build_with_drizzle(_LEGACY)
+        return SchemaGateResult(len(catalog(migrated)), metadata_differences(migrated), legacy_map_problems(legacy))
+    finally:
+        databases.drop(_MIGRATED)
+        databases.drop(_LEGACY)
 
 
 def against_live(url: str) -> tuple[frozenset[str], frozenset[str]]:
-    """A live database (the dev copy of production, read only) against the alembic baseline:
-    catalog lines only the live database has, and lines only the baseline has."""
+    """A live database's `research` schema against a freshly migrated one (the live one is only
+    read): catalog lines only the live database has, and lines only the migration has."""
+    try:
+        migrated = catalog(databases.build_with_alembic(_MIGRATED))
+    finally:
+        databases.drop(_MIGRATED)
     live = catalog(url)
-    baseline = catalog(databases.build_with_alembic("parity_schema_alembic", "0001_baseline"))
-    return live - baseline, baseline - live
+    return live - migrated, migrated - live

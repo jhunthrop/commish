@@ -23,7 +23,7 @@ from research.pipeline.jscompat import js_epoch_ms, js_is_integer, js_locale_com
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.config import SEASON_TYPE, Releases
 from research.pipeline.nflverse.csv import CsvRow
-from research.pipeline.nflverse.injury_reports import INJURY_SOURCE, has_date_modified_column, report_filed_at
+from research.pipeline.nflverse.injury_reports import has_date_modified_column, report_filed_at
 from research.pipeline.nflverse.universe_reads import known_player_ids
 from research.pipeline.observations import INSERT_CHUNK_ROWS
 
@@ -125,7 +125,6 @@ def record_injury_rows(conn: Connection, rows: Sequence[InjuryRow]) -> int:
                 "primary_injury": row.primary_injury,
                 "practice_status": row.practice_status,
                 "date_modified": row.date_modified,
-                "source": INJURY_SOURCE,
             }
             for row in rows[start : start + INSERT_CHUNK_ROWS]
         ]

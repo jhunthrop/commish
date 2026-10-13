@@ -39,6 +39,9 @@ from research.pipeline.jscompat import js_iso
 TS_DRIVER: Final = databases.RESEARCH_ROOT / "parity" / "ts" / "run.ts"
 TS_PRELOAD: Final = databases.RESEARCH_ROOT / "parity" / "ts" / "preload.ts"
 _STDERR_TAIL: Final = 4000
+# Long enough for the largest case (a 500,000-row roster release); a side that runs past it is hung
+# (an oracle script that fails without closing its database client never exits), and fails its case.
+_SIDE_TIMEOUT_SECONDS: Final = 900
 # An operator script's two success statuses: clean, and THIN (rows written, comparison unsafe).
 _SCRIPT_SUCCESS: Final = frozenset({0, 2})
 
@@ -73,10 +76,12 @@ class PassResult:
 class CaseResult:
     case: Case
     passes: tuple[PassResult, ...]
+    # Why the case could not finish (one side raised); a case with an error never matches.
+    error: str | None = None
 
     @property
     def matches(self) -> bool:
-        return all(p.matches for p in self.passes)
+        return self.error is None and all(p.matches for p in self.passes)
 
     @property
     def rows_compared(self) -> int:
@@ -112,7 +117,17 @@ def _fixture_dirs(sets: Sequence[str]) -> list[Path]:
 def _ts_env(case: Case, url: str) -> dict[str, str]:
     # TZ=UTC because production runs the TypeScript under UTC, and V8 reads an offset-less
     # date-time string as local time: the oracle is the production behaviour, not this laptop's.
-    return {**os.environ, "DATABASE_URL": url, "PARITY_NOW": js_iso(case.now), "NODE_NO_WARNINGS": "1", "TZ": "UTC"}
+    # The provider keys are placeholders: every request is answered from the recordings, and the
+    # oracle only checks that a key is present.
+    return {
+        **os.environ,
+        "DATABASE_URL": url,
+        "PARITY_NOW": js_iso(case.now),
+        "NODE_NO_WARNINGS": "1",
+        "TZ": "UTC",
+        "ODDS_API_KEY": "replay",
+        "TANK01_API_KEY": "replay",
+    }
 
 
 def _run_ts_case(case: Case, url: str, dirs: list[Path]) -> list[str]:
@@ -123,6 +138,7 @@ def _run_ts_case(case: Case, url: str, dirs: list[Path]) -> list[str]:
         capture_output=True,
         text=True,
         check=False,
+        timeout=_SIDE_TIMEOUT_SECONDS,
     )
     if completed.returncode != 0:
         raise RuntimeError(f"TypeScript side of {case.name} failed:\n{completed.stderr[-_STDERR_TAIL:]}")
@@ -140,12 +156,16 @@ def _run_ts_scripts(case: Case, url: str, dirs: list[Path]) -> tuple[list[str], 
                 **_ts_env(case, url),
                 "PARITY_FIXTURE_DIRS": "\n".join(str(d) for d in dirs),
                 "PARITY_REQUESTED_OUT": str(out),
-                "ODDS_API_KEY": "replay",
-                "TANK01_API_KEY": "replay",
             }
             command = ["npx", "tsx", "--import", str(TS_PRELOAD), script.path, *script.args]
             completed = subprocess.run(
-                command, cwd=databases.REPO_ROOT, env=env, capture_output=True, text=True, check=False
+                command,
+                cwd=databases.REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=_SIDE_TIMEOUT_SECONDS,
             )
             if completed.returncode not in _SCRIPT_SUCCESS:
                 raise RuntimeError(f"{script.path} for {case.name} failed:\n{completed.stderr[-_STDERR_TAIL:]}")
@@ -195,7 +215,10 @@ def _drop_pair(case: Case, suffix: str) -> None:
 
 
 def run_case(harness: Harness, case: Case) -> CaseResult:
+    """Every pass of one case. A side that raises ends the case as a failure with its message, and
+    the harness goes on to the next case: one broken ingest must not hide the state of the rest."""
     passes: list[PassResult] = []
+    error: str | None = None
     try:
         urls = _pair(harness, case, "a")
         passes.append(_pass("first", case, urls, case.fixture_sets))
@@ -204,7 +227,9 @@ def run_case(harness: Harness, case: Case) -> CaseResult:
             urls = _pair(harness, case, "b")
             passes.append(_pass("prior", case, urls, case.prior_fixture_sets))
             passes.append(_pass("later", case, urls, case.fixture_sets))
+    except Exception as failure:  # reported as the case failure, never swallowed
+        error = f"{type(failure).__name__}: {failure}"
     finally:
         _drop_pair(case, "a")
         _drop_pair(case, "b")
-    return CaseResult(case, tuple(passes))
+    return CaseResult(case, tuple(passes), error)

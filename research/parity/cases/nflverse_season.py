@@ -13,9 +13,9 @@ from sqlalchemy import Connection
 from research.parity.case import Case, Recording, RunContext
 from research.parity.cases.nflverse_sources import SCHEDULE_URL, TeamFilter, release_url
 from research.parity.cases.tables import (
-    NFL_PLAYERS,
     PLAYER_WEEK_OBSERVATIONS,
     PLAYER_WEEK_TEAMS,
+    PLAYERS,
     TEAM_WEEK_OBSERVATIONS,
 )
 from research.parity.record import RecordSpec
@@ -88,14 +88,14 @@ def _universe_only(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
     return ()
 
 
-SEASON_TABLES = (NFL_PLAYERS.as_setup(), PLAYER_WEEK_OBSERVATIONS, PLAYER_WEEK_TEAMS, TEAM_WEEK_OBSERVATIONS)
+SEASON_TABLES = (PLAYERS.as_setup(), PLAYER_WEEK_OBSERVATIONS, PLAYER_WEEK_TEAMS, TEAM_WEEK_OBSERVATIONS)
 
 CASES: tuple[Case, ...] = (
     Case(
         name="nflverse-universe",
         summary="nflverse players release to nfl_players (the universe upsert, moved ids released first)",
         fixture_sets=("nflverse-universe",),
-        tables=(NFL_PLAYERS,),
+        tables=(PLAYERS,),
         run_python=_universe_only,
         now=NOW,
         recordings=(UNIVERSE,),

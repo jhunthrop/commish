@@ -14,10 +14,10 @@ def sqlalchemy_url(raw: str) -> str:
             return "postgresql+psycopg://" + raw[len(prefix) :]
     if raw.startswith("postgresql+psycopg://"):
         return raw
-    raise ConfigurationError("DATABASE_URL must be a postgres:// or postgresql:// URL.")
+    raise ConfigurationError("a database URL must be postgres:// or postgresql://.")
 
 
-def database_url_from_env(variable: str = "DATABASE_URL") -> str:
+def database_url_from_env(variable: str = "RESEARCH_DATABASE_URL") -> str:
     """The URL in `variable`, in SQLAlchemy form. Fails fast, naming the variable and never the value."""
     raw = os.environ.get(variable, "").strip()
     if raw == "":

@@ -12,7 +12,7 @@ from research.parity.case import Case, Recording, RunContext, Script
 from research.parity.cases.nflverse_season import NOW
 from research.parity.cases.preseason import PRESEASON_NOW
 from research.parity.cases.steps import cli, schedule, universe
-from research.parity.cases.tables import NFL_PLAYERS, PROPS_PLAYER_MAP, TEAM_WEEK_OBSERVATIONS
+from research.parity.cases.tables import PLAYERS, PROPS_PLAYER_MAP, TEAM_WEEK_OBSERVATIONS
 from research.parity.diff import TableSpec
 from research.parity.record import RecordSpec
 from research.parity.replay import FIXTURES_ROOT, ReplayFetcher
@@ -25,6 +25,7 @@ from research.pipeline.odds.backfill import (
     to_historical_date_param,
 )
 from research.pipeline.odds.ingest import (
+    KickoffGate,
     resolve_all_prop_names,
     run_odds_snapshot,
     run_props_preseason_snapshot,
@@ -77,11 +78,17 @@ def _backfill_specs(fetcher: Fetcher) -> list[RecordSpec]:
     page = json.loads(fetcher.get(events_url).text())
     events = [parse_odds_event(raw, "data") for raw in page["data"]]
     window_end = kickoff + timedelta(days=WEEK_WINDOW_DAYS)
-    first = next(e for e in events if kickoff <= e.commence_time < window_end)
-    odds = odds_url(f"/historical/sports/{SPORT_KEY}/events/{first.id}/odds", key, {"date": date, **dict(ODDS_PARAMS)})
+    in_window = [e for e in events if kickoff <= e.commence_time < window_end][:BACKFILL_RUNS]
+    params = {"date": date, **dict(ODDS_PARAMS)}
     return [
         RecordSpec(url=events_url, file="historical_events_week_1.json.gz"),
-        RecordSpec(url=odds, file=f"historical_event_odds_{first.id}.json.gz"),
+        *(
+            RecordSpec(
+                url=odds_url(f"/historical/sports/{SPORT_KEY}/events/{event.id}/odds", key, params),
+                file=f"historical_event_odds_{event.id}.json.gz",
+            )
+            for event in in_window
+        ),
     ]
 
 
@@ -92,11 +99,14 @@ SNAPSHOT = Recording(
     "snapshot selects (kicking off within fourteen days of 05:00 UTC, earliest first, at most twenty). The key is "
     "stripped from every recorded URL.",
 )
+# One event per run of the one-credit backfill: the first pass, and the rerun that resumes it.
+BACKFILL_RUNS = 2
 BACKFILL = Recording(
     fixture_set="odds-backfill-2025-week-1",
     specs=_backfill_specs,
     note="The Odds API's historical archive at eight hours before 2025's first kickoff: the events page and the "
-    "first in-window event's five prop markets, which is exactly what a run with a budget of one credit reads.",
+    "first two in-window events' five prop markets. A run with a budget of one credit reads the first; the same "
+    "command run again resumes past the archived event and reads the second (the rerun pass).",
 )
 
 
@@ -114,7 +124,8 @@ def _preseason_job(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
     recording, so no event odds), then the archive-wide resolve."""
     universe(conn, ctx)
     schedule(conn, ctx, [2026])
-    run_props_preseason_snapshot(conn, ctx.fetcher, REPLAY_KEY, ctx.now, 2026, first_kickoff_for(conn, 2026))
+    gate = KickoffGate(ctx.now, 2026, first_kickoff_for(conn, 2026))
+    run_props_preseason_snapshot(conn, ctx.fetcher, REPLAY_KEY, gate)
     return ()
 
 
@@ -130,7 +141,7 @@ CASES: tuple[Case, ...] = (
         name="odds-snapshot-and-resolve",
         summary="the live props snapshot into player_prop_observations, then every name resolved into props_player_map",
         fixture_sets=("nflverse-universe", "odds-snapshot-2026-10-12"),
-        tables=(NFL_PLAYERS.as_setup(), PROP_OBSERVATIONS, PROPS_PLAYER_MAP),
+        tables=(PLAYERS.as_setup(), PROP_OBSERVATIONS, PROPS_PLAYER_MAP),
         run_python=_snapshot_and_resolve,
         now=NOW,
         recordings=(SNAPSHOT,),
@@ -139,7 +150,7 @@ CASES: tuple[Case, ...] = (
         name="props-preseason-job",
         summary="the props-preseason-snapshot job before the opener: the gate, an empty window, the resolve",
         fixture_sets=("nflverse-universe", "nflverse-schedule", "odds-snapshot-2026-10-12"),
-        tables=(NFL_PLAYERS.as_setup(), TEAM_WEEK_OBSERVATIONS.as_setup()),
+        tables=(PLAYERS.as_setup(), TEAM_WEEK_OBSERVATIONS.as_setup()),
         run_python=_preseason_job,
         now=PRESEASON_NOW,
     ),

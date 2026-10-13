@@ -14,10 +14,11 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Final
 
 from sqlalchemy import Connection, and_, select
 
-from research.db.schema import NFL_PLAYERS, PLAYER_PROP_OBSERVATIONS, PROPS_PLAYER_MAP
+from research.db.schema import PLAYER_PROP_OBSERVATIONS, PLAYERS, PROPS_PLAYER_MAP
 from research.pipeline.crosswalk import comparable_name
 from research.pipeline.http import Fetcher
 from research.pipeline.jscompat import js_iso
@@ -51,6 +52,12 @@ class SnapshotSummary:
     total_written: int
     total_skipped: int
     credits: CreditStatus
+
+
+# A name needs a first and a last part to have a loose key.
+_FIRST_AND_LAST: Final = 2
+# January and February games belong to the season that kicked off the autumn before.
+_LAST_MONTH_OF_PRIOR_SEASON: Final = 2
 
 
 def select_upcoming_events(
@@ -98,14 +105,14 @@ class PlayerMapRow:
 
 def _loose_key(name: str) -> str | None:
     parts = comparable_name(name).split(" ")
-    if len(parts) < 2:
+    if len(parts) < _FIRST_AND_LAST:
         return None
     return f"{parts[0][:1]}|{parts[-1]}"
 
 
 def season_of_kickoff(commence_time: datetime) -> int:
     """January and February belong to the season that started the previous autumn."""
-    return commence_time.year - 1 if commence_time.month <= 2 else commence_time.year
+    return commence_time.year - 1 if commence_time.month <= _LAST_MONTH_OF_PRIOR_SEASON else commence_time.year
 
 
 def resolve_prop_names(
@@ -151,8 +158,8 @@ def resolve_all_prop_names(conn: Connection) -> int:
     observed = list(seen.values())
     candidates: dict[int, list[tuple[str, str]]] = {}
     for season in sorted({p.season for p in observed}):
-        query = select(NFL_PLAYERS.c.id, NFL_PLAYERS.c.name).where(
-            and_(NFL_PLAYERS.c.rookie_season <= season, NFL_PLAYERS.c.last_season >= season)
+        query = select(PLAYERS.c.id, PLAYERS.c.name).where(
+            and_(PLAYERS.c.rookie_season <= season, PLAYERS.c.last_season >= season)
         )
         candidates[season] = [(r[0], r[1]) for r in conn.execute(query)]
     matched, _ = resolve_prop_names(observed, candidates)
@@ -168,10 +175,19 @@ def resolve_all_prop_names(conn: Connection) -> int:
 # --- the preseason job ----------------------------------------------------------------------------
 
 
-def run_props_preseason_snapshot(
-    conn: Connection, fetcher: Fetcher, api_key: str, fired_at: datetime, season: int, first_kickoff: datetime | None
-) -> str:
+@dataclass(frozen=True)
+class KickoffGate:
+    """When the job fired, for which season, and that season's first stored kickoff (None before
+    the schedule is ingested)."""
+
+    fired_at: datetime
+    season: int
+    first_kickoff: datetime | None
+
+
+def run_props_preseason_snapshot(conn: Connection, fetcher: Fetcher, api_key: str, gate: KickoffGate) -> str:
     """The props-preseason-snapshot job: capture then resolve, both strictly before the first kickoff."""
+    fired_at, season, first_kickoff = gate.fired_at, gate.season, gate.first_kickoff
     if first_kickoff is None:
         return f"{season} has no ingested schedule yet; skipping (no network call made)"
     if fired_at >= first_kickoff:

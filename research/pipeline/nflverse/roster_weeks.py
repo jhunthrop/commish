@@ -24,7 +24,6 @@ from research.pipeline.nflverse.csv import CsvRow
 from research.pipeline.nflverse.universe_reads import known_player_ids
 from research.pipeline.observations import INSERT_CHUNK_ROWS
 
-ROSTER_WEEK_SOURCE = "nflverse_roster_weeks"
 _REQUIRED_COLUMNS = ("season", "week", "game_type", "team", "gsis_id", "position", "status", "status_description_abbr")
 _NATURAL_KEYS = ("season", "week", "player_id", "ingested_at")
 
@@ -108,7 +107,6 @@ def record_roster_week_rows(conn: Connection, rows: Sequence[RosterWeekRow]) -> 
                 "status": row.status,
                 "status_detail": row.status_detail,
                 "position": row.position,
-                "source": ROSTER_WEEK_SOURCE,
             }
             for row in rows[start : start + INSERT_CHUNK_ROWS]
         ]

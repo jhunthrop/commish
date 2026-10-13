@@ -12,12 +12,12 @@ from research.parity.cases.nflverse_sources import SLICE_TEAMS, TeamFilter, rele
 from research.parity.cases.steps import cli, universe
 from research.parity.cases.tables import (
     NFL_DRAFT_PICKS,
-    NFL_PLAYERS,
     NFLVERSE_INJURIES,
     NFLVERSE_KICKING_WEEKS,
     NFLVERSE_ROSTER_WEEKS,
     NFLVERSE_TEAM_DEFENSE_WEEKS,
     PLAYER_WEEK_OBSERVATIONS,
+    PLAYERS,
     TEAM_WEEK_OBSERVATIONS,
 )
 from research.parity.record import RecordSpec
@@ -141,7 +141,7 @@ def _kdef(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
 
 
 UNIVERSE_SET = "nflverse-universe"
-SETUP_PLAYERS = NFL_PLAYERS.as_setup()
+SETUP_PLAYERS = PLAYERS.as_setup()
 
 CASES: tuple[Case, ...] = (
     Case(
@@ -208,7 +208,9 @@ CASES: tuple[Case, ...] = (
         now=NOW,
         recordings=(DRAFT_PICKS,),
         ts_scripts=(Script("research-ts/scripts/draft-picks-ingest.ts"),),
-        prior_fixture_sets=(PRIOR,),
+        # The sliced release's 2020 picks name nobody in the sliced universe, so the prior pass reads
+        # the full universe (a later set's recording wins) beside the sliced picks.
+        prior_fixture_sets=(PRIOR, UNIVERSE_SET),
     ),
     Case(
         name="nflverse-kdef",

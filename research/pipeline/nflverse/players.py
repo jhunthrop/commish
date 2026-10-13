@@ -8,12 +8,12 @@ unresolved reference comes back named and counted.
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Literal
+from typing import Final, Literal
 
 from sqlalchemy import Connection, text
 from sqlalchemy.dialects.postgresql import insert
 
-from research.db.schema import NFL_PLAYERS
+from research.db.schema import PLAYERS
 from research.errors import SchemaDriftError
 from research.pipeline.jscompat import js_is_integer, js_number, js_trim
 from research.pipeline.nflverse.csv import CsvRow
@@ -59,6 +59,10 @@ class UniverseResolution:
     resolution_rate: float | None
 
 
+# The `seasonOrNull` floor: anything at or below is a placeholder, not a season.
+_NOT_A_SEASON_BEFORE: Final = 1900
+
+
 def _text(row: CsvRow, column: str) -> str | None:
     raw = row.get(column)
     if raw is None:
@@ -73,7 +77,7 @@ def _season(row: CsvRow, column: str) -> int | None:
         return None
     value = js_number(raw)
     # 0 appears for players with no recorded season, and it is not a year.
-    return int(value) if js_is_integer(value) and value > 1900 else None
+    return int(value) if js_is_integer(value) and value > _NOT_A_SEASON_BEFORE else None
 
 
 def map_nfl_players(rows: Sequence[CsvRow]) -> list[NflPlayer]:
@@ -206,7 +210,7 @@ def release_moved_ids(conn: Connection, players: Sequence[NflPlayer]) -> None:
                 params[f"secondary{i}"] = secondary
             conn.execute(
                 text(
-                    f"update nfl_players as p set {column} = null from (values {values}) as v(id, secondary) "
+                    f"update {PLAYERS.fullname} as p set {column} = null from (values {values}) as v(id, secondary) "
                     f"where p.{column} = v.secondary and p.id <> v.id"
                 ),
                 params,
@@ -233,13 +237,13 @@ def record_nfl_players(conn: Connection, players: Sequence[NflPlayer]) -> int:
             }
             for p in players[start : start + _CHUNK_ROWS]
         ]
-        values = insert(NFL_PLAYERS).values(chunk)
+        values = insert(PLAYERS).values(chunk)
         statement = values.on_conflict_do_update(
-            index_elements=[NFL_PLAYERS.c.id],
+            index_elements=[PLAYERS.c.id],
             set_={
                 column: values.excluded[column]
                 for column in ("pfr_id", "espn_id", "name", "position", "latest_team", "rookie_season", "last_season")
             },
-        ).returning(NFL_PLAYERS.c.id)
+        ).returning(PLAYERS.c.id)
         written += len(conn.execute(statement).all())
     return written

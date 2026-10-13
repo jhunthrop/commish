@@ -7,9 +7,10 @@ stores nothing for its rows and counts them as unstamped: an unstamped fact cann
 """
 
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from types import MappingProxyType
 
 from sqlalchemy import Connection
 
@@ -29,20 +30,22 @@ class InjuryMetric:
     PRACTICE_STATUS = "injury_practice_status"
 
 
-_REPORT_STATUS_BY_NAME = {"": 0, "Note": 0, "Probable": 0, "Questionable": 1, "Doubtful": 2, "Out": 3}
-_PRACTICE_STATUS_BY_NAME = {
-    "": 0,
-    "Full Participation in Practice": 1,
-    "Limited Participation in Practice": 2,
-    "Did Not Participate In Practice": 3,
-}
+_REPORT_STATUS_BY_NAME = MappingProxyType({"": 0, "Note": 0, "Probable": 0, "Questionable": 1, "Doubtful": 2, "Out": 3})
+_PRACTICE_STATUS_BY_NAME = MappingProxyType(
+    {
+        "": 0,
+        "Full Participation in Practice": 1,
+        "Limited Participation in Practice": 2,
+        "Did Not Participate In Practice": 3,
+    }
+)
 
 
 def _json(raw: str | None) -> str:
     return "undefined" if raw is None else json.dumps(raw)
 
 
-def _ordinal(raw: str | None, table: dict[str, int], column: str) -> int:
+def _ordinal(raw: str | None, table: Mapping[str, int], column: str) -> int:
     value = table.get(js_trim(raw or ""))
     if value is None:
         raise SchemaDriftError(

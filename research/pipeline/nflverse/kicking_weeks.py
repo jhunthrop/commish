@@ -7,8 +7,9 @@ From the modern `stats_player` release, rows whose position is `K`, kicking colu
 
 import functools
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from sqlalchemy import Connection
 from sqlalchemy.dialects.postgresql import insert
@@ -22,34 +23,35 @@ from research.pipeline.nflverse.config import SEASON_TYPE, Releases
 from research.pipeline.nflverse.csv import CsvRow
 from research.pipeline.nflverse.universe_reads import known_player_ids
 
-KICKING_WEEK_SOURCE = "nflverse_kicking_weeks"
 _KICKER_POSITION = "K"
 _INSERT_CHUNK_ROWS = 1_000
 _NATURAL_KEYS = ("season", "week", "player_id", "ingested_at")
 
 # Table column -> release column. The two 60+ buckets are spelled with a trailing underscore upstream.
-NUMERIC_COLUMNS: dict[str, str] = {
-    "fg_made": "fg_made",
-    "fg_att": "fg_att",
-    "fg_missed": "fg_missed",
-    "fg_blocked": "fg_blocked",
-    "fg_made_0_19": "fg_made_0_19",
-    "fg_made_20_29": "fg_made_20_29",
-    "fg_made_30_39": "fg_made_30_39",
-    "fg_made_40_49": "fg_made_40_49",
-    "fg_made_50_59": "fg_made_50_59",
-    "fg_made_60": "fg_made_60_",
-    "fg_missed_0_19": "fg_missed_0_19",
-    "fg_missed_20_29": "fg_missed_20_29",
-    "fg_missed_30_39": "fg_missed_30_39",
-    "fg_missed_40_49": "fg_missed_40_49",
-    "fg_missed_50_59": "fg_missed_50_59",
-    "fg_missed_60": "fg_missed_60_",
-    "pat_made": "pat_made",
-    "pat_att": "pat_att",
-    "pat_missed": "pat_missed",
-    "pat_blocked": "pat_blocked",
-}
+NUMERIC_COLUMNS: Mapping[str, str] = MappingProxyType(
+    {
+        "fg_made": "fg_made",
+        "fg_att": "fg_att",
+        "fg_missed": "fg_missed",
+        "fg_blocked": "fg_blocked",
+        "fg_made_0_19": "fg_made_0_19",
+        "fg_made_20_29": "fg_made_20_29",
+        "fg_made_30_39": "fg_made_30_39",
+        "fg_made_40_49": "fg_made_40_49",
+        "fg_made_50_59": "fg_made_50_59",
+        "fg_made_60": "fg_made_60_",
+        "fg_missed_0_19": "fg_missed_0_19",
+        "fg_missed_20_29": "fg_missed_20_29",
+        "fg_missed_30_39": "fg_missed_30_39",
+        "fg_missed_40_49": "fg_missed_40_49",
+        "fg_missed_50_59": "fg_missed_50_59",
+        "fg_missed_60": "fg_missed_60_",
+        "pat_made": "pat_made",
+        "pat_att": "pat_att",
+        "pat_missed": "pat_missed",
+        "pat_blocked": "pat_blocked",
+    }
+)
 _REQUIRED_COLUMNS = ("player_id", "position", "season", "week", "season_type", "team", *NUMERIC_COLUMNS.values())
 
 
@@ -137,7 +139,6 @@ def record_kicking_week_rows(conn: Connection, rows: Sequence[KickingWeekRow]) -
                 "player_id": row.player_id,
                 "team": row.team,
                 **row.counts,
-                "source": KICKING_WEEK_SOURCE,
             }
             for row in rows[start : start + _INSERT_CHUNK_ROWS]
         ]

@@ -14,11 +14,12 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import Connection, delete, select, text
 
 from research.db.schema import (
-    NFL_PLAYERS,
     PLAYER_CROSSWALK,
     PLAYERS,
     PRESEASON_RANKINGS,
     PRESEASON_ROSTERS,
+    PROVIDER_PLAYERS,
+    TEAM_WEEK_OBSERVATIONS,
 )
 from research.errors import ResearchError
 from research.pipeline.nflverse.client import NflverseClient
@@ -106,7 +107,7 @@ def preseason_rosters_as_of(conn: Connection, season: int, as_of: datetime) -> l
     """`preseasonRostersAsOf`: each player's latest roster row at or before `as_of`."""
     rows = conn.execute(
         text(
-            "select distinct on (player_id) player_id, team, position, status from preseason_rosters "
+            f"select distinct on (player_id) player_id, team, position, status from {PRESEASON_ROSTERS.fullname} "
             "where season = :season and as_of <= :as_of order by player_id asc, as_of desc"
         ),
         {"season": season, "as_of": as_of},
@@ -118,7 +119,7 @@ def first_kickoff_for(conn: Connection, season: int) -> datetime | None:
     """`firstKickoffFor`: the earliest week-one kickoff instant the schedule stored."""
     return conn.execute(
         text(
-            "select min(as_of) from team_week_observations where season = :season and week = 1 "
+            f"select min(as_of) from {TEAM_WEEK_OBSERVATIONS.fullname} where season = :season and week = 1 "
             "and source = :source and metric = :metric"
         ),
         {"season": season, "source": ScheduleSource.KICKOFF, "metric": ScheduleMetric.KICKOFF_INSTANT},
@@ -198,7 +199,7 @@ def ingest_depth_charts(conn: Connection, client: NflverseClient, season: int, n
 
 def roster_identities_for(conn: Connection, season: int) -> list[RosterIdentity]:
     """`rosterIdentitiesFor`: the season's roster spine, named from the universe, nameless dropped."""
-    names = dict(conn.execute(select(NFL_PLAYERS.c.id, NFL_PLAYERS.c.name)).tuples().all())
+    names = dict(conn.execute(select(PLAYERS.c.id, PLAYERS.c.name)).tuples().all())
     identities = [
         RosterIdentity(r.player_id, names.get(r.player_id, ""), r.position, r.team)
         for r in preseason_rosters_as_of(conn, season, FINAL)
@@ -209,8 +210,12 @@ def roster_identities_for(conn: Connection, season: int) -> list[RosterIdentity]
 def crossed_roster_identities(conn: Connection) -> list[RosterIdentity]:
     """`crossedRosterIdentities`: the provider roster, on the universe ids the crosswalk placed."""
     query = (
-        select(PLAYER_CROSSWALK.c.nfl_player_id, PLAYERS.c.name, PLAYERS.c.position, PLAYERS.c.nfl_team)
-        .select_from(PLAYERS.join(PLAYER_CROSSWALK, PLAYER_CROSSWALK.c.player_id == PLAYERS.c.id))
-        .where(PLAYER_CROSSWALK.c.nfl_player_id.is_not(None))
+        select(
+            PLAYER_CROSSWALK.c.player_id, PROVIDER_PLAYERS.c.name, PROVIDER_PLAYERS.c.position, PROVIDER_PLAYERS.c.team
+        )
+        .select_from(
+            PROVIDER_PLAYERS.join(PLAYER_CROSSWALK, PLAYER_CROSSWALK.c.provider_player_id == PROVIDER_PLAYERS.c.id)
+        )
+        .where(PLAYER_CROSSWALK.c.player_id.is_not(None))
     )
     return [RosterIdentity(r[0], r[1], r[2], r[3]) for r in conn.execute(query)]

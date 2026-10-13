@@ -6,6 +6,8 @@ spelling folds onto today's code, never the reverse. It also mints the synthetic
 team defense hangs on, `team-def:<source code>`.
 """
 
+from types import MappingProxyType
+
 from research.errors import SchemaDriftError
 
 # The provider's 32, `NFL_TEAM_ABBREVIATIONS` in capture-feeds.ts.
@@ -18,8 +20,8 @@ NFL_TEAM_ABBREVIATIONS: tuple[str, ...] = (
 TEAM_DEFENSE_UNIVERSE_PREFIX = "team-def:"
 DEFENSE_PLAYER_ID_PREFIX = "DST-"
 
-_PRODUCT_TO_SOURCE = {"LAR": "LA", "WSH": "WAS"}
-_SOURCE_TO_PRODUCT = {"LA": "LAR", "WAS": "WSH", "STL": "LAR", "SD": "LAC", "OAK": "LV"}
+_PRODUCT_TO_SOURCE = MappingProxyType({"LAR": "LA", "WSH": "WAS"})
+_SOURCE_TO_PRODUCT = MappingProxyType({"LA": "LAR", "WAS": "WSH", "STL": "LAR", "SD": "LAC", "OAK": "LV"})
 _PRODUCT_CODES = frozenset(NFL_TEAM_ABBREVIATIONS)
 
 

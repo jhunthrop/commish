@@ -1,4 +1,4 @@
-"""THE PIPELINE'S COMMAND LINE: every ingest, against the database in DATABASE_URL, over the live network.
+"""THE PIPELINE'S COMMAND LINE: every ingest, into the `research` schema at RESEARCH_DATABASE_URL, live.
 
     uv run python -m research.pipeline <ingest> [options]
 

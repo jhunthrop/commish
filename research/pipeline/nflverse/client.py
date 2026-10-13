@@ -11,11 +11,12 @@ import codecs
 import zlib
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from http import HTTPStatus
 from typing import Literal
 from urllib.parse import urljoin
 
 from research.errors import ResearchError
-from research.pipeline.http import Fetcher
+from research.pipeline.http import Fetcher, is_success
 from research.pipeline.jscompat import js_trim
 from research.pipeline.nflverse.config import NFLVERSE_BASE_URL
 from research.pipeline.nflverse.csv import CsvRow, CsvSplitter, parse_csv, project_records
@@ -35,9 +36,9 @@ def _asset_url(base_url: str, release: str, file: str) -> str:
 
 
 def _assert_ok(status: int, asset: str) -> None:
-    if status == 404:
+    if status == HTTPStatus.NOT_FOUND:
         raise NflverseError("not_found", asset, f"nflverse has no release asset {asset}.")
-    if not 200 <= status < 300:
+    if not is_success(status):
         raise NflverseError("upstream", asset, f"nflverse returned HTTP {status} for {asset}.")
 
 

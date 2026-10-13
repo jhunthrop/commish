@@ -17,6 +17,7 @@ from sqlalchemy import Connection, select
 from sqlalchemy.dialects.postgresql import insert
 
 from research.db.schema import COACHES
+from research.db.schema.nflverse import COACH_ROLES, COACH_SOURCES
 from research.db.upsert import excluded_set
 from research.errors import SchemaDriftError
 from research.pipeline.jscompat import js_is_finite, js_is_integer, js_number, js_trim
@@ -26,9 +27,9 @@ PLAY_CALLERS_CSV_PATH = "data/play-callers/play-callers.csv"
 HEAD_COACH_SEASONS: tuple[int, ...] = (2026,)
 _COLUMNS = ("season", "team", "name", "role", "start_week", "end_week", "source", "note")
 _HEAD_COACH_COLUMNS = ("head_coach", "head_coach_first_season")
-_ROLES = frozenset({"HC", "OC"})
-_SOURCES = frozenset({"wikipedia", "pfr", "both"})
-_TENURE_KEY = ("id", "season", "team", "role", "start_week")
+_ROLES = frozenset(COACH_ROLES)
+_SOURCES = frozenset(COACH_SOURCES)
+_TENURE_KEY = ("season", "team", "role", "start_week")
 
 
 @dataclass(frozen=True)
@@ -72,9 +73,9 @@ def parse_play_callers(csv: str) -> list[PlayCallerRow]:
                 f"expected {len(_COLUMNS)} or {len(_COLUMNS) + 2} columns ({','.join((*_COLUMNS, *_HEAD_COACH_COLUMNS))}), "
                 f"got {len(fields)}.",
             )
-        season_raw, team, name, role, start_raw, end_raw, source, note = fields[:8]
-        head_coach = js_trim(fields[8]) if len(fields) > 8 else ""
-        first_raw = js_trim(fields[9]) if len(fields) > 9 else ""
+        season_raw, team, name, role, start_raw, end_raw, source, note = fields[: len(_COLUMNS)]
+        head_coach_raw, first_raw = (js_trim(f) for f in (*fields[len(_COLUMNS) :], "", "")[:2])
+        head_coach = head_coach_raw
         if (head_coach == "") != (first_raw == ""):
             raise _fail(
                 number, "head_coach and head_coach_first_season must be filled together or left blank together."
@@ -107,43 +108,57 @@ def validate_play_callers(
     head_coach_seasons: Sequence[int] = HEAD_COACH_SEASONS,
 ) -> list[str]:
     """`validatePlayCallers`: every problem, named; an empty list means the file may be written."""
-    problems: list[str] = []
-    for row in rows:
-        if js_trim(row.name) == "":
-            problems.append(f"{row.team} {row.season}: empty name for weeks {row.start_week}-{row.end_week}.")
-        if row.start_week > row.end_week:
-            problems.append(f"{row.team} {row.season}: start_week {row.start_week} is after end_week {row.end_week}.")
+    problems = [p for row in rows for p in _row_problems(row)]
     for season in seasons:
-        final_week = final_week_of(season)
         for team in teams_by_season(season):
-            team_rows = [r for r in _rows_for(rows, season, team) if r.start_week <= r.end_week]
-            if not team_rows:
-                problems.append(f"{team} {season}: no play-caller rows.")
-                continue
-            covered = 0
-            for r in team_rows:
-                if r.start_week > covered + 1:
-                    problems.append(f"{team} {season}: gap in week coverage between {covered} and {r.start_week}.")
-                elif r.start_week <= covered:
-                    problems.append(f"{team} {season}: overlapping week ranges around week {r.start_week}.")
-                covered = max(covered, r.end_week)
-            if covered < final_week:
-                problems.append(f"{team} {season}: gap in week coverage between {covered} and {final_week}.")
+            problems.extend(_coverage_problems(_rows_for(rows, season, team), season, team))
     for season in head_coach_seasons:
         for team in teams_by_season(season):
-            named = [r for r in _rows_for(rows, season, team) if r.head_coach != ""]
-            if not named:
-                problems.append(f"{team} {season}: empty head_coach.")
-                continue
-            distinct = list(
-                dict.fromkeys(
-                    f"{r.head_coach}|{'' if r.head_coach_first_season is None else r.head_coach_first_season}"
-                    for r in named
-                )
-            )
-            if len(distinct) > 1:
-                problems.append(f"{team} {season}: rows disagree about the head coach ({' and '.join(distinct)}).")
+            problems.extend(_head_coach_problems(_rows_for(rows, season, team), season, team))
     return problems
+
+
+def _row_problems(row: PlayCallerRow) -> list[str]:
+    problems: list[str] = []
+    if js_trim(row.name) == "":
+        problems.append(f"{row.team} {row.season}: empty name for weeks {row.start_week}-{row.end_week}.")
+    if row.start_week > row.end_week:
+        problems.append(f"{row.team} {row.season}: start_week {row.start_week} is after end_week {row.end_week}.")
+    return problems
+
+
+def _coverage_problems(team_rows: Sequence[PlayCallerRow], season: int, team: str) -> list[str]:
+    """Every week from 1 to the season's last covered once: no gap, no overlap."""
+    valid = [r for r in team_rows if r.start_week <= r.end_week]
+    if not valid:
+        return [f"{team} {season}: no play-caller rows."]
+    problems: list[str] = []
+    covered = 0
+    for r in valid:
+        if r.start_week > covered + 1:
+            problems.append(f"{team} {season}: gap in week coverage between {covered} and {r.start_week}.")
+        elif r.start_week <= covered:
+            problems.append(f"{team} {season}: overlapping week ranges around week {r.start_week}.")
+        covered = max(covered, r.end_week)
+    final_week = final_week_of(season)
+    if covered < final_week:
+        problems.append(f"{team} {season}: gap in week coverage between {covered} and {final_week}.")
+    return problems
+
+
+def _head_coach_problems(team_rows: Sequence[PlayCallerRow], season: int, team: str) -> list[str]:
+    """One head coach per club-season, named the same way on every row that names one."""
+    named = [r for r in team_rows if r.head_coach != ""]
+    if not named:
+        return [f"{team} {season}: empty head_coach."]
+    distinct = list(
+        dict.fromkeys(
+            f"{r.head_coach}|{'' if r.head_coach_first_season is None else r.head_coach_first_season}" for r in named
+        )
+    )
+    if len(distinct) > 1:
+        return [f"{team} {season}: rows disagree about the head coach ({' and '.join(distinct)})."]
+    return []
 
 
 def upsert_coach_rows(conn: Connection, rows: Sequence[PlayCallerRow]) -> int:
@@ -170,7 +185,7 @@ def upsert_coach_rows(conn: Connection, rows: Sequence[PlayCallerRow]) -> int:
     upsert = statement.on_conflict_do_update(
         index_elements=[COACHES.c.season, COACHES.c.team, COACHES.c.role, COACHES.c.start_week],
         set_=excluded_set(statement, COACHES, _TENURE_KEY),
-    ).returning(COACHES.c.id)
+    ).returning(COACHES.c.season)
     return len(conn.execute(upsert).all())
 
 

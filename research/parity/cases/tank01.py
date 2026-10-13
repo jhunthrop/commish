@@ -16,7 +16,13 @@ from research.errors import ConfigurationError
 from research.parity.case import Case, Recording, RunContext, Script
 from research.parity.cases.nflverse_season import NOW, UNIVERSE
 from research.parity.cases.steps import cli
-from research.parity.cases.tables import NFL_GAMES, NFL_PLAYERS, PLAYER_CROSSWALK, PLAYER_STAT_LINES, PLAYERS
+from research.parity.cases.tables import (
+    PLAYER_CROSSWALK,
+    PLAYERS,
+    PROVIDER_GAMES,
+    PROVIDER_PLAYERS,
+    PROVIDER_STAT_LINES,
+)
 from research.parity.record import RecordSpec
 from research.pipeline.budget import UnmeteredBudget
 from research.pipeline.http import Fetcher
@@ -118,7 +124,7 @@ CASES: tuple[Case, ...] = (
         name="tank01-roster-and-lines",
         summary="the provider roster into players, then weeks 1-2 of box scores into player_stat_lines (seedPlayers)",
         fixture_sets=("tank01-2026",),
-        tables=(PLAYERS, PLAYER_STAT_LINES),
+        tables=(PROVIDER_PLAYERS, PROVIDER_STAT_LINES),
         run_python=_roster_and_lines,
         now=NOW,
         recordings=(TANK01,),
@@ -127,7 +133,7 @@ CASES: tuple[Case, ...] = (
         name="tank01-schedule",
         summary="every 2026 fixture, weeks 1-18, into nfl_games (the stats pipeline's schedule walk)",
         fixture_sets=("tank01-2026",),
-        tables=(NFL_GAMES,),
+        tables=(PROVIDER_GAMES,),
         run_python=_schedule,
         now=NOW,
     ),
@@ -135,7 +141,7 @@ CASES: tuple[Case, ...] = (
         name="tank01-adp",
         summary="the PPR ADP feed onto players.adp and pos_adp (an update, never an insert)",
         fixture_sets=("tank01-2026",),
-        tables=(PLAYERS,),
+        tables=(PROVIDER_PLAYERS,),
         run_python=_adp,
         now=NOW,
     ),
@@ -143,7 +149,7 @@ CASES: tuple[Case, ...] = (
         name="tank01-headshots",
         summary="backfill-headshots.ts RE-ASSEMBLED (its provider needs Redis): headshot URLs onto existing players rows",
         fixture_sets=("tank01-2026",),
-        tables=(PLAYERS,),
+        tables=(PROVIDER_PLAYERS,),
         run_python=_headshots,
         now=NOW,
     ),
@@ -151,7 +157,7 @@ CASES: tuple[Case, ...] = (
         name="crosswalk",
         summary="build-crosswalk.ts run as is: the provider roster against the universe, defenses seeded",
         fixture_sets=("nflverse-universe", "tank01-2026"),
-        tables=(NFL_PLAYERS.as_setup(), PLAYERS.as_setup(), PLAYER_CROSSWALK),
+        tables=(PLAYERS.as_setup(), PROVIDER_PLAYERS.as_setup(), PLAYER_CROSSWALK),
         ts_scripts=(Script("research-ts/scripts/build-crosswalk.ts"),),
         run_python=_crosswalk,
         now=datetime(2026, 10, 12, 5, 0, tzinfo=UTC),

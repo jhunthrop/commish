@@ -19,7 +19,7 @@ from typing import Final, Literal
 
 from sqlalchemy import Connection, select, text
 
-from research.db.schema import CAPTURE_SNAPSHOTS, STAT_WEEKS
+from research.db.schema import CAPTURE_SNAPSHOTS, PROVIDER_WEEKS
 from research.pipeline.budget import FixedBudget, RequestBudget
 from research.pipeline.jscompat import js_iso, js_json_stringify, js_object_keys
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
@@ -128,19 +128,22 @@ class CaptureResult:
 
 
 _INSERT = text(
-    "insert into capture_snapshots (source, captured_at, digest, payload) "
+    f"insert into {CAPTURE_SNAPSHOTS.fullname} (source, captured_at, digest, payload) "
     "values (:source, :captured_at, :digest, cast(:payload as jsonb))"
 )
 
 
 @dataclass(frozen=True)
 class CapturePass:
-    """One capture pass's fixed inputs: when it captures, for which season and week, which clubs."""
+    """One capture pass's fixed inputs: when it captures, for which season and week, which clubs,
+    which feeds, and which of them a freshness key already covers."""
 
     captured_at: datetime
     season: int
     week: int
     teams: tuple[str, ...] = NFL_TEAM_ABBREVIATIONS
+    feeds: Sequence[CaptureFeed] = CAPTURE_FEEDS
+    is_fresh: Callable[[str], bool] = lambda _key: False
 
 
 def _due(
@@ -184,14 +187,12 @@ def capture_once(
     client: Tank01Client,
     capture: CapturePass,
     budget: RequestBudget,
-    feeds: Sequence[CaptureFeed] = CAPTURE_FEEDS,
-    is_fresh: Callable[[str], bool] = lambda _key: False,
 ) -> CaptureResult:
     """`captureOnce`: due feeds, one budget reservation, each feed captured, unchanged or failed."""
     context = CaptureContext(
         capture.season, capture.week, js_iso(capture.captured_at)[:10].replace("-", ""), capture.teams
     )
-    due, skipped = _due(feeds, capture.captured_at, is_fresh)
+    due, skipped = _due(capture.feeds, capture.captured_at, capture.is_fresh)
     if not due:
         return CaptureResult(skipped)
     reservation = budget.reserve(sum(len(feed.requests(context)) for feed in due))
@@ -205,12 +206,14 @@ def capture_once(
 
 def current_nfl_week(conn: Connection) -> int:
     """`currentNflWeek`: the earliest week not yet final, or week 1 when the table is empty."""
-    query = select(STAT_WEEKS.c.week).where(STAT_WEEKS.c.status != "final").order_by(STAT_WEEKS.c.week).limit(1)
+    query = (
+        select(PROVIDER_WEEKS.c.week).where(PROVIDER_WEEKS.c.status != "final").order_by(PROVIDER_WEEKS.c.week).limit(1)
+    )
     week = conn.execute(query).scalar_one_or_none()
     return 1 if week is None else int(week)
 
 
 def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: datetime, season: int) -> CaptureResult:
     """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys."""
-    capture = CapturePass(fired_at, season, current_nfl_week(conn))
-    return capture_once(conn, client, capture, FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET), feeds=harvest_feeds())
+    capture = CapturePass(fired_at, season, current_nfl_week(conn), feeds=harvest_feeds())
+    return capture_once(conn, client, capture, FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET))

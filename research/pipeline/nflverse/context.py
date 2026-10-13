@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import Connection, text
 
+from research.db.schema import TEAM_WEEK_OBSERVATIONS
 from research.pipeline.coaches import PlayCallerLookup, play_caller_lookup, read_coach_rows
 from research.pipeline.jscompat import js_locale_compare, js_sum
 from research.pipeline.nflverse.client import NflverseClient
@@ -100,7 +101,7 @@ def ingest_play_by_play(conn: Connection, client: NflverseClient, season: int) -
 
 _TEAM_OBSERVATIONS_AS_OF = text(
     "select distinct on (week, team, source, metric) season, week, team, source, metric, value, as_of "
-    "from team_week_observations "
+    f"from {TEAM_WEEK_OBSERVATIONS.fullname} "
     "where season = :season and week >= :week_from and week <= :week_to and as_of <= :as_of "
     "order by week asc, team asc, source asc, metric asc, as_of desc"
 )

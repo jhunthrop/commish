@@ -13,6 +13,7 @@ import re
 from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime, timedelta
 from types import MappingProxyType
+from typing import Final
 
 # ECMAScript WhiteSpace and LineTerminator code points: what `String.prototype.trim` removes.
 _JS_WHITESPACE = "".join(
@@ -26,6 +27,10 @@ _JS_WHITESPACE = "".join(
 # StrDecimalLiteral, the grammar `Number(string)` accepts after trimming (plus Infinity forms).
 _DECIMAL = re.compile(r"^[+-]?(?:Infinity|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)$")
 _NON_DECIMAL = re.compile(r"^0(?:[xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+)$")
+
+
+# Number.prototype.toString switches to exponent notation from 1e21 on.
+_EXPONENT_FROM: Final = 1e21
 
 
 def js_trim(value: str) -> str:
@@ -48,7 +53,7 @@ def js_number(value: str) -> float:
     return float(text)
 
 
-def js_number_of(value: object) -> float:
+def js_number_of(value: object) -> float:  # noqa: PLR0911 - one return per JavaScript type, as the ECMAScript algorithm reads
     """`Number(value)` for a parsed JSON value: undefined is NaN, null and false are 0, true is 1,
     a string goes through `Number(string)`, an array of one element through that element, and
     any other object is NaN."""
@@ -90,7 +95,7 @@ def js_sum(values: Iterable[float]) -> float:
     return total
 
 
-def js_json_stringify(value: object) -> str:
+def js_json_stringify(value: object) -> str:  # noqa: PLR0911 - one return per JavaScript type, as the ECMAScript algorithm reads
     """`JSON.stringify` of a parsed JSON value: no whitespace, keys in JavaScript's own property
     order (`js_object_keys`), numbers as JavaScript prints them (a parsed `1.0` is the number 1),
     non-ASCII left as is. What a TypeScript writer hands Postgres for a json column, and what its
@@ -150,7 +155,7 @@ _ISO_DATE_TIME = re.compile(
 )
 
 
-def js_date_parse(text: str) -> datetime | None:
+def js_date_parse(text: str) -> datetime | None:  # noqa: PLR0911 - one return per JavaScript type, as the ECMAScript algorithm reads
     """`new Date(string)` for the ISO shapes these feeds publish, or None where V8 yields NaN.
 
     A date alone is UTC midnight; a date-time with a `Z` or an offset is that instant; a date-time
@@ -206,7 +211,7 @@ def js_string(value: float) -> str:
         return "NaN"
     if math.isinf(value):
         return "Infinity" if value > 0 else "-Infinity"
-    if js_is_integer(value) and abs(value) < 1e21:
+    if js_is_integer(value) and abs(value) < _EXPONENT_FROM:
         return str(int(value))
     text = repr(value)
     if "e" in text:

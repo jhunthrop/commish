@@ -15,6 +15,7 @@ from sqlalchemy import Connection
 
 from research.pipeline.nflverse.client import NflverseClient, NflverseError
 from research.pipeline.nflverse.config import PUBLICATION_LAG_HOURS, Files, Releases
+from research.pipeline.nflverse.csv import CsvRow
 from research.pipeline.nflverse.participation import (
     SNAP_COUNT_ASSET_FLOOR,
     NflverseSource,
@@ -23,7 +24,7 @@ from research.pipeline.nflverse.participation import (
     participation_observations,
     week_as_of_from_snap_counts,
 )
-from research.pipeline.nflverse.players import PlayerUniverse, map_nfl_players, record_nfl_players
+from research.pipeline.nflverse.players import PlayerUniverse, UnresolvedRef, map_nfl_players, record_nfl_players
 from research.pipeline.nflverse.schedule import (
     SCHEDULE_BASE_URL,
     SCHEDULE_FILE,
@@ -131,6 +132,36 @@ def schedule_week_as_of(client: NflverseClient, seasons: Sequence[int]) -> dict[
     return {season: week_as_of_from_schedule([g for g in games if g.season == season]) for season in seasons}
 
 
+def _week_as_of(
+    snap_counts: Sequence[CsvRow], schedule_as_of: Mapping[float, datetime] | None
+) -> dict[float, datetime]:
+    """Each week's as-of: the snap-count publication where there is one, else the schedule's."""
+    return {
+        **(dict(schedule_as_of) if schedule_as_of is not None else {}),
+        **week_as_of_from_snap_counts(snap_counts, PUBLICATION_LAG_HOURS),
+    }
+
+
+def _retract_false_zeros(conn: Connection, season: int) -> None:
+    """With no player-week release, its earlier participation zeros are false: they go."""
+    removed = delete_observations_by_source(conn, season, NflverseSource.PLAYER_WEEK, PLAYERWEEK_PARTICIPATION_METRICS)
+    if removed > 0:
+        LOG.warning("WARNING: removed %s stale false-zero participation observations for %s.", removed, season)
+
+
+def _merged_unresolved(refs: Sequence[UnresolvedRef]) -> list[UnresolvedSummary]:
+    """One summary per unresolved id, occurrences summed, in first-seen order."""
+    unresolved: dict[str, UnresolvedSummary] = {}
+    for ref in refs:
+        already = unresolved.get(ref.id)
+        unresolved[ref.id] = (
+            UnresolvedSummary(ref.id, ref.name, ref.occurrences)
+            if already is None
+            else UnresolvedSummary(already.id, already.name, already.occurrences + ref.occurrences)
+        )
+    return list(unresolved.values())
+
+
 def ingest_season(
     conn: Connection,
     client: NflverseClient,
@@ -147,10 +178,7 @@ def ingest_season(
             f"stat lines cannot be dated. Pass scheduleWeekAsOf([...]).get({season}) for seasons at or below "
             "SNAP_COUNT_ASSET_FLOOR."
         )
-    week_as_of: dict[float, datetime] = {
-        **(dict(schedule_as_of) if schedule_as_of is not None else {}),
-        **week_as_of_from_snap_counts(snap_counts, PUBLICATION_LAG_HOURS),
-    }
+    week_as_of = _week_as_of(snap_counts, schedule_as_of)
 
     participation = map_participation(snap_counts, player_week, universe)
     stat_lines = map_stat_lines(player_week, week_as_of, universe)
@@ -161,11 +189,7 @@ def ingest_season(
     ]
 
     if not player_week:
-        removed = delete_observations_by_source(
-            conn, season, NflverseSource.PLAYER_WEEK, PLAYERWEEK_PARTICIPATION_METRICS
-        )
-        if removed > 0:
-            LOG.warning("WARNING: removed %s stale false-zero participation observations for %s.", removed, season)
+        _retract_false_zeros(conn, season)
 
     written = record_observations(conn, participation_rows) + record_observations(
         conn, stat_line_observations(stat_lines.stat_lines)
@@ -178,14 +202,7 @@ def ingest_season(
     edges = record_player_teams(conn, player_teams)
     record_team_observations(conn, line_continuity_observations(snap_counts, season))
 
-    unresolved: dict[str, UnresolvedSummary] = {}
-    for ref in [*participation.unresolved, *stat_lines.unresolved]:
-        already = unresolved.get(ref.id)
-        unresolved[ref.id] = (
-            UnresolvedSummary(ref.id, ref.name, ref.occurrences)
-            if already is None
-            else UnresolvedSummary(already.id, already.name, already.occurrences + ref.occurrences)
-        )
+    unresolved = _merged_unresolved([*participation.unresolved, *stat_lines.unresolved])
     return SeasonIngestReport(
         season=season,
         participation_rows=len(participation.participation),
@@ -193,7 +210,7 @@ def ingest_season(
         observations_written=written,
         participation_resolution=participation.resolution_rate,
         stat_line_resolution=stat_lines.resolution_rate,
-        unresolved=list(unresolved.values()),
+        unresolved=unresolved,
         week_as_of=week_as_of,
         player_week_unavailable=not player_week,
         snap_counts_unavailable=not snap_counts,

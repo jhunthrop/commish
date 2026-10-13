@@ -11,9 +11,15 @@ empty body MEANS is each provider client's job, because it means different thing
 
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
+from http import HTTPStatus
 from typing import Protocol
 
 import httpx
+
+
+def is_success(status: int) -> bool:
+    """A 2xx status, as `Response.ok` reads it."""
+    return HTTPStatus.OK <= status < HTTPStatus.MULTIPLE_CHOICES
 
 
 @dataclass(frozen=True)
@@ -24,7 +30,7 @@ class HttpResponse:
 
     @property
     def ok(self) -> bool:
-        return 200 <= self.status < 300
+        return is_success(self.status)
 
     def text(self) -> str:
         return self.body.decode("utf-8-sig", errors="replace")
