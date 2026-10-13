@@ -26,7 +26,7 @@
 <Panel as="section" label="Moves this week and last" padding="sm">
 	<PanelHead title="Moves" aside="This week and last" level={2} />
 	{#if lines.length > 0}
-		<LineList label="Moves this week and last" {lines} />
+		<LineList label="Moves this week and last" {lines} column />
 	{:else}
 		<p class="none">Nobody in your league has made a move this week or last.</p>
 	{/if}
