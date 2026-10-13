@@ -636,7 +636,7 @@ export interface paths {
 			query?: never;
 			header?: never;
 			path: {
-				/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+				/** @description a shared draft's settings, seed, picks and drafter, deflated and base64url encoded, then a dot and the server's signature; an unsigned or altered code is refused */
 				code: components['parameters']['ShareCode'];
 			};
 			cookie?: never;
@@ -656,7 +656,7 @@ export interface paths {
 			query?: never;
 			header?: never;
 			path: {
-				/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+				/** @description a shared draft's settings, seed, picks and drafter, deflated and base64url encoded, then a dot and the server's signature; an unsigned or altered code is refused */
 				code: components['parameters']['ShareCode'];
 			};
 			cookie?: never;
@@ -1187,7 +1187,7 @@ export interface components {
 			queue: string[];
 			/** Format: int64 */
 			seq: number;
-			/** @description the link's code */
+			/** @description the link's code: the settings, seed, picks and drafter, signed by the server */
 			share_code: string;
 			/** @description the drafter's handle, when he has one: a shared draft names whose it is */
 			shared_by?: string;
@@ -1556,7 +1556,7 @@ export interface components {
 		ID: string;
 		ClaimCode: string;
 		Page: number;
-		/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+		/** @description a shared draft's settings, seed, picks and drafter, deflated and base64url encoded, then a dot and the server's signature; an unsigned or altered code is refused */
 		ShareCode: string;
 		PerPage: number;
 	};
@@ -2395,7 +2395,7 @@ export interface operations {
 			query?: never;
 			header?: never;
 			path: {
-				/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+				/** @description a shared draft's settings, seed, picks and drafter, deflated and base64url encoded, then a dot and the server's signature; an unsigned or altered code is refused */
 				code: components['parameters']['ShareCode'];
 			};
 			cookie?: never;
@@ -2412,7 +2412,7 @@ export interface operations {
 			query?: never;
 			header?: never;
 			path: {
-				/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+				/** @description a shared draft's settings, seed, picks and drafter, deflated and base64url encoded, then a dot and the server's signature; an unsigned or altered code is refused */
 				code: components['parameters']['ShareCode'];
 			};
 			cookie?: never;

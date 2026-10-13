@@ -89,7 +89,7 @@ func (s *Service) fail(w http.ResponseWriter, r *http.Request, op string, err er
 }
 
 func (s *Service) answer(w http.ResponseWriter, r *http.Request, status int, rm room, withBoard bool) {
-	out, err := view(rm, withBoard)
+	out, err := view(rm, withBoard, s.Shares)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "solo: view", err)
 		return

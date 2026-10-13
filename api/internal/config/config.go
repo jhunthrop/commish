@@ -169,6 +169,12 @@ type API struct {
 	// RoomBaseURL is the room service's WebSocket origin a lobby seat is
 	// handed, wss://room.trycommish.app in production.
 	RoomBaseURL string
+	// ShareLinkKeys are SHARE_LINK_KEYS, newest first: the newest signs a
+	// share link and every one verifies, so a key rotates by putting the
+	// new one first. The cookie password is always the last key, so a
+	// deploy without the variable still signs, and links it signed keep
+	// opening after the variable is set.
+	ShareLinkKeys []string
 }
 
 // Room is cmd/room's whole configuration.
@@ -464,7 +470,22 @@ func LoadAPI(get Getenv) (API, error) {
 	c.Board = l.board()
 	c.Advisor = l.advisor()
 	c.RoomBaseURL = l.roomBaseURL(c.Env)
+	c.ShareLinkKeys = append(l.secrets("SHARE_LINK_KEYS"), c.Session.CookiePassword)
 	return c, l.err()
+}
+
+// secrets is a list of signing secrets separated by spaces or commas, each
+// at least as long as the cookie password must be.
+func (l *loader) secrets(name string) []string {
+	var out []string
+	for _, s := range strings.FieldsFunc(l.get(name), func(r rune) bool { return r == ',' || r == ' ' || r == '\t' || r == '\n' }) {
+		if len(s) < minCookiePasswordLen {
+			l.invalid(name, fmt.Sprintf("every key must be at least %d characters", minCookiePasswordLen))
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
 }
 
 // LoadRoom reads cmd/room's configuration.

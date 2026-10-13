@@ -1,17 +1,26 @@
 package solo
 
 import (
+	"bytes"
+	"compress/flate"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
-	"github.com/jhunthrop/commish/api/internal/names"
+)
+
+const (
+	testSecret    = "share-test-secret-0123456789abcdef-current"
+	testOldSecret = "share-test-secret-0123456789abcdef-previous"
 )
 
 func testShare() share {
 	preset := apitypes.ScoringPresetPpr
 	return share{
-		V: shareVersion, Seed: 2026, Picks: []string{"a", "b", "c"},
+		V: shareVersion, Seed: 2026, Picks: []string{"a", "b", "c"}, ForYou: []int{1, 2}, Sharer: "jpk88",
 		Settings: apitypes.LeagueSettings{
 			BotStyle: apitypes.BotStyleAdp, Keepers: []apitypes.Keeper{}, Lineup: apitypes.LineupStandard,
 			Roster:  apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 2, Te: 1, K: 1, Dst: 1, Bench: 6},
@@ -20,56 +29,103 @@ func testShare() share {
 	}
 }
 
-func testService(t *testing.T) *Service {
+func signer(t *testing.T, secrets ...string) *ShareSigner {
 	t.Helper()
-	filter, err := names.Default()
+	s, err := NewShareSigner(secrets)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &Service{Names: filter}
+	return s
 }
 
-// A link carries which picks were made for the drafter and his handle,
-// and a link written before either still opens.
-func TestShareCarriesForYouAndSharer(t *testing.T) {
-	s := testService(t)
-	in := testShare()
-	in.ForYou, in.Sharer = []int{1, 2}, "jpk88"
-	code, err := encodeShare(in)
+// pack is a payload as encodeShare writes it, for tests that forge one.
+func pack(t *testing.T, s share) string {
+	t.Helper()
+	raw, err := json.Marshal(s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := s.decode(code)
+	var buf bytes.Buffer
+	w, _ := flate.NewWriter(&buf, flate.BestCompression)
+	_, _ = w.Write(raw)
+	_ = w.Close()
+	return base64.RawURLEncoding.EncodeToString(buf.Bytes())
+}
+
+// A signed link round-trips its picks, marks and handle.
+func TestShareRoundTrip(t *testing.T) {
+	keys := signer(t, testSecret)
+	code, err := encodeShare(testShare(), keys)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Sharer != "jpk88" || len(out.ForYou) != 2 || out.ForYou[1] != 2 {
+	out, err := decodeShare(code, keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Sharer != "jpk88" || len(out.ForYou) != 2 || out.ForYou[1] != 2 || len(out.Picks) != 3 {
 		t.Fatalf("decoded %+v", out)
 	}
+}
 
-	plain, err := encodeShare(testShare())
+// Nobody can put a handle, or anything else, on a link this server did not
+// sign: an unsigned code, a re-signed forgery, a changed payload and a
+// stolen signature on another payload are all refused.
+func TestShareRefusesUnsignedAndAltered(t *testing.T) {
+	keys := signer(t, testSecret)
+	code, err := encodeShare(testShare(), keys)
 	if err != nil {
 		t.Fatal(err)
 	}
-	old, err := s.decode(plain)
-	if err != nil || old.Sharer != "" || old.ForYou != nil {
-		t.Fatalf("an earlier link decoded to %+v, %v", old, err)
+	payload, sig, _ := strings.Cut(code, shareSeparator)
+	forged := testShare()
+	forged.Sharer = "famous_drafter"
+	forgedPayload := pack(t, forged)
+	otherKeys := signer(t, "someone-else-secret-0123456789abcdef-xx")
+	otherCode, err := encodeShare(forged, otherKeys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string]string{
+		"unsigned":                  payload,
+		"unsigned forgery":          forgedPayload,
+		"signature on another body": forgedPayload + shareSeparator + sig,
+		"signed by another key":     otherCode,
+		"truncated signature":       payload + shareSeparator + sig[:len(sig)/2],
+		"empty signature":           payload + shareSeparator,
+		"not base64":                payload + shareSeparator + "!!!",
+	}
+	for name, c := range cases {
+		if _, err := decodeShare(c, keys); !errors.Is(err, errBadCode) {
+			t.Errorf("%s: got %v, want errBadCode", name, err)
+		}
 	}
 }
 
-// Anyone can write a link, so a sharer's name the account layer would
-// refuse makes the link one that holds no draft.
-func TestShareRefusesANameStrangersShouldNotSee(t *testing.T) {
-	s := testService(t)
-	for _, name := range []string{"a b", "<script>", "x"} {
-		in := testShare()
-		in.Sharer = name
-		code, err := encodeShare(in)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := s.decode(code); !errors.Is(err, errBadCode) {
-			t.Errorf("sharer %q: got %v, want errBadCode", name, err)
-		}
+// A key rotates without breaking links: the new key signs, the old one
+// still verifies, and a link signed under the new key is refused by a
+// server that only holds the old one.
+func TestShareKeyRotation(t *testing.T) {
+	old := signer(t, testOldSecret)
+	rotated := signer(t, testSecret, testOldSecret)
+	oldCode, err := encodeShare(testShare(), old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := decodeShare(oldCode, rotated); err != nil {
+		t.Fatalf("a link signed before the rotation stopped opening: %v", err)
+	}
+	newCode, err := encodeShare(testShare(), rotated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := decodeShare(newCode, old); !errors.Is(err, errBadCode) {
+		t.Fatal("the rotated key did not sign the new link")
+	}
+}
+
+func TestNewShareSignerNeedsAKey(t *testing.T) {
+	if _, err := NewShareSigner(nil); err == nil {
+		t.Fatal("a signer with no key was made")
 	}
 }

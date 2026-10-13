@@ -15,8 +15,8 @@ import (
 
 // view is the room on the wire. withBoard adds the board, which a page
 // reads once; a pick's answer leaves it off.
-func view(r room, withBoard bool) (apitypes.MockRoom, error) {
-	code, err := shareCodeOf(r)
+func view(r room, withBoard bool, signer *ShareSigner) (apitypes.MockRoom, error) {
+	code, err := shareCodeOf(r, signer)
 	if err != nil {
 		return apitypes.MockRoom{}, err
 	}
@@ -47,11 +47,11 @@ func view(r room, withBoard bool) (apitypes.MockRoom, error) {
 }
 
 // shareCodeOf is the link that replays the room as it stands.
-func shareCodeOf(r room) (*string, error) {
+func shareCodeOf(r room, signer *ShareSigner) (*string, error) {
 	picks, forYou := sharedPicks(r)
 	code, err := encodeShare(share{
 		V: shareVersion, Settings: r.settings.League, Seed: int64(r.seed), Picks: picks, ForYou: forYou, Sharer: r.sharer,
-	})
+	}, signer)
 	if err != nil {
 		return nil, err
 	}

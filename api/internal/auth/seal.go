@@ -36,7 +36,9 @@ const (
 	purposeCSRF    = "commish csrf v1"
 )
 
-func deriveKey(password, purpose string) ([]byte, error) {
+// DeriveKey is the 32-byte key for one purpose from a secret (HKDF-SHA256):
+// the session, the auth state, CSRF, and outside this package share links.
+func DeriveKey(password, purpose string) ([]byte, error) {
 	key, err := hkdf.Key(sha256.New, []byte(password), nil, purpose, 32)
 	if err != nil {
 		return nil, fmt.Errorf("auth: derive %s key: %w", purpose, err)
@@ -46,7 +48,7 @@ func deriveKey(password, purpose string) ([]byte, error) {
 
 // NewSealer derives the purpose's key from password.
 func NewSealer(password, purpose string) (*Sealer, error) {
-	key, err := deriveKey(password, purpose)
+	key, err := DeriveKey(password, purpose)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +92,7 @@ type CSRFSigner struct{ key []byte }
 
 // NewCSRFSigner derives its key from password.
 func NewCSRFSigner(password string) (*CSRFSigner, error) {
-	key, err := deriveKey(password, purposeCSRF)
+	key, err := DeriveKey(password, purposeCSRF)
 	if err != nil {
 		return nil, err
 	}

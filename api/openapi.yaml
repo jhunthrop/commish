@@ -796,8 +796,10 @@ components:
       name: code
       in: path
       required: true
-      description: a shared draft's settings, seed and picks, deflated and base64url encoded
-      schema: { type: string, minLength: 8, maxLength: 2048, pattern: "^[A-Za-z0-9_-]+$" }
+      description: >-
+        a shared draft's settings, seed, picks and drafter, deflated and base64url encoded, then a dot and the
+        server's signature; an unsigned or altered code is refused
+      schema: { type: string, minLength: 8, maxLength: 2048, pattern: "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$" }
     PerPage:
       name: per_page
       in: query
@@ -1387,7 +1389,7 @@ components:
           type: array
           items: { type: string }
         seq: { type: integer, format: int64 }
-        share_code: { type: string, description: the link's code, the settings, seed and picks }
+        share_code: { type: string, description: "the link's code: the settings, seed, picks and drafter, signed by the server" }
         shared_by: { type: string, description: "the drafter's handle, when he has one: a shared draft names whose it is" }
         created_at: { type: string, format: date-time }
         board:

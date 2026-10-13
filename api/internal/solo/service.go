@@ -85,8 +85,8 @@ type Service struct {
 	Hindsight mock.Odds
 	// Anon is the signed-out owner's cookies.
 	Anon AnonOwners
-	// Names checks the sharer's name a link carries.
-	Names NameCheck
+	// Shares signs and checks share links.
+	Shares *ShareSigner
 	// Site is the web's own origin (PUBLIC_BASE_URL), where a refused
 	// signed-out start is sent.
 	Site          string
@@ -388,7 +388,7 @@ func (s *Service) report(ctx context.Context, owner mocks.Owner, id uuid.UUID) (
 	if err != nil {
 		return nil, err
 	}
-	if out.ShareCode, err = shareCodeOf(r); err != nil {
+	if out.ShareCode, err = shareCodeOf(r, s.Shares); err != nil {
 		return nil, err
 	}
 	if err := s.Mocks.PutReport(ctx, owner, id, r.head, out, s.Now()); err != nil {
@@ -426,7 +426,7 @@ func (s *Service) start(ctx context.Context, owner mocks.Owner, leagueID *uuid.U
 
 // replay is a shared draft, rebuilt from its link.
 func (s *Service) replay(ctx context.Context, code string) (room, error) {
-	sh, err := s.decode(code)
+	sh, err := decodeShare(code, s.Shares)
 	if err != nil {
 		return room{}, err
 	}
@@ -465,7 +465,7 @@ func (s *Service) replay(ctx context.Context, code string) (room, error) {
 // sharedReport is a shared draft's report; the hindsight is the
 // engine's, since a link records no odds.
 func (s *Service) sharedReport(ctx context.Context, code string) (apitypes.MockReport, error) {
-	sh, err := s.decode(code)
+	sh, err := decodeShare(code, s.Shares)
 	if err != nil {
 		return apitypes.MockReport{}, err
 	}

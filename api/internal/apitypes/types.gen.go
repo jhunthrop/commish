@@ -933,7 +933,7 @@ type MockRoom struct {
 	Seq        int64          `json:"seq"`
 	Settings   LeagueSettings `json:"settings"`
 
-	// ShareCode the link's code
+	// ShareCode the link's code: the settings, seed, picks and drafter, signed by the server
 	ShareCode string `json:"share_code"`
 
 	// SharedBy the drafter's handle, when he has one: a shared draft names whose it is

@@ -25,6 +25,7 @@ Every setting is in `.env.example`. The test helper refuses any database whose n
 These belong in `infra/README.md`. They are kept here until Lane 1 moves them.
 
 - **Secret Manager** (project `trycommish`, label `lane=api`), read by `api-runtime`: `DATABASE_URL`, `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `WORKOS_COOKIE_PASSWORD`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `RESEND_API_KEY`. A secret holding only a newline reads as unset, and the feature behind it answers 503 until a real value is added as a new version.
+- **Share link keys** (`SHARE_LINK_KEYS`, optional, not yet in Secret Manager): signs the solo room's share links. Unset, the links are signed with a key derived from `WORKOS_COOKIE_PASSWORD`, which is always the last key held. Before rotating the cookie password, create the secret as a fresh key followed by the old cookie password, and add it to `API_SECRETS` in `api.yml`. Otherwise every link already shared stops opening.
 - **R2 bucket `commish-exports`**: private, location hint `enam`. The lifecycle rule `exports-expire-7d` deletes objects under `exports/` after seven days. The api reaches it with an R2 S3 access key pair.
 - **Repository variables `.github/workflows/api.yml` reads**:
   - `APP_SCHEMA_READY`: `true` runs migrations before each deploy.

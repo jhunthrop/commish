@@ -118,7 +118,7 @@ func build(cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Log
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, Now: now, Log: log,
 	}
 	exportHandler := &exports.Handler{Store: &exports.Store{Pool: pool}, Sheets: sheetStore, Objects: objects(cfg, log), Now: now, Log: log}
-	solo, lobbies, err := rooms(cfg, pool, mockStore, anon, gate, leagueStore, sheetStore, authStore, nameFilter, log)
+	solo, lobbies, err := rooms(cfg, pool, mockStore, anon, gate, leagueStore, sheetStore, authStore, log)
 	if err != nil {
 		return nil, err
 	}
