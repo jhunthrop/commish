@@ -880,8 +880,13 @@ type Feature string
 
 // GroupPass defines model for GroupPass.
 type GroupPass struct {
-	ClaimUrl string `json:"claim_url"`
-	Claimed  int    `json:"claimed"`
+	// ClaimCode the code in the claim link
+	ClaimCode string `json:"claim_code"`
+	ClaimUrl  string `json:"claim_url"`
+	Claimed   int    `json:"claimed"`
+
+	// ClaimedByMe the buyer holds one of its seats
+	ClaimedByMe bool `json:"claimed_by_me"`
 
 	// Claims each claimed seat, first claim first; the seats past these are open
 	Claims     []GroupPassClaim   `json:"claims"`

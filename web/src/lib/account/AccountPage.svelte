@@ -232,7 +232,11 @@
 					</section>
 
 					{#if groupPasses.length > 0}
-						<GroupPasses passes={groupPasses} />
+						<GroupPasses
+							passes={groupPasses}
+							features={account.features}
+							onclaimed={() => void load()}
+						/>
 					{/if}
 				</div>
 

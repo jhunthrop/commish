@@ -12,6 +12,7 @@ import (
 // Claim is one claimed seat of a group pass: who holds it, by lobby
 // handle, and when they claimed it.
 type Claim struct {
+	AccountID uuid.UUID
 	Handle    *string
 	ClaimedAt time.Time
 }
@@ -25,7 +26,7 @@ func (s *Store) GroupPassClaims(ctx context.Context, groupPassIDs []uuid.UUID) (
 		return out, nil
 	}
 	rows, err := s.Pool.Query(ctx, `
-		select e.group_pass_id, a.handle, e.created_at
+		select e.group_pass_id, e.account_id, a.handle, e.created_at
 		from app.entitlements e join app.accounts a on a.id = e.account_id
 		where e.group_pass_id = any($1)
 		order by e.created_at, e.id`, groupPassIDs)
@@ -38,7 +39,7 @@ func (s *Store) GroupPassClaims(ctx context.Context, groupPassIDs []uuid.UUID) (
 	}
 	claims, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (claimRow, error) {
 		var c claimRow
-		err := r.Scan(&c.pass, &c.claim.Handle, &c.claim.ClaimedAt)
+		err := r.Scan(&c.pass, &c.claim.AccountID, &c.claim.Handle, &c.claim.ClaimedAt)
 		return c, err
 	})
 	if err != nil {

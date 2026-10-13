@@ -1381,7 +1381,7 @@ components:
         league_name: { type: string, nullable: true, maxLength: 60, description: group_pass only }
     GroupPass:
       type: object
-      required: [id, league_name, season, seats, claimed, claims, claim_url, status, created_at]
+      required: [id, league_name, season, seats, claimed, claims, claim_url, claim_code, claimed_by_me, status, created_at]
       properties:
         id: { type: string, format: uuid }
         league_name: { type: string }
@@ -1393,6 +1393,8 @@ components:
           description: each claimed seat, first claim first; the seats past these are open
           items: { $ref: "#/components/schemas/GroupPassClaim" }
         claim_url: { type: string }
+        claim_code: { type: string, description: the code in the claim link, for the buyer's own claim }
+        claimed_by_me: { type: boolean, description: the buyer holds one of its seats }
         status: { type: string, enum: [active, refunded, disputed] }
         created_at: { type: string, format: date-time }
     GroupPassClaim:

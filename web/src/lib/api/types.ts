@@ -1151,6 +1151,10 @@ export interface components {
 			/** @description each claimed seat, first claim first; the seats past these are open */
 			claims: components['schemas']['GroupPassClaim'][];
 			claim_url: string;
+			/** @description the code in the claim link */
+			claim_code: string;
+			/** @description the buyer holds one of its seats */
+			claimed_by_me: boolean;
 			/** @enum {string} */
 			status: 'active' | 'refunded' | 'disputed';
 			/** Format: date-time */

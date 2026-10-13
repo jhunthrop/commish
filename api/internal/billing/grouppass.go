@@ -30,7 +30,8 @@ func newClaimCode() string {
 func (s *Service) claimURL(code string) string { return s.site(pathClaim + code) }
 
 func (s *Service) listGroupPasses(w http.ResponseWriter, r *http.Request) {
-	passes, err := s.Store.GroupPassesBoughtBy(r.Context(), auth.AccountID(r))
+	me := auth.AccountID(r)
+	passes, err := s.Store.GroupPassesBoughtBy(r.Context(), me)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "billing: group passes", err)
 		return
@@ -47,12 +48,15 @@ func (s *Service) listGroupPasses(w http.ResponseWriter, r *http.Request) {
 	out := make([]apitypes.GroupPass, 0, len(passes))
 	for _, g := range passes {
 		seats := make([]apitypes.GroupPassClaim, 0, len(claims[g.ID]))
+		mine := false
 		for _, c := range claims[g.ID] {
 			seats = append(seats, apitypes.GroupPassClaim{Handle: c.Handle, ClaimedAt: c.ClaimedAt})
+			mine = mine || c.AccountID == me
 		}
 		out = append(out, apitypes.GroupPass{
 			Id: g.ID, LeagueName: g.LeagueName, Season: g.Season, Seats: g.Seats, Claimed: g.Claimed, Claims: seats,
-			ClaimUrl: s.claimURL(g.ClaimCode), Status: apitypes.GroupPassStatus(g.Status), CreatedAt: g.CreatedAt,
+			ClaimUrl: s.claimURL(g.ClaimCode), ClaimCode: g.ClaimCode, ClaimedByMe: mine,
+			Status: apitypes.GroupPassStatus(g.Status), CreatedAt: g.CreatedAt,
 		})
 	}
 	httpx.WriteOK(w, r, http.StatusOK, out)
