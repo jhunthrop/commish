@@ -3,7 +3,12 @@
 		"collect": {
 			"startServerCommand": "npm run preview:static",
 			"startServerReadyPattern": "Accepting connections",
-			"url": ["http://localhost:4173/system"],
+			"url": [
+				"http://localhost:4173/board/ppr-12",
+				"http://localhost:4173/players/chris-olave",
+				"http://localhost:4173/record",
+				"http://localhost:4173/system"
+			],
 			"numberOfRuns": 7,
 			"settings": {
 				"preset": "perf",
@@ -14,7 +19,7 @@
 		"assert": {
 			"assertMatrix": [
 				{
-					"matchingUrlPattern": "^https?://[^/]+/(system|board|players|record|clubs|adp)?(/.*)?$",
+					"matchingUrlPattern": "^https?://[^/]+/(system|board|players|record|clubs|adp|schedule|compare)?(/.*)?$",
 					"assertions": {
 						"largest-contentful-paint": [
 							"error",
