@@ -17,6 +17,9 @@ const BOARD_PARTS =
 const SHARED_BY_ROUTES = 4;
 
 export default defineConfig({
+	// An explicit, empty PostCSS config: without it Vite walks up from web/ and finds the root Next
+	// app's postcss.config.mjs, whose plugin only the root install has, which failed the first CI build.
+	css: { postcss: { plugins: [] } },
 	plugins: [
 		sveltekit({
 			compilerOptions: {
