@@ -21,7 +21,7 @@
 	const name = $derived(`${club.city} ${club.nickname}`);
 	const names = $derived(new Map(page.clubs.map((other) => [other.abbr, other])));
 	const caption = $derived(
-		`${page.slate.unit}, ${hardestWords(page.slate.rank, page.clubs.length)}, the ${page.slate.method}, read ${windowLabel(page.slate.window)}`
+		`the ${page.slate.method}, ${hardestWords(page.slate.rank, page.clubs.length)}, read ${windowLabel(page.slate.window)}`
 	);
 </script>
 
