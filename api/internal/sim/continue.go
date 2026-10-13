@@ -62,6 +62,9 @@ type ContinueInput struct {
 	ExcludeFromOnClockSeat map[string]bool
 	Drivers                Drivers
 	Strategy               bots.Strategy
+	// Keepers are forced at their seat and round and held off the board
+	// for every other pick.
+	Keepers Keepers
 }
 
 // PlayedPick is one pick a run made.
@@ -102,6 +105,11 @@ func playPick(s draft.State, teamID string, d Driver, seed uint32, excluded map[
 	if !ok {
 		return draft.State{}, PlayedPick{}, false, nil
 	}
+	return submitPick(s, teamID, playerID)
+}
+
+// submitPick is one MAKE_PICK through Admit and Reduce.
+func submitPick(s draft.State, teamID, playerID string) (draft.State, PlayedPick, bool, error) {
 	stamp := SimInstant
 	if s.TurnStartedAt != nil {
 		stamp = *s.TurnStartedAt
@@ -144,13 +152,16 @@ func Continue(in ContinueInput) (ContinueResult, error) {
 			picked bool
 			err    error
 		)
-		if s.PickNumber == onClockPick {
-			next, pick, picked, err = playPick(s, team, neutralDriver(), in.Seed, in.ExcludeFromOnClockSeat, in.Strategy)
+		held := in.Keepers.HeldBack(s)
+		if kept, forced := in.Keepers.Forced(s, team); forced {
+			next, pick, picked, err = submitPick(s, team, kept)
+		} else if s.PickNumber == onClockPick {
+			next, pick, picked, err = playPick(s, team, neutralDriver(), in.Seed, union(in.ExcludeFromOnClockSeat, held), in.Strategy)
 			if err == nil && !picked {
-				next, pick, picked, err = playPick(s, team, neutralDriver(), in.Seed, nil, in.Strategy)
+				next, pick, picked, err = playPick(s, team, neutralDriver(), in.Seed, held, in.Strategy)
 			}
 		} else {
-			next, pick, picked, err = playPick(s, team, driverFor(in.Drivers, dealt, team), in.Seed, nil, in.Strategy)
+			next, pick, picked, err = playPick(s, team, driverFor(in.Drivers, dealt, team), in.Seed, held, in.Strategy)
 		}
 		if err != nil {
 			return ContinueResult{}, err

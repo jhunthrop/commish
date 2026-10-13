@@ -4,15 +4,20 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/bots"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/leagues"
+	"github.com/jhunthrop/commish/api/internal/sim"
 )
 
 // HumanPick is one of the drafter's picks and when it was made.
 type HumanPick struct {
 	PlayerID string `json:"playerId"`
 	At       string `json:"at"`
+	// Odds is what the room showed the drafter when he made this pick,
+	// recorded with it; the report's hindsight reads it back.
+	Odds *PickOdds `json:"odds,omitempty"`
 }
 
 // Options are the drafter's standing instructions.
@@ -35,6 +40,9 @@ type Draft struct {
 	Slot        int            `json:"slot"`
 	// Waiting is true when the drafter is on the clock with no pick given.
 	Waiting bool `json:"waiting"`
+	// Odds is the odds recorded with the drafter's picks, by the 1-based
+	// sequence of the MAKE_PICK action they rode in on.
+	Odds map[int]PickOdds `json:"odds,omitempty"`
 }
 
 // runner is one Run's working set.
@@ -43,10 +51,11 @@ type runner struct {
 	seed     uint32
 	human    string
 	dealt    map[string]bots.Archetype
-	keepers  map[seatRound]string
+	keepers  sim.Keepers
 	keeps    map[string]int
 	strategy bots.Strategy
 	actions  []draft.Action
+	odds     map[int]PickOdds
 	state    draft.State
 }
 
@@ -92,12 +101,23 @@ func Run(s Settings, seed uint32, picks []HumanPick, o Options) (Draft, error) {
 // pick and every bot pick to the next human turn, the batch the request
 // returns being the actions after the ones d had. The same answer Run
 // gives for the longer pick list, without replaying the bots before it.
+//
+// Advance trusts d: it does not re-check that d.Actions replay to d.State
+// or that the settings and seed are the ones d was made with. The caller
+// is the server, which builds d by replaying its own app.mock_actions rows
+// (FromLog) or receives it from Run, inside the request that appends the
+// batch; d never comes from a client. Re-verifying would replay the whole
+// log a second time on every pick to guard against a state the server
+// itself just produced.
 func Advance(s Settings, seed uint32, d Draft, pick HumanPick, o Options) (Draft, error) {
 	if !d.Waiting {
 		return Draft{}, fmt.Errorf("mock: the draft is not waiting on you")
 	}
 	r := newRunner(s, seed, d.HumanTeamID, d.State.DraftOrder)
 	r.state, r.actions = d.State, append([]draft.Action(nil), d.Actions...)
+	for seq, o := range d.Odds {
+		r.odds[seq] = o
+	}
 	r.keeps = keepsSoFar(r.keepers, d.State)
 	return r.finish(d.Config, d.Slot, []HumanPick{pick}, o.AutopickThroughRound)
 }
@@ -112,7 +132,7 @@ func newRunner(s Settings, seed uint32, human string, order []string) *runner {
 	sort.Strings(botIDs)
 	return &runner{
 		settings: s, seed: seed, human: human, strategy: bots.DefaultStrategy(), keeps: map[string]int{},
-		dealt: bots.AssignArchetypes(seed, botIDs), keepers: keeperMap(s),
+		dealt: bots.AssignArchetypes(seed, botIDs), keepers: KeepersOf(s.League), odds: map[int]PickOdds{},
 	}
 }
 
@@ -121,14 +141,18 @@ func (r *runner) finish(config draft.Config, slot int, picks []HumanPick, autopi
 	if err != nil {
 		return Draft{}, err
 	}
-	return Draft{Config: config, Actions: r.actions, State: r.state, HumanTeamID: r.human, Slot: slot, Waiting: waiting}, nil
+	d := Draft{Config: config, Actions: r.actions, State: r.state, HumanTeamID: r.human, Slot: slot, Waiting: waiting}
+	if len(r.odds) > 0 {
+		d.Odds = r.odds
+	}
+	return d, nil
 }
 
 // keepsSoFar counts each seat's keeper picks already in the state.
-func keepsSoFar(keepers map[seatRound]string, s draft.State) map[string]int {
+func keepsSoFar(keepers sim.Keepers, s draft.State) map[string]int {
 	out := map[string]int{}
 	for _, p := range s.Picks {
-		if keepers[seatRound{p.TeamID, p.Round}] == p.PlayerID {
+		if keepers[sim.KeeperKey{TeamID: p.TeamID, Round: p.Round}] == p.PlayerID {
 			out[p.TeamID]++
 		}
 	}
@@ -136,7 +160,10 @@ func keepsSoFar(keepers map[seatRound]string, s draft.State) map[string]int {
 }
 
 // Undo is the mock with the drafter's pick at index (0-based) and every
-// later one taken back: the same seed, so the bots draft the same up to it.
+// later one taken back, replayed from the log with the same seed, so the
+// bots draft the same up to it and the room shows the branch. Every later
+// pick goes with it on purpose: removing a pick changes the board each
+// later turn saw, so a later pick made against the old board cannot stand.
 func Undo(s Settings, seed uint32, picks []HumanPick, index int, o Options) (Draft, error) {
 	if index < 0 || index >= len(picks) {
 		return Draft{}, fmt.Errorf("mock: no pick %d to undo", index)
@@ -145,18 +172,23 @@ func Undo(s Settings, seed uint32, picks []HumanPick, index int, o Options) (Dra
 	return Run(s, seed, picks[:index], o)
 }
 
-// seatRound names one seat's pick in one round.
-type seatRound struct {
-	team  string
-	round int
-}
-
-func keeperMap(s Settings) map[seatRound]string {
-	out := map[seatRound]string{}
-	for _, k := range s.League.Keepers {
-		out[seatRound{SeatID(k.Slot), k.Round}] = k.PlayerId
+// KeepersOf is the league's keepers by seat and round, as the mock forces them.
+func KeepersOf(l apitypes.LeagueSettings) sim.Keepers {
+	out := sim.Keepers{}
+	for _, k := range l.Keepers {
+		out[sim.KeeperKey{TeamID: SeatID(k.Slot), Round: k.Round}] = k.PlayerId
 	}
 	return out
+}
+
+// board is the state the room's own hand drafts from: every kept player
+// not yet drafted held back, since he is his seat's and nobody else's.
+func (r *runner) board() draft.State {
+	held := r.keepers.HeldBack(r.state)
+	if len(held) == 0 {
+		return r.state
+	}
+	return r.state.WithPool(r.state.Pool.Filter(func(e draft.PoolEntry) bool { return !held[e.PlayerID] }))
 }
 
 func (r *runner) apply(a draft.Action) error {
@@ -206,7 +238,7 @@ func (r *runner) play(picks []HumanPick, autopickThrough int) (bool, error) {
 			return false, nil
 		}
 		round := draft.RoundForPick(len(r.state.DraftOrder), r.state.PickNumber)
-		if keeper, kept := r.keepers[seatRound{team, round}]; kept {
+		if keeper, kept := r.keepers.Forced(r.state, team); kept {
 			if err := r.apply(draft.NewMakePick(r.turnStamp(), team, keeper)); err != nil {
 				return false, fmt.Errorf("mock: keeper %s for %s in round %d: %w", keeper, team, round, err)
 			}
@@ -227,7 +259,7 @@ func (r *runner) play(picks []HumanPick, autopickThrough int) (bool, error) {
 			}
 			next++
 		case round <= autopickThrough:
-			best, ok := draft.BestAvailableFor(r.state, team)
+			best, ok := draft.BestAvailableFor(r.board(), team)
 			if !ok {
 				return true, nil
 			}
@@ -247,6 +279,9 @@ func (r *runner) play(picks []HumanPick, autopickThrough int) (bool, error) {
 // humanPick stamps the drafter's pick at its own time, or at the turn's
 // start if it claims to be earlier, so the log stays monotone.
 func (r *runner) humanPick(team string, p HumanPick) error {
+	if r.keepers.HeldBack(r.state)[p.PlayerID] {
+		return &draft.Refusal{Reason: "That player is kept by a team in this league."}
+	}
 	stamp := r.turnStamp()
 	if p.At != "" {
 		at, err := draft.ParseMillis(p.At)
@@ -261,7 +296,13 @@ func (r *runner) humanPick(team string, p HumanPick) error {
 			stamp = p.At
 		}
 	}
-	return r.apply(draft.NewMakePick(stamp, team, p.PlayerID))
+	if err := r.apply(draft.NewMakePick(stamp, team, p.PlayerID)); err != nil {
+		return err
+	}
+	if p.Odds != nil {
+		r.odds[len(r.actions)] = *p.Odds
+	}
+	return nil
 }
 
 // botPick is one bot's pick from its own stream; false when the bot can
@@ -277,7 +318,7 @@ func (r *runner) botPick(team string) (bool, error) {
 	for i := 0; i < prior; i++ {
 		rng.Next()
 	}
-	playerID, ok := bots.ChooseBotPick(r.state, team, r.dealt[team], r.strategy, rng)
+	playerID, ok := bots.ChooseBotPick(r.board(), team, r.dealt[team], r.strategy, rng)
 	if !ok {
 		return false, nil
 	}

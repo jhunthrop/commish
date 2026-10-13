@@ -26,6 +26,7 @@ type RoomOddsInput struct {
 	// ExcludeFromOnClockSeat is the on-clock seat's own shortlist.
 	ExcludeFromOnClockSeat map[string]bool
 	Strategy               bots.Strategy
+	Keepers                Keepers
 	// ChunkRuns is the runs per chunk; Workers the chunks played at once.
 	ChunkRuns int
 	Workers   int
@@ -37,6 +38,9 @@ type RoomOddsTable struct {
 	FromPick    int            `json:"fromPick"`
 	ThroughPick int            `json:"throughPick"`
 	Played      [][]PlayedPick `json:"played"`
+	// Kept is every kept player: never read as still there, since he is
+	// his seat's and no one else's.
+	Kept map[string]bool `json:"-"`
 }
 
 // NextTurnFor is the seat's next pick after its current one, in snake order.
@@ -77,7 +81,7 @@ func SimulateRoomOdds(ctx context.Context, in RoomOddsInput) (RoomOddsTable, err
 	if ok {
 		through = furthest - 1
 	}
-	table := RoomOddsTable{Runs: runs, FromPick: in.State.PickNumber, ThroughPick: through, Played: make([][]PlayedPick, runs)}
+	table := RoomOddsTable{Runs: runs, FromPick: in.State.PickNumber, ThroughPick: through, Played: make([][]PlayedPick, runs), Kept: in.Keepers.IDs()}
 	if !ok {
 		for i := range table.Played {
 			table.Played[i] = []PlayedPick{}
@@ -86,7 +90,8 @@ func SimulateRoomOdds(ctx context.Context, in RoomOddsInput) (RoomOddsTable, err
 	}
 	results, err := RunMany(ctx, ManyInput{
 		State: in.State, Seed: in.Seed, Runs: runs, ThroughPick: through, Drivers: in.Drivers,
-		ExcludeFromOnClockSeat: in.ExcludeFromOnClockSeat, Strategy: in.Strategy, ChunkRuns: in.ChunkRuns, Workers: in.Workers,
+		ExcludeFromOnClockSeat: in.ExcludeFromOnClockSeat, Strategy: in.Strategy, Keepers: in.Keepers,
+		ChunkRuns: in.ChunkRuns, Workers: in.Workers,
 	})
 	if err != nil {
 		return RoomOddsTable{}, err
@@ -106,6 +111,7 @@ type ManyInput struct {
 	Drivers                Drivers
 	ExcludeFromOnClockSeat map[string]bool
 	Strategy               bots.Strategy
+	Keepers                Keepers
 	ChunkRuns              int
 	Workers                int
 }
@@ -132,6 +138,7 @@ func RunMany(ctx context.Context, in ManyInput) ([]ContinueResult, error) {
 					r, err := Continue(ContinueInput{
 						State: in.State, Seed: in.Seed + uint32(i), ThroughPick: in.ThroughPick,
 						ExcludeFromOnClockSeat: in.ExcludeFromOnClockSeat, Drivers: in.Drivers, Strategy: in.Strategy,
+						Keepers: in.Keepers,
 					})
 					if err != nil {
 						errs <- fmt.Errorf("sim: run %d: %w", i, err)
@@ -206,7 +213,9 @@ func SurvivalFor(table RoomOddsTable, s draft.State, teamID string) (SeatSurviva
 	}
 	survived := map[string]int{}
 	for _, e := range draft.AvailablePool(s) {
-		survived[e.PlayerID] = runsReached - taken[e.PlayerID]
+		if !table.Kept[e.PlayerID] {
+			survived[e.PlayerID] = runsReached - taken[e.PlayerID]
+		}
 	}
 	return SeatSurvival{PickNumber: pickNumber, RunsReached: runsReached, Survived: survived}, true
 }

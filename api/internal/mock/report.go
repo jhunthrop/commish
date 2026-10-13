@@ -23,13 +23,6 @@ const (
 	TopFinish = 3
 )
 
-// Odds is the hindsight survival for a pick: the chance each player
-// would still be there at the seat's next turn, from the room as it stood.
-// The advisor service answers it at launch; SimOdds is the engine's own.
-type Odds interface {
-	Survival(ctx context.Context, s draft.State, teamID string, passedOn string) (map[string]float64, error)
-}
-
 // Board is what the report reads about players: points, value over
 // replacement, ADP, NFL team, and the bye weeks.
 type Board struct {
@@ -46,9 +39,10 @@ type ReportInput struct {
 	Seed     uint32
 	Draft    Draft
 	Board    Board
-	Odds     Odds
-	Runs     int
-	Workers  int
+	// Odds is the fallback for a pick that carries no recorded odds.
+	Odds    Odds
+	Runs    int
+	Workers int
 }
 
 // ADPChip is how a pick sits against where drafters take him.
@@ -79,7 +73,13 @@ type PickReview struct {
 	// StillThere is the chance he was there at the next turn; nil at the last.
 	StillThere *float64 `json:"stillThere"`
 	CouldWait  bool     `json:"couldWait"`
+	// OddsSource is where StillThere came from: OddsAdvisor or OddsSim as
+	// recorded at the pick, or "fallback_" plus the source computed now.
+	OddsSource string `json:"oddsSource,omitempty"`
 }
+
+// fallbackPrefix marks hindsight computed for the report, not recorded.
+const fallbackPrefix = "fallback_"
 
 // RunsSummary is "the same draft, 200 more times".
 type RunsSummary struct {
@@ -132,15 +132,19 @@ func chipFor(gap float64) ADPChip {
 	}
 }
 
-// reviewPicks walks the log: before each of the drafter's picks, the room
-// as it stood asks the odds whether he would have lasted.
+// reviewPicks walks the log: before each of the drafter's picks (his
+// keepers are not choices and are passed over), the odds the room
+// recorded with the pick, or the fallback's, say whether he would have
+// lasted.
 func reviewPicks(ctx context.Context, in ReportInput) ([]PickReview, error) {
 	human := in.Draft.HumanTeamID
+	keepers := KeepersOf(in.Settings.League)
 	s := draft.Initial(in.Draft.Config)
 	var out []PickReview
-	for _, a := range in.Draft.Actions {
-		if a.Type == draft.MakePick && a.TeamID == human && s.PickNumber <= draft.TotalPickCount(s) {
-			review, err := reviewOne(ctx, in, s, a.PlayerID)
+	for i, a := range in.Draft.Actions {
+		kept, forced := keepers.Forced(s, human)
+		if a.Type == draft.MakePick && a.TeamID == human && s.PickNumber <= draft.TotalPickCount(s) && !(forced && kept == a.PlayerID) {
+			review, err := reviewOne(ctx, in, keepers, s, i+1, a.PlayerID)
 			if err != nil {
 				return nil, err
 			}
@@ -155,7 +159,7 @@ func reviewPicks(ctx context.Context, in ReportInput) ([]PickReview, error) {
 	return out, nil
 }
 
-func reviewOne(ctx context.Context, in ReportInput, before draft.State, playerID string) (PickReview, error) {
+func reviewOne(ctx context.Context, in ReportInput, keepers sim.Keepers, before draft.State, seq int, playerID string) (PickReview, error) {
 	pos, _ := before.Pool.PositionOf(playerID)
 	r := PickReview{
 		PickNumber: before.PickNumber, Round: draft.RoundForPick(len(before.DraftOrder), before.PickNumber),
@@ -165,14 +169,23 @@ func reviewOne(ctx context.Context, in ReportInput, before draft.State, playerID
 		gap := adp - float64(before.PickNumber)
 		r.ADPGap, r.Chip = &gap, chipFor(gap)
 	}
-	if _, hasNext := sim.NextTurnFor(before, in.Draft.HumanTeamID); !hasNext || in.Odds == nil {
+	if _, hasNext := sim.NextTurnFor(before, in.Draft.HumanTeamID); !hasNext {
 		return r, nil
 	}
-	odds, err := in.Odds.Survival(ctx, before, in.Draft.HumanTeamID, playerID)
-	if err != nil {
-		return PickReview{}, fmt.Errorf("mock: odds at pick %d: %w", before.PickNumber, err)
+	odds, recorded := in.Draft.Odds[seq]
+	if !recorded {
+		if in.Odds == nil {
+			return r, nil
+		}
+		computed, err := in.Odds.Survival(ctx, OddsRequest{State: before, TeamID: in.Draft.HumanTeamID, PassedOn: playerID, Keepers: keepers})
+		if err != nil {
+			return PickReview{}, fmt.Errorf("mock: odds at pick %d: %w", before.PickNumber, err)
+		}
+		odds = computed
+		odds.Source = fallbackPrefix + odds.Source
 	}
-	if p, ok := odds[playerID]; ok {
+	r.OddsSource = odds.Source
+	if p, ok := odds.StillThere[playerID]; ok {
 		r.StillThere, r.CouldWait = &p, p >= CouldWaitFrom
 	}
 	return r, nil
@@ -192,7 +205,8 @@ func runReport(ctx context.Context, in ReportInput) (RunsSummary, error) {
 	human := in.Draft.HumanTeamID
 	results, err := sim.RunMany(ctx, sim.ManyInput{
 		State: started, Seed: in.Seed, Runs: runs, ThroughPick: draft.TotalPickCount(started),
-		Drivers: sim.Drivers{human: {Kind: sim.DriveAutopick}}, Strategy: bots.DefaultStrategy(), Workers: in.Workers,
+		Drivers: sim.Drivers{human: {Kind: sim.DriveAutopick}}, Strategy: bots.DefaultStrategy(),
+		Keepers: KeepersOf(in.Settings.League), Workers: in.Workers,
 	})
 	if err != nil {
 		return RunsSummary{}, err
@@ -233,33 +247,4 @@ func quantile(sorted []float64, q float64) float64 {
 	}
 	i := int(math.Ceil(q*float64(len(sorted)))) - 1
 	return sorted[min(max(i, 0), len(sorted)-1)]
-}
-
-// SimOdds answers Odds with the engine's own room odds: the seats read by
-// the seat model, the pick being judged held back from the drafter's turn.
-type SimOdds struct {
-	Seed    uint32
-	Runs    int
-	Workers int
-}
-
-// Survival is the share of runs each player lasted to the next turn.
-func (o SimOdds) Survival(ctx context.Context, s draft.State, teamID string, passedOn string) (map[string]float64, error) {
-	strategy := bots.DefaultStrategy()
-	table, err := sim.SimulateRoomOdds(ctx, sim.RoomOddsInput{
-		State: s, Seed: o.Seed, Runs: o.Runs, Drivers: sim.InferSeatDrivers(s, strategy, sim.DefaultSeatModel()),
-		ExcludeFromOnClockSeat: map[string]bool{passedOn: true}, Strategy: strategy, Workers: o.Workers,
-	})
-	if err != nil {
-		return nil, err
-	}
-	survival, ok := sim.SurvivalFor(table, s, teamID)
-	out := map[string]float64{}
-	if !ok || survival.RunsReached == 0 {
-		return out, nil
-	}
-	for id, n := range survival.Survived {
-		out[id] = float64(n) / float64(survival.RunsReached)
-	}
-	return out, nil
 }
