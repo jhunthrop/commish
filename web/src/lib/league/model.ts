@@ -13,7 +13,8 @@ export const POLL_MS = 60_000;
 
 const HOST_WORDS: Readonly<Record<LeagueHost, string>> = {
 	sleeper: 'Sleeper',
-	mfl: 'MyFantasyLeague'
+	mfl: 'MyFantasyLeague',
+	ffpc: 'FFPC'
 };
 
 /** The host as a sentence names it. */
@@ -21,8 +22,13 @@ export function hostWords(host: LeagueHost): string {
 	return HOST_WORDS[host];
 }
 
-/** Hosts a link may come from today, as the attach page says it. */
-export const HOSTS_LINE = 'Works with Sleeper leagues and public MyFantasyLeague leagues.';
+/** The hosts a league may come from here, as the attach page says it: FFPC only where it is open
+ * (HOST_FFPC_ENABLED). */
+export function hostsLine(ffpcOn: boolean): string {
+	return ffpcOn
+		? 'Works with Sleeper leagues, public MyFantasyLeague leagues and FFPC leagues.'
+		: 'Works with Sleeper leagues and public MyFantasyLeague leagues.';
+}
 
 const SECOND = 1;
 const MINUTE = 60;

@@ -27,12 +27,12 @@ type Host interface {
 
 // HostPlayer is one player in a host's directory.
 type HostPlayer struct {
-	ID       string
-	Name     string
-	Position string
-	Team     string
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Position string `json:"position"`
+	Team     string `json:"team"`
 	// ESPNID is the player's ESPN id, the key our board's ids share.
-	ESPNID string
+	ESPNID string `json:"espn_id,omitempty"`
 }
 
 // Hosts are the hosts a link may name, in the order they are tried.

@@ -23,7 +23,7 @@
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
 	import type { Companion, CompanionPick, Feature } from './api.ts';
 	import CompanionBar from './CompanionBar.svelte';
-	import { has, hostDraftUrl, landingStrip, roomPicks, seatNames } from './model.ts';
+	import { has, hostDraftUrl, hostName, landingStrip, roomPicks, seatNames } from './model.ts';
 	import SheetSync from './SheetSync.svelte';
 	import Shortlist from './Shortlist.svelte';
 
@@ -39,6 +39,8 @@
 	}
 
 	let { companion: c, picks, board, features, search }: Props = $props();
+
+	const host = $derived(hostName(c.host));
 
 	const FILTERS: readonly PoolFilter[] = ['All', 'QB', 'RB', 'WR', 'TE', 'K', 'DST'];
 	let filter = $state<PoolFilter>('All');
@@ -71,10 +73,10 @@
 	const notes = $derived(
 		[
 			c.unplaced > 0
-				? `${plural(c.unplaced, 'pick')} on Sleeper ${c.unplaced === 1 ? 'is a player' : 'are players'} we do not rank. Each fills his team's roster and takes nobody from our board.`
+				? `${plural(c.unplaced, 'pick')} on ${host} ${c.unplaced === 1 ? 'is a player' : 'are players'} we do not rank. Each fills his team's roster and takes nobody from our board.`
 				: null,
 			c.traded > 0
-				? `${plural(c.traded, 'pick')} changed hands on Sleeper. Our call follows the draft order by slot.`
+				? `${plural(c.traded, 'pick')} changed hands on ${host}. Our call follows the draft order by slot.`
 				: null
 		].filter((n): n is string => n !== null)
 	);
@@ -111,7 +113,7 @@
 	{#if c.lost_at !== null}
 		<Panel edge="loss" padding="sm">
 			<p class="note">
-				Pick {pickLabel(c.lost_at, teams)} on Sleeper does not fit how our draft is set up, so our call
+				Pick {pickLabel(c.lost_at, teams)} on {host} does not fit how our draft is set up, so our call
 				stops there. The picks keep landing below.
 			</p>
 		</Panel>
@@ -122,7 +124,7 @@
 	{#if strip.length > 0 && !onTurn}
 		<PickStrip
 			lead={pickLabel(picks.at(-1)?.pick ?? 1, teams)}
-			leadLines={['just taken on Sleeper', 'newest first']}
+			leadLines={[`just taken on ${host}`, 'newest first']}
 			picks={strip}
 			width="md"
 		/>
@@ -132,14 +134,14 @@
 		<RoomCall
 			view={call}
 			pickNumber={now}
-			action={{ label: 'Make the pick on Sleeper', onclick: openHost }}
+			action={{ label: `Make the pick on ${host}`, onclick: openHost }}
 		/>
 		<Shortlist {card} {board} {oddsLabel} ranges={c.ranges} />
 	{:else if call}
 		<RoomCall
 			view={call}
 			pickNumber={now}
-			action={{ label: 'Queue him on Sleeper', onclick: openHost }}
+			action={{ label: `Queue him on ${host}`, onclick: openHost }}
 		/>
 	{/if}
 	{#if c.status !== 'complete'}

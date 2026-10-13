@@ -114,6 +114,19 @@ func (p *Poller[S]) Holds(key string) bool {
 	return e.has
 }
 
+// Prime gives the key a read this process made outside Read (an attach
+// that read the host as one member), so the next view answers it fresh
+// and the gap counts from it.
+func (p *Poller[S]) Prime(key string, value S, at time.Time) {
+	e := p.entryFor(key, at)
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.has && !at.After(e.at) {
+		return
+	}
+	e.value, e.has, e.at, e.stored, e.err, e.tried, e.loaded = value, true, at, false, nil, at, true
+}
+
 func (p *Poller[S]) entryFor(key string, now time.Time) *entry[S] {
 	p.mu.Lock()
 	defer p.mu.Unlock()

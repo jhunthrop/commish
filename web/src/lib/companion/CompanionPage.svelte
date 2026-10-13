@@ -18,7 +18,7 @@
 		type MockReport
 	} from './api.ts';
 	import CompanionRoom from './CompanionRoom.svelte';
-	import { POLL_MS, mergePicks, seatNames } from './model.ts';
+	import { POLL_MS, hostName, mergePicks, seatNames } from './model.ts';
 
 	/** One followed draft: read every three seconds while it runs, the report once Sleeper says it
 	 * is over. Everything is read in the browser; the shell paints first. */
@@ -127,7 +127,7 @@
 			<Report
 				{report}
 				{names}
-				field="your league drafting on Sleeper, read pick by pick as it happened"
+				field={`your league drafting on ${hostName(companion.host)}, read pick by pick as it happened`}
 				others={{
 					who: 'stand-ins for your league',
 					how: 'from where drafters take players'

@@ -65,12 +65,15 @@ func (e BotStyle) Valid() bool {
 
 // Defines values for CompanionHost.
 const (
+	CompanionHostFfpc    CompanionHost = "ffpc"
 	CompanionHostSleeper CompanionHost = "sleeper"
 )
 
 // Valid indicates whether the value is a known member of the CompanionHost enum.
 func (e CompanionHost) Valid() bool {
 	switch e {
+	case CompanionHostFfpc:
+		return true
 	case CompanionHostSleeper:
 		return true
 	default:
@@ -96,6 +99,39 @@ func (e CompanionStatus) Valid() bool {
 	case CompanionStatusPaused:
 		return true
 	case CompanionStatusPreDraft:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConnectedHost.
+const (
+	ConnectedHostFfpc ConnectedHost = "ffpc"
+)
+
+// Valid indicates whether the value is a known member of the ConnectedHost enum.
+func (e ConnectedHost) Valid() bool {
+	switch e {
+	case ConnectedHostFfpc:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeviceScope.
+const (
+	DeviceScopeDraftWrite  DeviceScope = "draft:write"
+	DeviceScopeLeagueWrite DeviceScope = "league:write"
+)
+
+// Valid indicates whether the value is a known member of the DeviceScope enum.
+func (e DeviceScope) Valid() bool {
+	switch e {
+	case DeviceScopeDraftWrite:
+		return true
+	case DeviceScopeLeagueWrite:
 		return true
 	default:
 		return false
@@ -216,6 +252,24 @@ func (e HealthStatus) Valid() bool {
 	}
 }
 
+// Defines values for HostConnectionStatus.
+const (
+	HostConnectionStatusConnected HostConnectionStatus = "connected"
+	HostConnectionStatusSignedOut HostConnectionStatus = "signed_out"
+)
+
+// Valid indicates whether the value is a known member of the HostConnectionStatus enum.
+func (e HostConnectionStatus) Valid() bool {
+	switch e {
+	case HostConnectionStatusConnected:
+		return true
+	case HostConnectionStatusSignedOut:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Interval.
 const (
 	IntervalMonth Interval = "month"
@@ -236,6 +290,7 @@ func (e Interval) Valid() bool {
 
 // Defines values for LeagueHost.
 const (
+	LeagueHostFfpc    LeagueHost = "ffpc"
 	LeagueHostMfl     LeagueHost = "mfl"
 	LeagueHostSleeper LeagueHost = "sleeper"
 )
@@ -243,6 +298,8 @@ const (
 // Valid indicates whether the value is a known member of the LeagueHost enum.
 func (e LeagueHost) Valid() bool {
 	switch e {
+	case LeagueHostFfpc:
+		return true
 	case LeagueHostMfl:
 		return true
 	case LeagueHostSleeper:
@@ -938,8 +995,9 @@ type CompanionStatus string
 
 // CompanionSummary defines model for CompanionSummary.
 type CompanionSummary struct {
-	CreatedAt   time.Time `json:"created_at"`
-	HostDraftId string    `json:"host_draft_id"`
+	CreatedAt   time.Time     `json:"created_at"`
+	Host        CompanionHost `json:"host"`
+	HostDraftId string        `json:"host_draft_id"`
 
 	// HostUsername the Sleeper username the seat was found by
 	HostUsername *string            `json:"host_username"`
@@ -951,6 +1009,33 @@ type CompanionSummary struct {
 	Slot   int             `json:"slot"`
 	Status CompanionStatus `json:"status"`
 }
+
+// ConnectedHost a host the member connects their own account on, named as a mechanism
+type ConnectedHost string
+
+// Device defines model for Device.
+type Device struct {
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// LastUsedAt when it last sent a page, to the hour; null when it never has
+	LastUsedAt *time.Time `json:"last_used_at"`
+
+	// Name what the browser called itself at pairing
+	Name   string        `json:"name"`
+	Scopes []DeviceScope `json:"scopes"`
+}
+
+// DeviceMe defines model for DeviceMe.
+type DeviceMe struct {
+	Device Device `json:"device"`
+
+	// Handle the account's public name
+	Handle *string `json:"handle"`
+}
+
+// DeviceScope what a paired browser may write
+type DeviceScope string
 
 // DraftPassState defines model for DraftPassState.
 type DraftPassState struct {
@@ -1072,6 +1157,57 @@ type Health struct {
 
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
+
+// HostConnectInput defines model for HostConnectInput.
+type HostConnectInput struct {
+	// Consent the member agrees that we sign in to FFPC as them to read their league, never make a move or a bid, and that they can disconnect any time; must be true
+	Consent bool `json:"consent"`
+
+	// Email the member's FFPC sign-in (FFPC's form calls it the username)
+	Email string `json:"email"`
+
+	// Password sent to FFPC's sign-in only
+	Password string `json:"password"`
+}
+
+// HostConnected defines model for HostConnected.
+type HostConnected struct {
+	Connection HostConnection `json:"connection"`
+	Leagues    []HostLeague   `json:"leagues"`
+}
+
+// HostConnection defines model for HostConnection.
+type HostConnection struct {
+	ConnectedAt time.Time `json:"connected_at"`
+
+	// Host a host the member connects their own account on, named as a mechanism
+	Host       ConnectedHost `json:"host"`
+	LastReadAt *time.Time    `json:"last_read_at"`
+
+	// Status connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did not mend it; the member signs in again on our form
+	Status HostConnectionStatus `json:"status"`
+}
+
+// HostConnectionStatus connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did not mend it; the member signs in again on our form
+type HostConnectionStatus string
+
+// HostConnections defines model for HostConnections.
+type HostConnections struct {
+	Connections []HostConnection `json:"connections"`
+
+	// Enabled the hosts connecting is open for
+	Enabled []ConnectedHost `json:"enabled"`
+}
+
+// HostLeague defines model for HostLeague.
+type HostLeague struct {
+	LeagueId string `json:"league_id"`
+	Name     string `json:"name"`
+
+	// Record the team's record as FFPC writes it, 2 - 3
+	Record   string `json:"record"`
+	TeamName string `json:"team_name"`
+}
 
 // ImportSkip defines model for ImportSkip.
 type ImportSkip struct {
@@ -1445,6 +1581,30 @@ type PageMeta struct {
 	Page    int   `json:"page"`
 	PerPage int   `json:"per_page"`
 	Total   int64 `json:"total"`
+}
+
+// PairCode defines model for PairCode.
+type PairCode struct {
+	// Code six words separated by spaces
+	Code      string    `json:"code"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// PairInput defines model for PairInput.
+type PairInput struct {
+	// Code the six words as typed
+	Code string `json:"code"`
+
+	// Name what the browser calls itself
+	Name *string `json:"name,omitempty"`
+}
+
+// Paired defines model for Paired.
+type Paired struct {
+	Device Device `json:"device"`
+
+	// Token the device token
+	Token string `json:"token"`
 }
 
 // Placement how the league's rostered players were placed on our board, by rule
@@ -2051,6 +2211,12 @@ type StripeWebhookJSONRequestBody = StripeWebhookJSONBody
 
 // CreateCompanionJSONRequestBody defines body for CreateCompanion for application/json ContentType.
 type CreateCompanionJSONRequestBody = CompanionCreate
+
+// PairDeviceJSONRequestBody defines body for PairDevice for application/json ContentType.
+type PairDeviceJSONRequestBody = PairInput
+
+// ConnectFFPCJSONRequestBody defines body for ConnectFFPC for application/json ContentType.
+type ConnectFFPCJSONRequestBody = HostConnectInput
 
 // CreateLeagueJSONRequestBody defines body for CreateLeague for application/json ContentType.
 type CreateLeagueJSONRequestBody = LeagueInput

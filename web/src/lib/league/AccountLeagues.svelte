@@ -6,6 +6,8 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import ActionRow from '#lib/ui/ActionRow.svelte';
+	import ActionRows from '#lib/ui/ActionRows.svelte';
 	import { railLeague } from '#lib/account/rail-league.svelte.ts';
 	import { ApiError, leagueApi, type AttachedLeague } from './api.ts';
 	import { hostWords } from './model.ts';
@@ -79,30 +81,30 @@
 	{#if failed}
 		<p class="note">Your leagues can't be read right now.</p>
 	{:else if leagues && leagues.length > 0}
-		<ul class="list">
+		<ActionRows label="Your leagues">
 			{#each leagues as league (league.id)}
-				<li>
-					<span class="what">
-						<a href={resolve('/league/[id]', { id: league.id })}><b>{name(league)}</b></a>
-						<span class="text">
-							{league.team_name !== '' ? `as ${league.team_name}, ` : ''}on {hostWords(league.host)}
-						</span>
-					</span>
-					{#if detached.has(league.id)}
-						<span class="undo" role="status">
-							<span class="text">Detached.</span>
-							<Quiet size="sm" disabled={busy !== null} onclick={() => void undo(league)}
-								>Undo</Quiet
+				<ActionRow
+					lead={name(league)}
+					href={resolve('/league/[id]', { id: league.id })}
+					text={`${league.team_name !== '' ? `as ${league.team_name}, ` : ''}on ${hostWords(league.host)}`}
+				>
+					{#snippet action()}
+						{#if detached.has(league.id)}
+							<span class="undo" role="status">
+								<span class="text">Detached.</span>
+								<Quiet size="sm" disabled={busy !== null} onclick={() => void undo(league)}
+									>Undo</Quiet
+								>
+							</span>
+						{:else}
+							<Quiet size="sm" disabled={busy !== null} onclick={() => void detach(league)}
+								>{busy === league.id ? 'Detaching' : 'Detach'}</Quiet
 							>
-						</span>
-					{:else}
-						<Quiet size="sm" disabled={busy !== null} onclick={() => void detach(league)}
-							>{busy === league.id ? 'Detaching' : 'Detach'}</Quiet
-						>
-					{/if}
-				</li>
+						{/if}
+					{/snippet}
+				</ActionRow>
 			{/each}
-		</ul>
+		</ActionRows>
 		{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 	{:else if leagues}
 		<EmptyState level={3} title="No leagues yet">
@@ -112,38 +114,6 @@
 </section>
 
 <style>
-	.list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-	}
-
-	li {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--s-3);
-		padding: var(--s-2) 0;
-		border-bottom: 1px solid var(--line);
-	}
-
-	.what {
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-
-	a {
-		color: var(--ink);
-		text-decoration: none;
-		unicode-bidi: isolate;
-	}
-
-	a:hover b {
-		text-decoration: underline;
-	}
-
 	.text,
 	.note {
 		margin: 0;

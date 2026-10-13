@@ -94,24 +94,37 @@ export function seatNames(c: Pick<Companion, 'teams' | 'slot' | 'seat_names'>): 
 	});
 }
 
+const HOST_NAMES: Readonly<Record<Companion['host'], string>> = {
+	sleeper: 'Sleeper',
+	ffpc: 'FFPC'
+};
+
+/** The host as a sentence names it, a mechanism: "Sleeper", "FFPC". */
+export function hostName(host: Companion['host']): string {
+	return HOST_NAMES[host];
+}
+
 /** The bar's line under the count: where the draft is and when you are up. */
 export function turnWords(c: Companion): string {
+	const host = hostName(c.host);
 	switch (c.status) {
 		case 'pre_draft':
-			return 'Waiting for the draft to start on Sleeper';
+			return `Waiting for the draft to start on ${host}`;
 		case 'complete':
 			return 'The draft is over';
 		default:
 			break;
 	}
-	const paused = c.status === 'paused' ? 'Paused on Sleeper. ' : '';
-	if (c.your_turn) return `${paused}You're on the clock on Sleeper`;
+	const paused = c.status === 'paused' ? `Paused on ${host}. ` : '';
+	if (c.your_turn) return `${paused}You're on the clock on ${host}`;
 	if (c.your_next_pick === null || c.picks_until_turn === null) return `${paused}Your picks are in`;
 	return `${paused}You pick at ${pickLabel(c.your_next_pick, c.teams)}, ${plural(c.picks_until_turn, 'pick')} away`;
 }
 
 /** The host's own page for the draft, where the drafter makes the pick. */
-export function hostDraftUrl(c: Pick<Companion, 'host_draft_id'>): string {
+export function hostDraftUrl(c: Pick<Companion, 'host' | 'host_draft_id'>): string {
+	// FFPC's draft board is keyed by the member's own team, which only FFPC's My Teams page opens.
+	if (c.host === 'ffpc') return 'https://myffpc.com/MyTeams.aspx';
 	return `https://sleeper.com/draft/nfl/${c.host_draft_id}`;
 }
 
@@ -136,7 +149,7 @@ export function recentLine(r: CompanionSummary): {
 		: `slot ${String(r.slot)}`;
 	return {
 		key: r.id,
-		lead: r.name !== '' ? r.name : `Sleeper draft ${r.host_draft_id}`,
+		lead: r.name !== '' ? r.name : `${hostName(r.host)} draft ${r.host_draft_id}`,
 		text: `${seat} · ${STATUS_WORDS[r.status]} · followed ${dayLabel(r.created_at)}`,
 		href: links.companion(r.id)
 	};

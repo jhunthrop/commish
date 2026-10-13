@@ -93,7 +93,7 @@ func run(ctx context.Context, log *slog.Logger) error {
 
 	mux := http.NewServeMux()
 	routes := slices.Concat(server.Health(pool, version), socket.Routes())
-	if err := server.Mount(mux, routes, sessions, time.Now); err != nil {
+	if err := server.Mount(mux, routes, sessions, nil, time.Now); err != nil {
 		return err
 	}
 	// The clocks stop and give their leases up when the server stops,

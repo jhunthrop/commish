@@ -47,9 +47,18 @@ type followed struct {
 // follow reads the host (or the recording) and replays its picks.
 func (s *Service) follow(ctx context.Context, row Row) (followed, error) {
 	var read Read
-	if row.Replay {
+	switch {
+	case row.Host == HostFFPC:
+		if s.FFPC == nil {
+			return followed{}, errFFPCNotSetUp
+		}
+		var err error
+		if read, err = s.FFPC.Read(ctx, row.AccountID, row.HostDraftID, row.TeamKey); err != nil {
+			return followed{}, err
+		}
+	case row.Replay:
 		read = Read{Snapshot: s.Replay.At(s.Now().Sub(row.CreatedAt), row.Seat)}
-	} else {
+	default:
 		var err error
 		if read, err = s.Poller.Read(ctx, row.HostDraftID); err != nil {
 			return followed{}, err

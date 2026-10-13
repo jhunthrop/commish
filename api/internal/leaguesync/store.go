@@ -30,17 +30,21 @@ type Link struct {
 	RosterID   int
 	AttachedAt time.Time
 	LastReadAt *time.Time
+	// TeamKey is the member's own league-team id on a host whose pages are
+	// keyed by it (FFPC's ltuid), empty elsewhere.
+	TeamKey string
 }
 
 // Store reads and writes the sync tables. Every link query is scoped by
 // account, so one drafter never reads or changes another's attachment.
 type Store struct{ Pool *pgxpool.Pool }
 
-const linkColumns = `id, account_id, league_id, host, host_league_id, host_season, roster_id, attached_at, last_read_at`
+const linkColumns = `id, account_id, league_id, host, host_league_id, host_season, roster_id, attached_at, last_read_at,
+	coalesce(host_team_key, '')`
 
 func scanLink(row pgx.Row) (Link, error) {
 	var l Link
-	err := row.Scan(&l.ID, &l.AccountID, &l.LeagueID, &l.Ref.Host, &l.Ref.LeagueID, &l.Ref.Season, &l.RosterID, &l.AttachedAt, &l.LastReadAt)
+	err := row.Scan(&l.ID, &l.AccountID, &l.LeagueID, &l.Ref.Host, &l.Ref.LeagueID, &l.Ref.Season, &l.RosterID, &l.AttachedAt, &l.LastReadAt, &l.TeamKey)
 	return l, err
 }
 
@@ -76,13 +80,14 @@ func (s *Store) Save(ctx context.Context, l Link) (Link, error) {
 			return ErrTooMany
 		}
 		saved, err := scanLink(tx.QueryRow(ctx, `insert into app.league_links
-			(account_id, league_id, host, host_league_id, host_season, roster_id, last_read_at)
-			values ($1, $2, $3, $4, $5, $6, $7)
+			(account_id, league_id, host, host_league_id, host_season, roster_id, last_read_at, host_team_key)
+			values ($1, $2, $3, $4, $5, $6, $7, nullif($8, ''))
 			on conflict (account_id, host, host_league_id, host_season)
 			do update set league_id = excluded.league_id, roster_id = excluded.roster_id, last_read_at = excluded.last_read_at,
+				host_team_key = excluded.host_team_key,
 				detached_at = null
 			returning `+linkColumns,
-			l.AccountID, l.LeagueID, l.Ref.Host, l.Ref.LeagueID, l.Ref.Season, l.RosterID, l.LastReadAt))
+			l.AccountID, l.LeagueID, l.Ref.Host, l.Ref.LeagueID, l.Ref.Season, l.RosterID, l.LastReadAt, l.TeamKey))
 		out = saved
 		return err
 	})
@@ -309,4 +314,44 @@ func (s *Store) PutHostPlayers(ctx context.Context, host string, players []HostP
 		}
 		return nil
 	})
+}
+
+// FFPCReader is a connected member who has an FFPC league attached, to
+// read it as: the one whose connection read most recently, so one member
+// signed out never stops the league for the rest.
+func (s *Store) FFPCReader(ctx context.Context, ref Ref) (uuid.UUID, string, error) {
+	var accountID uuid.UUID
+	var ltuid string
+	err := s.Pool.QueryRow(ctx, `select l.account_id, l.host_team_key from app.league_links l
+		join app.host_connections c on c.account_id = l.account_id and c.host = l.host and c.status = 'connected'
+		where l.host = 'ffpc' and l.host_league_id = $1 and l.host_season = $2 and l.detached_at is null
+			and l.host_team_key is not null
+		order by c.last_read_at desc nulls last, l.attached_at limit 1`, ref.LeagueID, ref.Season).Scan(&accountID, &ltuid)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, "", ErrNotConnected
+	}
+	if err != nil {
+		return uuid.Nil, "", fmt.Errorf("leaguesync: ffpc reader %s: %w", ref.Key(), err)
+	}
+	return accountID, ltuid, nil
+}
+
+// FFPCLeagues is every attached FFPC league with a connected member, for
+// the background read.
+func (s *Store) FFPCLeagues(ctx context.Context) ([]Ref, error) {
+	rows, err := s.Pool.Query(ctx, `select distinct l.host_league_id, l.host_season from app.league_links l
+		join app.host_connections c on c.account_id = l.account_id and c.host = l.host and c.status = 'connected'
+		where l.host = 'ffpc' and l.detached_at is null order by 1, 2`)
+	if err != nil {
+		return nil, fmt.Errorf("leaguesync: ffpc leagues: %w", err)
+	}
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Ref, error) {
+		ref := Ref{Host: HostFFPC}
+		err := r.Scan(&ref.LeagueID, &ref.Season)
+		return ref, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("leaguesync: ffpc leagues: %w", err)
+	}
+	return out, nil
 }

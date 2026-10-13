@@ -83,6 +83,9 @@ func (p *Poller) Refresh(ctx context.Context, ref Ref) (Read, error) {
 
 func (p *Poller) read(ctx context.Context, ref Ref, gap time.Duration, mode poll.Mode) (Read, error) {
 	host, ok := p.Hosts.ByKey(ref.Host)
+	if !ok && ref.Host == HostFFPC {
+		return Read{}, ErrHostOff
+	}
 	if !ok {
 		return Read{}, ErrNotALink
 	}
@@ -109,6 +112,10 @@ func (p *Poller) Keep(snap Snapshot) {
 		p.Log.Warn("leaguesync: keep snapshot", "league", snap.Ref.Key(), "err", err)
 	}
 }
+
+// Prime gives the poller a read made outside it (an FFPC attach, read as
+// the attaching member), so the first view answers it fresh.
+func (p *Poller) Prime(snap Snapshot) { p.shared().Prime(snap.Ref.Key(), snap, snap.ReadAt) }
 
 // snapshots is the store as poll keeps reads: by the league's key.
 type snapshots struct{ store SnapshotStore }

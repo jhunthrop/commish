@@ -18,6 +18,9 @@ const unlistedName = "A player not yet listed"
 // view is the league as the link's drafter sees it.
 func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.LeagueSync, error) {
 	snap := read.Snapshot
+	if snap.Ref.Host == HostFFPC {
+		snap = ownLineupOnly(snap, link.RosterID)
+	}
 	saved, err := s.savedSettings(ctx, link)
 	if err != nil {
 		return apitypes.LeagueSync{}, err
@@ -27,9 +30,11 @@ func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.Leag
 		return apitypes.LeagueSync{}, fmt.Errorf("leaguesync: board: %w", err)
 	}
 	ids := namedPlayers(snap)
-	dir, err := s.Players.For(ctx, snap.Ref.Host, directorySeason(snap, s.Now()), ids)
-	if err != nil {
-		return apitypes.LeagueSync{}, fmt.Errorf("leaguesync: directory: %w", err)
+	dir := snap.Players
+	if dir == nil {
+		if dir, err = s.Players.For(ctx, snap.Ref.Host, directorySeason(snap, s.Now()), ids); err != nil {
+			return apitypes.LeagueSync{}, fmt.Errorf("leaguesync: directory: %w", err)
+		}
 	}
 	placed := Place(board.Raw, dir, ids)
 	p := players{dir: dir, placed: placed}
