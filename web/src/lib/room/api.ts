@@ -2,6 +2,7 @@
  * (ok, data, error), and every type is the one generated from api/openapi.yaml. */
 import { PUBLIC_API_URL } from '$app/env/public';
 import { ApiError, apiClient, type RequestOptions } from '#lib/api/client.ts';
+import { HTTP_STATUS, hasStatus, isSignedOut } from '#lib/api/status.ts';
 import type { components } from '#lib/api/types.ts';
 
 type Schemas = components['schemas'];
@@ -31,28 +32,18 @@ function call<T>(method: Method, path: string, body?: unknown): Promise<T> {
 	return client.call<T>(path, { method, body });
 }
 
-/** Whether an error is the API saying nobody is signed in. */
-export function isSignedOut(error: unknown): boolean {
-	return error instanceof ApiError && error.status === HTTP_UNAUTHORIZED;
-}
-
-const HTTP_UNAUTHORIZED = 401;
-const HTTP_FORBIDDEN = 403;
-const HTTP_NOT_FOUND = 404;
+export { isSignedOut };
 
 /** Whether an error is the API saying this drafter cannot be in the room at all: signed out, not
  * seated in it, or no such room. A retry never fixes one of these. */
 export function isFinalRefusal(error: unknown): boolean {
-	return (
-		error instanceof ApiError &&
-		[HTTP_UNAUTHORIZED, HTTP_FORBIDDEN, HTTP_NOT_FOUND].includes(error.status)
-	);
+	return hasStatus(error, HTTP_STATUS.unauthorized, HTTP_STATUS.forbidden, HTTP_STATUS.notFound);
 }
 
 /** Whether an error is the API saying the thing is not there for this drafter at all: no seat in it
  * (403) or no such room (404). Unlike a dropped connection, waiting never brings it back. */
 export function isGone(error: unknown): boolean {
-	return error instanceof ApiError && [HTTP_FORBIDDEN, HTTP_NOT_FOUND].includes(error.status);
+	return hasStatus(error, HTTP_STATUS.forbidden, HTTP_STATUS.notFound);
 }
 
 /** Where a signed-out drafter goes to sign in, coming back to the page they were on. */

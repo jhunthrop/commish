@@ -26,6 +26,17 @@ type FakeGateway struct {
 	// PaymentSubscriptions maps a payment intent to its subscription.
 	PaymentSubscriptions map[string]string
 
+	// CheckoutBaseURL and PortalURL, when set, are where a checkout
+	// session's link and the portal point: the development checkout
+	// (devcheckout.go). Unset, both are inert stripe.test links.
+	CheckoutBaseURL string
+	PortalURL       string
+	// Opened is every checkout session created, by id.
+	Opened map[string]CheckoutParams
+	// Run tells this process's ids from an earlier one's, so the
+	// development checkout never reuses a customer id already stored.
+	Run string
+
 	Customers   []string
 	Checkouts   []CheckoutParams
 	Canceled    map[string]bool
@@ -38,7 +49,7 @@ type FakeGateway struct {
 
 func (f *FakeGateway) id(prefix string) string {
 	f.next++
-	return fmt.Sprintf("%s_fake_%d", prefix, f.next)
+	return fmt.Sprintf("%s_fake%s_%d", prefix, f.Run, f.next)
 }
 
 func (f *FakeGateway) CreateCustomer(_ context.Context, email, _ string) (string, error) {
@@ -59,7 +70,15 @@ func (f *FakeGateway) CreateCheckout(_ context.Context, p CheckoutParams) (Check
 	}
 	f.Checkouts = append(f.Checkouts, p)
 	id := f.id("cs")
-	return CheckoutSession{ID: id, URL: "https://checkout.stripe.test/" + id, ExpiresAt: time.Now().Add(24 * time.Hour)}, nil
+	if f.Opened == nil {
+		f.Opened = map[string]CheckoutParams{}
+	}
+	f.Opened[id] = p
+	base := "https://checkout.stripe.test/"
+	if f.CheckoutBaseURL != "" {
+		base = f.CheckoutBaseURL
+	}
+	return CheckoutSession{ID: id, URL: base + id, ExpiresAt: time.Now().Add(24 * time.Hour)}, nil
 }
 
 func (f *FakeGateway) CreatePortal(_ context.Context, customerID, _ string) (string, error) {
@@ -67,6 +86,9 @@ func (f *FakeGateway) CreatePortal(_ context.Context, customerID, _ string) (str
 	defer f.mu.Unlock()
 	if f.Err != nil {
 		return "", f.Err
+	}
+	if f.PortalURL != "" {
+		return f.PortalURL, nil
 	}
 	return "https://billing.stripe.test/" + customerID, nil
 }

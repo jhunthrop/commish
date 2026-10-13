@@ -89,6 +89,16 @@ type Player struct {
 	Points *float64
 	// Bye is his team's bye week, 0 when the schedule has none.
 	Bye int
+	// Range is his season's floor, median and ceiling, nil with no
+	// projection.
+	Range *Range
+}
+
+// Range is a season's range of outcomes on the stored board.
+type Range struct {
+	Floor   float64
+	Median  float64
+	Ceiling float64
 }
 
 // Raw is one scoring board as stored, players in pool order: ADP

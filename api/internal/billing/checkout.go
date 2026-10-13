@@ -10,6 +10,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/season"
 )
@@ -18,40 +19,6 @@ import (
 type errRefused struct{ msg string }
 
 func (e errRefused) Error() string { return e.msg }
-
-func (s *Service) plans(w http.ResponseWriter, r *http.Request) {
-	if !s.available(w, r) {
-		return
-	}
-	ctx := r.Context()
-	out := apitypes.PlanCatalog{Season: season.Of(s.Now()), Membership: []apitypes.Price{}}
-	var err error
-	if out.DraftPass, err = s.lookupPrice(ctx, LookupDraftPass); err != nil {
-		httpx.WriteInternal(w, r, s.Log, "billing: plans", err)
-		return
-	}
-	// Annual first, always (spec §2.6).
-	for _, key := range []string{LookupMembershipYearly, LookupMembershipMonthly} {
-		p, err := s.lookupPrice(ctx, key)
-		if err != nil {
-			httpx.WriteInternal(w, r, s.Log, "billing: plans", err)
-			return
-		}
-		if p != nil {
-			out.Membership = append(out.Membership, *p)
-		}
-	}
-	seat, err := s.lookupPrice(ctx, LookupGroupPassSeat)
-	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "billing: plans", err)
-		return
-	}
-	if seat != nil {
-		out.GroupPass = &apitypes.GroupPassPrice{PerSeat: *seat, MinSeats: MinGroupSeats, MaxSeats: MaxGroupSeats}
-	}
-	w.Header().Set("Cache-Control", "public, max-age=300")
-	httpx.WriteOK(w, r, http.StatusOK, out)
-}
 
 // checkoutPlan is a validated request: what to sell and how.
 type checkoutPlan struct {
@@ -158,7 +125,7 @@ func (s *Service) checkout(w http.ResponseWriter, r *http.Request) {
 	var url string
 	// One checkout at a time per account, so a double click cannot slip
 	// two purchases past the duplicate check.
-	err := s.Store.WithLock(r.Context(), "checkout:"+a.ID.String(), func(ctx context.Context) error {
+	err := s.Store.WithLock(r.Context(), entitlements.AccountLockKey(a.ID), func(ctx context.Context) error {
 		if err := s.refuseDuplicate(ctx, a, in.Product); err != nil {
 			return err
 		}
@@ -212,7 +179,7 @@ func (s *Service) openCheckout(ctx context.Context, a auth.Account, product stri
 	}
 	session, err := s.Gateway.CreateCheckout(ctx, CheckoutParams{
 		Mode: p.mode, CustomerID: customerID, PriceID: price.ID, Quantity: p.quantity, Metadata: p.meta,
-		SuccessURL: s.site(pathCheckoutDone), CancelURL: s.site(pathCheckoutCanceled),
+		SuccessURL: s.site(pathCheckoutDone + "&bought=" + product), CancelURL: s.site(pathCheckoutCanceled),
 	})
 	if err != nil {
 		return "", err

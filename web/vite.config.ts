@@ -16,11 +16,12 @@ const ROW_PARTS =
  * the scoring chooser and its chips, and a missing format's page. One file for those pages. */
 const BOARD_PARTS =
 	/[\\/]src[\\/]lib[\\/](ui[\\/](TierStrip|TierJump|Toggle|Chip|ChipGroup|chips|FilterBar)\.|site[\\/](BoardView|BoardPageView|AdpView|FormatChips|AbsentFormatView|absent)\.)/;
-/** What only the user pages run: the mock room and its parts, the account, the request API client and
- * the sheet's store. A nightly page never loads any of it with the page; the sheet arrives on a
- * reader's first intent, the rest only on the pages that call the API. */
+/** What only the user pages run: the mock room and its parts, the account, the pass and the live
+ * draft companion, the request API client and the sheet's store. A nightly page never loads any of
+ * it with the page; the sheet arrives on a reader's first intent, the rest only on the pages that
+ * call the API. */
 const USER_PAGE_PARTS =
-	/[\\/]src[\\/]lib[\\/](room|account|api|sheet)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|OddsCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\./;
+	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|OddsCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\./;
 /** A component joins the shared chunk once this many routes use it. Fewer, and every page would
  * carry code only a couple of pages run. */
 const SHARED_BY_ROUTES = 4;

@@ -61,7 +61,7 @@ export const RAIL: readonly RailItem[] = [
 		href: MOCK_SETUP,
 		icon: 'advisor',
 		wideOnly: true,
-		owns: ['advisor']
+		owns: ['advisor', 'companion']
 	},
 	{
 		section: 'record',
@@ -80,7 +80,7 @@ export const RAIL_FOOT: RailItem = {
 	href: '/account',
 	icon: 'account',
 	wideOnly: true,
-	owns: ['account']
+	owns: ['account', 'pass', 'claim']
 };
 
 /** The section a path belongs to, by the one rule above, or null for a page outside the sections

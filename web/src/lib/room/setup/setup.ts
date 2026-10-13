@@ -14,6 +14,8 @@ export const SCORING_CHOICES: readonly { preset: Preset; label: string }[] = [
 ];
 
 export const TEAM_CHOICES: readonly number[] = [8, 10, 12, 14];
+/** The most teams a league holds (api/internal/leagues MaxTeams). */
+export const MAX_TEAMS = 14;
 
 export const LINEUP_CHOICES: readonly { lineup: LeagueSettings['lineup']; label: string }[] = [
 	{ lineup: 'standard', label: 'Standard' },

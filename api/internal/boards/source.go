@@ -54,13 +54,14 @@ func (s *PGSource) boardQuery() string {
 	return `with latest as (
   select max(as_of) as as_of from ` + s.table("preseason_projections") + ` where season = $1 and source = $2
 ), proj as (
-  select c.provider_player_id, p.projected_points
+  select c.provider_player_id, p.projected_points, p.floor_points, p.median_points, p.ceiling_points
   from ` + s.table("preseason_projections") + ` p
   join latest l on p.as_of = l.as_of
   join ` + s.table("player_crosswalk") + ` c on c.player_id = p.player_id
   where p.season = $1 and p.source = $2
 )
 select pp.id, pp.name, pp.position, pp.team, coalesce(pp.headshot_url, ''), pp.adp, proj.projected_points,
+  proj.floor_points, proj.median_points, proj.ceiling_points,
   (select as_of from latest)
 from ` + s.table("provider_players") + ` pp left join proj on proj.provider_player_id = pp.id
 order by pp.adp asc nulls last, pp.id collate "C"`
@@ -96,7 +97,8 @@ func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 	for rows.Next() {
 		var p Player
 		var position string
-		if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &p.Headshot, &p.ADP, &p.Points, &asOf); err != nil {
+		var floor, median, ceiling *float64
+		if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &p.Headshot, &p.ADP, &p.Points, &floor, &median, &ceiling, &asOf); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("boards: scan %s: %w", source, err)
 		}
@@ -105,6 +107,9 @@ func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 			continue
 		}
 		p.Bye = byes[p.Team]
+		if floor != nil && median != nil && ceiling != nil {
+			p.Range = &Range{Floor: *floor, Median: *median, Ceiling: *ceiling}
+		}
 		raw.Players = append(raw.Players, p)
 	}
 	if err := rows.Err(); err != nil {

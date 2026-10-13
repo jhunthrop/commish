@@ -214,9 +214,6 @@
 					{/each}
 				</ChipGroup>
 			</SetupRow>
-			<SetupRow label="Custom scoring" note="your league's exact points">
-				<Quiet size="sm" href="/pass">Import from ESPN, Yahoo or Sleeper with the Draft Pass</Quiet>
-			</SetupRow>
 			<SetupRow label="Teams">
 				<ChipGroup label="Teams">
 					{#each TEAM_CHOICES as n (n)}

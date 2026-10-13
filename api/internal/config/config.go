@@ -175,6 +175,8 @@ type API struct {
 	// deploy without the variable still signs, and links it signed keep
 	// opening after the variable is set.
 	ShareLinkKeys []string
+	// Dev is what only a development API may do.
+	Dev Dev
 }
 
 // Room is cmd/room's whole configuration.
@@ -471,6 +473,7 @@ func LoadAPI(get Getenv) (API, error) {
 	c.Advisor = l.advisor()
 	c.RoomBaseURL = l.roomBaseURL(c.Env)
 	c.ShareLinkKeys = append(l.secrets("SHARE_LINK_KEYS"), c.Session.CookiePassword)
+	c.Dev = l.dev(c.Env)
 	return c, l.err()
 }
 

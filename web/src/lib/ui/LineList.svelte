@@ -14,6 +14,8 @@
 		href?: string;
 		/** Runs before the link is followed: a sheet opens on the account before its page loads. */
 		onclick?: (event: MouseEvent) => void;
+		/** Struck through and quiet: a player on your sheet the draft has taken. */
+		struck?: boolean;
 	}
 
 	interface Props {
@@ -27,7 +29,7 @@
 
 <ul aria-label={label}>
 	{#each lines as line (line.key ?? line.lead)}
-		<li>
+		<li class:struck={line.struck}>
 			{#if line.href}
 				<a href={line.href} onclick={line.onclick}><b>{line.lead}</b></a>
 			{:else}
@@ -74,6 +76,12 @@
 
 	.text {
 		color: var(--ink-2);
+	}
+
+	.struck b,
+	.struck .text {
+		color: var(--ink-3);
+		text-decoration: line-through;
 	}
 
 	/* On the phone every line sets its text under its lead, whatever the lengths, so a list reads
