@@ -547,9 +547,9 @@ PARITY_SOURCE_DATABASE_URL=... uv run python -m research.parity capsules all   #
 | `capsules/facts/*.ts` (the depth pass) | `capsules/facts/{depth_collect,depth_reads,depth_absence,depth_role,depth_context}.py` |
 | `capsules/{config,voice-rules}.ts` | `capsules/config.py`, `capsules/voice_rules.py` (every voice rule, one file) |
 | `capsules/{validate,number-grounding}.ts` | `capsules/{validate,grounding}.py` |
-| `capsules/{render,render-depth,prompt,narrative,narrative-slots,bundle,template,write,generate}.ts` | `capsules/{render,render_depth,render_words,prompt,narrative,bundle,template,gateway,generate}.py` |
+| `capsules/{render,render-depth,prompt,narrative,narrative-slots,bundle,template,write,generate}.ts` | `capsules/{render,render_depth,render_words,prompt,narrative,bundle,facts_block,gateway,generate}.py` (the oracle's prose template is gone: `facts_block`) |
 | `capsules/{repetition,sameness,store,sweep}.ts` | `capsules/{repetition,store,sweep}.py`, `capsules/trial.py` |
-| `nightly/build/pull-figures.ts`, `nightly/gates.ts` (`capsuleFindings`) | `capsules/pull_figures.py`, `nightly/capsule_gate.py` (the template share and shared-sentence gate, this lane's) |
+| `nightly/build/pull-figures.ts`, `nightly/gates.ts` (`capsuleFindings`) | `capsules/pull_figures.py`, `nightly/capsule_gate.py` (the unwritten share and shared-sentence gate, this lane's) |
 
 ### The advisor's contract
 
@@ -577,7 +577,7 @@ advised. The service runs in the board's arithmetic (fused, `model/arithmetic.py
   after a skipped or owed pick (a slow room's clock running out) the next call is a 422 ("pick 8
   belongs to seat 8 ... not seat 9") and every later call a 400 ("picks must be numbered 1..n"), so
   **a skipped pick turns the advisor off for the rest of that draft today**; the rooms fall back to
-  the engine's card. The recorded `slow2_10t_standard` shows it: 1 state 422, 14 states 400. This is
+  the engine's card. The recorded `slow2_10t_standard` shows it: 1 state 422, 15 states 400. This is
   oracle behaviour and stays while parity holds. **Answering owed-pick rooms is the first improvement
   after the oracle retires** (the pick numbers and the seat on the clock already arrive; the closed
   form needs the turn order the room actually ran).
@@ -591,11 +591,15 @@ advised. The service runs in the board's arithmetic (fused, `model/arithmetic.py
   take two corrections inside the player's four calls (the oracle stopped at one). The fact sheet
   itself (`PlayerFacts`, its ledgers and its hash) is the oracle's, field for field, so the oracle's
   stored hashes stay valid.
-- **The template is a counted fallback** (ruled in phase C's fix round): stored `source =
-  'template'`, its sentences built from the player's own facts with their basis and every one
-  carrying him (his name, or his overall rank), never a stock sentence; the nightly's capsule gate
-  fails the run when more than 2% of the board's pages are on the template (missing pages counted)
-  or any template sentence sits on two pages.
+- **No prose template; the fallback is a facts block** (the founder's rule: every non-stat
+  sentence comes from the writer, and a frame with the name and numbers swapped is a stock
+  sentence). A player the writer cannot serve within its ceiling gets his numbers with their basis
+  as labelled facts, one `Label: value` line each and no sentence (the projection in his expected
+  games, the middle and full ranges, the board rank, the ADP), on both sizes, stored
+  `source = 'facts'` (revision 0004) and rendered by the page as a facts list. The sweep retries
+  every unwritten row nightly. The nightly's capsule gate fails the run when facts blocks, the
+  oracle's leftover `template` rows and missing pages pass 2% of the board, or when a sentence of a
+  written capsule sits on two pages.
 - **The board reasons' order is stored** (`preseason_board_reasons.ordinal`, revision 0003). The
   oracle read a player's reasons in heap order, and a capsule's evidence depends on it.
 - **The narrow read places every depth-chart room by the served board**, and reads an archive team
