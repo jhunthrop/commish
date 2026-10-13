@@ -127,6 +127,9 @@ export const ALWAYS_FREE: readonly FeatureWords[] = [
  * player, ADP and our record, mock drafts and your cheat sheet stay free." */
 export function freeLine(): string {
 	const [first = '', ...rest] = ALWAYS_FREE.map((line) => line.lead);
-	const names = [first, ...rest.map((lead) => lead.charAt(0).toLowerCase() + lead.slice(1))];
+	// An acronym keeps its capitals ("ADP"), a word drops its own ("Every player" to "every player").
+	const lower = (lead: string): string =>
+		/^[A-Z][a-z]/.test(lead) ? lead.charAt(0).toLowerCase() + lead.slice(1) : lead;
+	const names = [first, ...rest.map(lower)];
 	return `${listWords(names)} stay free.`;
 }
