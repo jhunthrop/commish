@@ -3,7 +3,6 @@ import { stamp } from '#lib/server/run.ts';
 import {
 	BOARD_SIZE,
 	LOBBY_BUG,
-	ROOM_KEYS,
 	ROW_PLAYER,
 	SCORING_UNIT,
 	SOLO_ROOM,
@@ -22,7 +21,6 @@ export const prerender = true;
 export const load: PageServerLoad = async () => ({
 	boardSize: BOARD_SIZE,
 	lobbyBug: LOBBY_BUG,
-	roomKeys: ROOM_KEYS,
 	rowPlayer: ROW_PLAYER,
 	scoringUnit: SCORING_UNIT,
 	soloRoom: SOLO_ROOM,
