@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import type { SheetPlayer } from '#lib/sheet/model.ts';
 	import SheetMark from '#lib/ui/SheetMark.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
+	import { links } from './links.ts';
 
 	/** Add to my sheet on a nightly page. verb: the player page's one solid action, the sheet lane's
 	 * button once the sheet has loaded and the same words until then, which add him as soon as it has.
@@ -17,14 +17,13 @@
 	let { player, variant = 'verb', fill = false }: Props = $props();
 
 	const parts = $derived(lazySheet.parts);
-	const sheetHref = resolve('/sheet');
 </script>
 
 {#if variant === 'row'}
 	<SheetMark
 		name={player.name}
 		place={lazySheet.place(player.id)}
-		{sheetHref}
+		sheetHref={links.sheet()}
 		onadd={() => lazySheet.add(player)}
 	/>
 {:else if parts}

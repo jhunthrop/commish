@@ -165,8 +165,9 @@
 		text-decoration: underline;
 	}
 
-	/* Every item keeps its whole width: a unit is never clipped. When the line runs short, the team
-	   steps out first (the pill and the club page still carry it), then the tier chip. */
+	/* Every item keeps its whole width: a unit is never clipped. The widest line with the club
+	   ("WR 6 · T3 · NO · 14.6 games") needs 201px, so only a narrower column drops the club (his page
+	   still names it), and below 170px the tier chip goes too. */
 	.meta {
 		display: flex;
 		align-items: center;
@@ -180,7 +181,7 @@
 		flex: none;
 	}
 
-	@container (max-width: 230px) {
+	@container (max-width: 204px) {
 		.team {
 			display: none;
 		}

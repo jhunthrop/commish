@@ -36,7 +36,7 @@
 						<Figure
 							value={fixed(club.slate.strength, 2)}
 							size="md"
-							caption="{club.slate.unit}, {hardestWords(club.slate.rank, page.clubs.length)}"
+							caption="{page.unit}, {hardestWords(club.slate.rank, page.clubs.length)}"
 						/>
 						{#if club.lead}
 							<PlayerLine

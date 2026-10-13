@@ -18,7 +18,9 @@
 	let { rows, weeks, caption, strengthLabel }: Props = $props();
 </script>
 
-<div class="frame" role="region" aria-label={caption} tabindex="-1">
+<!-- The frame scrolls, so it takes focus: a keyboard reaches week 18 with the arrow keys. -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="frame" role="region" aria-label={caption} tabindex="0">
 	<table>
 		<caption>{caption}</caption>
 		<thead>
@@ -36,8 +38,11 @@
 				<tr>
 					<th scope="row" class="club">
 						<span class="who">
-							<Face src={row.face} size={32} />
-							<a href={row.href}>{row.name}</a>
+							<Face src={row.face?.src ?? null} size={32} />
+							<span class="names">
+								<a href={row.href}>{row.name}</a>
+								{#if row.face}<span class="face-name">{row.face.name}</span>{/if}
+							</span>
 						</span>
 					</th>
 					<td class="rank"><b>{row.rank}</b></td>
@@ -59,10 +64,19 @@
 </div>
 
 <style>
+	/* The sticky columns' widths, which the next column's offset is built from. */
 	.frame {
+		--club-w: 220px;
+		--rank-w: 64px;
+		--strength-w: 96px;
 		overflow-x: auto;
 		border: 1px solid var(--line);
 		border-radius: var(--r-md);
+	}
+
+	.frame:focus-visible {
+		outline: 2px solid var(--focus);
+		outline-offset: 2px;
 	}
 
 	table {
@@ -106,23 +120,23 @@
 		position: sticky;
 		left: 0;
 		z-index: 1;
-		width: 220px;
-		min-width: 220px;
+		width: var(--club-w);
+		min-width: var(--club-w);
 	}
 
 	.rank {
 		position: sticky;
-		left: 220px;
+		left: var(--club-w);
 		z-index: 1;
-		width: 64px;
+		width: var(--rank-w);
 		text-align: right;
 	}
 
 	.strength {
 		position: sticky;
-		left: 284px;
+		left: calc(var(--club-w) + var(--rank-w));
 		z-index: 1;
-		width: 96px;
+		width: var(--strength-w);
 		text-align: right;
 		font-variant-numeric: tabular-nums;
 		border-right: 1px solid var(--line-strong);
@@ -136,8 +150,20 @@
 		font-weight: 600;
 	}
 
+	.names {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
 	.who a {
 		text-decoration: none;
+	}
+
+	.face-name {
+		font-size: var(--t-xs);
+		font-weight: 500;
+		color: var(--ink-3);
 	}
 
 	.who a:hover {
@@ -184,9 +210,8 @@
 	}
 
 	@media (max-width: 760px) {
-		.club {
-			width: 168px;
-			min-width: 168px;
+		.frame {
+			--club-w: 168px;
 		}
 
 		.rank,

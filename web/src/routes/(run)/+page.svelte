@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { recordHeadline } from '#lib/run/record.ts';
 	import { runStampText } from '#lib/run/stamp.ts';
 	import SheetAdd from '#lib/site/SheetAdd.svelte';
 	import SiteShell from '#lib/site/SiteShell.svelte';
@@ -24,7 +23,7 @@
 
 	const page = $derived(data.page);
 	const format = $derived(page.format);
-	const headline = $derived(recordHeadline(page.record));
+	const headline = $derived(page.record);
 
 	onMount(() => lazySheet.armOnFirstIntent(window));
 </script>

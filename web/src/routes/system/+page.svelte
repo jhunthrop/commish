@@ -461,7 +461,7 @@
 		</DocSection>
 
 		<NightlyParts nightly={data.nightly} run={data.run} />
-		<RoundParts nightly={data.nightly} />
+		<RoundParts nightly={data.nightly} run={data.run} />
 
 		<DocSection title="Rail icons" sub="A 24 grid, a 1.8 stroke, in the color of the text.">
 			<Parts>

@@ -24,6 +24,8 @@ export const links = {
 		const search = query.toString();
 		return `${resolve('/(run)/compare')}${search === '' ? '' : `?${search}`}`;
 	},
+	/** Your cheat sheet. Every page outside the sheet links it through here. */
+	sheet: (): string => resolve('/sheet'),
 	/** The prerendered JSON a browser fetches for one player's numbers. */
 	playerData: (id: string): string => resolve('/data/players/[id].json', { id })
 } as const;

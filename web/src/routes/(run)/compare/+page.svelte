@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import { draftersGap, lastName } from '#lib/format/draft.ts';
-	import { fixed, plural } from '#lib/format/number.ts';
+	import { draftersGap } from '#lib/format/draft.ts';
+	import { fixed } from '#lib/format/number.ts';
 	import type { IndexEntry, PlayerFormat } from '#lib/run/schema.ts';
 	import PlayerPicker from '#lib/site/PlayerPicker.svelte';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
+	import { SAME_PLAYER, verdict as callBetween } from '#lib/site/verdict.ts';
 	import { fetchPlayer, type PlayerData } from '#lib/site/player-data.ts';
 	import { SEARCH_INDEX_URL, searchable, type SearchablePlayer } from '#lib/site/search.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -48,7 +48,6 @@
 	let failed = $state(false);
 
 	const format = $derived(data.format);
-	const sheetHref = resolve('/sheet');
 
 	function pickOf(slot: Slot): Chosen | null {
 		const player = chosen[slot];
@@ -68,18 +67,18 @@
 	);
 
 	/** Our board's call between the two: the one it ranks higher, by how much, and the other. */
+	/** Our call between the two, once both are in. */
 	const verdict = $derived.by(() => {
 		const [first, second] = both;
 		if (!first || !second) return null;
-		const [leader, other] =
-			first.numbers.ourRank <= second.numbers.ourRank ? [first, second] : [second, first];
-		const places = other.numbers.ourRank - leader.numbers.ourRank;
-		const points = leader.numbers.vor - other.numbers.vor;
-		return {
-			leader: leader.player,
-			other: other.player,
-			sentence: `We'd take ${lastName(leader.player.name)}: ${plural(places, 'place')} higher on our ${format.label} board, ${fixed(points)} more points over replacement.`
-		};
+		const contender = ({ player, numbers }: Chosen) => ({
+			id: player.id,
+			name: player.name,
+			ourRank: numbers.ourRank,
+			vor: numbers.vor,
+			player
+		});
+		return callBetween(contender(first), contender(second), format.label);
 	});
 
 	function syncUrl(): void {
@@ -143,20 +142,20 @@
 				: `Our ${format.label} board · ${String(data.run.season)} season`}
 		/>
 
-		{#if verdict}
-			{@const leader = verdict.leader}
-			{@const other = verdict.other}
+		{#if verdict?.kind === 'same'}
+			<EmptyState level={2} title="Pick two different players" line={SAME_PLAYER} />
+		{:else if verdict}
+			{@const leader = verdict.leader.player}
+			{@const other = verdict.other.player}
 			<Verdict sentence={verdict.sentence}>
 				{#snippet actions()}
 					{#if lazySheet.has(leader.id)}
-						<Quiet href={sheetHref}>{lastName(leader.name)} is on your sheet</Quiet>
+						<Quiet href={links.sheet()}>{verdict.leaderName} is on your sheet</Quiet>
 					{:else}
-						<Verb onclick={() => lazySheet.add(leader)}
-							>Add {lastName(leader.name)} to my sheet</Verb
-						>
+						<Verb onclick={() => lazySheet.add(leader)}>Add {verdict.leaderName} to my sheet</Verb>
 					{/if}
 					{#if !lazySheet.has(other.id)}
-						<Quiet onclick={() => lazySheet.add(other)}>Add {lastName(other.name)} instead</Quiet>
+						<Quiet onclick={() => lazySheet.add(other)}>Add {verdict.otherName} instead</Quiet>
 					{/if}
 				{/snippet}
 			</Verdict>
@@ -216,7 +215,7 @@
 								<EmptyState
 									level={3}
 									title="We couldn't find that player"
-									line="Nobody on our board goes by {missing[slot]}. Find him by name."
+									line="Nobody here goes by that name."
 								/>
 							{/if}
 							<PlayerPicker

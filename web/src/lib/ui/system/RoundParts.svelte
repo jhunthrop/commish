@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { recordHeadline, weekWords } from '#lib/run/record.ts';
+	import { runStampText, type RunStamp } from '#lib/run/stamp.ts';
+	import { absentWords } from '#lib/site/absent.ts';
+	import { verdict } from '#lib/site/verdict.ts';
 	import type { SystemNightly } from '#lib/server/pages/system.ts';
 	import Chip from '../Chip.svelte';
 	import ChipGroup from '../ChipGroup.svelte';
@@ -24,9 +27,10 @@
 	 * Every specimen is drawn from the run the build reads. */
 	interface Props {
 		nightly: SystemNightly;
+		run: RunStamp;
 	}
 
-	let { nightly }: Props = $props();
+	let { nightly, run }: Props = $props();
 
 	const HREF = '/players';
 	const ROW_MIN_WIDTH = 760;
@@ -34,6 +38,17 @@
 	const unit = $derived(nightly.page.format.unit);
 	const headline = $derived(recordHeadline(nightly.record));
 	const [first, second] = $derived(nightly.rows);
+	const call = $derived(first && second ? verdict(first, second, nightly.page.format.label) : null);
+	const absentChip = $derived(nightly.formats.find((chip) => !chip.onRun));
+	const absent = $derived(
+		absentChip
+			? absentWords(
+					absentChip.label,
+					runStampText(run),
+					nightly.formats.filter((chip) => chip.onRun).map((chip) => chip.label)
+				)
+			: null
+	);
 </script>
 
 <DocSection
@@ -88,14 +103,16 @@
 	</Parts>
 
 	<Specimen frame="dashed">
-		<EmptyState title="Half PPR is not on this run" line="This run ranks PPR only.">
-			{#snippet actions()}<Quiet href={HREF}>PPR Board</Quiet>{/snippet}
-		</EmptyState>
-		{#if first && second}
-			<Verdict sentence="We'd take {first.name}: our board ranks him above {second.name}.">
+		{#if absent}
+			<EmptyState title={absent.title} line={absent.line}>
+				{#snippet actions()}<Quiet href={HREF}>{nightly.page.format.label} Board</Quiet>{/snippet}
+			</EmptyState>
+		{/if}
+		{#if call?.kind === 'call'}
+			<Verdict sentence={call.sentence}>
 				{#snippet actions()}
-					<Verb>Add him to my sheet</Verb>
-					<Quiet>Add {second.name} instead</Quiet>
+					<Verb>Add {call.leaderName} to my sheet</Verb>
+					<Quiet>Add {call.otherName} instead</Quiet>
 				{/snippet}
 			</Verdict>
 		{/if}

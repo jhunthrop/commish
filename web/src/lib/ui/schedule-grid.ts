@@ -15,8 +15,9 @@ export interface ScheduleRow {
 	/** "Arizona Cardinals". */
 	name: string;
 	href: string;
-	/** The face that leads the row: the club's top player on our board, or null for none. */
-	face: string | null;
+	/** The face that leads the row, named under the club: the club's top player on our board, or
+	 * null for a club with none. */
+	face: { src: string; name: string } | null;
 	/** 1 is the hardest slate. */
 	rank: number;
 	/** The strength, formatted: "9.26". */

@@ -27,15 +27,14 @@ function shortSlug(format: { id: string; teams: number }): string | null {
 }
 
 /** The chooser's formats the run lacks, as default-size formats. */
-async function absentFormats(): Promise<CatalogFormat[]> {
-	const { formats } = await manifest();
+function absentFrom(formats: readonly Format[]): CatalogFormat[] {
 	return CHOOSER.filter((entry) => !formats.some((format) => format.id === entry.id));
 }
 
 /** Every chip a format chooser draws: the run's formats first, then the chooser's it lacks. */
 export async function formatChips(): Promise<FormatChip[]> {
 	const { formats } = await manifest();
-	const absent = await absentFormats();
+	const absent = absentFrom(formats);
 	return [
 		...formats.map(({ id, label }) => ({ id, label, onRun: true })),
 		...absent.map((format) => ({ ...format, onRun: false }))
@@ -51,9 +50,10 @@ export async function formatRoute(
 	const { formats } = await manifest();
 	const exact = formats.find((format) => format.id === slug);
 	if (exact) return { kind: 'run', format: exact };
-	const absent = (await absentFormats()).find((format) => format.id === slug);
+	const missing = absentFrom(formats);
+	const absent = missing.find((format) => format.id === slug);
 	if (absent) return { kind: 'absent', format: absent };
-	const candidates = [...formats, ...(await absentFormats()).map(withDefaultTeams)];
+	const candidates = [...formats, ...missing.map(withDefaultTeams)];
 	const target = candidates.find((format) => shortSlug(format) === slug);
 	if (target) redirect(PERMANENT_REDIRECT, href(target.id));
 	error(NOT_FOUND, 'No such format.');
@@ -79,7 +79,7 @@ function slugsOf(format: { id: string; teams: number }): string[] {
  * the chooser's it lacks. */
 export async function formatSlugs(): Promise<string[]> {
 	const { formats } = await manifest();
-	const absent = (await absentFormats()).map(withDefaultTeams);
+	const absent = absentFrom(formats).map(withDefaultTeams);
 	return [...formats, ...absent].flatMap(slugsOf);
 }
 

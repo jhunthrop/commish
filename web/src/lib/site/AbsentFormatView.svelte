@@ -3,6 +3,7 @@
 	import type { AbsentFormatPage } from '#lib/server/pages/format-route.ts';
 	import { runStampText, type RunStamp } from '#lib/run/stamp.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
+	import { absentWords } from './absent.ts';
 	import FilterBar from '#lib/ui/FilterBar.svelte';
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
@@ -25,7 +26,13 @@
 	let { page, run, noun, href }: Props = $props();
 
 	const carried = $derived(page.formats.filter((chip) => chip.onRun));
-	const carriedWords = $derived(carried.map((chip) => chip.label).join(' and '));
+	const words = $derived(
+		absentWords(
+			page.format.label,
+			runStampText(run),
+			carried.map((chip) => chip.label)
+		)
+	);
 </script>
 
 <svelte:head>
@@ -43,10 +50,7 @@
 				href={(chip: FormatChip) => href(chip.id)}
 			/>
 		</FilterBar>
-		<EmptyState
-			title="{page.format.label} is not on this run"
-			line="{runStampText(run)} ranks {carriedWords} only."
-		>
+		<EmptyState title={words.title} line={words.line}>
 			{#snippet actions()}
 				{#each carried as chip (chip.id)}
 					<Quiet href={href(chip.id)}>{chip.label} {noun}</Quiet>

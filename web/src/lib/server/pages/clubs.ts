@@ -24,6 +24,8 @@ export interface ClubCard extends Club {
 
 export interface ClubsPage {
 	format: Format;
+	/** A slate's strength as its caption names it. */
+	unit: string;
 	clubs: ClubCard[];
 }
 
@@ -83,6 +85,7 @@ export async function clubsPage(): Promise<ClubsPage> {
 	const [list, loaded, rows] = await Promise.all([clubs(), schedule(), board(format.id)]);
 	return {
 		format,
+		unit: loaded.unit,
 		clubs: list.map((club) => {
 			const own = rows.rows.filter((row) => row.team === club.abbr);
 			return {
@@ -136,7 +139,7 @@ export async function schedulePage(): Promise<SchedulePage> {
 		season: loaded.season,
 		weeks,
 		method: first.method,
-		unit: first.unit,
+		unit: loaded.unit,
 		window: first.window,
 		opponentBasis: loaded.opponentBasis,
 		strong: { count: strong.count, atLeast: fixed(strong.floor, 1) },
@@ -147,7 +150,7 @@ export async function schedulePage(): Promise<SchedulePage> {
 				abbr: slate.abbr,
 				name: club ? `${club.city} ${club.nickname}` : slate.abbr,
 				href: links.club(slate.abbr),
-				face: lead?.headshot ?? null,
+				face: lead ? { src: lead.headshot, name: lead.name } : null,
 				rank: slate.rank,
 				strength: fixed(slate.strength, 2),
 				cells: weeks.map((week) => {

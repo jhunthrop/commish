@@ -45,12 +45,13 @@ export function recordHeadline(record: RunRecord): RecordHeadline {
 		};
 	}
 	const waiting = record.weeks.length - graded.length;
+	const weeks = graded.length === 1 ? 'week' : 'weeks';
 	return {
 		value: String(graded.length),
 		caption:
 			waiting === 0
-				? 'weeks graded. The first board freezes before the next kickoff'
-				: `weeks graded. ${plural(waiting, 'board')} frozen before kickoff, graded after the games`,
+				? `${weeks} graded. The first board freezes before the next kickoff`
+				: `${weeks} graded. ${plural(waiting, 'board')} frozen before kickoff, graded after the games`,
 		graded: false
 	};
 }

@@ -2,7 +2,6 @@
 	import { fixed, plural } from '#lib/format/number.ts';
 	import { allLine, recordHeadline, weekWords } from '#lib/run/record.ts';
 	import type { RecordWeek, Score } from '#lib/run/schema.ts';
-	import { runIdDay } from '#lib/run/stamp.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
 	import Footnote from '#lib/ui/Footnote.svelte';
@@ -42,7 +41,6 @@
 	}
 
 	const lines = $derived(record.weeks.map(weekLine));
-	const frozenDays = $derived([...new Set(record.weeks.map((week) => runIdDay(week.frozenBy)))]);
 
 	const positionColumns: Column[] = [
 		{ label: 'Position' },
@@ -97,9 +95,7 @@
 
 		<Footnote>
 			{record.method}
-			{#if frozenDays.length > 0}Frozen boards are kept as the runs of {frozenDays.join(
-					' and '
-				)}.{/if}
+			Each week's board is the nightly run taken just before it froze.
 		</Footnote>
 	</main>
 </SiteShell>

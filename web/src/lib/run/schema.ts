@@ -253,8 +253,6 @@ export const slateSchema = z.object({
 	rank: z.number().int().min(1).max(32),
 	/** How strength is measured, as the page prints it beside the number. */
 	method: phrase,
-	/** The strength's unit as a short caption under the number: "opponents' average win total". */
-	unit: phrase,
 	/** When the inputs were read, from their own stamps. */
 	window: windowSchema
 });
@@ -266,6 +264,8 @@ export const scheduleSchema = z
 		opponentValues: z.record(club, points),
 		/** What one opponent value is, as a column head prints it. */
 		opponentBasis: phrase,
+		/** A slate's strength as a short caption under its number: "opponents' average win total". */
+		unit: phrase,
 		slates: z.array(slateSchema).length(32)
 	})
 	.superRefine((schedule, ctx) => {

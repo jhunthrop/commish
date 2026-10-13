@@ -358,11 +358,11 @@ function scheduleFrom(
 		season: SEASON,
 		opponentValues: Object.fromEntries(codes.map((abbr) => [abbr, value(abbr)])),
 		opponentBasis: 'Published season win total',
+		unit: "opponents' average win total",
 		slates: unranked.map((slate) => ({
 			...slate,
 			rank: ordered.findIndex((other) => other.abbr === slate.abbr) + 1,
 			method: "average of its opponents' published season win totals",
-			unit: "opponents' average win total",
 			window: winTotals.window
 		}))
 	};
