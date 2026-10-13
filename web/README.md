@@ -64,10 +64,11 @@ CLS 0.05 everywhere. Collected: the board, a player page and the record. The sys
 `.github/workflows/web.yml` runs check, lint, the timed build (budget four minutes), Lighthouse and
 the deploy to the workers.dev preview, on a push to main touching `web/` and on `nightly-run`.
 
-Two choices keep a nightly page under the script budget: the client loads the Svelte runtime and the
-components four or more routes share as two files (`vite.config.ts`), and scripts are not preloaded
-(`hooks.server.ts`), so the first-paint fonts arrive before the first paint instead of swapping in
-after it.
+The client loads the Svelte runtime and the components four or more routes share as two files
+(`vite.config.ts`), which keeps a nightly page's script requests near ten and under the budget. Only
+styles are preloaded (`hooks.server.ts`): preloaded fonts made Chrome hold a light page's first
+paint until they landed, so a page paints in the fallback face at once and swaps when the fonts
+arrive. The swap costs a CLS of about 0.035 against the 0.05 budget.
 
 ## Tokens and primitives
 
