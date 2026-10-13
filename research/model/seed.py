@@ -4,7 +4,7 @@
 
 Runs `research/parity/ts/artifacts.ts` (or reads its saved output) and publishes every payload as
 version 1 of its artifact, with the provenance `research.model.fit_provenance` states: the fit's
-own commit (followed through renames) as the stamp, and in `fitted_on` the oracle module and
+commit that last changed its numbers (`research.model.fit_history`) as the stamp, and in `fitted_on` the oracle module and
 export, the seasons, the inputs the store has lost and the re-fit path. A re-seed of the same
 payloads is a no-op; a changed payload under version 1 is refused.
 
@@ -29,7 +29,7 @@ from sqlalchemy import Connection, text
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
 from research.model.artifacts import ArtifactVersionConflictError, publish_artifact, stable_json
-from research.model.fit_provenance import FIT_SOURCES, fit_commit, fitted_on
+from research.model.fit_provenance import FIT_SOURCES, fitted_on
 
 _REPO: Final = Path(__file__).resolve().parents[2]
 _EXPORTER: Final = _REPO / "research" / "parity" / "ts" / "artifacts.ts"
@@ -50,7 +50,7 @@ def provenance(name: str, file: str) -> tuple[datetime, str]:
     source = FIT_SOURCES.get(name)
     if source is None or source.file != file:
         raise LookupError(f"{name} ({file}) is not a fit research.model.fit_provenance describes")
-    commit = fit_commit(file)
+    commit = source.last_fit()
     return commit.committed_at, fitted_on(name, commit)
 
 

@@ -25,6 +25,7 @@ from research.parity.model.numerics import VectorCheck, run_committed, run_live
 from research.parity.model.outcome import CaseResult, Claim
 from research.parity.model.register_cases import (
     AFTER_KICKOFF,
+    register_freeze_unknown_model,
     register_freeze_week_two,
     register_grade_held_out,
     register_grade_live,
@@ -171,6 +172,12 @@ MODEL_CASES: Final = (
         "a scratch freeze and grade of 2024 week 2, every field, both sides",
         True,
         register_grade_held_out,
+    ),
+    ModelCase(
+        "register-freeze-unknown-model",
+        "the freeze refuses a board that names no model, and writes nothing",
+        True,
+        register_freeze_unknown_model,
     ),
     ModelCase("held-out-backtest", "the stored served board against outcomes in the held-out seasons", True, _held_out),
     ModelCase("fit-check", "the fit step's check: the live board before kickoff, the archive after", True, _fit_check),

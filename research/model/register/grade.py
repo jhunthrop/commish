@@ -160,8 +160,44 @@ def latest_freeze_for(conn: Connection, season: int, week: int) -> datetime | No
     return None if value is None else ms_instant(value)
 
 
-def grade_week(conn: Connection, season: int, week: int, now: datetime, write: bool = True) -> list[dict[str, Any]]:
-    """`gradeWeek`: grade the latest freeze of the week, served board first; refuse an empty served grade."""
+@dataclass(frozen=True, slots=True)
+class BoardGrade:
+    """`BoardGrade`: one board's graded rows and its four column scores, over its own population."""
+
+    board_source: str
+    population: int
+    rows: list[dict[str, Any]]
+    scores: list[ColumnScore]
+
+
+@dataclass(frozen=True, slots=True)
+class SkippedBoard:
+    """`SkippedBoard`: a board the freeze recorded that could not be scored, and why."""
+
+    board_source: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class WeekGrade:
+    """`WeekGrade`: every scored board (served first), every skipped one, and the served population."""
+
+    season: int
+    week: int
+    frozen_at: datetime
+    graded_at: datetime
+    boards: list[BoardGrade]
+    skipped: list[SkippedBoard]
+    population: int
+
+    @property
+    def rows(self) -> list[dict[str, Any]]:
+        return [row for board in self.boards for row in board.rows]
+
+
+def grade_week(conn: Connection, season: int, week: int, now: datetime, write: bool = True) -> WeekGrade:
+    """`gradeWeek`: grade the latest freeze of the week, served board first; refuse an empty served
+    grade, record an empty shadow as skipped; each board scored by `score_columns`."""
     frozen_at = latest_freeze_for(conn, season, week)
     if frozen_at is None:
         raise ValueError(f"The register holds no freeze for {season} week {week}, so there is nothing to grade.")
@@ -190,20 +226,33 @@ def grade_week(conn: Connection, season: int, week: int, now: datetime, write: b
         sorted({row["board_source"] for row in frozen}),
         lambda a, b: js_or((a != SERVED_SOURCE) - (b != SERVED_SOURCE), lambda: locale_compare(a, b)),
     )
-    rows: list[dict[str, Any]] = []
+    boards: list[BoardGrade] = []
+    skipped: list[SkippedBoard] = []
     for source in sources:
         graded = [row for row in frozen if row["board_source"] == source and row["player_id"] in lines]
         if not graded:
+            reason = (
+                f"{season} week {week} has outcomes, but none of them belong to a player the {js_iso(frozen_at)} freeze carried "
+                f'under "{source}". Refusing to grade an empty intersection.'
+            )
             if source == SERVED_SOURCE:
-                raise ValueError(
-                    f"{season} week {week} has outcomes, but none of them belong to a player the {js_iso(frozen_at)} freeze carried "
-                    f'under "{source}". Refusing to grade an empty intersection.'
-                )
+                raise ValueError(reason)
+            skipped.append(SkippedBoard(source, reason))
             continue
-        rows.extend(_grade_board((season, week, frozen_at), graded_at, source, graded, positions, lines))
+        rows = _grade_board((season, week, frozen_at), graded_at, source, graded, positions, lines)
+        boards.append(BoardGrade(source, len(rows), rows, score_columns(rows)))
+    result = WeekGrade(
+        season,
+        week,
+        frozen_at,
+        graded_at,
+        boards,
+        skipped,
+        next((board.population for board in boards if board.board_source == SERVED_SOURCE), 0),
+    )
     if write:
-        _record(conn, rows)
-    return rows
+        _record(conn, result.rows)
+    return result
 
 
 def _record(conn: Connection, rows: Sequence[Mapping[str, Any]]) -> None:

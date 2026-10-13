@@ -1,27 +1,21 @@
 """WHERE EACH SEEDED FIT CAME FROM: the record the artifact store keeps once the oracle's tree is gone.
 
 Version 1 of each artifact `research.model.seed` publishes is a constant the TypeScript oracle
-committed, carried number for number. Its row says, in `fitted_on`, which oracle module and export
-it is, the commit that last changed it, the seasons it was fitted on and held out from, the inputs
-the store has since lost, and how it would be fitted again; its `fit_stamp` is that commit's time.
-
-The commit is found with `git log --follow`, skipping pure renames: the move of the oracle into
-`research-ts/` (aa7adb09, and 519851ac before it) changed no number, so a stamp from it would date a
-fit to the day its file moved. A commit is named with its subject, because the last change to a
-constant can be a refactor rather than a fit (`kdef-fitted.ts` at 3d4afb70 is one), and the reader
-should see which.
+committed, carried number for number. Its row says, in `fitted_on`, which oracle module and exports
+it is, the commit that last changed those numbers and that commit's subject, the seasons it was
+fitted on and held out from, the inputs the store has since lost, and how it would be fitted again;
+its `fit_stamp` is that commit's time. The commit is found by `research.model.fit_history`, which
+compares the fitted numbers themselves across the file's history, so neither a rename nor a refactor
+that left the numbers alone can stamp a fit.
 """
 
-import subprocess
 from dataclasses import dataclass
-from datetime import datetime
-from pathlib import Path
 from types import MappingProxyType
 from typing import Final
 
-_REPO: Final = Path(__file__).resolve().parents[2]
+from research.model.fit_history import FitCommit, fit_commit
+
 _ORACLE_ROOT: Final = "research-ts/src/projections"
-_PURE_RENAME: Final = "R100"
 # What the dev store no longer holds (the store keeps only the seasons the product reads), and so
 # why none of these fits can be re-run on it as it stands.
 LOST_INPUTS: Final = (
@@ -43,20 +37,39 @@ class FitSource:
     fitted_on: str
     held_out: str
     command: str
+    # The module's exports that hold the fitted numbers; empty for a JSON file, which is all fit.
+    names: tuple[str, ...] = ()
 
     @property
     def file(self) -> str:
         return f"{_ORACLE_ROOT}/{self.module}"
+
+    def last_fit(self) -> FitCommit:
+        """The commit that last changed this fit's numbers (`research.model.fit_history`)."""
+        return fit_commit(self.file, self.names)
 
 
 FIT_SOURCES: Final = MappingProxyType(
     {
         "model/weekly-priors": FitSource(
             "model/fitted.ts",
-            "FITTED_MODEL, FIT_SEASONS, HELD_OUT_SEASONS",
+            "FITTED_MODEL (composed from the module's FITTED_* priors), FIT_SEASONS, HELD_OUT_SEASONS",
             "2021 and 2022 (2020 as history)",
             "2023 and 2024",
             "npm run projections:fit",
+            (
+                "FIT_SEASONS",
+                "HELD_OUT_SEASONS",
+                "FITTED_OPPORTUNITY_PRIORS",
+                "FITTED_EFFICIENCY_PRIORS",
+                "FITTED_LINE_PRIORS",
+                "FITTED_SCHEME_PRIORS",
+                "FITTED_REDISTRIBUTION_PRIORS",
+                "FITTED_GAME_CONTEXT_PRIORS",
+                "FITTED_RED_ZONE_PRIORS",
+                "FITTED_TARGET_DEPTH_PRIORS",
+                "FITTED_NEWS_PRIORS",
+            ),
         ),
         "preseason/priors": FitSource(
             "preseason/fitted.ts",
@@ -64,6 +77,7 @@ FIT_SOURCES: Final = MappingProxyType(
             "2021 and 2022, except the rookie games rate (2023 and 2024)",
             "2023 and 2024 (the rookie games rate: 2025 and 2026)",
             "npm run projections:preseason:fit",
+            ("FITTED_AVAILABILITY_PRIORS", "FITTED_ROOKIE_PRIORS", "FITTED_DEPTH_PRIORS", "FITTED_CAREER_PRIORS"),
         ),
         "preseason/rookie-curve": FitSource(
             "preseason/rookie-curve-fitted.ts",
@@ -71,6 +85,7 @@ FIT_SOURCES: Final = MappingProxyType(
             "rookie classes 2003-2021",
             "every class after 2021",
             "npm run projections:rookie-curve:fit",
+            ("FITTED_ROOKIE_CURVE",),
         ),
         "preseason/rookie-history": FitSource(
             "preseason/rookie-historical-games-fitted.ts",
@@ -78,6 +93,7 @@ FIT_SOURCES: Final = MappingProxyType(
             "rookie classes 2003-2021",
             "every class after 2021",
             "npm run projections:rookie-historical-games:fit",
+            ("FITTED_HISTORICAL_ROOKIE_GAMES_RATE", "FITTED_ROOKIE_CURVE_EVIDENCE"),
         ),
         "preseason/kdef-priors": FitSource(
             "preseason/kdef-fitted.ts",
@@ -85,6 +101,7 @@ FIT_SOURCES: Final = MappingProxyType(
             "2013-2024",
             "2025 (judged once) and 2026",
             "npm run projections:kdef:fit",
+            ("FITTED_KICKER_PRIORS", "FITTED_DEFENSE_PRIORS"),
         ),
         "market/blend-constants": FitSource(
             "market/blend-fitted.ts",
@@ -92,6 +109,7 @@ FIT_SOURCES: Final = MappingProxyType(
             "predictor seasons 2013-2021",
             "every season after 2021",
             "npm run projections:blend:fit",
+            ("FITTED_BLEND_CONSTANTS",),
         ),
         "market/curve-ppr": FitSource(
             "market/curve-fitted.ts",
@@ -99,6 +117,7 @@ FIT_SOURCES: Final = MappingProxyType(
             "ADP boards 2013-2021",
             "every season after 2021",
             "npm run projections:market:fit",
+            ("FITTED_MARKET_CURVE",),
         ),
         "market/curve-half": FitSource(
             "market/curve-fitted-half.ts",
@@ -106,6 +125,7 @@ FIT_SOURCES: Final = MappingProxyType(
             "Half PPR ADP boards 2018-2021",
             "2023 and 2024",
             "npm run projections:market:fit -- --format=half",
+            ("FITTED_MARKET_CURVE_HALF",),
         ),
         "market/curve-std": FitSource(
             "market/curve-fitted-std.ts",
@@ -113,6 +133,7 @@ FIT_SOURCES: Final = MappingProxyType(
             "Standard ADP boards 2013-2021",
             "2023 and 2024",
             "npm run projections:market:fit -- --format=std",
+            ("FITTED_MARKET_CURVE_STD",),
         ),
         "laws/measured": FitSource(
             "laws/measured.json",
@@ -134,34 +155,10 @@ FIT_SOURCES: Final = MappingProxyType(
             "predictor seasons 2003-2021",
             "every season after 2021",
             "npm run laws:discover:quantiles",
+            ("DISCOVERY_QUANTILES",),
         ),
     }
 )
-
-
-@dataclass(frozen=True, slots=True)
-class FitCommit:
-    sha: str
-    committed_at: datetime
-    subject: str
-
-
-def fit_commit(file: str) -> FitCommit:
-    """The last commit that changed `file`'s content, following it through renames."""
-    completed = subprocess.run(
-        ["git", "log", "--follow", "-M", "--format=@%h%x09%cI%x09%s", "--name-status", "--", file],
-        cwd=_REPO,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    header: list[str] | None = None
-    for line in completed.stdout.splitlines():
-        if line.startswith("@"):
-            header = line[1:].split("\t", 2)
-        elif line.strip() and header is not None and line.split("\t")[0] != _PURE_RENAME:
-            return FitCommit(header[0], datetime.fromisoformat(header[1]), header[2])
-    raise LookupError(f"{file} has no commit that changed its content")
 
 
 def fitted_on(name: str, commit: FitCommit) -> str:

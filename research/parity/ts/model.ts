@@ -34,7 +34,8 @@ async function freeze(db: Db, season: number, week: number, nowIso: string): Pro
 
 async function grade(db: Db, season: number, week: number, nowIso: string): Promise<void> {
   const result = await gradeWeek(db, { season, week }, at(nowIso));
-  emit({ gradedAt: result.gradedAt.toISOString(), rows: result.rows });
+  const boards = result.boards.map((board) => ({ boardSource: board.boardSource, population: board.population, scores: board.scores }));
+  emit({ gradedAt: result.gradedAt.toISOString(), rows: result.rows, boards, skipped: result.skipped, population: result.population });
 }
 
 async function main(): Promise<void> {

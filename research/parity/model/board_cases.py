@@ -10,6 +10,7 @@
 Every comparison is exact.
 """
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any, Final
 
@@ -55,6 +56,8 @@ WEEK_ONE_RESTATEMENT: Final = Restatement(
     f"update nfl_players set position = 'WR' where id = '{RESTATED_PLAYER}'",
     "Velus Jones Jr. was a WR in the universe at 2026-09-07T21:57Z; nfl_players was rewritten in place since",
 )
+# Without the restatement his value rank moves from 590 to 469, shifting the 121 between by one.
+WEEK_ONE_VALUE_RANKS_SHIFTED: Final = 122
 _FROZEN_COLUMNS: Final = (
     ("board_points", "projected_points"),
     ("board_rank", "rank"),
@@ -78,6 +81,14 @@ def _frozen(week: int) -> dict[str, dict[str, Any]]:
         (week, SERVED),
     )
     return {row["player_id"]: {ours: row[theirs] for theirs, ours in _FROZEN_COLUMNS} for row in rows}
+
+
+def _moved(frozen: Mapping[str, Mapping[str, Any]], claimed: Mapping[str, Mapping[str, Any]], column: str) -> set[str]:
+    return {
+        player_id
+        for player_id, row in claimed.items()
+        if player_id in frozen and row[column] != frozen[player_id][column]
+    }
 
 
 def _claimed(leg: Leg, *, without: str | None = None) -> dict[str, dict[str, Any]]:
@@ -138,15 +149,17 @@ def board_week_one() -> CaseResult:
     restated = read_leg(restated_url, 2026, SERVED, WEEK_ONE_BOARD)
     as_is = read_leg(as_is_url, 2026, SERVED, WEEK_ONE_BOARD)
     unrestated = diff_rows("register week 1 vs the tree, store as is", frozen, _claimed(as_is))
-    moved = {
-        player_id
-        for player_id, row in _claimed(as_is).items()
-        if player_id in frozen and row["projected_points"] != frozen[player_id]["projected_points"]
-    }
+    moved = {column: _moved(frozen, _claimed(as_is), column) for _, column in _FROZEN_COLUMNS}
     claims += [
         *as_is_claims,
         Claim(
-            f"on the store as is, the only player whose points move is {RESTATED_PLAYER}", moved == {RESTATED_PLAYER}
+            f"on the store as is, the only player whose points move is {RESTATED_PLAYER}",
+            moved["projected_points"] == {RESTATED_PLAYER},
+        ),
+        Claim("on the store as is, no overall rank moves", not moved["rank"]),
+        Claim(
+            f"on the store as is, exactly {WEEK_ONE_VALUE_RANKS_SHIFTED} value ranks move (his and those his move shifts)",
+            len(moved["value_rank"]) == WEEK_ONE_VALUE_RANKS_SHIFTED and RESTATED_PLAYER in moved["value_rank"],
         ),
     ]
     notes = [
