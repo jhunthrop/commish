@@ -253,6 +253,19 @@ export const recordSchema = z.object({
 	toDate: z.array(recordLineSchema)
 });
 
+/** His season so far in two numbers, as his file's season block has them (players/<id>.json, scored
+ * in the same format): the games he has played and his points a game, null before his first game.
+ * The league page prints them beside each player's projection. */
+export const indexSeasonSchema = z
+	.object({
+		games: z.number().int().nonnegative(),
+		pointsPerGame: z.number().nullable()
+	})
+	.refine(
+		(season) => (season.games === 0) === (season.pointsPerGame === null),
+		'Points a game are null exactly when he has no game.'
+	);
+
 export const indexEntrySchema = z.object({
 	id: playerId,
 	slug,
@@ -260,7 +273,8 @@ export const indexEntrySchema = z.object({
 	team: club,
 	position,
 	/** His face, so a search hit leads with it like every other list. */
-	headshot: z.url()
+	headshot: z.url(),
+	season: indexSeasonSchema
 });
 
 export const indexSchema = z.array(indexEntrySchema).min(1);
@@ -278,7 +292,10 @@ export const clubsSchema = z.array(clubSchema).length(32);
 export const gameSchema = z.object({
 	week: z.number().int().min(1),
 	opponent: club,
-	home: z.boolean()
+	home: z.boolean(),
+	/** When the game kicks off. A time the league has not set yet is the start of its day on the
+	 * Eastern clock. The season's first kickoff is the earliest of them. */
+	kickoff: isoTime
 });
 
 export const slateSchema = z.object({
@@ -336,6 +353,7 @@ export type RecordWeek = z.infer<typeof recordWeekSchema>;
 export type RecordWeekStatus = z.infer<typeof recordWeekStatus>;
 export type RunRecord = z.infer<typeof recordSchema>;
 export type IndexEntry = z.infer<typeof indexEntrySchema>;
+export type IndexSeason = z.infer<typeof indexSeasonSchema>;
 export type Club = z.infer<typeof clubSchema>;
 export type Game = z.infer<typeof gameSchema>;
 export type Slate = z.infer<typeof slateSchema>;

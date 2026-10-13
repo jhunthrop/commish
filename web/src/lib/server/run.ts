@@ -83,17 +83,43 @@ function seasonWeeks(): Promise<number> {
 	);
 }
 
-/** A player's file, its game log held to the run's own schedule: one row per regular-season week. */
+/** The season's first kickoff: the earliest game on the run's schedule. */
+export function firstKickoff(): Promise<string> {
+	return once('schedule:first-kickoff', async () => {
+		const kickoffs = (await schedule()).slates.flatMap((slate) =>
+			slate.games.map((game) => game.kickoff)
+		);
+		return kickoffs.reduce((first, kickoff) =>
+			Date.parse(kickoff) < Date.parse(first) ? kickoff : first
+		);
+	});
+}
+
+/** Whether the run was written after the season's first kickoff: the run decides, never the
+ * reader's clock, so every page of one run agrees. */
+export async function seasonUnderway(): Promise<boolean> {
+	const [run, first] = await Promise.all([manifest(), firstKickoff()]);
+	return Date.parse(run.runAt) >= Date.parse(first);
+}
+
+/** A player's file, its game log held to the run's own schedule (one row per regular-season week)
+ * and its season to the index's two numbers for him. */
 function readPlayer(id: string): Promise<Player> {
 	return once(`player:${id}`, async () => {
-		const [loaded, weeks] = await Promise.all([
+		const [loaded, weeks, entries] = await Promise.all([
 			read(RUN_PATHS.player(id), playerSchema),
-			seasonWeeks()
+			seasonWeeks(),
+			index()
 		]);
 		if (loaded.season.weeks !== weeks) {
 			throw new Error(
 				`players/${id}.json logs ${String(loaded.season.weeks)} weeks, the schedule runs ${String(weeks)}.`
 			);
+		}
+		const listed = entries.find((entry) => entry.id === id)?.season;
+		const { games, pointsPerGame } = loaded.season;
+		if (listed?.games !== games || listed.pointsPerGame !== pointsPerGame) {
+			throw new Error(`index.json's season for ${id} is not his file's: ${String(games)} games.`);
 		}
 		return loaded;
 	});
