@@ -363,7 +363,7 @@
 <!-- The action bar's two lines: a verb that went wrong, said above the verbs, and where a signed-out
      mock is kept, under them. -->
 {#snippet refusal()}
-	<RoomNotice {error} subject="setup" returnTo={page.url.pathname} />
+	<RoomNotice {error} subject="setup" returnTo={page.url.pathname} besideVerb />
 {/snippet}
 
 {#snippet keepNote()}

@@ -11,9 +11,11 @@
 		subject: NoticeSubject;
 		/** Where sign-in brings the drafter back to. */
 		returnTo: string;
+		/** Beside a page's own verb the way forward is quiet, so the page keeps one solid verb. */
+		besideVerb?: boolean;
 	}
 
-	let { error, subject, returnTo }: Props = $props();
+	let { error, subject, returnTo, besideVerb = false }: Props = $props();
 
 	const view = $derived(noticeFor(error, subject, returnTo));
 </script>
@@ -23,7 +25,8 @@
 		<p>{view.text}</p>
 		{#if (view.verb ?? view.quiet) !== undefined}
 			<div class="acts">
-				{#if view.verb}<Verb href={view.verb.href}>{view.verb.label}</Verb>{/if}
+				{#if view.verb && besideVerb}<Quiet href={view.verb.href}>{view.verb.label}</Quiet>
+				{:else if view.verb}<Verb href={view.verb.href}>{view.verb.label}</Verb>{/if}
 				{#if view.quiet}<Quiet href={view.quiet.href}>{view.quiet.label}</Quiet>{/if}
 			</div>
 		{/if}
