@@ -1341,8 +1341,11 @@ export interface components {
 			 * @description ADP less the pick
 			 */
 			adp_gap: number | null;
-			/** @enum {string} */
-			chip: 'reach' | 'steal' | 'at_adp' | 'none';
+			/**
+			 * @description kept is a keeper at his seat and round, with no ADP gap and no hindsight
+			 * @enum {string}
+			 */
+			chip: 'reach' | 'steal' | 'at_adp' | 'none' | 'kept';
 			/**
 			 * Format: double
 			 * @description the chance he was there at your next turn

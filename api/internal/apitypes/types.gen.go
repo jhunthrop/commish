@@ -387,6 +387,7 @@ func (e Product) Valid() bool {
 // Defines values for ReportPickChip.
 const (
 	ReportPickChipAtAdp ReportPickChip = "at_adp"
+	ReportPickChipKept  ReportPickChip = "kept"
 	ReportPickChipNone  ReportPickChip = "none"
 	ReportPickChipReach ReportPickChip = "reach"
 	ReportPickChipSteal ReportPickChip = "steal"
@@ -396,6 +397,8 @@ const (
 func (e ReportPickChip) Valid() bool {
 	switch e {
 	case ReportPickChipAtAdp:
+		return true
+	case ReportPickChipKept:
 		return true
 	case ReportPickChipNone:
 		return true
@@ -1222,7 +1225,9 @@ type ReportExposure struct {
 // ReportPick defines model for ReportPick.
 type ReportPick struct {
 	// AdpGap ADP less the pick
-	AdpGap    *float64       `json:"adp_gap"`
+	AdpGap *float64 `json:"adp_gap"`
+
+	// Chip kept is a keeper at his seat and round, with no ADP gap and no hindsight
 	Chip      ReportPickChip `json:"chip"`
 	CouldWait bool           `json:"could_wait"`
 
@@ -1240,7 +1245,7 @@ type ReportPick struct {
 	StillThere *float64 `json:"still_there"`
 }
 
-// ReportPickChip defines model for ReportPick.Chip.
+// ReportPickChip kept is a keeper at his seat and round, with no ADP gap and no hindsight
 type ReportPickChip string
 
 // ReportPickMadeBy who made the pick: you, Pick for me or Finish the draft (for_you), a lobby seat's stand-in after you left (queue), or the stand-in when your clock ran out (clock). A pick you did not make carries no hindsight.

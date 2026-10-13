@@ -1575,7 +1575,10 @@ components:
         player_id: { type: string }
         over_replacement: { type: number, format: double, nullable: true }
         adp_gap: { type: number, format: double, nullable: true, description: ADP less the pick, positive before drafters take him }
-        chip: { type: string, enum: [reach, steal, at_adp, none] }
+        chip:
+          type: string
+          enum: [reach, steal, at_adp, none, kept]
+          description: kept is a keeper at his seat and round, with no ADP gap and no hindsight
         still_there: { type: number, format: double, nullable: true, description: the chance he was there at your next turn, null at your last }
         could_wait: { type: boolean }
         odds_source: { type: string, description: "advisor or sim as recorded with the pick, or fallback_sim computed for the report" }
