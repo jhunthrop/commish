@@ -23,6 +23,9 @@ type Store struct{ Pool *pgxpool.Pool }
 // by a database clock running ahead is not yet live, so a second
 // checkout or the webhook's duplicate guard misses it (measured: 40 to
 // 60 ms locally, enough for two passes in one season to both grant).
+// The clause is right for a wall-clock $now only: every reader passes
+// the API's clock. A question about a time in the past would read a row
+// started since as already started.
 const liveClause = `e.status in ` + liveStatuses + ` and e.starts_at <= greatest($2, statement_timestamp()) and (e.ends_at is null or e.ends_at > $2)`
 
 // Can answers whether the account may use feature at now, from the

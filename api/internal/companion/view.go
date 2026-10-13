@@ -81,12 +81,13 @@ func (s *Service) answer(w http.ResponseWriter, r *http.Request, row Row, since 
 	}
 	out := s.view(f, since)
 	if out.YourTurn && f.built.LostAt == nil {
+		// A card that fails is logged and left off: the picks keep coming.
 		card, ranges, err := s.cardFor(ctx, f)
 		if err != nil {
-			httpx.WriteInternal(w, r, s.Log, "companion: card", err)
-			return
+			s.Log.Error("companion: card", "companion", row.ID, "pick", f.built.Draft.State.PickNumber, "err", err)
+		} else {
+			out.Card, out.Ranges = card, ranges
 		}
-		out.Card, out.Ranges = card, ranges
 	}
 	if since == 0 {
 		board := draftroom.BoardView(f.board, nil)
@@ -161,7 +162,8 @@ func traded(d sleeper.Draft, picks []sleeper.Pick) int {
 	return n
 }
 
-// basisWords names the board our call reads.
+// basisWords names the board our call reads. A stand-in until Lane 8
+// part A, whose line is "Your league's scoring".
 func basisWords(b boards.Board) string {
 	return "Our " + b.Raw.Format.Words() + " board, the nearest of ours to your league's scoring, valued for its roster."
 }

@@ -111,6 +111,9 @@ const (
 	halfPoints    = 0.5
 )
 
+// presetOf is a stand-in until Lane 8 part A (custom scoring from the
+// league's exact rules).
+//
 // presetOf is the scoring preset nearest the league's own points, or,
 // for a mock draft with no league, its scoring type.
 func presetOf(d sleeper.Draft, league *sleeper.League) apitypes.ScoringPreset {

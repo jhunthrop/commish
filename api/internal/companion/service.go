@@ -26,7 +26,8 @@ import (
 	"github.com/jhunthrop/commish/api/internal/sleeper"
 )
 
-// Rate limits: the browser asks every 3 s while drafting, 20 a minute.
+// Rate limits: the browser asks every 3 s while drafting, 20 a minute,
+// so reads allow 60 a minute an account.
 const (
 	limitReadPerMinute   = 60
 	limitCreatePerMinute = 20
@@ -141,7 +142,8 @@ func (s *Service) load(w http.ResponseWriter, r *http.Request) (Row, bool) {
 		return Row{}, false
 	}
 	row, err := s.Store.Get(r.Context(), auth.AccountID(r), id)
-	if errors.Is(err, ErrNotFound) {
+	// A replay made while COMPANION_REPLAY was on is gone once it is off.
+	if errors.Is(err, ErrNotFound) || (err == nil && row.Replay && s.Replay == nil) {
 		httpx.WriteNotFound(w, r)
 		return Row{}, false
 	}
