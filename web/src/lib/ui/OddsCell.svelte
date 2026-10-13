@@ -55,9 +55,12 @@
 		background: var(--ink-2);
 	}
 
+	/* On a phone the basis wraps under the number, so the cell grows with it. */
 	@media (max-width: 760px) {
 		.cell {
 			padding: 0 var(--s-2);
+			height: auto;
+			min-height: calc(var(--row-h) - 8px);
 		}
 
 		b {

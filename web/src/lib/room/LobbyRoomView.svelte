@@ -86,7 +86,7 @@
 	const onClockName = $derived(onClock === null ? '' : (names[onClock - 1] ?? ''));
 	const oddsLabel = $derived.by(() => {
 		if (!card) return '';
-		if (card.conditional) return `reaches your pick at ${pickLabel(card.for_pick, teams)}`;
+		if (card.conditional) return `reaches ${pickLabel(card.for_pick, teams)}`;
 		return card.next_pick ? `still there at ${pickLabel(card.next_pick, teams)}` : 'your last pick';
 	});
 
