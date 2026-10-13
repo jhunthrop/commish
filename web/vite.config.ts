@@ -8,6 +8,10 @@ const NOT_FOUND = 404;
  * on its first response. The design system's CSS for a whole page sits well under it. */
 const INLINE_STYLE_LIMIT = 32_768;
 const PRERENDER_CONCURRENCY = 8;
+/** The board's own parts: the row, its head and cells, the tier strip, the rail's jump list and toggles.
+ * A player page never draws them, so they stay out of the shared chunk. */
+const BOARD_PARTS =
+	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|RangeBar)\.|site[\\/](BoardView|BoardPageView)\.)/;
 /** A component joins the shared chunk once this many routes use it. Fewer, and every page would
  * carry code only a couple of pages run. */
 const SHARED_BY_ROUTES = 4;
@@ -46,7 +50,12 @@ export default defineConfig({
 						{
 							name: 'shared',
 							test: (id: string) =>
-								/[\\/]src[\\/]lib[\\/]/.test(id) && !/[\\/]ui[\\/]system[\\/]/.test(id),
+								/[\\/]src[\\/]lib[\\/]/.test(id) &&
+								!/[\\/]ui[\\/]system[\\/]/.test(id) &&
+								// The sheet's store and sync load with the sheet pages, or on a reader's first
+								// intent elsewhere, never with every page.
+								!/[\\/]lib[\\/](sheet|api)[\\/]/.test(id) &&
+								!BOARD_PARTS.test(id),
 							minShareCount: SHARED_BY_ROUTES,
 							priority: 1
 						}

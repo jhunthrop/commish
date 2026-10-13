@@ -2,9 +2,8 @@
 	import { onMount } from 'svelte';
 	import { POSITION_NAMES, tierGroups } from '#lib/run/derive.ts';
 	import type { BoardPage } from '#lib/server/pages/board.ts';
-	import AddToSheet from '#lib/sheet/AddToSheet.svelte';
-	import SheetRail from '#lib/sheet/SheetRail.svelte';
-	import { sheetStore } from '#lib/sheet/store.svelte.ts';
+	import { lazySheet } from './lazy-sheet.svelte.ts';
+	import SheetAdd from './SheetAdd.svelte';
 	import BasisList from '#lib/ui/BasisList.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -32,15 +31,19 @@
 
 	let belowReplacement = $state(true);
 	let range = $state(true);
-	let onlySheet = $state(false);
+	let onlySheet = $state<boolean>(false);
 
-	onMount(() => {
-		sheetStore.load();
+	// The sheet loads on the reader's first intent, and at once when they ask for only their sheet.
+	onMount(() => lazySheet.armOnFirstIntent(window));
+	$effect(() => {
+		if (onlySheet) void lazySheet.load();
 	});
+
+	const Rail = $derived(lazySheet.parts?.Rail);
 
 	function shown(row: BoardRow): boolean {
 		if (!belowReplacement && row.vor < 0) return false;
-		return !onlySheet || sheetStore.has(row.id);
+		return !onlySheet || lazySheet.has(row.id);
 	}
 
 	const groups = $derived(page.position === null ? [] : tierGroups(page.rows, page.position));
@@ -69,7 +72,7 @@
 		eager={i < EAGER_ROWS}
 	>
 		{#snippet action()}
-			<AddToSheet
+			<SheetAdd
 				player={{
 					id: player.id,
 					name: player.name,
@@ -159,7 +162,6 @@
 				/>
 			</Panel>
 		{/if}
-		<SheetRail />
 		<Panel>
 			<PanelHead title="Show" />
 			<Toggle label="Players below replacement" bind:checked={belowReplacement} />
@@ -170,6 +172,8 @@
 			<PanelHead title="Basis" />
 			<BasisList terms={basisTerms} />
 		</Panel>
+		<!-- Last in the column, so the rail arriving with the sheet moves nothing above it. -->
+		{#if Rail}<Rail />{/if}
 	</aside>
 </main>
 

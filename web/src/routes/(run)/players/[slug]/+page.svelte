@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, plural, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
-	import AddToSheet from '#lib/sheet/AddToSheet.svelte';
+	import SheetAdd from '#lib/site/SheetAdd.svelte';
+	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
 	import Capsule from '#lib/ui/Capsule.svelte';
@@ -23,6 +25,8 @@
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	onMount(() => lazySheet.armOnFirstIntent(window));
 
 	const page = $derived(data.page);
 	const n = $derived(page.numbers);
@@ -84,7 +88,7 @@
 						n.expectedGames
 					)} expected games"
 				/>
-				<AddToSheet
+				<SheetAdd
 					player={{
 						id: page.id,
 						name: page.name,
