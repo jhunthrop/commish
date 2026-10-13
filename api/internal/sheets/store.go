@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -16,6 +17,7 @@ import (
 var (
 	ErrNotFound = errors.New("sheets: not found")
 	ErrTooMany  = errors.New("sheets: too many sheets")
+	ErrChanged  = errors.New("sheets: changed since read")
 )
 
 // Store reads and writes app.sheets and app.sheet_rows, every query
@@ -28,6 +30,17 @@ func scanSheet(row pgx.Row) (apitypes.Sheet, error) {
 	var s apitypes.Sheet
 	err := row.Scan(&s.Id, &s.Name, &s.Format, &s.RowCount, &s.CreatedAt, &s.UpdatedAt)
 	return s, err
+}
+
+const rowColumns = `player_id, name, position, team, headshot, rank, tier, tags, note`
+
+func scanRow(row pgx.Row) (apitypes.SheetRow, error) {
+	var x apitypes.SheetRow
+	err := row.Scan(&x.PlayerId, &x.Name, &x.Position, &x.Team, &x.Headshot, &x.Rank, &x.Tier, &x.Tags, &x.Note)
+	if x.Tags == nil {
+		x.Tags = apitypes.SheetTags{}
+	}
+	return x, err
 }
 
 // querier is a pool or a transaction.
@@ -62,16 +75,12 @@ func detail(ctx context.Context, q querier, accountID, id uuid.UUID) (apitypes.S
 	if err != nil {
 		return apitypes.SheetDetail{}, err
 	}
-	rows, err := q.Query(ctx, `select player_id, name, position, team, rank, tier, tag, note
+	rows, err := q.Query(ctx, `select `+rowColumns+`
 		from app.sheet_rows where sheet_id = $1 order by rank`, id)
 	if err != nil {
 		return apitypes.SheetDetail{}, err
 	}
-	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (apitypes.SheetRow, error) {
-		var x apitypes.SheetRow
-		err := r.Scan(&x.PlayerId, &x.Name, &x.Position, &x.Team, &x.Rank, &x.Tier, &x.Tag, &x.Note)
-		return x, err
-	})
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (apitypes.SheetRow, error) { return scanRow(r) })
 	if err != nil {
 		return apitypes.SheetDetail{}, err
 	}
@@ -154,38 +163,47 @@ func (s *Store) Delete(ctx context.Context, accountID, id uuid.UUID) error {
 }
 
 // lockOwned locks one of the account's sheets for a row write and
-// stamps it changed.
-func lockOwned(ctx context.Context, tx pgx.Tx, accountID, id uuid.UUID) error {
-	tag, err := tx.Exec(ctx, `update app.sheets set updated_at = now() where id = $1 and account_id = $2`, id, accountID)
+// stamps it changed. With ifUpdatedAt it writes only when the sheet is
+// as the writer last read it, and answers ErrChanged otherwise.
+func lockOwned(ctx context.Context, tx pgx.Tx, accountID, id uuid.UUID, ifUpdatedAt *time.Time) error {
+	tag, err := tx.Exec(ctx, `update app.sheets set updated_at = now()
+		where id = $1 and account_id = $2 and ($3::timestamptz is null or updated_at = $3)`, id, accountID, ifUpdatedAt)
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
+	if tag.RowsAffected() > 0 {
+		return nil
+	}
+	if ifUpdatedAt == nil {
 		return ErrNotFound
 	}
-	return nil
+	var exists bool
+	if err := tx.QueryRow(ctx, `select exists (select 1 from app.sheets where id = $1 and account_id = $2)`, id, accountID).Scan(&exists); err != nil {
+		return err
+	}
+	if exists {
+		return ErrChanged
+	}
+	return ErrNotFound
 }
 
 func insertRows(ctx context.Context, tx pgx.Tx, sheetID uuid.UUID, rows []apitypes.SheetRowInput) error {
 	_, err := tx.CopyFrom(ctx, pgx.Identifier{"app", "sheet_rows"},
-		[]string{"sheet_id", "player_id", "rank", "name", "position", "team", "tier", "tag", "note"},
+		[]string{"sheet_id", "player_id", "rank", "name", "position", "team", "headshot", "tier", "tags", "note"},
 		pgx.CopyFromSlice(len(rows), func(i int) ([]any, error) {
 			r := rows[i]
-			var tag *string
-			if r.Tag != nil {
-				t := string(*r.Tag)
-				tag = &t
-			}
-			return []any{sheetID, r.PlayerId, i + 1, r.Name, r.Position, r.Team, r.Tier, tag, r.Note}, nil
+			return []any{sheetID, r.PlayerId, i + 1, r.Name, r.Position, r.Team, r.Headshot, r.Tier, normalizeTags(r.Tags), r.Note}, nil
 		}))
 	return err
 }
 
-// ReplaceRows replaces every row, ranked by order from 1.
-func (s *Store) ReplaceRows(ctx context.Context, accountID, id uuid.UUID, rows []apitypes.SheetRowInput) (apitypes.SheetDetail, error) {
+// ReplaceRows replaces every row, ranked by order from 1. With
+// ifUpdatedAt it refuses with ErrChanged when the sheet has changed since
+// the writer read it.
+func (s *Store) ReplaceRows(ctx context.Context, accountID, id uuid.UUID, rows []apitypes.SheetRowInput, ifUpdatedAt *time.Time) (apitypes.SheetDetail, error) {
 	var out apitypes.SheetDetail
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		if err := lockOwned(ctx, tx, accountID, id); err != nil {
+		if err := lockOwned(ctx, tx, accountID, id, ifUpdatedAt); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `delete from app.sheet_rows where sheet_id = $1`, id); err != nil {
@@ -198,29 +216,23 @@ func (s *Store) ReplaceRows(ctx context.Context, accountID, id uuid.UUID, rows [
 		out = d
 		return err
 	})
-	if err != nil && !errors.Is(err, ErrNotFound) {
+	if err != nil && !errors.Is(err, ErrNotFound) && !errors.Is(err, ErrChanged) {
 		return out, fmt.Errorf("sheets: replace rows %s: %w", id, err)
 	}
 	return out, err
 }
 
-// UpdateRow sets one row's tier, tag and note.
+// UpdateRow sets one row's tier, tags and note.
 func (s *Store) UpdateRow(ctx context.Context, accountID, id uuid.UUID, playerID string, in apitypes.SheetRowUpdate) (apitypes.SheetRow, error) {
 	var out apitypes.SheetRow
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		if err := lockOwned(ctx, tx, accountID, id); err != nil {
+		if err := lockOwned(ctx, tx, accountID, id, nil); err != nil {
 			return err
 		}
-		var tag *string
-		if in.Tag != nil {
-			t := string(*in.Tag)
-			tag = &t
-		}
-		err := tx.QueryRow(ctx, `update app.sheet_rows set tier = $3, tag = $4, note = $5
+		row, err := scanRow(tx.QueryRow(ctx, `update app.sheet_rows set tier = $3, tags = $4, note = $5
 			where sheet_id = $1 and player_id = $2
-			returning player_id, name, position, team, rank, tier, tag, note`,
-			id, playerID, in.Tier, tag, in.Note).
-			Scan(&out.PlayerId, &out.Name, &out.Position, &out.Team, &out.Rank, &out.Tier, &out.Tag, &out.Note)
+			returning `+rowColumns, id, playerID, in.Tier, normalizeTags(&in.Tags), in.Note))
+		out = row
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}

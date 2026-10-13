@@ -2,10 +2,10 @@ package sheets
 
 import (
 	"context"
-
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -14,9 +14,9 @@ import (
 	"github.com/jhunthrop/commish/api/internal/httpx"
 )
 
-// maxImportBody bounds a CSV import: a full sheet with long notes is
-// well under it.
-const maxImportBody = 1 << 20
+// maxSheetBody bounds a CSV import and a whole-sheet JSON write: a full
+// sheet of 1,000 rows with long notes and faces is under it.
+const maxSheetBody = 1 << 20
 
 // Rate limits for the sheet routes. A drag sends the whole order, so
 // row writes allow a steady hand.
@@ -34,7 +34,7 @@ type Repository interface {
 	Create(ctx context.Context, accountID uuid.UUID, in apitypes.SheetCreate) (apitypes.SheetDetail, error)
 	Rename(ctx context.Context, accountID, id uuid.UUID, name string) (apitypes.Sheet, error)
 	Delete(ctx context.Context, accountID, id uuid.UUID) error
-	ReplaceRows(ctx context.Context, accountID, id uuid.UUID, rows []apitypes.SheetRowInput) (apitypes.SheetDetail, error)
+	ReplaceRows(ctx context.Context, accountID, id uuid.UUID, rows []apitypes.SheetRowInput, ifUpdatedAt *time.Time) (apitypes.SheetDetail, error)
 	UpdateRow(ctx context.Context, accountID, id uuid.UUID, playerID string, in apitypes.SheetRowUpdate) (apitypes.SheetRow, error)
 }
 
@@ -64,6 +64,8 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, op string, err er
 		httpx.WriteNotFound(w, r)
 	case errors.Is(err, ErrTooMany):
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "You have the most sheets allowed, delete one first", nil)
+	case errors.Is(err, ErrChanged):
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "This sheet changed on another device", nil)
 	default:
 		httpx.WriteInternal(w, r, h.Log, op, err)
 	}
@@ -84,7 +86,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	var in apitypes.SheetCreate
-	if !httpx.DecodeJSON(w, r, httpx.MaxLargeBody, &in) {
+	if !httpx.DecodeJSON(w, r, maxSheetBody, &in) {
 		return
 	}
 	errs := validateName(in.Name)
@@ -95,7 +97,9 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		errs["format"] = "Pick a board format"
 	}
 	if errs == nil && in.Rows != nil {
-		errs = validateRows(*in.Rows)
+		rows := normalizeRows(*in.Rows)
+		in.Rows = &rows
+		errs = validateRows(rows)
 	}
 	if errs != nil {
 		httpx.WriteInvalid(w, r, errs)
@@ -161,14 +165,15 @@ func (h *Handler) replaceRows(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in apitypes.SheetRowsReplace
-	if !httpx.DecodeJSON(w, r, httpx.MaxLargeBody, &in) {
+	if !httpx.DecodeJSON(w, r, maxSheetBody, &in) {
 		return
 	}
-	if errs := validateRows(in.Rows); errs != nil {
+	rows := normalizeRows(in.Rows)
+	if errs := validateRows(rows); errs != nil {
 		httpx.WriteInvalid(w, r, errs)
 		return
 	}
-	d, err := h.Store.ReplaceRows(r.Context(), auth.AccountID(r), id, in.Rows)
+	d, err := h.Store.ReplaceRows(r.Context(), auth.AccountID(r), id, rows, in.IfUpdatedAt)
 	if err != nil {
 		h.fail(w, r, "sheets: replace rows", err)
 		return
@@ -186,7 +191,8 @@ func (h *Handler) updateRow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	errs := map[string]string{}
-	validateAnnotations(errs, "", in.Tier, in.Tag, in.Note)
+	in.Tags = normalizeTags(&in.Tags)
+	validateAnnotations(errs, "", in.Tier, in.Tags, in.Note, ownTag())
 	if len(errs) > 0 {
 		httpx.WriteInvalid(w, r, errs)
 		return
@@ -204,7 +210,7 @@ func (h *Handler) importCSV(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rows, skipped, err := DecodeCSV(http.MaxBytesReader(w, r.Body, maxImportBody))
+	rows, skipped, err := DecodeCSV(http.MaxBytesReader(w, r.Body, maxSheetBody))
 	var tooLarge *http.MaxBytesError
 	switch {
 	case errors.As(err, &tooLarge):
@@ -217,7 +223,7 @@ func (h *Handler) importCSV(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, h.Log, "sheets: import", err)
 		return
 	}
-	d, err := h.Store.ReplaceRows(r.Context(), auth.AccountID(r), id, rows)
+	d, err := h.Store.ReplaceRows(r.Context(), auth.AccountID(r), id, rows, nil)
 	if err != nil {
 		h.fail(w, r, "sheets: import", err)
 		return

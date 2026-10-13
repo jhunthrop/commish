@@ -232,6 +232,7 @@ paths:
         "200": { $ref: "#/components/responses/SheetDetailResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
   /sheets/{id}/rows/{player_id}:
     parameters:
       - { $ref: "#/components/parameters/ID" }
@@ -263,8 +264,9 @@ paths:
       tags: [sheets]
       operationId: importSheet
       summary: >-
-        Replaces the rows from a CSV in the export's columns (rank, player_id, name, position, team, tier, tag,
-        note). rank and player_id and name and position are required. Rows are ordered by rank.
+        Replaces the rows from a CSV in the export's columns (rank, player_id, name, position, team, tier, tags,
+        note). rank and player_id and name and position are required. tags holds up to four tags separated by
+        commas, bars or semicolons, and a header named tag is read as tags. Rows are ordered by rank.
       security: [{ session: [] }]
       requestBody:
         required: true
@@ -788,7 +790,16 @@ components:
 
     SheetTag:
       type: string
+      description: The fixed tags. A row's tags may also hold the drafter's own words (SheetTags).
       enum: [target, sleeper, breakout, avoid, injury, handcuff]
+    SheetTags:
+      type: array
+      description: >-
+        Up to four tags, each one of the fixed SheetTag values or the drafter's own word: 1 to 20 letters, digits,
+        spaces, apostrophes, periods or hyphens, starting with a letter or digit. A word that matches a fixed tag in
+        any case is stored as the fixed tag. No tag appears twice in any case.
+      maxItems: 4
+      items: { type: string, minLength: 1, maxLength: 20 }
     Sheet:
       type: object
       required: [id, name, format, row_count, created_at, updated_at]
@@ -801,17 +812,16 @@ components:
         updated_at: { type: string, format: date-time }
     SheetRow:
       type: object
-      required: [player_id, name, position, team, rank, tier, tag, note]
+      required: [player_id, name, position, team, headshot, rank, tier, tags, note]
       properties:
         player_id: { type: string }
         name: { type: string }
         position: { type: string }
         team: { type: string, nullable: true }
+        headshot: { type: string, nullable: true, description: the face the drafter saw when the row was added }
         rank: { type: integer }
         tier: { type: integer, nullable: true }
-        tag:
-          nullable: true
-          allOf: [{ $ref: "#/components/schemas/SheetTag" }]
+        tags: { $ref: "#/components/schemas/SheetTags" }
         note: { type: string, nullable: true }
     SheetDetail:
       allOf:
@@ -830,10 +840,9 @@ components:
         name: { type: string, minLength: 1, maxLength: 80 }
         position: { type: string, minLength: 1, maxLength: 8 }
         team: { type: string, nullable: true, maxLength: 8 }
+        headshot: { type: string, nullable: true, minLength: 9, maxLength: 300, description: an https URL }
         tier: { type: integer, nullable: true, minimum: 1, maximum: 50 }
-        tag:
-          nullable: true
-          allOf: [{ $ref: "#/components/schemas/SheetTag" }]
+        tags: { $ref: "#/components/schemas/SheetTags" }
         note: { type: string, nullable: true, maxLength: 500 }
     SheetCreate:
       type: object
@@ -858,14 +867,19 @@ components:
           type: array
           maxItems: 1000
           items: { $ref: "#/components/schemas/SheetRowInput" }
+        if_updated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            The sheet's updated_at as the writer last read it. When given and the sheet has changed since, nothing
+            is written and the answer is 409 conflict, so a second device never overwrites the first unseen.
     SheetRowUpdate:
       type: object
-      required: [tier, tag, note]
+      required: [tier, tags, note]
       properties:
         tier: { type: integer, nullable: true, minimum: 1, maximum: 50 }
-        tag:
-          nullable: true
-          allOf: [{ $ref: "#/components/schemas/SheetTag" }]
+        tags: { $ref: "#/components/schemas/SheetTags" }
         note: { type: string, nullable: true, maxLength: 500 }
     ImportSkip:
       type: object

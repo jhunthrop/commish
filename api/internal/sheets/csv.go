@@ -16,8 +16,12 @@ import (
 
 // Columns is the CSV's header, the export's and the import's.
 func Columns() []string {
-	return []string{"rank", "player_id", "name", "position", "team", "tier", "tag", "note"}
+	return []string{"rank", "player_id", "name", "position", "team", "tier", "tags", "note"}
 }
+
+// headerAliases are other names an import reads as one of Columns: the
+// single tag column this file had before tags became a list.
+func headerAliases() map[string]string { return map[string]string{"tag": "tags"} }
 
 // byteOrderMark is what a spreadsheet often writes before the header.
 const byteOrderMark = "\uFEFF"
@@ -63,7 +67,7 @@ func EncodeCSV(d apitypes.SheetDetail) ([]byte, error) {
 			strconv.Itoa(r.Rank), defuse(r.PlayerId), defuse(r.Name), defuse(r.Position),
 			defuse(deref(r.Team, func(s string) string { return s })),
 			deref(r.Tier, strconv.Itoa),
-			deref(r.Tag, func(t apitypes.SheetTag) string { return string(t) }),
+			defuse(joinTagCell(r.Tags)),
 			defuse(deref(r.Note, func(s string) string { return s })),
 		}
 		if err := w.Write(rec); err != nil {
@@ -103,8 +107,15 @@ func DecodeCSV(r io.Reader) ([]apitypes.SheetRowInput, []apitypes.ImportSkip, er
 		return nil, nil, fmt.Errorf("sheets: read csv: %w", err)
 	}
 	col := map[string]int{}
+	aliases := headerAliases()
 	for i, h := range header {
-		col[strings.ToLower(strings.TrimSpace(strings.TrimPrefix(h, byteOrderMark)))] = i
+		name := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(h, byteOrderMark)))
+		if canonical, ok := aliases[name]; ok {
+			name = canonical
+		}
+		if _, taken := col[name]; !taken {
+			col[name] = i
+		}
 	}
 	for _, c := range requiredColumns() {
 		if _, ok := col[c]; !ok {
@@ -182,10 +193,9 @@ func decodeRecord(rec []string, col map[string]int) (ranked, string) {
 		}
 		row.Tier = &t
 	}
-	if v := field(rec, col, "tag"); v != "" {
-		t := apitypes.SheetTag(strings.ToLower(v))
-		row.Tag = &t
-	}
+	cell := splitTagCell(field(rec, col, "tags"))
+	tags := normalizeTags(&cell)
+	row.Tags = &tags
 	if errs := validateRows([]apitypes.SheetRowInput{row}); errs != nil {
 		first := slices.Min(slices.Collect(maps.Keys(errs)))
 		return ranked{}, fmt.Sprintf("%s: %s", strings.TrimPrefix(first, "rows.0."), errs[first])
