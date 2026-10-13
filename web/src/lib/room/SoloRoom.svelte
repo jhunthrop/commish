@@ -107,6 +107,12 @@
 	/** The pick the drafter just drafted at, until the room moves past it. */
 	let draftedAt = $state<number | null>(null);
 	const inFlight = $derived(busy && draftedAt === room.pick_number);
+	/** Nobody picks between this turn and the one before it, or, with a pick in flight, between it and
+	 * the next: the strip's place is one line, not a block. The reserve changes as Enter is pressed, so
+	 * the next turn's arrival moves nothing. */
+	const straight = $derived(
+		inFlight ? next === room.pick_number + 1 : prev !== null && prev === room.pick_number - 1
+	);
 	/** No call is coming for this turn: the room never waits on it, Enter drafts from the pool. */
 	const noCall = $derived(
 		callMissing && !readonly && room.status === 'active' && room.waiting && !call && !inFlight
@@ -241,9 +247,10 @@
 	<LiveRegion words={notice ?? ''} />
 	{#if lastMine !== null || inFlight}
 		<!-- Once the first turn has passed, the strip's place is held, so its arrival after a pick never
-		     pushes the call down. -->
-		<div class="since">
-			{#if room.waiting && went.length > 0}
+		     pushes the call down: a strip's height, or one line when the next turn comes straight
+		     back. -->
+		<div class="since" class:straight>
+			{#if room.waiting}
 				<SinceStrip since={prev} {went} {teams} {whose} />
 			{/if}
 		</div>
@@ -341,6 +348,10 @@
 	/* The strip's panel: its strip and the panel's two borders. */
 	.since {
 		min-block-size: calc(var(--pick-strip-h) + 2px);
+	}
+
+	.since.straight {
+		min-block-size: calc(var(--pick-line-h) + 2px);
 	}
 
 	.notice {
