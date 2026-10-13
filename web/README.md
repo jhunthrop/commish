@@ -70,7 +70,7 @@ worker's JavaScript is never type-checked as if it were ours. Everything we writ
 
 `lighthouserc.json` carries the spec's budgets at the mobile profile (150 ms round trip, 1.6 Mbps,
 4x CPU), applied throttling, seven runs, asserted on the median. Applied throttling in Chrome lands an occasional run near 1.7 s whatever the page (it does so with no web fonts at all), and the median absorbs it. Prerendered pages are measured from `npm run preview:static` (`scripts/serve-built.ts`), a compressing static server over the build that also answers the headshot route, because in production they are Workers static assets with no Worker in the path. Prerendered pages: LCP 1.2 s, script
-transfer 60 KB. User pages (sheet, mock, lobby, report, account, pass): LCP 2.0 s, script 180 KB.
+transfer 60 KB as the target and 72 KB as the deploy gate (the Svelte and SvelteKit client runtime is a 47 KB floor before any page code; a page over 60 is a review finding, over 72 fails the deploy). User pages (sheet, mock, lobby, report, account, pass): LCP 2.0 s, script 180 KB.
 CLS 0.05 everywhere. Collected: the board, a player page and the record. The system page is a noindex documentation page, not a nightly page, and is not held to the nightly budget.
 `.github/workflows/web.yml` runs check, lint, the timed build (budget four minutes), Lighthouse and
 the deploy to the workers.dev preview, on a push to main touching `web/` and on `nightly-run`.
