@@ -55,7 +55,9 @@
 
 	async function choose(slot: Slot, entry: Pick<IndexEntry, 'id'>): Promise<void> {
 		try {
-			chosen = { ...chosen, [slot]: await fetchPlayer(entry.id) };
+			// Fetched before the spread, so a second pick landing first is never overwritten.
+			const loaded = await fetchPlayer(entry.id);
+			chosen = { ...chosen, [slot]: loaded };
 			syncUrl();
 		} catch {
 			failed = true;
