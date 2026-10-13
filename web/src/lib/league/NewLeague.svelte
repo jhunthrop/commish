@@ -20,7 +20,7 @@
 	import FFPCLeagues from '#lib/hosts/FFPCLeagues.svelte';
 	import { ffpcOpen, hostsApi, type HostLeague } from '#lib/hosts/api.ts';
 	import { ApiError, leagueApi, type AttachPreview, type AttachedLeague } from './api.ts';
-	import { HOSTS_LINE, hostWords } from './model.ts';
+	import { hostWords, hostsLine } from './model.ts';
 
 	/** Attach a league: paste its link, say which team is yours (a tap on it, or a Sleeper username),
 	 * one verb. The league is read as soon as the link is pasted, so the teams are there to tap. */
@@ -162,7 +162,7 @@
 				We keep your roster, this week's matchup and every player nobody in your league holds up to
 				date, on our board. Free.
 			</p>
-			<p class="hosts">{HOSTS_LINE}</p>
+			<p class="hosts">{hostsLine(ffpcOn)}</p>
 			{#if ffpcOn}
 				<ChipGroup label="Your league is on">
 					<Chip pressed={way === 'link'} onclick={() => (way = 'link')}
