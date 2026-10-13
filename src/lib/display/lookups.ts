@@ -1,5 +1,5 @@
 import type { TeamCard } from "@/domain/league";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 
 /**
  * The one place any room turns a `teamId`/`playerId` into the human it names. Both the draft

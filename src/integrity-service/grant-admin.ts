@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { users } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { attachAuditEvent, notifyAffectedMember } from "./notify";
 import { getAuditLogger, type AuditLogger } from "./audit-logger";
 

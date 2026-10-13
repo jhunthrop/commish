@@ -1,15 +1,15 @@
 import { and, asc, eq, gt, inArray, isNotNull, isNull, notLike, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import { drafts, leagues, scoringSettings, seatHolds, teams } from "@/db/schema";
 import type { DraftFormat } from "@/domain/league";
-import type { RosterSlotConfig } from "@/domain/roster";
-import type { Clock } from "@/domain/timing";
+import type { RosterSlotConfig } from "@research-ts/domain/roster";
+import type { Clock } from "@research-ts/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import { envOrUndefined } from "@/lib/env";
+import { envOrUndefined } from "@research-ts/lib/env";
 import { describeRosterShape, formatDraftTime, LEAGUE_CONFIG } from "@/league";
-import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
+import { ROSTER_SHAPE_LABEL } from "@research-ts/domain/roster";
 import { houseKickoffStillAhead } from "./house-factory";
 import { FIXTURE_LEAGUE_NAME_PREFIXES } from "@/matchmaking/fixtures";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
@@ -17,7 +17,7 @@ import type { BrowseBody, BrowseFilter, PublicLeagueSummary } from "@/matchmakin
 import type { HouseRungName } from "@/matchmaking/house-catalog";
 import type { PrizeTable } from "@/money/prize-table";
 import { compositionCategoryFor, tierCompositionFor } from "@/participation/composition";
-import { describeScoring, type ScoringRules } from "@/scoring";
+import { describeScoring, type ScoringRules } from "@research-ts/scoring";
 
 /**
  * D1 (storefront review; flow analysis J04) — THE ONE SHARED PREDICATE that keeps a seeded or
@@ -108,7 +108,7 @@ const PLAYOFF_WEEKS: readonly number[] = Array.from(
 
 /**
  * "15 slots, 1 flex" / "16 slots, 2 flex, superflex" — `PublicLeagueSummary.rosterSummary`'s own
- * derivation, through the existing `describeRosterShape` (`@/league/roster-shape`). The flex
+ * derivation, through the existing `describeRosterShape` (`@research-ts/domain/roster-shape`). The flex
  * count folds `FLEX` and `SUPERFLEX` together (a superflex league's second flex-like slot is
  * still a flex-like slot to a stranger deciding whether to join), and the shape clause is only
  * ever appended for a genuinely superflex league — "Custom" (a commissioner-edited shape) adds
@@ -309,7 +309,7 @@ export function browseQuery(db: Db, filter: BrowseFilter, options: BrowseQueryOp
       filledTeams: sql<number>`count(${teams.id})::int`,
       // A plain column, not an aggregate. Postgres accepts an ungrouped column only when the
       // `GROUP BY` covers ITS OWN table's primary key, so `drafts.id` joins `leagues.id` in the
-      // `groupBy` below — `drafts_league_id_idx` (`@/db/schema`) makes that a no-op on
+      // `groupBy` below — `drafts_league_id_idx` (`@research-ts/db/schema`) makes that a no-op on
       // cardinality (still exactly one draft row per league), purely a functional-dependency
       // proof for the planner.
       kickoffAt: drafts.kickoffAt,

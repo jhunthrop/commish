@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Position } from "@/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import { positionStickerClass } from "./position-badge";
 
 export interface StickerProps {

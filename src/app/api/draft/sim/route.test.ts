@@ -7,12 +7,14 @@ vi.hoisted(() => {
 
 vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn() }));
 
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { leagues, nflPlayers, playerCrosswalk, players, preseasonProjections, teams, users } from "@/db/schema";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@research-ts/db/schema";
+import { leagues, teams, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@research-ts/domain/roster";
+import { BOARD_SOURCE } from "@research-ts/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
 import { GET, POST } from "./route";
 
 const db = createTestDb();

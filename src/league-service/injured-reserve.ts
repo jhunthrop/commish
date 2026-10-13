@@ -1,12 +1,13 @@
 import { and, eq, sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
-import { injuredReserve, leagues, lineupSlots, players, rosterSlots, statWeeks, teams } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Db } from "@research-ts/db/client";
+import { players, statWeeks } from "@research-ts/db/schema";
+import { injuredReserve, leagues, lineupSlots, rosterSlots, teams } from "@/db/schema";
+import type { Clock } from "@research-ts/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { isLineupLocked } from "@/league";
 import { assignSlot } from "@/draft-engine";
 import { notInArray } from "drizzle-orm";
-import { IR_ELIGIBLE_DESIGNATIONS, injuryDesignations } from "./injuries";
+import { IR_ELIGIBLE_DESIGNATIONS, injuryDesignations } from "@research-ts/reference/injuries";
 import { toFilledRosterSlots } from "./trade-transfer";
 
 /** One IR spot per team — the incumbent default this engine matches (roadmap item 3). */

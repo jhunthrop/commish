@@ -30,7 +30,8 @@ vi.mock("@/money/states", async (importOriginal) => {
 });
 
 import { users } from "@/db/schema";
-import { createTestDb, truncateAll, truncateMoneyTables } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll, truncateMoneyTables } from "@/db/test-db";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { expectNoDepositTookPlace, expectNoPostingTookPlace } from "@/money-service/test-support";
 import { MONEY_CONFIG, MONEY_REFUSALS } from "@/money/config";

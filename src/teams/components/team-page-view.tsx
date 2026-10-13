@@ -1,4 +1,4 @@
-import { FANTASY_PLAYOFF_WEEKS } from "@/capsules/facts/schedule";
+import { FANTASY_PLAYOFF_WEEKS } from "@research-ts/capsules/facts/schedule";
 import type { TeamPageData } from "../contract";
 import { CoachesSection } from "./coaches-section";
 import { CompetitionSection } from "./competition-section";

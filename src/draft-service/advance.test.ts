@@ -1,9 +1,11 @@
 import { asc, eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions, drafts, players } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
-import type { DraftAction } from "@/domain/draft";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players } from "@research-ts/db/schema";
+import { draftActions, drafts } from "@/db/schema";
+import type { Clock } from "@research-ts/domain/timing";
+import type { DraftAction } from "@research-ts/domain/draft";
 import { createMockBotDriver, type MockBotDriver } from "@/mock-draft-service/driver";
 import { createDraftAdvancer, type DraftAdvancer } from "./advance";
 import { createDraftStore, type DraftStore } from "./store";

@@ -1,5 +1,5 @@
 import { asc, eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db } from "@research-ts/db/client";
 import type { TeamCard } from "@/domain/league";
 import { leagues, teams, users } from "@/db/schema";
 

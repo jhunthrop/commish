@@ -1,8 +1,9 @@
 import { and, eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
-import type { RosterSlotConfig } from "@/domain/roster";
-import type { ScoringPresetName } from "@/domain/scoring";
-import { drafts, lineupSlots, matchups, players, playerStatLines, rosterSlots, statWeeks, teams, users } from "@/db/schema";
+import type { Db } from "@research-ts/db/client";
+import type { RosterSlotConfig } from "@research-ts/domain/roster";
+import type { ScoringPresetName } from "@research-ts/domain/scoring";
+import { players, playerStatLines, statWeeks } from "@research-ts/db/schema";
+import { drafts, lineupSlots, matchups, rosterSlots, teams, users } from "@/db/schema";
 import { acceptTrade } from "./trades";
 import { createLeague } from "./creation";
 import { writeSchedule } from "./schedule";

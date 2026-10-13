@@ -1,5 +1,5 @@
-import type { Db } from "@/db/client";
-import type { Clock } from "@/domain/timing";
+import type { Db } from "@research-ts/db/client";
+import type { Clock } from "@research-ts/domain/timing";
 import { BOOTSTRAP_ACTOR, grantAdmin, type GrantAdminResult } from "@/integrity-service/grant-admin";
 import { DEV_SEED } from "./config";
 

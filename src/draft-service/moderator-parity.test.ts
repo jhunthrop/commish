@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { players } from "@/db/schema";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players } from "@research-ts/db/schema";
 import type { LlmClient } from "@/lib/llm/client";
 import { createDraftStore } from "./store";
 import { createDraftAdvancer } from "./advance";

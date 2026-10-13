@@ -1,4 +1,4 @@
-import type { PlayerFactsSchedule } from "@/capsules/facts/types";
+import type { PlayerFactsSchedule } from "@research-ts/capsules/facts/types";
 import { Table, type TableColumn } from "@/components/ui";
 import { formatFixture } from "./format";
 import { Section } from "./section";

@@ -1,14 +1,15 @@
 import { eq } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
-import { nflPlayers, players, scoringSettings } from "@/db/schema";
-import type { Position } from "@/domain/player";
-import { PPR_SCORING } from "@/domain/scoring";
+import type { Db, DbTx } from "@research-ts/db/client";
+import { nflPlayers, players } from "@research-ts/db/schema";
+import { scoringSettings } from "@/db/schema";
+import type { Position } from "@research-ts/domain/player";
+import { PPR_SCORING } from "@research-ts/domain/scoring";
 import type { PlayerHistoryBody, PlayerSeasonSummary, PlayerWeekPoints } from "@/draft-room/contract";
-import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
-import { nflPlayerIdsFor } from "@/projections/crosswalk";
-import type { SeasonStatLine } from "@/projections/lines";
-import { statLinesAsOfForLiveSurface } from "@/projections/nflverse/derived-stat-lines";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { computeFantasyPoints, roundPoints, type ScoringRules } from "@research-ts/scoring";
+import { nflPlayerIdsFor } from "@research-ts/projections/crosswalk";
+import type { SeasonStatLine } from "@research-ts/projections/lines";
+import { statLinesAsOfForLiveSurface } from "@research-ts/projections/nflverse/derived-stat-lines";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
 
 /** How many finished seasons the peek card looks back over — the mock's own three. */
 const HISTORY_SEASONS = 3;

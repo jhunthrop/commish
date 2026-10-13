@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { ok, parseJson } from "@/lib/api/respond";
 import { createSheet, listSheets } from "@/draft-hq/sheet/service";
 import { createSheetSchema } from "@/draft-hq/sheet/schemas";

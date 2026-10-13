@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, drafts, memberNotices, players, teams, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import type { RosterSlotConfig } from "@/domain/roster";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players } from "@research-ts/db/schema";
+import { auditEvents, drafts, memberNotices, teams, users } from "@/db/schema";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
+import type { RosterSlotConfig } from "@research-ts/domain/roster";
 import { clockTierFor } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { autoStartDueDrafts } from "@/draft-service/auto-start";

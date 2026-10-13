@@ -10,7 +10,8 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { drafts, leagues, teams, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { requireAdmin } from "@/lib/auth/current-user";
 import { SETTLEMENT_REFUSALS } from "@/money-service/settlement";
 import type { PrizeTable } from "@/money/prize-table";

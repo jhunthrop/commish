@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
 import { PublicBar, STOREFRONT_NAV } from "@/components/app-shell/public-bar";

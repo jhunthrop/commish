@@ -1,11 +1,13 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { buildPeekDocument } from "@/capsules/peek-document";
-import type { Db } from "@/db/client";
-import { drafts, leagues, matchups, playerPeekDocuments, players, rosterSlots, teams, users, weeks } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { buildPeekDocument } from "@/league-service/peek/peek-document";
+import type { Db } from "@research-ts/db/client";
+import { players } from "@research-ts/db/schema";
+import { drafts, leagues, matchups, playerPeekDocuments, rosterSlots, teams, users, weeks } from "@/db/schema";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { BOARD_SOURCE } from "@research-ts/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
 import { createLeague } from "./creation";
 import { playerSeason } from "./player";
 

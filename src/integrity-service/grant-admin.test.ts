@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { auditEvents, memberNotices, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { createAuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
 import { BOOTSTRAP_ACTOR, grantAdmin } from "./grant-admin";

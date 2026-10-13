@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import type { KycProviderHarness } from "../kyc-contract-suite";
 import { runKycProviderContractSuite } from "../kyc-contract-suite";
 import { createMockKycProvider, MOCK_KYC_CONFIG, type MockKycProvider } from "./mock-kyc-provider";

@@ -17,16 +17,16 @@
 // TERMINAL VS RETRYABLE: a payload that does not parse dead-letters through the contract's own
 // terminal path, since no retry makes a malformed row parse. Everything the build itself can throw
 // is ordinary database weather and retries, exactly like every other data job here.
-import type { Db, DbTx } from "@/db/client";
-import { writePeekDocuments } from "@/capsules/peek-document-store";
+import type { Db, DbTx } from "@research-ts/db/client";
+import { writePeekDocuments } from "@/league-service/peek/peek-document-store";
 import type { JsonObject } from "@/domain/audit";
-import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
-import type { Clock } from "@/domain/timing";
+import { PPR_SCORING, type ScoringSettings } from "@research-ts/domain/scoring";
+import type { Clock } from "@research-ts/domain/timing";
 import { eq } from "drizzle-orm";
 import { leagues, scoringSettings } from "@/db/schema";
 import { backfillLeagueScoringHashes, scoringHashesInUse } from "@/league-service/scoring-hash";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import type { ScoringRules } from "@/scoring";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
+import type { ScoringRules } from "@research-ts/scoring";
 import { enqueueJob } from "../store";
 import { defineJob, TerminalJobError, type AnyJobDefinition, type StepOutcome } from "../contract";
 

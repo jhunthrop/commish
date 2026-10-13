@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import type { FreeAgentRow, PendingWaiverClaim } from "@/league-service/claims-contract";
-import type { FixtureLabel } from "@/league-service/nfl-schedule";
+import type { FixtureLabel } from "@research-ts/reference/nfl-schedule";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { RoomSurfacePlayers } from "./room-surface-players";

@@ -32,7 +32,7 @@
 // resolves `trade_hold` flags the world already answered, and does nothing else — see
 // `src/integrity/flag-only.test.ts` for the proof that no code path reachable from here can
 // reverse a trade, suspend an account, or touch either manager's roster.
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { sweepSupersededHoldFlags, sweepUnflaggedTrades } from "@/integrity-service/trade-fairness";
 
 const USAGE = "Usage: npm run trades:sweep -- [--league <leagueId>]";

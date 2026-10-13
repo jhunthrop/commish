@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { CompletedPick } from "@/draft-engine";
 import { magnitudeStep } from "@/components/ui/stat";
 import { DRAFT_ROOM_CONFIG } from "../state/config";

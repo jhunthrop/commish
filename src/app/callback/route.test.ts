@@ -20,7 +20,7 @@ vi.mock("@workos-inc/authkit-nextjs", () => ({
 // Never called by `onError` itself, but imported at module scope by `route.ts` — mocked so
 // importing the module has no real side effect (no request context, no database).
 vi.mock("next/headers", () => ({ headers: vi.fn() }));
-vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
+vi.mock("@research-ts/db/client", () => ({ getDb: vi.fn() }));
 vi.mock("@/lib/auth/user-sync", () => ({ syncUserFromWorkOS: vi.fn() }));
 
 import "./route";

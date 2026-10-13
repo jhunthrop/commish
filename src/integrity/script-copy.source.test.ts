@@ -18,7 +18,7 @@ import { consoleCopyIn, sourceFilesIn } from "./test-support";
  */
 const REPO_ROOT = process.cwd();
 
-const files = sourceFilesIn(["scripts"], ".ts");
+const files = sourceFilesIn(["scripts", "research-ts/scripts"], ".ts");
 
 describe("operator scripts print in the house voice", () => {
   it("finds the scripts to sweep, so an empty scan can never pass silently", () => {

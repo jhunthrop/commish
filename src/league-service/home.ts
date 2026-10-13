@@ -1,12 +1,13 @@
 import { desc, inArray } from "drizzle-orm";
-import type { Db } from "@/db/client";
-import { lineupSlots, matchups, statWeeks, weeks } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Db } from "@research-ts/db/client";
+import { statWeeks } from "@research-ts/db/schema";
+import { lineupSlots, matchups, weeks } from "@/db/schema";
+import type { Clock } from "@research-ts/domain/timing";
 import { computeStandings, LEAGUE_CONFIG, nextAction, relativeDraftTime, seasonProgress, type WeekStatus } from "@/league";
 import type { HomeBody, HomeLeagueCard, LeagueMemberFace, LiveState, MatchupSummary } from "@/league-room/contract";
 import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
 import type { ScoreCache, ScoreCacheBatchRequest } from "@/stats-pipeline/score-cache";
-import { describeScoring } from "@/scoring";
+import { describeScoring } from "@research-ts/scoring";
 import { isCommissionerOf } from "./authority";
 import { scoringWeightsByLeagueId } from "./browse";
 import { draftSlotsForSeats, slotFactsFor } from "./draft-slots-overview";

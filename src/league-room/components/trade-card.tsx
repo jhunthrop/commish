@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { BigNumber, Button, EYEBROW, Manager, MessageBubble, Modal, PlayerRow, PositionBadge } from "@/components/ui";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import { describeAsset, type TradeAsset } from "@/trades/assets";
 import { TRADE_CONFIG } from "@/trades/config";
 import type { TradeProposalView, TradeSideView } from "@/trades/contract";

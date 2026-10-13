@@ -1,7 +1,7 @@
 import { and, asc, eq, lte, sql } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research-ts/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { ENFORCED_LEAGUE_SQL, enforcementIsSwitchedOn } from "@/league-service/enforcement";
 import { rollDueDrafts } from "@/league-service/roll";
 import { DRAFT_SERVICE_CONFIG } from "./config";
@@ -91,7 +91,7 @@ export interface AutoStartDeps {
 
 /**
  * `drafts` where `status = 'scheduled' AND kickoff_at <= now`, joined to `leagues` on
- * `is_public_matchmade` — served by `drafts_status_idx` (`@/db/schema`), the expiry scan's own
+ * `is_public_matchmade` — served by `drafts_status_idx` (`@research-ts/db/schema`), the expiry scan's own
  * index and this scan's second reader (measured over a realistic corpus,
  * `src/db/index-plans.test.ts`'s "auto-start's due-kickoff scan" — review fix round 1, F3).
  * Ordered by `id` for the same determinism reason the expiry scan is, and bounded by

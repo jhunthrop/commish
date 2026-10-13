@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { ButtonLink, ErrorState, PageTitle } from "@/components/ui";
 import { mockRoomSummary } from "@/mock-draft-service/lobby";

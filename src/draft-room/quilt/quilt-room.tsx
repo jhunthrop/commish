@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import type { Player } from "@/domain/player";
-import type { BoardReason } from "@/projections/preseason/board";
+import type { Player } from "@research-ts/domain/player";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
 import { useToast } from "@/components/ui";
 import { useMediaQuery } from "@/design/use-media-query";
 import { sharePercent } from "../advisor/format";

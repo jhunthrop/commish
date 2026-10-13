@@ -2,8 +2,8 @@
 
 import type { ReactNode } from "react";
 import type { TeamCard } from "@/domain/league";
-import type { Player, Position } from "@/domain/player";
-import type { RosterSlotType } from "@/domain/roster";
+import type { Player, Position } from "@research-ts/domain/player";
+import type { RosterSlotType } from "@research-ts/domain/roster";
 import type { DraftStateView } from "@/draft-engine";
 import { Avatar, Button, EYEBROW, LowerThird, PositionBadge, SlotChip, type LowerThirdCell } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";

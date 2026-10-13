@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { drafts, leagues, seatHolds, teams, users } from "@/db/schema";
 import { SEAT_HOLD, SEAT_HOLD_REFUSALS } from "@/matchmaking/seat-hold";
 import { joinPublicLeague, returnFromSignIn } from "./join";

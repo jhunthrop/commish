@@ -4,16 +4,16 @@
  *
  * THE BUG THIS EXISTS TO CLOSE (founder, 2026-09-05): the Simulator's "realistic best available"
  * named a quarterback at nearly every pick, because the sim read the stored board rank, which
- * `@/projections/preseason/board.ts` documents as a rank BY PROJECTED POINTS. Everyone starts one
+ * `@research-ts/projections/preseason/board` documents as a rank BY PROJECTED POINTS. Everyone starts one
  * quarterback and the twelfth scores close to the first, so points crown them and value does not.
- * `@/draft-hq/board/service.ts`'s `boardRows` already ran `valueBoardIndexed` for exactly this
+ * `@research-ts/board/service`'s `boardRows` already ran `valueBoardIndexed` for exactly this
  * reason; this module is the same read for the sim, so the two surfaces cannot disagree.
  *
  * Pure, and shape-parameterized rather than shape-defaulted: a rank is only true under the league
  * it was measured in, so the caller hands in the shape it is simulating.
  */
-import { compareBoardOrder } from "@/projections/decide/board-order-compare";
-import { valueBoardIndexed, type LeagueShape } from "@/projections/decide/replacement";
+import { compareBoardOrder } from "@research-ts/projections/decide/board-order-compare";
+import { valueBoardIndexed, type LeagueShape } from "@research-ts/projections/decide/replacement";
 import type { SimPlayerEvidence } from "./types";
 
 /**

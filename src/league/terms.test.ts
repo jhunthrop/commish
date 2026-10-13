@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { SCORING_PRESETS } from "@/domain/scoring";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { SCORING_PRESETS } from "@research-ts/domain/scoring";
+import { STANDARD_ROSTER_SLOTS } from "@research-ts/domain/roster";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
-import { SUPERFLEX_ROSTER_SLOTS } from "./roster-shape";
+import { SUPERFLEX_ROSTER_SLOTS } from "@research-ts/domain/roster-shape";
 import { formatDraftTime, leagueTerms, type LeagueTermsInput } from "./terms";
 
 /** A small custom roster shape — distinct from `STANDARD_ROSTER_SLOTS` so a test that swaps one

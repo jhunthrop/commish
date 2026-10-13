@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
-import type { PlayerCapsuleView } from "@/capsules/store";
-import { TEMPLATE_CAPSULE_NOTE } from "@/capsules/template";
+import type { PlayerCapsuleView } from "@research-ts/capsules/store";
+import { TEMPLATE_CAPSULE_NOTE } from "@research-ts/capsules/template";
 import { ReadCard } from "./read-card";
 
 const LLM: PlayerCapsuleView = { bodyCompact: "The short version.", bodyFull: "The long, uncapped version.", source: "llm", narrative: null };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { groupReasons } from "@/league-room/outlook/groups";
-import type { BoardReason } from "@/projections/preseason/board";
+import { groupReasons } from "@research-ts/capsules/outlook/groups";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
 import { strongestEvidenceSentence, tierBandLabel, tierBandSentence, vsMarketLabel } from "./copy";
 
 describe("vsMarketLabel", () => {

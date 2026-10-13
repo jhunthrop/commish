@@ -8,16 +8,17 @@
  * live room does — one function, never a second implementation of "what the advisor says".
  */
 import { SURVIVAL_BANDS } from "@/domain/draft-odds";
-import { restrictedPositions } from "@/domain/roster-eligibility";
+import { restrictedPositions } from "@research-ts/domain/roster-eligibility";
 import { assignSlot, rosterFor, teamOnClock, type DraftState } from "@/draft-engine";
-import type { Recommendation } from "@/projections/decide/draft";
-import type { LeagueShape } from "@/projections/decide/replacement";
+import type { Recommendation } from "@research-ts/projections/decide/draft";
+import type { LeagueShape } from "@research-ts/projections/decide/replacement";
 import { seatsAheadFor, survivalFor, type RoomOddsTable, type SeatSurvival } from "../sim/room-odds";
 import { ADVISOR_CONFIG } from "./config";
 import { askingWindow, recommendNow, type ValuedEntry } from "./recommend";
 import { detectRun } from "./signals";
-import type { AdvisorView, Candidate, NextPick, OddsCell, PositionRun, SurvivalOdds, TierCollapse, TierStandingView } from "./view";
-import { buildWhy } from "./why";
+import type { AdvisorView, Candidate, NextPick, OddsCell, SurvivalOdds, TierCollapse, TierStandingView } from "./view";
+import type { PositionRun } from "@research-ts/advisor/why";
+import { buildWhy } from "@research-ts/advisor/why";
 
 export interface AdvisorCoreInput {
   readonly state: DraftState;

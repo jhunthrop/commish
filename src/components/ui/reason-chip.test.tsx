@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import type { Law } from "@/projections/laws/types";
-import type { BoardReason } from "@/projections/preseason/board";
-import { discoveredHeadline, lawHeadline, ReasonChip, strongestLawReasons } from "./reason-chip";
+import type { Law } from "@research-ts/projections/laws/types";
+import type { BoardReason } from "@research-ts/projections/preseason/board";
+import { discoveredHeadline, lawHeadline } from "@research-ts/projections/laws/headline";
+import { ReasonChip, strongestLawReasons } from "./reason-chip";
 
 /**
  * `discoveredHeadline`'s GENERIC RENDERER, PINNED against small hand-built `Law` fixtures — never

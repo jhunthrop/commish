@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq, getTableName, is, isNull, Table } from "drizzle-orm";
-import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
-import type { Db } from "@/db/client";
-import * as schema from "@/db/schema";
+import { countingDb, createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import type { Db } from "@research-ts/db/client";
+import * as researchSchema from "@research-ts/db/schema";
+import * as appSchema from "@/db/schema";
 import { auditEvents, integrityFlags, leagues, memberNotices, reviewReports, reviews, teams, users } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { notifyAffectedMember, quoteFor, type MemberNotice } from "@/integrity-service/notify";
 import { renderNotice } from "@/integrity/notices";
@@ -26,8 +28,8 @@ const BRUTAL = "The commissioner vanished mid-season and nobody ever settled the
 const REVISED = "Updating my review: they came back and made it right. Genuinely impressed now.";
 const SPAM = "Click here for free V-bucks, best fantasy site ever, link in bio!!!";
 
-/** Every table this schema declares, so "which of them does this SQL name" is a closed question. */
-const ALL_TABLE_NAMES: readonly string[] = Object.values(schema)
+/** Every table either half of the schema declares, so "which of them does this SQL name" is a closed question. */
+const ALL_TABLE_NAMES: readonly string[] = Object.values({ ...researchSchema, ...appSchema })
   .filter((value) => is(value, Table))
   .map((table) => getTableName(table as Table));
 

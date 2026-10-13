@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { inArray } from "drizzle-orm";
 import type { DraftFormat } from "@/domain/league";
-import type { DraftStatus } from "@/domain/draft";
-import { draftActions, draftSlotPreferences, drafts, leagues, lineupSlots, matchups, statWeeks, teams, users, weeks } from "@/db/schema";
-import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
+import type { DraftStatus } from "@research-ts/domain/draft";
+import { statWeeks } from "@research-ts/db/schema";
+import { draftActions, draftSlotPreferences, drafts, leagues, lineupSlots, matchups, teams, users, weeks } from "@/db/schema";
+import { countingDb, createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
 import type { ScoreCache, ScoreCacheBatchRequest } from "@/stats-pipeline/score-cache";
 import type { TeamScore } from "@/stats-pipeline/contract";
@@ -516,7 +518,7 @@ describe("crossLeagueHome", () => {
       // Step 1b's `lineup_slots` read (F1) uses `selectDistinct`, not `select` — same stub
       // shape, so it falls back to `responses[call] ?? []` exactly like every other read here.
       selectDistinct: () => ({ from: fromStub }),
-    } as unknown as import("@/db/client").Db;
+    } as unknown as import("@research-ts/db/client").Db;
 
     const result = await crossLeagueHome(stubDb, "u1");
     const phantom = result.leagues.find((league) => league.id === "lg_phantom");

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, truncateAll, truncateJobTables } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll, truncateJobTables } from "@/db/test-db";
 import { defineJob, type AnyJobDefinition } from "./contract";
 import { JOBS_CONFIG } from "./config";
 import { enqueueJob } from "./store";

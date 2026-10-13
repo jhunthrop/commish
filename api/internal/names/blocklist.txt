@@ -1,0 +1,76 @@
+# The one list every public name passes (internal/names). Lobbies show
+# handles to strangers (docs/design/2026-10-12-mock-room-rethink.md,
+# "What the build must settle" 5), so a handle is refused when, after
+# folding case, look-alike digits and underscores:
+#
+#   exact:<word>     it is exactly this word (names that impersonate us
+#                    or the room's own seats)
+#   <word>           it contains this word anywhere
+#
+# Keep contained words unambiguous: a short word that sits inside an
+# ordinary name ("ass" in "bass") belongs in exact:, not here.
+# Lines starting with # and blank lines are ignored.
+
+exact:admin
+exact:administrator
+exact:bot
+exact:commish
+exact:commissioner
+exact:help
+exact:mod
+exact:moderator
+exact:null
+exact:official
+exact:root
+exact:staff
+exact:support
+exact:system
+exact:undefined
+exact:ass
+exact:cum
+exact:fag
+exact:tit
+exact:tits
+
+commishstaff
+commishsupport
+commishofficial
+asshole
+bastard
+bitch
+blowjob
+bollock
+boner
+chink
+clit
+cock
+coon
+cunt
+dick
+dildo
+dyke
+fagg
+fuck
+gook
+handjob
+jizz
+kike
+nazi
+nigg
+nigr
+orgasm
+paki
+penis
+porn
+pussy
+rapist
+retard
+shit
+slut
+spic
+tranny
+twat
+vagina
+wank
+wetback
+whore

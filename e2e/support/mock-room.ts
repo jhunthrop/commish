@@ -11,7 +11,7 @@
  * resolve.
  */
 import type { Page } from "@playwright/test";
-import { getDb } from "../../src/db/client";
+import { getDb } from "@research-ts/db/client";
 import { createDraftStore, type DraftStore } from "../../src/draft-service/store";
 import { getPublisher } from "../../src/lib/realtime/publisher";
 import { expect } from "./fixtures";

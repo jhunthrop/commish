@@ -1,0 +1,248 @@
+package auth
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/httpx"
+	"github.com/jhunthrop/commish/api/internal/names"
+)
+
+// stateCookie carries the sign-in's state and return path between
+// /auth/login and /auth/callback. It is host-only on the API and lives
+// ten minutes.
+const (
+	stateCookie   = "commish_auth"
+	stateTTL      = 10 * time.Minute
+	maxReturnTo   = 512
+	signInProblem = "/sign-in/problem"
+)
+
+// Rate limits for the auth routes.
+const (
+	limitSignInPerMinute  = 30
+	limitMeReadPerMinute  = 240
+	limitMeWritePerMinute = 10
+)
+
+// AccountViewer turns an account into the API's Account, with its
+// features and plans. internal/account implements it.
+type AccountViewer interface {
+	View(ctx context.Context, a Account) (apitypes.Account, error)
+}
+
+// AccountStore is the part of Store the handlers write through.
+type AccountStore interface {
+	UpsertAccount(ctx context.Context, id Identity) (Account, error)
+	CreateSession(ctx context.Context, accountID uuid.UUID, tokenHash []byte, workosSID, userAgent string, now time.Time) error
+	DeleteSession(ctx context.Context, tokenHash []byte) (string, error)
+	SetHandle(ctx context.Context, id uuid.UUID, handle string) (Account, error)
+}
+
+// Handler serves /auth and /me.
+type Handler struct {
+	Store         AccountStore
+	Sessions      *Sessions
+	IdP           IdentityProvider
+	Viewer        AccountViewer
+	Names         *names.Filter
+	PublicBaseURL string
+	StateSealer   *Sealer
+	TrustedHops   int
+	Now           func() time.Time
+	Log           *slog.Logger
+}
+
+// NewStateSealer is the sealer for the sign-in state cookie.
+func NewStateSealer(password string) (*Sealer, error) { return NewSealer(password, purposeState) }
+
+// Routes is every route this package serves.
+func (h *Handler) Routes() []httpx.Route {
+	return []httpx.Route{
+		{Method: http.MethodGet, Path: "/auth/login", Access: httpx.Public, Limit: httpx.PerMinute(limitSignInPerMinute), Handler: h.login},
+		{Method: http.MethodGet, Path: "/auth/callback", Access: httpx.Public, Limit: httpx.PerMinute(limitSignInPerMinute), Handler: h.callback},
+		{Method: http.MethodPost, Path: "/auth/logout", Access: httpx.Public, Limit: httpx.PerMinute(limitSignInPerMinute), Handler: h.logout},
+		{Method: http.MethodGet, Path: "/me", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitMeReadPerMinute), Handler: h.me},
+		{Method: http.MethodPatch, Path: "/me", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitMeWritePerMinute), Handler: h.updateMe},
+	}
+}
+
+type signInState struct {
+	State    string    `json:"s"`
+	ReturnTo string    `json:"r"`
+	Expires  time.Time `json:"e"`
+}
+
+// safeReturnTo keeps only a path on the site: never another host, never
+// a scheme, never a protocol-relative "//". Anything else becomes "/".
+func safeReturnTo(raw string) string {
+	if raw == "" || len(raw) > maxReturnTo || !strings.HasPrefix(raw, "/") ||
+		strings.HasPrefix(raw, "//") || strings.ContainsAny(raw, "\\\r\n") {
+		return "/"
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "" || u.Host != "" {
+		return "/"
+	}
+	return raw
+}
+
+func (h *Handler) site(path string) string { return h.PublicBaseURL + path }
+
+func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
+	b := make([]byte, 32)
+	_, _ = rand.Read(b)
+	st := signInState{
+		State:    base64.RawURLEncoding.EncodeToString(b),
+		ReturnTo: safeReturnTo(r.URL.Query().Get("return_to")),
+		Expires:  h.Now().Add(stateTTL),
+	}
+	screen := ScreenSignIn
+	if r.URL.Query().Get("screen") == string(ScreenSignUp) {
+		screen = ScreenSignUp
+	}
+	to, err := h.IdP.AuthorizationURL(st.State, screen)
+	if err != nil {
+		h.Log.Error("auth: login", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+		http.Redirect(w, r, h.site(signInProblem), http.StatusFound)
+		return
+	}
+	raw, _ := json.Marshal(st)
+	http.SetCookie(w, &http.Cookie{
+		Name: stateCookie, Value: h.StateSealer.Seal(raw), Path: "/auth", MaxAge: int(stateTTL / time.Second),
+		HttpOnly: true, Secure: h.Sessions.cookies.CookieSecure, SameSite: http.SameSiteLaxMode,
+	})
+	http.Redirect(w, r, to, http.StatusFound)
+}
+
+// readState opens and spends the state cookie, checking it against the
+// callback's state parameter.
+func (h *Handler) readState(w http.ResponseWriter, r *http.Request) (signInState, bool) {
+	http.SetCookie(w, &http.Cookie{Name: stateCookie, Value: "", Path: "/auth", MaxAge: -1,
+		HttpOnly: true, Secure: h.Sessions.cookies.CookieSecure, SameSite: http.SameSiteLaxMode})
+	c, err := r.Cookie(stateCookie)
+	if err != nil {
+		return signInState{}, false
+	}
+	raw, err := h.StateSealer.Open(c.Value)
+	if err != nil {
+		return signInState{}, false
+	}
+	var st signInState
+	if json.Unmarshal(raw, &st) != nil || h.Now().After(st.Expires) {
+		return signInState{}, false
+	}
+	got := r.URL.Query().Get("state")
+	if subtle.ConstantTimeCompare([]byte(got), []byte(st.State)) != 1 {
+		return signInState{}, false
+	}
+	return st, true
+}
+
+func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
+	problem := h.site(signInProblem)
+	st, ok := h.readState(w, r)
+	code := r.URL.Query().Get("code")
+	if !ok || code == "" {
+		http.Redirect(w, r, problem, http.StatusFound)
+		return
+	}
+	id, err := h.IdP.Authenticate(r.Context(), code, httpx.ClientIP(r, h.TrustedHops), r.UserAgent())
+	if err != nil {
+		h.Log.Warn("auth: callback", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+		http.Redirect(w, r, problem, http.StatusFound)
+		return
+	}
+	acct, err := h.Store.UpsertAccount(r.Context(), id)
+	if err != nil {
+		h.Log.Error("auth: callback", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+		http.Redirect(w, r, problem, http.StatusFound)
+		return
+	}
+	// Signing in again replaces this browser's session: the one its
+	// cookie names, if any, ends before the new one is issued.
+	if old, ok := h.Sessions.Token(r); ok {
+		if _, err := h.Store.DeleteSession(r.Context(), hashToken(old)); err != nil {
+			h.Log.Error("auth: callback", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+			http.Redirect(w, r, problem, http.StatusFound)
+			return
+		}
+	}
+	token, hash := newToken()
+	if err := h.Store.CreateSession(r.Context(), acct.ID, hash, id.SessionID, r.UserAgent(), h.Now()); err != nil {
+		h.Log.Error("auth: callback", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+		http.Redirect(w, r, problem, http.StatusFound)
+		return
+	}
+	h.Sessions.Issue(w, token)
+	http.Redirect(w, r, h.site(st.ReturnTo), http.StatusFound)
+}
+
+func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
+	to := h.site("/")
+	if token, ok := h.Sessions.Token(r); ok {
+		sid, err := h.Store.DeleteSession(r.Context(), hashToken(token))
+		if err != nil {
+			httpx.WriteInternal(w, r, h.Log, "auth: logout", err)
+			return
+		}
+		if sid != "" {
+			if u, err := h.IdP.LogoutURL(sid, to); err == nil {
+				to = u
+			} else {
+				h.Log.Warn("auth: logout url", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+			}
+		}
+	}
+	h.Sessions.Clear(w)
+	httpx.WriteOK(w, r, http.StatusOK, apitypes.Redirect{Url: to})
+}
+
+func (h *Handler) writeAccount(w http.ResponseWriter, r *http.Request, a Account) {
+	view, err := h.Viewer.View(r.Context(), a)
+	if err != nil {
+		httpx.WriteInternal(w, r, h.Log, "auth: view account", err)
+		return
+	}
+	httpx.WriteOK(w, r, http.StatusOK, view)
+}
+
+func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
+	a, _ := AccountFrom(r.Context())
+	h.writeAccount(w, r, a)
+}
+
+func (h *Handler) updateMe(w http.ResponseWriter, r *http.Request) {
+	a, _ := AccountFrom(r.Context())
+	var in apitypes.AccountUpdate
+	if !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
+		return
+	}
+	if err := h.Names.Check(in.Handle); err != nil {
+		httpx.WriteInvalid(w, r, map[string]string{"handle": err.Error()})
+		return
+	}
+	updated, err := h.Store.SetHandle(r.Context(), a.ID, in.Handle)
+	switch {
+	case errors.Is(err, ErrHandleTaken):
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "That name is taken",
+			map[string]string{"handle": "That name is taken"})
+		return
+	case err != nil:
+		httpx.WriteInternal(w, r, h.Log, "auth: set handle", err)
+		return
+	}
+	h.writeAccount(w, r, updated)
+}

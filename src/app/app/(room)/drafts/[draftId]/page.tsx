@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
 import { ToastProvider } from "@/components/ui";

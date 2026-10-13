@@ -10,7 +10,7 @@
 // production key silently plants a permanent, pre-verified account in the real directory.
 import { chmodSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { envOrUndefined } from "@/lib/env";
+import { envOrUndefined } from "@research-ts/lib/env";
 import { mintLabSession } from "./lib/lab-session";
 
 const DEFAULT_OUT = ".lab-session.json";

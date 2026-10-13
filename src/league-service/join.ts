@@ -1,8 +1,8 @@
 import { and, eq } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
-import { isUniqueViolation } from "@/db/errors";
+import type { Db, DbTx } from "@research-ts/db/client";
+import { isUniqueViolation } from "@research-ts/db/errors";
 import { drafts, leagues, memberNotices, teams, users } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
+import type { Clock } from "@research-ts/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { defaultSweepDeps, sweepQuietly, type SweepDeps } from "@/integrity-service/multi-account";
 import { attachAuditEvent, notifyAffectedMember } from "@/integrity-service/notify";
@@ -148,7 +148,7 @@ export interface JoinLeagueInput {
  * (`./seat-hold`), when `input.holdToken` is present, runs immediately after the already-member
  * check — an `UPDATE seat_holds SET consumed_at ...` by primary key, which takes no lock beyond
  * the row it updates and adds no new edge to the order above (`seat_holds`' own docblock,
- * `@/db/schema`). `liveHoldsFor`'s own read (the capacity check, below) is a plain `SELECT`,
+ * `@research-ts/db/schema`). `liveHoldsFor`'s own read (the capacity check, below) is a plain `SELECT`,
  * likewise no new lock. Both run while `leagues[X] FOR UPDATE` is already held, which is what
  * serializes either of them against a concurrent `claimSeatHold` on the same league — see that
  * function's own FK enumeration in `./seat-hold`.

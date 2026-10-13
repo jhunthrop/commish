@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { DbTx, ReadonlyDb } from "@/db/client";
+import type { DbTx, ReadonlyDb } from "@research-ts/db/client";
 import { matchups, weeks } from "@/db/schema";
 import { generateSchedule, LEAGUE_CONFIG, seasonProgress } from "@/league";
 

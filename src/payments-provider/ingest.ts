@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import { envOr } from "@/lib/env";
+import { envOr } from "@research-ts/lib/env";
 import { PAYMENTS_PROVIDER_CONFIG } from "./config";
 import type { TransferRef } from "./contract";
 

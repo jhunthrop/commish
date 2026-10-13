@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Position } from "@/domain/player";
-import { BENCH_SLOT, type RosterSlotConfig } from "@/domain/roster";
-import { valueBoardIndexed } from "@/projections/decide/replacement";
+import type { Position } from "@research-ts/domain/player";
+import { BENCH_SLOT, type RosterSlotConfig } from "@research-ts/domain/roster";
+import { valueBoardIndexed } from "@research-ts/projections/decide/replacement";
 import type { SimPlayerEvidence } from "./types";
 import { valueOrderFor } from "./value-order";
 

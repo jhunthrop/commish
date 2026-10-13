@@ -1,24 +1,9 @@
 import type { SeasonWeek, SourceValue } from "@/components/ui";
-import type { Position } from "@/domain/player";
 import type { PlayerDossierFacts } from "@/league-service/dossier-facts";
 import type { PlayerSeasonBody } from "@/league-service/player";
 import type { CallCardMarket, CallCardOurBoard } from "../dossier/call-card";
-import { verdictLine } from "../outlook/verdict";
-
-/**
- * A position in the words a manager would use, PLURAL — the shape a population takes in a
- * sentence ("Top 8% of running backs this season"). Extracted from the player page when the
- * bottom-sheet peek became this view's second consumer (founder, 2026-08-30: the name opens a
- * drawer wherever it appears).
- */
-export const POSITION_PLURAL: Readonly<Record<Position, string>> = {
-  QB: "quarterbacks",
-  RB: "running backs",
-  WR: "receivers",
-  TE: "tight ends",
-  K: "kickers",
-  DEF: "defenses",
-};
+import { POSITION_PLURAL } from "@research-ts/domain/position-words";
+import { verdictLine } from "@research-ts/capsules/outlook/verdict";
 
 /** The source strip's five cells; precision rulings live with each cell. See the player page's
  *  original docblock for the full account of which sources reach this season. */

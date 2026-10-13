@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import Redis from "ioredis";
 import { createReferenceCache } from "./reference-cache";
 import { STATS_INGESTION_CONFIG } from "./config";
-import type { Player } from "@/domain/player";
-import type { ScoringSettings } from "@/domain/scoring";
+import type { Player } from "@research-ts/domain/player";
+import type { ScoringSettings } from "@research-ts/domain/scoring";
 
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 

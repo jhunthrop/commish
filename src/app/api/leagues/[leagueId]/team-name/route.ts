@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { renameMyTeam } from "@/league-service/settings";
 import { renameMyTeamSchema } from "@/league-service/schemas";

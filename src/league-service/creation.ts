@@ -1,13 +1,13 @@
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research-ts/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
 import type { DraftFormat } from "@/domain/league";
-import type { RosterShapeName, RosterSlotConfig } from "@/domain/roster";
-import { SCORING_PRESETS, type ScoringPresetName } from "@/domain/scoring";
-import type { Clock } from "@/domain/timing";
+import type { RosterShapeName, RosterSlotConfig } from "@research-ts/domain/roster";
+import { SCORING_PRESETS, type ScoringPresetName } from "@research-ts/domain/scoring";
+import type { Clock } from "@research-ts/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { LEAGUE_CONFIG } from "@/league";
-import { ROSTER_SHAPES } from "@/league/roster-shape";
+import { ROSTER_SHAPES } from "@research-ts/domain/roster-shape";
 import type { HouseRungName, StartTrigger } from "@/matchmaking/house-catalog";
 import { prizeTableInvariant, type PrizeTable } from "@/money/prize-table";
 import { moneyIsLive } from "@/money/states";
@@ -71,7 +71,7 @@ export interface CreateLeagueInput {
    */
   readonly rosterSlots?: readonly RosterSlotConfig[];
   /**
-   * The named shape to resolve through `ROSTER_SHAPES` (`@/league/roster-shape`) when
+   * The named shape to resolve through `ROSTER_SHAPES` (`@research-ts/domain/roster-shape`) when
    * `rosterSlots` is omitted, falling back to `LEAGUE_CONFIG.defaults.rosterShape` when this is
    * omitted too. Never stored as a column — `leagues.roster_slots` holds only the resolved
    * rows, and `describeRosterShape` is what re-derives a name from them later, the identical
@@ -123,7 +123,7 @@ export interface CreateLeagueInput {
    * transaction, the same way the house factory does. Every other door leaves this unset and
    * every league they create stays a real league (`?? false` in the insert below). A caller that
    * ever set this `true` alongside `isPublicMatchmade: true` would not create a leaky mock — the
-   * row refuses to commit at the database (`leagues_mock_private_ck`, `@/db/schema`), which is
+   * row refuses to commit at the database (`leagues_mock_private_ck`, `@research-ts/db/schema`), which is
    * the CHECK's whole reason to exist.
    */
   readonly isMock?: boolean;

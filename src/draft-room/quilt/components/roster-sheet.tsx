@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Player } from "@/domain/player";
+import type { Player } from "@research-ts/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
 import { BottomSheet, Button, Manager, PlayerFace, PositionBadge, SlotChip } from "@/components/ui";

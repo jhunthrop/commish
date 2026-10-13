@@ -19,9 +19,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@research-ts/*": ["./research-ts/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.mts", ".next/types/**/*.ts", ".next-e2e/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "web", "api", "research", "research-ts", ".claude"]
 }

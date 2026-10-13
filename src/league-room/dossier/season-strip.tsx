@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { PlayerFactsLastSeasonStory } from "@/capsules/facts";
+import type { PlayerFactsLastSeasonStory } from "@research-ts/capsules/facts";
 import { Card, SeasonBars, type SeasonWeek } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { formatTenth, formatWhole, ordinal } from "../lib/format";

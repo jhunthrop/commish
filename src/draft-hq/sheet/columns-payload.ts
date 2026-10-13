@@ -1,5 +1,5 @@
-import type { Player } from "@/domain/player";
-import type { BoardRow } from "@/draft-hq/board/service";
+import type { Player } from "@research-ts/domain/player";
+import type { BoardRow } from "@research-ts/board/service";
 import type { SheetMark } from "@/draft-room/quilt/state/sheet-columns";
 import type { SheetEntryView } from "./view";
 

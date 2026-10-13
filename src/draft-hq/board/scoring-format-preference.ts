@@ -1,4 +1,4 @@
-import { DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
+import { DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@research-ts/projections/preseason/board-formats";
 
 /**
  * THE REMEMBERED FORMAT (the scoring-formats round, 2026-09-08) — which of the three boards a

@@ -3,7 +3,8 @@ import { join, relative } from "node:path";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { auditEvents, memberNotices, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
 import { DEV_SEED } from "./config";
 import { seedOperator } from "./seed-operator";
 

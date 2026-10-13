@@ -7,8 +7,8 @@
  * gets a finished sim inline — never a "pending" state on a page that has no run button of its
  * own to explain one.
  */
-import type { Db } from "@/db/client";
-import { valueBoard, type LeagueShape } from "@/projections/decide/replacement";
+import type { Db } from "@research-ts/db/client";
+import { valueBoard, type LeagueShape } from "@research-ts/projections/decide/replacement";
 import { evidencePoolFor } from "@/draft-service/sim/evidence";
 import { requestSimRun } from "@/draft-service/sim/service";
 import type { BuildOutcome, SimSummary } from "@/draft-service/sim/types";
@@ -82,7 +82,7 @@ export interface ScarcityPoint {
 }
 
 /**
- * POSITIONAL SCARCITY, BY ROUND — real replacement-level data (`@/projections/decide/replacement.ts`),
+ * POSITIONAL SCARCITY, BY ROUND — real replacement-level data (`@research-ts/projections/decide/replacement`),
  * sampled at each round's own leading overall pick. Every player is priced by value over
  * replacement under `shape` (the league's own team count and roster slots, exactly like the
  * Board's own `boardRows`), sorted best first; round R's point is the VOR of the

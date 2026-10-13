@@ -1,4 +1,4 @@
-import type { Position } from "@/domain/player";
+import type { Position } from "@research-ts/domain/player";
 import type { TradeProposalView } from "@/trades/contract";
 import { assetPlayerIds } from "@/trades/assets";
 import type { LeagueHomeBody, TradeRoomContext, TradeRosterPlayer } from "../contract";

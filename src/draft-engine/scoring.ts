@@ -7,8 +7,9 @@
  * read, so the autopick's constants (`AUTOPICK_CONFIG`, `./config`) and the bots' constants
  * (`MOCK_CONFIG.strategy`) can never contaminate each other.
  */
-import type { Position } from "@/domain/player";
-import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig } from "@/domain/roster";
+import type { Position } from "@research-ts/domain/player";
+import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig } from "@research-ts/domain/roster";
+import { LATE_ROUND_ONLY_POSITIONS } from "@research-ts/draft-engine/roster-need";
 
 /** `exp(-index / temperature)`: rank 0 weighs 1, each step down the board decays smoothly. */
 export function rankWeight(index: number, temperature: number): number {
@@ -112,13 +113,6 @@ export function needMultiplier(
   if (surplusDamp === undefined) return open === 0 ? filledDamp : warmed;
   return filledDamp * surplusDamp ** extraSurplusBodies(position, roster, slotConfig, rosteredAtPosition);
 }
-
-/**
- * The two positions a real draft board takes last (the 2026-09-05 kicker and team defence round).
- * Named here rather than inlined at the one call site so a format that starts two of either has one
- * list to widen.
- */
-export const LATE_ROUND_ONLY_POSITIONS: readonly Position[] = ["K", "DEF"];
 
 /**
  * Whether a candidate at `position` should be passed over FOR NOW — see

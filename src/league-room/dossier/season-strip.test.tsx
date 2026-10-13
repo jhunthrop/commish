@@ -3,7 +3,7 @@ import { render } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import type { SeasonWeek } from "@/components/ui";
-import type { PlayerFactsLastSeasonStory } from "@/capsules/facts";
+import type { PlayerFactsLastSeasonStory } from "@research-ts/capsules/facts";
 import { SeasonStrip } from "./season-strip";
 
 const STORY: PlayerFactsLastSeasonStory = {

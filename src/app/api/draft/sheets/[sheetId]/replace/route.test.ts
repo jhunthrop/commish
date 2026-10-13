@@ -7,8 +7,10 @@ vi.hoisted(() => {
 
 vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn() }));
 
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { players, users } from "@/db/schema";
+import { createTestDb } from "@research-ts/db/test-db";
+import { truncateAll } from "@/db/test-db";
+import { players } from "@research-ts/db/schema";
+import { users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { createSheet } from "@/draft-hq/sheet/service";
 import { PUT } from "./route";

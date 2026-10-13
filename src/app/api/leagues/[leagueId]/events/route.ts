@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { drafts } from "@/db/schema";
 import { createPresenceStore, presenceLifecycle } from "@/lib/realtime/presence";
 import { getPublisher } from "@/lib/realtime/publisher";

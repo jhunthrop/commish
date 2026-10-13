@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
-import type { PlayerFactsTrend, PlayerFactsUsage } from "@/capsules/facts";
-import type { DefenseSeasonFacts, KdefSeasonLine, KickerSeasonFacts } from "@/projections/kdef/season-lines";
+import type { PlayerFactsTrend, PlayerFactsUsage } from "@research-ts/capsules/facts";
+import type { DefenseSeasonFacts, KdefSeasonLine, KickerSeasonFacts } from "@research-ts/projections/kdef/season-lines";
 import { RoleModule } from "./role-module";
 
 const USAGE: PlayerFactsUsage = {

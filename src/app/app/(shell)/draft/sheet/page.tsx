@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { inArray } from "drizzle-orm";
-import { getDb } from "@/db/client";
-import { players } from "@/db/schema";
+import { getDb } from "@research-ts/db/client";
+import { players } from "@research-ts/db/schema";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { pageTitle } from "@/components/app-shell/page-metadata";
-import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { PRODUCT_SEASON } from "@research-ts/projections/preseason/current";
 import { getSheet, listSheets } from "@/draft-hq/sheet/service";
 import { boardOptionsFrom, sheetEntryViews } from "@/draft-hq/sheet/view";
 import { sheetColumnsPayload } from "@/draft-hq/sheet/columns-payload";

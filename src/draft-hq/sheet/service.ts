@@ -1,5 +1,5 @@
 import { and, asc, eq, sql } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx } from "@research-ts/db/client";
 import { draftSheetEntries, draftSheets } from "@/db/schema";
 import type { Sheet, SheetEntry, SheetEntryInput, SheetSummary, SheetTag, SheetWithEntries } from "./types";
 

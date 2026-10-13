@@ -1,5 +1,5 @@
 import { inArray } from "drizzle-orm";
-import type { DbTx } from "@/db/client";
+import type { DbTx } from "@research-ts/db/client";
 import { teams } from "@/db/schema";
 import type { DraftState } from "@/draft-engine";
 import type { AuditEventInput } from "@/domain/audit";

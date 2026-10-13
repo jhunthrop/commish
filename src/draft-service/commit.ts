@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
-import type { DbTx } from "@/db/client";
+import type { DbTx } from "@research-ts/db/client";
 import { draftPicks, drafts, rosterSlots } from "@/db/schema";
-import { excludedSetFor } from "@/db/upsert";
+import { excludedSetFor } from "@research-ts/db/upsert";
 import type { DraftState } from "@/draft-engine";
 import { LEAGUE_CONFIG } from "@/league";
 import { writeSchedule } from "@/league-service/schedule";

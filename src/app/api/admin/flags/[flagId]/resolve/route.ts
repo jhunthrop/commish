@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { getDb } from "@research-ts/db/client";
 import { resolveFlag } from "@/integrity-service/flags";
 import { resolveFlagSchema } from "@/integrity-service/schemas";
 import { getScoreCache } from "@/league-service/score-cache-instance";
