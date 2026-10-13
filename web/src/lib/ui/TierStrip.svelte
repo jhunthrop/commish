@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { fixed } from '#lib/format/number.ts';
 	import { tierColor, type TierCliff } from './tier.ts';
 
@@ -14,9 +15,12 @@
 		unit: string;
 		/** The anchor the tier jump list links to. */
 		id?: string;
+		/** Controls at the strip's right end where it has no drop to print: your sheet's tier
+		 * handle. */
+		tail?: Snippet;
 	}
 
-	let { tier, count, group, cliff, unit, id }: Props = $props();
+	let { tier, count, group, cliff, unit, id, tail }: Props = $props();
 </script>
 
 <div class="band" {id} style:--tier={tierColor(tier)}>
@@ -25,6 +29,8 @@
 	<span class="cliff">
 		{#if cliff}
 			<b>{fixed(cliff.drop)}</b><span>{unit} down to tier {cliff.nextTier}</span>
+		{:else if tail}
+			{@render tail()}
 		{:else}
 			<span>Last tier</span>
 		{/if}
