@@ -43,6 +43,15 @@ func main() {
 		people := fs.Int("people", 12, "drafters to seat")
 		_ = fs.Parse(os.Args[2:])
 		err = measureLobby(ctx, env, *format, *people)
+	case "session":
+		// A signed-in session for a page tool (web/scripts/room-shots.ts):
+		// prints the session cookie, the CSRF token and the account id.
+		handle := fs.String("handle", "shots", "the account's handle")
+		_ = fs.Parse(os.Args[2:])
+		var d *drafter
+		if d, err = mint(ctx, env, *handle); err == nil {
+			fmt.Println(d.Session, d.CSRF, d.ID)
+		}
 	case "fill":
 		format := fs.String("format", "10_ppr", "the lobby format")
 		_ = fs.Parse(os.Args[2:])

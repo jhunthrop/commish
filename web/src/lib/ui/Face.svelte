@@ -28,15 +28,15 @@
 	style:--face-size="{size}px"
 	style:--face-overfill="{FACE_OVERFILL * 100}%"
 >
-	<img
-		src={sources.src}
-		srcset={sources.srcset}
-		{alt}
-		{loading}
-		width={size}
-		height={size}
-		decoding="async"
-	/>
+	{#if src}<img
+			src={sources.src}
+			srcset={sources.srcset}
+			{alt}
+			{loading}
+			width={size}
+			height={size}
+			decoding="async"
+		/>{/if}
 </span>
 
 <style>

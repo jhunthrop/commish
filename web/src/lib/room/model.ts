@@ -30,6 +30,11 @@ function positionOf(position: BoardPlayer['position']): Position {
 	return position === 'DEF' ? 'DST' : position;
 }
 
+/** A defense's face is its team's logo, from the same image host as the headshots. */
+function teamLogo(team: string): string {
+	return `https://a.espncdn.com/i/teamlogos/nfl/500/${team.toLowerCase()}.png`;
+}
+
 export function boardOf(board: RoomBoard, teams: number): Board {
 	const valued = board.players
 		.filter((p): p is BoardPlayer & { vor: number } => p.vor !== null)
@@ -43,7 +48,7 @@ export function boardOf(board: RoomBoard, teams: number): Board {
 			position: positionOf(p.position),
 			positionRank: p.position_rank,
 			team: p.team,
-			headshot: p.headshot,
+			headshot: p.headshot === '' && p.position === 'DEF' ? teamLogo(p.team) : p.headshot,
 			adp: p.adp,
 			points: p.points,
 			vor: p.vor,

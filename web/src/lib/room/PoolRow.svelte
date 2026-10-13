@@ -14,6 +14,8 @@
 		odds: number | null;
 		/** What the odds are of: "still there at 6.05". */
 		oddsLabel: string;
+		/** What the odds cell says with no chance to show. */
+		oddsMissing: string;
 		/** Where drafters take him against the pick on the clock, in words. */
 		adp: string;
 		/** Our call's row, washed in the accent. */
@@ -33,6 +35,7 @@
 		player,
 		odds,
 		oddsLabel,
+		oddsMissing,
 		adp,
 		isCall,
 		selected,
@@ -65,8 +68,8 @@
 	{:else}
 		<span class="none"><b>–</b><Label size="cell">no projection</Label></span>
 	{/if}
-	<OddsCell {odds} label={oddsLabel} />
-	<span class="adp"><Label size="cell" align="end">{adp}</Label></span>
+	<OddsCell {odds} label={oddsLabel} missing={oddsMissing} />
+	<span class="adp">{adp}</span>
 	<span class="acts">
 		<span class="q"><Quiet size="sm" onclick={onqueue}>{queued ? 'Queued' : 'Queue'}</Quiet></span>
 		<Quiet size="sm" disabled={!canDraft} onclick={ondraft}>Draft</Quiet>
@@ -131,7 +134,9 @@
 
 	.adp {
 		text-align: right;
-		white-space: normal;
+		font-size: var(--t-xs);
+		line-height: 1.25;
+		color: var(--ink-2);
 	}
 
 	.acts {

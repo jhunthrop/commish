@@ -7,9 +7,11 @@
 		odds: number | null;
 		/** What the chance is of, printed under it: "still there at 6.05". */
 		label: string;
+		/** What prints under the dash when there is no chance to show: "not in the odds". */
+		missing?: string;
 	}
 
-	let { odds, label }: Props = $props();
+	let { odds, label, missing = 'not in the odds' }: Props = $props();
 
 	const percent = $derived(odds === null ? 0 : Math.round(odds * 100));
 </script>
@@ -17,7 +19,7 @@
 <span class="cell">
 	<b>{odds === null ? '–' : oddsShort(odds)}</b>
 	<span class="meter" aria-hidden="true"><i style:width="{percent}%"></i></span>
-	<Label size="cell">{odds === null ? 'not in the odds' : label}</Label>
+	<Label size="cell">{odds === null ? missing : label}</Label>
 </span>
 
 <style>

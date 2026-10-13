@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { clockLabel, lastName, pickLabel, snakeSlot } from '#lib/format/draft.ts';
+	import { plural } from '#lib/format/number.ts';
 	import Keys from '#lib/ui/Keys.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import ScoreBug from '#lib/ui/ScoreBug.svelte';
@@ -181,9 +182,11 @@
 	{#snippet dock()}
 		<Panel padding="sm">
 			<p class="about">
-				<b>{teams} {presetWords(room.settings.scoring.preset ?? 'ppr')} lobby</b>, {people} drafters and
-				{bots} bots. {room.clock_seconds} seconds a pick, your queue drafts if you step away, a bot takes
-				any seat that closes the tab.
+				<b>{teams} {presetWords(room.settings.scoring.preset ?? 'ppr')} lobby</b>, {plural(
+					people,
+					'drafter'
+				)} and {plural(bots, 'bot')}. {room.clock_seconds} seconds a pick, your queue drafts if you step
+				away, a bot takes any seat that closes the tab.
 			</p>
 		</Panel>
 		<TeamPanel slots={teamSlots(room.settings, mine, board)} rosterSize={room.rounds} {teams} />

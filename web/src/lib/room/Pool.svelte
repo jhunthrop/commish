@@ -3,6 +3,7 @@
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Label from '#lib/ui/Label.svelte';
+	import Quiet from '#lib/ui/Quiet.svelte';
 	import PoolRow from './PoolRow.svelte';
 	import type { PoolFilter, RoomPlayer } from './model.ts';
 
@@ -49,8 +50,16 @@
 		onselect
 	}: Props = $props();
 
-	/** The rows drawn at once: the pool runs a thousand deep, and nobody scrolls past this many. */
-	const SHOWN = 120;
+	/** The rows drawn first, the room's first screen, and how many more each "Show more" adds. The
+	 * arrow keys reach past them on their own. */
+	const FIRST_ROWS = 14;
+	const MORE_ROWS = 25;
+
+	let shown = $state(FIRST_ROWS);
+	const oddsMissing = $derived(
+		Object.keys(odds).length > 0 ? 'not in the odds' : 'odds come with the call'
+	);
+	const visible = $derived(Math.max(shown, rows.findIndex((p) => p.id === selectedId) + 1));
 </script>
 
 <section class="pool" aria-label="Pool">
@@ -74,11 +83,12 @@
 		<span class="adp"><Label align="end">ADP</Label></span>
 		<span></span>
 	</div>
-	{#each rows.slice(0, SHOWN) as player (player.id)}
+	{#each rows.slice(0, visible) as player (player.id)}
 		<PoolRow
 			{player}
 			odds={odds[player.id] ?? null}
 			{oddsLabel}
+			{oddsMissing}
 			adp={adpWords(player.adp, pickNumber)}
 			isCall={player.id === callId}
 			selected={player.id === selectedId}
@@ -91,6 +101,13 @@
 	{:else}
 		<p class="empty">Nobody left here.</p>
 	{/each}
+	{#if rows.length > visible}
+		<div class="more">
+			<Quiet size="sm" onclick={() => (shown = visible + MORE_ROWS)}
+				>Show {Math.min(MORE_ROWS, rows.length - visible)} more</Quiet
+			>
+		</div>
+	{/if}
 </section>
 
 <style>
@@ -135,6 +152,10 @@
 		border-bottom: 1px solid var(--line-strong);
 	}
 
+	.more {
+		padding: var(--s-3) 0;
+	}
+
 	.empty {
 		color: var(--ink-3);
 		font-size: var(--t-sm);
@@ -151,11 +172,8 @@
 			--pool-cols: 36px minmax(0, 1fr) 84px 84px;
 		}
 
+		/* On a phone each cell names itself under its number. */
 		.cols {
-			padding: var(--s-3) 0 var(--s-2);
-		}
-
-		.cols > :nth-child(n + 5) {
 			display: none;
 		}
 
