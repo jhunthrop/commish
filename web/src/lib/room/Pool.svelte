@@ -105,10 +105,12 @@
 	<div class="cols" aria-hidden="true">
 		<span></span>
 		<Label>Player</Label>
-		<Label align="end">Over replacement</Label>
+		<Label align="end"
+			><span class="wide">Over replacement</span><span class="narrow">Over repl</span></Label
+		>
 		{#if oddsShown}<Label align="end">Still there</Label>{/if}
 		<span class="adp"><Label align="end">ADP</Label></span>
-		{#if !readonly}<span></span>{/if}
+		{#if !readonly}<span class="acts-head"></span>{/if}
 	</div>
 	{#each rows.slice(0, visible) as player (player.id)}
 		<PoolRow
@@ -193,6 +195,10 @@
 		justify-content: flex-end;
 	}
 
+	.narrow {
+		display: none;
+	}
+
 	.more {
 		padding: var(--s-3) 0;
 	}
@@ -233,9 +239,21 @@
 			--pool-cols: 36px minmax(0, 1fr) 84px;
 		}
 
-		/* On a phone each cell names itself under its number. */
+		/* On the phone the head names the over replacement column, whose cells print the number
+		   alone, the board's rows' treatment. The odds cells still name what they are. */
 		.cols {
+			column-gap: var(--s-2);
+			padding: var(--s-2) 0;
+		}
+
+		.cols > .adp,
+		.acts-head,
+		.wide {
 			display: none;
+		}
+
+		.narrow {
+			display: inline;
 		}
 
 		.chips {
