@@ -1,3 +1,5 @@
+import { systemNightly } from '#lib/server/pages/system.ts';
+import { stamp } from '#lib/server/run.ts';
 import {
 	BOARD_SIZE,
 	LOBBY_BUG,
@@ -13,10 +15,11 @@ import {
 import type { PageServerLoad } from './$types';
 
 /** Built once at deploy like every nightly page, and measured against the same budget. The fixture
- * is read here, at build, so the browser gets the derived values and never the CSV rows. */
+ * is read here, at build, so the browser gets the derived values and never the CSV rows. The
+ * nightly page parts come from the run the build reads, so they show a real player too. */
 export const prerender = true;
 
-export const load: PageServerLoad = () => ({
+export const load: PageServerLoad = async () => ({
 	boardSize: BOARD_SIZE,
 	lobbyBug: LOBBY_BUG,
 	roomKeys: ROOM_KEYS,
@@ -26,5 +29,7 @@ export const load: PageServerLoad = () => ({
 	soloTeam: SOLO_TEAM,
 	valuePlayers: VALUE_PLAYERS,
 	wrRangeScale: WR_RANGE_SCALE,
-	wrTier: WR_TIER
+	wrTier: WR_TIER,
+	run: await stamp(),
+	nightly: await systemNightly()
 });

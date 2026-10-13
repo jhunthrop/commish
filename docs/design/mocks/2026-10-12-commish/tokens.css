@@ -11,11 +11,11 @@
      so a dense row holds "Jaxon Smith-Njigba" at 15px without truncating.
      Big Shoulders Display is the condensed number face, drawn from stadium and
      transit lettering, narrow enough that 344.1 fits a 64px cell at display size. */
-  --font-ui: "Outfit", "Avenir Next", "Segoe UI", system-ui, sans-serif;
-  --font-num: "Big Shoulders Display", "Oswald", "Arial Narrow", sans-serif;
+  --font-ui: "Outfit", "Outfit Fallback", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Big Shoulders Display", "Big Shoulders Display Fallback", "Oswald", "Arial Narrow", sans-serif;
   /* Newsreader is the reading face. Optical sizes cut for long screen reading, because the
      capsule is writing. Allowed on the player page's prose block and its pull figures, nowhere else. */
-  --font-read: "Newsreader", "Iowan Old Style", "Charter", Georgia, serif;
+  --font-read: "Newsreader", "Newsreader Fallback", "Iowan Old Style", "Charter", Georgia, serif;
   --t-read: 1.1875rem;  /* 19 capsule prose */
   --t-pull: 2.75rem;    /* 44 a pull figure, the same step as --t-2xl */
 

@@ -15,3 +15,23 @@ export function fixed(value: number, decimals = 1): string {
 export function plural(count: number, one: string, many = `${one}s`): string {
 	return `${count} ${count === 1 ? one : many}`;
 }
+
+const ORDINAL = new Intl.PluralRules('en-US', { type: 'ordinal' });
+const ORDINAL_SUFFIX: Readonly<Record<Intl.LDMLPluralRule, string>> = {
+	zero: 'th',
+	one: 'st',
+	two: 'nd',
+	few: 'rd',
+	many: 'th',
+	other: 'th'
+};
+
+/** "1st", "22nd", "13th". */
+export function ordinal(count: number): string {
+	return `${String(count)}${ORDINAL_SUFFIX[ORDINAL.select(count)]}`;
+}
+
+/** "Hardest schedule", "3rd hardest schedule": a schedule rank where 1 is the hardest. */
+export function scheduleRankWords(rank: number): string {
+	return rank === 1 ? 'Hardest schedule' : `${ordinal(rank)} hardest schedule`;
+}

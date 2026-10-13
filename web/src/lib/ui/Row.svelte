@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed } from '#lib/format/number.ts';
+	import type { Snippet } from 'svelte';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import Face from './Face.svelte';
 	import GapChip from './GapChip.svelte';
@@ -23,21 +24,39 @@
 		unit: string;
 		/** Faces in the first screen of a prerendered board load eagerly. */
 		eager?: boolean;
+		/** The floor to ceiling column, on unless the view switches it off. Match the RowHead above. */
+		range?: boolean;
+		/** The row's one action at its end, Add to my sheet. Off the phone. Match the RowHead's action. */
+		action?: Snippet;
 	}
 
-	let { player, href, scale, showTier, unit, eager = false }: Props = $props();
+	let {
+		player,
+		href,
+		scale,
+		showTier,
+		unit,
+		eager = false,
+		range = true,
+		action
+	}: Props = $props();
 
 	const adpLabel = $derived(player.adp === null ? 'Not in ADP' : `ADP ${fixed(player.adp)}`);
 </script>
 
-<div class="row">
+<div
+	class="row"
+	class:flat={!range}
+	class:act={action !== undefined}
+	class:act-flat={action !== undefined && !range}
+>
 	<span class="rk">{player.ourRank}</span>
 	<Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />
 	<span class="who">
 		<a class="name" {href}>{player.name}</a>
 		<span class="meta">
 			<PositionPill position={player.position} rank={player.positionRank} />
-			{#if showTier}<TierChip tier={player.tier} />{/if}
+			{#if showTier}<span class="wide"><TierChip tier={player.tier} /></span>{/if}
 			<span class="wide">{player.team}</span>
 			<span class="wide">{fixed(player.expectedGames)} games</span>
 			<span class="narrow">{fixed(player.projected)} pts</span>
@@ -45,13 +64,16 @@
 	</span>
 	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
 	<ValueCell {...vorCell(player.vor, player.vorRound)} />
-	<span class="rng">
-		<RangeBar floor={player.floor} median={player.median} ceiling={player.ceiling} {scale} />
-	</span>
+	{#if range}
+		<span class="rng">
+			<RangeBar floor={player.floor} median={player.median} ceiling={player.ceiling} {scale} />
+		</span>
+	{/if}
 	<span class="adp">
 		<GapChip gap={draftersGap(player.adp, player.ourRank)} />
 		<Label size="cell">{adpLabel}</Label>
 	</span>
+	{#if action}<span class="action">{@render action()}</span>{/if}
 </div>
 
 <style>
@@ -63,6 +85,23 @@
 		min-height: var(--row-h);
 		padding: 4px var(--s-3);
 		border-bottom: 1px solid var(--line);
+	}
+
+	.flat {
+		grid-template-columns: var(--board-cols-flat);
+	}
+
+	.act {
+		grid-template-columns: var(--board-cols-act);
+	}
+
+	.act-flat {
+		grid-template-columns: var(--board-cols-act-flat);
+	}
+
+	.action {
+		display: flex;
+		justify-content: flex-end;
 	}
 
 	.row:hover {
@@ -132,7 +171,8 @@
 
 		.rk,
 		.proj,
-		.wide {
+		.wide,
+		.action {
 			display: none;
 		}
 

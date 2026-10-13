@@ -39,3 +39,10 @@ export const SHELL_HREFS: readonly string[] = [
 	...RAIL.map((item) => item.href),
 	RAIL_FOOT.href
 ];
+
+/** A section's page, the way a link from another page reaches it: the verb to a mock, the sheet. */
+export function sectionHref(section: Section): string {
+	const item = [...RAIL, RAIL_FOOT].find((candidate) => candidate.section === section);
+	if (!item) throw new Error(`No rail item for the ${section} section.`);
+	return item.href;
+}

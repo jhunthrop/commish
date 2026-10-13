@@ -2,12 +2,17 @@
 	import type { Snippet } from 'svelte';
 
 	/**
-	 * The three uppercase titles in the number face: a page's title, a panel's
-	 * name ("Pool", "The wall"), and a section of a long page.
+	 * The uppercase titles in the number face: a nightly page's head ("2026 Board"), a room's
+	 * page title, a panel's name ("Pool", "The wall"), and a section of a long page.
 	 */
-	type Size = 'page' | 'panel' | 'section';
+	type Size = 'hero' | 'page' | 'panel' | 'section';
 
-	const TAGS = { page: 'h2', panel: 'h2', section: 'h3' } as const satisfies Record<Size, string>;
+	const TAGS = {
+		hero: 'h2',
+		page: 'h2',
+		panel: 'h2',
+		section: 'h3'
+	} as const satisfies Record<Size, string>;
 
 	interface Props {
 		size?: Size;
@@ -37,6 +42,12 @@
 		gap: var(--s-3);
 	}
 
+	.hero {
+		font-size: var(--t-2xl);
+		line-height: 0.9;
+		letter-spacing: 0.01em;
+	}
+
 	.page {
 		font-size: var(--t-display);
 	}
@@ -58,6 +69,11 @@
 	}
 
 	@media (max-width: 760px) {
+		.hero {
+			/* The mock's phone title, between --t-xl and --t-2xl. */
+			font-size: calc((var(--t-xl) + var(--t-2xl)) / 2);
+		}
+
 		.page {
 			font-size: var(--t-head);
 		}
