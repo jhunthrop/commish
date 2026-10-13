@@ -14,7 +14,9 @@ The order, and why each pass exists:
    printed, or a voice-rule hit), and those pages are rewritten. Each such sentence is kept on its first page in board order and the other
    pages are rewritten with the shared sentences quoted as worn language, at most `REPAIR_PASSES`
    times, from the budget left.
-5. **The capsule gate** (`capsule_gate`), whose verdict is the step's.
+5. **The retry passes again**, when a repair's rewrite could not pass its validator and left a facts
+   block, with the sentences still on two pages quoted.
+6. **The capsule gate** (`capsule_gate`), whose verdict is the step's.
 
 Every pass shares one ceiling per player for the night, `NIGHT_CALLS_PER_PLAYER` (12, two of phase C's
 six-call generations): a player who reached it is left to the next night rather than written again.
@@ -157,12 +159,23 @@ class _Passes:
             shared = tuple(sentence.sentence for sentence in capsule_gate(conn, self.now).shared)
         name = "capsules (mend only: pages whose facts moved wait for a full night)" if self.mend_only else "capsules"
         report = self.sweep(name, SweepPlan(self.budget, unwritten_only=self.mend_only, avoid=shared))
-        unwritten = report.facts
+        self.retry("capsule retries", report.facts, shared)
+        self.repair()
+        # A rewrite the repair could not get past its validator leaves a facts block, so the
+        # unwritten pages get their retries once more, the sentences now on two pages quoted.
+        with self.engine.connect() as conn:
+            gate = capsule_gate(conn, self.now)
+        if gate.facts_blocks:
+            self.retry("capsule retries after repair", gate.facts_blocks, tuple(x.sentence for x in gate.shared))
+
+    def retry(self, name: str, unwritten: int, avoid: tuple[str, ...]) -> None:
         for attempt in range(1, RETRY_PASSES + 1):
             if self.left <= 0 or unwritten == 0:
-                break
-            retry = self.sweep(f"capsule retries {attempt}", SweepPlan(self.left, unwritten_only=True, avoid=shared))
+                return
+            retry = self.sweep(f"{name} {attempt}", SweepPlan(self.left, unwritten_only=True, avoid=avoid))
             unwritten = retry.facts
+
+    def repair(self) -> None:
         for attempt in range(1, REPAIR_PASSES + 1):
             with self.engine.connect() as conn:
                 gate = capsule_gate(conn, self.now)
