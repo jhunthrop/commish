@@ -38,16 +38,22 @@
 	let board = $state<LeagueBoard | null>(null);
 	let failure = $state<'signed-out' | 'missing' | 'unreachable' | null>(null);
 	let problem = $state<string | null>(null);
+	/** The run's board file could not be read; cleared when one loads. */
+	let boardFailed = $state(false);
 	let refreshing = $state(false);
 	let now = $state(new Date());
 
 	function take(answer: LeagueSync): void {
 		sync = answer;
 		// The board is the run's own file: read once, and again only when the league reads on another.
+		// A failed board read says so and is tried again with the next read of the league.
 		if (board?.format !== answer.board_format) {
 			void loadBoard(answer.board_format, answer.byes)
-				.then((loaded) => (board = loaded))
-				.catch(() => (failure ??= 'unreachable'));
+				.then((loaded) => {
+					board = loaded;
+					boardFailed = false;
+				})
+				.catch(() => (boardFailed = true));
 		}
 		now = new Date();
 		problem = null;
@@ -124,6 +130,10 @@
 	{:else if failure === 'unreachable'}
 		<div class="pad">
 			<EmptyState title="Your league can't be read right now" line="Reload in a moment." />
+		</div>
+	{:else if sync && !board && boardFailed}
+		<div class="pad">
+			<ProblemLine>Our board can't be read right now. We try again in a minute.</ProblemLine>
 		</div>
 	{:else if sync && board}
 		<main class="league">
