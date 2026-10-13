@@ -417,6 +417,9 @@ The register against week 1 is not a port difference: 561 of the 669 frozen boar
 from today's model by more than 0.05 (worst 66.79). The week-1 board was taken by the 2026-09-07
 model; on 2026-09-08 the availability priors were re-fit and the roster-status gate, per-format
 boards and designation cells landed, and the oracle today reproduces the port, not that board.
+Proven by construction once: the tree at `800aef34` (the last commit before that board), run
+unmodified on the store as it stood at its moment, reproduces all 669 frozen week-1 points within
+0.05 (worst 0.03).
 
 ### The backtest
 
