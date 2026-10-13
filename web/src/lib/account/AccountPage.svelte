@@ -49,7 +49,11 @@
 			text: 'on every device you sign in on, with your notes and tiers'
 		},
 		{ lead: 'Your mock drafts', text: 'and the report on each one' },
-		{ lead: 'Your Draft Pass or Membership', text: 'and the receipts for it' }
+		{
+			lead: 'Your Draft Pass or Membership',
+			text: 'and the receipts for it',
+			href: accountLinks.pass()
+		}
 	];
 
 	let view = $state<AccountState | null>(null);

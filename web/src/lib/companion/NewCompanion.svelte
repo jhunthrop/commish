@@ -12,6 +12,7 @@
 	import Field from '#lib/ui/Field.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Stepper from '#lib/ui/Stepper.svelte';
+	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { isSignedOut } from '#lib/api/status.ts';
 	import { MAX_TEAMS } from '#lib/room/setup/setup.ts';
@@ -80,11 +81,12 @@
 			<div class="reserve"></div>
 		{:else if view === 'signed-out'}
 			<EmptyState
-				title="Sign in to follow your draft"
-				line="Our call beside your Sleeper draft comes with the Draft Pass."
+				title="Our call beside your real draft comes with the Draft Pass"
+				line="Paste your Sleeper draft link and get our pick at each of your turns, against the picks your league makes."
 			>
 				{#snippet actions()}
-					<Verb href={companions.signInUrl(links.companionNew())}>Sign in</Verb>
+					<Verb href={links.pass()}>See the Draft Pass</Verb>
+					<Quiet href={companions.signInUrl(links.companionNew())}>I have a pass, sign in</Quiet>
 				{/snippet}
 			</EmptyState>
 		{:else if view === 'no-pass'}

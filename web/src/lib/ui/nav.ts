@@ -17,11 +17,13 @@ export const HOME_HREF = '/';
 
 /** Where a mock draft starts: the room's setup. */
 const MOCK_SETUP = '/mock/new';
+/** The advisor's own page: our call beside your real draft (the live draft companion). */
+const COMPANION_START = '/companion/new';
 
 /** The rail, top to bottom. The phone shows every item not marked wideOnly along the bottom.
  * A page lights the item whose `owns` holds its first path segment: the board's companions (ADP,
- * schedule strength) light Board, the players' (clubs, compare) light Players. The advisor lives in
- * the mock room, so its item opens the room's setup until the advisor has a page of its own. */
+ * schedule strength) light Board, the players' (clubs, compare) light Players. The advisor's item
+ * opens its own page, the live draft companion, beside your real draft. */
 export const RAIL: readonly RailItem[] = [
 	{
 		section: 'board',
@@ -58,7 +60,7 @@ export const RAIL: readonly RailItem[] = [
 	{
 		section: 'advisor',
 		label: 'Advisor',
-		href: MOCK_SETUP,
+		href: COMPANION_START,
 		icon: 'advisor',
 		wideOnly: true,
 		owns: ['advisor', 'companion']
