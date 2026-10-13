@@ -54,6 +54,13 @@
 			{#if search}
 				<div class="find">{@render search()}</div>
 			{/if}
+			<a
+				class="account"
+				href={RAIL_FOOT.href}
+				aria-label={RAIL_FOOT.label}
+				aria-current={current === RAIL_FOOT.section ? 'page' : undefined}
+				><Icon name={RAIL_FOOT.icon} /></a
+			>
 			<div class="tail">
 				<ThemeSwitch />
 				{@render tail?.()}
@@ -126,6 +133,19 @@
 
 	.spacer {
 		flex: 1;
+	}
+
+	/* The account's way in on the phone, where the rail's foot is not drawn. */
+	.account {
+		display: none;
+		place-items: center;
+		width: 44px;
+		height: 44px;
+		color: var(--ink-2);
+	}
+
+	.account[aria-current='page'] {
+		color: var(--accent-text);
 	}
 
 	.main {
@@ -222,6 +242,17 @@
 
 		.stamp {
 			margin-left: 0;
+		}
+
+		/* Beside the run's date on the bar's first line, so the switch and the verb keep the second. */
+		.account {
+			display: grid;
+			margin: -10px -10px -10px auto;
+		}
+
+		/* A page with no run date: the account leads the bar's line instead. */
+		.top:not(:has(.stamp)) .account {
+			margin-left: -10px;
 		}
 
 		.find {
