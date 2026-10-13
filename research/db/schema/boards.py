@@ -64,7 +64,9 @@ PRESEASON_PROJECTIONS: Final = Table(
 # is written. Not a foreign key onto a projection row: a reason can explain why a player is NOT on
 # the board (`roster_status`, the roster gate's exclusions), and such a player has no projection
 # row at that stamp. A reason code can apply to one player more than once with different
-# particulars, so the `detail` that tells them apart is part of the key.
+# particulars, so the `detail` that tells them apart is part of the key. `ordinal` is the reason's
+# place among its player's reasons as the board emitted them (revision 0003): the readers group and
+# sum in that order, so it is stored rather than left to the heap.
 PRESEASON_BOARD_REASONS: Final = Table(
     "preseason_board_reasons",
     METADATA,
@@ -75,7 +77,9 @@ PRESEASON_BOARD_REASONS: Final = Table(
     Column("code", Text, primary_key=True),
     Column("detail", Text, primary_key=True),
     Column("payload", JSONB, nullable=False),
+    Column("ordinal", Integer, nullable=False),
     _player_fk("preseason_board_reasons"),
+    CheckConstraint("ordinal >= 0", name="preseason_board_reasons_ordinal_ck"),
     Index("preseason_board_reasons_board_idx", "season", "source", "as_of"),
 )
 

@@ -97,7 +97,9 @@ def projection_rows(
     ]
 
 
-def _reason_row(season: int, source: str, as_of: datetime, player_id: str, reason: Mapping[str, Any]) -> dict[str, Any]:
+def _reason_row(  # noqa: PLR0913, PLR0917 - one row's key, its reason and its place in the player's list
+    season: int, source: str, as_of: datetime, player_id: str, reason: Mapping[str, Any], ordinal: int
+) -> dict[str, Any]:
     payload = {key: value for key, value in reason.items() if key != "code"}
     detail = str(reason["lawId"]) if reason["code"] == "law" else ""
     return {
@@ -108,16 +110,20 @@ def _reason_row(season: int, source: str, as_of: datetime, player_id: str, reaso
         "code": reason["code"],
         "detail": detail,
         "payload": payload,
+        "ordinal": ordinal,
     }
 
 
 def reason_rows(built: BuiltBoard, season: int, source: str, as_of: datetime) -> list[dict[str, Any]]:
-    """`reasonRows` and `exclusionReasonRows`: the board's reasons, then the gate's exclusions."""
+    """`reasonRows` and `exclusionReasonRows`: the board's reasons, then the gate's exclusions, each
+    numbered by its place in its player's list as the board emitted it (revision 0003)."""
     rows = [
-        _reason_row(season, source, as_of, entry.player_id, reason) for entry in built.board for reason in entry.reasons
+        _reason_row(season, source, as_of, entry.player_id, reason, ordinal)
+        for entry in built.board
+        for ordinal, reason in enumerate(entry.reasons)
     ]
     rows.extend(
-        _reason_row(season, source, as_of, excluded.player_id, roster_status_reason(excluded.status))
+        _reason_row(season, source, as_of, excluded.player_id, roster_status_reason(excluded.status), 0)
         for excluded in built.exclusions
     )
     return rows
@@ -135,9 +141,10 @@ _INSERT_PROJECTION: Final = text(
     "on conflict do nothing"
 )
 _UPSERT_REASON: Final = text(
-    "insert into research.preseason_board_reasons (season, source, as_of, player_id, code, detail, payload) values (:season, :source, "
-    ":as_of, :player_id, :code, :detail, cast(:payload as jsonb)) on conflict (season, source, as_of, player_id, code, detail) "
-    "do update set payload = excluded.payload where research.preseason_board_reasons.payload is distinct from excluded.payload"
+    "insert into research.preseason_board_reasons (season, source, as_of, player_id, code, detail, payload, ordinal) values (:season, "
+    ":source, :as_of, :player_id, :code, :detail, cast(:payload as jsonb), :ordinal) on conflict (season, source, as_of, player_id, code, "
+    "detail) do update set payload = excluded.payload, ordinal = excluded.ordinal where (research.preseason_board_reasons.payload, "
+    "research.preseason_board_reasons.ordinal) is distinct from (excluded.payload, excluded.ordinal)"
 )
 
 
@@ -253,7 +260,8 @@ def stored_reasons(conn: Connection, season: int, source: str, as_of: datetime) 
     out: dict[str, list[dict[str, Any]]] = {}
     rows = conn.execute(
         text(
-            "select player_id, code, payload from research.preseason_board_reasons where season = :season and source = :source and as_of = :as_of"
+            "select player_id, code, payload from research.preseason_board_reasons where season = :season and source = :source "
+            "and as_of = :as_of order by player_id, ordinal"
         ),
         {"season": season, "source": source, "as_of": as_of},
     )
