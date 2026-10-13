@@ -45,8 +45,8 @@ func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.Leag
 		ScoringLike: NearestPreset(snap.Scoring.Rules), Teams: standings(snap.Teams), Moves: p.moves(snap.Moves),
 		Rostered: rosteredIDs(rosteredOnBoard(snap, placed)), BoardFormat: boardFormat(snap), Byes: byes(board.Raw.Players),
 		Placement: placement(snap, placed), ReadAt: snap.ReadAt, HostStaleSeconds: int(math.Round(read.Stale.Seconds())),
-		HostSignedOut: read.SignedOut,
-		Roster:        []apitypes.RosterSpot{},
+		HostFailed: read.Failed, HostSignedOut: read.SignedOut,
+		Roster: []apitypes.RosterSpot{},
 	}
 	if saved == nil {
 		out.SettingsLeagueId = nil

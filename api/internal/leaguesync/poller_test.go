@@ -218,9 +218,24 @@ func TestPollerStaleReadSaysSignedOut(t *testing.T) {
 			if err != nil || r.Stale != time.Minute {
 				t.Fatalf("a failed refresh answered %v, stale %s, want the last read a minute stale", err, r.Stale)
 			}
-			if r.SignedOut != c.want {
-				t.Fatalf("signed out %v, want %v", r.SignedOut, c.want)
+			if !r.Failed || r.SignedOut != c.want {
+				t.Fatalf("failed %v, signed out %v, want failed and signed out %v", r.Failed, r.SignedOut, c.want)
 			}
 		})
+	}
+}
+
+// A read kept from before this process is stale while the next goes to the
+// host, but nothing failed, so it never reads as a failure.
+func TestPollerKeptReadIsNotAFailure(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
+	store := &memorySnapshots{}
+	if _, err := newPoller(&countingHost{}, store, clock).Read(context.Background(), testRef); err != nil {
+		t.Fatal(err)
+	}
+	clock.Advance(3 * time.Minute)
+	r, err := newPoller(&countingHost{}, store, clock).Read(context.Background(), testRef)
+	if err != nil || r.Stale == 0 || r.Failed || r.SignedOut {
+		t.Fatalf("a kept read answered %v, stale %s, failed %v, signed out %v; want stale and not failed", err, r.Stale, r.Failed, r.SignedOut)
 	}
 }

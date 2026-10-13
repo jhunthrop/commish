@@ -2069,6 +2069,8 @@ export interface components {
 			read_at: string;
 			/** @description how stale the answer is because the host failed since, 0 when the last read reached it */
 			host_stale_seconds: number;
+			/** @description the stale answer's last read failed. False for a read kept from before this process while the next one goes to the host, so a stale answer names a failure only when there was one */
+			host_failed: boolean;
 			/** @description the stale answer's last read failed because no member of the league is signed in to the host (FFPC), so a sign-in mends it. False when fresh */
 			host_signed_out: boolean;
 		};
