@@ -25,7 +25,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
-from research.capsules.pull_figures import PageValues, capsule_findings, page_numbers
 from research.model.backtest import HeldOutScore
 from research.model.domain import BENCH_SLOT
 from research.nightly.capsule_gate import CapsuleGateResult
@@ -99,25 +98,15 @@ def depth_gate(formats: Sequence[RunFormat], boards: Mapping[str, Json]) -> Gate
     )
 
 
-@dataclass(frozen=True, slots=True)
-class CapsulePage:
-    """A page with a written capsule: its id, both reads, its PPR board numbers and its names."""
-
-    player_id: str
-    bodies: tuple[str, str]
-    values: PageValues
-    names: tuple[str, ...]
-
-
-def capsule_gate(step: CapsuleGateResult, pages: Sequence[CapsulePage]) -> GateRecord:
+def capsule_gate(step: CapsuleGateResult, page_reasons: Sequence[str]) -> GateRecord:
+    """The capsule step's gate (the unwritten share, shared sentences) and every written page's findings."""
     reasons = (
         [f"capsule_unwritten_share:{step.unwritten_share:.4f}>{step.share_max}"]
         if step.unwritten_share > step.share_max
         else []
     )
     reasons += [f"capsule_shared_sentence:{len(s.player_ids)}:{s.sentence}" for s in step.shared]
-    for page in pages:
-        reasons += capsule_findings(page.player_id, page.bodies, page_numbers(page.values), page.names)
+    reasons += list(page_reasons)
     return _gate("capsules", reasons, step.summary().removeprefix("capsule gate: "))
 
 

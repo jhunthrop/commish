@@ -63,12 +63,13 @@ def page_numbers(row: PageValues) -> tuple[PageNumber, ...]:
 
 
 def facts_page_numbers(facts: "PlayerFacts") -> tuple[PageNumber, ...]:
-    """The page numbers a sheet carries itself (the projection, its band, the ADP): the writer is
-    held to these, a subset of the page's, so a read it passes passes the gate."""
+    """The page numbers a sheet carries itself and the page prints the same (the projection and its
+    band): the writer is held to these, so a read it passes passes the gate. Not the ADP: the sheet's
+    is the stats provider's, the page's is the run's named source (`nightly/reads/adp.py`), so a read
+    whose only page number was its ADP printed a number the page does not show (phase D, measured on
+    the 2026-10-13 regeneration: 9 written pages)."""
     p = facts.projection
-    return page_numbers(
-        PageValues(p.projected_points, p.ceiling_points, p.floor_points, p.median_points, adp=facts.market.adp)
-    )
+    return page_numbers(PageValues(p.projected_points, p.ceiling_points, p.floor_points, p.median_points))
 
 
 def _renderings(value: float) -> list[str]:

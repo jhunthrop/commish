@@ -6,20 +6,18 @@ its path in the run (`RUN_PATHS` in `web/src/lib/run/schema.ts`), with the sourc
 each feed's vendor and window.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
-from research.capsules.pull_figures import PageValues
-from research.capsules.store import StoredCapsule, stored_capsules_for
+from research.capsules.store import stored_capsules_for
 from research.errors import ResearchError
 from research.model.reads.teams import first_kickoff_for
 from research.nightly.build import pages, season
 from research.nightly.config import PAGE_FORMAT, PRODUCT_SEASON, RUN_FORMATS, RunFormat
-from research.nightly.gates import CapsulePage
 from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.adp import AdpCapture, adp_cutoff, latest_capture
@@ -40,7 +38,6 @@ class Assembled:
     files: dict[str, Any]  # path in the run to its JSON
     boards: tuple[FormatBoard, ...]
     people: tuple[pages.Identity, ...]
-    capsule_pages: tuple[CapsulePage, ...]
     sources: tuple[Json, ...]
     model_versions: tuple[str, ...]
     formats: tuple[RunFormat, ...]
@@ -98,22 +95,6 @@ def _record(conn: Connection, as_of: datetime) -> tuple[Json, Json | None]:
         "window": season.window(min(stamps), max(stamps)),
     }
     return record, source
-
-
-def _capsule_pages(people: Sequence[pages.Identity], players: Sequence[Json], boards: Sequence[FormatBoard],
-                   adp: Mapping[str, float], capsules: Mapping[str, StoredCapsule]) -> tuple[CapsulePage, ...]:  # fmt: skip
-    """The pages carrying a written capsule, with what the page gate checks them against."""
-    page_board = next(b for b in boards if b.format.id == PAGE_FORMAT.id)
-    entries = {e.row.player_id: e for e in page_board.entries}
-    out = []
-    for who, page in zip(people, players, strict=True):
-        entry = entries.get(who.id)
-        stored = None if entry is None else capsules.get(entry.row.universe_id)
-        if page["capsule"] is None or entry is None or stored is None:
-            continue
-        values: PageValues = pages.page_values(entry, adp.get(who.id))
-        out.append(CapsulePage(who.id, (stored.body_compact, stored.body_full), values, (who.name,)))
-    return tuple(out)
 
 
 def assemble(conn: Connection, as_of: datetime) -> Assembled:
@@ -176,7 +157,6 @@ def assemble(conn: Connection, as_of: datetime) -> Assembled:
         files,
         boards,
         people,
-        _capsule_pages(people, players, boards, adp_by_format[PAGE_FORMAT.id], capsules),
         (
             *board_sources.values(),
             *adp_sources,

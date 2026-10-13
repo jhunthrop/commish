@@ -27,6 +27,7 @@ from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate
 from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan, run_capsule_step
 from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION, PRODUCT_SEASON
 from research.nightly.headshots import Face, mirror_headshots
+from research.nightly.page_findings import PageFindings, page_findings
 from research.nightly.publish import ArtifactWriter, encode, promote_early, read_json, take_run_id
 from research.nightly.run_store import RunStore
 from research.nightly.steps import IngestContext, StepRecord, ingest_step, run_fit_step
@@ -73,7 +74,7 @@ def _held_out(deps: RunDeps) -> tuple[list[HeldOutScore], Mapping[int, float] | 
 
 def _steps(
     deps: RunDeps, options: RunOptions
-) -> tuple[list[StepRecord], tuple[CapsuleGateResult, CapsuleSpend | None]]:
+) -> tuple[list[StepRecord], tuple[CapsuleGateResult, PageFindings, CapsuleSpend | None]]:
     records: list[StepRecord] = []
     if "ingest" in options.skip:
         records.append(StepRecord("ingest", "skipped", "skipped by --skip"))
@@ -89,12 +90,13 @@ def _steps(
     if "capsules" in options.skip:
         with deps.engine.connect() as conn:
             gate = capsule_gate(conn, deps.clock())
+            findings = page_findings(conn, deps.clock())
         records.append(StepRecord("capsules", "skipped", "skipped by --skip; the gate judges what is stored"))
-        return records, (gate, None)
+        return records, (gate, findings, None)
     result = run_capsule_step(deps.engine, deps.clock(), options.capsules, deps.log)
     status = "ran" if result.wrote else "skipped"
     records.append(StepRecord("capsules", status, f"{result.spend.line()}; {result.gate.summary()}"))
-    return records, (result.gate, result.spend)
+    return records, (result.gate, result.findings, result.spend)
 
 
 def _headshots(deps: RunDeps, assembled: Assembled, skip: bool) -> tuple[Json, str]:
@@ -127,7 +129,7 @@ def run_nightly(deps: RunDeps, options: RunOptions) -> RunOutcome:
     started = deps.clock()
     run_id = take_run_id(deps.store, started)
     deps.log(f"run {run_id}: season {PRODUCT_SEASON}, writing to {deps.store.locate(f'runs/{run_id}')}")
-    steps, (capsule_result, spend) = _steps(deps, options)
+    steps, (capsule_result, findings, spend) = _steps(deps, options)
     as_of = deps.clock()
     writer = ArtifactWriter(deps.store, run_id, [])
     try:
@@ -145,7 +147,7 @@ def run_nightly(deps: RunDeps, options: RunOptions) -> RunOutcome:
     record_set = [
         gates.held_out_gate(held_out, previous),
         gates.depth_gate(assembled.formats, {f.id: files[f"boards/{f.id}.json"] for f in assembled.formats}),
-        gates.capsule_gate(capsule_result, assembled.capsule_pages),
+        gates.capsule_gate(capsule_result, findings.reasons),
         gates.adp_gate(assembled.formats, files["adp.json"]),
     ]
     finished = deps.clock()

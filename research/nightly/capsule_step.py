@@ -10,7 +10,8 @@ The order, and why each pass exists:
 3. **The retry passes** (up to `RETRY_PASSES`): another attempt at the pages still unwritten (facts blocks), from the budget
    left, because a throttled or refused read often succeeds on a second try.
 4. **The repair pass**: the capsule gate fails a run when a written sentence of four words or more
-   sits on two pages. Each such sentence is kept on its first page in board order and the other
+   sits on two pages, or a written page fails its page gate (`page_findings`: no page number
+   printed, or a voice-rule hit), and those pages are rewritten. Each such sentence is kept on its first page in board order and the other
    pages are rewritten with the shared sentences quoted as worn language, at most `REPAIR_PASSES`
    times, from the budget left.
 5. **The capsule gate** (`capsule_gate`), whose verdict is the step's.
@@ -33,6 +34,7 @@ from research.capsules.gateway import GatewayClient
 from research.capsules.store import queue_regeneration
 from research.capsules.sweep import SweepPlan, SweepReport, sweep_capsules
 from research.nightly.capsule_gate import CapsuleGateResult, SharedSentence, board_universe_ids, capsule_gate
+from research.nightly.page_findings import PageFindings, page_findings
 
 REPAIR_PASSES: Final = 2
 # Each retry pass writes about half of what is left (measured on the 2026-10-13 regeneration: 31 of
@@ -79,6 +81,7 @@ class CapsuleStepPlan:
 @dataclass(frozen=True, slots=True)
 class CapsuleStepResult:
     gate: CapsuleGateResult
+    findings: PageFindings
     spend: CapsuleSpend
     wrote: bool
 
@@ -144,12 +147,18 @@ class _Passes:
             with self.engine.connect() as conn:
                 gate = capsule_gate(conn, self.now)
                 order = board_universe_ids(conn, self.now)
-            targets = repair_targets(gate.shared, order)
+                failing = page_findings(conn, self.now).by_page
+            place = {pid: index for index, pid in enumerate(order)}
+            shared_pages = repair_targets(gate.shared, order)
+            targets = sorted({*shared_pages, *failing}, key=lambda pid: place.get(pid, len(place)))
             if not targets or self.left <= 0:
                 self.log(f"capsule repair {attempt}: {'none needed' if not targets else 'no budget left'}")
                 return
             avoid = tuple(sentence.sentence for sentence in gate.shared)
-            name = f"capsule repair {attempt} ({len(gate.shared)} shared sentences, {len(targets)} pages)"
+            name = (
+                f"capsule repair {attempt} ({len(gate.shared)} shared sentences, {len(failing)} pages failing the "
+                f"page gate, {len(targets)} pages)"
+            )
             self.sweep(name, SweepPlan(self.left, only=frozenset(targets), avoid=avoid))
 
 
@@ -172,5 +181,6 @@ def run_capsule_step(engine: Engine, now: datetime, plan: CapsuleStepPlan, log: 
         log(f"capsules spent: {spend.line()}")
     with engine.connect() as conn:
         gate = capsule_gate(conn, now)
-    log(gate.summary())
-    return CapsuleStepResult(gate, spend, bool(key))
+        findings = page_findings(conn, now)
+    log(f"{gate.summary()}; {len(findings.by_page)} written pages fail the page gate")
+    return CapsuleStepResult(gate, findings, spend, bool(key))
