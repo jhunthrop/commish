@@ -92,9 +92,9 @@ export interface SheetsApi {
 	list(): Promise<readonly SheetSummary[]>;
 	get(id: string): Promise<RemoteSheet>;
 	create(sheet: Sheet): Promise<RemoteSheet>;
-	rename(id: string, name: string): Promise<SheetSummary>;
 	remove(id: string): Promise<void>;
-	/** Writes every row. With ifUpdatedAt, refused with 409 when the sheet changed since. */
+	/** Writes the name and every row in one request. With ifUpdatedAt, nothing is written and the
+	 * answer is 409 when the sheet changed since. */
 	replace(id: string, sheet: Sheet, ifUpdatedAt: string | null): Promise<RemoteSheet>;
 	signInUrl(returnTo: string): string;
 }
@@ -117,17 +117,13 @@ export function sheetsApi(client: ApiClient): SheetsApi {
 			};
 			return fromDetail(await client.call<ApiSheetDetail>('/sheets', { method: 'POST', body }));
 		},
-		async rename(id, name) {
-			const body: components['schemas']['SheetUpdate'] = { name };
-			const path = `/sheets/${encodeURIComponent(id)}`;
-			return fromSummary(await client.call<ApiSheet>(path, { method: 'PATCH', body }));
-		},
 		async remove(id) {
 			await client.call<null>(`/sheets/${encodeURIComponent(id)}`, { method: 'DELETE' });
 		},
 		async replace(id, sheet, ifUpdatedAt) {
 			const body: components['schemas']['SheetRowsReplace'] = {
 				rows: sheet.rows.map(toApiRow),
+				name: sheet.name,
 				if_updated_at: ifUpdatedAt
 			};
 			const path = `/sheets/${encodeURIComponent(id)}/rows`;

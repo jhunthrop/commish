@@ -5,12 +5,15 @@
  *
  * - A player in the ancestor and missing on either side was removed there, and stays removed.
  * - A player not in the ancestor was added on whichever side has him, and is kept.
- * - A field (a player's tags, his note, the sheet's name, the order) changed on one side only
- *   takes that side's value. Changed on both sides to different values, the account's copy stands
- *   and the page says what this browser's value was ("Your note on X was replaced by the one saved
- *   on another device").
- * - Tiers travel with the order: they come from the side whose order stands, and are made whole
- *   within each position after (tiers.ts), so an added player joins the tier above him.
+ * - A field (a player's tags, his note, the sheet's name, the order, the tiers) changed on one
+ *   side only takes that side's value. Changed on both sides to different values, the account's
+ *   copy stands and the page says what this browser's value was ("Your note on X was replaced by
+ *   the one saved on another device").
+ * - Tiers are their own field, not a byproduct of the order: a side changed its tiers when any
+ *   player both it and the ancestor hold sits in a different tier there (a split, a join, a moved
+ *   tier start, or a player dragged across a strip). A split or join on one side wins even when the
+ *   other side reordered. The tiers that stand are made whole within each position after
+ *   (tiers.ts), so an added player joins the tier above him and the order never breaks them.
  *
  * A replace in this browser (an import, a pasted list, our board) is this side's edit like any
  * other: the ancestor's players it dropped are removals, its new players are additions. When the
@@ -50,6 +53,14 @@ function orderChanged(ancestor: Sheet, side: Sheet): boolean {
 	const mine = relativeOrder(side, inAncestor);
 	const theirs = relativeOrder(ancestor, inSide);
 	return mine.length !== theirs.length || mine.some((id, index) => id !== theirs[index]);
+}
+
+/** Whether any player both the side and the ancestor hold sits in a different tier on the side. */
+function tiersChanged(ancestor: ReadonlyMap<string, SheetRow>, side: Sheet): boolean {
+	return side.rows.some((row) => {
+		const before = ancestor.get(row.id);
+		return before !== undefined && before.tier !== row.tier;
+	});
 }
 
 /** The value that stands for one field, and whether this browser's value lost a conflict. */
@@ -135,11 +146,22 @@ export function mergeSheets({ ancestor, local, server }: MergeSides): MergeResul
 		}
 	}
 
+	const localTiers = tiersChanged(inAncestor, local);
+	const serverTiers = tiersChanged(inAncestor, server);
+	const tierSide: ReadonlyMap<string, SheetRow> = localTiers && !serverTiers ? inLocal : inServer;
+	if (localTiers && serverTiers) {
+		const differ = local.rows.some((row) => {
+			const twin = inServer.get(row.id);
+			return twin !== undefined && twin.tier !== row.tier;
+		});
+		if (differ) notices.push('Your tiers were replaced by the ones saved on another device');
+	}
+
 	const rows = weave(orderSide.rows, otherSide.rows, kept).map((row) => {
 		const mine = inLocal.get(row.id);
 		const theirs = inServer.get(row.id);
 		if (!mine || !theirs) return row;
-		const tierFrom = orderSide === local ? mine : theirs;
+		const tierFrom = tierSide.get(row.id) ?? row;
 		return mergeRow(inAncestor.get(row.id), mine, theirs, tierFrom, notices);
 	});
 
@@ -155,14 +177,29 @@ export function mergeSheets({ ancestor, local, server }: MergeSides): MergeResul
 	if (name.overruled) {
 		notices.push(`Your sheet's name ${local.name} was replaced by the one saved on another device`);
 	}
+	const merged = repairTiers(rows.slice(0, SHEET_LIMITS.rows));
+	if (tierSide === inLocal && localTiers && redrawn(merged, inLocal)) {
+		notices.push('Your tiers were redrawn to fit the order saved on another device');
+	}
 	return {
-		sheet: {
-			name: name.value,
-			format: server.format,
-			rows: repairTiers(rows.slice(0, SHEET_LIMITS.rows))
-		},
+		sheet: { name: name.value, format: server.format, rows: merged },
 		notices
 	};
+}
+
+/** Whether, among players next to each other at a position in `merged` that `side` also holds,
+ * any pair shares a tier in one and not in the other: the order that stood broke a tier the side
+ * drew, and making the tiers whole moved its line. */
+function redrawn(merged: readonly SheetRow[], side: ReadonlyMap<string, SheetRow>): boolean {
+	const previous = new Map<string, SheetRow>();
+	return merged.some((row) => {
+		const before = previous.get(row.position);
+		previous.set(row.position, row);
+		const mine = side.get(row.id);
+		const mineBefore = before ? side.get(before.id) : undefined;
+		if (!before || !mine || !mineBefore) return false;
+		return (before.tier === row.tier) !== (mineBefore.tier === mine.tier);
+	});
 }
 
 /** Whether two sheets would store the same rows, names and annotations alike. */

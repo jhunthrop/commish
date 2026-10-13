@@ -135,18 +135,11 @@ function settle(
 	return mergeSheets({ ancestor, local: stored.sheet, server: remote.sheet });
 }
 
+/** Writes the sheet (its name and every row in one request) when it differs from `remote`,
+ * guarded by the updated_at `remote` was read at. */
 async function write(api: SheetsApi, remote: RemoteSheet, sheet: Sheet): Promise<RemoteSheet> {
-	let written = remote;
-	if (sheet.name !== remote.sheet.name) {
-		const renamed = await api.rename(remote.id, sheet.name);
-		written = {
-			...remote,
-			updatedAt: renamed.updatedAt,
-			sheet: { ...remote.sheet, name: renamed.name }
-		};
-	}
-	if (sameSheet(sheet, written.sheet)) return written;
-	return api.replace(remote.id, sheet, written.updatedAt);
+	if (sameSheet(sheet, remote.sheet)) return remote;
+	return api.replace(remote.id, sheet, remote.updatedAt);
 }
 
 /** Creates every shelved sheet on the account, in order. A sheet that does not make it stays on
@@ -213,6 +206,25 @@ export async function reconcile(api: SheetsApi, stored: StoredSheet): Promise<Sy
 	return { kind: 'failed', message: 'This sheet keeps changing on another device' };
 }
 
+/**
+ * Edits made here while a reconcile was out, laid over what it settled. What it settled stands:
+ * the sheet it followed or created, the new ancestor, the shelf it emptied, so nothing is created
+ * or uploaded twice. The copy the reconcile started from is the ancestor of a second three-way
+ * merge, so each edit made since is this side's change and every player the reconcile brought in
+ * stays. Only the sheet is left unsaved.
+ */
+export function keepEdits(
+	settled: StoredSheet,
+	started: Sheet,
+	current: StoredSheet
+): { stored: StoredSheet; notices: readonly string[] } {
+	const rebased = mergeSheets({ ancestor: started, local: current.sheet, server: settled.sheet });
+	return {
+		stored: { ...settled, sheet: rebased.sheet, editedAt: current.editedAt, dirty: true },
+		notices: rebased.notices
+	};
+}
+
 export type PushOutcome =
 	| { kind: 'saved'; stored: StoredSheet }
 	| { kind: 'reconcile' }
@@ -224,11 +236,9 @@ export type PushOutcome =
 export async function push(api: SheetsApi, stored: StoredSheet): Promise<PushOutcome> {
 	if (!stored.sync || stored.shelf.length > 0) return { kind: 'reconcile' };
 	try {
-		const { sheetId } = stored.sync;
-		let updatedAt = stored.sync.updatedAt;
-		if (stored.sheet.name !== stored.base?.name) {
-			updatedAt = (await api.rename(sheetId, stored.sheet.name)).updatedAt;
-		}
+		// The name rides in the same guarded write as the rows, so no rename can move the stamp
+		// a stale write is checked against.
+		const { sheetId, updatedAt } = stored.sync;
 		const written = await api.replace(sheetId, stored.sheet, updatedAt);
 		return { kind: 'saved', stored: syncedFrom(written, stored) };
 	} catch (error) {

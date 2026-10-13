@@ -39,6 +39,7 @@
 	--s-6: 32px;
 	--s-7: 48px;
 	--row-h: 52px;
+	--verb-h: 42px; /* the one solid verb, and the top bar slot that holds it */
 	--rail-w: 84px;
 	--side-w: 296px;
 	--r-sm: 4px;

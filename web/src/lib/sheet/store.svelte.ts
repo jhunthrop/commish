@@ -27,7 +27,7 @@ import {
 import { queueSeed } from './queue.ts';
 import { sheetsApi, type Account, type SheetSummary, type SheetsApi } from './remote.ts';
 import { EMPTY_STORED, SHELF_LIMIT, readStored, writeStored, type StoredSheet } from './storage.ts';
-import { isOffline, push, reconcile, syncedFrom } from './sync.ts';
+import { isOffline, keepEdits, push, reconcile, syncedFrom } from './sync.ts';
 import { moveTierStart, removeTierAt, startTierAt } from './tiers.ts';
 
 /** How long after the last edit a save goes out: a drag or a burst of typing is one save. */
@@ -358,6 +358,7 @@ export class SheetStore {
 	async #reconcileStep(): Promise<void> {
 		this.status = this.signedIn ? 'saving' : 'checking';
 		const edits = this.#edits;
+		const started = this.stored.sheet;
 		const outcome = await reconcile(this.#deps.api, this.stored);
 		switch (outcome.kind) {
 			case 'synced':
@@ -369,9 +370,7 @@ export class SheetStore {
 					this.#setStored(outcome.stored);
 					this.status = 'saved';
 				} else {
-					// You edited while the merge ran. Your copy is still marked unsaved, so the
-					// next pass merges it with what was just written and nothing is lost.
-					void this.#reconcile();
+					this.#keepEditsOver(outcome.stored, started);
 				}
 				return;
 			case 'signed-out':
@@ -385,6 +384,20 @@ export class SheetStore {
 				this.status = 'failed';
 				this.problem = outcome.message;
 		}
+	}
+
+	/**
+	 * You edited while a reconcile was out. What it settled stands (the sheet it followed or
+	 * created, the new ancestor, the shelf it emptied), so nothing is created or uploaded twice.
+	 * Your edits are laid over the sheet it wrote: the copy reconcile started from is the
+	 * ancestor, so each edit you made since is this side's change and every player the merge
+	 * brought in stays. Only the sheet is left unsaved, and the next save writes it guarded.
+	 */
+	#keepEditsOver(settled: StoredSheet, started: Sheet): void {
+		const kept = keepEdits(settled, started, this.stored);
+		if (kept.notices.length > 0) this.notices = [...this.notices, ...kept.notices];
+		this.#setStored(kept.stored);
+		this.#schedule();
 	}
 
 	#save(): Promise<void> {
