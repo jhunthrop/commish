@@ -781,6 +781,64 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/companions': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Follow a draft running on another host (Sleeper today) from the drafter's seat. Needs the live_draft_advisor feature (403 with feature otherwise). Snake drafts only; an auction, a linear order or a reversal is refused with a sentence. The same draft again answers the companion already made, with the seat updated. */
+		post: operations['createCompanion'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/companions/{id}': {
+		parameters: {
+			query?: {
+				/** @description the pick count the caller already holds (its last answer's pick_count); only later picks are sent */
+				since?: number;
+			};
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		/** The host's draft as of at most two seconds ago, the drafter's seat, pick N of M, picks until their turn, and at their turn our call. One upstream read per draft per two seconds whatever the viewer count; when the host fails, the last snapshot with host_stale_seconds. */
+		get: operations['getCompanion'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/companions/{id}/report': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		/** The report on the finished draft from the drafter's seat, once the host says it is complete (409 before). */
+		get: operations['companionReport'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/rooms/{id}/ws': {
 		parameters: {
 			query?: never;
@@ -1346,6 +1404,92 @@ export interface components {
 			share_code?: string;
 		};
 		/** @enum {string} */
+		CompanionHost: 'sleeper';
+		CompanionCreate: {
+			host: components['schemas']['CompanionHost'];
+			/** @description the draft link as pasted */
+			draft: string;
+			seat: components['schemas']['CompanionSeat'];
+			/** @description development only (COMPANION_REPLAY), replays a recorded completed draft one pick a second */
+			replay?: boolean;
+		};
+		/** @description exactly one of slot and username */
+		CompanionSeat: {
+			slot?: number | null;
+			username?: string | null;
+		};
+		/** @enum {string} */
+		CompanionStatus: 'pre_draft' | 'drafting' | 'paused' | 'complete';
+		CompanionPick: {
+			pick: number;
+			round: number;
+			/** @description the draft slot that made it */
+			seat: number;
+			/** @description our board's player */
+			player_id: string | null;
+			host_player_id: string;
+			/** @description the host's name for him */
+			name: string;
+			position: string;
+			team: string;
+			keeper: boolean;
+		};
+		OutcomeRange: {
+			/** Format: double */
+			floor: number;
+			/** Format: double */
+			median: number;
+			/** Format: double */
+			ceiling: number;
+		};
+		Companion: {
+			/** Format: uuid */
+			id: string;
+			host: components['schemas']['CompanionHost'];
+			host_draft_id: string;
+			replay: boolean;
+			/** @description the draft's name on the host */
+			name: string;
+			status: components['schemas']['CompanionStatus'];
+			teams: number;
+			rounds: number;
+			/** @description the drafter's draft slot */
+			slot: number;
+			settings: components['schemas']['LeagueSettings'];
+			/** @description the board our call reads */
+			basis: string;
+			/** @description picks the host has made */
+			pick_count: number;
+			total_picks: number;
+			/** @description the slot on the clock */
+			on_clock: number | null;
+			your_turn: boolean;
+			/** @description the drafter's next overall pick */
+			your_next_pick: number | null;
+			/** @description picks before the drafter's next */
+			picks_until_turn: number | null;
+			/** @description the pick count the picks follow */
+			since: number;
+			/** @description every pick after since, in order */
+			picks: components['schemas']['CompanionPick'][];
+			/** @description picks so far we could not place on our board; they take nobody from it */
+			unplaced: number;
+			/** @description the pick our draft could not follow (out of order, or no roster spot takes him); no call after it */
+			lost_at: number | null;
+			/** @description picks made by a team other than the slot's own */
+			traded: number;
+			/** @description our call at the drafter's turn. The why is on the call only, or on every shortlist row with full_reasoning. */
+			card: components['schemas']['RoomCard'] | null;
+			/** @description the board valued for this league, sent only when since is 0 */
+			board: components['schemas']['RoomBoard'] | null;
+			/** @description floor, median and ceiling for each shortlist player, with range_of_outcomes only */
+			ranges: Record<string, components['schemas']['OutcomeRange']> | null;
+			/** @description how old the picks are when the host did not answer the last read, null when fresh */
+			host_stale_seconds: number | null;
+			/** Format: date-time */
+			created_at: string;
+		};
+		/** @enum {string} */
 		LobbyFormat: '12_ppr' | '12_half_superflex' | '10_ppr';
 		LobbyFilling: {
 			format: components['schemas']['LobbyFormat'];
@@ -1553,6 +1697,15 @@ export interface components {
 			content: {
 				'application/json': components['schemas']['Envelope'] & {
 					data?: components['schemas']['MockReport'];
+				};
+			};
+		};
+		/** @description a live-draft companion as it stands */
+		CompanionResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['Companion'];
 				};
 			};
 		};
@@ -2549,6 +2702,62 @@ export interface operations {
 		responses: {
 			200: components['responses']['MockReportResponse'];
 			403: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+		};
+	};
+	createCompanion: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['CompanionCreate'];
+			};
+		};
+		responses: {
+			200: components['responses']['CompanionResponse'];
+			400: components['responses']['ErrorResponse'];
+			403: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	getCompanion: {
+		parameters: {
+			query?: {
+				/** @description the pick count the caller already holds (its last answer's pick_count); only later picks are sent */
+				since?: number;
+			};
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['CompanionResponse'];
+			404: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	companionReport: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['MockReportResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 		};

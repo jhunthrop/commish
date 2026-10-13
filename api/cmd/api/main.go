@@ -129,6 +129,10 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	if err != nil {
 		return nil, err
 	}
+	companions, err := companionService(cfg, pool, solo, ents, log)
+	if err != nil {
+		return nil, err
+	}
 
 	routes := slices.Concat(
 		server.Health(pool, version),
@@ -140,6 +144,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		(&mocks.Handler{Store: mockStore, Log: log}).Routes(),
 		solo.Routes(),
 		lobbies.Routes(),
+		companions.Routes(),
 		devRoutes,
 	)
 	mux := http.NewServeMux()

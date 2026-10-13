@@ -63,6 +63,45 @@ func (e BotStyle) Valid() bool {
 	}
 }
 
+// Defines values for CompanionHost.
+const (
+	CompanionHostSleeper CompanionHost = "sleeper"
+)
+
+// Valid indicates whether the value is a known member of the CompanionHost enum.
+func (e CompanionHost) Valid() bool {
+	switch e {
+	case CompanionHostSleeper:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CompanionStatus.
+const (
+	CompanionStatusComplete CompanionStatus = "complete"
+	CompanionStatusDrafting CompanionStatus = "drafting"
+	CompanionStatusPaused   CompanionStatus = "paused"
+	CompanionStatusPreDraft CompanionStatus = "pre_draft"
+)
+
+// Valid indicates whether the value is a known member of the CompanionStatus enum.
+func (e CompanionStatus) Valid() bool {
+	switch e {
+	case CompanionStatusComplete:
+		return true
+	case CompanionStatusDrafting:
+		return true
+	case CompanionStatusPaused:
+		return true
+	case CompanionStatusPreDraft:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DraftPassStateSource.
 const (
 	DraftPassStateSourceGrant     DraftPassStateSource = "grant"
@@ -650,6 +689,112 @@ type CheckoutRequest struct {
 	Seats *int `json:"seats,omitempty"`
 }
 
+// Companion defines model for Companion.
+type Companion struct {
+	// Basis the board our call reads
+	Basis string `json:"basis"`
+
+	// Board the board valued for this league, sent only when since is 0
+	Board *RoomBoard `json:"board"`
+
+	// Card our call at the drafter's turn. The why is on the call only, or on every shortlist row with full_reasoning.
+	Card        *RoomCard     `json:"card"`
+	CreatedAt   time.Time     `json:"created_at"`
+	Host        CompanionHost `json:"host"`
+	HostDraftId string        `json:"host_draft_id"`
+
+	// HostStaleSeconds how old the picks are when the host did not answer the last read, null when fresh
+	HostStaleSeconds *int               `json:"host_stale_seconds"`
+	Id               openapi_types.UUID `json:"id"`
+
+	// LostAt the pick our draft could not follow (out of order, or no roster spot takes him); no call after it
+	LostAt *int `json:"lost_at"`
+
+	// Name the draft's name on the host
+	Name string `json:"name"`
+
+	// OnClock the slot on the clock
+	OnClock *int `json:"on_clock"`
+
+	// PickCount picks the host has made
+	PickCount int `json:"pick_count"`
+
+	// Picks every pick after since, in order
+	Picks []CompanionPick `json:"picks"`
+
+	// PicksUntilTurn picks before the drafter's next
+	PicksUntilTurn *int `json:"picks_until_turn"`
+
+	// Ranges floor, median and ceiling for each shortlist player, with range_of_outcomes only
+	Ranges   *map[string]OutcomeRange `json:"ranges"`
+	Replay   bool                     `json:"replay"`
+	Rounds   int                      `json:"rounds"`
+	Settings LeagueSettings           `json:"settings"`
+
+	// Since the pick count the picks follow
+	Since int `json:"since"`
+
+	// Slot the drafter's draft slot
+	Slot       int             `json:"slot"`
+	Status     CompanionStatus `json:"status"`
+	Teams      int             `json:"teams"`
+	TotalPicks int             `json:"total_picks"`
+
+	// Traded picks made by a team other than the slot's own
+	Traded int `json:"traded"`
+
+	// Unplaced picks so far we could not place on our board; they take nobody from it
+	Unplaced int `json:"unplaced"`
+
+	// YourNextPick the drafter's next overall pick
+	YourNextPick *int `json:"your_next_pick"`
+	YourTurn     bool `json:"your_turn"`
+}
+
+// CompanionCreate defines model for CompanionCreate.
+type CompanionCreate struct {
+	// Draft the draft link as pasted
+	Draft string        `json:"draft"`
+	Host  CompanionHost `json:"host"`
+
+	// Replay development only (COMPANION_REPLAY), replays a recorded completed draft one pick a second
+	Replay *bool `json:"replay,omitempty"`
+
+	// Seat exactly one of slot and username
+	Seat CompanionSeat `json:"seat"`
+}
+
+// CompanionHost defines model for CompanionHost.
+type CompanionHost string
+
+// CompanionPick defines model for CompanionPick.
+type CompanionPick struct {
+	HostPlayerId string `json:"host_player_id"`
+	Keeper       bool   `json:"keeper"`
+
+	// Name the host's name for him
+	Name string `json:"name"`
+	Pick int    `json:"pick"`
+
+	// PlayerId our board's player
+	PlayerId *string `json:"player_id"`
+	Position string  `json:"position"`
+	Round    int     `json:"round"`
+
+	// Seat the draft slot that made it
+	Seat int    `json:"seat"`
+	Team string `json:"team"`
+}
+
+// CompanionSeat exactly one of slot and username
+type CompanionSeat struct {
+	Slot     *int    `json:"slot,omitempty"`
+	Username *string `json:"username,omitempty"`
+}
+
+// CompanionStatus defines model for CompanionStatus.
+type CompanionStatus string
+
 // DraftPassState defines model for DraftPassState.
 type DraftPassState struct {
 	EndsAt time.Time            `json:"ends_at"`
@@ -991,6 +1136,13 @@ type MockStatus string
 type MockUndoInput struct {
 	// Pick the overall pick of the drafter's to take back
 	Pick int `json:"pick"`
+}
+
+// OutcomeRange defines model for OutcomeRange.
+type OutcomeRange struct {
+	Ceiling float64 `json:"ceiling"`
+	Floor   float64 `json:"floor"`
+	Median  float64 `json:"median"`
 }
 
 // PageMeta defines model for PageMeta.
@@ -1387,6 +1539,15 @@ type AccountResponse struct {
 	RequestId string     `json:"request_id"`
 }
 
+// CompanionResponse defines model for CompanionResponse.
+type CompanionResponse struct {
+	Data      Companion  `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
 // EmptyResponse defines model for EmptyResponse.
 type EmptyResponse = Envelope
 
@@ -1515,6 +1676,12 @@ type StripeWebhookParams struct {
 	StripeSignature string `json:"Stripe-Signature"`
 }
 
+// GetCompanionParams defines parameters for GetCompanion.
+type GetCompanionParams struct {
+	// Since the pick count the caller already holds (its last answer's pick_count); only later picks are sent
+	Since *int `form:"since,omitempty" json:"since,omitempty"`
+}
+
 // ListExportsParams defines parameters for ListExports.
 type ListExportsParams struct {
 	Page    *Page    `form:"page,omitempty" json:"page,omitempty"`
@@ -1549,6 +1716,9 @@ type CheckoutJSONRequestBody = CheckoutRequest
 
 // StripeWebhookJSONRequestBody defines body for StripeWebhook for application/json ContentType.
 type StripeWebhookJSONRequestBody = StripeWebhookJSONBody
+
+// CreateCompanionJSONRequestBody defines body for CreateCompanion for application/json ContentType.
+type CreateCompanionJSONRequestBody = CompanionCreate
 
 // CreateLeagueJSONRequestBody defines body for CreateLeague for application/json ContentType.
 type CreateLeagueJSONRequestBody = LeagueInput

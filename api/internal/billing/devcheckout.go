@@ -41,7 +41,9 @@ const (
 // price present, links pointing back at this API. The second value is
 // the webhook signing secret it signs with, random per process.
 func NewDevGateway(apiBaseURL string) (*FakeGateway, string) {
-	f := &FakeGateway{CheckoutBaseURL: apiBaseURL + devCheckoutPath, PortalURL: apiBaseURL + devPortalPath}
+	run := make([]byte, 4)
+	_, _ = rand.Read(run)
+	f := &FakeGateway{CheckoutBaseURL: apiBaseURL + devCheckoutPath, PortalURL: apiBaseURL + devPortalPath, Run: "_" + hex.EncodeToString(run)}
 	for _, spec := range LaunchPrices() {
 		_ = f.EnsurePrice(context.Background(), spec)
 	}

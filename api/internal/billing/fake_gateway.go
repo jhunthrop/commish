@@ -33,6 +33,9 @@ type FakeGateway struct {
 	PortalURL       string
 	// Opened is every checkout session created, by id.
 	Opened map[string]CheckoutParams
+	// Run tells this process's ids from an earlier one's, so the
+	// development checkout never reuses a customer id already stored.
+	Run string
 
 	Customers   []string
 	Checkouts   []CheckoutParams
@@ -46,7 +49,7 @@ type FakeGateway struct {
 
 func (f *FakeGateway) id(prefix string) string {
 	f.next++
-	return fmt.Sprintf("%s_fake_%d", prefix, f.next)
+	return fmt.Sprintf("%s_fake%s_%d", prefix, f.Run, f.next)
 }
 
 func (f *FakeGateway) CreateCustomer(_ context.Context, email, _ string) (string, error) {

@@ -25,6 +25,7 @@ tags:
   - { name: billing }
   - { name: mocks }
   - { name: rooms }
+  - { name: companions }
 
 paths:
   /healthz:
@@ -740,6 +741,59 @@ paths:
         "404": { $ref: "#/components/responses/ErrorResponse" }
         "409": { $ref: "#/components/responses/ErrorResponse" }
 
+  /companions:
+    post:
+      tags: [companions]
+      operationId: createCompanion
+      summary: >-
+        Follow a draft running on another host (Sleeper today) from the drafter's seat. Needs the live_draft_advisor
+        feature (403 with feature otherwise). Snake drafts only; an auction, a linear order or a reversal is refused
+        with a sentence. The same draft again answers the companion already made, with the seat updated.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanionCreate" }
+      responses:
+        "200": { $ref: "#/components/responses/CompanionResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+  /companions/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/ID" }
+      - name: since
+        in: query
+        required: false
+        description: the pick count the caller already holds (its last answer's pick_count); only later picks are sent
+        schema: { type: integer, minimum: 0, maximum: 1600, default: 0 }
+    get:
+      tags: [companions]
+      operationId: getCompanion
+      summary: >-
+        The host's draft as of at most two seconds ago, the drafter's seat, pick N of M, picks until their turn, and at
+        their turn our call. One upstream read per draft per two seconds whatever the viewer count; when the host fails,
+        the last snapshot with host_stale_seconds.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/CompanionResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+  /companions/{id}/report:
+    parameters: [{ $ref: "#/components/parameters/ID" }]
+    get:
+      tags: [companions]
+      operationId: companionReport
+      summary: The report on the finished draft from the drafter's seat, once the host says it is complete (409 before).
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/MockReportResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+
   /rooms/{id}/ws:
     servers:
       - url: https://room.trycommish.app
@@ -901,6 +955,14 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/MockReport" } }
+    CompanionResponse:
+      description: a live-draft companion as it stands
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/Companion" } }
     LobbySeatResponse:
       description: the seat taken
       content:
@@ -1561,6 +1623,103 @@ components:
           allOf: [{ $ref: "#/components/schemas/RoomBoard" }]
         computed_ms: { type: integer, description: how long the report took to compute }
         share_code: { type: string, description: a solo draft's link code, absent for a lobby }
+
+    CompanionHost:
+      type: string
+      enum: [sleeper]
+    CompanionCreate:
+      type: object
+      required: [host, draft, seat]
+      properties:
+        host: { $ref: "#/components/schemas/CompanionHost" }
+        draft: { type: string, minLength: 1, maxLength: 300, description: the draft link as pasted, or its id }
+        seat: { $ref: "#/components/schemas/CompanionSeat" }
+        replay:
+          type: boolean
+          description: development only (COMPANION_REPLAY), replays a recorded completed draft one pick a second
+    CompanionSeat:
+      type: object
+      description: exactly one of slot and username
+      properties:
+        slot: { type: integer, nullable: true, minimum: 1, maximum: 32 }
+        username: { type: string, nullable: true, maxLength: 40 }
+    CompanionStatus:
+      type: string
+      enum: [pre_draft, drafting, paused, complete]
+    CompanionPick:
+      type: object
+      required: [pick, round, seat, player_id, host_player_id, name, position, team, keeper]
+      properties:
+        pick: { type: integer }
+        round: { type: integer }
+        seat: { type: integer, description: the draft slot that made it }
+        player_id: { type: string, nullable: true, description: our board's player, null when we could not place him }
+        host_player_id: { type: string }
+        name: { type: string, description: the host's name for him }
+        position: { type: string }
+        team: { type: string }
+        keeper: { type: boolean }
+    OutcomeRange:
+      type: object
+      required: [floor, median, ceiling]
+      properties:
+        floor: { type: number, format: double }
+        median: { type: number, format: double }
+        ceiling: { type: number, format: double }
+    Companion:
+      type: object
+      required:
+        [id, host, host_draft_id, replay, name, status, teams, rounds, slot, settings, basis, pick_count, total_picks,
+         on_clock, your_turn, your_next_pick, picks_until_turn, since, picks, unplaced, lost_at, traded, card, board,
+         ranges, host_stale_seconds, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        host: { $ref: "#/components/schemas/CompanionHost" }
+        host_draft_id: { type: string }
+        replay: { type: boolean }
+        name: { type: string, description: the draft's name on the host, may be empty }
+        status: { $ref: "#/components/schemas/CompanionStatus" }
+        teams: { type: integer }
+        rounds: { type: integer }
+        slot: { type: integer, description: the drafter's draft slot }
+        settings: { $ref: "#/components/schemas/LeagueSettings" }
+        basis: { type: string, description: the board our call reads, in a sentence }
+        pick_count: { type: integer, description: picks the host has made }
+        total_picks: { type: integer }
+        on_clock: { type: integer, nullable: true, description: the slot on the clock, null before the draft and after it }
+        your_turn: { type: boolean }
+        your_next_pick: { type: integer, nullable: true, description: the drafter's next overall pick, null after the last }
+        picks_until_turn: { type: integer, nullable: true, description: picks before the drafter's next, 0 on the clock }
+        since: { type: integer, description: the pick count the picks follow }
+        picks:
+          type: array
+          description: every pick after since, in order
+          items: { $ref: "#/components/schemas/CompanionPick" }
+        unplaced: { type: integer, description: picks so far we could not place on our board; they take nobody from it }
+        lost_at:
+          type: integer
+          nullable: true
+          description: the pick our draft could not follow (out of order, or no roster spot takes him); no call after it
+        traded: { type: integer, description: picks made by a team other than the slot's own, a traded pick }
+        card:
+          nullable: true
+          description: >-
+            our call at the drafter's turn. The why is on the call only, or on every shortlist row with full_reasoning.
+          allOf: [{ $ref: "#/components/schemas/RoomCard" }]
+        board:
+          nullable: true
+          description: the board valued for this league, sent only when since is 0
+          allOf: [{ $ref: "#/components/schemas/RoomBoard" }]
+        ranges:
+          type: object
+          nullable: true
+          description: floor, median and ceiling for each shortlist player, with range_of_outcomes only
+          additionalProperties: { $ref: "#/components/schemas/OutcomeRange" }
+        host_stale_seconds:
+          type: integer
+          nullable: true
+          description: how old the picks are when the host did not answer the last read, null when fresh
+        created_at: { type: string, format: date-time }
 
     LobbyFormat:
       type: string
