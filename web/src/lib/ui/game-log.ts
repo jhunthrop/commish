@@ -45,6 +45,8 @@ export interface AheadRow {
 	week: number;
 	/** "vs SF", "at PHI", "Bye". */
 	opponent: string;
+	/** His bye week, drawn on the surface tint. */
+	bye: boolean;
 	/** His kickoff's day, "Sun Oct 18", empty on his bye. */
 	day: string;
 }

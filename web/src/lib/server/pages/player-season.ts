@@ -33,22 +33,28 @@ function opponentWords(row: GameLogRow): string {
 }
 
 function logRow(row: GameLogRow, columns: readonly StatColumn[]): LogRow {
-	const played = row.status === 'played' && row.points !== null;
+	// The schema holds a played week to its points, so a played week here always has them.
+	const points = row.status === 'played' ? row.points : null;
+	const played = points !== null;
 	return {
 		week: row.week,
 		opponent: opponentWords(row),
 		note: row.status === 'inactive' ? 'Did not play' : '',
 		tone: played ? 'played' : row.status === 'bye' ? 'bye' : 'quiet',
-		points: played && row.points !== null ? fixed(row.points) : null,
+		points: points === null ? null : fixed(points),
 		cells: played ? columns.map((column) => column.value(row)) : null
 	};
 }
 
 function aheadRow(row: GameLogRow, kickoffOf: KickoffOf): AheadRow {
-	const kickoff = row.opponent === null ? null : kickoffOf(row.week);
+	const bye = row.opponent === null;
+	const kickoff = bye ? null : kickoffOf(row.week);
+	if (!bye && kickoff === null)
+		throw new Error(`Week ${String(row.week)} against ${String(row.opponent)} has no kickoff.`);
 	return {
 		week: row.week,
 		opponent: opponentWords(row),
+		bye,
 		day: kickoff === null ? '' : weekdayLabel(kickoff)
 	};
 }

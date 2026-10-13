@@ -90,7 +90,7 @@
 		<h3><Label>Still to play</Label></h3>
 		<ol>
 			{#each ahead as week (week.week)}
-				<li class:bye={week.day === ''}>
+				<li class:bye={week.bye}>
 					<span class="aw">Wk {week.week}</span>
 					<span class="ao">{week.opponent}</span>
 					<span class="ad">{week.day}</span>
