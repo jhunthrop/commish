@@ -90,8 +90,11 @@
 				<b>{player?.name ?? pick.player_id}</b>
 				{#if player}<span>{player.position} {player.positionRank} · {player.team}</span>{/if}
 			</span>
-			<span class="vor">{pick.over_replacement === null ? '–' : signed(pick.over_replacement)}</span
-			>
+			{#if pick.over_replacement === null}
+				<span class="vor none">no projection</span>
+			{:else}
+				<span class="vor">{signed(pick.over_replacement)}</span>
+			{/if}
 			<span class="chips">
 				<span class="gapc"><ToneChip tone={adp.tone}>{adp.text}</ToneChip></span>
 				<span class="hind"><ToneChip tone={hind.tone}>{hind.text}</ToneChip></span>
@@ -165,6 +168,13 @@
 		font-size: var(--t-lg);
 		text-align: right;
 		font-variant-numeric: tabular-nums;
+	}
+
+	.vor.none {
+		font-family: var(--font-ui);
+		font-weight: 500;
+		font-size: var(--t-xs);
+		color: var(--ink-3);
 	}
 
 	/* A pick nobody chose reads quieter than the ones you made. */

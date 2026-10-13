@@ -12,16 +12,20 @@
 		/** Print the sign: +93.7, −0.9. */
 		signed?: boolean;
 		decimals?: number;
+		/** Off, the phone prints the number alone, for a cell whose column head names it. */
+		phoneLabel?: boolean;
 	}
 
-	let { value, label, heat, signed = false, decimals = 1 }: Props = $props();
+	let { value, label, heat, signed = false, decimals = 1, phoneLabel = true }: Props = $props();
 
 	const text = $derived(signed ? withSign(value, decimals) : fixed(value, decimals));
 </script>
 
-<span class="cell {heat ?? ''}" class:tile={heat !== undefined}>
+<span class="cell {heat ?? ''}" class:tile={heat !== undefined} class:bare={!phoneLabel}>
 	<b>{text}</b>
-	<Label size="cell" tone={heat === undefined ? 'muted' : 'inherit'}>{label}</Label>
+	<span class="basis"
+		><Label size="cell" tone={heat === undefined ? 'muted' : 'inherit'}>{label}</Label></span
+	>
 </span>
 
 <style>
@@ -81,6 +85,17 @@
 
 		.tile {
 			padding: 0 var(--s-2);
+		}
+
+		/* The column head names the number, so the cell is the number alone. Assistive tech still reads
+		   the basis with it. */
+		.bare .basis {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
 		}
 	}
 </style>

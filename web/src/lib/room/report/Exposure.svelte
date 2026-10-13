@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NameWords from '#lib/ui/NameWords.svelte';
 	import Face from '#lib/ui/Face.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import type { MockReport } from '../api.ts';
@@ -28,7 +29,10 @@
 			{#if player}
 				<div class="e">
 					<Face src={player.headshot} name={player.name} size={32} />
-					<b>{player.name} <span>{player.position} {player.positionRank}</span></b>
+					<b
+						><NameWords name={player.name} />
+						<span>{player.position} {player.positionRank}</span></b
+					>
 					<span class="bar"><i style:width="{e.share * 100}%"></i></span>
 					<span class="pct">{Math.round(e.share * 100)}%</span>
 				</div>
@@ -63,7 +67,8 @@
 
 	.e {
 		display: grid;
-		grid-template-columns: 32px minmax(0, 1fr) 110px 48px;
+		/* The name takes the room the bar gives up, and wraps rather than losing its end. */
+		grid-template-columns: 32px minmax(0, 1fr) 64px 48px;
 		gap: var(--s-2);
 		align-items: center;
 		font-size: var(--t-sm);
@@ -71,9 +76,7 @@
 
 	.e b {
 		font-weight: 600;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		line-height: 1.25;
 	}
 
 	.e b span {

@@ -94,11 +94,9 @@
 		</DisplayTitle>
 		<RunsSection runs={report.runs} teams={report.teams} rank={head?.rank ?? 0} />
 		<p class="basis">
-			Each run drafts the room again from pick one with a new seed, seeds {report.seed} to {report.seed +
-				report.runs.runs -
-				1}, {others.who} drafting {others.how} and {their} seat taking the best player the board has for
-			the roster. Our projections lead the board, so a seat drafting off it finishes high in most runs.
-			The spread is the useful read.
+			Each run drafts the room again from pick one with {others.who} reshuffled, each drafting
+			{others.how}, and {their} seat taking the best player the board has for the roster. Our projections
+			lead the board, so a seat drafting off it finishes high in most runs. The spread is the useful read.
 		</p>
 	</section>
 	{#snippet dock()}

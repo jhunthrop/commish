@@ -145,5 +145,18 @@
 		.lg {
 			min-width: 0;
 		}
+
+		/* A thumb's 44px: an action drawn shorter keeps its look and its hit area reaches --touch
+		   tall, centred on it (the chips' pattern). A taller one is left as it is. */
+		.action {
+			position: relative;
+			min-width: var(--touch);
+		}
+
+		.action::after {
+			content: '';
+			position: absolute;
+			inset: min(0px, calc(50% - var(--touch) / 2)) 0;
+		}
 	}
 </style>

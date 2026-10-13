@@ -188,18 +188,53 @@ export const recordLineSchema = z.object({
 	adp: scoreSchema
 });
 
-export const recordWeekSchema = z.object({
-	week: z.number().int().min(1),
-	/** When our board was frozen for the week, before its first kickoff. */
-	frozenAt: isoTime,
-	/** The run whose board was frozen, by its run id. */
-	frozenBy: runIdSchema,
-	/** When the week was graded, or null while it waits on its games. */
-	gradedAt: isoTime.nullable(),
-	/** Frozen players with a stat line for the week. */
-	population: z.number().int().nonnegative(),
-	lines: z.array(recordLineSchema)
-});
+/** Where a week of the season stands in the record. Every week of the season is listed, so a week
+ * the run failed to freeze shows as a hole rather than going missing.
+ *   graded    frozen before its first kickoff and graded against the games
+ *   frozen    frozen before its first kickoff, waiting on the week's stat lines
+ *   missed    its first kickoff passed with no board frozen, the reason in the note
+ *   upcoming  its first kickoff is still ahead */
+export const RECORD_WEEK_STATUSES = ['graded', 'frozen', 'missed', 'upcoming'] as const;
+export const recordWeekStatus = z.enum(RECORD_WEEK_STATUSES);
+
+export const recordWeekSchema = z
+	.object({
+		week: z.number().int().min(1),
+		status: recordWeekStatus,
+		/** When our board was frozen for the week, before its first kickoff. For an upcoming week, its
+		 * first kickoff, the day it freezes by (the page prints only the day), or null when no date is
+		 * set yet. Null for a missed week. */
+		frozenAt: isoTime.nullable(),
+		/** The run whose board was frozen, by its run id. Null unless the week froze. */
+		frozenBy: runIdSchema.nullable(),
+		/** When the week was graded. Null unless the status is graded. */
+		gradedAt: isoTime.nullable(),
+		/** Frozen players with a stat line for the week. */
+		population: z.number().int().nonnegative(),
+		lines: z.array(recordLineSchema),
+		/** Why a missed week was not frozen, one sentence the page prints: "Our nightly run failed that
+		 * week." Present only for a missed week. */
+		note: phrase.optional()
+	})
+	.superRefine((week, ctx) => {
+		const froze = week.status === 'graded' || week.status === 'frozen';
+		const fail = (message: string): void => {
+			ctx.addIssue({
+				code: 'custom',
+				message: `Week ${String(week.week)} is ${week.status}: ${message}`
+			});
+		};
+		if (froze && (week.frozenAt === null || week.frozenBy === null))
+			fail('a frozen week names when it froze and the run that froze it.');
+		if (!froze && week.frozenBy !== null) fail('only a frozen week names the run that froze it.');
+		if (week.status === 'missed' && week.frozenAt !== null) fail('a missed week never froze.');
+		if ((week.status === 'graded') !== (week.gradedAt !== null))
+			fail('a week carries a grading time exactly when it is graded.');
+		if ((week.status === 'missed') !== (week.note !== undefined))
+			fail('a week carries a note exactly when it was missed.');
+		if (!froze && (week.population !== 0 || week.lines.length > 0))
+			fail('only a frozen week has players and lines.');
+	});
 
 export const recordSchema = z.object({
 	season: z.number().int(),
@@ -211,6 +246,7 @@ export const recordSchema = z.object({
 	statistic: z.object({ agreement: phrase, placesOff: phrase }),
 	/** How the record is kept, as one sentence the page prints under the weeks. */
 	method: phrase,
+	/** Every week of the season in order, whatever its status. */
 	weeks: z.array(recordWeekSchema),
 	/** Every graded week pooled, one line for all players and one per position. */
 	toDate: z.array(recordLineSchema)
@@ -296,6 +332,7 @@ export type Adp = z.infer<typeof adpSchema>;
 export type Score = z.infer<typeof scoreSchema>;
 export type RecordLine = z.infer<typeof recordLineSchema>;
 export type RecordWeek = z.infer<typeof recordWeekSchema>;
+export type RecordWeekStatus = z.infer<typeof recordWeekStatus>;
 export type RunRecord = z.infer<typeof recordSchema>;
 export type IndexEntry = z.infer<typeof indexEntrySchema>;
 export type Club = z.infer<typeof clubSchema>;

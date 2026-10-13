@@ -298,10 +298,41 @@ func (s *Service) undo(ctx context.Context, owner mocks.Owner, id uuid.UUID, pic
 	if err != nil {
 		return room{}, err
 	}
+	// The room at pickNumber is the one the drafter already saw, so the card
+	// he saw there carries to the new branch: the same moment prints the
+	// same numbers from the same source instead of asking again.
+	// The carry is a nicety, never part of the undo: a card that cannot be
+	// read or written is asked again on the next read.
+	shown, ok, err := s.Mocks.Card(ctx, id, r.branch, pickNumber)
+	if err != nil {
+		s.Log.Warn("solo: undo reads no card to carry", "mock", id, "pick", pickNumber, "err", err)
+		ok = false
+	}
 	if err := s.Mocks.Truncate(ctx, owner, id, r.head, int64(seq)); err != nil {
 		return room{}, err
 	}
-	return s.load(ctx, owner, id)
+	back, err := s.load(ctx, owner, id)
+	if err != nil {
+		return room{}, err
+	}
+	if ok {
+		s.carryCard(ctx, back, pickNumber, shown)
+	}
+	return back, nil
+}
+
+// carryCard writes the card shown at pick onto the room's branch, only
+// when the room is back on exactly that pick: there the state is the one
+// the card was made for. A failed write is logged and left: the next read
+// asks again.
+func (s *Service) carryCard(ctx context.Context, back room, pick int, shown json.RawMessage) {
+	if back.draft.State.PickNumber != pick || !back.draft.Waiting {
+		s.Log.Warn("solo: undo landed off the pick it took back, no card carried", "mock", back.mock.Id, "pick", pick, "at", back.draft.State.PickNumber)
+		return
+	}
+	if err := s.Mocks.PutCard(ctx, back.mock.Id, back.branch, pick, shown); err != nil {
+		s.Log.Warn("solo: undo could not carry the card", "mock", back.mock.Id, "pick", pick, "err", err)
+	}
 }
 
 // humanPickSeq is the 1-based seq of the MAKE_PICK that made the
@@ -335,9 +366,16 @@ func (s *Service) card(ctx context.Context, owner mocks.Owner, id uuid.UUID) (ap
 	if err != nil {
 		return apitypes.RoomCard{}, err
 	}
+	return s.cardAt(ctx, r)
+}
+
+// cardAt is the card for the room's turn, recorded on first read: the
+// stored one when there is one, else the advisor's (or the engine's).
+func (s *Service) cardAt(ctx context.Context, r room) (apitypes.RoomCard, error) {
 	if !r.draft.Waiting {
 		return apitypes.RoomCard{}, errNotWaiting
 	}
+	id := r.mock.Id
 	pick := r.draft.State.PickNumber
 	raw, ok, err := s.Mocks.Card(ctx, id, r.branch, pick)
 	if err != nil {
