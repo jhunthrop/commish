@@ -35,9 +35,9 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
   |---|---|---|---|
   | `research-nightly` | `0 5 * * *` | UTC | `nightly` |
   | `research-nightly-publish` | `0 6-12 * * *` | UTC | `nightly-publish` |
-  | `research-season-week-tue` | `0 8 * * 2` | America/New_York | `inseason` |
-  | `research-season-week-wed` | `0 18 * * 3` | America/New_York | `inseason` |
-  | `research-season-week-thu` | `0 14 * * 4` | America/New_York | `inseason` |
+  | `research-season-week-tue` | `0 8 * 1,2,9-12 2` | America/New_York | `inseason` |
+  | `research-season-week-wed` | `0 18 * 1,2,9-12 3` | America/New_York | `inseason` |
+  | `research-season-week-thu` | `0 14 * 1,2,9-12 4` | America/New_York | `inseason` |
   | `research-capture-harvest` | `0 2,7-23 * * *` | America/New_York | `inseason-capture` |
 
   At cutover, after the legacy writers stop and the loader has run: set the four placeholders, run `infra/research-schedule.sh verify`, prove one target with `gcloud scheduler jobs run research-nightly-publish --location us-east1` (publish with no early run is a no-op), then `gcloud scheduler jobs resume <job> --location us-east1` for each.
