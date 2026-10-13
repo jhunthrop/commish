@@ -18,7 +18,7 @@
 	import Verb from '#lib/ui/Verb.svelte';
 	import { railLeague } from '#lib/account/rail-league.svelte.ts';
 	import FFPCLeagues from '#lib/hosts/FFPCLeagues.svelte';
-	import type { HostLeague } from '#lib/hosts/api.ts';
+	import { ffpcOpen, hostsApi, type HostLeague } from '#lib/hosts/api.ts';
 	import { ApiError, leagueApi, type AttachPreview, type AttachedLeague } from './api.ts';
 	import { HOSTS_LINE, hostWords } from './model.ts';
 
@@ -33,6 +33,8 @@
 	let view = $state<View>('loading');
 	/** How the league comes in: a pasted link (Sleeper, MyFantasyLeague), or FFPC read as you. */
 	let way = $state<'link' | 'ffpc'>('link');
+	/** FFPC is offered only where it is open (HOST_FFPC_ENABLED). */
+	let ffpcOn = $state(false);
 	let link = $state('');
 	let preview = $state<AttachPreview | null>(null);
 	let reading = $state(false);
@@ -47,6 +49,10 @@
 	let asked = '';
 
 	onMount(() => {
+		hostsApi
+			.connections()
+			.then((hosts) => (ffpcOn = ffpcOpen(hosts)))
+			.catch(() => (ffpcOn = false));
 		leagueApi
 			.attached()
 			.then((list) => {
@@ -157,13 +163,15 @@
 				date, on our board. Free.
 			</p>
 			<p class="hosts">{HOSTS_LINE}</p>
-			<ChipGroup label="Your league is on">
-				<Chip pressed={way === 'link'} onclick={() => (way = 'link')}
-					>Sleeper or MyFantasyLeague</Chip
-				>
-				<Chip pressed={way === 'ffpc'} onclick={() => (way = 'ffpc')}>FFPC</Chip>
-			</ChipGroup>
-			{#if way === 'ffpc'}
+			{#if ffpcOn}
+				<ChipGroup label="Your league is on">
+					<Chip pressed={way === 'link'} onclick={() => (way = 'link')}
+						>Sleeper or MyFantasyLeague</Chip
+					>
+					<Chip pressed={way === 'ffpc'} onclick={() => (way = 'ffpc')}>FFPC</Chip>
+				</ChipGroup>
+			{/if}
+			{#if ffpcOn && way === 'ffpc'}
 				<FFPCLeagues verb="Follow my league" onpick={followFFPC} />
 			{:else}
 				<div class="form">

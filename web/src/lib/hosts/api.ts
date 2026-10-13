@@ -6,6 +6,7 @@ import type { components } from '#lib/api/types.ts';
 
 type Schemas = components['schemas'];
 export type HostConnection = Schemas['HostConnection'];
+export type HostConnections = Schemas['HostConnections'];
 export type HostConnected = Schemas['HostConnected'];
 export type HostLeague = Schemas['HostLeague'];
 export type Device = Schemas['Device'];
@@ -16,7 +17,7 @@ const client = apiClient(PUBLIC_API_URL);
 export { ApiError };
 
 export const hostsApi = {
-	connections: () => client.call<HostConnection[]>('/hosts'),
+	connections: () => client.call<HostConnections>('/hosts'),
 	connectFFPC: (email: string, password: string, consent: boolean) =>
 		client.call<HostConnected>('/hosts/ffpc/connect', {
 			method: 'POST',
@@ -30,9 +31,15 @@ export const hostsApi = {
 		client.call<null>(`/devices/${encodeURIComponent(id)}`, { method: 'DELETE' })
 };
 
-/** The consent the FFPC form asks for, word for word what the API's consent field means. */
+/** The consent the FFPC form asks for, word for word what the API keeps as consent version 2
+ * (api/internal/hosts ConsentVersion): change the words, raise the version. */
 export const FFPC_CONSENT =
-	'We sign in to FFPC as you to read your league. We never make a move or a bid. You can disconnect any time.';
+	'We sign in to FFPC as you to read your league. We never make a move or a bid. Your league-mates on Commish see your league as we read it. You can disconnect any time.';
+
+/** Whether FFPC is open here (HOST_FFPC_ENABLED), from the hosts answer. */
+export function ffpcOpen(hosts: HostConnections): boolean {
+	return hosts.enabled.includes('ffpc');
+}
 
 /** Whether an answer says the FFPC connection needs a fresh sign-in. */
 export function needsSignIn(error: unknown): boolean {

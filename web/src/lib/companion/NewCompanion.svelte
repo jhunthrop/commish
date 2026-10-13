@@ -20,7 +20,7 @@
 	import { ApiError, companions, type CompanionCreate, type CompanionSummary } from './api.ts';
 	import { has, recentLine } from './model.ts';
 	import FFPCLeagues from '#lib/hosts/FFPCLeagues.svelte';
-	import type { HostLeague } from '#lib/hosts/api.ts';
+	import { ffpcOpen, hostsApi, type HostLeague } from '#lib/hosts/api.ts';
 
 	/** Start following a draft: paste the Sleeper link, say which seat is yours, one verb. Without the
 	 * live draft feature (answered by Can through /me) the page says where it comes from. */
@@ -34,6 +34,8 @@
 	let view = $state<View>('loading');
 	/** Where the draft runs: Sleeper by its link, or FFPC read as you. */
 	let way = $state<'sleeper' | 'ffpc'>('sleeper');
+	/** FFPC is offered only where it is open (HOST_FFPC_ENABLED). */
+	let ffpcOn = $state(false);
 	let link = $state('');
 	let by = $state<'slot' | 'username'>('slot');
 	let slot = $state(1);
@@ -48,6 +50,10 @@
 
 	onMount(() => {
 		replay = page.url.searchParams.get('replay') === '1';
+		hostsApi
+			.connections()
+			.then((hosts) => (ffpcOn = ffpcOpen(hosts)))
+			.catch(() => (ffpcOn = false));
 		if (replay) link = REPLAY_WORDS;
 		companions
 			.me()
@@ -135,12 +141,14 @@
 			<p class="lede">
 				At each of your picks you get our call, against the picks your league actually makes.
 			</p>
-			<ChipGroup label="Your draft is on">
-				<Chip pressed={way === 'sleeper'} onclick={() => (way = 'sleeper')}>Sleeper</Chip>
-				<Chip pressed={way === 'ffpc'} onclick={() => (way = 'ffpc')}>FFPC</Chip>
-			</ChipGroup>
-			{#if way === 'ffpc'}
-				<FFPCLeagues verb="Follow my draft" onpick={followFFPC} />
+			{#if ffpcOn}
+				<ChipGroup label="Your draft is on">
+					<Chip pressed={way === 'sleeper'} onclick={() => (way = 'sleeper')}>Sleeper</Chip>
+					<Chip pressed={way === 'ffpc'} onclick={() => (way = 'ffpc')}>FFPC</Chip>
+				</ChipGroup>
+			{/if}
+			{#if ffpcOn && way === 'ffpc'}
+				<FFPCLeagues verb="Follow my draft" onpick={followFFPC} typed />
 			{:else}
 				<div class="form">
 					<Field

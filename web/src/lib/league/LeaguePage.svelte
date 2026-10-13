@@ -16,6 +16,7 @@
 	import { presetWords } from '#lib/room/setup/scoring.ts';
 	import { droppedKinds } from './scoring-words.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
+	import FFPCSignIn from '#lib/hosts/FFPCSignIn.svelte';
 	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
 	import { loadBoard, type LeagueBoard } from './board.ts';
 	import MatchupPanel from './MatchupPanel.svelte';
@@ -36,7 +37,9 @@
 
 	let sync = $state<LeagueSync | null>(null);
 	let board = $state<LeagueBoard | null>(null);
-	let failure = $state<'signed-out' | 'missing' | 'unreachable' | null>(null);
+	let failure = $state<'signed-out' | 'missing' | 'unreachable' | 'host-sign-in' | null>(null);
+	/** The host's words when a league read as the member needs them to sign in to the host again. */
+	let hostReason = $state('');
 	let problem = $state<string | null>(null);
 	/** The run's board file could not be read; cleared when one loads. */
 	let boardFailed = $state(false);
@@ -64,7 +67,11 @@
 			take(await leagueApi.sync(id));
 		} catch (error) {
 			if (isSignedOut(error)) failure = 'signed-out';
-			else if (hasStatus(error, HTTP_STATUS.notFound)) failure = 'missing';
+			else if (hasStatus(error, HTTP_STATUS.conflict)) {
+				// An FFPC league with no member signed in to read it as: sign in right here.
+				failure = 'host-sign-in';
+				hostReason = error instanceof ApiError ? error.message : '';
+			} else if (hasStatus(error, HTTP_STATUS.notFound)) failure = 'missing';
 			else if (sync === null) failure = 'unreachable';
 			else problem = 'Your league could not be read just now. The page shows the last read.';
 		}
@@ -126,6 +133,16 @@
 			>
 				{#snippet actions()}<Verb href={links.leagueNew()}>Follow a league</Verb>{/snippet}
 			</EmptyState>
+		</div>
+	{:else if failure === 'host-sign-in'}
+		<div class="pad">
+			<FFPCSignIn
+				reason={hostReason}
+				onconnected={() => {
+					failure = null;
+					void read();
+				}}
+			/>
 		</div>
 	{:else if failure === 'unreachable'}
 		<div class="pad">

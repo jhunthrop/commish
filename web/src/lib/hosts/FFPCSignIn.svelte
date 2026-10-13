@@ -47,26 +47,26 @@
 <div class="signin">
 	{#if reason}<p class="reason">{reason}</p>{/if}
 	<Field
-		label="FFPC email"
-		kind="email"
+		label="FFPC email or username"
 		autocomplete="username"
 		bind:value={email}
-		maxlength={50}
+		maxlength={128}
 	/>
 	<Field
 		label="FFPC password"
 		kind="password"
 		autocomplete="current-password"
 		bind:value={password}
-		maxlength={50}
+		maxlength={128}
 		onenter={() => void connect()}
 	/>
 	<div class="consent">
 		<Toggle label={FFPC_CONSENT} bind:checked={consent} />
 	</div>
 	<p class="reason">
-		We keep your FFPC sign-in encrypted, so we can sign in again when FFPC signs you out.
-		Disconnecting deletes it.
+		We keep your FFPC sign-in encrypted and use it only when FFPC signs you out, at most once every
+		six hours. Disconnecting deletes it. FFPC's terms ask members not to share their password, and
+		connecting shares it with Commish.
 	</p>
 	<ActionBar alert={problem ? alert : undefined}>
 		<Verb disabled={!ready} onclick={() => void connect()}

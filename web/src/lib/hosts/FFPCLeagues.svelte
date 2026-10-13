@@ -4,9 +4,10 @@
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
+	import Field from '#lib/ui/Field.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import FFPCSignIn from './FFPCSignIn.svelte';
-	import { ApiError, hostsApi, needsSignIn, type HostLeague } from './api.ts';
+	import { ApiError, ffpcOpen, hostsApi, needsSignIn, type HostLeague } from './api.ts';
 
 	/** FFPC as a way in: sign in once on our form, then tap your league and the verb. A connection
 	 * FFPC has signed out asks for the sign-in again. Used by the league and companion pages. */
@@ -14,11 +15,16 @@
 		/** The verb under the list: "Follow my league", "Follow my draft". */
 		verb: string;
 		onpick: (league: HostLeague) => Promise<void>;
+		/** Offer a league number typed by hand too: a draft still running may not be on FFPC's list of
+		 * finished drafts. */
+		typed?: boolean;
 	}
 
-	let { verb, onpick }: Props = $props();
+	let { verb, onpick, typed = false }: Props = $props();
 
-	type View = 'loading' | 'signin' | 'again' | 'leagues' | 'unreachable';
+	type View = 'loading' | 'off' | 'signin' | 'again' | 'leagues' | 'unreachable';
+
+	let number = $state('');
 
 	let view = $state<View>('loading');
 	let leagues = $state<HostLeague[]>([]);
@@ -29,9 +35,13 @@
 	onMount(() => {
 		hostsApi
 			.connections()
-			.then((list) => {
+			.then((hosts) => {
+				if (!ffpcOpen(hosts)) {
+					view = 'off';
+					return;
+				}
 				// FFPC is the one host connected this way, so the list holds it or nothing.
-				const ffpc = list.at(0);
+				const ffpc = hosts.connections.at(0);
 				if (!ffpc) {
 					view = 'signin';
 					return;
@@ -51,8 +61,18 @@
 		view = 'leagues';
 	}
 
+	const LEAGUE_NUMBER = /^[0-9]{1,12}$/;
+
+	function chosen(): HostLeague | undefined {
+		const n = number.trim();
+		if (typed && LEAGUE_NUMBER.test(n)) {
+			return { league_id: n, name: `FFPC league ${n}`, team_name: '', record: '' };
+		}
+		return leagues.find((l) => l.league_id === picked);
+	}
+
 	async function go(): Promise<void> {
-		const league = leagues.find((l) => l.league_id === picked);
+		const league = chosen();
 		if (!league || busy) return;
 		busy = true;
 		problem = null;
@@ -79,9 +99,11 @@
 		reason="FFPC signed you out. Sign in again to keep reading your leagues."
 		onconnected={connected}
 	/>
+{:else if view === 'off'}
+	<p class="line">FFPC leagues are not open here right now.</p>
 {:else if view === 'unreachable'}
 	<p class="line">FFPC can't be read right now. Try again in a moment.</p>
-{:else if leagues.length === 0}
+{:else if leagues.length === 0 && !typed}
 	<p class="line">Your FFPC account has no league with a finished draft yet.</p>
 {:else}
 	<ChipGroup label="Your FFPC league" variant="loose">
@@ -93,8 +115,19 @@
 			>
 		{/each}
 	</ChipGroup>
+	{#if typed}
+		<Field
+			label="Or your FFPC league number"
+			bind:value={number}
+			placeholder="104870"
+			maxlength={12}
+			onenter={() => void go()}
+		/>
+	{/if}
 	<ActionBar alert={problem ? alert : undefined}>
-		<Verb disabled={picked === null || busy} onclick={() => void go()}>{verb}</Verb>
+		<Verb disabled={(picked === null && number.trim() === '') || busy} onclick={() => void go()}
+			>{verb}</Verb
+		>
 	</ActionBar>
 {/if}
 

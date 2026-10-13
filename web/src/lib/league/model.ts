@@ -44,9 +44,7 @@ export function readLine(sync: LeagueSync, now: Date): string {
 	if (sync.host_stale_seconds > 0) {
 		return `${host} is not answering. This is our last read, ${agoWords(age)}.`;
 	}
-	// FFPC is read signed in as the member, so the line says whose eyes it is read with.
-	const as = sync.host === 'ffpc' ? ' as you' : '';
-	return `Read from ${host}${as} ${agoWords(age)}.`;
+	return `Read from ${host} ${agoWords(age)}.`;
 }
 
 /** "5-1", or "5-1-1" with ties. */

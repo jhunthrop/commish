@@ -11,7 +11,6 @@
 	/** Paired devices: each with when it was paired and last sent anything, and Unpair. A pairing
 	 * code (six words, ten minutes, one use) is shown on a tap, never kept by the page. */
 	let devices = $state<Device[] | null>(null);
-	let failed = $state(false);
 	let code = $state<PairCode | null>(null);
 	let busy = $state<string | null>(null);
 	let problem = $state<string | null>(null);
@@ -20,7 +19,7 @@
 		hostsApi
 			.devices()
 			.then((list) => (devices = list))
-			.catch(() => (failed = true));
+			.catch(() => (devices = []));
 	});
 
 	async function act(key: string, step: () => Promise<void>): Promise<void> {
@@ -41,52 +40,54 @@
 	}
 </script>
 
-<section aria-label="Paired devices">
-	<PanelHead
-		title="Paired devices"
-		aside={devices ? String(devices.length) : undefined}
-		level={2}
-	/>
-	{#if failed}
-		<p class="note">Your paired devices can't be read right now.</p>
-	{:else if devices}
-		{#if devices.length > 0}
-			<ActionRows label="Paired devices">
-				{#each devices as d (d.id)}
-					<ActionRow lead={d.name} text={line(d)}>
-						{#snippet action()}
-							<Quiet
-								size="sm"
-								disabled={busy !== null}
-								onclick={() =>
-									void act(d.id, async () => {
-										await hostsApi.revokeDevice(d.id);
-										devices = (devices ?? []).filter((x) => x.id !== d.id);
-									})}>{busy === d.id ? 'Unpairing' : 'Unpair'}</Quiet
-							>
-						{/snippet}
-					</ActionRow>
-				{/each}
-			</ActionRows>
+<!-- Shown once the account has a paired device: no client pairs today (the extension is paused,
+	the phone app not built), so a code would lead nowhere. -->
+{#if devices && devices.length > 0}
+	<section aria-label="Paired devices">
+		<PanelHead
+			title="Paired devices"
+			aside={String(devices.length)}
+			level={2}
+		/>
+		{#if devices}
+			{#if devices.length > 0}
+				<ActionRows label="Paired devices">
+					{#each devices as d (d.id)}
+						<ActionRow lead={d.name} text={line(d)}>
+							{#snippet action()}
+								<Quiet
+									size="sm"
+									disabled={busy !== null}
+									onclick={() =>
+										void act(d.id, async () => {
+											await hostsApi.revokeDevice(d.id);
+											devices = (devices ?? []).filter((x) => x.id !== d.id);
+										})}>{busy === d.id ? 'Unpairing' : 'Unpair'}</Quiet
+								>
+							{/snippet}
+						</ActionRow>
+					{/each}
+				</ActionRows>
+			{/if}
+			{#if code}
+				<p class="code" aria-live="polite"><b>{code.code}</b></p>
+				<p class="note">
+					Type these six words where the device asks. They work once, for ten minutes.
+				</p>
+			{:else}
+				<Quiet
+					size="sm"
+					disabled={busy !== null}
+					onclick={() =>
+						void act('code', async () => {
+							code = await hostsApi.pairCode();
+						})}>Pair a device</Quiet
+				>
+			{/if}
+			{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 		{/if}
-		{#if code}
-			<p class="code" aria-live="polite"><b>{code.code}</b></p>
-			<p class="note">
-				Type these six words where the device asks. They work once, for ten minutes.
-			</p>
-		{:else}
-			<Quiet
-				size="sm"
-				disabled={busy !== null}
-				onclick={() =>
-					void act('code', async () => {
-						code = await hostsApi.pairCode();
-					})}>Pair a device</Quiet
-			>
-		{/if}
-		{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
-	{/if}
-</section>
+	</section>
+{/if}
 
 <style>
 	.note {
