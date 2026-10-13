@@ -16,13 +16,16 @@ The order, and why each pass exists:
    times, from the budget left.
 5. **The capsule gate** (`capsule_gate`), whose verdict is the step's.
 
+Every pass shares one ceiling per player for the night, `NIGHT_CALLS_PER_PLAYER` (12, two of phase C's
+six-call generations): a player who reached it is left to the next night rather than written again.
+
 Without AI_GATEWAY_API_KEY the writing passes are skipped by name (a sweep without the key would
 demote written reads to facts blocks) and the gate still judges what is stored.
 """
 
 import os
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Final
 
@@ -40,6 +43,10 @@ REPAIR_PASSES: Final = 3
 # Each retry pass writes about half of what is left (measured on the 2026-10-13 regeneration: 31 of
 # 66 on the first), so three passes bring a tenth of the board unwritten under the 2% line.
 RETRY_PASSES: Final = 3
+# THE NIGHT'S CALLS FOR ONE PLAYER, shared by the sweep, the retries and the repairs. Phase C caps one
+# generation at six calls; with seven passes a night one player could take 42. Two full generations'
+# worth is the night's ceiling, and a player who reached it waits for the next night.
+NIGHT_CALLS_PER_PLAYER: Final = 12
 Log = Callable[[str], None]
 
 
@@ -120,13 +127,21 @@ class _Passes:
         self.budget = budget
         self.log = log
         self.spend = CapsuleSpend()
+        self.calls_by_player: dict[str, int] = {}
 
     @property
     def left(self) -> int:
         return self.budget - self.spend.processed
 
+    @property
+    def spent_out(self) -> frozenset[str]:
+        return frozenset(pid for pid, calls in self.calls_by_player.items() if calls >= NIGHT_CALLS_PER_PLAYER)
+
     def sweep(self, name: str, plan: SweepPlan) -> SweepReport:
+        plan = replace(plan, exclude=plan.exclude | self.spent_out)
         report = sweep_capsules(self.engine, self.gateway, self.now, plan)
+        for pid, calls in report.calls_by_player.items():
+            self.calls_by_player[pid] = self.calls_by_player.get(pid, 0) + calls
         self.spend.add(report)
         self.log(_sweep_line(name, report))
         return report

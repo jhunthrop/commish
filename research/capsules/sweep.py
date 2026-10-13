@@ -97,11 +97,14 @@ class SweepReport:
     cost_usd: float = 0.0
     queued: int | None = None
     detail: list[str] = field(default_factory=list)
+    # Universe id to the gateway calls his capsule took in this sweep.
+    calls_by_player: dict[str, int] = field(default_factory=dict)
 
 
 def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted: bool) -> None:
     usage = result.usage
     report.calls += result.calls
+    report.calls_by_player[subject.universe_id] = report.calls_by_player.get(subject.universe_id, 0) + result.calls
     if usage is not None:
         report.prompt_tokens += usage.prompt_tokens or 0
         report.completion_tokens += usage.completion_tokens or 0
@@ -162,9 +165,13 @@ class SweepPlan:
     # sentences) quoted into the prompt beside the board's worn language.
     only: frozenset[str] | None = None
     avoid: tuple[str, ...] = ()
+    # Players the night has spent its call budget on (`nightly.capsule_step`), never written again.
+    exclude: frozenset[str] = frozenset()
 
 
 def _eligible(subject: Subject, row: StoredCapsule | None, plan: SweepPlan) -> bool:
+    if subject.universe_id in plan.exclude:
+        return False
     if plan.only is not None:
         return subject.universe_id in plan.only
     return _unwritten(row) if plan.unwritten_only else _needs_generation(subject, row)
