@@ -115,10 +115,14 @@
 		}
 	}
 
-	/* The pinned columns' widths, which the opponent's offset is built from. */
+	/* The pinned columns' widths, which the opponent's offset is built from. The frame is the
+	 * containing block of the table's hidden words (caption, .sr), so its scroll clips them: held by
+	 * .log instead, they sat out at the last column's edge and widened the phone's page past the
+	 * viewport, and the fixed rail moved when the browser widened its layout to match. */
 	.frame {
 		--wk-w: 52px;
 		--opp-w: 84px;
+		position: relative;
 		overflow-x: auto;
 		border: 1px solid var(--line);
 		border-radius: var(--r-md);

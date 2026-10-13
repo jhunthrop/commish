@@ -4,7 +4,15 @@
 	import Icon from './Icon.svelte';
 	import Stamp from './Stamp.svelte';
 	import ThemeSwitch from './ThemeSwitch.svelte';
-	import { HOME_HREF, RAIL, RAIL_FOOT, sectionOf, type RailItem, type Section } from './nav.ts';
+	import {
+		HOME_HREF,
+		PHONE_RAIL_COUNT,
+		RAIL,
+		RAIL_FOOT,
+		sectionOf,
+		type RailItem,
+		type Section
+	} from './nav.ts';
 
 	interface Props {
 		/** The page's name in the top bar. Hidden on the phone, where the rail names the section. */
@@ -41,7 +49,7 @@
 {/snippet}
 
 <div class="app">
-	<nav class="rail" aria-label="Sections">
+	<nav class="rail" aria-label="Sections" style="--phone-items: {PHONE_RAIL_COUNT}">
 		<a class="mark" href={HOME_HREF} aria-label="Commish"><b>C</b></a>
 		{#each RAIL as item (item.section)}
 			{@render railLink(item)}
@@ -207,15 +215,17 @@
 		}
 
 		/* The tab bar is exactly --tab-bar-h over the safe area, so the page's padding and anything
-		   pinned above the bar (ActionBar) read the same number. */
+		   pinned above the bar (ActionBar) read the same number. Its columns come from the item
+		   count, not from the items drawn so far: a long page paints before the rail's last tab is
+		   parsed, and a tab must not slide when the next one arrives. */
 		.rail {
 			position: fixed;
 			inset: auto 0 0 0;
 			box-sizing: border-box;
 			height: calc(var(--tab-bar-h) + env(safe-area-inset-bottom, 0px));
 			z-index: 20;
-			flex-direction: row;
-			justify-content: space-around;
+			display: grid;
+			grid-template-columns: repeat(var(--phone-items), minmax(0, 1fr));
 			padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
 			border-right: 0;
 			border-top: 1px solid var(--shell-line);
@@ -228,7 +238,6 @@
 		}
 
 		.item {
-			flex: 1;
 			padding: 6px 2px;
 			border-left: 0;
 			border-top: 3px solid transparent;
