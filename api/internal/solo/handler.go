@@ -97,6 +97,27 @@ func (s *Service) answer(w http.ResponseWriter, r *http.Request, status int, rm 
 	httpx.WriteOK(w, r, status, out)
 }
 
+// answerTurn is the room with the card for the turn it leaves on the
+// drafter, so the turn and its call paint together rather than a second
+// round trip apart. A card that cannot be made here is left off: the
+// room still answers, and the page reads the card from /card.
+func (s *Service) answerTurn(w http.ResponseWriter, r *http.Request, status int, rm room, withBoard bool) {
+	out, err := view(rm, withBoard, s.Shares)
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "solo: view", err)
+		return
+	}
+	if rm.draft.Waiting {
+		card, err := s.cardAt(r.Context(), rm)
+		if err == nil {
+			out.Card = &card
+		} else {
+			s.Log.Warn("solo: the turn answers without its card", "mock", rm.mock.Id, "pick", rm.draft.State.PickNumber, "err", err)
+		}
+	}
+	httpx.WriteOK(w, r, status, out)
+}
+
 // settingsFor resolves a create's settings: a saved league's, or the
 // ones in the request, never both. On false it has already answered.
 func (s *Service) settingsFor(w http.ResponseWriter, r *http.Request, owner mocks.Owner, in apitypes.MockCreate) (apitypes.LeagueSettings, bool) {
@@ -180,7 +201,7 @@ func (s *Service) handleGet(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, "solo: get", err)
 		return
 	}
-	s.answer(w, r, http.StatusOK, rm, true)
+	s.answerTurn(w, r, http.StatusOK, rm, true)
 }
 
 func (s *Service) handlePick(w http.ResponseWriter, r *http.Request) {
@@ -201,7 +222,7 @@ func (s *Service) handlePick(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, "solo: pick", err)
 		return
 	}
-	s.answer(w, r, http.StatusOK, rm, false)
+	s.answerTurn(w, r, http.StatusOK, rm, false)
 }
 
 func (s *Service) handleUndo(w http.ResponseWriter, r *http.Request) {
@@ -218,7 +239,7 @@ func (s *Service) handleUndo(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, "solo: undo", err)
 		return
 	}
-	s.answer(w, r, http.StatusOK, rm, false)
+	s.answerTurn(w, r, http.StatusOK, rm, false)
 }
 
 func (s *Service) handleAutopick(w http.ResponseWriter, r *http.Request) {
@@ -248,7 +269,7 @@ func (s *Service) autopickThrough(w http.ResponseWriter, r *http.Request, owner 
 		s.fail(w, r, "solo: autopick", err)
 		return
 	}
-	s.answer(w, r, http.StatusOK, rm, false)
+	s.answerTurn(w, r, http.StatusOK, rm, false)
 }
 
 func (s *Service) handleQueue(w http.ResponseWriter, r *http.Request) {

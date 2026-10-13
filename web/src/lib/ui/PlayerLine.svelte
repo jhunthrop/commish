@@ -21,6 +21,8 @@
 		current?: boolean;
 		/** The line's one number, at its right end, with its basis. */
 		trailing?: Snippet;
+		/** The line heads a card beside a big face: the name at a board row's size, the person first. */
+		heads?: boolean;
 	}
 
 	let {
@@ -32,7 +34,8 @@
 		href,
 		size = 32,
 		current = false,
-		trailing
+		trailing,
+		heads = false
 	}: Props = $props();
 
 	const meta = $derived(
@@ -42,7 +45,7 @@
 	);
 </script>
 
-<span class="line" class:current class:faceless={!headshot}>
+<span class="line" class:current class:heads class:faceless={!headshot}>
 	{#if headshot}<Face src={headshot} {size} />{/if}
 	<span class="who">
 		{#if href}<a class="name" {href}>{name}</a>{:else}<span class="name">{name}</span>{/if}
@@ -84,6 +87,10 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		text-decoration: none;
+	}
+
+	.heads .name {
+		font-size: var(--t-md);
 	}
 
 	a.name:hover {

@@ -26,15 +26,22 @@
 	let branch = $state<string | null>(null);
 	const copied = new Flash(COPIED_MS);
 
+	/** The turn's call could not be made: the room says so and drafts from the pool. */
+	let cardMissing = $state(false);
+
 	async function loadCard(current: MockRoom): Promise<void> {
 		card = null;
+		cardMissing = false;
 		if (!current.waiting) return;
+		const stillHere = (): boolean => room?.pick_number === current.pick_number;
 		try {
 			const next = await rooms.card(id);
-			if (room?.pick_number === next.pick_number) card = next;
+			if (!stillHere()) return;
+			if (next.pick_number === current.pick_number) card = next;
+			else cardMissing = true;
 		} catch {
-			// The room drafts without a card; the call lands with the next one.
-			card = null;
+			// The room never waits on a call that is not coming: it drafts from the pool.
+			if (stillHere()) cardMissing = true;
 		}
 	}
 
@@ -46,21 +53,59 @@
 			return;
 		}
 		// A queue change keeps the turn, and the turn keeps its card.
-		if (!samePick) await loadCard(next);
+		if (samePick) return;
+		// The turn brings its card, so the call paints with it. Without one, the room asks.
+		if (next.card?.pick_number === next.pick_number) {
+			card = next.card;
+			cardMissing = false;
+		} else await loadCard(next);
 	}
 
+	/** Every write to the room runs one after another, so a key pressed while another write is on
+	 * its way acts when that write lands instead of being lost or racing it. */
+	let writes: Promise<void> = Promise.resolve();
+
+	function write(job: () => Promise<void>): Promise<void> {
+		const next = writes.then(job);
+		writes = next;
+		return next;
+	}
+
+	/** A pick, an undo or a stand-in run: one at a time, the room busy until its turn has its call. */
 	async function act(run: () => Promise<MockRoom>, after: string | null = null): Promise<void> {
 		if (busy) return;
 		busy = true;
 		error = null;
-		try {
-			await settle(await run());
-			branch = after;
-		} catch (e) {
-			error = e;
-		} finally {
-			busy = false;
-		}
+		await write(async () => {
+			try {
+				await settle(await run());
+				branch = after;
+			} catch (e) {
+				error = e;
+			} finally {
+				busy = false;
+			}
+		});
+	}
+
+	/** The queue as the drafter last set it, shown at once, until its writes land. A queue write never
+	 * holds the room busy, so D or Enter right after Q still acts. */
+	let queued = $state<string[] | null>(null);
+	let queueWrites = 0;
+
+	function setQueue(ids: string[]): void {
+		queued = ids;
+		queueWrites += 1;
+		void write(async () => {
+			try {
+				await settle(await rooms.queue(id, ids));
+			} catch (e) {
+				error = e;
+			} finally {
+				queueWrites -= 1;
+				if (queueWrites === 0) queued = null;
+			}
+		});
 	}
 
 	/** The undo's line: the pick it went back to, who is back in the pool, and that the room branched. */
@@ -89,7 +134,8 @@
 				await goto(resolve('/mock/[id]/report', { id }), { replaceState: true });
 				return;
 			}
-			await loadCard(loaded);
+			if (loaded.card?.pick_number === loaded.pick_number) card = loaded.card;
+			else await loadCard(loaded);
 		} catch (e) {
 			error = e;
 		}
@@ -109,7 +155,8 @@
 			/>{/if}
 	{/snippet}
 	{#snippet tail()}
-		<Quiet href={resolve('/mock/new')}>New mock</Quiet>
+		<!-- A room that never loaded shows its notice with New mock, so the bar leaves it out. -->
+		{#if room !== null || !error}<Quiet href={resolve('/mock/new')}>New mock</Quiet>{/if}
 	{/snippet}
 	{#if error}
 		<div class="notice">
@@ -118,18 +165,19 @@
 	{/if}
 	{#if room && board}
 		<SoloRoom
-			{room}
+			room={queued === null ? room : { ...room, queue: queued }}
 			{board}
 			{card}
 			search={query}
 			{busy}
 			notice={branch}
+			callMissing={cardMissing}
 			copied={copied.on}
 			onpick={(player: string) => act(() => rooms.pick(id, player, room?.pick_number ?? 0))}
 			onundo={(pick: number) => act(() => rooms.undo(id, pick), undoneWords(pick))}
 			onautopick={(round: number) => act(() => rooms.autopick(id, round))}
 			onfinish={() => act(() => rooms.finish(id))}
-			onqueue={(ids: string[]) => act(() => rooms.queue(id, ids), branch)}
+			onqueue={setQueue}
 			onshare={share}
 		/>
 	{/if}

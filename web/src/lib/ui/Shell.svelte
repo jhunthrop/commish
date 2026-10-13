@@ -16,7 +16,9 @@
 		active?: Section | null;
 		/** The top bar's search, usually a Search. */
 		search?: Snippet;
-		/** The top bar's right end, after the theme switch: the page's verb or a quiet action. */
+		/** The top bar's right end, after the theme switch: the page's verb or a quiet action. On the
+		 * phone the switch lives in the account room, so the bar holds only the account, the verb and
+		 * search. */
 		tail?: Snippet;
 		children: Snippet;
 	}
@@ -62,7 +64,7 @@
 				><Icon name={RAIL_FOOT.icon} /></a
 			>
 			<div class="tail">
-				<ThemeSwitch />
+				<span class="theme"><ThemeSwitch /></span>
 				{@render tail?.()}
 			</div>
 		</header>
@@ -184,6 +186,10 @@
 		display: flex;
 	}
 
+	.theme {
+		display: contents;
+	}
+
 	.tail {
 		margin-left: auto;
 		display: flex;
@@ -240,6 +246,10 @@
 		}
 
 		h1 {
+			display: none;
+		}
+
+		.theme {
 			display: none;
 		}
 

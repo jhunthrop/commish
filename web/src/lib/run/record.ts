@@ -1,6 +1,6 @@
 /** The record in the words a page prints: its one big number and each week as a person says it.
  * The record page and the front door both read these, so the headline is said one way. */
-import { dayLabel } from '#lib/format/date.ts';
+import { dayLabel, weekdayLabel } from '#lib/format/date.ts';
 import { fixed, plural } from '#lib/format/number.ts';
 import type { RecordLine, RecordWeek, RunRecord } from './schema.ts';
 
@@ -18,7 +18,12 @@ export function allLine(lines: readonly RecordLine[]): RecordLine | undefined {
 }
 
 function gradedWeeks(record: RunRecord): RecordWeek[] {
-	return record.weeks.filter((week) => week.gradedAt !== null);
+	return record.weeks.filter((week) => week.status === 'graded');
+}
+
+/** Weeks whose board froze, graded or still waiting on the stat lines. */
+function frozenWeeks(record: RunRecord): RecordWeek[] {
+	return record.weeks.filter((week) => week.status === 'graded' || week.status === 'frozen');
 }
 
 /** "weeks 1 to 3", "week 1". */
@@ -30,7 +35,7 @@ function weekSpan(weeks: readonly RecordWeek[]): string {
 }
 
 /** Graded: our agreement with the finish over every graded week, with the span and the players it
- * counts, and ADP's beside it. Not yet: how many weeks are graded and how many wait, said plainly. */
+ * counts, and ADP's beside it. Not yet: how many of the frozen weeks are graded, said plainly. */
 export function recordHeadline(record: RunRecord): RecordHeadline {
 	const graded = gradedWeeks(record);
 	const overall = allLine(record.toDate);
@@ -44,21 +49,43 @@ export function recordHeadline(record: RunRecord): RecordHeadline {
 			graded: true
 		};
 	}
-	const waiting = record.weeks.length - graded.length;
-	const weeks = graded.length === 1 ? 'week' : 'weeks';
+	const frozen = frozenWeeks(record).length;
 	return {
 		value: String(graded.length),
 		caption:
-			waiting === 0
-				? `${weeks} graded. The first board freezes before the next kickoff`
-				: `${weeks} graded. ${plural(waiting, 'board')} frozen before kickoff, graded after the games`,
+			frozen === 0
+				? 'weeks graded. The first board freezes before its first kickoff'
+				: `of ${plural(frozen, 'frozen week')} graded`,
 		graded: false
 	};
 }
 
-/** "frozen Sep 8, graded after the games", or "frozen Sep 8, graded Sep 15". */
+/** A missed week's reason as the end of its line: "our nightly run failed that week". */
+function reason(week: RecordWeek): string {
+	if (week.note === undefined) throw new Error(`Week ${String(week.week)} is missed with no note.`);
+	const text = week.note.replace(/\.$/, '');
+	return `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+}
+
+/** A time the schema guarantees for the status, read without a fallback that could print. */
+function stamp(iso: string | null, week: RecordWeek): string {
+	if (iso === null) throw new Error(`Week ${String(week.week)} is ${week.status} with no date.`);
+	return dayLabel(iso);
+}
+
+/** Each week as a person says it, by its status: "frozen Sep 8, waiting on the stat lines",
+ * "not frozen, our nightly run failed that week", "freezes Thu Oct 15". */
 export function weekWords(week: RecordWeek): string {
-	const graded =
-		week.gradedAt === null ? 'graded after the games' : `graded ${dayLabel(week.gradedAt)}`;
-	return `frozen ${dayLabel(week.frozenAt)}, ${graded}`;
+	switch (week.status) {
+		case 'graded':
+			return `frozen ${stamp(week.frozenAt, week)}, graded ${stamp(week.gradedAt, week)}`;
+		case 'frozen':
+			return `frozen ${stamp(week.frozenAt, week)}, waiting on the stat lines`;
+		case 'missed':
+			return `not frozen, ${reason(week)}`;
+		case 'upcoming':
+			return week.frozenAt === null
+				? 'freezes before its first kickoff'
+				: `freezes ${weekdayLabel(week.frozenAt)}`;
+	}
 }

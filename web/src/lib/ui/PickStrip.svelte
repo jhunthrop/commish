@@ -50,6 +50,13 @@
 		overflow-x: auto;
 	}
 
+	@media (max-width: 760px) {
+		.strip {
+			padding-right: var(--fade-w);
+			mask-image: var(--fade-end);
+		}
+	}
+
 	.lead {
 		flex: none;
 		display: flex;

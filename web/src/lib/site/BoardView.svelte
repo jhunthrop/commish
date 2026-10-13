@@ -62,6 +62,9 @@
 		{ term: 'Rose', means: 'Below replacement' },
 		{ term: 'Drafters', means: `Their ADP from ${page.adpBasis.join(' and ')}, against our rank` }
 	]);
+
+	/** The side column's anchor: the basis, the toggles and the tiers. */
+	const SIDE_ID = 'board-side';
 </script>
 
 {#snippet row(player: BoardRow, i: number)}
@@ -87,6 +90,8 @@
 				{#snippet actions()}
 					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
 					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
+					<!-- Where the side column falls below 400 rows, a way to it from the top. -->
+					<span class="to-side"><Quiet href="#{SIDE_ID}" size="sm">Basis and filters</Quiet></span>
 				{/snippet}
 			</PageHead>
 		</div>
@@ -137,7 +142,7 @@
 		</section>
 	</div>
 
-	<aside class="side" aria-label="Your board">
+	<aside class="side" id={SIDE_ID} aria-label="Your board">
 		{#if page.position !== null}
 			<Panel>
 				<PanelHead title="Tiers" aside="Drop to next" />
@@ -200,9 +205,17 @@
 		top: 84px;
 	}
 
+	.to-side {
+		display: none;
+	}
+
 	@media (max-width: 1180px) {
 		.board {
 			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.to-side {
+			display: contents;
 		}
 
 		.side {

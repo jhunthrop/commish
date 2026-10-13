@@ -161,6 +161,10 @@
 			</Verdict>
 		{/if}
 
+		{#if picks.every((pick) => pick === null) && SLOTS.every((slot) => missing[slot] === null)}
+			<p class="ask">Pick two players and we'll say which one we'd take, and why.</p>
+		{/if}
+
 		<div class="pair">
 			{#each SLOTS as slot, i (slot)}
 				{@const pick = picks[i]}
@@ -176,6 +180,7 @@
 									positionRank={numbers.positionRank}
 									team={player.team}
 									href={links.player(player.slug)}
+									heads
 								>
 									{#snippet trailing()}<TierChip tier={numbers.tier} long />{/snippet}
 								</PlayerLine>
@@ -238,6 +243,12 @@
 		flex-direction: column;
 		gap: var(--s-4);
 		max-width: 1180px;
+	}
+
+	.ask {
+		margin: 0;
+		font-size: var(--t-lg);
+		color: var(--ink-2);
 	}
 
 	.pair {

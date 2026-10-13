@@ -23,11 +23,17 @@ export interface CallView {
 
 /** The pool's basis, printed over it: whose points rank it, on which board, and where the odds come
  * from. Every number names its basis in the same view. */
-export function poolBasis(board: Board, card: RoomCard | null, teams: number): string {
-	return `${board.basis} ${oddsBasis(card, teams)}`;
+export function poolBasis(
+	board: Board,
+	card: RoomCard | null,
+	teams: number,
+	callMissing = false
+): string {
+	return `${board.basis} ${oddsBasis(card, teams, callMissing)}`;
 }
 
-function oddsBasis(card: RoomCard | null, teams: number): string {
+function oddsBasis(card: RoomCard | null, teams: number, callMissing: boolean): string {
+	if (card === null && callMissing) return 'No odds for this pick.';
 	if (card === null) return 'The odds land with our call.';
 	const to = card.next_pick === null ? 'your last pick' : pickLabel(card.next_pick, teams);
 	if (card.source === 'advisor') {
@@ -81,6 +87,29 @@ export function runnerWords(view: CallView): RunnerWords | null {
 	return {
 		name: runner.name,
 		rest: `${more}. He is there at ${at} ${oddsWords(runnerOdds)} of the time, ${call} ${oddsWords(odds)}.`
+	};
+}
+
+/** The frame the call panel holds before the first card of a room has come: the best player left by
+ * points over replacement, with no numbers. It is only ever drawn as the reading skeleton, so it
+ * shapes the panel and says nothing. */
+export function frameView(
+	board: Board,
+	drafted: ReadonlySet<string>,
+	teams: number,
+	pick: number
+): CallView | null {
+	const player = board.players.find((p) => !drafted.has(p.id));
+	if (!player) return null;
+	return {
+		player,
+		odds: null,
+		runner: null,
+		runnerOdds: null,
+		forLabel: pickLabel(pick, teams),
+		nextLabel: null,
+		conditional: false,
+		why: null
 	};
 }
 

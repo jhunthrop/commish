@@ -56,7 +56,7 @@
 	import NightlyParts from '#lib/ui/system/NightlyParts.svelte';
 	import RoundParts from '#lib/ui/system/RoundParts.svelte';
 	import Swatch from '#lib/ui/system/Swatch.svelte';
-	import { SOLO_KEYS } from '#lib/room/keys.ts';
+	import { soloKeys } from '#lib/room/keys.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -406,7 +406,7 @@
 		<DocSection title="Your team and the keys" sub="The same solo room at 5.08, from the dock.">
 			<Parts as="div">
 				<TeamPanel slots={data.soloTeam} rosterSize={data.soloRoom.rosterSize} />
-				<Keys bindings={SOLO_KEYS} />
+				<Keys bindings={soloKeys(false)} />
 			</Parts>
 		</DocSection>
 
