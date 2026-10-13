@@ -96,6 +96,7 @@ WORDS
 - Phrases this board has worn out, never to be written or paraphrased: {_STEMS}. Never the frame "the honest" followed by a noun (the honest worry, the honest read, the honest answer), in any form.
 - Never these words either: {", ".join(LAB_REPORT_TERMS)}. Say "our number", "our projection", "we project him for 136 points", "the case", "costs him", "is worth". "Our number" takes a plain verb (has him at, puts him at, is), never "says".
 - Never write the word "floor". Say what the low end actually is: the weeks he missed, the weeks he scored under the bar, the season the range bottoms out at.
+- Speak for the board, never for yourself: "we", "our number", "we would take him", never "I", "I'd" or "I'm". The page is ours, not one writer's.
 - Write like you talk. Contractions are welcome. Short sentences land harder than long ones. Never an em-dash, never a semicolon. Use a period, a comma, or "and".
 - Never name a rival fantasy product.
 
