@@ -131,22 +131,19 @@
 		{#if view === 'loading'}
 			<div class="reserve"></div>
 		{:else if view === 'signed-out'}
-			<EmptyState
-				title="Sign in to follow your league"
-				line="A league lives on your account. Following one is free."
-			>
-				{#snippet actions()}<Verb href={leagueApi.signInUrl(links.leagueNew())}>Sign in</Verb
-					>{/snippet}
-			</EmptyState>
+			<DisplayTitle size="page">Follow your league</DisplayTitle>
+			{@render gives()}
+			<ActionBar>
+				<!-- Back from sign-in on this same address, so a shared ?link= is still in it. -->
+				<Verb href={leagueApi.signInUrl(page.url.pathname + page.url.search)}
+					>Sign in to follow it</Verb
+				>
+			</ActionBar>
 		{:else if view === 'unreachable'}
 			<EmptyState title="This page can't reach Commish right now" line="Reload in a moment." />
 		{:else}
 			<DisplayTitle size="page">Follow your league</DisplayTitle>
-			<p class="lede">
-				Paste your league's link. We keep your roster, this week's matchup and every player nobody
-				in your league holds up to date, on our board. Free.
-			</p>
-			<p class="hosts">{HOSTS_LINE}</p>
+			{@render gives()}
 			<div class="form">
 				<Field
 					label="Your league's link"
@@ -206,6 +203,15 @@
 		{/if}
 	</main>
 </Shell>
+
+<!-- What following a league gives, and where from: the same two lines signed in and out. -->
+{#snippet gives()}
+	<p class="lede">
+		Paste your league's link. We keep your roster, this week's matchup and every player nobody in
+		your league holds up to date, on our board. Free.
+	</p>
+	<p class="hosts">{HOSTS_LINE}</p>
+{/snippet}
 
 {#snippet alert()}
 	<ProblemLine>{problem}</ProblemLine>

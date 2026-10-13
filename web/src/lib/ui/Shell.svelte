@@ -37,7 +37,7 @@
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
 	// League joins the rail when /me names an attached league.
 	onMount(() => void railLeague.load());
-	const items = $derived(railItems(railLeague.id));
+	const items = $derived(railItems(railLeague.account));
 </script>
 
 {#snippet railLink(item: RailItem)}

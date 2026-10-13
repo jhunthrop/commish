@@ -1,6 +1,6 @@
 /**
- * The rail's League item answers from /me: the account's newest attached league, read once per page
- * load and again after an attach, a detach or an undo. A browser with no signed-in session cookie
+ * The rail's League item answers from /me: signed in, the account's newest attached league or none,
+ * read once per page load and again after an attach, a detach or an undo. A browser with no signed-in session cookie
  * asks nothing, so a signed-out reader of the public pages makes no API call. Nothing is kept in the
  * browser, so another account on the same browser never sees it.
  */
@@ -12,9 +12,14 @@ type Account = components['schemas']['Account'];
 
 const client = apiClient(PUBLIC_API_URL);
 
+/** Signed in, the newest attached league's id, or null with none. */
+export interface RailAccount {
+	leagueId: string | null;
+}
+
 class RailLeague {
-	/** The newest attached league's id, null signed out or with none. */
-	id = $state<string | null>(null);
+	/** The signed-in account's league, null signed out or before /me answers. */
+	account = $state<RailAccount | null>(null);
 	#asked: Promise<void> | null = null;
 
 	/** Reads /me the first time any page asks in this page load. */
@@ -26,13 +31,13 @@ class RailLeague {
 	/** Reads /me again: after the account's leagues change. */
 	async refresh(): Promise<void> {
 		if (!hasSessionCookie()) {
-			this.id = null;
+			this.account = null;
 			return;
 		}
 		try {
-			this.id = (await client.call<Account>('/me')).league_id;
+			this.account = { leagueId: (await client.call<Account>('/me')).league_id };
 		} catch {
-			this.id = null;
+			this.account = null;
 		}
 	}
 }
