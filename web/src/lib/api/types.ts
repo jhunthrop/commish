@@ -1082,7 +1082,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Sign in to FFPC as the member, through FFPC's own sign-in form, and keep what FFPC hands back (its session, and the sign-in because FFPC offers no other way to renew a session), envelope encrypted. Answers the member's FFPC leagues. Needs consent, kept with its time and words. Three refused sign-ins in an hour pause connecting for the hour (423). 5 an hour an account. 503 when FFPC is not open here or its sign-in page changed. */
+		/** Sign in to FFPC as the member, through FFPC's own sign-in form, and keep what FFPC hands back (its session, and the sign-in because FFPC offers no other way to renew a session), envelope encrypted. Answers the member's FFPC leagues. Needs consent, kept with its time and words. Three refused sign-ins in an hour pause connecting for the hour (423). 5 an hour an account. 502 when FFPC is not answering or answers a sign-in in a way we do not expect; 503 when FFPC is not open here or its sign-in page changed. */
 		post: operations['connectFFPC'];
 		delete?: never;
 		options?: never;

@@ -75,7 +75,7 @@ func (f fake) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/MyTeams.aspx", http.StatusFound)
 			return
 		}
-		fmt.Fprint(w, `<form id="form1"><span>Invalid login</span></form>`)
+		fmt.Fprint(w, `<form id="form1"><span id="spnSignInError">Invalid email/password</span></form>`)
 	case r.URL.Path == "/MyTeams.aspx" && !signedIn(r):
 		http.Redirect(w, r, "/cms/public", http.StatusFound)
 	case r.URL.Path == "/MyTeams.aspx" && r.Method == http.MethodGet:

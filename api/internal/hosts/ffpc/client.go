@@ -1,6 +1,7 @@
 package ffpc
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -36,9 +38,6 @@ const (
 	// maxQueue is how long a read waits for its turn before it gives up.
 	maxQueue = 2 * time.Minute
 )
-
-// The cookies FFPC's session lives in; nothing else is kept.
-var sessionCookies = []string{"BGSLMSession", "BGSLMAuthenticated", "ASP.NET_SessionId"}
 
 // Errors a caller tells apart. None of them carries a credential.
 var (
@@ -91,8 +90,22 @@ func LocalPace(gap time.Duration) Pace { return localPace{lim: rate.NewLimiter(r
 // MaxQueue is how long a read waits for its turn before it gives up.
 const MaxQueue = maxQueue
 
-// Cookies is a session as FFPC handed it back, by cookie name.
+// Cookies is a session as FFPC handed it back, by cookie name: every
+// cookie FFPC set, kept and sent back whole. FFPC's sign-in lives in
+// HttpOnly cookies a browser's script never shows, so no list of names
+// could be trusted to hold it.
 type Cookies map[string]string
+
+// names is the jar's cookie names, sorted: what a log may say of a
+// session, never a value.
+func (c Cookies) names() []string {
+	out := make([]string, 0, len(c))
+	for k := range c {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
 
 // Client is FFPC over HTTP.
 type Client struct {
@@ -121,7 +134,7 @@ func NewAt(base string) *Client {
 func (c *Client) wait(ctx context.Context) error { return c.Pace.Wait(ctx) }
 
 // response is one answer: its status, where it sends us, its body and
-// the session cookies it set.
+// the cookies it set, an expired one as an empty value.
 type response struct {
 	status   int
 	location string
@@ -145,10 +158,8 @@ func (c *Client) do(ctx context.Context, method, path string, form url.Values, j
 	if form != nil {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
-	for _, name := range sessionCookies {
-		if v, ok := jar[name]; ok {
-			req.AddCookie(&http.Cookie{Name: name, Value: v})
-		}
+	for _, name := range jar.names() {
+		req.AddCookie(&http.Cookie{Name: name, Value: jar[name]})
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
@@ -160,15 +171,23 @@ func (c *Client) do(ctx context.Context, method, path string, form url.Values, j
 	if err != nil || len(raw) > MaxPage {
 		return response{}, fmt.Errorf("%w: %s body", ErrUnavailable, pathOnly(path))
 	}
-	out := response{status: resp.StatusCode, location: resp.Header.Get("Location"), body: raw, set: Cookies{}}
+	return response{status: resp.StatusCode, location: resp.Header.Get("Location"), body: raw, set: setCookies(resp)}, nil
+}
+
+// setCookies is every cookie an answer set, a redirect's too (redirects
+// are read, not followed), with an expired one as an empty value.
+func setCookies(resp *http.Response) Cookies {
+	now := time.Now()
+	out := Cookies{}
 	for _, ck := range resp.Cookies() {
-		for _, name := range sessionCookies {
-			if ck.Name == name {
-				out.set[name] = ck.Value
-			}
+		expired := ck.MaxAge < 0 || (!ck.Expires.IsZero() && ck.Expires.Before(now))
+		if expired {
+			out[ck.Name] = ""
+			continue
 		}
+		out[ck.Name] = ck.Value
 	}
-	return out, nil
+	return out
 }
 
 // merged is the jar with the answer's cookies laid over it, a new map.
@@ -225,14 +244,35 @@ func (c *Client) SignIn(ctx context.Context, username, password string) (Cookies
 	// from it to the public front page.
 	leagues, err := c.MyTeams(ctx, jar)
 	switch {
-	case errors.Is(err, ErrSignedOut):
+	case errors.Is(err, ErrSignedOut) && refused(posted):
 		return nil, nil, ErrBadSignIn
-	case errors.Is(err, ErrNotThisPage):
-		return nil, nil, ErrUnexpected
+	case errors.Is(err, ErrSignedOut), errors.Is(err, ErrNotThisPage):
+		// Names and status codes only: the operator's reason, never a value.
+		return nil, nil, fmt.Errorf("%w: post %d%s, then %v; cookies sent %s", ErrUnexpected,
+			posted.status, redirectTo(posted), err, strings.Join(jar.names(), ","))
 	case err != nil:
 		return nil, nil, err
 	}
 	return jar, leagues, nil
+}
+
+// refusedText is what FFPC's sign-in page says to a wrong email or
+// password (Login.aspx, 2026-10-13).
+const refusedText = "Invalid email/password"
+
+// refused reports a post FFPC answered with its sign-in page refusing
+// the email and password.
+func refused(r response) bool {
+	return r.status == http.StatusOK && bytes.Contains(r.body, []byte(refusedText))
+}
+
+// redirectTo is " to <path>" for a redirect, its query dropped, and
+// nothing otherwise.
+func redirectTo(r response) string {
+	if r.location == "" {
+		return ""
+	}
+	return " to " + pathOnly(r.location)
 }
 
 // signedOut reports an answer that sends a member's read away: to the
@@ -279,7 +319,7 @@ func (c *Client) MyTeams(ctx context.Context, jar Cookies) ([]MyLeague, error) {
 		return nil, err
 	}
 	if signedOut(r) {
-		return nil, ErrSignedOut
+		return nil, fmt.Errorf("%w: my teams %d%s", ErrSignedOut, r.status, redirectTo(r))
 	}
 	if r.status != http.StatusOK {
 		return nil, fmt.Errorf("%w: my teams %d", ErrUnavailable, r.status)
