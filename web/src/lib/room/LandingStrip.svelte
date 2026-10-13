@@ -28,7 +28,7 @@
 						{
 							key: pick.pick,
 							player,
-							lines: [pickCredit(pick, seats, you), pickLabel(pick.pick, teams)],
+							lines: [...pickCredit(pick, seats, you), pickLabel(pick.pick, teams)],
 							ring: i === 0 ? 'ink' : undefined,
 							strong: pick.by === 'drafter'
 						}

@@ -119,7 +119,7 @@ async function hold(roomId: string, who: Drafter): Promise<BrowserContext> {
 
 try {
 	await shoot('mock-new', '/mock/new', 'Start against bots');
-	await shoot('mock-new-signed-out', '/mock/new', 'Sign in to keep this mock', null);
+	await shoot('mock-new-signed-out', '/mock/new', 'Sign in to keep it', null);
 
 	interface Room {
 		id: string;

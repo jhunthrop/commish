@@ -45,12 +45,12 @@
 		else if (right > list.scrollLeft + list.clientWidth) list.scrollLeft = right - list.clientWidth;
 	}
 
-	// Your seat first, then the seat on the clock, so both are in view whenever they fit together.
+	// The seat on the clock, then yours, so both are in view whenever they fit and yours always is.
 	$effect(() => {
 		// A seat turning into a bot narrows the strip, so the seats are read here too.
 		if (seats.size < 0) return;
-		reveal(you);
 		reveal(onClock);
+		reveal(you);
 	});
 </script>
 

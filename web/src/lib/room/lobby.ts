@@ -70,18 +70,19 @@ export function pickCredit(
 	pick: LobbyPick,
 	seats: ReadonlyMap<number, LobbySeatState>,
 	you: number
-): string {
+): readonly string[] {
 	const seat = seats.get(pick.seat);
 	const owner = pick.seat === you ? 'you' : (seat?.handle ?? botName(pick.seat));
+	// A stand-in's credit is two lines, so the seat's handle reads whole under a face.
 	switch (pick.by) {
 		case 'drafter':
-			return owner;
+			return [owner];
 		case 'queue':
-			return `bot for ${owner}`;
+			return ['bot for', owner];
 		case 'clock':
-			return `clock for ${owner}`;
+			return ['clock for', owner];
 		default:
-			return botName(pick.seat);
+			return [botName(pick.seat)];
 	}
 }
 
