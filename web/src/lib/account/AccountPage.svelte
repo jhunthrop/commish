@@ -239,7 +239,7 @@
 						{/if}
 					</section>
 
-					<AccountLeagues />
+					<AccountLeagues features={account.features} />
 					<AccountConnections />
 					<AccountDevices />
 

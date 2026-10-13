@@ -86,6 +86,13 @@
 		await goto(resolve('/companion/[id]', { id: made.id }));
 	}
 
+	/** The FFPC list is a single choice here: its one league is the draft. */
+	async function followFirstFFPC(leagues: HostLeague[]): Promise<null> {
+		const [league] = leagues;
+		if (league) await followFFPC(league);
+		return null;
+	}
+
 	async function follow(): Promise<void> {
 		if (!ready) return;
 		busy = true;
@@ -148,7 +155,7 @@
 				</ChipGroup>
 			{/if}
 			{#if ffpcOn && way === 'ffpc'}
-				<FFPCLeagues verb="Follow my draft" onpick={followFFPC} typed />
+				<FFPCLeagues verb={() => 'Follow my draft'} onpick={followFirstFFPC} typed />
 			{:else}
 				<div class="form">
 					<Field

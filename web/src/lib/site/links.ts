@@ -7,6 +7,9 @@ import { COMPANION_START, LEAGUE_START, sectionHref } from '#lib/ui/nav.ts';
 /** The attach page's search parameter naming the way in it starts from: `?host=ffpc`. */
 export const LEAGUE_HOST_PARAM = 'host';
 
+/** The account page's search parameter for how many leagues were just followed: `?followed=2`. */
+export const FOLLOWED_PARAM = 'followed';
+
 /** The anchor of the account page's Your leagues. */
 export const LEAGUES_ANCHOR = 'your-leagues';
 
@@ -40,8 +43,10 @@ export const links = {
 	/** Your cheat sheet. Every page outside the sheet links it through here. */
 	sheet: (): string => resolve('/sheet'),
 	account: (): string => resolve('/account'),
-	/** The account page at Your leagues, every league the account follows. */
-	accountLeagues: (): string => `${resolve('/account')}#${LEAGUES_ANCHOR}`,
+	/** The account page at Your leagues, every league the account follows, saying how many were
+	 * just followed when it is told. */
+	accountLeagues: (followed?: number): string =>
+		`${resolve('/account')}${followed === undefined ? '' : `?${new URLSearchParams({ [FOLLOWED_PARAM]: String(followed) }).toString()}`}#${LEAGUES_ANCHOR}`,
 	/** The Draft Pass, the Membership and the Group Draft Pass. */
 	pass: (): string => resolve('/pass'),
 	/** Where a live draft starts being followed. */

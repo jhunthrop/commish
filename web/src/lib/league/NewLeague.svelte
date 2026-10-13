@@ -17,10 +17,25 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { railLeague } from '#lib/account/rail-league.svelte.ts';
+	import { hasFeature, type Feature } from '#lib/account/features.ts';
 	import FFPCLeagues from '#lib/hosts/FFPCLeagues.svelte';
-	import { ffpcOpen, hostsApi, type HostLeague } from '#lib/hosts/api.ts';
+	import {
+		ffpcOpen,
+		hostsApi,
+		needsSignIn,
+		type HostLeague,
+		type PickAnswer
+	} from '#lib/hosts/api.ts';
 	import { ApiError, leagueApi, type AttachPreview, type AttachedLeague } from './api.ts';
+	import {
+		followInOrder,
+		followVerb,
+		followingWords,
+		missedWords,
+		roomToFollow
+	} from './follow-many.ts';
 	import { hostWords, hostsLine } from './model.ts';
+	import OneLeagueFree from './OneLeagueFree.svelte';
 
 	/** Attach a league: paste its link, say which team is yours (a tap on it, or a Sleeper username),
 	 * one verb. The league is read as soon as the link is pasted, so the teams are there to tap. */
@@ -47,6 +62,8 @@
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
 	let attached = $state<AttachedLeague[]>([]);
+	/** What the reader may use, from /me (Can): many_leagues follows more than one league. */
+	let features = $state<readonly Feature[]>([]);
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	/** The link a preview was asked for, so a late answer for an older link is dropped. */
 	let asked = '';
@@ -56,6 +73,10 @@
 			.connections()
 			.then((hosts) => (ffpcOn = ffpcOpen(hosts)))
 			.catch(() => (ffpcOn = false));
+		leagueApi
+			.me()
+			.then((me) => (features = me.features))
+			.catch(() => (features = []));
 		leagueApi
 			.attached()
 			.then((list) => {
@@ -125,10 +146,40 @@
 		}
 	}
 
-	async function followFFPC(league: HostLeague): Promise<void> {
-		const made = await leagueApi.attach({ host: 'ffpc', link: league.league_id, me: {} });
+	const many = $derived(hasFeature(features, 'many_leagues'));
+	/** How many more leagues this account can follow now. */
+	const room = $derived(roomToFollow(many, attached.length));
+	/** The FFPC leagues already followed, by FFPC league id, to their page here. */
+	const followedFFPC = $derived(
+		new Map(
+			attached.filter((a) => a.host === 'ffpc').map((a) => [a.host_league_id, links.league(a.id)])
+		)
+	);
+
+	async function reread(): Promise<void> {
+		attached = await leagueApi.attached();
 		void railLeague.refresh();
-		await goto(resolve('/league/[id]', { id: made.id }));
+	}
+
+	/** Each chosen FFPC league through the one attach, in order. All followed: one league opens its
+	 * page, more open the account's list with the summary. A miss stays here, named. */
+	async function followFFPC(leagues: HostLeague[]): Promise<PickAnswer | null> {
+		const outcome = await followInOrder(
+			leagues.map((l) => ({ key: l.league_id, name: l.name })),
+			async (l) => (await leagueApi.attach({ host: 'ffpc', link: l.key, me: {} })).id,
+			failure,
+			needsSignIn
+		).finally(() => void reread().catch(() => undefined));
+		const [first] = outcome.made;
+		if (outcome.missed.length === 0 && first) {
+			const count = outcome.made.length;
+			await goto(count === 1 ? links.league(first.id) : links.accountLeagues(count));
+			return null;
+		}
+		return {
+			status: outcome.made.length > 0 ? followingWords(outcome.made.length) : '',
+			problems: outcome.missed.map(missedWords)
+		};
 	}
 
 	const attachedLines = $derived(
@@ -172,7 +223,13 @@
 				</ChipGroup>
 			{/if}
 			{#if ffpcOn && way === 'ffpc'}
-				<FFPCLeagues verb="Follow my league" onpick={followFFPC} />
+				<FFPCLeagues
+					verb={followVerb}
+					onpick={followFFPC}
+					most={room}
+					followed={followedFFPC}
+					limit={many ? undefined : oneLeagueFree}
+				/>
 			{:else}
 				<div class="form">
 					<Field
@@ -222,7 +279,10 @@
 						</div>
 					{/if}
 				</div>
-				<ActionBar alert={problem ? alert : undefined}>
+				<ActionBar
+					alert={problem ? alert : undefined}
+					note={room === 0 ? oneLeagueFree : undefined}
+				>
 					<Verb disabled={!ready} onclick={() => void follow()}>Follow my league</Verb>
 				</ActionBar>
 			{/if}
@@ -245,6 +305,10 @@
 		on our board. Free.
 	</p>
 	<p class="hosts">{hostsLine(ffpcOn)}</p>
+{/snippet}
+
+{#snippet oneLeagueFree()}
+	<OneLeagueFree />
 {/snippet}
 
 {#snippet alert()}
