@@ -36,14 +36,14 @@ CSS = LEAGUE_ROW_CSS + """
 .side header{display:flex;justify-content:space-between;padding:var(--s-2) var(--s-3);border-bottom:2px solid var(--line-strong);font-weight:700}
 .side.mine header{border-bottom-color:var(--accent)}
 .moves{list-style:none;margin:0;padding:0 var(--s-3) var(--s-2)}
-.moves li{display:flex;gap:var(--s-3);align-items:baseline;flex-wrap:wrap;padding:var(--s-3) 0;border-bottom:1px solid var(--line)}
+.moves li{display:grid;grid-template-columns:4.5em minmax(0,1fr);gap:var(--s-3);align-items:baseline;padding:var(--s-3) 0;border-bottom:1px solid var(--line)}
 .moves b{font-weight:600}
 .moves span{color:var(--ink-2)}
 .foot{display:flex;flex-direction:column;gap:var(--s-2);align-items:flex-start;font-size:var(--t-sm);color:var(--ink-3)}
 @media (max-width: 1100px){.grid{grid-template-columns:minmax(0,1fr)}}
 @media (max-width: 760px){.league{padding:var(--s-3) var(--s-4) var(--s-5)}.sides{grid-template-columns:minmax(0,1fr)}
   .stand{grid-template-columns:repeat(12,minmax(132px,1fr));overflow-x:auto}
-  .moves span{flex-basis:100%}}
+}
 """
 
 
@@ -82,7 +82,7 @@ def build():
         return f'<section class="side{" mine" if mine else ""}"><header><span>{escape(s["team"])}</span></header>{rows}</section>'
 
     roster = "".join(league_row(r["player"], slot=SLOT_WORDS[r["slot"]]) for r in d["roster"][:ROSTER_ROWS])
-    pool = "".join(league_row(p) for p in d["pool"])
+    pool = "".join(league_row(p, ends_on_value=True) for p in d["pool"])
     moves = "".join(f"<li><b>{_day(m['at'])}</b><span>{escape(_move(m))}.</span></li>" for m in d["moves"])
     body = f"""<main class="league">
   <header class="lead"><div><h2>{escape(d['name'])}</h2>
@@ -113,4 +113,5 @@ def build():
         '<a class="quiet" href="#">Follow another league</a>',
         body,
         CSS,
+        search=False,
     )

@@ -56,7 +56,8 @@ def league(sync, board):
         "name": sync["name"],
         "week": sync["week"],
         "me": sync["me"],
-        "teams": sync["teams"],
+        # Team names only: the host's member handles stay out of the design folder.
+        "teams": [{k: v for k, v in t.items() if k != "owner"} for t in sync["teams"]],
         "season_basis": board["season"],
         "board_basis": board["format"]["basis"],
         "matchup": {"mine": side(sync["matchup"]["mine"]), "opponent": side(sync["matchup"]["opponent"])},

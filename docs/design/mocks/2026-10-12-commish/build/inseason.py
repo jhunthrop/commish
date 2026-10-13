@@ -5,7 +5,7 @@ from datetime import datetime
 from html import escape
 from zoneinfo import ZoneInfo
 
-from data import MOCKS
+from data import MOCKS, TINTED_ROUNDS, heat_class
 from shell import face
 
 EASTERN = ZoneInfo("America/New_York")
@@ -136,6 +136,11 @@ LEAGUE_ROW_CSS = """
 .lrow .end{justify-self:end;text-align:right;display:flex;flex-direction:column;align-items:flex-end}
 .lrow .end b{font-family:var(--font-num);font-weight:700;font-size:var(--t-xl);line-height:1;font-variant-numeric:tabular-nums}
 .lrow .pts{font-family:var(--font-num);font-weight:600}
+.lrow .vcell{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;min-height:44px;
+  padding:0 var(--s-3);border-radius:var(--r-sm);color:var(--heat-ink)}
+.lrow .vcell b{font-family:var(--font-num);font-weight:700;font-size:var(--t-xl);line-height:1;font-variant-numeric:tabular-nums}
+.lrow .vcell .label{color:inherit}
+.lrow .vcell.heat-0{color:var(--ink)}
 """
 
 
@@ -147,18 +152,29 @@ def season_words(p):
     return "No games yet" if p["ppg"] is None else f"{p['games']} game{'s' if p['games'] != 1 else ''}, {p['ppg']:.1f} a game"
 
 
-def league_row(p, slot=None, trailing=None):
+def _value_cell(p):
+    tinted = p["vor"] >= 0 and p["vor_round"] <= TINTED_ROUNDS
+    label = f"over repl · rd {p['vor_round']}" if tinted else "over repl"
+    return f'<span class="vcell {heat_class(p)}"><b>{_signed0(p["vor"])}</b><span class="label">{label}</span></span>'
+
+
+def league_row(p, slot=None, trailing=None, ends_on_value=False):
     """A league row: name to the game log, position rank, team, bye, the projection with its basis, and at
-    its end points a game this season, or the row's own number with the season beside the projection."""
+    its end points a game this season, or the row's own number or (the waiver pool, ranked by it) his
+    value over replacement, with the season beside the projection."""
     slot_cell = f'<span class="label">{slot}</span>' if slot else ""
     if not p["placed"]:
         return (f'<div class="lrow{" slotted" if slot else ""}">{slot_cell}<span class="face" style="width:32px;height:32px"></span>'
                 f'<span class="who"><b>{escape(p["name"])}</b><span class="meta"><span>{p["pos"]} {p["team"]}</span>'
                 f'<span>not on our board</span></span></span><span class="end">{trailing or ""}</span></div>')
     bye = f'<span>bye {p["bye"]}</span>' if p["bye"] else ""
-    season = f'<span>{season_words(p)}</span>' if trailing is not None else ""
+    in_meta = trailing is not None or ends_on_value
+    season = f'<span>{season_words(p)}</span>' if in_meta else ""
+    projection = f'proj {p["proj"]:.0f}' + ("" if ends_on_value else f', over repl {_signed0(p["vor"])}')
     if trailing is not None:
         end = trailing
+    elif ends_on_value:
+        end = _value_cell(p)
     elif p["ppg"] is None:
         end = '<span class="label">No games yet</span>'
     else:
@@ -166,7 +182,7 @@ def league_row(p, slot=None, trailing=None):
     return (
         f'<div class="lrow{" slotted" if slot else ""}">{slot_cell}{face(p, 32)}<span class="who">'
         f'<a href="player.html#this-season">{escape(p["name"])}</a><span class="meta"><span class="pos">{p["pos"]} {p["pos_rank"]}</span>'
-        f'<span>{p["team"]}</span>{bye}{season}<span>proj {p["proj"]:.0f}, over repl {_signed0(p["vor"])}</span></span></span>'
+        f'<span>{p["team"]}</span>{bye}{season}<span>{projection}</span></span></span>'
         f'<span class="end">{end}</span></div>'
     )
 

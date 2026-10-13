@@ -161,7 +161,13 @@ THEME_JS = """
 """
 
 
-def page(title, active, heading, top_tail, body, css, js="", with_read=False):
+SEARCH = (
+    f'<label class="search">{icon("search", 18)}<input id="q" type="search" placeholder="Search 400 players" '
+    'aria-label="Search players"><kbd>/</kbd></label>'
+)
+
+
+def page(title, active, heading, top_tail, body, css, js="", with_read=False, search=True):
     rail = "".join(
         f'<a class="item{" wide-only" if i >= PHONE_ITEMS else ""}" href="{href}"'
         f'{CURRENT if key == active else ""}>{icon(key)}<span>{label}</span></a>'
@@ -191,7 +197,7 @@ def page(title, active, heading, top_tail, body, css, js="", with_read=False):
 <div class="main">
 <header class="top">
   <h1>{escape(heading)}</h1>
-  <label class="search">{icon("search", 18)}<input id="q" type="search" placeholder="Search 400 players" aria-label="Search players"><kbd>/</kbd></label>
+  {SEARCH if search else ""}
   <div class="tail">
     {THEME_SWITCH}
     {top_tail}
