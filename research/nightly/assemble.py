@@ -22,6 +22,7 @@ from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.adp import AdpCapture, adp_cutoff, latest_capture
 from research.nightly.reads.board import FormatBoard, format_board
+from research.nightly.register_log import FrozenBy
 
 Json = dict[str, Any]
 WIN_TOTALS_VENDOR: Final = "Published preseason season win totals, the nfelo win_totals.csv (greerreNFL/nfelosrs)"
@@ -80,10 +81,10 @@ def _schedule(conn: Connection, as_of: datetime) -> tuple[Json, list[Json], Json
     return season.schedule_json(PRODUCT_SEASON, slates, values), clubs, sources[0], sources[1]
 
 
-def _record(conn: Connection, as_of: datetime) -> tuple[Json, Json | None]:
+def _record(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> tuple[Json, Json | None]:
     """The record, and its source; a season with no freeze yet has an empty record and no source."""
     weeks, rows_by_week = record_read.read_record(conn, PRODUCT_SEASON, as_of)
-    record = season.record_json(PRODUCT_SEASON, weeks, record_read.to_date(weeks, rows_by_week))
+    record = season.record_json(PRODUCT_SEASON, weeks, record_read.to_date(weeks, rows_by_week), frozen_by)
     frozen = [w for w in weeks if w.status in {"frozen", "graded"}]
     if not frozen:
         return record, None
@@ -97,7 +98,7 @@ def _record(conn: Connection, as_of: datetime) -> tuple[Json, Json | None]:
     return record, source
 
 
-def assemble(conn: Connection, as_of: datetime) -> Assembled:
+def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> Assembled:
     cutoff = adp_cutoff(as_of, first_kickoff_for(conn, PRODUCT_SEASON))
     captures: dict[str, AdpCapture] = {}
     for run_format in RUN_FORMATS:
@@ -120,7 +121,7 @@ def assemble(conn: Connection, as_of: datetime) -> Assembled:
     inputs = pages.page_inputs(boards, adp_by_format, capsules)
     players = [pages.player_json(who, inputs) for who in people]
     schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of)
-    record, record_source = _record(conn, as_of)
+    record, record_source = _record(conn, as_of, frozen_by)
     files: dict[str, Any] = {
         f"boards/{b.format.id}.json": pages.board_json(b, by_slug, adp_by_format[b.format.id]) for b in boards
     }

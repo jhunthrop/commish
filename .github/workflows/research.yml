@@ -12,6 +12,9 @@ on:
   push:
     paths:
       - "research/**"
+      - "web/src/lib/run/**"
+      - "web/src/lib/types/player.ts"
+      - "web/package-lock.json"
       - "research-ts/**"
       - "drizzle/**"
       - "src/data/seed/**"
@@ -27,6 +30,9 @@ on:
   pull_request:
     paths:
       - "research/**"
+      - "web/src/lib/run/**"
+      - "web/src/lib/types/player.ts"
+      - "web/package-lock.json"
       - "research-ts/**"
       - "drizzle/**"
       - "src/data/seed/**"
@@ -141,6 +147,8 @@ jobs:
         with:
           context: research
           file: research/Dockerfile
+          # The web's run contract, which the nightly's schema gate runs (research/nightly/schema_gate.py).
+          build-contexts: web=web
           build-args: VERSION=${{ github.sha }}
           push: ${{ env.PUSH == 'true' }}
           tags: ${{ env.IMAGE }}
@@ -223,5 +231,5 @@ jobs:
           # A season's first night rewrites every capsule (hours at the gateway's pace); a night after, minutes.
           deploy nightly "research.nightly,run" "$nightly" 2 2Gi 8h
           deploy nightly-publish "research.nightly,publish" "$publish" 1 512Mi 10m
-          deploy inseason "research.inseason,--task,season-week" "$db,ODDS_API_KEY=ODDS_API_KEY:latest" 2 2Gi 1h
+          deploy inseason "research.inseason,--task,season-week" "$db,ODDS_API_KEY=ODDS_API_KEY:latest,CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest" 2 2Gi 1h
           deploy inseason-capture "research.inseason,--task,capture-harvest" "$db,TANK01_API_KEY=TANK01_API_KEY:latest" 1 512Mi 10m

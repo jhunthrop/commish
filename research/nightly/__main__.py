@@ -19,7 +19,6 @@ import os
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from pathlib import Path
 
 import httpx
 
@@ -28,9 +27,9 @@ from research.db.engine import make_engine
 from research.db.url import database_url_from_env
 from research.nightly.capsule_step import CapsuleStepPlan
 from research.nightly.publish import Dispatcher, publish
-from research.nightly.r2 import R2RunStore, credentials_from_token
+from research.nightly.r2 import run_store
 from research.nightly.run import STEPS, RunDeps, RunOptions, run_nightly
-from research.nightly.run_store import LocalRunStore, RunStore
+from research.nightly.run_store import RunStore
 from research.pipeline.commands import now_ms
 from research.pipeline.http import LiveFetcher
 
@@ -41,10 +40,7 @@ def _line(text: str) -> None:
 
 
 def _store(args: argparse.Namespace, http: httpx.Client) -> RunStore:
-    if args.out is not None:
-        return LocalRunStore(Path(args.out))
-    account, credentials = credentials_from_token(http, os.environ)
-    return R2RunStore(http, account, credentials)
+    return run_store(args.out, http)
 
 
 def _run(args: argparse.Namespace) -> int:

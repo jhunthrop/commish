@@ -71,6 +71,8 @@ class SeasonWeekContext:
     season: int
     environ: Mapping[str, str]
     skip: frozenset[str] = field(default_factory=frozenset)
+    # Told of each freeze taken (week, instant), so the bucket's trail names the pass that took it.
+    on_freeze: Callable[[int, datetime], None] = lambda week, at: None
 
 
 def _safely(name: str, body: Callable[[], StepResult], context: SeasonWeekContext) -> StepResult:
@@ -226,6 +228,7 @@ def _take_freeze(context: SeasonWeekContext, candidate: tuple[int, datetime] | N
         return StepResult("freeze", "skipped", f"week {week} already frozen at {js_iso(existing)}")
     with context.engine.begin() as conn:
         result = take_freeze(conn, context.season, week, context.now)
+    context.on_freeze(week, result.frozen_at)
     served = sum(1 for row in result.rows if row["board_source"] == SERVED_SOURCE)
     summary = (
         f"froze week {week} at {js_iso(result.frozen_at)}, kickoff {js_iso(kickoff)}, {len(result.rows)} rows "

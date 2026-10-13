@@ -15,12 +15,10 @@ so the site keeps building from the last clean run. Every failure is a named rea
    its drafts and window, each slate its method and window, the record its method and statistics,
    the manifest a source for every feed.
 5. `adp`: every format has an ADP source with a stamped capture and players in it.
-6. `contract`: what the web's reader checks across files (ids and slugs unique and well formed, the
-   index matching the pages, 32 clubs and slates, every pull figure in its prose), so a run the
+6. `schema` (`schema_gate.py`): the web's own reader and schema over the whole run, so a run the
    build would refuse never moves a pointer.
 """
 
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
@@ -31,9 +29,6 @@ from research.nightly.capsule_gate import CapsuleGateResult
 from research.nightly.config import GATES, PROJECTED_POSITIONS, TEAMS, RunFormat
 
 Json = dict[str, Any]
-_PLAYER_ID: Final = re.compile(r"^[\w-]+$")
-_SLUG: Final = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-_CLUBS: Final = 32
 _MARKET_ORDER_SLOTS: Final = frozenset({"K", "DEF"})
 
 
@@ -48,7 +43,7 @@ class GateRecord:
         return {"gate": self.gate, "passed": self.passed, "reasons": list(self.reasons), "summary": self.summary}
 
 
-def _gate(name: str, reasons: Sequence[str], context: str) -> GateRecord:
+def gate_record(name: str, reasons: Sequence[str], context: str) -> GateRecord:
     counts: dict[str, int] = {}
     for reason in reasons:
         counts[reason.split(":")[0]] = counts.get(reason.split(":")[0], 0) + 1
@@ -67,7 +62,7 @@ def held_out_gate(current: Sequence[HeldOutScore], previous: Mapping[int, float]
         if before is not None and before - score.rank_correlation > GATES.max_held_out_drop:
             reasons.append(f"held_out_regressed:{score.season}:{before:.4f}->{score.rank_correlation:.4f}")
     scores = ", ".join(f"{s.season} rho {s.rank_correlation or 0:.4f} n={s.sample_size}" for s in current)
-    return _gate("held_out_backtest", reasons, scores + (", the first baseline" if previous is None else ""))
+    return gate_record("held_out_backtest", reasons, scores + (", the first baseline" if previous is None else ""))
 
 
 def _depth_findings(run_format: RunFormat, rows: Sequence[Json]) -> list[str]:
@@ -91,7 +86,7 @@ def _depth_findings(run_format: RunFormat, rows: Sequence[Json]) -> list[str]:
 
 def depth_gate(formats: Sequence[RunFormat], boards: Mapping[str, Json]) -> GateRecord:
     reasons = [r for f in formats for r in _depth_findings(f, boards[f.id]["rows"])]
-    return _gate(
+    return gate_record(
         "board_depth",
         reasons,
         f"{len(formats)} boards, every ranked slot covered, kickers and defenses in market order",
@@ -107,7 +102,7 @@ def capsule_gate(step: CapsuleGateResult, page_reasons: Sequence[str]) -> GateRe
     )
     reasons += [f"capsule_shared_sentence:{len(s.player_ids)}:{s.sentence}" for s in step.shared]
     reasons += list(page_reasons)
-    return _gate("capsules", reasons, step.summary().removeprefix("capsule gate: "))
+    return gate_record("capsules", reasons, step.summary().removeprefix("capsule gate: "))
 
 
 def _blank(text: object) -> bool:
@@ -135,7 +130,7 @@ def basis_gate(manifest: Json, adp: Json, record: Json, schedule: Json) -> GateR
         *(("record",) if any(w["status"] in {"frozen", "graded"} for w in record["weeks"]) else ()),
     )
     reasons += [f"basis_missing:source:{a}" for a in needed if a not in artifacts]
-    return _gate("basis", reasons, "every number names its basis")
+    return gate_record("basis", reasons, "every number names its basis")
 
 
 def adp_gate(formats: Sequence[RunFormat], adp: Json) -> GateRecord:
@@ -146,30 +141,4 @@ def adp_gate(formats: Sequence[RunFormat], adp: Json) -> GateRecord:
         if not sources or not priced:
             reasons.append(f"adp_missing:{f.id}")
     counts = ", ".join(f"{s['id']} {s['window']['to']}" for s in adp["sources"])
-    return _gate("adp", reasons, f"every format has a captured ADP: {counts}")
-
-
-def contract_gate(
-    manifest: Json, index: Sequence[Json], players: Sequence[Json], clubs: Sequence[Json], schedule: Json
-) -> GateRecord:
-    reasons = [f"contract_player_id:{p['id']}" for p in index if not _PLAYER_ID.match(p["id"])]
-    reasons += [f"contract_slug:{p['slug']}" for p in index if not _SLUG.match(p["slug"])]
-    for key in ("id", "slug"):
-        values = [p[key] for p in index]
-        reasons += [f"contract_duplicate_{key}:{v}" for v in sorted({v for v in values if values.count(v) > 1})]
-    if len(index) != manifest["players"] or len(players) != len(index):
-        reasons.append(f"contract_index_count:{len(index)}/{manifest['players']}/{len(players)}")
-    reasons += [
-        f"contract_headshot:{p['id']}" for p in index if not str(p.get("headshot") or "").startswith("https://")
-    ]
-    reasons += [f"contract_clubs:{len(clubs)}"] if len(clubs) != _CLUBS else []
-    reasons += [f"contract_slates:{len(schedule['slates'])}"] if len(schedule["slates"]) != _CLUBS else []
-    for page in players:
-        capsule = page["capsule"]
-        if capsule is not None:
-            reasons += [
-                f"contract_pull_not_in_body:{page['id']}:{p['figure']}"
-                for p in capsule["pulls"]
-                if p["figure"] not in capsule["body"]
-            ]
-    return _gate("contract", reasons, f"{len(index)} pages, {len(clubs)} clubs, ids and slugs unique")
+    return gate_record("adp", reasons, f"every format has a captured ADP: {counts}")

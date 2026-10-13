@@ -11,16 +11,18 @@ run id is taken atomically.
 
 import hashlib
 import hmac
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Final
 from urllib.parse import quote
 
 import httpx
 
 from research.errors import ConfigurationError, ResearchError
-from research.nightly.run_store import checked_key
+from research.nightly.run_store import LocalRunStore, RunStore, checked_key
 
 RUNS_BUCKET: Final = "commish-runs"
 TOKEN_VARIABLE: Final = "CLOUDFLARE_API_TOKEN"
@@ -168,3 +170,11 @@ class R2RunStore:
 
     def locate(self, key: str) -> str:
         return f"r2://{self.bucket}/{key}"
+
+
+def run_store(out: str | None, http: httpx.Client) -> "RunStore":
+    """A local directory when `out` is given, else the bucket (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID)."""
+    if out is not None:
+        return LocalRunStore(Path(out))
+    account, credentials = credentials_from_token(http, os.environ)
+    return R2RunStore(http, account, credentials)

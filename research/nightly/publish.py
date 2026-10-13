@@ -48,9 +48,10 @@ def encode(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode()
 
 
-def take_run_id(store: RunStore, started_at: datetime) -> str:
-    """The first free id for this hour, claimed atomically."""
-    base = started_at.astimezone(UTC).strftime("%Y-%m-%dT%H")
+def take_run_id(store: RunStore, started_at: datetime, suffix: str | None = None) -> str:
+    """The first free id for this hour (with `suffix`, `2026-10-22T18-weekly`), claimed atomically."""
+    hour = started_at.astimezone(UTC).strftime("%Y-%m-%dT%H")
+    base = hour if suffix is None else f"{hour}-{suffix}"
     attempt = 1
     while True:
         candidate = base if attempt == 1 else f"{base}-{attempt}"

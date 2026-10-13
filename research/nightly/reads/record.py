@@ -173,3 +173,15 @@ def read_record(
         else:
             weeks.append(Week(week, "upcoming", kickoff, None, None, 0, ()))
     return weeks, rows_by_week
+
+
+def frozen_weeks(conn: Connection, season: int) -> dict[int, str]:
+    """Each week the served board was frozen for, with the implementation of its latest freeze."""
+    rows = conn.execute(
+        text(
+            "select distinct on (week) week, implementation from research.register_freeze_rows "
+            "where season = :s and board_source = :source order by week, frozen_at desc"
+        ),
+        {"s": season, "source": SERVED_SOURCE},
+    )
+    return {int(row.week): str(row.implementation) for row in rows}

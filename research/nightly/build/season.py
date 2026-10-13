@@ -9,6 +9,7 @@ from research.nightly.config import PAGE_FORMAT, TEAMS, RunFormat
 from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.adp import AdpCapture
+from research.nightly.register_log import FrozenBy
 
 Json = dict[str, Any]
 # A rank correlation is at most one in magnitude; a float sum can land an ulp past it.
@@ -64,17 +65,12 @@ def _line(line: record_read.Line) -> Json:
     return {"position": line.position, "ours": _score(line.ours), "adp": _score(line.adp)}
 
 
-def frozen_by(board_as_of: datetime) -> str:
-    """The run whose board a week froze, by run id: the board's own hour (`2026-09-09T02`)."""
-    return iso(board_as_of)[:13]
-
-
-def _week(week: record_read.Week) -> Json:
+def _week(week: record_read.Week, frozen_by: FrozenBy, season: int) -> Json:
     out: Json = {
         "week": week.week,
         "status": week.status,
         "frozenAt": None if week.at is None else iso(week.at),
-        "frozenBy": None if week.board_as_of is None else frozen_by(week.board_as_of),
+        "frozenBy": frozen_by.run_id(season, week.week) if week.status in {"frozen", "graded"} else None,
         "gradedAt": None if week.graded_at is None else iso(week.graded_at),
         "population": week.population,
         "lines": [_line(line) for line in week.lines],
@@ -84,13 +80,15 @@ def _week(week: record_read.Week) -> Json:
     return out
 
 
-def record_json(season: int, weeks: Sequence[record_read.Week], to_date: Sequence[record_read.Line]) -> Json:
+def record_json(
+    season: int, weeks: Sequence[record_read.Week], to_date: Sequence[record_read.Line], frozen_by: FrozenBy
+) -> Json:
     return {
         "season": season,
         "format": PAGE_FORMAT.id,
         "statistic": dict(record_read.STATISTIC),
         "method": record_read.METHOD,
-        "weeks": [_week(week) for week in weeks],
+        "weeks": [_week(week, frozen_by, season) for week in weeks],
         "toDate": [_line(line) for line in to_date],
     }
 

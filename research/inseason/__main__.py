@@ -15,9 +15,14 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Final
 
+import httpx
+
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
 from research.inseason.season_week import STEPS, SeasonWeekContext, run_season_week
+from research.nightly.publish import take_run_id
+from research.nightly.r2 import run_store
+from research.nightly.register_log import WEEKLY_SUFFIX, record_freeze, record_pass
 from research.pipeline.commands import now_ms
 from research.pipeline.http import LiveFetcher
 from research.pipeline.tank01.capture import run_capture_harvest
@@ -45,12 +50,24 @@ def _season_week(args: argparse.Namespace, now: datetime) -> bool:
     engine = make_engine(database_url_from_env())
     fetcher = LiveFetcher()
     try:
-        season = args.season if args.season is not None else default_season(now)
-        context = SeasonWeekContext(engine, fetcher, now, season, os.environ, skip)
-        results = run_season_week(context)
+        with httpx.Client(timeout=60.0) as http:
+            store = run_store(args.out, http)
+            run_id = take_run_id(store, now, WEEKLY_SUFFIX)
+            season = args.season if args.season is not None else default_season(now)
+
+            def on_freeze(week: int, at: datetime) -> None:
+                record_freeze(store, season, week, run_id, at)
+
+            context = SeasonWeekContext(engine, fetcher, now, season, os.environ, skip, on_freeze)
+            results = run_season_week(context)
+            lines = [
+                {"step": r.step, "status": r.status, "summary": r.summary, "detail": list(r.detail)} for r in results
+            ]
+            record_pass(store, run_id, now, lines)
     finally:
         fetcher.close()
         engine.dispose()
+    _line(f"season-week pass {run_id}, season {season}")
     for result in results:
         _line(f"{result.step}: {result.status}, {result.summary}")
         for detail in result.detail:
@@ -88,6 +105,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--task", required=True, choices=TASKS)
     parser.add_argument("--season", type=int, default=None, help="season-week: the season (default: the current one)")
     parser.add_argument("--skip", default="", help=f"season-week: steps to skip, of {', '.join(STEPS)}")
+    parser.add_argument("--out", default=None, help="season-week: a local directory for the register's trail, not R2")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     now = now_ms()
