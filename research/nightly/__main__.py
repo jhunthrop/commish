@@ -14,26 +14,22 @@ point rather than replace it.
 """
 
 import argparse
-import os
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Final
 
-import httpx
 from sqlalchemy import Engine
 
 from research.capsules.config import CAPSULE_CONFIG
-from research.capsules.gateway import GatewayClient
-from research.capsules.sweep import SweepPlan, SweepReport, sweep_capsules
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
 from research.model.arithmetic import ARM64_BOARDS
 from research.model.fit_check import fit_step
 from research.model.priors import load_model_artifacts
-from research.nightly.capsule_gate import capsule_gate
+from research.nightly.capsule_step import CapsuleStepPlan, run_capsule_step
 
-STEPS: Final = ("fit", "capsules", "capsule-gate")
+STEPS: Final = ("fit", "capsules")
 
 
 def _line(text: str) -> None:
@@ -47,45 +43,15 @@ def _fit(engine: Engine, now: datetime) -> bool:
     return record.status != "failed"
 
 
-def _capsules(engine: Engine, now: datetime, budget: int) -> bool:
-    key = os.environ.get(CAPSULE_CONFIG.gateway.api_key_variable, "").strip()
-    if not key:
-        _line(
-            f"capsules: skipped, {CAPSULE_CONFIG.gateway.api_key_variable} is not set (a sweep without it would demote written reads)"
-        )
-        return True
-    with httpx.Client() as http:
-        gateway = GatewayClient(key, http)
-        report = sweep_capsules(engine, gateway, now, SweepPlan(budget))
-        _line(f"capsules: ran, {_sweep_line(report)}")
-        left = budget - len(report.processed)
-        if left <= 0 or report.facts == 0:
-            _line("capsule retries: none (no budget left)" if left <= 0 else "capsule retries: none needed")
-            return True
-        retries = sweep_capsules(engine, gateway, now, SweepPlan(left, unwritten_only=True))
-    _line(f"capsule retries: ran, {_sweep_line(retries)}")
-    return True
-
-
-def _sweep_line(report: SweepReport) -> str:
-    return (
-        f"{report.board_players} board players, {report.eligible} needed a generation, "
-        f"{len(report.processed)} processed ({report.llm} llm, {report.facts} facts blocks), {report.calls} calls, "
-        f"${report.cost_usd:.6f}, {report.queued} queued for regeneration"
-    )
-
-
-def _capsule_gate(engine: Engine, now: datetime) -> bool:
-    with engine.connect() as conn:
-        result = capsule_gate(conn, now)
-    _line(result.summary())
-    return result.ok
+def _capsules(engine: Engine, now: datetime, plan: CapsuleStepPlan) -> bool:
+    return run_capsule_step(engine, now, plan, _line).gate.ok
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="research.nightly", description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--skip", default="", help=f"steps to skip, comma separated, of {', '.join(STEPS)}")
     parser.add_argument("--capsule-budget", type=int, default=CAPSULE_CONFIG.sweep_generation_budget)
+    parser.add_argument("--regenerate-all", action="store_true", help="rewrite every board page's capsule")
     args = parser.parse_args(argv)
     skip = {step for step in args.skip.split(",") if step}
     unknown = skip - set(STEPS)
@@ -101,11 +67,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if "capsules" in skip:
         _line("capsules: skipped by --skip")
     else:
-        ok = _capsules(engine, now, args.capsule_budget) and ok
-    if "capsule-gate" in skip:
-        _line("capsule gate: skipped by --skip")
-    else:
-        ok = _capsule_gate(engine, now) and ok
+        ok = _capsules(engine, now, CapsuleStepPlan(args.capsule_budget, args.regenerate_all)) and ok
     return 0 if ok else 1
 
 
