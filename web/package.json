@@ -20,7 +20,8 @@
 		"preview:static": "node scripts/serve-built.ts",
 		"glyphs": "node --env-file-if-exists=.env scripts/check-glyphs.ts",
 		"standin": "node --env-file-if-exists=.env scripts/run-from-mock-data.ts",
-		"measure:sheet": "node scripts/measure-sheet.ts"
+		"measure:sheet": "node scripts/measure-sheet.ts",
+		"measure:page": "node scripts/measure-page-js.ts"
 	},
 	"devDependencies": {
 		"@capsizecss/metrics": "^4.3.0",

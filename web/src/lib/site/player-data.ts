@@ -3,8 +3,9 @@
 import type { Player } from '#lib/run/schema.ts';
 import { links } from './links.ts';
 
-/** Everything a page needs about a player except the capsule, which only his own page prints. */
-export type PlayerData = Omit<Player, 'capsule'>;
+/** Everything a page needs about a player except the capsule and the season, which only his own
+ * page prints. */
+export type PlayerData = Omit<Player, 'capsule' | 'season'>;
 
 export async function fetchPlayer(id: string): Promise<PlayerData> {
 	const response = await fetch(links.playerData(id));

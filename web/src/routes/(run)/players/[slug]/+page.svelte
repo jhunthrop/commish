@@ -12,10 +12,13 @@
 	import Face from '#lib/ui/Face.svelte';
 	import Fact from '#lib/ui/Fact.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
+	import Footnote from '#lib/ui/Footnote.svelte';
+	import GameLog from '#lib/ui/GameLog.svelte';
 	import GapChip from '#lib/ui/GapChip.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import OutcomeBar from '#lib/ui/OutcomeBar.svelte';
+	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Table from '#lib/ui/Table.svelte';
@@ -124,6 +127,22 @@
 			</Fact>
 		</section>
 
+		<section class="season" aria-label="This season">
+			<PanelHead
+				title="This season"
+				aside="{page.season.season}, {page.season.scoring}"
+				level={2}
+			/>
+			<GameLog
+				caption="{page.name} week by week, {page.season.season}"
+				heads={page.season.heads}
+				line={page.season.line}
+				rows={page.season.rows}
+				none={page.season.none}
+			/>
+			<Footnote>{page.season.basis}</Footnote>
+		</section>
+
 		<div class="split">
 			{#if page.capsule}
 				<article class="read">
@@ -185,6 +204,13 @@
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: var(--s-4);
+	}
+
+	.season {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-3);
+		min-width: 0;
 	}
 
 	.bar {

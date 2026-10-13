@@ -1,10 +1,12 @@
 /** A player's page: his numbers in the default format, his tier and its mates, where drafters take
- * him and from which sources, his capsule, and his numbers in every other format the run carries. */
+ * him and from which sources, his season so far, his capsule, and his numbers in every other format
+ * the run carries. */
 import { windowLabel } from '#lib/format/date.ts';
 import { tierOf } from '#lib/run/derive.ts';
 import type { Capsule, Format, IndexEntry, PlayerFormat } from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
+import { seasonView, type SeasonView } from './player-season.ts';
 import { adp, board, entryBySlug, index, manifest, player } from '../run.ts';
 
 export interface TierMate {
@@ -39,6 +41,7 @@ export interface PlayerPage {
 	adpSources: string[];
 	boardSize: number;
 	capsule: Capsule | null;
+	season: SeasonView;
 }
 
 export async function playerEntries(): Promise<{ slug: string }[]> {
@@ -102,6 +105,7 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 			.filter((source) => source.formats.includes(lead.format.id))
 			.map((source) => `${source.drafts}, ${windowLabel(source.window)}`),
 		boardSize: loadedBoard.rows.length,
-		capsule: loaded.capsule
+		capsule: loaded.capsule,
+		season: seasonView(loaded.season, loaded.position, run.formats)
 	};
 }

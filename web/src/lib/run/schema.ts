@@ -7,7 +7,8 @@
  *   manifest.json            the run: its id, its time, its season, its formats, and the sources
  *                            block naming each feed's vendor and window (provenance, never shown)
  *   boards/<format>.json     one board per format, every player it ranks
- *   players/<id>.json        one page per player: every format's numbers and the capsule
+ *   players/<id>.json        one page per player: every format's numbers, the capsule, and his
+ *                            season so far (season.ts)
  *   adp.json                 every ADP source, named, with its value per player
  *   record.json              our projections against the season so far, against ADP
  *   index.json               the search index: id, slug, name, team, position
@@ -18,18 +19,16 @@
  */
 import { z } from 'zod';
 import { POSITIONS } from '#lib/types/player.ts';
+import { club, formatId } from './primitives.ts';
+import { seasonSchema } from './season.ts';
 
 const RUN_ID = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}(-[a-z0-9-]+)?$/;
-const FORMAT_ID = /^[a-z0-9]+(-[a-z0-9]+)*-[0-9]{1,2}$/;
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const CLUB = /^[A-Z]{2,3}$/;
 /** A player id becomes a file name and a URL segment, so it is word characters and hyphens only. */
 export const PLAYER_ID = /^[\w-]+$/;
 
 export const runIdSchema = z.string().regex(RUN_ID, 'A run id reads like 2026-10-12T05.');
-const formatId = z.string().regex(FORMAT_ID, 'A format id reads like ppr-12.');
 const slug = z.string().regex(SLUG, 'A slug is lower case words joined by hyphens.');
-const club = z.string().regex(CLUB, 'A club is its two or three letter code.');
 const position = z.enum(POSITIONS);
 const points = z.number();
 const isoTime = z.iso.datetime({ offset: true });
@@ -152,7 +151,9 @@ export const playerSchema = z.object({
 	headshot: z.url(),
 	/** Keyed by format id, every format the run carries that ranks him. */
 	formats: z.record(formatId, playerFormatSchema),
-	capsule: capsuleSchema.nullable()
+	capsule: capsuleSchema.nullable(),
+	/** His season so far: the season line and every week's game log, scored in one format. */
+	season: seasonSchema
 });
 
 export const adpSourceSchema = z.object({
