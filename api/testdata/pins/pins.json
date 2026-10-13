@@ -1,0 +1,1797 @@
+{
+ "source": "src/draft-engine/replay-pins.fixture.ts, src/mock-draft/bots.test.ts, src/draft-engine/autopick.test.ts",
+ "seed": 20260912,
+ "teams": [
+  "t01",
+  "t02",
+  "t03",
+  "t04",
+  "t05",
+  "t06",
+  "t07",
+  "t08",
+  "t09",
+  "t10",
+  "t11",
+  "t12"
+ ],
+ "pool": [
+  {
+   "playerId": "4362628",
+   "position": "WR"
+  },
+  {
+   "playerId": "4429795",
+   "position": "RB"
+  },
+  {
+   "playerId": "4426515",
+   "position": "WR"
+  },
+  {
+   "playerId": "4430807",
+   "position": "RB"
+  },
+  {
+   "playerId": "4430878",
+   "position": "WR"
+  },
+  {
+   "playerId": "4374302",
+   "position": "WR"
+  },
+  {
+   "playerId": "4241389",
+   "position": "WR"
+  },
+  {
+   "playerId": "4262921",
+   "position": "WR"
+  },
+  {
+   "playerId": "3117251",
+   "position": "RB"
+  },
+  {
+   "playerId": "4242335",
+   "position": "RB"
+  },
+  {
+   "playerId": "4426502",
+   "position": "WR"
+  },
+  {
+   "playerId": "4047646",
+   "position": "WR"
+  },
+  {
+   "playerId": "4258173",
+   "position": "WR"
+  },
+  {
+   "playerId": "4379399",
+   "position": "RB"
+  },
+  {
+   "playerId": "4362238",
+   "position": "RB"
+  },
+  {
+   "playerId": "4361370",
+   "position": "WR"
+  },
+  {
+   "playerId": "4432665",
+   "position": "TE"
+  },
+  {
+   "playerId": "4361307",
+   "position": "TE"
+  },
+  {
+   "playerId": "4426354",
+   "position": "WR"
+  },
+  {
+   "playerId": "4429160",
+   "position": "RB"
+  },
+  {
+   "playerId": "4241478",
+   "position": "WR"
+  },
+  {
+   "playerId": "3929630",
+   "position": "RB"
+  },
+  {
+   "playerId": "4595348",
+   "position": "WR"
+  },
+  {
+   "playerId": "4567048",
+   "position": "RB"
+  },
+  {
+   "playerId": "4685382",
+   "position": "RB"
+  },
+  {
+   "playerId": "4428331",
+   "position": "WR"
+  },
+  {
+   "playerId": "3918298",
+   "position": "QB"
+  },
+  {
+   "playerId": "4890973",
+   "position": "RB"
+  },
+  {
+   "playerId": "4569618",
+   "position": "WR"
+  },
+  {
+   "playerId": "4429615",
+   "position": "WR"
+  },
+  {
+   "playerId": "3916387",
+   "position": "QB"
+  },
+  {
+   "playerId": "4612826",
+   "position": "WR"
+  },
+  {
+   "playerId": "4372016",
+   "position": "WR"
+  },
+  {
+   "playerId": "4723086",
+   "position": "TE"
+  },
+  {
+   "playerId": "4685472",
+   "position": "WR"
+  },
+  {
+   "playerId": "4239993",
+   "position": "WR"
+  },
+  {
+   "playerId": "4431452",
+   "position": "QB"
+  },
+  {
+   "playerId": "3043078",
+   "position": "RB"
+  },
+  {
+   "playerId": "4427366",
+   "position": "RB"
+  },
+  {
+   "playerId": "4870808",
+   "position": "RB"
+  },
+  {
+   "playerId": "4567750",
+   "position": "WR"
+  },
+  {
+   "playerId": "4430737",
+   "position": "RB"
+  },
+  {
+   "playerId": "4361579",
+   "position": "RB"
+  },
+  {
+   "playerId": "3915511",
+   "position": "QB"
+  },
+  {
+   "playerId": "4239996",
+   "position": "RB"
+  },
+  {
+   "playerId": "4685278",
+   "position": "WR"
+  },
+  {
+   "playerId": "3121422",
+   "position": "WR"
+  },
+  {
+   "playerId": "16800",
+   "position": "WR"
+  },
+  {
+   "playerId": "3915416",
+   "position": "WR"
+  },
+  {
+   "playerId": "4426348",
+   "position": "QB"
+  },
+  {
+   "playerId": "4259545",
+   "position": "RB"
+  },
+  {
+   "playerId": "4431459",
+   "position": "TE"
+  },
+  {
+   "playerId": "4426388",
+   "position": "WR"
+  },
+  {
+   "playerId": "4248528",
+   "position": "WR"
+  },
+  {
+   "playerId": "4040715",
+   "position": "QB"
+  },
+  {
+   "playerId": "4596448",
+   "position": "RB"
+  },
+  {
+   "playerId": "4431299",
+   "position": "WR"
+  },
+  {
+   "playerId": "16737",
+   "position": "WR"
+  },
+  {
+   "playerId": "4696981",
+   "position": "RB"
+  },
+  {
+   "playerId": "4685702",
+   "position": "RB"
+  },
+  {
+   "playerId": "4035538",
+   "position": "RB"
+  },
+  {
+   "playerId": "4432620",
+   "position": "WR"
+  },
+  {
+   "playerId": "4431611",
+   "position": "QB"
+  },
+  {
+   "playerId": "4882093",
+   "position": "RB"
+  },
+  {
+   "playerId": "4871023",
+   "position": "WR"
+  },
+  {
+   "playerId": "4432708",
+   "position": "WR"
+  },
+  {
+   "playerId": "4685512",
+   "position": "RB"
+  },
+  {
+   "playerId": "4432710",
+   "position": "RB"
+  },
+  {
+   "playerId": "4038941",
+   "position": "QB"
+  },
+  {
+   "playerId": "5083076",
+   "position": "TE"
+  },
+  {
+   "playerId": "3116165",
+   "position": "WR"
+  },
+  {
+   "playerId": "4569173",
+   "position": "RB"
+  },
+  {
+   "playerId": "4569987",
+   "position": "RB"
+  },
+  {
+   "playerId": "2577417",
+   "position": "QB"
+  },
+  {
+   "playerId": "4360248",
+   "position": "TE"
+  },
+  {
+   "playerId": "4360310",
+   "position": "QB"
+  },
+  {
+   "playerId": "4047650",
+   "position": "WR"
+  },
+  {
+   "playerId": "4035687",
+   "position": "WR"
+  },
+  {
+   "playerId": "4432773",
+   "position": "WR"
+  },
+  {
+   "playerId": "4572680",
+   "position": "TE"
+  },
+  {
+   "playerId": "3128429",
+   "position": "WR"
+  },
+  {
+   "playerId": "3916148",
+   "position": "RB"
+  },
+  {
+   "playerId": "4430027",
+   "position": "TE"
+  },
+  {
+   "playerId": "4569587",
+   "position": "WR"
+  },
+  {
+   "playerId": "4688813",
+   "position": "WR"
+  },
+  {
+   "playerId": "4038815",
+   "position": "RB"
+  },
+  {
+   "playerId": "4678008",
+   "position": "RB"
+  },
+  {
+   "playerId": "4360761",
+   "position": "WR"
+  },
+  {
+   "playerId": "4429025",
+   "position": "WR"
+  },
+  {
+   "playerId": "2976212",
+   "position": "WR"
+  },
+  {
+   "playerId": "4568490",
+   "position": "RB"
+  },
+  {
+   "playerId": "4361741",
+   "position": "QB"
+  },
+  {
+   "playerId": "15847",
+   "position": "TE"
+  },
+  {
+   "playerId": "4689114",
+   "position": "QB"
+  },
+  {
+   "playerId": "4426338",
+   "position": "QB"
+  },
+  {
+   "playerId": "3040151",
+   "position": "TE"
+  },
+  {
+   "playerId": "4429023",
+   "position": "RB"
+  },
+  {
+   "playerId": "4371733",
+   "position": "RB"
+  },
+  {
+   "playerId": "4241416",
+   "position": "RB"
+  },
+  {
+   "playerId": "4360078",
+   "position": "WR"
+  },
+  {
+   "playerId": "3139477",
+   "position": "QB"
+  },
+  {
+   "playerId": "4241985",
+   "position": "RB"
+  },
+  {
+   "playerId": "12483",
+   "position": "QB"
+  },
+  {
+   "playerId": "3916433",
+   "position": "WR"
+  },
+  {
+   "playerId": "4362249",
+   "position": "WR"
+  },
+  {
+   "playerId": "3046779",
+   "position": "QB"
+  },
+  {
+   "playerId": "4429205",
+   "position": "WR"
+  },
+  {
+   "playerId": "4870795",
+   "position": "WR"
+  },
+  {
+   "playerId": "4429096",
+   "position": "RB"
+  },
+  {
+   "playerId": "4385690",
+   "position": "TE"
+  },
+  {
+   "playerId": "4697815",
+   "position": "RB"
+  },
+  {
+   "playerId": "3917315",
+   "position": "QB"
+  },
+  {
+   "playerId": "4575131",
+   "position": "RB"
+  },
+  {
+   "playerId": "4360569",
+   "position": "RB"
+  },
+  {
+   "playerId": "4870653",
+   "position": "WR"
+  },
+  {
+   "playerId": "4242355",
+   "position": "TE"
+  },
+  {
+   "playerId": "3042519",
+   "position": "RB"
+  },
+  {
+   "playerId": "3052587",
+   "position": "QB"
+  },
+  {
+   "playerId": "4608686",
+   "position": "RB"
+  },
+  {
+   "playerId": "4036378",
+   "position": "QB"
+  },
+  {
+   "playerId": "3121023",
+   "position": "TE"
+  },
+  {
+   "playerId": "4361050",
+   "position": "TE"
+  },
+  {
+   "playerId": "4373678",
+   "position": "WR"
+  },
+  {
+   "playerId": "4695883",
+   "position": "WR"
+  },
+  {
+   "playerId": "4360689",
+   "position": "QB"
+  },
+  {
+   "playerId": "4361432",
+   "position": "WR"
+  },
+  {
+   "playerId": "4701936",
+   "position": "WR"
+  },
+  {
+   "playerId": "4242512",
+   "position": "QB"
+  },
+  {
+   "playerId": "4683062",
+   "position": "WR"
+  },
+  {
+   "playerId": "4047365",
+   "position": "RB"
+  },
+  {
+   "playerId": "3929645",
+   "position": "TE"
+  },
+  {
+   "playerId": "4710714",
+   "position": "WR"
+  },
+  {
+   "playerId": "3116365",
+   "position": "TE"
+  },
+  {
+   "playerId": "4880281",
+   "position": "WR"
+  },
+  {
+   "playerId": "4429059",
+   "position": "RB"
+  },
+  {
+   "playerId": "3126486",
+   "position": "WR"
+  },
+  {
+   "playerId": "4373626",
+   "position": "RB"
+  },
+  {
+   "playerId": "3912547",
+   "position": "QB"
+  },
+  {
+   "playerId": "4428557",
+   "position": "RB"
+  },
+  {
+   "playerId": "4362619",
+   "position": "RB"
+  },
+  {
+   "playerId": "4432577",
+   "position": "QB"
+  },
+  {
+   "playerId": "3917792",
+   "position": "QB"
+  },
+  {
+   "playerId": "4032473",
+   "position": "WR"
+  },
+  {
+   "playerId": "5081397",
+   "position": "RB"
+  },
+  {
+   "playerId": "4596334",
+   "position": "RB"
+  },
+  {
+   "playerId": "DST-HOU",
+   "position": "DEF"
+  },
+  {
+   "playerId": "4426385",
+   "position": "RB"
+  },
+  {
+   "playerId": "4832800",
+   "position": "WR"
+  },
+  {
+   "playerId": "4688380",
+   "position": "QB"
+  },
+  {
+   "playerId": "4702555",
+   "position": "RB"
+  },
+  {
+   "playerId": "4360635",
+   "position": "TE"
+  },
+  {
+   "playerId": "4430539",
+   "position": "TE"
+  },
+  {
+   "playerId": "4686658",
+   "position": "RB"
+  },
+  {
+   "playerId": "3117256",
+   "position": "TE"
+  },
+  {
+   "playerId": "4428718",
+   "position": "WR"
+  },
+  {
+   "playerId": "DST-DEN",
+   "position": "DEF"
+  },
+  {
+   "playerId": "3046439",
+   "position": "TE"
+  },
+  {
+   "playerId": "3054850",
+   "position": "RB"
+  },
+  {
+   "playerId": "4361529",
+   "position": "RB"
+  },
+  {
+   "playerId": "4360516",
+   "position": "RB"
+  },
+  {
+   "playerId": "DST-LAR",
+   "position": "DEF"
+  },
+  {
+   "playerId": "DST-SEA",
+   "position": "DEF"
+  },
+  {
+   "playerId": "4241463",
+   "position": "WR"
+  },
+  {
+   "playerId": "4597500",
+   "position": "WR"
+  },
+  {
+   "playerId": "3886598",
+   "position": "WR"
+  },
+  {
+   "playerId": "4685720",
+   "position": "QB"
+  },
+  {
+   "playerId": "4429013",
+   "position": "RB"
+  },
+  {
+   "playerId": "4430834",
+   "position": "WR"
+  },
+  {
+   "playerId": "4685247",
+   "position": "RB"
+  },
+  {
+   "playerId": "DST-PHI",
+   "position": "DEF"
+  },
+  {
+   "playerId": "4429022",
+   "position": "WR"
+  },
+  {
+   "playerId": "4241474",
+   "position": "RB"
+  },
+  {
+   "playerId": "4686612",
+   "position": "WR"
+  },
+  {
+   "playerId": "4723820",
+   "position": "WR"
+  },
+  {
+   "playerId": "5083754",
+   "position": "WR"
+  },
+  {
+   "playerId": "3953687",
+   "position": "K"
+  },
+  {
+   "playerId": "DST-MIN",
+   "position": "DEF"
+  },
+  {
+   "playerId": "DST-PIT",
+   "position": "DEF"
+  },
+  {
+   "playerId": "4428850",
+   "position": "WR"
+  },
+  {
+   "playerId": "DST-NE",
+   "position": "DEF"
+  },
+  {
+   "playerId": "DST-JAX",
+   "position": "DEF"
+  },
+  {
+   "playerId": "4685415",
+   "position": "WR"
+  },
+  {
+   "playerId": "4600981",
+   "position": "WR"
+  },
+  {
+   "playerId": "4036133",
+   "position": "TE"
+  },
+  {
+   "playerId": "2971573",
+   "position": "K"
+  },
+  {
+   "playerId": "4382466",
+   "position": "WR"
+  },
+  {
+   "playerId": "4832955",
+   "position": "RB"
+  },
+  {
+   "playerId": "15818",
+   "position": "WR"
+  },
+  {
+   "playerId": "DST-LAC",
+   "position": "DEF"
+  },
+  {
+   "playerId": "4569603",
+   "position": "WR"
+  },
+  {
+   "playerId": "4429501",
+   "position": "RB"
+  },
+  {
+   "playerId": "4362081",
+   "position": "K"
+  },
+  {
+   "playerId": "2578570",
+   "position": "QB"
+  },
+  {
+   "playerId": "DST-BAL",
+   "position": "DEF"
+  },
+  {
+   "playerId": "4686361",
+   "position": "K"
+  },
+  {
+   "playerId": "2473037",
+   "position": "K"
+  },
+  {
+   "playerId": "4430968",
+   "position": "RB"
+  },
+  {
+   "playerId": "4586312",
+   "position": "WR"
+  },
+  {
+   "playerId": "DST-GB",
+   "position": "DEF"
+  },
+  {
+   "playerId": "4570037",
+   "position": "TE"
+  }
+ ],
+ "slotConfig": [
+  {
+   "slot": "QB",
+   "count": 1,
+   "eligiblePositions": [
+    "QB"
+   ]
+  },
+  {
+   "slot": "RB",
+   "count": 2,
+   "eligiblePositions": [
+    "RB"
+   ]
+  },
+  {
+   "slot": "WR",
+   "count": 2,
+   "eligiblePositions": [
+    "WR"
+   ]
+  },
+  {
+   "slot": "TE",
+   "count": 1,
+   "eligiblePositions": [
+    "TE"
+   ]
+  },
+  {
+   "slot": "FLEX",
+   "count": 1,
+   "eligiblePositions": [
+    "RB",
+    "WR",
+    "TE"
+   ]
+  },
+  {
+   "slot": "K",
+   "count": 1,
+   "eligiblePositions": [
+    "K"
+   ]
+  },
+  {
+   "slot": "DEF",
+   "count": 1,
+   "eligiblePositions": [
+    "DEF"
+   ]
+  },
+  {
+   "slot": "BENCH",
+   "count": 6,
+   "eligiblePositions": [
+    "QB",
+    "RB",
+    "WR",
+    "TE",
+    "K",
+    "DEF"
+   ]
+  }
+ ],
+ "clockSchedule": [
+  {
+   "untilHoursBeforeKickoff": 168,
+   "pickSeconds": 28800
+  },
+  {
+   "untilHoursBeforeKickoff": 48,
+   "pickSeconds": 14400
+  },
+  {
+   "untilHoursBeforeKickoff": 12,
+   "pickSeconds": 3600
+  },
+  {
+   "untilHoursBeforeKickoff": 2,
+   "pickSeconds": 600
+  },
+  {
+   "untilHoursBeforeKickoff": 0,
+   "pickSeconds": 90
+  }
+ ],
+ "startTimestamp": "2026-09-01T00:00:00.000Z",
+ "kickoffAt": "2026-09-10T17:00:00.000Z",
+ "legacyBotSnapshot": {
+  "temperature": 3,
+  "needPerOpenStartingSlot": 0.4,
+  "startersFilledDamp": 0.6,
+  "rampFullAtRosterFraction": 0.5,
+  "surplusDamp": 0.25,
+  "lateRoundOnlyRoundsFromEnd": 2
+ },
+ "surplusClockSnapshot": {
+  "temperature": 3,
+  "needPerOpenStartingSlot": 0.4,
+  "startersFilledDamp": 0.6,
+  "rampFullAtRosterFraction": 0.5,
+  "surplusDamp": 0.25,
+  "lateRoundOnlyRoundsFromEnd": 2
+ },
+ "legacyBotPicks": [
+  "4362628",
+  "4430807",
+  "4430878",
+  "4429795",
+  "4426515",
+  "4258173",
+  "4241389",
+  "4262921",
+  "4426502",
+  "4374302",
+  "4361307",
+  "3117251",
+  "4047646",
+  "4379399",
+  "4241478",
+  "4426354",
+  "4361370",
+  "4429160",
+  "4567048",
+  "4362238",
+  "4242335",
+  "4432665",
+  "4595348",
+  "4685382",
+  "4569618",
+  "4428331",
+  "4890973",
+  "3916387",
+  "3918298",
+  "3929630",
+  "4372016",
+  "4612826",
+  "4685472",
+  "4723086",
+  "4431452",
+  "3043078",
+  "4567750",
+  "4427366",
+  "4429615",
+  "4870808",
+  "3915511",
+  "4239996",
+  "4239993",
+  "16800",
+  "4259545",
+  "4430737",
+  "4685278",
+  "4431459",
+  "3915416",
+  "4426348",
+  "4361579",
+  "4426388",
+  "4596448",
+  "4685702",
+  "4248528",
+  "4035538",
+  "16737",
+  "4882093",
+  "3121422",
+  "4040715"
+ ],
+ "legacyBotPickStreamKey": "<teamId>:pin:<pickNumber>",
+ "botDelaysMs": [
+  507.7220435952768,
+  788.122566929087,
+  460.5068834964186,
+  753.8654496194795,
+  715.2986253378913,
+  822.7000912185758,
+  659.164064261131,
+  613.2726180832833,
+  523.8147590309381,
+  941.5084039093927,
+  762.2809544438496,
+  816.1229439312592,
+  838.0305516067892,
+  608.0865093274042,
+  670.787069061771,
+  905.9381984872743,
+  864.758745697327,
+  939.5233036950231,
+  552.7405587956309,
+  910.5786226456985,
+  616.7084101354703,
+  453.1753726070747,
+  557.9744802555069,
+  922.7462268201634
+ ],
+ "botDelaysBits": [
+  "407fbb8d7d95c000",
+  "4088a0fb045ec000",
+  "407cc81c31de8000",
+  "40878eec70d9a000",
+  "40865a6395ae6000",
+  "4089b599c96cc000",
+  "4084995000ec6000",
+  "40832a2e5263c000",
+  "40805e84a0620000",
+  "408d6c113611a000",
+  "4087d23f650b2000",
+  "408980fbca072000",
+  "408a303e91d74000",
+  "408300b12bcd6000",
+  "4084f64beadd4000",
+  "408c4f816e356000",
+  "408b0611e943a000",
+  "408d5c2fb9d90000",
+  "408145ecaa170000",
+  "408c74a104e8e000",
+  "408345aad2eee000",
+  "407c52ce5381c000",
+  "40816fcbbc4de000",
+  "408cd5f845c46000"
+ ],
+ "botDelayStreamKey": "<teamId>:delay:<pickNumber>",
+ "botDelayClockSeconds": 60,
+ "botDelayConfig": {
+  "baseMs": 700,
+  "jitterMs": 250,
+  "maxFractionOfClock": 0.5
+ },
+ "surplusClockPicks": [
+  "4362628",
+  "4429795",
+  "4426515",
+  "4430807",
+  "4430878",
+  "4374302",
+  "4241389",
+  "4262921",
+  "3117251",
+  "4242335",
+  "4426502",
+  "4047646",
+  "4258173",
+  "4379399",
+  "4362238",
+  "4361370",
+  "4432665",
+  "4361307",
+  "4426354",
+  "4429160",
+  "4241478",
+  "3929630",
+  "4595348",
+  "4567048",
+  "4685382",
+  "4428331",
+  "3918298",
+  "4890973",
+  "4569618",
+  "3916387",
+  "4429615",
+  "4612826",
+  "4372016",
+  "4723086",
+  "4685472",
+  "4431452",
+  "3043078",
+  "4427366",
+  "4239993",
+  "4870808",
+  "4430737",
+  "4361579",
+  "4239996",
+  "3915511",
+  "4567750",
+  "4685278",
+  "3121422",
+  "16800",
+  "4426348",
+  "4259545",
+  "4431459",
+  "3915416",
+  "4426388",
+  "4596448",
+  "4040715",
+  "4248528",
+  "4431299",
+  "16737",
+  "4696981",
+  "4685702"
+ ],
+ "archetypeDeal": {
+  "t01": {
+   "name": "run_follower",
+   "needWeight": 1,
+   "posBias": {},
+   "followsRuns": true
+  },
+  "t02": {
+   "name": "zero_rb",
+   "needWeight": 1,
+   "posBias": {
+    "RB": 0.4,
+    "WR": 1.5
+   }
+  },
+  "t03": {
+   "name": "te_premium",
+   "needWeight": 1,
+   "posBias": {
+    "TE": 1.7
+   }
+  },
+  "t04": {
+   "name": "qb_early",
+   "needWeight": 1,
+   "posBias": {
+    "QB": 1.8
+   }
+  },
+  "t05": {
+   "name": "need_filler",
+   "needWeight": 2,
+   "posBias": {}
+  },
+  "t06": {
+   "name": "best_available",
+   "needWeight": 1,
+   "posBias": {}
+  },
+  "t07": {
+   "name": "rb_heavy",
+   "needWeight": 1,
+   "posBias": {
+    "RB": 1.6
+   }
+  },
+  "t08": {
+   "name": "run_follower",
+   "needWeight": 1,
+   "posBias": {},
+   "followsRuns": true
+  },
+  "t09": {
+   "name": "zero_rb",
+   "needWeight": 1,
+   "posBias": {
+    "RB": 0.4,
+    "WR": 1.5
+   }
+  },
+  "t10": {
+   "name": "te_premium",
+   "needWeight": 1,
+   "posBias": {
+    "TE": 1.7
+   }
+  },
+  "t11": {
+   "name": "qb_early",
+   "needWeight": 1,
+   "posBias": {
+    "QB": 1.8
+   }
+  },
+  "t12": {
+   "name": "need_filler",
+   "needWeight": 2,
+   "posBias": {}
+  }
+ },
+ "rawSeedDraws": [
+  "3fd24cdc29000000",
+  "3fe28cb6c5600000",
+  "3fc8782c85800000",
+  "3fe10e6d9c800000",
+  "3fdb27a7c7400000",
+  "3fd0c4c71f400000",
+  "3fab461246000000",
+  "3fe2b2aa11600000",
+  "3fec97e4cb800000",
+  "3fe1a926d8c00000",
+  "3f927205c8000000",
+  "3fe448e993400000",
+  "3fcbbcfd0b000000",
+  "3fdf3afa1dc00000",
+  "3fef4a711e200000",
+  "3fe572b349400000"
+ ],
+ "rngVectors": [
+  {
+   "seed": 20260912,
+   "key": "archetypes",
+   "draws": [
+    "3fcaeb884d800000",
+    "3fc3e58b9b000000",
+    "3f93ba4760000000",
+    "3feef33caf600000",
+    "3fbba0defa000000",
+    "3fd4e7cee3c00000",
+    "3fe41b71bfe00000",
+    "3fece4f932200000"
+   ]
+  },
+  {
+   "seed": 20260912,
+   "key": "t01",
+   "draws": [
+    "3fe92d5315c00000",
+    "3fec0d3fa9a00000",
+    "3fabbfdda2000000",
+    "3fe29e5135200000",
+    "3fe849fda6200000",
+    "3fecfadbf1000000",
+    "3fcc7f4877000000",
+    "3fe519478e400000"
+   ]
+  },
+  {
+   "seed": 20260912,
+   "key": "t07:pin:1",
+   "draws": [
+    "3fe7313477600000",
+    "3fcce8f661800000",
+    "3fecfcbbd6400000",
+    "3fe0dc762e200000",
+    "3fbfedbcce000000",
+    "3fd8167ae1800000",
+    "3f99a3e848000000",
+    "3fe6344630a00000"
+   ]
+  },
+  {
+   "seed": 20260912,
+   "key": "t12:delay:24",
+   "draws": [
+    "3fe9a0e5cfc00000",
+    "3fce23144f800000",
+    "3fe23211f3400000",
+    "3f8d512ee8000000",
+    "3fd735b2f0400000",
+    "3fd42ed019800000",
+    "3fae784d22000000",
+    "3fd1567620800000"
+   ]
+  },
+  {
+   "seed": 20260912,
+   "key": "bot_park",
+   "draws": [
+    "3fec5d8ccc400000",
+    "3fe66739f2a00000",
+    "3fc8f35fd5000000",
+    "3fe40ecc9f600000",
+    "3fe482b30bc00000",
+    "3fe33f41c6800000",
+    "3fef69f9da400000",
+    "3fe8cd541ee00000"
+   ]
+  },
+  {
+   "seed": 20260912,
+   "key": "4a7c-e9:cont:131",
+   "draws": [
+    "3fe177b59be00000",
+    "3fe62755e6400000",
+    "3fe9c35e8ae00000",
+    "3fe599ebedc00000",
+    "3fef818650a00000",
+    "3feff08faa000000",
+    "3fdb87dd70000000",
+    "3fd3937708c00000"
+   ]
+  },
+  {
+   "seed": 20260912,
+   "key": "ünïcødé:κλειδί",
+   "draws": [
+    "3fc5e38ddd000000",
+    "3febb5a95b000000",
+    "3fd81118bd000000",
+    "3feed37047c00000",
+    "3fdaaf53c1c00000",
+    "3fe3bb3332200000",
+    "3fce19809a000000",
+    "3fabb14d8e000000"
+   ]
+  },
+  {
+   "seed": 0,
+   "key": "archetypes",
+   "draws": [
+    "3fe1d232c4600000",
+    "3fe8b52098a00000",
+    "3fec15eb51400000",
+    "3fa705f09c000000",
+    "3fbddf8276000000",
+    "3feb2cdb19a00000",
+    "3fd38d7085c00000",
+    "3fe0d334be800000"
+   ]
+  },
+  {
+   "seed": 0,
+   "key": "t01",
+   "draws": [
+    "3fe4bd44e8600000",
+    "3fa64ebffc000000",
+    "3fe460b5c1c00000",
+    "3fc91c5e72000000",
+    "3fd5f6f234000000",
+    "3fe11aec52800000",
+    "3fac740b98000000",
+    "3fec7d588b600000"
+   ]
+  },
+  {
+   "seed": 0,
+   "key": "t07:pin:1",
+   "draws": [
+    "3fd7e0c685c00000",
+    "3feb9a8c79600000",
+    "3fc3a19ebc000000",
+    "3fde178dd2c00000",
+    "3fc3b6236a000000",
+    "3fe87d7a3d400000",
+    "3fea8c791f400000",
+    "3fe5d1af89400000"
+   ]
+  },
+  {
+   "seed": 0,
+   "key": "t12:delay:24",
+   "draws": [
+    "3fe02ca47de00000",
+    "3febed0b4e400000",
+    "3fc0ea8cd2800000",
+    "3fdd0362aa800000",
+    "3fd7cb0ec9800000",
+    "3fee7b7a3a000000",
+    "3fd820e002000000",
+    "3fba60d002000000"
+   ]
+  },
+  {
+   "seed": 0,
+   "key": "bot_park",
+   "draws": [
+    "3fe2dbce1cc00000",
+    "3fd8b67a40c00000",
+    "3fdce87ef9400000",
+    "3fe0916ce1e00000",
+    "3fd1b7134ec00000",
+    "3fd43ad556c00000",
+    "3fd8df2ee9800000",
+    "3fe5d6c454400000"
+   ]
+  },
+  {
+   "seed": 0,
+   "key": "4a7c-e9:cont:131",
+   "draws": [
+    "3fd10db40b800000",
+    "3fc9c53e00800000",
+    "3fec03ba12000000",
+    "3fcf5e4813800000",
+    "3fbdced2be000000",
+    "3fce22fe4a000000",
+    "3fb36b0826000000",
+    "3fe42f8f2e800000"
+   ]
+  },
+  {
+   "seed": 0,
+   "key": "ünïcødé:κλειδί",
+   "draws": [
+    "3fe1f8ab68200000",
+    "3fcb5abab9000000",
+    "3fdd040795000000",
+    "3fe30c424a000000",
+    "3fe48e4408800000",
+    "3fdfc9969dc00000",
+    "3fd54bfdb6400000",
+    "3fe0f319b2e00000"
+   ]
+  },
+  {
+   "seed": 1,
+   "key": "archetypes",
+   "draws": [
+    "3fd700a224000000",
+    "3fd2aae712000000",
+    "3fce61000b000000",
+    "3fd66e727a400000",
+    "3fe8e86f83e00000",
+    "3fd6f1a8dbc00000",
+    "3fd515ada7800000",
+    "3fe1ad175d000000"
+   ]
+  },
+  {
+   "seed": 1,
+   "key": "t01",
+   "draws": [
+    "3fc1ad0732800000",
+    "3feebd86a3000000",
+    "3fe004843f400000",
+    "3fe6b3fe8f600000",
+    "3fc88d9d1e000000",
+    "3fec88251a600000",
+    "3fe0bac5cd400000",
+    "3fdf801aa6c00000"
+   ]
+  },
+  {
+   "seed": 1,
+   "key": "t07:pin:1",
+   "draws": [
+    "3fd456024f000000",
+    "3fe6964be3400000",
+    "3fe9b10f05800000",
+    "3fe7d09e38c00000",
+    "3faafef232000000",
+    "3fe508841be00000",
+    "3fea8b054e800000",
+    "3f9c65ab04000000"
+   ]
+  },
+  {
+   "seed": 1,
+   "key": "t12:delay:24",
+   "draws": [
+    "3fddc75c65c00000",
+    "3fead14f05e00000",
+    "3fd7100177800000",
+    "3fe2c6f4af400000",
+    "3fe0af0dfb600000",
+    "3fe1cd1984c00000",
+    "3feddd837d400000",
+    "3fe1d055a9200000"
+   ]
+  },
+  {
+   "seed": 1,
+   "key": "bot_park",
+   "draws": [
+    "3fb1348df9000000",
+    "3fb8aa6067000000",
+    "3fdd38a3b2800000",
+    "3fe40fe427200000",
+    "3fb6946e01000000",
+    "3fd2b9b7bec00000",
+    "3fee79d8a0c00000",
+    "3feaa87c04c00000"
+   ]
+  },
+  {
+   "seed": 1,
+   "key": "4a7c-e9:cont:131",
+   "draws": [
+    "3fe6f9d274200000",
+    "3fcf61be5a000000",
+    "3fd283ef3d000000",
+    "3faf81dac4000000",
+    "3fefbf1cf9600000",
+    "3fea5c1966200000",
+    "3fbb30fad3000000",
+    "3fe8edcd6de00000"
+   ]
+  },
+  {
+   "seed": 1,
+   "key": "ünïcødé:κλειδί",
+   "draws": [
+    "3fe710f8e9c00000",
+    "3fe650bc9c600000",
+    "3fe3f7fe89800000",
+    "3fe5f085cf200000",
+    "3fe9de5dc9a00000",
+    "3fd1801d80400000",
+    "3fe210c212800000",
+    "3fbb12b2eb000000"
+   ]
+  },
+  {
+   "seed": 4294967295,
+   "key": "archetypes",
+   "draws": [
+    "3fd45f8233c00000",
+    "3fef095616a00000",
+    "3fd9d70419800000",
+    "3fef11cccd000000",
+    "3fc20745b6000000",
+    "3feb6f7990a00000",
+    "3fd3b3ff28400000",
+    "3fedcdfe8bc00000"
+   ]
+  },
+  {
+   "seed": 4294967295,
+   "key": "t01",
+   "draws": [
+    "3fd3a095b1000000",
+    "3fd091b3ecc00000",
+    "3fec8723fd200000",
+    "3fe6fcb22e800000",
+    "3fd65601de800000",
+    "3fe710db24000000",
+    "3fe8a8aebd400000",
+    "3fda8ae3d8400000"
+   ]
+  },
+  {
+   "seed": 4294967295,
+   "key": "t07:pin:1",
+   "draws": [
+    "3fd28c5c1b800000",
+    "3fe5eed315000000",
+    "3fd5f8c088400000",
+    "3feaa0a040200000",
+    "3fda30f3fe400000",
+    "3f908ff6d0000000",
+    "3fe903ea50000000",
+    "3feba777c0400000"
+   ]
+  },
+  {
+   "seed": 4294967295,
+   "key": "t12:delay:24",
+   "draws": [
+    "3fdb001dab800000",
+    "3fe79ebd20c00000",
+    "3fdff784ef400000",
+    "3fe483b692e00000",
+    "3fef52e8b8e00000",
+    "3fe1602f43400000",
+    "3fbfb20b60000000",
+    "3fe4535131e00000"
+   ]
+  },
+  {
+   "seed": 4294967295,
+   "key": "bot_park",
+   "draws": [
+    "3fe5c6603a200000",
+    "3fe8e63c9f600000",
+    "3fd0e1b40e400000",
+    "3fcc03e4bb800000",
+    "3fe32e2bc0800000",
+    "3f95cf7d08000000",
+    "3fcfcede9c000000",
+    "3fe01632ea400000"
+   ]
+  },
+  {
+   "seed": 4294967295,
+   "key": "4a7c-e9:cont:131",
+   "draws": [
+    "3fec296fbf200000",
+    "3fbab8f9f1000000",
+    "3fe64f7753e00000",
+    "3fdab05c15400000",
+    "3fe5717b0a400000",
+    "3fb5b33176000000",
+    "3fd9ad5cc4c00000",
+    "3fdf96202b800000"
+   ]
+  },
+  {
+   "seed": 4294967295,
+   "key": "ünïcødé:κλειδί",
+   "draws": [
+    "3fe79cf265c00000",
+    "3fee4db0ce600000",
+    "3fd5e18364800000",
+    "3fece2346ca00000",
+    "3fe66d5340000000",
+    "3fe28a64f8e00000",
+    "3fc478a02e800000",
+    "3fe6baf480800000"
+   ]
+  },
+  {
+   "seed": 2147483648,
+   "key": "archetypes",
+   "draws": [
+    "3fe553ba82000000",
+    "3fe477b9d2000000",
+    "3feca229ce400000",
+    "3fbef9d3a3000000",
+    "3fe2443c70e00000",
+    "3fe483f6e5e00000",
+    "3fe4670885e00000",
+    "3fef83d33de00000"
+   ]
+  },
+  {
+   "seed": 2147483648,
+   "key": "t01",
+   "draws": [
+    "3fbd3e0e18000000",
+    "3fe683d522400000",
+    "3feba9c524e00000",
+    "3fe9b44190200000",
+    "3fe486d22d400000",
+    "3fd44ffdcec00000",
+    "3fe1d63d3d600000",
+    "3fe83f4543400000"
+   ]
+  },
+  {
+   "seed": 2147483648,
+   "key": "t07:pin:1",
+   "draws": [
+    "3fe50764df000000",
+    "3fb12f0a2a000000",
+    "3fc5903b7a800000",
+    "3fc6b52ccf800000",
+    "3fe69e00d5800000",
+    "3fcebd3ed1800000",
+    "3fe53bd501000000",
+    "3fd0c5990a000000"
+   ]
+  },
+  {
+   "seed": 2147483648,
+   "key": "t12:delay:24",
+   "draws": [
+    "3fa417e0b8000000",
+    "3fb42d556a000000",
+    "3fe2ca4c36600000",
+    "3fd0f167e2400000",
+    "3fe88db805000000",
+    "3fe646418e600000",
+    "3fe3e95f24400000",
+    "3fb5cc3cb1000000"
+   ]
+  },
+  {
+   "seed": 2147483648,
+   "key": "bot_park",
+   "draws": [
+    "3fbec56e82000000",
+    "3fa5a42654000000",
+    "3fee79d70a000000",
+    "3fd5f2f300000000",
+    "3fec05651d800000",
+    "3fe358b1fd800000",
+    "3fd005b003400000",
+    "3fc8a2c7b2800000"
+   ]
+  },
+  {
+   "seed": 2147483648,
+   "key": "4a7c-e9:cont:131",
+   "draws": [
+    "3fe130ca1c000000",
+    "3fe2d5bd52a00000",
+    "3fee9fe723400000",
+    "3fd687e52b400000",
+    "3fe9e7456c000000",
+    "3fea5d9587e00000",
+    "3fdc9be88c800000",
+    "3fd2807ca3000000"
+   ]
+  },
+  {
+   "seed": 2147483648,
+   "key": "ünïcødé:κλειδί",
+   "draws": [
+    "3fc98ff710000000",
+    "3fef3561e0e00000",
+    "3fe1a6c818400000",
+    "3fdeb586a3800000",
+    "3feb560429600000",
+    "3fd4045c2a400000",
+    "3fe2068717400000",
+    "3fefb6f1e5a00000"
+   ]
+  },
+  {
+   "seed": 123456789,
+   "key": "archetypes",
+   "draws": [
+    "3fe58664f9400000",
+    "3fb3461675000000",
+    "3fe38eba1e000000",
+    "3fc760f851800000",
+    "3fecd09bb9e00000",
+    "3fe0e2608ce00000",
+    "3fab18cdb2000000",
+    "3fe9f271f3200000"
+   ]
+  },
+  {
+   "seed": 123456789,
+   "key": "t01",
+   "draws": [
+    "3f89ed7898000000",
+    "3fb8150d16000000",
+    "3feb2c5a95c00000",
+    "3fc9e6f154800000",
+    "3f6dc98ac0000000",
+    "3fd3a63a21800000",
+    "3fc1200e5c800000",
+    "3fef7e6509800000"
+   ]
+  },
+  {
+   "seed": 123456789,
+   "key": "t07:pin:1",
+   "draws": [
+    "3fd7afebd5000000",
+    "3feb866998a00000",
+    "3fce673bb5000000",
+    "3fe4ea1bc7600000",
+    "3fd0161279000000",
+    "3fd7fc34b1800000",
+    "3fef30910e000000",
+    "3fde8ca1afc00000"
+   ]
+  },
+  {
+   "seed": 123456789,
+   "key": "t12:delay:24",
+   "draws": [
+    "3fea63c693e00000",
+    "3fe33a400d400000",
+    "3fe6687492e00000",
+    "3fe3fef1f0a00000",
+    "3fddf3d34c400000",
+    "3fdadac299000000",
+    "3fc86af3e2800000",
+    "3fe733389c000000"
+   ]
+  },
+  {
+   "seed": 123456789,
+   "key": "bot_park",
+   "draws": [
+    "3fd0efbdaa800000",
+    "3feba3a3b2000000",
+    "3feb3768bfc00000",
+    "3fc484ab9f800000",
+    "3fdcd0061c800000",
+    "3fe32a8851e00000",
+    "3fd6598282c00000",
+    "3fefc5ea90800000"
+   ]
+  },
+  {
+   "seed": 123456789,
+   "key": "4a7c-e9:cont:131",
+   "draws": [
+    "3fc7acb727800000",
+    "3fdccbc195800000",
+    "3fe04d466fc00000",
+    "3fb29a5797000000",
+    "3fe5f951f4600000",
+    "3fe6506547400000",
+    "3fe855a2a3000000",
+    "3fbc30729a000000"
+   ]
+  },
+  {
+   "seed": 123456789,
+   "key": "ünïcødé:κλειδί",
+   "draws": [
+    "3fe1025020000000",
+    "3fc996edb0000000",
+    "3fd9857679c00000",
+    "3fb145d457000000",
+    "3f8c6f3c38000000",
+    "3feadb9f2c000000",
+    "3fe23e3728800000",
+    "3fc6c08148800000"
+   ]
+  }
+ ]
+}

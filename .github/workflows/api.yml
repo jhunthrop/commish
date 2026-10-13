@@ -143,7 +143,7 @@ jobs:
           secrets: ${{ env.API_SECRETS }}
           secrets_update_strategy: overwrite
           flags: >-
-            --service-account=${{ env.RUNTIME_SA }} --allow-unauthenticated
+            --service-account=${{ env.RUNTIME_SA }} --no-invoker-iam-check --cpu=2 --memory=1Gi
             --min-instances=0 --max-instances=20 --concurrency=80
             --cpu=1 --memory=512Mi --cpu-boost --timeout=60
 
@@ -161,7 +161,7 @@ jobs:
           secrets: ${{ env.ROOM_SECRETS }}
           secrets_update_strategy: overwrite
           flags: >-
-            --command=/room --service-account=${{ env.RUNTIME_SA }} --allow-unauthenticated
+            --command=/room --service-account=${{ env.RUNTIME_SA }} --no-invoker-iam-check --cpu=2 --memory=1Gi
             --min-instances=${{ vars.ROOM_MIN_INSTANCES || '0' }} --max-instances=10 --concurrency=500
             --cpu=1 --memory=512Mi --no-cpu-throttling --session-affinity --timeout=3600
 
