@@ -10,7 +10,7 @@
  * It exists for the system page only. Every product page reads a nightly run.
  */
 import { POSITIONS, type BoardPlayer, type Position } from '#lib/types/player.ts';
-import type { KeyBinding, TeamSlot, WentPick } from '#lib/types/room.ts';
+import type { TeamSlot, WentPick } from '#lib/types/room.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
 
 /** The board CSV's header, column for column. */
@@ -701,11 +701,3 @@ export const SOLO_TEAM: readonly TeamSlot[] = [
 
 /** The lobby at pick 5.06: jpk88 on the clock, your pick at 5.08. */
 export const LOBBY_BUG = { now: 54, onClock: 'jpk88', secondsLeft: 19, yourPick: 56 };
-
-export const ROOM_KEYS: readonly KeyBinding[] = [
-	{ keys: 'Enter', does: 'draft our call' },
-	{ keys: '↑ ↓', does: 'move through the pool' },
-	{ keys: 'Q', does: 'queue the player' },
-	{ keys: 'U', does: 'undo your last pick' },
-	{ keys: '/', does: 'search the pool' }
-];

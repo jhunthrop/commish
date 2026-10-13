@@ -288,7 +288,7 @@ func (h *Handler) report(w http.ResponseWriter, r *http.Request) {
 	out, err := draftroom.Report(r.Context(), draftroom.ReportInput{
 		Settings: mock.Settings{League: room.Settings, Pool: board.Pool(), StartedAt: room.Config.KickoffAt},
 		Seed:     room.Seed, Board: board, Odds: h.Hindsight, Runs: sim.RoomOddsRuns, Workers: h.Workers,
-		Draft: mock.Draft{Config: room.Config, Actions: room.Actions, State: room.State, HumanTeamID: TeamID(seat), Slot: seat, Odds: room.Odds},
+		Draft: mock.Draft{Config: room.Config, Actions: room.Actions, State: room.State, HumanTeamID: TeamID(seat), Slot: seat, Odds: room.Odds, By: room.By},
 	})
 	if err != nil {
 		h.fail(w, r, "lobby: report", err)

@@ -2,11 +2,14 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
+	import { plural } from '#lib/format/number.ts';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { runAgain } from '#lib/room/actions.ts';
+	import { botName } from '#lib/room/words.ts';
 	import { type LobbyRoom, type MockReport, rooms } from '#lib/room/api.ts';
+	import { seatName, seatedPeople } from '#lib/room/lobby.ts';
 	import Report from '#lib/room/report/Report.svelte';
 	import RoomNotice from '#lib/room/RoomNotice.svelte';
 
@@ -18,12 +21,13 @@
 
 	const names = $derived(
 		room
-			? room.seats.map((s) =>
-					s.seat === room?.you ? 'You' : s.kind === 'bot' || s.handle === null ? 'Bot' : s.handle
-				)
+			? Array.from({ length: room.teams }, (_, i) => {
+					const seat = room?.seats.find((s) => s.seat === i + 1);
+					return seat ? seatName(seat, room?.you ?? 0) : botName(i + 1);
+				})
 			: []
 	);
-	const people = $derived(room ? room.seats.filter((s) => s.kind !== 'bot').length : 0);
+	const people = $derived(room ? seatedPeople(room.seats) : 0);
 
 	async function solo(): Promise<void> {
 		if (!report || starting) return;
@@ -51,11 +55,17 @@
 
 <Shell title="Mock draft" active="mock">
 	{#if error}
-		<div class="notice"><RoomNotice {error} returnTo={page.url.pathname} /></div>
+		<div class="notice">
+			<RoomNotice {error} subject="lobby" returnTo={page.url.pathname} />
+		</div>
 	{/if}
 	{#if report}
 		{@const r = report}
-		<Report report={r} {names} field="{people} drafters and {r.teams - people} bots">
+		<Report
+			report={r}
+			{names}
+			field="{plural(people, 'drafter')} and {plural(r.teams - people, 'bot')}"
+		>
 			{#snippet verbs()}
 				<Verb href={resolve('/mock/new')}>Join another lobby</Verb>
 				<Quiet onclick={solo} disabled={starting}>Run it against bots from slot {r.slot}</Quiet>

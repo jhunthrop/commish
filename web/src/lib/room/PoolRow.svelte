@@ -10,8 +10,9 @@
 
 	interface Props {
 		player: RoomPlayer;
-		/** His chance of lasting to your next pick, null past the card's depth. */
-		odds: number | null;
+		/** His chance of lasting to your next pick, null past the card's depth; undefined draws no odds
+		 * cell at all. */
+		odds: number | null | undefined;
 		/** What the odds are of: "still there at 6.05". */
 		oddsLabel: string;
 		/** What the odds cell says with no chance to show. */
@@ -23,8 +24,12 @@
 		/** The row the arrow keys are on. */
 		selected: boolean;
 		queued: boolean;
-		/** Draft is offered only on your turn. */
+		/** Draft is drawn only when the pick is yours to make (P3: no verb for a decision you cannot
+		 * make yet), and pressable while nothing else is in flight. */
+		draftShown: boolean;
 		canDraft: boolean;
+		/** A draft read, never drafted in: no Queue or Draft. */
+		readonly: boolean;
 		ondraft: () => void;
 		onqueue: () => void;
 		/** A tap marks the row; on a phone the marked row shows its Queue and Draft. */
@@ -40,7 +45,9 @@
 		isCall,
 		selected,
 		queued,
+		draftShown,
 		canDraft,
+		readonly,
 		ondraft,
 		onqueue,
 		onselect
@@ -54,9 +61,9 @@
 	class:call={isCall}
 	class:selected
 	aria-current={selected ? 'true' : undefined}
-	onclick={onselect}
+	onclick={readonly ? undefined : onselect}
 >
-	<Face src={player.headshot} size={40} />
+	<Face src={player.headshot} name={player.name} size={40} />
 	<span class="who">
 		<b>{player.name}</b>
 		<span class="meta">
@@ -68,12 +75,15 @@
 	{:else}
 		<span class="none"><b>–</b><Label size="cell">no projection</Label></span>
 	{/if}
-	<OddsCell {odds} label={oddsLabel} missing={oddsMissing} />
+	{#if odds !== undefined}<OddsCell {odds} label={oddsLabel} missing={oddsMissing} />{/if}
 	<span class="adp">{adp}</span>
-	<span class="acts">
-		<span class="q"><Quiet size="sm" onclick={onqueue}>{queued ? 'Queued' : 'Queue'}</Quiet></span>
-		<Quiet size="sm" disabled={!canDraft} onclick={ondraft}>Draft</Quiet>
-	</span>
+	{#if !readonly}
+		<span class="acts">
+			<span class="q"><Quiet size="sm" onclick={onqueue}>{queued ? 'Queued' : 'Queue'}</Quiet></span
+			>
+			{#if draftShown}<Quiet size="sm" disabled={!canDraft} onclick={ondraft}>Draft</Quiet>{/if}
+		</span>
+	{/if}
 </div>
 
 <style>

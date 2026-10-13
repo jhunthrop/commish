@@ -1,32 +1,34 @@
 <script lang="ts">
 	import Panel from '#lib/ui/Panel.svelte';
+	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { ApiError, isSignedOut, signInHref } from './api.ts';
+	import { type NoticeSubject, noticeFor } from './notice.ts';
 
 	interface Props {
-		/** What went wrong; a signed-out answer becomes the way to sign in. */
+		/** What went wrong. */
 		error: unknown;
+		/** Which page hit it, so the words fit: a mock, a shared link, a lobby, setup. */
+		subject: NoticeSubject;
 		/** Where sign-in brings the drafter back to. */
 		returnTo: string;
+		/** Beside a page's own verb the way forward is quiet, so the page keeps one solid verb. */
+		besideVerb?: boolean;
 	}
 
-	let { error, returnTo }: Props = $props();
+	let { error, subject, returnTo, besideVerb = false }: Props = $props();
 
-	const signedOut = $derived(isSignedOut(error));
-	const message = $derived(
-		error instanceof ApiError
-			? error.message
-			: 'The room could not be reached. Check the connection and reload.'
-	);
+	const view = $derived(noticeFor(error, subject, returnTo));
 </script>
 
-<Panel padding="md">
-	<div class="notice">
-		{#if signedOut}
-			<p>Sign in to draft. Your mocks and leagues are kept with your account.</p>
-			<Verb href={signInHref(returnTo)}>Sign in to draft</Verb>
-		{:else}
-			<p>{message}</p>
+<Panel padding="sm" edge="loss">
+	<div class="notice" role="alert">
+		<p>{view.text}</p>
+		{#if (view.verb ?? view.quiet) !== undefined}
+			<div class="acts">
+				{#if view.verb && besideVerb}<Quiet href={view.verb.href}>{view.verb.label}</Quiet>
+				{:else if view.verb}<Verb href={view.verb.href}>{view.verb.label}</Verb>{/if}
+				{#if view.quiet}<Quiet href={view.quiet.href}>{view.quiet.label}</Quiet>{/if}
+			</div>
 		{/if}
 	</div>
 </Panel>
@@ -36,11 +38,19 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
+		justify-content: space-between;
 		gap: var(--s-3);
 	}
 
 	p {
 		margin: 0;
-		color: var(--ink-2);
+		max-width: 64ch;
+		color: var(--ink);
+	}
+
+	.acts {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--s-2);
 	}
 </style>

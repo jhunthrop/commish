@@ -1,6 +1,7 @@
 /** A lobby as its log replays in the browser: who sits where, every pick with who made it, the pick on
  * the clock and when its clock runs out, your queue. Built from the room's own rows, so a reconnect
  * that sends the rows since the last seq brings the page to exactly where the room is. */
+import { botName } from './words.ts';
 import type { LobbyRoom, RoomAction, RoomPick } from './api.ts';
 
 export type SeatKind = 'drafter' | 'bot' | 'left' | 'open';
@@ -32,6 +33,57 @@ export interface LobbyState {
 	soloPace: boolean;
 	/** Your queue, best first, as the room last stored it. */
 	queue: readonly string[];
+}
+
+/** A seat as both the API's seat list and the log's replay name it. */
+interface SeatLike {
+	handle: string | null;
+	kind: SeatKind;
+}
+
+/** A seat's name everywhere a lobby lists seats: You, a drafter's handle (kept after he leaves, since
+ * the seat is still his), or Bot and its seat number. */
+export function seatName(seat: SeatLike & { seat: number }, you: number): string {
+	if (seat.seat === you) return 'You';
+	if (seat.kind === 'open') return openSeatName(seat.seat);
+	if (seat.kind === 'bot' || seat.handle === null) return botName(seat.seat);
+	return seat.handle;
+}
+
+/** A seat nobody holds yet, while the lobby fills: a bot takes it only when the draft starts. */
+export function openSeatName(seat: number): string {
+	return `Seat ${seat}`;
+}
+
+/** The people a lobby drafted with: everyone who held a seat when it started, whether he is still
+ * here or left and his stand-in drafts. */
+export function seatedPeople(seats: Iterable<SeatLike>): number {
+	let n = 0;
+	for (const s of seats) if (s.kind === 'drafter' || s.kind === 'left') n += 1;
+	return n;
+}
+
+/** Who made a pick, in the strip's words: a person by handle, a bot by seat, and a stand-in by whose
+ * seat it drafted for ("bot for jpk88", "clock for you"), so a pick nobody made is never credited to
+ * a person. */
+export function pickCredit(
+	pick: LobbyPick,
+	seats: ReadonlyMap<number, LobbySeatState>,
+	you: number
+): readonly string[] {
+	const seat = seats.get(pick.seat);
+	const owner = pick.seat === you ? 'you' : (seat?.handle ?? botName(pick.seat));
+	// A stand-in's credit is two lines, so the seat's handle reads whole under a face.
+	switch (pick.by) {
+		case 'drafter':
+			return [owner];
+		case 'queue':
+			return ['bot for', owner];
+		case 'clock':
+			return ['clock for', owner];
+		default:
+			return [botName(pick.seat)];
+	}
 }
 
 export function initialLobby(room: LobbyRoom): LobbyState {

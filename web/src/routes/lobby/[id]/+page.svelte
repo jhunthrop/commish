@@ -14,6 +14,7 @@
 	import LobbyRoomView from '#lib/room/LobbyRoomView.svelte';
 	import { type Board, boardOf } from '#lib/room/model.ts';
 	import RoomNotice from '#lib/room/RoomNotice.svelte';
+	import { rememberLeft } from '#lib/room/setup/left.ts';
 
 	/** The clock's redraw: a second clock read four times a second never shows a stale second. */
 	const TICK_MS = 250;
@@ -31,6 +32,9 @@
 	let query = $state('');
 	let socket: LobbySocket | null = null;
 	let cardFor = -1;
+
+	/** The lobby is still drafting or filling: it has a pool to search and a seat to leave. */
+	const open = $derived(lobby !== null && !lobby.complete && !lobby.abandoned && error === null);
 
 	async function loadCard(state: LobbyState): Promise<void> {
 		if (!state.drafting || state.complete || cardFor === state.pickNumber) return;
@@ -56,9 +60,24 @@
 		}
 	}
 
+	/** Leave asks once: what happens to the seat, then the way back from setup. */
+	let leaving = $state(false);
+	let confirmLeave = $state<HTMLElement | null>(null);
+
+	$effect(() => {
+		if (leaving) confirmLeave?.focus();
+	});
+
 	async function leave(): Promise<void> {
+		try {
+			await rooms.leave(id);
+		} catch (e) {
+			error = e;
+			leaving = false;
+			return;
+		}
 		socket?.close();
-		await rooms.leave(id).catch(() => undefined);
+		rememberLeft(id);
 		await goto(resolve('/mock/new'));
 	}
 
@@ -105,13 +124,42 @@
 
 <Shell title="Mock draft" active="mock">
 	{#snippet search()}
-		<Search placeholder="Search the pool" label="Search the pool" bind:value={query} />
+		{#if open}<Search
+				placeholder="Search the pool"
+				label="Search the pool"
+				bind:value={query}
+			/>{/if}
 	{/snippet}
 	{#snippet tail()}
-		{#if lobby && !lobby.complete && !lobby.abandoned}<Quiet onclick={leave}>Leave</Quiet>{/if}
+		{#if open && !leaving}<Quiet onclick={() => (leaving = true)}>Leave</Quiet>{/if}
 	{/snippet}
 	{#if error}
-		<div class="notice"><RoomNotice {error} returnTo={page.url.pathname} /></div>
+		<div class="notice">
+			<RoomNotice {error} subject="lobby" returnTo={page.url.pathname} />
+		</div>
+	{/if}
+	{#if leaving && lobby}
+		<!-- One quiet step: the room's own verb (Draft on your clock) stays the only solid one, and focus
+		     moves here so a keyboard or a screen reader lands on the question. -->
+		<div
+			class="notice"
+			role="group"
+			aria-labelledby="leave-question"
+			tabindex="-1"
+			bind:this={confirmLeave}
+		>
+			<Panel padding="sm" edge="quiet">
+				<div class="done">
+					<p class="line" id="leave-question">
+						{lobby.drafting
+							? 'Leave? Your queue drafts your seat, then the board, and the report is yours when the draft ends.'
+							: 'Leave? Your seat opens for someone else.'}
+					</p>
+					<Quiet onclick={leave}>Leave the lobby</Quiet>
+					<Quiet onclick={() => (leaving = false)}>Stay</Quiet>
+				</div>
+			</Panel>
+		</div>
 	{/if}
 	{#if status === 'reconnecting' || refused}
 		<div class="notice">
@@ -137,9 +185,7 @@
 		<div class="notice">
 			<Panel padding="sm">
 				<div class="done">
-					<p class="line">
-						This lobby closed because nobody was here when it filled. Join another.
-					</p>
+					<p class="line">This lobby closed because nobody was here when it filled.</p>
 					<Verb onclick={() => joinAnother(format)}>Join another lobby</Verb>
 				</div>
 			</Panel>

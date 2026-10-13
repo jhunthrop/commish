@@ -35,6 +35,8 @@
      a press box is glass and steel, not pillows. */
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
   --row-h: 52px;
+  --touch: 44px; /* the smallest target a thumb gets on a phone */
+  --tab-bar-h: 64px; /* the phone's tab bar, the rail laid along the bottom */
   --rail-w: 84px;
   --side-w: 296px;
   --r-sm: 4px; --r-md: 8px; --r-pill: 999px;

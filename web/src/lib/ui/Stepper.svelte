@@ -64,4 +64,20 @@
 		opacity: 0.4;
 		cursor: not-allowed;
 	}
+
+	/* A thumb needs a 44px target: the buttons grow to it on a phone and the stepper with them. */
+	@media (max-width: 760px) {
+		.stepper {
+			height: auto;
+			min-height: var(--touch);
+			padding: 0 0 0 var(--s-2);
+			gap: var(--s-1);
+		}
+
+		button {
+			width: var(--touch);
+			height: var(--touch);
+			font-size: var(--t-md);
+		}
+	}
 </style>

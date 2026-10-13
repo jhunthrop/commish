@@ -2,8 +2,8 @@
 import base64
 from pathlib import Path
 
-SHOTS = Path(__file__).resolve().parent.parent / "brand-mocks" / "commish" / "screenshots"
-OUT = Path(__file__).resolve().parent.parent / "brand-mocks" / "publish"
+SHOTS = Path(__file__).resolve().parent.parent / "screenshots"
+OUT = Path(__file__).resolve().parent.parent / "publish"
 
 HEAD = """<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap"><style>
 :root{--bg:#ffffff;--ink:#15120f;--muted:#6b635c;--card:#f7f4f0;--line:#e6e0d9;--accent:#c2470a}

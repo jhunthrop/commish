@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { lastName, pickLabel, snakeSlot } from '#lib/format/draft.ts';
 	import Keys from '#lib/ui/Keys.svelte';
+	import LiveRegion from '#lib/ui/LiveRegion.svelte';
+	import Panel from '#lib/ui/Panel.svelte';
 	import SinceStrip from '#lib/ui/SinceStrip.svelte';
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
-	import { botNames } from './actions.ts';
 	import type { MockRoom, RoomCard } from './api.ts';
 	import { callView, poolBasis } from './call.ts';
 	import { SOLO_KEYS, roomKeys } from './keys.ts';
@@ -21,9 +22,16 @@
 	import Pool from './Pool.svelte';
 	import RoomCall from './RoomCall.svelte';
 	import RoomLayout from './RoomLayout.svelte';
+	import SharedHead from './SharedHead.svelte';
 	import SoloBar from './SoloBar.svelte';
 	import Wall from './Wall.svelte';
-	import { leagueLine } from './words.ts';
+	import { botNames, leagueLine } from './words.ts';
+
+	/** A shared draft: read by someone else, never drafted in, with one verb that runs it as theirs. */
+	interface Shared {
+		starting: boolean;
+		onrun: () => void;
+	}
 
 	interface Props {
 		room: MockRoom;
@@ -32,9 +40,12 @@
 		/** The pool search, from the top bar. */
 		search: string;
 		busy: boolean;
-		/** A shared draft: read, never drafted in. */
-		readonly?: boolean;
-		shared?: boolean;
+		/** Set when the draft is someone else's, read through its link. */
+		shared?: Shared;
+		/** A line over the strip after an undo: what was taken back and that the room branched. */
+		notice?: string | null;
+		/** "Link copied" shows in place of Save and share for a moment. */
+		copied?: boolean;
 		onpick?: (playerId: string) => void;
 		onundo?: (pick: number) => void;
 		onautopick?: (round: number) => void;
@@ -49,8 +60,9 @@
 		card,
 		search,
 		busy,
-		readonly = false,
-		shared = false,
+		shared,
+		notice = null,
+		copied = false,
 		onpick,
 		onundo,
 		onautopick,
@@ -66,6 +78,8 @@
 	let filter = $state<PoolFilter>('All');
 	let marked = $state<string | null>(null);
 
+	const readonly = $derived(shared !== undefined);
+	const whose = $derived(readonly ? 'their' : 'your');
 	const teams = $derived(room.teams);
 	const total = $derived(room.teams * room.rounds);
 	const drafted = $derived(draftedSet(room.picks));
@@ -77,7 +91,9 @@
 	const queueAll = $derived(new Set(room.queue));
 	const rows = $derived(poolRows(board, drafted, filter, queue, search));
 	const left = $derived(board.players.length - drafted.size);
-	const call = $derived(card && room.waiting ? callView(card, board, drafted, teams) : null);
+	const call = $derived(
+		!readonly && card && room.waiting ? callView(card, board, drafted, teams) : null
+	);
 	const odds = $derived(card?.still_there ?? {});
 	const oddsLabel = $derived(
 		card?.next_pick ? `still there at ${pickLabel(card.next_pick, teams)}` : 'your last pick'
@@ -86,8 +102,14 @@
 		marked !== null && !drafted.has(marked) ? marked : (call?.player.id ?? null)
 	);
 	const wallRounds = $derived(Math.min(room.rounds, round));
-	const names = $derived(botNames(teams, room.slot));
+	/** The drafter's seat on the wall: you, or in a shared draft the drafter by handle. */
+	const names = $derived(
+		botNames(teams, room.slot).map((n, i) =>
+			readonly && i + 1 === room.slot ? (room.shared_by ?? 'Drafter') : n
+		)
+	);
 	const lastMine = $derived(mine.at(-1)?.pick ?? null);
+	const went = $derived(wentSince(room.picks, prev ?? 0, queueAll, board));
 
 	function draft(id: string | null): void {
 		if (readonly || busy || !room.waiting || id === null) return;
@@ -110,7 +132,8 @@
 
 	const onkeydown = $derived(
 		roomKeys({
-			draft: () => draft(selectedId),
+			draftCall: () => draft(call?.player.id ?? null),
+			draftMarked: () => draft(selectedId),
 			move,
 			queue: () => toggleQueue(selectedId),
 			undo: () => {
@@ -123,7 +146,9 @@
 <svelte:window onkeydown={readonly ? undefined : onkeydown} />
 
 <RoomLayout>
-	{#if !readonly && room.status === 'active'}
+	{#if shared}
+		<SharedHead {room} starting={shared.starting} onrun={shared.onrun} />
+	{:else if room.status === 'active'}
 		<SoloBar
 			now={room.pick_number}
 			{round}
@@ -133,15 +158,19 @@
 			autopickTo={Math.min(room.rounds, round + AUTOPICK_ROUNDS)}
 			canUndo={lastMine !== null}
 			{busy}
-			{shared}
+			{copied}
 			onundo={() => lastMine !== null && onundo?.(lastMine)}
 			onautopick={() => onautopick?.(Math.min(room.rounds, round + AUTOPICK_ROUNDS))}
 			onfinish={() => onfinish?.()}
 			onshare={() => onshare?.()}
 		/>
 	{/if}
-	{#if prev !== null && room.waiting}
-		<SinceStrip since={prev} went={wentSince(room.picks, prev, queueAll, board)} {teams} />
+	{#if notice}
+		<Panel padding="sm" edge="quiet"><p class="notice">{notice}</p></Panel>
+	{/if}
+	<LiveRegion words={notice ?? ''} />
+	{#if room.waiting && went.length > 0}
+		<SinceStrip since={prev} {went} {teams} {whose} />
 	{/if}
 	{#if call}
 		<RoomCall
@@ -160,14 +189,18 @@
 			{left}
 			{odds}
 			{oddsLabel}
-			basis={poolBasis(board, card, teams)}
+			oddsShown={!readonly}
+			basis={readonly ? board.basis : poolBasis(board, card, teams)}
 			pickNumber={room.pick_number}
 			callId={call?.player.id ?? null}
 			{selectedId}
 			queue={new Set(queue)}
+			draftShown={room.waiting}
 			canDraft={!readonly && room.waiting && !busy}
+			{readonly}
 			{filter}
-			filters={FILTERS}
+			filters={readonly ? FILTERS.filter((f) => f !== 'Queue') : FILTERS}
+			{search}
 			onfilter={(f: PoolFilter) => (filter = f)}
 			ondraft={draft}
 			onqueue={toggleQueue}
@@ -181,15 +214,28 @@
 		now={room.status === 'active' ? room.pick_number : null}
 		{teams}
 		rounds={room.rounds}
+		{whose}
 	/>
 	{#snippet dock()}
-		<TeamPanel slots={teamSlots(room.settings, mine, board)} rosterSize={room.rounds} {teams} />
+		<TeamPanel
+			title={readonly ? 'Their team' : 'Your team'}
+			slots={teamSlots(room.settings, mine, board)}
+			rosterSize={room.rounds}
+			{teams}
+			withCall={!readonly}
+		/>
 		{#if !readonly}<Keys bindings={SOLO_KEYS} />{/if}
 		<span class="seed">Seed {room.seed} · the same seed replays the same bots</span>
 	{/snippet}
 </RoomLayout>
 
 <style>
+	.notice {
+		margin: 0;
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+	}
+
 	.seed {
 		padding: 0 var(--s-1);
 		font-size: var(--t-xs);

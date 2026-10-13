@@ -67,13 +67,28 @@ def since_strip(since, queued, prev):
     return f'<div class="since panel"><div class="lead"><b>{len(since)}</b><span>went since your pick at {pick_label(prev)}</span><span>{lead_sub}</span></div><div class="run">{cards}</div></div>'
 
 
+# A contrast is drawn only when the odds back it: the runner-up at or above even, the call below.
+# Otherwise both numbers are given plainly. Every sentence names both (UX review 2, M5).
+EVEN = 0.5
+
+
+def runner_words(call, runner, odds, nxt):
+    more = f"has more over replacement at {signed(runner['vor'])}"
+    at = pick_label(nxt)
+    mine, theirs = odds[call["id"]], odds[runner["id"]]
+    name = escape(last_name(call["name"]))
+    if theirs >= EVEN and mine < EVEN:
+        return f"{more}, but he is still there at {at} {odds_words(theirs)} of the time. {name} is there {odds_words(mine)} of the time."
+    return f"{more}. He is there at {at} {odds_words(theirs)} of the time, {name} {odds_words(mine)}."
+
+
 def call_panel(call, runner, odds, nxt):
     return f"""<section class="call panel" aria-label="Our call">
   {face(call, 72)}
   <div><span class="tag">Our call at {pick_label(NOW)}</span>
     <h2>Take {escape(call['name'])}</h2>
     <div class="meta"><span class="pos">{call['pos']} {call['pos_rank']}</span>{call['team']} · {signed(call['vor'])} over replacement · {gap_words(call, NOW)}</div>
-    <p><b>{escape(runner['name'])}</b> has more over replacement at {signed(runner['vor'])}, but he is still there at {pick_label(nxt)} {odds_words(odds[runner['id']])} of the time. {escape(last_name(call['name']))} is not.</p>
+    <p><b>{escape(runner['name'])}</b> {runner_words(call, runner, odds, nxt)}</p>
   </div>
   <div class="odds-big"><b>{odds_short(odds[call['id']])}</b><span>chance he is still there at {pick_label(nxt)}</span>
     <button class="verb" type="button">Draft {escape(last_name(call['name']))} <kbd>Enter</kbd></button></div>

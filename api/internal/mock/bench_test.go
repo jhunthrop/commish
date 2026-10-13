@@ -83,7 +83,19 @@ func BenchmarkPickBatch(b *testing.B) {
 func BenchmarkHindsightFallback(b *testing.B) {
 	s := benchSettings(b)
 	const seed = 20261012
-	d, err := mock.Run(s, seed, nil, mock.Options{AutopickThroughRound: 15})
+	whole, err := mock.Run(s, seed, nil, mock.Options{AutopickThroughRound: 15})
+	if err != nil {
+		b.Fatal(err)
+	}
+	// The same picks as the drafter's own: a pick made for him carries no
+	// hindsight, so autopicked ones would measure nothing.
+	var picks []mock.HumanPick
+	for _, p := range whole.State.Picks {
+		if p.TeamID == whole.HumanTeamID {
+			picks = append(picks, mock.HumanPick{PlayerID: p.PlayerID})
+		}
+	}
+	d, err := mock.Run(s, seed, picks, mock.Options{})
 	if err != nil {
 		b.Fatal(err)
 	}

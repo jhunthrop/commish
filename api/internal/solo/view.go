@@ -15,8 +15,8 @@ import (
 
 // view is the room on the wire. withBoard adds the board, which a page
 // reads once; a pick's answer leaves it off.
-func view(r room, withBoard bool) (apitypes.MockRoom, error) {
-	code, err := shareCodeOf(r)
+func view(r room, withBoard bool, signer *ShareSigner) (apitypes.MockRoom, error) {
+	code, err := shareCodeOf(r, signer)
 	if err != nil {
 		return apitypes.MockRoom{}, err
 	}
@@ -35,6 +35,10 @@ func view(r room, withBoard bool) (apitypes.MockRoom, error) {
 		id := r.mock.Id
 		out.Id = &id
 	}
+	if r.sharer != "" {
+		sharer := r.sharer
+		out.SharedBy = &sharer
+	}
 	if withBoard {
 		b := draftroom.BoardView(r.board, nil)
 		out.Board = &b
@@ -43,8 +47,11 @@ func view(r room, withBoard bool) (apitypes.MockRoom, error) {
 }
 
 // shareCodeOf is the link that replays the room as it stands.
-func shareCodeOf(r room) (*string, error) {
-	code, err := encodeShare(share{V: shareVersion, Settings: r.settings.League, Seed: int64(r.seed), Picks: sharedPicks(r)})
+func shareCodeOf(r room, signer *ShareSigner) (*string, error) {
+	picks, forYou := sharedPicks(r)
+	code, err := encodeShare(share{
+		V: shareVersion, Settings: r.settings.League, Seed: int64(r.seed), Picks: picks, ForYou: forYou, Sharer: r.sharer,
+	}, signer)
 	if err != nil {
 		return nil, err
 	}
@@ -52,21 +59,32 @@ func shareCodeOf(r room) (*string, error) {
 }
 
 // sharedPicks is the drafter's own picks in order, keepers left out
-// because the settings force them.
-func sharedPicks(r room) []string {
+// because the settings force them, and the places in that list a
+// stand-in made. A solo log's picks are its MAKE_PICK actions one for
+// one, so the k-th MAKE_PICK is the state's k-th pick.
+func sharedPicks(r room) (picks []string, forYou []int) {
 	keepers := mock.KeepersOf(r.settings.League)
 	human := r.draft.HumanTeamID
-	var out []string
-	for _, p := range r.draft.State.Picks {
-		if p.TeamID != human {
+	made := r.draft.State.Picks
+	k := 0
+	for i, a := range r.draft.Actions {
+		if a.Type != draft.MakePick {
 			continue
 		}
-		if keepers[sim.KeeperKey{TeamID: human, Round: p.Round}] == p.PlayerID {
+		if k >= len(made) {
+			break
+		}
+		p := made[k]
+		k++
+		if p.TeamID != human || keepers[sim.KeeperKey{TeamID: human, Round: p.Round}] == p.PlayerID {
 			continue
 		}
-		out = append(out, p.PlayerID)
+		if _, ok := r.draft.By[i+1]; ok {
+			forYou = append(forYou, len(picks))
+		}
+		picks = append(picks, p.PlayerID)
 	}
-	return out
+	return picks, forYou
 }
 
 // sharedReports keeps the last few shared reports: a link passed around

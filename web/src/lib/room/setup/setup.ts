@@ -48,9 +48,40 @@ export function defaultSettings(): LeagueSettings {
 	};
 }
 
+/** A lobby starts this long after its first drafter joins, bots in the open seats (lobby.FillWindow). */
+export const LOBBY_FILL_SECONDS = 90;
+
+type Lineup = LeagueSettings['lineup'];
+
+/** The FLEX spots a lineup has: two in two flex, one otherwise. */
+export function flexCount(lineup: Lineup): number {
+	return lineup === 'two_flex' ? 2 : 1;
+}
+
+/** The superflex spots a lineup has: one in superflex, none otherwise. */
+export function superflexCount(lineup: Lineup): number {
+	return lineup === 'superflex' ? 1 : 0;
+}
+
+/** The FLEX stepper's bounds: a superflex lineup keeps its one FLEX, the others step from one to two. */
+export function flexMax(lineup: Lineup): number {
+	return lineup === 'superflex' ? 1 : 2;
+}
+
+/** The lineup a FLEX count makes: two FLEX is two flex, one is standard (or superflex, kept). */
+export function lineupForFlex(lineup: Lineup, flex: number): Lineup {
+	if (flex >= 2) return 'two_flex';
+	return lineup === 'two_flex' ? 'standard' : lineup;
+}
+
+/** The lineup a superflex count makes: one is superflex (with one FLEX), none is standard. */
+export function lineupForSuperflex(superflex: number): Lineup {
+	return superflex >= 1 ? 'superflex' : 'standard';
+}
+
 /** The flex spots a lineup adds: standard one, superflex a flex and a superflex, two flex two. */
-export function flexSpots(lineup: LeagueSettings['lineup']): number {
-	return lineup === 'standard' ? 1 : 2;
+export function flexSpots(lineup: Lineup): number {
+	return flexCount(lineup) + superflexCount(lineup);
 }
 
 /** Every roster spot, flex included: the draft's round count. */

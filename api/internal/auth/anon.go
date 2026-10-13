@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,10 +37,15 @@ type Anon struct {
 	cookies config.Session
 	seal    *Sealer
 	csrf    *CSRFSigner
+	// trusted is the API's CORS allow-list: a page on one of these origins
+	// is one of ours even when the browser calls it another site (a
+	// preview host), so it may start a signed-out mock.
+	trusted []string
 }
 
 // NewAnon derives the anonymous cookie's keys from the cookie password.
-func NewAnon(cfg config.Session) (*Anon, error) {
+// trusted is the CORS allow-list (CORS_ORIGINS).
+func NewAnon(cfg config.Session, trusted []string) (*Anon, error) {
 	seal, err := NewSealer(cfg.CookiePassword, purposeAnon)
 	if err != nil {
 		return nil, err
@@ -48,58 +54,111 @@ func NewAnon(cfg config.Session) (*Anon, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Anon{cookies: cfg, seal: seal, csrf: csrf}, nil
+	return &Anon{cookies: cfg, seal: seal, csrf: csrf, trusted: slices.Clone(trusted)}, nil
 }
 
-func (a *Anon) cookie(name, value string, maxAge int, httpOnly bool) *http.Cookie {
-	return &http.Cookie{
+// cookie is one of the anonymous cookies. A page on a trusted origin that
+// the browser calls another site keeps and sends only a SameSite=None
+// cookie, so there the cookie is None, Secure and Partitioned: held under
+// that page's own site and never sent from any other.
+func (a *Anon) cookie(name, value string, maxAge int, httpOnly, crossSite bool) *http.Cookie {
+	c := &http.Cookie{
 		Name: name, Value: value, Path: "/", Domain: a.cookies.CookieDomain, MaxAge: maxAge,
 		HttpOnly: httpOnly, Secure: a.cookies.CookieSecure, SameSite: http.SameSiteLaxMode,
 	}
+	if crossSite {
+		c.SameSite, c.Secure, c.Partitioned = http.SameSiteNoneMode, true, true
+	}
+	return c
 }
 
 // Owner is the request's anonymous owner hash, false without a cookie
-// that opens.
+// that opens. With both a site cookie and a partitioned one, the first
+// that opens is the owner.
 func (a *Anon) Owner(r *http.Request) ([]byte, bool) {
-	c, err := r.Cookie(AnonCookie)
-	if err != nil || c.Value == "" {
+	owners := a.Owners(r)
+	if len(owners) == 0 {
 		return nil, false
 	}
-	token, err := a.seal.Open(c.Value)
-	if err != nil {
-		return nil, false
+	return owners[0], true
+}
+
+// Owners is every anonymous owner the request carries: the site's own
+// cookie and, where the browser sends it, a partitioned one minted for a
+// preview page. They share a name, so each is opened in turn; duplicates
+// and cookies that do not open are passed over.
+func (a *Anon) Owners(r *http.Request) [][]byte {
+	var out [][]byte
+	for _, c := range r.CookiesNamed(AnonCookie) {
+		if c.Value == "" {
+			continue
+		}
+		token, err := a.seal.Open(c.Value)
+		if err != nil {
+			continue
+		}
+		hash := hashToken(token)
+		if !slices.ContainsFunc(out, func(h []byte) bool { return string(h) == string(hash) }) {
+			out = append(out, hash)
+		}
 	}
-	return hashToken(token), true
+	return out
 }
 
 // Issue mints an anonymous owner and sets its two cookies; the hash is
 // the owner. The caller mints only for a request with no valid session
-// and no valid anonymous cookie, after its input validated.
-func (a *Anon) Issue(w http.ResponseWriter) []byte {
+// and no valid anonymous cookie, after its input validated and Admits
+// passed.
+func (a *Anon) Issue(w http.ResponseWriter, r *http.Request) []byte {
 	token, hash := newToken()
 	maxAge := int(AnonTTL / time.Second)
-	http.SetCookie(w, a.cookie(AnonCookie, a.seal.Seal(token), maxAge, true))
-	http.SetCookie(w, a.cookie(AnonCSRFCookie, a.csrf.Token(hash), maxAge, false))
+	cross := CrossSite(r)
+	http.SetCookie(w, a.cookie(AnonCookie, a.seal.Seal(token), maxAge, true, cross))
+	http.SetCookie(w, a.cookie(AnonCSRFCookie, a.csrf.Token(hash), maxAge, false, cross))
 	return hash
 }
 
 // CrossSite reports whether the browser says the request came from
-// another site (Sec-Fetch-Site); such a request never mints an owner.
+// another site (Sec-Fetch-Site).
 func CrossSite(r *http.Request) bool {
 	return r.Header.Get("Sec-Fetch-Site") == "cross-site"
 }
 
-// ValidCSRF reports whether a state-changing request carries the CSRF
-// token bound to this anonymous owner.
+// trustedOrigin reports whether the request's Origin is on the allow-list.
+func (a *Anon) trustedOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	return origin != "" && slices.Contains(a.trusted, origin)
+}
+
+// Admits reports whether a request may mint an anonymous owner: one the
+// browser does not call cross-site, or a cross-site one whose Origin is on
+// the allow-list. Any other cross-site request, an absent Origin included,
+// never mints, so another site cannot plant or replace this browser's
+// cookies.
+func (a *Anon) Admits(r *http.Request) bool {
+	return !CrossSite(r) || a.trustedOrigin(r)
+}
+
+// ValidCSRF reports whether a state-changing request is the anonymous
+// owner's own: it carries the CSRF token bound to the owner, or it comes
+// cross-site from a trusted origin, whose page cannot read this site's
+// CSRF cookie and whose Origin header no other page can send.
 func (a *Anon) ValidCSRF(r *http.Request, hash []byte) bool {
+	if CrossSite(r) && a.trustedOrigin(r) {
+		return true
+	}
 	return a.csrf.Valid(hash, r.Header.Get(AnonCSRFHeader))
 }
 
-// Clear expires both anonymous cookies at sign-in; the session's own
+// Clear expires both anonymous cookies at sign-in, the site's and the
+// partitioned kind, since a browser keys a cookie by its partition and
+// only an expiry with the same attributes removes it. The session's own
 // CSRF cookie is untouched.
 func (a *Anon) Clear(w http.ResponseWriter) {
-	http.SetCookie(w, a.cookie(AnonCookie, "", -1, true))
-	http.SetCookie(w, a.cookie(AnonCSRFCookie, "", -1, false))
+	for _, partitioned := range []bool{false, true} {
+		http.SetCookie(w, a.cookie(AnonCookie, "", -1, true, partitioned))
+		http.SetCookie(w, a.cookie(AnonCSRFCookie, "", -1, false, partitioned))
+	}
 }
 
 // AnonClaimer moves an anonymous owner's mocks to an account.

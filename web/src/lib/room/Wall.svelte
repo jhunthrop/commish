@@ -15,9 +15,11 @@
 		now: number | null;
 		teams: number;
 		rounds: number;
+		/** Whose draft the wall is told for: the seat's own drafter, or a reader of a shared one. */
+		whose?: 'your' | 'their';
 	}
 
-	let { rows, names, you, now, teams, rounds }: Props = $props();
+	let { rows, names, you, now, teams, rounds, whose = 'your' }: Props = $props();
 </script>
 
 <section aria-label="The wall">
@@ -36,13 +38,13 @@
 				{#each row as cell (cell.pick)}
 					{#if cell.player}
 						<span class="cell" class:mine={cell.seat === you}>
-							<Face src={cell.player.headshot} size={22} />
+							<Face src={cell.player.headshot} name={cell.player.name} size={22} />
 							<span class="s">{cell.player.position} · {cell.player.team}</span>
 							<b>{lastName(cell.player.name)}</b>
 						</span>
 					{:else if cell.pick === now}
 						<span class="cell now">
-							{cell.seat === you ? 'Your pick' : 'On the clock'}
+							{cell.seat === you ? (whose === 'your' ? 'Your pick' : 'Their pick') : 'On the clock'}
 							<span>{pickLabel(cell.pick, teams)}</span>
 						</span>
 					{:else}
@@ -83,9 +85,10 @@
 		border-bottom: 1px solid var(--line);
 		text-transform: uppercase;
 		letter-spacing: var(--track-label);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		/* A handle is read whole: it wraps inside its column (a 20-letter handle takes two lines). */
+		overflow-wrap: anywhere;
+		line-height: 1.25;
+		align-self: end;
 	}
 
 	.h.you {

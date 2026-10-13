@@ -8,6 +8,7 @@
 		pickLabel
 	} from '#lib/format/draft.ts';
 	import { fixed, plural, signed } from '#lib/format/number.ts';
+	import ActionBar from '#lib/ui/ActionBar.svelte';
 	import CallPanel from '#lib/ui/CallPanel.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -17,6 +18,7 @@
 	import Icon from '#lib/ui/Icon.svelte';
 	import Keys from '#lib/ui/Keys.svelte';
 	import OddsCell from '#lib/ui/OddsCell.svelte';
+	import Panel from '#lib/ui/Panel.svelte';
 	import PickStrip from '#lib/ui/PickStrip.svelte';
 	import Stepper from '#lib/ui/Stepper.svelte';
 	import ToneChip from '#lib/ui/ToneChip.svelte';
@@ -54,6 +56,7 @@
 	import NightlyParts from '#lib/ui/system/NightlyParts.svelte';
 	import RoundParts from '#lib/ui/system/RoundParts.svelte';
 	import Swatch from '#lib/ui/system/Swatch.svelte';
+	import { SOLO_KEYS } from '#lib/room/keys.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -128,6 +131,16 @@
 			<Parts>
 				<Part name="Face" about="A 40px headshot on every row, before anything else.">
 					{#snippet show()}<Face src={row.headshot} size={40} loading="eager" />{/snippet}
+				</Part>
+				<Part
+					name="Face, no headshot"
+					about="A player with no headshot, or one that fails to load, holds his initials in the number face, so someone is on every row."
+				>
+					{#snippet show()}<Face src={null} name={row.name} size={40} /><Face
+							src={null}
+							name={row.name}
+							size={22}
+						/>{/snippet}
 				</Part>
 				<Part
 					name="Name"
@@ -367,7 +380,9 @@
 					{#snippet reason()}
 						<b>{runner.name}</b> has more over replacement at {signed(runner.vor)}, but he is still
 						there at {nextLabel}
-						{oddsWords(data.soloRoom.runnerOdds)} of the time. {lastName(call.name)} is not.
+						{oddsWords(data.soloRoom.runnerOdds)} of the time. {lastName(call.name)} is there {oddsWords(
+							data.soloRoom.callOdds
+						)} of the time.
 					{/snippet}
 				</CallPanel>
 				<ScoreBug {...data.lobbyBug} />
@@ -391,7 +406,7 @@
 		<DocSection title="Your team and the keys" sub="The same solo room at 5.08, from the dock.">
 			<Parts as="div">
 				<TeamPanel slots={data.soloTeam} rosterSize={data.soloRoom.rosterSize} />
-				<Keys bindings={data.roomKeys} />
+				<Keys bindings={SOLO_KEYS} />
 			</Parts>
 		</DocSection>
 
@@ -448,7 +463,10 @@
 						<DisplayTitle note="projected starting points, 12 teams">The field</DisplayTitle>
 					{/snippet}
 				</Part>
-				<Part name="Stepper" about="A roster count with its bounds.">
+				<Part
+					name="Stepper"
+					about="A roster count with its bounds. On a phone each button is a 44px target."
+				>
 					{#snippet show()}<Stepper
 							label="RB"
 							value={stepperValue}
@@ -457,6 +475,31 @@
 							onchange={(v: number) => (stepperValue = v)}
 						/>{/snippet}
 				</Part>
+			</Parts>
+		</DocSection>
+
+		<DocSection
+			title="Notices and the action bar"
+			sub="What a page says when something went wrong, and a form's verbs that stay on a phone's first screen."
+		>
+			<Specimen frame="dashed">
+				<Panel padding="sm" edge="loss">
+					<span> This mock is gone. It was deleted, or the link is wrong. </span>
+				</Panel>
+				<ActionBar>
+					<Verb>Start against bots</Verb>
+					<Quiet>Join a lobby with people</Quiet>
+				</ActionBar>
+			</Specimen>
+			<Parts>
+				<Part
+					name="Error notice"
+					about="A panel with a rose edge and wash: the truth in our words, then the verb that is the way forward. Never the API's own sentence when ours says more."
+				/>
+				<Part
+					name="Action bar"
+					about="A form's verb and the quiet one beside it. On a desk it follows the form. On a phone it pins above the tab bar. A refusal shows above the verbs, a note under them."
+				/>
 			</Parts>
 		</DocSection>
 

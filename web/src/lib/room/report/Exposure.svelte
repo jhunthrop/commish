@@ -8,22 +8,26 @@
 		runs: MockReport['runs'];
 		board: Board;
 		seat: number;
+		/** Whose runs: your own, or a shared draft's drafter. */
+		whose?: 'your' | 'their';
 	}
 
-	let { runs, board, seat }: Props = $props();
+	let { runs, board, seat, whose = 'your' }: Props = $props();
+
+	const who = $derived(whose === 'your' ? 'you' : 'they');
 
 	/** Rows listed: the players you land most. */
 	const ROWS = 8;
 </script>
 
 <Panel>
-	<h3>Who you end up with<span>share of {runs.runs} runs</span></h3>
+	<h3>Who {who} end up with<span>share of {runs.runs} runs</span></h3>
 	<div class="expo">
 		{#each runs.exposure.slice(0, ROWS) as e (e.player_id)}
 			{@const player = board.byId.get(e.player_id)}
 			{#if player}
 				<div class="e">
-					<Face src={player.headshot} size={32} />
+					<Face src={player.headshot} name={player.name} size={32} />
 					<b>{player.name} <span>{player.position} {player.positionRank}</span></b>
 					<span class="bar"><i style:width="{e.share * 100}%"></i></span>
 					<span class="pct">{Math.round(e.share * 100)}%</span>
@@ -32,7 +36,7 @@
 		{/each}
 	</div>
 	<p class="need">
-		Every player you land in more than half the runs from slot {seat} is a player to know cold.
+		Every player {who} land in more than half the runs from slot {seat} is a player to know cold.
 	</p>
 </Panel>
 

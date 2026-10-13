@@ -18,7 +18,22 @@ type HumanPick struct {
 	// Odds is what the room showed the drafter when he made this pick,
 	// recorded with it; the report's hindsight reads it back.
 	Odds *PickOdds `json:"odds,omitempty"`
+	// By is who made it when the drafter's own hand did not: MadeForYou,
+	// MadeByQueue or MadeByClock. Empty is the drafter.
+	By string `json:"by,omitempty"`
 }
+
+// Who made one of the drafter's picks, as the report marks it.
+const (
+	// MadeByYou is the drafter's own hand.
+	MadeByYou = "you"
+	// MadeForYou is "Pick for me to round N" or "Finish the draft".
+	MadeForYou = "for_you"
+	// MadeByQueue is a lobby seat's stand-in after its drafter left.
+	MadeByQueue = "queue"
+	// MadeByClock is the stand-in when the drafter's clock ran out.
+	MadeByClock = "clock"
+)
 
 // Options are the drafter's standing instructions.
 type Options struct {
@@ -43,6 +58,9 @@ type Draft struct {
 	// Odds is the odds recorded with the drafter's picks, by the 1-based
 	// sequence of the MAKE_PICK action they rode in on.
 	Odds map[int]PickOdds `json:"odds,omitempty"`
+	// By is who made each of the drafter's picks his own hand did not, by
+	// the same key as Odds; a pick missing from it is his.
+	By map[int]string `json:"by,omitempty"`
 }
 
 // runner is one Run's working set.
@@ -56,6 +74,7 @@ type runner struct {
 	strategy bots.Strategy
 	actions  []draft.Action
 	odds     map[int]PickOdds
+	by       map[int]string
 	state    draft.State
 }
 
@@ -118,6 +137,9 @@ func Advance(s Settings, seed uint32, d Draft, pick HumanPick, o Options) (Draft
 	for seq, o := range d.Odds {
 		r.odds[seq] = o
 	}
+	for seq, by := range d.By {
+		r.by[seq] = by
+	}
 	r.keeps = keepsSoFar(r.keepers, d.State)
 	return r.finish(d.Config, d.Slot, []HumanPick{pick}, o.AutopickThroughRound)
 }
@@ -132,7 +154,7 @@ func newRunner(s Settings, seed uint32, human string, order []string) *runner {
 	sort.Strings(botIDs)
 	return &runner{
 		settings: s, seed: seed, human: human, strategy: bots.DefaultStrategy(), keeps: map[string]int{},
-		dealt: bots.AssignArchetypes(seed, botIDs), keepers: KeepersOf(s.League), odds: map[int]PickOdds{},
+		dealt: bots.AssignArchetypes(seed, botIDs), keepers: KeepersOf(s.League), odds: map[int]PickOdds{}, by: map[int]string{},
 	}
 }
 
@@ -144,6 +166,9 @@ func (r *runner) finish(config draft.Config, slot int, picks []HumanPick, autopi
 	d := Draft{Config: config, Actions: r.actions, State: r.state, HumanTeamID: r.human, Slot: slot, Waiting: waiting}
 	if len(r.odds) > 0 {
 		d.Odds = r.odds
+	}
+	if len(r.by) > 0 {
+		d.By = r.by
 	}
 	return d, nil
 }
@@ -266,6 +291,7 @@ func (r *runner) play(picks []HumanPick, autopickThrough int) (bool, error) {
 			if err := r.apply(draft.NewMakePick(r.turnStamp(), team, best.PlayerID)); err != nil {
 				return false, fmt.Errorf("mock: pick for me: %w", err)
 			}
+			r.by[len(r.actions)] = MadeForYou
 		default:
 			return true, nil
 		}
@@ -301,6 +327,9 @@ func (r *runner) humanPick(team string, p HumanPick) error {
 	}
 	if p.Odds != nil {
 		r.odds[len(r.actions)] = *p.Odds
+	}
+	if p.By != "" {
+		r.by[len(r.actions)] = p.By
 	}
 	return nil
 }

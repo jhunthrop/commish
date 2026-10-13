@@ -636,7 +636,7 @@ export interface paths {
 			query?: never;
 			header?: never;
 			path: {
-				/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+				/** @description a shared draft's settings, seed, picks and drafter, deflated and base64url encoded, then a dot and the server's signature; an unsigned or altered code is refused */
 				code: components['parameters']['ShareCode'];
 			};
 			cookie?: never;
@@ -656,7 +656,7 @@ export interface paths {
 			query?: never;
 			header?: never;
 			path: {
-				/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+				/** @description a shared draft's settings, seed, picks and drafter, deflated and base64url encoded, then a dot and the server's signature; an unsigned or altered code is refused */
 				code: components['parameters']['ShareCode'];
 			};
 			cookie?: never;
@@ -1187,8 +1187,10 @@ export interface components {
 			queue: string[];
 			/** Format: int64 */
 			seq: number;
-			/** @description the link's code */
+			/** @description the link's code: the settings, seed, picks and drafter, signed by the server */
 			share_code: string;
+			/** @description the drafter's handle, when he has one: a shared draft names whose it is */
+			shared_by?: string;
 			/** Format: date-time */
 			created_at: string;
 			/** @description the board, on a full read (create, get, shared) and absent on a pick's answer */
@@ -1265,6 +1267,11 @@ export interface components {
 			could_wait: boolean;
 			/** @description advisor or sim as recorded with the pick, or fallback_sim computed for the report */
 			odds_source: string;
+			/**
+			 * @description who made the pick: you, Pick for me or Finish the draft (for_you), a lobby seat's stand-in after you left (queue), or the stand-in when your clock ran out (clock). A pick you did not make carries no hindsight.
+			 * @enum {string}
+			 */
+			made_by: 'you' | 'for_you' | 'queue' | 'clock';
 		};
 		ReportStarter: {
 			slot: string;
@@ -1549,7 +1556,7 @@ export interface components {
 		ID: string;
 		ClaimCode: string;
 		Page: number;
-		/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+		/** @description a shared draft's settings, seed, picks and drafter, deflated and base64url encoded, then a dot and the server's signature; an unsigned or altered code is refused */
 		ShareCode: string;
 		PerPage: number;
 	};
@@ -2388,7 +2395,7 @@ export interface operations {
 			query?: never;
 			header?: never;
 			path: {
-				/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+				/** @description a shared draft's settings, seed, picks and drafter, deflated and base64url encoded, then a dot and the server's signature; an unsigned or altered code is refused */
 				code: components['parameters']['ShareCode'];
 			};
 			cookie?: never;
@@ -2405,7 +2412,7 @@ export interface operations {
 			query?: never;
 			header?: never;
 			path: {
-				/** @description a shared draft's settings, seed and picks, deflated and base64url encoded */
+				/** @description a shared draft's settings, seed, picks and drafter, deflated and base64url encoded, then a dot and the server's signature; an unsigned or altered code is refused */
 				code: components['parameters']['ShareCode'];
 			};
 			cookie?: never;

@@ -796,8 +796,10 @@ components:
       name: code
       in: path
       required: true
-      description: a shared draft's settings, seed and picks, deflated and base64url encoded
-      schema: { type: string, minLength: 8, maxLength: 2048, pattern: "^[A-Za-z0-9_-]+$" }
+      description: >-
+        a shared draft's settings, seed, picks and drafter, deflated and base64url encoded, then a dot and the
+        server's signature; an unsigned or altered code is refused
+      schema: { type: string, minLength: 8, maxLength: 2048, pattern: "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$" }
     PerPage:
       name: per_page
       in: query
@@ -1387,7 +1389,8 @@ components:
           type: array
           items: { type: string }
         seq: { type: integer, format: int64 }
-        share_code: { type: string, description: the link's code, the settings, seed and picks }
+        share_code: { type: string, description: "the link's code: the settings, seed, picks and drafter, signed by the server" }
+        shared_by: { type: string, description: "the drafter's handle, when he has one: a shared draft names whose it is" }
         created_at: { type: string, format: date-time }
         board:
           description: the board, on a full read (create, get, shared) and absent on a pick's answer
@@ -1450,7 +1453,7 @@ components:
         value_captured: { type: number, format: double }
     ReportPick:
       type: object
-      required: [pick, round, player_id, over_replacement, adp_gap, chip, still_there, could_wait, odds_source]
+      required: [pick, round, player_id, over_replacement, adp_gap, chip, still_there, could_wait, odds_source, made_by]
       properties:
         pick: { type: integer }
         round: { type: integer }
@@ -1461,6 +1464,12 @@ components:
         still_there: { type: number, format: double, nullable: true, description: the chance he was there at your next turn, null at your last }
         could_wait: { type: boolean }
         odds_source: { type: string, description: "advisor or sim as recorded with the pick, or fallback_sim computed for the report" }
+        made_by:
+          type: string
+          enum: [you, for_you, queue, clock]
+          description: >-
+            who made the pick: you, Pick for me or Finish the draft (for_you), a lobby seat's stand-in after you left
+            (queue), or the stand-in when your clock ran out (clock). A pick you did not make carries no hindsight.
     ReportStarter:
       type: object
       required: [slot, player_id]

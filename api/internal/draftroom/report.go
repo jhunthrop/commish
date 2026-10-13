@@ -89,6 +89,7 @@ func pickView(p mock.PickReview, b boards.Board) apitypes.ReportPick {
 	v := apitypes.ReportPick{
 		Pick: p.PickNumber, Round: p.Round, PlayerId: p.PlayerID, AdpGap: round2p(p.ADPGap), Chip: apitypes.ReportPickChip(p.Chip),
 		StillThere: round2p(p.StillThere), CouldWait: p.CouldWait, OddsSource: p.OddsSource,
+		MadeBy: apitypes.ReportPickMadeBy(p.MadeBy),
 	}
 	if p.Chip == mock.NoADP {
 		v.Chip = "none"

@@ -1,6 +1,6 @@
 <script lang="ts">
+	import { ordinal } from '#lib/format/number.ts';
 	import type { MockReport } from '../api.ts';
-	import { ordinal } from '../words.ts';
 
 	interface Props {
 		runs: MockReport['runs'];
@@ -11,9 +11,8 @@
 
 	let { runs, teams, rank }: Props = $props();
 
-	/** The histogram's bars and the ranks printed under it. */
+	/** The histogram's bars. */
 	const BINS = 12;
-	const RANKS_SHOWN = 6;
 
 	const bins = $derived.by(() => {
 		const points = runs.points;
@@ -55,11 +54,16 @@
 		>
 	</div>
 </div>
-<div class="ranks">
-	{#each runs.rank_counts.slice(0, RANKS_SHOWN) as count, i (i)}
-		<span class:you={i + 1 === rank}><b>{count}</b>{ordinal(i + 1)}</span>
+<!-- Every place, first to last, so the counts add up to every run. -->
+<ol
+	class="ranks"
+	style:--places={runs.rank_counts.length}
+	aria-label="Runs finishing at each place"
+>
+	{#each runs.rank_counts as count, i (i)}
+		<li class:you={i + 1 === rank}><b>{count}</b>{ordinal(i + 1)}</li>
 	{/each}
-</div>
+</ol>
 
 <style>
 	.hist {
@@ -120,13 +124,15 @@
 	}
 
 	.ranks {
-		display: flex;
+		display: grid;
+		grid-template-columns: repeat(var(--places), minmax(0, 1fr));
 		gap: 4px;
-		margin-top: var(--s-3);
+		margin: var(--s-3) 0 0;
+		padding: 0;
+		list-style: none;
 	}
 
-	.ranks span {
-		flex: 1;
+	.ranks li {
 		text-align: center;
 		font-size: var(--t-xs);
 		color: var(--ink-3);
@@ -147,6 +153,12 @@
 	@media (max-width: 760px) {
 		.stats {
 			grid-template-columns: 1fr 1fr;
+		}
+
+		/* Two rows of places on a phone, each still a column of its own. */
+		.ranks {
+			grid-template-columns: repeat(6, minmax(0, 1fr));
+			row-gap: var(--s-2);
 		}
 	}
 </style>

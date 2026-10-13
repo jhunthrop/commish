@@ -12,14 +12,20 @@
 		/** Roster size for the draft: 14 in a standard redraft. */
 		rosterSize: number;
 		teams?: number;
+		/** The room has a call that weighs the open slots; off for a draft read without one. */
+		withCall?: boolean;
 	}
 
-	let { title = 'Your team', slots, rosterSize, teams = DEFAULT_TEAMS }: Props = $props();
+	let {
+		title = 'Your team',
+		slots,
+		rosterSize,
+		teams = DEFAULT_TEAMS,
+		withCall = true
+	}: Props = $props();
 
 	const drafted = $derived(slots.filter((slot) => slot.player !== null).length);
-	const open = $derived(
-		slots.filter((slot) => slot.player === null && slot.slot !== 'FLEX').map((slot) => slot.slot)
-	);
+	const open = $derived(slots.filter((slot) => slot.player === null).map((slot) => slot.slot));
 </script>
 
 <Panel>
@@ -29,7 +35,7 @@
 			{#if player}
 				<li>
 					<span class="slot">{slot}</span>
-					<Face src={player.headshot} size={32} />
+					<Face src={player.headshot} name={player.name} size={32} />
 					<span class="who">
 						{player.name}
 						<Label>{player.position} {player.positionRank} · {player.team}</Label>
@@ -47,9 +53,11 @@
 	</ol>
 	<div class="need">
 		{#if open.length > 0}
-			Still open: <b>{open.join(', ')}</b>. The board already weighs that in the call.
+			Still open: <b>{open.join(', ')}</b>.{withCall
+				? ' The board already weighs that in the call.'
+				: ''}
 		{:else}
-			Every starter filled. From here the call is depth.
+			Every starter filled.{withCall ? ' From here the call is depth.' : ''}
 		{/if}
 	</div>
 </Panel>

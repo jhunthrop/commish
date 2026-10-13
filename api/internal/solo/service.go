@@ -84,7 +84,12 @@ type Service struct {
 	// Hindsight answers a report's pick that recorded no odds.
 	Hindsight mock.Odds
 	// Anon is the signed-out owner's cookies.
-	Anon          AnonOwners
+	Anon AnonOwners
+	// Shares signs and checks share links.
+	Shares *ShareSigner
+	// Site is the web's own origin (PUBLIC_BASE_URL), where a refused
+	// signed-out start is sent.
+	Site          string
 	ReportWorkers int
 	Now           func() time.Time
 	Log           *slog.Logger
@@ -102,6 +107,9 @@ type room struct {
 	head     int64
 	// branch counts the undos; cards are stored per branch.
 	branch int
+	// sharer is the drafter's handle, empty when he has none or is signed
+	// out: a shared link names whose draft it is with it.
+	sharer string
 }
 
 // stamp is an instant as the engine's timestamps read: whole milliseconds.
@@ -125,7 +133,7 @@ func (s *Service) load(ctx context.Context, owner mocks.Owner, id uuid.UUID) (ro
 	if err != nil {
 		return room{}, fmt.Errorf("solo: replay %s: %w", id, err)
 	}
-	return room{mock: log.Mock, settings: settings, seed: seed, board: board, draft: d, head: log.Head, branch: log.Branch}, nil
+	return room{mock: log.Mock, settings: settings, seed: seed, board: board, draft: d, head: log.Head, branch: log.Branch, sharer: log.Handle}, nil
 }
 
 // errNotWaiting is a pick, a card or a stand-in asked for when the draft
@@ -224,7 +232,7 @@ func (s *Service) autopick(ctx context.Context, owner mocks.Owner, id uuid.UUID,
 		if !ok {
 			break
 		}
-		if next, err = mock.Advance(r.settings, r.seed, next, mock.HumanPick{PlayerID: choice, At: stamp(at)}, mock.Options{}); err != nil {
+		if next, err = mock.Advance(r.settings, r.seed, next, mock.HumanPick{PlayerID: choice, At: stamp(at), By: mock.MadeForYou}, mock.Options{}); err != nil {
 			return room{}, err
 		}
 	}
@@ -380,7 +388,7 @@ func (s *Service) report(ctx context.Context, owner mocks.Owner, id uuid.UUID) (
 	if err != nil {
 		return nil, err
 	}
-	if out.ShareCode, err = shareCodeOf(r); err != nil {
+	if out.ShareCode, err = shareCodeOf(r, s.Shares); err != nil {
 		return nil, err
 	}
 	if err := s.Mocks.PutReport(ctx, owner, id, r.head, out, s.Now()); err != nil {
@@ -418,7 +426,7 @@ func (s *Service) start(ctx context.Context, owner mocks.Owner, leagueID *uuid.U
 
 // replay is a shared draft, rebuilt from its link.
 func (s *Service) replay(ctx context.Context, code string) (room, error) {
-	sh, err := decodeShare(code)
+	sh, err := decodeShare(code, s.Shares)
 	if err != nil {
 		return room{}, err
 	}
@@ -435,6 +443,12 @@ func (s *Service) replay(ctx context.Context, code string) (room, error) {
 	for i, id := range sh.Picks {
 		picks[i] = mock.HumanPick{PlayerID: id}
 	}
+	for _, i := range sh.ForYou {
+		if i < 0 || i >= len(picks) {
+			return room{}, errBadCode
+		}
+		picks[i].By = mock.MadeForYou
+	}
 	d, err := mock.Run(settings, uint32(sh.Seed), picks, mock.Options{})
 	if err != nil {
 		return room{}, err
@@ -445,13 +459,13 @@ func (s *Service) replay(ctx context.Context, code string) (room, error) {
 		status = apitypes.MockStatusComplete
 	}
 	m := apitypes.Mock{Settings: league, Seed: sh.Seed, Status: status, CreatedAt: created}
-	return room{mock: m, settings: settings, seed: uint32(sh.Seed), board: board, draft: d}, nil
+	return room{mock: m, settings: settings, seed: uint32(sh.Seed), board: board, draft: d, sharer: sh.Sharer}, nil
 }
 
 // sharedReport is a shared draft's report; the hindsight is the
 // engine's, since a link records no odds.
 func (s *Service) sharedReport(ctx context.Context, code string) (apitypes.MockReport, error) {
-	sh, err := decodeShare(code)
+	sh, err := decodeShare(code, s.Shares)
 	if err != nil {
 		return apitypes.MockReport{}, err
 	}

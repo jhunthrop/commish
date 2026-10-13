@@ -113,6 +113,21 @@ type Room struct {
 	// Odds is the odds recorded with picks, by the 1-based place of the
 	// MAKE_PICK in Actions (mock.Draft.Odds's key).
 	Odds map[int]mock.PickOdds
+	// By is who made each pick a drafter's own hand did not, as the report
+	// marks it (mock.Draft.By's key and words); bots' picks are not in it.
+	By map[int]string
+}
+
+// madeBy is a stand-in's pick in the report's words, false for a pick a
+// drafter or a bot made.
+func madeBy(by string) (string, bool) {
+	switch by {
+	case ByQueue:
+		return mock.MadeByQueue, true
+	case ByClock:
+		return mock.MadeByClock, true
+	}
+	return "", false
 }
 
 // TeamID is a seat's team in the engine: seat01 and on, as the solo room.
@@ -231,6 +246,16 @@ func (r *Room) apply(row LogRow) error {
 		}
 		odds[len(r.Actions)] = *p.Odds
 		r.Odds = odds
+	}
+	if p.Pick != nil {
+		if by, ok := madeBy(p.Pick.By); ok {
+			made := make(map[int]string, len(r.By)+1)
+			for k, v := range r.By {
+				made[k] = v
+			}
+			made[len(r.Actions)] = by
+			r.By = made
+		}
 	}
 	return nil
 }

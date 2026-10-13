@@ -348,6 +348,30 @@ func (e ReportPickChip) Valid() bool {
 	}
 }
 
+// Defines values for ReportPickMadeBy.
+const (
+	ReportPickMadeByClock  ReportPickMadeBy = "clock"
+	ReportPickMadeByForYou ReportPickMadeBy = "for_you"
+	ReportPickMadeByQueue  ReportPickMadeBy = "queue"
+	ReportPickMadeByYou    ReportPickMadeBy = "you"
+)
+
+// Valid indicates whether the value is a known member of the ReportPickMadeBy enum.
+func (e ReportPickMadeBy) Valid() bool {
+	switch e {
+	case ReportPickMadeByClock:
+		return true
+	case ReportPickMadeByForYou:
+		return true
+	case ReportPickMadeByQueue:
+		return true
+	case ReportPickMadeByYou:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RoomBoardFormat.
 const (
 	RoomBoardFormatHalf RoomBoardFormat = "half"
@@ -909,8 +933,11 @@ type MockRoom struct {
 	Seq        int64          `json:"seq"`
 	Settings   LeagueSettings `json:"settings"`
 
-	// ShareCode the link's code
+	// ShareCode the link's code: the settings, seed, picks and drafter, signed by the server
 	ShareCode string `json:"share_code"`
+
+	// SharedBy the drafter's handle, when he has one: a shared draft names whose it is
+	SharedBy *string `json:"shared_by,omitempty"`
 
 	// Slot the drafter's 1-based slot
 	Slot   int        `json:"slot"`
@@ -981,6 +1008,9 @@ type ReportPick struct {
 	Chip      ReportPickChip `json:"chip"`
 	CouldWait bool           `json:"could_wait"`
 
+	// MadeBy who made the pick: you, Pick for me or Finish the draft (for_you), a lobby seat's stand-in after you left (queue), or the stand-in when your clock ran out (clock). A pick you did not make carries no hindsight.
+	MadeBy ReportPickMadeBy `json:"made_by"`
+
 	// OddsSource advisor or sim as recorded with the pick, or fallback_sim computed for the report
 	OddsSource      string   `json:"odds_source"`
 	OverReplacement *float64 `json:"over_replacement"`
@@ -994,6 +1024,9 @@ type ReportPick struct {
 
 // ReportPickChip defines model for ReportPick.Chip.
 type ReportPickChip string
+
+// ReportPickMadeBy who made the pick: you, Pick for me or Finish the draft (for_you), a lobby seat's stand-in after you left (queue), or the stand-in when your clock ran out (clock). A pick you did not make carries no hindsight.
+type ReportPickMadeBy string
 
 // ReportRuns defines model for ReportRuns.
 type ReportRuns struct {

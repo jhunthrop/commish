@@ -19,11 +19,11 @@
      so a dense row holds "Jaxon Smith-Njigba" at 15px without truncating.
      Big Shoulders Display is the condensed number face, drawn from stadium and
      transit lettering, narrow enough that 344.1 fits a 64px cell at display size. */
-  --font-ui: "Outfit", "Avenir Next", "Segoe UI", system-ui, sans-serif;
-  --font-num: "Big Shoulders Display", "Oswald", "Arial Narrow", sans-serif;
+  --font-ui: "Outfit", "Outfit Fallback", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Big Shoulders Display", "Big Shoulders Display Fallback", "Oswald", "Arial Narrow", sans-serif;
   /* Newsreader is the reading face. Optical sizes cut for long screen reading, because the
      capsule is writing. Allowed on the player page's prose block and its pull figures, nowhere else. */
-  --font-read: "Newsreader", "Iowan Old Style", "Charter", Georgia, serif;
+  --font-read: "Newsreader", "Newsreader Fallback", "Iowan Old Style", "Charter", Georgia, serif;
   --t-read: 1.1875rem;  /* 19 capsule prose */
   --t-pull: 2.75rem;    /* 44 a pull figure, the same step as --t-2xl */
 
@@ -33,6 +33,8 @@
   --t-md: 0.9375rem;   /* 15 names, body in rows */
   --t-lg: 1.125rem;    /* 18 section heads, prose */
   --t-xl: 1.625rem;    /* 26 cell numbers in display face */
+  --t-head: 1.875rem; /* 30 a panel title in the display face */
+  --t-display: 2.375rem; /* 38 a page title in the display face */
   --t-2xl: 2.75rem;    /* 44 tier cliffs, clock */
   --t-3xl: 5.5rem;     /* 88 the one big number on a page */
   --track-label: 0.08em;
@@ -41,6 +43,8 @@
      a press box is glass and steel, not pillows. */
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
   --row-h: 52px;
+  --touch: 44px; /* the smallest target a thumb gets on a phone */
+  --tab-bar-h: 64px; /* the phone's tab bar, the rail laid along the bottom */
   --rail-w: 84px;
   --side-w: 296px;
   --r-sm: 4px; --r-md: 8px; --r-pill: 999px;
@@ -368,12 +372,13 @@ button{font:inherit;color:inherit}
 .ranks span{flex:1;text-align:center;font-size:var(--t-xs);color:var(--ink-3)}
 .ranks span b{display:block;font-family:var(--font-num);font-weight:700;font-size:18px;color:var(--ink)}
 .ranks span.you b{color:var(--accent-text)}
-@media (max-width: 1180px){.report{grid-template-columns:minmax(0,1fr) 300px}.pk{grid-template-columns:48px 36px minmax(0,1fr) 90px 130px}.pk .gapc{display:none}}
+.pk .chips{display:contents}
+@media (max-width: 1180px){.report{grid-template-columns:minmax(0,1fr) 300px}.pk{grid-template-columns:48px 36px minmax(0,1fr) 90px;row-gap:6px}.pk.head .gapc,.pk.head .hind{display:none}.pk .chips{grid-column:3/-1;display:flex;flex-wrap:wrap;gap:6px}}
 @media (max-width: 760px){
   .report{grid-template-columns:minmax(0,1fr);padding:var(--s-3) var(--s-4) var(--s-6)}
   .hero{grid-template-columns:minmax(0,1fr);gap:var(--s-3)}
   .hero .big b{font-size:64px}.hero h2{font-size:28px}
-  .pk{grid-template-columns:44px 32px minmax(0,1fr) 70px}.pk .hind,.pk .gapc{display:none}
+  .pk{grid-template-columns:44px 32px minmax(0,1fr) 70px}
   .stats{grid-template-columns:1fr 1fr}
 }
 
@@ -409,33 +414,33 @@ button{font:inherit;color:inherit}
   <section class="sec"><h3>Pick by pick <span>what you took, what drafters do, and whether he would have lasted</span></h3>
     <div class="picks"><div class="pk head"><span class="label">Pick</span><span></span><span class="label">Player</span><span class="label r">Over repl</span><span class="label gapc">Against ADP</span><span class="label hind">Hindsight</span></div><div class="pk"><span class="no">1.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4374302.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Amon-Ra St. Brown</b><span>WR 4 · DET</span></span>
-  <span class="vor">+115.2</span><span class="gapc"><span class="tagc ok">3 after drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">2.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4429160.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">+115.2</span><span class="chips"><span class="gapc"><span class="tagc ok">3 after drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></span></div><div class="pk"><span class="no">2.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4429160.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>De&#x27;Von Achane</b><span>RB 3 · MIA</span></span>
-  <span class="vor">+97.3</span><span class="gapc"><span class="tagc wait">4 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">3.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3043078.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">+97.3</span><span class="chips"><span class="gapc"><span class="tagc wait">4 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></span></div><div class="pk"><span class="no">3.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3043078.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Derrick Henry</b><span>RB 11 · BAL</span></span>
-  <span class="vor">+63.3</span><span class="gapc"><span class="tagc wait">7 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, 36% there next turn</span></span></div><div class="pk"><span class="no">4.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4427366.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">+63.3</span><span class="chips"><span class="gapc"><span class="tagc wait">7 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, 36% there next turn</span></span></span></div><div class="pk"><span class="no">4.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4427366.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Breece Hall</b><span>RB 13 · NYJ</span></span>
-  <span class="vor">+43.4</span><span class="gapc"><span class="tagc even">at ADP</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">5.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4426388.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">+43.4</span><span class="chips"><span class="gapc"><span class="tagc even">at ADP</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></span></div><div class="pk"><span class="no">5.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4426388.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Jameson Williams</b><span>WR 18 · DET</span></span>
-  <span class="vor">+42.9</span><span class="gapc"><span class="tagc even">at ADP</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">6.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/2577417.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">+42.9</span><span class="chips"><span class="gapc"><span class="tagc even">at ADP</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></span></div><div class="pk"><span class="no">6.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/2577417.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Dak Prescott</b><span>QB 5 · DAL</span></span>
-  <span class="vor">+22.2</span><span class="gapc"><span class="tagc wait">12 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, 13% there next turn</span></span></div><div class="pk"><span class="no">7.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3128429.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">+22.2</span><span class="chips"><span class="gapc"><span class="tagc wait">12 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, 13% there next turn</span></span></span></div><div class="pk"><span class="no">7.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3128429.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Courtland Sutton</b><span>WR 25 · DEN</span></span>
-  <span class="vor">+21.1</span><span class="gapc"><span class="tagc wait">4 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">8.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/15847.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">+21.1</span><span class="chips"><span class="gapc"><span class="tagc wait">4 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></span></div><div class="pk"><span class="no">8.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/15847.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Travis Kelce</b><span>TE 7 · KC</span></span>
-  <span class="vor">+6.7</span><span class="gapc"><span class="tagc wait">9 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">9.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4361050.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">+6.7</span><span class="chips"><span class="gapc"><span class="tagc wait">9 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></span></div><div class="pk"><span class="no">9.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4361050.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Isaiah Likely</b><span>TE 8 · NYG</span></span>
-  <span class="vor">+6.6</span><span class="gapc"><span class="tagc wait">18 before drafters</span></span><span class="hind"><span class="tagc wait">could wait, 96% there next turn</span></span></div><div class="pk"><span class="no">10.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3052587.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">+6.6</span><span class="chips"><span class="gapc"><span class="tagc wait">18 before drafters</span></span><span class="hind"><span class="tagc wait">could wait, 96% there next turn</span></span></span></div><div class="pk"><span class="no">10.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3052587.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Baker Mayfield</b><span>QB 11 · TB</span></span>
-  <span class="vor">+0.8</span><span class="gapc"><span class="tagc wait">5 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">11.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4683062.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">+0.8</span><span class="chips"><span class="gapc"><span class="tagc wait">5 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></span></div><div class="pk"><span class="no">11.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4683062.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Xavier Worthy</b><span>WR 46 · KC</span></span>
-  <span class="vor">−20.1</span><span class="gapc"><span class="tagc even">at ADP</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></div><div class="pk"><span class="no">12.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4428718.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">−20.1</span><span class="chips"><span class="gapc"><span class="tagc even">at ADP</span></span><span class="hind"><span class="tagc ok">right on time, <1% there next turn</span></span></span></div><div class="pk"><span class="no">12.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4428718.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Tre Tucker</b><span>WR 47 · LV</span></span>
-  <span class="vor">−21.2</span><span class="gapc"><span class="tagc wait">25 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, 58% there next turn</span></span></div><div class="pk"><span class="no">13.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4241463.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">−21.2</span><span class="chips"><span class="gapc"><span class="tagc wait">25 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, 58% there next turn</span></span></span></div><div class="pk"><span class="no">13.08</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4241463.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Jerry Jeudy</b><span>WR 49 · CLE</span></span>
-  <span class="vor">−27.7</span><span class="gapc"><span class="tagc wait">17 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, 9% there next turn</span></span></div><div class="pk"><span class="no">14.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/15818.png" alt="" loading="lazy" width="36" height="36"></span>
+  <span class="vor">−27.7</span><span class="chips"><span class="gapc"><span class="tagc wait">17 before drafters</span></span><span class="hind"><span class="tagc ok">right on time, 9% there next turn</span></span></span></div><div class="pk"><span class="no">14.05</span><span class="face" style="width:36px;height:36px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/15818.png" alt="" loading="lazy" width="36" height="36"></span>
   <span class="who"><b>Keenan Allen</b><span>WR 52 · IND</span></span>
-  <span class="vor">−39.6</span><span class="gapc"><span class="tagc wait">32 before drafters</span></span><span class="hind"><span class="tagc even">last pick</span></span></div></div>
+  <span class="vor">−39.6</span><span class="chips"><span class="gapc"><span class="tagc wait">32 before drafters</span></span><span class="hind"><span class="tagc even">last pick</span></span></span></div></div>
     <p class="basis">Hindsight odds are the chance he was still there at your next turn, from where drafters take everyone who was still in the pool at that pick. "Could wait" starts at 60%.</p>
   </section>
   <section class="sec"><h3>The same draft, 200 more times <span>your picks on autopick from the board, the bots reshuffled each run</span></h3>

@@ -3,3 +3,4 @@
 The shared brief is `brief.md`; the screens are the `.html` files; the token set is `tokens.css`, which `web/src/lib/ui/tokens.css` copies value for value.
 
 - 2026-10-12, Lane 5: each font stack names a metric-matched fallback second ("Outfit Fallback" and the like, defined in `web/src/lib/ui/fonts/ui.css`), so text painted before the web font lands keeps its size when the font swaps in, which took the font-swap layout shift on the player and record pages out of the CLS budget.
+- 2026-10-13, rooms UX fix: the builders in `build/` read and write this folder (`python3 build/gen.py` regenerates every page, `node build/shoot.mjs [pages]` shoots them into `screenshots/`), so the pages carry the current `tokens.css`. Two screens follow the product. In `mock.html` the call's runner-up sentence states both odds and never says "is not". In `report.html` at 1180 and under, Against ADP and Hindsight sit on a second line under the player instead of being dropped.

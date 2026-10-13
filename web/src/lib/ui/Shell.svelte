@@ -197,13 +197,16 @@
 	@media (max-width: 760px) {
 		.app {
 			grid-template-columns: minmax(0, 1fr);
-			padding-bottom: 64px;
+			padding-bottom: calc(var(--tab-bar-h) + env(safe-area-inset-bottom, 0px));
 		}
 
+		/* The tab bar is exactly --tab-bar-h over the safe area, so the page's padding and anything
+		   pinned above the bar (ActionBar) read the same number. */
 		.rail {
 			position: fixed;
 			inset: auto 0 0 0;
-			height: auto;
+			box-sizing: border-box;
+			height: calc(var(--tab-bar-h) + env(safe-area-inset-bottom, 0px));
 			z-index: 20;
 			flex-direction: row;
 			justify-content: space-around;

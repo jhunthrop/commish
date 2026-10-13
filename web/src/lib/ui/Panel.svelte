@@ -6,8 +6,9 @@
 		/** Names a section or aside for assistive tech. */
 		label?: string;
 		padding?: 'none' | 'sm' | 'md';
-		/** A left edge: accent marks our call, quiet marks a call that waits on the board. */
-		edge?: 'accent' | 'quiet';
+		/** A left edge: accent marks our call, quiet marks a call that waits on the board, loss marks
+		 * something that went wrong and says what to do. */
+		edge?: 'accent' | 'quiet' | 'loss';
 		children: Snippet;
 	}
 
@@ -44,6 +45,11 @@
 
 	.edge-quiet {
 		border-left: 4px solid var(--line-strong);
+	}
+
+	.edge-loss {
+		border-left: 4px solid var(--loss-ink);
+		background: var(--loss-bg);
 	}
 
 	@media (max-width: 760px) {

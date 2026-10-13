@@ -5,9 +5,10 @@
 	import type { MockReport } from '../api.ts';
 	import { boardOf } from '../model.ts';
 	import RoomLayout from '../RoomLayout.svelte';
-	import { ordinal, scoringWords, slotLabel } from '../words.ts';
+	import { scoringWords, slotLabel } from '../words.ts';
 	import Exposure from './Exposure.svelte';
 	import FieldBars from './FieldBars.svelte';
+	import { headline, points } from './headline.ts';
 	import PickReview from './PickReview.svelte';
 	import RunsSection from './RunsSection.svelte';
 
@@ -17,16 +18,21 @@
 		names: readonly string[];
 		/** How the other seats drafted, for the basis sentence: "bots drafting from where drafters take players". */
 		field: string;
+		/** Set when someone else's draft is read through its link: the report speaks of them, by handle
+		 * when the link carries one. */
+		shared?: { by: string | null };
 		/** The verbs under the headline. */
 		verbs: Snippet;
 	}
 
-	let { report, names, field, verbs }: Props = $props();
+	let { report, names, field, shared, verbs }: Props = $props();
 
 	const board = $derived(boardOf(report.board, report.teams));
-	const mine = $derived(report.standings.find((t) => t.seat === report.slot));
-	const others = $derived(report.standings.filter((t) => t.seat !== report.slot));
-	const nextTeam = $derived(Math.max(...others.map((t) => t.points)));
+	const head = $derived(headline(report.standings, report.slot, report.teams));
+	const their = $derived(shared ? 'their' : 'your');
+	const title = $derived(
+		shared ? `${shared.by ? `${shared.by}'s` : 'A shared'} draft` : 'Your draft'
+	);
 	const starters = $derived(
 		report.starters
 			.flatMap((s) => {
@@ -35,27 +41,22 @@
 			})
 			.join(', ')
 	);
-	const round = (x: number) => Math.round(x).toLocaleString('en-US');
 </script>
 
 <RoomLayout variant="report">
 	<div class="hero">
-		{#if mine}
+		{#if head}
 			<div class="big">
-				<b>{round(mine.points)}</b>
-				<span
-					>projected points from your starters, {ordinal(mine.rank)} of {report.teams}, the next
-					team at {round(nextTeam)}</span
-				>
+				<b>{points(head.points)}</b>
+				<span>projected points from {their} starters, {head.standing}</span>
 			</div>
 		{/if}
 		<div>
-			<DisplayTitle size="page">Your draft from slot {report.slot}</DisplayTitle>
+			<DisplayTitle size="page">{title} from slot {report.slot}</DisplayTitle>
 			<p>
 				{report.teams} teams, {scoringWords(report.settings)}, {report.rounds} rounds, {field}.
-				Starters: {starters}. Points are our projections, the same numbers the board ranks by, so a
-				team drafted off the board should lead this table. The useful read is how far ahead, and
-				where it came from.
+				Starters: {starters}. Points are our projections, the same numbers the board ranks by, {head?.read ??
+					''}
 			</p>
 			<div class="acts">{@render verbs()}</div>
 		</div>
@@ -66,7 +67,7 @@
 		<p class="basis">{board.basis}</p>
 	</section>
 	<section>
-		<DisplayTitle note="what you took, what drafters do, and whether he would have lasted">
+		<DisplayTitle note="what was taken, what drafters do, and whether he would have lasted">
 			Pick by pick
 		</DisplayTitle>
 		<PickReview
@@ -74,23 +75,24 @@
 			{board}
 			teams={report.teams}
 			couldWaitFrom={report.could_wait_from}
+			whose={their}
 		/>
 	</section>
 	<section>
-		<DisplayTitle note="your picks on autopick from the board, the bots reshuffled each run">
+		<DisplayTitle note="{their} picks on autopick from the board, the bots reshuffled each run">
 			The same draft, {report.runs.runs} more times
 		</DisplayTitle>
-		<RunsSection runs={report.runs} teams={report.teams} rank={mine?.rank ?? 0} />
+		<RunsSection runs={report.runs} teams={report.teams} rank={head?.rank ?? 0} />
 		<p class="basis">
 			Each run drafts the room again from pick one with a new seed, seeds {report.seed} to {report.seed +
 				report.runs.runs -
-				1}, the bots drafting the way this room's bots do and your seat taking the best player the
-			board has for your roster. Our projections lead the board, so a seat drafting off it finishes
-			high in most runs. The spread is the useful read.
+				1}, the bots drafting the way this room's bots do and {their} seat taking the best player the
+			board has for the roster. Our projections lead the board, so a seat drafting off it finishes high
+			in most runs. The spread is the useful read.
 		</p>
 	</section>
 	{#snippet dock()}
-		<Exposure runs={report.runs} {board} seat={report.slot} />
+		<Exposure runs={report.runs} {board} seat={report.slot} whose={their} />
 	{/snippet}
 </RoomLayout>
 

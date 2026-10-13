@@ -43,6 +43,8 @@
 	--s-7: 48px;
 	--row-h: 52px;
 	--verb-h: 42px; /* the one solid verb, and the top bar slot that holds it */
+	--touch: 44px; /* the smallest target a thumb gets on a phone */
+	--tab-bar-h: 64px; /* the phone's tab bar, the rail laid along the bottom */
 	--rail-w: 84px;
 	--side-w: 296px;
 	--r-sm: 4px;

@@ -15,29 +15,40 @@
 
 	let { now, onClock, secondsLeft, yourPick, teams = DEFAULT_TEAMS }: Props = $props();
 
-	/** A screen reader hears the clock only at these marks, never every tick. */
+	/** A screen reader hears the clock only at these marks, never every tick, and only on your own. */
 	const SPOKEN_MARKS = [10, 5] as const;
 
 	const round = $derived(snakeSlot(now, teams).round);
 	const away = $derived(yourPick - now);
+	const yours = $derived(away === 0);
 	const spokenMark = $derived(SPOKEN_MARKS.findLast((mark) => secondsLeft <= mark));
-	const clockWords = $derived(spokenMark === undefined ? '' : `${spokenMark} seconds left`);
+	const clockWords = $derived(
+		!yours || spokenMark === undefined ? '' : `${spokenMark} seconds left`
+	);
 </script>
 
 <!-- Lobby only: the score bug appears only in a room with people in it, because only there is anyone on a clock.
-     The pick and who is on the clock are announced as they change. The ticking clock is hidden from
-     screen readers, and a separate line speaks it only at ten and five seconds. -->
+     The pick and who is on the clock are announced as they change, with "Your pick is now" when the
+     clock turns to you. The countdown to your pick is read, not announced. The ticking clock is hidden
+     from screen readers, and a separate line speaks it at ten and five seconds only on your clock. -->
 <div class="bug">
 	<div role="status" aria-live="polite" class="spoken">
 		<div class="seg"><small>Round {round}</small><b>Pick {pickLabel(now, teams)}</b></div>
 		<div class="seg grow"><small>On the clock</small><b>{onClock}</b></div>
+		<span class="visually-hidden">{yours ? 'Your pick is now' : ''}</span>
 	</div>
 	<div class="seg clock" aria-hidden="true">
 		<small>Clock</small><b>{clockLabel(secondsLeft)}</b>
 	</div>
+	<!-- Read when a reader moves to it, never announced: "Your pick is now" above is the one line
+	     this segment speaks. -->
 	<div class="seg you">
 		<small>Your pick</small>
-		<b>{away === 0 ? 'Now' : `${pickLabel(yourPick, teams)}, in ${away}`}</b>
+		{#if yours}
+			<b aria-hidden="true">Now</b>
+		{:else}
+			<b>{pickLabel(yourPick, teams)}, in {away}</b>
+		{/if}
 	</div>
 	<span class="visually-hidden" aria-live="polite">{clockWords}</span>
 </div>
