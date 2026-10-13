@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { isSignedOut } from '#lib/api/status.ts';
-	import { links } from '#lib/site/links.ts';
+	import { LEAGUE_HOST_PARAM, links } from '#lib/site/links.ts';
 	import ActionBar from '#lib/ui/ActionBar.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -31,8 +31,11 @@
 	type View = 'loading' | 'signed-out' | 'form' | 'unreachable';
 
 	let view = $state<View>('loading');
-	/** How the league comes in: a pasted link (Sleeper, MyFantasyLeague), or FFPC read as you. */
-	let way = $state<'link' | 'ffpc'>('link');
+	/** How the league comes in: a pasted link (Sleeper, MyFantasyLeague), or FFPC read as you. A
+	 * `?host=ffpc` starts on FFPC, and rides the sign-in's return path with the rest of the search. */
+	let way = $state<'link' | 'ffpc'>(
+		page.url.searchParams.get(LEAGUE_HOST_PARAM) === 'ffpc' ? 'ffpc' : 'link'
+	);
 	/** FFPC is offered only where it is open (HOST_FFPC_ENABLED). */
 	let ffpcOn = $state(false);
 	let link = $state('');
@@ -161,7 +164,7 @@
 			<DisplayTitle size="page">Follow your league</DisplayTitle>
 			{@render gives(way === 'link')}
 			{#if ffpcOn}
-				<ChipGroup label="Your league is on">
+				<ChipGroup label="Your league is on" fit>
 					<Chip pressed={way === 'link'} onclick={() => (way = 'link')}
 						>Sleeper or MyFantasyLeague</Chip
 					>

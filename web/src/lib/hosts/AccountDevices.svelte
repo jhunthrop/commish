@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { dayLabel } from '#lib/format/date.ts';
+	import { plural } from '#lib/format/number.ts';
 	import ActionRow from '#lib/ui/ActionRow.svelte';
 	import ActionRows from '#lib/ui/ActionRows.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
@@ -8,7 +9,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import { ApiError, hostsApi, type Device, type PairCode } from './api.ts';
 
-	/** Paired devices: each with when it was paired and last sent anything, and Unpair. A pairing
+	/** Paired devices: each with when it was paired and last used, and Unpair. A pairing
 	 * code (six words, ten minutes, one use) is shown on a tap, never kept by the page. */
 	let devices = $state<Device[] | null>(null);
 	let code = $state<PairCode | null>(null);
@@ -34,8 +35,9 @@
 		}
 	}
 
+	/** "Paired Oct 12, last used Oct 12". */
 	function line(d: Device): string {
-		const used = d.last_used_at ? `last sent ${dayLabel(d.last_used_at)}` : 'not used yet';
+		const used = d.last_used_at ? `last used ${dayLabel(d.last_used_at)}` : 'not used yet';
 		return `Paired ${dayLabel(d.created_at)}, ${used}`;
 	}
 </script>
@@ -44,44 +46,40 @@
 	the phone app not built), so a code would lead nowhere. -->
 {#if devices && devices.length > 0}
 	<section aria-label="Paired devices">
-		<PanelHead title="Paired devices" aside={String(devices.length)} level={2} />
-		{#if devices}
-			{#if devices.length > 0}
-				<ActionRows label="Paired devices">
-					{#each devices as d (d.id)}
-						<ActionRow lead={d.name} text={line(d)}>
-							{#snippet action()}
-								<Quiet
-									size="sm"
-									disabled={busy !== null}
-									onclick={() =>
-										void act(d.id, async () => {
-											await hostsApi.revokeDevice(d.id);
-											devices = (devices ?? []).filter((x) => x.id !== d.id);
-										})}>{busy === d.id ? 'Unpairing' : 'Unpair'}</Quiet
-								>
-							{/snippet}
-						</ActionRow>
-					{/each}
-				</ActionRows>
-			{/if}
-			{#if code}
-				<p class="code" aria-live="polite"><b>{code.code}</b></p>
-				<p class="note">
-					Type these six words where the device asks. They work once, for ten minutes.
-				</p>
-			{:else}
-				<Quiet
-					size="sm"
-					disabled={busy !== null}
-					onclick={() =>
-						void act('code', async () => {
-							code = await hostsApi.pairCode();
-						})}>Pair a device</Quiet
-				>
-			{/if}
-			{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
+		<PanelHead title="Paired devices" aside={plural(devices.length, 'device')} level={2} />
+		<ActionRows label="Paired devices">
+			{#each devices as d (d.id)}
+				<ActionRow lead={d.name} text={line(d)}>
+					{#snippet action()}
+						<Quiet
+							size="sm"
+							disabled={busy !== null}
+							onclick={() =>
+								void act(d.id, async () => {
+									await hostsApi.revokeDevice(d.id);
+									devices = (devices ?? []).filter((x) => x.id !== d.id);
+								})}>{busy === d.id ? 'Unpairing' : 'Unpair'}</Quiet
+						>
+					{/snippet}
+				</ActionRow>
+			{/each}
+		</ActionRows>
+		{#if code}
+			<p class="code" aria-live="polite"><b>{code.code}</b></p>
+			<p class="note">
+				Type these six words where the device asks. They work once, for ten minutes.
+			</p>
+		{:else}
+			<Quiet
+				size="sm"
+				disabled={busy !== null}
+				onclick={() =>
+					void act('code', async () => {
+						code = await hostsApi.pairCode();
+					})}>Pair a device</Quiet
+			>
 		{/if}
+		{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 	</section>
 {/if}
 
