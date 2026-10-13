@@ -65,6 +65,7 @@ import {
 } from '../src/lib/run/schema.ts';
 import { POSITIONS, type Position } from '../src/lib/types/player.ts';
 import { bucketUrl, credentialsFromToken } from './r2.ts';
+import { checkRunSeasons } from '../src/lib/run/season-checks.ts';
 import { seasonBlocks } from './standin-season.ts';
 import type { PlayerSeason } from '../src/lib/run/season.ts';
 
@@ -619,6 +620,7 @@ async function main(): Promise<void> {
 			now
 		});
 		const players = playerPages(rows, capsuleCsv, seasons);
+		checkRunSeasons(players, schedule);
 		const index: IndexEntry[] = rows.map(({ id, slug, name, team, position, headshot }) => {
 			const season = seasons.get(id);
 			if (!season) throw new Error(`${name} has no season block.`);

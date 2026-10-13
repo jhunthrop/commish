@@ -84,8 +84,8 @@
 			{@render trailing()}
 		{:else if valueEnd}
 			<ValueCell {...valueEnd} />
-		{:else if endsOnValue}
-			<Label size="cell">no projection</Label>
+		{:else if endsOnValue && player?.points == null}
+			<Label size="cell">No projection</Label>
 		{:else if player?.season.pointsPerGame != null}
 			<ValueCell
 				value={player.season.pointsPerGame}

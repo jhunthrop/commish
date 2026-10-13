@@ -25,6 +25,7 @@ import {
 	type RunRecord,
 	type Schedule
 } from '#lib/run/schema.ts';
+import { checkRunSeasons } from '#lib/run/season-checks.ts';
 import { openRun, type RunReader } from '#lib/run/source.ts';
 import type { RunStamp } from '#lib/run/stamp.ts';
 import type { z } from 'zod';
@@ -126,16 +127,22 @@ function readPlayer(id: string): Promise<Player> {
 }
 
 /** Pages prerender one at a time, so the first player read starts every player's read at once,
- * through the reader's gate. Hundreds of pages then wait on one parallel fetch, not a serial one. */
+ * through the reader's gate. Hundreds of pages then wait on one parallel fetch, not a serial one.
+ * With every file in, the rules across season blocks are checked (season-checks.ts), so the first
+ * player read fails on a run that breaks one, whichever page asks. */
 function warmPlayers(): Promise<void> {
 	return once('players:warm', async () => {
 		const entries = await index();
-		await Promise.all(entries.map((entry) => readPlayer(entry.id)));
+		const [players, slate] = await Promise.all([
+			Promise.all(entries.map((entry) => readPlayer(entry.id))),
+			schedule()
+		]);
+		checkRunSeasons(players, slate);
 	});
 }
 
 export async function player(id: string): Promise<Player> {
-	void warmPlayers().catch(() => undefined);
+	await warmPlayers();
 	return readPlayer(id);
 }
 

@@ -49,6 +49,7 @@ function logRow(row: GameLogRow, columns: readonly StatColumn[]): LogRow {
 function aheadRow(row: GameLogRow, kickoffOf: KickoffOf): AheadRow {
 	const bye = row.opponent === null;
 	const kickoff = bye ? null : kickoffOf(row.week);
+	// The run's reader holds every week still to play to a kickoff (season-checks.ts).
 	if (!bye && kickoff === null)
 		throw new Error(`Week ${String(row.week)} against ${String(row.opponent)} has no kickoff.`);
 	return {

@@ -28,18 +28,12 @@ export async function sheetBoardFormats(): Promise<BoardFormat[]> {
 }
 
 /** What every player's season figures are: the one format and the one through week every season
- * block in the run shares, checked across all of them. */
+ * block in the run shares, which the run's reader holds them to (season-checks.ts). */
 async function seasonBasis(): Promise<LeagueBoardFile['season']> {
-	const seasons = await Promise.all((await index()).map(async (e) => (await player(e.id)).season));
-	const [first] = seasons;
+	const [first] = await index();
 	if (!first) throw new Error('The run indexes no players.');
-	const odd = seasons.find((s) => s.format !== first.format || s.through !== first.through);
-	if (odd) {
-		throw new Error(
-			`Season blocks disagree: ${first.format} through week ${String(first.through)} against ${odd.format} through week ${String(odd.through)}.`
-		);
-	}
-	return { scoring: (await formatById(first.format)).label, through: first.through };
+	const { season } = await player(first.id);
+	return { scoring: (await formatById(season.format)).label, through: season.through };
 }
 
 /** The run's whole board for a sheet format, its format with it and each player's season so far, or
