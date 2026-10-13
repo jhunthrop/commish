@@ -153,6 +153,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		solo.Routes(),
 		lobbies.Routes(),
 		companions.Routes(),
+		leagueSyncService(cfg, pool, draftBoards, leagueStore, log).Routes(),
 		devRoutes,
 	)
 	mux := http.NewServeMux()

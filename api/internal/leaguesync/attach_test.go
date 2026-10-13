@@ -1,0 +1,215 @@
+package leaguesync
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/db/dbtest"
+	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/leagues"
+	"github.com/jhunthrop/commish/api/internal/mfl"
+	"github.com/jhunthrop/commish/api/internal/mock"
+	"github.com/jhunthrop/commish/api/internal/sleeper"
+)
+
+// offline is a live client that never answers, so the replay serves
+// only its recordings and the tests never reach a host.
+type offline struct{}
+
+var errOffline = errors.New("offline")
+
+func (offline) League(context.Context, string) (sleeper.League, error) {
+	return sleeper.League{}, errOffline
+}
+func (offline) Rosters(context.Context, string) ([]sleeper.Roster, error)   { return nil, errOffline }
+func (offline) LeagueUsers(context.Context, string) ([]sleeper.User, error) { return nil, errOffline }
+func (offline) Matchups(context.Context, string, int) ([]sleeper.Matchup, error) {
+	return nil, errOffline
+}
+func (offline) Transactions(context.Context, string, int) ([]sleeper.Transaction, error) {
+	return nil, errOffline
+}
+func (offline) NFLState(context.Context) (sleeper.State, error)   { return sleeper.State{}, errOffline }
+func (offline) UserID(context.Context, string) (string, error)    { return "", sleeper.ErrNotFound }
+func (offline) Players(context.Context) ([]sleeper.Player, error) { return nil, errOffline }
+
+type offlineMFL struct{}
+
+func (offlineMFL) League(context.Context, int, string) (mfl.League, error) {
+	return mfl.League{}, errOffline
+}
+func (offlineMFL) Rosters(context.Context, int, string) ([]mfl.Roster, error) { return nil, errOffline }
+func (offlineMFL) Rules(context.Context, int, string) ([]mfl.Rule, error)     { return nil, errOffline }
+func (offlineMFL) Standings(context.Context, int, string) ([]mfl.Standing, error) {
+	return nil, errOffline
+}
+func (offlineMFL) LiveScoring(context.Context, int, string, int) ([]mfl.Matchup, error) {
+	return nil, errOffline
+}
+func (offlineMFL) Transactions(context.Context, int, string) ([]mfl.Transaction, error) {
+	return nil, errOffline
+}
+func (offlineMFL) SeasonStatus(context.Context, int) (mfl.Status, error) {
+	return mfl.Status{}, errOffline
+}
+func (offlineMFL) Players(context.Context, int) ([]mfl.Player, error) { return nil, errOffline }
+
+func replayHosts(now func() time.Time) Hosts {
+	return Hosts{
+		&Sleeper{API: SleeperReplay{Live: offline{}}, Now: now},
+		&MFL{API: MFLReplay{Live: offlineMFL{}}, Now: now},
+	}
+}
+
+// smallBoard is a board of three players the recorded Sleeper league
+// holds or not: Aaron Rodgers (Sleeper 96, ESPN 8439), the Vikings
+// defense, and a free agent.
+type smallBoard struct{}
+
+func (smallBoard) For(_ context.Context, s apitypes.LeagueSettings) (boards.Board, error) {
+	pts := 300.0
+	raw := &boards.Raw{Format: boards.PPR, Season: 2026, Players: []boards.Player{
+		{ID: "8439", Name: "Aaron Rodgers", Position: draft.QB, Team: "PIT", Points: &pts},
+		{ID: "DST-MIN", Name: "Minnesota Vikings", Position: draft.DEF, Team: "MIN"},
+		{ID: "9999999", Name: "Nobody Holds Him", Position: draft.QB, Team: "PIT", Points: &pts},
+	}}
+	slots, err := mock.SlotConfig(s)
+	if err != nil {
+		return boards.Board{}, err
+	}
+	return boards.For(raw, s.Teams, slots)
+}
+
+type memoryPlayers struct{ hosts Hosts }
+
+func (m memoryPlayers) For(ctx context.Context, host string, season int, _ []string) (map[string]HostPlayer, error) {
+	h, _ := m.hosts.ByKey(host)
+	ps, err := h.Players(ctx, season)
+	return index(ps), err
+}
+
+type caller struct {
+	t   *testing.T
+	svc *Service
+	id  uuid.UUID
+}
+
+func (c caller) do(handler http.HandlerFunc, method, path string, body any, pathID string) (int, json.RawMessage) {
+	c.t.Helper()
+	var buf bytes.Buffer
+	if body != nil {
+		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+			c.t.Fatal(err)
+		}
+	}
+	r := httptest.NewRequest(method, path, &buf)
+	r.Header.Set("Content-Type", "application/json")
+	if pathID != "" {
+		r.SetPathValue("id", pathID)
+	}
+	r = r.WithContext(auth.WithAccount(r.Context(), auth.Account{ID: c.id}))
+	w := httptest.NewRecorder()
+	handler(w, r)
+	var env struct {
+		Data json.RawMessage `json:"data"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &env)
+	return w.Code, env.Data
+}
+
+func intp(n int) *int { return &n }
+
+// Two members of one league each attach it and each see their own seat;
+// one read reaches the host for both; neither can read, list or detach
+// the other's attachment or saved league; a detach takes its saved
+// league with it.
+func TestAttachIsScopedToTheAccount(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	accounts := &auth.Store{Pool: pool}
+	alice, err := accounts.UpsertAccount(ctx, auth.Identity{UserID: "user_alice", Email: "alice@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob, err := accounts.UpsertAccount(ctx, auth.Identity{UserID: "user_bob", Email: "bob@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
+	hosts := replayHosts(clock.Now)
+	store := &Store{Pool: pool}
+	saved := &leagues.Store{Pool: pool}
+	svc := &Service{
+		Hosts: hosts, Poller: &Poller{Hosts: hosts, Store: store, Now: clock.Now, Log: quietLog()},
+		Players: memoryPlayers{hosts}, Links: store, Saved: saved, Boards: smallBoard{}, Now: clock.Now, Log: quietLog(),
+	}
+	a, b := caller{t, svc, alice.ID}, caller{t, svc, bob.ID}
+	link := "https://sleeper.com/leagues/" + ReplaySleeperLeague + "/team"
+
+	var aliceSync, bobSync apitypes.LeagueSync
+	status, body := a.do(svc.attach, http.MethodPost, "/leagues/attach", apitypes.AttachInput{Link: link, Me: apitypes.AttachSeat{RosterId: intp(1)}}, "")
+	if status != http.StatusCreated || json.Unmarshal(body, &aliceSync) != nil {
+		t.Fatalf("alice attach: %d %s", status, body)
+	}
+	status, body = b.do(svc.attach, http.MethodPost, "/leagues/attach", apitypes.AttachInput{Link: link, Me: apitypes.AttachSeat{RosterId: intp(5)}}, "")
+	if status != http.StatusCreated || json.Unmarshal(body, &bobSync) != nil {
+		t.Fatalf("bob attach: %d %s", status, body)
+	}
+	if aliceSync.Me != 1 || bobSync.Me != 5 || aliceSync.Id == bobSync.Id {
+		t.Fatalf("seats %d and %d on links %s and %s", aliceSync.Me, bobSync.Me, aliceSync.Id, bobSync.Id)
+	}
+	if got := svc.Poller.Upstream(); got != 1 {
+		t.Fatalf("two members attaching made %d upstream reads, want 1", got)
+	}
+	if aliceSync.SettingsLeagueId == nil || len(aliceSync.Teams) != 12 || len(aliceSync.Roster) == 0 {
+		t.Fatalf("alice's league: settings %v, %d teams, %d on her roster", aliceSync.SettingsLeagueId, len(aliceSync.Teams), len(aliceSync.Roster))
+	}
+	if len(aliceSync.Pool) != 1 || aliceSync.Pool[0] != "9999999" {
+		t.Fatalf("pool %v, want only the player no team holds", aliceSync.Pool)
+	}
+
+	if status, _ := a.do(svc.sync, http.MethodGet, "/", nil, bobSync.Id.String()); status != http.StatusNotFound {
+		t.Fatalf("alice read bob's league: %d", status)
+	}
+	if status, _ := a.do(svc.detach, http.MethodDelete, "/", nil, bobSync.Id.String()); status != http.StatusNotFound {
+		t.Fatalf("alice detached bob's league: %d", status)
+	}
+	if _, err := saved.Get(ctx, bob.ID, *aliceSync.SettingsLeagueId); !errors.Is(err, leagues.ErrNotFound) {
+		t.Fatalf("bob read alice's saved league: %v", err)
+	}
+	_, body = a.do(svc.attached, http.MethodGet, "/", nil, "")
+	var list []apitypes.AttachedLeague
+	if err := json.Unmarshal(body, &list); err != nil || len(list) != 1 || list[0].Id != aliceSync.Id || list[0].TeamName == "" {
+		t.Fatalf("alice's list %s", body)
+	}
+
+	status, body = a.do(svc.attach, http.MethodPost, "/leagues/attach", apitypes.AttachInput{
+		Link: "https://www43.myfantasyleague.com/2026/home/" + ReplayMFLLeague, Me: apitypes.AttachSeat{Username: strp("alice")},
+	}, "")
+	if status != http.StatusBadRequest {
+		t.Fatalf("a MyFantasyLeague seat by username: %d %s", status, body)
+	}
+
+	if status, _ := a.do(svc.detach, http.MethodDelete, "/", nil, aliceSync.Id.String()); status != http.StatusOK {
+		t.Fatalf("alice detach: %d", status)
+	}
+	if _, err := saved.Get(ctx, alice.ID, *aliceSync.SettingsLeagueId); !errors.Is(err, leagues.ErrNotFound) {
+		t.Fatalf("the saved league outlived its detach: %v", err)
+	}
+	if status, _ := b.do(svc.sync, http.MethodGet, "/", nil, bobSync.Id.String()); status != http.StatusOK {
+		t.Fatalf("bob's league after alice detached: %d", status)
+	}
+}
+
+func strp(s string) *string { return &s }

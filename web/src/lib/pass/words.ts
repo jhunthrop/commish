@@ -41,17 +41,32 @@ export const FEATURE_WORDS: Readonly<Record<Feature, FeatureWords>> = {
 	early_run: {
 		lead: 'The nightly board an hour early',
 		text: "each night's run an hour before the public board"
+	},
+	start_sit: {
+		lead: 'Who to start this week',
+		text: 'your lineup from your own roster, scored on our weekly numbers, with the odds for each call'
+	},
+	waiver_ranks: {
+		lead: 'Your waiver pickups, ranked',
+		text: "the players no one in your league holds, ranked by what each adds to your own roster"
+	},
+	trade_finder: {
+		lead: 'Trades that help both teams',
+		text: "two rosters side by side, with the players who make each team better"
 	}
 };
 
 /** Features a product grants that are not built yet, kept off every screen until they ship, so
  * the page never sells what is not there: custom scoring comes back with Lane 8 part A, the why on
  * each row once the advisor writes it as the row's contrast to the call (part A), the early run with
- * the nightly's early-access build. */
+ * the nightly's early-access build, and the three in-season tools with Lane 13. */
 const NOT_BUILT: ReadonlySet<Feature> = new Set<Feature>([
 	'custom_scoring',
 	'full_reasoning',
-	'early_run'
+	'early_run',
+	'start_sit',
+	'waiver_ranks',
+	'trade_finder'
 ]);
 
 /** The feature lines a product's list prints, in the contract's order, built ones only. */
