@@ -1,11 +1,11 @@
 // THE ORACLE'S DECIDE LAYER, CALLED AS IT RUNS: the TypeScript side of the decide parity cases.
 //
-//   npx tsx research/parity/ts/decide.ts advise  <requests.json>   one line per request: the advice or the refusal
+//   npx tsx research/parity/ts/decide.ts advise  <bodies.json>     one line per raw request body: the advice or the refusal
 //   npx tsx research/parity/ts/decide.ts lineup  <queries.json>    one line per start/sit query
 //   npx tsx research/parity/ts/decide.ts normal  <inputs.json>     normalCdf, chanceOfClearing, survival, outlook
 //
-// `advise` is the service's own path: the zod schema the server validates with, then `advise`, so a
-// refusal is the server's 400 or 422 text. Nothing about the closed form is restated here.
+// `advise` is the service's own path: `JSON.parse`, the zod schema the server validates with, then
+// `advise`, so a refusal is the server's 400 or 422 text. Nothing about the closed form is restated here.
 import { readFileSync } from "node:fs";
 import { advise, RoomStateError } from "@research-ts/advisor/advise";
 import { adviseRequestSchema } from "@research-ts/advisor/request";
@@ -18,7 +18,13 @@ const emit = (value: unknown): void => {
   process.stdout.write(`${JSON.stringify(value)}\n`);
 };
 
-function adviseOne(body: unknown): unknown {
+function adviseOne(text: string): unknown {
+  let body: unknown;
+  try {
+    body = JSON.parse(text) as unknown;
+  } catch {
+    return { status: 400, error: "the body is not JSON" };
+  }
   const validated = adviseRequestSchema.safeParse(body);
   if (!validated.success) {
     return { status: 400, error: validated.error.issues.map((issue) => `${issue.path.join(".") || "body"}: ${issue.message}`).join("; ") };
@@ -53,7 +59,7 @@ function main(): void {
   const [command, path] = process.argv.slice(2);
   if (command === undefined || path === undefined) throw new Error("usage: tsx decide.ts advise|lineup|normal <inputs.json>");
   const inputs = JSON.parse(readFileSync(path, "utf8")) as unknown;
-  if (command === "advise") for (const body of inputs as readonly unknown[]) emit(adviseOne(body));
+  if (command === "advise") for (const text of inputs as readonly string[]) emit(adviseOne(text));
   else if (command === "lineup") for (const query of inputs as readonly StartSitQuery[]) emit(startSit(query));
   else if (command === "normal") normal(inputs as NormalInputs);
   else throw new Error(`no command ${command}`);

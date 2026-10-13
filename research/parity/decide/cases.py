@@ -21,6 +21,7 @@ from research.advisor.wire import advice_json
 from research.model.arithmetic import ARM64_BOARDS, X86_64_BOARDS, Arithmetic
 from research.model.decide.survival import SurvivalCurve
 from research.parity.decide.inputs import lineup_queries, normal_inputs, port_lineup, port_normal
+from research.parity.decide.refusals import refusals
 from research.parity.decide.rooms import RoomState, room_states
 from research.parity.model.compare import Diff, diff_rows
 from research.parity.model.outcome import CaseResult, Claim
@@ -30,6 +31,9 @@ _DRIVER: Final = _REPO / "research" / "parity" / "ts" / "decide.ts"
 _TIMEOUT_SECONDS: Final = 1800
 _MINIMUM_STATES: Final = 200
 _OK: Final = 200
+_REFUSAL_PICKS: Final = 2
+_NOTE_CHARACTERS: Final = 90
+_ANSWERED: Final = ("a key the schema does not know", "a key given twice, the last kept")
 
 
 @functools.cache
@@ -59,9 +63,10 @@ def run_oracle(command: str, inputs: object) -> list[Any]:
     return [json.loads(line) for line in completed.stdout.splitlines() if line.startswith("{")]
 
 
-def _port_advise(request: dict[str, Any], curve: SurvivalCurve) -> dict[str, Any]:
+def _port_advise(raw: str, curve: SurvivalCurve) -> dict[str, Any]:
+    """The service's `_answer` on one raw body: the advice, or the refusal's status and text."""
     try:
-        return {"status": 200, "data": advice_json(advise(parse_request(request), curve))}
+        return {"status": 200, "data": advice_json(advise(parse_request(raw), curve))}
     except RequestError as error:
         return {"status": 400, "error": str(error)}
     except RoomStateError as error:
@@ -105,11 +110,17 @@ def _shape_counts(states: Sequence[RoomState], oracle: Sequence[Mapping[str, Any
     ]
 
 
+def _first_issue(error: str) -> str:
+    """The refusal's opening words (a room that left the snake is refused once per pick since)."""
+    return error if len(error) <= _NOTE_CHARACTERS else f"{error[:_NOTE_CHARACTERS]}..."
+
+
 def advise_rooms() -> CaseResult:
     states = room_states()
-    oracle = run_oracle("advise", [state.request for state in states])
+    bodies = [json.dumps(state.request) for state in states]
+    oracle = run_oracle("advise", bodies)
     curve = SurvivalCurve(node_arithmetic())
-    port = [_port_advise(state.request, curve) for state in states]
+    port = [_port_advise(body, curve) for body in bodies]
     left: dict[str, dict[str, dict[str, Any]]] = collections.defaultdict(dict)
     right: dict[str, dict[str, dict[str, Any]]] = collections.defaultdict(dict)
     for state, ours, theirs in zip(states, port, oracle, strict=True):
@@ -123,7 +134,7 @@ def advise_rooms() -> CaseResult:
         for section in sections
     ]
     refusals = [
-        f"{state.label}: {answer['error']}"
+        f"{state.label}: {answer['status']}, {_first_issue(answer['error'])}"
         for state, answer in zip(states, oracle, strict=True)
         if answer["status"] != _OK
     ]
@@ -136,9 +147,38 @@ def advise_rooms() -> CaseResult:
     ]
     notes = [
         *_shape_counts(states, oracle),
-        *(f"refused alike (a room whose turns left the snake): {line}" for line in refusals),
+        *(f"refused: {line}" for line in refusals),
     ]
     return CaseResult("advise-rooms", diffs, notes, claims=claims)
+
+
+def _refusal_row(answer: Mapping[str, Any]) -> dict[str, Any]:
+    if answer["status"] == _OK:
+        return {"status": _OK}
+    return {"status": answer["status"], "error": answer["error"]}
+
+
+def advise_refusals() -> CaseResult:
+    """Every refusal the oracle's server makes, built from a recorded mid-draft room state."""
+    state = next(s for s in room_states() if len(s.request["picks"]) >= _REFUSAL_PICKS)
+    asked = refusals(state.request)
+    oracle = run_oracle("advise", [refusal.raw for refusal in asked])
+    curve = SurvivalCurve(node_arithmetic())
+    left = {r.label: _refusal_row(answer) for r, answer in zip(asked, oracle, strict=True)}
+    right = {r.label: _refusal_row(_port_advise(r.raw, curve)) for r in asked}
+    statuses = collections.Counter(row["status"] for row in left.values())
+    answered = [label for label, row in left.items() if row["status"] == _OK]
+    claims = [
+        Claim(
+            f"{len(asked)} bodies from {state.label}, the oracle answering only {', '.join(_ANSWERED)}",
+            answered == list(_ANSWERED),
+        )
+    ]
+    notes = [
+        "oracle statuses: " + ", ".join(f"{count} x {status}" for status, count in sorted(statuses.items())),
+        *(f"{label}: {row}" for label, row in left.items()),
+    ]
+    return CaseResult("advise-refusals", [diff_rows("refusals", left, right)], notes, claims=claims)
 
 
 def lineup_random() -> CaseResult:
@@ -189,6 +229,11 @@ class DecideCase:
 DECIDE_CASES: Final = (
     DecideCase(
         "advise-rooms", "POST /advise on every recorded room state: card, shortlist, why, survival, tiers", advise_rooms
+    ),
+    DecideCase(
+        "advise-refusals",
+        "POST /advise on bodies that are not room states: each status and the oracle's every word",
+        advise_refusals,
     ),
     DecideCase(
         "lineup", "startSit on generated rosters and matchups, every starter, reason and the win chance", lineup_random

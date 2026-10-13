@@ -2,70 +2,146 @@
 
 The contract is the Go rooms' (`api/internal/advisor/http.go`, `wireRequest`), which is the shape
 `research-ts/src/advisor/request.ts` validates: the pool with what we project and where drafters
-take each man, the picks so far, the seat on the clock and the league's roster rules. Every issue
-is named by its path, as the oracle names it.
+take each man, the picks so far, the seat on the clock and the league's roster rules.
+
+The checks are the oracle's zod schema, in its order and in its words (`checks.py`): strict, so a
+string is never read as a number nor a number as a string, and a refused body names each issue
+exactly as the oracle's 400 does. Its `superRefine` (unique ids, picks numbered 1..n from the pool,
+seats in range) runs when no issue aborted, as zod runs it.
+
+Past the oracle, the service bounds what one call may ask for, so no body under the 1 MB cap holds
+a worker for long: the Go rooms send at most 400 undrafted players plus the drafted ones, and their
+formats seat at most 14 teams with 17 rostered.
 """
 
-import math
-from typing import Annotated, Final
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from typing import Any, Final, cast, get_args
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
-
-from research.model.domain import Position, RosterSlotConfig, RosterSlotType
+from research.advisor.checks import (
+    MISSING,
+    NOT_JSON,
+    Bound,
+    Issue,
+    NotJsonError,
+    Path,
+    array,
+    number,
+    obj,
+    option,
+    parse_body,
+    string,
+)
+from research.model.domain import POSITIONS, Position, RosterSlotConfig, RosterSlotType
 
 MAX_TEAMS: Final = 32
 MAX_SHORTLIST: Final = 20
+MAX_POOL: Final = 1_000
+MAX_SLOT_COUNT: Final = 12
+MAX_ROSTER_SIZE: Final = 30
+_SLOT_TYPES: Final[tuple[RosterSlotType, ...]] = get_args(RosterSlotType)
+_POSITIVE: Final = (Bound(">", 0),)
+_TEAM_BOUNDS: Final = (Bound(">=", 2), Bound("<=", MAX_TEAMS))
+_SHORTLIST_BOUNDS: Final = (Bound(">=", 1), Bound("<=", MAX_SHORTLIST))
 
-_STRICT = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+__all__ = ["NOT_JSON", "AdviseRequest", "Pick", "PoolEntry", "RequestError", "parse_request"]
+
+type Check = Callable[[object, Path], list[Issue]]
 
 
-class PoolEntry(BaseModel):
+@dataclass(frozen=True, slots=True)
+class PoolEntry:
     """One player in the room's pool, drafted or not. `projected_points` is None for a position the
     board ships in market order, which then has survival odds but no value."""
 
-    model_config = _STRICT
-    id: Annotated[str, Field(min_length=1)]
+    id: str
     position: Position
-    adp: Annotated[float, Field(gt=0, allow_inf_nan=False)]
-    projected_points: Annotated[float | None, Field(alias="projectedPoints", allow_inf_nan=False)]
+    adp: float
+    projected_points: float | None
 
 
-class Pick(BaseModel):
-    model_config = _STRICT
-    pick_number: Annotated[int, Field(alias="pickNumber", gt=0)]
-    player_id: Annotated[str, Field(alias="playerId", min_length=1)]
-    seat: Annotated[int, Field(gt=0)]
+@dataclass(frozen=True, slots=True)
+class Pick:
+    pick_number: int
+    player_id: str
+    seat: int
 
 
-class RosterSlot(BaseModel):
-    model_config = _STRICT
-    slot: RosterSlotType
-    count: Annotated[int, Field(gt=0)]
-    eligible_positions: Annotated[tuple[Position, ...], Field(alias="eligiblePositions", min_length=1)]
-
-    def config(self) -> RosterSlotConfig:
-        return RosterSlotConfig(self.slot, self.count, self.eligible_positions)
-
-
-class AdviseRequest(BaseModel):
-    model_config = _STRICT
-    team_count: Annotated[int, Field(alias="teamCount", ge=2, le=MAX_TEAMS)]
-    roster_slots: Annotated[tuple[RosterSlot, ...], Field(alias="rosterSlots", min_length=1)]
-    pool: Annotated[tuple[PoolEntry, ...], Field(min_length=1)]
+@dataclass(frozen=True, slots=True)
+class AdviseRequest:
+    team_count: int
+    roster_slots: tuple[RosterSlotConfig, ...]
+    pool: tuple[PoolEntry, ...]
     picks: tuple[Pick, ...]
-    seat_on_clock: Annotated[int, Field(alias="seatOnClock", gt=0)]
-    shortlist_size: Annotated[int | None, Field(alias="shortlistSize", ge=1, le=MAX_SHORTLIST)] = None
+    seat_on_clock: int
+    shortlist_size: int | None
 
     def slot_configs(self) -> tuple[RosterSlotConfig, ...]:
-        return tuple(slot.config() for slot in self.roster_slots)
+        return self.roster_slots
 
 
 class RequestError(ValueError):
     """A body that is not a room state: every issue, joined, as the 400's error."""
 
 
-def _consistency_issues(request: AdviseRequest) -> list[str]:
-    """The oracle's `superRefine`: unique pool ids, picks numbered in order from the pool, seats in range."""
+def _fields(value: object, path: Path, checks: tuple[tuple[str, Check], ...]) -> list[Issue]:
+    """An object's own type, then each field's check in the shape's order (unknown keys ignored)."""
+    if not isinstance(value, dict):
+        return obj(value, path)
+    return [issue for key, check in checks for issue in check(value.get(key, MISSING), (*path, key))]
+
+
+def _positions(value: object, path: Path) -> list[Issue]:
+    return array(value, path, lambda item, at: option(item, at, POSITIONS), non_empty=True)
+
+
+def _whole_positive(value: object, path: Path) -> list[Issue]:
+    return number(value, path, _POSITIVE, integer=True)
+
+
+_POOL_ENTRY: Final[tuple[tuple[str, Check], ...]] = (
+    ("id", string),
+    ("position", lambda v, p: option(v, p, POSITIONS)),
+    ("adp", lambda v, p: number(v, p, _POSITIVE)),
+    ("projectedPoints", lambda v, p: [] if v is None else number(v, p)),
+)
+_PICK: Final[tuple[tuple[str, Check], ...]] = (
+    ("pickNumber", _whole_positive),
+    ("playerId", string),
+    ("seat", _whole_positive),
+)
+_SLOT: Final[tuple[tuple[str, Check], ...]] = (
+    ("slot", lambda v, p: option(v, p, _SLOT_TYPES)),
+    ("count", _whole_positive),
+    ("eligiblePositions", _positions),
+)
+_REQUEST: Final[tuple[tuple[str, Check], ...]] = (
+    ("teamCount", lambda v, p: number(v, p, _TEAM_BOUNDS, integer=True)),
+    ("rosterSlots", lambda v, p: array(v, p, lambda i, a: _fields(i, a, _SLOT), non_empty=True)),
+    ("pool", lambda v, p: array(v, p, lambda i, a: _fields(i, a, _POOL_ENTRY), non_empty=True)),
+    ("picks", lambda v, p: array(v, p, lambda i, a: _fields(i, a, _PICK), non_empty=False)),
+    ("seatOnClock", _whole_positive),
+    ("shortlistSize", lambda v, p: [] if v is MISSING else number(v, p, _SHORTLIST_BOUNDS, integer=True)),
+)
+
+
+def _build(body: Mapping[str, Any]) -> AdviseRequest:
+    """The typed room state from a body whose every value has its type (bounds may be broken)."""
+    shortlist = body.get("shortlistSize")
+    return AdviseRequest(
+        team_count=int(body["teamCount"]),
+        roster_slots=tuple(
+            RosterSlotConfig(s["slot"], int(s["count"]), tuple(s["eligiblePositions"])) for s in body["rosterSlots"]
+        ),
+        pool=tuple(PoolEntry(e["id"], e["position"], e["adp"], e["projectedPoints"]) for e in body["pool"]),
+        picks=tuple(Pick(int(p["pickNumber"]), p["playerId"], int(p["seat"])) for p in body["picks"]),
+        seat_on_clock=int(body["seatOnClock"]),
+        shortlist_size=None if shortlist is None else int(shortlist),
+    )
+
+
+def _refine_issues(request: AdviseRequest) -> list[str]:
+    """The oracle's `superRefine`, word for word."""
     issues: list[str] = []
     ids = {entry.id for entry in request.pool}
     if len(ids) != len(request.pool):
@@ -84,19 +160,35 @@ def _consistency_issues(request: AdviseRequest) -> list[str]:
     return issues
 
 
-def parse_request(body: object) -> AdviseRequest:
-    """The validated room state, or `RequestError` naming each issue by its path."""
+def _bound_issues(request: AdviseRequest) -> list[str]:
+    """The service's own bounds, past the oracle's schema."""
+    issues: list[str] = []
+    if len(request.pool) > MAX_POOL:
+        issues.append(f"pool: {len(request.pool)} players is over the bound of {MAX_POOL}")
+    for index, slot in enumerate(request.roster_slots):
+        if slot.count > MAX_SLOT_COUNT:
+            issues.append(f"rosterSlots.{index}.count: {slot.count} is over the bound of {MAX_SLOT_COUNT}")
+    roster_size = sum(slot.count for slot in request.roster_slots)
+    if roster_size > MAX_ROSTER_SIZE:
+        issues.append(f"rosterSlots: {roster_size} roster spots is over the bound of {MAX_ROSTER_SIZE}")
+    return issues
+
+
+def parse_request(raw: str | bytes) -> AdviseRequest:
+    """The validated room state from the raw body, or `RequestError` with the oracle's 400 text
+    (`NOT_JSON` when the body does not parse), or the service's bound text."""
     try:
-        request = AdviseRequest.model_validate(body)
-    except ValidationError as error:
-        issues = [
-            f"{'.'.join(str(part) for part in issue['loc']) or 'body'}: {issue['msg']}" for issue in error.errors()
-        ]
-        raise RequestError("; ".join(issues)) from None
-    issues = _consistency_issues(request)
-    if issues:
-        raise RequestError("; ".join(issues))
-    for entry in request.pool:
-        if entry.projected_points is not None and not math.isfinite(entry.projected_points):
-            raise RequestError(f"pool: {entry.id} has a projection that is not finite")
+        body = parse_body(raw)
+    except NotJsonError:
+        raise RequestError(NOT_JSON) from None
+    shape = _fields(body, (), _REQUEST)
+    texts = [issue.text() for issue in shape]
+    if any(issue.aborts for issue in shape):
+        raise RequestError("; ".join(texts))
+    request = _build(cast("Mapping[str, Any]", body))
+    texts += _refine_issues(request)
+    if texts:
+        raise RequestError("; ".join(texts))
+    if bounds := _bound_issues(request):
+        raise RequestError("; ".join(bounds))
     return request

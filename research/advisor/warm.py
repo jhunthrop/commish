@@ -6,6 +6,7 @@ It exercises every path a real call takes (the valuation, the survival curve, th
 the why and the tiers) so the first real call does not pay for imports and first-touch caches.
 """
 
+import json
 from typing import Final
 
 from research.advisor.advise import advise
@@ -18,7 +19,7 @@ _PER_POSITION: Final = (("QB", 30), ("RB", 60), ("WR", 70), ("TE", 30), ("K", 16
 _PICKS_IN: Final = 7
 
 
-def _shape_only_state() -> dict[str, object]:
+def shape_only_state() -> dict[str, object]:
     pool: list[dict[str, object]] = []
     for position, count in _PER_POSITION:
         for index in range(count):
@@ -36,4 +37,4 @@ def _shape_only_state() -> dict[str, object]:
 
 def warm_up(curve: SurvivalCurve) -> None:
     """Advise once on the shape-only state; raises if the closed form cannot answer it."""
-    advise(parse_request(_shape_only_state()), curve)
+    advise(parse_request(json.dumps(shape_only_state())), curve)

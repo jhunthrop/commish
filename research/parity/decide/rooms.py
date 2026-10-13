@@ -7,9 +7,17 @@ Two inputs, recorded once into `parity/fixtures/advisor-rooms-2026/`:
   against the dev copy's `research` schema): every provider player in ADP order with the stored
   board's points through the crosswalk.
 
-A room state is a room's first n picks with the snake's seat on the clock at n + 1, sent exactly as
-`api/internal/advisor/http.go` builds its request: the board in its order, every drafted player,
-the first 400 undrafted, a player with no ADP placed at 1000 plus his board index. One state per
+A room state is a room's first n picks, in the order they were made, with the team that made the
+next one on the clock, sent exactly as `api/internal/advisor/http.go` builds its request: each
+pick's own number from the draft state, each seat and the seat on the clock by `seatOf`, the board
+in its order, every drafted player, the first 400 undrafted, a player with no ADP placed at 1000
+plus his board index.
+
+A room whose turns leave the snake is sent as it is. In `slow2_10t_standard` pick 8's clock ran out
+and the pick was owed, so the state after seven picks has seat 9 on the clock (the oracle refuses
+it, 422: pick 8 belongs to seat 8) and every later state numbers its eighth pick 9 (refused, 400:
+picks must be numbered 1..n). The oracle answers only snake rooms; the Go rooms fall back to the
+engine's card for the rest of such a draft. One state per
 round per room, its slot in the round stepping through the seats, plus each room's last pick: every
 roster shape the mocks carry (standard, superflex, two flex, no kicker with a deep bench), every
 team count, the bench filling, the late kicker and defense calls and the last pick of a draft.
@@ -60,7 +68,10 @@ def record() -> Path:
             "name": room["name"],
             "slotConfig": room["config"]["slotConfig"],
             "draftOrder": room["finalState"]["draftOrder"],
-            "picks": [{"teamId": p["teamId"], "playerId": p["playerId"]} for p in room["finalState"]["picks"]],
+            "picks": [
+                {"pickNumber": p["pickNumber"], "teamId": p["teamId"], "playerId": p["playerId"]}
+                for p in room["finalState"]["picks"]
+            ],
         }
         for room in logs["rooms"]
     ]
@@ -89,7 +100,8 @@ class RoomState:
 
 
 def _go_request(room: dict[str, Any], board: list[dict[str, Any]], made: int) -> dict[str, Any]:
-    """`HTTP.request` in api/internal/advisor/http.go, for the room after `made` picks."""
+    """`HTTP.request` in api/internal/advisor/http.go, for the room after `made` picks, with the
+    team that made the next pick on the clock."""
     order: list[str] = room["draftOrder"]
     picks = room["picks"][:made]
     drafted = {pick["playerId"] for pick in picks}
@@ -104,20 +116,15 @@ def _go_request(room: dict[str, Any], board: list[dict[str, Any]], made: int) ->
         pool.append(
             {"id": player["id"], "position": player["position"], "adp": adp, "projectedPoints": player["points"]}
         )
-    teams = len(order)
-    pick_number = made + 1
-    round_number = -(-pick_number // teams)
-    in_round = (pick_number - 1) % teams
-    seat = in_round + 1 if round_number % 2 == 1 else teams - in_round
     return {
-        "teamCount": teams,
+        "teamCount": len(order),
         "rosterSlots": room["slotConfig"],
         "pool": pool,
         "picks": [
-            {"pickNumber": n + 1, "playerId": p["playerId"], "seat": order.index(p["teamId"]) + 1}
-            for n, p in enumerate(picks)
+            {"pickNumber": p["pickNumber"], "playerId": p["playerId"], "seat": order.index(p["teamId"]) + 1}
+            for p in picks
         ],
-        "seatOnClock": seat,
+        "seatOnClock": order.index(room["picks"][made]["teamId"]) + 1,
         "shortlistSize": SHORTLIST_SIZE,
     }
 
