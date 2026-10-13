@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 // BaseURL is the host's API front door; it redirects a league's request
@@ -84,8 +86,8 @@ type Client struct {
 	Now     func() time.Time
 	Sleep   func(ctx context.Context, d time.Duration) error
 
-	mu   sync.Mutex
-	next map[string]time.Time
+	mu      sync.Mutex
+	buckets map[string]*rate.Limiter
 	// servers is each league's own server, learned from its league
 	// export, so a read goes there directly instead of through a redirect.
 	servers map[string]string
@@ -93,7 +95,7 @@ type Client struct {
 
 // New is the client with the timeout, the redirect rule and the gap.
 func New() *Client {
-	c := &Client{BaseURL: BaseURL, Now: time.Now, Sleep: sleepCtx, next: map[string]time.Time{}, servers: map[string]string{}}
+	c := &Client{BaseURL: BaseURL, Now: time.Now, Sleep: sleepCtx, servers: map[string]string{}}
 	c.HTTP = &http.Client{Timeout: Timeout, CheckRedirect: checkRedirect}
 	return c
 }
@@ -121,21 +123,46 @@ func checkRedirect(req *http.Request, via []*http.Request) error {
 	return nil
 }
 
-// wait holds the gap for one server: the caller sleeps until its turn.
-func (c *Client) wait(ctx context.Context, server string) error {
+// MaxWait is the longest a request waits for its server's turn: past it
+// the request is refused rather than queued, so a burst from one caller
+// can never pin every other league behind it.
+const MaxWait = 5 * time.Second
+
+// ErrBusy is a server whose turns are taken for the next MaxWait.
+var ErrBusy = fmt.Errorf("%w: busy", ErrUnavailable)
+
+// limiter is a server's shared token bucket: one request a RequestGap.
+func (c *Client) limiter(server string) *rate.Limiter {
 	c.mu.Lock()
-	if c.next == nil {
-		c.next = map[string]time.Time{}
+	defer c.mu.Unlock()
+	if c.buckets == nil {
+		c.buckets = map[string]*rate.Limiter{}
 	}
+	l, ok := c.buckets[server]
+	if !ok {
+		l = rate.NewLimiter(rate.Every(RequestGap), 1)
+		c.buckets[server] = l
+	}
+	return l
+}
+
+// wait takes the server's next turn, sleeping until it comes, or answers
+// ErrBusy when it is more than MaxWait away. A caller that gives up
+// hands its turn back.
+func (c *Client) wait(ctx context.Context, server string) error {
 	now := c.Now()
-	at := c.next[server]
-	if at.Before(now) {
-		at = now
+	r := c.limiter(server).ReserveN(now, 1)
+	delay := r.DelayFrom(now)
+	if !r.OK() || delay > MaxWait {
+		r.CancelAt(now)
+		return ErrBusy
 	}
-	c.next[server] = at.Add(RequestGap)
-	c.mu.Unlock()
-	if d := at.Sub(now); d > 0 {
-		return c.Sleep(ctx, d)
+	if delay <= 0 {
+		return nil
+	}
+	if err := c.Sleep(ctx, delay); err != nil {
+		r.CancelAt(c.Now())
+		return err
 	}
 	return nil
 }
@@ -214,6 +241,9 @@ func (c *Client) export(ctx context.Context, season int, leagueID, typ string, a
 	u := base.JoinPath(strconv.Itoa(season), "export")
 	u.RawQuery = args.Encode()
 	if err := c.wait(ctx, base.Host); err != nil {
+		if errors.Is(err, ErrBusy) {
+			return err
+		}
 		return fmt.Errorf("%w: %v", ErrUnavailable, err)
 	}
 	return c.read(ctx, u.String(), limit, out)

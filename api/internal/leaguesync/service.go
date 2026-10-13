@@ -3,6 +3,7 @@ package leaguesync
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -35,6 +36,7 @@ type Links interface {
 	Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, error)
 	Delete(ctx context.Context, accountID, id uuid.UUID) error
 	Touch(ctx context.Context, id uuid.UUID, at time.Time) error
+	Linked(ctx context.Context, ref Ref) (bool, error)
 }
 
 // SavedLeagues is the part of leagues.Store an attach writes: the saved
@@ -59,14 +61,15 @@ type Players interface {
 
 // Service serves the league sync routes.
 type Service struct {
-	Hosts   Hosts
-	Poller  *Poller
-	Players Players
-	Links   Links
-	Saved   SavedLeagues
-	Boards  BoardSource
-	Now     func() time.Time
-	Log     *slog.Logger
+	Hosts     Hosts
+	Poller    *Poller
+	Admission *Admission
+	Players   Players
+	Links     Links
+	Saved     SavedLeagues
+	Boards    BoardSource
+	Now       func() time.Time
+	Log       *slog.Logger
 }
 
 // Routes is every route this package serves.
@@ -111,6 +114,12 @@ func (s *Service) writeHostError(w http.ResponseWriter, r *http.Request, host st
 	case errors.Is(err, ErrPrivate):
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid,
 			"This league is private on "+hostWords(host)+". We follow public leagues today", nil)
+	case errors.Is(err, ErrTooManyNew):
+		httpx.WriteError(w, r, http.StatusTooManyRequests, httpx.CodeRateLimited,
+			fmt.Sprintf("You have looked up %d new leagues this hour. Attach one of them, or try again later", NewLeaguesPerHour), nil)
+	case errors.Is(err, ErrBusy):
+		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable,
+			hostWords(host)+" is busy with other leagues right now. Try again in a minute", nil)
 	case errors.Is(err, ErrUnavailable):
 		s.Log.Warn("leaguesync: host", "host", host, "err", err)
 		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable,
@@ -150,7 +159,7 @@ func (s *Service) preview(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	read, err := s.Poller.Read(r.Context(), ref)
+	read, err := s.readFor(r.Context(), auth.AccountID(r), ref)
 	if err != nil {
 		s.writeHostError(w, r, ref.Host, err)
 		return
@@ -159,6 +168,27 @@ func (s *Service) preview(w http.ResponseWriter, r *http.Request) {
 		Host: apitypes.LeagueHost(ref.Host), HostLeagueId: ref.LeagueID, Season: read.Season, Name: read.Name,
 		Teams: standings(read.Teams), SeatByUsername: h.Key() == HostSleeper,
 	})
+}
+
+// readFor is the league for a preview or an attach. A league this
+// process holds or some account has attached reads as any view does; one
+// nobody has attached is admitted first (Admission), and its read waits
+// on the caller, who can cancel it.
+func (s *Service) readFor(ctx context.Context, accountID uuid.UUID, ref Ref) (Read, error) {
+	if !s.Poller.Holds(ref) {
+		linked, err := s.Links.Linked(ctx, ref)
+		if err != nil {
+			return Read{}, err
+		}
+		if !linked {
+			release, err := s.Admission.Admit(accountID, ref)
+			if err != nil {
+				return Read{}, err
+			}
+			defer release()
+		}
+	}
+	return s.Poller.Read(ctx, ref)
 }
 
 // load is one of the account's links, or an answer.

@@ -47,7 +47,7 @@ func (s *Service) attach(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	read, err := s.Poller.Read(ctx, ref)
+	read, err := s.readFor(ctx, auth.AccountID(r), ref)
 	if err != nil {
 		s.writeHostError(w, r, ref.Host, err)
 		return
@@ -68,6 +68,8 @@ func (s *Service) attach(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, s.Log, "leaguesync: attach", err)
 		return
 	}
+	// The league is linked now, so its read is kept from here on.
+	s.Poller.Keep(read.Snapshot)
 	s.answer(w, r, http.StatusCreated, link, read)
 }
 

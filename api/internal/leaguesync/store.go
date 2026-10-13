@@ -189,7 +189,20 @@ func (s *Store) LastSnapshot(ctx context.Context, ref Ref) (Snapshot, bool, erro
 	return snap, true, nil
 }
 
-// PutSnapshot keeps a good read, replacing the one before.
+// Linked reports whether any account has the league attached.
+func (s *Store) Linked(ctx context.Context, ref Ref) (bool, error) {
+	var linked bool
+	err := s.Pool.QueryRow(ctx, `select exists (select 1 from app.league_links
+		where host = $1 and host_league_id = $2 and host_season = $3)`, ref.Host, ref.LeagueID, ref.Season).Scan(&linked)
+	if err != nil {
+		return false, fmt.Errorf("leaguesync: linked %s: %w", ref.Key(), err)
+	}
+	return linked, nil
+}
+
+// PutSnapshot keeps a good read, replacing the one before, and only for a
+// league some account has attached: a league read for a preview leaves
+// nothing behind.
 func (s *Store) PutSnapshot(ctx context.Context, snap Snapshot) error {
 	raw, err := json.Marshal(snap)
 	if err != nil {
@@ -197,7 +210,8 @@ func (s *Store) PutSnapshot(ctx context.Context, snap Snapshot) error {
 	}
 	ref := snap.Ref
 	_, err = s.Pool.Exec(ctx, `insert into app.league_snapshots (host, host_league_id, host_season, snapshot, read_at)
-		values ($1, $2, $3, $4, $5)
+		select $1, $2, $3, $4, $5
+		where exists (select 1 from app.league_links where host = $1 and host_league_id = $2 and host_season = $3)
 		on conflict (host, host_league_id, host_season) do update set snapshot = excluded.snapshot, read_at = excluded.read_at`,
 		ref.Host, ref.LeagueID, ref.Season, raw, snap.ReadAt)
 	if err != nil {

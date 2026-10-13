@@ -32,9 +32,10 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 	}
 	store := &leaguesync.Store{Pool: pool}
 	return &leaguesync.Service{
-		Hosts:   hosts,
-		Poller:  &leaguesync.Poller{Hosts: hosts, Store: store, Now: now, Log: log},
-		Players: &leaguesync.Directory{Hosts: hosts, Store: store, Now: now, Log: log},
-		Links:   store, Saved: saved, Boards: board, Now: now, Log: log,
+		Hosts:     hosts,
+		Poller:    &leaguesync.Poller{Hosts: hosts, Store: store, Now: now, Log: log},
+		Admission: &leaguesync.Admission{Now: now},
+		Players:   &leaguesync.Directory{Hosts: hosts, Store: store, Now: now, Log: log},
+		Links:     store, Saved: saved, Boards: board, Now: now, Log: log,
 	}
 }

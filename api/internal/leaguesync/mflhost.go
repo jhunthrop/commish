@@ -51,6 +51,8 @@ func (m *MFL) Parse(pasted string) (Ref, error) {
 
 func mflErr(what string, err error) error {
 	switch {
+	case errors.Is(err, mfl.ErrBusy):
+		return fmt.Errorf("%w: %s: %v", ErrBusy, what, err)
 	case errors.Is(err, mfl.ErrPrivate):
 		return fmt.Errorf("%w: %s: %v", ErrPrivate, what, err)
 	case errors.Is(err, mfl.ErrNotFound):

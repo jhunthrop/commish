@@ -48,7 +48,8 @@ func TestListReadsOneAsAList(t *testing.T) {
 }
 
 // Requests to one server are a second apart, however many callers ask
-// at once, and a redirect leaves the host's own servers never.
+// at once, no request waits more than MaxWait for its turn, and a
+// redirect leaves the host's own servers never.
 func TestGapAndRedirects(t *testing.T) {
 	var mu sync.Mutex
 	var slept []time.Duration
@@ -68,6 +69,19 @@ func TestGapAndRedirects(t *testing.T) {
 	}
 	if len(slept) != 2 || slept[0] != time.Second || slept[1] != 2*time.Second {
 		t.Fatalf("three requests at once waited %v, want 1s and 2s", slept)
+	}
+	// Turns up to MaxWait away are queued; the next is refused, not slept on.
+	for range 3 {
+		if err := c.wait(context.Background(), "api.myfantasyleague.com"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := c.wait(context.Background(), "api.myfantasyleague.com"); !errors.Is(err, ErrBusy) {
+		t.Fatalf("a turn %s away answered %v, want ErrBusy", MaxWait+time.Second, err)
+	}
+	// Another server keeps its own bucket.
+	if err := c.wait(context.Background(), "www43.myfantasyleague.com"); err != nil {
+		t.Fatalf("a second server waited on the first's queue: %v", err)
 	}
 
 	srv := httptest.NewServer(http.RedirectHandler("https://evil.example/2026/export", http.StatusFound))

@@ -11,39 +11,53 @@ import (
 // one upstream read per league per minute whatever the number of
 // viewers, since rosters change slowly; a deliberate refresh may read
 // sooner, but never twice inside RefreshFloor; the last good read is
-// answered with its age when the host fails, and it survives a restart
-// through the store. The bound is per process: N instances serving one
-// league make at most N reads a minute.
+// answered with its age when the host fails, and a linked league's
+// survives a restart through the store. The bound is per process: N
+// instances serving one league make at most N reads a minute.
+//
+// A read is cancelled when every viewer waiting on it has gone; a read
+// nobody waits on (the one behind a view answered from the last read)
+// runs at most ReadTimeout.
 const (
 	MinUpstreamGap = time.Minute
 	RefreshFloor   = 10 * time.Second
+	ReadTimeout    = 30 * time.Second
 	// idleAfter drops a league no viewer has asked about in this long.
 	idleAfter = 30 * time.Minute
 )
 
-// SnapshotStore keeps the last good read per host league.
+// SnapshotStore keeps the last good read per host league. PutSnapshot
+// keeps nothing for a league no account has linked.
 type SnapshotStore interface {
 	LastSnapshot(ctx context.Context, ref Ref) (Snapshot, bool, error)
 	PutSnapshot(ctx context.Context, snap Snapshot) error
 }
 
 // Read is a snapshot and how stale it is: zero when this read reached
-// the host or a read within the gap did, the age of the last good read
-// when the host failed since.
+// the host or a read within the gap did; the age of the last good read
+// when the host failed since, or when the read is one kept from before
+// this process and none has landed since.
 type Read struct {
 	Snapshot
 	Stale time.Duration
 }
 
+// flight is one read upstream and the viewers waiting on it.
+type flight struct {
+	done    chan struct{}
+	cancel  context.CancelFunc
+	waiters int
+}
+
 type pollEntry struct {
 	mu       sync.Mutex
 	snap     *Snapshot
+	stored   bool
 	err      error
 	tried    time.Time
 	loaded   bool
 	lastSeen time.Time
-	// inflight is closed when the read upstream now lands.
-	inflight chan struct{}
+	inflight *flight
 }
 
 // Poller shares one upstream read per league between every viewer.
@@ -64,6 +78,20 @@ func (p *Poller) Upstream() int64 {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.upstream
+}
+
+// Holds reports whether this process has a read of the league, so a
+// view of it costs the host nothing new.
+func (p *Poller) Holds(ref Ref) bool {
+	p.mu.Lock()
+	e, ok := p.entries[ref.Key()]
+	p.mu.Unlock()
+	if !ok {
+		return false
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.snap != nil
 }
 
 func (p *Poller) entryFor(key string, now time.Time) *pollEntry {
@@ -88,8 +116,7 @@ func (p *Poller) entryFor(key string, now time.Time) *pollEntry {
 
 // Read is the league as of at most MinUpstreamGap ago. Past the gap,
 // a league read before answers that read at once while one read goes
-// upstream behind it (the next view sees it); only a league never read
-// waits for the host.
+// upstream behind it; only a league never read waits for the host.
 func (p *Poller) Read(ctx context.Context, ref Ref) (Read, error) {
 	return p.read(ctx, ref, MinUpstreamGap, false)
 }
@@ -109,91 +136,105 @@ func (p *Poller) read(ctx context.Context, ref Ref, gap time.Duration, waitFresh
 	e := p.entryFor(ref.Key(), now)
 	e.mu.Lock()
 	p.warm(ctx, e, ref)
-	inflight := e.inflight
+	f := e.inflight
 	switch {
-	case inflight != nil:
+	case f != nil:
 	case !e.tried.IsZero() && now.Sub(e.tried) < gap:
 		defer e.mu.Unlock()
-		return p.cached(e, now)
+		return p.cached(e, now, gap)
 	case e.snap != nil && e.tried.IsZero() && now.Sub(e.snap.ReadAt) < gap:
-		// A stored read from before a restart that is still fresh.
+		// A stored read from before this process that is still fresh.
 		defer e.mu.Unlock()
 		return Read{Snapshot: *e.snap}, nil
 	default:
-		inflight = p.start(ctx, e, host, ref, now)
+		f = p.start(e, host, ref, now)
 	}
 	if e.snap != nil && !waitFresh {
 		defer e.mu.Unlock()
-		return p.cached(e, now)
+		return p.cached(e, now, gap)
 	}
+	f.waiters++
 	e.mu.Unlock()
 	select {
-	case <-inflight:
+	case <-f.done:
 	case <-ctx.Done():
+		e.mu.Lock()
+		f.waiters--
+		if f.waiters == 0 {
+			f.cancel()
+		}
+		e.mu.Unlock()
 		return Read{}, ctx.Err()
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return p.cached(e, p.Now())
+	return p.cached(e, p.Now(), gap)
 }
 
-// start sends one read upstream for every viewer, with e locked. The
-// read outlives the viewer who started it; each host request has its
-// own timeout.
-func (p *Poller) start(ctx context.Context, e *pollEntry, host Host, ref Ref, now time.Time) chan struct{} {
-	done := make(chan struct{})
-	e.inflight, e.tried = done, now
+// start sends one read upstream for every viewer, with e locked.
+func (p *Poller) start(e *pollEntry, host Host, ref Ref, now time.Time) *flight {
+	ctx, cancel := context.WithTimeout(context.Background(), ReadTimeout)
+	f := &flight{done: make(chan struct{}), cancel: cancel}
+	e.inflight, e.tried = f, now
 	p.mu.Lock()
 	p.upstream++
 	p.mu.Unlock()
-	bg := context.WithoutCancel(ctx)
 	go func() {
-		snap, err := host.Read(bg, ref)
+		defer cancel()
+		snap, err := host.Read(ctx, ref)
 		e.mu.Lock()
 		if err != nil {
 			e.err = err
 		} else {
 			snap.ReadAt = now
-			e.snap, e.err = &snap, nil
+			e.snap, e.err, e.stored = &snap, nil, false
 		}
 		e.inflight = nil
-		close(done)
+		close(f.done)
 		e.mu.Unlock()
-		if err != nil {
-			return
-		}
-		if err := p.Store.PutSnapshot(bg, snap); err != nil {
-			p.Log.Warn("leaguesync: keep snapshot", "league", ref.Key(), "err", err)
+		if err == nil {
+			p.Keep(snap)
 		}
 	}()
-	return done
+	return f
+}
+
+// Keep stores a good read; the store keeps it only for a linked league,
+// so an attach keeps its read once the link is written.
+func (p *Poller) Keep(snap Snapshot) {
+	ctx, cancel := context.WithTimeout(context.Background(), ReadTimeout)
+	defer cancel()
+	if err := p.Store.PutSnapshot(ctx, snap); err != nil {
+		p.Log.Warn("leaguesync: keep snapshot", "league", snap.Ref.Key(), "err", err)
+	}
 }
 
 // warm loads the stored read the first time a league is asked about in
-// this process.
+// this process. A failed load is tried again by the next viewer.
 func (p *Poller) warm(ctx context.Context, e *pollEntry, ref Ref) {
 	if e.loaded {
 		return
 	}
-	e.loaded = true
-	snap, ok, err := p.Store.LastSnapshot(ctx, ref)
+	snap, ok, err := p.Store.LastSnapshot(context.WithoutCancel(ctx), ref)
 	if err != nil {
 		p.Log.Warn("leaguesync: stored snapshot", "league", ref.Key(), "err", err)
 		return
 	}
+	e.loaded = true
 	if ok {
-		e.snap = &snap
+		e.snap, e.stored = &snap, true
 	}
 }
 
-func (p *Poller) cached(e *pollEntry, now time.Time) (Read, error) {
+// cached is the entry's last read with its staleness, or its last error.
+func (p *Poller) cached(e *pollEntry, now time.Time, gap time.Duration) (Read, error) {
 	if e.snap == nil {
 		return Read{}, e.err
 	}
 	r := Read{Snapshot: *e.snap}
-	// Stale only when the host failed since the last good read.
-	if e.err != nil {
-		r.Stale = now.Sub(e.snap.ReadAt)
+	age := now.Sub(e.snap.ReadAt)
+	if e.err != nil || (e.stored && age >= gap) {
+		r.Stale = age
 	}
 	return r, nil
 }

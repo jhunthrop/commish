@@ -152,7 +152,8 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 	saved := &leagues.Store{Pool: pool}
 	svc := &Service{
 		Hosts: hosts, Poller: &Poller{Hosts: hosts, Store: store, Now: clock.Now, Log: quietLog()},
-		Players: memoryPlayers{hosts}, Links: store, Saved: saved, Boards: smallBoard{}, Now: clock.Now, Log: quietLog(),
+		Admission: &Admission{Now: clock.Now},
+		Players:   memoryPlayers{hosts}, Links: store, Saved: saved, Boards: smallBoard{}, Now: clock.Now, Log: quietLog(),
 	}
 	a, b := caller{t, svc, alice.ID}, caller{t, svc, bob.ID}
 	link := "https://sleeper.com/leagues/" + ReplaySleeperLeague + "/team"
@@ -199,6 +200,11 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 	}, "")
 	if status != http.StatusBadRequest {
 		t.Fatalf("a MyFantasyLeague seat by username: %d %s", status, body)
+	}
+	// That league was read but never attached: nothing of it was kept.
+	mflRef := Ref{Host: HostMFL, LeagueID: ReplayMFLLeague, Season: ReplayMFLSeason}
+	if _, kept, err := store.LastSnapshot(ctx, mflRef); err != nil || kept {
+		t.Fatalf("a league read and not attached left a snapshot (%v, %v)", kept, err)
 	}
 
 	if status, _ := a.do(svc.detach, http.MethodDelete, "/", nil, aliceSync.Id.String()); status != http.StatusOK {
