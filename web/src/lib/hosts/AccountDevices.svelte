@@ -44,11 +44,7 @@
 	the phone app not built), so a code would lead nowhere. -->
 {#if devices && devices.length > 0}
 	<section aria-label="Paired devices">
-		<PanelHead
-			title="Paired devices"
-			aside={String(devices.length)}
-			level={2}
-		/>
+		<PanelHead title="Paired devices" aside={String(devices.length)} level={2} />
 		{#if devices}
 			{#if devices.length > 0}
 				<ActionRows label="Paired devices">
