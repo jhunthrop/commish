@@ -1,0 +1,1047 @@
+{
+ "name": "S.U.C.K. - Severely Underrated Carolina Keepers",
+ "week": 6,
+ "me": 12,
+ "teams": [
+  {
+   "losses": 0,
+   "name": "Muttdogs",
+   "owner": "muttdog",
+   "points_for": 818.24,
+   "roster_id": 10,
+   "ties": 0,
+   "wins": 5
+  },
+  {
+   "losses": 1,
+   "name": "Keeper? I Hardly Know Her",
+   "owner": "JeffHaseleyFBG",
+   "points_for": 739.38,
+   "roster_id": 3,
+   "ties": 0,
+   "wins": 4
+  },
+  {
+   "losses": 2,
+   "name": "Nacua Matata",
+   "owner": "Rad_Thad1",
+   "points_for": 784.06,
+   "roster_id": 12,
+   "ties": 0,
+   "wins": 3
+  },
+  {
+   "losses": 2,
+   "name": "Bower Rangers",
+   "owner": "pricej07",
+   "points_for": 732.94,
+   "roster_id": 6,
+   "ties": 0,
+   "wins": 3
+  },
+  {
+   "losses": 2,
+   "name": "Carried by QJs",
+   "owner": "PeakedInHighSkool",
+   "points_for": 652.7,
+   "roster_id": 2,
+   "ties": 0,
+   "wins": 3
+  },
+  {
+   "losses": 2,
+   "name": "Ball Snatchers",
+   "owner": "Quinnifer",
+   "points_for": 638.88,
+   "roster_id": 5,
+   "ties": 0,
+   "wins": 3
+  },
+  {
+   "losses": 3,
+   "name": "Dad Runners",
+   "owner": "jjzachariason",
+   "points_for": 661.48,
+   "roster_id": 4,
+   "ties": 0,
+   "wins": 2
+  },
+  {
+   "losses": 3,
+   "name": "Aaron Donald Dependent",
+   "owner": "Nowlan",
+   "points_for": 660.24,
+   "roster_id": 9,
+   "ties": 0,
+   "wins": 2
+  },
+  {
+   "losses": 3,
+   "name": "OnlyFannins",
+   "owner": "jordanp2323",
+   "points_for": 655.22,
+   "roster_id": 11,
+   "ties": 0,
+   "wins": 2
+  },
+  {
+   "losses": 4,
+   "name": "Max_Jensen10",
+   "owner": "Max_Jensen10",
+   "points_for": 608.7,
+   "roster_id": 8,
+   "ties": 0,
+   "wins": 1
+  },
+  {
+   "losses": 4,
+   "name": "thatmattkelley",
+   "owner": "thatmattkelley",
+   "points_for": 580.1,
+   "roster_id": 7,
+   "ties": 0,
+   "wins": 1
+  },
+  {
+   "losses": 4,
+   "name": "McConkey Kong Country",
+   "owner": "GMenJay",
+   "points_for": 567.04,
+   "roster_id": 1,
+   "ties": 0,
+   "wins": 1
+  }
+ ],
+ "season_basis": {
+  "scoring": "PPR",
+  "through": 5
+ },
+ "board_basis": [
+  "PPR, full 2026 season",
+  "ranked by points over replacement",
+  "tiers drawn within each position"
+ ],
+ "matchup": {
+  "mine": {
+   "team": "Nacua Matata",
+   "starters": [
+    {
+     "name": "Josh Allen",
+     "pos": "QB",
+     "pos_rank": 1,
+     "team": "BUF",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/3918298.png",
+     "bye": 7,
+     "proj": 307.3,
+     "vor": 55.13,
+     "vor_round": 3,
+     "games": 5,
+     "ppg": 28.2,
+     "placed": true
+    },
+    {
+     "name": "Jaylen Warren",
+     "pos": "RB",
+     "pos_rank": 20,
+     "team": "PIT",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4569987.png",
+     "bye": 9,
+     "proj": 157.32,
+     "vor": 9.16,
+     "vor_round": 5,
+     "games": 5,
+     "ppg": 18.6,
+     "placed": true
+    },
+    {
+     "name": "Braelon Allen",
+     "pos": "RB",
+     "pos_rank": 61,
+     "team": "NYJ",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4685247.png",
+     "bye": 13,
+     "proj": 61.58,
+     "vor": -86.58,
+     "vor_round": 20,
+     "games": 5,
+     "ppg": 8.9,
+     "placed": true
+    },
+    {
+     "name": "Malik Washington",
+     "pos": "WR",
+     "pos_rank": 61,
+     "team": "MIA",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4569603.png",
+     "bye": 6,
+     "proj": 125.6,
+     "vor": -54.43,
+     "vor_round": 13,
+     "games": 5,
+     "ppg": 10,
+     "placed": true
+    },
+    {
+     "name": "Courtland Sutton",
+     "pos": "WR",
+     "pos_rank": 25,
+     "team": "DEN",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/3128429.png",
+     "bye": 10,
+     "proj": 201.11,
+     "vor": 21.08,
+     "vor_round": 5,
+     "games": 5,
+     "ppg": 5.5,
+     "placed": true
+    },
+    {
+     "name": "Deebo Samuel Sr.",
+     "pos": "WR",
+     "pos_rank": 56,
+     "team": "SF",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/3126486.png",
+     "bye": 8,
+     "proj": 135.24,
+     "vor": -44.79,
+     "vor_round": 12,
+     "games": 5,
+     "ppg": 12.1,
+     "placed": true
+    },
+    {
+     "name": "Hunter Henry",
+     "pos": "TE",
+     "pos_rank": 20,
+     "team": "NE",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/3046439.png",
+     "bye": 11,
+     "proj": 97.92,
+     "vor": -42.12,
+     "vor_round": 11,
+     "games": 5,
+     "ppg": 7.7,
+     "placed": true
+    },
+    {
+     "name": "Kyren Williams",
+     "pos": "RB",
+     "pos_rank": 17,
+     "team": "LAR",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4430737.png",
+     "bye": 11,
+     "proj": 163.84,
+     "vor": 15.68,
+     "vor_round": 5,
+     "games": 5,
+     "ppg": 21.9,
+     "placed": true
+    },
+    {
+     "name": "Puka Nacua",
+     "pos": "WR",
+     "pos_rank": 1,
+     "team": "LAR",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4426515.png",
+     "bye": 11,
+     "proj": 344.08,
+     "vor": 164.05,
+     "vor_round": 1,
+     "games": 3,
+     "ppg": 25.9,
+     "placed": true
+    },
+    {
+     "name": "Seattle Seahawks",
+     "pos": "DEF",
+     "team": "SEA",
+     "placed": false
+    }
+   ]
+  },
+  "opponent": {
+   "team": "OnlyFannins",
+   "starters": [
+    {
+     "name": "Lamar Jackson",
+     "pos": "QB",
+     "pos_rank": 2,
+     "team": "BAL",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/3916387.png",
+     "bye": 13,
+     "proj": 300.25,
+     "vor": 48.08,
+     "vor_round": 3,
+     "games": 4,
+     "ppg": 19.8,
+     "placed": true
+    },
+    {
+     "name": "Jonathan Taylor",
+     "pos": "RB",
+     "pos_rank": 6,
+     "team": "IND",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4242335.png",
+     "bye": 13,
+     "proj": 236.07,
+     "vor": 87.91,
+     "vor_round": 2,
+     "games": 5,
+     "ppg": 19.5,
+     "placed": true
+    },
+    {
+     "name": "Tony Pollard",
+     "pos": "RB",
+     "pos_rank": 28,
+     "team": "TEN",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/3916148.png",
+     "bye": 9,
+     "proj": 139.63,
+     "vor": -8.53,
+     "vor_round": 8,
+     "games": 5,
+     "ppg": 8.7,
+     "placed": true
+    },
+    {
+     "name": "Devaughn Vele",
+     "pos": "WR",
+     "pos_rank": 72,
+     "team": "NO",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4569559.png",
+     "bye": 8,
+     "proj": 103.67,
+     "vor": -76.36,
+     "vor_round": 17,
+     "games": 5,
+     "ppg": 12.4,
+     "placed": true
+    },
+    {
+     "name": "Germie Bernard",
+     "pos": "WR",
+     "pos_rank": 80,
+     "team": "PIT",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4685261.png",
+     "bye": 9,
+     "proj": 99.88,
+     "vor": -80.15,
+     "vor_round": 19,
+     "games": 5,
+     "ppg": 5.5,
+     "placed": true
+    },
+    {
+     "name": "Jaylin Noel",
+     "pos": "WR",
+     "pos_rank": 82,
+     "team": "HOU",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4586312.png",
+     "bye": 8,
+     "proj": 95.31,
+     "vor": -84.72,
+     "vor_round": 20,
+     "games": 5,
+     "ppg": 8.9,
+     "placed": true
+    },
+    {
+     "name": "Harold Fannin Jr.",
+     "pos": "TE",
+     "pos_rank": 6,
+     "team": "CLE",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/5083076.png",
+     "bye": 11,
+     "proj": 148.61,
+     "vor": 8.57,
+     "vor_round": 6,
+     "games": 5,
+     "ppg": 10.3,
+     "placed": true
+    },
+    {
+     "name": "George Pickens",
+     "pos": "WR",
+     "pos_rank": 8,
+     "team": "DAL",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4426354.png",
+     "bye": 14,
+     "proj": 271.43,
+     "vor": 91.4,
+     "vor_round": 1,
+     "games": 5,
+     "ppg": 13.7,
+     "placed": true
+    },
+    {
+     "name": "Kenyon Sadiq",
+     "pos": "TE",
+     "pos_rank": 34,
+     "team": "NYJ",
+     "img": "https://a.espncdn.com/i/headshots/nfl/players/full/5083315.png",
+     "bye": 13,
+     "proj": 82.89,
+     "vor": -57.15,
+     "vor_round": 14,
+     "games": 5,
+     "ppg": 7.8,
+     "placed": true
+    },
+    {
+     "name": "Pittsburgh Steelers",
+     "pos": "DEF",
+     "team": "PIT",
+     "placed": false
+    }
+   ]
+  }
+ },
+ "roster": [
+  {
+   "slot": "starter",
+   "player": {
+    "name": "Josh Allen",
+    "pos": "QB",
+    "pos_rank": 1,
+    "team": "BUF",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/3918298.png",
+    "bye": 7,
+    "proj": 307.3,
+    "vor": 55.13,
+    "vor_round": 3,
+    "games": 5,
+    "ppg": 28.2,
+    "placed": true
+   }
+  },
+  {
+   "slot": "starter",
+   "player": {
+    "name": "Jaylen Warren",
+    "pos": "RB",
+    "pos_rank": 20,
+    "team": "PIT",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4569987.png",
+    "bye": 9,
+    "proj": 157.32,
+    "vor": 9.16,
+    "vor_round": 5,
+    "games": 5,
+    "ppg": 18.6,
+    "placed": true
+   }
+  },
+  {
+   "slot": "starter",
+   "player": {
+    "name": "Braelon Allen",
+    "pos": "RB",
+    "pos_rank": 61,
+    "team": "NYJ",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4685247.png",
+    "bye": 13,
+    "proj": 61.58,
+    "vor": -86.58,
+    "vor_round": 20,
+    "games": 5,
+    "ppg": 8.9,
+    "placed": true
+   }
+  },
+  {
+   "slot": "starter",
+   "player": {
+    "name": "Malik Washington",
+    "pos": "WR",
+    "pos_rank": 61,
+    "team": "MIA",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4569603.png",
+    "bye": 6,
+    "proj": 125.6,
+    "vor": -54.43,
+    "vor_round": 13,
+    "games": 5,
+    "ppg": 10,
+    "placed": true
+   }
+  },
+  {
+   "slot": "starter",
+   "player": {
+    "name": "Courtland Sutton",
+    "pos": "WR",
+    "pos_rank": 25,
+    "team": "DEN",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/3128429.png",
+    "bye": 10,
+    "proj": 201.11,
+    "vor": 21.08,
+    "vor_round": 5,
+    "games": 5,
+    "ppg": 5.5,
+    "placed": true
+   }
+  },
+  {
+   "slot": "starter",
+   "player": {
+    "name": "Deebo Samuel Sr.",
+    "pos": "WR",
+    "pos_rank": 56,
+    "team": "SF",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/3126486.png",
+    "bye": 8,
+    "proj": 135.24,
+    "vor": -44.79,
+    "vor_round": 12,
+    "games": 5,
+    "ppg": 12.1,
+    "placed": true
+   }
+  },
+  {
+   "slot": "starter",
+   "player": {
+    "name": "Hunter Henry",
+    "pos": "TE",
+    "pos_rank": 20,
+    "team": "NE",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/3046439.png",
+    "bye": 11,
+    "proj": 97.92,
+    "vor": -42.12,
+    "vor_round": 11,
+    "games": 5,
+    "ppg": 7.7,
+    "placed": true
+   }
+  },
+  {
+   "slot": "starter",
+   "player": {
+    "name": "Kyren Williams",
+    "pos": "RB",
+    "pos_rank": 17,
+    "team": "LAR",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4430737.png",
+    "bye": 11,
+    "proj": 163.84,
+    "vor": 15.68,
+    "vor_round": 5,
+    "games": 5,
+    "ppg": 21.9,
+    "placed": true
+   }
+  },
+  {
+   "slot": "starter",
+   "player": {
+    "name": "Puka Nacua",
+    "pos": "WR",
+    "pos_rank": 1,
+    "team": "LAR",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4426515.png",
+    "bye": 11,
+    "proj": 344.08,
+    "vor": 164.05,
+    "vor_round": 1,
+    "games": 3,
+    "ppg": 25.9,
+    "placed": true
+   }
+  },
+  {
+   "slot": "starter",
+   "player": {
+    "name": "Seattle Seahawks",
+    "pos": "DEF",
+    "team": "SEA",
+    "placed": false
+   }
+  },
+  {
+   "slot": "bench",
+   "player": {
+    "name": "Jaylen Wright",
+    "pos": "RB",
+    "pos_rank": 76,
+    "team": "MIA",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4682745.png",
+    "bye": 6,
+    "proj": 45.97,
+    "vor": -102.19,
+    "vor_round": 25,
+    "games": 4,
+    "ppg": 0.7,
+    "placed": true
+   }
+  },
+  {
+   "slot": "bench",
+   "player": {
+    "name": "Ryan Flournoy",
+    "pos": "WR",
+    "pos_rank": 71,
+    "team": "DAL",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/5083754.png",
+    "bye": 14,
+    "proj": 104.84,
+    "vor": -75.19,
+    "vor_round": 17,
+    "games": 5,
+    "ppg": 7.1,
+    "placed": true
+   }
+  },
+  {
+   "slot": "bench",
+   "player": {
+    "name": "Trevor Etienne",
+    "pos": "RB",
+    "team": "CAR",
+    "placed": false
+   }
+  },
+  {
+   "slot": "bench",
+   "player": {
+    "name": "Dak Prescott",
+    "pos": "QB",
+    "pos_rank": 5,
+    "team": "DAL",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/2577417.png",
+    "bye": 14,
+    "proj": 274.32,
+    "vor": 22.15,
+    "vor_round": 4,
+    "games": 5,
+    "ppg": 18.4,
+    "placed": true
+   }
+  },
+  {
+   "slot": "bench",
+   "player": {
+    "name": "Matthew Stafford",
+    "pos": "QB",
+    "pos_rank": 10,
+    "team": "LAR",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/12483.png",
+    "bye": 11,
+    "proj": 256.01,
+    "vor": 3.84,
+    "vor_round": 6,
+    "games": 5,
+    "ppg": 17.8,
+    "placed": true
+   }
+  },
+  {
+   "slot": "bench",
+   "player": {
+    "name": "AJ Dillon",
+    "pos": "RB",
+    "team": "CAR",
+    "placed": false
+   }
+  },
+  {
+   "slot": "bench",
+   "player": {
+    "name": "Rico Dowdle",
+    "pos": "RB",
+    "pos_rank": 25,
+    "team": "PIT",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4038815.png",
+    "bye": 9,
+    "proj": 147.18,
+    "vor": -0.98,
+    "vor_round": 8,
+    "games": 2,
+    "ppg": 5.3,
+    "placed": true
+   }
+  },
+  {
+   "slot": "bench",
+   "player": {
+    "name": "Jauan Jennings",
+    "pos": "WR",
+    "pos_rank": 63,
+    "team": "MIN",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/3886598.png",
+    "bye": 6,
+    "proj": 121.92,
+    "vor": -58.11,
+    "vor_round": 14,
+    "games": 4,
+    "ppg": 0.7,
+    "placed": true
+   }
+  },
+  {
+   "slot": "bench",
+   "player": {
+    "name": "Chuba Hubbard",
+    "pos": "RB",
+    "pos_rank": 26,
+    "team": "CAR",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4241416.png",
+    "bye": 5,
+    "proj": 142.54,
+    "vor": -5.62,
+    "vor_round": 8,
+    "games": 4,
+    "ppg": 19.8,
+    "placed": true
+   }
+  },
+  {
+   "slot": "bench",
+   "player": {
+    "name": "Breece Hall",
+    "pos": "RB",
+    "pos_rank": 13,
+    "team": "NYJ",
+    "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4427366.png",
+    "bye": 13,
+    "proj": 191.52,
+    "vor": 43.36,
+    "vor_round": 3,
+    "games": 3,
+    "ppg": 14.2,
+    "placed": true
+   }
+  }
+ ],
+ "pool": [
+  {
+   "name": "De'Von Achane",
+   "pos": "RB",
+   "pos_rank": 3,
+   "team": "MIA",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4429160.png",
+   "bye": 6,
+   "proj": 245.43,
+   "vor": 97.27,
+   "vor_round": 1,
+   "games": 3,
+   "ppg": 8.2,
+   "placed": true
+  },
+  {
+   "name": "Jayden Reed",
+   "pos": "WR",
+   "pos_rank": 51,
+   "team": "GB",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4362249.png",
+   "bye": 11,
+   "proj": 146.23,
+   "vor": -33.8,
+   "vor_round": 11,
+   "games": 2,
+   "ppg": 3.2,
+   "placed": true
+  },
+  {
+   "name": "David Njoku",
+   "pos": "TE",
+   "pos_rank": 18,
+   "team": "LAC",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/3123076.png",
+   "bye": 7,
+   "proj": 104.48,
+   "vor": -35.56,
+   "vor_round": 11,
+   "games": 2,
+   "ppg": 6.4,
+   "placed": true
+  },
+  {
+   "name": "Tyrone Tracy Jr.",
+   "pos": "RB",
+   "pos_rank": 44,
+   "team": "NYG",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4360516.png",
+   "bye": 8,
+   "proj": 101.42,
+   "vor": -46.74,
+   "vor_round": 12,
+   "games": 5,
+   "ppg": 0.9,
+   "placed": true
+  },
+  {
+   "name": "Chimere Dike",
+   "pos": "WR",
+   "pos_rank": 58,
+   "team": "TEN",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4431268.png",
+   "bye": 9,
+   "proj": 131.44,
+   "vor": -48.59,
+   "vor_round": 13,
+   "games": 5,
+   "ppg": 2.3,
+   "placed": true
+  },
+  {
+   "name": "Emari Demercado",
+   "pos": "RB",
+   "pos_rank": 45,
+   "team": "DAL",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4362478.png",
+   "bye": 14,
+   "proj": 98.97,
+   "vor": -49.19,
+   "vor_round": 13,
+   "games": 2,
+   "ppg": 0.8,
+   "placed": true
+  },
+  {
+   "name": "Jalen Nailor",
+   "pos": "WR",
+   "pos_rank": 60,
+   "team": "LV",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4382466.png",
+   "bye": 13,
+   "proj": 125.75,
+   "vor": -54.28,
+   "vor_round": 13,
+   "games": 4,
+   "ppg": 2.6,
+   "placed": true
+  },
+  {
+   "name": "Colby Parkinson",
+   "pos": "TE",
+   "pos_rank": 25,
+   "team": "LAR",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4242557.png",
+   "bye": 11,
+   "proj": 85.56,
+   "vor": -54.48,
+   "vor_round": 13,
+   "games": 4,
+   "ppg": 1.6,
+   "placed": true
+  },
+  {
+   "name": "Cole Kmet",
+   "pos": "TE",
+   "pos_rank": 26,
+   "team": "CHI",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4258595.png",
+   "bye": 10,
+   "proj": 85.56,
+   "vor": -54.48,
+   "vor_round": 13,
+   "games": 5,
+   "ppg": 3.3,
+   "placed": true
+  },
+  {
+   "name": "Tommy Tremble",
+   "pos": "TE",
+   "pos_rank": 27,
+   "team": "CAR",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4372780.png",
+   "bye": 5,
+   "proj": 85.56,
+   "vor": -54.48,
+   "vor_round": 13,
+   "games": 4,
+   "ppg": 4.8,
+   "placed": true
+  },
+  {
+   "name": "Theo Johnson",
+   "pos": "TE",
+   "pos_rank": 29,
+   "team": "NYG",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4429148.png",
+   "bye": 8,
+   "proj": 85.56,
+   "vor": -54.48,
+   "vor_round": 13,
+   "games": 5,
+   "ppg": 3.1,
+   "placed": true
+  },
+  {
+   "name": "Gunnar Helm",
+   "pos": "TE",
+   "pos_rank": 30,
+   "team": "TEN",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4686728.png",
+   "bye": 9,
+   "proj": 85.56,
+   "vor": -54.48,
+   "vor_round": 14,
+   "games": 5,
+   "ppg": 3,
+   "placed": true
+  },
+  {
+   "name": "Mason Taylor",
+   "pos": "TE",
+   "pos_rank": 31,
+   "team": "NYJ",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4808766.png",
+   "bye": 13,
+   "proj": 85.56,
+   "vor": -54.48,
+   "vor_round": 14,
+   "games": 3,
+   "ppg": 2.4,
+   "placed": true
+  },
+  {
+   "name": "Darnell Washington",
+   "pos": "TE",
+   "pos_rank": 33,
+   "team": "PIT",
+   "img": "https://a.espncdn.com/i/headshots/nfl/players/full/4430802.png",
+   "bye": 9,
+   "proj": 83.68,
+   "vor": -56.36,
+   "vor_round": 14,
+   "games": 5,
+   "ppg": 6,
+   "placed": true
+  }
+ ],
+ "pool_size": 189,
+ "moves": [
+  {
+   "at": "2026-10-11T16:44:07.309Z",
+   "kind": "add",
+   "teams": [
+    "McConkey Kong Country"
+   ],
+   "adds": [
+    [
+     "McConkey Kong Country",
+     "Roschon Johnson"
+    ]
+   ],
+   "drops": [
+    "George Holani"
+   ]
+  },
+  {
+   "at": "2026-10-11T16:43:42.369Z",
+   "kind": "add",
+   "teams": [
+    "McConkey Kong Country"
+   ],
+   "adds": [
+    [
+     "McConkey Kong Country",
+     "Aaron Rodgers"
+    ]
+   ],
+   "drops": [
+    "Nicholas Singleton"
+   ]
+  },
+  {
+   "at": "2026-10-11T13:23:58.523Z",
+   "kind": "add",
+   "teams": [
+    "Max_Jensen10"
+   ],
+   "adds": [
+    [
+     "Max_Jensen10",
+     "Pierre Strong"
+    ]
+   ],
+   "drops": [
+    "Dohnte Meyers"
+   ]
+  },
+  {
+   "at": "2026-10-11T13:10:57.616Z",
+   "kind": "add",
+   "teams": [
+    "Ball Snatchers"
+   ],
+   "adds": [
+    [
+     "Ball Snatchers",
+     "Darius Cooper"
+    ]
+   ],
+   "drops": [
+    "De'Von Achane"
+   ]
+  },
+  {
+   "at": "2026-10-11T10:21:04.224Z",
+   "kind": "add",
+   "teams": [
+    "thatmattkelley"
+   ],
+   "adds": [
+    [
+     "thatmattkelley",
+     "Isaac TeSlaa"
+    ]
+   ],
+   "drops": [
+    "Isaiah Williams"
+   ]
+  },
+  {
+   "at": "2026-10-11T10:19:01.988Z",
+   "kind": "add",
+   "teams": [
+    "thatmattkelley"
+   ],
+   "adds": [
+    [
+     "thatmattkelley",
+     "New York Jets"
+    ]
+   ],
+   "drops": [
+    "Indianapolis Colts"
+   ]
+  },
+  {
+   "at": "2026-10-10T15:20:26.085Z",
+   "kind": "waiver",
+   "teams": [
+    "Max_Jensen10"
+   ],
+   "adds": [
+    [
+     "Max_Jensen10",
+     "Kendrick Bourne"
+    ]
+   ],
+   "drops": [
+    "Xavier Hutchinson"
+   ]
+  },
+  {
+   "at": "2026-10-09T21:57:12.447Z",
+   "kind": "waiver",
+   "teams": [
+    "Keeper? I Hardly Know Her"
+   ],
+   "adds": [
+    [
+     "Keeper? I Hardly Know Her",
+     "Kaytron Allen"
+    ]
+   ],
+   "drops": [
+    "Seth McGowan"
+   ]
+  }
+ ]
+}
