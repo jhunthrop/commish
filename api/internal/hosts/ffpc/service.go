@@ -162,17 +162,23 @@ func (s *Service) connect(w http.ResponseWriter, r *http.Request) {
 }
 
 // answerSignIn answers a sign-in that did not go through, and reports
-// whether it did. A refusal and a page we do not know both count.
+// whether it did. Only FFPC refusing the email and password counts
+// toward the pause; an answer we did not expect is logged for the
+// operator (status codes and cookie names, never a value).
 func (s *Service) answerSignIn(w http.ResponseWriter, r *http.Request, accountID uuid.UUID, err error) bool {
 	if err == nil {
 		return false
 	}
 	switch {
-	case errors.Is(err, ErrBadSignIn), errors.Is(err, ErrUnexpected):
+	case errors.Is(err, ErrBadSignIn):
 		if rerr := s.Store.Refused(r.Context(), accountID, Host, s.Now()); rerr != nil {
 			s.Log.Warn("ffpc: keep refusal", "err", rerr)
 		}
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, "FFPC did not accept that sign-in.", nil)
+	case errors.Is(err, ErrUnexpected):
+		s.Log.Error("ffpc: sign-in answered unexpectedly", "err", err)
+		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable,
+			"FFPC answered in a way we did not expect. Try again in a few minutes.", nil)
 	case errors.Is(err, ErrFormChanged):
 		s.Log.Error("ffpc: sign-in form changed")
 		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable,

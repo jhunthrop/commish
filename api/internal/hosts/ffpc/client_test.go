@@ -33,6 +33,25 @@ type fakeFFPC struct {
 	stillOut bool
 	// challenge adds a field the known form lacks.
 	challenge bool
+	// ignoreSignIn answers a right sign-in with the form again and no
+	// refusal, as a sign-in FFPC drops without saying why.
+	ignoreSignIn bool
+}
+
+// The stand-in's own cookies: the server session the form is issued
+// under (HttpOnly, as FFPC sets it), and an HttpOnly sign-in cookie a
+// browser's script never sees, so no list of names copied from a
+// browser could have known it.
+const (
+	testServerSession = "srv-session-1"
+	testAuthCookie    = ".ASPXAUTH"
+	testAuthValue     = "auth-ticket-1"
+)
+
+// hasCookie reports the request carrying the cookie with the value.
+func hasCookie(r *http.Request, name, value string) bool {
+	c, err := r.Cookie(name)
+	return err == nil && c.Value == value
 }
 
 func (f *fakeFFPC) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -40,13 +59,15 @@ func (f *fakeFFPC) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.agents = append(f.agents, r.UserAgent())
 	f.times = append(f.times, time.Now())
 	f.mu.Unlock()
-	signedIn := false
-	if c, err := r.Cookie("BGSLMAuthenticated"); err == nil && c.Value == "yes" {
-		signedIn = true
-	}
+	// FFPC keeps the sign-in in its server session: a request without the
+	// session the form was issued under, or without the sign-in cookie, is
+	// a signed-out visitor.
+	inSession := hasCookie(r, "ASP.NET_SessionId", testServerSession)
+	signedIn := inSession && hasCookie(r, "BGSLMAuthenticated", "yes") && hasCookie(r, testAuthCookie, testAuthValue)
 	switch {
 	case r.URL.Path == loginPath && r.Method == http.MethodGet:
-		http.SetCookie(w, &http.Cookie{Name: "BGSLMSession", Value: "sessionID=ABC"})
+		http.SetCookie(w, &http.Cookie{Name: "ASP.NET_SessionId", Value: testServerSession, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
+		http.SetCookie(w, &http.Cookie{Name: "BGSLMSession", Value: "sessionID=ABC", Path: "/"})
 		extra := ""
 		if f.challenge {
 			extra = `<input name="txtSecurityCode" type="text" />`
@@ -63,13 +84,20 @@ func (f *fakeFFPC) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			f.posted[k] = r.PostForm.Get(k)
 		}
 		f.mu.Unlock()
-		if r.PostForm.Get(fieldUser) == testUser && r.PostForm.Get(fieldPass) == testPass && r.PostForm.Get("__VIEWSTATE") == "vs1" {
-			http.SetCookie(w, &http.Cookie{Name: "BGSLMAuthenticated", Value: "yes"})
-			http.SetCookie(w, &http.Cookie{Name: "Unrelated", Value: "dropped"})
+		right := r.PostForm.Get(fieldUser) == testUser && r.PostForm.Get(fieldPass) == testPass && r.PostForm.Get("__VIEWSTATE") == "vs1"
+		switch {
+		case !inSession || f.ignoreSignIn:
+			// A post outside the form's session: the form again, no refusal.
+			fmt.Fprint(w, `<form id="form1"><span id="spnSignInError"></span></form>`)
+		case right:
+			http.SetCookie(w, &http.Cookie{Name: "BGSLMAuthenticated", Value: "yes", Path: "/"})
+			http.SetCookie(w, &http.Cookie{Name: testAuthCookie, Value: testAuthValue, Path: "/", HttpOnly: true})
+			http.SetCookie(w, &http.Cookie{Name: "Stale", Value: "gone", Path: "/", MaxAge: -1})
+			http.SetCookie(w, &http.Cookie{Name: "BGSLMSession", Value: "sessionID=DEF", Path: "/"})
 			http.Redirect(w, r, "/MyTeams.aspx", http.StatusFound)
-			return
+		default:
+			fmt.Fprint(w, `<form id="form1"><span id="spnSignInError">Invalid email/password</span></form>`)
 		}
-		fmt.Fprint(w, `<form id="form1"><span>Invalid login</span></form>`)
 	case r.URL.Path == myTeamsPath && !signedIn:
 		http.Redirect(w, r, "/cms/public", http.StatusFound)
 	case r.URL.Path == myTeamsPath && r.Method == http.MethodGet:
@@ -116,8 +144,14 @@ func TestSignInReadAndOpenLeague(t *testing.T) {
 	if len(leagues) != 2 || leagues[0].LeagueID != "104870" {
 		t.Fatalf("leagues %+v", leagues)
 	}
-	if jar["BGSLMAuthenticated"] != "yes" || jar["BGSLMSession"] != "sessionID=ABC" || jar["Unrelated"] != "" {
+	// Every cookie FFPC set across the form, the post and its redirect,
+	// and none it expired.
+	if jar["BGSLMAuthenticated"] != "yes" || jar["BGSLMSession"] != "sessionID=DEF" ||
+		jar["ASP.NET_SessionId"] != testServerSession || jar[testAuthCookie] != testAuthValue {
 		t.Fatalf("jar keeps %v", keys(jar))
+	}
+	if _, ok := jar["Stale"]; ok {
+		t.Fatal("the jar keeps a cookie FFPC expired")
 	}
 	if fake.posted[fieldSubmit] != submitValue || fake.posted["__EVENTVALIDATION"] != "ev1" {
 		t.Fatalf("the post did not echo the form: %v", keys(fake.posted))
@@ -180,5 +214,28 @@ func TestChangedFormIsNotPosted(t *testing.T) {
 	}
 	if fake.signIns != 0 {
 		t.Fatalf("the password was posted %d times", fake.signIns)
+	}
+}
+
+// A post FFPC answers without refusing, after which My Teams still sends
+// the member away, is not a wrong password: it says so, with what the
+// operator needs and no cookie's value.
+func TestDroppedSignInIsUnexpected(t *testing.T) {
+	c, fake := testClient(t)
+	fake.ignoreSignIn = true
+	_, _, err := c.SignIn(context.Background(), testUser, testPass)
+	if !errors.Is(err, ErrUnexpected) || errors.Is(err, ErrBadSignIn) {
+		t.Fatalf("a dropped sign-in: %v", err)
+	}
+	msg := err.Error()
+	for _, want := range []string{"post 200", "ASP.NET_SessionId", "BGSLMSession", "/cms/public"} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("the reason lacks %q: %s", want, msg)
+		}
+	}
+	for _, secret := range []string{testServerSession, "sessionID=ABC", testPass, testUser} {
+		if strings.Contains(msg, secret) {
+			t.Fatalf("the reason names %q: %s", secret, msg)
+		}
 	}
 }
