@@ -70,40 +70,43 @@ func (s *Store) Join(ctx context.Context, account uuid.UUID, handle string, f Fo
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, 0, fmt.Errorf("lobby: seated already: %w", err)
 	}
-	rows, err := s.Pool.Query(ctx, `select id from app.rooms where queue = $1 and status = 'filling' and fill_deadline > now()
-		order by created_at limit $2`, string(f.Key), candidateRooms)
-	if err != nil {
-		return uuid.Nil, 0, fmt.Errorf("lobby: filling rooms: %w", err)
-	}
-	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
-	if err != nil {
-		return uuid.Nil, 0, fmt.Errorf("lobby: filling rooms: %w", err)
-	}
-	for _, id := range ids {
+	for attempt := 0; attempt < candidateRooms; attempt++ {
+		id, err := s.fillingRoom(ctx, f)
+		if err != nil {
+			return uuid.Nil, 0, err
+		}
 		seat, err := s.takeSeat(ctx, id, account, handle)
 		if errors.Is(err, errFull) {
 			continue
 		}
 		return id, seat, err
 	}
-	id, err := s.open(ctx, f)
-	if err != nil {
-		return uuid.Nil, 0, err
-	}
-	seat, err = s.takeSeat(ctx, id, account, handle)
-	return id, seat, err
+	return uuid.Nil, 0, fmt.Errorf("lobby: no %s room had a seat after %d tries", f.Key, candidateRooms)
 }
 
-// open makes a new filling room for the format.
-func (s *Store) open(ctx context.Context, f Format) (uuid.UUID, error) {
-	settings := f.Settings()
-	now := s.Now().UTC().Truncate(time.Millisecond)
+// fillingRoom is the format's oldest filling room with an open seat, or a
+// new one. One join at a time chooses per format (a transaction lock on
+// the format), so drafters who join together land in the same room.
+func (s *Store) fillingRoom(ctx context.Context, f Format) (uuid.UUID, error) {
 	var id uuid.UUID
-	err := s.Pool.QueryRow(ctx, `insert into app.rooms (queue, settings, seed, clock_seconds, teams, fill_deadline, created_at, updated_at)
-		values ($1, $2, $3, $4, $5, $6, $7, $7) returning id`,
-		string(f.Key), settings, int64(randomSeed()), f.ClockSeconds, f.Teams, now.Add(FillWindow), now).Scan(&id)
+	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext('lobby:' || $1))`, string(f.Key)); err != nil {
+			return err
+		}
+		err := tx.QueryRow(ctx, `select r.id from app.rooms r
+			where r.queue = $1 and r.status = 'filling' and r.fill_deadline > now()
+			and (select count(*) from app.room_seats st where st.room_id = r.id) < r.teams
+			order by r.created_at limit 1`, string(f.Key)).Scan(&id)
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		now := s.Now().UTC().Truncate(time.Millisecond)
+		return tx.QueryRow(ctx, `insert into app.rooms (queue, settings, seed, clock_seconds, teams, fill_deadline, created_at, updated_at)
+			values ($1, $2, $3, $4, $5, $6, $7, $7) returning id`,
+			string(f.Key), f.Settings(), int64(randomSeed()), f.ClockSeconds, f.Teams, now.Add(FillWindow), now).Scan(&id)
+	})
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("lobby: open a %s room: %w", f.Key, err)
+		return uuid.Nil, fmt.Errorf("lobby: a %s room: %w", f.Key, err)
 	}
 	return id, nil
 }
