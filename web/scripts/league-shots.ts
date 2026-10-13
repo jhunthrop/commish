@@ -119,7 +119,8 @@ async function shoot(
 	name: string,
 	who: Drafter | null,
 	path: string,
-	ready: string
+	ready: string,
+	fullPage = true
 ): Promise<void> {
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {

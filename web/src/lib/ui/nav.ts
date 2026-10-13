@@ -91,11 +91,15 @@ export function leagueItem(leagueId: string): RailItem {
 	};
 }
 
-/** The rail with League in its place when the account has a league. */
+/** The rail with League in its place when the account has a league. The phone's bar holds five, so
+ * League takes Our record's place there; Our record stays on the desk's rail. */
 export function railItems(leagueId: string | null): readonly RailItem[] {
 	if (leagueId === null) return RAIL;
 	const at = RAIL.findIndex((item) => item.section === 'sheet') + 1;
-	return [...RAIL.slice(0, at), leagueItem(leagueId), ...RAIL.slice(at)];
+	const rest = RAIL.slice(at).map((item) =>
+		item.section === 'record' ? { ...item, wideOnly: true } : item
+	);
+	return [...RAIL.slice(0, at), leagueItem(leagueId), ...rest];
 }
 
 /** Pinned to the foot of the rail. */
