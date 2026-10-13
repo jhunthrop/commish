@@ -36,7 +36,7 @@ from research.capsules.sweep import SweepPlan, SweepReport, sweep_capsules
 from research.nightly.capsule_gate import CapsuleGateResult, SharedSentence, board_universe_ids, capsule_gate
 from research.nightly.page_findings import PageFindings, page_findings
 
-REPAIR_PASSES: Final = 2
+REPAIR_PASSES: Final = 3
 # Each retry pass writes about half of what is left (measured on the 2026-10-13 regeneration: 31 of
 # 66 on the first), so three passes bring a tenth of the board unwritten under the 2% line.
 RETRY_PASSES: Final = 3
