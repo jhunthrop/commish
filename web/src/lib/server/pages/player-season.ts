@@ -24,7 +24,7 @@ export interface SeasonView {
  * the opponent and the basis line's "through week" say enough. */
 const NOTES: Readonly<Record<GameLogRow['status'], string>> = {
 	played: '',
-	inactive: 'No stat line',
+	inactive: 'Did not play',
 	bye: '',
 	upcoming: ''
 };

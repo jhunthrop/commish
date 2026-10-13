@@ -39,8 +39,10 @@ export const STAT_FIELDS = [
 export type StatField = (typeof STAT_FIELDS)[number];
 
 /** Where a week stands for him.
- *   played    he has a stat line for the week
- *   inactive  no stat line, and his club's game for the week is final with its lines in the records
+ *   played    he has a stat line for the week, or offensive snaps with no stats row: the weekly
+ *             release carries only players who recorded a stat, so that is a game with no touches,
+ *             every counted stat 0, 0 points, and his snap share from the snaps
+ *   inactive  no stat line and no snaps, and his club's game is final with its lines in the records
  *   bye       his club does not play
  *   upcoming  his club's game is not final, or its lines are not in the records yet */
 export const GAME_STATUSES = ['played', 'inactive', 'bye', 'upcoming'] as const;

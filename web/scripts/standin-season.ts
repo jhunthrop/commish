@@ -15,8 +15,10 @@
 //     scheduled. The nightly uses the feed's final flag instead.
 //   The player-week feed lands in two ingests: the stat line (the scoring stats and completions)
 //     and the usage line (carries, targets, pass attempts and the team totals).
-//   A week is played when he has a stat line, inactive when he has none and his club's game is in
-//     the records, upcoming otherwise, and a bye when his club does not play.
+//   A week is played when he has a stat line, or offensive snaps with no stats row: the weekly
+//     release carries only players who recorded a stat, so that is a game with no touches, every
+//     counted stat 0 and 0 points. With neither, the week is inactive once his club's game is in
+//     the records and upcoming before. A bye is a week his club does not play.
 //   Within a played week, a stat with no row is zero only when that week has his row from the same
 //     ingest and the store holds that metric for the week. Otherwise it is null (his usage line
 //     never landed, or the metric is not loaded yet). A week with no stat line is never zeros.
@@ -211,8 +213,12 @@ function lineOf(
 	carried: ReadonlySet<string>,
 	score: (line: PointsLine) => number
 ): StatLine {
+	// Snaps with no stats row is a game with no touches: the weekly release carries only players who
+	// recorded a stat, so both ingests read as zero lines.
+	const noTouches = !hasIngest(line, false);
 	const value = (field: string): number | null =>
-		line.get(field) ?? (hasIngest(line, isUsage(field)) && carried.has(field) ? 0 : null);
+		line.get(field) ??
+		((noTouches || hasIngest(line, isUsage(field))) && carried.has(field) ? 0 : null);
 	const counts = Object.fromEntries(STAT_FIELDS.map((field) => [field, value(field)])) as Record<
 		StatField,
 		number | null
@@ -265,9 +271,10 @@ function weekRow(week: number, player: PlayerRead, context: Context): GameLogRow
 	const game = inputs.schedule.slates
 		.find((slate) => slate.abbr === team)
 		?.games.find((candidate) => candidate.week === week);
-	// Played means a stat line. A week with only his usage line has no stat line to score.
-	const found = player.lines.get(week);
-	const line = found && hasIngest(found, false) ? found : undefined;
+	// Played means a stat line, or offensive snaps with no stats row (a game with no touches).
+	const found = player.lines.get(week) ?? new Map<string, number>();
+	const snapped = (player.snaps.get(week)?.get(SNAPS) ?? 0) > 0;
+	const line = hasIngest(found, false) || snapped ? found : undefined;
 	if (!game) {
 		if (context.byes.get(team) !== week)
 			throw new Error(`${team} has no week ${String(week)} game and it is not their bye.`);
