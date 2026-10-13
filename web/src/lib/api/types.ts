@@ -293,7 +293,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** What is for sale, for how much and what each product unlocks. Prices are read from Stripe, the annual Membership first; what each product unlocks is read from app.product_features. With checkout not open (Stripe not configured) the prices are null and the features still answer. */
+		/** What is for sale, for how much and what each product unlocks. Prices are read from Stripe, the annual Membership first; what each product unlocks is read from app.product_features. With checkout not open (Stripe not configured) the prices are the launch prices stripe-setup creates, and checkout_open says no one can pay yet. */
 		get: operations['getPlans'];
 		put?: never;
 		post?: never;
@@ -1105,9 +1105,9 @@ export interface components {
 			currency: string;
 			interval: components['schemas']['Interval'] | null;
 		};
-		/** @description A product whose price is not set in Stripe yet, or every product while checkout is not open, is null (draft_pass, group_pass) or missing from the list (membership). */
+		/** @description A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership). While checkout is not open the prices are the launch prices. */
 		PlanCatalog: {
-			/** @description the season a pass bought now is for */
+			/** @description the season a pass bought now is for: the current one until its first kickoff, then the next */
 			season: number;
 			/**
 			 * Format: date-time

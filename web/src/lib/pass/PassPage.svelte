@@ -35,6 +35,7 @@
 	} from './pass-api.ts';
 	import {
 		ALWAYS_FREE,
+		freeLine,
 		HOSTS,
 		addedFeatures,
 		featureLines,
@@ -136,21 +137,26 @@
 </script>
 
 <svelte:head>
-	<title>Draft Pass · Commish</title>
+	<title>Passes and Membership · Commish</title>
 	<meta
 		name="description"
 		content="Our call beside your real Sleeper draft, at every one of your picks, for one season."
 	/>
 </svelte:head>
 
-<Shell title="Draft Pass" active="account">
+<Shell title="Passes and Membership" active="account">
 	<main class="pass" aria-busy={catalog === null && !unreachable}>
 		<PageHead
 			title="Passes and Membership"
-			lead={catalog
-				? `For the ${String(catalog.season)} season. The board, every player and mock drafts stay free.`
-				: 'The board, every player and mock drafts stay free.'}
+			lead={catalog ? `For the ${String(catalog.season)} season. ${freeLine()}` : freeLine()}
 		/>
+		{#if catalog && !catalog.checkout_open}
+			<Panel edge="quiet" padding="sm">
+				<p class="note">
+					Checkout is not open yet. The figures below are set for the {catalog.season} season.
+				</p>
+			</Panel>
+		{/if}
 		{#if canceled}
 			<Panel edge="quiet" padding="sm">
 				<p class="note">Checkout closed before paying. Nothing was charged.</p>
@@ -191,7 +197,7 @@
 						{:else}
 							<Verb
 								fill
-								disabled={busy || !catalog?.draft_pass}
+								disabled={busy || !catalog?.checkout_open || !catalog.draft_pass}
 								onclick={() => void begin({ product: 'draft_pass' })}>Get the Draft Pass</Verb
 							>
 						{/if}
@@ -227,7 +233,7 @@
 						{:else}
 							<Quiet
 								fill
-								disabled={busy || !membershipPrice}
+								disabled={busy || !catalog?.checkout_open || !membershipPrice}
 								onclick={() => void begin({ product: 'membership', interval })}
 								>Become a member</Quiet
 							>
@@ -258,7 +264,7 @@
 					{#snippet action()}
 						<Quiet
 							fill
-							disabled={busy || !group || league.trim() === ''}
+							disabled={busy || !catalog?.checkout_open || !group || league.trim() === ''}
 							onclick={() =>
 								void begin({ product: 'group_pass', seats, league_name: league.trim() })}
 							>Get {seats} passes for my league</Quiet

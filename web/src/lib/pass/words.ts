@@ -1,7 +1,8 @@
 /** The pass page's words: what each feature does in a drafter's terms, a figure in dollars with
  * its basis, and which hosts the live draft works with today. Pure, so the page, the account page
  * and the claim page say a product the same way. */
-import { dayLabel } from '#lib/format/date.ts';
+import { dateLabel } from '#lib/format/date.ts';
+import { listWords } from '#lib/format/list.ts';
 import type { components } from '#lib/api/types.ts';
 
 type Schemas = components['schemas'];
@@ -85,7 +86,7 @@ export function perInterval(price: Price): string {
 
 /** "Good through Mar 1, 2027": when a pass bought now ends. */
 export function passEnds(catalog: Pick<PlanCatalog, 'pass_ends_at'>): string {
-	return dayLabel(catalog.pass_ends_at);
+	return dateLabel(catalog.pass_ends_at);
 }
 
 /** A host's live draft, said as a mechanism by the host's own name. ready is today. */
@@ -119,5 +120,13 @@ export const ALWAYS_FREE: readonly FeatureWords[] = [
 		lead: 'Mock drafts',
 		text: 'against bots or people, with our call at every pick and the report'
 	},
-	{ lead: 'Your cheat sheet', text: 'ranks, tiers, tags and notes, on every device' }
+	{ lead: 'Your cheat sheet', text: 'ranks, tiers, tags and notes, on every device you sign in on' }
 ];
+
+/** What stays free in one sentence, from the same list the pass page prints: "The board, every
+ * player, ADP and our record, mock drafts and your cheat sheet stay free." */
+export function freeLine(): string {
+	const [first = '', ...rest] = ALWAYS_FREE.map((line) => line.lead);
+	const names = [first, ...rest.map((lead) => lead.charAt(0).toLowerCase() + lead.slice(1))];
+	return `${listWords(names)} stay free.`;
+}

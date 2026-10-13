@@ -18,6 +18,19 @@ function parse(iso: string): Date {
 	return date;
 }
 
+const CALENDAR_DATE = new Intl.DateTimeFormat('en-US', {
+	month: 'short',
+	day: 'numeric',
+	year: 'numeric',
+	timeZone: 'UTC'
+});
+
+/** "Mar 1, 2028": a calendar date with its year, read in UTC, for an end the API stamps at a UTC
+ * midnight (a pass's season end), so no zone moves it to the day before. */
+export function dateLabel(iso: string): string {
+	return CALENDAR_DATE.format(parse(iso));
+}
+
 /** "Oct 12". */
 export function dayLabel(iso: string): string {
 	return DAY.format(parse(iso));
