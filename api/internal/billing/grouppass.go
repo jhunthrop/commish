@@ -1,7 +1,6 @@
 package billing
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -112,20 +111,19 @@ func (s *Service) claimGroupPass(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	accountID := auth.AccountID(r)
-	covered, err := s.coveredElsewhere(r.Context(), g, accountID)
-	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "billing: claim", err)
-		return
-	}
-	if covered != "" {
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, covered, nil)
-		return
-	}
-	err = s.Entitlements.ClaimGroupPass(r.Context(), g.ID, accountID, s.Now(), "claim:"+accountID.String())
+	err := s.Entitlements.ClaimGroupPass(r.Context(), g.ID, accountID, s.Now(), "claim:"+accountID.String())
 	switch {
 	case errors.Is(err, entitlements.ErrAlreadyClaimed):
 		// Claiming twice is not a mistake worth an error: the pass is
 		// already theirs.
+	case errors.Is(err, entitlements.ErrCoveredByMembership):
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict,
+			"Your Membership already includes the Draft Pass, so this seat stays open for your league", nil)
+		return
+	case errors.Is(err, entitlements.ErrCoveredByPass):
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict,
+			fmt.Sprintf("You already have the %d Draft Pass, so this seat stays open for your league", g.Season), nil)
+		return
 	case errors.Is(err, entitlements.ErrGroupPassFull):
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "Every pass on this link is taken", nil)
 		return
@@ -140,29 +138,4 @@ func (s *Service) claimGroupPass(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeAccount(w, r)
-}
-
-// coveredElsewhere says why the claimer already has what a seat grants
-// from somewhere else (the Membership, or their own pass for the
-// season), so a claim would only take a seat a teammate needs; empty
-// when they do not. A claimer who holds this pass's seat already is not
-// covered elsewhere: claiming again answers as before.
-func (s *Service) coveredElsewhere(ctx context.Context, g GroupPass, accountID uuid.UUID) (string, error) {
-	mine, err := s.Store.ClaimedBy(ctx, g.ID, accountID)
-	if err != nil || mine {
-		return "", err
-	}
-	now := s.Now()
-	m, err := s.Entitlements.LiveMembership(ctx, accountID, now)
-	if err != nil {
-		return "", err
-	}
-	if m != nil {
-		return "Your Membership already includes the Draft Pass, so this seat stays open for your league", nil
-	}
-	has, err := s.Entitlements.HasLivePass(ctx, accountID, g.Season, now)
-	if err != nil || !has {
-		return "", err
-	}
-	return fmt.Sprintf("You already have the %d Draft Pass, so this seat stays open for your league", g.Season), nil
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/season"
 )
@@ -124,7 +125,7 @@ func (s *Service) checkout(w http.ResponseWriter, r *http.Request) {
 	var url string
 	// One checkout at a time per account, so a double click cannot slip
 	// two purchases past the duplicate check.
-	err := s.Store.WithLock(r.Context(), "checkout:"+a.ID.String(), func(ctx context.Context) error {
+	err := s.Store.WithLock(r.Context(), entitlements.AccountLockKey(a.ID), func(ctx context.Context) error {
 		if err := s.refuseDuplicate(ctx, a, in.Product); err != nil {
 			return err
 		}
