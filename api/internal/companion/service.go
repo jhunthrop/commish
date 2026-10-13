@@ -128,7 +128,13 @@ func (s *Service) parseID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bo
 	return id, true
 }
 
+// load is one of the account's companions, for an account that still
+// has the live draft advisor: a pass refunded, disputed or past its
+// season loses the call and the report at once, the same 403 as create.
 func (s *Service) load(w http.ResponseWriter, r *http.Request) (Row, bool) {
+	if !s.allowed(w, r) {
+		return Row{}, false
+	}
 	id, ok := s.parseID(w, r)
 	if !ok {
 		return Row{}, false
