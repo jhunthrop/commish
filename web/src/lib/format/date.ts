@@ -34,3 +34,11 @@ export function windowLabel(window: { from: string; to: string }): string {
 	const to = dayLabel(window.to);
 	return from === to ? from : `${from} to ${to}`;
 }
+
+const LOCAL_TIME = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+
+/** "9:41 PM" on the reader's own clock: the time something happened in front of them, like a
+ * save, rather than a time the league keeps. */
+export function localTimeLabel(date: Date): string {
+	return LOCAL_TIME.format(date);
+}
