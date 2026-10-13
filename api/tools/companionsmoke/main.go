@@ -40,11 +40,16 @@ import (
 // fixtureHost answers the Poller from the recording, counting reads.
 type fixtureHost struct {
 	replay companion.Replay
-	reads  atomic.Int64
+	// down answers every read as Sleeper failing.
+	down  bool
+	reads atomic.Int64
 }
 
 func (h *fixtureHost) Draft(context.Context, string) (sleeper.Draft, error) {
 	h.reads.Add(1)
+	if h.down {
+		return sleeper.Draft{}, sleeper.ErrUnavailable
+	}
 	return h.replay.Draft, nil
 }
 
@@ -69,7 +74,8 @@ func run(dbURL string, slot, viewers, seconds int) error {
 	if err != nil {
 		return err
 	}
-	pollCost(replay, viewers, seconds)
+	pollCost(replay, viewers, seconds, false)
+	pollCost(replay, viewers, seconds, true)
 	pool, err := db.Open(dbURL)
 	if err != nil {
 		return err
@@ -92,8 +98,8 @@ func run(dbURL string, slot, viewers, seconds int) error {
 	return walk(ctx, replay, slot, settings, board)
 }
 
-func pollCost(replay companion.Replay, viewers, seconds int) {
-	host := &fixtureHost{replay: replay}
+func pollCost(replay companion.Replay, viewers, seconds int, down bool) {
+	host := &fixtureHost{replay: replay, down: down}
 	poller := &companion.Poller{Host: host, Now: time.Now}
 	deadline := time.Now().Add(time.Duration(seconds) * time.Second)
 	var asked atomic.Int64
@@ -112,8 +118,12 @@ func pollCost(replay companion.Replay, viewers, seconds int) {
 		}()
 	}
 	wg.Wait()
-	fmt.Printf("poll cost: %d viewers asked %d times in %d s, %d reads reached the host (%.2f a second, the cap is 0.5)\n",
-		viewers, asked.Load(), seconds, host.reads.Load(), float64(host.reads.Load())/float64(seconds))
+	state := "up"
+	if down {
+		state = "down, no snapshot ever"
+	}
+	fmt.Printf("poll cost (Sleeper %s): %d viewers asked %d times in %d s, %d reads reached the host (%.2f a second, the cap is 0.5)\n",
+		state, viewers, asked.Load(), seconds, host.reads.Load(), float64(host.reads.Load())/float64(seconds))
 }
 
 func placement(replay companion.Replay, raw *boards.Raw) {
