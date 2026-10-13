@@ -47,7 +47,8 @@ REPAIR_PASSES: Final = 3
 RETRY_PASSES: Final = 3
 # THE NIGHT'S CALLS FOR ONE PLAYER, shared by the sweep, the retries and the repairs. Phase C caps one
 # generation at six calls; with seven passes a night one player could take 42. Two full generations'
-# worth is the night's ceiling, and a player who reached it waits for the next night.
+# worth is the night's ceiling: a player starts a generation only while it cannot take him past it
+# (at most 6 calls used), and otherwise waits for the next night.
 NIGHT_CALLS_PER_PLAYER: Final = 12
 Log = Callable[[str], None]
 
@@ -141,7 +142,10 @@ class _Passes:
 
     @property
     def spent_out(self) -> frozenset[str]:
-        return frozenset(pid for pid, calls in self.calls_by_player.items() if calls >= NIGHT_CALLS_PER_PLAYER)
+        # A player is left for the next night once another full generation could take him past the
+        # ceiling (review N12: at 11 calls a six-call generation would reach 17).
+        last_start = NIGHT_CALLS_PER_PLAYER - CAPSULE_CONFIG.max_gateway_calls_per_player
+        return frozenset(pid for pid, calls in self.calls_by_player.items() if calls > last_start)
 
     def sweep(self, name: str, plan: SweepPlan) -> SweepReport:
         plan = replace(plan, exclude=plan.exclude | self.spent_out)
