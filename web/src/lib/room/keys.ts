@@ -4,14 +4,22 @@
 import type { KeyBinding } from '#lib/types/room.ts';
 
 const CALL: KeyBinding = { keys: 'Enter', does: 'draft our call' };
+/** The same key when no call came for the pick: Enter drafts the marked player, or the pool's top row. */
+const NO_CALL: KeyBinding = {
+	keys: 'Enter',
+	does: 'draft the marked player, or the top of the pool'
+};
 const MARK: KeyBinding = { keys: '↑ ↓', does: 'mark a player' };
 const DRAFT_MARKED: KeyBinding = { keys: 'D', does: 'draft the marked player' };
 const QUEUE: KeyBinding = { keys: 'Q', does: 'queue the marked player' };
 const UNDO: KeyBinding = { keys: 'U', does: 'undo your last pick' };
 const SEARCH: KeyBinding = { keys: '/', does: 'search the pool' };
 
-/** The solo room's keys: no clock, so the drafting keys always act. */
-export const SOLO_KEYS: readonly KeyBinding[] = [CALL, MARK, DRAFT_MARKED, QUEUE, UNDO, SEARCH];
+/** The solo room's keys: no clock, so the drafting keys always act. When no call came for the
+ * pick, the Enter line says what Enter drafts instead. */
+export function soloKeys(noCall: boolean): readonly KeyBinding[] {
+	return [noCall ? NO_CALL : CALL, MARK, DRAFT_MARKED, QUEUE, UNDO, SEARCH];
+}
 
 /** A lobby's keys. It is other people's draft too, so there is no undo, and off your clock there is
  * no pick to make, so the drafting keys leave the panel (and do nothing). */

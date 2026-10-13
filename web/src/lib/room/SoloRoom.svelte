@@ -8,7 +8,7 @@
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
 	import type { MockRoom, RoomCard } from './api.ts';
 	import { type CallView, callView, frameView, poolBasis } from './call.ts';
-	import { SOLO_KEYS, roomKeys } from './keys.ts';
+	import { roomKeys, soloKeys } from './keys.ts';
 	import {
 		type Board,
 		type PoolFilter,
@@ -311,7 +311,7 @@
 			{teams}
 			withCall={!readonly}
 		/>
-		{#if !readonly}<Keys bindings={SOLO_KEYS} />{/if}
+		{#if !readonly}<Keys bindings={soloKeys(noCall)} />{/if}
 	{/snippet}
 </RoomLayout>
 
