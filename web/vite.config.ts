@@ -12,6 +12,11 @@ const PRERENDER_CONCURRENCY = 8;
  * A player page never draws them, so they stay out of the shared chunk. */
 const BOARD_PARTS =
 	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|RangeBar)\.|site[\\/](BoardView|BoardPageView)\.)/;
+/** What only the user pages run: the mock room and its parts, the account, the request API client and
+ * the sheet's store. A nightly page never loads any of it with the page; the sheet arrives on a
+ * reader's first intent, the rest only on the pages that call the API. */
+const USER_PAGE_PARTS =
+	/[\\/]src[\\/]lib[\\/](room|account|api|sheet)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|OddsCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\./;
 /** A component joins the shared chunk once this many routes use it. Fewer, and every page would
  * carry code only a couple of pages run. */
 const SHARED_BY_ROUTES = 4;
@@ -55,9 +60,7 @@ export default defineConfig({
 							test: (id: string) =>
 								/[\\/]src[\\/]lib[\\/]/.test(id) &&
 								!/[\\/]ui[\\/]system[\\/]/.test(id) &&
-								// The sheet's store and sync load with the sheet pages, or on a reader's first
-								// intent elsewhere, never with every page.
-								!/[\\/]lib[\\/](sheet|api)[\\/]/.test(id) &&
+								!USER_PAGE_PARTS.test(id) &&
 								!BOARD_PARTS.test(id),
 							minShareCount: SHARED_BY_ROUTES,
 							priority: 1
