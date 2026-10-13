@@ -22,12 +22,15 @@
 		lines: readonly Line[];
 		/** Names the list for assistive tech. */
 		label: string;
+		/** Every lead is short and alike (a day): the leads take one column and every sentence starts
+		 * beside its lead, at every width. */
+		column?: boolean;
 	}
 
-	let { lines, label }: Props = $props();
+	let { lines, label, column = false }: Props = $props();
 </script>
 
-<ul aria-label={label}>
+<ul aria-label={label} class:column>
 	{#each lines as line (line.key ?? line.lead)}
 		<li class:struck={line.struck}>
 			{#if line.href}
@@ -93,6 +96,17 @@
 
 		.text {
 			flex-basis: 100%;
+		}
+	}
+
+	.column li {
+		display: grid;
+		grid-template-columns: 4.5em minmax(0, 1fr);
+	}
+
+	@media (max-width: 760px) {
+		.column .text {
+			flex-basis: auto;
 		}
 	}
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { count } from '#lib/format/number.ts';
-	import type { RoomPlayer } from '#lib/room/model.ts';
+	import type { LeagueBoardPlayer } from './board.ts';
 	import { POSITIONS, type Position } from '#lib/types/player.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -12,7 +12,7 @@
 	/** Our board with only the players nobody in your league holds: the waiver pool, ranked by points
 	 * over replacement for your league, a position at a time if you like, with your sheet's tags. */
 	interface Props {
-		rows: readonly RoomPlayer[];
+		rows: readonly LeagueBoardPlayer[];
 		tagsOf: (boardId: string | null) => readonly string[];
 		/** Whose points the rows carry. */
 		basis: string;
@@ -60,6 +60,7 @@
 				team: player.team
 			}}
 			tags={tagsOf(player.id)}
+			endsOnValue
 		/>
 	{:else}
 		<p class="none">Every player we rank at this position is on a roster in your league.</p>

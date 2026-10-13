@@ -52,7 +52,11 @@
 			text: 'on every device you sign in on, with your notes and tiers'
 		},
 		{ lead: 'Your mock drafts', text: 'and the report on each one' },
-		{ lead: 'Your leagues', text: 'on Sleeper or MyFantasyLeague, kept up to date' },
+		{
+			lead: 'Your leagues',
+			text: 'on Sleeper or MyFantasyLeague, kept up to date',
+			href: accountLinks.leagueNew()
+		},
 		{
 			lead: 'Your Draft Pass or Membership',
 			text: 'and the receipts for it',

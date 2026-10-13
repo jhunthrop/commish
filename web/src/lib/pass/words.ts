@@ -135,7 +135,14 @@ export const ALWAYS_FREE: readonly FeatureWords[] = [
 		lead: 'Mock drafts',
 		text: 'against bots or people, with our call at every pick and the report'
 	},
-	{ lead: 'Your cheat sheet', text: 'ranks, tiers, tags and notes, on every device you sign in on' }
+	{
+		lead: 'Your cheat sheet',
+		text: 'ranks, tiers, tags and notes, on every device you sign in on'
+	},
+	{
+		lead: 'Your league',
+		text: "kept up to date: your roster, this week's matchup, the players nobody holds and every move"
+	}
 ];
 
 /** What stays free in one sentence, from the same list the pass page prints: "The board, every

@@ -1,9 +1,10 @@
 /** What the league page reads off a sync: the host's name as a mechanism, the read's age, a team's
  * record, a move in words, and the drafter's roster and the pool as board players. Pure functions
  * over the API's answer. */
-import { plural } from '#lib/format/number.ts';
-import type { RoomPlayer } from '#lib/room/model.ts';
-import type { LeagueBoard } from './board.ts';
+import { fixed, plural, signed } from '#lib/format/number.ts';
+import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
+import type { IndexSeason } from '#lib/run/schema.ts';
+import type { LeagueBoard, LeagueBoardPlayer } from './board.ts';
 import type { LeagueHost, LeagueMove, LeaguePlayer, LeagueSync, LeagueTeam } from './api.ts';
 
 /** How often an open league page reads the league again. The API reads the host at most once a
@@ -63,28 +64,43 @@ export function teamName(sync: LeagueSync, rosterId: number): string {
 	return name !== '' ? name : `Team ${String(rosterId)}`;
 }
 
-/** A move as a line: who did it, and who came and went, with no closing period. */
-export function moveLine(sync: LeagueSync, move: LeagueMove): { lead: string; text: string } {
+/** A move as a sentence, with no closing period: "Alpha and Beta traded. Alpha got X, Beta got Y",
+ * "Alpha claimed X and dropped Y". The list leads it with its day. */
+export function moveWords(sync: LeagueSync, move: LeagueMove): string {
 	const names = (list: LeagueMove['adds']): string => list.map((m) => m.player.name).join(', ');
 	if (move.kind === 'trade') {
 		const [a = 0, b = 0] = move.roster_ids;
 		const toA = move.adds.filter((m) => m.roster_id === a);
 		const toB = move.adds.filter((m) => m.roster_id === b);
-		return {
-			lead: `${teamName(sync, a)} and ${teamName(sync, b)}`,
-			text: `traded. ${teamName(sync, a)} got ${names(toA) || 'nobody'}, ${teamName(sync, b)} got ${names(toB) || 'nobody'}`
-		};
+		const [nameA, nameB] = [teamName(sync, a), teamName(sync, b)];
+		return `${nameA} and ${nameB} traded. ${nameA} got ${names(toA) || 'nobody'}, ${nameB} got ${names(toB) || 'nobody'}`;
 	}
 	const who = teamName(sync, move.roster_ids[0] ?? 0);
 	const how = move.kind === 'waiver' ? 'claimed' : 'picked up';
 	const added = move.adds.length > 0 ? `${how} ${names(move.adds)}` : '';
 	const dropped = move.drops.length > 0 ? `dropped ${names(move.drops)}` : '';
-	return { lead: who, text: [added, dropped].filter((s) => s !== '').join(' and ') };
+	return `${who} ${[added, dropped].filter((part) => part !== '').join(' and ')}`;
+}
+
+/** His season so far with its basis: "5 games, 18.4 a game", or "No games yet". */
+export function seasonWords(season: IndexSeason): string {
+	if (season.pointsPerGame === null) return 'No games yet';
+	const figure = fixed(season.pointsPerGame, POINTS_PER_GAME_DECIMALS);
+	return `${plural(season.games, 'game')}, ${figure} a game`;
+}
+
+/** His preseason numbers with their basis: "proj 288, over repl +61". */
+export function projectionWords(player: { points: number | null; vor: number | null }): string {
+	const parts = [
+		player.points === null ? null : `proj ${fixed(player.points, 0)}`,
+		player.vor === null ? null : `over repl ${signed(player.vor, 0)}`
+	];
+	return parts.filter((part) => part !== null).join(', ');
 }
 
 /** A league player as a board row: the board's numbers when we placed him, the host's own name,
  * position and team when we did not. */
-export function rowOf(board: LeagueBoard, player: LeaguePlayer): RoomPlayer | null {
+export function rowOf(board: LeagueBoard, player: LeaguePlayer): LeagueBoardPlayer | null {
 	if (player.board_id !== null) {
 		const placed = board.byId.get(player.board_id);
 		if (placed) return placed;
@@ -94,7 +110,7 @@ export function rowOf(board: LeagueBoard, player: LeaguePlayer): RoomPlayer | nu
 
 /** The waiver pool: our board without every player a team in the league holds, in the board's own
  * order, best first by points over replacement. */
-export function poolRows(board: LeagueBoard, sync: LeagueSync): readonly RoomPlayer[] {
+export function poolRows(board: LeagueBoard, sync: LeagueSync): readonly LeagueBoardPlayer[] {
 	const held = new Set(sync.rostered);
 	return board.players.filter((p) => !held.has(p.id));
 }

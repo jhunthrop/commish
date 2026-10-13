@@ -4,14 +4,17 @@
  * resolves to the payload or throws an ApiError carrying the envelope's code, so a caller branches
  * on the code and shows the API's own sentence.
  */
+import { SESSION_CSRF_COOKIE } from './session.ts';
 import type { components } from './types.ts';
+
+export { hasSessionCookie } from './session.ts';
 
 type ErrorBody = components['schemas']['ErrorBody'];
 
 /** Each CSRF cookie and the header that echoes it: the session's, and a signed-out browser's (a
  * solo mock drafted before sign-in). The API reads the one that matches who is calling. */
 const CSRF_PAIRS = [
-	['commish_csrf', 'X-CSRF-Token'],
+	[SESSION_CSRF_COOKIE, 'X-CSRF-Token'],
 	['commish_anon_csrf', 'X-Anon-CSRF-Token']
 ] as const;
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -36,12 +39,6 @@ export class ApiError extends Error {
 function cookie(name: string): string | null {
 	const pair = document.cookie.split('; ').find((entry) => entry.startsWith(`${name}=`));
 	return pair ? decodeURIComponent(pair.slice(name.length + 1)) : null;
-}
-
-/** Whether this browser holds a signed-in session's CSRF cookie, which the API sets only with a
- * session: a page can skip a call that would answer 401 to a signed-out reader. */
-export function hasSessionCookie(): boolean {
-	return cookie(CSRF_PAIRS[0][0]) !== null;
 }
 
 interface Envelope {

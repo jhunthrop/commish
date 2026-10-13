@@ -147,22 +147,19 @@
 		{#if view === 'loading'}
 			<div class="reserve"></div>
 		{:else if view === 'signed-out'}
-			<EmptyState
-				title="Sign in to follow your league"
-				line="A league lives on your account. Following one is free."
-			>
-				{#snippet actions()}<Verb href={leagueApi.signInUrl(links.leagueNew())}>Sign in</Verb
-					>{/snippet}
-			</EmptyState>
+			<DisplayTitle size="page">Follow your league</DisplayTitle>
+			{@render gives(false)}
+			<ActionBar>
+				<!-- Back from sign-in on this same address, so a shared ?link= is still in it. -->
+				<Verb href={leagueApi.signInUrl(page.url.pathname + page.url.search)}
+					>Sign in to follow it</Verb
+				>
+			</ActionBar>
 		{:else if view === 'unreachable'}
 			<EmptyState title="This page can't reach Commish right now" line="Reload in a moment." />
 		{:else}
 			<DisplayTitle size="page">Follow your league</DisplayTitle>
-			<p class="lede">
-				We keep your roster, this week's matchup and every player nobody in your league holds up to
-				date, on our board. Free.
-			</p>
-			<p class="hosts">{hostsLine(ffpcOn)}</p>
+			{@render gives(way === 'link')}
 			{#if ffpcOn}
 				<ChipGroup label="Your league is on">
 					<Chip pressed={way === 'link'} onclick={() => (way = 'link')}
@@ -235,6 +232,17 @@
 		{/if}
 	</main>
 </Shell>
+
+<!-- What following a league gives, and where from: the same two lines signed in and out. Only the
+     link form, which has the field, asks for the link. -->
+{#snippet gives(withField: boolean)}
+	<p class="lede">
+		{#if withField}Paste your league's link.{/if}
+		We keep your roster, this week's matchup and every player nobody in your league holds up to date,
+		on our board. Free.
+	</p>
+	<p class="hosts">{hostsLine(ffpcOn)}</p>
+{/snippet}
 
 {#snippet alert()}
 	<ProblemLine>{problem}</ProblemLine>

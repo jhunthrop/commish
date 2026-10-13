@@ -2,7 +2,10 @@
 import { resolve } from '$app/paths';
 import { positionSegment } from '#lib/run/derive.ts';
 import type { Position } from '#lib/types/player.ts';
-import { COMPANION_START, LEAGUE_START } from '#lib/ui/nav.ts';
+import { COMPANION_START, LEAGUE_START, sectionHref } from '#lib/ui/nav.ts';
+
+/** The anchor of a player page's This season block. */
+export const SEASON_ANCHOR = 'this-season';
 
 export const links = {
 	board: (format: string, position: Position | null = null): string =>
@@ -13,6 +16,9 @@ export const links = {
 					position: positionSegment(position)
 				}),
 	player: (slug: string): string => resolve('/(run)/players/[slug]', { slug }),
+	/** His page at This season, the season line and the game log. */
+	playerSeason: (slug: string): string =>
+		`${resolve('/(run)/players/[slug]', { slug })}#${SEASON_ANCHOR}`,
 	adp: (format: string): string => resolve('/(run)/adp/[format]', { format }),
 	record: (): string => resolve('/(run)/record'),
 	clubs: (): string => resolve('/(run)/clubs'),
@@ -37,6 +43,9 @@ export const links = {
 	/** Where a league on another host is attached. */
 	leagueNew: (): string => resolve(LEAGUE_START),
 	league: (id: string): string => resolve('/league/[id]', { id }),
+	/** A new mock with a saved league's settings filled in, so drafting it is one tap. */
+	mockLeague: (savedId: string): string =>
+		`${sectionHref('mock')}?${new URLSearchParams({ league: savedId }).toString()}`,
 	/** The prerendered JSON a browser fetches for one player's numbers. */
 	playerData: (id: string): string => resolve('/data/players/[id].json', { id })
 } as const;

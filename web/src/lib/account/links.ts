@@ -8,6 +8,8 @@ export const accountLinks = {
 	pass: links.pass,
 	/** The live draft companion's start. */
 	companion: links.companionNew,
+	/** Where a league is attached. */
+	leagueNew: links.leagueNew,
 	sheet: links.sheet,
 	/** A finished mock opens on its report, one in progress on its room. */
 	mock: (mock: AccountMock): string =>

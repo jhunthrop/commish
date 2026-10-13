@@ -287,13 +287,49 @@ button{font:inherit;color:inherit}
   .pulls b{font-size:34px;min-width:3.2ch}
 }
 
+.season{display:flex;flex-direction:column;gap:var(--s-3);min-width:0}
+.season .head{display:flex;justify-content:space-between;align-items:baseline;gap:var(--s-3);margin:0;font-size:var(--t-md);font-weight:700}
+.log .frame{--wk-w:52px;--opp-w:104px;--pts-w:84px;position:relative;overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-md)}
+.log table{border-collapse:separate;border-spacing:0;width:100%;min-width:max-content;font-size:var(--t-sm)}
+.log th,.log td{height:44px;padding:0 var(--s-3);border-bottom:1px solid var(--line);background:var(--bg);text-align:end;white-space:nowrap}
+.log tbody tr:last-child > *{border-bottom:0}
+.log thead th{height:auto;padding-block:var(--s-2);font-size:var(--t-xs);font-weight:500;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3)}
+.log .pin{position:sticky;z-index:1;text-align:start}
+.log .wk{left:0;width:var(--wk-w);min-width:var(--wk-w);font-variant-numeric:tabular-nums}
+.log .opp{left:var(--wk-w);width:var(--opp-w);min-width:var(--opp-w);line-height:1.2}
+.log .lead{left:0}
+.log .pts{left:calc(var(--wk-w) + var(--opp-w));width:var(--pts-w);min-width:var(--pts-w);text-align:end;border-left:1px solid var(--line);border-right:1px solid var(--line-strong)}
+.log .line > *{height:auto;padding-block:var(--s-3);background:var(--surface);border-bottom:1px solid var(--line-strong);vertical-align:top}
+.log .line b,.log .line span{display:block}
+.log .lead b{font-size:var(--t-md)}
+.log .lead span{font-weight:400;color:var(--ink-2)}
+.log .line td b{font-family:var(--font-num);font-size:var(--t-xl);font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.log .line td span{max-width:11ch;margin:4px 0 0 auto;font-size:var(--t-xs);line-height:1.2;color:var(--ink-3);white-space:normal}
+.log .n{font-family:var(--font-num);font-size:var(--t-lg);font-weight:700;font-variant-numeric:tabular-nums}
+.log .played .opp{font-weight:600}
+.log .quiet .wk,.log .quiet .opp,.log .bye .wk,.log .bye .opp{color:var(--ink-3)}
+.log .note{display:block;font-size:var(--t-xs)}
+.log .bye > *{background:var(--surface)}
+.ahead h3{margin:var(--s-4) 0 var(--s-2);line-height:1}
+.ahead ol{display:grid;grid-template-columns:repeat(auto-fill,minmax(208px,1fr));column-gap:var(--s-5);margin:0;padding:0;list-style:none;border-top:1px solid var(--line)}
+.ahead li{display:grid;grid-template-columns:3.5em 1fr auto;align-items:center;gap:var(--s-2);min-height:32px;padding:0 var(--s-2);
+  border-bottom:1px solid var(--line);font-size:var(--t-sm);color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ahead li.bye{color:var(--ink-3);background:var(--surface)}
+.ahead .aw,.ahead .ad{color:var(--ink-3)}
+.foot-note{margin:0;font-size:var(--t-sm);color:var(--ink-3);max-width:72ch}
+@media (max-width: 760px){
+  .log .frame{--wk-w:40px;--opp-w:84px;--pts-w:60px}
+  .log th,.log td{padding-inline:var(--s-2)}
+  .ahead ol{grid-template-columns:minmax(0,1fr)}
+}
+
 </style>
 </head>
 <body>
 <div class="app">
 <nav class="rail" aria-label="Sections">
   <a class="mark" href="direction.html" aria-label="Commish"><b>C</b></a>
-  <a class="item" href="board.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg><span>Board</span></a><a class="item" href="player.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Players</span></a><a class="item" href="setup.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16M15 4v16"/></svg><span>Mock draft</span></a><a class="item" href="board.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h5"/></svg><span>Cheat sheet</span></a><a class="item wide-only" href="mock.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Advisor</span></a><a class="item wide-only" href="direction.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Our record</span></a>
+  <a class="item" href="board.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg><span>Board</span></a><a class="item" href="player.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Players</span></a><a class="item" href="setup.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16M15 4v16"/></svg><span>Mock draft</span></a><a class="item" href="board.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h5"/></svg><span>Cheat sheet</span></a><a class="item" href="league.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h13l-3 4.5L18 13H5"/></svg><span>League</span></a><a class="item wide-only" href="mock.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Advisor</span></a><a class="item wide-only" href="direction.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Our record</span></a>
   <span class="spacer"></span>
   <a class="item wide-only" href="direction.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18c1.5-2 3.4-3 5.5-3s4 1 5.5 3"/></svg><span>Account</span></a>
 </nav>
@@ -317,9 +353,19 @@ button{font:inherit;color:inherit}
     </div>
     <div class="big">
       <b>273.7</b>
-      <span>projected PPR points in 2026, over 14.6 expected games</span>
+      <span>PPR points in 2026, projected preseason over 14.6 games</span>
       <button class="verb" type="button">Add to my sheet</button>
     </div>
+  </section>
+  <section class="season" id="this-season" aria-label="This season">
+    <h2 class="head"><span>This season</span><span class="label">2026, PPR, through week 5</span></h2>
+    <p class="foot-note">Stat lines from the league's own records, scored in PPR. Points a game average the 5 games he played.</p>
+    <div class="log"><div class="frame" role="region" aria-label="Chris Olave week by week" tabindex="0"><table>
+      <thead><tr><th scope="col" class="pin wk">Wk</th><th scope="col" class="pin opp">Opp</th><th scope="col" class="pin pts">Pts</th><th scope="col">Tgt</th><th scope="col">Rec</th><th scope="col">Yds</th><th scope="col">TD</th><th scope="col">Car</th><th scope="col">Rush yds</th><th scope="col">Rush TD</th></tr></thead>
+      <tbody><tr class="line"><th scope="row" colspan="2" class="pin lead"><b>Season</b><span>5 games</span></th>
+        <td class="pin pts"><b>19.7</b><span>PPR points a game</span></td><td><b>54</b><span>targets</span></td><td><b>39</b><span>catches</span></td><td><b>537</b><span>receiving yards</span></td><td><b>1</b><span>receiving touchdown</span></td><td><b>0</b><span>carries</span></td><td><b>0</b><span>rushing yards</span></td><td><b>0</b><span>rushing touchdowns</span></td></tr>
+      <tr class="played"><th scope="row" class="pin wk">1</th><td class="pin opp">at DET</td><td class="pin pts n">28.2</td><td class="n">13</td><td class="n">10</td><td class="n">182</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td></tr><tr class="played"><th scope="row" class="pin wk">2</th><td class="pin opp">at BAL</td><td class="pin pts n">22.6</td><td class="n">10</td><td class="n">8</td><td class="n">86</td><td class="n">1</td><td class="n">0</td><td class="n">0</td><td class="n">0</td></tr><tr class="played"><th scope="row" class="pin wk">3</th><td class="pin opp">vs LV</td><td class="pin pts n">19.7</td><td class="n">13</td><td class="n">9</td><td class="n">107</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td></tr><tr class="played"><th scope="row" class="pin wk">4</th><td class="pin opp">vs ATL</td><td class="pin pts n">19.6</td><td class="n">12</td><td class="n">8</td><td class="n">116</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td></tr><tr class="played"><th scope="row" class="pin wk">5</th><td class="pin opp">vs MIN</td><td class="pin pts n">8.6</td><td class="n">6</td><td class="n">4</td><td class="n">46</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td></tr></tbody></table></div></div>
+    <section class="ahead" aria-label="Still to play"><h3><span class="label">Still to play</span></h3><ol><li class=""><span class="aw">Wk 6</span><span class="ao">at NYG</span><span class="ad">Sun Oct 18</span></li><li class=""><span class="aw">Wk 7</span><span class="ao">vs PIT</span><span class="ad">Sun Oct 25</span></li><li class="bye"><span class="aw">Wk 8</span><span class="ao">Bye</span><span class="ad"></span></li><li class=""><span class="aw">Wk 9</span><span class="ao">vs CLE</span><span class="ad">Sun Nov 8</span></li><li class=""><span class="aw">Wk 10</span><span class="ao">vs CAR</span><span class="ad">Sun Nov 15</span></li><li class=""><span class="aw">Wk 11</span><span class="ao">at CHI</span><span class="ad">Sun Nov 22</span></li><li class=""><span class="aw">Wk 12</span><span class="ao">at CIN</span><span class="ad">Sun Nov 29</span></li><li class=""><span class="aw">Wk 13</span><span class="ao">vs GB</span><span class="ad">Sun Dec 6</span></li><li class=""><span class="aw">Wk 14</span><span class="ao">at CAR</span><span class="ad">Sun Dec 13</span></li><li class=""><span class="aw">Wk 15</span><span class="ao">at TB</span><span class="ad">Sun Dec 20</span></li><li class=""><span class="aw">Wk 16</span><span class="ao">vs ARI</span><span class="ad">Sun Dec 27</span></li><li class=""><span class="aw">Wk 17</span><span class="ao">at ATL</span><span class="ad">Sun Jan 3</span></li><li class=""><span class="aw">Wk 18</span><span class="ao">vs TB</span><span class="ad">Sun Jan 10</span></li></ol></section>
   </section>
   <section class="facts">
     <div class="fact panel">
