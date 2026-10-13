@@ -23,6 +23,13 @@ export function dayLabel(iso: string): string {
 	return DAY.format(parse(iso));
 }
 
+const WEEKDAY = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: ZONE });
+
+/** "Thu Oct 15": a day ahead, where the weekday is how a drafter places it. */
+export function weekdayLabel(iso: string): string {
+	return `${WEEKDAY.format(parse(iso))} ${dayLabel(iso)}`;
+}
+
 /** "Oct 12, 1:00 AM EDT". */
 export function dayTimeLabel(iso: string): string {
 	return DAY_TIME.format(parse(iso));

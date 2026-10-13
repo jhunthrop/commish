@@ -55,6 +55,7 @@ import {
 	type IndexEntry,
 	type Manifest,
 	type Player,
+	type RecordWeek,
 	type RunRecord,
 	type Schedule,
 	type Source,
@@ -78,8 +79,9 @@ const ADP_VENDOR = 'Fantasy Football Calculator, 12-team PPR ADP';
 const WIN_TOTALS_FEED = 'vegas_win_totals';
 const WIN_TOTALS_VENDOR =
 	'Published preseason season win totals, the nfelo win_totals.csv (greerreNFL/nfelosrs)';
-/** Kickoff times in nfl_games are Eastern. The season opens in September, under daylight time. */
-const SEASON_OPENER_UTC_OFFSET = '-04:00';
+/** Why the record lists a week whose first kickoff passed with no board frozen. The ledger records
+ * the nightly run's failures over weeks 3 to 5. */
+const MISSED_WEEK_NOTE = 'Our nightly run failed that week.';
 
 const FORMAT: Format = {
 	id: 'ppr-12',
@@ -251,18 +253,49 @@ interface Preseason {
 	window: Window;
 }
 
-/** The season's first kickoff, from nfl_games' date ("20260909") and Eastern time ("8:20p"). */
-function firstKickoff(games: readonly GameRow[]): Date {
-	const opener = [...games]
-		.filter((game) => game.week === 1)
-		.sort((a, b) => a.game_date.localeCompare(b.game_date))[0];
-	const time = /^(\d{1,2}):(\d{2})([ap])$/.exec(opener?.kickoff_et ?? '');
-	if (!opener || !time) throw new Error('The 2026 slate has no week 1 kickoff to read.');
+const EASTERN_OFFSET = new Intl.DateTimeFormat('en-US', {
+	timeZone: 'America/New_York',
+	timeZoneName: 'longOffset'
+});
+
+/** The Eastern offset on a game's date ("-04:00" under daylight time, "-05:00" after), read at
+ * noon UTC, hours clear of the 2 AM change. */
+function easternOffset(date: string): string {
+	const noon = new Date(`${date}T12:00:00Z`);
+	const name = EASTERN_OFFSET.formatToParts(noon).find((part) => part.type === 'timeZoneName');
+	const offset = /GMT([+-]\d{2}:\d{2})/.exec(name?.value ?? '')?.[1];
+	if (!offset) throw new Error(`No Eastern offset for ${date}.`);
+	return offset;
+}
+
+/** The slate's word for a late-season kickoff the league has not set yet. */
+const KICKOFF_NOT_SET = 'TBD';
+
+/** A game's kickoff, from nfl_games' date ("20260909") and Eastern time ("8:20p"). A kickoff not
+ * set yet counts from the start of its day, the earliest it can be. */
+function kickoffOf(game: GameRow): Date {
+	const d = game.game_date;
+	const date = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+	if (game.kickoff_et === KICKOFF_NOT_SET)
+		return new Date(`${date}T00:00:00${easternOffset(date)}`);
+	const time = /^(\d{1,2}):(\d{2})([ap])$/.exec(game.kickoff_et);
+	if (!time)
+		throw new Error(`Week ${String(game.week)} has an unreadable kickoff "${game.kickoff_et}".`);
 	const [, hourText = '', minute = '', half = ''] = time;
 	const hour = (Number(hourText) % 12) + (half === 'p' ? 12 : 0);
-	const d = opener.game_date;
-	const iso = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}T${String(hour).padStart(2, '0')}:${minute}:00${SEASON_OPENER_UTC_OFFSET}`;
-	return new Date(iso);
+	return new Date(`${date}T${String(hour).padStart(2, '0')}:${minute}:00${easternOffset(date)}`);
+}
+
+/** A week's first kickoff. */
+function weekKickoff(games: readonly GameRow[], week: number): Date {
+	const kickoffs = games.filter((game) => game.week === week).map(kickoffOf);
+	if (kickoffs.length === 0) throw new Error(`The 2026 slate has no week ${String(week)} kickoff.`);
+	return new Date(Math.min(...kickoffs.map((kickoff) => kickoff.getTime())));
+}
+
+/** The season's first kickoff. */
+function firstKickoff(games: readonly GameRow[]): Date {
+	return weekKickoff(games, 1);
 }
 
 /** Every PPR 12-team capture before the first kickoff, averaged per player. */
@@ -368,8 +401,56 @@ function scheduleFrom(
 	};
 }
 
-async function recordFrom(sql: postgres.Sql): Promise<RunRecord> {
-	const frozen = await sql<{ week: number; frozen_at: Date; board_as_of: Date }[]>`
+interface FrozenRow {
+	week: number;
+	frozen_at: Date;
+	board_as_of: Date;
+}
+
+/** Every week of the season by its status as of now: frozen when the register froze it, missed
+ * when its first kickoff passed with no freeze, and upcoming otherwise, the next one with its day. */
+function seasonWeeks(
+	frozen: readonly FrozenRow[],
+	games: readonly GameRow[],
+	now: Date
+): RecordWeek[] {
+	const byWeek = new Map(frozen.map((row) => [row.week, row]));
+	const empty = { gradedAt: null, population: 0, lines: [] };
+	const weeks = Array.from({ length: LAST_WEEK }, (_, i) => i + 1);
+	const next = weeks.find((week) => !byWeek.has(week) && weekKickoff(games, week) > now);
+	return weeks.map((week): RecordWeek => {
+		const row = byWeek.get(week);
+		if (row) {
+			return {
+				week,
+				status: 'frozen',
+				frozenAt: row.frozen_at.toISOString(),
+				frozenBy: runIdOf(row.board_as_of),
+				...empty
+			};
+		}
+		const kickoff = weekKickoff(games, week);
+		if (kickoff <= now) {
+			return {
+				week,
+				status: 'missed',
+				frozenAt: null,
+				frozenBy: null,
+				...empty,
+				note: MISSED_WEEK_NOTE
+			};
+		}
+		const frozenAt = week === next ? kickoff.toISOString() : null;
+		return { week, status: 'upcoming', frozenAt, frozenBy: null, ...empty };
+	});
+}
+
+async function recordFrom(
+	sql: postgres.Sql,
+	games: readonly GameRow[],
+	now: Date
+): Promise<RunRecord> {
+	const frozen = await sql<FrozenRow[]>`
 		select week, max(frozen_at) as frozen_at, max(board_as_of) as board_as_of
 		from register_freeze_rows
 		where season = ${SEASON} and board_source = ${SERVED_REGISTER_BOARD}
@@ -389,14 +470,7 @@ async function recordFrom(sql: postgres.Sql): Promise<RunRecord> {
 		statistic: { agreement: 'agreement with the finish', placesOff: 'places off, typical player' },
 		method:
 			'Each week our PPR board is frozen before the first kickoff and graded after the games against how its players finished, with ADP graded the same way on the same players.',
-		weeks: frozen.map((row) => ({
-			week: row.week,
-			frozenAt: row.frozen_at.toISOString(),
-			frozenBy: runIdOf(row.board_as_of),
-			gradedAt: null,
-			population: 0,
-			lines: []
-		})),
+		weeks: seasonWeeks(frozen, games, now),
 		toDate: []
 	};
 }
@@ -498,11 +572,10 @@ async function main(): Promise<void> {
 		readCsv<CapsuleCsv>('capsules.csv')
 	]);
 	const sql = postgres(process.env.STANDIN_DATABASE_URL ?? DEFAULT_DATABASE_URL, { max: 2 });
+	const now = new Date();
 	try {
-		const [{ games, winTotals }, record] = await Promise.all([
-			slateAndValues(sql),
-			recordFrom(sql)
-		]);
+		const { games, winTotals } = await slateAndValues(sql);
+		const record = await recordFrom(sql, games, now);
 		const adp = await preseasonAdp(sql, firstKickoff(games));
 		const rows = boardRows(boardCsv, adp.byGsis);
 		const codes = [...new Set(rows.map((row) => row.team))].sort();
@@ -520,7 +593,7 @@ async function main(): Promise<void> {
 		const files = artifacts({
 			manifest: {
 				runId: RUN_ID,
-				runAt: new Date().toISOString(),
+				runAt: now.toISOString(),
 				season: SEASON,
 				implementation: IMPLEMENTATION,
 				standIn: true,
