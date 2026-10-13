@@ -74,3 +74,6 @@ web/node_modules/
 web/.svelte-kit/
 web/build/
 web/screenshots/
+
+# compiled measurement tool, built on demand
+api/roommeasure

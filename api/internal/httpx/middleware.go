@@ -1,9 +1,11 @@
 package httpx
 
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
+	"net"
 	"net/http"
 	"regexp"
 	"slices"
@@ -61,6 +63,17 @@ func (s *statusWriter) Write(b []byte) (int, error) {
 
 // Unwrap lets http.ResponseController reach the underlying writer.
 func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
+
+// Hijack hands the connection to a WebSocket upgrade: the room socket's
+// library asserts http.Hijacker on the writer it is given. The upgrade
+// is logged as 101.
+func (s *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	conn, rw, err := http.NewResponseController(s.ResponseWriter).Hijack()
+	if err == nil {
+		s.status = http.StatusSwitchingProtocols
+	}
+	return conn, rw, err
+}
 
 // routeInfo is filled in by the route wrapper (see Mount), so the
 // access log can name the route pattern rather than the raw path,
@@ -144,7 +157,7 @@ func SecurityHeaders() Middleware {
 // on the apex domain and the site is a different origin from the API.
 const (
 	corsMethods = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-	corsHeaders = "Content-Type, X-CSRF-Token, X-Request-Id"
+	corsHeaders = "Content-Type, X-CSRF-Token, X-Anon-CSRF-Token, X-Request-Id"
 	corsMaxAge  = "600"
 )
 

@@ -1,26 +1,32 @@
 // Command room is the live room service (spec §2.2): one process per
 // instance holding lobbies' clocks, WebSockets to the drafters with
-// session affinity, state as the app.room_actions log. Today it serves
-// health and the socket's seq handshake; the lobby lane (Lane 6) adds
-// the clock, the queue and the broadcast.
+// session affinity, state as the app.room_actions log. Every room's
+// clock runs under a lease this instance renews; a sweep adopts any live
+// room whose lease lapsed, so a room outlives the instance it started on.
 package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"slices"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/db"
+	"github.com/jhunthrop/commish/api/internal/draftroom"
+	"github.com/jhunthrop/commish/api/internal/lobby"
 	"github.com/jhunthrop/commish/api/internal/metrics"
 	"github.com/jhunthrop/commish/api/internal/rooms"
 	"github.com/jhunthrop/commish/api/internal/server"
+	"github.com/jhunthrop/commish/api/internal/sheets"
 )
 
 // version is set at build: -ldflags "-X main.version=<git sha>".
@@ -36,6 +42,18 @@ func main() {
 		log.Error("exit", "err", err)
 		os.Exit(1)
 	}
+}
+
+// instanceName tells this process apart in a room's lease: the
+// configured name, else the host and a random suffix.
+func instanceName(configured string) string {
+	if configured != "" {
+		return configured
+	}
+	host, _ := os.Hostname()
+	var b [4]byte
+	_, _ = rand.Read(b[:])
+	return host + "-" + hex.EncodeToString(b[:])
 }
 
 func run(ctx context.Context, log *slog.Logger) error {
@@ -58,14 +76,35 @@ func run(ctx context.Context, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	socket := &rooms.Socket{
-		Rooms: &rooms.Store{Pool: pool}, OriginHosts: rooms.OriginHosts(cfg.HTTP.CORSOrigins), Log: log,
+	draftBoards, closeBoards, err := draftroom.OpenBoards(pool, cfg.Board, time.Now)
+	if err != nil {
+		return err
 	}
+	defer closeBoards()
+	hub := &rooms.Hub{URL: cfg.ListenURL, Log: log}
+	store := &lobby.Store{Pool: pool, Now: time.Now, OnWrite: hub.Signal}
+	owners := &rooms.Owners{
+		Pool: pool, Store: store, Hub: hub, Instance: instanceName(cfg.Instance), Now: time.Now, Log: log,
+		Clock: &lobby.Clock{Store: store, Boards: draftBoards, Sheets: &sheets.Store{Pool: pool}},
+		Lease: rooms.DefaultLease, Renew: rooms.DefaultRenew, Sweep: rooms.DefaultSweep,
+	}
+	socket := &rooms.Socket{Lobby: store, Hub: hub, Adopt: owners.Adopt, OriginHosts: rooms.OriginHosts(cfg.HTTP.CORSOrigins), Now: time.Now, Log: log}
+	owners.Serving = socket.Serving
+
 	mux := http.NewServeMux()
 	routes := slices.Concat(server.Health(pool, version), socket.Routes())
 	if err := server.Mount(mux, routes, sessions, time.Now); err != nil {
 		return err
 	}
+	// The clocks stop and give their leases up when the server stops,
+	// whether by signal or by failing.
+	bgCtx, stopBackground := context.WithCancel(ctx)
+	var background sync.WaitGroup
+	background.Add(2)
+	go func() { defer background.Done(); hub.Run(bgCtx) }()
+	go func() { defer background.Done(); owners.Run(bgCtx) }()
+	defer background.Wait()
+	defer stopBackground()
 	registry := metrics.New()
 	public := server.Stack(mux, log, registry, cfg.HTTP.CORSOrigins)
 	return server.Run(ctx, log, cfg.HTTP.Port, public, cfg.HTTP.MetricsPort, registry.Handler())

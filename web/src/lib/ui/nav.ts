@@ -17,7 +17,7 @@ export const HOME_HREF = '/';
 export const RAIL: readonly RailItem[] = [
 	{ section: 'board', label: 'Board', href: '/board', icon: 'board', wideOnly: false },
 	{ section: 'players', label: 'Players', href: '/players', icon: 'players', wideOnly: false },
-	{ section: 'mock', label: 'Mock draft', href: '/mock', icon: 'mock', wideOnly: false },
+	{ section: 'mock', label: 'Mock draft', href: '/mock/new', icon: 'mock', wideOnly: false },
 	{ section: 'sheet', label: 'Cheat sheet', href: '/sheet', icon: 'sheet', wideOnly: false },
 	{ section: 'advisor', label: 'Advisor', href: '/advisor', icon: 'advisor', wideOnly: true },
 	{ section: 'record', label: 'Our record', href: '/record', icon: 'record', wideOnly: true }

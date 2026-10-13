@@ -9,6 +9,18 @@ export interface WentPick {
 	queued: boolean;
 }
 
+/** One face on a strip of picks: what went since your pick, or picks as they land in a lobby. */
+export interface StripPick {
+	key: number;
+	player: PlayerRef;
+	/** The lines under the name: the pick, "queued", who took him. */
+	lines: readonly string[];
+	/** accent rings a player from your queue, ink marks the newest pick. */
+	ring?: 'accent' | 'ink';
+	/** The line after the name set in ink, for a pick a person made. */
+	strong?: boolean;
+}
+
 /** One line of your roster: a starting slot or the bench, filled or open. */
 export interface TeamSlot {
 	/** QB, RB, WR, TE, FLEX, BN. */

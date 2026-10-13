@@ -47,9 +47,13 @@
 		text-align: right;
 	}
 
+	/* A phone's number columns are narrow: a cell's basis wraps under its number rather than clip. */
 	@media (max-width: 760px) {
 		.cell {
 			letter-spacing: 0.03em;
+			white-space: normal;
+			line-height: 1.1;
+			text-align: right;
 		}
 	}
 </style>

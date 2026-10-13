@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Env is the deployment's environment. Production turns on Secure
@@ -130,6 +131,29 @@ type HTTP struct {
 	TrustedProxyHops int
 }
 
+// Board is where the rooms read the board they draft from: the research
+// lane's tables (spec §2.5).
+type Board struct {
+	// DatabaseURL reaches the research tables; empty reads them through
+	// DATABASE_URL, the production shape (one database, two schemas).
+	DatabaseURL string
+	// Schema holds the research tables.
+	Schema string
+	// Season is the season the board drafts for.
+	Season int
+	// SourcePrefix names the stored boards, <prefix>_<format>_12.
+	SourcePrefix string
+	// TTL is how long a loaded board serves before it is read again.
+	TTL time.Duration
+}
+
+// Advisor is the research lane's advisor service. An empty URL leaves
+// the card to the engine's own room odds.
+type Advisor struct {
+	URL     string
+	Timeout time.Duration
+}
+
 // API is cmd/api's whole configuration.
 type API struct {
 	Env      Env
@@ -140,6 +164,11 @@ type API struct {
 	Stripe   Stripe
 	R2       R2
 	Mail     Mail
+	Board    Board
+	Advisor  Advisor
+	// RoomBaseURL is the room service's WebSocket origin a lobby seat is
+	// handed, wss://room.trycommish.app in production.
+	RoomBaseURL string
 }
 
 // Room is cmd/room's whole configuration.
@@ -148,6 +177,12 @@ type Room struct {
 	HTTP     HTTP
 	Database Database
 	Session  Session
+	Board    Board
+	// ListenURL is a direct (unpooled) connection for LISTEN, which a
+	// transaction pooler cannot carry. Falls back to DATABASE_URL.
+	ListenURL string
+	// Instance names this process in a room's lease.
+	Instance string
 }
 
 // Getenv is os.Getenv's shape, injected so tests never touch the
@@ -344,6 +379,74 @@ func (l *loader) r2() R2 {
 	}
 }
 
+// Board and advisor defaults: the 2026 board under the v9 source names,
+// read again every fifteen minutes; the advisor's answer awaited 300 ms
+// (its measured p90 is 35 to 63 ms) before the engine answers instead.
+const (
+	defaultBoardSchema    = "research"
+	defaultBoardSeason    = 2026
+	defaultBoardPrefix    = "commish_board_v9"
+	defaultBoardTTL       = 15 * time.Minute
+	defaultAdvisorTimeout = 300 * time.Millisecond
+	defaultDevRoomBaseURL = "ws://localhost:8081"
+)
+
+func (l *loader) positiveInt(name string, def int) int {
+	v := strings.TrimSpace(l.get(name))
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		l.invalid(name, "must be a whole number above 0")
+		return def
+	}
+	return n
+}
+
+func (l *loader) board() Board {
+	b := Board{
+		DatabaseURL:  l.optional("BOARD_DATABASE_URL", ""),
+		Schema:       l.optional("BOARD_SCHEMA", defaultBoardSchema),
+		Season:       l.positiveInt("BOARD_SEASON", defaultBoardSeason),
+		SourcePrefix: l.optional("BOARD_SOURCE_PREFIX", defaultBoardPrefix),
+		TTL:          time.Duration(l.positiveInt("BOARD_TTL_SECONDS", int(defaultBoardTTL/time.Second))) * time.Second,
+	}
+	l.postgresURL("BOARD_DATABASE_URL", b.DatabaseURL)
+	return b
+}
+
+func (l *loader) advisor() Advisor {
+	a := Advisor{
+		URL:     strings.TrimRight(l.optional("ADVISOR_URL", ""), "/"),
+		Timeout: time.Duration(l.positiveInt("ADVISOR_TIMEOUT_MS", int(defaultAdvisorTimeout/time.Millisecond))) * time.Millisecond,
+	}
+	if a.URL != "" {
+		if u, err := url.Parse(a.URL); err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+			l.invalid("ADVISOR_URL", "must be an http(s) origin")
+		}
+	}
+	return a
+}
+
+func (l *loader) roomBaseURL(env Env) string {
+	def := ""
+	if env == EnvDevelopment {
+		def = defaultDevRoomBaseURL
+	}
+	v := strings.TrimRight(l.optional("ROOM_BASE_URL", def), "/")
+	u, err := url.Parse(v)
+	switch {
+	case v == "":
+		l.errs = append(l.errs, &VarError{Name: "ROOM_BASE_URL", Err: ErrMissing, Reason: "a lobby seat is handed the room's socket"})
+	case err != nil || u.Host == "" || (u.Scheme != "ws" && u.Scheme != "wss"):
+		l.invalid("ROOM_BASE_URL", "must be a ws:// or wss:// origin")
+	case env == EnvProduction && u.Scheme != "wss":
+		l.invalid("ROOM_BASE_URL", "must be wss in production")
+	}
+	return v
+}
+
 // LoadAPI reads cmd/api's configuration.
 func LoadAPI(get Getenv) (API, error) {
 	l := &loader{get: get}
@@ -355,6 +458,9 @@ func LoadAPI(get Getenv) (API, error) {
 	c.Stripe = l.stripe()
 	c.R2 = l.r2()
 	c.Mail = Mail{ResendAPIKey: l.optional("RESEND_API_KEY", ""), From: l.optional("MAIL_FROM", defaultMailFrom)}
+	c.Board = l.board()
+	c.Advisor = l.advisor()
+	c.RoomBaseURL = l.roomBaseURL(c.Env)
 	return c, l.err()
 }
 
@@ -365,7 +471,28 @@ func LoadRoom(get Getenv) (Room, error) {
 	c.HTTP = l.http(c.Env)
 	c.Database = l.database()
 	c.Session = l.session(c.Env)
+	c.Board = l.board()
+	c.ListenURL = l.optional("ROOM_LISTEN_DATABASE_URL", DirectURL(c.Database.URL))
+	l.postgresURL("ROOM_LISTEN_DATABASE_URL", c.ListenURL)
+	// Empty names the instance by its host and a random suffix.
+	c.Instance = l.optional("ROOM_INSTANCE", "")
 	return c, l.err()
+}
+
+// neonPoolerSuffix marks Neon's pooled endpoint in a host name: the
+// direct endpoint is the same host without it.
+const neonPoolerSuffix = "-pooler."
+
+// DirectURL is a database URL's direct (unpooled) endpoint: Neon's pooled
+// host with "-pooler" taken out, any other URL as it is. LISTEN needs a
+// session the pooler cannot hold.
+func DirectURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || !strings.Contains(u.Host, neonPoolerSuffix) {
+		return raw
+	}
+	u.Host = strings.Replace(u.Host, neonPoolerSuffix, ".", 1)
+	return u.String()
 }
 
 // LoadMigrate reads cmd/migrate's configuration: only the database.

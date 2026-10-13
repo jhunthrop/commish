@@ -26,6 +26,8 @@
 	--t-md: 0.9375rem; /* 15 names, body in rows */
 	--t-lg: 1.125rem; /* 18 section heads, prose */
 	--t-xl: 1.625rem; /* 26 cell numbers in display face */
+	--t-head: 1.875rem; /* 30 a panel title in the display face */
+	--t-display: 2.375rem; /* 38 a page title in the display face */
 	--t-2xl: 2.75rem; /* 44 tier cliffs, clock */
 	--t-3xl: 5.5rem; /* 88 the one big number on a page */
 	--track-label: 0.08em;
