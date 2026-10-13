@@ -6,14 +6,14 @@ its path in the run (`RUN_PATHS` in `web/src/lib/run/schema.ts`), with the sourc
 each feed's vendor and window.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
-from research.capsules.store import WRITTEN_SOURCE, stored_capsules_for
+from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, stored_capsules_for
 from research.errors import ResearchError
 from research.model.reads.teams import first_kickoff_for
 from research.nightly.build import pages, season
@@ -109,7 +109,10 @@ def _record(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> tuple[Jso
     return record, source
 
 
-def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> Assembled:
+def _captures(
+    conn: Connection, as_of: datetime
+) -> tuple[dict[str, AdpCapture], tuple[RunFormat, ...], tuple[str, ...]]:
+    """Tonight's ADP per source, the formats it carries, and each format dropped with why."""
     cutoff = adp_cutoff(as_of, first_kickoff_for(conn, PRODUCT_SEASON))
     captures: dict[str, AdpCapture] = {}
     for run_format in RUN_FORMATS:
@@ -122,7 +125,36 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> Assemble
         raise AssemblyError(
             f"adp_missing:{PAGE_FORMAT.id}: the page format has no ADP at or before {season.iso(cutoff)}"
         )
-    captures = {source: c for source, c in captures.items() if any(f.adp.source == source for f in formats)}
+    carried = {source: c for source, c in captures.items() if any(f.adp.source == source for f in formats)}
+    return carried, formats, dropped
+
+
+def _feed_sources(
+    boards: Sequence[FormatBoard], captures: Mapping[str, AdpCapture], capsules: Mapping[str, StoredCapsule]
+) -> list[Json]:
+    """The sources block's boards, ADP and capsules entries, each with its vendor and window."""
+    board_sources = {
+        b.stored.source: {"artifact": "boards", "vendor": f"Commish projections, model {b.stored.model_version}",
+                          "feed": b.stored.source, "window": season.window(b.stored.as_of, b.stored.as_of)}
+        for b in boards
+    }  # fmt: skip
+    adp_sources = [
+        {"artifact": "adp", "vendor": c.feed.vendor, "feed": c.feed.source,
+         "window": season.window(c.captured_at, c.captured_at)}
+        for c in captures.values()
+        if c.captured_at is not None
+    ]  # fmt: skip
+    written = [c for c in capsules.values() if c.source == WRITTEN_SOURCE]
+    capsule_sources = (
+        [{"artifact": "capsules", "vendor": f"written by {', '.join(sorted({c.model or 'the writer' for c in written}))}",
+          "feed": "player_capsules", "window": season.window(min(c.generated_at for c in written), max(c.generated_at for c in written))}]
+        if written else []
+    )  # fmt: skip
+    return [*board_sources.values(), *adp_sources, *capsule_sources]
+
+
+def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> Assembled:
+    captures, formats, dropped = _captures(conn, as_of)
     boards = _boards(conn, as_of, formats)
     adp_by_format = {f.id: season.format_adp(f, captures) for f in formats}
     people = tuple(pages.identities(boards))
@@ -144,40 +176,15 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> Assemble
         "clubs.json": clubs,
         "schedule.json": schedule,
     }
-    board_sources = {
-        b.stored.source: {"artifact": "boards", "vendor": f"Commish projections, model {b.stored.model_version}",
-                          "feed": b.stored.source, "window": season.window(b.stored.as_of, b.stored.as_of)}
-        for b in boards
-    }  # fmt: skip
-    adp_sources = [
-        {
-            "artifact": "adp",
-            "vendor": c.feed.vendor,
-            "feed": c.feed.source,
-            "window": season.window(c.captured_at, c.captured_at),
-        }
-        for c in captures.values()
-        if c.captured_at is not None
-    ]
-    written = [c for c in capsules.values() if c.source == WRITTEN_SOURCE]
-    capsule_sources = (
-        [{"artifact": "capsules", "vendor": f"written by {', '.join(sorted({c.model or 'the writer' for c in written}))}",
-          "feed": "player_capsules", "window": season.window(min(c.generated_at for c in written), max(c.generated_at for c in written))}]
-        if written else []
-    )  # fmt: skip
-    return Assembled(
-        files,
-        boards,
-        people,
-        (
-            *board_sources.values(),
-            *adp_sources,
-            schedule_source,
-            clubs_source,
-            *([record_source] if record_source else []),
-            *capsule_sources,
-        ),
-        tuple(sorted({b.stored.model_version or "unrecorded" for b in boards})),
-        formats,
-        dropped,
+    feeds = _feed_sources(boards, captures, capsules)
+    # The sources block's order: boards, ADP, schedule, clubs, the record, capsules.
+    capsule_feeds = [f for f in feeds if f["artifact"] == "capsules"]
+    sources = (
+        *(f for f in feeds if f["artifact"] != "capsules"),
+        schedule_source,
+        clubs_source,
+        *([record_source] if record_source else []),
+        *capsule_feeds,
     )
+    model_versions = tuple(sorted({b.stored.model_version or "unrecorded" for b in boards}))
+    return Assembled(files, boards, people, sources, model_versions, formats, dropped)
