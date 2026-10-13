@@ -368,6 +368,11 @@ const eslintConfig = [
       "next-env.d.ts",
       "coverage/**",
       ".claude/**",
+      // The prep-site lanes carry their own lint configs (web/, api/, research/, research-ts/).
+      "web/**",
+      "api/**",
+      "research/**",
+      "research-ts/**",
       "playwright-report/**",
       "test-results/**",
     ],
