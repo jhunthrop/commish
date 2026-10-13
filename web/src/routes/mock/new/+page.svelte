@@ -73,7 +73,8 @@
 	/** The lobby Leave came from, offered back in the dock. */
 	let left = $state<string | null>(null);
 	/** The saved league the page opened on (`?league=`, the league page's Start a mock draft): while
-	 * the form is untouched, the verb drafts that league. Any change to the form lets it go. */
+	 * the form holds its settings, a draft slot aside, the verb drafts that league. Any other change
+	 * to the form lets it go. */
 	let opened = $state<League | null>(null);
 	/** The roster's steppers: the counts, then the flex spots the lineup makes, the bench last, so
 	 * they add up to the rounds line. */
@@ -92,7 +93,8 @@
 
 	function set(patch: Partial<LeagueSettings>): void {
 		settings = { ...settings, ...patch };
-		opened = null;
+		// Choosing a slot is part of drafting the league, every other change makes a new setup.
+		if (Object.keys(patch).some((key) => key !== 'slot')) opened = null;
 	}
 
 	function setTeams(teams: number): void {
@@ -167,11 +169,19 @@
 		players = (await rooms.board(boardFormat)).players;
 	}
 
-	/** A saved league's mock: its own rules with the Draft Pass, the nearest preset without. */
-	async function mockLeague(league: League): Promise<void> {
+	/** A saved league's mock: its own rules with the Draft Pass, the nearest preset without, from
+	 * its own slot or the one chosen on the form. A chosen slot drafts its settings rather than the
+	 * saved league, since the API takes a league or settings, not both. */
+	async function mockLeague(
+		league: League,
+		slot: LeagueSettings['slot'] = league.settings.slot
+	): Promise<void> {
 		const rerun = rerunOf(league.settings, exactRules);
+		const own = slot === league.settings.slot;
 		await run(() =>
-			rerun.line === null ? startMock(league.settings, league.id) : startMock(rerun.settings)
+			rerun.line === null && own
+				? startMock(league.settings, league.id)
+				: startMock({ ...rerun.settings, slot })
 		);
 	}
 
@@ -200,6 +210,7 @@
 		try {
 			const mock = await rooms.mock(from);
 			settings = { ...mock.settings, slot: null };
+			opened = null;
 		} catch (e) {
 			error = e;
 		}
@@ -355,7 +366,8 @@
 		<ActionBar alert={error ? refusal : undefined} note={signedOut ? keepNote : undefined}>
 			<Verb
 				disabled={busy || !roundsOk}
-				onclick={() => (opened ? mockLeague(opened) : run(() => startMock(settings)))}
+				onclick={() =>
+					opened ? mockLeague(opened, settings.slot) : run(() => startMock(settings))}
 				>Start against bots</Verb
 			>
 			<Quiet disabled={busy} onclick={() => join(nearestLobby(settings))}
