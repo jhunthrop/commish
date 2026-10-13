@@ -4,6 +4,8 @@
     uv run python -m research.parity schema              the migrations against the declared schema, and the legacy map
     uv run python -m research.parity record <set>|all    re-record a fixture set from the live provider
     uv run python -m research.parity model <case>|all    the model: boards, register, backtest, fit check
+    uv run python -m research.parity decide <case>|all   the decide layer and the advisor on recorded room states
+    uv run python -m research.parity decide record       re-record the advisor's room states (reads the dev copy)
     uv run python -m research.parity list                every case and fixture set
 
 `ingest` and `schema` need PARITY_DATABASE_URL (a Postgres where the harness may create its own
@@ -23,6 +25,8 @@ from pathlib import Path
 
 from research.parity import databases
 from research.parity.cases import ALL_CASES, CASES_BY_NAME, all_recordings
+from research.parity.decide.cases import DECIDE_CASES
+from research.parity.decide.rooms import record as record_rooms
 from research.parity.model.cases import MODEL_CASES, MODEL_CASES_BY_NAME
 from research.parity.model.report import report_model
 from research.parity.record import record_case
@@ -60,6 +64,17 @@ def _model(names: Sequence[str], store: bool) -> int:
     finally:
         if any(case.needs_store for case in chosen):
             databases.drop_scratch_databases()
+    report_model(results)
+    return 0 if all(result.matches for result in results) else 1
+
+
+def _decide(names: Sequence[str]) -> int:
+    if names == ["record"]:
+        _print(f"recorded the advisor's room states -> {record_rooms()}")
+        return 0
+    by_name = {case.name: case for case in DECIDE_CASES}
+    cases = DECIDE_CASES if names == ["all"] else tuple(by_name[name] for name in names)
+    results = [case.run() for case in cases]
     report_model(results)
     return 0 if all(result.matches for result in results) else 1
 
@@ -118,6 +133,8 @@ def _list() -> int:
         _print(f"{case.name:<32} {case.summary}")
     for model_case in MODEL_CASES:
         _print(f"model {model_case.name:<26} {model_case.summary}")
+    for decide_case in DECIDE_CASES:
+        _print(f"decide {decide_case.name:<25} {decide_case.summary}")
     _print()
     for name in sorted(all_recordings()):
         _print(f"fixture set {name}")
@@ -137,6 +154,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     model = sub.add_parser("model", help="the model's numeric entry points, oracle against port")
     model.add_argument("names", nargs="+", help="model case names, or all")
     model.add_argument("--no-store", action="store_true", help="run only the cases that need no dev store")
+    decide = sub.add_parser("decide", help="the decide layer and the advisor, oracle against port")
+    decide.add_argument("names", nargs="+", help="decide case names, all, or record")
     sub.add_parser("list", help="every case and fixture set")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
@@ -144,6 +163,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _ingest(args.names)
     if args.command == "model":
         return _model(args.names, not args.no_store)
+    if args.command == "decide":
+        return _decide(args.names)
     if args.command == "schema":
         return _schema(args.against)
     if args.command == "record":
