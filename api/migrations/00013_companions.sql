@@ -20,7 +20,9 @@ create table app.companions (
   host_league_id text check (host_league_id ~ '^[0-9]{1,25}$'),
   status         text not null check (status in ('pre_draft', 'drafting', 'paused', 'complete')),
   last_host_pick integer not null default 0 check (last_host_pick >= 0),
-  -- The finished draft's report, computed once.
+  -- The finished draft's report, computed once. It is product output,
+  -- and it embeds every seat's roster, the host's picks in derived form:
+  -- the one place they outlive the last read.
   report         jsonb,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now(),

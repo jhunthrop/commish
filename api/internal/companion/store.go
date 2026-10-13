@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/db"
 )
 
 // ErrNotFound is a companion that is not the account's.
@@ -61,8 +62,9 @@ func nullable(s string) *string {
 }
 
 // Upsert makes the account's companion for a host draft, or takes the
-// one already made with the seat and settings the drafter chose now. A
-// replay starts over each time it is made.
+// one already made with the seat and settings the drafter chose now. The
+// stored report stays unless the seat changed; a replay starts over each
+// time it is made.
 func (s *Store) Upsert(ctx context.Context, r Row) (Row, error) {
 	settings, err := json.Marshal(r.Settings)
 	if err != nil {
@@ -73,7 +75,8 @@ func (s *Store) Upsert(ctx context.Context, r Row) (Row, error) {
 		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		on conflict (account_id, host, host_draft_id, replay) do update set
 		  seat = excluded.seat, settings = excluded.settings, host_league_id = excluded.host_league_id,
-		  status = excluded.status, last_host_pick = excluded.last_host_pick, report = null,
+		  status = excluded.status, last_host_pick = excluded.last_host_pick,
+		  report = case when excluded.replay or app.companions.seat <> excluded.seat then null else app.companions.report end,
 		  created_at = case when excluded.replay then now() else app.companions.created_at end,
 		  finished_at = null
 		returning `+rowColumns,
@@ -179,4 +182,10 @@ func (s *Store) PutReport(ctx context.Context, id uuid.UUID, report any) error {
 		return fmt.Errorf("companion: put report %s: %w", id, err)
 	}
 	return nil
+}
+
+// WithReportLock runs fn holding the companion's report lock, so
+// parallel reads never build one report twice, on any instance.
+func (s *Store) WithReportLock(ctx context.Context, id uuid.UUID, fn func(context.Context) error) error {
+	return db.WithLock(ctx, s.Pool, "companion-report:"+id.String(), fn)
 }

@@ -3,6 +3,7 @@ package companion
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -20,34 +21,47 @@ func (s *Service) report(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx := r.Context()
+	var out json.RawMessage
+	err := s.Store.WithReportLock(r.Context(), row.ID, func(ctx context.Context) error {
+		var err error
+		out, err = s.storedOrBuilt(ctx, row)
+		return err
+	})
+	switch {
+	case errors.Is(err, errNotOver):
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "The report comes when the draft is over", nil)
+	case err != nil:
+		s.writeHostError(w, r, err)
+	default:
+		httpx.WriteOK(w, r, http.StatusOK, out)
+	}
+}
+
+// errNotOver is a report asked for before the host says the draft is over.
+var errNotOver = errors.New("companion: the draft is not over")
+
+// storedOrBuilt is the stored report, or the report built and stored
+// now. The caller holds the report lock, so a second reader waits and
+// then finds it stored.
+func (s *Service) storedOrBuilt(ctx context.Context, row Row) (json.RawMessage, error) {
 	if raw, ok, err := s.Store.Report(ctx, row.ID); err != nil || ok {
-		if err != nil {
-			httpx.WriteInternal(w, r, s.Log, "companion: report", err)
-			return
-		}
-		httpx.WriteOK(w, r, http.StatusOK, json.RawMessage(raw))
-		return
+		return raw, err
 	}
 	f, err := s.follow(ctx, row)
 	if err != nil {
-		s.writeHostError(w, r, err)
-		return
+		return nil, err
 	}
 	if f.read.Draft.Status != sleeper.StatusComplete || f.built.LostAt != nil {
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "The report comes when the draft is over", nil)
-		return
+		return nil, errNotOver
 	}
 	out, err := s.buildReport(ctx, f)
 	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "companion: report", err)
-		return
+		return nil, err
 	}
 	if err := s.Store.PutReport(ctx, row.ID, out); err != nil {
-		httpx.WriteInternal(w, r, s.Log, "companion: report", err)
-		return
+		return nil, err
 	}
-	httpx.WriteOK(w, r, http.StatusOK, out)
+	return json.Marshal(out)
 }
 
 // buildReport is the mock report's builder on the host draft's final

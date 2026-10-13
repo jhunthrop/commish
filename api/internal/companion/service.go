@@ -43,6 +43,7 @@ type Repository interface {
 	Cards(ctx context.Context, id uuid.UUID) (map[int]json.RawMessage, error)
 	Report(ctx context.Context, id uuid.UUID) (json.RawMessage, bool, error)
 	PutReport(ctx context.Context, id uuid.UUID, report any) error
+	WithReportLock(ctx context.Context, id uuid.UUID, fn func(context.Context) error) error
 }
 
 // Checker answers whether an account may use a feature, from Can only.
