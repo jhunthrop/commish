@@ -634,7 +634,10 @@ uv run python -m research.inseason --task capture-harvest
 uv run python -m research.pipeline history
 
 # a run against the web's own reader and schemas (needs a web/ checkout with node_modules)
-node --experimental-strip-types parity/ts/run-contract.ts ../web DIR [RUN_ID]
+node --experimental-strip-types nightly/contract/run-contract.ts ../web DIR RUN_ID
+
+# which unported fits the store can re-run, and what each still lacks
+uv run python -m research.model.fit_inputs
 ```
 
 ### The chain
@@ -649,19 +652,25 @@ node --experimental-strip-types parity/ts/run-contract.ts ../web DIR [RUN_ID]
    skipped (comparing them with today's model reports a model change, not drift).
 3. **capsules** (`nightly/capsule_step.py`): the sweep, a retry pass over unwritten pages, a repair
    pass for written sentences on two pages, then the capsule gate. The sentences already shared are
-   quoted to the writer from the first call. `--regenerate-all` rewrites the whole board.
+   quoted to the writer from the first call. `--regenerate-all` rewrites the whole board. One player
+   takes at most 12 calls a night across every pass (`NIGHT_CALLS_PER_PLAYER`). The writer's ADP is
+   the run's own (`capsules/facts/market_adp.py`), and a stated ADP or pick that is not the page's is a
+   violation and a page finding.
 4. **assemble** (`nightly/assemble.py`): every artifact of `web/src/lib/run/schema.ts` at one
    instant: `boards/<format>.json`, `players/<id>.json`, `adp.json`, `record.json`, `index.json`,
    `clubs.json`, `schedule.json`, and the manifest with its sources block.
 5. **gates** (`nightly/gates.py`), each failure a named reason: `held_out_backtest`,
-   `board_depth`, `capsules`, `basis`, `adp`, `contract`.
+   `board_depth`, `capsules`, `basis`, `adp`, and `schema`: the web's own reader and schema
+   (`nightly/contract/run-contract.ts` under node, the web's `src/lib/run` copied into the image) over
+   the run staged in a temporary directory, before anything is copied to the store.
 6. **headshots** (`nightly/headshots.py`): every face mirrored into R2 by content
    (`headshots/<sha256>.<ext>`), fetched conditionally, with the run's map `headshots.json`.
 7. **write**: every artifact, `report.json` (steps, gates and their reasons, the held-out scores,
    the capsule spend, every file's bytes and SHA-256), `manifest.json` last. A run id is claimed
    with a conditional write, so it is never reused (`2026-10-13T05`, then `2026-10-13T05-2`).
 8. **promote**: a run that passed moves `runs/early.json` (early access, spec §4) and goes public an
-   hour later, when `publish` moves `runs/latest.json` and dispatches `web.yml` with its id.
+   hour later, when `publish` moves `runs/latest.json` and dispatches `web.yml` with its id
+   (`workflow_dispatch`, an Actions-only token). A step that raises is a failed step with a report.
 
 ### What the run reads and decides
 
@@ -692,7 +701,19 @@ pass, so it is never silent.
 ### The history rebuild
 
 `research.pipeline history` (`pipeline/history.py`) re-creates, with phase A's ingests, what the
-store lost: schedule and kickoffs 2018-2023, box scores and snap counts 2018-2022 (2019 from
-play-by-play, nflverse never published it), player teams 2018-2023, play-by-play context, coaches
-and opponent adjustment 2018-2023, injury filings and depth charts 2018-2022, week-one rosters
-2021-2024. It makes the "Unported fits" re-runnable in the 2027 offseason.
+store lost, back to the first season any unported fit names: schedule and kickoffs 2003-2023, box
+scores 2003-2022 (snap counts from 2012, nflverse's first; 2019 from play-by-play, nflverse never
+published it), player teams 2003-2023, play-by-play context, coaches and opponent adjustment
+2003-2023, injury filings 2009-2022 (a season nflverse cannot stamp, or whose filings contradict
+themselves, is named and left out), depth charts 2003-2022, week-one rosters 2003-2024.
+`--first`/`--last` narrow it. `python -m research.model.fit_inputs` names each fit as re-runnable or
+the seasons it still lacks, and the nightly's fit step prints the same.
+
+### The register's trail and the product season
+
+The weekly pass claims its own run id in the bucket (`<hour>-weekly`, its lines in
+`runs/<id>/inseason.json`), records it for each freeze in `register/frozen-by.json`, and its outcome
+in `register/last-pass.json`, which the nightly copies into its manifest (`register`). The record's
+`frozenBy` names those ids; a week frozen before the trail is named by the first passed run that
+carries it, with a note in that run's manifest. The product season is named once,
+`research/season.py`, with the rule for moving it.
