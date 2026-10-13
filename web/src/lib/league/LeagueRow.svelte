@@ -82,6 +82,7 @@
 
 <style>
 	.row {
+		position: relative;
 		display: grid;
 		grid-template-columns: 32px minmax(0, 1fr) auto;
 		align-items: center;
@@ -114,6 +115,13 @@
 
 	.who a:hover b {
 		text-decoration: underline;
+	}
+
+	/* The whole row is the link's target, so a thumb anywhere on it opens his game log. */
+	.who a::after {
+		content: '';
+		position: absolute;
+		inset: 0;
 	}
 
 	.meta {
