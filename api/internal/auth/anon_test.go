@@ -65,17 +65,54 @@ func TestAnonIssueSetsOnlyItsOwnCookies(t *testing.T) {
 	}
 }
 
+// Clear expires both cookies in both kinds, the site's and the
+// partitioned one a preview page was given.
 func TestAnonClearExpiresBothCookies(t *testing.T) {
 	a := newTestAnon(t)
 	w := httptest.NewRecorder()
 	a.Clear(w)
-	for _, c := range w.Result().Cookies() {
+	cookies := w.Result().Cookies()
+	partitioned := 0
+	for _, c := range cookies {
 		if c.Name != AnonCookie && c.Name != AnonCSRFCookie {
 			t.Fatalf("Clear touched %s", c.Name)
 		}
 		if c.MaxAge >= 0 {
 			t.Fatalf("%s not expired", c.Name)
 		}
+		if c.Partitioned {
+			partitioned++
+		}
+	}
+	if len(cookies) != 4 || partitioned != 2 {
+		t.Fatalf("Clear set %d cookies, %d partitioned; want 4 and 2", len(cookies), partitioned)
+	}
+}
+
+// A request carrying the site's cookie and a partitioned one names both
+// owners, so sign-in claims the mocks of each; a cookie that does not
+// open and a repeat are passed over.
+func TestAnonOwnersReadsEveryCookie(t *testing.T) {
+	a := newTestAnon(t)
+	site := httptest.NewRecorder()
+	siteHash := a.Issue(site, httptest.NewRequest(http.MethodPost, "/mocks", nil))
+	preview := httptest.NewRecorder()
+	previewHash := a.Issue(preview, crossSiteRequest(previewOrigin))
+	r := httptest.NewRequest(http.MethodGet, "/auth/callback", nil)
+	for _, rec := range []*httptest.ResponseRecorder{site, preview, site} {
+		for _, c := range rec.Result().Cookies() {
+			if c.Name == AnonCookie {
+				r.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
+			}
+		}
+	}
+	r.AddCookie(&http.Cookie{Name: AnonCookie, Value: "not-a-sealed-token"})
+	owners := a.Owners(r)
+	if len(owners) != 2 || string(owners[0]) != string(siteHash) || string(owners[1]) != string(previewHash) {
+		t.Fatalf("Owners = %d owners, want the site's then the preview's", len(owners))
+	}
+	if first, ok := a.Owner(r); !ok || string(first) != string(siteHash) {
+		t.Fatal("Owner is not the first cookie that opens")
 	}
 }
 

@@ -203,14 +203,18 @@ func (h *Handler) claimAnon(w http.ResponseWriter, r *http.Request, accountID uu
 	if h.Anon == nil || h.Claimer == nil {
 		return
 	}
-	owner, ok := h.Anon.Owner(r)
-	if !ok {
+	owners := h.Anon.Owners(r)
+	if len(owners) == 0 {
 		return
 	}
-	n, err := h.Claimer.Claim(r.Context(), accountID, owner)
-	if err != nil {
-		h.Log.Error("auth: claim anonymous mocks", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
-		return
+	var n int64
+	for _, owner := range owners {
+		claimed, err := h.Claimer.Claim(r.Context(), accountID, owner)
+		if err != nil {
+			h.Log.Error("auth: claim anonymous mocks", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+			return
+		}
+		n += claimed
 	}
 	h.Anon.Clear(w)
 	h.Log.Info("auth: claimed anonymous mocks", "request_id", httpx.RequestIDFrom(r.Context()), "mocks", n)

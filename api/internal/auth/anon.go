@@ -73,17 +73,36 @@ func (a *Anon) cookie(name, value string, maxAge int, httpOnly, crossSite bool) 
 }
 
 // Owner is the request's anonymous owner hash, false without a cookie
-// that opens.
+// that opens. With both a site cookie and a partitioned one, the first
+// that opens is the owner.
 func (a *Anon) Owner(r *http.Request) ([]byte, bool) {
-	c, err := r.Cookie(AnonCookie)
-	if err != nil || c.Value == "" {
+	owners := a.Owners(r)
+	if len(owners) == 0 {
 		return nil, false
 	}
-	token, err := a.seal.Open(c.Value)
-	if err != nil {
-		return nil, false
+	return owners[0], true
+}
+
+// Owners is every anonymous owner the request carries: the site's own
+// cookie and, where the browser sends it, a partitioned one minted for a
+// preview page. They share a name, so each is opened in turn; duplicates
+// and cookies that do not open are passed over.
+func (a *Anon) Owners(r *http.Request) [][]byte {
+	var out [][]byte
+	for _, c := range r.CookiesNamed(AnonCookie) {
+		if c.Value == "" {
+			continue
+		}
+		token, err := a.seal.Open(c.Value)
+		if err != nil {
+			continue
+		}
+		hash := hashToken(token)
+		if !slices.ContainsFunc(out, func(h []byte) bool { return string(h) == string(hash) }) {
+			out = append(out, hash)
+		}
 	}
-	return hashToken(token), true
+	return out
 }
 
 // Issue mints an anonymous owner and sets its two cookies; the hash is
@@ -131,11 +150,15 @@ func (a *Anon) ValidCSRF(r *http.Request, hash []byte) bool {
 	return a.csrf.Valid(hash, r.Header.Get(AnonCSRFHeader))
 }
 
-// Clear expires both anonymous cookies at sign-in; the session's own
+// Clear expires both anonymous cookies at sign-in, the site's and the
+// partitioned kind, since a browser keys a cookie by its partition and
+// only an expiry with the same attributes removes it. The session's own
 // CSRF cookie is untouched.
 func (a *Anon) Clear(w http.ResponseWriter) {
-	http.SetCookie(w, a.cookie(AnonCookie, "", -1, true, false))
-	http.SetCookie(w, a.cookie(AnonCSRFCookie, "", -1, false, false))
+	for _, partitioned := range []bool{false, true} {
+		http.SetCookie(w, a.cookie(AnonCookie, "", -1, true, partitioned))
+		http.SetCookie(w, a.cookie(AnonCSRFCookie, "", -1, false, partitioned))
+	}
 }
 
 // AnonClaimer moves an anonymous owner's mocks to an account.
