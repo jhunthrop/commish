@@ -6,7 +6,7 @@
 import type { components } from '#lib/api/types.ts';
 import { POSITIONS, type Position } from '#lib/types/player.ts';
 import { DEFAULT_SHEET_NAME, SHEET_LIMITS } from './limits.ts';
-import { normalizeTags } from './tags.ts';
+import { toggledTags } from './tags.ts';
 import { repairTiers } from './tiers.ts';
 
 export type BoardFormat = components['schemas']['BoardFormat'];
@@ -148,14 +148,25 @@ function updateRow(sheet: Sheet, playerId: string, change: (row: SheetRow) => Sh
 	return { ...sheet, rows: sheet.rows.map((row) => (row.id === playerId ? change(row) : row)) };
 }
 
-/** Sets his note, or clears it with an empty one. */
+/** Sets his note, or clears it with an empty one. The same sheet when the note reads the same. */
 export function setNote(sheet: Sheet, playerId: string, note: string): Sheet {
 	const trimmed = note.trim().slice(0, SHEET_LIMITS.note);
-	return updateRow(sheet, playerId, (row) => ({ ...row, note: trimmed === '' ? null : trimmed }));
+	const next = trimmed === '' ? null : trimmed;
+	if (sheet.rows[indexOfPlayer(sheet, playerId)]?.note === next) return sheet;
+	return updateRow(sheet, playerId, (row) => ({ ...row, note: next }));
 }
 
-export function setTags(sheet: Sheet, playerId: string, tags: readonly string[]): Sheet {
-	return updateRow(sheet, playerId, (row) => ({ ...row, tags: normalizeTags(tags) }));
+/**
+ * A tap on one of his tags, read against his tags as the sheet holds them now, never against a
+ * copy the page drew earlier: a note committed a moment before keeps its place. Null when his row
+ * is full and the tag cannot go on.
+ */
+export function toggleTag(sheet: Sheet, playerId: string, tag: string): Sheet | null {
+	const row = sheet.rows[indexOfPlayer(sheet, playerId)];
+	if (!row) return sheet;
+	const tags = toggledTags(row.tags, tag);
+	if (tags === null) return null;
+	return updateRow(sheet, playerId, (current) => ({ ...current, tags }));
 }
 
 export function renameSheet(sheet: Sheet, name: string): Sheet {
