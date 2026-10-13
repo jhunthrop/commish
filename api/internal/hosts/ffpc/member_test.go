@@ -27,16 +27,20 @@ func (m *memoryConnections) Get(_ context.Context, accountID uuid.UUID, _ string
 	return m.conn, nil
 }
 
-func (m *memoryConnections) SessionKept(_ context.Context, _ uuid.UUID, _ string, sealed hosts.Sealed) error {
-	m.conn.Sealed = sealed
+func (m *memoryConnections) SessionKept(_ context.Context, _ uuid.UUID, _ string, sessionCT []byte) error {
+	m.conn.Sealed.SessionCT = sessionCT
 	m.kept++
 	return nil
 }
 
-func (m *memoryConnections) SignInTried(_ context.Context, _ uuid.UUID, _ string, at time.Time) error {
+// ClaimSignIn holds the store's rule: one claim a window, connected only.
+func (m *memoryConnections) ClaimSignIn(_ context.Context, _ uuid.UUID, _ string, at time.Time, every time.Duration) (bool, error) {
+	if m.conn.Status != hosts.StatusConnected || (m.conn.LastSignInAt != nil && at.Sub(*m.conn.LastSignInAt) < every) {
+		return false, nil
+	}
 	m.conn.LastSignInAt = &at
 	m.tries++
-	return nil
+	return true, nil
 }
 
 func (m *memoryConnections) SignedOut(context.Context, uuid.UUID, string) error {
@@ -157,5 +161,29 @@ func TestRefusalAndChangedFormSignOut(t *testing.T) {
 	h := newMember(t, testPass)
 	if _, err := h.m.Pages(context.Background(), uuid.New(), testLTUID, PageStandings); !errors.Is(err, hosts.ErrNotConnected) {
 		t.Fatalf("another account read through this connection: %v", err)
+	}
+}
+
+// Two processes find the same expired session. The first claims the
+// sign-in and mends it. The second, holding the row as it was before,
+// loses the claim, re-reads the row once, reads with the mended session,
+// and never signs in or signs the member out.
+func TestTwoProcessesOneSignIn(t *testing.T) {
+	h := newMember(t, testPass)
+	stale := h.store.conn
+	if err := h.read(); err != nil {
+		t.Fatal(err)
+	}
+	other := &Member{Client: h.m.Client, Store: h.store, Vault: h.m.Vault, Now: h.m.Now, Log: h.m.Log}
+	read := func(jar Cookies) (Cookies, error) {
+		_, next, err := other.Client.Page(context.Background(), jar, PageStandings, testLTUID)
+		return next, err
+	}
+	jar, _, err := other.mend(context.Background(), h.acct, stale, read)
+	if err != nil || jar == nil {
+		t.Fatalf("the second process: %v", err)
+	}
+	if h.fake.signIns != 1 || h.store.conn.Status != hosts.StatusConnected {
+		t.Fatalf("%d sign-ins, status %s", h.fake.signIns, h.store.conn.Status)
 	}
 }

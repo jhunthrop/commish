@@ -1,6 +1,7 @@
 package ffpc
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -29,8 +30,8 @@ var ErrNeedsSignIn = errors.New("ffpc: sign in again")
 // Connections is the part of hosts.Store a member read needs.
 type Connections interface {
 	Get(ctx context.Context, accountID uuid.UUID, host string) (hosts.Connection, error)
-	SessionKept(ctx context.Context, accountID uuid.UUID, host string, sealed hosts.Sealed) error
-	SignInTried(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error
+	SessionKept(ctx context.Context, accountID uuid.UUID, host string, sessionCT []byte) error
+	ClaimSignIn(ctx context.Context, accountID uuid.UUID, host string, at time.Time, every time.Duration) (bool, error)
 	SignedOut(ctx context.Context, accountID uuid.UUID, host string) error
 	Read(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error
 }
@@ -142,14 +143,7 @@ func (m *Member) as(ctx context.Context, accountID uuid.UUID, read func(Cookies)
 	}
 	jar, err := read(kept)
 	if errors.Is(err, ErrSignedOut) {
-		if jar, err = m.renew(ctx, accountID, conn); err != nil {
-			return err
-		}
-		kept = jar
-		if jar, err = read(jar); errors.Is(err, ErrSignedOut) {
-			m.signedOut(ctx, accountID, "a read was still sent away after a fresh sign-in")
-			return ErrNeedsSignIn
-		}
+		jar, kept, err = m.mend(ctx, accountID, conn, read)
 	}
 	if err != nil {
 		return err
@@ -165,22 +159,58 @@ func (m *Member) as(ctx context.Context, accountID uuid.UUID, read func(Cookies)
 	return nil
 }
 
-// renew signs in again with the kept sign-in, only if none was tried in
-// SignInEvery. The try is noted before it is sent. Every outcome but a
-// clean sign-in marks the connection signed out.
-func (m *Member) renew(ctx context.Context, accountID uuid.UUID, conn hosts.Connection) (Cookies, error) {
-	now := m.Now()
-	if conn.LastSignInAt != nil && now.Sub(*conn.LastSignInAt) < SignInEvery {
-		m.signedOut(ctx, accountID, "signed out again within six hours of a sign-in")
-		return nil, ErrNeedsSignIn
+// mend answers a read FFPC sent away. Exactly one process may sign in
+// again for a member in a SignInEvery: it claims the sign-in on the row in
+// one statement. A process that loses the claim re-reads the row once: a
+// session another process kept meanwhile is tried, and only if that read
+// is sent away too (or there is none) is the member marked signed out.
+// It answers the read and the session it was made with.
+func (m *Member) mend(ctx context.Context, accountID uuid.UUID, conn hosts.Connection, read func(Cookies) (Cookies, error)) (Cookies, Cookies, error) {
+	claimed, err := m.Store.ClaimSignIn(ctx, accountID, Host, m.Now(), SignInEvery)
+	if err != nil {
+		return nil, nil, err
 	}
+	if !claimed {
+		return m.fresher(ctx, accountID, conn, read)
+	}
+	session, err := m.renew(ctx, accountID, conn)
+	if err != nil {
+		return nil, nil, err
+	}
+	jar, err := read(session)
+	if errors.Is(err, ErrSignedOut) {
+		m.signedOut(ctx, accountID, "a read was still sent away after a fresh sign-in")
+		return nil, nil, ErrNeedsSignIn
+	}
+	return jar, session, err
+}
+
+// fresher tries a session another process kept since this read began,
+// once; with none, or one FFPC also sends away, the member is signed out.
+func (m *Member) fresher(ctx context.Context, accountID uuid.UUID, conn hosts.Connection, read func(Cookies) (Cookies, error)) (Cookies, Cookies, error) {
+	fresh, err := m.Store.Get(ctx, accountID, Host)
+	if err != nil {
+		return nil, nil, err
+	}
+	if fresh.Status == hosts.StatusConnected && !bytes.Equal(fresh.Sealed.SessionCT, conn.Sealed.SessionCT) {
+		if s, err := m.Vault.OpenSession(accountID.String(), Host, fresh.Sealed); err == nil {
+			jar, err := read(Cookies(s))
+			if !errors.Is(err, ErrSignedOut) {
+				return jar, Cookies(s), err
+			}
+		}
+	}
+	m.signedOut(ctx, accountID, "signed out again within six hours of a sign-in")
+	return nil, nil, ErrNeedsSignIn
+}
+
+// renew signs in again with the kept sign-in, once the sign-in is claimed.
+// Every outcome but a clean sign-in marks the connection signed out.
+func (m *Member) renew(ctx context.Context, accountID uuid.UUID, conn hosts.Connection) (Cookies, error) {
 	in, err := m.Vault.OpenSignIn(accountID.String(), Host, conn.Sealed)
 	if err != nil {
 		m.signedOut(ctx, accountID, "the kept sign-in no longer opens")
 		return nil, ErrNeedsSignIn
-	}
-	if err := m.Store.SignInTried(ctx, accountID, Host, now); err != nil {
-		return nil, err
 	}
 	jar, _, err := m.Client.SignIn(ctx, in.Username, in.Password)
 	switch {
@@ -193,10 +223,12 @@ func (m *Member) renew(ctx context.Context, accountID uuid.UUID, conn hosts.Conn
 	return jar, m.keep(ctx, accountID, conn.Sealed, jar)
 }
 
+// keep seals a new session under the row's own data key and keeps the
+// session ciphertext alone.
 func (m *Member) keep(ctx context.Context, accountID uuid.UUID, sealed hosts.Sealed, jar Cookies) error {
 	next, err := m.Vault.Reseal(accountID.String(), Host, sealed, hosts.Session(jar))
 	if err != nil {
 		return err
 	}
-	return m.Store.SessionKept(ctx, accountID, Host, next)
+	return m.Store.SessionKept(ctx, accountID, Host, next.SessionCT)
 }

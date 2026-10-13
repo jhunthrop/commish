@@ -114,24 +114,33 @@ func (s *Store) Delete(ctx context.Context, accountID uuid.UUID, host string) er
 	return nil
 }
 
-// SessionKept keeps a new session (the sign-in's ciphertext untouched).
-func (s *Store) SessionKept(ctx context.Context, accountID uuid.UUID, host string, sealed Sealed) error {
-	_, err := s.Pool.Exec(ctx, `update app.host_connections set wrapped_key = $3, session_ct = $4, key_version = $5
-		where account_id = $1 and host = $2`, accountID, host, sealed.WrappedKey, sealed.SessionCT, sealed.KeyVersion)
+// SessionKept keeps a new session: the session ciphertext only. A new
+// session is sealed under the row's own data key, so the wrapped key and
+// its version are never written here, and a re-encrypt that lands while a
+// read is in flight is never undone by it.
+func (s *Store) SessionKept(ctx context.Context, accountID uuid.UUID, host string, sessionCT []byte) error {
+	_, err := s.Pool.Exec(ctx, `update app.host_connections set session_ct = $3 where account_id = $1 and host = $2`,
+		accountID, host, sessionCT)
 	if err != nil {
 		return fmt.Errorf("hosts: keep session: %w", err)
 	}
 	return nil
 }
 
-// SignInTried notes a kept sign-in before it is sent, so a crash between
-// the two still counts it against the six-hour allowance.
-func (s *Store) SignInTried(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error {
-	if _, err := s.Pool.Exec(ctx, `update app.host_connections set last_signin_at = $3 where account_id = $1 and host = $2`,
-		accountID, host, at); err != nil {
-		return fmt.Errorf("hosts: note sign-in: %w", err)
+// ClaimSignIn claims the member's one kept sign-in for the window: it
+// writes last_signin_at only when none was tried in the window, in one
+// statement, so of every process that finds the same expired session
+// exactly one signs in. The claim is noted before the sign-in is sent, so
+// a crash between the two still counts it.
+func (s *Store) ClaimSignIn(ctx context.Context, accountID uuid.UUID, host string, at time.Time, every time.Duration) (bool, error) {
+	tag, err := s.Pool.Exec(ctx, `update app.host_connections set last_signin_at = $3
+		where account_id = $1 and host = $2 and status = 'connected'
+			and (last_signin_at is null or last_signin_at <= $3 - $4::interval)`,
+		accountID, host, at, fmt.Sprintf("%d milliseconds", every.Milliseconds()))
+	if err != nil {
+		return false, fmt.Errorf("hosts: claim sign-in: %w", err)
 	}
-	return nil
+	return tag.RowsAffected() == 1, nil
 }
 
 // SignedOut stops reading as the member until they sign in again.
