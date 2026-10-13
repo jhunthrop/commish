@@ -81,6 +81,9 @@ type Price struct {
 	Interval string
 }
 
+// launchCurrency is the launch prices' currency, as Stripe writes it.
+const launchCurrency = "usd"
+
 // Launch prices in cents. The seat is the provisional Lane 8 ruling:
 // $29 a team, at least eight teams.
 const (

@@ -334,7 +334,7 @@ paths:
       summary: >-
         What is for sale, for how much and what each product unlocks. Prices are read from Stripe, the annual
         Membership first; what each product unlocks is read from app.product_features. With checkout not open (Stripe
-        not configured) the prices are null and the features still answer.
+        not configured) the prices are the launch prices stripe-setup creates, and checkout_open says no one can pay yet.
       responses:
         "200":
           description: the catalog
@@ -1318,11 +1318,11 @@ components:
     PlanCatalog:
       type: object
       description: >-
-        A product whose price is not set in Stripe yet, or every product while checkout is not open, is null
-        (draft_pass, group_pass) or missing from the list (membership).
+        A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list
+        (membership). While checkout is not open the prices are the launch prices.
       required: [season, pass_ends_at, checkout_open, features, draft_pass, membership, group_pass]
       properties:
-        season: { type: integer, description: the season a pass bought now is for }
+        season: { type: integer, description: "the season a pass bought now is for: the current one until its first kickoff, then the next" }
         pass_ends_at: { type: string, format: date-time, description: "when a pass bought now ends: its season's end, March 1 UTC" }
         checkout_open: { type: boolean, description: false while Stripe is not configured, and checkout answers 503 }
         features: { $ref: "#/components/schemas/PlanFeatures" }

@@ -1155,7 +1155,7 @@ type PageMeta struct {
 	Total   int64 `json:"total"`
 }
 
-// PlanCatalog A product whose price is not set in Stripe yet, or every product while checkout is not open, is null (draft_pass, group_pass) or missing from the list (membership).
+// PlanCatalog A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership). While checkout is not open the prices are the launch prices.
 type PlanCatalog struct {
 	// CheckoutOpen false while Stripe is not configured
 	CheckoutOpen bool   `json:"checkout_open"`
@@ -1171,7 +1171,7 @@ type PlanCatalog struct {
 	// PassEndsAt when a pass bought now ends: its season's end, March 1 UTC
 	PassEndsAt time.Time `json:"pass_ends_at"`
 
-	// Season the season a pass bought now is for
+	// Season the season a pass bought now is for: the current one until its first kickoff, then the next
 	Season int `json:"season"`
 }
 

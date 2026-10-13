@@ -35,7 +35,7 @@ type checkoutPlan struct {
 // fault.
 func (s *Service) plan(a auth.Account, in apitypes.CheckoutRequest) (checkoutPlan, map[string]string) {
 	meta := map[string]string{metaAccountID: a.ID.String(), metaProduct: string(in.Product)}
-	yr := season.Of(s.Now())
+	yr := season.OnSale(s.Now())
 	switch in.Product {
 	case apitypes.ProductDraftPass:
 		meta[metaSeason] = strconv.Itoa(yr)
@@ -84,7 +84,7 @@ func (s *Service) refuseDuplicate(ctx context.Context, a auth.Account, product a
 		return errRefused{"Your Membership already includes this"}
 	}
 	if product == apitypes.ProductDraftPass {
-		has, err := s.Entitlements.HasLivePass(ctx, a.ID, season.Of(now), now)
+		has, err := s.Entitlements.HasLivePass(ctx, a.ID, season.OnSale(now), now)
 		if err != nil {
 			return err
 		}

@@ -196,7 +196,7 @@ func (g *StripeGateway) EnsurePrice(ctx context.Context, spec PriceSpec) error {
 		}
 	}
 	params := &stripe.PriceCreateParams{
-		Product: stripe.String(spec.ProductID), Currency: stripe.String("usd"),
+		Product: stripe.String(spec.ProductID), Currency: stripe.String(launchCurrency),
 		UnitAmount: stripe.Int64(spec.AmountCents), LookupKey: stripe.String(spec.LookupKey),
 		TaxBehavior: stripe.String("exclusive"),
 	}

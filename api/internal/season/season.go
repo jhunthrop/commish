@@ -27,3 +27,29 @@ func Of(t time.Time) int {
 func End(s int) time.Time {
 	return time.Date(s+1, rolloverMonth, 1, 0, 0, 0, 0, time.UTC)
 }
+
+// kickoffAfterLaborDay: the season's first game is the Thursday after
+// Labor Day (the first Monday of September), the NFL's convention.
+const kickoffAfterLaborDay = 3
+
+// FirstKickoff is the day of season s's first game, 00:00 UTC: the
+// Thursday after Labor Day. Drafts happen before it.
+func FirstKickoff(s int) time.Time {
+	d := time.Date(s, time.September, 1, 0, 0, 0, 0, time.UTC)
+	for d.Weekday() != time.Monday {
+		d = d.AddDate(0, 0, 1)
+	}
+	return d.AddDate(0, 0, kickoffAfterLaborDay)
+}
+
+// OnSale is the season a pass bought at t is for: the current season
+// until its first kickoff, then the next one, so a pass is never sold
+// for a season whose drafts are over. On 2026-10-13 that is 2027,
+// ending 2028-03-01.
+func OnSale(t time.Time) int {
+	s := Of(t)
+	if t.UTC().Before(FirstKickoff(s)) {
+		return s
+	}
+	return s + 1
+}
