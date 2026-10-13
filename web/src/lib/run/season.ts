@@ -13,6 +13,7 @@
  * build's reader checks `weeks` against the run's schedule.
  */
 import { z } from 'zod';
+import { POINTS_PER_GAME_DECIMALS } from './decimals.ts';
 import { club, formatId } from './primitives.ts';
 
 /** Every counting stat a line carries, in the store's names. */
@@ -48,8 +49,7 @@ export type StatField = (typeof STAT_FIELDS)[number];
 export const GAME_STATUSES = ['played', 'inactive', 'bye', 'upcoming'] as const;
 export type GameStatus = (typeof GAME_STATUSES)[number];
 
-/** Points a game print to one decimal, and the run stores them at that precision. */
-export const POINTS_PER_GAME_DECIMALS = 1;
+export { POINTS_PER_GAME_DECIMALS };
 /** Fantasy points are kept to two decimals, the scoring's own rounding: whole cents. */
 const CENTS = 100;
 const CENTS_PER_TENTH = 10;

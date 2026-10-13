@@ -2,6 +2,7 @@
  * record, a move in words, and the drafter's roster and the pool as board players. Pure functions
  * over the API's answer. */
 import { fixed, plural, signed } from '#lib/format/number.ts';
+import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
 import type { IndexSeason } from '#lib/run/schema.ts';
 import type { LeagueBoard, LeagueBoardPlayer } from './board.ts';
 import type { LeagueHost, LeagueMove, LeaguePlayer, LeagueSync, LeagueTeam } from './api.ts';
@@ -75,14 +76,10 @@ export function moveWords(sync: LeagueSync, move: LeagueMove): string {
 	return `${who} ${[added, dropped].filter((part) => part !== '').join(' and ')}`;
 }
 
-/** Points a game as the run stores them, to one decimal (POINTS_PER_GAME_DECIMALS in season.ts, which
- * the browser does not load: it carries zod). */
-const PER_GAME_DECIMALS = 1;
-
 /** His season so far with its basis: "5 games, 18.4 a game", or "No games yet". */
 export function seasonWords(season: IndexSeason): string {
 	if (season.pointsPerGame === null) return 'No games yet';
-	const figure = fixed(season.pointsPerGame, PER_GAME_DECIMALS);
+	const figure = fixed(season.pointsPerGame, POINTS_PER_GAME_DECIMALS);
 	return `${plural(season.games, 'game')}, ${figure} a game`;
 }
 
