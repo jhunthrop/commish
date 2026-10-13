@@ -15,3 +15,9 @@ export interface RunStamp {
 export function runStampText(run: RunStamp): string {
 	return `${run.standIn ? 'Stand-in run' : 'Run'} of ${dayLabel(run.runAt)}`;
 }
+
+/** The day a run ran, from its id alone: "Sep 7" for 2026-09-07T21. Provenance a page can print
+ * without the id itself. */
+export function runIdDay(runId: string): string {
+	return dayLabel(`${runId.slice(0, 13)}:00:00Z`);
+}

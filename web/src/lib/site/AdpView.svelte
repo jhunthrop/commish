@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { FormatChip } from '#lib/server/pages/format-route.ts';
 	import { onMount } from 'svelte';
 	import { windowLabel } from '#lib/format/date.ts';
 	import { plural } from '#lib/format/number.ts';
@@ -64,7 +65,7 @@
 					<FormatChips
 						formats={page.formats}
 						current={page.format.id}
-						href={(chip) => links.adp(chip.id)}
+						href={(chip: FormatChip) => links.adp(chip.id)}
 					/>
 				</FilterBar>
 			</div>
@@ -81,16 +82,7 @@
 						eager={i < EAGER_ROWS}
 					>
 						{#snippet action()}
-							<SheetAdd
-								player={{
-									id: player.id,
-									name: player.name,
-									position: player.position,
-									team: player.team,
-									headshot: player.headshot
-								}}
-								variant="row"
-							/>
+							<SheetAdd {player} variant="row" />
 						{/snippet}
 					</Row>
 				{/each}

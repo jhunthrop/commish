@@ -383,33 +383,11 @@ async function recordFrom(sql: postgres.Sql): Promise<RunRecord> {
 	return {
 		season: SEASON,
 		format: FORMAT.id,
-		statistic: { agreement: 'Spearman rho', placesOff: 'Mean places off' },
-		// The register's own rules, as research-ts/src/projections/register/grade.ts states them.
-		method: [
-			{
-				term: 'Frozen',
-				means: "Our PPR board is saved before each week's first kickoff and never changed after"
-			},
-			{
-				term: 'Graded',
-				means: 'Frozen players with a stat line that week, ranked by the points they scored'
-			},
-			{
-				term: 'Spearman rho',
-				means:
-					'How closely an order matches that finish, from 1 for the same order to −1 for the reverse'
-			},
-			{
-				term: 'Mean places off',
-				means: 'How far the typical player was from where he finished'
-			},
-			{ term: 'n', means: 'Players the order ranked, among those graded' },
-			{ term: 'Against', means: 'ADP, graded the same way on the same players' }
-		],
-		pending:
-			frozen.length === 0
-				? 'No week is frozen yet.'
-				: `${frozen.length === 1 ? 'Week' : 'Weeks'} ${frozen.map((row) => String(row.week)).join(' and ')} ${frozen.length === 1 ? 'is' : 'are'} frozen. Their stat lines are not in the store yet, so nothing is graded.`,
+		// The register's own rules (research-ts/src/projections/register/grade.ts), in drafter words:
+		// the agreement is Spearman's rank correlation, the places off the mean distance in places.
+		statistic: { agreement: 'agreement with the finish', placesOff: 'places off, typical player' },
+		method:
+			'Each week our PPR board is frozen before the first kickoff and graded after the games against how its players finished, with ADP graded the same way on the same players.',
 		weeks: frozen.map((row) => ({
 			week: row.week,
 			frozenAt: row.frozen_at.toISOString(),

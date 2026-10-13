@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { FormatChip } from '#lib/server/pages/format-route.ts';
 	import { onMount } from 'svelte';
 	import { POSITION_NAMES, tierGroups } from '#lib/run/derive.ts';
 	import type { BoardPage } from '#lib/server/pages/board.ts';
@@ -74,16 +75,7 @@
 		eager={i < EAGER_ROWS}
 	>
 		{#snippet action()}
-			<SheetAdd
-				player={{
-					id: player.id,
-					name: player.name,
-					position: player.position,
-					team: player.team,
-					headshot: player.headshot
-				}}
-				variant="row"
-			/>
+			<SheetAdd {player} variant="row" />
 		{/snippet}
 	</Row>
 {/snippet}
@@ -103,7 +95,7 @@
 				<FormatChips
 					formats={page.formats}
 					current={page.format.id}
-					href={(chip) => links.board(chip.id, chip.onRun ? page.position : null)}
+					href={(chip: FormatChip) => links.board(chip.id, chip.onRun ? page.position : null)}
 				/>
 				<ChipGroup label="Position">
 					<Chip href={links.board(page.format.id)} pressed={page.position === null}>All</Chip>

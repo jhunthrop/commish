@@ -205,12 +205,12 @@ export const recordSchema = z.object({
 	season: z.number().int(),
 	/** The format every frozen board ranks in. */
 	format: formatId,
-	/** The statistics the record grades with, as their columns name them. */
+	/** The statistics the record grades with, in words a drafter says with no gloss: the rank
+	 * agreement as "agreement with the finish", the typical miss as "places off, typical player".
+	 * The page prints them as the big number's caption and the column heads. */
 	statistic: z.object({ agreement: phrase, placesOff: phrase }),
-	/** How the record is kept, term by term, as the page's method panel prints it. */
-	method: z.array(z.object({ term: phrase, means: phrase })).min(1),
-	/** While no week is graded, what the run knows about why, in a sentence. Null once one is. */
-	pending: phrase.nullable(),
+	/** How the record is kept, as one sentence the page prints under the weeks. */
+	method: phrase,
 	weeks: z.array(recordWeekSchema),
 	/** Every graded week pooled, one line for all players and one per position. */
 	toDate: z.array(recordLineSchema)

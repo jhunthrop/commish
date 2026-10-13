@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { FormatChip } from '#lib/server/pages/format-route.ts';
 	import type { AbsentFormatPage } from '#lib/server/pages/format-route.ts';
 	import { runStampText, type RunStamp } from '#lib/run/stamp.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -36,7 +37,11 @@
 	<main class="absent">
 		<PageHead title="{run.season} {noun}" />
 		<FilterBar>
-			<FormatChips formats={page.formats} current={page.format.id} href={(chip) => href(chip.id)} />
+			<FormatChips
+				formats={page.formats}
+				current={page.format.id}
+				href={(chip: FormatChip) => href(chip.id)}
+			/>
 		</FilterBar>
 		<EmptyState
 			title="{page.format.label} is not on this run"
