@@ -7,6 +7,7 @@ type Schemas = components['schemas'];
 export type Companion = Schemas['Companion'];
 export type CompanionCreate = Schemas['CompanionCreate'];
 export type CompanionPick = Schemas['CompanionPick'];
+export type CompanionSummary = Schemas['CompanionSummary'];
 export type OutcomeRange = Schemas['OutcomeRange'];
 export type Account = Schemas['Account'];
 export type Feature = Schemas['Feature'];
@@ -20,6 +21,7 @@ export const companions = {
 	me: () => client.call<Account>('/me'),
 	create: (body: CompanionCreate) =>
 		client.call<Companion>('/companions', { method: 'POST', body }),
+	recent: () => client.call<CompanionSummary[]>('/companions'),
 	read: (id: string, since: number) =>
 		client.call<Companion>(`/companions/${encodeURIComponent(id)}?since=${String(since)}`),
 	report: (id: string) => client.call<MockReport>(`/companions/${encodeURIComponent(id)}/report`),

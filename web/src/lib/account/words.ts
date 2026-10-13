@@ -1,5 +1,6 @@
 /** The account in the words its page prints: your name, your plan, a sheet and a mock as lines. */
-import { dayLabel } from '#lib/format/date.ts';
+import { dateLabel, dayLabel, dayYearLabel } from '#lib/format/date.ts';
+import { freeLine } from '#lib/pass/words.ts';
 import { plural } from '#lib/format/number.ts';
 import { FORMAT_LABELS } from '#lib/sheet/format.ts';
 import type { Account, AccountGroupPass, AccountMock, AccountSheet } from './account-api.ts';
@@ -37,7 +38,8 @@ export function hasLiveMembership(account: Pick<Account, 'membership'>): boolean
 
 function membershipWords(membership: NonNullable<Account['membership']>): PlanWords {
 	const interval = membership.interval === 'month' ? 'Monthly' : 'Yearly';
-	const end = membership.current_period_end ? dayLabel(membership.current_period_end) : null;
+	// A real instant (Stripe's period end), read on the Eastern clock with its year.
+	const end = membership.current_period_end ? dayYearLabel(membership.current_period_end) : null;
 	if (membership.cancel_at_period_end) {
 		return {
 			title: 'Membership',
@@ -66,11 +68,11 @@ export function planWords(account: Account): PlanWords {
 	if (pass) {
 		return {
 			title: `${String(pass.season)} Draft Pass`,
-			line: `${PASS_SOURCES[pass.source]}, good through ${dayLabel(pass.ends_at)}.`,
+			line: `${PASS_SOURCES[pass.source]}. It ends ${dateLabel(pass.ends_at)}.`,
 			action: null
 		};
 	}
-	return { title: 'Free', line: 'The board, every player and the record, on us.', action: null };
+	return { title: 'Free', line: freeLine(), action: null };
 }
 
 /** "PPR · 42 players · changed Oct 12". */

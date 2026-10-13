@@ -387,6 +387,7 @@ func (e Product) Valid() bool {
 // Defines values for ReportPickChip.
 const (
 	ReportPickChipAtAdp ReportPickChip = "at_adp"
+	ReportPickChipKept  ReportPickChip = "kept"
 	ReportPickChipNone  ReportPickChip = "none"
 	ReportPickChipReach ReportPickChip = "reach"
 	ReportPickChipSteal ReportPickChip = "steal"
@@ -396,6 +397,8 @@ const (
 func (e ReportPickChip) Valid() bool {
 	switch e {
 	case ReportPickChipAtAdp:
+		return true
+	case ReportPickChipKept:
 		return true
 	case ReportPickChipNone:
 		return true
@@ -697,7 +700,7 @@ type Companion struct {
 	// Board the board valued for this league, sent only when since is 0
 	Board *RoomBoard `json:"board"`
 
-	// Card our call at the drafter's turn. The why is on the call only, or on every shortlist row with full_reasoning.
+	// Card our call at the drafter's turn, or between turns the conditional call (conditional true): the player to take if the board holds to your_next_pick. The why is on the call only, or on every shortlist row with full_reasoning.
 	Card        *RoomCard     `json:"card"`
 	CreatedAt   time.Time     `json:"created_at"`
 	Host        CompanionHost `json:"host"`
@@ -726,10 +729,13 @@ type Companion struct {
 	PicksUntilTurn *int `json:"picks_until_turn"`
 
 	// Ranges floor, median and ceiling for each shortlist player, with range_of_outcomes only
-	Ranges   *map[string]OutcomeRange `json:"ranges"`
-	Replay   bool                     `json:"replay"`
-	Rounds   int                      `json:"rounds"`
-	Settings LeagueSettings           `json:"settings"`
+	Ranges *map[string]OutcomeRange `json:"ranges"`
+	Replay bool                     `json:"replay"`
+	Rounds int                      `json:"rounds"`
+
+	// SeatNames each slot's name in the host league (its members' display names), slot 1 first; empty for a mock draft, and '' for a slot with no member
+	SeatNames []string       `json:"seat_names"`
+	Settings  LeagueSettings `json:"settings"`
 
 	// Since the pick count the picks follow
 	Since int `json:"since"`
@@ -794,6 +800,22 @@ type CompanionSeat struct {
 
 // CompanionStatus defines model for CompanionStatus.
 type CompanionStatus string
+
+// CompanionSummary defines model for CompanionSummary.
+type CompanionSummary struct {
+	CreatedAt   time.Time `json:"created_at"`
+	HostDraftId string    `json:"host_draft_id"`
+
+	// HostUsername the Sleeper username the seat was found by
+	HostUsername *string            `json:"host_username"`
+	Id           openapi_types.UUID `json:"id"`
+
+	// Name the draft's name on the host, empty when it has none
+	Name   string          `json:"name"`
+	Replay bool            `json:"replay"`
+	Slot   int             `json:"slot"`
+	Status CompanionStatus `json:"status"`
+}
 
 // DraftPassState defines model for DraftPassState.
 type DraftPassState struct {
@@ -861,8 +883,13 @@ type Feature string
 
 // GroupPass defines model for GroupPass.
 type GroupPass struct {
-	ClaimUrl string `json:"claim_url"`
-	Claimed  int    `json:"claimed"`
+	// ClaimCode the code in the claim link
+	ClaimCode string `json:"claim_code"`
+	ClaimUrl  string `json:"claim_url"`
+	Claimed   int    `json:"claimed"`
+
+	// ClaimedByMe the buyer holds one of its seats
+	ClaimedByMe bool `json:"claimed_by_me"`
 
 	// Claims each claimed seat, first claim first; the seats past these are open
 	Claims     []GroupPassClaim   `json:"claims"`
@@ -1155,7 +1182,7 @@ type PageMeta struct {
 	Total   int64 `json:"total"`
 }
 
-// PlanCatalog A product whose price is not set in Stripe yet, or every product while checkout is not open, is null (draft_pass, group_pass) or missing from the list (membership).
+// PlanCatalog A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership). While checkout is not open the prices are the launch prices.
 type PlanCatalog struct {
 	// CheckoutOpen false while Stripe is not configured
 	CheckoutOpen bool   `json:"checkout_open"`
@@ -1171,7 +1198,7 @@ type PlanCatalog struct {
 	// PassEndsAt when a pass bought now ends: its season's end, March 1 UTC
 	PassEndsAt time.Time `json:"pass_ends_at"`
 
-	// Season the season a pass bought now is for
+	// Season the season a pass bought now is for: the current one until its first kickoff, then the next
 	Season int `json:"season"`
 }
 
@@ -1209,7 +1236,9 @@ type ReportExposure struct {
 // ReportPick defines model for ReportPick.
 type ReportPick struct {
 	// AdpGap ADP less the pick
-	AdpGap    *float64       `json:"adp_gap"`
+	AdpGap *float64 `json:"adp_gap"`
+
+	// Chip kept is a keeper at his seat and round, with no ADP gap and no hindsight
 	Chip      ReportPickChip `json:"chip"`
 	CouldWait bool           `json:"could_wait"`
 
@@ -1227,7 +1256,7 @@ type ReportPick struct {
 	StillThere *float64 `json:"still_there"`
 }
 
-// ReportPickChip defines model for ReportPick.Chip.
+// ReportPickChip kept is a keeper at his seat and round, with no ADP gap and no hindsight
 type ReportPickChip string
 
 // ReportPickMadeBy who made the pick: you, Pick for me or Finish the draft (for_you), a lobby seat's stand-in after you left (queue), or the stand-in when your clock ran out (clock). A pick you did not make carries no hindsight.

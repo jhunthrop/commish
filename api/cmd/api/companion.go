@@ -7,9 +7,11 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/jhunthrop/commish/api/internal/advisor"
 	"github.com/jhunthrop/commish/api/internal/companion"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
+	"github.com/jhunthrop/commish/api/internal/sim"
 	"github.com/jhunthrop/commish/api/internal/sleeper"
 	"github.com/jhunthrop/commish/api/internal/solo"
 )
@@ -22,6 +24,7 @@ func companionService(cfg config.API, pool *pgxpool.Pool, rooms *solo.Service, e
 	s := &companion.Service{
 		Store: &companion.Store{Pool: pool}, Poller: &companion.Poller{Host: host, Now: time.Now}, Directory: host,
 		Boards: rooms.Boards, Matcher: &companion.NameMatcher{}, Advisor: rooms.Advisor, Entitlements: ents,
+		Conditional:   advisor.Engine{Runs: sim.RoomOddsRuns, Workers: runtime.GOMAXPROCS(0)},
 		ReportWorkers: runtime.GOMAXPROCS(0), Now: time.Now, Log: log,
 	}
 	if cfg.Dev.CompanionReplay {

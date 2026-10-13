@@ -3,16 +3,23 @@ package companion
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/jhunthrop/commish/api/internal/advisor"
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/sleeper"
 )
@@ -129,5 +136,209 @@ func TestPollerHoldsTheGap(t *testing.T) {
 		if host.reads != 2 {
 			t.Fatalf("down=%v: %d host reads after the gap, want 2", down, host.reads)
 		}
+	}
+}
+
+// countingConditional counts the conditional cards it is asked for and
+// answers one for the seat it was asked about.
+type countingConditional struct {
+	calls atomic.Int64
+	gate  chan struct{}
+}
+
+func (c *countingConditional) Conditional(_ context.Context, req advisor.Request) (advisor.Card, error) {
+	c.calls.Add(1)
+	if c.gate != nil {
+		<-c.gate
+	}
+	next := 20
+	return advisor.Card{Call: req.TeamID, NextPick: &next, StillThere: map[string]float64{}}, nil
+}
+
+func followedAt(row Row, picks int) followed {
+	f := followed{row: row}
+	f.read.Picks = make([]sleeper.Pick, picks)
+	f.built.Draft.HumanTeamID = row.HostDraftID + "-seat"
+	return f
+}
+
+// The between-turns card is made once per companion, seat and pick
+// count, however many viewers ask at once; a new pick or a seat changed
+// by a re-follow is a new card, never the old seat's.
+func TestConditionalCardIsKeptPerSeatAndPick(t *testing.T) {
+	cond := &countingConditional{gate: make(chan struct{})}
+	s := &Service{Conditional: cond}
+	row := Row{ID: uuid.New(), HostDraftID: "1", Seat: 5, CreatedAt: time.Unix(1, 0)}
+
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := s.conditionalFor(context.Background(), followedAt(row, 6)); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	time.Sleep(50 * time.Millisecond)
+	close(cond.gate)
+	wg.Wait()
+	if n := cond.calls.Load(); n != 1 {
+		t.Fatalf("8 viewers at one pick made %d cards, want 1", n)
+	}
+	if _, err := s.conditionalFor(context.Background(), followedAt(row, 6)); err != nil || cond.calls.Load() != 1 {
+		t.Fatalf("the same pick again made a card (%d, %v)", cond.calls.Load(), err)
+	}
+	if _, err := s.conditionalFor(context.Background(), followedAt(row, 7)); err != nil || cond.calls.Load() != 2 {
+		t.Fatalf("a new pick did not make a card (%d, %v)", cond.calls.Load(), err)
+	}
+	moved := row
+	moved.Seat = 3
+	card, err := s.conditionalFor(context.Background(), followedAt(moved, 7))
+	if err != nil || cond.calls.Load() != 3 {
+		t.Fatalf("a changed seat reused the old seat's card (%d, %v)", cond.calls.Load(), err)
+	}
+	if !card.Conditional || card.ForPick != 20 {
+		t.Fatalf("card %+v, want conditional for pick 20", card)
+	}
+}
+
+// recentRepo answers Recent for one account only, as the store's query
+// does, and records whom it was asked about.
+type recentRepo struct {
+	Repository
+	owner uuid.UUID
+	asked uuid.UUID
+}
+
+func (r *recentRepo) Recent(_ context.Context, accountID uuid.UUID, limit int) ([]Row, error) {
+	r.asked = accountID
+	if accountID != r.owner || limit != recentShown {
+		return nil, nil
+	}
+	return []Row{{ID: uuid.New(), AccountID: accountID, HostDraftID: "1", Seat: 4, HostUsername: "muttdog", Status: "drafting"}}, nil
+}
+
+// GET /companions answers the caller's own followed drafts and nobody
+// else's, and needs the live draft advisor like every companion read.
+func TestRecentIsTheCallersOwn(t *testing.T) {
+	me := auth.Account{ID: uuid.New()}
+	repo := &recentRepo{owner: me.ID}
+	can := &checker{}
+	s := &Service{Store: repo, Entitlements: can, Now: time.Now, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	send := func() (int, []apitypes.CompanionSummary) {
+		req := httptest.NewRequest(http.MethodGet, "/companions", nil)
+		req = req.WithContext(auth.WithAccount(req.Context(), me))
+		rec := httptest.NewRecorder()
+		s.recent(rec, req)
+		var body struct {
+			Data []apitypes.CompanionSummary `json:"data"`
+		}
+		_ = json.Unmarshal(rec.Body.Bytes(), &body)
+		return rec.Code, body.Data
+	}
+	if code, _ := send(); code != http.StatusForbidden {
+		t.Fatalf("without the pass: %d, want 403", code)
+	}
+	can.live = true
+	code, rows := send()
+	if code != http.StatusOK || repo.asked != me.ID {
+		t.Fatalf("with the pass: %d, asked about %s, want 200 about %s", code, repo.asked, me.ID)
+	}
+	if len(rows) != 1 || rows[0].HostUsername == nil || *rows[0].HostUsername != "muttdog" || rows[0].Slot != 4 {
+		t.Fatalf("rows %+v", rows)
+	}
+}
+
+// directory answers a league's members, or fails.
+type directory struct {
+	users []sleeper.User
+	err   error
+}
+
+func (d directory) UserID(context.Context, string) (string, error) { return "", sleeper.ErrNotFound }
+func (d directory) League(context.Context, string) (sleeper.League, error) {
+	return sleeper.League{}, sleeper.ErrNotFound
+}
+func (d directory) LeagueUsers(context.Context, string) ([]sleeper.User, error) {
+	return d.users, d.err
+}
+
+// Each slot's name comes from the league's members by the draft order: a
+// mock draft (no league) and a failed read get none, and a slot no
+// member holds is empty.
+func TestSeatNames(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	draft := sleeper.Draft{LeagueID: "9", Teams: 3, Order: map[string]int{"11": 1, "33": 3}}
+	users := []sleeper.User{{ID: "11", DisplayName: "muttdog"}, {ID: "33", DisplayName: "Nowlan"}}
+
+	s := &Service{Directory: directory{users: users}, Log: log}
+	got := s.seatNames(context.Background(), draft)
+	if len(got) != 3 || got[0] != "muttdog" || got[1] != "" || got[2] != "Nowlan" {
+		t.Fatalf("names %q, want muttdog, empty, Nowlan", got)
+	}
+	mockDraft := draft
+	mockDraft.LeagueID = ""
+	if got := s.seatNames(context.Background(), mockDraft); got != nil {
+		t.Fatalf("a mock draft named %q", got)
+	}
+	failing := &Service{Directory: directory{err: errors.New("down")}, Log: log}
+	if got := failing.seatNames(context.Background(), draft); got != nil {
+		t.Fatalf("a failed read named %q", got)
+	}
+}
+
+// The store keeps each account's companions apart: Recent answers only
+// the caller's, newest first, at most the limit, and a re-follow keeps
+// or clears the saved username and the seat names with the seat.
+func TestStoreRecentAndSeatPeople(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	accounts := &auth.Store{Pool: pool}
+	mine, err := accounts.UpsertAccount(ctx, auth.Identity{UserID: "user_mine", Email: "mine@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	theirs, err := accounts.UpsertAccount(ctx, auth.Identity{UserID: "user_theirs", Email: "theirs@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &Store{Pool: pool}
+	follow := func(account uuid.UUID, draftID, username string, names []string) Row {
+		r, err := store.Upsert(ctx, Row{AccountID: account, Host: "sleeper", HostDraftID: draftID, Seat: 4,
+			HostUsername: username, SeatNames: names, DraftName: "League " + draftID, Settings: apitypes.LeagueSettings{}, Status: "drafting"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	for i := range 7 {
+		follow(mine.ID, fmt.Sprint(100+i), "", nil)
+	}
+	follow(theirs.ID, "999", "someone", nil)
+	newest := follow(mine.ID, "555", "muttdog", []string{"muttdog", "", "Nowlan"})
+
+	rows, err := store.Recent(ctx, mine.ID, recentShown)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != recentShown || rows[0].ID != newest.ID {
+		t.Fatalf("recent: %d rows, newest %s, want %d with %s first", len(rows), rows[0].ID, recentShown, newest.ID)
+	}
+	for _, r := range rows {
+		if r.AccountID != mine.ID {
+			t.Fatalf("recent answered another account's companion %s", r.ID)
+		}
+	}
+	if rows[0].DraftName != "League 555" || rows[0].HostUsername != "muttdog" || len(rows[0].SeatNames) != 3 || rows[0].SeatNames[2] != "Nowlan" {
+		t.Fatalf("saved username %q names %q", rows[0].HostUsername, rows[0].SeatNames)
+	}
+	again := follow(mine.ID, "555", "", nil)
+	if again.ID != newest.ID || again.HostUsername != "" || len(again.SeatNames) != 0 {
+		t.Fatalf("a re-follow by slot kept username %q names %q", again.HostUsername, again.SeatNames)
+	}
+	if _, err := store.Upsert(ctx, Row{AccountID: mine.ID, Host: "sleeper", HostDraftID: "556", Seat: 1,
+		HostUsername: "not a username!", Settings: apitypes.LeagueSettings{}, Status: "drafting"}); err == nil {
+		t.Fatal("the column took a username Sleeper would refuse")
 	}
 }

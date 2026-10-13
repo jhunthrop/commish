@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { firstSentence } from '#lib/format/sentence.ts';
 	import type { RoomCard } from '#lib/room/api.ts';
 	import type { Board } from '#lib/room/model.ts';
 	import OddsCell from '#lib/ui/OddsCell.svelte';
@@ -22,10 +23,14 @@
 	let { card, board, oddsLabel, ranges }: Props = $props();
 
 	const rows = $derived(
-		card.shortlist.flatMap((c) => {
-			const player = board.byId.get(c.player_id);
-			return player ? [{ player, why: c.why ?? null, range: ranges?.[c.player_id] ?? null }] : [];
-		})
+		// The call has its own panel: the list is who comes after him.
+		card.shortlist
+			.filter((c) => c.player_id !== card.call)
+			.flatMap((c) => {
+				const player = board.byId.get(c.player_id);
+				const why = c.why ? firstSentence(c.why) : null;
+				return player ? [{ player, why, range: ranges?.[c.player_id] ?? null }] : [];
+			})
 	);
 	const scale = $derived.by(() => {
 		const all = rows.flatMap((r) => (r.range ? [r.range.floor, r.range.ceiling] : []));

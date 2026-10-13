@@ -163,7 +163,7 @@ await shoot(
 	'between-turns',
 	member,
 	async () => at(await replay(member)),
-	'away',
+	'Queue him on Sleeper',
 	BETWEEN_TURNS_MS
 );
 await shoot('report', holder, () => Promise.resolve(at(live)), 'Follow another draft');

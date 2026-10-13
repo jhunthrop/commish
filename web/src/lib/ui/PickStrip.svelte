@@ -15,6 +15,9 @@
 	}
 
 	let { lead, leadLines, picks, width = 'sm' }: Props = $props();
+
+	/** The face's size, base.css's --strip-face, which the strip's reserved height counts. */
+	const STRIP_FACE = 36;
 </script>
 
 <Panel padding="none">
@@ -29,7 +32,7 @@
 					<Face
 						src={pick.player.headshot}
 						name={pick.player.name}
-						size={36}
+						size={STRIP_FACE}
 						ringed={pick.ring === 'accent'}
 						marked={pick.ring === 'ink'}
 					/>
@@ -46,15 +49,12 @@
 		display: flex;
 		align-items: center;
 		gap: var(--s-3);
-		padding: var(--s-3) var(--s-4);
+		padding: var(--s-3) var(--fade-w) var(--s-3) var(--s-4);
 		overflow-x: auto;
-	}
-
-	@media (max-width: 760px) {
-		.strip {
-			padding-right: var(--fade-w);
-			mask-image: var(--fade-end);
-		}
+		min-block-size: var(--pick-strip-h);
+		box-sizing: border-box;
+		/* At every width the last face fades, the cue that more of the strip scrolls in. */
+		mask-image: var(--fade-end);
 	}
 
 	.lead {
@@ -102,9 +102,12 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 3px;
+		gap: var(--strip-gap);
 		width: var(--strip-w);
 		font-size: var(--t-xs);
+		line-height: var(--strip-line);
+		/* A name, a league member's handle among them, keeps its direction to itself. */
+		unicode-bidi: isolate;
 		color: var(--ink-3);
 		text-align: center;
 	}

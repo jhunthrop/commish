@@ -21,6 +21,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/billing"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/db"
+	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/exports"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -28,6 +29,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/metrics"
 	"github.com/jhunthrop/commish/api/internal/mocks"
 	"github.com/jhunthrop/commish/api/internal/names"
+	"github.com/jhunthrop/commish/api/internal/season"
 	"github.com/jhunthrop/commish/api/internal/server"
 	"github.com/jhunthrop/commish/api/internal/sheets"
 )
@@ -112,9 +114,15 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, TrustedHops: cfg.HTTP.TrustedProxyHops, Now: now, Log: log,
 		Anon: anon, Claimer: mockStore,
 	}
+	// The board's pool lives as long as the process.
+	draftBoards, _, err := draftroom.OpenBoards(pool, cfg.Board, now)
+	if err != nil {
+		return nil, err
+	}
+	sale := &season.Sale{Schedule: draftBoards.Schedule, Log: log}
 	billingService := &billing.Service{
 		Store: &billing.Store{Pool: pool}, Entitlements: ents, Gateway: gateway(cfg, log),
-		WebhookSecret: cfg.Stripe.WebhookSecret, Viewer: viewer, Handles: authStore, Catalog: ents,
+		WebhookSecret: cfg.Stripe.WebhookSecret, Viewer: viewer, Handles: authStore, Catalog: ents, Sale: sale,
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, Now: now, Log: log,
 	}
 	var devRoutes []httpx.Route
@@ -125,7 +133,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		log.Warn("billing is the development fake", "checkout", cfg.HTTP.APIBaseURL+"/billing/dev-checkout/")
 	}
 	exportHandler := &exports.Handler{Store: &exports.Store{Pool: pool}, Sheets: sheetStore, Objects: objects(cfg, log), Now: now, Log: log}
-	solo, lobbies, err := rooms(ctx, cfg, pool, mockStore, anon, gate, leagueStore, sheetStore, authStore, log)
+	solo, lobbies, err := rooms(ctx, cfg, pool, draftBoards, mockStore, anon, gate, leagueStore, sheetStore, authStore, log)
 	if err != nil {
 		return nil, err
 	}

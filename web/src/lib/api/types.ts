@@ -293,7 +293,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** What is for sale, for how much and what each product unlocks. Prices are read from Stripe, the annual Membership first; what each product unlocks is read from app.product_features. With checkout not open (Stripe not configured) the prices are null and the features still answer. */
+		/** What is for sale, for how much and what each product unlocks. Prices are read from Stripe, the annual Membership first; what each product unlocks is read from app.product_features. With checkout not open (Stripe not configured) the prices are the launch prices stripe-setup creates, and checkout_open says no one can pay yet. */
 		get: operations['getPlans'];
 		put?: never;
 		post?: never;
@@ -788,7 +788,8 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		get?: never;
+		/** The account's newest followed drafts, newest first, with the Sleeper username each seat was found by. */
+		get: operations['listCompanions'];
 		put?: never;
 		/** Follow a draft running on another host (Sleeper today) from the drafter's seat. Needs the live_draft_advisor feature (403 with feature otherwise). Snake drafts only; an auction, a linear order or a reversal is refused with a sentence. The same draft again answers the companion already made, with the seat updated. */
 		post: operations['createCompanion'];
@@ -1105,9 +1106,9 @@ export interface components {
 			currency: string;
 			interval: components['schemas']['Interval'] | null;
 		};
-		/** @description A product whose price is not set in Stripe yet, or every product while checkout is not open, is null (draft_pass, group_pass) or missing from the list (membership). */
+		/** @description A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership). While checkout is not open the prices are the launch prices. */
 		PlanCatalog: {
-			/** @description the season a pass bought now is for */
+			/** @description the season a pass bought now is for: the current one until its first kickoff, then the next */
 			season: number;
 			/**
 			 * Format: date-time
@@ -1150,6 +1151,10 @@ export interface components {
 			/** @description each claimed seat, first claim first; the seats past these are open */
 			claims: components['schemas']['GroupPassClaim'][];
 			claim_url: string;
+			/** @description the code in the claim link */
+			claim_code: string;
+			/** @description the buyer holds one of its seats */
+			claimed_by_me: boolean;
 			/** @enum {string} */
 			status: 'active' | 'refunded' | 'disputed';
 			/** Format: date-time */
@@ -1340,8 +1345,11 @@ export interface components {
 			 * @description ADP less the pick
 			 */
 			adp_gap: number | null;
-			/** @enum {string} */
-			chip: 'reach' | 'steal' | 'at_adp' | 'none';
+			/**
+			 * @description kept is a keeper at his seat and round, with no ADP gap and no hindsight
+			 * @enum {string}
+			 */
+			chip: 'reach' | 'steal' | 'at_adp' | 'none' | 'kept';
 			/**
 			 * Format: double
 			 * @description the chance he was there at your next turn
@@ -1422,6 +1430,20 @@ export interface components {
 		};
 		/** @enum {string} */
 		CompanionStatus: 'pre_draft' | 'drafting' | 'paused' | 'complete';
+		CompanionSummary: {
+			/** Format: uuid */
+			id: string;
+			host_draft_id: string;
+			/** @description the draft's name on the host, empty when it has none */
+			name: string;
+			slot: number;
+			/** @description the Sleeper username the seat was found by */
+			host_username: string | null;
+			status: components['schemas']['CompanionStatus'];
+			replay: boolean;
+			/** Format: date-time */
+			created_at: string;
+		};
 		CompanionPick: {
 			pick: number;
 			round: number;
@@ -1457,6 +1479,8 @@ export interface components {
 			rounds: number;
 			/** @description the drafter's draft slot */
 			slot: number;
+			/** @description each slot's name in the host league (its members' display names), slot 1 first; empty for a mock draft, and '' for a slot with no member */
+			seat_names: string[];
 			settings: components['schemas']['LeagueSettings'];
 			/** @description the board our call reads */
 			basis: string;
@@ -1480,7 +1504,7 @@ export interface components {
 			lost_at: number | null;
 			/** @description picks made by a team other than the slot's own */
 			traded: number;
-			/** @description our call at the drafter's turn. The why is on the call only, or on every shortlist row with full_reasoning. */
+			/** @description our call at the drafter's turn, or between turns the conditional call (conditional true): the player to take if the board holds to your_next_pick. The why is on the call only, or on every shortlist row with full_reasoning. */
 			card: components['schemas']['RoomCard'] | null;
 			/** @description the board valued for this league, sent only when since is 0 */
 			board: components['schemas']['RoomBoard'] | null;
@@ -2706,6 +2730,27 @@ export interface operations {
 			403: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
+		};
+	};
+	listCompanions: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description up to five */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['CompanionSummary'][];
+					};
+				};
+			};
+			403: components['responses']['ErrorResponse'];
 		};
 	};
 	createCompanion: {

@@ -49,12 +49,8 @@ func advisorClient(ctx context.Context, cfg config.Advisor) (*http.Client, error
 // the research tables, the advisor with the engine behind it, and the
 // engine's own runs for the report. The board's pool, when it has one of
 // its own, lives as long as the process.
-func rooms(ctx context.Context, cfg config.API, pool *pgxpool.Pool, mockStore *mocks.Store, anon *auth.Anon, gate *leagues.Gate, leagueStore *leagues.Store, sheetStore *sheets.Store,
+func rooms(ctx context.Context, cfg config.API, pool *pgxpool.Pool, draftBoards *draftroom.Boards, mockStore *mocks.Store, anon *auth.Anon, gate *leagues.Gate, leagueStore *leagues.Store, sheetStore *sheets.Store,
 	authStore *auth.Store, log *slog.Logger) (*solo.Service, *lobby.Handler, error) {
-	draftBoards, _, err := draftroom.OpenBoards(pool, cfg.Board, time.Now)
-	if err != nil {
-		return nil, nil, err
-	}
 	workers := runtime.GOMAXPROCS(0)
 	engine := advisor.Engine{Runs: sim.RoomOddsRuns, Workers: workers}
 	card := advisor.Fallback{Secondary: engine, Timeout: cfg.Advisor.Timeout, Log: log}

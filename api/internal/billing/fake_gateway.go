@@ -195,7 +195,7 @@ func (f *FakeGateway) EnsurePrice(_ context.Context, spec PriceSpec) error {
 	}
 	if _, ok := f.Prices[spec.LookupKey]; !ok {
 		f.Prices[spec.LookupKey] = Price{ID: "price_fake_" + spec.LookupKey, LookupKey: spec.LookupKey,
-			AmountCents: spec.AmountCents, Currency: "usd", Interval: spec.Interval}
+			AmountCents: spec.AmountCents, Currency: launchCurrency, Interval: spec.Interval}
 	}
 	return nil
 }

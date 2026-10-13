@@ -239,7 +239,15 @@
 		<Panel padding="sm" edge="quiet"><p class="notice">{notice}</p></Panel>
 	{/if}
 	<LiveRegion words={notice ?? ''} />
-	{#if room.waiting && went.length > 0}
+	{#if lastMine !== null || inFlight}
+		<!-- Once the first turn has passed, the strip's place is held, so its arrival after a pick never
+		     pushes the call down. -->
+		<div class="since">
+			{#if room.waiting && went.length > 0}
+				<SinceStrip since={prev} {went} {teams} {whose} />
+			{/if}
+		</div>
+	{:else if room.waiting && went.length > 0}
 		<SinceStrip since={prev} {went} {teams} {whose} />
 	{/if}
 	{#if noCall}
@@ -328,6 +336,11 @@
 		margin: 0;
 		font-size: var(--t-md);
 		color: var(--ink-2);
+	}
+
+	/* The strip's panel: its strip and the panel's two borders. */
+	.since {
+		min-block-size: calc(var(--pick-strip-h) + 2px);
 	}
 
 	.notice {

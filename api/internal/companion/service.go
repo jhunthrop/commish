@@ -10,11 +10,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/jhunthrop/commish/api/internal/advisor"
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -23,6 +25,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/httpx"
+	"github.com/jhunthrop/commish/api/internal/memo"
 	"github.com/jhunthrop/commish/api/internal/sleeper"
 )
 
@@ -45,6 +48,7 @@ type Repository interface {
 	Report(ctx context.Context, id uuid.UUID) (json.RawMessage, bool, error)
 	PutReport(ctx context.Context, id uuid.UUID, report any) error
 	WithReportLock(ctx context.Context, id uuid.UUID, fn func(context.Context) error) error
+	Recent(ctx context.Context, accountID uuid.UUID, limit int) ([]Row, error)
 }
 
 // Checker answers whether an account may use a feature, from Can only.
@@ -58,33 +62,63 @@ type BoardSource interface {
 	For(ctx context.Context, s apitypes.LeagueSettings) (boards.Board, error)
 }
 
+// ConditionalAdvisor is the call for a seat off the clock: the player to
+// take if the board holds to its next pick.
+type ConditionalAdvisor interface {
+	Conditional(ctx context.Context, req advisor.Request) (advisor.Card, error)
+}
+
 // Directory is what the companion reads from the host beyond the draft:
 // a drafter's user id by username, and a league's scoring.
 type Directory interface {
 	UserID(ctx context.Context, username string) (string, error)
 	League(ctx context.Context, id string) (sleeper.League, error)
+	LeagueUsers(ctx context.Context, leagueID string) ([]sleeper.User, error)
 }
 
 // Service serves the companion's routes.
 type Service struct {
-	Store        Repository
-	Poller       *Poller
-	Directory    Directory
-	Boards       BoardSource
-	Matcher      Matcher
-	Advisor      advisor.Advisor
+	Store     Repository
+	Poller    *Poller
+	Directory Directory
+	Boards    BoardSource
+	Matcher   Matcher
+	Advisor   advisor.Advisor
+	// Conditional makes the call between turns, the lobby's.
+	// advisor.Engine implements it.
+	Conditional  ConditionalAdvisor
 	Entitlements Checker
 	// Replay is the recorded draft, nil unless COMPANION_REPLAY is on.
 	Replay        *Replay
 	ReportWorkers int
 	Now           func() time.Time
 	Log           *slog.Logger
+
+	// conditional keeps the between-turns card per companion, seat and
+	// pick count, and building singles the work out: every viewer of one
+	// pick costs one computation, and a seat changed by a re-follow is a
+	// new card.
+	conditional memo.Map[conditionalKey, apitypes.RoomCard]
+	building    singleflight.Group
+}
+
+type conditionalKey struct {
+	companion uuid.UUID
+	seat      int
+	// started is the row's created_at: a replay restarted is a new draft.
+	started int64
+	picks   int
+}
+
+func (k conditionalKey) String() string {
+	return fmt.Sprintf("%s/%d/%d/%d", k.companion, k.seat, k.started, k.picks)
 }
 
 // Routes is every route this package serves.
 func (s *Service) Routes() []httpx.Route {
 	return []httpx.Route{
 		{Method: http.MethodPost, Path: "/companions", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitCreatePerMinute), Handler: s.create},
+		{Method: http.MethodGet, Path: "/companions", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: s.recent},
 		{Method: http.MethodGet, Path: "/companions/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: s.get},
 		{Method: http.MethodGet, Path: "/companions/{id}/report", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReportPerMinute), Handler: s.report},
 	}

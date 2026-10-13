@@ -8,6 +8,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
+	import { hasLiveMembership } from '#lib/account/words.ts';
 	import { links } from '#lib/site/links.ts';
 	import { claimStep, fromWords, stateFromError, type ClaimState } from './claim.ts';
 	import { ApiError, currentAccount, pass, type Feature } from './pass-api.ts';
@@ -27,13 +28,25 @@
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
 
+	/** Where this browser notes the claim it sent a reader to sign in for, so the return lands
+	 * claimed with no second press. */
+	const RESUME_NOTE = 'commish:claim-resume';
+
 	async function load(): Promise<void> {
 		try {
 			const [preview, account] = await Promise.all([pass.preview(code), currentAccount()]);
 			view = { kind: 'open', preview, account };
+			const noted = sessionStorage.getItem(RESUME_NOTE) === code;
+			sessionStorage.removeItem(RESUME_NOTE);
+			if (noted && claimStep(preview, account) === 'claim') await claim();
 		} catch (error) {
 			view = stateFromError(error);
 		}
+	}
+
+	function signInToClaim(): void {
+		sessionStorage.setItem(RESUME_NOTE, code);
+		window.location.assign(pass.signInUrl(here));
 	}
 
 	onMount(() => {
@@ -111,12 +124,15 @@
 			<section class="step" aria-label="Your pass">
 				{#if step === 'yours'}
 					<p class="line">
-						Your Draft Pass is on{endsAt ? `, good through ${endsAt}` : ''}.
+						Your Draft Pass is on{endsAt ? `. It ends ${endsAt}` : ''}.
 					</p>
 					<Verb href={links.companionNew()} size="lg">Open the live draft companion</Verb>
 				{:else if step === 'covered'}
 					<p class="line">
-						You already have the {preview.season} Draft Pass, so leave this one for a teammate.
+						{account && hasLiveMembership(account)
+							? 'Your Membership already includes the Draft Pass'
+							: `You already have the ${String(preview.season)} Draft Pass`}, so leave this one for
+						a teammate.
 					</p>
 					<Quiet href={links.companionNew()}>Open the live draft companion</Quiet>
 				{:else if step === 'full'}
@@ -128,7 +144,7 @@
 					<Quiet href={links.pass()}>See the Draft Pass</Quiet>
 				{:else if step === 'sign-in'}
 					<p class="line">Sign in and the pass is yours, one per drafter.</p>
-					<Verb href={pass.signInUrl(here)} size="lg">Sign in to claim your pass</Verb>
+					<Verb size="lg" onclick={signInToClaim}>Sign in to claim your pass</Verb>
 				{:else}
 					<p class="line">One pass per drafter, yours for the {preview.season} season.</p>
 					<Verb size="lg" disabled={busy} onclick={() => void claim()}>Claim my pass</Verb>

@@ -54,6 +54,9 @@ const (
 	Steal ADPChip = "steal"
 	AtADP ADPChip = "at_adp"
 	NoADP ADPChip = ""
+	// Kept is a keeper at his seat and round: no choice, so no ADP gap and
+	// no hindsight, listed so every pick of the drafter's shows.
+	Kept ADPChip = "kept"
 )
 
 // noValue is a summary over no runs.
@@ -147,7 +150,11 @@ func reviewPicks(ctx context.Context, in ReportInput) ([]PickReview, error) {
 	var out []PickReview
 	for i, a := range in.Draft.Actions {
 		kept, forced := keepers.Forced(s, human)
-		if a.Type == draft.MakePick && a.TeamID == human && s.PickNumber <= draft.TotalPickCount(s) && !(forced && kept == a.PlayerID) {
+		mine := a.Type == draft.MakePick && a.TeamID == human && s.PickNumber <= draft.TotalPickCount(s)
+		switch {
+		case mine && forced && kept == a.PlayerID:
+			out = append(out, keptPick(in, s, a.PlayerID))
+		case mine:
 			review, err := reviewOne(ctx, in, keepers, s, i+1, a.PlayerID)
 			if err != nil {
 				return nil, err
@@ -161,6 +168,16 @@ func reviewPicks(ctx context.Context, in ReportInput) ([]PickReview, error) {
 		s = next
 	}
 	return out, nil
+}
+
+// keptPick is the drafter's keeper as the report lists it: where he went
+// and what he is worth, with no ADP gap or hindsight, since nobody chose.
+func keptPick(in ReportInput, before draft.State, playerID string) PickReview {
+	pos, _ := before.Pool.PositionOf(playerID)
+	return PickReview{
+		PickNumber: before.PickNumber, Round: draft.RoundForPick(len(before.DraftOrder), before.PickNumber),
+		PlayerID: playerID, Position: pos, OverReplacement: in.Board.Values[playerID], Chip: Kept, MadeBy: MadeByYou,
+	}
 }
 
 func reviewOne(ctx context.Context, in ReportInput, keepers sim.Keepers, before draft.State, seq int, playerID string) (PickReview, error) {

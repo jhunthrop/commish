@@ -12,9 +12,11 @@
 		teams?: number;
 		/** Whose draft the strip is told for: your own, or a draft someone shared with you. */
 		whose?: 'your' | 'their';
+		/** The room keeps a queue: off for a draft followed on another host, which has none here. */
+		queue?: boolean;
 	}
 
-	let { since, went, teams = DEFAULT_TEAMS, whose = 'your' }: Props = $props();
+	let { since, went, teams = DEFAULT_TEAMS, whose = 'your', queue = true }: Props = $props();
 
 	const fromQueue = $derived(went.filter((pick) => pick.queued).length);
 	const lead = $derived(
@@ -26,7 +28,7 @@
 
 <PickStrip
 	lead={String(went.length)}
-	leadLines={[lead, `${fromQueue === 0 ? 'none' : fromQueue} from ${whose} queue`]}
+	leadLines={queue ? [lead, `${fromQueue === 0 ? 'none' : fromQueue} from ${whose} queue`] : [lead]}
 	picks={went.map(({ player, pick, queued }) => ({
 		key: pick,
 		player,

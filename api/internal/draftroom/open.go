@@ -27,5 +27,5 @@ func OpenBoards(app *pgxpool.Pool, c config.Board, now func() time.Time) (*Board
 		closeFn()
 		return nil, nil, err
 	}
-	return &Boards{Raw: &boards.Cache{Source: source, TTL: c.TTL, Now: now}}, closeFn, nil
+	return &Boards{Raw: &boards.Cache{Source: source, TTL: c.TTL, Now: now}, Schedule: source}, closeFn, nil
 }

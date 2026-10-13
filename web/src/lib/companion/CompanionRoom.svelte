@@ -23,7 +23,7 @@
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
 	import type { Companion, CompanionPick, Feature } from './api.ts';
 	import CompanionBar from './CompanionBar.svelte';
-	import { has, hostDraftUrl, landingStrip, roomPicks } from './model.ts';
+	import { has, hostDraftUrl, landingStrip, roomPicks, seatNames } from './model.ts';
 	import SheetSync from './SheetSync.svelte';
 	import Shortlist from './Shortlist.svelte';
 
@@ -51,16 +51,23 @@
 	const round = $derived(snakeSlot(Math.min(now, c.total_picks), teams).round);
 	const prev = $derived(turnBefore(now, c.slot, teams));
 	const card = $derived(c.card);
-	const call = $derived(card && c.your_turn ? callView(card, board, drafted, teams) : null);
+	/** At your turn our call; between turns the lobby's conditional call, the player to take if the
+	 * board holds to your next pick. */
+	const call = $derived(
+		card && (c.your_turn || card.conditional) ? callView(card, board, drafted, teams) : null
+	);
+	const onTurn = $derived(call !== null && c.your_turn);
 	const oddsLabel = $derived(
-		card?.next_pick ? `still there at ${pickLabel(card.next_pick, teams)}` : 'your last pick'
+		card?.conditional
+			? `reaches ${pickLabel(card.for_pick, teams)}`
+			: card?.next_pick
+				? `still there at ${pickLabel(card.next_pick, teams)}`
+				: 'your last pick'
 	);
 	const rows = $derived(poolRows(board, drafted, filter, [], search));
-	const strip = $derived(landingStrip(picks, board, teams, c.slot));
+	const names = $derived(seatNames(c));
+	const strip = $derived(landingStrip(picks, board, teams, c.slot, names));
 	const went = $derived(wentSince(placed, prev ?? 0, new Set(), board));
-	const names = $derived(
-		Array.from({ length: teams }, (_, i) => (i + 1 === c.slot ? 'You' : `Slot ${String(i + 1)}`))
-	);
 	const notes = $derived(
 		[
 			c.unplaced > 0
@@ -72,8 +79,30 @@
 		].filter((n): n is string => n !== null)
 	);
 
+	const SLEEPER_TAB = 'sleeper-draft';
+
+	/** The Sleeper tab this page opened, kept so every later turn returns to it. */
+	let sleeperTab: Window | null = null;
+
+	/**
+	 * One Sleeper tab for the whole draft. The first turn opens it by name and cuts its opener while
+	 * it is still about:blank (same origin), so Sleeper can never navigate this page. Every later turn
+	 * brings that same tab forward: it is already the draft room, and with its opener cut this page
+	 * may focus it but not navigate it (Chromium refuses with a SecurityError, measured). If the
+	 * drafter closed it, the next turn opens a new one. A tab left from before a reload is found by
+	 * its name, and cutting its opener then may be refused, which changes nothing the drafter sees.
+	 */
 	function openHost(): void {
-		window.open(hostDraftUrl(c), '_blank', 'noopener');
+		if (sleeperTab && !sleeperTab.closed) {
+			sleeperTab.focus();
+			return;
+		}
+		sleeperTab = window.open(hostDraftUrl(c), SLEEPER_TAB);
+		try {
+			if (sleeperTab) sleeperTab.opener = null;
+		} catch {
+			// Already on sleeper.com (a tab from before a reload): its opener is out of reach.
+		}
 	}
 </script>
 
@@ -82,15 +111,15 @@
 	{#if c.lost_at !== null}
 		<Panel edge="loss" padding="sm">
 			<p class="note">
-				Pick {c.lost_at} on Sleeper does not fit how our draft is set up, so our call stops there. The
-				picks keep landing below.
+				Pick {pickLabel(c.lost_at, teams)} on Sleeper does not fit how our draft is set up, so our call
+				stops there. The picks keep landing below.
 			</p>
 		</Panel>
 	{/if}
 	{#each notes as note (note)}
 		<p class="note">{note}</p>
 	{/each}
-	{#if strip.length > 0 && !call}
+	{#if strip.length > 0 && !onTurn}
 		<PickStrip
 			lead={pickLabel(picks.at(-1)?.pick ?? 1, teams)}
 			leadLines={['just taken on Sleeper', 'newest first']}
@@ -98,14 +127,20 @@
 			width="md"
 		/>
 	{/if}
-	{#if call && card}
-		{#if went.length > 0}<SinceStrip since={prev} {went} {teams} />{/if}
+	{#if call && card && onTurn}
+		{#if went.length > 0}<SinceStrip since={prev} {went} {teams} queue={false} />{/if}
 		<RoomCall
 			view={call}
 			pickNumber={now}
 			action={{ label: 'Make the pick on Sleeper', onclick: openHost }}
 		/>
 		<Shortlist {card} {board} {oddsLabel} ranges={c.ranges} />
+	{:else if call}
+		<RoomCall
+			view={call}
+			pickNumber={now}
+			action={{ label: 'Queue him on Sleeper', onclick: openHost }}
+		/>
 	{/if}
 	{#if c.status !== 'complete'}
 		<Pool
@@ -113,6 +148,7 @@
 			left={board.players.length - drafted.size}
 			odds={card?.still_there ?? {}}
 			{oddsLabel}
+			oddsHead={card?.conditional ? 'Reaches' : 'Still there'}
 			oddsShown={call !== null}
 			basis={call ? poolBasis(board, card, teams) : c.basis}
 			pickNumber={now}

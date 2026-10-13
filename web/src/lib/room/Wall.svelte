@@ -3,6 +3,7 @@
 	import { lastName, pickLabel } from '#lib/format/draft.ts';
 	import Face from '#lib/ui/Face.svelte';
 	import Label from '#lib/ui/Label.svelte';
+	import NameWords from '#lib/ui/NameWords.svelte';
 	import type { WallCell } from './model.ts';
 
 	interface Props {
@@ -31,7 +32,7 @@
 		<div class="wall" style:--teams={teams}>
 			<span class="h"></span>
 			{#each names as name, i (i)}
-				<span class="h" class:you={i + 1 === you}>{name}</span>
+				<span class="h" class:you={i + 1 === you}><NameWords {name} /></span>
 			{/each}
 			{#each rows as row, r (r)}
 				<span class="rd">{r + 1}</span>
@@ -85,8 +86,12 @@
 		border-bottom: 1px solid var(--line);
 		text-transform: uppercase;
 		letter-spacing: var(--track-label);
-		/* A handle is read whole: it wraps inside its column (a 20-letter handle takes two lines). */
-		overflow-wrap: anywhere;
+		/* A name breaks only between its words; one long handle is cut with an ellipsis rather than
+		   split mid-word. */
+		overflow: hidden;
+		text-overflow: ellipsis;
+		/* A league member's name keeps its direction to itself. */
+		unicode-bidi: isolate;
 		line-height: 1.25;
 		align-self: end;
 	}

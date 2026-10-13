@@ -86,6 +86,12 @@ type ProductCatalog interface {
 	ProductFeatures(ctx context.Context) (map[entitlements.Product][]entitlements.Feature, error)
 }
 
+// SaleSeason is the one rule for which season a pass bought now is for.
+// *season.Sale implements it.
+type SaleSeason interface {
+	Season(ctx context.Context, t time.Time) int
+}
+
 // HandleReader reads an account's public handle.
 type HandleReader interface {
 	HandleOf(ctx context.Context, id uuid.UUID) (*string, error)
@@ -102,6 +108,7 @@ type Service struct {
 	Viewer        auth.AccountViewer
 	Handles       HandleReader
 	Catalog       ProductCatalog
+	Sale          SaleSeason
 	PublicBaseURL string
 	Now           func() time.Time
 	Log           *slog.Logger
