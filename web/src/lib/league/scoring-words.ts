@@ -23,7 +23,7 @@ const KINDS: readonly (readonly [RegExp, string])[] = [
 function kindOf(rule: string): string {
 	const [head = ''] = rule.split(' ');
 	const kind = KINDS.find(([pattern]) => pattern.test(head));
-	return kind ? kind[1] : head.replaceAll('_', ' ').toLowerCase();
+	return kind ? kind[1] : 'other scoring rules';
 }
 
 /** Each kind of dropped rule once, in the order first met. */

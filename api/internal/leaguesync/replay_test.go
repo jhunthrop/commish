@@ -2,6 +2,7 @@ package leaguesync
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -54,6 +55,11 @@ func TestRecordedLeaguesRead(t *testing.T) {
 		}
 		if !contains(snap.Scoring.Dropped, c.dropped) {
 			t.Errorf("%s: dropped %q, want %q among them", c.link, snap.Scoring.Dropped, c.dropped)
+		}
+		for _, d := range snap.Scoring.Dropped {
+			if strings.HasSuffix(d, " 0") {
+				t.Errorf("%s: a setting of 0 is named dropped: %q", c.link, d)
+			}
 		}
 		if len(snap.Scoring.Rules) != len(ruleKeys) {
 			t.Errorf("%s: %d rule keys, want the %d of ScoringRules", c.link, len(snap.Scoring.Rules), len(ruleKeys))

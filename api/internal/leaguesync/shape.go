@@ -91,7 +91,10 @@ func sleeperScoring(settings map[string]float64) Scoring {
 	}
 	m := toRules(host)
 	for _, k := range m.left {
-		dropped = append(dropped, fmt.Sprintf("%s %g", k, host[k]))
+		// A setting of 0 scores nothing, so dropping it loses nothing.
+		if host[k] != 0 {
+			dropped = append(dropped, fmt.Sprintf("%s %g", k, host[k]))
+		}
 	}
 	sort.Strings(dropped)
 	return Scoring{Rules: m.rules, Dropped: dropped, Defaulted: m.defaulted}

@@ -142,7 +142,10 @@ func mflScoring(rules []mfl.Rule) Scoring {
 	}
 	m := toRules(host)
 	for _, key := range m.left {
-		dropped = append(dropped, sources[key]...)
+		// A rule worth 0 scores nothing, so dropping it loses nothing.
+		if host[key] != 0 {
+			dropped = append(dropped, sources[key]...)
+		}
 	}
 	sort.Strings(dropped)
 	return Scoring{Rules: m.rules, Dropped: dedupe(dropped), Defaulted: m.defaulted}
