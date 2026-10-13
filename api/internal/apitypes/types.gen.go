@@ -729,10 +729,13 @@ type Companion struct {
 	PicksUntilTurn *int `json:"picks_until_turn"`
 
 	// Ranges floor, median and ceiling for each shortlist player, with range_of_outcomes only
-	Ranges   *map[string]OutcomeRange `json:"ranges"`
-	Replay   bool                     `json:"replay"`
-	Rounds   int                      `json:"rounds"`
-	Settings LeagueSettings           `json:"settings"`
+	Ranges *map[string]OutcomeRange `json:"ranges"`
+	Replay bool                     `json:"replay"`
+	Rounds int                      `json:"rounds"`
+
+	// SeatNames each slot's name in the host league (its members' display names), slot 1 first; empty for a mock draft, and '' for a slot with no member
+	SeatNames []string       `json:"seat_names"`
+	Settings  LeagueSettings `json:"settings"`
 
 	// Since the pick count the picks follow
 	Since int `json:"since"`

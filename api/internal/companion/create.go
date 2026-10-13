@@ -68,6 +68,7 @@ func (s *Service) create(w http.ResponseWriter, r *http.Request) {
 	row, err := s.Store.Upsert(ctx, Row{
 		AccountID: auth.AccountID(r), Host: string(apitypes.CompanionHostSleeper), HostDraftID: draftID, HostLeagueID: d.LeagueID,
 		Replay: replay, Seat: seat, HostUsername: usernameOf(in.Seat), Settings: settings, Status: d.Status,
+		SeatNames: s.seatNames(ctx, d),
 	})
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "companion: create", err)
@@ -153,4 +154,27 @@ func usernameOf(seat apitypes.CompanionSeat) string {
 		return ""
 	}
 	return strings.TrimSpace(*seat.Username)
+}
+
+// seatNames is each slot's name in the host league, slot 1 first, from
+// its members' display names and the draft order. A mock draft has no
+// league and gets none; a failed read is logged and costs only the names.
+func (s *Service) seatNames(ctx context.Context, d sleeper.Draft) []string {
+	if d.LeagueID == "" || len(d.Order) == 0 {
+		return nil
+	}
+	users, err := s.Directory.LeagueUsers(ctx, d.LeagueID)
+	if err != nil {
+		s.Log.Warn("companion: league users", "league", d.LeagueID, "err", err)
+		return nil
+	}
+	byID := make(map[string]string, len(users))
+	for _, u := range users {
+		byID[u.ID] = u.DisplayName
+	}
+	names := make([]string, d.Teams)
+	for user, slot := range d.Order {
+		names[slot-1] = byID[user]
+	}
+	return names
 }

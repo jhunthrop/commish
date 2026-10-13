@@ -1473,6 +1473,8 @@ export interface components {
 			rounds: number;
 			/** @description the drafter's draft slot */
 			slot: number;
+			/** @description each slot's name in the host league (its members' display names), slot 1 first; empty for a mock draft, and '' for a slot with no member */
+			seat_names: string[];
 			settings: components['schemas']['LeagueSettings'];
 			/** @description the board our call reads */
 			basis: string;

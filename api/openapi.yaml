@@ -1707,7 +1707,7 @@ components:
     Companion:
       type: object
       required:
-        [id, host, host_draft_id, replay, name, status, teams, rounds, slot, settings, basis, pick_count, total_picks,
+        [id, host, host_draft_id, replay, name, status, teams, rounds, slot, seat_names, settings, basis, pick_count, total_picks,
          on_clock, your_turn, your_next_pick, picks_until_turn, since, picks, unplaced, lost_at, traded, card, board,
          ranges, host_stale_seconds, created_at]
       properties:
@@ -1720,6 +1720,12 @@ components:
         teams: { type: integer }
         rounds: { type: integer }
         slot: { type: integer, description: the drafter's draft slot }
+        seat_names:
+          type: array
+          description: >-
+            each slot's name in the host league (its members' display names), slot 1 first; empty for a mock draft,
+            and '' for a slot with no member
+          items: { type: string }
         settings: { $ref: "#/components/schemas/LeagueSettings" }
         basis: { type: string, description: the board our call reads, in a sentence }
         pick_count: { type: integer, description: picks the host has made }

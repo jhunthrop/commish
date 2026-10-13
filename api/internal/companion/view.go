@@ -115,6 +115,7 @@ func (s *Service) view(f followed, since int) apitypes.Companion {
 		Settings: f.row.Settings, Basis: basisWords(f.board), PickCount: len(f.read.Picks), TotalPicks: total,
 		Since: min(since, len(f.read.Picks)), Unplaced: f.built.Unplaced, LostAt: f.built.LostAt,
 		Traded: traded(d, f.read.Picks), CreatedAt: f.row.CreatedAt, Picks: []apitypes.CompanionPick{},
+		SeatNames: seatNamesOrEmpty(f.row.SeatNames),
 	}
 	if f.read.Stale > 0 {
 		secs := int(f.read.Stale / time.Second)

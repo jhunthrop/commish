@@ -18,7 +18,7 @@
 		type MockReport
 	} from './api.ts';
 	import CompanionRoom from './CompanionRoom.svelte';
-	import { POLL_MS, mergePicks } from './model.ts';
+	import { POLL_MS, mergePicks, seatNames } from './model.ts';
 
 	/** One followed draft: read every three seconds while it runs, the report once Sleeper says it
 	 * is over. Everything is read in the browser; the shell paints first. */
@@ -75,13 +75,7 @@
 		};
 	});
 
-	const names = $derived(
-		companion
-			? Array.from({ length: companion.teams }, (_, i) =>
-					i + 1 === companion?.slot ? 'You' : `Slot ${String(i + 1)}`
-				)
-			: []
-	);
+	const names = $derived(companion ? seatNames(companion) : []);
 	const here = $derived(links.companion(id));
 </script>
 

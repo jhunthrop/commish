@@ -23,7 +23,7 @@
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
 	import type { Companion, CompanionPick, Feature } from './api.ts';
 	import CompanionBar from './CompanionBar.svelte';
-	import { has, hostDraftUrl, landingStrip, roomPicks } from './model.ts';
+	import { has, hostDraftUrl, landingStrip, roomPicks, seatNames } from './model.ts';
 	import SheetSync from './SheetSync.svelte';
 	import Shortlist from './Shortlist.svelte';
 
@@ -65,11 +65,9 @@
 				: 'your last pick'
 	);
 	const rows = $derived(poolRows(board, drafted, filter, [], search));
-	const strip = $derived(landingStrip(picks, board, teams, c.slot));
+	const names = $derived(seatNames(c));
+	const strip = $derived(landingStrip(picks, board, teams, c.slot, names));
 	const went = $derived(wentSince(placed, prev ?? 0, new Set(), board));
-	const names = $derived(
-		Array.from({ length: teams }, (_, i) => (i + 1 === c.slot ? 'You' : `Slot ${String(i + 1)}`))
-	);
 	const notes = $derived(
 		[
 			c.unplaced > 0

@@ -62,7 +62,8 @@ export function landingStrip(
 	picks: readonly CompanionPick[],
 	board: Board,
 	teams: number,
-	you: number
+	you: number,
+	names: readonly string[]
 ): StripPick[] {
 	return picks
 		.slice(-STRIP_PICKS)
@@ -74,13 +75,23 @@ export function landingStrip(
 						{
 							key: p.pick,
 							player,
-							lines: [pickLabel(p.pick, teams), p.seat === you ? 'you' : `slot ${String(p.seat)}`],
+							lines: [pickLabel(p.pick, teams), p.seat === you ? 'you' : (names[p.seat - 1] ?? '')],
 							ring: i === 0 ? ('ink' as const) : undefined,
 							strong: p.seat === you
 						}
 					]
 				: [];
 		});
+}
+
+/** Each seat's name, slot 1 first: you, the league member's name on the host, or the slot in a
+ * mock draft or for a slot no member holds. */
+export function seatNames(c: Pick<Companion, 'teams' | 'slot' | 'seat_names'>): string[] {
+	return Array.from({ length: c.teams }, (_, i) => {
+		if (i + 1 === c.slot) return 'You';
+		const name = c.seat_names[i];
+		return name !== undefined && name !== '' ? name : `Slot ${String(i + 1)}`;
+	});
 }
 
 /** The bar's line under the count: where the draft is and when you are up. */

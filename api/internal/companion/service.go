@@ -65,6 +65,7 @@ type BoardSource interface {
 type Directory interface {
 	UserID(ctx context.Context, username string) (string, error)
 	League(ctx context.Context, id string) (sleeper.League, error)
+	LeagueUsers(ctx context.Context, leagueID string) ([]sleeper.User, error)
 }
 
 // Service serves the companion's routes.
