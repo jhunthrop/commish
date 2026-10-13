@@ -33,7 +33,7 @@ type FFPCMember interface {
 // FFPCReaders finds a connected member who has attached a league, to
 // read it as. *Store implements it.
 type FFPCReaders interface {
-	FFPCReader(ctx context.Context, leagueID string) (accountID uuid.UUID, ltuid string, err error)
+	FFPCReader(ctx context.Context, ref Ref) (accountID uuid.UUID, ltuid string, err error)
 }
 
 // FFPC is the FFPC host. One read per league per interval, as any host,
@@ -63,7 +63,9 @@ func (f *FFPC) Owns(pasted string) bool {
 
 var ffpcLeagueID = regexp.MustCompile(`^[0-9]{1,12}$`)
 
-// Parse reads an FFPC league id, as the member's league list gives it.
+// Parse reads an FFPC league id, as the member's league list gives it. Its
+// season is the league home banner's, set at attach, since FFPC keeps a
+// league's id from season to season.
 func (f *FFPC) Parse(pasted string) (Ref, error) {
 	id := strings.TrimSpace(pasted)
 	if !ffpcLeagueID.MatchString(id) {
@@ -74,7 +76,7 @@ func (f *FFPC) Parse(pasted string) (Ref, error) {
 
 // Read reads the league as a connected member who attached it.
 func (f *FFPC) Read(ctx context.Context, ref Ref) (Snapshot, error) {
-	accountID, ltuid, err := f.Readers.FFPCReader(ctx, ref.LeagueID)
+	accountID, ltuid, err := f.Readers.FFPCReader(ctx, ref)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -140,8 +142,12 @@ func ffpcErr(err error) error {
 		return fmt.Errorf("%w: %v", ErrSignInAgain, err)
 	case errors.Is(err, ffpc.ErrBusy):
 		return fmt.Errorf("%w: %v", ErrBusy, err)
-	case errors.Is(err, ffpc.ErrNotThisPage):
+	case errors.Is(err, ffpc.ErrNoSuchLeague):
 		return fmt.Errorf("%w: %v", ErrNotFound, err)
+	case errors.Is(err, ffpc.ErrNotThisPage):
+		// FFPC answered a page we do not read: the host is not answering
+		// as we know it, never "not your league".
+		return fmt.Errorf("%w: ffpc answered a page we do not read: %v", ErrUnavailable, err)
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		return err
 	default:

@@ -17,7 +17,7 @@ import (
 // 21-key map.
 func ffpcSnapshot(l ffpc.League, now time.Time) Snapshot {
 	snap := Snapshot{
-		Ref: Ref{Host: HostFFPC, LeagueID: l.Banner.LeagueID}, Name: cleanHostText(l.Banner.LeagueName),
+		Ref: Ref{Host: HostFFPC, LeagueID: l.Banner.LeagueID, Season: l.Banner.Season}, Name: cleanHostText(l.Banner.LeagueName),
 		Status: "in_season", Season: l.Banner.Season, Players: map[string]HostPlayer{}, ReadAt: now,
 	}
 	teams := map[int]*Team{}
@@ -152,6 +152,21 @@ func ffpcScoring(r ffpc.Rules) Scoring {
 	}
 	sort.Strings(sc.Dropped)
 	return sc
+}
+
+// ownLineupOnly is the snapshot with every team's starters dropped but the
+// viewer's own: an FFPC league is read as one member, whose lineup page is
+// theirs to see, never their league-mates'.
+func ownLineupOnly(snap Snapshot, me int) Snapshot {
+	out := snap
+	out.Teams = make([]Team, len(snap.Teams))
+	for i, t := range snap.Teams {
+		if t.RosterID != me {
+			t.Starters = nil
+		}
+		out.Teams[i] = t
+	}
+	return out
 }
 
 // ffpcShape is the rules' lineup, the bench made up to the roster size.

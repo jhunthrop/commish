@@ -38,7 +38,7 @@ func (s *Service) attachFFPC(w http.ResponseWriter, r *http.Request, in apitypes
 	ltuid, err := s.FFPC.Member.OpenLeague(ctx, accountID, ref.LeagueID)
 	if err != nil {
 		err = ffpcErr(err)
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, ErrNotFound) { // ffpc.ErrNoSuchLeague
 			httpx.WriteInvalid(w, r, map[string]string{fieldLink: ffpcNotInListWords})
 			return
 		}

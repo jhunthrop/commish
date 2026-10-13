@@ -319,32 +319,37 @@ func (s *Store) PutHostPlayers(ctx context.Context, host string, players []HostP
 // FFPCReader is a connected member who has an FFPC league attached, to
 // read it as: the one whose connection read most recently, so one member
 // signed out never stops the league for the rest.
-func (s *Store) FFPCReader(ctx context.Context, leagueID string) (uuid.UUID, string, error) {
+func (s *Store) FFPCReader(ctx context.Context, ref Ref) (uuid.UUID, string, error) {
 	var accountID uuid.UUID
 	var ltuid string
 	err := s.Pool.QueryRow(ctx, `select l.account_id, l.host_team_key from app.league_links l
 		join app.host_connections c on c.account_id = l.account_id and c.host = l.host and c.status = 'connected'
-		where l.host = 'ffpc' and l.host_league_id = $1 and l.detached_at is null and l.host_team_key is not null
-		order by c.last_read_at desc nulls last, l.attached_at limit 1`, leagueID).Scan(&accountID, &ltuid)
+		where l.host = 'ffpc' and l.host_league_id = $1 and l.host_season = $2 and l.detached_at is null
+			and l.host_team_key is not null
+		order by c.last_read_at desc nulls last, l.attached_at limit 1`, ref.LeagueID, ref.Season).Scan(&accountID, &ltuid)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, "", ErrNotConnected
 	}
 	if err != nil {
-		return uuid.Nil, "", fmt.Errorf("leaguesync: ffpc reader %s: %w", leagueID, err)
+		return uuid.Nil, "", fmt.Errorf("leaguesync: ffpc reader %s: %w", ref.Key(), err)
 	}
 	return accountID, ltuid, nil
 }
 
 // FFPCLeagues is every attached FFPC league with a connected member, for
 // the background read.
-func (s *Store) FFPCLeagues(ctx context.Context) ([]string, error) {
-	rows, err := s.Pool.Query(ctx, `select distinct l.host_league_id from app.league_links l
+func (s *Store) FFPCLeagues(ctx context.Context) ([]Ref, error) {
+	rows, err := s.Pool.Query(ctx, `select distinct l.host_league_id, l.host_season from app.league_links l
 		join app.host_connections c on c.account_id = l.account_id and c.host = l.host and c.status = 'connected'
-		where l.host = 'ffpc' and l.detached_at is null order by 1`)
+		where l.host = 'ffpc' and l.detached_at is null order by 1, 2`)
 	if err != nil {
 		return nil, fmt.Errorf("leaguesync: ffpc leagues: %w", err)
 	}
-	out, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Ref, error) {
+		ref := Ref{Host: HostFFPC}
+		err := r.Scan(&ref.LeagueID, &ref.Season)
+		return ref, err
+	})
 	if err != nil {
 		return nil, fmt.Errorf("leaguesync: ffpc leagues: %w", err)
 	}

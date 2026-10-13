@@ -18,6 +18,9 @@ const unlistedName = "A player not yet listed"
 // view is the league as the link's drafter sees it.
 func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.LeagueSync, error) {
 	snap := read.Snapshot
+	if snap.Ref.Host == HostFFPC {
+		snap = ownLineupOnly(snap, link.RosterID)
+	}
 	saved, err := s.savedSettings(ctx, link)
 	if err != nil {
 		return apitypes.LeagueSync{}, err

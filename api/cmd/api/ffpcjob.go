@@ -25,19 +25,19 @@ func runFFPCRefresh(ctx context.Context, log *slog.Logger, cfg config.API, pool 
 	store := &leaguesync.Store{Pool: pool}
 	host := ff.host(store)
 	if host == nil {
-		log.Warn("host credentials key not set", "effect", "no FFPC league read")
+		log.Warn("ffpc is off", "effect", "no FFPC league read")
 		return nil
 	}
-	ids, err := store.FFPCLeagues(ctx)
+	refs, err := store.FFPCLeagues(ctx)
 	if err != nil {
 		return err
 	}
 	read, failed := 0, 0
-	for _, id := range ids {
-		snap, err := host.Read(ctx, leaguesync.Ref{Host: leaguesync.HostFFPC, LeagueID: id})
+	for _, ref := range refs {
+		snap, err := host.Read(ctx, ref)
 		if err != nil {
 			failed++
-			log.Warn("ffpc refresh: league", "league", id, "err", err)
+			log.Warn("ffpc refresh: league", "league", ref.Key(), "err", err)
 			continue
 		}
 		if err := store.PutSnapshot(ctx, snap); err != nil {
@@ -45,6 +45,6 @@ func runFFPCRefresh(ctx context.Context, log *slog.Logger, cfg config.API, pool 
 		}
 		read++
 	}
-	log.Info("ffpc refresh", "leagues", len(ids), "read", read, "failed", failed)
+	log.Info("ffpc refresh", "leagues", len(refs), "read", read, "failed", failed)
 	return nil
 }

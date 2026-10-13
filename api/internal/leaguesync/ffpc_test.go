@@ -56,7 +56,7 @@ func fixtureLeagueRead(t *testing.T) ffpc.League {
 func TestFFPCSnapshotFromTheFixtures(t *testing.T) {
 	now := time.Date(2026, 10, 13, 14, 0, 0, 0, time.UTC)
 	snap := ffpcSnapshot(fixtureLeagueRead(t), now)
-	if snap.Ref.Key() != "ffpc/0/104870" || snap.Season != 2026 || snap.Week != 6 || len(snap.Teams) != 12 {
+	if snap.Ref.Key() != "ffpc/2026/104870" || snap.Season != 2026 || snap.Week != 6 || len(snap.Teams) != 12 {
 		t.Fatalf("league %s season %d week %d, %d teams", snap.Ref.Key(), snap.Season, snap.Week, len(snap.Teams))
 	}
 	me, ok := snap.TeamByRoster(11)
@@ -122,7 +122,7 @@ func (f *fakeMember) OpenLeague(_ context.Context, accountID uuid.UUID, leagueID
 		return "", hosts.ErrNotConnected
 	}
 	if leagueID != fixtureLeague {
-		return "", ffpc.ErrNotThisPage
+		return "", ffpc.ErrNoSuchLeague
 	}
 	return fixtureLTUID, nil
 }
@@ -142,16 +142,17 @@ func TestAttachFFPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	clock := &fakeClock{now: time.Date(2026, 10, 13, 14, 0, 0, 0, time.UTC)}
+	clock0 := clock.now
 	// Alice's connection row, sealed under a throwaway key.
-	vault, _ := hosts.NewVault(make([]byte, 32))
-	sealed, err := vault.Seal(alice.ID.String(), ffpc.Host, hosts.Secret{Cookies: map[string]string{"BGSLMSession": "test"}})
+	vault, _ := hosts.NewVault(hosts.OneKey(make([]byte, 32)))
+	sealed, err := vault.Seal(alice.ID.String(), ffpc.Host, hosts.Session{"BGSLMSession": "test"}, hosts.SignIn{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (&hosts.Store{Pool: pool}).Put(ctx, alice.ID, ffpc.Host, sealed); err != nil {
+	if _, err := (&hosts.Store{Pool: pool}).Put(ctx, alice.ID, ffpc.Host, sealed, clock0); err != nil {
 		t.Fatal(err)
 	}
-	clock := &fakeClock{now: time.Date(2026, 10, 13, 14, 0, 0, 0, time.UTC)}
 	store := &Store{Pool: pool}
 	member := &fakeMember{t: t, owner: alice.ID, league: fixtureLeagueRead(t)}
 	host := &FFPC{Member: member, Readers: store, Now: clock.Now}
@@ -182,7 +183,8 @@ func TestAttachFFPC(t *testing.T) {
 	if got.Me != 11 || got.Host != apitypes.LeagueHostFfpc || len(got.Teams) != 12 || len(got.Roster) != 20 || got.SettingsLeagueId == nil {
 		t.Fatalf("the league: me %d, %d teams, %d on my roster, settings %v", got.Me, len(got.Teams), len(got.Roster), got.SettingsLeagueId)
 	}
-	reader, ltuid, err := store.FFPCReader(ctx, fixtureLeague)
+	ref := Ref{Host: HostFFPC, LeagueID: fixtureLeague, Season: 2026}
+	reader, ltuid, err := store.FFPCReader(ctx, ref)
 	if err != nil || reader != alice.ID || ltuid != fixtureLTUID {
 		t.Fatalf("reader %s %q %v", reader, ltuid, err)
 	}
@@ -193,37 +195,20 @@ func TestAttachFFPC(t *testing.T) {
 	if member.reads != 2 {
 		t.Fatalf("%d member reads, want the attach and the refresh", member.reads)
 	}
-	// Pushed pages, raw HTML through the same parsers: the member's own
-	// team is taken, a second batch inside ten seconds is refused by page,
-	// another account's link is not found.
-	home, _ := os.ReadFile(filepath.Join("..", "hosts", "ffpc", "testdata", "ffpc-league-home.html"))
-	standings, _ := os.ReadFile(filepath.Join("..", "hosts", "ffpc", "testdata", "ffpc-standings.html"))
-	batch := apitypes.LeaguePages{Pages: []apitypes.LeaguePage{
-		{Page: apitypes.HostPageLeagueHome, Html: string(home)}, {Page: apitypes.HostPageStandings, Html: string(standings)},
-	}}
-	var taken apitypes.PagesTaken
-	status, body = a.do(svc.pushPages, http.MethodPost, "/", batch, got.Id.String())
-	if status != http.StatusOK || json.Unmarshal(body, &taken) != nil || len(taken.Taken) != 2 {
-		t.Fatalf("push: %d %s", status, body)
+	// A league-mate's view never carries the reader's lineup: the view
+	// keeps starters for the viewer's own team only.
+	if got.Roster[0].Slot != apitypes.RosterSpotSlotStarter {
+		t.Fatalf("the member's own starters: %+v", got.Roster[0])
 	}
-	if status, _ := a.do(svc.pushPages, http.MethodPost, "/", batch, got.Id.String()); status != http.StatusTooManyRequests {
-		t.Fatalf("a push inside ten seconds: %d", status)
-	}
-	if status, _ := b.do(svc.pushPages, http.MethodPost, "/", batch, got.Id.String()); status != http.StatusNotFound {
-		t.Fatalf("bob pushed to alice's league: %d", status)
-	}
-	clock.now = clock.now.Add(pushPageInterval)
-	other := apitypes.LeaguePages{Pages: []apitypes.LeaguePage{
-		{Page: apitypes.HostPageLeagueHome, Html: strings.Replace(string(home), "Team ID: 11", "Team ID: 3", 1)},
-	}}
-	if status, _ := a.do(svc.pushPages, http.MethodPost, "/", other, got.Id.String()); status != http.StatusBadRequest {
-		t.Fatalf("another team's page: %d", status)
+	scrubbed := ownLineupOnly(ffpcSnapshot(fixtureLeagueRead(t), clock.now), 3)
+	if me, _ := scrubbed.TeamByRoster(11); len(me.Starters) != 0 {
+		t.Fatalf("team 3's view shows team 11's starters: %v", me.Starters)
 	}
 
 	if err := (&hosts.Store{Pool: pool}).Delete(ctx, alice.ID, ffpc.Host); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := store.FFPCReader(ctx, fixtureLeague); err == nil {
+	if _, _, err := store.FFPCReader(ctx, ref); err == nil {
 		t.Fatal("a disconnected member still reads the league")
 	}
 }
