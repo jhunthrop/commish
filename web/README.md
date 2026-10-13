@@ -71,3 +71,28 @@ rerun `npm run fonts` when a real name needs it.
 
 `src/lib/ui/headshot.ts` asks ESPN's image combiner for each face at its drawn size at 1x and 2x,
 about 10 KB a face instead of the 260 KB original.
+
+## The sheet
+
+`/sheet` and `/sheet/print` are user pages: the frame is prerendered and the sheet is drawn in the
+browser. Everything lives in `src/lib/sheet/`. The sheet works signed out from `localStorage`
+(`storage.ts`) and saves to the account through the API when signed in (`sync.ts`, the merge rule
+in `merge.ts`). `PUBLIC_API_URL` names the API at build: production by default,
+`http://localhost:8080` for a local API. Our board reaches the sheet as
+`data/sheet-board/<format>.json`, today from the stand-in in `src/lib/server/sheet-board.ts` until
+the nightly run loader is on main.
+
+Mount points for other lanes: `SheetRail.svelte` in the board's side column, `AddToSheet.svelte`
+(variant `verb` on the player page, `row` on a board row), `SaveDraftAsSheet.svelte` on the mock
+report, and `sheetStore.queueFor(available)` with `QUEUE_SEED_SIZE` in `queue.ts` for a room's
+queue.
+
+`npm run measure:sheet -- <url>` measures the drag at the phone profile with a mouse and with a
+finger (touch, a cancelled touch, a pan), a 400-row import and the print view against a running
+build. `npm run lighthouse:sheet` (part of `npm run lighthouse`) audits `/sheet` with 400 rows
+seeded into the browser before each cold run (`lighthouserc.sheet.cjs`,
+`scripts/lighthouse-seed-sheet.cjs`); `LH_SHEET_URL` points it at a build already being served.
+
+The paper tokens (`--paper`, `--paper-ink`, `--paper-line`, `--paper-muted`) are this lane's
+addition to `tokens.css`: the print view's colors in both themes, and the page ground under print
+media.

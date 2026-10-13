@@ -14,10 +14,12 @@
 		"format": "prettier --write .",
 		"gen": "wrangler types",
 		"screenshots": "node scripts/screenshots.ts",
-		"lighthouse": "lhci autorun",
+		"lighthouse": "lhci autorun && npm run lighthouse:sheet",
+		"lighthouse:sheet": "lhci autorun --config=lighthouserc.sheet.cjs",
 		"fonts": "node scripts/subset-fonts.ts && prettier --write src/lib/ui/fonts/ui.css",
 		"preview:static": "serve .svelte-kit/cloudflare -l 4173 --no-request-logging",
-		"glyphs": "node scripts/check-glyphs.ts"
+		"glyphs": "node scripts/check-glyphs.ts",
+		"measure:sheet": "node scripts/measure-sheet.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

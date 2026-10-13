@@ -33,7 +33,17 @@ export const ICONS = {
 	search: [
 		{ tag: 'circle', cx: 11, cy: 11, r: 7 },
 		{ tag: 'path', d: 'M20 20l-4-4' }
-	]
+	],
+	/** The handle a row or a tier strip is dragged by. */
+	grip: [
+		{ tag: 'circle', cx: 9, cy: 6, r: 1.2 },
+		{ tag: 'circle', cx: 15, cy: 6, r: 1.2 },
+		{ tag: 'circle', cx: 9, cy: 12, r: 1.2 },
+		{ tag: 'circle', cx: 15, cy: 12, r: 1.2 },
+		{ tag: 'circle', cx: 9, cy: 18, r: 1.2 },
+		{ tag: 'circle', cx: 15, cy: 18, r: 1.2 }
+	],
+	close: [{ tag: 'path', d: 'M6 6l12 12M18 6L6 18' }]
 } as const satisfies Record<string, readonly IconShape[]>;
 
 export type IconName = keyof typeof ICONS;
