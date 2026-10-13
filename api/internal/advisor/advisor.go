@@ -84,7 +84,11 @@ func (f Fallback) Card(ctx context.Context, req Request) (Card, error) {
 		if errors.Is(ctx.Err(), context.Canceled) {
 			return Card{}, ctx.Err()
 		}
-		f.Log.Warn("advisor: falling back to the engine", "pick", req.State.PickNumber, "err", err)
+		if errors.Is(err, ErrDeclined) {
+			f.Log.Info("advisor: declined, the engine answers", "pick", req.State.PickNumber)
+		} else {
+			f.Log.Warn("advisor: falling back to the engine", "pick", req.State.PickNumber, "err", err)
+		}
 	}
 	return f.Secondary.Card(ctx, req)
 }

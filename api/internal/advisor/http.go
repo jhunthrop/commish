@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,6 +26,11 @@ const (
 	unpricedADPFrom = 1000
 	maxResponse     = 2 << 20
 )
+
+// ErrDeclined is the advisor answering 422: a room it does not advise, one
+// with a pick owed or skipped. The engine answers instead, as the oracle
+// does.
+var ErrDeclined = errors.New("advisor: the advisor declines this room")
 
 // HTTP is the research lane's advisor service.
 type HTTP struct {
@@ -135,6 +141,9 @@ func (h HTTP) Card(ctx context.Context, req Request) (Card, error) {
 		return Card{}, fmt.Errorf("advisor: call: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusUnprocessableEntity {
+		return Card{}, fmt.Errorf("%w at pick %d", ErrDeclined, req.State.PickNumber)
+	}
 	var wire wireResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponse)).Decode(&wire); err != nil {
 		return Card{}, fmt.Errorf("advisor: decode (status %d): %w", resp.StatusCode, err)

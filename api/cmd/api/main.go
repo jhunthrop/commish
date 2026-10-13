@@ -72,7 +72,7 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	}
 	cancel()
 	registry := metrics.New()
-	handler, err := build(cfg, pool, registry, log)
+	handler, err := build(ctx, cfg, pool, registry, log)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func serve(ctx context.Context, log *slog.Logger) error {
 }
 
 // build wires every package and returns the whole handler.
-func build(cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Logger) (http.Handler, error) {
+func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Logger) (http.Handler, error) {
 	now := time.Now
 	authStore := &auth.Store{Pool: pool}
 	ents := &entitlements.Store{Pool: pool}
@@ -118,7 +118,7 @@ func build(cfg config.API, pool *pgxpool.Pool, obs httpx.Observer, log *slog.Log
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, Now: now, Log: log,
 	}
 	exportHandler := &exports.Handler{Store: &exports.Store{Pool: pool}, Sheets: sheetStore, Objects: objects(cfg, log), Now: now, Log: log}
-	solo, lobbies, err := rooms(cfg, pool, mockStore, anon, gate, leagueStore, sheetStore, authStore, log)
+	solo, lobbies, err := rooms(ctx, cfg, pool, mockStore, anon, gate, leagueStore, sheetStore, authStore, log)
 	if err != nil {
 		return nil, err
 	}
