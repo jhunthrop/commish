@@ -8,18 +8,76 @@ import (
 
 // Roster is one team on the league rosters page.
 type Roster struct {
-	TeamID  int      `json:"team_id"`
-	Name    string   `json:"name"`
+	TeamID int    `json:"team_id"`
+	Name   string `json:"name"`
+	// Players is the active roster, each under the position column the
+	// page files him in.
 	Players []Player `json:"players"`
-	// Reserve is how many of the team's players the page says are on
-	// injured reserve; the page does not say which.
-	Reserve int `json:"reserve"`
+	// Reserve and Taxi are the players the page files anywhere that is
+	// not a position column: an IR or taxi column, or a line under the
+	// team's name. A player on any of them is rostered.
+	Reserve []Player `json:"reserve"`
+	Taxi    []Player `json:"taxi"`
+	// ReserveCount is how many the page says are on injured reserve
+	// ("IR: 1" under the team's name).
+	ReserveCount int `json:"reserve_count"`
 }
 
-// MaxRoster bounds one team's players.
+// MaxRoster bounds one team's players across every slot.
 const MaxRoster = 60
 
-var irCount = regexp.MustCompile(`IR: ([0-9]{1,2})`)
+// The slot kinds the roster and lineup pages file a player under.
+const (
+	SlotActive  = "active"
+	SlotBench   = "bench"
+	SlotReserve = "reserve"
+	SlotTaxi    = "taxi"
+)
+
+var (
+	irCount = regexp.MustCompile(`IR: ([0-9]{1,2})`)
+	// posWord is a position code written beside a player outside a
+	// position column: "(MIA) RB", "RB - MIA".
+	posWord = regexp.MustCompile(`\b(QB|RB|WR|TE|PK|DF|DST)\b`)
+	// teamWord is the team in parentheses beside a player: "(MIA)".
+	teamWord = regexp.MustCompile(`\(([A-Z]{2,3})\)`)
+)
+
+// lineTeam is the team a player's line writes beside him.
+func lineTeam(line string) string {
+	if m := teamWord.FindStringSubmatch(line); m != nil {
+		return team(m[1])
+	}
+	return team(line)
+}
+
+// slotOf is the kind of a column or table the page files players under
+// that is not a position: a taxi squad by its name, every other one
+// (IR, Injured Reserve, Reserve, a kind not seen yet) as reserve, so a
+// player on it is never read as unrostered.
+func slotOf(label string) string {
+	if strings.Contains(strings.ToUpper(label), "TAXI") {
+		return SlotTaxi
+	}
+	return SlotReserve
+}
+
+func (r *Roster) size() int { return len(r.Players) + len(r.Reserve) + len(r.Taxi) }
+
+// file adds a player under a slot kind, within MaxRoster.
+func (r *Roster) file(p Player, slot string) {
+	if r.size() >= MaxRoster {
+		return
+	}
+	switch slot {
+	case SlotTaxi:
+		r.Taxi = append(r.Taxi, p)
+	case SlotReserve:
+		r.Reserve = append(r.Reserve, p)
+	default:
+		r.Players = append(r.Players, p)
+	}
+}
 
 // ParseRosters reads the league rosters page: every team with its
 // players, each under the position column the page files him in.
@@ -66,16 +124,24 @@ func rosterRow(row, header []*node) (Roster, bool) {
 		return Roster{}, false
 	}
 	if m := irCount.FindStringSubmatch(text(row[0])); m != nil {
-		r.Reserve, _ = strconv.Atoi(m[1])
+		r.ReserveCount, _ = strconv.Atoi(m[1])
+	}
+	// A player named under the team's name is off the active roster.
+	for _, a := range all(row[0], tag("a")) {
+		if p, ok := rosterPlayer(a, a.Parent, ""); ok {
+			r.file(p, SlotReserve)
+		}
 	}
 	for i := 1; i < len(row) && i < len(header); i++ {
-		pos, ok := position(text(header[i]))
-		if !ok {
-			continue
+		label := text(header[i])
+		pos, active := position(label)
+		slot := SlotActive
+		if !active {
+			slot = slotOf(label)
 		}
-		for _, div := range children(row[i], "div") {
-			if p, ok := rosterPlayer(div, pos); ok && len(r.Players) < MaxRoster {
-				r.Players = append(r.Players, p)
+		for _, a := range all(row[i], tag("a")) {
+			if p, ok := rosterPlayer(a, a.Parent, pos); ok {
+				r.file(p, slot)
 			}
 		}
 	}
@@ -83,18 +149,21 @@ func rosterRow(row, header []*node) (Roster, bool) {
 }
 
 // rosterPlayer reads "<a href=PlayerProfile.aspx?playerID=..>Josh
-// Allen</a>&nbsp;(BUF)" under a position column.
-func rosterPlayer(div *node, pos string) (Player, bool) {
-	a := first(div, tag("a"))
-	if a == nil {
-		return Player{}, false
-	}
+// Allen</a>&nbsp;(BUF)" in its line (the link's parent). pos is the
+// column's position; outside a position column it is read from the line
+// when the page writes one, and left empty otherwise (placed by name).
+func rosterPlayer(a, line *node, pos string) (Player, bool) {
 	id := playerID(attr(a, "href"))
 	name := Clean(text(a), maxName)
-	if id == "" || name == "" {
+	if id == "" || name == "" || line == nil {
 		return Player{}, false
 	}
-	p := Player{ID: id, Name: name, Position: pos, Team: team(ownText(div))}
+	if pos == "" {
+		if m := posWord.FindStringSubmatch(ownText(line)); m != nil {
+			pos, _ = position(m[1])
+		}
+	}
+	p := Player{ID: id, Name: name, Position: pos, Team: lineTeam(ownText(line))}
 	if pos == DEF {
 		if t, ok := isDefenseText(name); ok {
 			p.Team = t
@@ -113,9 +182,42 @@ type Lineup struct {
 	Bench    []Player `json:"bench"`
 	// Slots is each starter's lineup slot as the page names it (QB, FLEX).
 	Slots []string `json:"slots"`
+	// Reserve and Taxi are the players in any other table of the page
+	// (an injured reserve or taxi table), by the table's name.
+	Reserve []Player `json:"reserve"`
+	Taxi    []Player `json:"taxi"`
 }
 
-var weekNum = regexp.MustCompile(`(?i)weekNum=([0-9]{1,2})`)
+var (
+	weekNum = regexp.MustCompile(`(?i)weekNum=([0-9]{1,2})`)
+	// repeaterName is a lineup table's repeater in its controls' ids:
+	// "..._rptBench_tdPlayerRole_3" names rptBench.
+	repeaterName = regexp.MustCompile(`_(rpt[A-Za-z]+)_`)
+)
+
+// Lineup tables the page always has, and the repeater nested in a row
+// (the player's news) that is not a table of players.
+const (
+	repStarting = "rptStartingLineup"
+	repBench    = "rptBench"
+	repNews     = "rptPlayerNews"
+)
+
+// otherRepeaters is every repeater on the page that is not the starting
+// lineup, the bench or a row's news, in page order: an IR or taxi table.
+func otherRepeaters(doc *node) []string {
+	var out []string
+	seen := map[string]bool{repStarting: true, repBench: true, repNews: true}
+	for _, n := range all(doc, func(n *node) bool { return attr(n, "id") != "" }) {
+		m := repeaterName.FindStringSubmatch(attr(n, "id"))
+		if m == nil || seen[m[1]] {
+			continue
+		}
+		seen[m[1]] = true
+		out = append(out, m[1])
+	}
+	return out
+}
 
 // ParseLineup reads the set-lineup page.
 func ParseLineup(page []byte) (Lineup, error) {
@@ -134,8 +236,8 @@ func ParseLineup(page []byte) (Lineup, error) {
 			l.Owner = Clean(text(s), maxName)
 		}
 	}
-	starters := lineupTable(doc, "rptStartingLineup")
-	bench := lineupTable(doc, "rptBench")
+	starters := lineupTable(doc, repStarting)
+	bench := lineupTable(doc, repBench)
 	if starters == nil && bench == nil {
 		return Lineup{}, ErrNotThisPage
 	}
@@ -144,6 +246,15 @@ func ParseLineup(page []byte) (Lineup, error) {
 	}
 	for _, row := range bench {
 		l.Bench = append(l.Bench, row.player)
+	}
+	for _, rep := range otherRepeaters(doc) {
+		for _, row := range lineupTable(doc, rep) {
+			if slotOf(rep) == SlotTaxi {
+				l.Taxi = append(l.Taxi, row.player)
+			} else {
+				l.Reserve = append(l.Reserve, row.player)
+			}
+		}
 	}
 	return l, nil
 }

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"sort"
 	"time"
 
@@ -46,6 +47,8 @@ func ffpcSnapshot(l ffpc.League, now time.Time) Snapshot {
 		for _, p := range r.Players {
 			t.Players = append(t.Players, snap.addPlayer(p))
 		}
+		t.Reserve = snap.addPlayers(t.Reserve, r.Reserve)
+		t.Taxi = snap.addPlayers(t.Taxi, r.Taxi)
 	}
 	if l.Lineup != nil && l.Banner.TeamID > 0 {
 		t := team(l.Banner.TeamID)
@@ -60,6 +63,8 @@ func ffpcSnapshot(l ffpc.League, now time.Time) Snapshot {
 		if len(t.Players) == 0 {
 			t.Players = all
 		}
+		t.Reserve = snap.addPlayers(t.Reserve, l.Lineup.Reserve)
+		t.Taxi = snap.addPlayers(t.Taxi, l.Lineup.Taxi)
 	}
 	if l.Banner.TeamID > 0 && team(l.Banner.TeamID).Name == "" {
 		team(l.Banner.TeamID).Name = cleanHostText(l.Banner.TeamName)
@@ -91,6 +96,17 @@ func (s *Snapshot) addPlayer(p ffpc.Player) string {
 		s.Players[id] = HostPlayer{ID: id, Name: cleanHostText(p.Name), Position: p.Position, Team: cleanTeam(p.Team)}
 	}
 	return id
+}
+
+// addPlayers keeps each player and adds his id to ids once.
+func (s *Snapshot) addPlayers(ids []string, players []ffpc.Player) []string {
+	for _, p := range players {
+		id := s.addPlayer(p)
+		if !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 // ffpcWeek is the league's week: the lineup page's, else the schedule's
