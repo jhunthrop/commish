@@ -105,9 +105,9 @@
 					size="xl"
 					align="end"
 					phoneAlign="start"
-					caption="projected {scoring} points in {season}{page.underway
-						? ' before the season'
-						: ''}, over {fixed(n.expectedGames)} expected games"
+					caption={page.underway
+						? `${scoring} points in ${String(season)}, projected preseason over ${fixed(n.expectedGames)} games`
+						: `projected ${scoring} points in ${String(season)}, over ${fixed(n.expectedGames)} expected games`}
 				/>
 				<SheetAdd
 					player={{

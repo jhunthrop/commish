@@ -130,7 +130,7 @@ def build(players, capsules):
     </div>
     <div class="big">
       <b>{p['proj']:.1f}</b>
-      <span>projected PPR points in 2026 before the season, over {p['games']:.1f} expected games</span>
+      <span>PPR points in 2026, projected preseason over {p['games']:.1f} games</span>
       <button class="verb" type="button">Add to my sheet</button>
     </div>
   </section>
