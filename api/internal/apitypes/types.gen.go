@@ -809,9 +809,12 @@ type CompanionSummary struct {
 	// HostUsername the Sleeper username the seat was found by
 	HostUsername *string            `json:"host_username"`
 	Id           openapi_types.UUID `json:"id"`
-	Replay       bool               `json:"replay"`
-	Slot         int                `json:"slot"`
-	Status       CompanionStatus    `json:"status"`
+
+	// Name the draft's name on the host, empty when it has none
+	Name   string          `json:"name"`
+	Replay bool            `json:"replay"`
+	Slot   int             `json:"slot"`
+	Status CompanionStatus `json:"status"`
 }
 
 // DraftPassState defines model for DraftPassState.

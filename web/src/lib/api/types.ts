@@ -1434,6 +1434,8 @@ export interface components {
 			/** Format: uuid */
 			id: string;
 			host_draft_id: string;
+			/** @description the draft's name on the host, empty when it has none */
+			name: string;
 			slot: number;
 			/** @description the Sleeper username the seat was found by */
 			host_username: string | null;

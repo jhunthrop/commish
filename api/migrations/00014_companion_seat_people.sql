@@ -10,6 +10,12 @@ alter table app.companions
 alter table app.companions
   add column seat_names text[] not null default '{}' check (cardinality(seat_names) <= 32);
 
+-- The draft's own name on the host, so a list of followed drafts reads as
+-- leagues and not as ids.
+alter table app.companions
+  add column draft_name text not null default '' check (char_length(draft_name) <= 80);
+
 -- +goose Down
+alter table app.companions drop column draft_name;
 alter table app.companions drop column seat_names;
 alter table app.companions drop column host_username;

@@ -1677,10 +1677,11 @@ components:
       enum: [pre_draft, drafting, paused, complete]
     CompanionSummary:
       type: object
-      required: [id, host_draft_id, slot, host_username, status, replay, created_at]
+      required: [id, host_draft_id, name, slot, host_username, status, replay, created_at]
       properties:
         id: { type: string, format: uuid }
         host_draft_id: { type: string }
+        name: { type: string, description: "the draft's name on the host, empty when it has none" }
         slot: { type: integer }
         host_username: { type: string, nullable: true, description: the Sleeper username the seat was found by }
         status: { $ref: "#/components/schemas/CompanionStatus" }

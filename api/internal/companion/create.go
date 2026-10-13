@@ -68,7 +68,7 @@ func (s *Service) create(w http.ResponseWriter, r *http.Request) {
 	row, err := s.Store.Upsert(ctx, Row{
 		AccountID: auth.AccountID(r), Host: string(apitypes.CompanionHostSleeper), HostDraftID: draftID, HostLeagueID: d.LeagueID,
 		Replay: replay, Seat: seat, HostUsername: usernameOf(in.Seat), Settings: settings, Status: d.Status,
-		SeatNames: s.seatNames(ctx, d),
+		SeatNames: s.seatNames(ctx, d), DraftName: d.Name,
 	})
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "companion: create", err)

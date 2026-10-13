@@ -136,7 +136,7 @@ export function recentLine(r: CompanionSummary): {
 		: `slot ${String(r.slot)}`;
 	return {
 		key: r.id,
-		lead: `Sleeper draft ${r.host_draft_id}`,
+		lead: r.name !== '' ? r.name : `Sleeper draft ${r.host_draft_id}`,
 		text: `${seat} · ${STATUS_WORDS[r.status]} · followed ${dayLabel(r.created_at)}`,
 		href: links.companion(r.id)
 	};

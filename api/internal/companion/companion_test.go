@@ -306,7 +306,7 @@ func TestStoreRecentAndSeatPeople(t *testing.T) {
 	store := &Store{Pool: pool}
 	follow := func(account uuid.UUID, draftID, username string, names []string) Row {
 		r, err := store.Upsert(ctx, Row{AccountID: account, Host: "sleeper", HostDraftID: draftID, Seat: 4,
-			HostUsername: username, SeatNames: names, Settings: apitypes.LeagueSettings{}, Status: "drafting"})
+			HostUsername: username, SeatNames: names, DraftName: "League " + draftID, Settings: apitypes.LeagueSettings{}, Status: "drafting"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -330,7 +330,7 @@ func TestStoreRecentAndSeatPeople(t *testing.T) {
 			t.Fatalf("recent answered another account's companion %s", r.ID)
 		}
 	}
-	if rows[0].HostUsername != "muttdog" || len(rows[0].SeatNames) != 3 || rows[0].SeatNames[2] != "Nowlan" {
+	if rows[0].DraftName != "League 555" || rows[0].HostUsername != "muttdog" || len(rows[0].SeatNames) != 3 || rows[0].SeatNames[2] != "Nowlan" {
 		t.Fatalf("saved username %q names %q", rows[0].HostUsername, rows[0].SeatNames)
 	}
 	again := follow(mine.ID, "555", "", nil)
