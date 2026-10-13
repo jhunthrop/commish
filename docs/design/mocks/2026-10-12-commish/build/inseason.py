@@ -115,13 +115,13 @@ def season_block(player_name):
     games = s["games"]
     return f"""<section class="season" id="this-season" aria-label="This season">
     <h2 class="head"><span>This season</span><span class="label">{s['season']}, PPR, through week {s['through']}</span></h2>
+    <p class="foot-note">Stat lines from the league's own records, scored in PPR. Points a game average the {games} games he played.</p>
     <div class="log"><div class="frame" role="region" aria-label="{escape(player_name)} week by week" tabindex="0"><table>
       <thead><tr><th scope="col" class="pin wk">Wk</th><th scope="col" class="pin opp">Opp</th><th scope="col" class="pin pts">Pts</th>{heads}</tr></thead>
       <tbody><tr class="line"><th scope="row" colspan="2" class="pin lead"><b>Season</b><span>{games} games</span></th>
         <td class="pin pts"><b>{s['pointsPerGame']:.1f}</b><span>PPR points a game</span></td>{totals}</tr>
       {''.join(rows)}</tbody></table></div></div>
     <section class="ahead" aria-label="Still to play"><h3><span class="label">Still to play</span></h3><ol>{ahead_rows}</ol></section>
-    <p class="foot-note">Stat lines from the league's own records, scored in PPR. Points a game average the {games} games he played.</p>
   </section>"""
 
 

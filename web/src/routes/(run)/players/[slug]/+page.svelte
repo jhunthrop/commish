@@ -63,6 +63,7 @@
 {#snippet thisSeason()}
 	<section class="season" id={SEASON_ANCHOR} aria-label="This season">
 		<PanelHead title="This season" aside={page.season.aside} level={2} />
+		<Footnote>{page.season.basis}</Footnote>
 		<GameLog
 			caption="{page.name} week by week, {page.season.season}"
 			heads={page.season.heads}
@@ -72,7 +73,6 @@
 			ahead={page.season.ahead}
 			none={page.season.none}
 		/>
-		<Footnote>{page.season.basis}</Footnote>
 	</section>
 {/snippet}
 
