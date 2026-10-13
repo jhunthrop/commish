@@ -298,10 +298,24 @@ func (s *Service) undo(ctx context.Context, owner mocks.Owner, id uuid.UUID, pic
 	if err != nil {
 		return room{}, err
 	}
+	// The room at pickNumber is the one the drafter already saw, so the card
+	// he saw there carries to the new branch: the same moment prints the
+	// same numbers from the same source instead of asking again.
+	shown, ok, err := s.Mocks.Card(ctx, id, r.branch, pickNumber)
+	if err != nil {
+		return room{}, err
+	}
 	if err := s.Mocks.Truncate(ctx, owner, id, r.head, int64(seq)); err != nil {
 		return room{}, err
 	}
-	return s.load(ctx, owner, id)
+	back, err := s.load(ctx, owner, id)
+	if err != nil || !ok {
+		return back, err
+	}
+	if err := s.Mocks.PutCard(ctx, id, back.branch, pickNumber, shown); err != nil {
+		return room{}, err
+	}
+	return back, nil
 }
 
 // humanPickSeq is the 1-based seq of the MAKE_PICK that made the
