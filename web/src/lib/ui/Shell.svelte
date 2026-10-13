@@ -257,15 +257,18 @@
 			margin-left: 0;
 		}
 
-		/* Beside the run's date on the bar's first line, so the switch and the verb keep the second. */
-		.account {
-			display: grid;
-			margin: -10px -10px -10px auto;
+		/* The account sits at the bar's top right on every page, whatever else the bar holds, so the
+		   one way to the account, the pass and the companion is always in the same place. The bar
+		   keeps its width clear of it. */
+		.top {
+			padding-right: calc(var(--s-4) + 44px);
 		}
 
-		/* A page with no run date: the account leads the bar's line instead. */
-		.top:not(:has(.stamp)) .account {
-			margin-left: -10px;
+		.account {
+			display: grid;
+			position: absolute;
+			top: 0;
+			right: var(--s-2);
 		}
 
 		.find {
