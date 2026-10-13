@@ -38,6 +38,7 @@
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
 	let recent = $state<CompanionSummary[]>([]);
+	let recentFailed = $state(false);
 	/** Every slot a league can have, one tap each (the setup page's slot chips). */
 	const SLOTS = Array.from({ length: MAX_TEAMS }, (_, i) => i + 1);
 
@@ -51,7 +52,12 @@
 					view = 'no-pass';
 					return;
 				}
-				recent = await companions.recent().catch(() => []);
+				try {
+					recent = await companions.recent();
+				} catch {
+					// The list is a convenience: the form works without it, and the page says it is missing.
+					recentFailed = true;
+				}
 				// The username used last comes first: one tap instead of choosing a slot.
 				const used = recent.find((r) => r.host_username !== null)?.host_username;
 				if (used) {
@@ -155,7 +161,9 @@
 			<ActionBar alert={problem ? alert : undefined}>
 				<Verb disabled={!ready} onclick={() => void follow()}>Follow my draft</Verb>
 			</ActionBar>
-			{#if recent.length > 0}
+			{#if recentFailed}
+				<p class="lede">The drafts you followed can't be read right now.</p>
+			{:else if recent.length > 0}
 				<section aria-label="Drafts you followed">
 					<PanelHead title="Drafts you followed" level={2} />
 					<LineList label="Drafts you followed" lines={recent.map(recentLine)} />

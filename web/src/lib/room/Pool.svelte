@@ -19,6 +19,8 @@
 		odds: Readonly<Record<string, number>>;
 		/** What the odds are of: "still there at 6.05". */
 		oddsLabel: string;
+		/** The odds column's head: Still there, or Reaches for a call that waits on the board. */
+		oddsHead?: string;
 		/** The odds column is drawn only when there is a call to come with odds; a draft read without
 		 * one (shared, or a lobby before your call) has no column promising them. */
 		oddsShown: boolean;
@@ -50,6 +52,7 @@
 		oddsGone = false,
 		odds,
 		oddsLabel,
+		oddsHead = 'Still there',
 		oddsShown,
 		basis,
 		pickNumber,
@@ -108,7 +111,7 @@
 		<Label align="end"
 			><span class="wide">Over replacement</span><span class="narrow">Over repl</span></Label
 		>
-		{#if oddsShown}<Label align="end">Still there</Label>{/if}
+		{#if oddsShown}<Label align="end">{oddsHead}</Label>{/if}
 		<span class="adp"><Label align="end">ADP</Label></span>
 		{#if !readonly}<span class="acts-head"></span>{/if}
 	</div>

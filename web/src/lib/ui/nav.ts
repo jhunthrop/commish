@@ -18,7 +18,7 @@ export const HOME_HREF = '/';
 /** Where a mock draft starts: the room's setup. */
 const MOCK_SETUP = '/mock/new';
 /** The advisor's own page: our call beside your real draft (the live draft companion). */
-const COMPANION_START = '/companion/new';
+export const COMPANION_START = '/companion/new' as const;
 
 /** The rail, top to bottom. The phone shows every item not marked wideOnly along the bottom.
  * A page lights the item whose `owns` holds its first path segment: the board's companions (ADP,

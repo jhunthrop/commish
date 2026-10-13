@@ -31,6 +31,18 @@ export function dateLabel(iso: string): string {
 	return CALENDAR_DATE.format(parse(iso));
 }
 
+const DAY_YEAR = new Intl.DateTimeFormat('en-US', {
+	month: 'short',
+	day: 'numeric',
+	year: 'numeric',
+	timeZone: ZONE
+});
+
+/** "Oct 13, 2027": an instant's day on the Eastern clock, with its year. */
+export function dayYearLabel(iso: string): string {
+	return DAY_YEAR.format(parse(iso));
+}
+
 /** "Oct 12". */
 export function dayLabel(iso: string): string {
 	return DAY.format(parse(iso));

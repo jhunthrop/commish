@@ -2,6 +2,7 @@
 import { resolve } from '$app/paths';
 import { positionSegment } from '#lib/run/derive.ts';
 import type { Position } from '#lib/types/player.ts';
+import { COMPANION_START } from '#lib/ui/nav.ts';
 
 export const links = {
 	board: (format: string, position: Position | null = null): string =>
@@ -30,7 +31,7 @@ export const links = {
 	/** The Draft Pass, the Membership and the Group Draft Pass. */
 	pass: (): string => resolve('/pass'),
 	/** Where a live draft starts being followed. */
-	companionNew: (): string => resolve('/companion/new'),
+	companionNew: (): string => resolve(COMPANION_START),
 	companion: (id: string): string => resolve('/companion/[id]', { id }),
 	claim: (code: string): string => resolve('/claim/[code]', { code }),
 	/** The prerendered JSON a browser fetches for one player's numbers. */

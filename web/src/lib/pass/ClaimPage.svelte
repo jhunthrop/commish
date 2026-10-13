@@ -124,7 +124,7 @@
 			<section class="step" aria-label="Your pass">
 				{#if step === 'yours'}
 					<p class="line">
-						Your Draft Pass is on{endsAt ? `, good through ${endsAt}` : ''}.
+						Your Draft Pass is on{endsAt ? `. It ends ${endsAt}` : ''}.
 					</p>
 					<Verb href={links.companionNew()} size="lg">Open the live draft companion</Verb>
 				{:else if step === 'covered'}

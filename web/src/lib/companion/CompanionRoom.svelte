@@ -131,6 +131,7 @@
 			left={board.players.length - drafted.size}
 			odds={card?.still_there ?? {}}
 			{oddsLabel}
+			oddsHead={card?.conditional ? 'Reaches' : 'Still there'}
 			oddsShown={call !== null}
 			basis={call ? poolBasis(board, card, teams) : c.basis}
 			pickNumber={now}
