@@ -17,9 +17,14 @@ from typing import Any, Final
 from sqlalchemy import Connection, text
 
 from research.model.backtest import Observation, spearman, sum_left
+from research.model.reads.teams import kickoff_instants_by_week
 from research.model.register.freeze import SERVED_SOURCE
 from research.model.register.grade import average_outcome_ranks, ordinal_ranks
 
+# The one sentence a missed week prints. The 2026 misses (weeks 3 to 5) were the old weekly job
+# failing on every pass; from cutover a missed freeze fails the in-season job (`inseason`).
+MISSED_NOTE: Final = "Our nightly run failed that week."
+REGULAR_SEASON_WEEKS: Final = 18
 RECORD_POSITIONS: Final = ("QB", "RB", "WR", "TE", "K", "DST")
 ALL: Final = "All"
 STATISTIC: Final = {"agreement": "agreement with the finish", "placesOff": "places off, typical player"}
@@ -45,9 +50,13 @@ class Line:
 
 @dataclass(frozen=True, slots=True)
 class Week:
+    """One week of the season as the record shows it (`recordWeekSchema`): graded, frozen, missed (its
+    first kickoff passed with no freeze) or upcoming (`at` is then its first kickoff, if known)."""
+
     week: int
-    frozen_at: datetime
-    board_as_of: datetime
+    status: str
+    at: datetime | None
+    board_as_of: datetime | None
     graded_at: datetime | None
     population: int
     lines: tuple[Line, ...]
@@ -92,7 +101,7 @@ def _pooled(scores: Sequence[Score], players: int) -> Score:
 
 def to_date(weeks: Sequence[Week], rows_by_week: Mapping[int, Sequence[Mapping[str, Any]]]) -> tuple[Line, ...]:
     """The running score: per position, the mean of each graded week's numbers."""
-    graded = [week for week in weeks if week.graded_at is not None]
+    graded = [week for week in weeks if week.status == "graded"]
     lines = []
     for position in (ALL, *RECORD_POSITIONS):
         found = [line for week in graded for line in week.lines if line.position == position]
@@ -126,21 +135,41 @@ where g.season = :s and g.week = :w and g.frozen_at = :f and g.board_source = :s
 """
 
 
-def read_record(conn: Connection, season: int) -> tuple[list[Week], dict[int, list[Mapping[str, Any]]]]:
-    """Every week the served board was frozen for, with its latest grading's lines."""
+def _frozen_week(conn: Connection, season: int, week: int, frozen_at: datetime) -> tuple[Week, list[Mapping[str, Any]]]:
+    params = {"s": season, "w": week, "f": frozen_at, "source": SERVED_SOURCE}
+    rows: list[Mapping[str, Any]] = [row._asdict() for row in conn.execute(text(_GRADED), params)]
+    board_as_of = conn.execute(
+        text(
+            "select max(board_as_of) from research.register_freeze_rows "
+            "where season = :s and week = :w and frozen_at = :f and board_source = :source"
+        ),
+        params,
+    ).scalar_one()
+    graded_at = max((row["graded_at"] for row in rows), default=None)
+    status = "frozen" if graded_at is None else "graded"
+    return Week(week, status, frozen_at, board_as_of, graded_at, len(rows), week_lines(rows)), rows
+
+
+def read_record(
+    conn: Connection, season: int, as_of: datetime
+) -> tuple[list[Week], dict[int, list[Mapping[str, Any]]]]:
+    """Every week of the regular season in order: each frozen week with its latest grading's lines,
+    each week whose first kickoff passed with no freeze as missed, the rest upcoming."""
+    freezes = {
+        int(row.week): row.frozen_at for row in conn.execute(text(_FREEZES), {"s": season, "source": SERVED_SOURCE})
+    }
+    kickoffs = kickoff_instants_by_week(conn, season)
+    last = max([REGULAR_SEASON_WEEKS, *freezes])
     weeks: list[Week] = []
     rows_by_week: dict[int, list[Mapping[str, Any]]] = {}
-    for freeze in conn.execute(text(_FREEZES), {"s": season, "source": SERVED_SOURCE}):
-        params = {"s": season, "w": freeze.week, "f": freeze.frozen_at, "source": SERVED_SOURCE}
-        rows: list[Mapping[str, Any]] = [row._asdict() for row in conn.execute(text(_GRADED), params)]
-        board_as_of = conn.execute(
-            text(
-                "select max(board_as_of) from research.register_freeze_rows "
-                "where season = :s and week = :w and frozen_at = :f and board_source = :source"
-            ),
-            params,
-        ).scalar_one()
-        rows_by_week[freeze.week] = rows
-        graded_at = max((row["graded_at"] for row in rows), default=None)
-        weeks.append(Week(freeze.week, freeze.frozen_at, board_as_of, graded_at, len(rows), week_lines(rows)))
+    for week in range(1, last + 1):
+        kickoff = kickoffs.get(week)
+        if week in freezes:
+            built, rows = _frozen_week(conn, season, week, freezes[week])
+            weeks.append(built)
+            rows_by_week[week] = rows
+        elif kickoff is not None and kickoff <= as_of:
+            weeks.append(Week(week, "missed", None, None, None, 0, ()))
+        else:
+            weeks.append(Week(week, "upcoming", kickoff, None, None, 0, ()))
     return weeks, rows_by_week

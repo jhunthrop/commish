@@ -83,13 +83,14 @@ def _schedule(conn: Connection, as_of: datetime) -> tuple[Json, list[Json], Json
     return season.schedule_json(PRODUCT_SEASON, slates, values), clubs, sources[0], sources[1]
 
 
-def _record(conn: Connection) -> tuple[Json, Json | None]:
+def _record(conn: Connection, as_of: datetime) -> tuple[Json, Json | None]:
     """The record, and its source; a season with no freeze yet has an empty record and no source."""
-    weeks, rows_by_week = record_read.read_record(conn, PRODUCT_SEASON)
+    weeks, rows_by_week = record_read.read_record(conn, PRODUCT_SEASON, as_of)
     record = season.record_json(PRODUCT_SEASON, weeks, record_read.to_date(weeks, rows_by_week))
-    if not weeks:
+    frozen = [w for w in weeks if w.status in {"frozen", "graded"}]
+    if not frozen:
         return record, None
-    stamps = [w.frozen_at for w in weeks] + [w.graded_at for w in weeks if w.graded_at is not None]
+    stamps = [w.at for w in frozen if w.at is not None] + [w.graded_at for w in frozen if w.graded_at is not None]
     source = {
         "artifact": "record",
         "vendor": REGISTER_VENDOR,
@@ -138,7 +139,7 @@ def assemble(conn: Connection, as_of: datetime) -> Assembled:
     inputs = pages.page_inputs(boards, adp_by_format, capsules)
     players = [pages.player_json(who, inputs) for who in people]
     schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of)
-    record, record_source = _record(conn)
+    record, record_source = _record(conn, as_of)
     files: dict[str, Any] = {
         f"boards/{b.format.id}.json": pages.board_json(b, by_slug, adp_by_format[b.format.id]) for b in boards
     }

@@ -69,23 +69,28 @@ def frozen_by(board_as_of: datetime) -> str:
     return iso(board_as_of)[:13]
 
 
+def _week(week: record_read.Week) -> Json:
+    out: Json = {
+        "week": week.week,
+        "status": week.status,
+        "frozenAt": None if week.at is None else iso(week.at),
+        "frozenBy": None if week.board_as_of is None else frozen_by(week.board_as_of),
+        "gradedAt": None if week.graded_at is None else iso(week.graded_at),
+        "population": week.population,
+        "lines": [_line(line) for line in week.lines],
+    }
+    if week.status == "missed":
+        out["note"] = record_read.MISSED_NOTE
+    return out
+
+
 def record_json(season: int, weeks: Sequence[record_read.Week], to_date: Sequence[record_read.Line]) -> Json:
     return {
         "season": season,
         "format": PAGE_FORMAT.id,
         "statistic": dict(record_read.STATISTIC),
         "method": record_read.METHOD,
-        "weeks": [
-            {
-                "week": week.week,
-                "frozenAt": iso(week.frozen_at),
-                "frozenBy": frozen_by(week.board_as_of),
-                "gradedAt": None if week.graded_at is None else iso(week.graded_at),
-                "population": week.population,
-                "lines": [_line(line) for line in week.lines],
-            }
-            for week in weeks
-        ],
+        "weeks": [_week(week) for week in weeks],
         "toDate": [_line(line) for line in to_date],
     }
 

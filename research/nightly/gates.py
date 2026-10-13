@@ -138,7 +138,13 @@ def basis_gate(manifest: Json, adp: Json, record: Json, schedule: Json) -> GateR
     ]
     reasons += [f"basis_missing:schedule:{k}" for k in ("opponentBasis", "unit") if _blank(schedule[k])]
     artifacts = {source["artifact"] for source in manifest["sources"]}
-    needed = ("boards", "adp", "schedule", "clubs", *(("record",) if record["weeks"] else ()))
+    needed = (
+        "boards",
+        "adp",
+        "schedule",
+        "clubs",
+        *(("record",) if any(w["status"] in {"frozen", "graded"} for w in record["weeks"]) else ()),
+    )
     reasons += [f"basis_missing:source:{a}" for a in needed if a not in artifacts]
     return _gate("basis", reasons, "every number names its basis")
 
