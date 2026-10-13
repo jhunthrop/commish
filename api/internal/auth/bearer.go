@@ -59,6 +59,11 @@ type DeviceReader interface {
 
 const deviceKey ctxKey = 2
 
+// WithDevice puts a device on a context, as Require does.
+func WithDevice(ctx context.Context, d Device) context.Context {
+	return context.WithValue(ctx, deviceKey, d)
+}
+
 // DeviceFrom is the device a bearer request came from.
 func DeviceFrom(ctx context.Context) (Device, bool) {
 	d, ok := ctx.Value(deviceKey).(Device)
@@ -176,7 +181,7 @@ func (b *Bearer) Require(scope Scope) httpx.Middleware {
 				httpx.WriteError(w, r, http.StatusForbidden, httpx.CodeForbidden, "This browser is not paired for that", nil)
 				return
 			}
-			ctx := context.WithValue(WithAccount(r.Context(), acct), deviceKey, dev)
+			ctx := WithDevice(WithAccount(r.Context(), acct), dev)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

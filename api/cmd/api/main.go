@@ -144,7 +144,11 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	if err != nil {
 		return nil, err
 	}
-	companions, err := companionService(cfg, pool, solo, ents, log)
+	ff, err := newFFPCWiring(cfg, pool, log)
+	if err != nil {
+		return nil, err
+	}
+	companions, err := companionService(cfg, pool, solo, ents, ff, log)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +165,8 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		lobbies.Routes(),
 		companions.Routes(),
 		(&devices.Service{Store: deviceStore, Tokens: bearer, Now: now, Log: log}).Routes(),
-		leagueSyncService(cfg, pool, draftBoards, leagueStore, log).Routes(),
+		leagueSyncService(cfg, pool, draftBoards, leagueStore, ff, log).Routes(),
+		ff.routes(log),
 		devRoutes,
 	)
 	mux := http.NewServeMux()

@@ -89,7 +89,9 @@ type Service struct {
 	Conditional  ConditionalAdvisor
 	Entitlements Checker
 	// Replay is the recorded draft, nil unless COMPANION_REPLAY is on.
-	Replay        *Replay
+	Replay *Replay
+	// FFPC follows FFPC drafts as the member, nil when it is not set up.
+	FFPC          *FFPCDrafts
 	ReportWorkers int
 	Now           func() time.Time
 	Log           *slog.Logger
@@ -141,6 +143,9 @@ func (s *Service) allowed(w http.ResponseWriter, r *http.Request) bool {
 
 // writeHostError says what went wrong reaching the host, in our words.
 func (s *Service) writeHostError(w http.ResponseWriter, r *http.Request, err error) {
+	if writeFFPCError(w, r, s.Log, err) {
+		return
+	}
 	var refusal *draft.Refusal
 	switch {
 	case errors.As(err, &refusal):

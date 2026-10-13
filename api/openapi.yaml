@@ -27,6 +27,7 @@ tags:
   - { name: rooms }
   - { name: companions }
   - { name: devices }
+  - { name: hosts }
 
 paths:
   /healthz:
@@ -1009,30 +1010,6 @@ paths:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
 
-  /leagues/pushed:
-    post:
-      tags: [league-sync]
-      operationId: attachPushedLeague
-      summary: >-
-        Attach a league on a pushed host (FFPC) from its league home page as the member's own browser read it. The seat
-        is the team the page is for. Attaching the same league again answers the attachment already made. Free.
-      security: [{ device: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/PushedLeagueAttach" }
-      responses:
-        "201":
-          description: the attachment
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - properties: { data: { $ref: "#/components/schemas/AttachedLeague" } }
-        "400": { $ref: "#/components/responses/ErrorResponse" }
-        "409": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/pages:
     parameters:
       - name: id
@@ -1044,10 +1021,10 @@ paths:
       tags: [league-sync]
       operationId: pushLeaguePages
       summary: >-
-        The pages of an attached league on a pushed host, read in the member's own browser: league home, standings,
-        rosters, scoring, a matchup, moves. Refused for a league the account did not attach or a page for another
-        league. One batch a page family per ten seconds a device; a family sent sooner is named in refused and the rest
-        are taken. Needs the league:write scope.
+        An attached FFPC league's pages as the member's own browser holds them, raw HTML, read by the same parsers as
+        the server's own read. The league home page names the league and the team; a page for another league or team
+        is refused. One batch a page per ten seconds a device; a page sent sooner is named in refused. Needs the
+        league:write scope. 8 MB a batch.
       security: [{ device: [] }]
       requestBody:
         required: true
@@ -1067,59 +1044,77 @@ paths:
         "404": { $ref: "#/components/responses/ErrorResponse" }
         "429": { $ref: "#/components/responses/ErrorResponse" }
 
-  /companions/pushed:
-    post:
-      tags: [companions]
-      operationId: createPushedCompanion
-      summary: >-
-        Follow a draft on a pushed host (FFPC) from its draft room or draft board as the member's own browser read it.
-        The seat is the team the page is for. Needs the live_draft_advisor feature and the draft:write scope. The same
-        draft again answers the companion already made, with its picks merged.
-      security: [{ device: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/DraftPage" }
+  /hosts:
+    get:
+      tags: [hosts]
+      operationId: listHostConnections
+      summary: The hosts the account is connected to, each with its state and when it was last read. No credential is ever answered.
+      security: [{ session: [] }]
       responses:
         "200":
-          description: the companion
+          description: the connections
           content:
             application/json:
               schema:
                 allOf:
                   - $ref: "#/components/schemas/Envelope"
-                  - properties: { data: { $ref: "#/components/schemas/PicksTaken" } }
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/HostConnection" } } }
+  /hosts/ffpc/connect:
+    post:
+      tags: [hosts]
+      operationId: connectFFPC
+      summary: >-
+        Sign in to FFPC as the member, through FFPC's own sign-in form, and keep what FFPC hands back (its session, and
+        the sign-in because FFPC offers no other way to renew a session), envelope encrypted. Answers the member's FFPC
+        leagues. Needs consent. Three refused sign-ins in an hour lock connecting for the hour. 5 an hour an account.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HostConnectInput" }
+      responses:
+        "201":
+          description: connected
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/HostConnected" } }
         "400": { $ref: "#/components/responses/ErrorResponse" }
-        "403": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
-  /companions/{id}/picks:
-    parameters: [{ $ref: "#/components/parameters/ID" }]
-    post:
-      tags: [companions]
-      operationId: pushCompanionPicks
-      summary: >-
-        The draft as the member's browser reads it now. Picks are merged by pick number with those already taken; a
-        pick that disagrees with one already taken replaces it only when the page says the draft was reset. One batch
-        a device per draft per ten seconds; a batch sooner answers 429. Needs the draft:write scope.
-      security: [{ device: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/DraftPage" }
+        "423": { $ref: "#/components/responses/ErrorResponse" }
+        "429": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /hosts/ffpc/leagues:
+    get:
+      tags: [hosts]
+      operationId: ffpcLeagues
+      summary: The member's FFPC leagues, read from FFPC as them. 409 when the connection needs a fresh sign-in.
+      security: [{ session: [] }]
       responses:
         "200":
-          description: what was taken
+          description: the leagues
           content:
             application/json:
               schema:
                 allOf:
                   - $ref: "#/components/schemas/Envelope"
-                  - properties: { data: { $ref: "#/components/schemas/PicksTaken" } }
-        "400": { $ref: "#/components/responses/ErrorResponse" }
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/HostLeague" } } }
         "404": { $ref: "#/components/responses/ErrorResponse" }
-        "429": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+  /hosts/ffpc:
+    delete:
+      tags: [hosts]
+      operationId: disconnectFFPC
+      summary: Disconnect FFPC. The kept sign-in and session are deleted at once; leagues read from FFPC stop updating.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
 
   /rooms/{id}/ws:
     servers:
@@ -2463,196 +2458,70 @@ components:
         token: { type: string, description: the device token, answered this once; send it as Authorization Bearer }
         device: { $ref: "#/components/schemas/Device" }
 
-    PushedHost:
+    HostPage:
       type: string
-      description: a host whose pages arrive from the member's own browser through the extension
-      enum: [ffpc]
-    PushedPosition:
-      type: string
-      enum: [QB, RB, WR, TE, K, DEF]
-    PushedPlayer:
-      type: object
-      required: [id, name, position, team]
-      properties:
-        id:
-          type: string
-          maxLength: 16
-          description: >-
-            the host's player id (FFPC's own ids, kept for a future crosswalk); empty only in a move, where the host's
-            page names the player without one
-        name: { type: string, minLength: 1, maxLength: 80 }
-        position: { $ref: "#/components/schemas/PushedPosition" }
-        team: { type: string, maxLength: 4, description: the NFL team code as the host writes it, empty for a free agent }
-        name_cut:
-          type: boolean
-          description: the host showed the name cut short (a draft board cell), so it is matched by its start
-    PushedLeagueRef:
-      type: object
-      required: [host, host_league_id, season]
-      properties:
-        host: { $ref: "#/components/schemas/PushedHost" }
-        host_league_id: { type: string, pattern: "^[0-9]{1,12}$" }
-        season: { type: integer, minimum: 2000, maximum: 2100 }
-    PushedLeagueAttach:
-      type: object
-      required: [league, home]
-      properties:
-        league: { $ref: "#/components/schemas/PushedLeagueRef" }
-        home: { $ref: "#/components/schemas/HomePage" }
-    HomePage:
-      type: object
-      required: [name, team_id, team_name]
-      properties:
-        name: { type: string, minLength: 1, maxLength: 80, description: the league's name }
-        team_id: { type: integer, minimum: 1, maximum: 32, description: the team the page is for, the member's own }
-        team_name: { type: string, maxLength: 80 }
-    PushedTeam:
-      type: object
-      required: [team_id, name]
-      properties:
-        team_id: { type: integer, minimum: 1, maximum: 32 }
-        name: { type: string, maxLength: 80 }
-        owner: { type: string, maxLength: 80 }
-        wins: { type: integer, minimum: 0, maximum: 30 }
-        losses: { type: integer, minimum: 0, maximum: 30 }
-        ties: { type: integer, minimum: 0, maximum: 30 }
-        points_for: { type: number, format: double, minimum: 0, maximum: 10000 }
-        players: { type: array, maxItems: 60, items: { $ref: "#/components/schemas/PushedPlayer" } }
-        reserve: { type: array, maxItems: 20, items: { type: string, maxLength: 16 }, description: player ids on injured reserve }
-    PushedLineup:
-      type: object
-      required: [qb, rb, wr, te, k, def, flex, super_flex, bench]
-      properties:
-        qb: { type: integer, minimum: 0, maximum: 4 }
-        rb: { type: integer, minimum: 0, maximum: 6 }
-        wr: { type: integer, minimum: 0, maximum: 6 }
-        te: { type: integer, minimum: 0, maximum: 4 }
-        k: { type: integer, minimum: 0, maximum: 2 }
-        def: { type: integer, minimum: 0, maximum: 2 }
-        flex: { type: integer, minimum: 0, maximum: 4 }
-        super_flex: { type: integer, minimum: 0, maximum: 2 }
-        bench: { type: integer, minimum: 0, maximum: 40 }
-    ScoringPage:
-      type: object
-      required: [rules, unread]
-      properties:
-        rules:
-          type: object
-          description: >-
-            the league's points per stat as the extension read them, in Sleeper's key names (pass_yd, rec, bonus_rec_te),
-            mapped by the api into ScoringRules' 21 keys with every other rule named as dropped
-          additionalProperties: { type: number, format: double }
-        unread:
-          type: array
-          maxItems: 40
-          description: the host's own words for each scoring rule the extension could not put in a key
-          items: { type: string, maxLength: 160 }
-        lineup: { $ref: "#/components/schemas/PushedLineup" }
-        teams: { type: integer, minimum: 2, maximum: 32 }
-    PushedSide:
-      type: object
-      required: [team_id, game, points, starters]
-      properties:
-        team_id: { type: integer, minimum: 1, maximum: 32 }
-        game: { type: integer, minimum: 0, maximum: 32, description: sides with the same game play each other }
-        points: { type: number, format: double, minimum: -100, maximum: 1000 }
-        starters: { type: array, maxItems: 30, items: { $ref: "#/components/schemas/PushedPlayer" } }
-        player_points: { type: object, additionalProperties: { type: number, format: double } }
-    MatchupPage:
-      type: object
-      required: [week, sides]
-      properties:
-        week: { type: integer, minimum: 1, maximum: 22 }
-        sides: { type: array, maxItems: 32, items: { $ref: "#/components/schemas/PushedSide" } }
-    PushedMove:
-      type: object
-      required: [kind, at]
-      properties:
-        kind: { type: string, enum: [add, waiver, trade] }
-        at: { type: string, format: date-time }
-        adds: { type: array, maxItems: 20, items: { $ref: "#/components/schemas/PushedMovePlayer" } }
-        drops: { type: array, maxItems: 20, items: { $ref: "#/components/schemas/PushedMovePlayer" } }
-    PushedMovePlayer:
-      type: object
-      required: [team_id, player]
-      properties:
-        team_id: { type: integer, minimum: 1, maximum: 32 }
-        player: { $ref: "#/components/schemas/PushedPlayer" }
-    MovesPage:
-      type: object
-      required: [moves]
-      properties:
-        moves: { type: array, maxItems: 100, items: { $ref: "#/components/schemas/PushedMove" } }
-    PageFamily:
-      type: string
-      enum: [home, standings, rosters, scoring, matchup, moves]
+      description: an FFPC league page, by the page its address names
+      enum: [league_home, standings, rosters, lineup, schedule, owners, rules]
     LeaguePage:
       type: object
-      required: [family, league]
-      description: one page the member had open; exactly the object its family names is set
+      required: [page, html]
       properties:
-        family: { $ref: "#/components/schemas/PageFamily" }
-        league: { $ref: "#/components/schemas/PushedLeagueRef" }
-        home: { $ref: "#/components/schemas/HomePage" }
-        standings: { type: array, maxItems: 32, items: { $ref: "#/components/schemas/PushedTeam" } }
-        rosters: { type: array, maxItems: 32, items: { $ref: "#/components/schemas/PushedTeam" } }
-        scoring: { $ref: "#/components/schemas/ScoringPage" }
-        matchup: { $ref: "#/components/schemas/MatchupPage" }
-        moves: { $ref: "#/components/schemas/MovesPage" }
+        page: { $ref: "#/components/schemas/HostPage" }
+        html: { type: string, maxLength: 3145728, description: the page's HTML as the member's browser holds it }
     LeaguePages:
       type: object
       required: [pages]
       properties:
-        pages: { type: array, minItems: 1, maxItems: 6, items: { $ref: "#/components/schemas/LeaguePage" } }
+        pages: { type: array, minItems: 1, maxItems: 7, items: { $ref: "#/components/schemas/LeaguePage" } }
     PagesTaken:
       type: object
       required: [taken, refused, read_at]
       properties:
-        taken: { type: array, items: { $ref: "#/components/schemas/PageFamily" } }
+        taken: { type: array, items: { $ref: "#/components/schemas/HostPage" } }
         refused:
           type: object
-          description: each page family not taken and why, in our words
+          description: each page not taken and why, in our words
           additionalProperties: { type: string }
         read_at: { type: string, format: date-time }
 
-    DraftPageStatus:
+    ConnectedHost:
       type: string
-      enum: [pre_draft, drafting, complete]
-    DraftPagePick:
+      description: a host the member connects their own account on, named as a mechanism
+      enum: [ffpc]
+    HostConnectionStatus:
+      type: string
+      description: connected reads; signed_out needs a fresh sign-in; locked followed three refused sign-ins
+      enum: [connected, signed_out, locked]
+    HostConnection:
       type: object
-      required: [pick, round, slot, player]
+      required: [host, status, connected_at, last_read_at]
       properties:
-        pick: { type: integer, minimum: 1, maximum: 1600 }
-        round: { type: integer, minimum: 1, maximum: 50 }
-        slot: { type: integer, minimum: 1, maximum: 32, description: the draft slot whose turn it was }
-        player: { $ref: "#/components/schemas/PushedPlayer" }
-    DraftPage:
+        host: { $ref: "#/components/schemas/ConnectedHost" }
+        status: { $ref: "#/components/schemas/HostConnectionStatus" }
+        connected_at: { type: string, format: date-time }
+        last_read_at: { type: string, format: date-time, nullable: true }
+    HostConnectInput:
       type: object
-      required: [league, name, status, teams, rounds, snake, reversal_round, lineup, slot_names, my_slot, picks]
+      required: [email, password, consent]
       properties:
-        league: { $ref: "#/components/schemas/PushedLeagueRef" }
-        name: { type: string, maxLength: 80 }
-        status: { $ref: "#/components/schemas/DraftPageStatus" }
-        teams: { type: integer, minimum: 2, maximum: 32 }
-        rounds: { type: integer, minimum: 1, maximum: 50 }
-        snake: { type: boolean, description: the order turns each round }
-        reversal_round: { type: integer, minimum: 0, maximum: 50, description: the round a third-round reversal starts, 0 for none }
-        lineup: { $ref: "#/components/schemas/PushedLineup" }
-        slot_names:
-          type: array
-          maxItems: 32
-          description: the team's name in each draft slot, slot 1 first
-          items: { type: string, maxLength: 80 }
-        my_slot: { type: integer, minimum: 1, maximum: 32, description: the member's own draft slot, as the page marks it }
-        picks: { type: array, maxItems: 1600, items: { $ref: "#/components/schemas/DraftPagePick" } }
-        rules:
-          type: object
-          description: the league's scoring as the extension last read it, in Sleeper's key names, when it has
-          additionalProperties: { type: number, format: double }
-    PicksTaken:
+        email: { type: string, minLength: 3, maxLength: 50, description: the member's FFPC sign-in email, as FFPC's form takes it }
+        password: { type: string, minLength: 1, maxLength: 50, description: sent to FFPC's sign-in only, never answered or logged }
+        consent:
+          type: boolean
+          description: >-
+            the member agrees that we sign in to FFPC as them to read their league, never make a move or a bid, and that
+            they can disconnect any time; must be true
+    HostLeague:
       type: object
-      required: [id, pick_count, read_at]
+      required: [league_id, name, team_name, record]
       properties:
-        id: { type: string, format: uuid, description: the companion }
-        pick_count: { type: integer }
-        read_at: { type: string, format: date-time }
+        league_id: { type: string }
+        name: { type: string }
+        team_name: { type: string }
+        record: { type: string, description: "the team's record as FFPC writes it, 2 - 3" }
+    HostConnected:
+      type: object
+      required: [connection, leagues]
+      properties:
+        connection: { $ref: "#/components/schemas/HostConnection" }
+        leagues: { type: array, items: { $ref: "#/components/schemas/HostLeague" } }

@@ -1,0 +1,229 @@
+package leaguesync
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/db/dbtest"
+	"github.com/jhunthrop/commish/api/internal/hosts"
+	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
+	"github.com/jhunthrop/commish/api/internal/leagues"
+)
+
+const (
+	fixtureLeague = "104870"
+	fixtureLTUID  = "F3C-781497793F8E"
+)
+
+// fixtureLeagueRead is the founder's captured league through every
+// parser, as a member read would give it.
+func fixtureLeagueRead(t *testing.T) ffpc.League {
+	t.Helper()
+	dir := filepath.Join("..", "hosts", "ffpc", "testdata")
+	read := func(name string) []byte {
+		b, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	pages := map[ffpc.PageName][]byte{
+		ffpc.PageLeagueHome: read("ffpc-league-home.html"), ffpc.PageStandings: read("ffpc-standings.html"),
+		ffpc.PageRosters: read("ffpc-rosters.html"), ffpc.PageLineup: read("ffpc-team-lineup.html"),
+		ffpc.PageSchedule: read("ffpc-schedule.html"), ffpc.PageOwners: read("ffpc-owners.html"), ffpc.PageRules: read("ffpc-rules.html"),
+	}
+	l, err := ffpc.Parse(pages, read("public-big-gorilla-official-rules.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(l.Missing) != 0 {
+		t.Fatalf("missing %v", l.Missing)
+	}
+	return l
+}
+
+func TestFFPCSnapshotFromTheFixtures(t *testing.T) {
+	now := time.Date(2026, 10, 13, 14, 0, 0, 0, time.UTC)
+	snap := ffpcSnapshot(fixtureLeagueRead(t), now)
+	if snap.Ref.Key() != "ffpc/0/104870" || snap.Season != 2026 || snap.Week != 6 || len(snap.Teams) != 12 {
+		t.Fatalf("league %s season %d week %d, %d teams", snap.Ref.Key(), snap.Season, snap.Week, len(snap.Teams))
+	}
+	me, ok := snap.TeamByRoster(11)
+	if !ok || me.Name != "My Ball Zach Ertz" || me.Owner != "jh0486" || me.Wins != 2 || me.Losses != 3 ||
+		len(me.Players) != 20 || len(me.Starters) != 10 {
+		t.Fatalf("my team %+v", me)
+	}
+	for _, tm := range snap.Teams {
+		if tm.Name == "" || tm.Owner == "" || len(tm.Players) != 20 {
+			t.Fatalf("team %d %q owner %q, %d players", tm.RosterID, tm.Name, tm.Owner, len(tm.Players))
+		}
+	}
+	if len(snap.Scoring.Rules) != 21 || snap.Scoring.Rules["points_per_reception"] != 1 || snap.Scoring.Rules["te_reception_bonus"] != 0.5 ||
+		snap.Scoring.Rules["points_per_passing_yard"] != 0.05 || snap.Scoring.Rules["points_per_interception"] != -1 {
+		t.Fatalf("rules %v", snap.Scoring.Rules)
+	}
+	if NearestPreset(snap.Scoring.Rules) != apitypes.ScoringPresetTePremium {
+		t.Fatalf("scores like %s", NearestPreset(snap.Scoring.Rules))
+	}
+	want := Shape{Teams: 12, QB: 1, RB: 2, WR: 2, TE: 1, K: 1, DEF: 1, Flex: 2, Bench: 10}
+	if snap.Shape.Teams != want.Teams || snap.Shape.Bench != want.Bench || snap.Shape.Flex != want.Flex || len(snap.Shape.Unfollowed) != 0 {
+		t.Fatalf("shape %+v", snap.Shape)
+	}
+	if _, reason := SettingsFor(snap); reason != "" {
+		t.Fatalf("a mock cannot rerun it: %s", reason)
+	}
+	if len(snap.Moves) != 4 || snap.Moves[0].Kind != MoveAdd || len(snap.Moves[0].Adds) != 1 {
+		t.Fatalf("moves %+v", snap.Moves)
+	}
+	// The week is the all-play week: no head-to-head games.
+	if len(snap.Matchups) != 0 {
+		t.Fatalf("matchups %+v", snap.Matchups)
+	}
+	for _, id := range namedPlayers(snap) {
+		if p, ok := snap.Players[id]; !ok || p.Name == "" || p.Position == "" {
+			t.Fatalf("player %s not named: %+v", id, p)
+		}
+	}
+	if !slices.ContainsFunc(snap.Scoring.Dropped, func(s string) bool { return strings.Contains(s, "every yard thereafter") }) {
+		t.Fatalf("dropped %q", snap.Scoring.Dropped)
+	}
+}
+
+// fakeMember is a member read that answers the fixtures for one account
+// and its league, and refuses any other.
+type fakeMember struct {
+	t      *testing.T
+	owner  uuid.UUID
+	league ffpc.League
+	reads  int
+}
+
+func (f *fakeMember) ReadLeague(_ context.Context, accountID uuid.UUID, ltuid string, _ bool) (ffpc.League, error) {
+	if accountID != f.owner || ltuid != fixtureLTUID {
+		return ffpc.League{}, hosts.ErrNotConnected
+	}
+	f.reads++
+	return f.league, nil
+}
+
+func (f *fakeMember) OpenLeague(_ context.Context, accountID uuid.UUID, leagueID string) (string, error) {
+	if accountID != f.owner {
+		return "", hosts.ErrNotConnected
+	}
+	if leagueID != fixtureLeague {
+		return "", ffpc.ErrNotThisPage
+	}
+	return fixtureLTUID, nil
+}
+
+// An FFPC league attaches from the member's own list and reads as them;
+// an account with no connection is told to connect; a league outside the
+// list is refused; the league reads again through the connected member.
+func TestAttachFFPC(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	accounts := &auth.Store{Pool: pool}
+	alice, err := accounts.UpsertAccount(ctx, auth.Identity{UserID: "user_alice", Email: "alice@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob, err := accounts.UpsertAccount(ctx, auth.Identity{UserID: "user_bob", Email: "bob@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Alice's connection row, sealed under a throwaway key.
+	vault, _ := hosts.NewVault(make([]byte, 32))
+	sealed, err := vault.Seal(alice.ID.String(), ffpc.Host, hosts.Secret{Cookies: map[string]string{"BGSLMSession": "test"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&hosts.Store{Pool: pool}).Put(ctx, alice.ID, ffpc.Host, sealed); err != nil {
+		t.Fatal(err)
+	}
+	clock := &fakeClock{now: time.Date(2026, 10, 13, 14, 0, 0, 0, time.UTC)}
+	store := &Store{Pool: pool}
+	member := &fakeMember{t: t, owner: alice.ID, league: fixtureLeagueRead(t)}
+	host := &FFPC{Member: member, Readers: store, Now: clock.Now}
+	hostList := Hosts{host}
+	svc := &Service{
+		Hosts: hostList, Poller: &Poller{Hosts: hostList, Store: store, Now: clock.Now, Log: quietLog()},
+		Admission: &Admission{Now: clock.Now}, Players: memoryPlayers{hostList}, Links: store,
+		Saved: &leagues.Store{Pool: pool}, Boards: smallBoard{}, FFPC: host, Now: clock.Now, Log: quietLog(),
+	}
+	a, b := caller{t, svc, alice.ID}, caller{t, svc, bob.ID}
+	ffpcHost := apitypes.LeagueHostFfpc
+
+	status, body := b.do(svc.attach, http.MethodPost, "/", apitypes.AttachInput{Host: &ffpcHost, Link: fixtureLeague}, "")
+	if status != http.StatusConflict {
+		t.Fatalf("bob with no connection: %d %s", status, body)
+	}
+	if status, _ := a.do(svc.attach, http.MethodPost, "/", apitypes.AttachInput{Host: &ffpcHost, Link: "999"}, ""); status != http.StatusBadRequest {
+		t.Fatalf("a league outside the list: %d", status)
+	}
+	if status, _ := a.do(svc.preview, http.MethodPost, "/", apitypes.AttachPreviewInput{Host: &ffpcHost, Link: fixtureLeague}, ""); status != http.StatusBadRequest {
+		t.Fatalf("an FFPC preview: %d", status)
+	}
+	var got apitypes.LeagueSync
+	status, body = a.do(svc.attach, http.MethodPost, "/", apitypes.AttachInput{Host: &ffpcHost, Link: fixtureLeague}, "")
+	if status != http.StatusCreated || json.Unmarshal(body, &got) != nil {
+		t.Fatalf("attach: %d %s", status, body)
+	}
+	if got.Me != 11 || got.Host != apitypes.LeagueHostFfpc || len(got.Teams) != 12 || len(got.Roster) != 20 || got.SettingsLeagueId == nil {
+		t.Fatalf("the league: me %d, %d teams, %d on my roster, settings %v", got.Me, len(got.Teams), len(got.Roster), got.SettingsLeagueId)
+	}
+	reader, ltuid, err := store.FFPCReader(ctx, fixtureLeague)
+	if err != nil || reader != alice.ID || ltuid != fixtureLTUID {
+		t.Fatalf("reader %s %q %v", reader, ltuid, err)
+	}
+	clock.now = clock.now.Add(2 * MinUpstreamGap)
+	if status, _ := a.do(svc.refresh, http.MethodPost, "/", nil, got.Id.String()); status != http.StatusOK {
+		t.Fatalf("refresh: %d", status)
+	}
+	if member.reads != 2 {
+		t.Fatalf("%d member reads, want the attach and the refresh", member.reads)
+	}
+	// Pushed pages, raw HTML through the same parsers: the member's own
+	// team is taken, a second batch inside ten seconds is refused by page,
+	// another account's link is not found.
+	home, _ := os.ReadFile(filepath.Join("..", "hosts", "ffpc", "testdata", "ffpc-league-home.html"))
+	standings, _ := os.ReadFile(filepath.Join("..", "hosts", "ffpc", "testdata", "ffpc-standings.html"))
+	batch := apitypes.LeaguePages{Pages: []apitypes.LeaguePage{
+		{Page: apitypes.HostPageLeagueHome, Html: string(home)}, {Page: apitypes.HostPageStandings, Html: string(standings)},
+	}}
+	var taken apitypes.PagesTaken
+	status, body = a.do(svc.pushPages, http.MethodPost, "/", batch, got.Id.String())
+	if status != http.StatusOK || json.Unmarshal(body, &taken) != nil || len(taken.Taken) != 2 {
+		t.Fatalf("push: %d %s", status, body)
+	}
+	if status, _ := a.do(svc.pushPages, http.MethodPost, "/", batch, got.Id.String()); status != http.StatusTooManyRequests {
+		t.Fatalf("a push inside ten seconds: %d", status)
+	}
+	if status, _ := b.do(svc.pushPages, http.MethodPost, "/", batch, got.Id.String()); status != http.StatusNotFound {
+		t.Fatalf("bob pushed to alice's league: %d", status)
+	}
+	clock.now = clock.now.Add(pushPageInterval)
+	other := apitypes.LeaguePages{Pages: []apitypes.LeaguePage{
+		{Page: apitypes.HostPageLeagueHome, Html: strings.Replace(string(home), "Team ID: 11", "Team ID: 3", 1)},
+	}}
+	if status, _ := a.do(svc.pushPages, http.MethodPost, "/", other, got.Id.String()); status != http.StatusBadRequest {
+		t.Fatalf("another team's page: %d", status)
+	}
+
+	if err := (&hosts.Store{Pool: pool}).Delete(ctx, alice.ID, ffpc.Host); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.FFPCReader(ctx, fixtureLeague); err == nil {
+		t.Fatal("a disconnected member still reads the league")
+	}
+}

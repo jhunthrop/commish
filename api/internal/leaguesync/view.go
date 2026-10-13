@@ -27,9 +27,11 @@ func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.Leag
 		return apitypes.LeagueSync{}, fmt.Errorf("leaguesync: board: %w", err)
 	}
 	ids := namedPlayers(snap)
-	dir, err := s.Players.For(ctx, snap.Ref.Host, directorySeason(snap, s.Now()), ids)
-	if err != nil {
-		return apitypes.LeagueSync{}, fmt.Errorf("leaguesync: directory: %w", err)
+	dir := snap.Players
+	if dir == nil {
+		if dir, err = s.Players.For(ctx, snap.Ref.Host, directorySeason(snap, s.Now()), ids); err != nil {
+			return apitypes.LeagueSync{}, fmt.Errorf("leaguesync: directory: %w", err)
+		}
 	}
 	placed := Place(board.Raw, dir, ids)
 	p := players{dir: dir, placed: placed}

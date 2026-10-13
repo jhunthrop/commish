@@ -45,6 +45,9 @@ func jobTable() map[string]job {
 		"sweep": runSweep,
 		// stripe-setup runs by hand once per Stripe mode.
 		"stripe-setup": runStripeSetup,
+		// ffpc-refresh runs hourly and in bursts: every FFPC league read as
+		// a connected member (ffpcjob.go).
+		"ffpc-refresh": runFFPCRefresh,
 		// grant runs by hand: a pass or membership for support.
 		"grant": runGrant,
 	}

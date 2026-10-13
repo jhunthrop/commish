@@ -26,6 +26,16 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
 - GitHub Actions variables: `GCP_PROJECT`, `GCP_PROJECT_NUMBER`, `GCP_REGION`, `GCP_WIF_PROVIDER`, `GCP_DEPLOYER_SA`, `GCP_ARTIFACT_REPO`.
 - `.github/workflows/infra-smoke.yml` proves the chain on demand: authenticate as the deployer and read the repository, then read the Cloudflare zone and bucket with the token.
 
+### Connected host accounts (FFPC, Lane 14)
+
+- Secret Manager `HOST_CREDENTIALS_KEY`: base64 of 32 random bytes (`openssl rand -base64 32 | gcloud secrets create HOST_CREDENTIALS_KEY --data-file=-`). It wraps each member's own data key; the api refuses to start in production without it. Rotating it means re-wrapping every `app.host_connections.wrapped_key` under the new key (a one-shot job, not built yet); until then keep it.
+- Cloud Scheduler runs the `api-ffpc-refresh` job (one read of every attached FFPC league with a connected member, at one FFPC request a second) on these schedules, all `America/New_York`:
+  - hourly: `0 * * * *`
+  - after Wednesday's waiver run: `0 6 * * 3`
+  - after Tuesday's waiver run: `0 6 * * 2`
+  - at Sunday's first kickoffs: `0 13 * * 0`, `15 13 * * 0`, `30 13 * * 0`
+  Each is `gcloud scheduler jobs create http ffpc-refresh-<name> --schedule "<cron>" --time-zone America/New_York --uri https://us-east1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/trycommish/jobs/api-ffpc-refresh:run --http-method POST --oauth-service-account-email deployer@trycommish.iam.gserviceaccount.com`, the same way the other api jobs are scheduled.
+
 ## Neon (the data)
 
 One database, two schemas (spec §2.5): `app` owned by Go and migrated with goose from `api/migrations`, `research` owned by the TypeScript core and migrated with Drizzle from `research/drizzle`. The `app` schema is owned by the login role `commish_app`, which also holds `create` on the database (goose's `create schema if not exists` needs it); its pooled URL is Secret Manager `DATABASE_URL`. Twenty tables as of migration 6.

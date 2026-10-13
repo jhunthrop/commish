@@ -69,8 +69,13 @@ type Service struct {
 	Links     Links
 	Saved     SavedLeagues
 	Boards    BoardSource
-	Now       func() time.Time
-	Log       *slog.Logger
+	// FFPC is the FFPC host when it is set up (HOST_CREDENTIALS_KEY), nil
+	// otherwise; it is also among Hosts, which reads it on the poll.
+	FFPC *FFPC
+
+	pushes pushGate
+	Now    func() time.Time
+	Log    *slog.Logger
 }
 
 // Routes is every route this package serves.
@@ -84,13 +89,17 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/restore", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDetachPerMinute), Handler: s.restore},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/sync", Access: httpx.SignedIn, Limit: read, Handler: s.sync},
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/refresh", Access: httpx.SignedIn, Limit: httpx.PerHour(limitRefreshPerHour), Handler: s.refresh},
+		s.pushRoute(),
 	}
 }
 
 // hostWords is a host's name as a sentence says it.
 func hostWords(host string) string {
-	if host == HostMFL {
+	switch host {
+	case HostMFL:
 		return "MyFantasyLeague"
+	case HostFFPC:
+		return "FFPC"
 	}
 	return "Sleeper"
 }
@@ -108,6 +117,9 @@ const (
 
 // writeHostError says what went wrong reading the league, in our words.
 func (s *Service) writeHostError(w http.ResponseWriter, r *http.Request, host string, err error) {
+	if writeFFPCError(w, r, err) {
+		return
+	}
 	switch {
 	case errors.Is(err, ErrNotALink):
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: linkWords})
@@ -159,6 +171,11 @@ func (s *Service) preview(w http.ResponseWriter, r *http.Request) {
 	}
 	h, ref, ok := s.resolve(w, r, in.Host, in.Link)
 	if !ok {
+		return
+	}
+	if h.Key() == HostFFPC {
+		// An FFPC league is picked from the member's own list, read as them.
+		httpx.WriteInvalid(w, r, map[string]string{fieldLink: ffpcPickWords})
 		return
 	}
 	read, err := s.readFor(r.Context(), auth.AccountID(r), ref)
