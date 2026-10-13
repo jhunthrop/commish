@@ -7,7 +7,7 @@ The order, and why each pass exists:
    to replace the oracle-era rows (their prose template and their repeated verdict sentences).
 2. **The sweep** (`capsules.sweep`): every page whose facts moved, whose row is missing or whose row
    the writer did not write, within the night's budget.
-3. **The retry pass**: one more attempt at the pages still unwritten (facts blocks), from the budget
+3. **The retry passes** (up to `RETRY_PASSES`): another attempt at the pages still unwritten (facts blocks), from the budget
    left, because a throttled or refused read often succeeds on a second try.
 4. **The repair pass**: the capsule gate fails a run when a written sentence of four words or more
    sits on two pages. Each such sentence is kept on its first page in board order and the other
@@ -35,6 +35,9 @@ from research.capsules.sweep import SweepPlan, SweepReport, sweep_capsules
 from research.nightly.capsule_gate import CapsuleGateResult, SharedSentence, board_universe_ids, capsule_gate
 
 REPAIR_PASSES: Final = 2
+# Each retry pass writes about half of what is left (measured on the 2026-10-13 regeneration: 31 of
+# 66 on the first), so three passes bring a tenth of the board unwritten under the 2% line.
+RETRY_PASSES: Final = 3
 Log = Callable[[str], None]
 
 
@@ -131,8 +134,12 @@ class _Passes:
         with self.engine.connect() as conn:
             shared = tuple(sentence.sentence for sentence in capsule_gate(conn, self.now).shared)
         report = self.sweep("capsules", SweepPlan(self.budget, avoid=shared))
-        if self.left > 0 and report.facts > 0:
-            self.sweep("capsule retries", SweepPlan(self.left, unwritten_only=True, avoid=shared))
+        unwritten = report.facts
+        for attempt in range(1, RETRY_PASSES + 1):
+            if self.left <= 0 or unwritten == 0:
+                break
+            retry = self.sweep(f"capsule retries {attempt}", SweepPlan(self.left, unwritten_only=True, avoid=shared))
+            unwritten = retry.facts
         for attempt in range(1, REPAIR_PASSES + 1):
             with self.engine.connect() as conn:
                 gate = capsule_gate(conn, self.now)
