@@ -1,0 +1,156 @@
+"""TAKING A RUN ID, WRITING A RUN, AND MAKING IT PUBLIC.
+
+A run id is the run's UTC start to the hour (`2026-10-13T05`, spec §2.1), with `-2`, `-3` appended
+when an earlier run took that hour (the web's run id pattern allows a lower-case suffix). An id is
+taken by claiming `runs/<id>/started.json` with a conditional write, so it is never reused, even by
+a run that died half way: its partial files stay where they are.
+
+Every JSON artifact is written compact, as the web reads it, and recorded in the run's report with
+its bytes and SHA-256. The manifest is written last.
+
+PUBLIC AFTER AN HOUR (spec §4, early access). A run that passed every gate moves `runs/early.json`
+at once, the run a member may read, with the instant it goes public. `publish` (hourly from 06:00
+UTC) moves `runs/latest.json` to it once that instant has passed and dispatches the web build with
+its id (`repository_dispatch`, type `nightly-run`). A dispatch that failed is retried by the next
+`publish`; the run's `published.json` records each attempt.
+"""
+
+import hashlib
+import json
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any, Final
+
+import httpx
+
+from research.errors import ConfigurationError
+from research.model.instants import js_iso
+from research.nightly.config import EARLY_ACCESS, EARLY_KEY, LATEST_KEY, RUNS_PREFIX
+from research.nightly.run_store import RunStore
+
+JSON_TYPE: Final = "application/json"
+STARTED_FILE: Final = "started.json"
+PUBLISHED_FILE: Final = "published.json"
+DISPATCH_TOKEN_VARIABLE: Final = "WEB_DISPATCH_TOKEN"
+DISPATCH_REPOSITORY_VARIABLE: Final = "WEB_DISPATCH_REPOSITORY"
+DEFAULT_REPOSITORY: Final = "jhunthrop/commish"
+DISPATCH_EVENT: Final = "nightly-run"
+_DISPATCHED: Final = 204
+Json = dict[str, Any]
+
+
+def run_key(run_id: str, path: str) -> str:
+    return f"{RUNS_PREFIX}/{run_id}/{path}"
+
+
+def encode(value: object) -> bytes:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode()
+
+
+def take_run_id(store: RunStore, started_at: datetime) -> str:
+    """The first free id for this hour, claimed atomically."""
+    base = started_at.astimezone(UTC).strftime("%Y-%m-%dT%H")
+    attempt = 1
+    while True:
+        candidate = base if attempt == 1 else f"{base}-{attempt}"
+        body = encode({"runId": candidate, "startedAt": js_iso(started_at)})
+        if store.claim(run_key(candidate, STARTED_FILE), body, JSON_TYPE):
+            return candidate
+        attempt += 1
+
+
+@dataclass(slots=True)
+class ArtifactWriter:
+    store: RunStore
+    run_id: str
+    records: list[Json]
+
+    def write(self, path: str, value: object) -> None:
+        body = encode(value)
+        self.store.put(run_key(self.run_id, path), body, JSON_TYPE)
+        self.records.append({"path": path, "bytes": len(body), "sha256": hashlib.sha256(body).hexdigest()})
+
+
+def read_json(store: RunStore, key: str) -> Json | None:
+    raw = store.get(key)
+    return None if raw is None else json.loads(raw)
+
+
+def promote_early(store: RunStore, run_id: str, finished_at: datetime) -> datetime:
+    """A passed run becomes the early-access run; returns when it goes public."""
+    public_at = finished_at + EARLY_ACCESS
+    store.put(
+        EARLY_KEY,
+        encode({"runId": run_id, "finishedAt": js_iso(finished_at), "publicAt": js_iso(public_at)}),
+        JSON_TYPE,
+    )
+    return public_at
+
+
+@dataclass(frozen=True, slots=True)
+class Dispatcher:
+    http: httpx.Client
+    token: str
+    repository: str
+
+    @classmethod
+    def from_environ(cls, http: httpx.Client, environ: Mapping[str, str]) -> "Dispatcher":
+        token = environ.get(DISPATCH_TOKEN_VARIABLE, "").strip()
+        if not token:
+            raise ConfigurationError(f"{DISPATCH_TOKEN_VARIABLE} is not set; the web build cannot be dispatched.")
+        return cls(http, token, environ.get(DISPATCH_REPOSITORY_VARIABLE, DEFAULT_REPOSITORY).strip())
+
+    def dispatch(self, run_id: str) -> str | None:
+        """The web workflow's build of `run_id`; None on success, else what GitHub answered."""
+        response = self.http.post(
+            f"https://api.github.com/repos/{self.repository}/dispatches",
+            headers={
+                "Authorization": f"Bearer {self.token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            json={"event_type": DISPATCH_EVENT, "client_payload": {"runId": run_id}},
+            timeout=30.0,
+        )
+        return None if response.status_code == _DISPATCHED else f"HTTP {response.status_code} {response.text[:200]}"
+
+
+@dataclass(frozen=True, slots=True)
+class PublishOutcome:
+    run_id: str | None
+    line: str
+    ok: bool
+
+
+def publish(store: RunStore, dispatcher: Dispatcher | None, now: datetime) -> PublishOutcome:
+    """Move `latest.json` to the early run once it is public, and dispatch its build (once)."""
+    early = read_json(store, EARLY_KEY)
+    if early is None:
+        return PublishOutcome(None, "publish: no run has passed its gates yet", True)
+    run_id = str(early["runId"])
+    public_at = datetime.fromisoformat(str(early["publicAt"]).replace("Z", "+00:00"))
+    if now < public_at:
+        return PublishOutcome(
+            run_id, f"publish: run {run_id} goes public at {early['publicAt']}, in {public_at - now}", True
+        )
+    latest = read_json(store, LATEST_KEY)
+    record = read_json(store, run_key(run_id, PUBLISHED_FILE)) or {"attempts": []}
+    if latest is None or latest.get("runId") != run_id:
+        store.put(LATEST_KEY, encode({"runId": run_id}), JSON_TYPE)
+        record["publishedAt"] = js_iso(now)
+    if record.get("dispatchedAt"):
+        return PublishOutcome(run_id, f"publish: run {run_id} is public and its build was dispatched", True)
+    if dispatcher is None:
+        store.put(run_key(run_id, PUBLISHED_FILE), encode(record), JSON_TYPE)
+        return PublishOutcome(run_id, f"publish: run {run_id} is public; dispatch skipped (--no-dispatch)", True)
+    failure = dispatcher.dispatch(run_id)
+    record["attempts"] = [*record["attempts"], {"at": js_iso(now), "error": failure}]
+    if failure is None:
+        record["dispatchedAt"] = js_iso(now)
+    store.put(run_key(run_id, PUBLISHED_FILE), encode(record), JSON_TYPE)
+    if failure is not None:
+        return PublishOutcome(
+            run_id, f"publish: run {run_id} is public, the dispatch FAILED ({failure}); retried next hour", False
+        )
+    return PublishOutcome(run_id, f"publish: run {run_id} is public and the web build of it was dispatched", True)
