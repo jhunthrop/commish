@@ -7,19 +7,18 @@
 import { PUBLIC_API_URL } from '$app/env/public';
 import { apiClient, hasSessionCookie } from '#lib/api/client.ts';
 import type { components } from '#lib/api/types.ts';
+import type { RailAccount } from '#lib/ui/nav.ts';
 
 type Account = components['schemas']['Account'];
 
 const client = apiClient(PUBLIC_API_URL);
 
-/** Signed in, the newest attached league's id, or null with none. */
-export interface RailAccount {
-	leagueId: string | null;
-}
-
 class RailLeague {
 	/** The signed-in account's league, null signed out or before /me answers. */
 	account = $state<RailAccount | null>(null);
+	/** /me has answered, or there was nothing to ask. Until then a signed-in phone bar holds the slot
+	 * League may take. */
+	answered = $state(false);
 	#asked: Promise<void> | null = null;
 
 	/** Reads /me the first time any page asks in this page load. */
@@ -32,12 +31,15 @@ class RailLeague {
 	async refresh(): Promise<void> {
 		if (!hasSessionCookie()) {
 			this.account = null;
+			this.answered = true;
 			return;
 		}
 		try {
 			this.account = { leagueId: (await client.call<Account>('/me')).league_id };
 		} catch {
 			this.account = null;
+		} finally {
+			this.answered = true;
 		}
 	}
 }

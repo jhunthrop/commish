@@ -92,9 +92,14 @@ export function leagueItem(leagueId: string | null): RailItem {
 	};
 }
 
+/** A signed-in account as the rail reads it: its newest attached league's id, or null with none. */
+export interface RailAccount {
+	leagueId: string | null;
+}
+
 /** The rail with League in its place for a signed-in account, null signed out. The phone's bar holds
  * five, so League takes Our record's place there; Our record stays on the desk's rail. */
-export function railItems(account: { leagueId: string | null } | null): readonly RailItem[] {
+export function railItems(account: RailAccount | null): readonly RailItem[] {
 	if (account === null) return RAIL;
 	const { leagueId } = account;
 	const at = RAIL.findIndex((item) => item.section === 'sheet') + 1;
