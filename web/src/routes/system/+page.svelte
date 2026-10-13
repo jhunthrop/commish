@@ -7,7 +7,7 @@
 		oddsWords,
 		pickLabel
 	} from '#lib/format/draft.ts';
-	import { fixed, signed } from '#lib/format/number.ts';
+	import { fixed, plural, signed } from '#lib/format/number.ts';
 	import CallPanel from '#lib/ui/CallPanel.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -42,6 +42,7 @@
 	import Part from '#lib/ui/system/Part.svelte';
 	import Parts from '#lib/ui/system/Parts.svelte';
 	import Specimen from '#lib/ui/system/Specimen.svelte';
+	import NightlyParts from '#lib/ui/system/NightlyParts.svelte';
 	import Swatch from '#lib/ui/system/Swatch.svelte';
 	import type { PageProps } from './$types';
 
@@ -164,7 +165,8 @@
 				/>
 				<Part name="The name and the count" about="How many players share the tier.">
 					{#snippet show()}<b>Tier {data.wrTier.tier}</b>
-						<Label>{data.wrTier.count} {data.wrTier.group}</Label>{/snippet}
+						<Label>{plural(data.wrTier.count, data.wrTier.group.one, data.wrTier.group.many)}</Label
+						>{/snippet}
 				</Part>
 				<Part
 					name="The drop label"
@@ -183,7 +185,13 @@
 			sub="Chris Olave on a cheat sheet in the WR view: your rank, your tier strip with its handle, your tags and your note."
 		>
 			<Specimen minWidth={ROW_MIN_WIDTH}>
-				<SheetTier tier={2} count={6} group="WRs" startId="system-tier" movable />
+				<SheetTier
+					tier={2}
+					count={6}
+					group={{ one: 'WR', many: 'WRs' }}
+					startId="system-tier"
+					movable
+				/>
 				<SheetRow
 					id={row.id}
 					name={row.name}
@@ -324,6 +332,8 @@
 				<Keys bindings={data.roomKeys} />
 			</Parts>
 		</DocSection>
+
+		<NightlyParts nightly={data.nightly} run={data.run} />
 
 		<DocSection title="Rail icons" sub="A 24 grid, a 1.8 stroke, in the color of the text.">
 			<Parts>

@@ -4,12 +4,16 @@
 	interface Props {
 		/** Tier within the player's position, 1 is the top. */
 		tier: number;
+		/** "Tier 3" where there is room, a player's hero. "T3" in a row. */
+		long?: boolean;
 	}
 
-	let { tier }: Props = $props();
+	let { tier, long = false }: Props = $props();
 </script>
 
-<span class="tier-chip" style:--tier={tierColor(tier)}>T{tier}</span>
+<span class="tier-chip" class:long style:--tier={tierColor(tier)}
+	>{long ? `Tier ${String(tier)}` : `T${String(tier)}`}</span
+>
 
 <style>
 	.tier-chip {
@@ -23,5 +27,10 @@
 		font-size: var(--t-xs);
 		font-weight: 700;
 		letter-spacing: 0.04em;
+	}
+
+	.long {
+		height: 24px;
+		font-size: var(--t-sm);
 	}
 </style>

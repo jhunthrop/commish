@@ -1,0 +1,97 @@
+# The prep site: check, lint, build every nightly page from a run, hold the Lighthouse budgets, and
+# deploy to the workers.dev preview. Runs on a push to main that touches web/, and when the nightly
+# job dispatches nightly-run with the id of a run that passed its gates
+# (client_payload.runId). A push builds the run runs/latest.json names.
+# The custom domain route is added at cutover (spec §10), not here.
+name: web
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/web.yml']
+  repository_dispatch:
+    types: [nightly-run]
+  workflow_dispatch:
+    inputs:
+      runId:
+        description: 'Run id to build, or latest'
+        required: false
+        default: latest
+
+# One deploy at a time. A newer run waits for the one in flight rather than racing it.
+concurrency:
+  group: web-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+# The Cloudflare token is set on the two steps that use it (the run inputs and the deploy), never on
+# the job, so no install script, check or browser ever sees it.
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+  PUBLIC_RUN_ID: ${{ github.event.client_payload.runId || inputs.runId || 'latest' }}
+  # The full set of nightly pages builds in under four minutes (spec §2.1).
+  BUILD_BUDGET_SECONDS: 240
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  build-measure-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: The run inputs
+        # Appends R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (masked) and PUBLIC_RUN_BASE_URL to the job's env.
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/r2-env.ts
+
+      - name: svelte-check
+        run: npm run check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build every nightly page, timed
+        run: |
+          start=$(date +%s)
+          npm run build
+          seconds=$(( $(date +%s) - start ))
+          pages=$(find .svelte-kit/cloudflare -name '*.html' | wc -l | tr -d ' ')
+          echo "Built ${pages} pages from run ${PUBLIC_RUN_ID} in ${seconds} s (budget ${BUILD_BUDGET_SECONDS} s)." | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$seconds" -gt "$BUILD_BUDGET_SECONDS" ]; then
+            echo "::error::The build took ${seconds} s, over the ${BUILD_BUDGET_SECONDS} s budget."
+            exit 1
+          fi
+
+      - name: Lighthouse budgets on the board, the run's top-ranked player and the record
+        # Real (devtools) throttling at the mobile profile, seven runs, asserted on the median, from
+        # a static server of the build. A failed budget stops the deploy.
+        run: npm run lighthouse
+
+      - name: Keep the Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-${{ github.run_id }}
+          path: web/.lighthouseci
+          if-no-files-found: ignore
+
+      - name: Deploy to the workers.dev preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler deploy

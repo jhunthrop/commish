@@ -64,11 +64,37 @@ export default defineConfig(
 		rules: { '@typescript-eslint/no-confusing-void-expression': 'off' }
 	},
 	{
+		// Pages and site components link only through src/lib/site/links.ts, which builds every
+		// href and navigation target with resolve(). The rule cannot see through that module.
+		files: ['src/routes/(run)/**/*.svelte', 'src/lib/site/**/*.svelte'],
+		rules: {
+			'svelte/no-navigation-without-resolve': [
+				'error',
+				{ ignoreLinks: true, ignoreGoto: true, ignorePushState: true, ignoreReplaceState: true }
+			]
+		}
+	},
+	{
 		// Primitives render hrefs their callers hand them. A route resolves its own links with
 		// resolve() from $app/paths, so the check belongs at the call site, not in the primitive.
 		files: ['src/lib/ui/**/*.svelte'],
 		rules: {
 			'svelte/no-navigation-without-resolve': ['error', { ignoreLinks: true }]
+		}
+	},
+	{
+		// Lighthouse CI loads its config with require(), so the one CommonJS file is plain JavaScript,
+		// linted without type information.
+		files: ['**/*.cjs'],
+		languageOptions: {
+			sourceType: 'commonjs',
+			parserOptions: { projectService: false, program: null }
+		},
+		rules: {
+			...ts.configs.disableTypeChecked.rules,
+			'@typescript-eslint/no-require-imports': 'off',
+			// The Svelte plugin's copy of this core rule has no scope for a CommonJS file.
+			'svelte/no-inner-declarations': 'off'
 		}
 	}
 );

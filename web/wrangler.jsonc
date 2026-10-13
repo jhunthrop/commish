@@ -1,6 +1,8 @@
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
-	"name": "web",
+	// The prep site. Prerendered pages and assets are Workers static assets, served with no Worker in
+	// the path. The Worker answers what is left: the headshot image route and SvelteKit's 404.
+	"name": "commish-web",
 	"compatibility_date": "2026-10-12",
 	"compatibility_flags": ["nodejs_als"],
 	"main": ".svelte-kit/cloudflare/_worker.js",
@@ -8,6 +10,11 @@
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
 	},
+	// The workers.dev preview is the deploy target until cutover. The custom domain route on
+	// trycommish.app is added at cutover (spec §10), not here.
 	"workers_dev": true,
-	"preview_urls": true
+	"preview_urls": true,
+	"observability": {
+		"enabled": true
+	}
 }

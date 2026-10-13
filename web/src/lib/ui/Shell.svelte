@@ -1,12 +1,15 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
+	import Stamp from './Stamp.svelte';
 	import ThemeSwitch from './ThemeSwitch.svelte';
 	import { HOME_HREF, RAIL, RAIL_FOOT, type RailItem, type Section } from './nav.ts';
 
 	interface Props {
 		/** The page's name in the top bar. Hidden on the phone, where the rail names the section. */
 		title: string;
+		/** What the page's numbers are as of, beside the title: the nightly run's date. Kept on the phone. */
+		stamp?: string;
 		/** The rail item for this page, or null for a page outside the sections. */
 		active: Section | null;
 		/** The top bar's search, usually a Search. */
@@ -16,7 +19,7 @@
 		children: Snippet;
 	}
 
-	let { title, active, search, tail, children }: Props = $props();
+	let { title, stamp, active, search, tail, children }: Props = $props();
 </script>
 
 {#snippet railLink(item: RailItem)}
@@ -43,6 +46,7 @@
 	<div class="main">
 		<header class="top">
 			<h1>{title}</h1>
+			{#if stamp}<span class="stamp"><Stamp text={stamp} /></span>{/if}
 			{#if search}
 				<div class="find">{@render search()}</div>
 			{/if}
@@ -146,6 +150,10 @@
 		white-space: nowrap;
 	}
 
+	.stamp {
+		margin-left: calc(-1 * var(--s-2));
+	}
+
 	.find {
 		flex: 1;
 		max-width: 620px;
@@ -206,6 +214,10 @@
 
 		h1 {
 			display: none;
+		}
+
+		.stamp {
+			margin-left: 0;
 		}
 
 		.find {

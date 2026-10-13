@@ -5,30 +5,50 @@
 	interface Props {
 		/** Pressed fills with ink, never orange, so orange keeps meaning the verb, the brand and you. */
 		pressed?: boolean;
+		/** A chip that goes to another page, a view of the same thing: the PPR board, the WR board.
+		 * It draws the same, and pressed marks the page you are on. */
+		href?: string;
 		/** A compact chip for a side panel's tag row. */
 		size?: 'md' | 'sm';
 		onclick?: (event: MouseEvent) => void;
 		children: Snippet;
 	}
 
-	let { pressed = false, size = 'md', onclick, children }: Props = $props();
+	let { pressed = false, href, size = 'md', onclick, children }: Props = $props();
 
 	const grouped = inChipGroup();
 </script>
 
-<button
-	type="button"
-	class="chip"
-	class:grouped
-	class:sm={size === 'sm'}
-	aria-pressed={pressed}
-	{onclick}
->
-	{@render children()}
-</button>
+{#if href}
+	<a
+		class="chip"
+		class:grouped
+		class:sm={size === 'sm'}
+		class:on={pressed}
+		{href}
+		aria-current={pressed ? 'page' : undefined}
+		{onclick}
+	>
+		{@render children()}
+	</a>
+{:else}
+	<button
+		type="button"
+		class="chip"
+		class:grouped
+		class:sm={size === 'sm'}
+		class:on={pressed}
+		aria-pressed={pressed}
+		{onclick}
+	>
+		{@render children()}
+	</button>
+{/if}
 
 <style>
 	.chip {
+		display: inline-flex;
+		align-items: center;
 		height: 32px;
 		padding: 0 var(--s-3);
 		border-radius: var(--r-pill);
@@ -39,6 +59,7 @@
 		color: var(--ink-2);
 		cursor: pointer;
 		white-space: nowrap;
+		text-decoration: none;
 	}
 
 	.chip:hover {
@@ -54,9 +75,13 @@
 		border-color: transparent;
 	}
 
-	.chip[aria-pressed='true'] {
+	.on {
 		background: var(--ink);
 		border-color: var(--ink);
+		color: var(--bg);
+	}
+
+	.on:hover {
 		color: var(--bg);
 	}
 </style>

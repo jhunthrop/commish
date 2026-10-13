@@ -5,7 +5,7 @@
 	import type { Position } from '#lib/types/player.ts';
 	import { attachDrag, type RowDrop, type StripDrop } from './drag.ts';
 	import type { Ranks, SheetRow as Row } from './model.ts';
-	import { POSITION_GROUP } from './positions.ts';
+	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import RowEditor from './RowEditor.svelte';
 	import type { SheetStore } from './store.svelte.ts';
 	import { tagLabel } from './tags.ts';
@@ -151,7 +151,7 @@
 			<SheetTier
 				tier={run.tier}
 				count={run.count}
-				group={POSITION_GROUP[position]}
+				group={POSITION_NAMES[position]}
 				startId={row.id}
 				movable={movable && run.tier > 1}
 				lifted={liftedTier === run.tier}

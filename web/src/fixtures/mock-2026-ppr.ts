@@ -647,7 +647,7 @@ export const VALUE_PLAYERS: readonly BoardPlayer[] = [
 export const WR_TIER = {
 	tier: 3,
 	count: 9,
-	group: 'WRs',
+	group: { one: 'WR', many: 'WRs' },
 	cliff: { drop: 16.819999999999993, nextTier: 4 } satisfies TierCliff
 };
 

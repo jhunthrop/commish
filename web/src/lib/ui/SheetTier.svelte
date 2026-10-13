@@ -1,12 +1,13 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import TierStrip from './TierStrip.svelte';
+	import type { GroupName } from './tier.ts';
 
 	interface Props {
 		tier: number;
 		count: number;
-		/** The plural the count reads with: "WRs". */
-		group: string;
+		/** What the count counts, one and many: { one: 'WR', many: 'WRs' }. */
+		group: GroupName;
 		/** The id of the row the tier starts at. The drag controller moves the strip by it. */
 		startId: string;
 		/** The first tier stays at the top. Every other one moves and can join the one above. */
