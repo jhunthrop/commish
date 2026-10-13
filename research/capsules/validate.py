@@ -25,7 +25,7 @@ from research.capsules.grounding import (
     proper_name_phrases,
     round_half_up,
 )
-from research.capsules.pull_figures import facts_page_numbers, pull_figures_of
+from research.capsules.pull_figures import facts_page_numbers, pull_figures_of, renderings_of
 from research.capsules.render import render_facts_for_model
 from research.capsules.voice_rules import (
     BANNED_VOCABULARY,
@@ -49,14 +49,23 @@ NARRATIVE_MIN_WORDS: Final = 3
 UNFRAMED_FLOOR_VIOLATION: Final = (
     'The text says "floor" beside a number without saying that the number comes from seasons shortened by injury.'
 )
+# The read must print one of the page's numbers exactly as the page prints it. The violation names
+# the renderings that count, so the correction can hand them to the writer (phase D: a deep player's
+# projection under ten points counts only to the tenth, which reads that wrote "about 6 points" kept
+# missing within the six calls).
 NO_PAGE_NUMBER_VIOLATION: Final = (
-    "The long note never prints one of the page's own numbers: his projected points, its range, or his ADP."
+    "The long note never prints one of the page's own numbers exactly as the page prints them"
 )
+
+
+def no_page_number_violation(numbers: tuple[tuple[str, float], ...]) -> str:
+    choices = "; ".join(f"{' or '.join(renderings_of(value))} ({label})" for label, value in numbers)
+    return f"{NO_PAGE_NUMBER_VIOLATION}: {choices}."
+
+
 SOFT_CORRECTIONS: Final = {
     UNFRAMED_FLOOR_VIOLATION: 'One sentence uses "floor" beside a number. Rewrite that sentence, in your own words, so a '
     'reader knows the number comes from seasons shortened by injury, or take the word "floor" out of it.',
-    NO_PAGE_NUMBER_VIOLATION: "Work our projected points for him, or his ADP, into one sentence as the sheet prints it "
-    "(the whole number is fine), in your own words, and leave everything else as it is.",
 }
 _AVAILABILITY: Final = re.compile(
     r"injur|health|hurt|miss(?:es|ed|ing)?\s+(?:time|games?|weeks?|snaps?)|games?\s+(?:he\s+)?miss|availab|durab|absen|"
@@ -227,6 +236,12 @@ def soft_correction_for(violation: str) -> str | None:
     """The correction a soft violation is handed back with, or None for one that costs a rewrite."""
     if violation in SOFT_CORRECTIONS:
         return SOFT_CORRECTIONS[violation]
+    if violation.startswith(NO_PAGE_NUMBER_VIOLATION):
+        choices = violation.removeprefix(NO_PAGE_NUMBER_VIOLATION).removeprefix(": ").removesuffix(".")
+        return (
+            "Work one of these numbers into one sentence, printed exactly as written here, in your own words: "
+            f"{choices}. Leave everything else as it is."
+        )
     banned = _BANNED_TERM_VIOLATION.match(violation)
     if banned is not None and banned.group(1) in TRADING_REPLACEMENTS:
         return (
@@ -297,7 +312,7 @@ def _validate(
             f"Mixed evidence: the strongest downside ({figure} pts/game) is never cited. It has to appear, with that number, before the call."
         )
     if page_number and not pull_figures_of(trimmed, source.page_numbers, 1):
-        violations.append(NO_PAGE_NUMBER_VIOLATION)
+        violations.append(no_page_number_violation(source.page_numbers))
     return ValidationResult(not violations, tuple(violations))
 
 

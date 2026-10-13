@@ -72,7 +72,8 @@ def facts_page_numbers(facts: "PlayerFacts") -> tuple[PageNumber, ...]:
     return page_numbers(PageValues(p.projected_points, p.ceiling_points, p.floor_points, p.median_points))
 
 
-def _renderings(value: float) -> list[str]:
+def renderings_of(value: float) -> list[str]:
+    """How a page number may be printed: to the tenth, and from ten up to the whole point."""
     tenth = js_to_fixed(value, 1)
     return [tenth, js_string(js_round(value))] if abs(value) >= _WHOLE_NUMBER_FLOOR else [tenth]
 
@@ -88,7 +89,7 @@ def pull_figures_of(
     sentences = [s.strip() for s in _SENTENCES.split(prose) if s.strip()]
     figures: list[PullFigure] = []
     for label, value in numbers:
-        for text in _renderings(value):
+        for text in renderings_of(value):
             if any(figure.text == text for figure in figures):
                 continue
             sentence = next((s for s in sentences if _prints(s, text)), None)
