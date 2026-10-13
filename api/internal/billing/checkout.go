@@ -12,7 +12,6 @@ import (
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/httpx"
-	"github.com/jhunthrop/commish/api/internal/season"
 )
 
 // errRefused carries a 409's message out of the checkout lock.
@@ -33,9 +32,8 @@ type checkoutPlan struct {
 
 // plan validates the request into a checkoutPlan, or the fields at
 // fault.
-func (s *Service) plan(a auth.Account, in apitypes.CheckoutRequest) (checkoutPlan, map[string]string) {
+func (s *Service) plan(a auth.Account, in apitypes.CheckoutRequest, yr int) (checkoutPlan, map[string]string) {
 	meta := map[string]string{metaAccountID: a.ID.String(), metaProduct: string(in.Product)}
-	yr := season.OnSale(s.Now())
 	switch in.Product {
 	case apitypes.ProductDraftPass:
 		meta[metaSeason] = strconv.Itoa(yr)
@@ -84,7 +82,7 @@ func (s *Service) refuseDuplicate(ctx context.Context, a auth.Account, product a
 		return errRefused{"Your Membership already includes this"}
 	}
 	if product == apitypes.ProductDraftPass {
-		has, err := s.Entitlements.HasLivePass(ctx, a.ID, season.OnSale(now), now)
+		has, err := s.Entitlements.HasLivePass(ctx, a.ID, s.Sale.Season(ctx, now), now)
 		if err != nil {
 			return err
 		}
@@ -117,7 +115,7 @@ func (s *Service) checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a, _ := auth.AccountFrom(r.Context())
-	p, errs := s.plan(a, in)
+	p, errs := s.plan(a, in, s.Sale.Season(r.Context(), s.Now()))
 	if errs != nil {
 		httpx.WriteInvalid(w, r, errs)
 		return

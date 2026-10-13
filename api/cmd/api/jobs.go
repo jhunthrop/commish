@@ -18,6 +18,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/billing"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/db"
+	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/exports"
 	"github.com/jhunthrop/commish/api/internal/mail"
@@ -163,7 +164,7 @@ func runStripeSetup(ctx context.Context, log *slog.Logger, cfg config.API, _ *pg
 }
 
 // runGrant: grant <account-id> draft_pass [season] | grant <account-id> membership <days>.
-func runGrant(ctx context.Context, log *slog.Logger, _ config.API, pool *pgxpool.Pool, args []string) error {
+func runGrant(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpool.Pool, args []string) error {
 	if len(args) < 2 {
 		return errors.New("usage: api grant <account-id> draft_pass [season] | membership <days>")
 	}
@@ -175,7 +176,13 @@ func runGrant(ctx context.Context, log *slog.Logger, _ config.API, pool *pgxpool
 	actor := "grant:" + os.Getenv("USER")
 	switch entitlements.Product(args[1]) {
 	case entitlements.ProductDraftPass:
-		yr := season.Of(time.Now())
+		// The one sale-season rule, read from the schedule as checkout does.
+		draftBoards, closeBoards, openErr := draftroom.OpenBoards(pool, cfg.Board, time.Now)
+		if openErr != nil {
+			return openErr
+		}
+		defer closeBoards()
+		yr := (&season.Sale{Schedule: draftBoards.Schedule, Log: log}).Season(ctx, time.Now())
 		if len(args) > 2 {
 			if yr, err = strconv.Atoi(args[2]); err != nil {
 				return fmt.Errorf("season: %w", err)
