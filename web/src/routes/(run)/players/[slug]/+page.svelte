@@ -53,7 +53,6 @@
 			? `Below replacement, among the ${String(page.boardSize)} on our board`
 			: `Round ${String(n.vorRound)} value among the ${String(page.boardSize)} on our board`
 	);
-	const thisSeason = $derived(page.season);
 	const mates = $derived(
 		page.tier.mates.map((mate) => ({ ...mate, href: links.player(mate.slug) }))
 	);
@@ -129,18 +128,19 @@
 		</section>
 
 		<section class="season" aria-label="This season">
-			<PanelHead title="This season" aside="{thisSeason.season}, {thisSeason.scoring}" level={2} />
-			{#if thisSeason.line}
-				<GameLog
-					caption="{page.name} week by week, {thisSeason.season}"
-					heads={thisSeason.heads}
-					line={thisSeason.line}
-					rows={thisSeason.rows}
-				/>
-			{:else}
-				<p class="none">{thisSeason.none}</p>
-			{/if}
-			<Footnote>{thisSeason.basis}</Footnote>
+			<PanelHead
+				title="This season"
+				aside="{page.season.season}, {page.season.scoring}"
+				level={2}
+			/>
+			<GameLog
+				caption="{page.name} week by week, {page.season.season}"
+				heads={page.season.heads}
+				line={page.season.line}
+				rows={page.season.rows}
+				none={page.season.none}
+			/>
+			<Footnote>{page.season.basis}</Footnote>
 		</section>
 
 		<div class="split">
@@ -211,12 +211,6 @@
 		flex-direction: column;
 		gap: var(--s-3);
 		min-width: 0;
-	}
-
-	.none {
-		margin: 0;
-		font-size: var(--t-md);
-		color: var(--ink-2);
 	}
 
 	.bar {

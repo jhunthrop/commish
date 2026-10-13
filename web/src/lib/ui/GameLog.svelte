@@ -3,59 +3,118 @@
 
 	/** A player's season week by week: the season line first, each number captioned with its full
 	 * words, then every week of the regular season with its opponent and his line. The week and the
-	 * opponent stay put while the stat columns scroll sideways in their own frame on a phone. */
+	 * opponent stay put while the stat columns scroll sideways in their own frame on a phone, and a
+	 * fade at the frame's end says there is more until the last column is in view. A player with no
+	 * line yet gets one sentence instead of a table. */
 	interface Props {
 		/** Names the log for assistive tech. */
 		caption: string;
 		heads: readonly LogHead[];
-		line: SeasonLine;
+		/** Null when he has no game yet. */
+		line: SeasonLine | null;
 		rows: readonly LogRow[];
+		/** The sentence printed in the table's place when there is no line. */
+		none: string;
 	}
 
-	let { caption, heads, line, rows }: Props = $props();
+	let { caption, heads, line, rows, none }: Props = $props();
 </script>
 
-<!-- The frame scrolls, so it takes focus: a keyboard reaches the last column with the arrow keys. -->
-<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="frame" role="region" aria-label={caption} tabindex="0">
-	<table>
-		<caption>{caption}</caption>
-		<thead>
-			<tr>
-				<th scope="col" class="pin wk">Wk</th>
-				<th scope="col" class="pin opp">Opp</th>
-				{#each heads as head, i (i)}
-					<th scope="col"
-						><span aria-hidden="true">{head.short}</span><span class="sr">{head.full}</span></th
-					>
-				{/each}
-			</tr>
-		</thead>
-		<tbody>
-			<tr class="season">
-				<th scope="row" colspan="2" class="pin lead"><b>{line.lead}</b><span>{line.sub}</span></th>
-				{#each line.cells as cell, i (i)}
-					<td><b>{cell.value}</b><span>{cell.caption}</span></td>
-				{/each}
-			</tr>
-			{#each rows as row (row.week)}
-				<tr class={row.tone}>
-					<th scope="row" class="pin wk">{row.week}</th>
-					<td class="pin opp">{row.opponent}</td>
-					{#if row.cells}
-						{#each row.cells as cell, i (i)}
-							<td class="n">{cell}</td>
+{#if line}
+	<div class="log">
+		<!-- The frame scrolls, so it takes focus: a keyboard reaches the last column with the arrow keys. -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<div class="frame" role="region" aria-label={caption} tabindex="0">
+			<table>
+				<caption>{caption}</caption>
+				<thead>
+					<tr>
+						<th scope="col" class="pin wk">Wk</th>
+						<th scope="col" class="pin opp">Opp</th>
+						{#each heads as head, i (i)}
+							<th scope="col"
+								><span aria-hidden="true">{head.short}</span><span class="sr">{head.full}</span></th
+							>
 						{/each}
-					{:else}
-						<td class="note" colspan={heads.length}>{row.note}</td>
-					{/if}
-				</tr>
-			{/each}
-		</tbody>
-	</table>
-</div>
+					</tr>
+				</thead>
+				<tbody>
+					<tr class="season">
+						<th scope="row" colspan="2" class="pin lead"
+							><b>{line.lead}</b><span>{line.sub}</span></th
+						>
+						{#each line.cells as cell, i (i)}
+							<td><b>{cell.value}</b><span>{cell.caption}</span></td>
+						{/each}
+					</tr>
+					{#each rows as row (row.week)}
+						<tr class={row.tone}>
+							<th scope="row" class="pin wk">{row.week}</th>
+							<td class="pin opp">{row.opponent}</td>
+							{#if row.cells}
+								{#each row.cells as cell, i (i)}
+									<td class="n">{cell}</td>
+								{/each}
+							{:else}
+								<td class="note" colspan={heads.length}>{row.note}</td>
+							{/if}
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	</div>
+{:else}
+	<p class="none">{none}</p>
+{/if}
 
 <style>
+	.none {
+		margin: 0;
+		font-size: var(--t-md);
+		color: var(--ink-2);
+	}
+
+	/* The end fade rides the frame's own scroll: shown while more columns wait to the right, gone at
+	 * the last one, and never drawn when the table fits or the browser has no scroll timelines. */
+	.log {
+		position: relative;
+		timeline-scope: --log-scroll;
+	}
+
+	.log::after {
+		content: '';
+		position: absolute;
+		inset: 1px 1px 1px auto;
+		width: var(--s-6);
+		border-radius: 0 var(--r-md) var(--r-md) 0;
+		background: linear-gradient(to right, transparent, var(--bg));
+		pointer-events: none;
+		opacity: 0;
+	}
+
+	@supports (animation-timeline: scroll()) {
+		.frame {
+			scroll-timeline: --log-scroll inline;
+		}
+
+		.log::after {
+			animation: log-more linear both;
+			animation-timeline: --log-scroll;
+		}
+	}
+
+	@keyframes log-more {
+		0%,
+		90% {
+			opacity: 1;
+		}
+
+		100% {
+			opacity: 0;
+		}
+	}
+
 	/* The pinned columns' widths, which the opponent's offset is built from. */
 	.frame {
 		--wk-w: 52px;
