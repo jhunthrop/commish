@@ -107,12 +107,6 @@
 	/** The pick the drafter just drafted at, until the room moves past it. */
 	let draftedAt = $state<number | null>(null);
 	const inFlight = $derived(busy && draftedAt === room.pick_number);
-	/** Nobody picks between this turn and the one before it, or, with a pick in flight, between it and
-	 * the next: the strip's place is one line, not a block. The reserve changes as Enter is pressed, so
-	 * the next turn's arrival moves nothing. */
-	const straight = $derived(
-		inFlight ? next === room.pick_number + 1 : prev !== null && prev === room.pick_number - 1
-	);
 	/** No call is coming for this turn: the room never waits on it, Enter drafts from the pool. */
 	const noCall = $derived(
 		callMissing && !readonly && room.status === 'active' && room.waiting && !call && !inFlight
@@ -167,6 +161,18 @@
 		)
 	);
 	const lastMine = $derived(mine.at(-1)?.pick ?? null);
+	/** Nobody picks between your latest pick (the one in flight counts as soon as Enter is pressed) and
+	 * your next turn: the strip's place is one line, not a block. It is decided from the draft order
+	 * at Enter, so the next turn's arrival moves nothing. */
+	const straight = $derived.by(() => {
+		const own = Math.max(lastMine ?? 0, draftedAt ?? 0);
+		if (own === 0) return false;
+		const upcoming =
+			room.waiting && room.pick_number > own
+				? room.pick_number
+				: turnAfter(own, room.slot, teams, total);
+		return upcoming === own + 1;
+	});
 	const went = $derived(wentSince(room.picks, prev ?? 0, queueAll, board));
 
 	function draft(id: string | null): void {
@@ -250,7 +256,7 @@
 		     pushes the call down: a strip's height, or one line when the next turn comes straight
 		     back. -->
 		<div class="since" class:straight>
-			{#if room.waiting}
+			{#if room.waiting && !inFlight}
 				<SinceStrip since={prev} {went} {teams} {whose} />
 			{/if}
 		</div>
