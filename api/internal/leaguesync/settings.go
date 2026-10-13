@@ -13,10 +13,14 @@ import (
 )
 
 // SettingsFor is the saved league a mock reruns from: the league's
-// roster as the rooms draft it, its scoring through the custom-scoring
-// path exactly as the host states it, and no draft slot (the league's
-// next draft order is not known). When a mock room cannot draft this
-// league, the sentence says why and the league still syncs.
+// roster as the rooms draft it, its scoring as custom scoring in
+// ScoringRules' 21 keys (rules.go: what the host states that the keys do
+// not carry is named in Scoring.Dropped, a key the host does not state
+// takes the standard figure and is named in Scoring.Defaulted), and no
+// draft slot (the league's next draft order is not known). An account
+// without custom scoring reruns it on the nearest preset (the mock
+// setup's rerunOf). When a mock room cannot draft this league, the
+// sentence says why and the league still syncs.
 func SettingsFor(snap Snapshot) (apitypes.LeagueSettings, string) {
 	sh := snap.Shape
 	if len(sh.Unfollowed) > 0 {
