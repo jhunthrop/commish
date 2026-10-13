@@ -472,11 +472,27 @@ func LoadRoom(get Getenv) (Room, error) {
 	c.Database = l.database()
 	c.Session = l.session(c.Env)
 	c.Board = l.board()
-	c.ListenURL = l.optional("ROOM_LISTEN_DATABASE_URL", c.Database.URL)
+	c.ListenURL = l.optional("ROOM_LISTEN_DATABASE_URL", DirectURL(c.Database.URL))
 	l.postgresURL("ROOM_LISTEN_DATABASE_URL", c.ListenURL)
-	// K_REVISION is Cloud Run's; the hostname tells instances apart.
+	// Empty names the instance by its host and a random suffix.
 	c.Instance = l.optional("ROOM_INSTANCE", "")
 	return c, l.err()
+}
+
+// neonPoolerSuffix marks Neon's pooled endpoint in a host name: the
+// direct endpoint is the same host without it.
+const neonPoolerSuffix = "-pooler."
+
+// DirectURL is a database URL's direct (unpooled) endpoint: Neon's pooled
+// host with "-pooler" taken out, any other URL as it is. LISTEN needs a
+// session the pooler cannot hold.
+func DirectURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || !strings.Contains(u.Host, neonPoolerSuffix) {
+		return raw
+	}
+	u.Host = strings.Replace(u.Host, neonPoolerSuffix, ".", 1)
+	return u.String()
 }
 
 // LoadMigrate reads cmd/migrate's configuration: only the database.

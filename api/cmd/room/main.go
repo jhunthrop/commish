@@ -81,8 +81,8 @@ func run(ctx context.Context, log *slog.Logger) error {
 		return err
 	}
 	defer closeBoards()
-	store := &lobby.Store{Pool: pool, Now: time.Now}
 	hub := &rooms.Hub{URL: cfg.ListenURL, Log: log}
+	store := &lobby.Store{Pool: pool, Now: time.Now, OnWrite: hub.Signal}
 	owners := &rooms.Owners{
 		Pool: pool, Store: store, Hub: hub, Instance: instanceName(cfg.Instance), Now: time.Now, Log: log,
 		Clock: &lobby.Clock{Store: store, Boards: draftBoards, Sheets: &sheets.Store{Pool: pool}},

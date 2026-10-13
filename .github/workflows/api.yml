@@ -25,16 +25,18 @@ env:
   RUNTIME_SA: api-runtime@trycommish.iam.gserviceaccount.com
   # The plain settings every api process gets (internal/config).
   API_ENV_VARS: >-
-    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '1' }},STRIPE_ENVIRONMENT=${{ vars.STRIPE_ENVIRONMENT || 'test' }},STRIPE_AUTOMATIC_TAX=${{ vars.STRIPE_AUTOMATIC_TAX || 'false' }},R2_ACCOUNT_ID=${{ vars.CLOUDFLARE_ACCOUNT_ID }},R2_EXPORTS_BUCKET=commish-exports
+    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '1' }},STRIPE_ENVIRONMENT=${{ vars.STRIPE_ENVIRONMENT || 'test' }},STRIPE_AUTOMATIC_TAX=${{ vars.STRIPE_AUTOMATIC_TAX || 'false' }},R2_ACCOUNT_ID=${{ vars.CLOUDFLARE_ACCOUNT_ID }},R2_EXPORTS_BUCKET=commish-exports,ROOM_BASE_URL=wss://room.trycommish.app,ADVISOR_URL=${{ vars.ADVISOR_URL }},BOARD_SCHEMA=${{ vars.BOARD_SCHEMA || 'research' }}
   # Secret Manager references, NAME=secret:version.
   API_SECRETS: >-
     DATABASE_URL=DATABASE_URL:latest,WORKOS_CLIENT_ID=WORKOS_CLIENT_ID:latest,WORKOS_API_KEY=WORKOS_API_KEY:latest,WORKOS_COOKIE_PASSWORD=WORKOS_COOKIE_PASSWORD:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,R2_ACCESS_KEY_ID=R2_ACCESS_KEY_ID:latest,R2_SECRET_ACCESS_KEY=R2_SECRET_ACCESS_KEY:latest
   # The jobs add the mail key the renewal reminder sends with.
   JOB_SECRETS: >-
     RESEND_API_KEY=RESEND_API_KEY:latest
-  # The room reads only the database and the session cookie.
+  # The room reads the database, the session cookie and the board (the
+  # research tables, BOARD_SCHEMA). Its LISTEN connection is the direct
+  # endpoint derived from DATABASE_URL (config.DirectURL).
   ROOM_ENV_VARS: >-
-    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '1' }}
+    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '1' }},BOARD_SCHEMA=${{ vars.BOARD_SCHEMA || 'research' }}
   ROOM_SECRETS: >-
     DATABASE_URL=DATABASE_URL:latest,WORKOS_COOKIE_PASSWORD=WORKOS_COOKIE_PASSWORD:latest
 
@@ -145,7 +147,7 @@ jobs:
           flags: >-
             --service-account=${{ env.RUNTIME_SA }} --no-invoker-iam-check --cpu=2 --memory=1Gi
             --min-instances=0 --max-instances=20 --concurrency=80
-            --cpu=1 --memory=512Mi --cpu-boost --timeout=60
+            --cpu-boost --timeout=60
 
         # The room holds lobby clocks between requests, so its CPU is
         # never throttled, and a WebSocket stays on one instance by
@@ -163,7 +165,7 @@ jobs:
           flags: >-
             --command=/room --service-account=${{ env.RUNTIME_SA }} --no-invoker-iam-check --cpu=2 --memory=1Gi
             --min-instances=${{ vars.ROOM_MIN_INSTANCES || '0' }} --max-instances=10 --concurrency=500
-            --cpu=1 --memory=512Mi --no-cpu-throttling --session-affinity --timeout=3600
+            --no-cpu-throttling --session-affinity --timeout=3600
 
         # Every job is this image run with the job's name as its argument,
         # so each moves with the service. Their schedules are Cloud

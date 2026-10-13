@@ -39,6 +39,10 @@ const maxCachedRooms = 512
 type Store struct {
 	Pool *pgxpool.Pool
 	Now  func() time.Time
+	// OnWrite, when set, hears of every committed write in this process at
+	// once, ahead of its notification: the room service wakes its own
+	// sockets and clock with it.
+	OnWrite func(id uuid.UUID)
 
 	mu    sync.Mutex
 	rooms map[uuid.UUID]*Room
@@ -193,6 +197,7 @@ type writer struct {
 // logged, with a notification for every socket and clock on the room.
 func (s *Store) Write(ctx context.Context, id uuid.UUID, fn func(w *writer) error) (*Room, error) {
 	var out *Room
+	wrote := false
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		r, err := s.read(ctx, tx, id, true)
 		if err != nil {
@@ -207,7 +212,7 @@ func (s *Store) Write(ctx context.Context, id uuid.UUID, fn func(w *writer) erro
 				return fmt.Errorf("lobby: notify %s: %w", id, err)
 			}
 		}
-		out = w.room
+		out, wrote = w.room, w.n > 0
 		return nil
 	})
 	if errors.Is(err, errNoChange) {
@@ -217,6 +222,9 @@ func (s *Store) Write(ctx context.Context, id uuid.UUID, fn func(w *writer) erro
 		return nil, err
 	}
 	s.keep(out)
+	if wrote && s.OnWrite != nil {
+		s.OnWrite(id)
+	}
 	return out, nil
 }
 

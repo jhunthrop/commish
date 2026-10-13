@@ -218,6 +218,11 @@ func (s *Socket) session(ctx context.Context, conn *websocket.Conn, roomID, acco
 			if err != nil {
 				return err
 			}
+			// A notification lost while the hub was reconnecting is caught
+			// up here, at the latest one ping later.
+			if sent, err = s.catchUp(ctx, conn, roomID, sent); err != nil {
+				return err
+			}
 		}
 	}
 }
@@ -271,9 +276,6 @@ func (s *Socket) command(ctx context.Context, conn *websocket.Conn, roomID, acco
 		err = &draft.Refusal{Reason: "That is not a command the room knows."}
 	}
 	if err == nil {
-		// A write made here reaches this instance's sockets and clock at
-		// once, ahead of its notification.
-		s.Hub.Signal(roomID)
 		return nil
 	}
 	var refusal *draft.Refusal
