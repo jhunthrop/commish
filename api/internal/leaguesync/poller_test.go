@@ -92,7 +92,9 @@ func readAll(t *testing.T, p *Poller, n int) []Read {
 }
 
 // 25 viewers of one league make one upstream read a minute, the host up
-// or down; a refresh reads at once but shares a read inside ten seconds.
+// or down, and past the minute a view answers the last read while the
+// next one goes upstream; a refresh reads at once but shares a read
+// inside ten seconds.
 func TestPollerOneReadPerLeaguePerMinute(t *testing.T) {
 	clock := &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
 	host := &countingHost{}
@@ -112,12 +114,18 @@ func TestPollerOneReadPerLeaguePerMinute(t *testing.T) {
 
 	host.down.Store(true)
 	clock.Advance(time.Minute)
-	reads := readAll(t, p, 25)
+	for _, r := range readAll(t, p, 25) {
+		if r.Name != "League" {
+			t.Fatalf("a view past the minute waited on the host instead of answering the last read")
+		}
+	}
 	if got := host.reads.Load(); got != 3 {
 		t.Fatalf("the host down: %d reads in all, want 3", got)
 	}
-	if reads[0].Stale != time.Minute || reads[0].Name != "League" {
-		t.Fatalf("the host down answered stale %s name %q, want the last read a minute stale", reads[0].Stale, reads[0].Name)
+	// A refresh inside the floor waits for the read in flight and shares it.
+	r, err := p.Refresh(context.Background(), testRef)
+	if err != nil || r.Stale != time.Minute || host.reads.Load() != 3 {
+		t.Fatalf("the host down answered %v stale %s after %d reads, want the last read a minute stale", err, r.Stale, host.reads.Load())
 	}
 
 	host.down.Store(false)
@@ -129,7 +137,7 @@ func TestPollerOneReadPerLeaguePerMinute(t *testing.T) {
 		t.Fatalf("a refresh 5 s after a read went upstream (%d reads)", got)
 	}
 	clock.Advance(6 * time.Second)
-	r, err := p.Refresh(context.Background(), testRef)
+	r, err = p.Refresh(context.Background(), testRef)
 	if err != nil {
 		t.Fatal(err)
 	}
