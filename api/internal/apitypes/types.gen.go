@@ -757,7 +757,7 @@ type CompanionCreate struct {
 	Draft string        `json:"draft"`
 	Host  CompanionHost `json:"host"`
 
-	// Replay development only (COMPANION_REPLAY), replays a recorded completed draft one pick a second
+	// Replay development only (COMPANION_REPLAY), replays the recorded completed draft one pick a second, whatever draft says
 	Replay *bool `json:"replay,omitempty"`
 
 	// Seat exactly one of slot and username

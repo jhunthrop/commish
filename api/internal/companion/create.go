@@ -84,7 +84,11 @@ func (s *Service) checkCreate(in apitypes.CompanionCreate, replay bool) (string,
 		errs[fieldHost] = "The companion follows Sleeper drafts today"
 	}
 	draftID, err := sleeper.ParseDraftLink(in.Draft)
-	if err != nil {
+	switch {
+	case replay:
+		// A replay always follows the recorded draft, whatever was pasted.
+		draftID = ReplayDraftID
+	case err != nil:
 		errs[fieldDraft] = draftLinkWords
 	}
 	hasSlot := in.Seat.Slot != nil
@@ -92,8 +96,8 @@ func (s *Service) checkCreate(in apitypes.CompanionCreate, replay bool) (string,
 	if hasSlot == hasUser {
 		errs[fieldSeat] = seatWords
 	}
-	if replay && (s.Replay == nil || draftID != ReplayDraftID) {
-		errs[fieldReplay] = "A replay is for development, of the recorded draft only"
+	if replay && s.Replay == nil {
+		errs[fieldReplay] = "A replay is for development only"
 	}
 	if len(errs) > 0 {
 		return "", errs

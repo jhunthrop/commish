@@ -14,16 +14,16 @@
 	import Stepper from '#lib/ui/Stepper.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { isSignedOut } from '#lib/api/status.ts';
+	import { MAX_TEAMS } from '#lib/room/setup/setup.ts';
 	import { ApiError, companions, type CompanionCreate } from './api.ts';
 	import { has } from './model.ts';
 
 	/** Start following a draft: paste the Sleeper link, say which seat is yours, one verb. Without the
 	 * live draft feature (answered by Can through /me) the page says where it comes from. */
 
-	/** Slots a Sleeper draft can have; the API checks the draft's own count. */
-	const MAX_SLOT = 14;
-	/** The recorded draft a development replay follows (COMPANION_REPLAY on the API). */
-	const REPLAY_DRAFT = '1382163311050645504';
+	/** The words in the link field for a development replay (COMPANION_REPLAY on the API), which
+	 * always follows the recorded draft. */
+	const REPLAY_WORDS = 'The recorded draft (development replay)';
 
 	type View = 'loading' | 'signed-out' | 'no-pass' | 'form' | 'unreachable';
 
@@ -38,7 +38,7 @@
 
 	onMount(() => {
 		replay = page.url.searchParams.get('replay') === '1';
-		if (replay) link = `https://sleeper.com/draft/nfl/${REPLAY_DRAFT}`;
+		if (replay) link = REPLAY_WORDS;
 		companions
 			.me()
 			.then((me) => (view = has(me.features, 'live_draft_advisor') ? 'form' : 'no-pass'))
@@ -122,7 +122,7 @@
 							label="Slot"
 							value={slot}
 							min={1}
-							max={MAX_SLOT}
+							max={MAX_TEAMS}
 							onchange={(n: number) => (slot = n)}
 						/>
 					{:else}

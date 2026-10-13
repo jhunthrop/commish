@@ -29,27 +29,33 @@ export function roomPicks(picks: readonly CompanionPick[]): RoomPick[] {
 	);
 }
 
-function position(p: string): Position {
+/** The host's position as ours, or null for one we do not draft (a defensive player), which is
+ * never drawn under a wrong pill. */
+function position(p: string): Position | null {
 	if (p === 'DEF') return 'DST';
-	return POSITIONS.find((known) => known === p) ?? 'WR';
+	return POSITIONS.find((known) => known === p) ?? null;
 }
 
-/** The player a host pick names: our board's, or the host's name for one we could not place. */
-export function pickPlayer(p: CompanionPick, board: Board): PlayerRef {
+/** The player a host pick names: our board's, the host's name for one we could not place, or null
+ * for a position we do not draft. */
+export function pickPlayer(p: CompanionPick, board: Board): PlayerRef | null {
 	const ours = p.player_id === null ? undefined : board.byId.get(p.player_id);
-	return (
-		ours ?? {
-			id: `host:${p.host_player_id}`,
-			name: p.name,
-			position: position(p.position),
-			positionRank: 0,
-			team: p.team,
-			headshot: ''
-		}
-	);
+	if (ours) return ours;
+	const pos = position(p.position);
+	return pos === null
+		? null
+		: {
+				id: `host:${p.host_player_id}`,
+				name: p.name,
+				position: pos,
+				positionRank: 0,
+				team: p.team,
+				headshot: ''
+			};
 }
 
-/** The last picks, newest first, each with its pick and who made it. */
+/** The last picks, newest first, each with its pick and who made it. A pick at a position we do
+ * not draft is left off the strip; the bar's count still holds it. */
 export function landingStrip(
 	picks: readonly CompanionPick[],
 	board: Board,
@@ -59,13 +65,20 @@ export function landingStrip(
 	return picks
 		.slice(-STRIP_PICKS)
 		.reverse()
-		.map((p, i) => ({
-			key: p.pick,
-			player: pickPlayer(p, board),
-			lines: [pickLabel(p.pick, teams), p.seat === you ? 'you' : `slot ${String(p.seat)}`],
-			ring: i === 0 ? 'ink' : undefined,
-			strong: p.seat === you
-		}));
+		.flatMap((p, i) => {
+			const player = pickPlayer(p, board);
+			return player
+				? [
+						{
+							key: p.pick,
+							player,
+							lines: [pickLabel(p.pick, teams), p.seat === you ? 'you' : `slot ${String(p.seat)}`],
+							ring: i === 0 ? ('ink' as const) : undefined,
+							strong: p.seat === you
+						}
+					]
+				: [];
+		});
 }
 
 /** The bar's line under the count: where the draft is and when you are up. */

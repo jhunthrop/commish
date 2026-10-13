@@ -1,5 +1,5 @@
 /** A checkout a signed-out drafter asked for, carried through sign-in in the pass page's address so
- * the page picks it up on the way back and goes straight on to checkout. Pure. */
+ * the page picks it up on the way back and goes straight on to checkout. */
 import { links } from '#lib/site/links.ts';
 import type { CheckoutRequest, Interval } from './pass-api.ts';
 
@@ -44,4 +44,21 @@ export function intentFrom(params: Pick<URLSearchParams, 'get'>): CheckoutReques
 		default:
 			return null;
 	}
+}
+
+/** Where this browser notes the checkout it sent a reader to sign in for. Only an address that
+ * matches the note goes straight on to checkout; any other `/pass?get=...` link, crafted or old,
+ * fills in the choices and waits for the verb. */
+const RESUME_NOTE = 'commish:pass-resume';
+
+/** Notes the checkout before sign-in. */
+export function noteResume(request: CheckoutRequest): void {
+	sessionStorage.setItem(RESUME_NOTE, resumePath(request));
+}
+
+/** Whether the address's checkout is the one this browser noted, taking the note either way. */
+export function takeResume(request: CheckoutRequest): boolean {
+	const noted = sessionStorage.getItem(RESUME_NOTE);
+	sessionStorage.removeItem(RESUME_NOTE);
+	return noted === resumePath(request);
 }

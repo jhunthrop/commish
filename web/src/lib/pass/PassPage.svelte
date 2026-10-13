@@ -16,7 +16,14 @@
 	import Verb from '#lib/ui/Verb.svelte';
 	import GroupPassForm from './GroupPassForm.svelte';
 	import PlanPanel from './PlanPanel.svelte';
-	import { CHECKOUT_CANCELED, CHECKOUT_KEY, intentFrom, resumePath } from './intent.ts';
+	import {
+		CHECKOUT_CANCELED,
+		CHECKOUT_KEY,
+		intentFrom,
+		noteResume,
+		resumePath,
+		takeResume
+	} from './intent.ts';
 	import {
 		ApiError,
 		currentAccount,
@@ -65,6 +72,7 @@
 	async function begin(request: CheckoutRequest): Promise<void> {
 		if (busy) return;
 		if (account === null) {
+			noteResume(request);
 			window.location.assign(pass.signInUrl(resumePath(request)));
 			return;
 		}
@@ -84,6 +92,7 @@
 	onMount(() => {
 		canceled = page.url.searchParams.get(CHECKOUT_KEY) === CHECKOUT_CANCELED;
 		const intent = intentFrom(page.url.searchParams);
+		const resume = intent !== null && takeResume(intent);
 		if (intent || canceled) void goto(resolve('/pass'), { replace: true, shallow: true });
 		if (intent?.product === 'membership') interval = intent.interval ?? 'year';
 		if (intent?.product === 'group_pass') {
@@ -95,7 +104,7 @@
 				catalog = plans;
 				account = me;
 				if (group) seats = Math.min(Math.max(seats, group.min_seats), group.max_seats);
-				if (intent && me && plans.checkout_open) void begin(intent);
+				if (intent && resume && me && plans.checkout_open) void begin(intent);
 			})
 			.catch(() => (unreachable = true));
 	});

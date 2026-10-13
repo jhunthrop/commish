@@ -1410,7 +1410,7 @@ export interface components {
 			/** @description the draft link as pasted */
 			draft: string;
 			seat: components['schemas']['CompanionSeat'];
-			/** @description development only (COMPANION_REPLAY), replays a recorded completed draft one pick a second */
+			/** @description development only (COMPANION_REPLAY), replays the recorded completed draft one pick a second, whatever draft says */
 			replay?: boolean;
 		};
 		/** @description exactly one of slot and username */
