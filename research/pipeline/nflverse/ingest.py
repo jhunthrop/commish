@@ -32,7 +32,12 @@ from research.pipeline.nflverse.schedule import (
     map_schedule,
     week_as_of_from_schedule,
 )
-from research.pipeline.nflverse.stat_lines import STAT_LINE_GAPS, map_stat_lines, stat_line_observations
+from research.pipeline.nflverse.stat_lines import (
+    STAT_LINE_GAPS,
+    completion_observations,
+    map_stat_lines,
+    stat_line_observations,
+)
 from research.pipeline.nflverse.team_map import (
     line_continuity_observations,
     map_player_teams,
@@ -189,9 +194,12 @@ def ingest_season(  # noqa: PLR0913 - the oracle's four, its schedule stamps, an
     schedule_as_of: Mapping[float, datetime] | None = None,
     *,
     release: str | None = None,
+    completions: bool = True,
 ) -> SeasonIngestReport:
     """`ingestSeason`: participation, stat lines, team edges and line continuity for one season.
-    `release` names the weekly stats' release tag, `player_week_release(season)` when not given."""
+    `release` names the weekly stats' release tag, `player_week_release(season)` when not given.
+    `completions` also writes each line's pass completions (the player card's game log reads them;
+    the oracle never wrote them, so its parity cases turn them off)."""
     snap_counts = _fetch_snap_counts(client, season)
     player_week = _fetch_player_week(client, season, release or player_week_release(season))
     week_as_of = _week_as_of(season, snap_counts, schedule_as_of)
@@ -208,6 +216,8 @@ def ingest_season(  # noqa: PLR0913 - the oracle's four, its schedule stamps, an
     written = record_observations(conn, participation_rows) + record_observations(
         conn, stat_line_observations(stat_lines.stat_lines)
     )
+    if completions:
+        written += record_observations(conn, completion_observations(stat_lines.stat_lines))
     player_teams = (
         map_player_teams(snap_counts, universe)
         if snap_counts
