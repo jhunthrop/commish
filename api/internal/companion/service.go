@@ -46,6 +46,7 @@ type Repository interface {
 	Report(ctx context.Context, id uuid.UUID) (json.RawMessage, bool, error)
 	PutReport(ctx context.Context, id uuid.UUID, report any) error
 	WithReportLock(ctx context.Context, id uuid.UUID, fn func(context.Context) error) error
+	Recent(ctx context.Context, accountID uuid.UUID, limit int) ([]Row, error)
 }
 
 // Checker answers whether an account may use a feature, from Can only.
@@ -97,6 +98,7 @@ type conditionalKey struct {
 func (s *Service) Routes() []httpx.Route {
 	return []httpx.Route{
 		{Method: http.MethodPost, Path: "/companions", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitCreatePerMinute), Handler: s.create},
+		{Method: http.MethodGet, Path: "/companions", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: s.recent},
 		{Method: http.MethodGet, Path: "/companions/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: s.get},
 		{Method: http.MethodGet, Path: "/companions/{id}/report", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReportPerMinute), Handler: s.report},
 	}

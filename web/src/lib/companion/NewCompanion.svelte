@@ -11,13 +11,14 @@
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
-	import Stepper from '#lib/ui/Stepper.svelte';
+	import LineList from '#lib/ui/LineList.svelte';
+	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { isSignedOut } from '#lib/api/status.ts';
 	import { MAX_TEAMS } from '#lib/room/setup/setup.ts';
-	import { ApiError, companions, type CompanionCreate } from './api.ts';
-	import { has } from './model.ts';
+	import { ApiError, companions, type CompanionCreate, type CompanionSummary } from './api.ts';
+	import { has, recentLine } from './model.ts';
 
 	/** Start following a draft: paste the Sleeper link, say which seat is yours, one verb. Without the
 	 * live draft feature (answered by Can through /me) the page says where it comes from. */
@@ -36,13 +37,29 @@
 	let replay = $state(false);
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
+	let recent = $state<CompanionSummary[]>([]);
+	/** Every slot a league can have, one tap each (the setup page's slot chips). */
+	const SLOTS = Array.from({ length: MAX_TEAMS }, (_, i) => i + 1);
 
 	onMount(() => {
 		replay = page.url.searchParams.get('replay') === '1';
 		if (replay) link = REPLAY_WORDS;
 		companions
 			.me()
-			.then((me) => (view = has(me.features, 'live_draft_advisor') ? 'form' : 'no-pass'))
+			.then(async (me) => {
+				if (!has(me.features, 'live_draft_advisor')) {
+					view = 'no-pass';
+					return;
+				}
+				recent = await companions.recent().catch(() => []);
+				// The username used last comes first: one tap instead of choosing a slot.
+				const used = recent.find((r) => r.host_username !== null)?.host_username;
+				if (used) {
+					by = 'username';
+					username = used;
+				}
+				view = 'form';
+			})
 			.catch((error: unknown) => (view = isSignedOut(error) ? 'signed-out' : 'unreachable'));
 	});
 
@@ -120,13 +137,11 @@
 						>
 					</ChipGroup>
 					{#if by === 'slot'}
-						<Stepper
-							label="Slot"
-							value={slot}
-							min={1}
-							max={MAX_TEAMS}
-							onchange={(n: number) => (slot = n)}
-						/>
+						<ChipGroup label="Your draft slot" variant="loose">
+							{#each SLOTS as n (n)}
+								<Chip size="sm" pressed={slot === n} onclick={() => (slot = n)}>{n}</Chip>
+							{/each}
+						</ChipGroup>
 					{:else}
 						<Field
 							label="Sleeper username"
@@ -140,6 +155,12 @@
 			<ActionBar alert={problem ? alert : undefined}>
 				<Verb disabled={!ready} onclick={() => void follow()}>Follow my draft</Verb>
 			</ActionBar>
+			{#if recent.length > 0}
+				<section aria-label="Drafts you followed">
+					<PanelHead title="Drafts you followed" level={2} />
+					<LineList label="Drafts you followed" lines={recent.map(recentLine)} />
+				</section>
+			{/if}
 		{/if}
 	</main>
 </Shell>

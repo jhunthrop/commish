@@ -795,6 +795,19 @@ type CompanionSeat struct {
 // CompanionStatus defines model for CompanionStatus.
 type CompanionStatus string
 
+// CompanionSummary defines model for CompanionSummary.
+type CompanionSummary struct {
+	CreatedAt   time.Time `json:"created_at"`
+	HostDraftId string    `json:"host_draft_id"`
+
+	// HostUsername the Sleeper username the seat was found by
+	HostUsername *string            `json:"host_username"`
+	Id           openapi_types.UUID `json:"id"`
+	Replay       bool               `json:"replay"`
+	Slot         int                `json:"slot"`
+	Status       CompanionStatus    `json:"status"`
+}
+
 // DraftPassState defines model for DraftPassState.
 type DraftPassState struct {
 	EndsAt time.Time            `json:"ends_at"`

@@ -742,6 +742,21 @@ paths:
         "409": { $ref: "#/components/responses/ErrorResponse" }
 
   /companions:
+    get:
+      tags: [companions]
+      operationId: listCompanions
+      summary: The account's newest followed drafts, newest first, with the Sleeper username each seat was found by.
+      security: [{ session: [] }]
+      responses:
+        "200":
+          description: up to five
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/CompanionSummary" } } }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
     post:
       tags: [companions]
       operationId: createCompanion
@@ -1655,6 +1670,17 @@ components:
     CompanionStatus:
       type: string
       enum: [pre_draft, drafting, paused, complete]
+    CompanionSummary:
+      type: object
+      required: [id, host_draft_id, slot, host_username, status, replay, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        host_draft_id: { type: string }
+        slot: { type: integer }
+        host_username: { type: string, nullable: true, description: the Sleeper username the seat was found by }
+        status: { $ref: "#/components/schemas/CompanionStatus" }
+        replay: { type: boolean }
+        created_at: { type: string, format: date-time }
     CompanionPick:
       type: object
       required: [pick, round, seat, player_id, host_player_id, name, position, team, keeper]

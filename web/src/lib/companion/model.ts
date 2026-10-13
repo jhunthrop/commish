@@ -1,5 +1,6 @@
 /** What the companion's page reads off the API's answers: the host's picks kept across polls, the
  * picks as the rooms' views take them, the strip of picks as they land, and the bar's words. Pure. */
+import { dayLabel } from '#lib/format/date.ts';
 import { pickLabel } from '#lib/format/draft.ts';
 import { plural } from '#lib/format/number.ts';
 import type { RoomPick } from '#lib/room/api.ts';
@@ -7,7 +8,8 @@ import type { Board } from '#lib/room/model.ts';
 import type { PlayerRef, Position } from '#lib/types/player.ts';
 import { POSITIONS } from '#lib/types/player.ts';
 import type { StripPick } from '#lib/types/room.ts';
-import type { Companion, CompanionPick } from './api.ts';
+import { links } from '#lib/site/links.ts';
+import type { Companion, CompanionPick, CompanionSummary } from './api.ts';
 
 /** How often the page asks while the draft is on, and while it waits for it to start. */
 export const POLL_MS = 3000;
@@ -103,3 +105,28 @@ export function hostDraftUrl(c: Pick<Companion, 'host_draft_id'>): string {
 }
 
 export { hasFeature as has } from '#lib/account/features.ts';
+
+const STATUS_WORDS: Readonly<Record<CompanionSummary['status'], string>> = {
+	pre_draft: 'not started',
+	drafting: 'drafting',
+	paused: 'paused',
+	complete: 'over, the report is ready'
+};
+
+/** A followed draft as the start page lists it, a link back to it. */
+export function recentLine(r: CompanionSummary): {
+	key: string;
+	lead: string;
+	text: string;
+	href: string;
+} {
+	const seat = r.host_username
+		? `@${r.host_username}, slot ${String(r.slot)}`
+		: `slot ${String(r.slot)}`;
+	return {
+		key: r.id,
+		lead: `Sleeper draft ${r.host_draft_id}`,
+		text: `${seat} · ${STATUS_WORDS[r.status]} · followed ${dayLabel(r.created_at)}`,
+		href: links.companion(r.id)
+	};
+}

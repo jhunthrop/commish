@@ -788,7 +788,8 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		get?: never;
+		/** The account's newest followed drafts, newest first, with the Sleeper username each seat was found by. */
+		get: operations['listCompanions'];
 		put?: never;
 		/** Follow a draft running on another host (Sleeper today) from the drafter's seat. Needs the live_draft_advisor feature (403 with feature otherwise). Snake drafts only; an auction, a linear order or a reversal is refused with a sentence. The same draft again answers the companion already made, with the seat updated. */
 		post: operations['createCompanion'];
@@ -1422,6 +1423,18 @@ export interface components {
 		};
 		/** @enum {string} */
 		CompanionStatus: 'pre_draft' | 'drafting' | 'paused' | 'complete';
+		CompanionSummary: {
+			/** Format: uuid */
+			id: string;
+			host_draft_id: string;
+			slot: number;
+			/** @description the Sleeper username the seat was found by */
+			host_username: string | null;
+			status: components['schemas']['CompanionStatus'];
+			replay: boolean;
+			/** Format: date-time */
+			created_at: string;
+		};
 		CompanionPick: {
 			pick: number;
 			round: number;
@@ -2706,6 +2719,27 @@ export interface operations {
 			403: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
+		};
+	};
+	listCompanions: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description up to five */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['CompanionSummary'][];
+					};
+				};
+			};
+			403: components['responses']['ErrorResponse'];
 		};
 	};
 	createCompanion: {
