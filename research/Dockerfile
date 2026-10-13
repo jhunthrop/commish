@@ -1,10 +1,12 @@
 # research/Dockerfile. The build context is research/:
 #   docker build --build-arg VERSION=$(git rev-parse --short=8 HEAD) -t commish-research:local research
 #
-# One image, two commands, each a module run with `python -m`:
-#   research.advisor   the advisor service (the default CMD), POST /advise on $PORT
-#   research.nightly   the nightly run (the Cloud Run Job passes it as its argument)
-# The deploy builds once and points the service and the job at the same digest.
+# One image, three modules, each run with `python -m`:
+#   research.advisor                    the advisor service (the default CMD), POST /advise on $PORT
+#   research.nightly run | publish      the Cloud Run Jobs `nightly` and `nightly-publish`
+#   research.inseason --task <task>     the Cloud Run Jobs `inseason` (season-week) and `inseason-capture`
+# The jobs pass the module and its arguments as their args. The deploy builds once and points the
+# service and every job at the same digest.
 #
 # `research/` is both the uv project and the importable package `research` (pyproject.toml), so it
 # is copied to /app/research and /app is what puts `research` on the path.

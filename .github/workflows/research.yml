@@ -197,3 +197,30 @@ jobs:
         env:
           URL: ${{ steps.advisor.outputs.url }}
         run: echo "advisor deployed at $URL (set the repository variable ADVISOR_URL to it)" >> "$GITHUB_STEP_SUMMARY"
+
+        # THE NIGHTLY AND IN-SEASON JOBS (spec §4, research/JOBS.md): one image, one Cloud Run Job per
+        # command, each running as research-runtime with only the secrets its command reads. Cloud
+        # Scheduler runs them (infra/README.md, "The research schedule"); the deployer lacks the
+        # scheduler role, so the scheduler jobs are created by hand, and this step grants their caller
+        # (research-runtime) run.invoker on each job and nothing wider.
+      - name: The nightly and in-season jobs
+        env:
+          RUNTIME_SA: research-runtime@trycommish.iam.gserviceaccount.com
+          ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          db="RESEARCH_DATABASE_URL=RESEARCH_DATABASE_URL:latest"
+          nightly="$db,AI_GATEWAY_API_KEY=AI_GATEWAY_API_KEY:latest,CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest"
+          nightly="$nightly,TANK01_API_KEY=TANK01_API_KEY:latest,ODDS_API_KEY=ODDS_API_KEY:latest"
+          publish="CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest,WEB_DISPATCH_TOKEN=WEB_DISPATCH_TOKEN:latest"
+          deploy() { # name, args, secrets, cpu, memory, task timeout
+            gcloud run jobs deploy "$1" --image "$IMAGE" --region "$REGION" --service-account "$RUNTIME_SA" \
+              --args "$2" --set-secrets "$3" --set-env-vars "CLOUDFLARE_ACCOUNT_ID=$ACCOUNT_ID" \
+              --cpu "$4" --memory "$5" --task-timeout "$6" --max-retries 0 --quiet
+            gcloud run jobs add-iam-policy-binding "$1" --region "$REGION" \
+              --member "serviceAccount:$RUNTIME_SA" --role roles/run.invoker --quiet
+          }
+          # A season's first night rewrites every capsule (hours at the gateway's pace); a night after, minutes.
+          deploy nightly "research.nightly,run" "$nightly" 2 2Gi 8h
+          deploy nightly-publish "research.nightly,publish" "$publish" 1 512Mi 10m
+          deploy inseason "research.inseason,--task,season-week" "$db,ODDS_API_KEY=ODDS_API_KEY:latest" 2 2Gi 1h
+          deploy inseason-capture "research.inseason,--task,capture-harvest" "$db,TANK01_API_KEY=TANK01_API_KEY:latest" 1 512Mi 10m

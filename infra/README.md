@@ -17,11 +17,30 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
 - Service accounts:
   - `deployer@trycommish.iam.gserviceaccount.com`: GitHub Actions. Roles `run.admin`, `artifactregistry.writer`, `run.jobsExecutorWithOverrides`, and `iam.serviceAccountUser` on the two runtime accounts.
   - `api-runtime@trycommish.iam.gserviceaccount.com`: the `api` and `room` services.
-  - `research-runtime@trycommish.iam.gserviceaccount.com`: the `nightly` and in-season jobs.
+  - `research-runtime@trycommish.iam.gserviceaccount.com`: the `nightly`, `nightly-publish`, `inseason` and `inseason-capture` jobs, and the caller of the research schedule.
   - `advisor-runtime@trycommish.iam.gserviceaccount.com`: the `advisor` service, no roles; `deployer` has `iam.serviceAccountUser` on it. The service runs with ingress all behind IAM; `api-runtime` holds `run.invoker` on it and the Go rooms call it with a Google identity token (`ADVISOR_URL` repository variable; unset means the engine's own odds).
   - Both runtime accounts: `secretmanager.secretAccessor`, `logging.logWriter`, `monitoring.metricWriter`.
 - Cloud Run services as deployed by `api.yml`: `api` at https://api-mgq3rq4xbq-ue.a.run.app and `room` at https://room-mgq3rq4xbq-ue.a.run.app (us-east1, runtime `api-runtime`, scale to zero), the migrate job `api-migrate` run from the workflow when `APP_SCHEMA_READY` is true. The organization policy `iam.allowedPolicyMemberDomains` restricts IAM members to the derbee.ai customer, so `allUsers` cannot be granted `run.invoker`; public access comes from the invoker IAM check being disabled on the service, the same way foreversixty's API is public.
 - Custom hostnames: `api.trycommish.app` and `room.trycommish.app` map to the services with `gcloud beta run domain-mappings create` once the domain is verified for the GCP account (`gcloud domains verify trycommish.app`, a Search Console step the founder does once), then DNS-only CNAME records in Cloudflare as the mapping prints them. Until then the run.app URLs serve.
+- Cloud Run Jobs from the `research` image, deployed by `research.yml` as `research-runtime`, each holding only the secrets its command reads (Lane 2P phase D):
+  - `nightly` (`research.nightly run`): RESEARCH_DATABASE_URL, AI_GATEWAY_API_KEY, CLOUDFLARE_API_TOKEN, TANK01_API_KEY, ODDS_API_KEY; env CLOUDFLARE_ACCOUNT_ID. Writes the run to R2 `commish-runs` and, when every gate passed, moves `runs/early.json`.
+  - `nightly-publish` (`research.nightly publish`): CLOUDFLARE_API_TOKEN, WEB_DISPATCH_TOKEN. Moves `runs/latest.json` to the early run an hour after it passed and dispatches `web.yml` (`repository_dispatch`, type `nightly-run`, `client_payload.runId`).
+  - `inseason` (`research.inseason --task season-week`): RESEARCH_DATABASE_URL, ODDS_API_KEY. The register's freeze and grade; a missed freeze or an overdue grade fails the execution.
+  - `inseason-capture` (`research.inseason --task capture-harvest`): RESEARCH_DATABASE_URL, TANK01_API_KEY.
+  - `research-runtime` holds `run.invoker` on each job (granted by the workflow), which is what the scheduler calls with.
+- Secret Manager placeholders created 2026-10-13 with the value `placeholder`, to be set before the jobs are resumed: `CLOUDFLARE_API_TOKEN` (the account token, R2 Edit), `TANK01_API_KEY` (the stats provider), `ODDS_API_KEY` (the odds provider), `WEB_DISPATCH_TOKEN` (a fine-grained GitHub token on `jhunthrop/commish` with Contents read and write, which `repository_dispatch` needs). `AI_GATEWAY_API_KEY` was created by phase C, `RESEARCH_DATABASE_URL` by Lane 1.
+- The research schedule, Cloud Scheduler in us-east1, created by hand 2026-10-13 (the deployer lacks the scheduler role) and PAUSED until cutover, because until then the Vercel cron writes the legacy register and the Neon research schema is a loaded copy: each is an HTTP POST to `https://run.googleapis.com/v2/projects/trycommish/locations/us-east1/jobs/<job>:run` with an OAuth token for `research-runtime` (the Run Admin API takes OAuth, not an OIDC identity token), no retries.
+
+  | Scheduler job | Schedule | Time zone | Runs |
+  |---|---|---|---|
+  | `research-nightly` | `0 5 * * *` | UTC | `nightly` |
+  | `research-nightly-publish` | `0 6-12 * * *` | UTC | `nightly-publish` |
+  | `research-season-week-tue` | `0 8 * * 2` | America/New_York | `inseason` |
+  | `research-season-week-wed` | `0 18 * * 3` | America/New_York | `inseason` |
+  | `research-season-week-thu` | `0 14 * * 4` | America/New_York | `inseason` |
+  | `research-capture-harvest` | `0 2,7-23 * * *` | America/New_York | `inseason-capture` |
+
+  At cutover, after the legacy writers stop and the loader has run: set the four placeholders, then `gcloud scheduler jobs resume <job> --location us-east1` for each. A failed execution of any job is the alert: Cloud Run marks it failed and its log carries the step that failed.
 - Workload identity federation, no stored keys: pool `github`, provider `github` (OIDC from `token.actions.githubusercontent.com`, condition `assertion.repository == 'jhunthrop/commish'`), bound to the deployer for that repository's runs.
 - GitHub Actions variables: `GCP_PROJECT`, `GCP_PROJECT_NUMBER`, `GCP_REGION`, `GCP_WIF_PROVIDER`, `GCP_DEPLOYER_SA`, `GCP_ARTIFACT_REPO`.
 - `.github/workflows/infra-smoke.yml` proves the chain on demand: authenticate as the deployer and read the repository, then read the Cloudflare zone and bucket with the token.
