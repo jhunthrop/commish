@@ -1,8 +1,11 @@
-"""EACH FORMAT'S ADP, READ FROM ITS NEWEST STAMPED CAPTURE (`adp_snapshots`), WITH ITS WINDOW.
+"""EACH FORMAT'S ADP, READ FROM ITS STAMPED CAPTURES (`adp_snapshots`), WITH ITS WINDOW.
 
-The newest capture is tonight's (the nightly's ingest step takes it before the run is built), as the
-oracle's nightly reads it (`research-ts/src/nightly/reads/adp.ts`). The window is that capture's own
-stamp. The register keeps its own ADP, the one frozen beside each week's board before kickoff.
+Which capture: before the product season's first kickoff, the newest (tonight's, which the ingest
+step takes before the run is built), as the oracle's nightly reads it (`nightly/reads/adp.ts`).
+Once the season has kicked off, the newest capture taken before the first kickoff: the drafts held
+after it are few and are not the market the board was drafted against (measured 2026-10-12: 29
+players in the PPR capture against 255 on September 9), and it is the ADP the register froze
+beside the board. The window is the capture's own stamp.
 
 ADP is keyed by the product's player id through the crosswalk; a captured player the crosswalk
 cannot place is on no page, so he is counted and left out.
@@ -22,6 +25,11 @@ class AdpCapture:
     captured_at: datetime | None
     by_player: dict[str, float]  # the product's player id to ADP
     unplaced: int
+
+
+def adp_cutoff(now: datetime, first_kickoff: datetime | None) -> datetime:
+    """The instant the run reads ADP at: now, or the first kickoff once the season has started."""
+    return now if first_kickoff is None or now < first_kickoff else first_kickoff
 
 
 def latest_capture(conn: Connection, feed: AdpFeed, as_of: datetime) -> AdpCapture:

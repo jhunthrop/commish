@@ -126,9 +126,13 @@ class _Passes:
         return report
 
     def run(self) -> None:
-        report = self.sweep("capsules", SweepPlan(self.budget))
+        # The sentences already on two pages are quoted to the writer from the first call, so the
+        # sweep does not write them again and the repair pass is left the few it still does.
+        with self.engine.connect() as conn:
+            shared = tuple(sentence.sentence for sentence in capsule_gate(conn, self.now).shared)
+        report = self.sweep("capsules", SweepPlan(self.budget, avoid=shared))
         if self.left > 0 and report.facts > 0:
-            self.sweep("capsule retries", SweepPlan(self.left, unwritten_only=True))
+            self.sweep("capsule retries", SweepPlan(self.left, unwritten_only=True, avoid=shared))
         for attempt in range(1, REPAIR_PASSES + 1):
             with self.engine.connect() as conn:
                 gate = capsule_gate(conn, self.now)

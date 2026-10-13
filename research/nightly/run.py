@@ -25,7 +25,7 @@ from research.nightly.assemble import Assembled, AssemblyError, assemble
 from research.nightly.build.season import format_json
 from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate
 from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan, run_capsule_step
-from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION, PRODUCT_SEASON, RUN_FORMATS
+from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION, PRODUCT_SEASON
 from research.nightly.headshots import Face, mirror_headshots
 from research.nightly.publish import ArtifactWriter, encode, promote_early, read_json, take_run_id
 from research.nightly.run_store import RunStore
@@ -113,7 +113,7 @@ def _manifest(run_id: str, finished: datetime, assembled: Assembled, status: str
         "season": PRODUCT_SEASON,
         "implementation": IMPLEMENTATION,
         "standIn": False,
-        "formats": [format_json(f, PRODUCT_SEASON) for f in RUN_FORMATS],
+        "formats": [format_json(f, PRODUCT_SEASON) for f in assembled.formats],
         "players": len(assembled.people),
         "sources": list(assembled.sources),
         # Past the web's schema, which reads only the fields above: who made the numbers and the verdict.
@@ -139,12 +139,14 @@ def run_nightly(deps: RunDeps, options: RunOptions) -> RunOutcome:
         deps.log(f"run {run_id} FAILED: {error}")
         return RunOutcome(run_id, False, str(error))
     files = assembled.files
+    for line in assembled.dropped:
+        deps.log(f"format not carried tonight, {line}")
     held_out, previous = _held_out(deps)
     record_set = [
         gates.held_out_gate(held_out, previous),
-        gates.depth_gate(RUN_FORMATS, {f.id: files[f"boards/{f.id}.json"] for f in RUN_FORMATS}),
+        gates.depth_gate(assembled.formats, {f.id: files[f"boards/{f.id}.json"] for f in assembled.formats}),
         gates.capsule_gate(capsule_result, assembled.capsule_pages),
-        gates.adp_gate(RUN_FORMATS, files["adp.json"]),
+        gates.adp_gate(assembled.formats, files["adp.json"]),
     ]
     finished = deps.clock()
     draft = _manifest(run_id, finished, assembled, "pending")
@@ -174,6 +176,7 @@ def run_nightly(deps: RunDeps, options: RunOptions) -> RunOutcome:
         ],
         "capsuleSpend": None if spend is None else asdict(spend),
         "headshots": headshot_line,
+        "formatsNotCarried": list(assembled.dropped),
         "artifacts": writer.records,
     }
     writer.write("report.json", report)
@@ -182,7 +185,7 @@ def run_nightly(deps: RunDeps, options: RunOptions) -> RunOutcome:
         baseline = {"runId": run_id, "heldOut": report["heldOut"]}
         deps.store.put(HELD_OUT_BASELINE_KEY, encode(baseline), "application/json")
     line = (
-        f"run {run_id} {manifest['status'].upper()}: {len(RUN_FORMATS)} boards, {len(assembled.people)} players, "
+        f"run {run_id} {manifest['status'].upper()}: {len(assembled.formats)} boards, {len(assembled.people)} players, "
         f"{sum(1 for p in players if p['capsule'] is not None)} capsules, {len(writer.records)} files"
     )
     if passed:

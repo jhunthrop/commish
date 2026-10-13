@@ -18,11 +18,11 @@ from research.capsules.store import StoredCapsule, stored_capsules_for
 from research.errors import ResearchError
 from research.model.reads.teams import first_kickoff_for
 from research.nightly.build import pages, season
-from research.nightly.config import PAGE_FORMAT, PRODUCT_SEASON, RUN_FORMATS
+from research.nightly.config import PAGE_FORMAT, PRODUCT_SEASON, RUN_FORMATS, RunFormat
 from research.nightly.gates import CapsulePage
 from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
-from research.nightly.reads.adp import AdpCapture, latest_capture
+from research.nightly.reads.adp import AdpCapture, adp_cutoff, latest_capture
 from research.nightly.reads.board import FormatBoard, format_board
 
 Json = dict[str, Any]
@@ -43,11 +43,14 @@ class Assembled:
     capsule_pages: tuple[CapsulePage, ...]
     sources: tuple[Json, ...]
     model_versions: tuple[str, ...]
+    formats: tuple[RunFormat, ...]
+    # The formats the run does not carry tonight, each with why (a format without ADP is not shipped).
+    dropped: tuple[str, ...]
 
 
-def _boards(conn: Connection, as_of: datetime) -> tuple[FormatBoard, ...]:
+def _boards(conn: Connection, as_of: datetime, formats: Sequence[RunFormat]) -> tuple[FormatBoard, ...]:
     boards = []
-    for run_format in RUN_FORMATS:
+    for run_format in formats:
         board = format_board(conn, PRODUCT_SEASON, run_format, as_of)
         if board is None or not board.entries:
             raise AssemblyError(f"board_missing:{run_format.id}: no stored {run_format.board_source} at {as_of}")
@@ -113,11 +116,21 @@ def _capsule_pages(people: Sequence[pages.Identity], players: Sequence[Json], bo
 
 
 def assemble(conn: Connection, as_of: datetime) -> Assembled:
-    boards = _boards(conn, as_of)
+    cutoff = adp_cutoff(as_of, first_kickoff_for(conn, PRODUCT_SEASON))
     captures: dict[str, AdpCapture] = {}
     for run_format in RUN_FORMATS:
-        captures.setdefault(run_format.adp.source, latest_capture(conn, run_format.adp, as_of))
-    adp_by_format = {f.id: season.format_adp(f, captures) for f in RUN_FORMATS}
+        captures.setdefault(run_format.adp.source, latest_capture(conn, run_format.adp, cutoff))
+    formats = tuple(f for f in RUN_FORMATS if captures[f.adp.source].by_player)
+    dropped = tuple(
+        f"{f.id}: no {f.adp.source} capture at or before {season.iso(cutoff)}" for f in RUN_FORMATS if f not in formats
+    )
+    if PAGE_FORMAT not in formats:
+        raise AssemblyError(
+            f"adp_missing:{PAGE_FORMAT.id}: the page format has no ADP at or before {season.iso(cutoff)}"
+        )
+    captures = {source: c for source, c in captures.items() if any(f.adp.source == source for f in formats)}
+    boards = _boards(conn, as_of, formats)
+    adp_by_format = {f.id: season.format_adp(f, captures) for f in formats}
     people = tuple(pages.identities(boards))
     by_slug = {p.id: p for p in people}
     universe_ids = sorted({e.row.universe_id for b in boards for e in b.entries})
@@ -131,7 +144,7 @@ def assemble(conn: Connection, as_of: datetime) -> Assembled:
     }
     files |= {f"players/{page['id']}.json": page for page in players}
     files |= {
-        "adp.json": season.adp_json(RUN_FORMATS, captures),
+        "adp.json": season.adp_json(formats, captures),
         "record.json": record,
         "index.json": pages.index_json(people),
         "clubs.json": clubs,
@@ -172,4 +185,6 @@ def assemble(conn: Connection, as_of: datetime) -> Assembled:
             *capsule_sources,
         ),
         tuple(sorted({b.stored.model_version or "unrecorded" for b in boards})),
+        formats,
+        dropped,
     )
