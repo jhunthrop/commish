@@ -101,6 +101,7 @@ func (h HTTP) request(req Request) (wireRequest, error) {
 		out.Picks = append(out.Picks, wirePick{PickNumber: p.PickNumber, PlayerID: p.PlayerID, Seat: seatOf(s.DraftOrder, p.TeamID)})
 	}
 	held := req.Keepers.HeldBack(s)
+	sent := map[string]bool{}
 	undrafted := 0
 	for i, p := range req.Board.Raw.Players {
 		if held[p.ID] {
@@ -117,6 +118,22 @@ func (h HTTP) request(req Request) (wireRequest, error) {
 			adp = *p.ADP
 		}
 		out.Pool = append(out.Pool, wirePool{ID: p.ID, Position: string(p.Position), ADP: adp, ProjectedPoints: p.Points})
+		sent[p.ID] = true
+	}
+	// A drafted player the board does not carry (the live-draft
+	// companion's stand-in for a host pick it could not place) is sent at
+	// his draft position with no projection, after every priced player:
+	// the advisor refuses a pick whose player is not in the pool.
+	for _, p := range s.Picks {
+		if sent[p.PlayerID] {
+			continue
+		}
+		pos, ok := s.Pool.PositionOf(p.PlayerID)
+		if !ok {
+			return wireRequest{}, fmt.Errorf("advisor: drafted %s is not in the draft's pool", p.PlayerID)
+		}
+		sent[p.PlayerID] = true
+		out.Pool = append(out.Pool, wirePool{ID: p.PlayerID, Position: string(pos), ADP: float64(unpricedADPFrom + len(out.Pool))})
 	}
 	return out, nil
 }

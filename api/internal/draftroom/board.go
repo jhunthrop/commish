@@ -25,6 +25,9 @@ type RawLoader interface {
 // answer for as long as the stored board it was valued from is current.
 type Boards struct {
 	Raw RawLoader
+	// Schedule is the research schedule the board reads byes from, which
+	// also answers a season's first kickoff (season.Sale).
+	Schedule *boards.PGSource
 
 	mu     sync.Mutex
 	valued map[shapeKey]boards.Board

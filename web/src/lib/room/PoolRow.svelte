@@ -4,6 +4,7 @@
 	import OddsCell from '#lib/ui/OddsCell.svelte';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import NameWords from '#lib/ui/NameWords.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
 	import { vorCell } from '#lib/ui/heat.ts';
 	import type { RoomPlayer } from './model.ts';
@@ -65,13 +66,13 @@
 >
 	<Face src={player.headshot} name={player.name} size={40} />
 	<span class="who">
-		<b>{player.name}</b>
+		<b><NameWords name={player.name} /></b>
 		<span class="meta">
 			<PositionPill position={player.position} rank={player.positionRank} />{player.team}
 		</span>
 	</span>
 	{#if player.vor !== null && player.vorRound !== null}
-		<ValueCell {...vorCell(player.vor, player.vorRound)} />
+		<ValueCell {...vorCell(player.vor, player.vorRound)} phoneLabel={false} />
 	{:else}
 		<span class="none"><Label size="cell">no projection</Label></span>
 	{/if}
@@ -164,6 +165,15 @@
 		.adp,
 		.acts {
 			display: none;
+		}
+
+		/* A long name takes a second line rather than losing its end: "Jaxon Smith-Njigba". */
+		.who b {
+			white-space: normal;
+			display: -webkit-box;
+			-webkit-box-orient: vertical;
+			-webkit-line-clamp: 2;
+			line-clamp: 2;
 		}
 
 		.selected .acts {

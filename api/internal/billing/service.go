@@ -13,15 +13,19 @@ import (
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/httpx"
+	"github.com/jhunthrop/commish/api/internal/leagues"
 )
 
-// Group pass seat bounds, matching app.group_passes' check.
+// Group pass seat bounds: one pass per team in a league, so the
+// league's own team bounds, matching app.group_passes' check.
 const (
-	MinGroupSeats = 2
-	MaxGroupSeats = 32
+	MinGroupSeats = leagues.MinTeams
+	MaxGroupSeats = leagues.MaxTeams
 )
 
-// Where checkout returns the browser on the site (Lane 8's pages).
+// Where checkout returns the browser on the site (Lane 8's pages). The
+// done page is told what was bought (&bought=draft_pass), so it knows
+// what to wait for while the webhook lands.
 const (
 	pathCheckoutDone     = "/account?checkout=done"
 	pathCheckoutCanceled = "/pass?checkout=canceled"
@@ -72,7 +76,20 @@ type BillingStore interface {
 	CreateGroupPass(ctx context.Context, g NewGroupPass) error
 	GroupPassByCode(ctx context.Context, code string) (GroupPass, error)
 	GroupPassesBoughtBy(ctx context.Context, accountID uuid.UUID) ([]GroupPass, error)
+	GroupPassClaims(ctx context.Context, groupPassIDs []uuid.UUID) (map[uuid.UUID][]Claim, error)
 	ClaimedBy(ctx context.Context, groupPassID, accountID uuid.UUID) (bool, error)
+}
+
+// ProductCatalog is what each product unlocks, the rows Can joins
+// through. *entitlements.Store implements it.
+type ProductCatalog interface {
+	ProductFeatures(ctx context.Context) (map[entitlements.Product][]entitlements.Feature, error)
+}
+
+// SaleSeason is the one rule for which season a pass bought now is for.
+// *season.Sale implements it.
+type SaleSeason interface {
+	Season(ctx context.Context, t time.Time) int
 }
 
 // HandleReader reads an account's public handle.
@@ -90,6 +107,8 @@ type Service struct {
 	WebhookSecret string
 	Viewer        auth.AccountViewer
 	Handles       HandleReader
+	Catalog       ProductCatalog
+	Sale          SaleSeason
 	PublicBaseURL string
 	Now           func() time.Time
 	Log           *slog.Logger

@@ -63,6 +63,45 @@ func (e BotStyle) Valid() bool {
 	}
 }
 
+// Defines values for CompanionHost.
+const (
+	CompanionHostSleeper CompanionHost = "sleeper"
+)
+
+// Valid indicates whether the value is a known member of the CompanionHost enum.
+func (e CompanionHost) Valid() bool {
+	switch e {
+	case CompanionHostSleeper:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CompanionStatus.
+const (
+	CompanionStatusComplete CompanionStatus = "complete"
+	CompanionStatusDrafting CompanionStatus = "drafting"
+	CompanionStatusPaused   CompanionStatus = "paused"
+	CompanionStatusPreDraft CompanionStatus = "pre_draft"
+)
+
+// Valid indicates whether the value is a known member of the CompanionStatus enum.
+func (e CompanionStatus) Valid() bool {
+	switch e {
+	case CompanionStatusComplete:
+		return true
+	case CompanionStatusDrafting:
+		return true
+	case CompanionStatusPaused:
+		return true
+	case CompanionStatusPreDraft:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DraftPassStateSource.
 const (
 	DraftPassStateSourceGrant     DraftPassStateSource = "grant"
@@ -123,6 +162,27 @@ func (e Feature) Valid() bool {
 	case FeatureRangeOfOutcomes:
 		return true
 	case FeatureSyncedSheet:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GroupPassStatus.
+const (
+	GroupPassStatusActive   GroupPassStatus = "active"
+	GroupPassStatusDisputed GroupPassStatus = "disputed"
+	GroupPassStatusRefunded GroupPassStatus = "refunded"
+)
+
+// Valid indicates whether the value is a known member of the GroupPassStatus enum.
+func (e GroupPassStatus) Valid() bool {
+	switch e {
+	case GroupPassStatusActive:
+		return true
+	case GroupPassStatusDisputed:
+		return true
+	case GroupPassStatusRefunded:
 		return true
 	default:
 		return false
@@ -327,6 +387,7 @@ func (e Product) Valid() bool {
 // Defines values for ReportPickChip.
 const (
 	ReportPickChipAtAdp ReportPickChip = "at_adp"
+	ReportPickChipKept  ReportPickChip = "kept"
 	ReportPickChipNone  ReportPickChip = "none"
 	ReportPickChipReach ReportPickChip = "reach"
 	ReportPickChipSteal ReportPickChip = "steal"
@@ -336,6 +397,8 @@ const (
 func (e ReportPickChip) Valid() bool {
 	switch e {
 	case ReportPickChipAtAdp:
+		return true
+	case ReportPickChipKept:
 		return true
 	case ReportPickChipNone:
 		return true
@@ -625,8 +688,133 @@ type CheckoutRequest struct {
 	LeagueName *string `json:"league_name,omitempty"`
 	Product    Product `json:"product"`
 
-	// Seats group_pass only
+	// Seats group_pass only: one pass per team, the league bounds
 	Seats *int `json:"seats,omitempty"`
+}
+
+// Companion defines model for Companion.
+type Companion struct {
+	// Basis the board our call reads
+	Basis string `json:"basis"`
+
+	// Board the board valued for this league, sent only when since is 0
+	Board *RoomBoard `json:"board"`
+
+	// Card our call at the drafter's turn, or between turns the conditional call (conditional true): the player to take if the board holds to your_next_pick. The why is on the call only, or on every shortlist row with full_reasoning.
+	Card        *RoomCard     `json:"card"`
+	CreatedAt   time.Time     `json:"created_at"`
+	Host        CompanionHost `json:"host"`
+	HostDraftId string        `json:"host_draft_id"`
+
+	// HostStaleSeconds how old the picks are when the host did not answer the last read, null when fresh
+	HostStaleSeconds *int               `json:"host_stale_seconds"`
+	Id               openapi_types.UUID `json:"id"`
+
+	// LostAt the pick our draft could not follow (out of order, or no roster spot takes him); no call after it
+	LostAt *int `json:"lost_at"`
+
+	// Name the draft's name on the host
+	Name string `json:"name"`
+
+	// OnClock the slot on the clock
+	OnClock *int `json:"on_clock"`
+
+	// PickCount picks the host has made
+	PickCount int `json:"pick_count"`
+
+	// Picks every pick after since, in order
+	Picks []CompanionPick `json:"picks"`
+
+	// PicksUntilTurn picks before the drafter's next
+	PicksUntilTurn *int `json:"picks_until_turn"`
+
+	// Ranges floor, median and ceiling for each shortlist player, with range_of_outcomes only
+	Ranges *map[string]OutcomeRange `json:"ranges"`
+	Replay bool                     `json:"replay"`
+	Rounds int                      `json:"rounds"`
+
+	// SeatNames each slot's name in the host league (its members' display names), slot 1 first; empty for a mock draft, and '' for a slot with no member
+	SeatNames []string       `json:"seat_names"`
+	Settings  LeagueSettings `json:"settings"`
+
+	// Since the pick count the picks follow
+	Since int `json:"since"`
+
+	// Slot the drafter's draft slot
+	Slot       int             `json:"slot"`
+	Status     CompanionStatus `json:"status"`
+	Teams      int             `json:"teams"`
+	TotalPicks int             `json:"total_picks"`
+
+	// Traded picks made by a team other than the slot's own
+	Traded int `json:"traded"`
+
+	// Unplaced picks so far we could not place on our board; they take nobody from it
+	Unplaced int `json:"unplaced"`
+
+	// YourNextPick the drafter's next overall pick
+	YourNextPick *int `json:"your_next_pick"`
+	YourTurn     bool `json:"your_turn"`
+}
+
+// CompanionCreate defines model for CompanionCreate.
+type CompanionCreate struct {
+	// Draft the draft link as pasted
+	Draft string        `json:"draft"`
+	Host  CompanionHost `json:"host"`
+
+	// Replay development only (COMPANION_REPLAY), replays the recorded completed draft one pick a second, whatever draft says
+	Replay *bool `json:"replay,omitempty"`
+
+	// Seat exactly one of slot and username
+	Seat CompanionSeat `json:"seat"`
+}
+
+// CompanionHost defines model for CompanionHost.
+type CompanionHost string
+
+// CompanionPick defines model for CompanionPick.
+type CompanionPick struct {
+	HostPlayerId string `json:"host_player_id"`
+	Keeper       bool   `json:"keeper"`
+
+	// Name the host's name for him
+	Name string `json:"name"`
+	Pick int    `json:"pick"`
+
+	// PlayerId our board's player
+	PlayerId *string `json:"player_id"`
+	Position string  `json:"position"`
+	Round    int     `json:"round"`
+
+	// Seat the draft slot that made it
+	Seat int    `json:"seat"`
+	Team string `json:"team"`
+}
+
+// CompanionSeat exactly one of slot and username
+type CompanionSeat struct {
+	Slot     *int    `json:"slot,omitempty"`
+	Username *string `json:"username,omitempty"`
+}
+
+// CompanionStatus defines model for CompanionStatus.
+type CompanionStatus string
+
+// CompanionSummary defines model for CompanionSummary.
+type CompanionSummary struct {
+	CreatedAt   time.Time `json:"created_at"`
+	HostDraftId string    `json:"host_draft_id"`
+
+	// HostUsername the Sleeper username the seat was found by
+	HostUsername *string            `json:"host_username"`
+	Id           openapi_types.UUID `json:"id"`
+
+	// Name the draft's name on the host, empty when it has none
+	Name   string          `json:"name"`
+	Replay bool            `json:"replay"`
+	Slot   int             `json:"slot"`
+	Status CompanionStatus `json:"status"`
 }
 
 // DraftPassState defines model for DraftPassState.
@@ -695,13 +883,33 @@ type Feature string
 
 // GroupPass defines model for GroupPass.
 type GroupPass struct {
-	ClaimUrl   string             `json:"claim_url"`
-	Claimed    int                `json:"claimed"`
+	// ClaimCode the code in the claim link
+	ClaimCode string `json:"claim_code"`
+	ClaimUrl  string `json:"claim_url"`
+	Claimed   int    `json:"claimed"`
+
+	// ClaimedByMe the buyer holds one of its seats
+	ClaimedByMe bool `json:"claimed_by_me"`
+
+	// Claims each claimed seat, first claim first; the seats past these are open
+	Claims     []GroupPassClaim   `json:"claims"`
 	CreatedAt  time.Time          `json:"created_at"`
 	Id         openapi_types.UUID `json:"id"`
 	LeagueName string             `json:"league_name"`
 	Season     int                `json:"season"`
 	Seats      int                `json:"seats"`
+	Status     GroupPassStatus    `json:"status"`
+}
+
+// GroupPassStatus defines model for GroupPass.Status.
+type GroupPassStatus string
+
+// GroupPassClaim defines model for GroupPassClaim.
+type GroupPassClaim struct {
+	ClaimedAt time.Time `json:"claimed_at"`
+
+	// Handle the claimer's lobby handle
+	Handle *string `json:"handle"`
 }
 
 // GroupPassPreview defines model for GroupPassPreview.
@@ -960,6 +1168,13 @@ type MockUndoInput struct {
 	Pick int `json:"pick"`
 }
 
+// OutcomeRange defines model for OutcomeRange.
+type OutcomeRange struct {
+	Ceiling float64 `json:"ceiling"`
+	Floor   float64 `json:"floor"`
+	Median  float64 `json:"median"`
+}
+
 // PageMeta defines model for PageMeta.
 type PageMeta struct {
 	Page    int   `json:"page"`
@@ -967,16 +1182,30 @@ type PageMeta struct {
 	Total   int64 `json:"total"`
 }
 
-// PlanCatalog A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership).
+// PlanCatalog A product whose price is not set in Stripe yet is null (draft_pass, group_pass) or missing from the list (membership). While checkout is not open the prices are the launch prices.
 type PlanCatalog struct {
-	DraftPass *Price          `json:"draft_pass"`
+	// CheckoutOpen false while Stripe is not configured
+	CheckoutOpen bool   `json:"checkout_open"`
+	DraftPass    *Price `json:"draft_pass"`
+
+	// Features what each product unlocks, from app.product_features. A group pass seat is a draft_pass.
+	Features  PlanFeatures    `json:"features"`
 	GroupPass *GroupPassPrice `json:"group_pass"`
 
 	// Membership annual first
 	Membership []Price `json:"membership"`
 
-	// Season the season a pass bought now is for
+	// PassEndsAt when a pass bought now ends: its season's end, March 1 UTC
+	PassEndsAt time.Time `json:"pass_ends_at"`
+
+	// Season the season a pass bought now is for: the current one until its first kickoff, then the next
 	Season int `json:"season"`
+}
+
+// PlanFeatures what each product unlocks, from app.product_features. A group pass seat is a draft_pass.
+type PlanFeatures struct {
+	DraftPass  []Feature `json:"draft_pass"`
+	Membership []Feature `json:"membership"`
 }
 
 // PlayerPosition defines model for PlayerPosition.
@@ -1007,7 +1236,9 @@ type ReportExposure struct {
 // ReportPick defines model for ReportPick.
 type ReportPick struct {
 	// AdpGap ADP less the pick
-	AdpGap    *float64       `json:"adp_gap"`
+	AdpGap *float64 `json:"adp_gap"`
+
+	// Chip kept is a keeper at his seat and round, with no ADP gap and no hindsight
 	Chip      ReportPickChip `json:"chip"`
 	CouldWait bool           `json:"could_wait"`
 
@@ -1025,7 +1256,7 @@ type ReportPick struct {
 	StillThere *float64 `json:"still_there"`
 }
 
-// ReportPickChip defines model for ReportPick.Chip.
+// ReportPickChip kept is a keeper at his seat and round, with no ADP gap and no hindsight
 type ReportPickChip string
 
 // ReportPickMadeBy who made the pick: you, Pick for me or Finish the draft (for_you), a lobby seat's stand-in after you left (queue), or the stand-in when your clock ran out (clock). A pick you did not make carries no hindsight.
@@ -1340,6 +1571,15 @@ type AccountResponse struct {
 	RequestId string     `json:"request_id"`
 }
 
+// CompanionResponse defines model for CompanionResponse.
+type CompanionResponse struct {
+	Data      Companion  `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
 // EmptyResponse defines model for EmptyResponse.
 type EmptyResponse = Envelope
 
@@ -1468,6 +1708,12 @@ type StripeWebhookParams struct {
 	StripeSignature string `json:"Stripe-Signature"`
 }
 
+// GetCompanionParams defines parameters for GetCompanion.
+type GetCompanionParams struct {
+	// Since the pick count the caller already holds (its last answer's pick_count); only later picks are sent
+	Since *int `form:"since,omitempty" json:"since,omitempty"`
+}
+
 // ListExportsParams defines parameters for ListExports.
 type ListExportsParams struct {
 	Page    *Page    `form:"page,omitempty" json:"page,omitempty"`
@@ -1502,6 +1748,9 @@ type CheckoutJSONRequestBody = CheckoutRequest
 
 // StripeWebhookJSONRequestBody defines body for StripeWebhook for application/json ContentType.
 type StripeWebhookJSONRequestBody = StripeWebhookJSONBody
+
+// CreateCompanionJSONRequestBody defines body for CreateCompanion for application/json ContentType.
+type CreateCompanionJSONRequestBody = CompanionCreate
 
 // CreateLeagueJSONRequestBody defines body for CreateLeague for application/json ContentType.
 type CreateLeagueJSONRequestBody = LeagueInput

@@ -3,6 +3,7 @@ package billing
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,7 +13,9 @@ import (
 
 	"github.com/stripe/stripe-go/v82/webhook"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
+	"github.com/jhunthrop/commish/api/internal/entitlements"
 )
 
 const testSecret = "whsec_test_secret"
@@ -76,5 +79,48 @@ func TestWebhookRejectsBadSignature(t *testing.T) {
 	}
 	if n := events(); n != 1 || !processed {
 		t.Fatalf("after two deliveries: %d events, processed %v, want 1 processed", n, processed)
+	}
+}
+
+type catalog struct{}
+
+func (catalog) ProductFeatures(context.Context) (map[entitlements.Product][]entitlements.Feature, error) {
+	return map[entitlements.Product][]entitlements.Feature{
+		entitlements.ProductDraftPass: {entitlements.LiveDraftAdvisor},
+	}, nil
+}
+
+type fixedSale struct{ season int }
+
+func (f fixedSale) Season(context.Context, time.Time) int { return f.season }
+
+// With Stripe not configured the catalog still answers, its figures the
+// launch prices stripe-setup creates, and says no one can pay yet.
+func TestPlansWithCheckoutClosed(t *testing.T) {
+	s := &Service{Catalog: catalog{}, Sale: fixedSale{season: 2027}, Now: time.Now,
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	rec := httptest.NewRecorder()
+	s.plans(rec, httptest.NewRequest(http.MethodGet, "/billing/plans", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	var body struct {
+		Data apitypes.PlanCatalog `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	c := body.Data
+	switch {
+	case c.CheckoutOpen:
+		t.Error("checkout reads open with no Stripe")
+	case c.Season != 2027 || !c.PassEndsAt.Equal(time.Date(2028, 3, 1, 0, 0, 0, 0, time.UTC)):
+		t.Errorf("season %d ending %s, want 2027 ending 2028-03-01", c.Season, c.PassEndsAt)
+	case c.DraftPass == nil || c.DraftPass.AmountCents != centsDraftPass:
+		t.Errorf("draft pass %+v, want %d", c.DraftPass, centsDraftPass)
+	case len(c.Membership) != 2 || c.Membership[0].AmountCents != centsMembershipYearly:
+		t.Errorf("membership %+v, want yearly first", c.Membership)
+	case c.GroupPass == nil || c.GroupPass.PerSeat.AmountCents != centsGroupPassSeat || c.GroupPass.MinSeats != MinGroupSeats:
+		t.Errorf("group pass %+v, want %d a seat from %d", c.GroupPass, centsGroupPassSeat, MinGroupSeats)
 	}
 }

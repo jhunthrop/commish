@@ -2,6 +2,7 @@
  * where the odds come from. Read off the card the API recorded for the turn. */
 import { lastName, oddsWords, pickLabel } from '#lib/format/draft.ts';
 import { signed } from '#lib/format/number.ts';
+import { firstSentence } from '#lib/format/sentence.ts';
 import type { RoomCard } from './api.ts';
 import type { Board, RoomPlayer } from './model.ts';
 
@@ -128,7 +129,9 @@ export function callView(
 			null
 		);
 	const runner = best && best.id !== player.id && (best.vor ?? 0) > (player.vor ?? 0) ? best : null;
-	const why = card.shortlist[0]?.why ?? null;
+	// The reason alone: the odds after it are the call's own big figure.
+	const first = card.shortlist[0]?.why;
+	const why = first ? firstSentence(first) : null;
 	return {
 		player,
 		odds: card.still_there[player.id] ?? null,

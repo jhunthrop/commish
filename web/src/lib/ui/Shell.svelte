@@ -238,11 +238,27 @@
 			border-top-color: var(--accent);
 		}
 
+		/* The phone bar is a grid with the account in its first row's last cell on every page, so the
+		   one way to the account, the pass and the companion is always in the same place, and only
+		   that row gives it room: the run's date (or the page's verb, on a page with no date) to its
+		   left, the verb on its own row under a date, the search across the last. */
 		.top {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) auto;
+			grid-template-areas:
+				'tail account'
+				'find find';
+			align-items: center;
 			padding: var(--s-2) var(--s-4);
 			gap: var(--s-2);
-			flex-wrap: wrap;
 			min-height: 0;
+		}
+
+		.top:has(.stamp) {
+			grid-template-areas:
+				'stamp account'
+				'tail tail'
+				'find find';
 		}
 
 		h1 {
@@ -254,23 +270,28 @@
 		}
 
 		.stamp {
+			grid-area: stamp;
 			margin-left: 0;
 		}
 
-		/* Beside the run's date on the bar's first line, so the switch and the verb keep the second. */
 		.account {
+			grid-area: account;
 			display: grid;
-			margin: -10px -10px -10px auto;
+			margin: -10px -10px -10px 0;
 		}
 
-		/* A page with no run date: the account leads the bar's line instead. */
-		.top:not(:has(.stamp)) .account {
-			margin-left: -10px;
+		.tail {
+			grid-area: tail;
+			justify-content: flex-end;
+		}
+
+		/* A tail holding only the theme switch (hidden here) takes no row under a date. */
+		.tail:not(:has(> :not(.theme))) {
+			display: none;
 		}
 
 		.find {
-			order: 3;
-			flex-basis: 100%;
+			grid-area: find;
 			max-width: none;
 		}
 	}

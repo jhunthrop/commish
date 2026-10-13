@@ -1,0 +1,143 @@
+/** What the companion's page reads off the API's answers: the host's picks kept across polls, the
+ * picks as the rooms' views take them, the strip of picks as they land, and the bar's words. Pure. */
+import { dayLabel } from '#lib/format/date.ts';
+import { pickLabel } from '#lib/format/draft.ts';
+import { plural } from '#lib/format/number.ts';
+import type { RoomPick } from '#lib/room/api.ts';
+import type { Board } from '#lib/room/model.ts';
+import type { PlayerRef, Position } from '#lib/types/player.ts';
+import { POSITIONS } from '#lib/types/player.ts';
+import type { StripPick } from '#lib/types/room.ts';
+import { links } from '#lib/site/links.ts';
+import type { Companion, CompanionPick, CompanionSummary } from './api.ts';
+
+/** How often the page asks while the draft is on, and while it waits for it to start. */
+export const POLL_MS = 3000;
+/** The picks the landing strip shows, newest first: a round of a 12-team draft. */
+export const STRIP_PICKS = 12;
+
+/** The host's picks held by the page: the ones it had to the answer's since, then the answer's. */
+export function mergePicks(held: readonly CompanionPick[], answer: Companion): CompanionPick[] {
+	return [...held.filter((p) => p.pick <= answer.since), ...answer.picks];
+}
+
+/** The placed picks as the rooms' views take them. A pick we could not place is left out: it takes
+ * nobody from our board. */
+export function roomPicks(picks: readonly CompanionPick[]): RoomPick[] {
+	return picks.flatMap((p) =>
+		p.player_id === null
+			? []
+			: [{ pick: p.pick, round: p.round, seat: p.seat, player_id: p.player_id, auto: false }]
+	);
+}
+
+/** The host's position as ours, or null for one we do not draft (a defensive player), which is
+ * never drawn under a wrong pill. */
+function position(p: string): Position | null {
+	if (p === 'DEF') return 'DST';
+	return POSITIONS.find((known) => known === p) ?? null;
+}
+
+/** The player a host pick names: our board's, the host's name for one we could not place, or null
+ * for a position we do not draft. */
+export function pickPlayer(p: CompanionPick, board: Board): PlayerRef | null {
+	const ours = p.player_id === null ? undefined : board.byId.get(p.player_id);
+	if (ours) return ours;
+	const pos = position(p.position);
+	return pos === null
+		? null
+		: {
+				id: `host:${p.host_player_id}`,
+				name: p.name,
+				position: pos,
+				positionRank: 0,
+				team: p.team,
+				headshot: ''
+			};
+}
+
+/** The last picks, newest first, each with its pick and who made it. A pick at a position we do
+ * not draft is left off the strip; the bar's count still holds it. */
+export function landingStrip(
+	picks: readonly CompanionPick[],
+	board: Board,
+	teams: number,
+	you: number,
+	names: readonly string[]
+): StripPick[] {
+	return picks
+		.slice(-STRIP_PICKS)
+		.reverse()
+		.flatMap((p, i) => {
+			const player = pickPlayer(p, board);
+			return player
+				? [
+						{
+							key: p.pick,
+							player,
+							lines: [pickLabel(p.pick, teams), p.seat === you ? 'you' : (names[p.seat - 1] ?? '')],
+							ring: i === 0 ? ('ink' as const) : undefined,
+							strong: p.seat === you
+						}
+					]
+				: [];
+		});
+}
+
+/** Each seat's name, slot 1 first: you, the league member's name on the host, or the slot in a
+ * mock draft or for a slot no member holds. */
+export function seatNames(c: Pick<Companion, 'teams' | 'slot' | 'seat_names'>): string[] {
+	return Array.from({ length: c.teams }, (_, i) => {
+		if (i + 1 === c.slot) return 'You';
+		const name = c.seat_names[i];
+		return name !== undefined && name !== '' ? name : `Slot ${String(i + 1)}`;
+	});
+}
+
+/** The bar's line under the count: where the draft is and when you are up. */
+export function turnWords(c: Companion): string {
+	switch (c.status) {
+		case 'pre_draft':
+			return 'Waiting for the draft to start on Sleeper';
+		case 'complete':
+			return 'The draft is over';
+		default:
+			break;
+	}
+	const paused = c.status === 'paused' ? 'Paused on Sleeper. ' : '';
+	if (c.your_turn) return `${paused}You're on the clock on Sleeper`;
+	if (c.your_next_pick === null || c.picks_until_turn === null) return `${paused}Your picks are in`;
+	return `${paused}You pick at ${pickLabel(c.your_next_pick, c.teams)}, ${plural(c.picks_until_turn, 'pick')} away`;
+}
+
+/** The host's own page for the draft, where the drafter makes the pick. */
+export function hostDraftUrl(c: Pick<Companion, 'host_draft_id'>): string {
+	return `https://sleeper.com/draft/nfl/${c.host_draft_id}`;
+}
+
+export { hasFeature as has } from '#lib/account/features.ts';
+
+const STATUS_WORDS: Readonly<Record<CompanionSummary['status'], string>> = {
+	pre_draft: 'not started',
+	drafting: 'drafting',
+	paused: 'paused',
+	complete: 'over, the report is ready'
+};
+
+/** A followed draft as the start page lists it, a link back to it. */
+export function recentLine(r: CompanionSummary): {
+	key: string;
+	lead: string;
+	text: string;
+	href: string;
+} {
+	const seat = r.host_username
+		? `@${r.host_username}, slot ${String(r.slot)}`
+		: `slot ${String(r.slot)}`;
+	return {
+		key: r.id,
+		lead: r.name !== '' ? r.name : `Sleeper draft ${r.host_draft_id}`,
+		text: `${seat} · ${STATUS_WORDS[r.status]} · followed ${dayLabel(r.created_at)}`,
+		href: links.companion(r.id)
+	};
+}

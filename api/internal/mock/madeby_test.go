@@ -121,6 +121,39 @@ func TestReportMarksPicksMadeForYou(t *testing.T) {
 	}
 }
 
+// A keeper is listed among the drafter's picks with the kept chip, no ADP
+// gap and no hindsight, since nobody chose him (ux-review-4 M9).
+func TestReportListsKeepers(t *testing.T) {
+	s := testSettings(t)
+	const keptRound = 3
+	kept := s.Pool[60].PlayerID
+	s.League.Keepers = []apitypes.Keeper{{Slot: 1, PlayerId: kept, Round: keptRound}}
+	d, err := mock.Run(s, 11, nil, mock.Options{AutopickThroughRound: 15})
+	if err != nil {
+		t.Fatal(err)
+	}
+	asked := 0
+	r, err := mock.BuildReport(context.Background(), mock.ReportInput{
+		Settings: s, Seed: 11, Draft: d, Runs: 1, Workers: 1, Odds: fixedOdds{asked: &asked},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, p := range r.Picks {
+		if p.PlayerID != kept {
+			continue
+		}
+		found = true
+		if p.Chip != mock.Kept || p.Round != keptRound || p.ADPGap != nil || p.StillThere != nil {
+			t.Fatalf("the keeper reads chip %q round %d gap %v still there %v", p.Chip, p.Round, p.ADPGap, p.StillThere)
+		}
+	}
+	if !found {
+		t.Fatalf("the keeper %s is not among the report's %d picks", kept, len(r.Picks))
+	}
+}
+
 // "Pick for me" inside Run marks its picks too.
 func TestRunAutopickMarksItsPicks(t *testing.T) {
 	s := testSettings(t)

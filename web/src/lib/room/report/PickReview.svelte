@@ -66,7 +66,7 @@
 		return { tone: 'gain', text: `right on time, ${oddsShort(odds)} there next turn` };
 	}
 
-	const lastPick = $derived(picks.at(-1)?.pick ?? null);
+	const lastPick = $derived(picks.filter((p) => p.chip !== 'kept').at(-1)?.pick ?? null);
 	const fellBack = $derived(picks.some((p) => p.odds_source.startsWith('fallback')));
 	const madeFor = $derived(picks.filter((p) => p.made_by !== 'you').length);
 </script>
@@ -96,8 +96,13 @@
 				<span class="vor">{signed(pick.over_replacement)}</span>
 			{/if}
 			<span class="chips">
-				<span class="gapc"><ToneChip tone={adp.tone}>{adp.text}</ToneChip></span>
-				<span class="hind"><ToneChip tone={hind.tone}>{hind.text}</ToneChip></span>
+				{#if pick.chip === 'kept'}
+					<!-- A keeper was nobody's choice: one grey chip where the gap and hindsight go. -->
+					<span class="gapc"><ToneChip tone="even">kept</ToneChip></span>
+				{:else}
+					<span class="gapc"><ToneChip tone={adp.tone}>{adp.text}</ToneChip></span>
+					<span class="hind"><ToneChip tone={hind.tone}>{hind.text}</ToneChip></span>
+				{/if}
 			</span>
 		</div>
 	{/each}
