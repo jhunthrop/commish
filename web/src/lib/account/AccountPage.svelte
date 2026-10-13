@@ -38,7 +38,7 @@
 	import GroupPasses from './GroupPasses.svelte';
 	import { accountLinks } from './links.ts';
 	import { hasFeature } from './features.ts';
-	import { displayName, mockLine, planWords, sheetLine } from './words.ts';
+	import { boughtMembership, displayName, mockLine, planWords, sheetLine } from './words.ts';
 
 	/** Your account: who you are, your sheets and mocks, your pass or membership with its one-click
 	 * cancel, and sign out. Signed out, the sign-in verb and what an account keeps. The shell is
@@ -273,7 +273,7 @@
 							<Quiet href={accountLinks.pass()}>See the Draft Pass</Quiet>
 						{/if}
 						<!-- Receipts are a purchase question, not a feature one: a claimer's pass has none. -->
-						{#if account.membership !== null || account.draft_pass?.source === 'purchase' || groupPasses.length > 0}
+						{#if boughtMembership(account) || account.draft_pass?.source === 'purchase' || groupPasses.length > 0}
 							<Quiet disabled={busy} onclick={() => void billing()}>Billing and receipts</Quiet>
 						{/if}
 						<Quiet disabled={busy} onclick={() => void signOut()}>Sign out</Quiet>

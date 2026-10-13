@@ -420,6 +420,24 @@ func (e LobbySeatViewKind) Valid() bool {
 	}
 }
 
+// Defines values for MembershipStateSource.
+const (
+	MembershipStateSourceGrant        MembershipStateSource = "grant"
+	MembershipStateSourceSubscription MembershipStateSource = "subscription"
+)
+
+// Valid indicates whether the value is a known member of the MembershipStateSource enum.
+func (e MembershipStateSource) Valid() bool {
+	switch e {
+	case MembershipStateSourceGrant:
+		return true
+	case MembershipStateSourceSubscription:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MockStatus.
 const (
 	MockStatusActive   MockStatus = "active"
@@ -1455,13 +1473,21 @@ type MatchupStarter struct {
 	Points float64 `json:"points"`
 }
 
-// MembershipState defines model for MembershipState.
+// MembershipState the account's Membership, from its live membership entitlement whatever its source, else its latest subscription. A subscription carries its billing (interval, current_period_end and cancel_at_period_end). A grant bought nothing, so those three are null.
 type MembershipState struct {
-	CancelAtPeriodEnd bool       `json:"cancel_at_period_end"`
+	CancelAtPeriodEnd *bool      `json:"cancel_at_period_end"`
 	CurrentPeriodEnd  *time.Time `json:"current_period_end"`
-	Interval          *Interval  `json:"interval"`
-	Status            string     `json:"status"`
+
+	// EndsAt when access ends, null for a grant with no end
+	EndsAt   *time.Time            `json:"ends_at"`
+	Interval *Interval             `json:"interval"`
+	Source   MembershipStateSource `json:"source"`
+	StartsAt time.Time             `json:"starts_at"`
+	Status   string                `json:"status"`
 }
+
+// MembershipStateSource defines model for MembershipState.Source.
+type MembershipStateSource string
 
 // Mock defines model for Mock.
 type Mock struct {

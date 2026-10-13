@@ -109,20 +109,41 @@ func scanMembership(row pgx.Row) (Membership, error) {
 	return m, err
 }
 
-// LatestMembership is the account's most recent subscription that got
-// past checkout, live or not, so the account page can still show a
-// canceled one. nil when there is none.
-func (s *Store) LatestMembership(ctx context.Context, accountID uuid.UUID) (*Membership, error) {
-	m, err := scanMembership(s.Pool.QueryRow(ctx, `
-		select `+membershipColumns+` from app.entitlements e
-		where e.account_id = $1 and e.source = 'subscription'
-		  and e.status not in ('incomplete', 'incomplete_expired')
-		order by e.created_at desc limit 1`, accountID))
+// HeldMembership is the Membership an account holds, from whatever
+// source wrote it. A grant has no billing: Interval and
+// CurrentPeriodEnd are nil and CancelAtPeriodEnd is false.
+type HeldMembership struct {
+	Source            Source
+	Status            string
+	StartsAt          time.Time
+	EndsAt            *time.Time
+	Interval          *string
+	CurrentPeriodEnd  *time.Time
+	CancelAtPeriodEnd bool
+}
+
+// AccountMembership is the Membership the account page shows: the live
+// membership row at now whatever its source (a subscription ahead of a
+// grant, so the cancel stays in reach), else the most recent
+// subscription that got past checkout, so a canceled one still shows.
+// nil when there is neither.
+func (s *Store) AccountMembership(ctx context.Context, accountID uuid.UUID, now time.Time) (*HeldMembership, error) {
+	var m HeldMembership
+	err := s.Pool.QueryRow(ctx, `
+		select e.source, e.status, e.starts_at, e.ends_at, e.billing_interval,
+		       e.current_period_end, e.cancel_at_period_end
+		from app.entitlements e
+		where e.account_id = $1 and e.product = 'membership'
+		  and ((`+liveClause+`)
+		       or (e.source = 'subscription' and e.status not in ('incomplete', 'incomplete_expired')))
+		order by (`+liveClause+`) desc, e.source = 'subscription' desc, e.created_at desc
+		limit 1`, accountID, now).Scan(&m.Source, &m.Status, &m.StartsAt, &m.EndsAt, &m.Interval,
+		&m.CurrentPeriodEnd, &m.CancelAtPeriodEnd)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("entitlements: latest membership %s: %w", accountID, err)
+		return nil, fmt.Errorf("entitlements: account membership %s: %w", accountID, err)
 	}
 	return &m, nil
 }

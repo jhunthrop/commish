@@ -1217,12 +1217,22 @@ export interface components {
 			/** @enum {string} */
 			source: 'purchase' | 'group_pass' | 'grant';
 		};
+		/** @description the account's Membership, from its live membership entitlement whatever its source, else its latest subscription. A subscription carries its billing (interval, current_period_end and cancel_at_period_end). A grant bought nothing, so those three are null. */
 		MembershipState: {
+			/** @enum {string} */
+			source: 'subscription' | 'grant';
 			status: string;
+			/** Format: date-time */
+			starts_at: string;
+			/**
+			 * Format: date-time
+			 * @description when access ends, null for a grant with no end
+			 */
+			ends_at: string | null;
 			interval: components['schemas']['Interval'] | null;
 			/** Format: date-time */
 			current_period_end: string | null;
-			cancel_at_period_end: boolean;
+			cancel_at_period_end: boolean | null;
 		};
 		AccountUpdate: {
 			handle: string;
