@@ -18,8 +18,27 @@ var ErrLinkNotFound = errors.New("leaguesync: link not found")
 // ErrTooMany is an attach past MaxLinksPerAccount.
 var ErrTooMany = errors.New("leaguesync: too many leagues")
 
+// ErrManyLeagues is a second live league for an account without the
+// many_leagues feature (the Draft Pass, and the Membership with it).
+var ErrManyLeagues = errors.New("leaguesync: a second league needs many_leagues")
+
 // MaxLinksPerAccount bounds the leagues one account attaches.
 const MaxLinksPerAccount = 20
+
+// MostFree is the live leagues an account follows without many_leagues.
+const MostFree = 1
+
+// overCap says why one more live league is refused when the account
+// already follows n others, nil when it is not.
+func overCap(n int, many bool) error {
+	switch {
+	case !many && n >= MostFree:
+		return ErrManyLeagues
+	case n >= MaxLinksPerAccount:
+		return ErrTooMany
+	}
+	return nil
+}
 
 // Link is one account's attachment to a host league.
 type Link struct {
@@ -63,8 +82,9 @@ func (s *Store) Find(ctx context.Context, accountID uuid.UUID, ref Ref) (Link, b
 }
 
 // Save inserts or updates the account's link to the host league,
-// refusing a new one past MaxLinksPerAccount.
-func (s *Store) Save(ctx context.Context, l Link) (Link, error) {
+// refusing a new one past MostFree without many, and past
+// MaxLinksPerAccount with it.
+func (s *Store) Save(ctx context.Context, l Link, many bool) (Link, error) {
 	var out Link
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext('league_links:' || $1::text))`, l.AccountID); err != nil {
@@ -76,8 +96,8 @@ func (s *Store) Save(ctx context.Context, l Link) (Link, error) {
 			l.AccountID, l.Ref.Host, l.Ref.LeagueID, l.Ref.Season).Scan(&n); err != nil {
 			return err
 		}
-		if n >= MaxLinksPerAccount {
-			return ErrTooMany
+		if err := overCap(n, many); err != nil {
+			return err
 		}
 		saved, err := scanLink(tx.QueryRow(ctx, `insert into app.league_links
 			(account_id, league_id, host, host_league_id, host_season, roster_id, last_read_at, host_team_key)
@@ -91,7 +111,7 @@ func (s *Store) Save(ctx context.Context, l Link) (Link, error) {
 		out = saved
 		return err
 	})
-	if errors.Is(err, ErrTooMany) {
+	if errors.Is(err, ErrTooMany) || errors.Is(err, ErrManyLeagues) {
 		return Link{}, err
 	}
 	if err != nil {
@@ -180,29 +200,36 @@ func (s *Store) Detach(ctx context.Context, accountID, id uuid.UUID) error {
 	return nil
 }
 
-// Restore undoes a detach of the account's link, within the attach cap.
-func (s *Store) Restore(ctx context.Context, accountID, id uuid.UUID) (Link, error) {
+// Restore undoes a detach of the account's link, within the same caps
+// as Save.
+func (s *Store) Restore(ctx context.Context, accountID, id uuid.UUID, many bool) (Link, error) {
 	var out Link
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext('league_links:' || $1::text))`, accountID); err != nil {
 			return err
 		}
-		var n int
-		if err := tx.QueryRow(ctx, `select count(*) from app.league_links where account_id = $1 and detached_at is null`, accountID).Scan(&n); err != nil {
-			return err
-		}
-		if n >= MaxLinksPerAccount {
-			return ErrTooMany
-		}
+		// The undo first, so another account's link is not found before
+		// any cap is counted; a cap refusal rolls it back.
 		l, err := scanLink(tx.QueryRow(ctx, `update app.league_links set detached_at = null
 			where id = $1 and account_id = $2 and detached_at is not null returning `+linkColumns, id, accountID))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrLinkNotFound
 		}
+		if err != nil {
+			return err
+		}
+		var others int
+		if err := tx.QueryRow(ctx, `select count(*) from app.league_links where account_id = $1 and detached_at is null and id <> $2`,
+			accountID, id).Scan(&others); err != nil {
+			return err
+		}
+		if err := overCap(others, many); err != nil {
+			return err
+		}
 		out = l
-		return err
+		return nil
 	})
-	if errors.Is(err, ErrLinkNotFound) || errors.Is(err, ErrTooMany) {
+	if errors.Is(err, ErrLinkNotFound) || errors.Is(err, ErrTooMany) || errors.Is(err, ErrManyLeagues) {
 		return Link{}, err
 	}
 	if err != nil {

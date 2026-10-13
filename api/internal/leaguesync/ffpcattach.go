@@ -34,6 +34,10 @@ func (s *Service) attachFFPC(w http.ResponseWriter, r *http.Request, in apitypes
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: ffpcPickWords})
 		return
 	}
+	many, ok := s.admitLeague(w, r, HostFFPC, ref.LeagueID)
+	if !ok {
+		return
+	}
 	ctx := r.Context()
 	accountID := auth.AccountID(r)
 	ltuid, err := s.FFPC.Member.OpenLeague(ctx, accountID, ref.LeagueID)
@@ -55,9 +59,8 @@ func (s *Service) attachFFPC(w http.ResponseWriter, r *http.Request, in apitypes
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: ffpcNotInListWords})
 		return
 	}
-	link, err := s.save(ctx, accountID, snap, teamID, ltuid)
-	if errors.Is(err, ErrTooMany) {
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, tooManyWords(), nil)
+	link, err := s.save(ctx, accountID, snap, teamID, ltuid, many)
+	if writeCapError(w, r, err) {
 		return
 	}
 	if err != nil {

@@ -188,7 +188,8 @@ paths:
         Attach the drafter's own league on another host by its link. Free. The league's roster and scoring become a
         saved league (custom scoring, exactly as the host states it) a mock reruns from, when a mock room can draft
         its shape. The drafter's seat is the team their Sleeper username runs, or the team they pick. Attaching the
-        same league again updates the seat.
+        same league again updates the seat. One live league is free; a second needs the many_leagues feature
+        (the Draft Pass or the Membership), refused with 403 naming it. A detached league does not count.
       security: [{ session: [] }]
       requestBody:
         required: true
@@ -198,6 +199,7 @@ paths:
       responses:
         "201": { $ref: "#/components/responses/LeagueSyncResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
@@ -234,10 +236,13 @@ paths:
     post:
       tags: [league-sync]
       operationId: restoreLeague
-      summary: Undo a detach. The league is followed again with the seat and saved league it had.
+      summary: >-
+        Undo a detach. The league is followed again with the seat and saved league it had. Like an attach, a second
+        live league needs the many_leagues feature (403 naming it).
       security: [{ session: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
         "409": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/sync:
@@ -1345,7 +1350,7 @@ components:
 
     Feature:
       type: string
-      enum: [live_draft_advisor, custom_scoring, full_reasoning, range_of_outcomes, synced_sheet, early_run, start_sit, waiver_ranks, trade_finder]
+      enum: [live_draft_advisor, custom_scoring, full_reasoning, range_of_outcomes, synced_sheet, early_run, start_sit, waiver_ranks, trade_finder, many_leagues]
     Product:
       type: string
       enum: [draft_pass, membership, group_pass]

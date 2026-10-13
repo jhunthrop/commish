@@ -11,12 +11,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/leagues"
 	"github.com/jhunthrop/commish/api/internal/mfl"
 	"github.com/jhunthrop/commish/api/internal/mock"
@@ -130,6 +132,20 @@ func (c caller) do(handler http.HandlerFunc, method, path string, body any, path
 
 func intp(n int) *int { return &n }
 
+// replayService serves the recorded Sleeper and MyFantasyLeague leagues
+// over the test database, with Can read from it too.
+func replayService(pool *pgxpool.Pool) *Service {
+	clock := &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
+	hosts := replayHosts(clock.Now)
+	store := &Store{Pool: pool}
+	return &Service{
+		Hosts: hosts, Poller: &Poller{Hosts: hosts, Store: store, Now: clock.Now, Log: quietLog()},
+		Admission: &Admission{Now: clock.Now}, Players: memoryPlayers{hosts}, Links: store,
+		Saved: &leagues.Store{Pool: pool}, Boards: smallBoard{}, Entitlements: &entitlements.Store{Pool: pool},
+		Now: clock.Now, Log: quietLog(),
+	}
+}
+
 // Two members of one league each attach it and each see their own seat;
 // one read reaches the host for both; neither can read, list or detach
 // the other's attachment or saved league; a detach keeps the saved league
@@ -146,15 +162,9 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
-	hosts := replayHosts(clock.Now)
+	svc := replayService(pool)
 	store := &Store{Pool: pool}
 	saved := &leagues.Store{Pool: pool}
-	svc := &Service{
-		Hosts: hosts, Poller: &Poller{Hosts: hosts, Store: store, Now: clock.Now, Log: quietLog()},
-		Admission: &Admission{Now: clock.Now},
-		Players:   memoryPlayers{hosts}, Links: store, Saved: saved, Boards: smallBoard{}, Now: clock.Now, Log: quietLog(),
-	}
 	a, b := caller{t, svc, alice.ID}, caller{t, svc, bob.ID}
 	link := "https://sleeper.com/leagues/" + ReplaySleeperLeague + "/team"
 
@@ -198,6 +208,10 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 		t.Fatalf("alice's list %s", body)
 	}
 
+	// A second league needs many_leagues, so alice holds a Draft Pass for it.
+	if err := (&entitlements.Store{Pool: pool}).Grant(ctx, alice.ID, entitlements.ProductDraftPass, 2026, clock2027(), "test"); err != nil {
+		t.Fatal(err)
+	}
 	status, body = a.do(svc.attach, http.MethodPost, "/leagues/attach", apitypes.AttachInput{
 		Link: "https://www43.myfantasyleague.com/2026/home/" + ReplayMFLLeague, Me: apitypes.AttachSeat{Username: strp("alice")},
 	}, "")
@@ -237,3 +251,6 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 }
 
 func strp(s string) *string { return &s }
+
+// clock2027 is a grant's end well past the replay clock's day.
+func clock2027() time.Time { return time.Date(2027, 3, 1, 0, 0, 0, 0, time.UTC) }

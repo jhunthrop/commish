@@ -9,6 +9,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
+	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/hosts"
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -69,7 +70,7 @@ func (f ffpcWiring) host(store *leaguesync.Store) *leaguesync.FFPC {
 // second and FFPC third behind one poller, the rooms' board, and the
 // recorded leagues when COMPANION_REPLAY is on (development only). The
 // host directories are read at start, so the first view finds them.
-func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ff ffpcWiring, log *slog.Logger) *leaguesync.Service {
+func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ents *entitlements.Store, ff ffpcWiring, log *slog.Logger) *leaguesync.Service {
 	now := time.Now
 	var sleeperAPI leaguesync.SleeperAPI = sleeper.New()
 	var mflAPI leaguesync.MFLAPI = mfl.New()
@@ -94,6 +95,6 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 		Poller:    &leaguesync.Poller{Hosts: hostList, Store: store, Now: now, Log: log},
 		Admission: &leaguesync.Admission{Now: now},
 		Players:   players,
-		Links:     store, Saved: saved, Boards: board, FFPC: ffpcHost, Now: now, Log: log,
+		Links:     store, Saved: saved, Boards: board, FFPC: ffpcHost, Entitlements: ents, Now: now, Log: log,
 	}
 }

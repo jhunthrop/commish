@@ -16,6 +16,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
+	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/hosts"
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
 	"github.com/jhunthrop/commish/api/internal/leagues"
@@ -160,7 +161,8 @@ func TestAttachFFPC(t *testing.T) {
 	svc := &Service{
 		Hosts: hostList, Poller: &Poller{Hosts: hostList, Store: store, Now: clock.Now, Log: quietLog()},
 		Admission: &Admission{Now: clock.Now}, Players: memoryPlayers{hostList}, Links: store,
-		Saved: &leagues.Store{Pool: pool}, Boards: smallBoard{}, FFPC: host, Now: clock.Now, Log: quietLog(),
+		Saved: &leagues.Store{Pool: pool}, Boards: smallBoard{}, FFPC: host, Entitlements: &entitlements.Store{Pool: pool},
+		Now: clock.Now, Log: quietLog(),
 	}
 	a, b := caller{t, svc, alice.ID}, caller{t, svc, bob.ID}
 	ffpcHost := apitypes.LeagueHostFfpc

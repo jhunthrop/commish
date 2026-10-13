@@ -180,6 +180,7 @@ const (
 	FeatureEarlyRun         Feature = "early_run"
 	FeatureFullReasoning    Feature = "full_reasoning"
 	FeatureLiveDraftAdvisor Feature = "live_draft_advisor"
+	FeatureManyLeagues      Feature = "many_leagues"
 	FeatureRangeOfOutcomes  Feature = "range_of_outcomes"
 	FeatureStartSit         Feature = "start_sit"
 	FeatureSyncedSheet      Feature = "synced_sheet"
@@ -197,6 +198,8 @@ func (e Feature) Valid() bool {
 	case FeatureFullReasoning:
 		return true
 	case FeatureLiveDraftAdvisor:
+		return true
+	case FeatureManyLeagues:
 		return true
 	case FeatureRangeOfOutcomes:
 		return true

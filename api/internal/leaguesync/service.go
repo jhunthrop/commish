@@ -13,6 +13,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leagues"
 )
@@ -31,11 +32,11 @@ const (
 // Links is the part of Store the handlers use.
 type Links interface {
 	Find(ctx context.Context, accountID uuid.UUID, ref Ref) (Link, bool, error)
-	Save(ctx context.Context, l Link) (Link, error)
+	Save(ctx context.Context, l Link, many bool) (Link, error)
 	Get(ctx context.Context, accountID, id uuid.UUID) (Link, error)
 	Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, error)
 	Detach(ctx context.Context, accountID, id uuid.UUID) error
-	Restore(ctx context.Context, accountID, id uuid.UUID) (Link, error)
+	Restore(ctx context.Context, accountID, id uuid.UUID, many bool) (Link, error)
 	Touch(ctx context.Context, accountID, id uuid.UUID, at time.Time) error
 	Linked(ctx context.Context, ref Ref) (bool, error)
 }
@@ -69,6 +70,8 @@ type Service struct {
 	Links     Links
 	Saved     SavedLeagues
 	Boards    BoardSource
+	// Entitlements answers many_leagues: one live league is free.
+	Entitlements Checker
 	// FFPC is the FFPC host when it is set up (HOST_CREDENTIALS_KEY), nil
 	// otherwise; it is also among Hosts, which reads it on the poll.
 	FFPC *FFPC
@@ -326,13 +329,18 @@ func (s *Service) restore(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	_, err := s.Links.Restore(r.Context(), auth.AccountID(r), id)
+	ctx := r.Context()
+	accountID := auth.AccountID(r)
+	many, err := s.Entitlements.Can(ctx, accountID, entitlements.ManyLeagues, s.Now())
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "leaguesync: can many leagues", err)
+		return
+	}
+	_, err = s.Links.Restore(ctx, accountID, id, many)
 	switch {
 	case errors.Is(err, ErrLinkNotFound):
 		httpx.WriteNotFound(w, r)
-	case errors.Is(err, ErrTooMany):
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict,
-			fmt.Sprintf("You follow %d leagues, the most allowed. Detach one first", MaxLinksPerAccount), nil)
+	case writeCapError(w, r, err):
 	case err != nil:
 		httpx.WriteInternal(w, r, s.Log, "leaguesync: restore", err)
 	default:

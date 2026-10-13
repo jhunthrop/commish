@@ -165,7 +165,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Attach the drafter's own league on another host by its link. Free. The league's roster and scoring become a saved league (custom scoring, exactly as the host states it) a mock reruns from, when a mock room can draft its shape. The drafter's seat is the team their Sleeper username runs, or the team they pick. Attaching the same league again updates the seat. */
+		/** Attach the drafter's own league on another host by its link. Free. The league's roster and scoring become a saved league (custom scoring, exactly as the host states it) a mock reruns from, when a mock room can draft its shape. The drafter's seat is the team their Sleeper username runs, or the team they pick. Attaching the same league again updates the seat. One live league is free; a second needs the many_leagues feature (the Draft Pass or the Membership), refused with 403 naming it. A detached league does not count. */
 		post: operations['attachLeague'];
 		delete?: never;
 		options?: never;
@@ -220,7 +220,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Undo a detach. The league is followed again with the seat and saved league it had. */
+		/** Undo a detach. The league is followed again with the seat and saved league it had. Like an attach, a second live league needs the many_leagues feature (403 naming it). */
 		post: operations['restoreLeague'];
 		delete?: never;
 		options?: never;
@@ -1186,7 +1186,8 @@ export interface components {
 			| 'early_run'
 			| 'start_sit'
 			| 'waiver_ranks'
-			| 'trade_finder';
+			| 'trade_finder'
+			| 'many_leagues';
 		/** @enum {string} */
 		Product: 'draft_pass' | 'membership' | 'group_pass';
 		/** @enum {string} */
@@ -2573,6 +2574,7 @@ export interface operations {
 		responses: {
 			201: components['responses']['LeagueSyncResponse'];
 			400: components['responses']['ErrorResponse'];
+			403: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 			422: components['responses']['ErrorResponse'];
@@ -2626,6 +2628,7 @@ export interface operations {
 		requestBody?: never;
 		responses: {
 			200: components['responses']['EmptyResponse'];
+			403: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 		};
