@@ -167,7 +167,7 @@
 						/>
 						{#if preview.seat_by_username}
 							<ChipGroup label="Find your team by">
-								<Chip pressed={by === 'team'} onclick={() => (by = 'team')}>Picking it</Chip>
+								<Chip pressed={by === 'team'} onclick={() => (by = 'team')}>From the list</Chip>
 								<Chip pressed={by === 'username'} onclick={() => (by = 'username')}
 									>My Sleeper username</Chip
 								>

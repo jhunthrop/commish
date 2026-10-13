@@ -134,7 +134,7 @@ async function shoot(
 			await page.waitForLoadState('networkidle');
 			await page.evaluate(() => document.fonts.ready);
 			const file = new URL(`${name}-${theme}-${String(width)}.png`, out);
-			await page.screenshot({ path: file.pathname, fullPage: true });
+			await page.screenshot({ path: file.pathname, fullPage });
 			await ctx.close();
 			process.stdout.write(`${file.pathname}\n`);
 		}
@@ -145,9 +145,11 @@ const ids = await seed();
 const link = (l: string): string => `/league/new?link=${encodeURIComponent(l)}`;
 await shoot('new-signed-out', null, '/league/new', 'Sign in to follow your league');
 await shoot('new-empty', fresh, '/league/new', 'Follow your league');
-await shoot('new-sleeper', fresh, link(SLEEPER_LINK), 'Picking it');
+await shoot('new-sleeper', fresh, link(SLEEPER_LINK), 'From the list');
 await shoot('new-mfl', fresh, link(MFL_LINK), '12 teams on MyFantasyLeague');
 await shoot('league-sleeper', owner, `/league/${ids.sleeper}`, 'Waiver pool');
+// The first screen alone, where the phone's tab bar holds League.
+await shoot('league-sleeper-first-screen', owner, `/league/${ids.sleeper}`, 'Waiver pool', false);
 await shoot('league-mfl', owner, `/league/${ids.mfl}`, 'Waiver pool');
 await shoot('league-signed-out', null, `/league/${ids.sleeper}`, 'Sign in to see your league');
 await shoot('account', owner, '/account', 'Your leagues');
