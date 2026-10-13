@@ -182,7 +182,16 @@ async function main(): Promise<void> {
   const { budget, seasons } = parseArgs(process.argv.slice(2));
   const apiKey = requireEnv("ODDS_API_KEY");
   const db = createDb(requireEnv("DATABASE_URL"));
+  try {
+    await run(db, apiKey, budget, seasons);
+  } finally {
+    // The client closes on every path. A thrown error used to leave the pool open, and the process
+    // hung instead of exiting 1, which is how the Python parity harness found it on 2026-10-13.
+    await db.$client.end();
+  }
+}
 
+async function run(db: ReturnType<typeof createDb>, apiKey: string, budget: number, seasons: readonly number[]): Promise<void> {
   const archived = new Set(await archivedEventIds(db));
   const tracker: CreditTracker = { usedThisRun: 0, lastRemaining: "unknown" };
   const usedAtStart = { value: null as number | null };
@@ -252,11 +261,7 @@ async function main(): Promise<void> {
   }
 }
 
-// The client closes on every path. A thrown error used to leave the pool open, and the process hung
-// instead of exiting 1, which is how the Python parity harness found it on 2026-10-13.
-main()
-  .catch((error: unknown) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(() => db.$client.end());
+main().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});
