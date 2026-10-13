@@ -3,13 +3,16 @@ package solo
 import (
 	"bytes"
 	"compress/flate"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/leagues"
 )
 
 // shareVersion is the code's format; a code of another version is refused.
@@ -48,6 +51,18 @@ func encodeShare(s share) (string, error) {
 		return "", fmt.Errorf("solo: deflate share: %w", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(buf.Bytes()), nil
+}
+
+// shareKey names a shared draft by what it is: its settings, seed and
+// picks, canonically encoded and hashed.
+func shareKey(s share) (string, error) {
+	s.Settings = leagues.Normalize(s.Settings)
+	raw, err := json.Marshal(s)
+	if err != nil {
+		return "", fmt.Errorf("solo: share key: %w", err)
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 func decodeShare(code string) (share, error) {

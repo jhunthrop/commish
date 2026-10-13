@@ -21,6 +21,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/exports"
 	"github.com/jhunthrop/commish/api/internal/mail"
+	"github.com/jhunthrop/commish/api/internal/mocks"
 	"github.com/jhunthrop/commish/api/internal/season"
 )
 
@@ -123,6 +124,11 @@ func runSweep(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpo
 		return err
 	}
 	log.Info("cleared billing event payloads", "cleared", cleared)
+	unclaimed, err := (&mocks.Store{Pool: pool}).SweepUnclaimed(ctx, now.Add(-auth.AnonTTL))
+	if err != nil {
+		return err
+	}
+	log.Info("swept unclaimed anonymous mocks", "deleted", unclaimed)
 	if !cfg.R2.Configured() {
 		log.Warn("r2 not configured", "effect", "exports not swept")
 		return nil

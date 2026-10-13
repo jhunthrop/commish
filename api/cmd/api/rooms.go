@@ -25,7 +25,7 @@ import (
 // the research tables, the advisor with the engine behind it, and the
 // engine's own runs for the report. The board's pool, when it has one of
 // its own, lives as long as the process.
-func rooms(cfg config.API, pool *pgxpool.Pool, gate *leagues.Gate, leagueStore *leagues.Store, sheetStore *sheets.Store,
+func rooms(cfg config.API, pool *pgxpool.Pool, mockStore *mocks.Store, anon *auth.Anon, gate *leagues.Gate, leagueStore *leagues.Store, sheetStore *sheets.Store,
 	authStore *auth.Store, log *slog.Logger) (*solo.Service, *lobby.Handler, error) {
 	draftBoards, _, err := draftroom.OpenBoards(pool, cfg.Board, time.Now)
 	if err != nil {
@@ -41,7 +41,7 @@ func rooms(cfg config.API, pool *pgxpool.Pool, gate *leagues.Gate, leagueStore *
 	}
 	hindsight := mock.SimOdds{Runs: sim.RoomOddsRuns, Workers: workers}
 	soloService := &solo.Service{
-		Mocks: &mocks.Store{Pool: pool}, Leagues: leagueStore, Gate: gate, Sheets: sheetStore, Boards: draftBoards,
+		Mocks: mockStore, Anon: anon, Leagues: leagueStore, Gate: gate, Sheets: sheetStore, Boards: draftBoards,
 		Advisor: card, Hindsight: hindsight, ReportWorkers: workers, Now: time.Now, Log: log,
 	}
 	lobbyHandler := &lobby.Handler{

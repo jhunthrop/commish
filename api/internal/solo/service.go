@@ -38,14 +38,15 @@ const sharedEpoch = "2026-08-15T18:00:00.000Z"
 
 // Repository is the part of mocks.Store the room uses.
 type Repository interface {
-	Start(ctx context.Context, accountID uuid.UUID, n mocks.NewMock) (apitypes.Mock, error)
-	ReadLog(ctx context.Context, accountID, id uuid.UUID) (mocks.Log, error)
-	AppendActions(ctx context.Context, accountID, id uuid.UUID, afterSeq int64, actions []mocks.Action, completedAt *time.Time) error
-	Truncate(ctx context.Context, accountID, id uuid.UUID, head, fromSeq int64, keepCardsThrough int) error
-	Card(ctx context.Context, id uuid.UUID, pick int) (json.RawMessage, bool, error)
-	PutCard(ctx context.Context, id uuid.UUID, pick int, card any) error
-	Report(ctx context.Context, accountID, id uuid.UUID) (json.RawMessage, bool, error)
-	PutReport(ctx context.Context, accountID, id uuid.UUID, head int64, report any, at time.Time) error
+	Start(ctx context.Context, owner mocks.Owner, n mocks.NewMock) (apitypes.Mock, error)
+	LiveAnonymous(ctx context.Context, ownerToken []byte) (int, error)
+	ReadLog(ctx context.Context, owner mocks.Owner, id uuid.UUID) (mocks.Log, error)
+	AppendActions(ctx context.Context, owner mocks.Owner, id uuid.UUID, afterSeq int64, actions []mocks.Action, completedAt *time.Time) error
+	Truncate(ctx context.Context, owner mocks.Owner, id uuid.UUID, head, fromSeq int64) error
+	Card(ctx context.Context, id uuid.UUID, branch, pick int) (json.RawMessage, bool, error)
+	PutCard(ctx context.Context, id uuid.UUID, branch, pick int, card any) error
+	Report(ctx context.Context, owner mocks.Owner, id uuid.UUID) (json.RawMessage, bool, error)
+	PutReport(ctx context.Context, owner mocks.Owner, id uuid.UUID, head int64, report any, at time.Time) error
 }
 
 // LeagueReader is the part of leagues.Store a mock reads.
@@ -80,7 +81,9 @@ type Service struct {
 	Boards  BoardSource
 	Advisor advisor.Advisor
 	// Hindsight answers a report's pick that recorded no odds.
-	Hindsight     mock.Odds
+	Hindsight mock.Odds
+	// Anon is the signed-out owner's cookies.
+	Anon          AnonOwners
 	ReportWorkers int
 	Now           func() time.Time
 	Log           *slog.Logger
@@ -96,6 +99,8 @@ type room struct {
 	board    boards.Board
 	draft    mock.Draft
 	head     int64
+	// branch counts the undos; cards are stored per branch.
+	branch int
 }
 
 // stamp is an instant as the engine's timestamps read: whole milliseconds.
@@ -104,8 +109,8 @@ func stamp(t time.Time) string { return draft.FormatMillis(t.UnixMilli()) }
 func (s *Service) now() time.Time { return s.Now().UTC().Truncate(time.Millisecond) }
 
 // load replays one of the account's mocks from its log.
-func (s *Service) load(ctx context.Context, accountID, id uuid.UUID) (room, error) {
-	log, err := s.Mocks.ReadLog(ctx, accountID, id)
+func (s *Service) load(ctx context.Context, owner mocks.Owner, id uuid.UUID) (room, error) {
+	log, err := s.Mocks.ReadLog(ctx, owner, id)
 	if err != nil {
 		return room{}, err
 	}
@@ -119,7 +124,7 @@ func (s *Service) load(ctx context.Context, accountID, id uuid.UUID) (room, erro
 	if err != nil {
 		return room{}, fmt.Errorf("solo: replay %s: %w", id, err)
 	}
-	return room{mock: log.Mock, settings: settings, seed: seed, board: board, draft: d, head: log.Head}, nil
+	return room{mock: log.Mock, settings: settings, seed: seed, board: board, draft: d, head: log.Head, branch: log.Branch}, nil
 }
 
 // errNotWaiting is a pick, a card or a stand-in asked for when the draft
@@ -134,7 +139,7 @@ var errWrongPick = errors.New("solo: that pick has passed")
 
 // append writes the actions after the ones r had, closing the mock when
 // the draft is over.
-func (s *Service) append(ctx context.Context, accountID uuid.UUID, r room, next mock.Draft, at time.Time) (room, error) {
+func (s *Service) append(ctx context.Context, owner mocks.Owner, r room, next mock.Draft, at time.Time) (room, error) {
 	entries, err := mock.LogEntries(next, len(r.draft.Actions)+1)
 	if err != nil {
 		return room{}, err
@@ -143,7 +148,7 @@ func (s *Service) append(ctx context.Context, accountID uuid.UUID, r room, next 
 	if draft.IsComplete(next.State) {
 		completed = &at
 	}
-	if err := s.Mocks.AppendActions(ctx, accountID, r.mock.Id, r.head, entries, completed); err != nil {
+	if err := s.Mocks.AppendActions(ctx, owner, r.mock.Id, r.head, entries, completed); err != nil {
 		return room{}, err
 	}
 	r.draft, r.head = next, r.head+int64(len(entries))
@@ -154,8 +159,9 @@ func (s *Service) append(ctx context.Context, accountID uuid.UUID, r room, next 
 }
 
 // recordedOdds is the card the room showed at a pick, as the pick records it.
-func (s *Service) recordedOdds(ctx context.Context, id uuid.UUID, pick int) (*mock.PickOdds, error) {
-	raw, ok, err := s.Mocks.Card(ctx, id, pick)
+func (s *Service) recordedOdds(ctx context.Context, r room, pick int) (*mock.PickOdds, error) {
+	id := r.mock.Id
+	raw, ok, err := s.Mocks.Card(ctx, id, r.branch, pick)
 	if err != nil || !ok {
 		return nil, err
 	}
@@ -167,8 +173,8 @@ func (s *Service) recordedOdds(ctx context.Context, id uuid.UUID, pick int) (*mo
 }
 
 // pick is the drafter's pick and every bot pick to the next turn.
-func (s *Service) pick(ctx context.Context, accountID, id uuid.UUID, in apitypes.MockPickInput) (room, error) {
-	r, err := s.load(ctx, accountID, id)
+func (s *Service) pick(ctx context.Context, owner mocks.Owner, id uuid.UUID, in apitypes.MockPickInput) (room, error) {
+	r, err := s.load(ctx, owner, id)
 	if err != nil {
 		return room{}, err
 	}
@@ -178,7 +184,7 @@ func (s *Service) pick(ctx context.Context, accountID, id uuid.UUID, in apitypes
 	if in.Pick != r.draft.State.PickNumber {
 		return room{}, errWrongPick
 	}
-	odds, err := s.recordedOdds(ctx, id, in.Pick)
+	odds, err := s.recordedOdds(ctx, r, in.Pick)
 	if err != nil {
 		return room{}, err
 	}
@@ -187,22 +193,26 @@ func (s *Service) pick(ctx context.Context, accountID, id uuid.UUID, in apitypes
 	if err != nil {
 		return room{}, err
 	}
-	return s.append(ctx, accountID, r, next, at)
+	return s.append(ctx, owner, r, next, at)
 }
 
 // autopick is "Pick for me to round N": the drafter's turns through that
 // round go to the stand-in, queue then sheet then board.
-func (s *Service) autopick(ctx context.Context, accountID, id uuid.UUID, through int) (room, error) {
-	r, err := s.load(ctx, accountID, id)
+func (s *Service) autopick(ctx context.Context, owner mocks.Owner, id uuid.UUID, through int) (room, error) {
+	r, err := s.load(ctx, owner, id)
 	if err != nil {
 		return room{}, err
 	}
 	if !r.draft.Waiting {
 		return room{}, errNotWaiting
 	}
-	sheet, err := s.Sheets.Order(ctx, accountID)
-	if err != nil {
-		return room{}, err
+	// A signed-out drafter has no sheet: the stand-in reads the queue,
+	// then the board.
+	var sheet []string
+	if !owner.Anonymous() {
+		if sheet, err = s.Sheets.Order(ctx, owner.Account); err != nil {
+			return room{}, err
+		}
 	}
 	keepers := mock.KeepersOf(r.settings.League)
 	at := s.now()
@@ -220,12 +230,12 @@ func (s *Service) autopick(ctx context.Context, accountID, id uuid.UUID, through
 	if len(next.Actions) == len(r.draft.Actions) {
 		return r, nil
 	}
-	return s.append(ctx, accountID, r, next, at)
+	return s.append(ctx, owner, r, next, at)
 }
 
 // setQueue replaces the drafter's queue.
-func (s *Service) setQueue(ctx context.Context, accountID, id uuid.UUID, ids []string) (room, error) {
-	r, err := s.load(ctx, accountID, id)
+func (s *Service) setQueue(ctx context.Context, owner mocks.Owner, id uuid.UUID, ids []string) (room, error) {
+	r, err := s.load(ctx, owner, id)
 	if err != nil {
 		return room{}, err
 	}
@@ -251,7 +261,7 @@ func (s *Service) setQueue(ctx context.Context, accountID, id uuid.UUID, ids []s
 	next := r.draft
 	next.Actions = append(append([]draft.Action(nil), r.draft.Actions...), a)
 	next.State = state
-	return s.append(ctx, accountID, r, next, at)
+	return s.append(ctx, owner, r, next, at)
 }
 
 func dedupe(ids []string) []string {
@@ -270,8 +280,8 @@ func dedupe(ids []string) []string {
 var errNotYours = &draft.Refusal{Reason: "That pick is not one of yours to take back."}
 
 // undo cuts the log back to just before the drafter's pick at pickNumber.
-func (s *Service) undo(ctx context.Context, accountID, id uuid.UUID, pickNumber int) (room, error) {
-	r, err := s.load(ctx, accountID, id)
+func (s *Service) undo(ctx context.Context, owner mocks.Owner, id uuid.UUID, pickNumber int) (room, error) {
+	r, err := s.load(ctx, owner, id)
 	if err != nil {
 		return room{}, err
 	}
@@ -279,10 +289,10 @@ func (s *Service) undo(ctx context.Context, accountID, id uuid.UUID, pickNumber 
 	if err != nil {
 		return room{}, err
 	}
-	if err := s.Mocks.Truncate(ctx, accountID, id, r.head, int64(seq), pickNumber); err != nil {
+	if err := s.Mocks.Truncate(ctx, owner, id, r.head, int64(seq)); err != nil {
 		return room{}, err
 	}
-	return s.load(ctx, accountID, id)
+	return s.load(ctx, owner, id)
 }
 
 // humanPickSeq is the 1-based seq of the MAKE_PICK that made the
@@ -311,8 +321,8 @@ func humanPickSeq(d mock.Draft, keepers sim.Keepers, pickNumber int) (int, error
 }
 
 // card is the drafter's card at the current turn, recorded on first read.
-func (s *Service) card(ctx context.Context, accountID, id uuid.UUID) (apitypes.RoomCard, error) {
-	r, err := s.load(ctx, accountID, id)
+func (s *Service) card(ctx context.Context, owner mocks.Owner, id uuid.UUID) (apitypes.RoomCard, error) {
+	r, err := s.load(ctx, owner, id)
 	if err != nil {
 		return apitypes.RoomCard{}, err
 	}
@@ -320,7 +330,7 @@ func (s *Service) card(ctx context.Context, accountID, id uuid.UUID) (apitypes.R
 		return apitypes.RoomCard{}, errNotWaiting
 	}
 	pick := r.draft.State.PickNumber
-	raw, ok, err := s.Mocks.Card(ctx, id, pick)
+	raw, ok, err := s.Mocks.Card(ctx, id, r.branch, pick)
 	if err != nil {
 		return apitypes.RoomCard{}, err
 	}
@@ -332,11 +342,14 @@ func (s *Service) card(ctx context.Context, accountID, id uuid.UUID) (apitypes.R
 		if err != nil {
 			return apitypes.RoomCard{}, err
 		}
-		if err := s.Mocks.PutCard(ctx, id, pick, draftroom.Trim(c, r.draft.State)); err != nil {
+		if err := s.Mocks.PutCard(ctx, id, r.branch, pick, draftroom.Trim(c, r.draft.State)); err != nil {
 			return apitypes.RoomCard{}, err
 		}
 		// Two tabs asking at once: the first card written is the one both see.
-		if raw, _, err = s.Mocks.Card(ctx, id, pick); err != nil {
+		if raw, ok, err = s.Mocks.Card(ctx, id, r.branch, pick); err != nil || !ok {
+			if err == nil {
+				err = mocks.ErrSeqConflict
+			}
 			return apitypes.RoomCard{}, err
 		}
 	}
@@ -348,11 +361,11 @@ func (s *Service) card(ctx context.Context, accountID, id uuid.UUID) (apitypes.R
 }
 
 // report is the finished draft's report, from the cache or computed once.
-func (s *Service) report(ctx context.Context, accountID, id uuid.UUID) (json.RawMessage, error) {
-	if raw, ok, err := s.Mocks.Report(ctx, accountID, id); err != nil || ok {
+func (s *Service) report(ctx context.Context, owner mocks.Owner, id uuid.UUID) (json.RawMessage, error) {
+	if raw, ok, err := s.Mocks.Report(ctx, owner, id); err != nil || ok {
 		return raw, err
 	}
-	r, err := s.load(ctx, accountID, id)
+	r, err := s.load(ctx, owner, id)
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +382,7 @@ func (s *Service) report(ctx context.Context, accountID, id uuid.UUID) (json.Raw
 	if out.ShareCode, err = shareCodeOf(r); err != nil {
 		return nil, err
 	}
-	if err := s.Mocks.PutReport(ctx, accountID, id, r.head, out, s.Now()); err != nil {
+	if err := s.Mocks.PutReport(ctx, owner, id, r.head, out, s.Now()); err != nil {
 		return nil, err
 	}
 	return json.Marshal(out)
@@ -377,7 +390,7 @@ func (s *Service) report(ctx context.Context, accountID, id uuid.UUID) (json.Raw
 
 // start makes a new mock: every bot pick before the drafter's first turn
 // is in its log from the start.
-func (s *Service) start(ctx context.Context, accountID uuid.UUID, leagueID *uuid.UUID, league apitypes.LeagueSettings, seed int64) (room, error) {
+func (s *Service) start(ctx context.Context, owner mocks.Owner, leagueID *uuid.UUID, league apitypes.LeagueSettings, seed int64) (room, error) {
 	league = leagues.Normalize(league)
 	board, err := s.Boards.For(ctx, league)
 	if err != nil {
@@ -393,7 +406,7 @@ func (s *Service) start(ctx context.Context, accountID uuid.UUID, leagueID *uuid
 	if err != nil {
 		return room{}, err
 	}
-	m, err := s.Mocks.Start(ctx, accountID, mocks.NewMock{
+	m, err := s.Mocks.Start(ctx, owner, mocks.NewMock{
 		ID: uuid.New(), LeagueID: leagueID, Settings: league, Seed: seed, CreatedAt: at, Actions: entries,
 	})
 	if err != nil {
@@ -437,7 +450,18 @@ func (s *Service) replay(ctx context.Context, code string) (room, error) {
 // sharedReport is a shared draft's report; the hindsight is the
 // engine's, since a link records no odds.
 func (s *Service) sharedReport(ctx context.Context, code string) (apitypes.MockReport, error) {
-	if out, ok := s.shared.get(code); ok {
+	sh, err := decodeShare(code)
+	if err != nil {
+		return apitypes.MockReport{}, err
+	}
+	// Keyed by the draft (settings, seed, picks), not the link's bytes, so
+	// every copy of one link costs one computation.
+	key, err := shareKey(sh)
+	if err != nil {
+		return apitypes.MockReport{}, err
+	}
+	if out, ok := s.shared.get(key); ok {
+		out.ShareCode = &code
 		return out, nil
 	}
 	r, err := s.replay(ctx, code)
@@ -455,6 +479,6 @@ func (s *Service) sharedReport(ctx context.Context, code string) (apitypes.MockR
 		return apitypes.MockReport{}, err
 	}
 	out.ShareCode = &code
-	s.shared.put(code, out)
+	s.shared.put(key, out)
 	return out, nil
 }

@@ -27,8 +27,8 @@ var (
 	ErrSeqConflict = errors.New("mocks: the log moved on")
 )
 
-// Store reads and writes app.mocks and app.mock_actions, every query
-// scoped by account.
+// Store reads and writes app.mocks, app.mock_actions and app.mock_cards,
+// every query on a mock scoped by its owner.
 type Store struct{ Pool *pgxpool.Pool }
 
 const columns = `id, league_id, settings, seed, status, created_at, updated_at, completed_at`
@@ -39,11 +39,15 @@ func scan(row pgx.Row) (apitypes.Mock, error) {
 	if err := row.Scan(&m.Id, &m.LeagueId, &raw, &m.Seed, &m.Status, &m.CreatedAt, &m.UpdatedAt, &m.CompletedAt); err != nil {
 		return apitypes.Mock{}, err
 	}
+	return m, decodeSettings(raw, &m)
+}
+
+func decodeSettings(raw []byte, m *apitypes.Mock) error {
 	if err := json.Unmarshal(raw, &m.Settings); err != nil {
-		return apitypes.Mock{}, fmt.Errorf("mocks: decode settings %s: %w", m.Id, err)
+		return fmt.Errorf("mocks: decode settings %s: %w", m.Id, err)
 	}
 	m.Settings = leagues.Normalize(m.Settings)
-	return m, nil
+	return nil
 }
 
 // NewMock is a mock about to be saved with the start of its log.
@@ -61,23 +65,24 @@ type NewMock struct {
 
 // Start saves a new mock and its first actions in one transaction: a
 // mock never exists without the log that starts it.
-func (s *Store) Start(ctx context.Context, accountID uuid.UUID, n NewMock) (apitypes.Mock, error) {
+func (s *Store) Start(ctx context.Context, owner Owner, n NewMock) (apitypes.Mock, error) {
 	raw, err := json.Marshal(leagues.Normalize(n.Settings))
 	if err != nil {
 		return apitypes.Mock{}, fmt.Errorf("mocks: encode settings: %w", err)
 	}
+	account, token := owner.columns()
 	var m apitypes.Mock
 	err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		var err error
-		m, err = scan(tx.QueryRow(ctx, `insert into app.mocks (id, account_id, league_id, settings, seed, created_at, updated_at)
-			values ($1, $2, $3, $4, $5, $6, $6) returning `+columns, n.ID, accountID, n.LeagueID, raw, n.Seed, n.CreatedAt))
+		m, err = scan(tx.QueryRow(ctx, `insert into app.mocks (id, account_id, owner_token, league_id, settings, seed, created_at, updated_at)
+			values ($1, $2, $3, $4, $5, $6, $7, $7) returning `+columns, n.ID, account, token, n.LeagueID, raw, n.Seed, n.CreatedAt))
 		if err != nil {
 			return err
 		}
 		return copyActions(ctx, tx, n.ID, 0, n.Actions)
 	})
 	if err != nil {
-		return apitypes.Mock{}, fmt.Errorf("mocks: start for %s: %w", accountID, err)
+		return apitypes.Mock{}, fmt.Errorf("mocks: start for %s: %w", owner, err)
 	}
 	return m, nil
 }
@@ -134,13 +139,14 @@ type Action struct {
 // the same commit. afterSeq must be the log's current head, so two
 // writers racing on one mock cannot interleave: the loser gets
 // ErrSeqConflict.
-func (s *Store) AppendActions(ctx context.Context, accountID, id uuid.UUID, afterSeq int64, actions []Action, completedAt *time.Time) error {
+func (s *Store) AppendActions(ctx context.Context, owner Owner, id uuid.UUID, afterSeq int64, actions []Action, completedAt *time.Time) error {
+	match, arg := owner.match(2)
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		var head int64
 		err := tx.QueryRow(ctx, `
 			select coalesce((select max(seq) from app.mock_actions where mock_id = m.id), 0)
-			from app.mocks m where m.id = $1 and m.account_id = $2 and m.status = 'active' for update`,
-			id, accountID).Scan(&head)
+			from app.mocks m where m.id = $1 and `+match+` and m.status = 'active' for update`,
+			id, arg).Scan(&head)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}

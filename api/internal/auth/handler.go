@@ -61,8 +61,12 @@ type Handler struct {
 	PublicBaseURL string
 	StateSealer   *Sealer
 	TrustedHops   int
-	Now           func() time.Time
-	Log           *slog.Logger
+	// Anon and Claimer move a browser's signed-out mocks to the account
+	// at sign-in; nil leaves them where they are.
+	Anon    *Anon
+	Claimer AnonClaimer
+	Now     func() time.Time
+	Log     *slog.Logger
 }
 
 // NewStateSealer is the sealer for the sign-in state cookie.
@@ -187,7 +191,29 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Sessions.Issue(w, token)
+	h.claimAnon(w, r, acct.ID)
 	http.Redirect(w, r, h.site(st.ReturnTo), http.StatusFound)
+}
+
+// claimAnon moves the mocks this browser drafted signed out to the
+// account it just signed in to, and retires the anonymous cookie. A
+// failed claim is logged and leaves the cookie, so the next sign-in
+// claims them; it never fails the sign-in.
+func (h *Handler) claimAnon(w http.ResponseWriter, r *http.Request, accountID uuid.UUID) {
+	if h.Anon == nil || h.Claimer == nil {
+		return
+	}
+	owner, ok := h.Anon.Owner(r)
+	if !ok {
+		return
+	}
+	n, err := h.Claimer.Claim(r.Context(), accountID, owner)
+	if err != nil {
+		h.Log.Error("auth: claim anonymous mocks", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+		return
+	}
+	h.Anon.Clear(w)
+	h.Log.Info("auth: claimed anonymous mocks", "request_id", httpx.RequestIDFrom(r.Context()), "mocks", n)
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {

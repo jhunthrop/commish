@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
-	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -32,7 +31,7 @@ const (
 
 // Routes is every route the solo room serves.
 func (s *Service) Routes() []httpx.Route {
-	in, perMin := httpx.SignedIn, httpx.PerMinute
+	in, perMin := httpx.Public, httpx.PerMinute
 	return []httpx.Route{
 		{Method: http.MethodPost, Path: "/mocks", Access: in, Limit: httpx.PerHour(limitCreatePerHour), Handler: s.handleCreate},
 		{Method: http.MethodGet, Path: "/mocks/{id}", Access: in, Limit: perMin(limitReadPerMinute), Handler: s.handleGet},
@@ -53,6 +52,17 @@ func randomSeed() int64 {
 	var b [4]byte
 	_, _ = rand.Read(b[:])
 	return int64(binary.BigEndian.Uint32(b[:]))
+}
+
+// ownerAndID is the request's owner and the mock in its path. On false it
+// has already answered.
+func (s *Service) ownerAndID(w http.ResponseWriter, r *http.Request) (mocks.Owner, uuid.UUID, bool) {
+	id, ok := httpx.PathUUID(w, r, "id")
+	if !ok {
+		return mocks.Owner{}, uuid.Nil, false
+	}
+	owner, ok := s.owner(w, r, false)
+	return owner, id, ok
 }
 
 // fail answers an error from the room in the envelope.
@@ -89,11 +99,16 @@ func (s *Service) answer(w http.ResponseWriter, r *http.Request, status int, rm 
 
 // settingsFor resolves a create's settings: a saved league's, or the
 // ones in the request, never both. On false it has already answered.
-func (s *Service) settingsFor(w http.ResponseWriter, r *http.Request, in apitypes.MockCreate) (apitypes.LeagueSettings, bool) {
-	accountID := auth.AccountID(r)
+func (s *Service) settingsFor(w http.ResponseWriter, r *http.Request, owner mocks.Owner, in apitypes.MockCreate) (apitypes.LeagueSettings, bool) {
+	// A signed-out drafter has no saved leagues and no entitlements, so the
+	// gate refuses custom scoring for them as for any account without it.
+	accountID := owner.Account
 	switch {
 	case (in.LeagueId == nil) == (in.Settings == nil):
 		httpx.WriteInvalid(w, r, map[string]string{"settings": "Start from a saved league or from settings, not both"})
+		return apitypes.LeagueSettings{}, false
+	case in.LeagueId != nil && owner.Anonymous():
+		httpx.WriteError(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, "Sign in to start from a saved league", nil)
 		return apitypes.LeagueSettings{}, false
 	case in.LeagueId != nil:
 		l, err := s.Leagues.Get(r.Context(), accountID, *in.LeagueId)
@@ -122,15 +137,31 @@ func (s *Service) handleCreate(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, map[string]string{"seed": "The seed is a whole number from 0 to 4294967295"})
 		return
 	}
-	settings, ok := s.settingsFor(w, r, in)
+	owner, ok := s.owner(w, r, true)
 	if !ok {
 		return
+	}
+	settings, ok := s.settingsFor(w, r, owner, in)
+	if !ok {
+		return
+	}
+	if owner.Anonymous() {
+		live, err := s.Mocks.LiveAnonymous(r.Context(), owner.Token)
+		if err != nil {
+			httpx.WriteInternal(w, r, s.Log, "solo: count anonymous", err)
+			return
+		}
+		if live >= MaxLiveAnonymous {
+			httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict,
+				"Sign in to keep more than 25 mocks going at once", nil)
+			return
+		}
 	}
 	seed := randomSeed()
 	if in.Seed != nil {
 		seed = *in.Seed
 	}
-	rm, err := s.start(r.Context(), auth.AccountID(r), in.LeagueId, settings, seed)
+	rm, err := s.start(r.Context(), owner, in.LeagueId, settings, seed)
 	if err != nil {
 		s.fail(w, r, "solo: create", err)
 		return
@@ -139,11 +170,11 @@ func (s *Service) handleCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) handleGet(w http.ResponseWriter, r *http.Request) {
-	id, ok := httpx.PathUUID(w, r, "id")
+	owner, id, ok := s.ownerAndID(w, r)
 	if !ok {
 		return
 	}
-	rm, err := s.load(r.Context(), auth.AccountID(r), id)
+	rm, err := s.load(r.Context(), owner, id)
 	if err != nil {
 		s.fail(w, r, "solo: get", err)
 		return
@@ -152,7 +183,7 @@ func (s *Service) handleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) handlePick(w http.ResponseWriter, r *http.Request) {
-	id, ok := httpx.PathUUID(w, r, "id")
+	owner, id, ok := s.ownerAndID(w, r)
 	if !ok {
 		return
 	}
@@ -164,7 +195,7 @@ func (s *Service) handlePick(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, map[string]string{"player_id": "Pick a player at the pick on the clock"})
 		return
 	}
-	rm, err := s.pick(r.Context(), auth.AccountID(r), id, in)
+	rm, err := s.pick(r.Context(), owner, id, in)
 	if err != nil {
 		s.fail(w, r, "solo: pick", err)
 		return
@@ -173,7 +204,7 @@ func (s *Service) handlePick(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) handleUndo(w http.ResponseWriter, r *http.Request) {
-	id, ok := httpx.PathUUID(w, r, "id")
+	owner, id, ok := s.ownerAndID(w, r)
 	if !ok {
 		return
 	}
@@ -181,7 +212,7 @@ func (s *Service) handleUndo(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
 		return
 	}
-	rm, err := s.undo(r.Context(), auth.AccountID(r), id, in.Pick)
+	rm, err := s.undo(r.Context(), owner, id, in.Pick)
 	if err != nil {
 		s.fail(w, r, "solo: undo", err)
 		return
@@ -190,7 +221,7 @@ func (s *Service) handleUndo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) handleAutopick(w http.ResponseWriter, r *http.Request) {
-	id, ok := httpx.PathUUID(w, r, "id")
+	owner, id, ok := s.ownerAndID(w, r)
 	if !ok {
 		return
 	}
@@ -199,19 +230,19 @@ func (s *Service) handleAutopick(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, map[string]string{"to_round": "Pick a round in the draft"})
 		return
 	}
-	s.autopickThrough(w, r, id, through)
+	s.autopickThrough(w, r, owner, id, through)
 }
 
 func (s *Service) handleFinish(w http.ResponseWriter, r *http.Request) {
-	id, ok := httpx.PathUUID(w, r, "id")
+	owner, id, ok := s.ownerAndID(w, r)
 	if !ok {
 		return
 	}
-	s.autopickThrough(w, r, id, leagues.MaxRounds)
+	s.autopickThrough(w, r, owner, id, leagues.MaxRounds)
 }
 
-func (s *Service) autopickThrough(w http.ResponseWriter, r *http.Request, id uuid.UUID, through int) {
-	rm, err := s.autopick(r.Context(), auth.AccountID(r), id, through)
+func (s *Service) autopickThrough(w http.ResponseWriter, r *http.Request, owner mocks.Owner, id uuid.UUID, through int) {
+	rm, err := s.autopick(r.Context(), owner, id, through)
 	if err != nil {
 		s.fail(w, r, "solo: autopick", err)
 		return
@@ -220,7 +251,7 @@ func (s *Service) autopickThrough(w http.ResponseWriter, r *http.Request, id uui
 }
 
 func (s *Service) handleQueue(w http.ResponseWriter, r *http.Request) {
-	id, ok := httpx.PathUUID(w, r, "id")
+	owner, id, ok := s.ownerAndID(w, r)
 	if !ok {
 		return
 	}
@@ -228,7 +259,7 @@ func (s *Service) handleQueue(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
 		return
 	}
-	rm, err := s.setQueue(r.Context(), auth.AccountID(r), id, in.PlayerIds)
+	rm, err := s.setQueue(r.Context(), owner, id, in.PlayerIds)
 	if err != nil {
 		s.fail(w, r, "solo: queue", err)
 		return
@@ -237,11 +268,11 @@ func (s *Service) handleQueue(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) handleCard(w http.ResponseWriter, r *http.Request) {
-	id, ok := httpx.PathUUID(w, r, "id")
+	owner, id, ok := s.ownerAndID(w, r)
 	if !ok {
 		return
 	}
-	card, err := s.card(r.Context(), auth.AccountID(r), id)
+	card, err := s.card(r.Context(), owner, id)
 	if err != nil {
 		s.fail(w, r, "solo: card", err)
 		return
@@ -250,11 +281,11 @@ func (s *Service) handleCard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) handleReport(w http.ResponseWriter, r *http.Request) {
-	id, ok := httpx.PathUUID(w, r, "id")
+	owner, id, ok := s.ownerAndID(w, r)
 	if !ok {
 		return
 	}
-	raw, err := s.report(r.Context(), auth.AccountID(r), id)
+	raw, err := s.report(r.Context(), owner, id)
 	if err != nil {
 		s.fail(w, r, "solo: report", err)
 		return
