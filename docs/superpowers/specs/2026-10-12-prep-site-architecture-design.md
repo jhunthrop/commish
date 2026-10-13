@@ -14,7 +14,7 @@ A fantasy football draft prep site. Everything on it answers one question for a 
 6. **Comparison, strength of schedule, the clubs index.** Free.
 7. **The Draft Pass** ($39 a season, non-renewing): the advisor beside a live draft on another host, custom-scoring boards from your league's exact rules, every format. **The Membership** ($99 a year or $14.99 a month, annual shown first): the pass plus full-depth reasoning per player, the range of outcomes in full, the sheet synced to a live draft, early access to the nightly run. **The Group Draft Pass** per league. One-click cancellation, a reminder before any renewal. Never gated: the prose, the projection, the standard boards. Never: contests, sportsbook bundles, ads. Prices are set in 2027 against the 2026 record.
 
-Not at launch, by design: league sync, start and sit, waivers, trades, lineups, content, a native app.
+Not at launch, by design: content, a native app, league management. League sync, start and sit, waivers and trades were on this list until 2026-10-13; the founder ruled that day that in-season tools carry equal weight to the draft tools (§2.9).
 
 The copy rules carry unchanged: no em-dashes, no semicolons, no competitor names on a screen, no tips or explainer text, fantasy words not trading words, every number names its basis in the same view, prose is written by the grounded writer and never templated.
 
@@ -81,6 +81,17 @@ The one piece of new engineering: reading a draft in progress on another host. S
 ### 2.8 A phone app, later
 
 Founder question 2026-10-13: "did we keep in mind a future mobile app - does svelte have something like react native?" Svelte has no first-class native runtime; Svelte Native on NativeScript is a small community project and not a foundation. The planned path is Capacitor: the same SvelteKit app in a native shell with store presence, push and native plugins, chosen when the Draft Pass companion (the advisor beside a live draft on another host) needs to sit on a phone beside the host's app. A separate native app stays possible because everything is behind the Go API with an OpenAPI contract, the web lane holds no secret, and the rooms speak WebSocket with a reconnect handshake. Two things are built now so that day is a new client, not a rewrite: a bearer-token session path in `api/internal/auth` beside the cookie session (WorkOS's mobile flow), and an installable web app (manifest, offline shell, phone-first layouts) so the site is a home-screen app at launch. Not at launch: a store listing.
+
+### 2.9 In-season tools, equal weight
+
+Founder ruling 2026-10-13: "since we're already in season - the in-season tools are of equal weight." The Membership is the in-season tier. Four lanes follow Lane 10, each needing the one before it:
+
+1. **League sync**, Sleeper first by league link (its league, rosters, users, matchups and transactions endpoints are public by id): rosters, the league's scoring through the custom-scoring path (§2.6), matchups, and the unrostered pool, read on the companion's polling discipline (one upstream read per league per interval whatever the viewer count, stale answers say how stale). A league is attached to an account and to the saved league settings a mock reruns from.
+2. **A weekly projection round** in research, preregistered: the weekly opportunity, efficiency and scheme components the register already uses, fitted and gated on held-out weeks the way the kicker and defense round was, with its model_version and implementation on every row. No weekly number reaches a screen before the round passes its gates; until then the in-season screens show the season projection and the stat lines, labelled.
+3. **The in-season tools** on the two above, each one screen, one verb, the evidence beside it: start and sit (the lineup the engine's roster rules already hold, scored by the weekly projection, with the sit-and-start odds stated), waivers (the board restricted to the unrostered pool, ranked by value over the drafter's own roster), and the trade finder (value over replacement across two rosters with the sheet's tags, never a word from the trading vocabulary on screen).
+4. **The browser extension** for ESPN and Yahoo, the live draft and league sync both, measured on a real league of each before either is sold, named on the pass page only once it works.
+
+Timing is honest: the weekly round takes weeks, so the full set targets the 2027 preseason; league sync and the waiver pool can ship this season.
 
 ## 3. The mock rooms
 
