@@ -7,7 +7,7 @@ import type { Board } from '#lib/room/model.ts';
 import type { PlayerRef, Position } from '#lib/types/player.ts';
 import { POSITIONS } from '#lib/types/player.ts';
 import type { StripPick } from '#lib/types/room.ts';
-import type { Companion, CompanionPick, Feature } from './api.ts';
+import type { Companion, CompanionPick } from './api.ts';
 
 /** How often the page asks while the draft is on, and while it waits for it to start. */
 export const POLL_MS = 3000;
@@ -89,7 +89,4 @@ export function hostDraftUrl(c: Pick<Companion, 'host_draft_id'>): string {
 	return `https://sleeper.com/draft/nfl/${c.host_draft_id}`;
 }
 
-/** Whether the account has a feature, as the API's Can answers it through /me. */
-export function has(features: readonly Feature[], feature: Feature): boolean {
-	return features.includes(feature);
-}
+export { hasFeature as has } from '#lib/account/features.ts';

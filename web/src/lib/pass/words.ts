@@ -43,9 +43,14 @@ export const FEATURE_WORDS: Readonly<Record<Feature, FeatureWords>> = {
 	}
 };
 
-/** The feature lines a product's list prints, in the contract's order. */
+/** Features a product grants that are not built yet, kept off every screen until they ship, so
+ * the page never sells what is not there: custom scoring comes back with Lane 8 part A, the early
+ * run with the nightly's early-access build. */
+const NOT_BUILT: ReadonlySet<Feature> = new Set<Feature>(['custom_scoring', 'early_run']);
+
+/** The feature lines a product's list prints, in the contract's order, built ones only. */
 export function featureLines(features: readonly Feature[]): FeatureWords[] {
-	return features.map((feature) => FEATURE_WORDS[feature]);
+	return features.filter((f) => !NOT_BUILT.has(f)).map((feature) => FEATURE_WORDS[feature]);
 }
 
 /** The features the Membership adds over the pass, for the line that says "everything in the pass,
@@ -85,22 +90,18 @@ export interface Host {
 	line: string;
 }
 
-/** Which hosts the live draft and the scoring import work with, today and later (spec §2.7). */
+/** Which hosts the live draft works with today, by the host's own name (spec §2.7). Only what is
+ * built is said: the other hosts are named as not followed yet, with no date. */
 export const HOSTS: readonly Host[] = [
 	{
 		name: 'Sleeper',
 		ready: true,
-		line: 'Works with a Sleeper draft today: paste the draft link, no sign-in to Sleeper needed. Scoring imports from the league.'
+		line: 'Works with a Sleeper draft today: paste the draft link, no sign-in to Sleeper needed.'
 	},
 	{
-		name: 'ESPN',
+		name: 'ESPN and Yahoo',
 		ready: false,
-		line: 'An ESPN draft needs your own ESPN session, so it comes with a browser extension after launch. Scoring imports from a league anyone can view.'
-	},
-	{
-		name: 'Yahoo',
-		ready: false,
-		line: "A Yahoo draft comes with the same extension. Enter a Yahoo league's scoring by hand."
+		line: 'Drafts on ESPN and Yahoo are not followed yet.'
 	}
 ];
 

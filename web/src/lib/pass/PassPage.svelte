@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { hasLiveMembership } from '#lib/account/words.ts';
+	import { hasEvery, hasFeature } from '#lib/account/features.ts';
 	import { links } from '#lib/site/links.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -52,10 +52,11 @@
 	/** Back from a checkout closed without paying. Read in the browser: the shell is prerendered. */
 	let canceled = $state(false);
 
-	const memberNow = $derived(account !== null && hasLiveMembership(account));
-	const passNow = $derived(
-		account?.draft_pass != null && catalog !== null && account.draft_pass.season === catalog.season
-	);
+	/** Every verb answers from the features /me reports (Can), never from which product is held. */
+	const features = $derived(account?.features ?? []);
+	const passOn = $derived(catalog !== null && hasEvery(features, catalog.features.draft_pass));
+	const memberOn = $derived(catalog !== null && hasEvery(features, catalog.features.membership));
+	const companionOn = $derived(hasFeature(features, 'live_draft_advisor'));
 	const membershipPrice = $derived(
 		catalog?.membership.find((p) => p.interval === interval) ?? null
 	);
@@ -129,7 +130,7 @@
 	<title>Draft Pass · Commish</title>
 	<meta
 		name="description"
-		content="Our call beside your real draft and your league's exact scoring, for one season."
+		content="Our call beside your real Sleeper draft, at every one of your picks, for one season."
 	/>
 </svelte:head>
 
@@ -173,12 +174,11 @@
 						</section>
 					{/snippet}
 					{#snippet action()}
-						{#if memberNow}
-							<p class="have">Your Membership includes it.</p>
-							<Verb href={links.companionNew()} fill>Open the live draft companion</Verb>
-						{:else if passNow}
-							<p class="have">It's yours through {ends}.</p>
-							<Verb href={links.companionNew()} fill>Open the live draft companion</Verb>
+						{#if passOn}
+							<p class="have">Everything in it is on your account.</p>
+							{#if companionOn}
+								<Verb href={links.companionNew()} fill>Open the live draft companion</Verb>
+							{/if}
 						{:else}
 							<Verb
 								fill
@@ -212,8 +212,8 @@
 						{/if}
 					{/snippet}
 					{#snippet action()}
-						{#if memberNow}
-							<p class="have">You're a member.</p>
+						{#if memberOn}
+							<p class="have">Everything in it is on your account.</p>
 							<Quiet href={links.account()} fill>Your account</Quiet>
 						{:else}
 							<Quiet

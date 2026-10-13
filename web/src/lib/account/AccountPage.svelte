@@ -33,7 +33,8 @@
 	} from './arrival.ts';
 	import GroupPasses from './GroupPasses.svelte';
 	import { accountLinks } from './links.ts';
-	import { displayName, hasLiveMembership, mockLine, planWords, sheetLine } from './words.ts';
+	import { hasFeature } from './features.ts';
+	import { displayName, mockLine, planWords, sheetLine } from './words.ts';
 
 	/** Your account: who you are, your sheets and mocks, your pass or membership with its one-click
 	 * cancel, and sign out. Signed out, the sign-in verb and what an account keeps. The shell is
@@ -245,12 +246,12 @@
 								Keep my membership
 							</Quiet>
 						{/if}
-						{#if account.draft_pass !== null || hasLiveMembership(account)}
+						{#if hasFeature(account.features, 'live_draft_advisor')}
 							<Quiet href={accountLinks.companion()}>Open the live draft companion</Quiet>
 						{:else}
 							<Quiet href={accountLinks.pass()}>See the Draft Pass</Quiet>
 						{/if}
-						{#if account.membership !== null || account.draft_pass?.source === 'purchase' || groupPasses.length > 0}
+						{#if account.features.length > 0 || groupPasses.length > 0}
 							<Quiet disabled={busy} onclick={() => void billing()}>Billing and receipts</Quiet>
 						{/if}
 						<Quiet disabled={busy} onclick={() => void signOut()}>Sign out</Quiet>

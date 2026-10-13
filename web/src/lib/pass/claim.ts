@@ -1,6 +1,6 @@
 /** What the claim page says about a group pass link and the reader: one state, its sentence and its
  * verb. Pure, so the page only draws it. */
-import { hasLiveMembership } from '#lib/account/words.ts';
+import { hasFeature } from '#lib/account/features.ts';
 import { HTTP_STATUS, hasStatus } from '#lib/api/status.ts';
 import type { Account, GroupPassPreview } from './pass-api.ts';
 
@@ -33,10 +33,9 @@ export type ClaimStep =
 
 export function claimStep(preview: GroupPassPreview, account: Account | null): ClaimStep {
 	if (preview.claimed_by_me) return 'yours';
-	if (account !== null) {
-		const ownPass = account.draft_pass !== null && account.draft_pass.season === preview.season;
-		if (ownPass || hasLiveMembership(account)) return 'covered';
-	}
+	// The features /me reports answer it: a reader who already has the live draft advisor is
+	// covered, whatever product gave it to them. The API refuses the claim the same way.
+	if (account !== null && hasFeature(account.features, 'live_draft_advisor')) return 'covered';
 	if (preview.claimed >= preview.seats) return 'full';
 	return account === null ? 'sign-in' : 'claim';
 }
