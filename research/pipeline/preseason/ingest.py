@@ -55,6 +55,10 @@ BOARD_FORMATS: tuple[tuple[str, str, str, FfcAdpFormat], ...] = (
     ("std", BenchmarkSource.ADP_STD, "std_12", "standard"),
 )
 DEFAULT_BOARD_FORMAT = "ppr"
+# The superflex board's market: Fantasy Football Calculator's two-quarterback drafts, captured by the
+# nightly beside the three above (`ingest_superflex_adp_snapshot`). Kept out of BOARD_FORMATS, which
+# is the oracle's three and what the parity cases prove; the oracle never captured it.
+SUPERFLEX_ADP_SNAPSHOT: tuple[str, str, str, FfcAdpFormat] = ("superflex", "ffc_adp_2qb_12", "2qb_12", "2qb")
 
 
 # --- the store ----------------------------------------------------------------------------------

@@ -233,6 +233,14 @@ STANDARD_ROSTER_SLOTS: Final = (
     RosterSlotConfig(BENCH_SLOT, 6, ("QB", "RB", "WR", "TE", "K", "DEF")),
 )
 
+# `SUPERFLEX_ROSTER_SLOTS` (`domain/roster-shape.ts`): one more slot that also takes a quarterback,
+# after FLEX so a back or receiver fills the narrower slot first.
+SUPERFLEX_ROSTER_SLOTS: Final = (
+    *STANDARD_ROSTER_SLOTS[:5],
+    RosterSlotConfig("SUPERFLEX", 1, ("QB", "RB", "WR", "TE")),
+    *STANDARD_ROSTER_SLOTS[5:],
+)
+
 SCORING_PRESETS: Final = MappingProxyType(
     {"standard": STANDARD_SCORING, "ppr": PPR_SCORING, "half_ppr": HALF_PPR_SCORING}
 )

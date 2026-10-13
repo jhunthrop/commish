@@ -23,7 +23,7 @@ from typing import Final
 from sqlalchemy import Connection
 
 from research.errors import ConfigurationError
-from research.pipeline import coaches, crosswalk, vegas
+from research.pipeline import coaches, crosswalk, history, vegas
 from research.pipeline.budget import FixedBudget
 from research.pipeline.checkpoint import Checkpoint
 from research.pipeline.http import Fetcher
@@ -200,4 +200,5 @@ COMMANDS: Final = MappingProxyType({
     "props-backfill": Command("the historical props archive, budgeted", _props_backfill, atomic=False),
     "win-totals-seed": Command("the committed win-totals CSV", lambda c, i: vegas.ingest_win_totals_csv(c, RESEARCH_ROOT / vegas.WIN_TOTALS_CSV_PATH, i.now)),
     "win-totals": Command("the publisher's win totals before kickoff", _win_totals),
+    "history": Command("the seasons the store lost, re-created from nflverse (pipeline/history.py)", lambda c, i: history.rebuild_history(c, i.fetcher, i.now, i.checkpoint), atomic=False),
 })  # fmt: skip
