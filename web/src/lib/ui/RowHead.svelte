@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Label from './Label.svelte';
 
-	/** The column heads over a run of Rows, on the same grid. Hidden on the phone, where each cell names itself. */
+	/** The column heads over a run of Rows, on the same grid. On the phone it names only the columns whose cells print a bare number. */
 	interface Props {
 		/** The floor to ceiling column, on unless the view switches it off. Rows under it take the same. */
 		range?: boolean;
@@ -27,10 +27,14 @@
 	<span></span>
 	<Label>Player</Label>
 	<span class="proj"><Label align="end">Projected</Label></span>
-	<span class="end"><Label align="end">Over replacement</Label></span>
+	<span class="end"
+		><Label align="end"
+			><span class="wide">Over replacement</span><span class="narrow">Over repl</span></Label
+		></span
+	>
 	{#if range}<span class="rng"><Label>Floor to ceiling</Label></span>{/if}
-	<Label>Drafters vs us</Label>
-	{#if action}<span></span>{/if}
+	<Label><span class="wide">Drafters vs us</span><span class="narrow">Drafters</span></Label>
+	{#if action}<span class="act-end"></span>{/if}
 </div>
 
 <style>
@@ -58,7 +62,8 @@
 	.lead,
 	.proj,
 	.end {
-		text-align: right;
+		display: flex;
+		justify-content: flex-end;
 	}
 
 	@media (max-width: 960px) {
@@ -67,9 +72,26 @@
 		}
 	}
 
+	.narrow {
+		display: none;
+	}
+
+	/* On the phone the head names the over replacement column, whose cells print the number alone. */
 	@media (max-width: 760px) {
 		.head {
+			column-gap: var(--s-2);
+			padding: 0 0 var(--s-2);
+		}
+
+		.lead,
+		.proj,
+		.wide,
+		.act-end {
 			display: none;
+		}
+
+		.narrow {
+			display: inline;
 		}
 	}
 </style>

@@ -66,7 +66,8 @@ input {
 @media (max-width: 760px) {
 	:root {
 		--row-h: 48px;
-		--board-cols: 36px minmax(0, 1fr) 110px 90px;
+		/* The over replacement cell is its number alone on the phone ("+164.1"), named by the head. */
+		--board-cols: 36px minmax(0, 1fr) 76px 90px;
 		/* The phone row has no room for the action; a player's page carries it. */
 		--board-cols-act: var(--board-cols);
 		--board-cols-act-flat: var(--board-cols);

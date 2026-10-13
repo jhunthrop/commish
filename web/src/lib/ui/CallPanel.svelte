@@ -5,6 +5,7 @@
 	import type { PlayerRef } from '#lib/types/player.ts';
 	import type { CallAction } from '#lib/types/room.ts';
 	import Face from './Face.svelte';
+	import NameWords from './NameWords.svelte';
 	import { holdHeight } from './hold-height.ts';
 	import Panel from './Panel.svelte';
 	import PositionPill from './PositionPill.svelte';
@@ -47,9 +48,6 @@
 	}: Props = $props();
 
 	const quiet = $derived(waiting || reading !== undefined);
-	/** A name breaks only between its words, never at the hyphen inside one: "Amon-Ra" stays whole. */
-	const SPACE = ' ';
-	const words = $derived(player.name.split(SPACE));
 </script>
 
 <Panel as="section" label={reading ?? tag} padding="none" edge={quiet ? 'quiet' : 'accent'}>
@@ -66,9 +64,7 @@
 		<div class="what">
 			<span class="tag">{reading ?? tag}</span>
 			<h2>
-				<span
-					>Take{#each words as word, i (i)}{SPACE}<span class="word">{word}</span>{/each}</span
-				>
+				<span>Take <NameWords name={player.name} /></span>
 			</h2>
 			<div class="meta">
 				<PositionPill position={player.position} rank={player.positionRank} />
@@ -114,10 +110,6 @@
 
 	.waiting .tag {
 		color: var(--ink-3);
-	}
-
-	.word {
-		white-space: nowrap;
 	}
 
 	/* The skeleton: the last call's frame, every word a quiet block of the same size. */

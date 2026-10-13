@@ -4,6 +4,7 @@
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import AdpCell from './AdpCell.svelte';
 	import Face from './Face.svelte';
+	import NameWords from './NameWords.svelte';
 	import PositionPill from './PositionPill.svelte';
 	import RangeBar from './RangeBar.svelte';
 	import TierChip from './TierChip.svelte';
@@ -59,7 +60,7 @@
 	<span class="rk">{lead}</span>
 	<Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />
 	<span class="who">
-		<a class="name" {href}>{player.name}</a>
+		<a class="name" {href}><NameWords name={player.name} /></a>
 		<span class="meta">
 			<PositionPill position={player.position} rank={player.positionRank} />
 			{#if showTier}<span class="wide tier"><TierChip tier={player.tier} /></span>{/if}
@@ -69,7 +70,7 @@
 		</span>
 	</span>
 	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
-	<ValueCell {...vorCell(player.vor, player.vorRound)} />
+	<ValueCell {...vorCell(player.vor, player.vorRound)} phoneLabel={false} />
 	{#if range}
 		<span class="rng">
 			<RangeBar floor={player.floor} median={player.median} ceiling={player.ceiling} {scale} />
@@ -218,6 +219,16 @@
 
 		.narrow {
 			display: inline;
+		}
+
+		/* A long name takes a second line rather than losing its end: "Jaxon Smith-Njigba". */
+		.name {
+			white-space: normal;
+			display: -webkit-box;
+			-webkit-box-orient: vertical;
+			-webkit-line-clamp: 2;
+			line-clamp: 2;
+			line-height: 1.2;
 		}
 	}
 </style>
