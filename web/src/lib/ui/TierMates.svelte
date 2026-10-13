@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { fixed } from '#lib/format/number.ts';
+	import { fixed, plural } from '#lib/format/number.ts';
 	import type { PlayerRef } from '#lib/types/player.ts';
 	import PlayerLine from './PlayerLine.svelte';
 	import Figure from './Figure.svelte';
-	import { tierColor, type TierCliff } from './tier.ts';
+	import { tierColor, type GroupName, type TierCliff } from './tier.ts';
 
 	interface Mate extends PlayerRef {
 		href: string;
@@ -12,8 +12,8 @@
 
 	interface Props {
 		tier: number;
-		/** "WRs". */
-		group: string;
+		/** What his tier's players are called, one and many. */
+		group: GroupName;
 		mates: readonly Mate[];
 		/** The player the page is about, marked in the list. */
 		currentId: string;
@@ -28,15 +28,15 @@
 
 	const drop = $derived(
 		cliff
-			? `${String(mates.length)} players, then ${fixed(cliff.drop)} ${unit} down to tier ${String(cliff.nextTier)}`
-			: `${String(mates.length)} players, the last tier`
+			? `${plural(mates.length, 'player')}, then ${fixed(cliff.drop)} ${unit} down to tier ${String(cliff.nextTier)}`
+			: `${plural(mates.length, 'player')}, the last tier`
 	);
 </script>
 
 <div class="mates" style:--tier={tierColor(tier)}>
 	<div class="band">
 		<span class="strip">{tier}</span>
-		<span class="what"><b>Tier {tier} {group}</b><span>{drop}</span></span>
+		<span class="what"><b>Tier {tier} {group.many}</b><span>{drop}</span></span>
 	</div>
 	<ol>
 		{#each mates as mate (mate.id)}

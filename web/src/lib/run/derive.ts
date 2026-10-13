@@ -1,19 +1,19 @@
 /** What every nightly page derives from a board, in one place: tiers and their drops, the range
  * scale rows share, the positions a board carries, the URL segment of a position. */
 import { POSITIONS, type Position, type RangeScale } from '#lib/types/player.ts';
-import type { TierCliff } from '#lib/ui/tier.ts';
+import type { GroupName, TierCliff } from '#lib/ui/tier.ts';
 import type { BoardRow } from './schema.ts';
 
 /** A range scale starts at the floor rounded down to this many points. */
 const SCALE_STEP = 25;
 
-export const POSITION_PLURAL: Readonly<Record<Position, string>> = {
-	QB: 'QBs',
-	RB: 'RBs',
-	WR: 'WRs',
-	TE: 'TEs',
-	K: 'kickers',
-	DST: 'defenses'
+export const POSITION_NAMES: Readonly<Record<Position, GroupName>> = {
+	QB: { one: 'QB', many: 'QBs' },
+	RB: { one: 'RB', many: 'RBs' },
+	WR: { one: 'WR', many: 'WRs' },
+	TE: { one: 'TE', many: 'TEs' },
+	K: { one: 'kicker', many: 'kickers' },
+	DST: { one: 'defense', many: 'defenses' }
 };
 
 /** The URL segment of a position view: /board/ppr-12/wr. */

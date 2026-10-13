@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { fixed, MINUS } from '#lib/format/number.ts';
-	import { tierColor, type TierCliff } from './tier.ts';
+	import { fixed, MINUS, plural } from '#lib/format/number.ts';
+	import { tierColor, type GroupName, type TierCliff } from './tier.ts';
 
 	interface TierLink {
 		tier: number;
@@ -12,8 +12,8 @@
 
 	interface Props {
 		tiers: readonly TierLink[];
-		/** "WRs". */
-		group: string;
+		/** What each count counts, one and many. */
+		group: GroupName;
 	}
 
 	let { tiers, group }: Props = $props();
@@ -24,7 +24,7 @@
 		<li>
 			<a href={link.href} style:--tier={tierColor(link.tier)}>
 				<span class="n">{link.tier}</span>
-				<span>{link.count} {group}</span>
+				<span>{plural(link.count, group.one, group.many)}</span>
 				<span class="d">{link.cliff ? `${MINUS}${fixed(link.cliff.drop)}` : ''}</span>
 			</a>
 		</li>

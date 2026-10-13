@@ -39,7 +39,7 @@
 		<a class="name" {href}>{player.name}</a>
 		<span class="meta">
 			<PositionPill position={player.position} rank={player.positionRank} />
-			{#if showTier}<TierChip tier={player.tier} />{/if}
+			{#if showTier}<span class="wide"><TierChip tier={player.tier} /></span>{/if}
 			<span class="wide">{player.team}</span>
 			<span class="wide">{fixed(player.expectedGames)} games</span>
 			<span class="narrow">{fixed(player.projected)} pts</span>

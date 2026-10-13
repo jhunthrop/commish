@@ -10,6 +10,12 @@ export function tierColor(tier: number): string {
 	return `var(--tier-${((tier - 1) % TIER_HUES) + 1})`;
 }
 
+/** What a tier's players are called, one and many: { one: 'WR', many: 'WRs' }. */
+export interface GroupName {
+	one: string;
+	many: string;
+}
+
 /** The drop from one tier to the next, the reason tiers exist. */
 export interface TierCliff {
 	/** Projected points from the last player in this tier to the first in the next. */

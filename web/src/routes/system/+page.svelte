@@ -7,7 +7,7 @@
 		oddsWords,
 		pickLabel
 	} from '#lib/format/draft.ts';
-	import { fixed, signed } from '#lib/format/number.ts';
+	import { fixed, plural, signed } from '#lib/format/number.ts';
 	import CallPanel from '#lib/ui/CallPanel.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -151,7 +151,8 @@
 				/>
 				<Part name="The name and the count" about="How many players share the tier.">
 					{#snippet show()}<b>Tier {data.wrTier.tier}</b>
-						<Label>{data.wrTier.count} {data.wrTier.group}</Label>{/snippet}
+						<Label>{plural(data.wrTier.count, data.wrTier.group.one, data.wrTier.group.many)}</Label
+						>{/snippet}
 				</Part>
 				<Part
 					name="The drop label"

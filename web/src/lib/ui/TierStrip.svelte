@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { fixed } from '#lib/format/number.ts';
-	import { tierColor, type TierCliff } from './tier.ts';
+	import { fixed, plural } from '#lib/format/number.ts';
+	import { tierColor, type GroupName, type TierCliff } from './tier.ts';
 
 	interface Props {
 		tier: number;
 		/** How many players share the tier. */
 		count: number;
-		/** The plural the count reads with: "WRs". */
-		group: string;
+		/** What the count counts, one and many: { one: 'WR', many: 'WRs' }. */
+		group: GroupName;
 		/** The drop to the next tier, or null on the last tier. */
 		cliff: TierCliff | null;
 		/** What the drop is measured in, named in full: "PPR pts". */
@@ -21,7 +21,7 @@
 
 <div class="band" {id} style:--tier={tierColor(tier)}>
 	<span class="strip">{tier}</span>
-	<span class="name"><b>Tier {tier}</b><span>{count} {group}</span></span>
+	<span class="name"><b>Tier {tier}</b><span>{plural(count, group.one, group.many)}</span></span>
 	<span class="cliff">
 		{#if cliff}
 			<b>{fixed(cliff.drop)}</b><span>{unit} down to tier {cliff.nextTier}</span>
