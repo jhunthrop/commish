@@ -9,10 +9,11 @@ import (
 )
 
 // Both recorded leagues read through the same checks a live answer
-// gets, and their roster and scoring come out as the hosts state them:
-// the Sleeper league's two flex spots and half a point more per tight
-// end catch, the MyFantasyLeague league's per-unit rules with its
-// field goals by distance named as dropped.
+// gets, and their roster and scoring come out as the hosts state them, in
+// ScoringRules' 21 keys: the Sleeper league's two flex spots and half a
+// point more per tight end catch, its special teams touchdowns named as
+// dropped; the MyFantasyLeague league's per-unit rules, its points
+// allowed by bracket named as dropped in its own words.
 func TestRecordedLeaguesRead(t *testing.T) {
 	now := func() time.Time { return time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC) }
 	hosts := replayHosts(now)
@@ -24,9 +25,15 @@ func TestRecordedLeaguesRead(t *testing.T) {
 		dropped string
 	}{
 		{"sleeper.com/leagues/" + ReplaySleeperLeague, apitypes.LineupTwoFlex, 20,
-			map[string]float64{"rec": 1, "bonus_rec_te": 0.5, "pass_td": 5, "pass_yd": 0.04}, ""},
+			map[string]float64{
+				"points_per_reception": 1, "te_reception_bonus": 0.5, "points_per_passing_touchdown": 5,
+				"points_per_passing_yard": 0.04, "points_per_two_point_conversion": 2, "points_per_interception": -1,
+			}, "st_td 6"},
 		{"https://www43.myfantasyleague.com/2026/home/" + ReplayMFLLeague, apitypes.LineupStandard, 23,
-			map[string]float64{"rec": 1, "pass_td": 4, "pass_yd": 0.04, "rush_td": 6, "pts_allow_0": 6, "sack": 1}, "FG 31-99 *.1 (QB RB WR TE PK)"},
+			map[string]float64{
+				"points_per_reception": 1, "points_per_passing_touchdown": 4, "points_per_passing_yard": 0.04,
+				"points_per_rushing_touchdown": 6, "points_per_sack": 1, "points_per_return_touchdown": 6,
+			}, "STPA+OPA 0-0 6 (Def)"},
 	}
 	for _, c := range cases {
 		h, ref, err := hosts.Resolve("", c.link)
@@ -45,8 +52,11 @@ func TestRecordedLeaguesRead(t *testing.T) {
 				t.Errorf("%s: %s = %v, want %v", c.link, k, snap.Scoring.Rules[k], v)
 			}
 		}
-		if c.dropped != "" && !contains(snap.Scoring.Dropped, c.dropped) {
+		if !contains(snap.Scoring.Dropped, c.dropped) {
 			t.Errorf("%s: dropped %q, want %q among them", c.link, snap.Scoring.Dropped, c.dropped)
+		}
+		if len(snap.Scoring.Rules) != len(ruleKeys) {
+			t.Errorf("%s: %d rule keys, want the %d of ScoringRules", c.link, len(snap.Scoring.Rules), len(ruleKeys))
 		}
 		settings, reason := SettingsFor(snap)
 		if reason != "" {

@@ -33,6 +33,7 @@ const (
 	pprReceptionFrom  = 0.75
 	halfReceptionFrom = 0.25
 	receptionStat     = "rec"
+	receptionRule     = "points_per_reception"
 )
 
 // FormatFor is the board a league's scoring drafts from. TE premium has
@@ -52,6 +53,10 @@ func FormatFor(s apitypes.Scoring) Format {
 	}
 	if s.Custom != nil {
 		rec := (*s.Custom)[receptionStat]
+		// ScoringRules' name for it, as an attached league saves it.
+		if v, ok := (*s.Custom)[receptionRule]; ok {
+			rec = v
+		}
 		switch {
 		case rec >= pprReceptionFrom:
 			return PPR

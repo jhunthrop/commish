@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/leagues"
+	"github.com/jhunthrop/commish/api/internal/lobby"
 )
 
 // SettingsFor is the saved league a mock reruns from: the league's
@@ -60,32 +63,25 @@ func firstProblem(errs map[string]string) string {
 	}
 	sort.Strings(keys)
 	msg := errs[keys[0]]
-	return strings.ToLower(msg[:1]) + msg[1:]
+	r, size := utf8.DecodeRuneInString(msg)
+	if size == 0 {
+		return "its settings do not check out"
+	}
+	return string(unicode.ToLower(r)) + msg[size:]
 }
 
-// ValuationSettings is the league a board is valued for on the league
-// page: the saved settings when a mock can rerun the league, otherwise
-// the nearest shape the rooms hold, with the league's own scoring.
+// ValuationSettings is the league our board is valued for on the league
+// page: the saved league's shape when a mock can rerun it, otherwise the
+// rooms' standard roster at the nearest team count the rooms hold, and
+// in both the preset the league's rules score most like, so the board is
+// one the rooms carry whatever the rules.
 func ValuationSettings(snap Snapshot, saved *apitypes.LeagueSettings) apitypes.LeagueSettings {
+	preset := NearestPreset(snap.Scoring.Rules)
 	if saved != nil {
-		return *saved
+		s := *saved
+		s.Scoring = apitypes.Scoring{Preset: &preset}
+		return s
 	}
-	teams := snap.Shape.Teams
-	switch {
-	case teams < leagues.MinTeams:
-		teams = leagues.MinTeams
-	case teams > leagues.MaxTeams:
-		teams = leagues.MaxTeams
-	}
-	preset := apitypes.ScoringPresetPpr
-	s := apitypes.LeagueSettings{
-		Scoring: apitypes.Scoring{Preset: &preset}, Teams: teams, Lineup: apitypes.LineupStandard,
-		Roster:  apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 2, Te: 1, K: 1, Dst: 1, Bench: 6},
-		Keepers: []apitypes.Keeper{}, BotStyle: apitypes.BotStyleAdp,
-	}
-	if len(snap.Scoring.Rules) > 0 {
-		rules := snap.Scoring.Rules
-		s.Scoring = apitypes.Scoring{Custom: &rules}
-	}
-	return s
+	teams := min(max(snap.Shape.Teams, leagues.MinTeams), leagues.MaxTeams)
+	return lobby.Format{Scoring: preset, Teams: teams, Lineup: apitypes.LineupStandard}.Settings()
 }

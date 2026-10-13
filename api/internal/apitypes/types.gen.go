@@ -1183,9 +1183,15 @@ type LeagueSync struct {
 	ReadAt time.Time    `json:"read_at"`
 	Roster []RosterSpot `json:"roster"`
 
-	// ScoringDropped the league's scoring rules the saved league could not carry, in the host's own terms
+	// ScoringDefaulted the ScoringRules keys the league does not state, each at its standard figure ("key figure")
+	ScoringDefaulted []string `json:"scoring_defaulted"`
+
+	// ScoringDropped the league's scoring rules the saved league (ScoringRules' 21 keys) does not carry, by the host's own name and figure
 	ScoringDropped []string `json:"scoring_dropped"`
-	Season         int      `json:"season"`
+
+	// ScoringLike the preset the league's rules score most like, what a mock without custom scoring drafts on
+	ScoringLike ScoringPreset `json:"scoring_like"`
+	Season      int           `json:"season"`
 
 	// SettingsLeagueId the saved league a mock reruns from, null when a mock room cannot draft this league
 	SettingsLeagueId *openapi_types.UUID `json:"settings_league_id"`

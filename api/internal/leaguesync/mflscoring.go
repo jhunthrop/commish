@@ -14,9 +14,10 @@ import (
 // MyFantasyLeague states scoring as rules: an event code (TYPE=allRules
 // names them), the range of the event's value it applies over, and the
 // points, "*0.04" for each unit or a flat figure for a value inside the
-// range. A rule is carried into the saved league's custom keys only when
-// it says exactly what the key says; every other rule is named in
-// Dropped with the league's own words.
+// range. A rule is put in Sleeper's key for it only when it says exactly
+// what the key says, and from there into ScoringRules (rules.go); every
+// rule that does not land in ScoringRules is named in Dropped with the
+// league's own words.
 
 // perUnit is each event scored per unit, by its custom key.
 func perUnit() map[string]string {
@@ -24,7 +25,7 @@ func perUnit() map[string]string {
 		"#P": "pass_td", "PY": "pass_yd", "IN": "pass_int", "P2": "pass_2pt",
 		"#R": "rush_td", "RY": "rush_yd", "R2": "rush_2pt",
 		"#C": "rec_td", "CY": "rec_yd", "CC": "rec", "C2": "rec_2pt",
-		"EP": "xpm", "EM": "xpmiss", "FL": "fum_lost", "FLO": "fum_lost",
+		"EP": "xpm", "EM": "xpmiss", "MG": "fgmiss", "FL": "fum_lost", "FLO": "fum_lost",
 		"#UT": "pr_td", "#KT": "kr_td", "#FR": "fum_rec_td",
 		"SK": "sack", "IC": "int", "FC": "fum_rec", "SF": "safe", "#T": "def_td", "#D": "def_td",
 	}
@@ -108,34 +109,53 @@ func groupKind(positions string) string {
 	return "other"
 }
 
-// mflScoring carries the league's rules into custom keys.
+// mflScoring maps the league's rules to ScoringRules, naming in the
+// league's own words every rule that does not land there.
 func mflScoring(rules []mfl.Rule) Scoring {
-	out := Scoring{Rules: map[string]float64{}}
+	host := map[string]float64{}
+	sources := map[string][]string{}
 	te := map[string]float64{}
 	conflicts := map[string]bool{}
-	put := func(key string, v float64) {
-		if prev, ok := out.Rules[key]; ok && prev != v {
-			conflicts[key] = true
-		}
-		out.Rules[key] = v
-	}
+	var dropped []string
 	for _, raw := range rules {
+		words := ruleWords(raw)
+		put := func(key string, v float64) {
+			if prev, ok := host[key]; ok && prev != v {
+				conflicts[key] = true
+			}
+			host[key] = v
+			sources[key] = append(sources[key], words)
+		}
 		r, ok := parseRule(raw)
-		kind := groupKind(raw.Positions)
-		if !ok || !carry(r, kind, put, te) {
-			out.Dropped = append(out.Dropped, ruleWords(raw))
+		if !ok || !carry(r, groupKind(raw.Positions), put, te) {
+			dropped = append(dropped, words)
 		}
 	}
 	// A tight end's own reception points beyond everyone's are the
 	// tight end premium.
 	if v, ok := te["CC"]; ok {
-		out.Rules["bonus_rec_te"] = round2(v - out.Rules["rec"])
+		host["bonus_rec_te"] = round2(v - host["rec"])
 	}
 	for key := range conflicts {
-		delete(out.Rules, key)
-		out.Dropped = append(out.Dropped, key+" is stated twice with different points")
+		delete(host, key)
+		dropped = append(dropped, sources[key]...)
 	}
-	sort.Strings(out.Dropped)
+	m := toRules(host)
+	for _, key := range m.left {
+		dropped = append(dropped, sources[key]...)
+	}
+	sort.Strings(dropped)
+	return Scoring{Rules: m.rules, Dropped: dedupe(dropped), Defaulted: m.defaulted}
+}
+
+// dedupe is a sorted list with repeats taken out.
+func dedupe(sorted []string) []string {
+	out := make([]string, 0, len(sorted))
+	for i, v := range sorted {
+		if i == 0 || v != sorted[i-1] {
+			out = append(out, v)
+		}
+	}
 	return out
 }
 
@@ -151,6 +171,10 @@ func carry(r mflRule, kind string, put func(string, float64), te map[string]floa
 			put(key, r.value)
 		}
 		return ok
+	case (kind == "k" || kind == "offense") && r.Event == "FG" && !r.perUnit && r.lo <= 0 && r.hi >= openEnded:
+		// The same points for every made field goal.
+		put("fgm", r.value)
+		return true
 	case (kind == "k" || kind == "offense") && r.Event == "FG" && !r.perUnit:
 		keys, ok := fieldGoalTiers()[strings.TrimSpace(r.Range)]
 		for _, k := range keys {
@@ -181,7 +205,7 @@ func carry(r mflRule, kind string, put func(string, float64), te map[string]floa
 
 // ruleWords is a dropped rule in the league's own terms: "FG 31-99 *.1 (PK)".
 func ruleWords(r mfl.Rule) string {
-	return fmt.Sprintf("%s %s %s (%s)", r.Event, r.Range, r.Points, strings.ReplaceAll(r.Positions, "|", " "))
+	return cleanHostText(fmt.Sprintf("%s %s %s (%s)", r.Event, r.Range, r.Points, strings.ReplaceAll(r.Positions, "|", " ")))
 }
 
 // mflShape counts the league's lineup from its starter limits: each

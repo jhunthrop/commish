@@ -36,7 +36,8 @@ func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.Leag
 	out := apitypes.LeagueSync{
 		Id: link.ID, Host: apitypes.LeagueHost(snap.Ref.Host), HostLeagueId: snap.Ref.LeagueID, Season: snap.Season,
 		Name: snap.Name, Status: snap.Status, Week: snap.Week, Me: link.RosterID, SettingsLeagueId: link.LeagueID,
-		ScoringDropped: nonNil(snap.Scoring.Dropped), Teams: standings(snap.Teams), Moves: p.moves(snap.Moves),
+		ScoringDropped: nonNil(snap.Scoring.Dropped), ScoringDefaulted: nonNil(snap.Scoring.Defaulted),
+		ScoringLike: NearestPreset(snap.Scoring.Rules), Teams: standings(snap.Teams), Moves: p.moves(snap.Moves),
 		Pool: pool(board.Raw.Players, rosteredOnBoard(snap, placed)), Board: draftroom.BoardView(board, nil),
 		Placement: placement(snap, placed), ReadAt: snap.ReadAt, HostStaleSeconds: int(math.Round(read.Stale.Seconds())),
 		Roster: []apitypes.RosterSpot{},

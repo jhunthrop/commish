@@ -1882,8 +1882,12 @@ export interface components {
 			settings_league_id: string | null;
 			/** @description why there is no saved league */
 			settings_note: string | null;
-			/** @description the league's scoring rules the saved league could not carry, in the host's own terms */
+			/** @description the preset the league's rules score most like, what a mock without custom scoring drafts on */
+			scoring_like: components['schemas']['ScoringPreset'];
+			/** @description the league's scoring rules the saved league (ScoringRules' 21 keys) does not carry, by the host's own name and figure */
 			scoring_dropped: string[];
+			/** @description the ScoringRules keys the league does not state, each at its standard figure ("key figure") */
+			scoring_defaulted: string[];
 			/** @description every team, in standings order (wins, then points for) */
 			teams: components['schemas']['LeagueTeam'][];
 			roster: components['schemas']['RosterSpot'][];

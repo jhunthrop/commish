@@ -99,12 +99,13 @@ type Move struct {
 	At        time.Time      `json:"at"`
 }
 
-// Scoring is the league's points per stat as the host states them, in
-// the custom-scoring keys a saved league carries, and every rule that
-// could not be carried, by name.
+// Scoring is the league's points per stat as ScoringRules (rules.go),
+// every host rule that does not land there in the host's own words, and
+// every rule key the host does not state, at the standard figure.
 type Scoring struct {
-	Rules   map[string]float64 `json:"rules"`
-	Dropped []string           `json:"dropped"`
+	Rules     map[string]float64 `json:"rules"`
+	Dropped   []string           `json:"dropped"`
+	Defaulted []string           `json:"defaulted"`
 }
 
 // Shape is the league's starting lineup and bench, by our slot names.

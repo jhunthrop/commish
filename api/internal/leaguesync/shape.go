@@ -72,30 +72,25 @@ func sortedKeys(m map[string]bool) []string {
 // key is snake_case, points stay within 100 either way, 200 stats at most.
 var customKey = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)
 
-const (
-	maxCustomPoints = 100
-	maxCustomStats  = 200
-)
+const maxCustomPoints = 100
 
-// sleeperScoring is the league's scoring_settings as the saved league's
-// custom rules, word for word: Sleeper's stat keys are the keys the
-// custom-scoring path reads. A key or a figure outside the saved
-// league's bounds is named in Dropped, never silently lost.
+// sleeperScoring maps the league's scoring_settings to ScoringRules
+// (rules.go), naming every setting that does not land there, and any
+// figure outside the saved league's bounds, by its key and figure.
 func sleeperScoring(settings map[string]float64) Scoring {
-	out := Scoring{Rules: map[string]float64{}}
-	keys := make([]string, 0, len(settings))
-	for k := range settings {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		v := settings[k]
-		switch {
-		case !customKey.MatchString(k), math.IsNaN(v), math.Abs(v) > maxCustomPoints, len(out.Rules) >= maxCustomStats:
-			out.Dropped = append(out.Dropped, fmt.Sprintf("%.40s %g", k, v))
-		default:
-			out.Rules[k] = v
+	host := map[string]float64{}
+	var dropped []string
+	for k, v := range settings {
+		if !customKey.MatchString(k) || math.IsNaN(v) || math.IsInf(v, 0) || math.Abs(v) > maxCustomPoints {
+			dropped = append(dropped, cleanHostText(fmt.Sprintf("%s %g", k, v)))
+			continue
 		}
+		host[k] = v
 	}
-	return out
+	m := toRules(host)
+	for _, k := range m.left {
+		dropped = append(dropped, fmt.Sprintf("%s %g", k, host[k]))
+	}
+	sort.Strings(dropped)
+	return Scoring{Rules: m.rules, Dropped: dropped, Defaulted: m.defaulted}
 }

@@ -2144,7 +2144,9 @@ components:
         - me
         - settings_league_id
         - settings_note
+        - scoring_like
         - scoring_dropped
+        - scoring_defaulted
         - teams
         - roster
         - matchup
@@ -2169,9 +2171,18 @@ components:
           nullable: true
           description: the saved league a mock reruns from, null when a mock room cannot draft this league
         settings_note: { type: string, nullable: true, description: why there is no saved league, in the drafter's words }
+        scoring_like:
+          allOf: [{ $ref: "#/components/schemas/ScoringPreset" }]
+          description: the preset the league's rules score most like, what a mock without custom scoring drafts on
         scoring_dropped:
           type: array
-          description: the league's scoring rules the saved league could not carry, in the host's own terms
+          description: >-
+            the league's scoring rules the saved league (ScoringRules' 21 keys) does not carry, by the host's own
+            name and figure
+          items: { type: string }
+        scoring_defaulted:
+          type: array
+          description: the ScoringRules keys the league does not state, each at its standard figure ("key figure")
           items: { type: string }
         teams:
           type: array
