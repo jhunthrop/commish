@@ -14,7 +14,7 @@ from typing import Final, Literal
 from sqlalchemy import Connection, text
 
 from research.model.domain import PPR_SCORING, Position
-from research.model.instants import ms_instant
+from research.model.instants import js_iso, ms_instant
 from research.model.laws.discovery_facts import DiscoveryFacts, discovery_facts_for_season
 from research.model.laws.tribal import LawConditionFacts
 from research.model.laws.tribal_facts import facts_for_season
@@ -95,7 +95,7 @@ def live_moment_for(conn: Connection, season: int, now: datetime) -> BoardMoment
     now = ms_instant(now)
     if now >= kickoff:
         raise SeasonStartedError(
-            f"{season}'s first scheduled kickoff ({kickoff.isoformat()}) is not after {now.isoformat()}. {season} has already started"
+            f"{season}'s first scheduled kickoff ({js_iso(kickoff)}) is not after {js_iso(now)}. {season} has already started"
         )
     return BoardMoment("live", min(now, kickoff - _ONE_MS))
 
@@ -114,11 +114,11 @@ def _assert_season_invisible(conn: Connection, season: int, moment: BoardMoment)
         return
     if moment.kind == "live":
         raise BoardMomentError(
-            f"A {season} LIVE board taken at {moment.at.isoformat()} can see a {season} game-derived observation stamped {earliest.isoformat()}."
+            f"A {season} LIVE board taken at {js_iso(moment.at)} can see a {season} game-derived observation stamped {js_iso(earliest)}."
         )
     if earliest <= moment.at:
         raise BoardMomentError(
-            f"A {season} preseason board taken at {moment.at.isoformat()} can see a {season} game-derived observation stamped {earliest.isoformat()}."
+            f"A {season} preseason board taken at {js_iso(moment.at)} can see a {season} game-derived observation stamped {js_iso(earliest)}."
         )
 
 
@@ -170,7 +170,7 @@ def load_preseason(conn: Connection, season: int, moment: BoardMoment) -> Presea
     _assert_season_invisible(conn, season, moment)
     roster = preseason_rosters_as_of(conn, season, moment.at)
     if not roster:
-        raise MissingInputError(f"The store holds no {season} week-one roster knowable at {moment.at.isoformat()}.")
+        raise MissingInputError(f"The store holds no {season} week-one roster knowable at {js_iso(moment.at)}.")
     positions = all_positions(conn)
     history, usage, teams, observations, priors = _prior_seasons(conn, season, moment, positions)
     observations.extend(

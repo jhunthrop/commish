@@ -67,7 +67,9 @@ def js_round(x: float) -> float:
     if not math.isfinite(x):
         return x
     ceiling = float(math.ceil(x))
-    return ceiling - 1.0 if ceiling - 0.5 > x else ceiling
+    rounded = ceiling - 1.0 if ceiling - 0.5 > x else ceiling
+    # A value in [-0.5, 0) rounds to negative zero, as V8 keeps the sign.
+    return math.copysign(0.0, x) if rounded == 0 else rounded
 
 
 def js_max(*values: float) -> float:

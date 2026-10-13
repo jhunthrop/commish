@@ -24,6 +24,10 @@ import { BOARD_FORMAT_SPECS, BOARD_FORMATS, type BoardFormat } from "@research-t
 import { FITTED_AVAILABILITY_PRIORS, FITTED_CAREER_PRIORS, FITTED_DEPTH_PRIORS, FITTED_ROOKIE_PRIORS } from "@research-ts/projections/preseason/fitted";
 import { loadShippedGameVariance } from "@research-ts/projections/preseason/game-variance-artifacts";
 import { liveMomentFor, loadPreseason, replayMomentFor, type BoardMoment, type PreseasonPriors } from "@research-ts/projections/preseason/source";
+import { takeFreeze } from "@research-ts/projections/register/freeze";
+import { gradeWeek } from "@research-ts/projections/register/grade";
+import type { Clock } from "@research-ts/domain/timing";
+import { heldOutScores } from "@research-ts/nightly/reads/held-out";
 
 const SCORED: readonly Position[] = ["QB", "RB", "WR", "TE"];
 const SLOTS: readonly RosterSlotConfig[] = STANDARD_ROSTER_SLOTS.filter(
@@ -91,15 +95,35 @@ async function boards(db: Db, season: number, now: Date, legs: readonly string[]
   }
 }
 
+const at = (iso: string): Clock => ({ now: () => Date.parse(iso) }) as Clock;
+
+async function freeze(db: Db, season: number, week: number, nowIso: string): Promise<void> {
+  const result = await takeFreeze(db, { season, week }, at(nowIso));
+  process.stdout.write(`${JSON.stringify({ frozenAt: result.frozenAt.toISOString(), rows: result.rows })}\n`);
+}
+
+async function grade(db: Db, season: number, week: number, nowIso: string): Promise<void> {
+  const result = await gradeWeek(db, { season, week }, at(nowIso));
+  process.stdout.write(`${JSON.stringify({ gradedAt: result.gradedAt.toISOString(), rows: result.rows })}\n`);
+}
+
+async function heldOut(db: Db): Promise<void> {
+  process.stdout.write(`${JSON.stringify(await heldOutScores(db))}\n`);
+}
+
 async function main(): Promise<void> {
-  const [command, season, nowIso, legList] = process.argv.slice(2);
+  const [command, season, second, third] = process.argv.slice(2);
   const url = process.env.DATABASE_URL;
-  if (command !== "board" || season === undefined || nowIso === undefined || url === undefined) {
-    throw new Error("usage: DATABASE_URL=... tsx model.ts board <season> <nowIso> [ppr,half,std,raw]");
+  if (command === undefined || url === undefined) {
+    throw new Error("usage: DATABASE_URL=... tsx model.ts board <season> <nowIso> [legs] | freeze|grade <season> <week> <nowIso> | held-out");
   }
   const db = createDb(url, { max: 2 });
   try {
-    await boards(db, Number(season), new Date(nowIso), (legList ?? "ppr,half,std,raw").split(","));
+    if (command === "board") await boards(db, Number(season), new Date(second!), (third ?? "ppr,half,std,raw").split(","));
+    else if (command === "freeze") await freeze(db, Number(season), Number(second), third!);
+    else if (command === "grade") await grade(db, Number(season), Number(second), third!);
+    else if (command === "held-out") await heldOut(db);
+    else throw new Error(`no command ${command}`);
   } finally {
     await db.$client.end();
   }
