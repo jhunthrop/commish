@@ -6,7 +6,7 @@
 	import SheetAdd from '#lib/site/SheetAdd.svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
-	import { links } from '#lib/site/links.ts';
+	import { SEASON_ANCHOR, links } from '#lib/site/links.ts';
 	import Capsule from '#lib/ui/Capsule.svelte';
 	import Crumb from '#lib/ui/Crumb.svelte';
 	import Face from '#lib/ui/Face.svelte';
@@ -58,6 +58,24 @@
 	);
 </script>
 
+<!-- His season so far: once the run is past the season's first kickoff it leads the draft facts,
+     before it they lead. -->
+{#snippet thisSeason()}
+	<section class="season" id={SEASON_ANCHOR} aria-label="This season">
+		<PanelHead title="This season" aside={page.season.aside} level={2} />
+		<GameLog
+			caption="{page.name} week by week, {page.season.season}"
+			heads={page.season.heads}
+			pointsHead={page.season.pointsHead}
+			line={page.season.line}
+			rows={page.season.rows}
+			ahead={page.season.ahead}
+			none={page.season.none}
+		/>
+		<Footnote>{page.season.basis}</Footnote>
+	</section>
+{/snippet}
+
 <SiteShell title={page.name} run={data.run}>
 	{#snippet tail()}<Quiet href={links.compare(page.slug)}>Compare</Quiet>{/snippet}
 	<main class="player">
@@ -87,9 +105,9 @@
 					size="xl"
 					align="end"
 					phoneAlign="start"
-					caption="projected {scoring} points in {season}, over {fixed(
-						n.expectedGames
-					)} expected games"
+					caption="projected {scoring} points in {season}{page.underway
+						? ' before the season'
+						: ''}, over {fixed(n.expectedGames)} expected games"
 				/>
 				<SheetAdd
 					player={{
@@ -103,6 +121,8 @@
 				/>
 			{/snippet}
 		</HeroCard>
+
+		{#if page.underway}{@render thisSeason()}{/if}
 
 		<section class="facts" aria-label="His numbers">
 			<Fact label="Where drafters take him">
@@ -127,23 +147,9 @@
 			</Fact>
 		</section>
 
-		<section class="season" aria-label="This season">
-			<PanelHead
-				title="This season"
-				aside="{page.season.season}, {page.season.scoring}"
-				level={2}
-			/>
-			<GameLog
-				caption="{page.name} week by week, {page.season.season}"
-				heads={page.season.heads}
-				line={page.season.line}
-				rows={page.season.rows}
-				none={page.season.none}
-			/>
-			<Footnote>{page.season.basis}</Footnote>
-		</section>
+		{#if !page.underway}{@render thisSeason()}{/if}
 
-		<div class="split">
+		<div class="split" class:alone={!page.capsule}>
 			{#if page.capsule}
 				<article class="read">
 					<h3><Label>Our read</Label></h3>
@@ -211,6 +217,7 @@
 		flex-direction: column;
 		gap: var(--s-3);
 		min-width: 0;
+		scroll-margin-top: var(--s-5);
 	}
 
 	.bar {
@@ -235,6 +242,16 @@
 
 	.tier {
 		grid-column: 2;
+	}
+
+	/* With no read of ours, the tier card takes the left column rather than sitting alone at the
+	   right. */
+	.alone {
+		grid-template-columns: minmax(0, 480px);
+	}
+
+	.alone .tier {
+		grid-column: 1;
 	}
 
 	@media (max-width: 1080px) {

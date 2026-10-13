@@ -6,8 +6,17 @@ import { tierOf } from '#lib/run/derive.ts';
 import type { Capsule, Format, IndexEntry, PlayerFormat } from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
-import { seasonView, type SeasonView } from './player-season.ts';
-import { adp, board, entryBySlug, index, manifest, player } from '../run.ts';
+import { seasonView, type KickoffOf, type SeasonView } from './player-season.ts';
+import {
+	adp,
+	board,
+	entryBySlug,
+	index,
+	manifest,
+	player,
+	schedule,
+	seasonUnderway
+} from '../run.ts';
 
 export interface TierMate {
 	id: string;
@@ -42,6 +51,8 @@ export interface PlayerPage {
 	boardSize: number;
 	capsule: Capsule | null;
 	season: SeasonView;
+	/** The run was written after the season's first kickoff: his season leads the draft facts. */
+	underway: boolean;
 }
 
 export async function playerEntries(): Promise<{ slug: string }[]> {
@@ -83,9 +94,22 @@ async function mates(format: Format, entry: IndexEntry): Promise<PlayerPage['tie
 	};
 }
 
+/** His club's kickoff in each week, from the run's schedule. */
+async function kickoffsOf(team: string): Promise<KickoffOf> {
+	const slate = (await schedule()).slates.find((candidate) => candidate.abbr === team);
+	if (!slate) throw new Error(`${team} has no slate on the run's schedule.`);
+	return (week) => slate.games.find((game) => game.week === week)?.kickoff ?? null;
+}
+
 export async function playerPage(slug: string): Promise<PlayerPage> {
 	const entry = await entryBySlug(slug);
-	const [loaded, run, sources] = await Promise.all([player(entry.id), manifest(), adp()]);
+	const [loaded, run, sources, kickoffOf, underway] = await Promise.all([
+		player(entry.id),
+		manifest(),
+		adp(),
+		kickoffsOf(entry.team),
+		seasonUnderway()
+	]);
 	const lines = linesFor(run.formats, loaded.formats);
 	const [lead] = lines;
 	if (!lead) throw new Error(`${loaded.name} has a page but no format ranks him.`);
@@ -106,6 +130,7 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 			.map((source) => `${source.drafts}, ${windowLabel(source.window)}`),
 		boardSize: loadedBoard.rows.length,
 		capsule: loaded.capsule,
-		season: seasonView(loaded.season, loaded.position, run.formats)
+		season: seasonView(loaded.season, loaded.position, run.formats, kickoffOf),
+		underway
 	};
 }
