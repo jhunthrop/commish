@@ -7,17 +7,21 @@
 	import Face from '#lib/ui/Face.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
+	import Place from '#lib/ui/Place.svelte';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import TagChip from '#lib/ui/TagChip.svelte';
-	import { ranksOf, type SheetRow } from './model.ts';
+	import { fileDirectory } from './directory.ts';
+	import { OurBoard } from './our-board.svelte.ts';
+	import type { SheetRow } from './model.ts';
 	import { sheetStore } from './store.svelte.ts';
-	import { FIXED_TAGS, ownTags, sameTag, tagLabel } from './tags.ts';
+	import { FIXED_TAGS, ownTags, sameTag, tagLabel, tagTone } from './tags.ts';
 
 	/**
 	 * The board's sheet rail: the top of your sheet with faces, filtered by a tag when you pick
 	 * one. Mount it in the board's side column. Add to my sheet on a board row is AddToSheet with
-	 * variant="row".
+	 * variant="row". The position pill prints our board's rank, as it does on every page. His place
+	 * on your sheet is the quiet number at the row's end.
 	 */
 	interface Props {
 		/** How many players the rail shows before the link to the rest. */
@@ -28,11 +32,20 @@
 
 	const NOTES = 'notes';
 	let filter = $state<string | null>(null);
+	/** Our board for the sheet's format, followed when the format changes. */
+	const ourBoard = new OurBoard(fileDirectory());
+	const board = $derived(ourBoard.byId);
 
-	onMount(() => sheetStore.load());
+	onMount(() => {
+		sheetStore.load();
+	});
+
+	$effect(() => {
+		if (sheetStore.loaded) void ourBoard.follow(sheetStore.sheet.format);
+	});
 
 	const rows = $derived(sheetStore.sheet.rows);
-	const ranks = $derived(ranksOf(rows));
+	const places = $derived(new Map(rows.map((row, index) => [row.id, index + 1])));
 	const tagsInUse = $derived([
 		...FIXED_TAGS.map((fixed) => fixed.tag).filter((tag) =>
 			rows.some((row) => row.tags.includes(tag))
@@ -63,28 +76,39 @@
 	{#if sheetStore.loaded && rows.length === 0}
 		<p class="none">No one yet</p>
 	{/if}
-	<ul>
+	<ol>
 		{#each top as row (row.id)}
 			<li>
 				<Face src={row.headshot} size={32} />
 				<span class="who">
 					<span class="name">{row.name}</span>
 					<span class="meta"
-						><PositionPill position={row.position} rank={ranks.get(row.id)?.position} /></span
+						><PositionPill position={row.position} rank={board?.get(row.id)?.positionRank} />
+						{#if row.tags[0]}<TagChip
+								label={tagLabel(row.tags[0])}
+								tone={tagTone(row.tags[0])}
+							/>{/if}</span
 					>
 				</span>
-				{#if row.tags[0]}<TagChip label={tagLabel(row.tags[0])} />{/if}
+				<Place place={places.get(row.id) ?? 0} />
 			</li>
 		{/each}
-	</ul>
+	</ol>
 	{#if tagsInUse.length > 0 || hasNotes}
 		<div class="tags">
 			<ChipGroup label="Show" variant="loose">
 				{#each tagsInUse as tag (tag)}
-					<Chip size="sm" pressed={filter === tag} onclick={() => pick(tag)}>{tagLabel(tag)}</Chip>
+					<Chip
+						size="sm"
+						label="Show {tagLabel(tag)}"
+						pressed={filter === tag}
+						onclick={() => pick(tag)}>{tagLabel(tag)}</Chip
+					>
 				{/each}
 				{#if hasNotes}
-					<Chip size="sm" pressed={filter === NOTES} onclick={() => pick(NOTES)}>Notes</Chip>
+					<Chip size="sm" label="Show Notes" pressed={filter === NOTES} onclick={() => pick(NOTES)}
+						>Notes</Chip
+					>
 				{/if}
 			</ChipGroup>
 		</div>
@@ -112,7 +136,7 @@
 		color: var(--ink-3);
 	}
 
-	ul {
+	ol {
 		list-style: none;
 		margin: 0;
 		padding: 0;
@@ -134,6 +158,12 @@
 		flex-direction: column;
 		min-width: 0;
 		gap: 2px;
+	}
+
+	.meta {
+		display: flex;
+		align-items: center;
+		gap: 6px;
 	}
 
 	.name {

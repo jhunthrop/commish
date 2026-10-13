@@ -6,7 +6,8 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import { SHEET_LIMITS } from './limits.ts';
 	import type { SheetRow } from './model.ts';
-	import { FIXED_TAGS, canonicalTag, sameTag, tagLabel, tagProblem } from './tags.ts';
+	import type { TagToggle } from './store.svelte.ts';
+	import { FIXED_TAGS, canonicalTag, hasTag, tagLabel, tagProblem } from './tags.ts';
 
 	interface Props {
 		row: SheetRow;
@@ -14,32 +15,28 @@
 		ownTags: readonly string[];
 		canStartTier: boolean;
 		startsTier: boolean;
+		/** Every keystroke of his note, so the sheet holds it before anything else is tapped. */
 		onnote: (note: string) => void;
-		ontags: (tags: readonly string[]) => void;
+		/** A tap on a tag, applied to his row as the sheet holds it then. */
+		ontag: (tag: string) => TagToggle;
 		onstarttier: () => void;
 		onremove: () => void;
 	}
 
-	let { row, ownTags, canStartTier, startsTier, onnote, ontags, onstarttier, onremove }: Props =
+	let { row, ownTags, canStartTier, startsTier, onnote, ontag, onstarttier, onremove }: Props =
 		$props();
 
-	// The field starts from his note when the row opens and is written back on change.
+	// The field starts from his note when the row opens and writes every keystroke back.
 	let note = $state(untrack(() => row.note ?? ''));
 	let newTag = $state('');
 	let tagError = $state<string | null>(null);
 
 	const full = $derived(row.tags.length >= SHEET_LIMITS.tags);
-	const has = (tag: string): boolean => row.tags.some((kept) => sameTag(kept, tag));
+	const has = (tag: string): boolean => hasTag(row.tags, tag);
+	const FULL = `Keep it to ${String(SHEET_LIMITS.tags)} tags`;
 
 	function toggle(tag: string): void {
-		if (has(tag)) {
-			tagError = null;
-			ontags(row.tags.filter((kept) => !sameTag(kept, tag)));
-		} else if (full) {
-			tagError = `Keep it to ${String(SHEET_LIMITS.tags)} tags`;
-		} else {
-			ontags([...row.tags, tag]);
-		}
+		tagError = ontag(tag) === 'full' ? FULL : null;
 	}
 
 	function addOwn(): void {
@@ -47,8 +44,8 @@
 		if (tag === '') return;
 		tagError = tagProblem(tag);
 		if (tagError) return;
-		if (!has(tag)) ontags([...row.tags, tag]);
-		newTag = '';
+		if (!has(tag)) toggle(tag);
+		if (tagError === null) newTag = '';
 	}
 
 	function onTagKey(event: KeyboardEvent): void {
@@ -67,11 +64,11 @@
 		maxlength={SHEET_LIMITS.note}
 		placeholder="Your note"
 		bind:value={note}
-		onchange={onnote}
+		oninput={onnote}
 		autofocus
 	/>
 	<div class="tags">
-		<ChipGroup label="Tags" variant="loose">
+		<ChipGroup label="Tags on {row.name}" variant="loose">
 			{#each FIXED_TAGS as { tag, label } (tag)}
 				<Chip size="sm" pressed={has(tag)} onclick={() => toggle(tag)}>{label}</Chip>
 			{/each}

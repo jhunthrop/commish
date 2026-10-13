@@ -13,5 +13,8 @@ export interface ActionProps {
 	fill?: boolean;
 	disabled?: boolean;
 	type?: 'button' | 'submit';
+	/** The action opens something (a menu): whether it is open, and the id of what it opens. */
+	expanded?: boolean;
+	controls?: string;
 	children: Snippet;
 }

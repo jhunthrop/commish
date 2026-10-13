@@ -5,6 +5,7 @@
  * most SHEET_LIMITS.tags.
  */
 import type { components } from '#lib/api/types.ts';
+import type { TagMark, TagTone } from '#lib/ui/tag.ts';
 import { SHEET_LIMITS, characterCount } from './limits.ts';
 
 export type FixedTag = components['schemas']['SheetTag'];
@@ -18,6 +19,23 @@ export const FIXED_TAGS: readonly { tag: FixedTag; label: string }[] = [
 	{ tag: 'injury', label: 'Injury' },
 	{ tag: 'handcuff', label: 'Handcuff' }
 ];
+
+/** Tags that contradict each other: a row holds one of a pair, the one chosen last. */
+const OPPOSITES: Readonly<Partial<Record<FixedTag, FixedTag>>> = {
+	target: 'avoid',
+	avoid: 'target'
+};
+
+/** How a tag is drawn: yours in your color, or the loss tone for a player you are steering
+ * away from, so Avoid never reads as a pick. */
+export function tagTone(tag: string): TagTone {
+	return canonicalTag(tag) === 'avoid' ? 'loss' : 'you';
+}
+
+/** The tags as a row prints them. */
+export function tagMarks(tags: readonly string[]): readonly TagMark[] {
+	return tags.map((tag) => ({ label: tagLabel(tag), tone: tagTone(tag) }));
+}
 
 /** Letters, digits, spaces, apostrophes, periods and hyphens, starting with a letter or digit.
  * Commas, bars and semicolons separate tags in a CSV cell, so they are never part of one. */
@@ -52,17 +70,37 @@ export function sameTag(a: string, b: string): boolean {
 	return tagKey(a) === tagKey(b);
 }
 
-/** Canonical, valid, each once, at most SHEET_LIMITS.tags, first ones kept. */
+function oppositeOf(tag: string): FixedTag | undefined {
+	return isFixedTag(tag) ? OPPOSITES[tag] : undefined;
+}
+
+/** Canonical, valid, each once, never with its opposite, at most SHEET_LIMITS.tags, first ones
+ * kept. */
 export function normalizeTags(raw: readonly string[]): readonly string[] {
 	const out: string[] = [];
 	for (const candidate of raw) {
 		const tag = canonicalTag(candidate);
 		if (tagProblem(tag) !== null) continue;
-		if (out.some((kept) => sameTag(kept, tag))) continue;
+		if (out.some((kept) => sameTag(kept, tag) || kept === oppositeOf(tag))) continue;
 		if (out.length === SHEET_LIMITS.tags) break;
 		out.push(tag);
 	}
 	return out;
+}
+
+export function hasTag(tags: readonly string[], tag: string): boolean {
+	return tags.some((kept) => sameTag(kept, tag));
+}
+
+/** What a tap on a tag does to a row's tags: off when it is on, otherwise on in place of its
+ * opposite. Null when the row is full and the tag cannot go on. */
+export function toggledTags(tags: readonly string[], raw: string): readonly string[] | null {
+	const tag = canonicalTag(raw);
+	if (hasTag(tags, tag)) return tags.filter((kept) => !sameTag(kept, tag));
+	const opposite = oppositeOf(tag);
+	const rest = tags.filter((kept) => kept !== opposite);
+	if (rest.length >= SHEET_LIMITS.tags) return null;
+	return normalizeTags([...rest, tag]);
 }
 
 /** The word a chip prints for a tag. */

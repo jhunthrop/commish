@@ -18,7 +18,7 @@ import {
 	renameSheet,
 	replaceRows,
 	setNote,
-	setTags,
+	toggleTag,
 	type BoardFormat,
 	type Sheet,
 	type SheetPlayer,
@@ -27,6 +27,7 @@ import {
 import { queueSeed } from './queue.ts';
 import { sheetsApi, type Account, type SheetSummary, type SheetsApi } from './remote.ts';
 import { EMPTY_STORED, SHELF_LIMIT, readStored, writeStored, type StoredSheet } from './storage.ts';
+import { awaitsAccount, unreachedStatus, type SyncStatus } from './status.ts';
 import { isOffline, keepEdits, push, reconcile, syncedFrom } from './sync.ts';
 import { moveTierStart, removeTierAt, startTierAt } from './tiers.ts';
 
@@ -35,8 +36,10 @@ export const SAVE_DELAY_MS = 900;
 /** How many edits Undo can walk back. */
 const UNDO_DEPTH = 50;
 
-export type SyncStatus =
-	'local' | 'checking' | 'saving' | 'saved' | 'offline' | 'failed' | 'storage-blocked';
+export type { SyncStatus } from './status.ts';
+
+/** What a tap on a tag did: on or off, or nothing because his row holds as many as it can. */
+export type TagToggle = 'done' | 'full';
 
 /** What the store does when the page's world changes. */
 export interface PageEvents {
@@ -52,6 +55,8 @@ export interface SheetStoreDeps {
 	api: SheetsApi;
 	storage: StorageGetter;
 	now: () => Date;
+	/** Whether the browser says it has a connection. Only this ever makes the sheet say Offline. */
+	online: () => boolean;
 	/** Wires the store to the page's events. Absent where there is no page. */
 	events?: (handlers: PageEvents) => void;
 }
@@ -63,6 +68,8 @@ export class SheetStore {
 	account = $state.raw<Account | null>(null);
 	sheets = $state.raw<readonly SheetSummary[]>([]);
 	status = $state<SyncStatus>('local');
+	/** When the account last answered a save, for the status line. */
+	savedAt = $state.raw<Date | null>(null);
 	/** The API's sentence for the last save that failed. */
 	problem = $state<string | null>(null);
 	canUndo = $state(false);
@@ -78,6 +85,9 @@ export class SheetStore {
 
 	readonly #deps: SheetStoreDeps;
 	#undo: Sheet[] = [];
+	/** The edit the last undo entry covers, when it is one that keeps growing (his note as you
+	 * type it), so a burst of typing is one undo. */
+	#growing: string | null = null;
 	#timer: ReturnType<typeof setTimeout> | null = null;
 	#edits = 0;
 	#busy: Promise<void> = Promise.resolve();
@@ -121,12 +131,17 @@ export class SheetStore {
 		this.#commit(nudgePlayer(this.sheet, playerId, delta, visible));
 	}
 
+	/** Called as you type: every keystroke lands, and a burst of typing on one note is one undo. */
 	setNote(playerId: string, note: string): void {
-		this.#commit(setNote(this.sheet, playerId, note));
+		this.#commit(setNote(this.sheet, playerId, note), `note:${playerId}`);
 	}
 
-	setTags(playerId: string, tags: readonly string[]): void {
-		this.#commit(setTags(this.sheet, playerId, tags));
+	/** One tap on a tag, read against his row as the sheet holds it at the tap. */
+	toggleTag(playerId: string, tag: string): TagToggle {
+		const next = toggleTag(this.sheet, playerId, tag);
+		if (next === null) return 'full';
+		this.#commit(next);
+		return 'done';
 	}
 
 	startTier(playerId: string): void {
@@ -154,6 +169,7 @@ export class SheetStore {
 	}
 
 	undo(): void {
+		this.#growing = null;
 		const previous = this.#undo.pop();
 		this.canUndo = this.#undo.length > 0;
 		if (previous) this.#write(previous);
@@ -215,7 +231,7 @@ export class SheetStore {
 				const remote = await this.#deps.api.get(sheetId);
 				this.#resetUndo();
 				this.#setStored(syncedFrom(remote, { ...this.stored, editedAt: null }));
-				this.status = 'saved';
+				this.#saved();
 			} catch (error) {
 				this.#fail(error);
 			}
@@ -236,7 +252,7 @@ export class SheetStore {
 				this.#resetUndo();
 				this.#setStored(syncedFrom(created, { ...this.stored, editedAt: null }));
 				this.sheets = await this.#deps.api.list();
-				this.status = 'saved';
+				this.#saved();
 			} catch (error) {
 				this.#fail(error);
 			}
@@ -298,10 +314,15 @@ export class SheetStore {
 		void this.#reconcile();
 	}
 
-	#commit(next: Sheet): void {
+	/** `growing` names an edit that extends the one before it with the same name (typing), which
+	 * then shares that edit's undo entry. */
+	#commit(next: Sheet, growing: string | null = null): void {
 		if (next === this.sheet) return;
-		this.#undo.push(this.sheet);
-		if (this.#undo.length > UNDO_DEPTH) this.#undo.shift();
+		if (growing === null || growing !== this.#growing) {
+			this.#undo.push(this.sheet);
+			if (this.#undo.length > UNDO_DEPTH) this.#undo.shift();
+		}
+		this.#growing = growing;
 		this.canUndo = true;
 		this.#write(next);
 	}
@@ -324,11 +345,23 @@ export class SheetStore {
 
 	#resetUndo(): void {
 		this.#undo = [];
+		this.#growing = null;
 		this.canUndo = false;
 	}
 
+	/** A request that never reached the account: Offline only when the browser says so. */
+	#unreached(): void {
+		const knowsAccount = this.account !== null || this.stored.sync !== null;
+		this.status = unreachedStatus(this.#deps.online(), knowsAccount);
+	}
+
+	#saved(): void {
+		this.status = 'saved';
+		this.savedAt = this.#deps.now();
+	}
+
 	#schedule(): void {
-		if (!this.signedIn && this.status !== 'offline') return;
+		if (!this.signedIn && !awaitsAccount(this.status)) return;
 		if (this.#timer !== null) clearTimeout(this.#timer);
 		this.#timer = setTimeout(() => {
 			this.#timer = null;
@@ -368,7 +401,7 @@ export class SheetStore {
 				if (outcome.notices.length > 0) this.notices = [...this.notices, ...outcome.notices];
 				if (this.#edits === edits) {
 					this.#setStored(outcome.stored);
-					this.status = 'saved';
+					this.#saved();
 				} else {
 					this.#keepEditsOver(outcome.stored, started);
 				}
@@ -378,7 +411,7 @@ export class SheetStore {
 				this.status = 'local';
 				return;
 			case 'offline':
-				this.status = 'offline';
+				this.#unreached();
 				return;
 			case 'failed':
 				this.status = 'failed';
@@ -411,7 +444,7 @@ export class SheetStore {
 					this.problem = null;
 					if (this.#edits === edits) {
 						this.#setStored(outcome.stored);
-						this.status = 'saved';
+						this.#saved();
 					} else {
 						// Edits landed while this one was out: the account now holds what was sent,
 						// so that is the new ancestor, and the newer edits stay unsaved.
@@ -430,7 +463,7 @@ export class SheetStore {
 					this.status = 'local';
 					return;
 				case 'offline':
-					this.status = 'offline';
+					this.#unreached();
 					return;
 				case 'failed':
 					this.status = 'failed';
@@ -454,6 +487,7 @@ function browserDeps(): SheetStoreDeps {
 		api: sheetsApi(apiClient(PUBLIC_API_URL)),
 		storage: browserStorage,
 		now: () => new Date(),
+		online: () => navigator.onLine,
 		events: pageEvents
 	};
 }

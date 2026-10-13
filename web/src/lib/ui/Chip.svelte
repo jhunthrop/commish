@@ -10,11 +10,14 @@
 		href?: string;
 		/** A compact chip for a side panel's tag row. */
 		size?: 'md' | 'sm';
+		/** The chip's name for assistive tech when its words alone would repeat another control's:
+		 * "Show Target" on a filter beside a row's Target. It holds the chip's words. */
+		label?: string;
 		onclick?: (event: MouseEvent) => void;
 		children: Snippet;
 	}
 
-	let { pressed = false, href, size = 'md', onclick, children }: Props = $props();
+	let { pressed = false, href, size = 'md', label, onclick, children }: Props = $props();
 
 	const grouped = inChipGroup();
 </script>
@@ -27,6 +30,7 @@
 		class:on={pressed}
 		{href}
 		aria-current={pressed ? 'page' : undefined}
+		aria-label={label}
 		{onclick}
 	>
 		{@render children()}
@@ -39,6 +43,7 @@
 		class:sm={size === 'sm'}
 		class:on={pressed}
 		aria-pressed={pressed}
+		aria-label={label}
 		{onclick}
 	>
 		{@render children()}
