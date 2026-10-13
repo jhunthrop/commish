@@ -72,6 +72,10 @@
 	let signedOut = $state(false);
 	/** The lobby Leave came from, offered back in the dock. */
 	let left = $state<string | null>(null);
+	/** The saved league the page opened on (`?league=`, the league page's Start a mock draft): while
+	 * the form holds its settings, a draft slot aside, the verb drafts that league. Any other change
+	 * to the form lets it go. */
+	let opened = $state<League | null>(null);
 	/** The roster's steppers: the counts, then the flex spots the lineup makes, the bench last, so
 	 * they add up to the rounds line. */
 	const rosterHead = $derived(ROSTER_FIELDS.filter((f) => f.key !== 'bench'));
@@ -89,6 +93,8 @@
 
 	function set(patch: Partial<LeagueSettings>): void {
 		settings = { ...settings, ...patch };
+		// Choosing a slot is part of drafting the league, every other change makes a new setup.
+		if (Object.keys(patch).some((key) => key !== 'slot')) opened = null;
 	}
 
 	function setTeams(teams: number): void {
@@ -163,10 +169,36 @@
 		players = (await rooms.board(boardFormat)).players;
 	}
 
+	/** A saved league's mock: its own rules with the Draft Pass, the nearest preset without, from
+	 * its own slot or the one chosen on the form. A chosen slot drafts its settings rather than the
+	 * saved league, since the API takes a league or settings, not both. */
+	async function mockLeague(
+		league: League,
+		slot: LeagueSettings['slot'] = league.settings.slot
+	): Promise<void> {
+		const rerun = rerunOf(league.settings, exactRules);
+		const own = slot === league.settings.slot;
+		await run(() =>
+			rerun.line === null && own
+				? startMock(league.settings, league.id)
+				: startMock({ ...rerun.settings, slot })
+		);
+	}
+
+	/** Fill the form with the saved league the page was opened on, when the account has it. */
+	function openLeague(id: string): void {
+		const league = leagues.find((candidate) => candidate.id === id);
+		if (!league) return;
+		settings = rerunOf(league.settings, exactRules).settings;
+		opened = league;
+	}
+
 	async function loadLeagues(): Promise<void> {
 		try {
 			leagues = await rooms.leagues();
 			exactRules = hasFeature((await rooms.me()).features, 'custom_scoring');
+			const id = page.url.searchParams.get('league');
+			if (id) openLeague(id);
 		} catch (e) {
 			// Signed out: setup still works, a mock against bots starts, the other verbs ask to sign in.
 			if (isSignedOut(e)) signedOut = true;
@@ -178,6 +210,7 @@
 		try {
 			const mock = await rooms.mock(from);
 			settings = { ...mock.settings, slot: null };
+			opened = null;
 		} catch (e) {
 			error = e;
 		}
@@ -331,7 +364,10 @@
 			{/if}
 		</div>
 		<ActionBar alert={error ? refusal : undefined} note={signedOut ? keepNote : undefined}>
-			<Verb disabled={busy || !roundsOk} onclick={() => run(() => startMock(settings))}
+			<Verb
+				disabled={busy || !roundsOk}
+				onclick={() =>
+					opened ? mockLeague(opened, settings.slot) : run(() => startMock(settings))}
 				>Start against bots</Verb
 			>
 			<Quiet disabled={busy} onclick={() => join(nearestLobby(settings))}
@@ -347,17 +383,7 @@
 						left = null;
 					}}
 				/>{/if}
-			<SavedLeagues
-				{leagues}
-				{busy}
-				{exactRules}
-				onmock={(league: League) => {
-					const rerun = rerunOf(league.settings, exactRules);
-					return run(() =>
-						rerun.line === null ? startMock(league.settings, league.id) : startMock(rerun.settings)
-					);
-				}}
-			/>
+			<SavedLeagues {leagues} {busy} {exactRules} onmock={mockLeague} />
 			<LobbyList
 				{lobbies}
 				{busy}

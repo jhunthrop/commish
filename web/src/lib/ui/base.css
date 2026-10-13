@@ -89,6 +89,8 @@ input {
 		2 * var(--s-3) + var(--strip-face) + var(--strip-text-lines) *
 			(var(--strip-line) + var(--strip-gap))
 	);
+	/* The strip's one line, when no pick landed between two of yours. */
+	--pick-line-h: var(--touch);
 	--fade-end: linear-gradient(to right, #000 calc(100% - var(--fade-w)), transparent);
 }
 

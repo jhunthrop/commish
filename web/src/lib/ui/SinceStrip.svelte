@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { DEFAULT_TEAMS, pickLabel } from '#lib/format/draft.ts';
 	import type { WentPick } from '#lib/types/room.ts';
+	import Panel from './Panel.svelte';
 	import PickStrip from './PickStrip.svelte';
 
 	interface Props {
@@ -26,13 +27,35 @@
 	);
 </script>
 
-<PickStrip
-	lead={String(went.length)}
-	leadLines={queue ? [lead, `${fromQueue === 0 ? 'none' : fromQueue} from ${whose} queue`] : [lead]}
-	picks={went.map(({ player, pick, queued }) => ({
-		key: pick,
-		player,
-		lines: queued ? [pickLabel(pick, teams), 'queued'] : [pickLabel(pick, teams)],
-		ring: queued ? 'accent' : undefined
-	}))}
-/>
+<!-- No pick landed between two of yours: one line says so, where a strip would sit. -->
+{#if since !== null && went.length === 0}
+	<Panel padding="none">
+		<p class="straight">{whose === 'your' ? 'Your' : 'Their'} turn came straight back</p>
+	</Panel>
+{:else}
+	<PickStrip
+		lead={String(went.length)}
+		leadLines={queue
+			? [lead, `${fromQueue === 0 ? 'none' : fromQueue} from ${whose} queue`]
+			: [lead]}
+		picks={went.map(({ player, pick, queued }) => ({
+			key: pick,
+			player,
+			lines: queued ? [pickLabel(pick, teams), 'queued'] : [pickLabel(pick, teams)],
+			ring: queued ? 'accent' : undefined
+		}))}
+	/>
+{/if}
+
+<style>
+	.straight {
+		display: flex;
+		align-items: center;
+		min-block-size: var(--pick-line-h);
+		box-sizing: border-box;
+		margin: 0;
+		padding: 0 var(--s-4);
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+	}
+</style>

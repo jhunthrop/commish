@@ -4,7 +4,7 @@
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { LeagueSync } from './api.ts';
-	import { moveLine } from './model.ts';
+	import { moveWords } from './model.ts';
 
 	/** The league's moves this week and last, newest first, each in a sentence. */
 	interface Props {
@@ -15,21 +15,18 @@
 
 	const SHOWN = 12;
 	const lines = $derived(
-		sync.moves.slice(0, SHOWN).map((move, i) => {
-			const line = moveLine(sync, move);
-			return {
-				key: `${move.at}-${String(i)}`,
-				lead: line.lead,
-				text: `${line.text} on ${dayLabel(move.at)}.`
-			};
-		})
+		sync.moves.slice(0, SHOWN).map((move, i) => ({
+			key: `${move.at}-${String(i)}`,
+			lead: dayLabel(move.at),
+			text: `${moveWords(sync, move)}.`
+		}))
 	);
 </script>
 
 <Panel as="section" label="Moves this week and last" padding="sm">
 	<PanelHead title="Moves" aside="This week and last" level={2} />
 	{#if lines.length > 0}
-		<LineList label="Moves this week and last" {lines} />
+		<LineList label="Moves this week and last" {lines} column />
 	{:else}
 		<p class="none">Nobody in your league has made a move this week or last.</p>
 	{/if}

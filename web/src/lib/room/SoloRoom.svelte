@@ -161,6 +161,18 @@
 		)
 	);
 	const lastMine = $derived(mine.at(-1)?.pick ?? null);
+	/** Nobody picks between your latest pick (the one in flight counts as soon as Enter is pressed) and
+	 * your next turn: the strip's place is one line, not a block. It is decided from the draft order
+	 * at Enter, so the next turn's arrival moves nothing. */
+	const straight = $derived.by(() => {
+		const own = Math.max(lastMine ?? 0, draftedAt ?? 0);
+		if (own === 0) return false;
+		const upcoming =
+			room.waiting && room.pick_number > own
+				? room.pick_number
+				: turnAfter(own, room.slot, teams, total);
+		return upcoming === own + 1;
+	});
 	const went = $derived(wentSince(room.picks, prev ?? 0, queueAll, board));
 
 	function draft(id: string | null): void {
@@ -241,9 +253,10 @@
 	<LiveRegion words={notice ?? ''} />
 	{#if lastMine !== null || inFlight}
 		<!-- Once the first turn has passed, the strip's place is held, so its arrival after a pick never
-		     pushes the call down. -->
-		<div class="since">
-			{#if room.waiting && went.length > 0}
+		     pushes the call down: a strip's height, or one line when the next turn comes straight
+		     back. -->
+		<div class="since" class:straight>
+			{#if room.waiting && !inFlight}
 				<SinceStrip since={prev} {went} {teams} {whose} />
 			{/if}
 		</div>
@@ -341,6 +354,10 @@
 	/* The strip's panel: its strip and the panel's two borders. */
 	.since {
 		min-block-size: calc(var(--pick-strip-h) + 2px);
+	}
+
+	.since.straight {
+		min-block-size: calc(var(--pick-line-h) + 2px);
 	}
 
 	.notice {

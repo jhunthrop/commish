@@ -35,15 +35,16 @@
 	let { title, stamp, active, search, tail, children }: Props = $props();
 
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
-	// League joins the rail when /me names an attached league.
+	// League joins the rail for a signed-in account, once /me answers.
 	onMount(() => void railLeague.load());
-	const items = $derived(railItems(railLeague.id));
+	const items = $derived(railItems(railLeague.account));
 </script>
 
 {#snippet railLink(item: RailItem)}
 	<a
 		class="item"
 		class:wide-only={item.wideOnly}
+		class:held={!railLeague.answered && item.section === 'record'}
 		href={item.href}
 		aria-current={item.section === current ? 'page' : undefined}
 	>
@@ -239,6 +240,12 @@
 		.spacer,
 		.wide-only {
 			display: none;
+		}
+
+		/* Signed in, the fifth place is League's: Our record keeps it empty until /me answers, so the
+		   bar never paints one tab and swaps it for another. */
+		:global(html[data-session]) .held {
+			visibility: hidden;
 		}
 
 		.item {

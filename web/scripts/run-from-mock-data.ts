@@ -65,6 +65,7 @@ import {
 } from '../src/lib/run/schema.ts';
 import { POSITIONS, type Position } from '../src/lib/types/player.ts';
 import { bucketUrl, credentialsFromToken } from './r2.ts';
+import { checkRunSeasons } from '../src/lib/run/season-checks.ts';
 import { seasonBlocks } from './standin-season.ts';
 import type { PlayerSeason } from '../src/lib/run/season.ts';
 
@@ -397,10 +398,11 @@ function scheduleFrom(
 	};
 	const unranked = codes.map((abbr) => {
 		const slate: Game[] = games.flatMap((game): Game[] => {
+			const kickoff = kickoffOf(game).toISOString();
 			if (game.home_nfl_team === abbr)
-				return [{ week: game.week, opponent: game.away_nfl_team, home: true }];
+				return [{ week: game.week, opponent: game.away_nfl_team, home: true, kickoff }];
 			if (game.away_nfl_team === abbr)
-				return [{ week: game.week, opponent: game.home_nfl_team, home: false }];
+				return [{ week: game.week, opponent: game.home_nfl_team, home: false, kickoff }];
 			return [];
 		});
 		const values = slate.map((game) => value(game.opponent));
@@ -618,14 +620,20 @@ async function main(): Promise<void> {
 			now
 		});
 		const players = playerPages(rows, capsuleCsv, seasons);
-		const index: IndexEntry[] = rows.map(({ id, slug, name, team, position, headshot }) => ({
-			id,
-			slug,
-			name,
-			team,
-			position,
-			headshot
-		}));
+		checkRunSeasons(players, schedule);
+		const index: IndexEntry[] = rows.map(({ id, slug, name, team, position, headshot }) => {
+			const season = seasons.get(id);
+			if (!season) throw new Error(`${name} has no season block.`);
+			return {
+				id,
+				slug,
+				name,
+				team,
+				position,
+				headshot,
+				season: { games: season.games, pointsPerGame: season.pointsPerGame }
+			};
+		});
 		const files = artifacts({
 			manifest: {
 				runId: RUN_ID,

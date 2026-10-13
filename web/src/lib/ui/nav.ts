@@ -78,23 +78,30 @@ export const RAIL: readonly RailItem[] = [
 	}
 ];
 
-/** Your league, shown when /me names one (account/rail-league.svelte.ts), after the cheat sheet:
- * the in-season half of the rail. It opens the account's newest league. */
-export function leagueItem(leagueId: string): RailItem {
+/** Your league, shown to a signed-in account (account/rail-league.svelte.ts), after the cheat
+ * sheet: the in-season half of the rail. It opens the account's newest league, or, with none yet,
+ * the page that attaches one. */
+export function leagueItem(leagueId: string | null): RailItem {
 	return {
 		section: 'league',
 		label: 'League',
-		href: `/league/${encodeURIComponent(leagueId)}`,
+		href: leagueId === null ? LEAGUE_START : `/league/${encodeURIComponent(leagueId)}`,
 		icon: 'league',
 		wideOnly: false,
 		owns: ['league']
 	};
 }
 
-/** The rail with League in its place when the account has a league. The phone's bar holds five, so
- * League takes Our record's place there; Our record stays on the desk's rail. */
-export function railItems(leagueId: string | null): readonly RailItem[] {
-	if (leagueId === null) return RAIL;
+/** A signed-in account as the rail reads it: its newest attached league's id, or null with none. */
+export interface RailAccount {
+	leagueId: string | null;
+}
+
+/** The rail with League in its place for a signed-in account, null signed out. The phone's bar holds
+ * five, so League takes Our record's place there; Our record stays on the desk's rail. */
+export function railItems(account: RailAccount | null): readonly RailItem[] {
+	if (account === null) return RAIL;
+	const { leagueId } = account;
 	const at = RAIL.findIndex((item) => item.section === 'sheet') + 1;
 	const rest = RAIL.slice(at).map((item) =>
 		item.section === 'record' ? { ...item, wideOnly: true } : item

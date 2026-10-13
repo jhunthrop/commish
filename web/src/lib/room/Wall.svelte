@@ -125,12 +125,13 @@
 		font-size: var(--t-sm);
 	}
 
+	/* A last name wraps rather than being cut: at its space ("St. Brown"), or after the hyphen of a
+	   double name ("Smith-" over "Njigba"), the only place a narrow cell can turn it. */
 	.cell b {
 		grid-column: 1 / -1;
 		font-weight: 600;
-		white-space: nowrap;
+		line-height: 1.2;
 		overflow: hidden;
-		text-overflow: ellipsis;
 	}
 
 	.s {
