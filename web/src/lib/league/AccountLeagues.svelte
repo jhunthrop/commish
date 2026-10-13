@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { links } from '#lib/site/links.ts';
+	import { LEAGUES_ANCHOR, links } from '#lib/site/links.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
@@ -76,7 +76,7 @@
 	}
 </script>
 
-<section aria-label="Your leagues">
+<section id={LEAGUES_ANCHOR} aria-label="Your leagues">
 	<PanelHead title="Your leagues" aside={leagues ? String(leagues.length) : undefined} level={2} />
 	{#if failed}
 		<p class="note">Your leagues can't be read right now.</p>

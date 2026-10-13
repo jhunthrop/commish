@@ -37,8 +37,8 @@
 	let sync = $state<LeagueSync | null>(null);
 	let board = $state<LeagueBoard | null>(null);
 	let failure = $state<'signed-out' | 'missing' | 'unreachable' | 'host-sign-in' | null>(null);
-	/** The host's words when a league read as the member needs them to sign in to the host again. */
-	let hostReason = $state('');
+	/** The league's saved name, for the sign-in an FFPC league with no member signed in asks for. */
+	let savedName = $state('');
 	let problem = $state<string | null>(null);
 	/** The run's board file could not be read; cleared when one loads. */
 	let boardFailed = $state(false);
@@ -67,9 +67,15 @@
 		} catch (error) {
 			if (isSignedOut(error)) failure = 'signed-out';
 			else if (hasStatus(error, HTTP_STATUS.conflict)) {
-				// An FFPC league with no member signed in to read it as: sign in right here.
+				// An FFPC league with no member signed in to read it as: sign in right here, under the
+				// league's saved name.
 				failure = 'host-sign-in';
-				hostReason = error instanceof ApiError ? error.message : '';
+				if (savedName === '') {
+					void leagueApi
+						.attached()
+						.then((list) => (savedName = list.find((a) => a.id === id)?.name ?? ''))
+						.catch(() => (savedName = ''));
+				}
 			} else if (hasStatus(error, HTTP_STATUS.notFound)) failure = 'missing';
 			else if (sync === null) failure = 'unreachable';
 			else problem = 'Your league could not be read just now. The page shows the last read.';
@@ -138,15 +144,17 @@
 			</EmptyState>
 		</div>
 	{:else if failure === 'host-sign-in'}
-		<div class="pad">
+		<main class="league">
+			<DisplayTitle size="page">{savedName || `Your ${hostWords('ffpc')} league`}</DisplayTitle>
+			<p class="sub">Read from FFPC as a member. Sign in to FFPC to read it now.</p>
 			<FFPCSignIn
-				reason={hostReason}
 				onconnected={() => {
 					failure = null;
 					void read();
 				}}
 			/>
-		</div>
+			<Quiet href={links.accountLeagues()} size="sm">Your leagues</Quiet>
+		</main>
 	{:else if failure === 'unreachable'}
 		<div class="pad">
 			<EmptyState title="Your league can't be read right now" line="Reload in a moment." />
@@ -175,6 +183,10 @@
 			</header>
 			{#if problem}
 				<Panel edge="loss" padding="sm"><ProblemLine>{problem}</ProblemLine></Panel>
+			{/if}
+			{#if sync.host_signed_out}
+				<!-- The read line says no one is signed in: the sign-in that mends it sits under it. -->
+				<FFPCSignIn onconnected={() => void refresh()} />
 			{/if}
 			<StandingsStrip teams={sync.teams} me={sync.me} />
 			<div class="grid">

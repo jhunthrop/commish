@@ -41,13 +41,17 @@ export function agoWords(seconds: number): string {
 	return `${plural(Math.floor(seconds / HOUR), 'hour')} ago`;
 }
 
-/** The read's line: when the host was last read, and, when it has failed since, that this is the
- * last read we have. */
+/** The read's line: when the host was last read, and, when it has failed since, why, and that this
+ * is the last read we have. */
 export function readLine(sync: LeagueSync, now: Date): string {
 	const age = Math.max(0, (now.getTime() - Date.parse(sync.read_at)) / 1000);
 	const host = hostWords(sync.host);
+	const last = `This is our last read, ${agoWords(age)}.`;
+	if (sync.host_signed_out) {
+		return `No one in this league is signed in to ${host}. ${last}`;
+	}
 	if (sync.host_stale_seconds > 0) {
-		return `${host} is not answering. This is our last read, ${agoWords(age)}.`;
+		return `${host} is not answering. ${last}`;
 	}
 	return `Read from ${host} ${agoWords(age)}.`;
 }
