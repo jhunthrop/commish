@@ -9,8 +9,9 @@ import type { ScheduleRow } from '#lib/ui/schedule-grid.ts';
 import type { RangeScale } from '#lib/types/player.ts';
 import { board, clubs, defaultFormat, schedule } from '../run.ts';
 
-/** The share of opponents the schedule grid shades as the strongest: the top third of the league. */
-const STRONG_SHARE = 1 / 3;
+/** The share of opponents the schedule grid shades as the strongest: the top quarter of the league
+ * (win totals move in halves, so ties can carry a few more). */
+const STRONG_SHARE = 1 / 4;
 
 const NOT_FOUND = 404;
 
