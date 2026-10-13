@@ -44,6 +44,7 @@
 	}
 
 	button {
+		position: relative;
 		height: 30px;
 		padding: 0 10px;
 		border: 0;
@@ -60,11 +61,18 @@
 		color: var(--bg);
 	}
 
+	/* A thumb's 44px: the segment draws at 32 and its hit area reaches past the track's padding. */
 	@media (max-width: 760px) {
 		button {
-			height: 26px;
-			padding: 0 7px;
-			font-size: var(--t-xs);
+			height: 32px;
+			min-width: 44px;
+			padding: 0 var(--s-2);
+		}
+
+		button::after {
+			content: '';
+			position: absolute;
+			inset: -6px 0;
 		}
 	}
 </style>

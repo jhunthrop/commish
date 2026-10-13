@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { windowLabel } from '#lib/format/date.ts';
-	import { fixed, plural, scheduleRankWords } from '#lib/format/number.ts';
+	import { fixed, hardestWords, plural } from '#lib/format/number.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
 	import Figure from '#lib/ui/Figure.svelte';
@@ -22,7 +22,7 @@
 	});
 </script>
 
-<SiteShell title="Clubs" active="players" run={data.run}>
+<SiteShell title="Clubs" run={data.run}>
 	<main class="clubs">
 		<PageHead title="Clubs" {lead} />
 		<ul>
@@ -33,10 +33,11 @@
 						href={links.club(club.abbr)}
 						meta="{club.abbr} · bye week {club.bye ?? 'not set'}"
 					>
-						<span class="sos">
-							<Figure value={fixed(club.slate.strength, 2)} size="md" />
-							<Label>{scheduleRankWords(club.slate.rank)}</Label>
-						</span>
+						<Figure
+							value={fixed(club.slate.strength, 2)}
+							size="md"
+							caption="{page.unit}, {hardestWords(club.slate.rank, page.clubs.length)}"
+						/>
 						{#if club.lead}
 							<PlayerLine
 								name={club.lead.name}
@@ -72,12 +73,6 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 		gap: var(--s-3);
-	}
-
-	.sos {
-		display: flex;
-		align-items: baseline;
-		gap: var(--s-2);
 	}
 
 	@media (max-width: 760px) {

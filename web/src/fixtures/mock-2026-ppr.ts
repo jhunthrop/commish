@@ -9,7 +9,7 @@
  *
  * It exists for the system page only. Every product page reads a nightly run.
  */
-import { POSITIONS, type BoardPlayer, type Position, type RangeScale } from '#lib/types/player.ts';
+import { POSITIONS, type BoardPlayer, type Position } from '#lib/types/player.ts';
 import type { KeyBinding, TeamSlot, WentPick } from '#lib/types/room.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
 
@@ -629,12 +629,6 @@ export const FIXTURE_PLAYER_NAMES: readonly string[] = ROWS.map((row) => row.nam
 
 /** The rows on the mock's 2026 PPR board. */
 export const BOARD_SIZE = 400;
-
-export const SCORING_UNIT = 'PPR pts';
-
-/** The board row specimen: Chris Olave in the WR view, on the WR top 40's range scale. */
-export const ROW_PLAYER = byName('Chris Olave');
-export const WR_RANGE_SCALE: RangeScale = { lo: 100, hi: 446.4688606358823 };
 
 /** The three value cells: round 1 green, round 3 green, below replacement. */
 export const VALUE_PLAYERS: readonly BoardPlayer[] = [

@@ -3,12 +3,16 @@
 	import { goto } from '$app/navigation';
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed } from '#lib/format/number.ts';
-	import type { IndexEntry } from '#lib/run/schema.ts';
+	import type { IndexEntry, PlayerFormat } from '#lib/run/schema.ts';
 	import PlayerPicker from '#lib/site/PlayerPicker.svelte';
 	import SiteShell from '#lib/site/SiteShell.svelte';
+	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
+	import { SAME_PLAYER, verdict as callBetween } from '#lib/site/verdict.ts';
 	import { fetchPlayer, type PlayerData } from '#lib/site/player-data.ts';
 	import { SEARCH_INDEX_URL, searchable, type SearchablePlayer } from '#lib/site/search.ts';
+	import EmptyState from '#lib/ui/EmptyState.svelte';
+	import Face from '#lib/ui/Face.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
 	import GapChip from '#lib/ui/GapChip.svelte';
 	import Label from '#lib/ui/Label.svelte';
@@ -19,6 +23,8 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import TierChip from '#lib/ui/TierChip.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
+	import Verb from '#lib/ui/Verb.svelte';
+	import Verdict from '#lib/ui/Verdict.svelte';
 	import { vorCell } from '#lib/ui/heat.ts';
 	import type { PageProps } from './$types';
 
@@ -27,27 +33,53 @@
 	const SLOTS = ['a', 'b'] as const;
 	type Slot = (typeof SLOTS)[number];
 	const SLOT_LABELS: Record<Slot, string> = { a: 'First player', b: 'Second player' };
+	/** The face leads each card, larger than any number on it. */
+	const CARD_FACE = 72;
+
+	interface Chosen {
+		player: PlayerData;
+		numbers: PlayerFormat;
+	}
 
 	let players = $state<SearchablePlayer[]>([]);
 	let chosen = $state<Record<Slot, PlayerData | null>>({ a: null, b: null });
+	/** A slug from the link that names nobody on our board, per side. */
+	let missing = $state<Record<Slot, string | null>>({ a: null, b: null });
 	let failed = $state(false);
 
-	const format = $derived(data.formats[0]);
-	const both = $derived(
-		SLOTS.flatMap((slot) => {
-			const player = chosen[slot];
-			const numbers = format ? player?.formats[format.id] : undefined;
-			return numbers ? [numbers] : [];
-		})
-	);
+	const format = $derived(data.format);
+
+	function pickOf(slot: Slot): Chosen | null {
+		const player = chosen[slot];
+		const numbers = player?.formats[format.id];
+		return player && numbers ? { player, numbers } : null;
+	}
+
+	const picks = $derived(SLOTS.map(pickOf));
+	const both = $derived(picks.filter((pick): pick is Chosen => pick !== null));
 	const scale = $derived(
 		both.length === 0
 			? undefined
 			: {
-					lo: Math.min(...both.map((numbers) => numbers.floor)),
-					hi: Math.max(...both.map((numbers) => numbers.ceiling))
+					lo: Math.min(...both.map(({ numbers }) => numbers.floor)),
+					hi: Math.max(...both.map(({ numbers }) => numbers.ceiling))
 				}
 	);
+
+	/** Our board's call between the two: the one it ranks higher, by how much, and the other. */
+	/** Our call between the two, once both are in. */
+	const verdict = $derived.by(() => {
+		const [first, second] = both;
+		if (!first || !second) return null;
+		const contender = ({ player, numbers }: Chosen) => ({
+			id: player.id,
+			name: player.name,
+			ourRank: numbers.ourRank,
+			vor: numbers.vor,
+			player
+		});
+		return callBetween(contender(first), contender(second), format.label);
+	});
 
 	function syncUrl(): void {
 		void goto(links.compare(chosen.a?.slug, chosen.b?.slug), { replace: true, shallow: true });
@@ -58,6 +90,7 @@
 			// Fetched before the spread, so a second pick landing first is never overwritten.
 			const loaded = await fetchPlayer(entry.id);
 			chosen = { ...chosen, [slot]: loaded };
+			missing = { ...missing, [slot]: null };
 			syncUrl();
 		} catch {
 			failed = true;
@@ -66,10 +99,12 @@
 
 	function clear(slot: Slot): void {
 		chosen = { ...chosen, [slot]: null };
+		missing = { ...missing, [slot]: null };
 		syncUrl();
 	}
 
 	onMount(async () => {
+		void lazySheet.load();
 		try {
 			const response = await fetch(SEARCH_INDEX_URL);
 			if (!response.ok) throw new Error(`The index answered ${String(response.status)}.`);
@@ -81,8 +116,14 @@
 		const query = new URLSearchParams(window.location.search);
 		await Promise.all(
 			SLOTS.map((slot) => {
-				const entry = players.find((player) => player.slug === query.get(slot));
-				return entry ? choose(slot, entry) : Promise.resolve();
+				const slug = query.get(slot);
+				if (slug === null || slug === '') return Promise.resolve();
+				const entry = players.find((player) => player.slug === slug);
+				if (!entry) {
+					missing = { ...missing, [slot]: slug };
+					return Promise.resolve();
+				}
+				return choose(slot, entry);
 			})
 		);
 	});
@@ -92,32 +133,53 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
-<SiteShell title="Compare" active="players" run={data.run}>
+<SiteShell title="Compare" run={data.run}>
 	<main class="compare">
 		<PageHead
 			title="Compare"
 			lead={failed
 				? 'The players are not loading. Try again in a moment.'
-				: `Our ${format?.label ?? ''} board · ${String(data.run.season)} season`}
+				: `Our ${format.label} board · ${String(data.run.season)} season`}
 		/>
+
+		{#if verdict?.kind === 'same'}
+			<EmptyState level={2} title="Pick two different players" line={SAME_PLAYER} />
+		{:else if verdict}
+			{@const leader = verdict.leader.player}
+			{@const other = verdict.other.player}
+			<Verdict sentence={verdict.sentence}>
+				{#snippet actions()}
+					{#if lazySheet.has(leader.id)}
+						<Quiet href={links.sheet()}>{verdict.leaderName} is on your sheet</Quiet>
+					{:else}
+						<Verb onclick={() => lazySheet.add(leader)}>Add {verdict.leaderName} to my sheet</Verb>
+					{/if}
+					{#if !lazySheet.has(other.id)}
+						<Quiet onclick={() => lazySheet.add(other)}>Add {verdict.otherName} instead</Quiet>
+					{/if}
+				{/snippet}
+			</Verdict>
+		{/if}
+
 		<div class="pair">
-			{#each SLOTS as slot (slot)}
-				{@const player = chosen[slot]}
-				{@const numbers = format ? player?.formats[format.id] : undefined}
-				<Panel as="section" label={player?.name ?? SLOT_LABELS[slot]}>
-					{#if player && numbers && format}
+			{#each SLOTS as slot, i (slot)}
+				{@const pick = picks[i]}
+				<Panel as="section" label={pick?.player.name ?? SLOT_LABELS[slot]}>
+					{#if pick}
+						{@const { player, numbers } = pick}
 						<div class="card">
-							<PlayerLine
-								name={player.name}
-								position={player.position}
-								positionRank={numbers.positionRank}
-								team={player.team}
-								headshot={player.headshot}
-								href={links.player(player.slug)}
-								size={40}
-							>
-								{#snippet trailing()}<TierChip tier={numbers.tier} long />{/snippet}
-							</PlayerLine>
+							<div class="who">
+								<Face src={player.headshot} size={CARD_FACE} loading="eager" />
+								<PlayerLine
+									name={player.name}
+									position={player.position}
+									positionRank={numbers.positionRank}
+									team={player.team}
+									href={links.player(player.slug)}
+								>
+									{#snippet trailing()}<TierChip tier={numbers.tier} long />{/snippet}
+								</PlayerLine>
+							</div>
 							<Figure
 								value={fixed(numbers.projected)}
 								size="lg"
@@ -133,7 +195,7 @@
 								<dt><Label>Drafters</Label></dt>
 								<dd>
 									<GapChip gap={draftersGap(numbers.adp, numbers.ourRank)} />
-									<Label>{numbers.adp === null ? 'Not in ADP' : `ADP ${fixed(numbers.adp)}`}</Label>
+									{#if numbers.adp !== null}<Label>ADP {fixed(numbers.adp)}</Label>{/if}
 								</dd>
 							</dl>
 							<div class="range">
@@ -148,11 +210,20 @@
 							<Quiet size="sm" onclick={() => clear(slot)}>Pick someone else</Quiet>
 						</div>
 					{:else}
-						<PlayerPicker
-							label={SLOT_LABELS[slot]}
-							{players}
-							onpick={(entry: SearchablePlayer) => void choose(slot, entry)}
-						/>
+						<div class="card">
+							{#if missing[slot] !== null}
+								<EmptyState
+									level={3}
+									title="We couldn't find that player"
+									line="Nobody here goes by that name."
+								/>
+							{/if}
+							<PlayerPicker
+								label={SLOT_LABELS[slot]}
+								{players}
+								onpick={(entry: SearchablePlayer) => void choose(slot, entry)}
+							/>
+						</div>
 					{/if}
 				</Panel>
 			{/each}
@@ -180,6 +251,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-4);
+	}
+
+	.who {
+		display: flex;
+		align-items: center;
+		gap: var(--s-3);
+		min-width: 0;
 	}
 
 	dl {

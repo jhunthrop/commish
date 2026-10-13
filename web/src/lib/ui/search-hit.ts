@@ -6,5 +6,7 @@ export interface SearchHit {
 	name: string;
 	position: Position;
 	team: string;
+	/** His face, which leads the line. */
+	headshot: string;
 	href: string;
 }

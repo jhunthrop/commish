@@ -1,33 +1,27 @@
 <script lang="ts">
 	import type { SheetPlayer } from '#lib/sheet/model.ts';
-	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
 
-	/** Add to my sheet on a nightly page: the sheet lane's button once the sheet has loaded, the same
-	 * words until then, which add him as soon as it has. */
+	/** Add to my sheet, the player page's one solid action: the sheet lane's button once the sheet
+	 * has loaded, the same words until then, which add him as soon as it has. A board row's control
+	 * is RowSheetMark, so the player page never loads the row's mark. */
 	interface Props {
 		player: SheetPlayer;
-		/** verb: the player page's one solid action. row: a quiet button at the end of a board row. */
-		variant?: 'verb' | 'row';
 		fill?: boolean;
 	}
 
-	let { player, variant = 'verb', fill = false }: Props = $props();
+	let { player, fill = false }: Props = $props();
 
 	const parts = $derived(lazySheet.parts);
 </script>
 
 {#if parts}
 	{@const Add = parts.Add}
-	<Add {player} {variant} {fill} />
+	<Add {player} {fill} />
 {:else}
 	<span class="add">
-		{#if variant === 'row'}
-			<Quiet size="sm" onclick={() => lazySheet.add(player)}>Add to my sheet</Quiet>
-		{:else}
-			<Verb size="lg" {fill} onclick={() => lazySheet.add(player)}>Add to my sheet</Verb>
-		{/if}
+		<Verb size="lg" {fill} onclick={() => lazySheet.add(player)}>Add to my sheet</Verb>
 	</span>
 {/if}
 

@@ -205,12 +205,12 @@ export const recordSchema = z.object({
 	season: z.number().int(),
 	/** The format every frozen board ranks in. */
 	format: formatId,
-	/** The statistics the record grades with, as their columns name them. */
+	/** The statistics the record grades with, in words a drafter says with no gloss: the rank
+	 * agreement as "agreement with the finish", the typical miss as "places off, typical player".
+	 * The page prints them as the big number's caption and the column heads. */
 	statistic: z.object({ agreement: phrase, placesOff: phrase }),
-	/** How the record is kept, term by term, as the page's method panel prints it. */
-	method: z.array(z.object({ term: phrase, means: phrase })).min(1),
-	/** While no week is graded, what the run knows about why, in a sentence. Null once one is. */
-	pending: phrase.nullable(),
+	/** How the record is kept, as one sentence the page prints under the weeks. */
+	method: phrase,
 	weeks: z.array(recordWeekSchema),
 	/** Every graded week pooled, one line for all players and one per position. */
 	toDate: z.array(recordLineSchema)
@@ -221,7 +221,9 @@ export const indexEntrySchema = z.object({
 	slug,
 	name: phrase,
 	team: club,
-	position
+	position,
+	/** His face, so a search hit leads with it like every other list. */
+	headshot: z.url()
 });
 
 export const indexSchema = z.array(indexEntrySchema).min(1);
@@ -262,6 +264,8 @@ export const scheduleSchema = z
 		opponentValues: z.record(club, points),
 		/** What one opponent value is, as a column head prints it. */
 		opponentBasis: phrase,
+		/** A slate's strength as a short caption under its number: "opponents' average win total". */
+		unit: phrase,
 		slates: z.array(slateSchema).length(32)
 	})
 	.superRefine((schedule, ctx) => {
