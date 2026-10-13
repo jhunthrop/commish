@@ -23,14 +23,16 @@
 		unit: string;
 		/** Faces in the first screen of a prerendered board load eagerly. */
 		eager?: boolean;
+		/** The floor to ceiling column, on unless the view switches it off. Match the RowHead above. */
+		range?: boolean;
 	}
 
-	let { player, href, scale, showTier, unit, eager = false }: Props = $props();
+	let { player, href, scale, showTier, unit, eager = false, range = true }: Props = $props();
 
 	const adpLabel = $derived(player.adp === null ? 'Not in ADP' : `ADP ${fixed(player.adp)}`);
 </script>
 
-<div class="row">
+<div class="row" class:flat={!range}>
 	<span class="rk">{player.ourRank}</span>
 	<Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />
 	<span class="who">
@@ -45,9 +47,11 @@
 	</span>
 	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
 	<ValueCell {...vorCell(player.vor, player.vorRound)} />
-	<span class="rng">
-		<RangeBar floor={player.floor} median={player.median} ceiling={player.ceiling} {scale} />
-	</span>
+	{#if range}
+		<span class="rng">
+			<RangeBar floor={player.floor} median={player.median} ceiling={player.ceiling} {scale} />
+		</span>
+	{/if}
 	<span class="adp">
 		<GapChip gap={draftersGap(player.adp, player.ourRank)} />
 		<Label size="cell">{adpLabel}</Label>
@@ -63,6 +67,10 @@
 		min-height: var(--row-h);
 		padding: 4px var(--s-3);
 		border-bottom: 1px solid var(--line);
+	}
+
+	.flat {
+		grid-template-columns: var(--board-cols-flat);
 	}
 
 	.row:hover {

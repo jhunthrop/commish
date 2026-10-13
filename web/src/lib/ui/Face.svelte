@@ -14,9 +14,19 @@
 		ringed?: boolean;
 		/** A ring in ink: the newest pick. */
 		marked?: boolean;
+		/** A smaller diameter on the phone, for a hero face: 168 on a desk, 96 in a hand. */
+		phoneSize?: number;
 	}
 
-	let { src, size, alt = '', loading = 'lazy', ringed = false, marked = false }: Props = $props();
+	let {
+		src,
+		size,
+		alt = '',
+		loading = 'lazy',
+		ringed = false,
+		marked = false,
+		phoneSize
+	}: Props = $props();
 
 	const sources = $derived(headshotSources(src, size));
 </script>
@@ -26,6 +36,7 @@
 	class:ringed
 	class:marked
 	style:--face-size="{size}px"
+	style:--face-phone-size={phoneSize === undefined ? undefined : `${String(phoneSize)}px`}
 	style:--face-overfill="{FACE_OVERFILL * 100}%"
 >
 	<img
@@ -49,6 +60,13 @@
 		overflow: hidden;
 		display: grid;
 		place-items: end center;
+	}
+
+	@media (max-width: 760px) {
+		.face {
+			width: var(--face-phone-size, var(--face-size));
+			height: var(--face-phone-size, var(--face-size));
+		}
 	}
 
 	.ringed {

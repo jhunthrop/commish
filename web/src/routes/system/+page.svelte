@@ -37,6 +37,7 @@
 	import Part from '#lib/ui/system/Part.svelte';
 	import Parts from '#lib/ui/system/Parts.svelte';
 	import Specimen from '#lib/ui/system/Specimen.svelte';
+	import NightlyParts from '#lib/ui/system/NightlyParts.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -258,6 +259,8 @@
 				<Keys bindings={data.roomKeys} />
 			</Parts>
 		</DocSection>
+
+		<NightlyParts nightly={data.nightly} run={data.run} />
 
 		<DocSection title="Rail icons" sub="A 24 grid, a 1.8 stroke, in the color of the text.">
 			<Parts>

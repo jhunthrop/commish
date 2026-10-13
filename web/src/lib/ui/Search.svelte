@@ -9,9 +9,28 @@
 		/** Called on the first focus, so a page can load its index only when someone searches. */
 		onfirstfocus?: () => void;
 		oninput?: (value: string) => void;
+		/** Set when the field drives a list of results: the list's id, whether it is open, the option
+		 * the arrow keys are on, and the keys that move through it. */
+		controls?: string;
+		expanded?: boolean;
+		activeOption?: string;
+		onkeydown?: (event: KeyboardEvent) => void;
+		/** The / key focuses this field. One field per page holds it: the top bar's. */
+		shortcut?: boolean;
 	}
 
-	let { placeholder, label, value = $bindable(''), onfirstfocus, oninput }: Props = $props();
+	let {
+		placeholder,
+		label,
+		value = $bindable(''),
+		onfirstfocus,
+		oninput,
+		controls,
+		expanded = false,
+		activeOption,
+		onkeydown,
+		shortcut = true
+	}: Props = $props();
 
 	const FOCUS_KEY = '/';
 	let input: HTMLInputElement | undefined = $state();
@@ -25,6 +44,7 @@
 	}
 
 	function onKeydown(event: KeyboardEvent): void {
+		if (!shortcut) return;
 		if (event.key !== FOCUS_KEY || event.metaKey || event.ctrlKey || event.altKey) return;
 		if (isTyping(event.target)) return;
 		event.preventDefault();
@@ -48,11 +68,18 @@
 		type="search"
 		{placeholder}
 		aria-label={label}
-		aria-keyshortcuts={FOCUS_KEY}
+		aria-keyshortcuts={shortcut ? FOCUS_KEY : undefined}
+		role={controls ? 'combobox' : undefined}
+		aria-controls={controls}
+		aria-expanded={controls ? expanded : undefined}
+		aria-autocomplete={controls ? 'list' : undefined}
+		aria-activedescendant={activeOption}
+		autocomplete="off"
 		onfocus={onFocus}
 		oninput={() => oninput?.(value)}
+		{onkeydown}
 	/>
-	<kbd>{FOCUS_KEY}</kbd>
+	{#if shortcut}<kbd>{FOCUS_KEY}</kbd>{/if}
 </label>
 
 <style>
