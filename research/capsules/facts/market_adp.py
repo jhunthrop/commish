@@ -18,8 +18,9 @@ from typing import ClassVar
 from sqlalchemy import Connection
 
 from research.model.reads.teams import first_kickoff_for
-from research.nightly.config import PAGE_FORMAT, PRODUCT_SEASON
+from research.nightly.config import PAGE_FORMAT
 from research.nightly.reads.adp import adp_cutoff, latest_capture
+from research.season import PRODUCT_SEASON
 
 
 @dataclass(frozen=True, slots=True)

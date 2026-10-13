@@ -13,7 +13,6 @@ from typing import Final
 from research.model.domain import STANDARD_ROSTER_SLOTS, RosterSlotConfig
 from research.model.domain import SUPERFLEX_ROSTER_SLOTS as SUPERFLEX_SLOTS
 
-PRODUCT_SEASON: Final = 2026
 TEAMS: Final = 12
 IMPLEMENTATION: Final = "python"
 BOARD_SOURCE_PREFIX: Final = "commish_board_v9"

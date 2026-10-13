@@ -27,9 +27,8 @@ import httpx
 from research.errors import ConfigurationError
 from research.model.instants import js_iso
 from research.nightly.config import EARLY_ACCESS, EARLY_KEY, LATEST_KEY, RUNS_PREFIX
-from research.nightly.run_store import RunStore
+from research.nightly.run_store import JSON_TYPE, RunStore
 
-JSON_TYPE: Final = "application/json"
 STARTED_FILE: Final = "started.json"
 PUBLISHED_FILE: Final = "published.json"
 DISPATCH_TOKEN_VARIABLE: Final = "WEB_DISPATCH_TOKEN"

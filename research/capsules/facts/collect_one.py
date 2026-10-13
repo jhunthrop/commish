@@ -27,7 +27,6 @@ from research.capsules.facts.board import (
 )
 from research.capsules.facts.build import PlayerFacts, build_player_facts
 from research.capsules.facts.collect import (
-    PRODUCT_SEASON,
     Population,
     SharedReads,
     active_peers_for,
@@ -39,6 +38,7 @@ from research.capsules.facts.market_adp import MarketAdp, run_market_adp
 from research.capsules.facts.reference import injury_snapshot, news_for_players
 from research.model.laws.registry import chip_eligible_laws
 from research.model.priors import load_model_artifacts
+from research.season import PRODUCT_SEASON
 
 BOARD_MEMO_SECONDS: Final = 60 * 60
 

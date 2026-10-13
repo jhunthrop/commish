@@ -18,11 +18,12 @@ import argparse
 import os
 import sys
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import datetime
 
 import httpx
 
 from research.capsules.config import CAPSULE_CONFIG
+from research.cli import log_line as _line
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
 from research.nightly.capsule_step import CapsuleStepPlan
@@ -32,11 +33,6 @@ from research.nightly.run import STEPS, RunDeps, RunOptions, run_nightly
 from research.nightly.run_store import RunStore
 from research.pipeline.commands import now_ms
 from research.pipeline.http import LiveFetcher
-
-
-def _line(text: str) -> None:
-    sys.stdout.write(f"{datetime.now(UTC).isoformat()} {text}\n")
-    sys.stdout.flush()
 
 
 def _store(args: argparse.Namespace, http: httpx.Client) -> RunStore:

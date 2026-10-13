@@ -11,7 +11,6 @@ capsule row keys on rides on the pass (`universe_ids`).
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Final
 
 from sqlalchemy import Connection, text
 
@@ -38,8 +37,7 @@ from research.model.reads.teams import first_kickoff_for, team_observations_as_o
 from research.pipeline.nflverse.team_codes import source_team_code
 from research.pipeline.odds.props import PROP_MARKETS
 from research.pipeline.vegas import VEGAS_SOURCE, VegasMetric
-
-PRODUCT_SEASON: Final = 2026
+from research.season import PRODUCT_SEASON
 
 
 def active_peers_for(conn: Connection, positions: Sequence[Position], season: int) -> dict[str, Position]:

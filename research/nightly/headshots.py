@@ -26,14 +26,13 @@ from typing import Any, Final
 import httpx
 
 from research.nightly.config import HEADSHOT_REGISTRY_KEY
-from research.nightly.run_store import RunStore
+from research.nightly.run_store import JSON_TYPE, RunStore
 
 _WORKERS: Final = 8
 _TIMEOUT_SECONDS: Final = 20.0
 _OK: Final = 200
 _NOT_MODIFIED: Final = 304
 _EXTENSIONS: Final = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
-JSON_TYPE: Final = "application/json"
 Json = dict[str, Any]
 
 

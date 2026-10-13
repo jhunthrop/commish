@@ -13,16 +13,17 @@ from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
-from research.capsules.store import stored_capsules_for
+from research.capsules.store import WRITTEN_SOURCE, stored_capsules_for
 from research.errors import ResearchError
 from research.model.reads.teams import first_kickoff_for
 from research.nightly.build import pages, season
-from research.nightly.config import PAGE_FORMAT, PRODUCT_SEASON, RUN_FORMATS, RunFormat
+from research.nightly.config import PAGE_FORMAT, RUN_FORMATS, RunFormat
 from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.adp import AdpCapture, adp_cutoff, latest_capture
 from research.nightly.reads.board import FormatBoard, format_board
 from research.nightly.register_log import FrozenBy
+from research.season import PRODUCT_SEASON
 
 Json = dict[str, Any]
 WIN_TOTALS_VENDOR: Final = "Published preseason season win totals, the nfelo win_totals.csv (greerreNFL/nfelosrs)"
@@ -148,7 +149,7 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> Assemble
         for c in captures.values()
         if c.captured_at is not None
     ]
-    written = [c for c in capsules.values() if c.source == pages.WRITTEN_SOURCE]
+    written = [c for c in capsules.values() if c.source == WRITTEN_SOURCE]
     capsule_sources = (
         [{"artifact": "capsules", "vendor": f"written by {', '.join(sorted({c.model or 'the writer' for c in written}))}",
           "feed": "player_capsules", "window": season.window(min(c.generated_at for c in written), max(c.generated_at for c in written))}]

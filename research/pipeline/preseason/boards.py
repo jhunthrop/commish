@@ -32,7 +32,6 @@ from research.pipeline.preseason.benchmarks import (
 from research.pipeline.preseason.ingest import (
     BOARD_FORMATS,
     DEFAULT_BOARD_FORMAT,
-    PRODUCT_SEASON,
     SUPERFLEX_ADP_SNAPSHOT,
     RankingRow,
     crossed_roster_identities,
@@ -48,6 +47,7 @@ from research.pipeline.preseason.publishers import (
     fetch_expert_consensus,
 )
 from research.pipeline.tolerated import TOLERATED_FAILURES
+from research.season import PRODUCT_SEASON
 
 LOG = logging.getLogger(__name__)
 MINIMUM_RESOLUTION: Final = 0.7

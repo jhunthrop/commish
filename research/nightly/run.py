@@ -26,7 +26,7 @@ from research.model.instants import js_iso
 from research.nightly import gates
 from research.nightly.assemble import Assembled, assemble
 from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan
-from research.nightly.config import HELD_OUT_BASELINE_KEY, PRODUCT_SEASON
+from research.nightly.config import HELD_OUT_BASELINE_KEY
 from research.nightly.publish import ArtifactWriter, encode, promote_early, run_key, take_run_id
 from research.nightly.reads.record import frozen_weeks
 from research.nightly.register_log import FrozenBy, carry_forward, read_frozen_by, save_frozen_by
@@ -40,6 +40,7 @@ from research.nightly.run_parts import (
 from research.nightly.run_store import LocalRunStore, RunStore
 from research.nightly.schema_gate import contract_dir, schema_gate
 from research.pipeline.http import Fetcher
+from research.season import PRODUCT_SEASON
 
 STEPS = ("ingest", "fit", "capsules", "headshots")
 Json = dict[str, Any]

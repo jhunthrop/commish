@@ -21,7 +21,7 @@ from research.nightly.assemble import Assembled
 from research.nightly.build.season import format_json
 from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate
 from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan, run_capsule_step
-from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION, PRODUCT_SEASON
+from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION
 from research.nightly.headshots import Face, mirror_headshots
 from research.nightly.page_findings import page_findings
 from research.nightly.publish import read_json
@@ -29,6 +29,7 @@ from research.nightly.register_log import FrozenBy, carried_note, last_pass
 from research.nightly.run_store import RunStore
 from research.nightly.steps import IngestContext, StepRecord, ingest_step, run_fit_step
 from research.pipeline.http import Fetcher
+from research.season import PRODUCT_SEASON
 
 Json = dict[str, Any]
 Log = Callable[[str], None]

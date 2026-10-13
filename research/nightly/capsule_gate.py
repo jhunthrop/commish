@@ -23,12 +23,12 @@ from sqlalchemy import Connection
 
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts.board import board_rows
-from research.capsules.facts.collect import PRODUCT_SEASON, universe_ids_for
+from research.capsules.facts.collect import universe_ids_for
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.narrative import normalize_sentence, sentences_verbatim
-from research.capsules.store import StoredCapsule, stored_capsules_for
+from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, stored_capsules_for
+from research.season import PRODUCT_SEASON
 
-WRITTEN_SOURCE: Final = "llm"
 _EXAMPLES: Final = 5
 
 

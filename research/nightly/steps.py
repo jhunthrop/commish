@@ -20,9 +20,9 @@ from sqlalchemy import Engine
 
 from research.model.arithmetic import ARM64_BOARDS
 from research.model.fit_check import fit_step
+from research.model.fit_inputs import fit_readiness
 from research.model.priors import load_model_artifacts
 from research.model.reads.teams import first_kickoff_for
-from research.nightly.config import PRODUCT_SEASON
 from research.pipeline import vegas
 from research.pipeline.http import Fetcher
 from research.pipeline.odds.ingest import KickoffGate, run_props_preseason_snapshot
@@ -30,6 +30,7 @@ from research.pipeline.preseason.boards import ingest_adp_snapshot, ingest_super
 from research.pipeline.tank01.capture import run_capture_harvest
 from research.pipeline.tank01.client import API_KEY_ENV as TANK01_KEY
 from research.pipeline.tank01.client import DEFAULT_SEASON, SEASON_ENV, Tank01Client
+from research.season import PRODUCT_SEASON
 
 ODDS_KEY: Final = "ODDS_API_KEY"
 
@@ -114,6 +115,14 @@ def ingest_step(context: IngestContext) -> StepRecord:
 
 
 def run_fit_step(engine: Engine, now: datetime) -> StepRecord:
+    """The board's check, and every unported fit named: re-runnable, or the seasons it still lacks."""
     with engine.begin() as conn:
         record = fit_step(conn, now, load_model_artifacts(conn), ARM64_BOARDS)
-    return StepRecord("fit", record.status, record.summary)
+        readiness = fit_readiness(conn)
+    ready = [fit for fit, reason in readiness.items() if reason is None]
+    blocked = [f"{fit} ({reason})" for fit, reason in readiness.items() if reason is not None]
+    fits = f"unported fits with every input held: {', '.join(ready) or 'none'}" + (
+        f"; blocked: {'; '.join(blocked)}" if blocked else ""
+    )
+    checked = " The board was not checked tonight, which is not a pass." if record.status == "skipped" else ""
+    return StepRecord("fit", record.status, f"{record.summary}.{checked} {fits}")

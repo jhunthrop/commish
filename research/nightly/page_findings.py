@@ -15,15 +15,13 @@ from datetime import datetime
 from sqlalchemy import Connection
 
 from research.capsules.facts.board import board_rows
-from research.capsules.facts.collect import PRODUCT_SEASON
 from research.capsules.pull_figures import PageValues, adp_figures_off_page, capsule_findings, page_numbers
-from research.capsules.store import stored_capsules_for
+from research.capsules.store import WRITTEN_SOURCE, stored_capsules_for
 from research.capsules.sweep import subjects_of
 from research.model.reads.teams import first_kickoff_for
 from research.nightly.config import PAGE_FORMAT
 from research.nightly.reads.adp import adp_cutoff, latest_capture
-
-WRITTEN_SOURCE = "llm"
+from research.season import PRODUCT_SEASON
 
 
 @dataclass(frozen=True, slots=True)

@@ -13,7 +13,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from research.model.backtest import sum_left
+from research.model.backtest import mean_or_none
 from research.model.register.freeze import SERVED_SOURCE
 from research.model.register.grade import REGISTER_COLUMNS, score_columns
 
@@ -54,10 +54,6 @@ def grade_rows_for(conn: Connection, season: int) -> list[Mapping[str, Any]]:
     ]
 
 
-def _mean(values: Sequence[float]) -> float | None:
-    return None if not values else sum_left(values) / len(values)
-
-
 def running_scoreboard(conn: Connection, season: int) -> list[CumulativeScore]:
     by_week = latest_grade_rows_by_week(grade_rows_for(conn, season))
     sources = sorted(
@@ -78,8 +74,10 @@ def running_scoreboard(conn: Connection, season: int) -> list[CumulativeScore]:
                     source,
                     column,
                     len(graded),
-                    _mean([s.spearman for s in graded if s.spearman is not None]),
-                    _mean([s.mean_absolute_rank_error for s in graded if s.mean_absolute_rank_error is not None]),
+                    mean_or_none([s.spearman for s in graded if s.spearman is not None]),
+                    mean_or_none(
+                        [s.mean_absolute_rank_error for s in graded if s.mean_absolute_rank_error is not None]
+                    ),
                 )
             )
     return scores

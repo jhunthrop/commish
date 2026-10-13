@@ -12,11 +12,12 @@ import logging
 import os
 import sys
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Final
 
 import httpx
 
+from research.cli import log_line as _line
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
 from research.inseason.season_week import STEPS, SeasonWeekContext, run_season_week
@@ -27,19 +28,9 @@ from research.pipeline.commands import now_ms
 from research.pipeline.http import LiveFetcher
 from research.pipeline.tank01.capture import run_capture_harvest
 from research.pipeline.tank01.client import API_KEY_ENV, DEFAULT_SEASON, SEASON_ENV, Tank01Client
+from research.season import PRODUCT_SEASON
 
 TASKS: Final = ("season-week", "capture-harvest")
-# January and February belong to the season that kicked off the autumn before.
-_LAST_MONTH_OF_PRIOR_SEASON: Final = 2
-
-
-def _line(text: str) -> None:
-    sys.stdout.write(f"{datetime.now(UTC).isoformat()} {text}\n")
-
-
-def default_season(now: datetime) -> int:
-    """`defaultSeason`: the season that started in the preceding September."""
-    return now.year - 1 if now.month <= _LAST_MONTH_OF_PRIOR_SEASON else now.year
 
 
 def _season_week(args: argparse.Namespace, now: datetime) -> bool:
@@ -53,7 +44,7 @@ def _season_week(args: argparse.Namespace, now: datetime) -> bool:
         with httpx.Client(timeout=60.0) as http:
             store = run_store(args.out, http)
             run_id = take_run_id(store, now, WEEKLY_SUFFIX)
-            season = args.season if args.season is not None else default_season(now)
+            season = args.season if args.season is not None else PRODUCT_SEASON
 
             def on_freeze(week: int, at: datetime) -> None:
                 record_freeze(store, season, week, run_id, at)

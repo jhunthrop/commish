@@ -22,8 +22,8 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.errors import ResearchError
 from research.model.backtest import sum_left
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS, product_team_code
+from research.season import REGULAR_SEASON_WEEKS
 
-REGULAR_SEASON_WEEKS: Final = 18
 WIN_TOTAL_SOURCE: Final = "vegas_win_totals"
 WIN_TOTAL_METRIC: Final = "vegas_win_total"
 OPPONENT_BASIS: Final = "Expected wins, set before the season"

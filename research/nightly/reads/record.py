@@ -16,15 +16,15 @@ from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
-from research.model.backtest import Observation, spearman, sum_left
+from research.model.backtest import Observation, mean_or_none, spearman, sum_left
 from research.model.reads.teams import kickoff_instants_by_week
 from research.model.register.freeze import SERVED_SOURCE
 from research.model.register.grade import average_outcome_ranks, ordinal_ranks
+from research.season import REGULAR_SEASON_WEEKS
 
 # The one sentence a missed week prints. The 2026 misses (weeks 3 to 5) were the old weekly job
 # failing on every pass; from cutover a missed freeze fails the in-season job (`inseason`).
 MISSED_NOTE: Final = "Our nightly run failed that week."
-REGULAR_SEASON_WEEKS: Final = 18
 RECORD_POSITIONS: Final = ("QB", "RB", "WR", "TE", "K", "DST")
 ALL: Final = "All"
 STATISTIC: Final = {"agreement": "agreement with the finish", "placesOff": "places off, typical player"}
@@ -87,15 +87,11 @@ def week_lines(rows: Sequence[Mapping[str, Any]]) -> tuple[Line, ...]:
     return tuple(lines)
 
 
-def _mean(values: Sequence[float]) -> float | None:
-    return None if not values else sum_left(values) / len(values)
-
-
 def _pooled(scores: Sequence[Score], players: int) -> Score:
     return Score(
         players,
-        _mean([s.agreement for s in scores if s.agreement is not None]),
-        _mean([s.places_off for s in scores if s.places_off is not None]),
+        mean_or_none([s.agreement for s in scores if s.agreement is not None]),
+        mean_or_none([s.places_off for s in scores if s.places_off is not None]),
     )
 
 

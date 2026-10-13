@@ -20,12 +20,11 @@ from datetime import datetime
 from typing import Any, Final
 
 from research.model.instants import js_iso
-from research.nightly.run_store import RunStore
+from research.nightly.run_store import JSON_TYPE, RunStore
 
 FROZEN_BY_KEY: Final = "register/frozen-by.json"
 LAST_PASS_KEY: Final = "register/last-pass.json"
 WEEKLY_SUFFIX: Final = "weekly"
-JSON_TYPE: Final = "application/json"
 Json = dict[str, Any]
 
 

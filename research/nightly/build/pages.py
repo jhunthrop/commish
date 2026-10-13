@@ -16,11 +16,10 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from research.capsules.pull_figures import PageValues, page_numbers, pull_figures_of
-from research.capsules.store import StoredCapsule
+from research.capsules.store import WRITTEN_SOURCE, StoredCapsule
 from research.nightly.config import PAGE_FORMAT, TEAMS
 from research.nightly.reads.board import BoardEntry, FormatBoard
 
-WRITTEN_SOURCE: Final = "llm"
 # The run names a team defense as the site does.
 WEB_POSITION: Final = {"QB": "QB", "RB": "RB", "WR": "WR", "TE": "TE", "K": "K", "DEF": "DST"}
 # Each pull figure's caption, the page number it counts in a few words, in the PPR board's unit.

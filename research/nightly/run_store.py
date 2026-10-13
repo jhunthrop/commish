@@ -8,9 +8,11 @@ racing for the same hour.
 """
 
 from pathlib import Path
-from typing import Protocol
+from typing import Final, Protocol
 
 from research.errors import ConfigurationError
+
+JSON_TYPE: Final = "application/json"
 
 
 class RunStore(Protocol):

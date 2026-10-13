@@ -59,8 +59,8 @@ from research.model.preseason.persist import (
 )
 from research.model.priors import ModelArtifacts, load_model_artifacts
 from research.model.reads.teams import first_kickoff_for
+from research.season import PRODUCT_SEASON
 
-PRODUCT_SEASON: Final = 2026
 INGESTED_SEASONS: Final = (2021, 2022, 2023, 2024)
 FIT_POINT_TOLERANCE: Final = 0.05
 SERVED_SOURCE: Final = board_source_for("ppr")

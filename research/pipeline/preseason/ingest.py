@@ -46,7 +46,6 @@ from research.pipeline.preseason.rosters import (
 
 LOG = logging.getLogger(__name__)
 FINAL = datetime(9999, 12, 31, tzinfo=UTC)
-PRODUCT_SEASON = 2026
 
 # Each board format: (format, ADP source, snapshot format, feed format).
 BOARD_FORMATS: tuple[tuple[str, str, str, FfcAdpFormat], ...] = (
