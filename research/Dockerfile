@@ -26,6 +26,8 @@ RUN node -e 'const lock = require("/tmp/web-lock.json").packages; \
   && npm install --omit=dev --no-audit --no-fund --ignore-scripts
 COPY --from=web src/lib/run ./src/lib/run
 COPY --from=web src/lib/types/player.ts ./src/lib/types/player.ts
+# The build's own reader, which the gate drives so that its cross-file checks are the web's, not a copy.
+COPY --from=web src/lib/server/run.ts ./src/lib/server/run.ts
 
 FROM python:3.13-slim AS build
 COPY --from=ghcr.io/astral-sh/uv:0.12.23 /uv /usr/local/bin/uv

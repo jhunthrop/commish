@@ -2,9 +2,9 @@
 
 The web's schema (`web/src/lib/run/schema.ts`) is the run's contract, and the web build refuses a run
 that breaks it, so the nightly runs the same code over the run before it can become early or public:
-`contract/run-contract.ts` under node, against the web's `schema.ts` and `source.ts` (the research image
-copies them from the repository at build, with the web's own zod and aws4fetch, into
-`WEB_CONTRACT_DIR`). A field the web adds later (the player card's season block) is gated the night the
+`contract/run-contract.ts` under node, which drives the web build's own reader (`src/lib/server/run.ts`,
+its schemas and every cross-file check it makes; the research image copies `src/lib/run` and that
+reader from the repository at build, with the web's own zod and aws4fetch, into `WEB_CONTRACT_DIR`). A field the web adds later (the player card's season block) is gated the night the
 image carrying it deploys, with no change here.
 
 The gate fails, naming each refusal `schema:<file>:<message>`, when the reader refuses anything, and
@@ -40,19 +40,26 @@ def schema_gate(runs_root: Path, run_id: str, web_dir: Path) -> GateRecord:
         for what, present in (
             ("node on the PATH", node is not None),
             (f"the web contract at {web_dir}", (web_dir / "src/lib/run/schema.ts").is_file()),
+            (f"the web reader at {web_dir}", (web_dir / "src/lib/server/run.ts").is_file()),
             ("zod in the web contract", (web_dir / "node_modules/zod").is_dir()),
         )
         if not present
     ]
     if missing or node is None:
         return gate_record("schema", [f"schema_unchecked:{', '.join(missing)}"], "the web's reader could not run")
-    completed = subprocess.run(
-        [node, "--experimental-strip-types", "--no-warnings", str(_SCRIPT), str(web_dir), str(runs_root), run_id],
-        capture_output=True,
-        text=True,
-        timeout=_TIMEOUT_SECONDS,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            [node, "--experimental-strip-types", "--no-warnings", str(_SCRIPT), str(web_dir), str(runs_root), run_id],
+            capture_output=True,
+            text=True,
+            timeout=_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        # Review N11: a reader that never answers is an unchecked run, never a crashed one.
+        return gate_record(
+            "schema", [f"schema_unchecked:timeout after {_TIMEOUT_SECONDS} s"], "the web's reader timed out"
+        )
     lines = [line for line in completed.stdout.splitlines() if line.strip()]
     reasons = [line for line in lines if line.startswith("schema:")]
     summary = next((line for line in reversed(lines) if not line.startswith("schema:")), "")

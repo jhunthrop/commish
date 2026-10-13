@@ -13,6 +13,7 @@ on:
     paths:
       - "research/**"
       - "web/src/lib/run/**"
+      - "web/src/lib/server/run.ts"
       - "web/src/lib/types/player.ts"
       - "web/package-lock.json"
       - "research-ts/**"
@@ -31,6 +32,7 @@ on:
     paths:
       - "research/**"
       - "web/src/lib/run/**"
+      - "web/src/lib/server/run.ts"
       - "web/src/lib/types/player.ts"
       - "web/package-lock.json"
       - "research-ts/**"
@@ -150,10 +152,18 @@ jobs:
           # The web's run contract, which the nightly's schema gate runs (research/nightly/schema_gate.py).
           build-contexts: web=web
           build-args: VERSION=${{ github.sha }}
-          push: ${{ env.PUSH == 'true' }}
+          load: true
           tags: ${{ env.IMAGE }}
           cache-from: type=gha,scope=research
           cache-to: type=gha,mode=max,scope=research
+        # The schema gate inside the built image, over a recorded three-player run
+        # (research/nightly/contract/fixture): a web import the image's contract copy lacks fails here,
+        # not on the first night (review N16).
+      - name: The schema gate in the built image
+        run: docker run --rm "$IMAGE" research.nightly contract --runs nightly/contract/fixture --run-id 2026-10-13T21-2
+      - name: Push the image
+        if: env.PUSH == 'true'
+        run: docker push "$IMAGE"
 
   deploy:
     needs: image
@@ -229,7 +239,9 @@ jobs:
               --member "serviceAccount:$RUNTIME_SA" --role roles/run.invoker --quiet
           }
           # A season's first night rewrites every capsule (hours at the gateway's pace); a night after, minutes.
-          deploy nightly "research.nightly,run" "$nightly" 2 2Gi 8h
+          # The first production night mends only (a run with every page whose facts moved waiting for a
+          # planned regeneration); drop --mend-only once that regeneration has run against production.
+          deploy nightly "research.nightly,run,--mend-only" "$nightly" 2 2Gi 8h
           deploy nightly-publish "research.nightly,publish" "$publish" 1 512Mi 10m
           deploy inseason "research.inseason,--task,season-week" "$db,ODDS_API_KEY=ODDS_API_KEY:latest,CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest" 2 2Gi 1h
           deploy inseason-capture "research.inseason,--task,capture-harvest" "$db,TANK01_API_KEY=TANK01_API_KEY:latest" 1 512Mi 10m

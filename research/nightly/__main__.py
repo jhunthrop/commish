@@ -19,6 +19,7 @@ import os
 import sys
 from collections.abc import Sequence
 from datetime import datetime
+from pathlib import Path
 
 import httpx
 
@@ -31,6 +32,7 @@ from research.nightly.publish import Dispatcher, publish
 from research.nightly.r2 import run_store
 from research.nightly.run import STEPS, RunDeps, RunOptions, run_nightly
 from research.nightly.run_store import RunStore
+from research.nightly.schema_gate import contract_dir, schema_gate
 from research.pipeline.commands import now_ms
 from research.pipeline.http import LiveFetcher
 
@@ -67,6 +69,15 @@ def _publish(args: argparse.Namespace) -> int:
     return 0 if outcome.ok else 1
 
 
+def _contract(args: argparse.Namespace) -> int:
+    """The schema gate alone, over a run already written (CI runs it in the built image, review N16)."""
+    record = schema_gate(Path(args.runs), args.run_id, contract_dir(os.environ))
+    for reason in record.reasons:
+        _line(reason)
+    _line(f"schema gate: {'passed' if record.passed else 'FAILED'}, {record.summary}")
+    return 0 if record.passed else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="research.nightly", description=(__doc__ or "").splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
@@ -84,8 +95,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     published.add_argument("--no-dispatch", action="store_true", help="move the pointer, dispatch nothing")
     for sub in (run, published):
         sub.add_argument("--out", default=None, help="a local directory instead of the R2 bucket")
+    contract = commands.add_parser("contract", help="the schema gate alone, over a run already written")
+    contract.add_argument("--runs", required=True, help="the directory laid out as the bucket (runs/<id>/...)")
+    contract.add_argument("--run-id", required=True)
     args = parser.parse_args(argv)
-    return _run(args) if args.command == "run" else _publish(args)
+    commands_by_name = {"run": _run, "publish": _publish, "contract": _contract}
+    return commands_by_name[args.command](args)
 
 
 if __name__ == "__main__":

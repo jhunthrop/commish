@@ -1,17 +1,21 @@
 // THE RUN AGAINST THE WEB'S OWN READER (the nightly's `schema` gate, `research/nightly/schema_gate.py`).
 //
-// Every artifact of one run, read through the web's `openRun` and parsed with the schema the web build
-// parses it with (`web/src/lib/run/schema.ts`, copied from the repository into the research image at
-// build), then the cross-file checks the build makes (`web/src/lib/server/run.ts`: the manifest names
-// its own run, the index matches the manifest, ids and slugs are unique, every format has its board,
-// every index entry has its page, each page's log runs the schedule's weeks and its season is the
-// index's two numbers for him, and the rules across season blocks, `season-checks.ts`). A run this refuses is one the web build would refuse.
+// Every artifact of one run, read through the web build's own reader, `web/src/lib/server/run.ts`:
+// the same module the build prerenders from, with its schemas (`src/lib/run/schema.ts`) and every
+// cross-file check it makes (the manifest names its own run, the index matches the manifest, ids and
+// slugs are unique, each format's board says it is that format, each page's log runs the schedule's
+// weeks and its season is the index's two numbers for him, and `season-checks.ts` across the season
+// blocks). Nothing here restates a check (fix round 2, N6): a check the web adds is gated the night
+// the image carrying it deploys. A run this refuses is one the web build would refuse.
 //
 //   node --experimental-strip-types run-contract.ts <web dir> <runs root> <run id>
 //
-// <web dir> holds `src/lib/run/*.ts`, `src/lib/types/player.ts` and a node_modules with zod and
-// aws4fetch (the web's own versions). Every refusal is printed as one line, `schema:<file>:<message>`,
-// and the exit status is 1 when there is any, 2 when the checker itself could not run.
+// <web dir> holds `src/lib/run/*.ts`, `src/lib/server/run.ts`, `src/lib/types/player.ts` and a
+// node_modules with zod and aws4fetch (the web's own versions). The reader's one SvelteKit import,
+// `$app/env/public` (the build's PUBLIC_RUN_ID and PUBLIC_RUN_BASE_URL), is answered here with the run
+// to check. Every refusal is printed as one line, `schema:<file>:<message>`, and the exit status is 1
+// when there is any, 2 when the checker itself could not run.
+import { registerHooks } from 'node:module';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -20,98 +24,63 @@ if (!webDir || !root || !runId) {
 	process.stderr.write('usage: run-contract.ts <web dir> <runs root> <run id>\n');
 	process.exit(2);
 }
-const lib = (path: string): string => pathToFileURL(resolve(webDir, 'src/lib/run', path)).href;
-const schema = await import(lib('schema.ts'));
-const { openRun } = await import(lib('source.ts'));
-const { checkRunSeasons } = await import(lib('season-checks.ts'));
-const run = await openRun({ runId, location: { kind: 'directory', path: resolve(root) } });
 
-const refusals: string[] = [];
-const refuse = (file: string, message: string): void => {
-	refusals.push(`schema:${file}:${message.replaceAll('\n', ' ')}`);
-};
-
-async function read<T>(path: string, parser: unknown): Promise<T | null> {
-	try {
-		return (await run.read(path, parser)) as T;
-	} catch (error) {
-		refuse(path, error instanceof Error ? error.message : String(error));
-		return null;
+const ENV_MODULE = '$app/env/public';
+const envSource =
+	`export const PUBLIC_RUN_ID = ${JSON.stringify(runId)};\n` +
+	`export const PUBLIC_RUN_BASE_URL = ${JSON.stringify(resolve(root))};\n`;
+registerHooks({
+	resolve(specifier, context, nextResolve) {
+		if (specifier === ENV_MODULE) {
+			return { url: `data:text/javascript,${encodeURIComponent(envSource)}`, shortCircuit: true };
+		}
+		return nextResolve(specifier, context);
 	}
-}
+});
+
+const web = await import(pathToFileURL(resolve(webDir, 'src/lib/server/run.ts')).href);
 
 interface Entry {
 	id: string;
-	slug: string;
-	season: { games: number; pointsPerGame: number | null };
-}
-interface Page {
-	id: string;
-	team: string;
-	season: { weeks: number; games: number; pointsPerGame: number | null };
-}
-interface Slates {
-	slates: { games: { week: number }[] }[];
 }
 interface Format {
 	id: string;
 }
 
-const manifest = await read<{ runId: string; players: number; formats: Format[] }>(
-	schema.RUN_PATHS.manifest,
-	schema.manifestSchema
-);
-const index = await read<Entry[]>(schema.RUN_PATHS.index, schema.indexSchema);
-if (manifest && manifest.runId !== run.runId) refuse('manifest.json', `names run ${manifest.runId}, read as ${run.runId}`);
-if (manifest && index && index.length !== manifest.players) {
-	refuse('index.json', `lists ${index.length} players, the manifest says ${manifest.players}`);
+// One line per refusal, named by the first file that met it: the reader shares one read per artifact,
+// so a broken schedule refuses every page through the same error.
+const refusals = new Map<string, string>();
+async function check<T>(file: string, read: () => Promise<T>): Promise<T | null> {
+	try {
+		return await read();
+	} catch (error) {
+		const message = (error instanceof Error ? error.message : String(error)).replaceAll('\n', ' ');
+		if (!refusals.has(message)) refusals.set(message, `schema:${file}:${message}`);
+		return null;
+	}
 }
-for (const key of ['id', 'slug'] as const) {
-	const values = (index ?? []).map((entry) => entry[key]);
-	const repeated = values.filter((value, at) => values.indexOf(value) !== at);
-	for (const value of new Set(repeated)) refuse('index.json', `repeats the ${key} ${value}`);
-}
+
+const manifest = await check<{ formats: Format[] }>('manifest.json', () => web.manifest());
+await check('manifest.json', () => web.stamp());
+const index = await check<Entry[]>('index.json', () => web.index());
 let rows = 0;
 for (const format of manifest?.formats ?? []) {
-	const board = await read<{ format: string; rows: unknown[] }>(schema.RUN_PATHS.board(format.id), schema.boardSchema);
-	if (board && board.format !== format.id) refuse(`boards/${format.id}.json`, `says it is the ${board.format} board`);
+	const board = await check<{ rows: unknown[] }>(`boards/${format.id}.json`, () => web.board(format.id));
 	rows += board?.rows.length ?? 0;
 }
-const players: Page[] = [];
+let pages = 0;
 for (const entry of index ?? []) {
-	const page = await read<Page>(schema.RUN_PATHS.player(entry.id), schema.playerSchema);
-	if (!page) continue;
-	players.push(page);
-	const { games, pointsPerGame } = page.season;
-	if (entry.season.games !== games || entry.season.pointsPerGame !== pointsPerGame) {
-		refuse('index.json', `the season for ${entry.id} is not his file's: ${games} games`);
-	}
+	if (await check(`players/${entry.id}.json`, () => web.player(entry.id))) pages += 1;
 }
-const pages = players.length;
-for (const [path, parser] of [
-	[schema.RUN_PATHS.adp, schema.adpSchema],
-	[schema.RUN_PATHS.record, schema.recordSchema],
-	[schema.RUN_PATHS.clubs, schema.clubsSchema]
-] as const) {
-	await read(path, parser);
-}
-const slate = await read<Slates>(schema.RUN_PATHS.schedule, schema.scheduleSchema);
-if (slate) {
-	const weeks = Math.max(...slate.slates.flatMap((s) => s.games.map((game) => game.week)));
-	for (const page of players) {
-		if (page.season.weeks !== weeks) {
-			refuse(`players/${page.id}.json`, `logs ${page.season.weeks} weeks, the schedule runs ${weeks}`);
-		}
-	}
-	try {
-		checkRunSeasons(players, slate);
-	} catch (error) {
-		refuse('players', error instanceof Error ? error.message : String(error));
-	}
-}
-for (const line of refusals) process.stdout.write(`${line}\n`);
+await check('adp.json', () => web.adp());
+await check('record.json', () => web.record());
+await check('clubs.json', () => web.clubs());
+await check('schedule.json', () => web.schedule());
+await check('schedule.json', () => web.firstKickoff());
+
+for (const line of refusals.values()) process.stdout.write(`${line}\n`);
 process.stdout.write(
-	`run ${run.runId}: ${refusals.length} refusals; ${manifest?.formats.length ?? 0} formats (${rows} board rows), ` +
+	`run ${runId}: ${refusals.size} refusals; ${manifest?.formats.length ?? 0} formats (${rows} board rows), ` +
 		`${pages} of ${index?.length ?? 0} player pages parsed, adp, record, clubs, schedule\n`
 );
-process.exit(refusals.length === 0 ? 0 : 1);
+process.exit(refusals.size === 0 ? 0 : 1);
