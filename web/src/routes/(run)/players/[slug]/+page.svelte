@@ -1,15 +1,17 @@
 <script lang="ts">
 	import { draftersGap, lastName } from '#lib/format/draft.ts';
 	import { fixed, plural, signed } from '#lib/format/number.ts';
-	import { POSITION_PLURAL } from '#lib/run/derive.ts';
+	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import AddToSheet from '#lib/site/AddToSheet.svelte';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
 	import Capsule from '#lib/ui/Capsule.svelte';
+	import Crumb from '#lib/ui/Crumb.svelte';
 	import Face from '#lib/ui/Face.svelte';
 	import Fact from '#lib/ui/Fact.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
 	import GapChip from '#lib/ui/GapChip.svelte';
+	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import OutcomeBar from '#lib/ui/OutcomeBar.svelte';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
@@ -52,25 +54,27 @@
 <SiteShell title={page.name} active="players" run={data.run}>
 	{#snippet tail()}<Quiet href={links.compare(page.slug)}>Compare</Quiet>{/snippet}
 	<main class="player">
-		<nav class="crumb" aria-label="Where this page sits">
-			<a href={links.board(page.format.id)}>Board</a> /
-			<a href={links.board(page.format.id, page.position)}>{page.position}</a> /
-			{page.name}
-		</nav>
+		<Crumb
+			trail={[
+				{ label: 'Board', href: links.board(page.format.id) },
+				{ label: page.position, href: links.board(page.format.id, page.position) },
+				{ label: page.name }
+			]}
+		/>
 
-		<section class="hero">
-			<span class="face"
-				><Face src={page.headshot} size={168} phoneSize={96} loading="eager" /></span
-			>
-			<div class="ident">
-				<h2>{page.name}</h2>
-				<div class="meta">
-					<PositionPill position={page.position} rank={n.positionRank} />
-					<TierChip tier={n.tier} long />
-					<a href={links.club(page.team)}>{page.team}</a>
-				</div>
-			</div>
-			<div class="big">
+		<HeroCard title={page.name}>
+			{#snippet media()}<Face
+					src={page.headshot}
+					size={168}
+					phoneSize={96}
+					loading="eager"
+				/>{/snippet}
+			{#snippet meta()}
+				<PositionPill position={page.position} rank={n.positionRank} />
+				<TierChip tier={n.tier} long />
+				<a href={links.club(page.team)}>{page.team}</a>
+			{/snippet}
+			{#snippet aside()}
 				<Figure
 					value={fixed(n.projected)}
 					size="xl"
@@ -81,8 +85,8 @@
 					)} expected games"
 				/>
 				<AddToSheet playerId={page.id} name={lastName(page.name)} fill />
-			</div>
-		</section>
+			{/snippet}
+		</HeroCard>
 
 		<section class="facts" aria-label="His numbers">
 			<Fact label="Where drafters take him">
@@ -117,7 +121,7 @@
 			<aside class="tier" aria-label="His tier">
 				<TierMates
 					tier={page.tier.tier}
-					group={POSITION_PLURAL[page.position]}
+					group={POSITION_NAMES[page.position]}
 					{mates}
 					currentId={page.id}
 					cliff={page.tier.cliff}
@@ -162,74 +166,6 @@
 		flex-direction: column;
 		gap: var(--s-5);
 		max-width: 1320px;
-	}
-
-	.crumb {
-		font-size: var(--t-sm);
-		color: var(--ink-3);
-	}
-
-	.crumb a {
-		text-decoration: none;
-	}
-
-	.crumb a:hover {
-		text-decoration: underline;
-	}
-
-	.hero {
-		display: grid;
-		grid-template-columns: auto minmax(0, 1fr) auto;
-		gap: var(--s-6);
-		align-items: center;
-		padding: var(--s-6);
-		border-radius: var(--r-md);
-		background: var(--surface);
-		border: 1px solid var(--line);
-	}
-
-	.face {
-		display: flex;
-	}
-
-	.ident {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-3);
-		min-width: 0;
-	}
-
-	h2 {
-		margin: 0;
-		font-size: clamp(2rem, 4vw, 3.25rem);
-		font-weight: 700;
-		line-height: 1;
-		letter-spacing: -0.01em;
-		text-wrap: balance;
-	}
-
-	.meta {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--s-2);
-		align-items: center;
-		font-size: var(--t-md);
-		color: var(--ink-2);
-	}
-
-	.meta a {
-		text-decoration: none;
-	}
-
-	.meta a:hover {
-		text-decoration: underline;
-	}
-
-	.big {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: var(--s-4);
 	}
 
 	.facts {
@@ -280,17 +216,6 @@
 		.player {
 			padding: var(--s-4);
 			gap: var(--s-4);
-		}
-
-		.hero {
-			grid-template-columns: auto minmax(0, 1fr);
-			gap: var(--s-4);
-			padding: var(--s-4);
-		}
-
-		.big {
-			grid-column: 1 / -1;
-			align-items: stretch;
 		}
 	}
 </style>

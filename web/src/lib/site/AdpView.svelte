@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { draftersGap } from '#lib/format/draft.ts';
-	import { dayLabel } from '#lib/format/date.ts';
+	import { windowLabel } from '#lib/format/date.ts';
 	import { fixed, plural } from '#lib/format/number.ts';
 	import type { AdpPage } from '#lib/server/pages/adp.ts';
 	import type { RunStamp } from '#lib/run/stamp.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import GapChip from '#lib/ui/GapChip.svelte';
+	import PageHead from '#lib/ui/PageHead.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import PlayerLine from '#lib/ui/PlayerLine.svelte';
@@ -24,11 +25,13 @@
 
 	let { page, run }: Props = $props();
 
-	const sourceNames = $derived(page.sources.map((source) => `${source.name} ${source.drafts}`));
+	const sourceNames = $derived(
+		page.sources.map((source) => `${source.drafts}, ${windowLabel(source.window)}`)
+	);
 	const sourceTerms = $derived(
 		page.sources.map((source) => ({
-			term: source.name,
-			means: `${source.drafts}, ${source.readAt === null ? `read with the run of ${dayLabel(run.runAt)}` : `read ${dayLabel(source.readAt)}`}`
+			term: source.drafts,
+			means: `Averaged from ${windowLabel(source.window)}`
 		}))
 	);
 </script>
@@ -42,10 +45,11 @@
 	<main class="adp">
 		<div class="content">
 			<div class="lead">
-				<h2>{run.season} ADP</h2>
-				<p>
-					{sourceNames.join(' and ')} · against our {page.format.label} board · earliest pick first
-				</p>
+				<PageHead
+					title="{run.season} ADP"
+					lead="{sourceNames.join(' and ')} · against our {page.format
+						.label} board · earliest pick first"
+				/>
 			</div>
 			{#if page.formats.length > 1}
 				<div class="filters">
@@ -120,21 +124,6 @@
 		margin-bottom: var(--s-4);
 	}
 
-	h2 {
-		margin: 0;
-		font-family: var(--font-num);
-		font-weight: 800;
-		font-size: var(--t-2xl);
-		line-height: 0.9;
-		text-transform: uppercase;
-	}
-
-	.lead p {
-		margin: 6px 0 0;
-		color: var(--ink-2);
-		font-size: var(--t-sm);
-	}
-
 	.filters {
 		margin-bottom: var(--s-4);
 	}
@@ -161,10 +150,6 @@
 	@media (max-width: 760px) {
 		.adp {
 			padding: var(--s-4);
-		}
-
-		h2 {
-			font-size: 34px;
 		}
 	}
 </style>

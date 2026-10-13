@@ -9,13 +9,13 @@
 	import { links } from '#lib/site/links.ts';
 	import { fetchPlayer, type PlayerData } from '#lib/site/player-data.ts';
 	import { SEARCH_INDEX_URL, searchable, type SearchablePlayer } from '#lib/site/search.ts';
-	import Face from '#lib/ui/Face.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
 	import GapChip from '#lib/ui/GapChip.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import OutcomeBar from '#lib/ui/OutcomeBar.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
-	import PositionPill from '#lib/ui/PositionPill.svelte';
+	import PageHead from '#lib/ui/PageHead.svelte';
+	import PlayerLine from '#lib/ui/PlayerLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import TierChip from '#lib/ui/TierChip.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
@@ -94,13 +94,12 @@
 
 <SiteShell title="Compare" active="players" run={data.run}>
 	<main class="compare">
-		<div class="lead">
-			<h2>Compare</h2>
-			{#if format}<p>Our {format.label} board · {data.run.season} season</p>{/if}
-		</div>
-		{#if failed}
-			<p class="note">The players are not loading. Try again in a moment.</p>
-		{/if}
+		<PageHead
+			title="Compare"
+			lead={failed
+				? 'The players are not loading. Try again in a moment.'
+				: `Our ${format?.label ?? ''} board · ${String(data.run.season)} season`}
+		/>
 		<div class="pair">
 			{#each SLOTS as slot (slot)}
 				{@const player = chosen[slot]}
@@ -108,17 +107,17 @@
 				<Panel as="section" label={player?.name ?? SLOT_LABELS[slot]}>
 					{#if player && numbers && format}
 						<div class="card">
-							<div class="who">
-								<Face src={player.headshot} size={72} loading="eager" />
-								<div class="ident">
-									<a class="name" href={links.player(player.slug)}>{player.name}</a>
-									<span class="meta">
-										<PositionPill position={player.position} rank={numbers.positionRank} />
-										<TierChip tier={numbers.tier} />
-										<Label>{player.team}</Label>
-									</span>
-								</div>
-							</div>
+							<PlayerLine
+								name={player.name}
+								position={player.position}
+								positionRank={numbers.positionRank}
+								team={player.team}
+								headshot={player.headshot}
+								href={links.player(player.slug)}
+								size={40}
+							>
+								{#snippet trailing()}<TierChip tier={numbers.tier} long />{/snippet}
+							</PlayerLine>
 							<Figure
 								value={fixed(numbers.projected)}
 								size="lg"
@@ -170,22 +169,6 @@
 		max-width: 1180px;
 	}
 
-	h2 {
-		margin: 0;
-		font-family: var(--font-num);
-		font-weight: 800;
-		font-size: var(--t-2xl);
-		line-height: 0.9;
-		text-transform: uppercase;
-	}
-
-	.lead p,
-	.note {
-		margin: 6px 0 0;
-		color: var(--ink-2);
-		font-size: var(--t-sm);
-	}
-
 	.pair {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -197,35 +180,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-4);
-	}
-
-	.who {
-		display: flex;
-		align-items: center;
-		gap: var(--s-3);
-	}
-
-	.ident {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		min-width: 0;
-	}
-
-	.name {
-		font-size: var(--t-lg);
-		font-weight: 700;
-		text-decoration: none;
-	}
-
-	.name:hover {
-		text-decoration: underline;
-	}
-
-	.meta {
-		display: flex;
-		align-items: center;
-		gap: 6px;
 	}
 
 	dl {
@@ -256,10 +210,6 @@
 
 		.pair {
 			grid-template-columns: minmax(0, 1fr);
-		}
-
-		h2 {
-			font-size: 34px;
 		}
 	}
 </style>

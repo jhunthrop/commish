@@ -1,25 +1,32 @@
 <script lang="ts">
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
-	import { POSITION_PLURAL } from '#lib/run/derive.ts';
+	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import type { SystemNightly } from '#lib/server/pages/system.ts';
 	import { runStampText, type RunStamp } from '#lib/run/stamp.ts';
 	import BasisList from '../BasisList.svelte';
 	import Capsule from '../Capsule.svelte';
 	import Chip from '../Chip.svelte';
 	import ChipGroup from '../ChipGroup.svelte';
+	import Crumb from '../Crumb.svelte';
+	import Face from '../Face.svelte';
 	import Fact from '../Fact.svelte';
 	import Figure from '../Figure.svelte';
 	import GapChip from '../GapChip.svelte';
+	import HeroCard from '../HeroCard.svelte';
 	import OutcomeBar from '../OutcomeBar.svelte';
+	import PageHead from '../PageHead.svelte';
 	import Panel from '../Panel.svelte';
 	import PanelHead from '../PanelHead.svelte';
 	import PlayerLine from '../PlayerLine.svelte';
+	import PositionPill from '../PositionPill.svelte';
+	import Quiet from '../Quiet.svelte';
 	import SearchMenu from '../SearchMenu.svelte';
 	import Table from '../Table.svelte';
 	import TierChip from '../TierChip.svelte';
 	import TierJump from '../TierJump.svelte';
 	import TierMates from '../TierMates.svelte';
+	import Tile from '../Tile.svelte';
 	import Toggle from '../Toggle.svelte';
 	import { heatFor } from '../heat.ts';
 	import DocSection from './DocSection.svelte';
@@ -39,7 +46,7 @@
 	const page = $derived(nightly.page);
 	const n = $derived(page.numbers);
 	const unit = $derived(page.format.unit);
-	const group = $derived(POSITION_PLURAL[page.position]);
+	const group = $derived(POSITION_NAMES[page.position]);
 	let showBelow = $state(true);
 	let showRange = $state(false);
 </script>
@@ -85,14 +92,56 @@
 	</Parts>
 
 	<Specimen frame="dashed">
-		<Figure
-			value={fixed(n.projected)}
-			size="xl"
-			caption="projected {page.format.label} points in {run.season}, over {fixed(
-				n.expectedGames
-			)} expected games"
+		<PageHead title="{run.season} Board" lead={page.format.basis.join(' · ')}>
+			{#snippet actions()}<Quiet size="sm" href={PLAYER_HREF}>ADP</Quiet>{/snippet}
+		</PageHead>
+		<Crumb
+			trail={[
+				{ label: 'Board', href: PLAYER_HREF },
+				{ label: page.position, href: PLAYER_HREF },
+				{ label: page.name }
+			]}
 		/>
+		<HeroCard title={page.name}>
+			{#snippet media()}<Face src={page.headshot} size={168} phoneSize={96} />{/snippet}
+			{#snippet meta()}
+				<PositionPill position={page.position} rank={n.positionRank} />
+				<TierChip tier={n.tier} long />
+				<span>{page.team}</span>
+			{/snippet}
+			{#snippet aside()}
+				<Figure
+					value={fixed(n.projected)}
+					size="xl"
+					align="end"
+					phoneAlign="start"
+					caption="projected {page.format.label} points in {run.season}, over {fixed(
+						n.expectedGames
+					)} expected games"
+				/>
+			{/snippet}
+		</HeroCard>
+		<span class="tile">
+			<Tile title={page.name} href={PLAYER_HREF} meta="{page.position} · {page.team}">
+				<Figure value={fixed(n.projected)} size="md" />
+			</Tile>
+		</span>
 	</Specimen>
+	<Parts>
+		<Part
+			name="The page head"
+			about="Every nightly page opens with it: the title in the number face, one line naming the basis, quiet links at the right end."
+		/>
+		<Part name="The crumb" about="Where a page sits, every step but the page itself a link." />
+		<Part
+			name="The hero card"
+			about="A page about one player or club: the face, the name, its pills, and the one big number with the verb under it."
+		/>
+		<Part
+			name="The tile"
+			about="One of many on an index page: a name that links, one line of labels, then its number."
+		/>
+	</Parts>
 	<Parts as="div">
 		<Fact label="Where drafters take him">
 			{#snippet value()}
@@ -238,6 +287,11 @@
 		display: block;
 		width: 100%;
 		min-height: 200px;
+	}
+
+	.tile {
+		display: block;
+		max-width: 300px;
 	}
 
 	.grow {

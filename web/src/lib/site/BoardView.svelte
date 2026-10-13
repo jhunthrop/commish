@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { POSITION_PLURAL, tierGroups } from '#lib/run/derive.ts';
+	import { POSITION_NAMES, tierGroups } from '#lib/run/derive.ts';
 	import type { BoardPage } from '#lib/server/pages/board.ts';
 	import { sheet } from '#lib/sheet/sheet.svelte.ts';
 	import BasisList from '#lib/ui/BasisList.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
+	import PageHead from '#lib/ui/PageHead.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
@@ -43,7 +44,7 @@
 
 	const groups = $derived(page.position === null ? [] : tierGroups(page.rows, page.position));
 	const visible = $derived(page.rows.filter(shown));
-	const group = $derived(page.position === null ? '' : POSITION_PLURAL[page.position]);
+	const group = $derived(POSITION_NAMES[page.position ?? 'WR']);
 	const unit = $derived(page.format.unit);
 	const basisTerms = $derived([
 		{ term: 'Scoring', means: page.format.basis[0] ?? page.format.label },
@@ -71,15 +72,13 @@
 <main class="board">
 	<div class="content">
 		<div class="lead">
-			<div>
-				<h2>{season} Board</h2>
-				<p>{page.format.basis.join(' · ')}</p>
-			</div>
-			<nav class="more" aria-label="More from this run">
-				<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
-				<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
-				<Quiet href={links.clubs()} size="sm">Clubs</Quiet>
-			</nav>
+			<PageHead title="{season} Board" lead={page.format.basis.join(' · ')}>
+				{#snippet actions()}
+					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
+					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
+					<Quiet href={links.clubs()} size="sm">Clubs</Quiet>
+				{/snippet}
+			</PageHead>
 		</div>
 		<div class="filters">
 			{#if page.formats.length > 1}
@@ -173,34 +172,7 @@
 	}
 
 	.lead {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: end;
-		justify-content: space-between;
-		gap: var(--s-3);
 		margin-bottom: var(--s-4);
-	}
-
-	h2 {
-		margin: 0;
-		font-family: var(--font-num);
-		font-weight: 800;
-		font-size: var(--t-2xl);
-		line-height: 0.9;
-		text-transform: uppercase;
-		letter-spacing: 0.01em;
-	}
-
-	.lead p {
-		margin: 6px 0 0;
-		color: var(--ink-2);
-		font-size: var(--t-sm);
-	}
-
-	.more {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--s-2);
 	}
 
 	.filters {
@@ -239,10 +211,6 @@
 		.board {
 			padding: var(--s-4);
 			gap: var(--s-4);
-		}
-
-		h2 {
-			font-size: 34px;
 		}
 
 		.filters {

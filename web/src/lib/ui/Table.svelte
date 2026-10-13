@@ -10,7 +10,7 @@
 		columns: readonly Column[];
 		/** Wider than the phone, the table scrolls inside its frame instead of squeezing. */
 		minWidth?: number;
-		/** The rows: <tr> elements whose cells take the classes num, end and wide. */
+		/** The rows: <tr> elements whose cells take the classes num, end, small, nowrap and wide. */
 		children: Snippet;
 	}
 
@@ -89,6 +89,27 @@
 		font-size: 20px;
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
+	}
+
+	/* A small cell: a schedule's opponent, a date. */
+	tbody :global(td.small) {
+		font-size: var(--t-xs);
+		color: var(--ink-2);
+		white-space: nowrap;
+	}
+
+	tbody :global(td.nowrap) {
+		white-space: nowrap;
+	}
+
+	/* A link in a cell is a name: bold, underlined on hover. */
+	tbody :global(td > a) {
+		font-weight: 600;
+		text-decoration: none;
+	}
+
+	tbody :global(td > a:hover) {
+		text-decoration: underline;
 	}
 
 	.end,
