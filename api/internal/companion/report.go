@@ -21,8 +21,18 @@ func (s *Service) report(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var out json.RawMessage
-	err := s.Store.WithReportLock(r.Context(), row.ID, func(ctx context.Context) error {
+	// The common read, a report already stored, needs no lock and no
+	// connection of its own: only a build takes the lock.
+	out, stored, err := s.Store.Report(r.Context(), row.ID)
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "companion: report", err)
+		return
+	}
+	if stored {
+		httpx.WriteOK(w, r, http.StatusOK, out)
+		return
+	}
+	err = s.Store.WithReportLock(r.Context(), row.ID, func(ctx context.Context) error {
 		var err error
 		out, err = s.storedOrBuilt(ctx, row)
 		return err
@@ -41,8 +51,8 @@ func (s *Service) report(w http.ResponseWriter, r *http.Request) {
 var errNotOver = errors.New("companion: the draft is not over")
 
 // storedOrBuilt is the stored report, or the report built and stored
-// now. The caller holds the report lock, so a second reader waits and
-// then finds it stored.
+// now. The caller holds the report lock, so a reader that waited on a
+// build re-reads it here and finds it stored.
 func (s *Service) storedOrBuilt(ctx context.Context, row Row) (json.RawMessage, error) {
 	if raw, ok, err := s.Store.Report(ctx, row.ID); err != nil || ok {
 		return raw, err
