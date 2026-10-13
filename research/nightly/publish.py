@@ -11,7 +11,9 @@ its bytes and SHA-256. The manifest is written last.
 PUBLIC AFTER AN HOUR (spec §4, early access). A run that passed every gate moves `runs/early.json`
 at once, the run a member may read, with the instant it goes public. `publish` (hourly from 06:00
 UTC) moves `runs/latest.json` to it once that instant has passed and dispatches the web build with
-its id (`repository_dispatch`, type `nightly-run`). A dispatch that failed is retried by the next
+its id: a `workflow_dispatch` of `web.yml` on main with the input `runId`, which needs a token with
+Actions write and nothing else (a `repository_dispatch` token needs Contents write, which can push
+code). A dispatch that failed is retried by the next
 `publish`; the run's `published.json` records each attempt.
 """
 
@@ -34,7 +36,8 @@ PUBLISHED_FILE: Final = "published.json"
 DISPATCH_TOKEN_VARIABLE: Final = "WEB_DISPATCH_TOKEN"
 DISPATCH_REPOSITORY_VARIABLE: Final = "WEB_DISPATCH_REPOSITORY"
 DEFAULT_REPOSITORY: Final = "jhunthrop/commish"
-DISPATCH_EVENT: Final = "nightly-run"
+WEB_WORKFLOW: Final = "web.yml"
+WEB_REF: Final = "main"
 _DISPATCHED: Final = 204
 Json = dict[str, Any]
 
@@ -104,13 +107,13 @@ class Dispatcher:
     def dispatch(self, run_id: str) -> str | None:
         """The web workflow's build of `run_id`; None on success, else what GitHub answered."""
         response = self.http.post(
-            f"https://api.github.com/repos/{self.repository}/dispatches",
+            f"https://api.github.com/repos/{self.repository}/actions/workflows/{WEB_WORKFLOW}/dispatches",
             headers={
                 "Authorization": f"Bearer {self.token}",
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
             },
-            json={"event_type": DISPATCH_EVENT, "client_payload": {"runId": run_id}},
+            json={"ref": WEB_REF, "inputs": {"runId": run_id}},
             timeout=30.0,
         )
         return None if response.status_code == _DISPATCHED else f"HTTP {response.status_code} {response.text[:200]}"
