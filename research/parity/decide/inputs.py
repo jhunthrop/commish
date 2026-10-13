@@ -9,7 +9,7 @@ import random
 from dataclasses import fields
 from typing import Any, Final
 
-from research.model.arithmetic import ARM64_BOARDS
+from research.model.arithmetic import Arithmetic
 from research.model.decide.lineup import LineupCandidate, LineupDecision, MatchupContext, start_sit
 from research.model.decide.normal import chance_of_clearing, normal_cdf
 from research.model.decide.outlook import (
@@ -101,8 +101,8 @@ def normal_inputs() -> dict[str, Any]:
     return {"z": z, "clearing": clearing, "survival": survival, "spreads": spreads, "around": around, "weeks": weeks}
 
 
-def port_normal(inputs: dict[str, Any]) -> list[dict[str, list[Any]]]:
-    curve = SurvivalCurve(ARM64_BOARDS)
+def port_normal(inputs: dict[str, Any], arithmetic: Arithmetic) -> list[dict[str, list[Any]]]:
+    curve = SurvivalCurve(arithmetic)
     survival = [
         list(
             curve.probabilities(
@@ -114,8 +114,8 @@ def port_normal(inputs: dict[str, Any]) -> list[dict[str, list[Any]]]:
         for query in inputs["survival"]
     ]
     return [
-        {"normalCdf": [normal_cdf(z, ARM64_BOARDS) for z in inputs["z"]]},
-        {"chanceOfClearing": [chance_of_clearing(m, sd, t, ARM64_BOARDS) for m, sd, t in inputs["clearing"]]},
+        {"normalCdf": [normal_cdf(z, arithmetic) for z in inputs["z"]]},
+        {"chanceOfClearing": [chance_of_clearing(m, sd, t, arithmetic) for m, sd, t in inputs["clearing"]]},
         {"survival": [[list(pair) for pair in query] for query in survival]},
         {"standardDeviationOf": [standard_deviation_of(ProjectionDistribution(*t)) for t in inputs["spreads"]]},
         {"outlookAround": [_camel(outlook_around(m, sd)) for m, sd in inputs["around"]]},
@@ -162,11 +162,11 @@ def _decision_json(decision: LineupDecision) -> dict[str, Any]:
     return {"starters": starters, "bench": list(decision.bench), "winProbability": decision.win_probability}
 
 
-def port_lineup(query: dict[str, Any]) -> dict[str, Any]:
+def port_lineup(query: dict[str, Any], arithmetic: Arithmetic) -> dict[str, Any]:
     candidates = [
         LineupCandidate(c["playerId"], c["position"], ProjectionDistribution(**c["outlook"]))
         for c in query["candidates"]
     ]
     slots = [RosterSlotConfig(s["slot"], s["count"], tuple(s["eligiblePositions"])) for s in query["rosterSlots"]]
     matchup = MatchupContext(query["matchup"]["projectedMargin"], query["matchup"]["opponentStandardDeviation"])
-    return _decision_json(start_sit(candidates, slots, matchup, ARM64_BOARDS))
+    return _decision_json(start_sit(candidates, slots, matchup, arithmetic))

@@ -6,6 +6,7 @@ oracle against port, every comparison exact (tolerance 0, every bit, every word)
 """
 
 import collections
+import functools
 import json
 import subprocess
 import tempfile
@@ -17,7 +18,7 @@ from typing import Any, Final
 from research.advisor.advise import RoomStateError, advise
 from research.advisor.request import RequestError, parse_request
 from research.advisor.wire import advice_json
-from research.model.arithmetic import ARM64_BOARDS
+from research.model.arithmetic import ARM64_BOARDS, X86_64_BOARDS, Arithmetic
 from research.model.decide.survival import SurvivalCurve
 from research.parity.decide.inputs import lineup_queries, normal_inputs, port_lineup, port_normal
 from research.parity.decide.rooms import RoomState, room_states
@@ -29,6 +30,15 @@ _DRIVER: Final = _REPO / "research" / "parity" / "ts" / "decide.ts"
 _TIMEOUT_SECONDS: Final = 1800
 _MINIMUM_STATES: Final = 200
 _OK: Final = 200
+
+
+@functools.cache
+def node_arithmetic() -> Arithmetic:
+    """The arm the running node computes `Math.exp` in: fused on arm64 (clang contracted V8's
+    fdlibm), unfused on x86-64 (`research.model.arithmetic`). The port is judged in the node's own
+    arm; the advisor itself always runs fused, the arm the stored boards were made in."""
+    completed = subprocess.run(["node", "-p", "process.arch"], capture_output=True, text=True, check=True)
+    return ARM64_BOARDS if completed.stdout.strip() == "arm64" else X86_64_BOARDS
 
 
 def run_oracle(command: str, inputs: object) -> list[Any]:
@@ -98,7 +108,7 @@ def _shape_counts(states: Sequence[RoomState], oracle: Sequence[Mapping[str, Any
 def advise_rooms() -> CaseResult:
     states = room_states()
     oracle = run_oracle("advise", [state.request for state in states])
-    curve = SurvivalCurve(ARM64_BOARDS)
+    curve = SurvivalCurve(node_arithmetic())
     port = [_port_advise(state.request, curve) for state in states]
     left: dict[str, dict[str, dict[str, Any]]] = collections.defaultdict(dict)
     right: dict[str, dict[str, dict[str, Any]]] = collections.defaultdict(dict)
@@ -134,7 +144,7 @@ def advise_rooms() -> CaseResult:
 def lineup_random() -> CaseResult:
     queries = lineup_queries()
     oracle = run_oracle("lineup", queries)
-    port = [port_lineup(query) for query in queries]
+    port = [port_lineup(query, node_arithmetic()) for query in queries]
     left = {f"query {n}": _flat(answer) for n, answer in enumerate(oracle)}
     right = {f"query {n}": _flat(answer) for n, answer in enumerate(port)}
     return CaseResult("lineup", [diff_rows("startSit decisions", left, right)])
@@ -143,7 +153,7 @@ def lineup_random() -> CaseResult:
 def normal_numerics() -> CaseResult:
     inputs = normal_inputs()
     oracle = run_oracle("normal", inputs)
-    port = port_normal(inputs)
+    port = port_normal(inputs, node_arithmetic())
     diffs: list[Diff] = []
     for line, mine in zip(oracle, port, strict=True):
         (name, theirs), (_, ours) = next(iter(line.items())), next(iter(mine.items()))

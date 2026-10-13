@@ -1,0 +1,11 @@
+# The image carries the package and its lock; nothing a developer's tree or the parity harness holds.
+.venv
+**/__pycache__
+.mypy_cache
+.ruff_cache
+.pytest_cache
+tests
+parity/fixtures
+parity/ts
+Dockerfile
+.dockerignore

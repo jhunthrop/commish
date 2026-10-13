@@ -1,8 +1,9 @@
 # .github/workflows/research.yml
-# The Python research lane: lint, types, the smoke tests, the schema gate and the parity harness.
-# No deploy in phase A. The parity run replays recorded provider responses only (no secrets, no
-# network beyond the package registries), against a Postgres service the harness creates its own
-# parity_* scratch databases in. The TypeScript oracle runs from research-ts/ (and the app modules
+# The Python research lane: lint, types, the smoke tests, the schema gate and the parity harness;
+# then, from main, the one research image (research/Dockerfile) and the advisor service on Cloud
+# Run. The parity run replays recorded provider responses only (no secrets, no network beyond the
+# package registries), against a Postgres service the harness creates its own parity_* scratch
+# databases in. The TypeScript oracle runs from research-ts/ (and the app modules
 # under src/ it still imports, and the root drizzle journal that builds its legacy tables) with the
 # repository's own node_modules, so any change to an oracle path reruns parity too.
 name: research
@@ -40,7 +41,13 @@ on:
 permissions: { contents: read }
 concurrency:
   group: research-${{ github.ref }}
-  cancel-in-progress: true
+  # A deploy from main is never cancelled half way; a pull request's run is superseded.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  IMAGE: ${{ vars.GCP_ARTIFACT_REPO }}/research:${{ github.sha }}
+  RUNTIME_SA: research-runtime@trycommish.iam.gserviceaccount.com
+  # The api and room services' identity, the only callers the advisor admits.
+  CALLER_SA: api-runtime@trycommish.iam.gserviceaccount.com
 jobs:
   research:
     runs-on: ubuntu-latest
@@ -96,3 +103,87 @@ jobs:
       # (PARITY_SOURCE_DATABASE_URL), which never lives on a runner; they run where it is restored.
       - name: Parity, the model's numerics
         run: uv run python -m research.parity model all --no-store
+      # The decide layer and the advisor. The recorded room states (advise-rooms) carry their board
+      # as a committed fixture, so every decide case runs here. The port is judged in the arm of
+      # the node it is compared with (unfused on this x86-64 runner, `node_arithmetic`); the
+      # advisor itself always runs fused, as the stored boards were made.
+      - name: Parity, the decide layer and the advisor
+        run: uv run python -m research.parity decide all
+
+  image:
+    needs: research
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    env:
+      PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - id: auth
+        if: env.PUSH == 'true'
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+          token_format: access_token
+      - if: env.PUSH == 'true'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+        # Built on every push and pull request that can change it, pushed only from main.
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: research
+          file: research/Dockerfile
+          build-args: VERSION=${{ github.sha }}
+          push: ${{ env.PUSH == 'true' }}
+          tags: ${{ env.IMAGE }}
+          cache-from: type=gha,scope=research
+          cache-to: type=gha,mode=max,scope=research
+
+  deploy:
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    env:
+      REGION: ${{ vars.GCP_REGION }}
+    steps:
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
+        with: { project_id: '${{ vars.GCP_PROJECT }}' }
+
+        # THE ADVISOR (spec §2.3): called only by api and room, never by a browser. Internal
+        # ingress, and the invoker IAM check on: a caller needs the internal network path and an
+        # identity token for this service, and only api-runtime holds the invoker role. It reads
+        # no table and calls no provider (the room sends the whole pool with each call), so it
+        # mounts no secret; the nightly job is the image's command that reads RESEARCH_DATABASE_URL
+        # and AI_GATEWAY_API_KEY. Two processes on two vCPUs (ADVISOR_WORKERS), four calls an
+        # instance at once, ready only after a warm-up call (/readyz).
+      - uses: google-github-actions/deploy-cloudrun@251330ba9a8a34bfbc1622895f42e1d53fd14522 # v2.7.6
+        id: advisor
+        with:
+          service: advisor
+          region: ${{ vars.GCP_REGION }}
+          image: ${{ env.IMAGE }}
+          env_vars: ADVISOR_WORKERS=2
+          env_vars_update_strategy: overwrite
+          flags: >-
+            --service-account=${{ env.RUNTIME_SA }} --ingress=internal --no-allow-unauthenticated
+            --cpu=2 --memory=1Gi --concurrency=4 --min-instances=0 --max-instances=10
+            --cpu-boost --timeout=10 --port=8080
+            --startup-probe=httpGet.path=/readyz,httpGet.port=8080,periodSeconds=2,failureThreshold=30,timeoutSeconds=2
+            --liveness-probe=httpGet.path=/healthz,httpGet.port=8080,periodSeconds=30,timeoutSeconds=2
+      - name: Only the api and room services may invoke the advisor
+        run: |
+          gcloud run services add-iam-policy-binding advisor --region "$REGION" \
+            --member "serviceAccount:$CALLER_SA" --role roles/run.invoker --quiet
+      - name: The advisor's URL, for the api's ADVISOR_URL
+        env:
+          URL: ${{ steps.advisor.outputs.url }}
+        run: echo "advisor deployed at $URL (set the repository variable ADVISOR_URL to it)" >> "$GITHUB_STEP_SUMMARY"
