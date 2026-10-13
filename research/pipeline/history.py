@@ -29,7 +29,7 @@ from typing import Final
 
 from sqlalchemy import Connection, text
 
-from research.errors import SchemaDriftError
+from research.errors import CoherenceError, SchemaDriftError
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse import context, derived_stat_lines, ingest, ingest_schedule, injury_reports
 from research.pipeline.nflverse.client import NflverseClient
@@ -151,9 +151,10 @@ def rebuild_history(
             with conn.begin_nested():
                 filings = injury_reports.ingest_injury_reports(conn, client, [season])
             step(f"injury filings {season}: {sum(r.observations_written for r in filings)} observations")
-        except SchemaDriftError as error:
-            # nflverse's older injury files carry rows with no `date_modified`: a filing that cannot
-            # be stamped cannot be replayed, so the season is named and left out, as the ingest refuses it.
+        except (SchemaDriftError, CoherenceError) as error:
+            # nflverse's older injury files carry rows with no `date_modified`, or one filing twice with two
+            # statuses (2017): a filing that cannot be stamped, or contradicts itself, cannot
+            # be replayed, so the season is named and left out, as the ingest refuses it.
             step(f"injury filings {season}: not ingested, {error}")
     for season in observations:
         step(f"depth chart {season}: {ingest_depth_charts(conn, client, season, now)} observations")
