@@ -1,13 +1,13 @@
 <script lang="ts">
 	import ActionBar from '#lib/ui/ActionBar.svelte';
+	import Consent from '#lib/ui/Consent.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
-	import Toggle from '#lib/ui/Toggle.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { ApiError, FFPC_CONSENT, hostsApi, type HostLeague } from './api.ts';
+	import { ApiError, FFPC_CONSENT, FFPC_TERMS, hostsApi, type HostLeague } from './api.ts';
 
-	/** Sign in to FFPC on our form: email, password, the consent in plain words, one verb. The
-	 * password is sent to the API once and the field is cleared, whatever the answer. */
+	/** Sign in to FFPC on our form: email, password, the consent in plain words with the box first,
+	 * one verb. The password is sent to the API once and the field is cleared, whatever the answer. */
 	interface Props {
 		/** A line above the form: why a sign-in is asked for again. */
 		reason?: string;
@@ -60,14 +60,8 @@
 		maxlength={128}
 		onenter={() => void connect()}
 	/>
-	<div class="consent">
-		<Toggle label={FFPC_CONSENT} bind:checked={consent} />
-	</div>
-	<p class="reason">
-		We keep your FFPC sign-in encrypted and use it only when FFPC signs you out, at most once every
-		six hours. Disconnecting deletes it. FFPC's terms ask members not to share their password, and
-		connecting shares it with Commish.
-	</p>
+	<Consent words={FFPC_CONSENT} bind:checked={consent} />
+	<p class="terms">{FFPC_TERMS}</p>
 	<ActionBar alert={problem ? alert : undefined}>
 		<Verb disabled={!ready} onclick={() => void connect()}
 			>{busy ? 'Signing in to FFPC' : 'Connect FFPC'}</Verb
@@ -84,7 +78,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-3);
-		max-width: 420px;
+		max-width: var(--form-w);
 	}
 
 	.reason {
@@ -92,9 +86,9 @@
 		color: var(--ink-2);
 	}
 
-	.consent {
-		border: 1px solid var(--line);
-		border-radius: var(--r-md);
-		padding: var(--s-2) var(--s-3);
+	.terms {
+		margin: 0;
+		font-size: var(--t-sm);
+		color: var(--ink-2);
 	}
 </style>

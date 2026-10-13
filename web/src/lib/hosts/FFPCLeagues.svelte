@@ -7,7 +7,14 @@
 	import Field from '#lib/ui/Field.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import FFPCSignIn from './FFPCSignIn.svelte';
-	import { ApiError, ffpcOpen, hostsApi, needsSignIn, type HostLeague } from './api.ts';
+	import {
+		ApiError,
+		ffpcOpen,
+		hostsApi,
+		needsSignIn,
+		notConnected,
+		type HostLeague
+	} from './api.ts';
 
 	/** FFPC as a way in: sign in once on our form, then tap your league and the verb. A connection
 	 * FFPC has signed out asks for the sign-in again. Used by the league and companion pages. */
@@ -31,6 +38,14 @@
 	let picked = $state<string | null>(null);
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
+	/** Why the sign-in is asked for again, in the API's own words. */
+	let reason = $state('FFPC signed you out. Sign in again to keep reading your leagues.');
+
+	/** A 409 asks for the sign-in again with the API's sentence as the reason. */
+	function signInAgain(error: unknown): void {
+		if (error instanceof ApiError) reason = error.message;
+		view = 'again';
+	}
 
 	onMount(() => {
 		hostsApi
@@ -52,8 +67,21 @@
 				}
 				return hostsApi.ffpcLeagues().then((answer) => connected(answer));
 			})
-			.catch((error: unknown) => (view = needsSignIn(error) ? 'again' : 'unreachable'));
+			.catch((error: unknown) => {
+				if (needsSignIn(error)) signInAgain(error);
+				else view = notConnected(error) ? 'signin' : 'unreachable';
+			});
 	});
+
+	/** FFPC writes a record "2 - 3": the page writes it "2-3". */
+	function recordWords(record: string): string {
+		return record.replace(/\s*-\s*/g, '-');
+	}
+
+	/** A league's chip: its name and the member's record in it, so two alike names part. */
+	function chipWords(league: HostLeague): string {
+		return league.record ? `${league.name}, ${recordWords(league.record)}` : league.name;
+	}
 
 	function connected(list: HostLeague[]): void {
 		leagues = list;
@@ -80,7 +108,7 @@
 			await onpick(league);
 		} catch (error) {
 			if (needsSignIn(error)) {
-				view = 'again';
+				signInAgain(error);
 			} else {
 				problem = error instanceof ApiError ? error.message : 'That did not go through. Try again.';
 			}
@@ -95,10 +123,7 @@
 {:else if view === 'signin'}
 	<FFPCSignIn onconnected={connected} />
 {:else if view === 'again'}
-	<FFPCSignIn
-		reason="FFPC signed you out. Sign in again to keep reading your leagues."
-		onconnected={connected}
-	/>
+	<FFPCSignIn {reason} onconnected={connected} />
 {:else if view === 'off'}
 	<p class="line">FFPC leagues are not open here right now.</p>
 {:else if view === 'unreachable'}
@@ -111,7 +136,8 @@
 			<Chip
 				pressed={picked === league.league_id}
 				onclick={() => (picked = league.league_id)}
-				label={`${league.name}, as ${league.team_name}, ${league.record}`}>{league.name}</Chip
+				label={`${league.name}, as ${league.team_name}, ${recordWords(league.record)}`}
+				>{chipWords(league)}</Chip
 			>
 		{/each}
 	</ChipGroup>
@@ -119,7 +145,6 @@
 		<Field
 			label="Or your FFPC league number"
 			bind:value={number}
-			placeholder="104870"
 			maxlength={12}
 			onenter={() => void go()}
 		/>
