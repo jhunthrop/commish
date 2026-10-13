@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Sleeper's player directory (GET /players/nfl) is about 15 MB and the
@@ -44,11 +45,17 @@ func fantasyPositions() map[string]bool {
 // Players reads the host's whole player directory.
 func (c *Client) Players(ctx context.Context) ([]Player, error) {
 	var w map[string]wirePlayer
-	if err := c.get(ctx, "/players/nfl", maxPlayersBody, &w); err != nil {
+	long := *c.HTTP
+	long.Timeout = PlayersTimeout
+	if err := c.getWith(ctx, &long, "/players/nfl", maxPlayersBody, &w); err != nil {
 		return nil, err
 	}
 	return validatePlayers(w)
 }
+
+// PlayersTimeout bounds the directory read, about 15 MB, where every
+// other read has Timeout.
+const PlayersTimeout = 45 * time.Second
 
 // DecodePlayers checks a recorded directory answer.
 func DecodePlayers(body []byte) ([]Player, error) {

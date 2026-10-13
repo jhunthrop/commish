@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
@@ -16,7 +17,8 @@ import (
 
 // leagueSyncService wires league sync: Sleeper first and MyFantasyLeague
 // second behind one poller, the rooms' board, and the recorded leagues
-// when COMPANION_REPLAY is on (development only).
+// when COMPANION_REPLAY is on (development only). The host directories
+// are read at start, so the first view finds them.
 func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, log *slog.Logger) *leaguesync.Service {
 	now := time.Now
 	var sleeperAPI leaguesync.SleeperAPI = sleeper.New()
@@ -31,11 +33,13 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 		&leaguesync.MFL{API: mflAPI, Now: now},
 	}
 	store := &leaguesync.Store{Pool: pool}
+	players := &leaguesync.Directory{Hosts: hosts, Store: store, Now: now, Log: log}
+	go players.Warm(context.Background(), cfg.Board.Season)
 	return &leaguesync.Service{
 		Hosts:     hosts,
 		Poller:    &leaguesync.Poller{Hosts: hosts, Store: store, Now: now, Log: log},
 		Admission: &leaguesync.Admission{Now: now},
-		Players:   &leaguesync.Directory{Hosts: hosts, Store: store, Now: now, Log: log},
+		Players:   players,
 		Links:     store, Saved: saved, Boards: board, Now: now, Log: log,
 	}
 }

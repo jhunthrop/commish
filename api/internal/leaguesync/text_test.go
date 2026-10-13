@@ -11,7 +11,7 @@ import (
 func TestHostTextIsCleaned(t *testing.T) {
 	cases := map[string]string{
 		"FG 31-99 *.1 (PK)":     "FG 31-99 *.1 (PK)",
-		"IDP‮_FLEX":        "IDP_FLEX",
+		"IDP\u202e_FLEX":        "IDP_FLEX",
 		"  st\x00_td 6 ":        "st_td 6",
 		"bad\xffbyte":           "badbyte",
 		strings.Repeat("é", 90): strings.Repeat("é", maxHostText),
@@ -22,7 +22,7 @@ func TestHostTextIsCleaned(t *testing.T) {
 			t.Errorf("cleanHostText(%q) = %q, want %q", in, got, want)
 		}
 	}
-	for in, want := range map[string]string{"KC": "KC", "JAC": "JAC", "kc": "", "K‮C": "", "TOOLONG": ""} {
+	for in, want := range map[string]string{"KC": "KC", "JAC": "JAC", "kc": "", "K\u202eC": "", "TOOLONG": ""} {
 		if got := cleanTeam(in); got != want {
 			t.Errorf("cleanTeam(%q) = %q, want %q", in, got, want)
 		}

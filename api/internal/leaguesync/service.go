@@ -235,6 +235,12 @@ func (s *Service) answerRead(w http.ResponseWriter, r *http.Request, readFn func
 // answer writes the league's view for the link's seat.
 func (s *Service) answer(w http.ResponseWriter, r *http.Request, status int, link Link, read Read) {
 	view, err := s.view(r.Context(), link, read)
+	if errors.Is(err, ErrUnavailable) {
+		// No player directory yet: say the host is not answering rather
+		// than show a league of players we cannot name.
+		s.writeHostError(w, r, link.Ref.Host, err)
+		return
+	}
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "leaguesync: view", err)
 		return

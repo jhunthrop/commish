@@ -14,11 +14,20 @@ import (
 
 // A host's player directory is read at most once a day (both hosts ask
 // that it be read rarely), or once an hour when a roster names a player
-// the kept copy lacks, a signing since the last read.
+// the kept copy lacks, a signing since the last read. Until a host's
+// directory has been read once, a failed read is tried again after a
+// minute, and the views wait for it rather than show a league of
+// strangers.
 const (
 	directoryTTL     = 24 * time.Hour
 	directoryMissing = time.Hour
+	directoryRetry   = time.Minute
+	// directoryTimeout bounds one whole directory read, Sleeper's 15 MB.
+	directoryTimeout = time.Minute
 )
+
+// ErrNoDirectory is a host whose players have never been read.
+var ErrNoDirectory = fmt.Errorf("%w: no player directory yet", ErrUnavailable)
 
 // PlayerStore keeps each host's directory (app.host_players), so a
 // restart does not read it again.
@@ -33,6 +42,8 @@ type directoryEntry struct {
 	readAt time.Time
 	tried  time.Time
 	fromDB bool
+	// reading is closed when the read in flight lands; nil when none is.
+	reading chan struct{}
 }
 
 // Directory is each host's players by id.
@@ -60,7 +71,19 @@ func (d *Directory) entry(host string) *directoryEntry {
 	return e
 }
 
-// For is the host's directory, covering need when the host can.
+// Warm reads every host's directory now, from the store or the host, so
+// the first view after a start finds it.
+func (d *Directory) Warm(ctx context.Context, season int) {
+	for _, h := range d.Hosts {
+		if _, err := d.For(ctx, h.Key(), season, nil); err != nil {
+			d.Log.Warn("leaguesync: warm directory", "host", h.Key(), "err", err)
+		}
+	}
+}
+
+// For is the host's directory, covering need when the host can. The read
+// runs outside the entry's lock: views go on with the kept copy while it
+// runs, and wait for it only when there is no copy yet.
 func (d *Directory) For(ctx context.Context, host string, season int, need []string) (map[string]HostPlayer, error) {
 	h, ok := d.Hosts.ByKey(host)
 	if !ok {
@@ -68,41 +91,76 @@ func (d *Directory) For(ctx context.Context, host string, season int, need []str
 	}
 	e := d.entry(host)
 	e.mu.Lock()
-	defer e.mu.Unlock()
-	if !e.fromDB {
-		e.fromDB = true
-		players, at, err := d.Store.HostPlayers(ctx, host)
-		if err != nil {
-			d.Log.Warn("leaguesync: stored directory", "host", host, "err", err)
-		} else if len(players) > 0 {
-			e.byID, e.readAt = index(players), at
-		}
-	}
+	d.load(ctx, e, host)
 	now := d.Now()
-	if d.stale(e, now, need) {
-		e.tried = now
-		players, err := h.Players(context.WithoutCancel(ctx), season)
-		switch {
-		case err != nil && e.byID == nil:
-			return nil, err
-		case err != nil:
-			d.Log.Warn("leaguesync: directory read, keeping the last", "host", host, "err", err)
-		default:
-			e.byID, e.readAt = index(players), now
-			if err := d.Store.PutHostPlayers(context.WithoutCancel(ctx), host, players, now); err != nil {
-				d.Log.Warn("leaguesync: keep directory", "host", host, "err", err)
-			}
-		}
+	if e.reading == nil && d.stale(e, now, need) {
+		e.tried, e.reading = now, make(chan struct{})
+		go d.read(e, h, season, now)
+	}
+	byID, reading := e.byID, e.reading
+	e.mu.Unlock()
+	if byID != nil {
+		return byID, nil
+	}
+	if reading == nil {
+		return nil, ErrNoDirectory
+	}
+	select {
+	case <-reading:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.byID == nil {
+		return nil, ErrNoDirectory
 	}
 	return e.byID, nil
 }
 
-// stale says whether the directory should be read again: never read,
-// older than a day, or missing a player a roster names and not tried in
-// the last hour.
+// load reads the kept copy once a process; a failed load is tried again.
+func (d *Directory) load(ctx context.Context, e *directoryEntry, host string) {
+	if e.fromDB {
+		return
+	}
+	players, at, err := d.Store.HostPlayers(context.WithoutCancel(ctx), host)
+	if err != nil {
+		d.Log.Warn("leaguesync: stored directory", "host", host, "err", err)
+		return
+	}
+	e.fromDB = true
+	if len(players) > 0 {
+		e.byID, e.readAt = index(players), at
+	}
+}
+
+// read reads the host's directory and keeps it, outside the entry's lock.
+func (d *Directory) read(e *directoryEntry, h Host, season int, now time.Time) {
+	ctx, cancel := context.WithTimeout(context.Background(), directoryTimeout)
+	defer cancel()
+	players, err := h.Players(ctx, season)
+	e.mu.Lock()
+	if err == nil {
+		e.byID, e.readAt = index(players), now
+	}
+	close(e.reading)
+	e.reading = nil
+	e.mu.Unlock()
+	if err != nil {
+		d.Log.Warn("leaguesync: directory read", "host", h.Key(), "err", err)
+		return
+	}
+	if err := d.Store.PutHostPlayers(ctx, h.Key(), players, now); err != nil {
+		d.Log.Warn("leaguesync: keep directory", "host", h.Key(), "err", err)
+	}
+}
+
+// stale says whether the directory should be read again: never read and
+// not tried in the last minute, older than a day, or missing a player a
+// roster names and not tried in the last hour.
 func (d *Directory) stale(e *directoryEntry, now time.Time, need []string) bool {
 	if e.byID == nil {
-		return e.tried.IsZero() || now.Sub(e.tried) >= directoryMissing
+		return e.tried.IsZero() || now.Sub(e.tried) >= directoryRetry
 	}
 	if now.Sub(e.readAt) >= directoryTTL && now.Sub(e.tried) >= directoryMissing {
 		return true
