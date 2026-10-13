@@ -1187,10 +1187,15 @@ components:
 
     Account:
       type: object
-      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, created_at]
+      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, league_id, created_at]
       properties:
         id: { type: string, format: uuid }
         email: { type: string }
+        league_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
         first_name: { type: string, nullable: true }
         last_name: { type: string, nullable: true }
         handle:

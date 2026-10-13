@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, type Snippet } from 'svelte';
 	import { page } from '$app/state';
-	import { railLeague } from './rail-league.svelte.ts';
+	import { railLeague } from '#lib/account/rail-league.svelte.ts';
 	import Icon from './Icon.svelte';
 	import Stamp from './Stamp.svelte';
 	import ThemeSwitch from './ThemeSwitch.svelte';
@@ -34,8 +34,8 @@
 	let { title, stamp, active, search, tail, children }: Props = $props();
 
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
-	// League joins the rail once this browser has seen the account's league list hold one.
-	onMount(() => railLeague.read());
+	// League joins the rail when /me names an attached league.
+	onMount(() => void railLeague.load());
 	const items = $derived(railItems(railLeague.id));
 </script>
 

@@ -78,7 +78,7 @@ export const RAIL: readonly RailItem[] = [
 	}
 ];
 
-/** Your league, shown once the account has one (rail-league.svelte.ts), after the cheat sheet:
+/** Your league, shown when /me names one (account/rail-league.svelte.ts), after the cheat sheet:
  * the in-season half of the rail. It opens the account's newest league. */
 export function leagueItem(leagueId: string): RailItem {
 	return {

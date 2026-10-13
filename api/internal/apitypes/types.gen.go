@@ -708,10 +708,13 @@ type Account struct {
 	FirstName *string         `json:"first_name"`
 
 	// Handle the name shown in lobbies, 3 to 20 letters, digits or underscores, not starting with a digit
-	Handle     *string            `json:"handle"`
-	Id         openapi_types.UUID `json:"id"`
-	LastName   *string            `json:"last_name"`
-	Membership *MembershipState   `json:"membership"`
+	Handle   *string            `json:"handle"`
+	Id       openapi_types.UUID `json:"id"`
+	LastName *string            `json:"last_name"`
+
+	// LeagueId the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
+	LeagueId   *openapi_types.UUID `json:"league_id"`
+	Membership *MembershipState    `json:"membership"`
 }
 
 // AccountUpdate defines model for AccountUpdate.

@@ -10,7 +10,6 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
-	import { railLeague } from '#lib/ui/rail-league.svelte.ts';
 	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
 	import { loadBoard, type LeagueBoard } from './board.ts';
 	import MatchupPanel from './MatchupPanel.svelte';
@@ -51,7 +50,6 @@
 	async function read(): Promise<void> {
 		try {
 			take(await leagueApi.sync(id));
-			if (railLeague.id === null) railLeague.note(id);
 		} catch (error) {
 			if (isSignedOut(error)) failure = 'signed-out';
 			else if (hasStatus(error, HTTP_STATUS.notFound)) failure = 'missing';

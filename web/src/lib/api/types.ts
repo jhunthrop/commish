@@ -1040,6 +1040,11 @@ export interface components {
 			/** Format: uuid */
 			id: string;
 			email: string;
+			/**
+			 * Format: uuid
+			 * @description the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
+			 */
+			league_id: string | null;
 			first_name: string | null;
 			last_name: string | null;
 			/** @description the name shown in lobbies, 3 to 20 letters, digits or underscores, not starting with a digit */

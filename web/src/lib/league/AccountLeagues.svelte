@@ -5,7 +5,7 @@
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
-	import { railLeague } from '#lib/ui/rail-league.svelte.ts';
+	import { railLeague } from '#lib/account/rail-league.svelte.ts';
 	import { ApiError, leagueApi, type AttachedLeague } from './api.ts';
 	import { hostWords } from './model.ts';
 
@@ -27,7 +27,6 @@
 			.attached()
 			.then((list) => {
 				leagues = list;
-				railLeague.note(list[0]?.id ?? null);
 			})
 			.catch(() => (failed = true));
 	});
@@ -52,8 +51,7 @@
 		return act(league.id, async () => {
 			await leagueApi.detach(league.id);
 			detached = new Set([...detached, league.id]);
-			const rest = (leagues ?? []).filter((l) => !detached.has(l.id));
-			railLeague.note(rest[0]?.id ?? null);
+			void railLeague.refresh();
 			setTimeout(() => {
 				if (!detached.has(league.id)) return;
 				detached = without(detached, league.id);
@@ -66,7 +64,7 @@
 		return act(league.id, async () => {
 			await leagueApi.restore(league.id);
 			detached = without(detached, league.id);
-			railLeague.note((leagues ?? []).find((l) => !detached.has(l.id))?.id ?? null);
+			void railLeague.refresh();
 		});
 	}
 

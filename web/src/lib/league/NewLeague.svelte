@@ -15,7 +15,7 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { railLeague } from '#lib/ui/rail-league.svelte.ts';
+	import { railLeague } from '#lib/account/rail-league.svelte.ts';
 	import { ApiError, leagueApi, type AttachPreview, type AttachedLeague } from './api.ts';
 	import { HOSTS_LINE, hostWords } from './model.ts';
 
@@ -46,7 +46,6 @@
 			.attached()
 			.then((list) => {
 				attached = list;
-				railLeague.note(list[0]?.id ?? null);
 				view = 'form';
 				const pasted = page.url.searchParams.get('link');
 				if (pasted) typed(pasted);
@@ -104,7 +103,7 @@
 		try {
 			const me = by === 'team' ? { roster_id: rosterId } : { username: username.trim() };
 			const made = await leagueApi.attach({ host: preview.host, link: link.trim(), me });
-			railLeague.note(made.id);
+			void railLeague.refresh();
 			await goto(resolve('/league/[id]', { id: made.id }));
 		} catch (error) {
 			problem = failure(error);
