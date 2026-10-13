@@ -4,10 +4,10 @@ import { links } from '#lib/site/links.ts';
 import type { AccountMock } from './account-api.ts';
 
 export const accountLinks = {
-	account: (): string => resolve('/account'),
-	pass: (): string => resolve('/pass'),
+	account: links.account,
+	pass: links.pass,
 	/** The live draft companion's start. */
-	companion: (): string => resolve('/companion/new'),
+	companion: links.companionNew,
 	sheet: links.sheet,
 	/** A finished mock opens on its report, one in progress on its room. */
 	mock: (mock: AccountMock): string =>

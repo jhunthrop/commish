@@ -16,12 +16,6 @@ const client = apiClient(PUBLIC_API_URL);
 
 export { ApiError };
 
-export const HTTP = { unauthorized: 401, forbidden: 403, notFound: 404, conflict: 409 } as const;
-
-export function isSignedOut(error: unknown): boolean {
-	return error instanceof ApiError && error.status === HTTP.unauthorized;
-}
-
 export const companions = {
 	me: () => client.call<Account>('/me'),
 	create: (body: CompanionCreate) =>

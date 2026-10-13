@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { HTTP_STATUS, hasStatus, isSignedOut } from '#lib/api/status.ts';
 	import { boardOf, type Board } from '#lib/room/model.ts';
+	import { links } from '#lib/site/links.ts';
 	import Report from '#lib/room/report/Report.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
@@ -8,10 +10,7 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import {
-		ApiError,
-		HTTP,
 		companions,
-		isSignedOut,
 		type Companion,
 		type CompanionPick,
 		type Feature,
@@ -27,8 +26,6 @@
 	}
 
 	let { id }: Props = $props();
-
-	const NEW_HREF = '/companion/new';
 
 	let companion = $state<Companion | null>(null);
 	let picks = $state<CompanionPick[]>([]);
@@ -52,7 +49,7 @@
 			}
 		} catch (error) {
 			if (isSignedOut(error)) failure = 'signed-out';
-			else if (error instanceof ApiError && error.status === HTTP.notFound) failure = 'missing';
+			else if (hasStatus(error, HTTP_STATUS.notFound)) failure = 'missing';
 			else if (companion === null) failure = 'unreachable';
 			else retrying = true;
 		}
@@ -84,7 +81,7 @@
 				)
 			: []
 	);
-	const here = $derived(`/companion/${id}`);
+	const here = $derived(links.companion(id));
 </script>
 
 <svelte:head>
@@ -94,7 +91,7 @@
 
 <Shell title="Live draft" active="advisor">
 	{#snippet tail()}
-		<Quiet href={NEW_HREF}>Follow another draft</Quiet>
+		<Quiet href={links.companionNew()}>Follow another draft</Quiet>
 	{/snippet}
 	{#if failure === 'signed-out'}
 		<div class="pad">
@@ -111,7 +108,7 @@
 				title="This draft is not on your account"
 				line="Paste the draft link again to follow it."
 			>
-				{#snippet actions()}<Verb href={NEW_HREF}>Follow a draft</Verb>{/snippet}
+				{#snippet actions()}<Verb href={links.companionNew()}>Follow a draft</Verb>{/snippet}
 			</EmptyState>
 		</div>
 	{:else if failure === 'unreachable'}
@@ -133,7 +130,7 @@
 				field="your league drafting on Sleeper, read pick by pick as it happened"
 			>
 				{#snippet verbs()}
-					<Verb href={NEW_HREF}>Follow another draft</Verb>
+					<Verb href={links.companionNew()}>Follow another draft</Verb>
 				{/snippet}
 			</Report>
 		{:else}

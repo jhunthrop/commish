@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { hasLiveMembership } from '#lib/account/words.ts';
+	import { links } from '#lib/site/links.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import LineList from '#lib/ui/LineList.svelte';
@@ -39,8 +40,6 @@
 	 * read from the API (the prices from Stripe, the features from the table Can reads), which hosts
 	 * the live draft works with today, and what is free whatever you have. Signed out, a verb signs
 	 * in first and comes back here to go on to checkout. */
-	const COMPANION_HREF = '/companion/new';
-	const ACCOUNT_HREF = '/account';
 
 	let catalog = $state<PlanCatalog | null>(null);
 	let account = $state<Account | null>(null);
@@ -176,10 +175,10 @@
 					{#snippet action()}
 						{#if memberNow}
 							<p class="have">Your Membership includes it.</p>
-							<Verb href={COMPANION_HREF} fill>Open the live draft companion</Verb>
+							<Verb href={links.companionNew()} fill>Open the live draft companion</Verb>
 						{:else if passNow}
 							<p class="have">It's yours through {ends}.</p>
-							<Verb href={COMPANION_HREF} fill>Open the live draft companion</Verb>
+							<Verb href={links.companionNew()} fill>Open the live draft companion</Verb>
 						{:else}
 							<Verb
 								fill
@@ -215,7 +214,7 @@
 					{#snippet action()}
 						{#if memberNow}
 							<p class="have">You're a member.</p>
-							<Quiet href={ACCOUNT_HREF} fill>Your account</Quiet>
+							<Quiet href={links.account()} fill>Your account</Quiet>
 						{:else}
 							<Quiet
 								fill

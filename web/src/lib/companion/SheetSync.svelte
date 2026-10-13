@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
+	import { links } from '#lib/site/links.ts';
 	import LineList from '#lib/ui/LineList.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
@@ -43,7 +44,7 @@
 		/>
 		{#if rows.length === 0}
 			<p class="none">Your sheet is empty. Rank players on it and they line up here.</p>
-			<Quiet href="/sheet" size="sm">Open your cheat sheet</Quiet>
+			<Quiet href={links.sheet()} size="sm">Open your cheat sheet</Quiet>
 		{:else}
 			<LineList label="Your sheet, taken players struck" {lines} />
 			{#if !all && rows.length > FIRST_ROWS}

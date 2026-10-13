@@ -1,8 +1,7 @@
 /** A checkout a signed-out drafter asked for, carried through sign-in in the pass page's address so
  * the page picks it up on the way back and goes straight on to checkout. Pure. */
+import { links } from '#lib/site/links.ts';
 import type { CheckoutRequest, Interval } from './pass-api.ts';
-
-export const PASS_PATH = '/pass';
 
 /** The query keys, and Lane 3's canceled return (`/pass?checkout=canceled`). */
 const KEY = { product: 'get', interval: 'interval', seats: 'seats', league: 'league' } as const;
@@ -20,7 +19,7 @@ export function resumePath(request: CheckoutRequest): string {
 	if (request.interval) params.set(KEY.interval, request.interval);
 	if (request.seats != null) params.set(KEY.seats, String(request.seats));
 	if (request.league_name) params.set(KEY.league, request.league_name);
-	return `${PASS_PATH}?${params.toString()}`;
+	return `${links.pass()}?${params.toString()}`;
 }
 
 /** The checkout an address asks to resume, or null for none or one that does not read. The API

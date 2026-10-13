@@ -1,7 +1,8 @@
 /** What the claim page says about a group pass link and the reader: one state, its sentence and its
  * verb. Pure, so the page only draws it. */
 import { hasLiveMembership } from '#lib/account/words.ts';
-import { ApiError, HTTP, type Account, type GroupPassPreview } from './pass-api.ts';
+import { HTTP_STATUS, hasStatus } from '#lib/api/status.ts';
+import type { Account, GroupPassPreview } from './pass-api.ts';
 
 export type ClaimState =
 	| { kind: 'loading' }
@@ -14,8 +15,8 @@ export type ClaimState =
 
 /** The page's state from what the preview call answered. */
 export function stateFromError(error: unknown): ClaimState {
-	if (error instanceof ApiError && error.status === HTTP.notFound) return { kind: 'missing' };
-	if (error instanceof ApiError && error.status === HTTP.gone) return { kind: 'ended' };
+	if (hasStatus(error, HTTP_STATUS.notFound)) return { kind: 'missing' };
+	if (hasStatus(error, HTTP_STATUS.gone)) return { kind: 'ended' };
 	return { kind: 'unreachable' };
 }
 

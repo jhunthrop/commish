@@ -2,6 +2,7 @@
  * contract: the catalog, who is signed in, checkout, and a group pass's link. */
 import { PUBLIC_API_URL } from '$app/env/public';
 import { ApiError, apiClient } from '#lib/api/client.ts';
+import { isSignedOut } from '#lib/api/status.ts';
 import type { components } from '#lib/api/types.ts';
 
 type Schemas = components['schemas'];
@@ -16,13 +17,6 @@ export type PlanCatalog = Schemas['PlanCatalog'];
 const client = apiClient(PUBLIC_API_URL);
 
 export { ApiError };
-
-export const HTTP = { unauthorized: 401, notFound: 404, conflict: 409, gone: 410 } as const;
-
-/** Whether an error is the API saying nobody is signed in. */
-export function isSignedOut(error: unknown): boolean {
-	return error instanceof ApiError && error.status === HTTP.unauthorized;
-}
 
 /** The signed-in account, or null signed out. Any other failure throws. */
 export async function currentAccount(): Promise<Account | null> {

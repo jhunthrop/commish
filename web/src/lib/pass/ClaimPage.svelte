@@ -8,9 +8,9 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
+	import { links } from '#lib/site/links.ts';
 	import { claimStep, fromWords, stateFromError, type ClaimState } from './claim.ts';
 	import { ApiError, currentAccount, pass, type Feature } from './pass-api.ts';
-	import { PASS_PATH } from './intent.ts';
 	import { featureLines, passEnds } from './words.ts';
 
 	/** A group pass's claim link: whose league it is, how many passes are left, what a pass unlocks,
@@ -20,8 +20,6 @@
 	}
 
 	let { code }: Props = $props();
-
-	const COMPANION_HREF = '/companion/new';
 
 	let view = $state<ClaimState>({ kind: 'loading' });
 	let features = $state<Feature[]>([]);
@@ -63,7 +61,7 @@
 		}
 	}
 
-	const here = $derived(`/claim/${code}`);
+	const here = $derived(links.claim(code));
 </script>
 
 <svelte:head>
@@ -80,14 +78,14 @@
 				title="This link does not open a pass"
 				line="Check the link with whoever sent it. A pass that was refunded stops working."
 			>
-				{#snippet actions()}<Quiet href={PASS_PATH}>See the Draft Pass</Quiet>{/snippet}
+				{#snippet actions()}<Quiet href={links.pass()}>See the Draft Pass</Quiet>{/snippet}
 			</EmptyState>
 		{:else if view.kind === 'ended'}
 			<EmptyState
 				title="This pass was for a season that has ended"
 				line="A pass runs for one season. This season's is on the pass page."
 			>
-				{#snippet actions()}<Quiet href={PASS_PATH}>See the Draft Pass</Quiet>{/snippet}
+				{#snippet actions()}<Quiet href={links.pass()}>See the Draft Pass</Quiet>{/snippet}
 			</EmptyState>
 		{:else if view.kind === 'unreachable'}
 			<EmptyState title="This link can't be read right now" line="Reload in a moment.">
@@ -115,19 +113,19 @@
 					<p class="line">
 						Your Draft Pass is on{endsAt ? `, good through ${endsAt}` : ''}.
 					</p>
-					<Verb href={COMPANION_HREF} size="lg">Open the live draft companion</Verb>
+					<Verb href={links.companionNew()} size="lg">Open the live draft companion</Verb>
 				{:else if step === 'covered'}
 					<p class="line">
 						You already have the {preview.season} Draft Pass, so leave this one for a teammate.
 					</p>
-					<Quiet href={COMPANION_HREF}>Open the live draft companion</Quiet>
+					<Quiet href={links.companionNew()}>Open the live draft companion</Quiet>
 				{:else if step === 'full'}
 					<p class="line">
 						Every pass on this link is taken. Ask {preview.purchaser_handle
 							? `@${preview.purchaser_handle}`
 							: 'whoever sent it'} about another, or get your own.
 					</p>
-					<Quiet href={PASS_PATH}>See the Draft Pass</Quiet>
+					<Quiet href={links.pass()}>See the Draft Pass</Quiet>
 				{:else if step === 'sign-in'}
 					<p class="line">Sign in and the pass is yours, one per drafter.</p>
 					<Verb href={pass.signInUrl(here)} size="lg">Sign in to claim your pass</Verb>

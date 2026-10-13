@@ -4,6 +4,7 @@
  * sign out. A signed-out browser is an answer here, not an error.
  */
 import { ApiError, type ApiClient } from '#lib/api/client.ts';
+import { isSignedOut } from '#lib/api/status.ts';
 import type { components } from '#lib/api/types.ts';
 
 export type Account = components['schemas']['Account'];
@@ -11,7 +12,6 @@ export type AccountSheet = components['schemas']['Sheet'];
 export type AccountMock = components['schemas']['Mock'];
 export type AccountGroupPass = components['schemas']['GroupPass'];
 
-const UNAUTHORIZED = 401;
 /** How many of each list the page shows: the most recent first. */
 export const LIST_SIZE = 20;
 
@@ -42,10 +42,6 @@ export interface AccountApi {
 	signInUrl(returnTo: string): string;
 }
 
-function isUnauthorized(error: unknown): boolean {
-	return error instanceof ApiError && error.status === UNAUTHORIZED;
-}
-
 function unreachableKind(online: () => boolean): AccountState {
 	return online() ? { kind: 'unreachable' } : { kind: 'offline' };
 }
@@ -57,7 +53,7 @@ export function accountApi(client: ApiClient, online: () => boolean): AccountApi
 			try {
 				account = await client.call<Account>('/me');
 			} catch (error) {
-				if (isUnauthorized(error)) return { kind: 'signed-out' };
+				if (isSignedOut(error)) return { kind: 'signed-out' };
 				if (error instanceof ApiError || error instanceof TypeError) return unreachableKind(online);
 				throw error;
 			}

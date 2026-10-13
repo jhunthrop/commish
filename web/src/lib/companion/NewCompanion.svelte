@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { links } from '#lib/site/links.ts';
 	import ActionBar from '#lib/ui/ActionBar.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -12,7 +13,8 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Stepper from '#lib/ui/Stepper.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { ApiError, companions, isSignedOut, type CompanionCreate } from './api.ts';
+	import { isSignedOut } from '#lib/api/status.ts';
+	import { ApiError, companions, type CompanionCreate } from './api.ts';
 	import { has } from './model.ts';
 
 	/** Start following a draft: paste the Sleeper link, say which seat is yours, one verb. Without the
@@ -82,7 +84,7 @@
 				line="Our call beside your Sleeper draft comes with the Draft Pass."
 			>
 				{#snippet actions()}
-					<Verb href={companions.signInUrl('/companion/new')}>Sign in</Verb>
+					<Verb href={companions.signInUrl(links.companionNew())}>Sign in</Verb>
 				{/snippet}
 			</EmptyState>
 		{:else if view === 'no-pass'}
@@ -90,7 +92,7 @@
 				title="Our call beside your real draft comes with the Draft Pass"
 				line="Paste your Sleeper draft link and get our pick at each of your turns, against the picks your league makes."
 			>
-				{#snippet actions()}<Verb href={resolve('/pass')}>See the Draft Pass</Verb>{/snippet}
+				{#snippet actions()}<Verb href={links.pass()}>See the Draft Pass</Verb>{/snippet}
 			</EmptyState>
 		{:else if view === 'unreachable'}
 			<EmptyState title="This page can't reach Commish right now" line="Reload in a moment." />
