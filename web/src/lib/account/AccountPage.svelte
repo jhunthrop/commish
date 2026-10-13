@@ -252,7 +252,8 @@
 						{:else}
 							<Quiet href={accountLinks.pass()}>See the Draft Pass</Quiet>
 						{/if}
-						{#if account.features.length > 0 || groupPasses.length > 0}
+						<!-- Receipts are a purchase question, not a feature one: a claimer's pass has none. -->
+						{#if account.membership !== null || account.draft_pass?.source === 'purchase' || groupPasses.length > 0}
 							<Quiet disabled={busy} onclick={() => void billing()}>Billing and receipts</Quiet>
 						{/if}
 						<Quiet disabled={busy} onclick={() => void signOut()}>Sign out</Quiet>
