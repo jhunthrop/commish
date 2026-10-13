@@ -188,10 +188,6 @@ func carry(r mflRule, kind string, put func(string, float64), te map[string]floa
 		if ok {
 			put(key, r.value)
 		}
-		// #T counts defensive and special teams touchdowns alike.
-		if r.Event == "#T" {
-			put("st_td", r.value)
-		}
 		return ok
 	case !r.perUnit && r.hi >= openEnded:
 		key, ok := yardBonuses()[fmt.Sprintf("%s/%d", r.Event, r.lo)]
