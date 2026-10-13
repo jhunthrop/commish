@@ -40,6 +40,8 @@ class ObservationQuery:
     week: Weeks
     as_of: datetime
     source: str | None = None
+    # `ObservationQuery.playerIds`: only these players' rows, the order unchanged.
+    player_ids: tuple[str, ...] | None = None
 
 
 def _week_bounds(week: Weeks) -> tuple[int, int]:
@@ -49,7 +51,7 @@ def _week_bounds(week: Weeks) -> tuple[int, int]:
 _OBSERVATIONS_AS_OF: Final = """
 select distinct on (week, player_id, source, metric) season, week, player_id, source, metric, value, as_of
 from research.player_week_observations
-where season = :season and week >= :first and week <= :last and as_of <= :as_of {source}
+where season = :season and week >= :first and week <= :last and as_of <= :as_of {source} {players}
 order by week asc, player_id asc, source asc, metric asc, as_of desc
 """
 
@@ -62,7 +64,11 @@ def observations_as_of(conn: Connection, query: ObservationQuery) -> list[Player
     if query.source is not None:
         clause = "and source = :source"
         params["source"] = query.source
-    rows = conn.execute(text(_OBSERVATIONS_AS_OF.format(source=clause)), params)
+    players = ""
+    if query.player_ids is not None:
+        players = "and player_id = any(:player_ids)"
+        params["player_ids"] = list(query.player_ids)
+    rows = conn.execute(text(_OBSERVATIONS_AS_OF.format(source=clause, players=players)), params)
     return [
         PlayerWeekObservation(
             row.season, row.week, row.player_id, row.source, row.metric, row.value, ms_instant(row.as_of)
@@ -301,16 +307,27 @@ STAT_LINE_GAPS: Final = (2019, 2025)
 LIVE_ADMITTED_DERIVED_SEASONS: Final = (2025,)
 
 
-def stat_lines_for_measurement(conn: Connection, query: ObservationQuery) -> list[SeasonStatLine]:
-    """`statLinesAsOfForMeasurement`: the published lines, filled from play-by-play in a gap season."""
+def _published_with_derived(conn: Connection, query: ObservationQuery, admit: bool) -> list[SeasonStatLine]:
+    """The published lines, and where `admit`, a derived line for each (week, player) they lack."""
     published = stat_lines_as_of(conn, query, STAT_LINE_SOURCE)
-    if query.season not in STAT_LINE_GAPS:
+    if not admit:
         return published
     derived = stat_lines_as_of(conn, query, DERIVED_STAT_LINE_SOURCE)
     keys = {f"{row.line.week}|{row.line.player_id}" for row in published}
     return [*published, *(row for row in derived if f"{row.line.week}|{row.line.player_id}" not in keys)]
 
 
+def stat_lines_for_measurement(conn: Connection, query: ObservationQuery) -> list[SeasonStatLine]:
+    """`statLinesAsOfForMeasurement`: the published lines, filled from play-by-play in a gap season."""
+    return _published_with_derived(conn, query, query.season in STAT_LINE_GAPS)
+
+
 def admits_derived_for_live_surface(season: int) -> bool:
     """`admitsDerivedForLiveSurface`."""
     return season in STAT_LINE_GAPS and season in LIVE_ADMITTED_DERIVED_SEASONS
+
+
+def stat_lines_for_live_surface(conn: Connection, query: ObservationQuery) -> list[SeasonStatLine]:
+    """`statLinesAsOfForLiveSurface`: the published lines, filled from play-by-play only in a gap
+    season a live surface admits (`LIVE_ADMITTED_DERIVED_SEASONS`)."""
+    return _published_with_derived(conn, query, admits_derived_for_live_surface(query.season))
