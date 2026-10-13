@@ -623,7 +623,7 @@ correction quotes the exact banned phrases the read was caught with. The fact sh
 ```sh
 # the nightly run, into a local directory laid out as the bucket (the web builds from it with
 # PUBLIC_RUN_BASE_URL=DIR); without --out it writes R2 (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID)
-uv run python -m research.nightly run --out DIR [--skip ingest,fit,capsules,headshots] [--regenerate-all]
+uv run python -m research.nightly run --out DIR [--skip ingest,fit,capsules,headshots] [--regenerate-all] [--mend-only]
 uv run python -m research.nightly publish --out DIR [--at ISO] [--no-dispatch]
 
 # the in-season jobs, one pass each

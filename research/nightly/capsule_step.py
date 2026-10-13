@@ -83,6 +83,9 @@ class CapsuleSpend:
 class CapsuleStepPlan:
     budget: int = CAPSULE_CONFIG.sweep_generation_budget
     regenerate_all: bool = False
+    # A mending night: the sweep writes only the unwritten pages, not those whose facts moved, then
+    # the retries and repairs run as on any night. For a night whose spend must stay near zero.
+    mend_only: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,11 +123,12 @@ def _regenerate_all(engine: Engine, now: datetime) -> str:
 class _Passes:
     """The writing passes of one night: one gateway, one clock, one budget shared by every pass."""
 
-    def __init__(self, engine: Engine, gateway: GatewayClient, now: datetime, budget: int, log: Log) -> None:
+    def __init__(self, engine: Engine, gateway: GatewayClient, now: datetime, plan: CapsuleStepPlan, log: Log) -> None:
         self.engine = engine
+        self.mend_only = plan.mend_only
         self.gateway = gateway
         self.now = now
-        self.budget = budget
+        self.budget = plan.budget
         self.log = log
         self.spend = CapsuleSpend()
         self.calls_by_player: dict[str, int] = {}
@@ -151,7 +155,8 @@ class _Passes:
         # sweep does not write them again and the repair pass is left the few it still does.
         with self.engine.connect() as conn:
             shared = tuple(sentence.sentence for sentence in capsule_gate(conn, self.now).shared)
-        report = self.sweep("capsules", SweepPlan(self.budget, avoid=shared))
+        name = "capsules (mend only: pages whose facts moved wait for a full night)" if self.mend_only else "capsules"
+        report = self.sweep(name, SweepPlan(self.budget, unwritten_only=self.mend_only, avoid=shared))
         unwritten = report.facts
         for attempt in range(1, RETRY_PASSES + 1):
             if self.left <= 0 or unwritten == 0:
@@ -190,7 +195,7 @@ def run_capsule_step(engine: Engine, now: datetime, plan: CapsuleStepPlan, log: 
         if plan.regenerate_all:
             log(_regenerate_all(engine, now))
         with httpx.Client() as http:
-            passes = _Passes(engine, GatewayClient(key, http), now, plan.budget, log)
+            passes = _Passes(engine, GatewayClient(key, http), now, plan, log)
             passes.run()
             spend = passes.spend
         log(f"capsules spent: {spend.line()}")

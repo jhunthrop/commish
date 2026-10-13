@@ -1,7 +1,7 @@
 """`python -m research.nightly`: the nightly run and its publication (the Cloud Run Job `nightly`).
 
     uv run python -m research.nightly run [--out DIR] [--skip ingest,fit,capsules,headshots]
-                                          [--capsule-budget N] [--regenerate-all]
+                                          [--capsule-budget N] [--regenerate-all] [--mend-only]
     uv run python -m research.nightly publish [--out DIR] [--at ISO] [--no-dispatch]
 
 `run` writes one run under a new run id (05:00 UTC); `publish` makes the newest passed run public
@@ -49,7 +49,9 @@ def _run(args: argparse.Namespace) -> int:
     try:
         with httpx.Client(timeout=60.0) as http:
             deps = RunDeps(engine, _store(args, http), http, fetcher, os.environ, now_ms, _line)
-            outcome = run_nightly(deps, RunOptions(skip, CapsuleStepPlan(args.capsule_budget, args.regenerate_all)))
+            outcome = run_nightly(
+                deps, RunOptions(skip, CapsuleStepPlan(args.capsule_budget, args.regenerate_all, args.mend_only))
+            )
     finally:
         fetcher.close()
         engine.dispose()
@@ -71,6 +73,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     run = commands.add_parser("run", help="write tonight's run")
     run.add_argument("--skip", default="", help=f"steps to skip, of {', '.join(STEPS)}")
     run.add_argument("--capsule-budget", type=int, default=CAPSULE_CONFIG.sweep_generation_budget)
+    run.add_argument(
+        "--mend-only",
+        action="store_true",
+        help="write only unwritten pages and repair failing ones; pages whose facts moved wait",
+    )
     run.add_argument("--regenerate-all", action="store_true", help="rewrite every board page's capsule")
     published = commands.add_parser("publish", help="make the early-access run public and dispatch its build")
     published.add_argument("--at", default=None, help="the instant to publish as of (ISO, development)")
