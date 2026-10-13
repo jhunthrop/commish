@@ -32,9 +32,3 @@ var pagePaths = map[PageName]string{
 	PageDraftReport: "/DraftReportCard.aspx",
 	PageScoreboard:  "/Scoreboard.aspx",
 }
-
-// ValidPage reports a page name the client reads.
-func ValidPage(p PageName) bool {
-	_, ok := pagePaths[p]
-	return ok
-}
