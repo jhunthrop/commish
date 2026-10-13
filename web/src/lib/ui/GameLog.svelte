@@ -320,7 +320,8 @@
 
 	.ahead ol {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(208px, 1fr));
+		column-gap: var(--s-5);
 		margin: 0;
 		padding: 0;
 		list-style: none;
@@ -331,6 +332,7 @@
 		display: grid;
 		grid-template-columns: 3.5em 1fr auto;
 		align-items: center;
+		white-space: nowrap;
 		gap: var(--s-2);
 		min-height: 32px;
 		padding: 0 var(--s-2);
@@ -366,7 +368,7 @@
 		}
 
 		.ahead ol {
-			grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+			grid-template-columns: minmax(0, 1fr);
 		}
 	}
 </style>
