@@ -349,9 +349,16 @@ func (s *Service) card(ctx context.Context, owner mocks.Owner, id uuid.UUID) (ap
 	if err != nil {
 		return apitypes.RoomCard{}, err
 	}
+	return s.cardAt(ctx, r)
+}
+
+// cardAt is the card for the room's turn, recorded on first read: the
+// stored one when there is one, else the advisor's (or the engine's).
+func (s *Service) cardAt(ctx context.Context, r room) (apitypes.RoomCard, error) {
 	if !r.draft.Waiting {
 		return apitypes.RoomCard{}, errNotWaiting
 	}
+	id := r.mock.Id
 	pick := r.draft.State.PickNumber
 	raw, ok, err := s.Mocks.Card(ctx, id, r.branch, pick)
 	if err != nil {

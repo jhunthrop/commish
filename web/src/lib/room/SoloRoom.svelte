@@ -6,7 +6,7 @@
 	import SinceStrip from '#lib/ui/SinceStrip.svelte';
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
 	import type { MockRoom, RoomCard } from './api.ts';
-	import { callView, poolBasis } from './call.ts';
+	import { type CallView, callView, frameView, poolBasis } from './call.ts';
 	import { SOLO_KEYS, roomKeys } from './keys.ts';
 	import {
 		type Board,
@@ -94,6 +94,41 @@
 	const call = $derived(
 		!readonly && card && room.waiting ? callView(card, board, drafted, teams) : null
 	);
+	/** The call's frame while the next one is on its way: the last call, or before any, the best
+	 * player left. The panel draws it as a skeleton, so it holds its place and nothing below moves. */
+	let lastCall = $state<CallView | null>(null);
+	$effect(() => {
+		if (call) lastCall = call;
+	});
+	/** The pick the drafter just drafted at, until the room moves past it. */
+	let draftedAt = $state<number | null>(null);
+	const inFlight = $derived(busy && draftedAt === room.pick_number);
+	/** The pick whose call is on its way: the next turn while a pick is in flight, else this one. */
+	const readingFor = $derived(
+		readonly || room.status !== 'active' || !room.waiting
+			? null
+			: inFlight
+				? next
+				: call
+					? null
+					: room.pick_number
+	);
+	const frame = $derived(
+		call ??
+			(readingFor === null
+				? null
+				: (lastCall ?? frameView(board, drafted, teams, room.pick_number)))
+	);
+	/** The pick whose call has painted. Enter drafts our call only once the reader has seen it, so a
+	 * second Enter pressed before the next call paints is dropped on purpose. */
+	let paintedFor = $state<number | null>(null);
+	$effect(() => {
+		const pick = call ? room.pick_number : null;
+		if (pick === null) return;
+		const frameId = requestAnimationFrame(() => (paintedFor = pick));
+		return () => cancelAnimationFrame(frameId);
+	});
+	const callReady = $derived(call !== null && paintedFor === room.pick_number);
 	const odds = $derived(card?.still_there ?? {});
 	const oddsLabel = $derived(
 		card?.next_pick ? `still there at ${pickLabel(card.next_pick, teams)}` : 'your last pick'
@@ -114,6 +149,7 @@
 	function draft(id: string | null): void {
 		if (readonly || busy || !room.waiting || id === null) return;
 		marked = null;
+		draftedAt = room.pick_number;
 		onpick?.(id);
 	}
 
@@ -132,8 +168,13 @@
 
 	const onkeydown = $derived(
 		roomKeys({
-			draftCall: () => draft(call?.player.id ?? null),
-			draftMarked: () => draft(selectedId),
+			draftCall: () => {
+				if (callReady) draft(call?.player.id ?? null);
+			},
+			draftMarked: () => {
+				// Unmarked, D drafts the call, so it waits on the call as Enter does.
+				if (marked !== null || callReady) draft(selectedId);
+			},
 			move,
 			queue: () => toggleQueue(selectedId),
 			undo: () => {
@@ -172,14 +213,19 @@
 	{#if room.waiting && went.length > 0}
 		<SinceStrip since={prev} {went} {teams} {whose} />
 	{/if}
-	{#if call}
+	{#if frame}
 		<RoomCall
-			view={call}
+			view={frame}
 			pickNumber={room.pick_number}
+			reading={readingFor === null
+				? undefined
+				: `Reading the room for ${pickLabel(readingFor, teams)}`}
 			action={{
-				label: `Draft ${lastName(call.player.name)}`,
+				label: `Draft ${lastName(frame.player.name)}`,
 				key: 'Enter',
-				onclick: () => draft(call.player.id)
+				onclick: () => {
+					if (call) draft(call.player.id);
+				}
 			}}
 		/>
 	{/if}

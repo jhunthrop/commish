@@ -914,8 +914,11 @@ type MockReport struct {
 // MockRoom defines model for MockRoom.
 type MockRoom struct {
 	// Board the board, on a full read (create, get, shared) and absent on a pick's answer
-	Board     *RoomBoard `json:"board,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
+	Board *RoomBoard `json:"board,omitempty"`
+
+	// Card the drafter's card at the turn on the clock, the one GET /mocks/{id}/card records, so the turn and its call arrive together. On a get, pick, undo or autopick that leaves the draft on the drafter; absent otherwise, and absent when it could not be made in the request (read it from /card then)
+	Card      *RoomCard `json:"card,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 
 	// Id null for a shared draft
 	Id       *openapi_types.UUID `json:"id"`

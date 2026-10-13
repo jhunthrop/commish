@@ -84,6 +84,29 @@ export function runnerWords(view: CallView): RunnerWords | null {
 	};
 }
 
+/** The frame the call panel holds before the first card of a room has come: the best player left by
+ * points over replacement, with no numbers. It is only ever drawn as the reading skeleton, so it
+ * shapes the panel and says nothing. */
+export function frameView(
+	board: Board,
+	drafted: ReadonlySet<string>,
+	teams: number,
+	pick: number
+): CallView | null {
+	const player = board.players.find((p) => !drafted.has(p.id));
+	if (!player) return null;
+	return {
+		player,
+		odds: null,
+		runner: null,
+		runnerOdds: null,
+		forLabel: pickLabel(pick, teams),
+		nextLabel: null,
+		conditional: false,
+		why: null
+	};
+}
+
 export function callView(
 	card: RoomCard,
 	board: Board,

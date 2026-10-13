@@ -9,9 +9,11 @@
 		/** The pick the ADP sentence is read against. */
 		pickNumber: number;
 		action: CallAction;
+		/** Set while the next turn's call is on its way: the panel holds this frame as a skeleton. */
+		reading?: string;
 	}
 
-	let { view, pickNumber, action }: Props = $props();
+	let { view, pickNumber, action, reading }: Props = $props();
 
 	const tag = $derived(
 		view.conditional ? `If the board holds to ${view.forLabel}` : `Our call at ${view.forLabel}`
@@ -35,6 +37,7 @@
 	{oddsLabel}
 	{action}
 	waiting={view.conditional}
+	{reading}
 >
 	{#snippet reason()}
 		{#if runner}

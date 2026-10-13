@@ -46,21 +46,57 @@
 			return;
 		}
 		// A queue change keeps the turn, and the turn keeps its card.
-		if (!samePick) await loadCard(next);
+		if (samePick) return;
+		// The turn brings its card, so the call paints with it. Without one, the room asks.
+		if (next.card?.pick_number === next.pick_number) card = next.card;
+		else await loadCard(next);
 	}
 
+	/** Every write to the room runs one after another, so a key pressed while another write is on
+	 * its way acts when that write lands instead of being lost or racing it. */
+	let writes: Promise<void> = Promise.resolve();
+
+	function write(job: () => Promise<void>): Promise<void> {
+		const next = writes.then(job);
+		writes = next;
+		return next;
+	}
+
+	/** A pick, an undo or a stand-in run: one at a time, the room busy until its turn has its call. */
 	async function act(run: () => Promise<MockRoom>, after: string | null = null): Promise<void> {
 		if (busy) return;
 		busy = true;
 		error = null;
-		try {
-			await settle(await run());
-			branch = after;
-		} catch (e) {
-			error = e;
-		} finally {
-			busy = false;
-		}
+		await write(async () => {
+			try {
+				await settle(await run());
+				branch = after;
+			} catch (e) {
+				error = e;
+			} finally {
+				busy = false;
+			}
+		});
+	}
+
+	/** The queue as the drafter last set it, shown at once, until its writes land. A queue write never
+	 * holds the room busy, so D or Enter right after Q still acts. */
+	let queued = $state<string[] | null>(null);
+	let queueWrites = 0;
+
+	function setQueue(ids: string[]): void {
+		queued = ids;
+		queueWrites += 1;
+		void write(async () => {
+			try {
+				await settle(await rooms.queue(id, ids));
+			} catch (e) {
+				error = e;
+			} finally {
+				queueWrites -= 1;
+				if (queueWrites === 0) queued = null;
+			}
+		});
 	}
 
 	/** The undo's line: the pick it went back to, who is back in the pool, and that the room branched. */
@@ -89,7 +125,8 @@
 				await goto(resolve('/mock/[id]/report', { id }), { replaceState: true });
 				return;
 			}
-			await loadCard(loaded);
+			if (loaded.card?.pick_number === loaded.pick_number) card = loaded.card;
+			else await loadCard(loaded);
 		} catch (e) {
 			error = e;
 		}
@@ -118,7 +155,7 @@
 	{/if}
 	{#if room && board}
 		<SoloRoom
-			{room}
+			room={queued === null ? room : { ...room, queue: queued }}
 			{board}
 			{card}
 			search={query}
@@ -129,7 +166,7 @@
 			onundo={(pick: number) => act(() => rooms.undo(id, pick), undoneWords(pick))}
 			onautopick={(round: number) => act(() => rooms.autopick(id, round))}
 			onfinish={() => act(() => rooms.finish(id))}
-			onqueue={(ids: string[]) => act(() => rooms.queue(id, ids), branch)}
+			onqueue={setQueue}
 			onshare={share}
 		/>
 	{/if}
