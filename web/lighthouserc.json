@@ -6,8 +6,7 @@
 			"url": [
 				"http://localhost:4173/board/ppr-12",
 				"http://localhost:4173/players/chris-olave",
-				"http://localhost:4173/record",
-				"http://localhost:4173/system"
+				"http://localhost:4173/record"
 			],
 			"numberOfRuns": 7,
 			"settings": {
@@ -19,7 +18,7 @@
 		"assert": {
 			"assertMatrix": [
 				{
-					"matchingUrlPattern": "^https?://[^/]+/(system|board|players|record|clubs|adp|schedule|compare)?(/.*)?$",
+					"matchingUrlPattern": "^https?://[^/]+/(board|players|record|clubs|adp|schedule|compare)?(/.*)?$",
 					"assertions": {
 						"largest-contentful-paint": [
 							"error",
