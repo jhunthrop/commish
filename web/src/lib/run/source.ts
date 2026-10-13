@@ -51,6 +51,24 @@ function pause(ms: number): Promise<void> {
 	return new Promise((done) => setTimeout(done, ms));
 }
 
+const SERVER_ERROR = 500;
+
+/** The bucket's answer to a read, kept with its status so the caller decides by the number. */
+export class RunReadError extends Error {
+	readonly status: number;
+
+	constructor(url: string, status: number, statusText: string) {
+		super(`${url} answered ${String(status)} ${statusText}.`);
+		this.name = 'RunReadError';
+		this.status = status;
+	}
+
+	/** A 5xx may pass. A 4xx is an answer: the object is missing or the keys are wrong. */
+	get retryable(): boolean {
+		return this.status >= SERVER_ERROR;
+	}
+}
+
 /** Retries a network failure or a 5xx with backoff. A 4xx is an answer, not a blip. */
 async function getText(fetcher: Fetcher, url: string): Promise<string> {
 	let lastError: unknown = null;
@@ -58,11 +76,9 @@ async function getText(fetcher: Fetcher, url: string): Promise<string> {
 		try {
 			const response = await fetcher(url);
 			if (response.ok) return await response.text();
-			const status = `${String(response.status)} ${response.statusText}`;
-			if (response.status < 500) throw new Error(`${url} answered ${status}.`);
-			lastError = new Error(`${url} answered ${status}.`);
+			throw new RunReadError(url, response.status, response.statusText);
 		} catch (error) {
-			if (error instanceof Error && error.message.includes(' answered 4')) throw error;
+			if (error instanceof RunReadError && !error.retryable) throw error;
 			lastError = error;
 		}
 		await pause(RETRY_BASE_MS * 2 ** (attempt - 1));

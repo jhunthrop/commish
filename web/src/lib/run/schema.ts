@@ -4,7 +4,8 @@
  * every one against these schemas before a page renders, so a malformed run fails the build and the
  * previous deploy stays live.
  *
- *   manifest.json            the run: its id, its time, its season, its formats
+ *   manifest.json            the run: its id, its time, its season, its formats, and the sources
+ *                            block naming each feed's vendor and window (provenance, never shown)
  *   boards/<format>.json     one board per format, every player it ranks
  *   players/<id>.json        one page per player: every format's numbers and the capsule
  *   adp.json                 every ADP source, named, with its value per player
@@ -22,6 +23,8 @@ const RUN_ID = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}(-[a-z0-9-]+)?$/;
 const FORMAT_ID = /^[a-z0-9]+(-[a-z0-9]+)*-[0-9]{1,2}$/;
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const CLUB = /^[A-Z]{2,3}$/;
+/** A player id becomes a file name and a URL segment, so it is word characters and hyphens only. */
+export const PLAYER_ID = /^[\w-]+$/;
 
 export const runIdSchema = z.string().regex(RUN_ID, 'A run id reads like 2026-10-12T05.');
 const formatId = z.string().regex(FORMAT_ID, 'A format id reads like ppr-12.');
@@ -31,6 +34,23 @@ const position = z.enum(POSITIONS);
 const points = z.number();
 const isoTime = z.iso.datetime({ offset: true });
 const phrase = z.string().min(1);
+const playerId = z.string().regex(PLAYER_ID, 'A player id is word characters and hyphens.');
+
+/** The first and last moments a feed's numbers were captured, read from the data's own stamps. */
+export const windowSchema = z
+	.object({ from: isoTime, to: isoTime })
+	.refine((window) => window.from <= window.to, 'A window ends after it starts.');
+
+/** Where one artifact's numbers came from. Provenance for us, never printed on a screen. */
+export const sourceSchema = z.object({
+	/** The artifact it feeds: "adp", "schedule". */
+	artifact: phrase,
+	/** Who publishes the numbers. */
+	vendor: phrase,
+	/** The feed's id in our store. */
+	feed: phrase,
+	window: windowSchema
+});
 
 export const formatSchema = z.object({
 	id: formatId,
@@ -55,11 +75,13 @@ export const manifestSchema = z.object({
 	/** Every format the run carries, the default first. */
 	formats: z.array(formatSchema).min(1),
 	/** Every player with a page, matching index.json. */
-	players: z.number().int().min(1)
+	players: z.number().int().min(1),
+	/** Each feed's vendor and window. Provenance, never printed on a screen. */
+	sources: z.array(sourceSchema).min(1)
 });
 
 export const boardRowSchema = z.object({
-	id: z.string().min(1),
+	id: playerId,
 	slug,
 	name: phrase,
 	position,
@@ -122,7 +144,7 @@ export const playerFormatSchema = boardRowSchema.omit({
 });
 
 export const playerSchema = z.object({
-	id: z.string().min(1),
+	id: playerId,
 	slug,
 	name: phrase,
 	position,
@@ -135,14 +157,13 @@ export const playerSchema = z.object({
 
 export const adpSourceSchema = z.object({
 	id: z.string().min(1),
-	/** Who publishes it, as the page names it. */
-	name: phrase,
-	/** The scoring and league size its drafts use: "PPR, 12 teams". */
+	/** The drafts behind the numbers, in a drafter's words: "PPR drafts". The vendor is provenance
+	 * in the manifest, never on a screen. */
 	drafts: phrase,
 	/** The formats whose boards blend this source. */
 	formats: z.array(formatId).min(1),
-	/** When the run read it, or null when the source does not date its numbers. */
-	readAt: isoTime.nullable()
+	/** The first and last capture the ADP averages, from the captures' own stamps. */
+	window: windowSchema
 });
 
 export const adpSchema = z.object({
@@ -153,7 +174,7 @@ export const adpSchema = z.object({
 
 /** How well one order matched the finish: rank agreement and the typical miss in places. */
 export const scoreSchema = z.object({
-	/** Players this order had an opinion about, among those graded. */
+	/** n: players this order had an opinion about, among those graded. */
 	graded: z.number().int().nonnegative(),
 	/** Spearman rank correlation with the finish, or null when the sample cannot support one. */
 	agreement: z.number().min(-1).max(1).nullable(),
@@ -171,6 +192,8 @@ export const recordWeekSchema = z.object({
 	week: z.number().int().min(1),
 	/** When our board was frozen for the week, before its first kickoff. */
 	frozenAt: isoTime,
+	/** The run whose board was frozen, by its run id. */
+	frozenBy: runIdSchema,
 	/** When the week was graded, or null while it waits on its games. */
 	gradedAt: isoTime.nullable(),
 	/** Frozen players with a stat line for the week. */
@@ -182,15 +205,19 @@ export const recordSchema = z.object({
 	season: z.number().int(),
 	/** The format every frozen board ranks in. */
 	format: formatId,
-	/** The code that froze each week's board, and when it last changed, or null if it never has. */
-	implementation: z.object({ current: phrase, since: isoTime.nullable() }),
+	/** The statistics the record grades with, as their columns name them. */
+	statistic: z.object({ agreement: phrase, placesOff: phrase }),
+	/** How the record is kept, term by term, as the page's method panel prints it. */
+	method: z.array(z.object({ term: phrase, means: phrase })).min(1),
+	/** While no week is graded, what the run knows about why, in a sentence. Null once one is. */
+	pending: phrase.nullable(),
 	weeks: z.array(recordWeekSchema),
 	/** Every graded week pooled, one line for all players and one per position. */
 	toDate: z.array(recordLineSchema)
 });
 
 export const indexEntrySchema = z.object({
-	id: z.string().min(1),
+	id: playerId,
 	slug,
 	name: phrase,
 	team: club,
@@ -218,25 +245,42 @@ export const gameSchema = z.object({
 export const slateSchema = z.object({
 	abbr: club,
 	games: z.array(gameSchema).min(1),
-	/** The strength of this slate in the basis's unit. */
+	/** The strength of this slate in the method's unit. */
 	strength: points,
 	/** 1 is the hardest slate of the 32. */
-	rank: z.number().int().min(1).max(32)
+	rank: z.number().int().min(1).max(32),
+	/** How strength is measured, as the page prints it beside the number. */
+	method: phrase,
+	/** When the inputs were read, from their own stamps. */
+	window: windowSchema
 });
 
-export const scheduleSchema = z.object({
-	season: z.number().int(),
-	/** What strength measures, as the page prints it under the number. */
-	basis: phrase,
-	/** The number each opponent contributes to the strength, keyed by club. */
-	opponentValues: z.record(club, points),
-	/** What one opponent value is, as a column head prints it. */
-	opponentBasis: phrase,
-	slates: z.array(slateSchema).length(32)
-});
+export const scheduleSchema = z
+	.object({
+		season: z.number().int(),
+		/** The number each opponent contributes to the strength, keyed by club. */
+		opponentValues: z.record(club, points),
+		/** What one opponent value is, as a column head prints it. */
+		opponentBasis: phrase,
+		slates: z.array(slateSchema).length(32)
+	})
+	.superRefine((schedule, ctx) => {
+		for (const slate of schedule.slates) {
+			for (const game of slate.games) {
+				if (schedule.opponentValues[game.opponent] === undefined) {
+					ctx.addIssue({
+						code: 'custom',
+						message: `${slate.abbr} plays ${game.opponent}, who has no value.`
+					});
+				}
+			}
+		}
+	});
 
 export type Format = z.infer<typeof formatSchema>;
 export type Manifest = z.infer<typeof manifestSchema>;
+export type Source = z.infer<typeof sourceSchema>;
+export type Window = z.infer<typeof windowSchema>;
 export type BoardRow = z.infer<typeof boardRowSchema>;
 export type Board = z.infer<typeof boardSchema>;
 export type PullFigure = z.infer<typeof pullFigureSchema>;
@@ -259,7 +303,10 @@ export type Schedule = z.infer<typeof scheduleSchema>;
 export const RUN_PATHS = {
 	manifest: 'manifest.json',
 	board: (format: string) => `boards/${format}.json`,
-	player: (id: string) => `players/${id}.json`,
+	player: (id: string) => {
+		if (!PLAYER_ID.test(id)) throw new Error(`"${id}" is not a player id.`);
+		return `players/${id}.json`;
+	},
 	adp: 'adp.json',
 	record: 'record.json',
 	index: 'index.json',

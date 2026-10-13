@@ -18,7 +18,6 @@ export interface ClubCard extends Club {
 export interface ClubsPage {
 	format: Format;
 	clubs: ClubCard[];
-	basis: string;
 }
 
 export interface ScheduleGame extends Game {
@@ -31,7 +30,7 @@ export interface ClubPage {
 	format: Format;
 	slate: Slate;
 	games: ScheduleGame[];
-	schedule: Pick<Schedule, 'basis' | 'opponentBasis' | 'season'>;
+	schedule: Pick<Schedule, 'opponentBasis' | 'season'>;
 	rows: BoardRow[];
 	scale: RangeScale | null;
 	clubs: Club[];
@@ -41,6 +40,13 @@ export interface SchedulePage {
 	schedule: Schedule;
 	clubs: Club[];
 	weeks: number[];
+}
+
+/** An opponent's value. The run's schema guarantees one for every opponent on a slate. */
+function opponentValue(loaded: Schedule, abbr: string): number {
+	const value = loaded.opponentValues[abbr];
+	if (value === undefined) throw new Error(`schedule.json has no value for ${abbr}.`);
+	return value;
 }
 
 function slateOf(loaded: Schedule, abbr: string): Slate {
@@ -54,7 +60,6 @@ export async function clubsPage(): Promise<ClubsPage> {
 	const [list, loaded, rows] = await Promise.all([clubs(), schedule(), board(format.id)]);
 	return {
 		format,
-		basis: loaded.basis,
 		clubs: list.map((club) => {
 			const own = rows.rows.filter((row) => row.team === club.abbr);
 			return {
@@ -84,9 +89,9 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 		slate,
 		games: slate.games.map((game) => ({
 			...game,
-			value: loaded.opponentValues[game.opponent] ?? 0
+			value: opponentValue(loaded, game.opponent)
 		})),
-		schedule: { basis: loaded.basis, opponentBasis: loaded.opponentBasis, season: loaded.season },
+		schedule: { opponentBasis: loaded.opponentBasis, season: loaded.season },
 		rows: own,
 		scale: own.length > 0 ? rangeScale(own) : null,
 		clubs: list

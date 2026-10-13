@@ -1,5 +1,6 @@
 /** A player's page: his numbers in the default format, his tier and its mates, where drafters take
  * him and from which sources, his capsule, and his numbers in every other format the run carries. */
+import { windowLabel } from '#lib/format/date.ts';
 import { tierOf } from '#lib/run/derive.ts';
 import type { Capsule, Format, IndexEntry, PlayerFormat } from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
@@ -34,7 +35,7 @@ export interface PlayerPage {
 	/** Every format that ranks him, the page's own first. */
 	lines: FormatLine[];
 	tier: { tier: number; cliff: TierCliff | null; mates: TierMate[] };
-	/** The named sources whose ADP the format's board blends. */
+	/** The drafts behind the format's ADP and their window, in a drafter's words: "PPR drafts, Sep 5 to Sep 9". */
 	adpSources: string[];
 	boardSize: number;
 	capsule: Capsule | null;
@@ -99,7 +100,7 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		tier: await mates(lead.format, entry),
 		adpSources: sources.sources
 			.filter((source) => source.formats.includes(lead.format.id))
-			.map((source) => `${source.name} ${source.drafts}`),
+			.map((source) => `${source.drafts}, ${windowLabel(source.window)}`),
 		boardSize: loadedBoard.rows.length,
 		capsule: loaded.capsule
 	};
