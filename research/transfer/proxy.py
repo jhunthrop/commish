@@ -11,7 +11,8 @@ import threading
 from dataclasses import dataclass
 from typing import Final
 
-LOOPBACK: Final = frozenset({"localhost", "127.0.0.1", "::1"})
+from research.transfer.target import is_loopback
+
 _CHUNK: Final = 65_536
 
 
@@ -26,7 +27,7 @@ class CountingRelay:
     """Listens on an ephemeral loopback port and relays each connection to (host, port)."""
 
     def __init__(self, host: str, port: int) -> None:
-        if host not in LOOPBACK:
+        if not is_loopback(host):
             raise ValueError(f"the relay forwards only to a loopback host, not {host!r}")
         self._target = (host, port)
         self._lock = threading.Lock()
