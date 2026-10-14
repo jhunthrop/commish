@@ -237,5 +237,10 @@ void test('the account page goes on only to a path on this site', () => {
 	assert.equal(safeThen('//evil.example', origin), null);
 	assert.equal(safeThen('https://evil.example/board', origin), null);
 	assert.equal(safeThen('javascript:alert(1)', origin), null);
+	assert.equal(safeThen('/.//evil.example', origin), null);
+	assert.equal(safeThen('/..//evil.example', origin), null);
+	assert.equal(safeThen('/a/..//evil.example', origin), null);
+	assert.equal(safeThen(' //evil.example', origin), null);
+	assert.equal(safeThen('\n//evil.example', origin), null);
 	assert.equal(safeThen(null, origin), null);
 });
