@@ -150,6 +150,29 @@ def test_a_player_the_ppr_board_lacks_keeps_that_format_preseason_alone() -> Non
     assert "preseason for half-ppr-12: it ranks 1 players the PPR board does not" in result.status
 
 
+def test_a_player_off_the_ppr_board_with_a_line_is_ranked_once_on_a_board_that_has_him() -> None:
+    """The reviewer's case: p7 on the half board, not on PPR, with a line this season."""
+    boards = _boards(half_extra=True)
+    context = _context(6)
+    lines = {**context.store.lines, "p7": {w: _line(12.0) for w in range(1, 7)}}
+    snaps = {
+        **context.store.snaps,
+        "p7": {w: {"offensive_snaps": 30.0, "team_offensive_snaps": 60.0} for w in range(1, 7)},
+    }
+    teams = {**context.store.teams, "p7": dict.fromkeys(range(1, 7), "KC")}
+    context = replace(context, store=replace(context.store, lines=lines, snaps=snaps, teams=teams))
+    p7 = SeasonPlayer("u-p7", "p7", "P7", "WR", "KC", None, None)
+    result = ros_boards(boards, context, WEEK_7, replace(SETUP, season_players=(OFF, p7)))
+    assert result.in_season == {"ppr-12", "half-ppr-12", "standard-12"}
+    for board in result.boards:
+        ids = [e.row.player_id for e in board.entries]
+        assert len(ids) == len(set(ids)), ids
+    half = result.boards[1]
+    assert sorted(e.row.player_id for e in half.entries) == ["p1", "p2", "p3", "p7", "p9"]
+    seven = next(e for e in half.entries if e.row.player_id == "p7")
+    assert seven.preseason is not None  # the half board ranked him preseason: his entry is kept
+
+
 # --- the one-shot fit, its reads stubbed ---------------------------------------------------------
 
 

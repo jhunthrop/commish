@@ -163,7 +163,10 @@ def _projections(
 
 
 def _reranked(board: FormatBoard, extra: Sequence[StoredRow], found: Projections) -> FormatBoard:
+    """The board re-valued by rest-of-season points, with each off-board row it does not already rank
+    (a player off the PPR board can be on this one: he is ranked once, keeping his preseason entry)."""
     preseason: dict[str, BoardEntry | None] = {entry.row.universe_id: entry for entry in board.entries}
+    extra = [row for row in extra if row.universe_id not in preseason]
     rows = [
         replace(
             row,
