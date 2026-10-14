@@ -11,6 +11,14 @@ export type ImportHost = components['schemas']['ScoringImportInput']['host'];
 export type RuleKey = keyof ScoringRules;
 type Preset = NonNullable<LeagueSettings['scoring']['preset']>;
 
+/** A group of the form: `boardless` for the kicking and defense rules, which move nothing on the
+ * board (kickers and defenses rank in draft order) and are kept for the league's record. */
+export interface RuleGroup {
+	label: string;
+	boardless?: boolean;
+	rules: readonly RuleField[];
+}
+
 export interface RuleField {
 	key: RuleKey;
 	label: string;
@@ -21,7 +29,7 @@ const YARD_STEP = 0.01;
 const POINT_STEP = 0.5;
 
 /** The form's groups, in a league settings page's order. */
-export const RULE_GROUPS: readonly { label: string; rules: readonly RuleField[] }[] = [
+export const RULE_GROUPS: readonly RuleGroup[] = [
 	{
 		label: 'Passing',
 		rules: [
@@ -55,6 +63,7 @@ export const RULE_GROUPS: readonly { label: string; rules: readonly RuleField[] 
 	},
 	{
 		label: 'Kicking',
+		boardless: true,
 		rules: [
 			{ key: 'points_per_field_goal', label: 'Field goal made', step: POINT_STEP },
 			{ key: 'points_per_field_goal_missed', label: 'Field goal missed', step: POINT_STEP },
@@ -64,6 +73,7 @@ export const RULE_GROUPS: readonly { label: string; rules: readonly RuleField[] 
 	},
 	{
 		label: 'Defense',
+		boardless: true,
 		rules: [
 			{ key: 'points_per_sack', label: 'Sack', step: POINT_STEP },
 			{ key: 'points_per_defensive_interception', label: 'Interception', step: POINT_STEP },

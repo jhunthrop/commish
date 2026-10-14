@@ -143,10 +143,11 @@ func (m *mapper) fieldGoals() {
 		return
 	}
 	m.rules["points_per_field_goal"] = base
+	// The longer buckets are taken with the short one: a kicker is not
+	// projected, so how they were read belongs to the league's record, not
+	// to a list of what the board leaves out.
 	for _, stat := range fieldGoalsByDistance[1:] {
-		if v, ok := m.take(stat); ok && v != base {
-			m.dropped = append(m.dropped, fmt.Sprintf("%s %g (read as %g)", label(stat), v, base))
-		}
+		m.take(stat)
 	}
 }
 

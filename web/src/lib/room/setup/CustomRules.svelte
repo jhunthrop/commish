@@ -13,6 +13,7 @@
 		importLine,
 		ruleLabel,
 		type ImportHost,
+		type RuleGroup,
 		type RuleKey,
 		type ScoringImport,
 		type ScoringRules
@@ -80,9 +81,7 @@
 			<p class="took">{importLine(result)}</p>
 			{#if result.dropped.length > 0}
 				<p class="note">
-					Your league also scores these, which our board leaves out: {listWords(
-						result.dropped
-					)}.
+					Your league also scores these, which our board leaves out: {listWords(result.dropped)}.
 				</p>
 			{/if}
 			{#if result.defaulted.length > 0}
@@ -96,21 +95,37 @@
 		<p class="note">On Yahoo, enter your league's rules below.</p>
 	</div>
 	<div class="groups">
-		{#each RULE_GROUPS as group (group.label)}
-			<fieldset>
-				<legend>{group.label}, points</legend>
-				{#each group.rules as r (r.key)}
-					<NumberField
-						label={r.label}
-						value={rules[r.key]}
-						step={r.step}
-						onchange={(v: number) => setRule(r.key, v)}
-					/>
-				{/each}
-			</fieldset>
+		{#each RULE_GROUPS.filter((g) => !g.boardless) as group (group.label)}
+			{@render fields(group)}
 		{/each}
 	</div>
+	<section class="record" aria-label="Kickers and defenses">
+		<h3>Kickers and defenses</h3>
+		<p class="note">
+			Kickers and defenses rank in draft order, so these change nothing on the board. They stay with
+			your league's record.
+		</p>
+		<div class="groups">
+			{#each RULE_GROUPS.filter((g) => g.boardless) as group (group.label)}
+				{@render fields(group)}
+			{/each}
+		</div>
+	</section>
 </div>
+
+{#snippet fields(group: RuleGroup)}
+	<fieldset>
+		<legend>{group.label}, points</legend>
+		{#each group.rules as r (r.key)}
+			<NumberField
+				label={r.label}
+				value={rules[r.key]}
+				step={r.step}
+				onchange={(v: number) => setRule(r.key, v)}
+			/>
+		{/each}
+	</fieldset>
+{/snippet}
 
 <style>
 	.custom {
@@ -144,6 +159,20 @@
 		margin: 0;
 		font-size: var(--t-xs);
 		color: var(--ink-3);
+	}
+
+	.record {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
+		padding-top: var(--s-3);
+		border-top: 1px solid var(--line);
+	}
+
+	h3 {
+		margin: 0;
+		font-size: var(--t-sm);
+		font-weight: 600;
 	}
 
 	.groups {

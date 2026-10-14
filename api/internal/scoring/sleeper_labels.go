@@ -38,15 +38,11 @@ var sleeperLabels = map[string]string{
 	"qb_hit": "quarterback hit", "pass_def": "pass defended", "idp_sack": "defender sack",
 }
 
-// sleeperWords is a Sleeper setting and its figure in drafter words; a
-// figure read as another one says so.
-func sleeperWords(key string, figure float64, readAs *float64) string {
+// sleeperWords is a Sleeper setting and its figure in drafter words.
+func sleeperWords(key string, figure float64) string {
 	label, ok := sleeperLabels[key]
 	if !ok {
 		label = "Sleeper setting " + strings.ReplaceAll(key, "_", " ")
-	}
-	if readAs != nil {
-		return HostText(fmt.Sprintf("%s %g (read as %g)", label, figure, *readAs))
 	}
 	return HostText(fmt.Sprintf("%s %g", label, figure))
 }

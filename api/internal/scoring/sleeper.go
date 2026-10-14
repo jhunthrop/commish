@@ -167,7 +167,7 @@ func FromSleeper(settings map[string]float64) Imported {
 	var dropped []string
 	for k, v := range settings {
 		if !settingKey.MatchString(k) || math.IsNaN(v) || math.IsInf(v, 0) || math.Abs(v) > MaxPoints {
-			dropped = append(dropped, sleeperWords(k, v, nil))
+			dropped = append(dropped, sleeperWords(k, v))
 			continue
 		}
 		host[k] = v
@@ -177,11 +177,13 @@ func FromSleeper(settings map[string]float64) Imported {
 		if host[k] == 0 {
 			continue
 		}
-		var readAs *float64
-		if v, ok := m.ReadAs[k]; ok {
-			readAs = &v
+		// A longer field goal range is read with the short ones: a kicker
+		// is not projected, so its reading is the league's record, not a
+		// rule the board leaves out.
+		if _, read := m.ReadAs[k]; read {
+			continue
 		}
-		dropped = append(dropped, sleeperWords(k, host[k], readAs))
+		dropped = append(dropped, sleeperWords(k, host[k]))
 	}
 	sort.Strings(dropped)
 	return Imported{Rules: m.Rules, Dropped: dropped, Defaulted: m.Defaulted}

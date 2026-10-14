@@ -87,8 +87,7 @@ func TestMapRealLeague(t *testing.T) {
 	if len(im.Rules) != len(want) {
 		t.Errorf("%d rules, want %d", len(im.Rules), len(want))
 	}
-	for _, d := range []string{"field goal made, 40 to 49 yards 4 (read as 3)", "field goal made, 50+ yards 5 (read as 3)",
-		"400+ yard passing game 1", "defense, 0 points allowed 10", "defense, blocked kick 2", "fumble recovered for a TD 6"} {
+	for _, d := range []string{"400+ yard passing game 1", "defense, 0 points allowed 10", "defense, blocked kick 2", "fumble recovered for a TD 6"} {
 		if !slices.Contains(im.Dropped, d) {
 			t.Errorf("dropped %q, want %q among them", im.Dropped, d)
 		}
