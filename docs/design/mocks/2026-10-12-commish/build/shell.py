@@ -28,6 +28,7 @@ ICONS = {
     "record": '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     "account": '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18c1.5-2 3.4-3 5.5-3s4 1 5.5 3"/>',
     "search": '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+    "chevron": '<path d="M6 9l6 6 6-6"/>',
 }
 CURRENT = ' aria-current="page"'
 # The phone's bottom bar holds five items.
@@ -37,9 +38,10 @@ RAIL = [
     ("players", "Players", "player.html"),
     ("mock", "Mock draft", "setup.html"),
     ("sheet", "Cheat sheet", "board.html"),
-    # A signed-in account's League: its league, or the attach page before it has one. On the phone it
-    # takes the fifth place, so Advisor and Our record stay on the desk's rail.
-    ("league", "League", "league.html"),
+    # Leagues opens the shell's league switch, the same menu as the top bar's (founder ruling
+    # 2026-10-13: the league is the site's context). On the phone it takes the fifth place, so Advisor
+    # and Our record stay on the desk's rail.
+    ("league", "Leagues", "league.html"),
     ("advisor", "Advisor", "mock.html"),
     ("record", "Our record", "direction.html"),
 ]
@@ -132,6 +134,31 @@ button{font:inherit;color:inherit}
   .search kbd{display:none}
   .theme button{height:26px;padding:0 7px;font-size:var(--t-xs)}
 }
+/* The league switch closes the top bar at the right on every width: the selected league's name (or
+   the format with none) at one width, so the bar never moves when the name arrives. */
+.switch{position:relative;display:flex;flex:none;min-width:0}
+.switch>button{display:inline-flex;align-items:center;gap:var(--s-2);width:232px;height:40px;padding:0 var(--s-3);
+  border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);font-size:var(--t-sm);
+  font-weight:600;text-align:left;cursor:pointer}
+.switch>button[aria-expanded="true"]{border-color:var(--ink)}
+.switch>button .flag{display:inline-flex;color:var(--accent-text)}
+.switch>button .words{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.switch>button .chev{display:inline-flex;color:var(--ink-3)}
+.switch-menu{position:absolute;top:calc(100% + var(--s-2));right:0;z-index:30;width:360px;display:flex;flex-direction:column;
+  gap:var(--s-3);padding:var(--s-3);border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--bg);
+  box-shadow:var(--shadow-pop)}
+.switch-menu .lg{display:flex;flex-direction:column;gap:2px;width:100%;padding:var(--s-2) var(--s-3);border:0;
+  border-left:3px solid transparent;border-radius:var(--r-sm);background:none;text-align:left;cursor:pointer}
+.switch-menu .lg[aria-pressed="true"]{border-left-color:var(--accent);background:var(--surface)}
+.switch-menu .lg b{font-weight:600}
+.switch-menu .lg small{font-size:var(--t-sm);color:var(--ink-2)}
+.switch-menu .foot{display:flex;flex-direction:column;align-items:flex-start;gap:var(--s-2);padding-top:var(--s-3);
+  border-top:1px solid var(--line)}
+@media (max-width: 760px){
+  .top .switch{order:2;flex:1}
+  .top .switch>button{width:100%}
+  .switch-menu{position:fixed;top:60px;left:var(--s-3);right:var(--s-3);width:auto}
+}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 """
 
@@ -170,7 +197,43 @@ SEARCH = (
 )
 
 
-def page(title, active, heading, top_tail, body, css, js="", with_read=False, search=True):
+# The leagues a signed-in account follows in the mocks, as the switch's menu lists them: the name, then
+# the host and the scoring in words (founder ruling 2026-10-13).
+LEAGUES = [
+    ("S.U.C.K. - Severely Underrated Carolina Keepers", "Sleeper, TE premium"),
+    ("Big Gorilla Tourney #104870", "FFPC, TE premium"),
+    ("Apex Amateur Dynasty 203", "MyFantasyLeague, PPR"),
+]
+FORMATS = ["PPR", "Half PPR", "Standard"]
+
+
+def league_switch(selected=0, open_menu=False):
+    """The shell's league switch, closed or open on the account's leagues, the formats with no league,
+    the selected league's page and the way to follow another."""
+    label = LEAGUES[selected][0]
+    menu = ""
+    if open_menu:
+        rows = "".join(
+            f'<button class="lg" type="button" aria-pressed="{str(i == selected).lower()}"><b>{escape(n)}</b>'
+            f"<small>{escape(line)}</small></button>"
+            for i, (n, line) in enumerate(LEAGUES)
+        )
+        chips = "".join(f'<button class="chip" type="button">{f}</button>' for f in FORMATS)
+        menu = (
+            f'<div class="switch-menu" id="league-menu"><span class="label">Your leagues</span>{rows}'
+            f'<span class="label">No league, just a format</span><div class="chip-group">{chips}</div>'
+            '<div class="foot"><a class="quiet" href="league.html">League page</a>'
+            '<a class="quiet" href="#">Follow another league</a></div></div>'
+        )
+    return (
+        f'<div class="switch"><button type="button" aria-expanded="{str(open_menu).lower()}" '
+        f'aria-controls="league-menu"><span class="flag">{icon("league", 18)}</span>'
+        f'<span class="words">{escape(label)}</span><span class="chev">{icon("chevron", 16)}</span></button>{menu}</div>'
+    )
+
+
+def page(title, active, heading, top_tail, body, css, js="", with_read=False, search=True, switch=None):
+    switch = league_switch() if switch is None else switch
     rail = "".join(
         f'<a class="item{" wide-only" if i >= PHONE_ITEMS else ""}" href="{href}"'
         f'{CURRENT if key == active else ""}>{icon(key)}<span>{label}</span></a>'
@@ -204,6 +267,7 @@ def page(title, active, heading, top_tail, body, css, js="", with_read=False, se
   <div class="tail">
     {top_tail}
   </div>
+  {switch}
 </header>
 {body}
 </div>

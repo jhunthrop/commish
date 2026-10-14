@@ -8,7 +8,7 @@ from html import escape
 from zoneinfo import ZoneInfo
 
 from inseason import LEAGUE_ROW_CSS, league_data, league_row
-from shell import page
+from shell import league_switch, page
 
 EASTERN = ZoneInfo("America/New_York")
 SLOT_WORDS = {"starter": "Start", "bench": "Bench", "reserve": "IR", "taxi": "Taxi"}
@@ -110,8 +110,9 @@ def build():
         "Commish League",
         "league",
         "League",
-        '<a class="quiet" href="#">Follow another league</a>',
+        "",
         body,
         CSS,
         search=False,
+        switch=league_switch(open_menu=True),
     )
