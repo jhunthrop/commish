@@ -220,9 +220,11 @@
 		color: var(--ink-3);
 	}
 
-	/* A played week stays readable but steps back behind the weeks still to come. */
-	.played {
-		opacity: 0.45;
+	/* A played week steps back behind the weeks still to come in muted ink, which holds 4.5:1. */
+	.played,
+	.played .value {
+		color: var(--played-ink);
+		font-weight: 400;
 	}
 
 	.rank-lead {

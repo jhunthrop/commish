@@ -91,8 +91,9 @@
 
 <style>
 	/* A week already played is set back, so what is left reads first. */
-	.played {
-		opacity: 0.5;
+	.played,
+	.played :global(a) {
+		color: var(--played-ink);
 	}
 
 	.club {
