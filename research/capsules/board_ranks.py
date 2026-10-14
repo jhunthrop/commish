@@ -37,8 +37,8 @@ _OVERALL: Final = re.compile(
 
 # An NFL draft slot in a sentence about our board ("a rookie taken 13th overall, and we have him for
 # about 10 games") is his draft, not our rank.
-_DRAFT_SLOT_BEFORE: Final = re.compile(r"\b(?:taken|drafted|picked|selected|went|pick|the)\s+$", re.IGNORECASE)
-_DRAFT_SLOT_AFTER: Final = re.compile(r"^\s*(?:pick|selection|in the|in 20\d\d)\b", re.IGNORECASE)
+_DRAFT_SLOT_BEFORE: Final = re.compile(r"\b(?:taken|drafted|picked|selected|went)\s+$", re.IGNORECASE)
+_DRAFT_SLOT_AFTER: Final = re.compile(r"^\s*(?:pick|selection)\b(?!-)", re.IGNORECASE)
 
 
 def _position_claims(sentence: str, position: str, position_rank: int | None) -> list[str]:
