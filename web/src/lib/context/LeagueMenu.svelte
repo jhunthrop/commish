@@ -10,6 +10,7 @@
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import { choose, switchProblem } from './choose.svelte.ts';
+	import { signInReturn } from './sign-in.ts';
 	import { siteContext } from './context.svelte.ts';
 	import { leagueLine } from './menu-words.ts';
 	import { FALLBACK_BOARDS, runBoards, type RunBoard } from './run-boards.ts';
@@ -67,7 +68,9 @@
 		if (siteContext.open) readBoards();
 	});
 
-	const signInHref = $derived(apiClient(PUBLIC_API_URL).signInUrl(page.url.pathname));
+	const signInHref = $derived(
+		apiClient(PUBLIC_API_URL).signInUrl(signInReturn(page.url.pathname + page.url.search))
+	);
 	const many = $derived(hasFeature(siteContext.features, 'many_leagues'));
 	const league = $derived(siteContext.league);
 	/** The pressed format: the chosen format with no league, PPR before any choice. */
