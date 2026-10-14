@@ -19,7 +19,7 @@ from research.capsules.board_ranks import rank_claims_off_page
 from research.capsules.facts.board import board_rows
 from research.capsules.pull_figures import PageValues, adp_figures_off_page, capsule_findings, page_numbers
 from research.capsules.store import WRITTEN_SOURCE, stored_capsules_for
-from research.capsules.sweep import subjects_of
+from research.capsules.sweep import Subjects, subjects_of
 from research.model.reads.teams import first_kickoff_for
 from research.nightly.config import PAGE_FORMAT
 from research.nightly.reads.adp import adp_cutoff, latest_capture
@@ -44,12 +44,13 @@ def _rank_findings(player_id: str, position: str, entry: BoardEntry | None, body
     ]
 
 
-def page_findings(conn: Connection, as_of: datetime) -> PageFindings:
+def page_findings(conn: Connection, as_of: datetime, subjects_at: Subjects = subjects_of) -> PageFindings:
+    """Every written page's findings; the sheets from `subjects_at` (`sweep.FactsPassMemo` in the nightly)."""
     adp = latest_capture(conn, PAGE_FORMAT.adp, adp_cutoff(as_of, first_kickoff_for(conn, PRODUCT_SEASON))).by_player
     rows = {row.player_id: row for row in board_rows(conn, PRODUCT_SEASON, as_of)}
     board = format_board(conn, PRODUCT_SEASON, PAGE_FORMAT, as_of)
     ranks = {} if board is None else {e.row.player_id: e for e in board.entries}
-    subjects = subjects_of(conn, as_of)
+    subjects = subjects_at(conn, as_of)
     stored = stored_capsules_for(conn, [s.universe_id for s in subjects])
     found: dict[str, tuple[str, ...]] = {}
     for subject in subjects:

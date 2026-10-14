@@ -13,6 +13,8 @@ from typing import Any, Final
 import httpx
 from sqlalchemy import Engine
 
+from research.capsules.facts.history import history_cache
+from research.capsules.sweep import FactsPassMemo
 from research.db.read_cache import ReadCache
 from research.db.value_codec import ValueCodec
 from research.model.arithmetic import model_version
@@ -59,17 +61,17 @@ def _isolated(name: str, body: Callable[[], StepOutcome], log: Log) -> StepOutco
     return outcome
 
 
-def _capsules(
-    engine: Engine, clock: Callable[[], datetime], log: Log, skip: bool, plan: CapsuleStepPlan
+def _capsules(  # noqa: PLR0913, PLR0917 - the step's parts
+    engine: Engine, clock: Callable[[], datetime], log: Log, skip: bool, plan: CapsuleStepPlan, facts: FactsPassMemo
 ) -> StepOutcome:
     if not skip:
-        result = run_capsule_step(engine, clock(), plan, log)
+        result = run_capsule_step(engine, clock(), plan, log, facts)
         status = "ran" if result.wrote else "skipped"
         record = StepRecord("capsules", status, f"{result.spend.line()}; {result.gate.summary()}")
         return StepOutcome(record, result.gate, tuple(result.findings.reasons), result.spend)
     with engine.connect() as conn:
         gate = capsule_gate(conn, clock())
-        findings = page_findings(conn, clock())
+        findings = page_findings(conn, clock(), facts)
     return StepOutcome(
         StepRecord("capsules", "skipped", "skipped by --skip; the gate judges what is stored"),
         gate,
@@ -87,16 +89,18 @@ def run_steps(  # noqa: PLR0913, PLR0917 - the steps' shared dependencies
     plan: CapsuleStepPlan,
 ) -> list[StepOutcome]:
     skipped = StepOutcome(StepRecord("ingest", "skipped", "skipped by --skip"))
+    # One facts pass for the capsule step, its finished seasons read through the cache.
+    facts = FactsPassMemo(history_cache(engine, model_version()))
     steps = [
         _isolated("ingest", lambda: skipped if "ingest" in skip else StepOutcome(ingest_step(IngestContext(engine, fetcher, clock(), environ))), log),
         _isolated("fit", lambda: StepOutcome(StepRecord("fit", "skipped", "skipped by --skip") if "fit" in skip else run_fit_step(engine, clock())), log),
-        _isolated("capsules", lambda: _capsules(engine, clock, log, "capsules" in skip, plan), log),
+        _isolated("capsules", lambda: _capsules(engine, clock, log, "capsules" in skip, plan, facts), log),
     ]  # fmt: skip
     capsule = steps[-1]
     if capsule.capsule_gate is None:
         # The step raised: the gate still judges the board as stored.
         with engine.connect() as conn:
-            gate, findings = capsule_gate(conn, clock()), page_findings(conn, clock())
+            gate, findings = capsule_gate(conn, clock()), page_findings(conn, clock(), facts)
         steps[-1] = StepOutcome(capsule.record, gate, tuple(findings.reasons))
     return steps
 

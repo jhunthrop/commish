@@ -13,6 +13,7 @@ from typing import Final
 from sqlalchemy import Connection
 
 from research.capsules.facts import depth_reads as reads
+from research.capsules.facts import history as cached
 from research.capsules.facts.depth_absence import (
     InjuryCapture,
     SeasonInputs,
@@ -45,6 +46,7 @@ from research.capsules.facts.depth_role import (
 )
 from research.capsules.facts.model import WeekPoints
 from research.capsules.facts.rank import RankableStat, rank_within_groups
+from research.db.read_cache import UNCACHED, ReadThrough
 from research.model.domain import Position
 from research.model.jsmath import js_round
 from research.model.preseason.availability_history import (
@@ -213,8 +215,8 @@ def _depth_rows(
     return rooms
 
 
-def collect_depth_facts(conn: Connection, options: DepthOptions) -> dict[str, Depth]:
-    """`collectDepthFacts`: one `Depth` per subject."""
+def collect_depth_facts(conn: Connection, options: DepthOptions, history: ReadThrough = UNCACHED) -> dict[str, Depth]:
+    """`collectDepthFacts`: one `Depth` per subject; the finished seasons' reads through `history`."""
     subjects = list(options.team_by_player_id)
     if not subjects:
         return {}
@@ -222,8 +224,8 @@ def collect_depth_facts(conn: Connection, options: DepthOptions) -> dict[str, De
     prior = options.prior_seasons[0] if options.prior_seasons else None
     season, as_of = options.product_season, options.as_of
     names = reads.names_for(conn, list(dict.fromkeys([*population, *subjects])))
-    week_scores = {s: reads.week_scores_for(conn, s, options.positions, as_of) for s in options.prior_seasons}
-    targets, team_of = ({}, {}) if prior is None else reads.season_targets_for(conn, prior, population, as_of)
+    week_scores = {s: cached.week_scores(history, conn, s, options.positions, as_of) for s in options.prior_seasons}
+    targets, team_of = ({}, {}) if prior is None else cached.season_targets(history, conn, prior, population, as_of)
     by_team: dict[str, list[TeamPlayerTargets]] = {}
     for player_id, row in targets.items():
         team = team_of.get(player_id)
@@ -243,17 +245,17 @@ def collect_depth_facts(conn: Connection, options: DepthOptions) -> dict[str, De
         colleges=reads.latest_roster_colleges(conn),
         opening_day=first_kickoff_for(conn, season),
         rows_by_room=_depth_rows(reads.depth_slots_for(conn, season, as_of), options, team_of),
-        weekly_shares={} if prior is None else reads.weekly_shares_for(conn, prior, subjects, as_of),
+        weekly_shares={} if prior is None else cached.weekly_shares(history, conn, prior, subjects, as_of),
         competition_by_team={}
         if prior is None
         else {t: target_competition_for(prior, t, rows, names) for t, rows in by_team.items()},
         scoring_usage={}
         if prior is None
         else scoring_usage_for(
-            prior, reads.scoring_tallies_for(conn, prior, population, as_of), options.positions, names
+            prior, cached.scoring_tallies(history, conn, prior, population, as_of), options.positions, names
         ),
         play_callers=read_coach_rows(conn),
-        prior_team_rows={} if prior is None else reads.team_metric_rows_for(conn, prior, window, as_of),
+        prior_team_rows={} if prior is None else cached.team_rows(history, conn, prior, window, as_of),
         week_one_team_rows=reads.team_metric_rows_for(conn, season, 1, as_of, ScheduleSource.KICKOFF),
         games=reads.scheduled_games_for(conn, season),
         indoors=_indoors(reads.team_metric_rows_for(conn, season, window, as_of, ScheduleSource.SCHEDULE)),
