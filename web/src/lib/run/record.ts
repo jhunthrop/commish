@@ -90,11 +90,14 @@ function lead(weeks: readonly RecordWeek[]): string {
 	return `${span.charAt(0).toUpperCase()}${span.slice(1)}`;
 }
 
-/** A graded or frozen week as a person says it: "frozen Sep 8, graded Oct 14". */
-function frozenWords(week: RecordWeek): string {
-	return week.status === 'graded'
-		? `frozen ${stamp(week.frozenAt, week)}, graded ${stamp(week.gradedAt, week)}`
-		: `frozen ${stamp(week.frozenAt, week)}, waiting on the stat lines`;
+/** A graded or frozen week as a person says it: "frozen Sep 8, graded Oct 14", "frozen Oct 13, not
+ * played yet" before its first kickoff, "frozen Oct 13, waiting on the stat lines" after it. */
+function frozenWords(week: RecordWeek, unplayed: readonly number[]): string {
+	const frozen = `frozen ${stamp(week.frozenAt, week)}`;
+	if (week.status === 'graded') return `${frozen}, graded ${stamp(week.gradedAt, week)}`;
+	return unplayed.includes(week.week)
+		? `${frozen}, not played yet`
+		: `${frozen}, waiting on the stat lines`;
 }
 
 /** A missed week's reason as a clause: the run's note ("Our weekly freeze failed that week.") with its
@@ -127,8 +130,11 @@ function joins(run: readonly RecordWeek[] | undefined, week: RecordWeek): boolea
 /** The season week by week, each run of missed weeks one line ("Weeks 3 to 5, not frozen because our
  * weekly freeze failed, so not graded") and every week still to come one line ("Weeks 7 to 18, next
  * freeze Thu Oct 22"), so the list says what happened and what is next rather than logging each
- * week alike. */
-export function weekLines(weeks: readonly RecordWeek[]): WeekLine[] {
+ * week alike. `unplayed` names the frozen weeks whose first kickoff is still ahead of the run. */
+export function weekLines(
+	weeks: readonly RecordWeek[],
+	unplayed: readonly number[] = []
+): WeekLine[] {
 	const runs: RecordWeek[][] = [];
 	for (const week of weeks) {
 		const last = runs.at(-1);
@@ -141,6 +147,6 @@ export function weekLines(weeks: readonly RecordWeek[]): WeekLine[] {
 		const grouped = first.status === 'missed' || first.status === 'upcoming';
 		return grouped
 			? { lead: lead(run), text: runWords(first), week: null }
-			: { lead: lead(run), text: frozenWords(first), week: first };
+			: { lead: lead(run), text: frozenWords(first, unplayed), week: first };
 	});
 }
