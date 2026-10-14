@@ -35,6 +35,7 @@ class Thresholds:
     shrink_weeks: tuple[int, ...] | None = None  # the weeks k, alpha, k_q and the rates fit on; None: fit_weeks
     coverage_per_week: bool = False
     switch_week: int | None = None  # the last week the preseason board is served
+    gate_coverage: bool = True  # round 3 gives no range in season, so G3 is not a gate
 
     @property
     def search_weeks(self) -> tuple[int, ...]:
@@ -79,6 +80,23 @@ ROUND_TWO: Final = replace(
 )
 ROUND_TWO_CHECK: Final = replace(
     ROUND_TWO, fit_seasons=(2023,), opportunity_seasons=(2021, 2022, 2023), judgment_season=2024
+)
+
+# Round 3 (`2026-10-14-rest-of-season-round3-preregistration.md`): round 2's model without an
+# interval, fit on 2021-2023, judged once on 2024 weeks 8 and 12; G1 and G2 only.
+ROUND_THREE: Final = replace(
+    ROUND_TWO,
+    fit_seasons=(2021, 2022, 2023),
+    opportunity_seasons=(2021, 2022, 2023),
+    judgment_season=2024,
+    model_name="commish_ros_v3",
+    interval_by="none",
+    coverage_per_week=False,
+    gate_coverage=False,
+)
+# Its development check: 2023 held out from the fit for the check only.
+ROUND_THREE_CHECK: Final = replace(
+    ROUND_THREE, fit_seasons=(2021, 2022), opportunity_seasons=(2021, 2022), judgment_season=2023
 )
 
 
@@ -161,6 +179,8 @@ def judged_lines(scores: Mapping[str, CellScore], coverage: Mapping[str, Coverag
     missing = CellScore(0, None, None, None, None)
     lines = [ordering_line(key, scores.get(key, missing), t) for key in keys]
     lines += [starters_line(key, scores.get(key, missing)) for key in keys]
+    if not t.gate_coverage:
+        return lines
     coverage_keys = keys if t.coverage_per_week else [f"{p}|{f}" for p in SKILL_POSITIONS for f in FORMATS]
     lines += [coverage_line(key, coverage.get(key, Coverage(0, 0)), t) for key in coverage_keys]
     return lines

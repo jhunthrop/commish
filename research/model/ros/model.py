@@ -17,6 +17,7 @@ FORMATS: Final = ("ppr", "half", "std")
 LAST_FANTASY_WEEK: Final = 17
 SEASON_GAMES: Final = 17
 STREAK_CAP: Final = 3
+NO_INTERVAL: Final = "none"  # round 3: the in-season board gives no range
 BANDS: Final = (("early", 2, 5), ("middle", 6, 10), ("late", 11, 15))
 
 

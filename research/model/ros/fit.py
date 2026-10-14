@@ -24,6 +24,7 @@ from research.model.ros.model import (
     BANDS,
     FORMATS,
     LAST_FANTASY_WEEK,
+    NO_INTERVAL,
     STREAK_CAP,
     OpportunityLine,
     PlayerToDate,
@@ -323,4 +324,6 @@ def fit_priors(rows: Sequence[FitRow], opportunity: dict[str, OpportunityLine], 
         return_next=following,
         return_later=later,
     )
+    if t.interval_by == NO_INTERVAL:
+        return partial
     return replace(partial, interval=MappingProxyType(fit_interval(rows, partial, t)))

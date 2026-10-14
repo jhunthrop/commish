@@ -40,9 +40,9 @@ class JudgedRow:
     player_id: str
     position: Position
     model: Mapping[str, float]
-    floor: Mapping[str, float]
-    median: Mapping[str, float]
-    ceiling: Mapping[str, float]
+    floor: Mapping[str, float] | None  # None: a round with no interval (round 3)
+    median: Mapping[str, float] | None
+    ceiling: Mapping[str, float] | None
     board: Mapping[str, float] | None
     form: Mapping[str, float] | None
     ecr: float | None
@@ -108,8 +108,11 @@ def cell_score(report: CellReport) -> CellScore:
 
 
 def coverage(cell: Sequence[JudgedRow], format_name: str) -> Coverage:
-    inside = sum(1 for r in cell if r.floor[format_name] <= r.actual[format_name] <= r.ceiling[format_name])
-    return Coverage(inside, len(cell))
+    """The share inside [floor, ceiling]; a round with no interval covers nothing (size 0)."""
+    bands = [
+        (r.floor[format_name], r.actual[format_name], r.ceiling[format_name]) for r in cell if r.floor and r.ceiling
+    ]
+    return Coverage(sum(1 for low, actual, high in bands if low <= actual <= high), len(bands))
 
 
 def points_error(cell: Sequence[JudgedRow], format_name: str) -> float | None:

@@ -33,8 +33,13 @@ _DOCS: Final = Path(__file__).resolve().parents[3] / "docs/research"
 JUDGMENT_RECORDS: Final = {
     1: _DOCS / "2026-10-14-rest-of-season-results.json",
     2: _DOCS / "2026-10-14-rest-of-season-round2-results.json",
+    3: _DOCS / "2026-10-14-rest-of-season-round3-results.json",
 }
-ROUNDS: Final = {1: (gates.PREREGISTERED, gates.DEVELOPMENT_CHECK), 2: (gates.ROUND_TWO, gates.ROUND_TWO_CHECK)}
+ROUNDS: Final = {
+    1: (gates.PREREGISTERED, gates.DEVELOPMENT_CHECK),
+    2: (gates.ROUND_TWO, gates.ROUND_TWO_CHECK),
+    3: (gates.ROUND_THREE, gates.ROUND_THREE_CHECK),
+}
 
 
 def _render(fitted: RoundFit, judged: Judgment) -> list[str]:
@@ -88,7 +93,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     ingest = sub.add_parser("ingest-judgment-season", help="the house's ingests of one season, into the named database")
     ingest.add_argument("--database", required=True)
     ingest.add_argument("--season", type=int, required=True)
-    rosters = sub.add_parser("ingest-week-one-rosters", help="the house's week-one roster ingest, into the named database")
+    rosters = sub.add_parser(
+        "ingest-week-one-rosters", help="the house's week-one roster ingest, into the named database"
+    )
     rosters.add_argument("--database", required=True)
     rosters.add_argument("--season", type=int, action="append", required=True)
     for name in ("dev-check", "judge"):

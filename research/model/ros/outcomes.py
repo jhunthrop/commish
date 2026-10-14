@@ -84,6 +84,6 @@ def fit_reader(judgment_season: int) -> OutcomeReader:
     return OutcomeReader(frozenset(range(judgment_season, PRISTINE_SEASON)))
 
 
-def judgment_reader() -> OutcomeReader:
-    """The judgment's reader: only the pristine season is refused."""
-    return OutcomeReader(frozenset())
+def judgment_reader(judgment_season: int) -> OutcomeReader:
+    """The judgment's reader: every season after the judgment season, and the pristine one, refused."""
+    return OutcomeReader(frozenset(range(judgment_season + 1, PRISTINE_SEASON)))

@@ -173,12 +173,32 @@ def test_the_fit_reader_refuses_the_judgment_season_and_after() -> None:
             dev.admit(season)
 
 
-def test_the_judgment_reader_refuses_only_the_pristine_season() -> None:
-    reader = judgment_reader()
+def test_the_judgment_reader_refuses_every_later_season() -> None:
+    reader = judgment_reader(2025)
     reader.admit(2025)
     with pytest.raises(HeldOutReadError):
         reader.admit(2026)
     assert reader.served == [2025]
+    round_three = judgment_reader(2024)
+    round_three.admit(2024)
+    for season in (2025, 2026):
+        with pytest.raises(HeldOutReadError):
+            round_three.admit(season)
+
+
+def test_round_three_gates_ordering_and_starters_only_and_fits_no_interval() -> None:
+    t = gates.ROUND_THREE
+    lines = gates.judged_lines({}, {}, t)
+    assert len(lines) == 48
+    assert {line.gate for line in lines} == {"G1", "G2"}
+    assert t.rho_margin == 0.04
+    assert (t.fit_seasons, t.judgment_season, t.judgment_weeks) == ((2021, 2022, 2023), 2024, (8, 12))
+    assert gates.ROUND_THREE_CHECK.judgment_season == 2023
+    assert 2023 not in gates.ROUND_THREE_CHECK.fit_seasons
+    fitted = fit_reader(t.judgment_season)
+    for season in (2024, 2025, 2026):
+        with pytest.raises(HeldOutReadError):
+            fitted.admit(season)
 
 
 _DOCS = Path(__file__).resolve().parents[2] / "docs/research"

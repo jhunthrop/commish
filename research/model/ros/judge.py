@@ -21,7 +21,7 @@ from research.model.reads.preseason import all_positions, preseason_rankings_as_
 from research.model.register.freeze import ECR_SOURCE
 from research.model.ros import gates
 from research.model.ros.fit import FitRow, collect, fit_opportunity, fit_priors
-from research.model.ros.model import FORMATS, PlayerToDate, RosPriors, interval, project, season_rate
+from research.model.ros.model import FORMATS, NO_INTERVAL, PlayerToDate, RosPriors, interval, project, season_rate
 from research.model.ros.outcomes import SeasonOutcomes, fit_reader, judgment_reader
 from research.model.ros.reads import StaleBoard, build_stale_board, week_inputs
 from research.model.ros.statistics import (
@@ -72,7 +72,11 @@ def _judged_row(  # noqa: PLR0913, PLR0917 - one player's every view at one judg
     in_population: frozenset[str],
 ) -> JudgedRow:
     projection = project(player, priors)
-    bands = {name: interval(projection.projected[name], player.position, name, week, priors) for name in FORMATS}
+    bands = (
+        None
+        if priors.interval_by == NO_INTERVAL
+        else {name: interval(projection.projected[name], player.position, name, week, priors) for name in FORMATS}
+    )
     actual, games = outcomes.rest_of_season(player.player_id, week)
     form = (
         None
@@ -84,9 +88,9 @@ def _judged_row(  # noqa: PLR0913, PLR0917 - one player's every view at one judg
         player.player_id,
         player.position,
         projection.projected,
-        FROZEN({name: band[0] for name, band in bands.items()}),
-        FROZEN({name: band[1] for name, band in bands.items()}),
-        FROZEN({name: band[2] for name, band in bands.items()}),
+        None if bands is None else FROZEN({name: band[0] for name, band in bands.items()}),
+        None if bands is None else FROZEN({name: band[1] for name, band in bands.items()}),
+        None if bands is None else FROZEN({name: band[2] for name, band in bands.items()}),
         None if player.stale is None else player.stale.projected,
         form,
         ecr.get(player.player_id),
@@ -156,7 +160,7 @@ def judge_round(
 ) -> Judgment:
     before = table_digests(conn)
     positions = all_positions(conn)
-    reader = judgment_reader()
+    reader = judgment_reader(t.judgment_season)
     stale = build_stale_board(conn, t.judgment_season, artifacts, arithmetic, t.prior_source)
     outcomes = reader.season(conn, t.judgment_season, positions)
     rows = [
