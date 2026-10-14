@@ -214,7 +214,9 @@
 								<dd><ValueCell {...vorCell(numbers.vor, numbers.vorRound)} /></dd>
 								<dt><Label>Drafters</Label></dt>
 								<dd>
-									<GapChip gap={draftersGap(numbers.adp, numbers.ourRank)} />
+									{#if format.rosFromWeek === undefined}<GapChip
+											gap={draftersGap(numbers.adp, numbers.ourRank)}
+										/>{/if}
 									{#if numbers.adp !== null}<Label>ADP {fixed(numbers.adp)}</Label>{/if}
 								</dd>
 							</dl>

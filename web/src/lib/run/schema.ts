@@ -108,9 +108,10 @@ export const boardRowSchema = z.object({
 	ceiling: points.nullable(),
 	/** Tier within his position, 1 is the top. */
 	tier: z.number().int().min(1),
-	/** In season, where the preseason board ranked him, and its points for the full season. */
-	preseasonRank: z.number().int().min(1).optional(),
-	preseasonPoints: points.optional()
+	/** In season, where the preseason board ranked him, and its points for the full season; null
+	 * for a player with a line this season whom the preseason board did not rank. */
+	preseasonRank: z.number().int().min(1).nullable().optional(),
+	preseasonPoints: points.nullable().optional()
 });
 
 export const boardSchema = z.object({

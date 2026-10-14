@@ -94,7 +94,7 @@
 	</Row>
 {/snippet}
 
-<main class="board">
+<main class="board" class:rest={!page.range}>
 	<!-- The league's line sits by the switch, not under the caption: atop the side column on a desk,
 	     first under the bar elsewhere. -->
 	<div class="league-line">
@@ -261,6 +261,13 @@
 
 	.range-toggle {
 		display: contents;
+	}
+
+	/* In season the ADP is the drafts' preseason order and our rank the rest of the season's: the
+	   column shows the ADP alone, with no picks-earlier-or-later chip and no "vs us". */
+	.rest :global(.adp > :first-child),
+	.rest :global(.head .vs) {
+		display: none;
 	}
 
 	/* From 961 to 1439px an in-season row has no floor to ceiling column, so no switch for it. */

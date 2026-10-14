@@ -74,7 +74,11 @@ function basisTerms(
 			means: `The round his points over replacement rank in, among ${String(boardSize)}`
 		},
 		{ term: 'Rose', means: 'Below replacement' },
-		{ term: 'Drafters', means: `Their ADP from ${adpBasis.join(' and ')}, against our rank` },
+		{
+			term: 'Drafters',
+			// In season the ADP is the drafts' preseason order, never compared with the rest of the season.
+			means: `Their ADP from ${adpBasis.join(' and ')}${format.rosFromWeek === undefined ? ', against our rank' : ''}`
+		},
 		// Last, so the band that hides the range column hides its line too (BoardView's style).
 		...(range ? [{ term: 'Range', means: 'Floor to ceiling' }] : [])
 	];

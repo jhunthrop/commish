@@ -38,8 +38,8 @@ export interface TierMate {
  * prints. */
 export interface RestFigures {
 	lead: string;
-	preseasonRank: number;
-	preseasonPoints: number;
+	/** Null for a player the preseason board did not rank: the page shows no preseason figure. */
+	preseason: { rank: number; points: number } | null;
 }
 
 /** A format line's sentences, as the page prints them for it. */
@@ -78,6 +78,8 @@ export interface PlayerPage {
 	 * leads with the context's when the run carries it. */
 	lines: FormatLine[];
 	tier: { tier: number; cliff: TierCliff | null; mates: TierMate[] };
+	/** The tier list's caption: what its points are. */
+	tierBasis: string;
 	/** The default format's sentences, as its line carries them. */
 	words: LineWords;
 	/** The default format's rest-of-season figures, as its line carries them. */
@@ -99,7 +101,18 @@ export async function playerEntries(): Promise<{ slug: string }[]> {
  * behind its ADP and its board's size. */
 /** "We have him at pick 12, so drafters take him 3 picks later. ADP 15.0 from PPR drafts, Sep 5 to
  * Sep 9." */
-function draftersWords(numbers: PlayerFormat, sources: readonly string[]): string {
+function draftersWords(
+	numbers: PlayerFormat,
+	sources: readonly string[],
+	inSeason: boolean
+): string {
+	// In season the ADP is the drafts' preseason order and our rank the rest of the season's, so
+	// the two are not compared: the page gives the ADP alone.
+	if (inSeason) {
+		return numbers.adp === null
+			? 'None of our ADP sources has him.'
+			: `ADP ${fixed(numbers.adp)} from ${sources.join(' and ')}.`;
+	}
 	const gap = draftersGap(numbers.adp, numbers.ourRank);
 	if (numbers.adp === null || gap === null) {
 		return `None of our ADP sources has him yet. We have him at pick ${String(numbers.ourRank)}.`;
@@ -130,7 +143,7 @@ function lineWords(
 		numbers.vor < 0
 			? `Below replacement, among the ${String(boardSize)} on our board`
 			: `Round ${String(numbers.vorRound)} value among the ${String(boardSize)} on our board`;
-	return { caption, drafters: draftersWords(numbers, sources), value };
+	return { caption, drafters: draftersWords(numbers, sources, rest !== null), value };
 }
 
 async function linesFor(
@@ -171,7 +184,11 @@ function restFigures(
 			`The ${format.id} board ranks the rest of the season without his preseason figures.`
 		);
 	}
-	return { lead, preseasonRank, preseasonPoints };
+	const preseason =
+		preseasonRank === null || preseasonPoints === null
+			? null
+			: { rank: preseasonRank, points: preseasonPoints };
+	return { lead, preseason };
 }
 
 async function mates(format: Format, entry: IndexEntry): Promise<PlayerPage['tier']> {
@@ -231,6 +248,10 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		numbers: lead.numbers,
 		lines,
 		tier: await mates(lead.format, entry),
+		tierBasis:
+			lead.format.rosFromWeek === undefined
+				? `Projected ${lead.format.label} points, ${String(run.season)}`
+				: `Projected ${lead.format.label} points for the rest of ${String(run.season)} from week ${String(lead.format.rosFromWeek)}`,
 		words: lead.words,
 		rest: lead.rest,
 		adpSources: lead.adpSources,

@@ -109,13 +109,13 @@
 					phoneAlign="start"
 					caption={lead.words.caption}
 				/>
-				{#if lead.rest}
+				{#if lead.rest?.preseason}
 					<Figure
-						value={fixed(lead.rest.preseasonPoints)}
+						value={fixed(lead.rest.preseason.points)}
 						size="sm"
 						align="end"
 						phoneAlign="start"
-						caption="projected preseason for all {season}, our rank {lead.rest.preseasonRank}"
+						caption="projected preseason for all {season}, our rank {lead.rest.preseason.rank}"
 					/>
 				{/if}
 				<SheetAdd
@@ -141,7 +141,7 @@
 			<Fact label="Where drafters take him">
 				{#snippet value()}
 					<Figure value={n.adp === null ? 'No ADP' : `Pick ${fixed(n.adp, 0)}`} />
-					<GapChip {gap} />
+					{#if !lead.rest}<GapChip {gap} />{/if}
 				{/snippet}
 				{lead.words.drafters}
 			</Fact>
@@ -183,7 +183,7 @@
 					currentId={page.id}
 					cliff={page.tier.cliff}
 					unit={page.format.unit}
-					basis="Projected {page.format.label} points, {season}"
+					basis={page.tierBasis}
 				/>
 			</aside>
 		</div>
