@@ -186,7 +186,8 @@ export function poolRows(board: LeagueBoard, sync: LeagueSync): readonly LeagueB
 
 /** How the pool is ranked and what its figure is, said once above it. */
 export function poolBasis(board: LeagueBoard): string {
-	const order = "Unrostered in your league, ranked by our preseason board's points over replacement.";
+	const order =
+		"Unrostered in your league, ranked by our preseason board's points over replacement.";
 	return seasonStarted(board) ? `${order} The figure is his points a game this season.` : order;
 }
 
@@ -203,17 +204,6 @@ export function figuresLine(figuresScoring: string, scoringLike: ScoringPreset):
 	const league = SCORING_WORDS[scoringLike];
 	const same = figures.toLowerCase() === league.toLowerCase();
 	return `Figures are ${figures}. Your league scores ${same ? 'the same' : league}.`;
-}
-
-/** The kicker and defense the league starts that the run's board does not rank, said as the pool's
- * missing chips: "No kickers on this run." */
-export function missingFromRun(sync: LeagueSync, board: LeagueBoard): readonly string[] {
-	const ranked = new Set(board.players.map((p) => p.position as string));
-	const held = new Set(sync.roster.map((s) => s.player.position));
-	const words: Readonly<Record<string, string>> = { K: 'kickers', DEF: 'defenses' };
-	return Object.entries(words)
-		.filter(([pos]) => held.has(pos) && !ranked.has(pos))
-		.map(([, plural]) => `No ${plural} on this run.`);
 }
 
 /** The drafter's team. */

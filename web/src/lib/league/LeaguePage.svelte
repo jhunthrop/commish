@@ -30,7 +30,6 @@
 		POLL_MS,
 		figuresLine,
 		hostWords,
-		missingFromRun,
 		myPlace,
 		myTeam,
 		poolBasis,
@@ -274,7 +273,6 @@
 						{tagsOf}
 						basis={poolBasis(board)}
 						inSeason={seasonStarted(board)}
-						missing={missingFromRun(sync, board)}
 					/>
 					<MovesPanel {sync} />
 				</div>
