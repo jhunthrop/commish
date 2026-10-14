@@ -25,7 +25,7 @@
 </script>
 
 <p class="note" class:filled={note !== null} class:short class:narrow>
-	{note ?? ''}{#if link}{' '}
+	{note ?? ''}{#if link}
 		<a href={link.savedLeague === null ? sectionHref('mock') : links.mockLeague(link.savedLeague)}
 			>{link.words}</a
 		>{/if}
@@ -39,6 +39,11 @@
 		font-size: var(--t-sm);
 		line-height: 1.4;
 		color: var(--ink-2);
+	}
+
+	/* The link follows the sentence before it as the next sentence would. */
+	.note a {
+		margin-left: 0.25em;
 	}
 
 	.filled,
