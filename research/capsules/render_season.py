@@ -103,19 +103,21 @@ def bye_line(facts: "PlayerFacts") -> str:
     return f"Bye: {named}, {'already behind him' if bye <= season.through else 'still to come'}."
 
 
-def _from_week(facts: "PlayerFacts") -> str:
+def _since(facts: "PlayerFacts", since: str) -> str:
+    """When his status began: its day before the season; in season the week it reaches, never a
+    date (a date reads back as a month, which the in-season floor refuses)."""
     season = facts.season
-    if season is None or season.injury_from_week is None:
-        return ""
-    return f", from {week_of(season.injury_from_week, season.season)} on"
+    if season is None:
+        return f"since {since}"
+    if season.injury_from_week is None:
+        return f"since after his last game of {season.season}"
+    return f"since the run-up to {week_of(season.injury_from_week, season.season)}"
 
 
 def injury_line(facts: "PlayerFacts") -> str:
     injury = facts.injury
     if isinstance(injury, InjuryDesignated):
-        return (
-            f"Injury report: designation {injury.designation}, on every report since {injury.since}{_from_week(facts)}."
-        )
+        return f"Injury report: designation {injury.designation}, on every report {_since(facts, injury.since)}."
     if isinstance(injury, InjuryClean):
-        return f"Injury report: no designation on file on any report since {injury.since}{_from_week(facts)}."
+        return f"Injury report: no designation on file on any report {_since(facts, injury.since)}."
     return "Injury report: no injury feed has been checked for him yet. This is not a health claim either way."

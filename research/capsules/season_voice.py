@@ -91,7 +91,12 @@ DRAFT_VOICE_PATTERNS: Final = (
         "draft voice (let him fall)", r"\blet (?:him|them) (?:fall|slide)\b|\b(?:wait|waiting) on (?:him|them)\b"
     ),
     named_rule("draft voice (reach for him)", r"\breach(?:ing)? for (?:him|them)\b"),
-    named_rule("draft voice (at his ADP)", r"\b(?:at|worth|below|above|past|before|after) (?:his|their|that) ADP\b"),
+    # Drafters' history ("backs drafted at his ADP", "taken at his ADP") is past and passes.
+    named_rule(
+        "draft voice (at his ADP)",
+        r"(?<!drafted )(?<!taken )(?<!picked )(?<!went )(?<!go )(?<!going )"
+        r"\b(?:at|worth|below|above|past|before|after) (?:his|their|that) ADP\b",
+    ),
     named_rule(
         "draft voice (rounds and picks ahead)",
         r"\b(?:a|one|two|three) rounds? (?:earlier|later|early|late|sooner)\b|\bpicks? (?:earlier|later|sooner)\b",

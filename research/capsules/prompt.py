@@ -97,7 +97,8 @@ _PRESEASON_TIME: Final = """TIME
 - Name every week with its season, always: "week 7 of 2025", "weeks 2 to 5 of 2024". Never a bare "week 7"."""
 _IN_SEASON_TIME: Final = """TIME
 - The top of the sheet says what day it is and how far the season has gone. Write to a reader on that day. His draft is behind him: never write as if it is still ahead. No "draft him", no "take him at his ADP", no round or pick advice, no draft day. His ADP is history now, where drafters took him before the season.
-- Name every week with its season, always: "week 7 of 2025", "weeks 2 and 3 of 2026". Never a bare "week 7".
+- Name every week with its season, always: "week 7 of 2025", "weeks 2 and 3 of 2026". Never a bare "week 7". Only a numbered week takes a year: never tack one onto anything else ("this week", his bye, the next game).
+- Our preseason number is points for the full season. Never set his points so far against it as if he were behind it: compare points a game with points a game.
 - A week of this season that is still to play can only be looked ahead to, never told as if it happened.
 - Place things by week and season, never by a date or the name of a month.
 - If he has missed weeks this season, the long note names them by week, before any talk of how many games to expect. Our games expectation and our projection were set before the season: say so if you use them, beside what has happened since."""

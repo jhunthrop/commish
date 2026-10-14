@@ -63,6 +63,7 @@ def test_the_draft_and_the_calendar_are_preseason_words_only() -> None:
     for text in ("Draft him at 18.", "Take him at his ADP of 9.6.", "Let him fall a round.", "On draft day, wait."):
         assert any(rule.startswith("draft voice") for rule in _rules(text, OCTOBER)), text
     assert _rules("Start him and hold him through his week 11 of 2026 bye.", OCTOBER) == []
+    assert _rules("He beat the backs drafted at his ADP of 1.4 by 20 points.", OCTOBER) == []
     assert _rules("That early-October dud last season is rare for him.", OCTOBER) == []
     assert _rules("He sat three weeks in October of 2025.", OCTOBER) == []
     assert "time frame (a month)" in _rules("He sat in October of 2025 and again this October of 2026.", OCTOBER)
