@@ -1,6 +1,7 @@
 """What a job reads once instead of on every use: the night's facts pass, a generation's candidates."""
 
 from collections.abc import Sequence
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -12,6 +13,7 @@ from research.db.read_cache import UNCACHED, ReadThrough
 from research.model.preseason.candidates import BoardCandidate
 
 _CONN = cast("Connection", object())
+_SNAPSHOT = cast("Connection", object())
 _NIGHT = datetime(2026, 10, 15, 5, tzinfo=UTC)
 
 
@@ -19,11 +21,11 @@ def test_the_facts_pass_is_read_once_an_instant() -> None:
     calls: list[tuple[datetime, ReadThrough]] = []
 
     def read(conn: Connection, as_of: datetime, history: ReadThrough) -> Sequence[Subject]:
-        del conn
+        assert conn is _SNAPSHOT, "the pass reads its own snapshot, not the caller's connection"
         calls.append((as_of, history))
         return [cast("Subject", f"sheet at {as_of.isoformat()}")]
 
-    memo = FactsPassMemo(UNCACHED, read)
+    memo = FactsPassMemo(lambda: nullcontext(_SNAPSHOT), UNCACHED, read)
     first = memo(_CONN, _NIGHT)
     assert memo(_CONN, _NIGHT) is first
     later = datetime(2026, 10, 16, 5, tzinfo=UTC)

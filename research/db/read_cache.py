@@ -9,7 +9,11 @@ incident). A cached read is served instead when nothing it read has changed:
    parameters, the read's `as_of` written as a placeholder). Each statement is then fingerprinted
    on the server, `count(*)` and the sum of a 64-bit hash of every row's text, and the result is
    kept with the statements and their fingerprints as one row of `model_artifacts`
-   (`cache/<name>`, a new version each time; older versions of the name are dropped).
+   (`cache/<name>`, a new version each time; older versions of the name are dropped). The read and
+   its fingerprints must see one snapshot, or a row committed between them would enter the
+   fingerprint and not the result, which would then be served every night after (review HIGH-1):
+   so a result is kept only from a REPEATABLE READ or SERIALIZABLE transaction (`snapshot`), and a
+   read on any other connection is served when it matches but never kept.
 2. On the next call with the same arguments under the same code, each recorded statement is run
    again on the server, as a fingerprint only, with tonight's `as_of` in the placeholder's place.
    Every fingerprint equal means every row it read is the same, so the kept result is the result:
@@ -18,12 +22,15 @@ incident). A cached read is served instead when nothing it read has changed:
 
 That is sound for a read that is a pure function of its arguments and of the rows its statements
 return, which treats `as_of` only as a bound it passes to its statements (never as a date it
-computes with). Every read cached here is one such; `facts.history` names them. The result's exact
-form is `db.value_codec`; a value it cannot write is simply not cached.
+computes with), and whose statements have no side effect (no `for update`, no `nextval`, no lock:
+the fingerprint runs each statement again). Every read cached here is one such; `facts.history`
+names them. The result's exact form is `db.value_codec`; a value it cannot write or read back is
+not cached, and a kept value that no longer decodes is a miss.
 """
 
 import hashlib
 import json
+import re
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -41,6 +48,16 @@ _FINGERPRINT: Final = (
     "select count(*)::text || ':' || coalesce(sum(hashtextextended(r::text, 0)), 0)::text from ({sql}) as r"
 )
 _READ_VERBS: Final = ("select", "with")
+# What a read must not do, since the fingerprint runs it again: lock rows, move a sequence, take a lock.
+_SIDE_EFFECTS: Final = re.compile(
+    r"\bfor\s+(?:no\s+key\s+)?(?:update|share|key\s+share)\b|\b(?:nextval|setval|pg_advisory\w*)\s*\(",
+    re.IGNORECASE,
+)
+# The isolation levels under which a read and its fingerprints see one snapshot.
+SNAPSHOT_LEVELS: Final = frozenset({"REPEATABLE READ", "SERIALIZABLE"})
+# Every float as text with its exact digits whatever a role or pooler sets (the default since
+# Postgres 12 is already exact; this pins it), so two different floats never hash alike.
+_EXACT_FLOATS: Final = "set local extra_float_digits = 3"
 
 
 class UncacheableError(ValueError):
@@ -79,6 +96,8 @@ def recorded(statement: str, parameters: Any, as_of: datetime | None) -> Recorde
     """One statement as the cache keeps it: a read, its parameters in their JSON form."""
     if not statement.lstrip().lower().startswith(_READ_VERBS):
         raise UncacheableError("a cached read sent a statement that is not a read")
+    if _SIDE_EFFECTS.search(statement):
+        raise UncacheableError("a cached read sent a statement with a side effect")
     if parameters is not None and not isinstance(parameters, Mapping):
         raise UncacheableError("positional parameters")
     named = {} if parameters is None else {str(k): _parameter(v, as_of) for k, v in parameters.items()}
@@ -88,21 +107,29 @@ def recorded(statement: str, parameters: Any, as_of: datetime | None) -> Recorde
 def fingerprint(conn: Connection, read: Recorded, as_of: datetime | None) -> str:
     """The rows `read` returns now, as a count and an order-free hash, computed on the server."""
     parameters = {k: _bound(v, as_of) for k, v in read.parameters.items()}
+    conn.exec_driver_sql(_EXACT_FLOATS)
     return str(conn.exec_driver_sql(_FINGERPRINT.format(sql=read.sql), parameters or None).scalar_one())
 
 
-@dataclass(slots=True)
+@contextmanager
+def snapshot(engine: Engine) -> Iterator[Connection]:
+    """A read-only REPEATABLE READ connection: every statement on it sees the store at its first."""
+    with engine.connect().execution_options(isolation_level="REPEATABLE READ", postgresql_readonly=True) as conn:
+        yield conn
+
+
 class Recording:
     """The statements a block sent, and the first one the cache could not keep, if any."""
 
-    reads: list[Recorded]
-    refused: UncacheableError | None = None
+    def __init__(self) -> None:
+        self.reads: list[Recorded] = []
+        self.refused: UncacheableError | None = None
 
 
 @contextmanager
 def recording(conn: Connection, as_of: datetime | None) -> Iterator[Recording]:
     """Every statement `conn` sends inside the block, as the cache keeps it."""
-    record = Recording([])
+    record = Recording()
 
     def listen(*args: Any) -> None:
         try:
@@ -131,10 +158,9 @@ def key_of(name: str, arguments: Any, code_version: str) -> CacheKey:
 
 
 _KEPT: Final = text(
-    "select version, payload->>'arguments' as arguments, payload->'reads' as reads "
+    "select payload->>'arguments' as arguments, payload->'reads' as reads, payload->>'value' as value "
     "from research.model_artifacts where name = :n order by version desc limit 1"
 )
-_VALUE: Final = text("select payload->>'value' from research.model_artifacts where name = :n and version = :v")
 _NEXT: Final = text("select coalesce(max(version), 0) + 1 from research.model_artifacts where name = :n")
 _INSERT: Final = text(
     "insert into research.model_artifacts (name, version, fit_stamp, fitted_on, payload) "
@@ -178,8 +204,9 @@ UNCACHED: Final = Uncached()
 
 @dataclass(frozen=True, slots=True)
 class ReadCache:
-    """Kept results by name, written on `engine` in their own transaction (a read's connection may be
-    one that never commits), decoded with `codec`, valid for `code_version` only."""
+    """Kept results by name, read and written on `engine` in their own transactions (a read's
+    connection may be read-only, and may be another store's), decoded with `codec`, valid for
+    `code_version` only. The fingerprints run on the read's own connection."""
 
     engine: Engine
     codec: ValueCodec
@@ -187,10 +214,16 @@ class ReadCache:
     log: Callable[[str], None] = lambda line: None
 
     def kept[T](self, conn: Connection, key: CacheKey, as_of: datetime | None) -> T | None:
-        row = conn.execute(_KEPT, {"n": key.name}).first()
+        """The kept result when its arguments are these and every fingerprint still holds on `conn`."""
+        with self.engine.connect() as store:
+            row = store.execute(_KEPT, {"n": key.name}).first()
         if row is None or row.arguments != key.arguments or not _still_true(conn, row.reads, as_of):
             return None
-        value: T = self.codec.loads(conn.execute(_VALUE, {"n": key.name, "v": row.version}).scalar_one())
+        try:
+            value: T = self.codec.loads(row.value)
+        except (UnencodableError, TypeError, ValueError, KeyError) as error:
+            self.log(f"read cache: {key.name} kept value does not decode ({error}), read again")
+            return None
         return value
 
     def through[T](
@@ -206,6 +239,10 @@ class ReadCache:
             value = read()
         if record.refused is not None:
             self.log(f"read cache: {name} not kept, {record.refused}")
+            return value
+        level = conn.get_isolation_level()
+        if level not in SNAPSHOT_LEVELS:
+            self.log(f"read cache: {name} not kept, read at {level}, where its fingerprint could see other rows")
             return value
         try:
             encoded = self.codec.dumps(value)

@@ -13,10 +13,9 @@ from typing import Any, Final
 import httpx
 from sqlalchemy import Engine
 
-from research.capsules.facts.history import history_cache
 from research.capsules.sweep import FactsPassMemo
 from research.db.code_digest import code_digest
-from research.db.read_cache import ReadCache
+from research.db.read_cache import ReadCache, snapshot
 from research.db.value_codec import ValueCodec
 from research.model.arithmetic import model_version
 from research.model.artifacts import read_artifact
@@ -25,7 +24,7 @@ from research.model.instants import js_iso
 from research.nightly.assemble import Assembled
 from research.nightly.build.season import format_json
 from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate
-from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan, run_capsule_step
+from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan, night_facts, run_capsule_step
 from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION
 from research.nightly.headshots import Face, mirror_headshots
 from research.nightly.page_findings import page_findings
@@ -90,8 +89,8 @@ def run_steps(  # noqa: PLR0913, PLR0917 - the steps' shared dependencies
     plan: CapsuleStepPlan,
 ) -> list[StepOutcome]:
     skipped = StepOutcome(StepRecord("ingest", "skipped", "skipped by --skip"))
-    # One facts pass for the capsule step, its finished seasons read through the cache.
-    facts = FactsPassMemo(history_cache(engine, code_digest("research.capsules.facts.history")))
+    # One facts pass for the capsule step and every gate after it (`FactsPassMemo`).
+    facts = night_facts(engine)
     steps = [
         _isolated("ingest", lambda: skipped if "ingest" in skip else StepOutcome(ingest_step(IngestContext(engine, fetcher, clock(), environ))), log),
         _isolated("fit", lambda: StepOutcome(StepRecord("fit", "skipped", "skipped by --skip") if "fit" in skip else run_fit_step(engine, clock())), log),
@@ -108,7 +107,8 @@ def run_steps(  # noqa: PLR0913, PLR0917 - the steps' shared dependencies
 
 def held_out(engine: Engine, store: RunStore) -> tuple[list[HeldOutScore], Mapping[int, float] | None]:
     cache = ReadCache(engine, HELD_OUT_CODEC, code_digest("research.model.backtest"))
-    with engine.connect() as conn:
+    # One snapshot for the read and its fingerprints, so the cache may keep it (`db.read_cache`).
+    with snapshot(engine) as conn:
         seasons = [int(s) for s in read_artifact(conn, "model/weekly-priors").payload["heldOutSeasons"]]
         scores = cache.through(conn, HELD_OUT_CACHE, [seasons], None, lambda: held_out_scores(conn, seasons))
     baseline = read_json(store, HELD_OUT_BASELINE_KEY)

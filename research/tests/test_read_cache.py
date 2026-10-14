@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy import Connection, Engine, insert, text
 
 from research.db.engine import make_engine
-from research.db.read_cache import ReadCache
+from research.db.read_cache import ReadCache, snapshot
 from research.db.schema import PLAYER_WEEK_OBSERVATIONS, PLAYERS
 from research.db.url import sqlalchemy_url
 from research.db.value_codec import ValueCodec
@@ -68,14 +68,14 @@ def _cache(engine: Engine, code: str = "code-1") -> ReadCache:
 def test_served_while_unchanged_and_read_again_once_a_row_lands(engine: Engine) -> None:
     read, now = Counted(), datetime(2026, 10, 1, tzinfo=UTC)
     cache = _cache(engine)
-    with engine.connect() as conn:
+    with snapshot(engine) as conn:
         assert cache.through(conn, "test/total", ["a"], now, lambda: read(conn, now)) == (10.0,)
         later = now + timedelta(days=1)
         assert cache.through(conn, "test/total", ["a"], later, lambda: read(conn, later)) == (10.0,)
     assert read.ran_at == [now], "the second night is served from the kept result"
     with engine.begin() as conn:
         _observe(conn, 2, 7.0, later - timedelta(hours=1))
-    with engine.connect() as conn:
+    with snapshot(engine) as conn:
         assert cache.through(conn, "test/total", ["a"], later, lambda: read(conn, later)) == (10.0, 7.0)
     assert read.ran_at == [now, later], "a row inside tonight's bound moved the fingerprint"
 
@@ -83,12 +83,12 @@ def test_served_while_unchanged_and_read_again_once_a_row_lands(engine: Engine) 
 def test_the_bound_is_tonights_not_the_kept_one(engine: Engine) -> None:
     read, now = Counted(), datetime(2026, 11, 1, tzinfo=UTC)
     cache = _cache(engine, "code-bound")
-    with engine.connect() as conn:
+    with snapshot(engine) as conn:
         first = cache.through(conn, "test/bound", ["b"], now, lambda: read(conn, now))
     with engine.begin() as conn:
         _observe(conn, 3, 1.0, now + timedelta(hours=1))
     tomorrow = now + timedelta(days=1)
-    with engine.connect() as conn:
+    with snapshot(engine) as conn:
         assert cache.through(conn, "test/bound", ["b"], now, lambda: read(conn, now)) == first
         assert read.ran_at == [now], "a row after the kept bound is invisible at that bound"
         assert cache.through(conn, "test/bound", ["b"], tomorrow, lambda: read(conn, tomorrow)) == (*first, 1.0)
@@ -97,10 +97,11 @@ def test_the_bound_is_tonights_not_the_kept_one(engine: Engine) -> None:
 
 def test_other_arguments_or_code_are_a_miss(engine: Engine) -> None:
     read, now = Counted(), datetime(2026, 12, 1, tzinfo=UTC)
-    with engine.connect() as conn:
+    with snapshot(engine) as conn:
         _cache(engine, "code-x").through(conn, "test/key", ["c"], now, lambda: read(conn, now))
         _cache(engine, "code-x").through(conn, "test/key", ["d"], now, lambda: read(conn, now))
         _cache(engine, "code-y").through(conn, "test/key", ["d"], now, lambda: read(conn, now))
+    with engine.connect() as conn:
         kept = conn.execute(text("select count(*) from research.model_artifacts where name = 'cache/test/key'"))
         assert kept.scalar_one() == 1, "a name keeps only its newest version"
     assert read.ran_at == [now, now, now], "each new key read again"
@@ -113,7 +114,39 @@ def test_a_read_that_writes_is_never_kept(engine: Engine) -> None:
         conn.execute(text("update research.players set name = name where id = '00-1'"))
         return 1
 
-    with engine.connect() as conn:
+    with engine.connect().execution_options(isolation_level="REPEATABLE READ") as conn:
         assert _cache(engine).through(conn, "test/writes", [], now, lambda: writes(conn)) == 1
         kept = conn.execute(text("select count(*) from research.model_artifacts where name = 'cache/test/writes'"))
+        assert kept.scalar_one() == 0
+
+
+def _night(engine: Engine, cache: ReadCache, read: Counted, at: datetime) -> tuple[float, ...]:
+    with snapshot(engine) as conn:
+        return cache.through(conn, "test/window", ["w"], at, lambda: read(conn, at))
+
+
+def test_a_row_committed_during_a_miss_is_never_served_stale(engine: Engine) -> None:
+    """Review HIGH-1's probe: a row lands between the read and its fingerprints. On one snapshot the
+    fingerprint matches what was read, so the next night sees the row move and reads again."""
+    read, now = Counted(), datetime(2027, 2, 1, tzinfo=UTC)
+    cache = _cache(engine, "code-window")
+
+    def read_then_a_row_lands(conn: Connection) -> tuple[float, ...]:
+        value = read(conn, now)
+        with engine.begin() as other:
+            _observe(other, 4, 2.0, now - timedelta(days=1))
+        return value
+
+    with snapshot(engine) as conn:
+        before = cache.through(conn, "test/window", ["w"], now, lambda: read_then_a_row_lands(conn))
+    for night in (1, 2, 30):
+        served = _night(engine, cache, read, now + timedelta(days=night))
+        assert served == (*before, 2.0), f"night +{night} served the value read before the row landed"
+
+
+def test_a_read_outside_a_snapshot_is_served_but_never_kept(engine: Engine) -> None:
+    read, now = Counted(), datetime(2027, 3, 1, tzinfo=UTC)
+    with engine.connect() as conn:
+        _cache(engine, "code-rc").through(conn, "test/rc", ["r"], now, lambda: read(conn, now))
+        kept = conn.execute(text("select count(*) from research.model_artifacts where name = 'cache/test/rc'"))
         assert kept.scalar_one() == 0

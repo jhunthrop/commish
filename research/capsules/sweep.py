@@ -12,6 +12,7 @@ key on the universe id (`research.players.id`), through the crosswalk.
 
 import time
 from collections.abc import Callable, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -159,20 +160,28 @@ class FactsPassMemo:
     """ONE BOARD FACTS PASS AN INSTANT: the nightly's capsule step runs a sweep, its retries, its
     repairs and the page gate at one instant, and the sheets are the same for each (the step writes
     only capsule rows, which no sheet reads), so the pass is read once and handed to every one.
-    Before this each of them read it again, up to seventeen passes a night (2026-10-14)."""
+    Before this each of them read it again, up to seventeen passes a night (2026-10-14).
+
+    The pass reads on its own connection from `snapshot_of` (`db.read_cache.snapshot`: one
+    REPEATABLE READ snapshot, so its history reads may be kept by the read cache), never the
+    caller's, which is why a caller's `conn` is not used."""
 
     def __init__(
         self,
+        snapshot_of: Callable[[], AbstractContextManager[Connection]],
         history: ReadThrough = UNCACHED,
         read: Callable[[Connection, datetime, ReadThrough], Sequence[Subject]] = subjects_of,
     ) -> None:
+        self._snapshot_of = snapshot_of
         self._history = history
         self._read = read
         self._held: tuple[datetime, tuple[Subject, ...]] | None = None
 
     def __call__(self, conn: Connection, as_of: datetime) -> tuple[Subject, ...]:
+        del conn  # the pass reads its own snapshot
         if self._held is None or self._held[0] != as_of:
-            self._held = (as_of, tuple(self._read(conn, as_of, self._history)))
+            with self._snapshot_of() as snapshot:
+                self._held = (as_of, tuple(self._read(snapshot, as_of, self._history)))
         return self._held[1]
 
 

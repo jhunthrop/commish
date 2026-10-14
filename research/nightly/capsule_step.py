@@ -36,9 +36,12 @@ import httpx
 from sqlalchemy import Engine
 
 from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.facts.history import history_cache
 from research.capsules.gateway import GatewayClient
 from research.capsules.store import queue_regeneration
 from research.capsules.sweep import FactsPassMemo, SweepPlan, SweepReport, sweep_capsules
+from research.db.code_digest import code_digest
+from research.db.read_cache import snapshot
 from research.nightly.capsule_gate import CapsuleGateResult, SharedSentence, board_universe_ids, capsule_gate
 from research.nightly.page_findings import PageFindings, page_findings
 
@@ -90,6 +93,14 @@ class CapsuleStepPlan:
     # A mending night: the sweep writes only the unwritten pages, not those whose facts moved, then
     # the retries and repairs run as on any night. For a night whose spend must stay near zero.
     mend_only: bool = False
+
+
+def night_facts(engine: Engine) -> FactsPassMemo:
+    """The night's one board facts pass: read on its own snapshot, its finished seasons through the
+    read cache. Every reader of the night's sheets takes this memo (see `FactsPassMemo`)."""
+    return FactsPassMemo(
+        lambda: snapshot(engine), history_cache(engine, code_digest("research.capsules.facts.history"))
+    )
 
 
 @dataclass(frozen=True, slots=True)
