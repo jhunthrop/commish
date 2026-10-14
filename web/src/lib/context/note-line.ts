@@ -8,7 +8,7 @@ import { siteContext } from './context.svelte.ts';
 import { contextNote, type FiguresSubject, type LeagueNote } from './note-words.ts';
 import type { BoardFormat } from './words.ts';
 
-export { leagueScores, scoresSentence } from './note-words.ts';
+export { leagueScores } from './note-words.ts';
 
 /** The line and, for an account with exact rules, the link it ends on. */
 export interface LeagueLine {

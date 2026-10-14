@@ -18,7 +18,7 @@ import type {
 	RosterSpot
 } from './api.ts';
 import type { components } from '#lib/api/types.ts';
-import { SCORING_WORDS, hostWords } from './names.ts';
+import { SCORING_WORDS, hostWords, scoresSentence } from './names.ts';
 
 export { followedName, hostWords } from './names.ts';
 
@@ -192,23 +192,21 @@ export function poolBasis(board: LeagueBoard): string {
 	return seasonStarted(board) ? `${order} The figure is his points a game this season.` : order;
 }
 
-/** The page's one basis line, once: the scoring the figures are in (the run's season scoring,
- * never a lineup shape such as superflex), which figures are this season's and which are preseason,
- * and the league's own scoring in plain words when it differs: "PPR. This season's games and points
- * a game through week 5, beside our preseason proj and over repl. Your league gives tight ends extra
- * points per catch." The league's sentence is note-words' scoresSentence, passed in. No page
- * promises the league's exact rules here. */
+/** The page's one basis line, once: the scoring the figures are in (the run's season scoring, never
+ * a lineup shape such as superflex), which figures are this season's and which are preseason, in
+ * words, and the league's own scoring in plain words when it differs: "PPR. This season's games and
+ * points a game through week 5, beside our preseason projection and points over replacement. Your
+ * league gives tight ends extra points per catch." No page promises the league's exact rules here. */
 export function leagueBasis(
 	figuresScoring: string,
 	through: number,
-	scoringLike: ScoringPreset,
-	scoresSentence: (scoring: ScoringPreset) => string
+	scoringLike: ScoringPreset
 ): string {
 	const reach = through === 0 ? '' : ` through week ${String(through)}`;
 	const same =
 		midSentence(figuresScoring).toLowerCase() === SCORING_WORDS[scoringLike].toLowerCase();
 	const own = same ? '' : ` ${scoresSentence(scoringLike)}`;
-	return `${figuresScoring}. This season's games and points a game${reach}, beside our preseason proj and over repl.${own}`;
+	return `${figuresScoring}. This season's games and points a game${reach}, beside our preseason projection and points over replacement.${own}`;
 }
 
 /** The drafter's team. */

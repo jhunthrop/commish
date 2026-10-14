@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { labelEnds, switchLabel, type ContextLeague } from './words.ts';
 import { heldMark, holderWords } from './held-marks.ts';
 import type { Held } from './held-words.ts';
-import { contextNote, scoresSentence } from './note-words.ts';
+import { contextNote } from './note-words.ts';
 import { safeThen } from './then-path.ts';
 import { leagueLine } from './menu-words.ts';
 import {
@@ -188,8 +188,8 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 		leagueLine(te),
 		recordHeadline(record).caption,
 		...weekLines(record.weeks).map((line) => `${line.lead} ${line.text}`),
-		leagueBasis('PPR', 5, 'te_premium', scoresSentence),
-		leagueBasis('Half PPR', 0, 'half_ppr', scoresSentence),
+		leagueBasis('PPR', 5, 'te_premium'),
+		leagueBasis('Half PPR', 0, 'half_ppr'),
 		heldMark(held, 'a')?.words,
 		heldMark(held, 'free')?.words,
 		holderWords(held, 'b'),

@@ -1,7 +1,7 @@
 /** The one basis line a page prints about the selected league: what its figures are against the
  * league's scoring. Its own module, so only the pages that print it carry it. */
 import { midSentence } from '#lib/format/sentence.ts';
-import { SCORING_WORDS } from '#lib/league/names.ts';
+import { SCORING_WORDS, scoresSentence } from '#lib/league/names.ts';
 import { FORMAT_LABELS } from '#lib/sheet/format.ts';
 import type { BoardFormat, ContextLeague } from './words.ts';
 
@@ -17,14 +17,6 @@ export type FiguresSubject = 'This board is' | 'These figures are';
  * cannot act on, so it says what it does. */
 export function leagueScores(league: ContextLeague): string {
 	return scoresSentence(league.scoring);
-}
-
-/** The same sentence for a scoring preset: the league line's, and the league page's basis (which
- * reads it here, loaded with the league, so no first load carries it). */
-export function scoresSentence(scoring: ContextLeague['scoring']): string {
-	return scoring === 'te_premium'
-		? 'Your league gives tight ends extra points per catch.'
-		: `Your league scores ${SCORING_WORDS[scoring]}.`;
 }
 
 /** Where the line sends a Draft Pass holder for the league's exact board: its saved league's mock
