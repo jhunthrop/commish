@@ -201,8 +201,11 @@
 			<PanelHead title="Basis" />
 			<BasisList terms={basisTerms} />
 		</Panel>
-		<!-- Last in the column, so the rail arriving with the sheet moves nothing above it. -->
-		{#if Rail}<Rail />{/if}
+		<!-- Last in the column, so the rail arriving with the sheet moves nothing above it, in a slot
+		     holding an empty sheet's height, so the column does not grow when it arrives. -->
+		<div class="rail-slot">
+			{#if Rail}<Rail />{/if}
+		</div>
 	</aside>
 </main>
 
@@ -264,6 +267,11 @@
 
 	.to-side {
 		display: none;
+	}
+
+	/* The sheet card's height with no one on it yet ("Your sheet", "No one yet"). */
+	.rail-slot {
+		min-height: 86px;
 	}
 
 	@media (max-width: 1400px) {
