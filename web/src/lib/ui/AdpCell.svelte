@@ -16,13 +16,17 @@
 		/** What the line under the chip names: his ADP (a row in our order), or our rank (a row in
 		 * ADP order, which leads with the ADP already). */
 		under?: 'adp' | 'rank';
+		/** Whether the chip compares drafters with our rank. Off in season, where the ADP is the drafts'
+		 * preseason order and our rank the rest of the season's: the ADP stands alone, and a player with
+		 * none says so in the chip as the preseason board does. */
+		compare?: boolean;
 	}
 
-	let { adp, ourRank, figure = true, under = 'adp' }: Props = $props();
+	let { adp, ourRank, figure = true, under = 'adp', compare = true }: Props = $props();
 </script>
 
 <span class="adp">
-	<GapChip gap={draftersGap(adp, ourRank)} />
+	{#if compare || adp === null}<GapChip gap={compare ? draftersGap(adp, ourRank) : null} />{/if}
 	{#if figure && under === 'rank'}
 		<Label size="cell">Our rank {ourRank}</Label>
 	{:else if figure && adp !== null}

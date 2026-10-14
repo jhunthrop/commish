@@ -15,8 +15,8 @@ const PPR: Format = {
 };
 const REST: Format = {
 	...PPR,
-	basis: ['PPR, rest of the 2026 season from week 6, refreshed October 14'],
-	rosFromWeek: 6,
+	basis: ['PPR, rest of the 2026 season from week 7, refreshed October 14'],
+	rosFromWeek: 7,
 	rosThroughWeek: 5,
 	refreshedAt: '2026-10-14T19:05:38.329Z'
 };
@@ -24,7 +24,7 @@ const REST: Format = {
 void test('from the switch week the lead names the rest of the season, the refresh day and the figures', () => {
 	assert.equal(
 		restLead(REST, { scoring: 'PPR', through: 5 }, 2026),
-		"Ranked by points over replacement for the rest of the 2026 season from week 6, refreshed October 14. Games and points a game are this season's, through week 5."
+		"Ranked by points over replacement for the rest of the 2026 season from week 7, refreshed October 14. Games and points a game are this season's, through week 5."
 	);
 });
 
@@ -32,7 +32,7 @@ void test('on a board of another scoring the figures name theirs', () => {
 	const half: Format = { ...REST, id: 'half-ppr-12', label: 'Half PPR' };
 	assert.equal(
 		restLead(half, { scoring: 'PPR', through: 5 }, 2026),
-		"Ranked by points over replacement for the rest of the 2026 season from week 6, refreshed October 14. Games and points a game are this season's, scored in PPR, through week 5."
+		"Ranked by points over replacement for the rest of the 2026 season from week 7, refreshed October 14. Games and points a game are this season's, scored in PPR, through week 5."
 	);
 });
 

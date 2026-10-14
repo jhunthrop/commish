@@ -38,6 +38,8 @@
 	let rangeOn = $state(true);
 	/** The floor to ceiling column: shown while the switch is on, and only on a board with a range. */
 	const range = $derived(page.range && rangeOn);
+	/** Drafters against our rank: preseason only (in season the ADP stands alone). */
+	const compare = $derived(page.format.rosFromWeek === undefined);
 	let onlySheet = $state<boolean>(false);
 
 	// The sheet loads on the reader's first intent, and at once when they ask for only their sheet.
@@ -84,6 +86,7 @@
 		showTier={page.position === null}
 		{unit}
 		{range}
+		{compare}
 		eager={i < EAGER_ROWS}
 		season={player.season}
 		held={siteContext.held?.mark(player.id) ?? null}
@@ -94,7 +97,7 @@
 	</Row>
 {/snippet}
 
-<main class="board" class:rest={!page.range}>
+<main class="board">
 	<!-- The league's line sits by the switch, not under the caption: atop the side column on a desk,
 	     first under the bar elsewhere. -->
 	<div class="league-line">
@@ -125,7 +128,7 @@
 		</div>
 
 		<section aria-label="{page.position ?? 'All'} {page.format.label} board">
-			<RowHead {range} action games={page.seasonLead !== null} />
+			<RowHead {range} action games={page.seasonLead !== null} {compare} />
 			{#if page.position === null}
 				{#each visible as player, i (player.id)}
 					{@render row(player, i)}
@@ -261,13 +264,6 @@
 
 	.range-toggle {
 		display: contents;
-	}
-
-	/* In season the ADP is the drafts' preseason order and our rank the rest of the season's: the
-	   column shows the ADP alone, with no picks-earlier-or-later chip and no "vs us". */
-	.rest :global(.adp > :first-child),
-	.rest :global(.head .vs) {
-		display: none;
 	}
 
 	/* From 961 to 1439px an in-season row has no floor to ceiling column, so no switch for it. */

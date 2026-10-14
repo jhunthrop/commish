@@ -196,14 +196,14 @@
 					columns={[
 						{ label: 'Format' },
 						{ label: 'Our rank', align: 'end' },
-						{ label: 'Projected', align: 'end' },
+						{ label: page.pointsHead, align: 'end' },
 						{ label: 'Over replacement', align: 'end' },
 						{ label: 'Tier', align: 'end' }
 					]}
 				>
 					{#each page.lines as line (line.format.id)}
 						<tr>
-							<td><a href={links.board(line.format.id, page.position)}>{line.format.label}</a></td>
+							<td><a href={links.board(line.format.id, page.position)}>{line.tableLabel}</a></td>
 							<td class="num">{line.numbers.ourRank}</td>
 							<td class="num">{fixed(line.numbers.projected)}</td>
 							<td class="num">{signed(line.numbers.vor)}</td>

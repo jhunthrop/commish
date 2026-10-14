@@ -59,6 +59,8 @@
 		return lead;
 	});
 	const figures = $derived(apiFormatOf(format));
+	/** The format's lead, and in season its figure's caption, built with the page. */
+	const words = $derived(data.words[format.id]);
 	const note = $derived(siteContext.notes?.lineFor(figures, 'These figures are') ?? null);
 
 	function pickOf(slot: Slot): Chosen | null {
@@ -70,15 +72,14 @@
 	const picks = $derived(SLOTS.map(pickOf));
 	const both = $derived(picks.filter((pick): pick is Chosen => pick !== null));
 	/** The two ranges' shared scale; in season the rows carry none, and the cards draw no range. */
-	const scale = $derived.by(() => {
-		const floors = both.flatMap(({ numbers }) => (numbers.floor === null ? [] : [numbers.floor]));
-		const ceilings = both.flatMap(({ numbers }) =>
-			numbers.ceiling === null ? [] : [numbers.ceiling]
-		);
-		return floors.length === 0 || ceilings.length === 0
+	const scale = $derived(
+		both.length === 0 || words?.caption
 			? undefined
-			: { lo: Math.min(...floors), hi: Math.max(...ceilings) };
-	});
+			: {
+					lo: Math.min(...both.map(({ numbers }) => numbers.floor ?? 0)),
+					hi: Math.max(...both.map(({ numbers }) => numbers.ceiling ?? 0))
+				}
+	);
 
 	/** Our board's call between the two: the one it ranks higher, by how much, and the other. */
 	/** Our call between the two, once both are in. */
@@ -151,9 +152,7 @@
 	<main class="compare">
 		<PageHead
 			title="Compare"
-			lead={failed
-				? 'The players are not loading. Try again in a moment.'
-				: `Our ${format.label} board · ${String(data.run.season)} season`}
+			lead={failed ? 'The players are not loading. Try again in a moment.' : words?.lead}
 		/>
 		<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
 
@@ -203,9 +202,8 @@
 							<Figure
 								value={fixed(numbers.projected)}
 								size="lg"
-								caption="projected {format.label} points, over {fixed(
-									numbers.expectedGames
-								)} expected games"
+								caption={words?.caption ??
+									`projected ${format.label} points, over ${fixed(numbers.expectedGames)} expected games`}
 							/>
 							<dl>
 								<dt><Label>Our rank</Label></dt>
@@ -214,7 +212,7 @@
 								<dd><ValueCell {...vorCell(numbers.vor, numbers.vorRound)} /></dd>
 								<dt><Label>Drafters</Label></dt>
 								<dd>
-									{#if format.rosFromWeek === undefined}<GapChip
+									{#if !words?.caption}<GapChip
 											gap={draftersGap(numbers.adp, numbers.ourRank)}
 										/>{/if}
 									{#if numbers.adp !== null}<Label>ADP {fixed(numbers.adp)}</Label>{/if}

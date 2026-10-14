@@ -26,3 +26,10 @@ export function restLead(format: Format, reach: FiguresReach, season: number): s
 	const rest = `the rest of the ${String(season)} season from week ${String(format.rosFromWeek)}`;
 	return `Ranked by points over replacement for ${rest}, refreshed ${monthDayLabel(format.refreshedAt)}. ${figuresLine(format, reach)}`;
 }
+
+/** A rest-of-season figure's caption where no basis line sits beside it (/compare): "PPR points for
+ * the rest of the 2026 season from week 7, refreshed October 21". Null on a preseason board. */
+export function restCaption(format: Format, season: number): string | null {
+	if (format.rosFromWeek === undefined || format.refreshedAt === undefined) return null;
+	return `${format.label} points for the rest of the ${String(season)} season from week ${String(format.rosFromWeek)}, refreshed ${monthDayLabel(format.refreshedAt)}`;
+}
