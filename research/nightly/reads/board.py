@@ -75,6 +75,9 @@ class BoardEntry:
     # In season, the preseason board's own entry for him (its rank and points, and the numbers his
     # capsule was written about); None on a preseason board.
     preseason: "BoardEntry | None" = None
+    # True on an in-season board (its rows rank the rest of the season), whether or not the preseason
+    # board ranked him: the page carries his preseason figures, null when it did not.
+    in_season: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,6 +186,7 @@ def board_entries(
             *tiers[row.universe_id],
             rank,
             None if preseason is None else preseason[row.universe_id],
+            preseason is not None,
         )
         for rank, row in enumerate(ordered, start=1)
     )

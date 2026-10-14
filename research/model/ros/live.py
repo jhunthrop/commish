@@ -26,6 +26,7 @@ from research.model.reads.observations import STAT_LINE_SOURCE
 from research.model.ros.model import (
     FORMATS,
     LAST_FANTASY_WEEK,
+    NO_INTERVAL,
     SEASON_GAMES,
     GamePlayed,
     PlayerToDate,
@@ -49,12 +50,22 @@ _USAGE_INGEST: Final = frozenset(
 )
 
 
+class UnjudgedArtifactError(ValueError):
+    """`model/ros-priors` holds numbers of another configuration than the judged one (no interval)."""
+
+
 def load_ros_priors(conn: Connection, version: int = ARTIFACT_VERSION) -> RosPriors | None:
-    """The judged model's fitted numbers, or None when the store does not hold the artifact."""
+    """The judged model's fitted numbers, or None when the store does not hold the artifact. An
+    artifact of another configuration than round 3's (it carries an interval) is refused."""
     try:
-        return priors_from(read_artifact(conn, ARTIFACT_NAME, version).payload)
+        priors = priors_from(read_artifact(conn, ARTIFACT_NAME, version).payload)
     except MissingArtifactError:
         return None
+    if priors.interval_by != NO_INTERVAL:
+        raise UnjudgedArtifactError(
+            f"{ARTIFACT_NAME} v{version} carries an interval ({priors.interval_by}), not round 3's"
+        )
+    return priors
 
 
 @dataclass(frozen=True, slots=True)

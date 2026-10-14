@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from research.errors import ConfigurationError
 from research.model.ros.live import (
     FIRST_MODEL_WEEK,
     PlayerWeeks,
@@ -17,6 +18,7 @@ from research.model.ros.live import (
     window_of,
 )
 from research.model.ros.raw_line import RawLine, line_of, payload_of
+from research.model.ros.scratch import check_target_url
 from research.model.ros.ship import first_difference
 from research.nightly.build.player_season import SCORING
 from research.nightly.build.ros import RosBasis, carried
@@ -90,23 +92,43 @@ def test_the_players_input_stops_at_the_lines_and_ranks_from_the_window() -> Non
     }
     who = PlayerWeeks("p", "WR", "KC", {1: "KC", 2: "BUF"}, weeks)
     schedule = {"KC": [1, 2, 3, 4, 5, 6, 7], "BUF": [1, 2, 3, 5, 6, 8, 9, 17, 18]}
-    player = player_to_date(who, Window(6, 5), schedule, stale_prior(None, _SERVED, 17.0), SCORING)
+    player = player_to_date(who, Window(7, 5), schedule, stale_prior(None, _SERVED, 17.0), SCORING)
     assert player.club_weeks == (1, 2, 3, 5)  # his latest club is Buffalo
     assert [g.week for g in player.played] == [1, 2]
-    assert player.remaining_weeks == (6, 8, 9, 17)
+    assert player.remaining_weeks == (8, 9, 17)  # Buffalo plays weeks 8, 9 and 17 from week 7
     assert player.streak == 2
 
 
 def test_the_in_season_basis_names_the_rest_of_the_season_and_the_refresh() -> None:
-    rest = RosBasis(6, 5, datetime(2026, 10, 14, 3, 30, tzinfo=UTC))  # 23:30 on October 13 in New York
-    assert month_day(rest.refreshed_at) == "October 13"
+    rest = RosBasis(7, 6, datetime(2026, 10, 21, 3, 30, tzinfo=UTC))  # 23:30 on October 20 in New York
+    assert month_day(rest.refreshed_at) == "October 20"
     shown = format_json(RUN_FORMATS[0], 2026, rest)
     assert shown["basis"] == [
-        "PPR, rest of the 2026 season from week 6, refreshed October 13",
+        "PPR, rest of the 2026 season from week 7, refreshed October 20",
         "ranked by points over replacement in a 12-team league",
         "tiers drawn within each position",
     ]
-    assert (shown["rosFromWeek"], shown["rosThroughWeek"], shown["refreshedAt"]) == (6, 5, "2026-10-14T03:30:00.000Z")
+    assert (shown["rosFromWeek"], shown["rosThroughWeek"], shown["refreshedAt"]) == (7, 6, "2026-10-21T03:30:00.000Z")
     preseason = format_json(RUN_FORMATS[0], 2026)
     assert "rosFromWeek" not in preseason
     assert preseason["basis"][:2] == ["PPR, full 2026 season", "projected before the season's first kickoff"]
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgres://commish:commish@localhost:5432/commish",
+        "postgres://commish:commish@localhost/commish",  # no port: libpq's 5432
+        "postgres://commish:commish@127.0.0.1/commish",
+        "postgres://commish:commish@[::1]/commish",
+        "postgres://u:p@prod.example:6543/commish_test",  # the parity database, anywhere
+    ],
+)
+def test_the_one_shot_guard_refuses_dev_and_the_parity_database(url: str) -> None:
+    with pytest.raises(ConfigurationError):
+        check_target_url(url)
+
+
+def test_the_one_shot_guard_admits_an_explicit_other_store() -> None:
+    check_target_url("postgres://u:p@localhost:6543/commish")  # a proxy on another port
+    check_target_url("postgres://commish:commish@localhost:5433/lane18_live")

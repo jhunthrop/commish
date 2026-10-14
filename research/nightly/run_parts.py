@@ -169,8 +169,9 @@ def ros_setup(engine: Engine, instant: datetime, log: Log) -> RosSetup:
             switched = priors is not None and bool(weeks) and min(weeks) >= FIRST_MODEL_WEEK
             players = season_players(conn, PRODUCT_SEASON, instant) if switched else ()
     except Exception as error:
-        log(f"rest of season: the model's inputs could not be read ({type(error).__name__}: {error})")
-        return RosSetup(None, None)
+        why = f"{type(error).__name__}: {error}"
+        log(f"rest of season: the model's inputs could not be read ({why})")
+        return RosSetup(None, None, unread=why)
     return RosSetup(priors, raw, players)
 
 

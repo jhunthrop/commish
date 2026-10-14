@@ -3,7 +3,6 @@
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any, Final, Protocol
-from zoneinfo import ZoneInfo
 
 from research.model.instants import js_iso
 from research.nightly.config import PAGE_FORMAT, TEAMS, RunFormat
@@ -157,8 +156,6 @@ class RestOfSeason(Protocol):
     def refreshed_at(self) -> datetime: ...
 
 
-# The day a run refreshed the board, in the product's time zone (the league's Sunday is Eastern).
-_PRODUCT_ZONE: Final = ZoneInfo("America/New_York")
 _MONTHS: Final = (
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
@@ -167,5 +164,5 @@ _MONTHS: Final = (
 
 def month_day(instant: datetime) -> str:
     """ "October 14": the month in words and the day, in the product's time zone."""
-    local = instant.astimezone(_PRODUCT_ZONE)
+    local = instant.astimezone(schedule_read.EASTERN)
     return f"{_MONTHS[local.month - 1]} {local.day}"

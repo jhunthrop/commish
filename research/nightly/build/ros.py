@@ -47,6 +47,8 @@ class RosSetup:
     priors: RosPriors | None
     raw: RawLine | None
     season_players: tuple[SeasonPlayer, ...] = ()
+    # Why the inputs could not be read, when a read failed (the report names it, not a missing artifact).
+    unread: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,12 +91,25 @@ def _weeks(provider_id: str, context: SeasonContext) -> dict[int, WeekFacts]:
 
 def _off_board_rows(board: FormatBoard, players: Sequence[SeasonPlayer]) -> list[StoredRow]:
     """A row for every player with a line this season the page board does not rank (points filled later)."""
-    on = {entry.row.universe_id for entry in board.entries}
+    on = {entry.row.universe_id for entry in board.entries} | {entry.row.player_id for entry in board.entries}
     return [
-        StoredRow(p.universe_id, p.provider_id, p.name, p.position, p.team, p.headshot_url, p.market_adp, 0.0, None, None, None, 0.0)
+        StoredRow(
+            universe_id=p.universe_id,
+            player_id=p.provider_id,
+            name=p.name,
+            position=p.position,
+            team=p.team,
+            headshot_url=p.headshot_url,
+            market_adp=p.market_adp,
+            projected=0.0,
+            floor=None,
+            median=None,
+            ceiling=None,
+            expected_games=0.0,
+        )
         for p in players
-        if p.universe_id not in on
-    ]  # fmt: skip
+        if p.universe_id not in on and p.provider_id not in on
+    ]
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,18 +121,36 @@ class Ready:
     raw: RawLine
 
 
+def whole_line(line: Mapping[str, float] | None, scorings: frozenset[str]) -> dict[str, float] | None:
+    """A player's raw line with every scoring the model computes: one the line lacks takes his PPR
+    figure, never read, since a board of a scoring the line lacks stays preseason (`ros_boards`)."""
+    if not line:
+        return None
+    stand_in = next(line[name] for name in FORMATS if name in line)
+    return {name: line[name] if name in scorings and name in line else line.get("ppr", stand_in) for name in FORMATS}
+
+
 def _projections(
     boards: Sequence[FormatBoard], extra: Sequence[StoredRow], context: SeasonContext, ready: Ready
 ) -> dict[str, tuple[Mapping[str, float], float]]:
-    """Rest-of-season points by scoring and expected games, for the judged universe."""
+    """Rest-of-season points by scoring and expected games, for the page board's players and the ones
+    with a line it does not rank."""
     page = next(b for b in boards if b.format.id == PAGE_FORMAT.id)
     served = _served_projected(boards)
     schedule = {club: [g.week for g in slate] for club, slate in context.games.items()}
+    scorings = carried(ready.raw)
     per_game = ready.raw.per_game
     found: dict[str, tuple[Mapping[str, float], float]] = {}
     for row, stale in [
         *(
-            (e.row, stale_prior(per_game.get(e.row.universe_id), served[e.row.universe_id], e.row.expected_games))
+            (
+                e.row,
+                stale_prior(
+                    whole_line(per_game.get(e.row.universe_id), scorings),
+                    served[e.row.universe_id],
+                    e.row.expected_games,
+                ),
+            )
             for e in page.entries
         ),
         *((row, None) for row in extra),
@@ -151,8 +184,18 @@ def carried(raw: RawLine) -> frozenset[str]:
     return frozenset(name for name in FORMATS if all(name in by for by in raw.per_game.values()))
 
 
+def held_because(board: FormatBoard, scorings: frozenset[str], found: Projections) -> str | None:
+    """Why this format's board stays preseason tonight, or None when it ranks the rest of the season."""
+    if board.format.scoring not in scorings:
+        return f"the raw line holds no {board.format.scoring} points"
+    unranked = sum(1 for entry in board.entries if entry.row.universe_id not in found)
+    return None if unranked == 0 else f"it ranks {unranked} players the PPR board does not"
+
+
 def _ready(boards: tuple[FormatBoard, ...], context: SeasonContext, instant: datetime, setup: RosSetup) -> Ready | str:
     """Every input, or why every board stays preseason tonight."""
+    if setup.unread is not None:
+        return f"the model's inputs could not be read ({setup.unread})"
     if setup.priors is None:
         return "the rest-of-season artifact is not in the store"
     window = window_of(pending_weeks(context.games, instant), context.through)
@@ -166,7 +209,9 @@ def _ready(boards: tuple[FormatBoard, ...], context: SeasonContext, instant: dat
 
 
 def ros_boards(boards: Sequence[FormatBoard], context: SeasonContext, instant: datetime, setup: RosSetup) -> RosResult:
-    """The boards the run prints, with the basis of the in-season ones or why they are preseason."""
+    """The boards the run prints, with the basis of the in-season ones or why they are preseason. A
+    format whose board cannot be ranked as judged (a scoring the raw line lacks, a player the PPR board
+    does not rank) stays preseason alone, and the status names it."""
     preseason = tuple(boards)
     ready = _ready(preseason, context, instant, setup)
     if isinstance(ready, str):
@@ -176,13 +221,15 @@ def ros_boards(boards: Sequence[FormatBoard], context: SeasonContext, instant: d
     extra = _off_board_rows(page, setup.season_players)
     found = _projections(preseason, extra, context, ready)
     scorings = carried(ready.raw)
-    out = tuple(_reranked(b, extra, found) if b.format.scoring in scorings else b for b in preseason)
-    held = [b.format.id for b in preseason if b.format.scoring not in scorings]
-    missing = sorted({b.format.scoring for b in preseason} - scorings)
+    held = {b.format.id: why for b in preseason if (why := held_because(b, scorings, found)) is not None}
+    out = tuple(b if b.format.id in held else _reranked(b, extra, found) for b in preseason)
+    ranked = frozenset(b.format.id for b in preseason if b.format.id not in held)
+    kept = "; ".join(f"preseason for {fid}: {why}" for fid, why in held.items())
+    if not ranked:
+        return RosResult(preseason, None, f"preseason: {kept}")
     status = (
         f"rest of season from week {window.from_week} (switch week {FIRST_MODEL_WEEK - 1}), lines through week "
         f"{window.through}, model {MODEL_NAME}, {len(extra)} players off the preseason board ranked"
-        + (f"; preseason for {', '.join(held)}: the raw line holds no {' or '.join(missing)} points" if held else "")
+        + (f"; {kept}" if kept else "")
     )
-    ranked = frozenset(b.format.id for b in preseason if b.format.scoring in scorings)
     return RosResult(out, RosBasis(window.from_week, window.through, instant), status, ranked)

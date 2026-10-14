@@ -43,7 +43,7 @@ def fitted_on(record: Path) -> str:
         f"{SHIPPED.model_name} at {model_version()}: round 3 of the rest-of-season board "
         f"(docs/research/2026-10-14-rest-of-season-round3-preregistration.md), fit on "
         f"{'-'.join(str(s) for s in (SHIPPED.fit_seasons[0], SHIPPED.fit_seasons[-1]))}, judged once on "
-        f"{SHIPPED.judgment_season} weeks 8 and 12 ({record.name}: G1 24 of 24, G2 21 of 24); shipped by the "
+        f"{SHIPPED.judgment_season} weeks 8 and 12 (the record: {record.name}); shipped by the "
         "founder's ruling of 2026-10-14; equal, number for number, to the judged record's priors"
     )
 

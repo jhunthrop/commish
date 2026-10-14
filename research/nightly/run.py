@@ -132,7 +132,8 @@ def run_nightly(deps: RunDeps, options: RunOptions) -> RunOutcome:
             frozen_by = carry_forward(
                 read_frozen_by(deps.store), PRODUCT_SEASON, frozen_weeks(conn, PRODUCT_SEASON), run_id
             )
-            assembled = assemble(conn, deps.clock(), frozen_by, ros_setup(deps.engine, deps.clock(), deps.log))
+            instant = deps.clock()
+            assembled = assemble(conn, instant, frozen_by, ros_setup(deps.engine, instant, deps.log))
     except Exception as error:
         return _failed(deps, run_id, steps, error)
     for line in assembled.dropped:

@@ -61,7 +61,8 @@ def check_target_url(url: str) -> None:
     database = parsed.path.lstrip("/")
     if database == PARITY_DATABASE:
         raise ConfigurationError("the parity database is the harness's, never a target")
-    if (parsed.hostname or "") in LOCAL_HOSTS and parsed.port == DEV_PORT and database == DEV_DATABASE:
+    # No port is libpq's default, 5432: dev's.
+    if (parsed.hostname or "") in LOCAL_HOSTS and parsed.port in (None, DEV_PORT) and database == DEV_DATABASE:
         raise ConfigurationError("dev on 5432 is only read")
 
 

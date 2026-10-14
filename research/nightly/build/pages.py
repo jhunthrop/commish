@@ -88,7 +88,7 @@ def numbers_of(entry: BoardEntry, adp: float | None) -> Json:
         "ceiling": row.ceiling,
         "tier": entry.tier,
     }
-    if row.floor is None:
+    if entry.in_season:
         # In season, beside the rest-of-season figures: where the preseason board had him, or null
         # for a player it did not rank.
         before = entry.preseason
