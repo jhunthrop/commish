@@ -8,6 +8,8 @@ import (
 	"os"
 	"slices"
 	"testing"
+
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // The fixture is a real public league's settings as ESPN answered them
@@ -87,9 +89,10 @@ func TestMapRealLeague(t *testing.T) {
 	if len(im.Rules) != len(want) {
 		t.Errorf("%d rules, want %d", len(im.Rules), len(want))
 	}
-	for _, d := range []string{"400+ yard passing game 1", "defense, 0 points allowed 10", "defense, blocked kick 2", "fumble recovered for a TD 6"} {
-		if !slices.Contains(im.Dropped, d) {
-			t.Errorf("dropped %q, want %q among them", im.Dropped, d)
+	words := scoring.DroppedWords(im.Dropped)
+	for _, d := range []string{"400 yard passing game 1", "0 points allowed 10", "blocked kick 2", "fumble recovered for a touchdown 6", "two-point return 2"} {
+		if !slices.Contains(words, d) {
+			t.Errorf("dropped %q, want %q among them", words, d)
 		}
 	}
 	if !slices.Equal(im.Defaulted, []string{"te_reception_bonus 0", "points_per_extra_point_missed 0"}) {

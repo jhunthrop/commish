@@ -2,7 +2,6 @@ package espn
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/jhunthrop/commish/api/internal/scoring"
 )
@@ -89,7 +88,7 @@ type mapper struct {
 	stated  map[int]float64
 	used    map[int]bool
 	rules   map[string]float64
-	dropped []string
+	dropped []scoring.DroppedRule
 }
 
 func (m *mapper) take(stat int) (float64, bool) {
@@ -178,10 +177,10 @@ func (m *mapper) alike() {
 func (m *mapper) finish() scoring.Imported {
 	for stat, v := range m.stated {
 		if !m.used[stat] && v != 0 {
-			m.dropped = append(m.dropped, fmt.Sprintf("%s %g", label(stat), v))
+			m.dropped = append(m.dropped, scoring.Dropped(label(stat), v))
 		}
 	}
-	sort.Strings(m.dropped)
+	scoring.SortDropped(m.dropped)
 	out := scoring.Imported{Rules: m.rules, Dropped: m.dropped}
 	for _, r := range scoring.Rules() {
 		if _, ok := out.Rules[r.Key]; !ok {

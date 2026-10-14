@@ -10,7 +10,9 @@
 	import {
 		IMPORT_HOSTS,
 		RULE_GROUPS,
+		droppedGroups,
 		importLine,
+		pointsWords,
 		ruleLabel,
 		type ImportHost,
 		type RuleGroup,
@@ -80,9 +82,18 @@
 		{#if result}
 			<p class="took">{importLine(result)}</p>
 			{#if result.dropped.length > 0}
-				<p class="note">
-					Your league also scores these, which our board leaves out: {listWords(result.dropped)}.
-				</p>
+				<p class="note">Your league also scores these. Our board leaves them out.</p>
+				<div class="left">
+					{#each droppedGroups(result.dropped) as group (group.label)}
+						<h4>{group.label}</h4>
+						<dl>
+							{#each group.rules as d, i (i)}
+								<dt>{d.rule}</dt>
+								<dd>{d.points === null ? '' : pointsWords(d.points)}</dd>
+							{/each}
+						</dl>
+					{/each}
+				</div>
 			{/if}
 			{#if result.defaulted.length > 0}
 				<p class="note">
@@ -173,6 +184,41 @@
 		margin: 0;
 		font-size: var(--t-sm);
 		font-weight: 600;
+	}
+
+	.left {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-1);
+		max-width: 420px;
+	}
+
+	h4 {
+		margin: var(--s-1) 0 0;
+		font-size: var(--t-xs);
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		font-weight: 500;
+		color: var(--ink-3);
+	}
+
+	dl {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 2px var(--s-3);
+		margin: 0;
+		font-size: var(--t-sm);
+	}
+
+	dt {
+		color: var(--ink-2);
+	}
+
+	dd {
+		margin: 0;
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+		color: var(--ink);
 	}
 
 	.groups {

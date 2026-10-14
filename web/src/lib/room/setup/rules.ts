@@ -139,6 +139,36 @@ export function ruleLabel(defaulted: string): string {
 	return LABELS.get(key) ?? key;
 }
 
+export type DroppedRule = components['schemas']['DroppedRule'];
+
+const GROUP_WORDS: Readonly<Record<DroppedRule['group'], string>> = {
+	offense: 'Offense',
+	bonus: 'Bonuses',
+	kicking: 'Kicking',
+	defense: 'Defense',
+	other: 'Other'
+};
+
+/** The left-out rules by group, in the API's order, each group named once. */
+export function droppedGroups(
+	rules: readonly DroppedRule[]
+): { label: string; rules: DroppedRule[] }[] {
+	const out: { label: string; rules: DroppedRule[] }[] = [];
+	for (const rule of rules) {
+		const label = GROUP_WORDS[rule.group];
+		const last = out.at(-1);
+		if (last?.label === label) last.rules.push(rule);
+		else out.push({ label, rules: [rule] });
+	}
+	return out;
+}
+
+/** "+10 points", "-4 points", "1 point". */
+export function pointsWords(points: number): string {
+	const sign = points > 0 ? '+' : '';
+	return `${sign}${String(points)} ${Math.abs(points) === 1 ? 'point' : 'points'}`;
+}
+
 /** The line that says what an import brought in, with its count's basis. */
 export function importLine(result: ScoringImport): string {
 	const n = result.applied.length;

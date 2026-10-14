@@ -1565,6 +1565,17 @@ components:
       properties:
         host: { type: string, enum: [sleeper, espn, mfl] }
         link: { type: string, minLength: 1, maxLength: 300, description: the league link as pasted, or its id }
+    DroppedRule:
+      type: object
+      required: [group, rule, points]
+      properties:
+        group: { type: string, enum: [offense, bonus, kicking, defense, other] }
+        rule: { type: string, description: the rule in drafter words, no commas }
+        points:
+          type: number
+          format: double
+          nullable: true
+          description: the host's figure, null when the rule's own words carry it
     ScoringImport:
       type: object
       required: [rules, applied, dropped, defaulted]
@@ -1573,8 +1584,8 @@ components:
         applied: { type: array, items: { type: string }, description: the rules the host states, by our names }
         dropped:
           type: array
-          items: { type: string }
-          description: every host rule the 21 do not carry, in the host's words with its figure, never silently lost
+          items: { $ref: "#/components/schemas/DroppedRule" }
+          description: every host rule the 21 do not carry, in drafter words by group with its figure, never silently lost
         defaulted:
           type: array
           items: { type: string }

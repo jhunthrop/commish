@@ -1375,12 +1375,23 @@ export interface components {
 			/** @description the league link as pasted */
 			link: string;
 		};
+		DroppedRule: {
+			/** @enum {string} */
+			group: 'offense' | 'bonus' | 'kicking' | 'defense' | 'other';
+			/** @description the rule in drafter words */
+			rule: string;
+			/**
+			 * Format: double
+			 * @description the host's figure, null when the rule's own words carry it
+			 */
+			points: number | null;
+		};
 		ScoringImport: {
 			rules: components['schemas']['ScoringRules'];
 			/** @description the rules the host states */
 			applied: string[];
-			/** @description every host rule the 21 do not carry, in the host's words with its figure, never silently lost */
-			dropped: string[];
+			/** @description every host rule the 21 do not carry, in drafter words by group with its figure, never silently lost */
+			dropped: components['schemas']['DroppedRule'][];
 			/** @description the rules the host does not state, each at the standard figure */
 			defaulted: string[];
 		};

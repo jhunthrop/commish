@@ -159,6 +159,33 @@ func (e DraftPassStateSource) Valid() bool {
 	}
 }
 
+// Defines values for DroppedRuleGroup.
+const (
+	DroppedRuleGroupBonus   DroppedRuleGroup = "bonus"
+	DroppedRuleGroupDefense DroppedRuleGroup = "defense"
+	DroppedRuleGroupKicking DroppedRuleGroup = "kicking"
+	DroppedRuleGroupOffense DroppedRuleGroup = "offense"
+	DroppedRuleGroupOther   DroppedRuleGroup = "other"
+)
+
+// Valid indicates whether the value is a known member of the DroppedRuleGroup enum.
+func (e DroppedRuleGroup) Valid() bool {
+	switch e {
+	case DroppedRuleGroupBonus:
+		return true
+	case DroppedRuleGroupDefense:
+		return true
+	case DroppedRuleGroupKicking:
+		return true
+	case DroppedRuleGroupOffense:
+		return true
+	case DroppedRuleGroupOther:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ExportFormat.
 const (
 	ExportFormatCsv ExportFormat = "csv"
@@ -1128,6 +1155,20 @@ type DraftPassState struct {
 // DraftPassStateSource defines model for DraftPassState.Source.
 type DraftPassStateSource string
 
+// DroppedRule defines model for DroppedRule.
+type DroppedRule struct {
+	Group DroppedRuleGroup `json:"group"`
+
+	// Points the host's figure, null when the rule's own words carry it
+	Points *float64 `json:"points"`
+
+	// Rule the rule in drafter words
+	Rule string `json:"rule"`
+}
+
+// DroppedRuleGroup defines model for DroppedRule.Group.
+type DroppedRuleGroup string
+
 // Envelope defines model for Envelope.
 type Envelope struct {
 	// Data the payload
@@ -2020,8 +2061,8 @@ type ScoringImport struct {
 	// Defaulted the rules the host does not state, each at the standard figure
 	Defaulted []string `json:"defaulted"`
 
-	// Dropped every host rule the 21 do not carry, in the host's words with its figure, never silently lost
-	Dropped []string `json:"dropped"`
+	// Dropped every host rule the 21 do not carry, in drafter words by group with its figure, never silently lost
+	Dropped []DroppedRule `json:"dropped"`
 
 	// Rules A league's exact scoring, the 21 rules research/model/domain.py ScoringRules names, every one required. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest.
 	Rules ScoringRules `json:"rules"`
