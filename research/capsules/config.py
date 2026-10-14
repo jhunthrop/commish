@@ -116,6 +116,10 @@ class CapsuleConfig:
     # A written sentence this long or longer may sit on one page only; shorter ones ("Draft him.",
     # "Let him go.") are the product's vocabulary, not stock prose (ruled in phase C's fix round 3).
     shared_sentence_min_words: int = 4
+    # A six-word span (`capsules.spans`) on two pages is queued for the repair and counted; one still on
+    # this many pages after the repairs is a stock phrase, not coincidence, and fails the run (the
+    # coordinator's Lane 17 ruling).
+    stock_span_pages: int = 3
     narrative_voice_rewrites_per_slot: int = 1
     length_correction: LengthCorrection = LengthCorrection()
     narrative_target_share_of_cap: float = 0.75
@@ -123,6 +127,10 @@ class CapsuleConfig:
     repetition: Repetition = Repetition()
     # A law group's |net effect| at or above this is a real, citable downside.
     tension_threshold_points: float = 1.0
+    # Pages one night may write, every pass together. Measured in Lane 17 (2026-10-14, the in-season
+    # floor): a page costs $0.0027 to $0.0038. In season most of the board's sheets move on the morning
+    # a week lands, so that night rewrites about 536 pages, about $1.60 to $2.00, and the retries and
+    # repairs take the rest: the ceiling is about $2.10 to $2.65 a night. Other nights write only what moved.
     sweep_generation_budget: int = 700
     # Zero: every gateway call is spaced at `gateway.min_call_spacing_ms`, which paces the sweep.
     sweep_pacing_ms: int = 0

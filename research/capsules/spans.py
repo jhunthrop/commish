@@ -39,6 +39,22 @@ class SharedSpan:
     player_ids: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class SpanRules:
+    """What a span is judged against: the words that break a run (`names`), and the spans the fact
+    sheets themselves print (`exempt`): a read that copies a sheet label or a stat name word for word
+    ("red-zone share of his own touches") shares it with every page that names the same stat, which
+    is the label, not stock prose. Both are built at run time, never a hand list."""
+
+    names: frozenset[str]
+    exempt: frozenset[str] = frozenset()
+
+
+def sheet_spans(sheets: Iterable[str], names: frozenset[str]) -> frozenset[str]:
+    """Every span the rendered fact sheets print, read as a capsule's spans are read."""
+    return frozenset(span for sheet in sheets for span in spans_of(runs_of(sheet, names)))
+
+
 def club_name_words() -> frozenset[str]:
     """Every word of every club's city and nickname."""
     return frozenset(word for city, nickname in NFL_TEAM_NAMES.values() for word in (*city.split(), nickname))
@@ -74,11 +90,11 @@ def page_runs(bodies: Sequence[str], names: frozenset[str]) -> Runs:
     return tuple(run for body in bodies for run in runs_of(body, names))
 
 
-def shared_spans(pages: Mapping[str, Runs]) -> tuple[SharedSpan, ...]:
-    """Every span on two pages or more, the most widely shared first."""
+def shared_spans(pages: Mapping[str, Runs], exempt: frozenset[str] = frozenset()) -> tuple[SharedSpan, ...]:
+    """Every span on two pages or more that no fact sheet prints, the most widely shared first."""
     holders: dict[str, list[str]] = {}
     for player_id, runs in pages.items():
-        for span in spans_of(runs):
+        for span in spans_of(runs) - exempt:
             holders.setdefault(span, []).append(player_id)
     shared = [SharedSpan(span, tuple(sorted(ids))) for span, ids in holders.items() if len(ids) > 1]
     return tuple(sorted(shared, key=lambda s: (-len(s.player_ids), s.span)))

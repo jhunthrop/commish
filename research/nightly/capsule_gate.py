@@ -10,9 +10,11 @@ across players is a defect. The run fails when
   every written read on the board). Shorter ones, "Draft him." and "Let him go.", are the
   product's vocabulary, not stock prose; or
 - any six words in a row (`capsules.spans`, case folded, punctuation stripped, player and club names
-  breaking the run) appear on two players' written pages (the live review's M1). Every page carrying
-  one fails, and each page's shared spans are kept, joined where they overlap, for the repair's
-  prompt.
+  breaking the run) still appear on `stock_span_pages` (three) players' written pages or more once the
+  repairs have run: a stock phrase, not coincidence (the live review's M1, as the coordinator ruled
+  it). A span on exactly two pages is counted and queued for the repair but does not fail the run,
+  and a span a fact sheet prints itself (a label or a stat name copied word for word) is exempt.
+  Each page's shared spans are kept, joined where they overlap, for the repair's prompt.
 
 Phase D extends this gate (the page findings of `capsules.pull_figures`, the run's other gates);
 the nightly's capsule step runs it after the sweep.
@@ -31,8 +33,19 @@ from research.capsules.facts.board import board_rows
 from research.capsules.facts.collect import universe_ids_for
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.narrative import normalize_sentence, sentences_verbatim
-from research.capsules.spans import Runs, SharedSpan, name_words, page_runs, phrases_on_page, shared_spans
+from research.capsules.render import render_facts_for_model
+from research.capsules.spans import (
+    Runs,
+    SharedSpan,
+    SpanRules,
+    name_words,
+    page_runs,
+    phrases_on_page,
+    shared_spans,
+    sheet_spans,
+)
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, stored_capsules_for
+from research.capsules.sweep import subjects_of
 from research.season import PRODUCT_SEASON
 
 _EXAMPLES: Final = 5
@@ -52,10 +65,19 @@ class CapsuleGateResult:
     template: int
     missing: int
     shared: tuple[SharedSentence, ...]
+    # Every span on two pages or more that no fact sheet prints, queued for the repair.
     spans: tuple[SharedSpan, ...] = ()
     # Each page that carries a shared span, to its shared spans joined where they overlap.
     span_phrases: Mapping[str, tuple[str, ...]] = field(default_factory=lambda: MappingProxyType({}))
+    # Spans two pages or more share that a fact sheet prints, so not judged.
+    exempt_spans: int = 0
     share_max: float = CAPSULE_CONFIG.unwritten_share_max
+    stock_span_pages: int = CAPSULE_CONFIG.stock_span_pages
+
+    @property
+    def stock_spans(self) -> tuple[SharedSpan, ...]:
+        """The spans that fail the run: on `stock_span_pages` pages or more."""
+        return tuple(s for s in self.spans if len(s.player_ids) >= self.stock_span_pages)
 
     @property
     def unwritten_share(self) -> float:
@@ -64,7 +86,7 @@ class CapsuleGateResult:
 
     @property
     def ok(self) -> bool:
-        return self.unwritten_share <= self.share_max and not self.shared and not self.spans
+        return self.unwritten_share <= self.share_max and not self.shared and not self.stock_spans
 
     def summary(self) -> str:
         verdict = "passed" if self.ok else "failed"
@@ -72,8 +94,9 @@ class CapsuleGateResult:
             f"capsule gate: {verdict}, {self.board_players} board pages, {self.written} written, "
             f"{self.facts_blocks} facts blocks, {self.template} on the oracle's template, {self.missing} missing "
             f"({self.unwritten_share:.1%} unwritten, the line {self.share_max:.0%}), "
-            f"{len(self.shared)} written sentences on two pages, {len(self.spans)} six-word spans on two pages "
-            f"({len(self.span_phrases)} pages carry one)"
+            f"{len(self.shared)} written sentences on two pages, {len(self.spans)} six-word spans on two pages or "
+            f"more ({len(self.span_phrases)} pages carry one, queued for repair), {len(self.stock_spans)} on "
+            f"{self.stock_span_pages} pages or more (failing), {self.exempt_spans} sheet labels exempt"
         )
         examples = "; ".join(
             [
@@ -109,14 +132,13 @@ def _written_runs(rows: Mapping[str, StoredCapsule], names: frozenset[str]) -> d
     }
 
 
-def judge_capsules(
-    board_ids: Sequence[str], rows: Mapping[str, StoredCapsule], names: frozenset[str]
-) -> CapsuleGateResult:
-    """The gate over the board's universe ids and their stored rows; `names` break a span's run."""
+def judge_capsules(board_ids: Sequence[str], rows: Mapping[str, StoredCapsule], rules: SpanRules) -> CapsuleGateResult:
+    """The gate over the board's universe ids and their stored rows, spans judged by `rules`."""
     on_board = {pid: rows[pid] for pid in board_ids if pid in rows}
     sources = [row.source for row in on_board.values()]
-    runs = _written_runs(on_board, names)
-    spans = shared_spans(runs)
+    runs = _written_runs(on_board, rules.names)
+    spans = shared_spans(runs, rules.exempt)
+    exempt = len(shared_spans(runs)) - len(spans)
     held = frozenset(s.span for s in spans)
     carriers = {pid for s in spans for pid in s.player_ids}
     return CapsuleGateResult(
@@ -128,6 +150,7 @@ def judge_capsules(
         shared=shared_written_sentences(on_board),
         spans=spans,
         span_phrases=MappingProxyType({pid: phrases_on_page(runs[pid], held) for pid in sorted(carriers)}),
+        exempt_spans=exempt,
     )
 
 
@@ -143,7 +166,14 @@ def span_names(conn: Connection) -> frozenset[str]:
     return name_words(str(name) for name in conn.execute(text("select name from research.provider_players")).scalars())
 
 
+def span_rules(conn: Connection, as_of: datetime) -> SpanRules:
+    """The names, and every span the board's fact sheets print at `as_of` (the exemption)."""
+    names = span_names(conn)
+    sheets = (render_facts_for_model(subject.facts) for subject in subjects_of(conn, as_of))
+    return SpanRules(names, sheet_spans(sheets, names))
+
+
 def capsule_gate(conn: Connection, as_of: datetime) -> CapsuleGateResult:
     """The gate over the board as served at `as_of` (its pages keyed on the universe id)."""
     board_ids = board_universe_ids(conn, as_of)
-    return judge_capsules(board_ids, stored_capsules_for(conn, board_ids), span_names(conn))
+    return judge_capsules(board_ids, stored_capsules_for(conn, board_ids), span_rules(conn, as_of))

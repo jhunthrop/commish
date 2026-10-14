@@ -21,7 +21,7 @@ from research.capsules.pull_figures import PageValues, capsule_findings, page_nu
 from research.capsules.season_voice import clock_of
 from research.capsules.store import stored_capsules_for
 from research.capsules.sweep import Subject, subjects_of, worn_phrases, write_one
-from research.nightly.capsule_gate import judge_capsules, span_names
+from research.nightly.capsule_gate import judge_capsules, span_rules
 from research.season import PRODUCT_SEASON
 
 
@@ -89,11 +89,11 @@ def write_chosen(engine: Engine, gateway: GatewayClient, as_of: datetime, choice
     return written
 
 
-def gate_written(engine: Engine, written: Sequence[Written]) -> list[str]:
+def gate_written(engine: Engine, written: Sequence[Written], as_of: datetime) -> list[str]:
     """One line per capsule (outcome, cost, pull figures, gate findings), read back from the store, and the totals."""
     with engine.connect() as conn:
         stored = stored_capsules_for(conn, [w.subject.universe_id for w in written])
-        names = span_names(conn)
+        rules = span_rules(conn, as_of)
     lines: list[str] = []
     calls = prompt = completion = 0
     cost = 0.0
@@ -123,7 +123,7 @@ def gate_written(engine: Engine, written: Sequence[Written]) -> list[str]:
             f"completion tokens, ${d:.6f}; pull figures {figures or 'none'}; {verdict}; "
             f"narrative slots kept {len(w.result.narrative.slots)}, refused {len(w.result.narrative.refused)}"
         )
-    judged = judge_capsules([w.subject.universe_id for w in written], stored, names)
+    judged = judge_capsules([w.subject.universe_id for w in written], stored, rules)
     lines.append(f"the nightly's capsule gate over these pages alone: {judged.summary()}")
     n = max(1, len(written))
     lines.append(
