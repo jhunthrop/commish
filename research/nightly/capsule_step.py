@@ -10,10 +10,13 @@ The order, and why each pass exists:
 3. **The retry passes** (up to `RETRY_PASSES`): another attempt at the pages still unwritten (facts blocks), from the budget
    left, because a throttled or refused read often succeeds on a second try.
 4. **The repair pass**: the capsule gate fails a run when a written sentence of four words or more
-   sits on two pages, or a written page fails its page gate (`page_findings`: no page number
-   printed, or a voice-rule hit), and those pages are rewritten. Each such sentence is kept on its first page in board order and the other
-   pages are rewritten with the shared sentences quoted as worn language, at most `REPAIR_PASSES`
-   times, from the budget left.
+   sits on two pages, six words in a row sit on two pages (`capsules.spans`), or a written page fails
+   its page gate (`page_findings`: no page number printed, a voice-rule hit, a time frame slip for
+   the run's day), and those pages are rewritten. Each shared sentence and span is kept on its first
+   page in board order and the other pages are rewritten, the shared sentences quoted to every one
+   as worn language and each page's own shared spans quoted to it, at most `REPAIR_PASSES` times,
+   from the budget left. The first page keeps the span so each pass strictly shrinks the set: were
+   every carrier rewritten, two pages could trade one shared span for another night after night.
 5. **The retry passes again**, when a repair's rewrite could not pass its validator and left a facts
    block, with the sentences still on two pages quoted, and then the repairs once more, since a page
    those retries write can share a sentence.
@@ -39,7 +42,7 @@ from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.gateway import GatewayClient
 from research.capsules.store import queue_regeneration
 from research.capsules.sweep import SweepPlan, SweepReport, sweep_capsules
-from research.nightly.capsule_gate import CapsuleGateResult, SharedSentence, board_universe_ids, capsule_gate
+from research.nightly.capsule_gate import CapsuleGateResult, board_universe_ids, capsule_gate
 from research.nightly.page_findings import PageFindings, page_findings
 
 REPAIR_PASSES: Final = 3
@@ -100,14 +103,25 @@ class CapsuleStepResult:
     wrote: bool
 
 
-def repair_targets(shared: Sequence[SharedSentence], board_order: Sequence[str]) -> list[str]:
-    """Every page but the first (in board order) of each shared sentence, each once, in board order."""
+def repair_targets(holders: Sequence[tuple[str, ...]], board_order: Sequence[str]) -> list[str]:
+    """Every page but the first (in board order) of each shared sentence or span (`holders`, each one's
+    pages), each once, in board order."""
     place = {player_id: index for index, player_id in enumerate(board_order)}
     rewrite: set[str] = set()
-    for sentence in shared:
-        ordered = sorted(sentence.player_ids, key=lambda pid: place.get(pid, len(place)))
+    for player_ids in holders:
+        ordered = sorted(player_ids, key=lambda pid: place.get(pid, len(place)))
         rewrite.update(ordered[1:])
     return sorted(rewrite, key=lambda pid: place.get(pid, len(place)))
+
+
+def _holders(gate: CapsuleGateResult) -> list[tuple[str, ...]]:
+    return [*(s.player_ids for s in gate.shared), *(s.player_ids for s in gate.spans)]
+
+
+def _quoted_spans(gate: CapsuleGateResult, pages: Sequence[str]) -> dict[str, tuple[str, ...]]:
+    """Each page's own shared spans for its repair prompt, at most `max_quoted_spans` of them."""
+    cap = CAPSULE_CONFIG.repetition.max_quoted_spans
+    return {pid: gate.span_phrases[pid][:cap] for pid in pages if pid in gate.span_phrases}
 
 
 def _sweep_line(name: str, report: SweepReport) -> str:
@@ -161,7 +175,9 @@ class _Passes:
         # The sentences already on two pages are quoted to the writer from the first call, so the
         # sweep does not write them again and the repair pass is left the few it still does.
         with self.engine.connect() as conn:
-            shared = tuple(sentence.sentence for sentence in capsule_gate(conn, self.now).shared)
+            gate = capsule_gate(conn, self.now)
+        cap = CAPSULE_CONFIG.repetition.max_quoted_spans
+        shared = (*(s.sentence for s in gate.shared), *(s.span for s in gate.spans[:cap]))
         name = "capsules (mend only: pages whose facts moved wait for a full night)" if self.mend_only else "capsules"
         report = self.sweep(name, SweepPlan(self.budget, unwritten_only=self.mend_only, avoid=shared))
         self.retry("capsule retries", report.facts, shared)
@@ -190,17 +206,20 @@ class _Passes:
                 order = board_universe_ids(conn, self.now)
                 failing = page_findings(conn, self.now).by_page
             place = {pid: index for index, pid in enumerate(order)}
-            shared_pages = repair_targets(gate.shared, order)
+            shared_pages = repair_targets(_holders(gate), order)
             targets = sorted({*shared_pages, *failing}, key=lambda pid: place.get(pid, len(place)))
             if not targets or self.left <= 0:
                 self.log(f"capsule repair {attempt}: {'none needed' if not targets else 'no budget left'}")
                 return
             avoid = tuple(sentence.sentence for sentence in gate.shared)
             name = (
-                f"capsule repair {attempt} ({len(gate.shared)} shared sentences, {len(failing)} pages failing the "
-                f"page gate, {len(targets)} pages)"
+                f"capsule repair {attempt} ({len(gate.shared)} shared sentences, {len(gate.spans)} shared spans, "
+                f"{len(failing)} pages failing the page gate, {len(targets)} pages)"
             )
-            self.sweep(name, SweepPlan(self.left, only=frozenset(targets), avoid=avoid))
+            plan = SweepPlan(
+                self.left, only=frozenset(targets), avoid=avoid, avoid_by_page=_quoted_spans(gate, targets)
+            )
+            self.sweep(name, plan)
 
 
 def run_capsule_step(engine: Engine, now: datetime, plan: CapsuleStepPlan, log: Log) -> CapsuleStepResult:

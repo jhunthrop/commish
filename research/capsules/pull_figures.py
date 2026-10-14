@@ -4,7 +4,8 @@ Ported from `research-ts/src/nightly/build/pull-figures.ts` and `nightly/gates.t
 (`capsuleFindings`). A pull figure is one of the page's own numbers (from the page's board row,
 never from the prose) that the long read prints word for word, to the tenth or, from ten up, to the
 whole point. A written page needs at least one; each must equal the page's value at the precision
-printed; and neither read may carry a voice-rule or register hit (`voice_rules.gate_hits`).
+printed; neither read may carry a voice-rule or register hit (`voice_rules.gate_hits`, a doubled word
+included) or a time frame slip for the run's day (`season_voice`).
 """
 
 import math
@@ -13,7 +14,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
-from research.capsules.voice_rules import gate_hits
+from research.capsules.season_voice import SeasonClock, names_missed_weeks, time_frame_hits
+from research.capsules.voice_rules import gate_hits, mask_names
 from research.model.jsmath import js_round, js_to_fixed
 from research.pipeline.jscompat import js_number, js_string
 
@@ -109,17 +111,23 @@ def figure_matches_value(figure: PullFigure) -> bool:
 
 
 def capsule_findings(
-    player_id: str, bodies: tuple[str, str], numbers: Sequence[PageNumber], names: Sequence[str]
+    player_id: str, bodies: tuple[str, str], numbers: Sequence[PageNumber], names: Sequence[str], clock: SeasonClock
 ) -> list[str]:
     """`capsuleFindings` for a page the writer covers: the reasons the nightly would fail it for.
-    `bodies` is (compact, full); `names` are the page's proper names, never read as banned words."""
+    `bodies` is (compact, full); `names` are the page's proper names, never read as banned words;
+    `clock` is the run's day, which the prose's time frame is held to (`season_voice`)."""
     body_compact, body_full = bodies
     figures = pull_figures_of(body_full, numbers)
     findings = [] if figures else [f"pull_figures_none:{player_id}"]
     findings += [f"pull_figure_not_in_prose:{player_id}:{f.text}" for f in figures if f.text not in body_full]
     findings += [f"pull_figure_off_page:{player_id}:{f.label}:{f.text}" for f in figures if not figure_matches_value(f)]
     found = dict.fromkeys(hit.found for hit in (*gate_hits(body_full, names), *gate_hits(body_compact, names)))
-    return findings + [f"capsule_voice_rule:{player_id}:{text}" for text in found]
+    findings += [f"capsule_voice_rule:{player_id}:{text}" for text in found]
+    slips = dict.fromkeys(
+        f"{hit.rule}:{hit.found}" for body in bodies for hit in time_frame_hits(mask_names(body, names), clock)
+    )
+    findings += [f"capsule_time_frame:{player_id}:{slip}" for slip in slips]
+    return findings + ([] if names_missed_weeks(body_full, clock) else [f"capsule_missed_weeks_unnamed:{player_id}"])
 
 
 # AN ADP CLAIM IN THE PROSE: "ADP of 25.7", "ADP 26", "pick 53", "drafted around pick 36". The number

@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.facts.depth_model import Depth, Fixture, GamesMissed
-from research.capsules.render_words import ranked_clause, whole
+from research.capsules.render_words import ranked_clause, week_of, whole
 from research.model.jsmath import js_round, js_to_fixed
 from research.pipeline.jscompat import js_string
 
@@ -30,12 +30,13 @@ def _season_endings(depth: Depth) -> list[str]:
         else:
             cause = f"the weekly roster listed him {ending.roster_status} with no body part on file"
         lines.append(
-            f"His {ending.season} season ended after week {ending.last_played_week}. From week {ending.first_missed_week} on, {cause}."
+            f"His {ending.season} season ended after {week_of(ending.last_played_week, ending.season)}. From "
+            f"{week_of(ending.first_missed_week, ending.season)} on, {cause}."
         )
     return lines
 
 
-def _week_runs(weeks: Sequence[int]) -> str:
+def _week_runs(weeks: Sequence[int], season: int) -> str:
     runs: list[str] = []
     start: int | None = None
     previous: int | None = None
@@ -49,23 +50,27 @@ def _week_runs(weeks: Sequence[int]) -> str:
         runs.append(str(start) if start == previous else f"{start} to {previous}")
     plural = "weeks" if len(weeks) > 1 else "week"
     listed = "".join(runs) if len(runs) <= 1 else f"{', '.join(runs[:-1])} and {runs[-1]}"
-    return f"{plural} {listed}"
+    return f"{plural} {listed} of {season}"
 
 
 def _games_missed(record: GamesMissed) -> str:
     played = f"Played {record.games_played} of {record.team_games} in {record.season}"
-    first = None if record.first_played_week is None else f"first appearance in week {record.first_played_week}"
+    first = (
+        None
+        if record.first_played_week is None
+        else f"first appearance in {week_of(record.first_played_week, record.season)}"
+    )
     if record.unavailable_weeks is None:
         return f"{', '.join(p for p in (played, first) if p is not None)}; {_ARCHIVES_SILENT}."
     missed = len(record.unavailable_weeks)
     clauses = [
         "none missed to injury or a reserve list"
         if missed == 0
-        else f"{missed} missed to injury or a reserve list ({_week_runs(record.unavailable_weeks)})"
+        else f"{missed} missed to injury or a reserve list ({_week_runs(record.unavailable_weeks, record.season)})"
     ]
     suspended = record.suspended_weeks or ()
     if suspended:
-        clauses.append(f"{len(suspended)} missed to a suspension ({_week_runs(suspended)})")
+        clauses.append(f"{len(suspended)} missed to a suspension ({_week_runs(suspended, record.season)})")
     head = ", ".join(p for p in (played, first, *clauses) if p is not None)
     scratches = record.healthy_did_not_play or 0
     if scratches == 0:
@@ -171,10 +176,10 @@ def _pct(fraction: float) -> str:
     return f"{js_string(js_round(fraction * 100))}%"
 
 
-def _span(weeks: Sequence[int]) -> str:
+def _span(weeks: Sequence[int], season: int) -> str:
     if not weeks:
         return "no weeks"
-    return f"week {weeks[0]}" if weeks[0] == weeks[-1] else f"weeks {weeks[0]} to {weeks[-1]}"
+    return week_of(weeks[0], season) if weeks[0] == weeks[-1] else f"weeks {weeks[0]} to {weeks[-1]} of {season}"
 
 
 def _role_trend(depth: Depth) -> str | None:
@@ -194,7 +199,7 @@ def _role_trend(depth: Depth) -> str | None:
     return (
         None
         if not clauses
-        else f"Inside {t.season}, {_span(t.early_weeks)} against {_span(t.late_weeks)}: {', '.join(clauses)}."
+        else f"Inside {t.season}, {_span(t.early_weeks, t.season)} against {_span(t.late_weeks, t.season)}: {', '.join(clauses)}."
     )
 
 
@@ -246,24 +251,24 @@ def _team_context(facts: "PlayerFacts") -> str | None:
     return None if not history else f"{facts.identity.team} in {c.prior_season}: {', '.join(history)}."
 
 
-def _fixture(fixture: Fixture) -> str:
-    return f"{'at home against' if fixture.home else 'away at'} {fixture.opponent} in week {fixture.week}"
+def _fixture(fixture: Fixture, season: int) -> str:
+    return f"{'at home against' if fixture.home else 'away at'} {fixture.opponent} in {week_of(fixture.week, season)}"
 
 
-def _schedule(depth: Depth) -> str | None:
+def _schedule(depth: Depth, season: int) -> str | None:
     s = depth.schedule
     if s is None:
         return None
     opener = (
         "The published schedule holds no week one game for his team."
         if s.week_one_opponent is None
-        else f"Opens {_fixture(s.week_one_opponent)}."
+        else f"Opens {_fixture(s.week_one_opponent, season)}."
     )
     roof = ", with no roof reading on file" if s.indoor_games is None else f", {s.indoor_games} of them indoors"
     playoffs = (
-        "The schedule holds none of weeks 15 to 17 for his team yet."
+        f"The schedule holds none of weeks 15 to 17 of {season} for his team yet."
         if not s.playoff_weeks
-        else f"Weeks 15 to 17: {', '.join(_fixture(f) for f in s.playoff_weeks)}."
+        else f"Weeks 15 to 17 of {season}: {', '.join(_fixture(f, season) for f in s.playoff_weeks)}."
     )
     return f"Schedule: {opener} {s.home_games} home and {s.road_games} away on the published schedule{roof}. {playoffs}"
 
@@ -286,7 +291,7 @@ def _volatility(depth: Depth) -> str | None:
     weeks = "week" if v.weeks_played == 1 else "weeks"
     return (
         f"He cleared {js_string(v.threshold)} points in {v.weeks_above_threshold} of his {v.weeks_played} played {weeks} in "
-        f"{v.season}, and his worst was {js_string(v.worst_week.points)} in week {v.worst_week.week}."
+        f"{v.season}, and his worst was {js_string(v.worst_week.points)} in {week_of(v.worst_week.week, v.season)}."
     )
 
 
@@ -315,7 +320,7 @@ def render_depth_section(facts: "PlayerFacts") -> str | None:
         _target_competition(depth),
         _scoring_usage(facts),
         _team_context(facts),
-        _schedule(depth),
+        _schedule(depth, facts.product_season),
         _market_movement(depth),
         _volatility(depth),
         _prior_seasons(facts),

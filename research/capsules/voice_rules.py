@@ -58,62 +58,65 @@ class NamedPattern:
     pattern: re.Pattern[str]
 
 
-def _rule(name: str, pattern: str, flags: int = re.IGNORECASE) -> NamedPattern:
+def named_rule(name: str, pattern: str, flags: int = re.IGNORECASE) -> NamedPattern:
+    """A rule named for the violation it raises, matched ASCII-only (case-insensitive unless `flags` says)."""
     return NamedPattern(name, re.compile(pattern, flags | re.ASCII))
 
 
 # The "the honest <noun>" frame, whatever the noun.
-_HONEST_FRAME: Final = _rule("the honest ... frame", r"\bthe honest [a-z]+\b")
+_HONEST_FRAME: Final = named_rule("the honest ... frame", r"\bthe honest [a-z]+\b")
 
 # The model talking to itself or its editor. Narrow: "wait" and "actually" are drafting words.
 ASIDE_PATTERNS: Final = (
-    _rule("let me", r"\blet me (?:say|put|try|rephrase|start|be (?:clear|plain|honest))\b"),
-    _rule("not that word", r"\bnot that word\b"),
-    _rule("the wrong word", r"\b(?:that'?s|that is) (?:the wrong|not the right) word\b"),
-    _rule("scratch that", r"\b(?:scratch|strike) that\b"),
-    _rule("or rather", r"\bor rather\b"),
-    _rule("put plainly", r"\b(?:to )?put (?:it )?(?:plainly|simply|another way)\b"),
-    _rule("in other words", r"\bin other words\b"),
-    _rule("I mean", r"\bI mean\b", 0),
-    _rule("a rewrite note", r"\bhere'?s (?:my|the|a) (?:rewrite|revision|draft|version)\b"),
-    _rule("an editorial bracket", r"\[[^\]]*\]"),
-    _rule("the model naming itself", r"\bas an? (?:AI|language model|assistant)\b"),
+    named_rule("let me", r"\blet me (?:say|put|try|rephrase|start|be (?:clear|plain|honest))\b"),
+    named_rule("not that word", r"\bnot that word\b"),
+    named_rule("the wrong word", r"\b(?:that'?s|that is) (?:the wrong|not the right) word\b"),
+    named_rule("scratch that", r"\b(?:scratch|strike) that\b"),
+    named_rule("or rather", r"\bor rather\b"),
+    named_rule("put plainly", r"\b(?:to )?put (?:it )?(?:plainly|simply|another way)\b"),
+    named_rule("in other words", r"\bin other words\b"),
+    named_rule("I mean", r"\bI mean\b", 0),
+    named_rule("a rewrite note", r"\bhere'?s (?:my|the|a) (?:rewrite|revision|draft|version)\b"),
+    named_rule("an editorial bracket", r"\[[^\]]*\]"),
+    named_rule("the model naming itself", r"\bas an? (?:AI|language model|assistant)\b"),
     # The capsule speaks as "we" (our board, our projection); a single writer's "I" is an aside
     # (phase D review L10: "I would still spend it elsewhere"). Case-sensitive, so "Week I" and a
     # name's "III" never match a lone "I".
-    _rule("the first person singular", r"(?<![\w'])I(?:'d|'m|'ll|'ve)?(?![\w'])", 0),
+    named_rule("the first person singular", r"(?<![\w'])I(?:'d|'m|'ll|'ve)?(?![\w'])", 0),
     # And its other cases (fix round 2, N8: "gives me pause", "in my mind"); a name is masked first.
-    _rule("the first person singular", r"\b(?:[Mm]e|[Mm]y|[Mm]ine|[Mm]yself)\b", 0),
+    named_rule("the first person singular", r"\b(?:[Mm]e|[Mm]y|[Mm]ine|[Mm]yself)\b", 0),
     # The writer's fact sheet is its own input, never the reader's (fix round 2, N13: "nothing on the
     # sheet says that changes"). The page shows numbers, not a sheet.
-    _rule("the writer's sheet", r"\b(?:the|this|his|our) (?:fact |facts )?sheet\b|\bfacts? sheet\b"),
+    named_rule("the writer's sheet", r"\b(?:the|this|his|our) (?:fact |facts )?sheet\b|\bfacts? sheet\b"),
 )
 
 # Betting words, named. Football's own senses (the offensive line, the line of scrimmage, the Las
 # Vegas Raiders, spreading the ball) are not bets and pass.
 BETTING_PATTERNS: Final = (
-    _rule("the books", r"\bthe books\b"),
-    _rule("a sportsbook", r"\bsports ?books?\b|\b(?:book|odds)makers?\b"),
-    _rule("odds", r"\bodds\b"),
-    _rule(
+    named_rule("the books", r"\bthe books\b"),
+    named_rule("a sportsbook", r"\bsports ?books?\b|\b(?:book|odds)makers?\b"),
+    named_rule("odds", r"\bodds\b"),
+    named_rule(
         "a posted line", r"\bposted (?:him at|a line|his line|their line)\b|\b(?:prop|betting|player|season) lines?\b"
     ),
-    _rule(
+    named_rule(
         "the line as a bet",
         r"\bthe (?:posted |opening |closing )?line (?:on|for|at|sits|is set|was set|moved|opened|closed)\b",
     ),
-    _rule(
+    named_rule(
         "a line as a number",
         r"(?<!stat )(?<!offensive )(?<!defensive )\bline (?:is|was|of|at|sits at|sat at|set at|opened at|closed at)"
         r" (?:about |around |roughly )?[0-9]",
     ),
-    _rule("over or under as a bet", r"\bthe (?:over|under)\b(?!-)|\bover/under\b|\bo/u\b|\b(?:over|under) [0-9]+\.5\b"),
-    _rule("a win total", r"\bwin totals?\b"),
-    _rule("a prop", r"\bprops?\b"),
-    _rule("a spread", r"\bpoint spread\b|\bthe spread\b"),
-    _rule("Vegas as a bettor", r"(?<!las )\bvegas\b"),
-    _rule("a bet", r"\bbet(?:s|ting|tor|tors)?\b|\bwagers?\b|\bparlays?\b|\bmoneylines?\b|\bvig\b"),
-    _rule("an implied total", r"\bimplied (?:team )?totals?\b"),
+    named_rule(
+        "over or under as a bet", r"\bthe (?:over|under)\b(?!-)|\bover/under\b|\bo/u\b|\b(?:over|under) [0-9]+\.5\b"
+    ),
+    named_rule("a win total", r"\bwin totals?\b"),
+    named_rule("a prop", r"\bprops?\b"),
+    named_rule("a spread", r"\bpoint spread\b|\bthe spread\b"),
+    named_rule("Vegas as a bettor", r"(?<!las )\bvegas\b"),
+    named_rule("a bet", r"\bbet(?:s|ting|tor|tors)?\b|\bwagers?\b|\bparlays?\b|\bmoneylines?\b|\bvig\b"),
+    named_rule("an implied total", r"\bimplied (?:team )?totals?\b"),
 )
 
 LAB_REPORT_TERMS: Final = (
@@ -166,6 +169,12 @@ DRAFTING_SENTENCES: Final = (
     ("at this price", "drafters are taking him around pick 100"),
     ("the price is too high", "a reach at his ADP"),
 )
+# The same three in season, when the draft is behind the reader (`season_voice`).
+IN_SEASON_SENTENCES: Final = (
+    ("the price is right", "he is giving you more than where he went"),
+    ("at this price", "for where he went before the season"),
+    ("the price is too high", "he has not been worth where he went"),
+)
 _PRICE: Final = tuple(write for _, write in DRAFTING_SENTENCES)
 _ADP_PICK: Final = ("drafters are taking him around pick 100",)
 TRADING_REPLACEMENTS: Final = MappingProxyType(
@@ -187,6 +196,31 @@ TRADING_REPLACEMENTS: Final = MappingProxyType(
         "overvalue": ("a reach at his ADP",),
         "premium": ("a reach",),
         "discount": ("a steal",),
+        "dividend": ("points over replacement",),
+        "return on": ("what he gives back",),
+    }
+)
+_SPENT: Final = ("where he went before the season", "what he cost you")
+# The drafting phrases above speak to a draft still ahead; in season the same words for a roster.
+IN_SEASON_REPLACEMENTS: Final = MappingProxyType(
+    {
+        "market": ("managers", "where he went before the season"),
+        "price": _SPENT,
+        "priced": _SPENT,
+        "buy": ("trade for him", "pick him up"),
+        "bought": ("traded for him", "picked him up"),
+        "sell": ("trade him away", "let him go"),
+        "sold": ("traded him away", "let him go"),
+        "fade": ("bench him", "pass on him"),
+        "trade at": ("where he went before the season",),
+        "trades at": ("where he went before the season",),
+        "trading at": ("where he went before the season",),
+        "undervalued": ("better than where he went",),
+        "overvalued": ("not worth where he went",),
+        "undervalue": ("better than where he went",),
+        "overvalue": ("not worth where he went",),
+        "premium": ("a steep cost",),
+        "discount": ("a bargain",),
         "dividend": ("points over replacement",),
         "return on": ("what he gives back",),
     }
@@ -235,7 +269,21 @@ def banned_term_pattern(term: str) -> re.Pattern[str]:
     return re.compile(re.escape(term), re.IGNORECASE)
 
 
-_SET_PHRASE_PATTERNS: Final = tuple(_rule(phrase, rf"\b{re.escape(phrase)}\b") for phrase in SET_PHRASES)
+_SET_PHRASE_PATTERNS: Final = tuple(named_rule(phrase, rf"\b{re.escape(phrase)}\b") for phrase in SET_PHRASES)
+
+
+# A word written twice in a row ("the the", the live review's M2). Two doublings are English.
+_DOUBLED_WORD: Final = re.compile(r"\b([A-Za-z]+)\s+\1\b", re.IGNORECASE)
+_DOUBLINGS_THAT_ARE_ENGLISH: Final = frozenset({"had", "that"})
+
+
+def doubled_words(text: str) -> list[str]:
+    """Every word the text writes twice in a row, as written."""
+    return [
+        match.group(0)
+        for match in _DOUBLED_WORD.finditer(text)
+        if match.group(1).lower() not in _DOUBLINGS_THAT_ARE_ENGLISH
+    ]
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +318,8 @@ def voice_rule_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
             match = rule.pattern.search(normalised)
             if match is not None:
                 hits.append(VoiceRuleHit(f"{kind} ({rule.name})", match.group(0)))
+    # Read on the text as written: a masked name ("Him") beside another would read as one doubled.
+    hits += [VoiceRuleHit("doubled word", doubled) for doubled in dict.fromkeys(doubled_words(text))]
     return hits
 
 

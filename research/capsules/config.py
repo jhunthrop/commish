@@ -49,6 +49,9 @@ class LengthCorrection:
 class Repetition:
     max_share: float = 0.02
     max_quoted_sentences: int = 8
+    # The six-word spans shared across pages (`capsules.spans`) a prompt quotes: the board's most
+    # widely shared to every writer, and a repaired page its own.
+    max_quoted_spans: int = 12
     opener_words: int = 4
     max_opener_family_share: float = 0.1
     max_refrain_share: float = 0.1
@@ -81,6 +84,14 @@ class Repetition:
         "it says nothing about whether he can play",
         "nobody is drafting",
         "the number that decides",
+        # The live review of 2026-10-14 (M1): stock lines across the board's pages.
+        "is the whole story",
+        "is the whole case",
+        "the call is easy",
+        "get cute",
+        "cut short by injury",
+        "our number puts him at",
+        "once injury risk is in",
     )
 
 

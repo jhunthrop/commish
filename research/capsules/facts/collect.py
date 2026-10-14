@@ -19,15 +19,15 @@ from research.capsules.facts.build import FactsInput, PlayerFacts, build_player_
 from research.capsules.facts.color import (
     StoryWithoutTouches,
     UsageTouchesAndTrend,
-    current_season_summaries,
     last_season_stories_for,
     usage_touches_and_trend_for,
 )
 from research.capsules.facts.depth_collect import DepthOptions, collect_depth_facts, depth_prior_seasons
 from research.capsules.facts.depth_model import EMPTY_DEPTH, Depth
 from research.capsules.facts.market_adp import MarketAdp, run_market_adp
-from research.capsules.facts.model import BooksNumbers, Identity, NewsItem, PropsLine, SeasonSummary
-from research.capsules.facts.reference import InjurySnapshot, injury_snapshot, news_for_players
+from research.capsules.facts.model import BooksNumbers, Identity, NewsItem, PropsLine, SeasonSoFar
+from research.capsules.facts.reference import InjurySnapshot, capture_day, injury_snapshot, news_for_players
+from research.capsules.facts.season_so_far import SeasonSubject, seasons_so_far
 from research.model.domain import Position
 from research.model.laws.registry import Law, chip_eligible_laws
 from research.model.market.props_anchor import load_archived_prop_lines, median_prop_lines_by_player
@@ -95,10 +95,22 @@ class SharedReads:
     laws: Sequence[Law]
     injuries: InjurySnapshot
     news: Mapping[str, Sequence[NewsItem]]
-    seasons: Mapping[str, SeasonSummary]
+    # This season so far by provider id: empty before the first kickoff (`facts.season_so_far`).
+    seasons: Mapping[str, SeasonSoFar]
     color: ColorFacts
     # The ADP the sheets carry (`market_adp`): the run's own, or the oracle's in the parity cases.
     market: MarketAdp
+    # The run's Eastern day (`reference.capture_day`), told to the writer.
+    run_day: str
+
+
+def season_reads(
+    conn: Connection, as_of: datetime, rows: Sequence[BoardRow], injuries: InjurySnapshot
+) -> dict[str, SeasonSoFar]:
+    """These rows' seasons so far, each read for his board club and position."""
+    subjects = [SeasonSubject(row.player_id, row.team, row.position) for row in rows]
+    statuses = {row.player_id: injuries.status_for(row.player_id) for row in rows}
+    return seasons_so_far(conn, PRODUCT_SEASON, as_of, subjects, statuses)
 
 
 def facts_input_for(row: BoardRow, shared: SharedReads) -> FactsInput:
@@ -130,6 +142,7 @@ def facts_input_for(row: BoardRow, shared: SharedReads) -> FactsInput:
         books,
         None if gsis is None else color.usage.usage.get(gsis),
         None if gsis is None else color.usage.trend.get(gsis),
+        shared.run_day,
         EMPTY_DEPTH if gsis is None else color.depth.get(gsis, EMPTY_DEPTH),
         shared.market.page_ranks(row.player_id),
     )
@@ -201,15 +214,15 @@ def collect_board_facts(conn: Connection, as_of: datetime) -> BoardFactsPass:
     universe_ids = universe_ids_for(conn, [row.player_id for row in rows])
     team_by_gsis = {universe_ids[row.player_id]: row.team for row in rows if row.player_id in universe_ids}
     color = collect_color(conn, Population(positions, universe_ids, team_by_gsis), as_of)
+    injuries = injury_snapshot(conn, as_of)
     shared = SharedReads(
         chip_eligible_laws(load_model_artifacts(conn).laws),
-        injury_snapshot(conn, as_of),
+        injuries,
         news_for_players(conn, [row.name for row in rows], as_of),
-        current_season_summaries(
-            conn, PRODUCT_SEASON, [row.player_id for row in rows], {r.player_id: r.position for r in rows}
-        ),
+        season_reads(conn, as_of, rows, injuries),
         color,
         run_market_adp(conn, as_of),
+        capture_day(as_of),
     )
     facts = tuple(build_player_facts(facts_input_for(row, shared)) for row in rows)
     peers: dict[Position, int] = {}

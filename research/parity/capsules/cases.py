@@ -19,6 +19,11 @@ product's sheet (the run's ADP and board ranks, `facts.market_adp`):
 - `facts-one`: the narrow single-player read for the sample, a market-order kicker and an unknown id,
   equal to the recorded sheet and to the board pass's sheet for the same player.
 
+Lane 17 re-recorded them once more: a sheet now carries this season so far as the player page
+prints it (`facts.season_so_far`, the in-season voice of the live review's H2) in place of the
+provider's season lines, so every facts hash moved by design; and the season block reads the store
+as of `AS_OF` like every other read here.
+
 Both read the dev copy (PARITY_SOURCE_DATABASE_URL), read only, as of `AS_OF`: every capture and
 observation after it is ignored, so a later nightly does not move them. An ingest that writes rows
 stamped before `AS_OF` (a history rebuild) does; then `capsules record` writes the recording again,

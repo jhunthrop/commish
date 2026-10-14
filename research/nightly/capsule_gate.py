@@ -8,24 +8,30 @@ across players is a defect. The run fails when
 - any sentence of four words or more (`shared_sentence_min_words`) of a written capsule appears on
   two players' pages (compared normalized, as the repetition measures compare, across both sizes of
   every written read on the board). Shorter ones, "Draft him." and "Let him go.", are the
-  product's vocabulary, not stock prose.
+  product's vocabulary, not stock prose; or
+- any six words in a row (`capsules.spans`, case folded, punctuation stripped, player and club names
+  breaking the run) appear on two players' written pages (the live review's M1). Every page carrying
+  one fails, and each page's shared spans are kept, joined where they overlap, for the repair's
+  prompt.
 
 Phase D extends this gate (the page findings of `capsules.pull_figures`, the run's other gates);
 the nightly's capsule step runs it after the sweep.
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from types import MappingProxyType
 from typing import Final
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, text
 
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts.board import board_rows
 from research.capsules.facts.collect import universe_ids_for
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.narrative import normalize_sentence, sentences_verbatim
+from research.capsules.spans import Runs, SharedSpan, name_words, page_runs, phrases_on_page, shared_spans
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, stored_capsules_for
 from research.season import PRODUCT_SEASON
 
@@ -46,6 +52,9 @@ class CapsuleGateResult:
     template: int
     missing: int
     shared: tuple[SharedSentence, ...]
+    spans: tuple[SharedSpan, ...] = ()
+    # Each page that carries a shared span, to its shared spans joined where they overlap.
+    span_phrases: Mapping[str, tuple[str, ...]] = field(default_factory=lambda: MappingProxyType({}))
     share_max: float = CAPSULE_CONFIG.unwritten_share_max
 
     @property
@@ -55,7 +64,7 @@ class CapsuleGateResult:
 
     @property
     def ok(self) -> bool:
-        return self.unwritten_share <= self.share_max and not self.shared
+        return self.unwritten_share <= self.share_max and not self.shared and not self.spans
 
     def summary(self) -> str:
         verdict = "passed" if self.ok else "failed"
@@ -63,9 +72,15 @@ class CapsuleGateResult:
             f"capsule gate: {verdict}, {self.board_players} board pages, {self.written} written, "
             f"{self.facts_blocks} facts blocks, {self.template} on the oracle's template, {self.missing} missing "
             f"({self.unwritten_share:.1%} unwritten, the line {self.share_max:.0%}), "
-            f"{len(self.shared)} written sentences on two pages"
+            f"{len(self.shared)} written sentences on two pages, {len(self.spans)} six-word spans on two pages "
+            f"({len(self.span_phrases)} pages carry one)"
         )
-        examples = "; ".join(f'"{s.sentence}" on {len(s.player_ids)} pages' for s in self.shared[:_EXAMPLES])
+        examples = "; ".join(
+            [
+                *(f'"{s.sentence}" on {len(s.player_ids)} pages' for s in self.shared[:_EXAMPLES]),
+                *(f'span "{s.span}" on {len(s.player_ids)} pages' for s in self.spans[:_EXAMPLES]),
+            ]
+        )
         return line if not examples else f"{line}: {examples}"
 
 
@@ -86,10 +101,24 @@ def shared_written_sentences(rows: Mapping[str, StoredCapsule]) -> tuple[SharedS
     return tuple(sorted(shared, key=lambda s: (-len(s.player_ids), s.sentence)))
 
 
-def judge_capsules(board_ids: Sequence[str], rows: Mapping[str, StoredCapsule]) -> CapsuleGateResult:
-    """The gate over the board's universe ids and their stored rows."""
+def _written_runs(rows: Mapping[str, StoredCapsule], names: frozenset[str]) -> dict[str, Runs]:
+    return {
+        pid: page_runs((row.body_compact, row.body_full), names)
+        for pid, row in rows.items()
+        if row.source == WRITTEN_SOURCE
+    }
+
+
+def judge_capsules(
+    board_ids: Sequence[str], rows: Mapping[str, StoredCapsule], names: frozenset[str]
+) -> CapsuleGateResult:
+    """The gate over the board's universe ids and their stored rows; `names` break a span's run."""
     on_board = {pid: rows[pid] for pid in board_ids if pid in rows}
     sources = [row.source for row in on_board.values()]
+    runs = _written_runs(on_board, names)
+    spans = shared_spans(runs)
+    held = frozenset(s.span for s in spans)
+    carriers = {pid for s in spans for pid in s.player_ids}
     return CapsuleGateResult(
         board_players=len(board_ids),
         written=sources.count(WRITTEN_SOURCE),
@@ -97,6 +126,8 @@ def judge_capsules(board_ids: Sequence[str], rows: Mapping[str, StoredCapsule]) 
         template=len(sources) - sources.count(WRITTEN_SOURCE) - sources.count(FACTS_SOURCE),
         missing=len(board_ids) - len(on_board),
         shared=shared_written_sentences(on_board),
+        spans=spans,
+        span_phrases=MappingProxyType({pid: phrases_on_page(runs[pid], held) for pid in sorted(carriers)}),
     )
 
 
@@ -107,7 +138,12 @@ def board_universe_ids(conn: Connection, as_of: datetime) -> list[str]:
     return list(dict.fromkeys(universe[pid] for pid in provider_ids if pid in universe))
 
 
+def span_names(conn: Connection) -> frozenset[str]:
+    """The words that break a span: every player's name in the store, and every club's."""
+    return name_words(str(name) for name in conn.execute(text("select name from research.provider_players")).scalars())
+
+
 def capsule_gate(conn: Connection, as_of: datetime) -> CapsuleGateResult:
     """The gate over the board as served at `as_of` (its pages keyed on the universe id)."""
     board_ids = board_universe_ids(conn, as_of)
-    return judge_capsules(board_ids, stored_capsules_for(conn, board_ids))
+    return judge_capsules(board_ids, stored_capsules_for(conn, board_ids), span_names(conn))

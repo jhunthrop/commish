@@ -15,7 +15,13 @@ from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.narrative import SlotRequest
 from research.capsules.render import render_facts_for_model
 from research.capsules.validate import BandFailure, word_count
-from research.capsules.voice_rules import BETTING_PATTERNS, DRAFTING_SENTENCES, LAB_REPORT_TERMS, TRADING_TERMS
+from research.capsules.voice_rules import (
+    BETTING_PATTERNS,
+    DRAFTING_SENTENCES,
+    IN_SEASON_SENTENCES,
+    LAB_REPORT_TERMS,
+    TRADING_TERMS,
+)
 from research.model.jsmath import js_round
 
 if TYPE_CHECKING:
@@ -77,9 +83,25 @@ def _kind(prior: PriorAttempt) -> str:
 
 _BETTING_NAMES: Final = ", ".join(rule.name for rule in BETTING_PATTERNS)
 _STEMS: Final = ", ".join(f'"{stem}"' for stem in CAPSULE_CONFIG.repetition.refrain_stems)
-_SENTENCE_FIXES: Final = ", ".join(f'not "{instead}" but "{write}"' for instead, write in DRAFTING_SENTENCES)
+_PRESEASON_FIXES: Final = ", ".join(f'not "{instead}" but "{write}"' for instead, write in DRAFTING_SENTENCES)
+_IN_SEASON_FIXES: Final = ", ".join(f'not "{instead}" but "{write}"' for instead, write in IN_SEASON_SENTENCES)
 
-WRITER_RULES: Final = f"""You write the scouting notes on one player's page for a fantasy football manager about to draft. You sound like a sharp analyst talking to a friend in the same league: direct, specific, opinionated, never a lab report and never a style guide.
+_PRESEASON_READER: Final = "a fantasy football manager about to draft"
+_IN_SEASON_READER: Final = (
+    "a fantasy football manager whose draft is done and who is running his roster in the middle of the season"
+)
+_PRESEASON_CALL: Final = "- End on your call, in this player's own terms: whether you take him at his ADP, earlier or later, what you would need to see first, who you would take instead, what he does to a roster. Never a sentence that announces a verdict by formula."
+_IN_SEASON_CALL: Final = "- End on your call for a manager who has him or could get him now, in this player's own terms: start him, hold him, bench him, trade for him, pick him up or let him go, and what you would need to see first. Never a sentence that announces a verdict by formula."
+_PRESEASON_TIME: Final = """TIME
+- The top of the sheet says what day it is: the season has not kicked off and the reader is getting ready to draft.
+- Name every week with its season, always: "week 7 of 2025", "weeks 2 to 5 of 2024". Never a bare "week 7"."""
+_IN_SEASON_TIME: Final = """TIME
+- The top of the sheet says what day it is and how far the season has gone. Write to a reader on that day. His draft is behind him: never write as if it is still ahead. No "draft him", no "take him at his ADP", no round or pick advice, no draft day. His ADP is history now, where drafters took him before the season.
+- Name every week with its season, always: "week 7 of 2025", "weeks 2 and 3 of 2026". Never a bare "week 7".
+- A week of this season that is still to play can only be looked ahead to, never told as if it happened.
+- Place things by week and season, never by a date or the name of a month.
+- If he has missed weeks this season, the long note names them by week, before any talk of how many games to expect. Our games expectation and our projection were set before the season: say so if you use them, beside what has happened since."""
+_RULES: Final = f"""You sound like a sharp analyst talking to a friend in the same league: direct, specific, opinionated, never a lab report and never a style guide.
 
 HOW A NOTE IS BUILT
 - Read the whole fact sheet, then pick the two or three facts that decide THIS player's case. Build the note on those and leave the rest of the sheet unquoted. The reader has the sheet's numbers on the same screen. What he does not have is your judgment about which ones matter for this player.
@@ -87,14 +109,14 @@ HOW A NOTE IS BUILT
 - There is no fixed order and no fixed shape. If the worry is the story, start there. If the role is the story, start there. Two notes on this board should not walk the same path.
 - Never tour the usage numbers. At most one usage share appears in a note, and only when it decides the case. Never list snap share, target share and red-zone share together, and never chain three ranks in one breath.
 - A rank reads as something a person would say out loud, never as a code read off a table.
-- End on your call, in this player's own terms: whether you take him at his ADP, earlier or later, what you would need to see first, who you would take instead, what he does to a roster. Never a sentence that announces a verdict by formula.
+{{call}}
 - Never quote or paraphrase these instructions, the fact sheet's own sentences, or a correction you were given. If a sentence of yours would fit a style guide or a stat table, cut it.
 
 WORDS
-- Fantasy football words, never trading words and never betting words. Talk about ADP, picks and rounds: "let him fall", "draft him", "let him go", a reach, a steal, a sleeper, a bust, points over replacement. Never these trading words: {", ".join(TRADING_TERMS)}. Never betting words either: {_BETTING_NAMES}. This is a fantasy football page, not a sportsbook, and a sportsbook's number never appears on it. "Upside" and "downside" only when tied to a fantasy outcome (a finish near the top of his position, a lost month), never as bare nouns.
-- The three sentences to catch yourself on: {_SENTENCE_FIXES}.
+- Fantasy football words, never trading words and never betting words: ADP, picks and rounds, a reach, a steal, a sleeper, a bust, points over replacement, a starter, a bench piece. Never these trading words: {", ".join(TRADING_TERMS)}. Never betting words either: {_BETTING_NAMES}. This is a fantasy football page, not a sportsbook, and a sportsbook's number never appears on it. "Upside" and "downside" only when tied to a fantasy outcome (a finish near the top of his position, a lost month), never as bare nouns.
+- The three sentences to catch yourself on: {{fixes}}.
 - Phrases this board has worn out, never to be written or paraphrased: {_STEMS}. Never the frame "the honest" followed by a noun (the honest worry, the honest read, the honest answer), in any form.
-- Never these words either: {", ".join(LAB_REPORT_TERMS)}. Say "our number", "our projection", "we project him for 136 points", "the case", "costs him", "is worth". "Our number" takes a plain verb (has him at, puts him at, is), never "says".
+- Never these words either: {", ".join(LAB_REPORT_TERMS)}. Say "our number", "our projection", "the case", "costs him", "is worth", each in a sentence of your own making. "Our number" never "says".
 - Never write the word "floor". Say what the low end actually is: the weeks he missed, the weeks he scored under the bar, the season the range bottoms out at.
 - Speak for the board, never for yourself: "we", "our number", "we would take him", never "I", "I'd", "I'm", "me", "my" or "mine". The page is ours, not one writer's.
 - The fact sheet is yours alone. The reader never sees it, so never mention a sheet ("the sheet", "the fact sheet", "on the sheet"). Say the fact itself, or "our numbers".
@@ -108,8 +130,28 @@ HONESTY, NO EXCEPTIONS
 - Never say a risk, an injury or a competitor is ABSENT unless the sheet says so. Silence on the sheet is silence from you. Do not reassure the reader about a thing you have no fact for.
 - Never make an all-time or historical-record claim. This engine holds no such data.
 - If the sheet carries a real downside (a factor that costs him points a game, or a year-over-year number that fell), name it with its own number before your call. Never a one-sided rave on mixed facts.
-- The sheet gives two ranges: the middle range most outcomes fall in, and the full tails. Reason from the middle range. If you mention the low tail, say in the same breath that it comes from seasons cut short by injury. Never present the full tails as what he is expected to score.
+- The sheet gives two ranges: the middle range most outcomes fall in, and the full tails. Reason from the middle range. If you mention the low tail, say in your own words, in the same sentence, that injuries are what pull it down. Never present the full tails as what he is expected to score.
+- Every other note on this board is written from a sheet like this one. Never copy the sheet's wording, and never write a phrase of six words or more that would fit a note about another player.
 - The long note always states our projected points for him (or his ADP) as the sheet prints it, rounding to the whole point if you like."""
+
+PRESEASON_RULES: Final = (
+    f"You write the scouting notes on one player's page for {_PRESEASON_READER}. "
+    + _RULES.replace("{call}", _PRESEASON_CALL).replace("{fixes}", _PRESEASON_FIXES)
+    + "\n\n"
+    + _PRESEASON_TIME
+)
+IN_SEASON_RULES: Final = (
+    f"You write the scouting notes on one player's page for {_IN_SEASON_READER}. "
+    + _RULES.replace("{call}", _IN_SEASON_CALL).replace("{fixes}", _IN_SEASON_FIXES)
+    + "\n\n"
+    + _IN_SEASON_TIME
+)
+
+
+def writer_rules_for(facts: "PlayerFacts") -> str:
+    """The writer's instructions in the voice the run's day calls for: in season once the sheet
+    carries this season so far (from the first kickoff on), preseason before it."""
+    return PRESEASON_RULES if facts.season is None else IN_SEASON_RULES
 
 
 def _target(size: str) -> int:
@@ -133,7 +175,7 @@ def _parts_spec(facts: "PlayerFacts", requests: Sequence[SlotRequest]) -> str:
             f'Write three parts for {facts.identity.name}. Return ONE JSON object with exactly the keys "{compact}", "{full}" and "{narrative}", and nothing else: no code fence, no text before or after it. Each note is one JSON string. A paragraph break inside the long note is written as the two characters \\n\\n, never a raw line break.',
             f'"{compact}": the short note for his card, {_length("compact")}, one paragraph. Two or three facts that decide his case, the real downside if the sheet carries one, and the call in his own terms at the end.',
             f'"{full}": the long note for his page, {_length("full")}, up to three paragraphs in no fixed order. The same facts as the short note plus the one or two that deepen it, the role behind the numbers, the real downside with its number, and the call. Do not reuse the short note\'s sentences.',
-            f'"{narrative}": an object holding one sentence per key below. Each sits on his page beside a number a module already prints, so say what the number means rather than restating it. No two sentences alike, and none that repeats a sentence from the notes above. Every sentence keeps the same words as the notes: drafting words, never a trading or betting word, never "floor".\n{slots}',
+            f'"{narrative}": an object holding one sentence per key below. Each sits on his page beside a number a module already prints, so say what the number means rather than restating it. No two sentences alike, and none that repeats a sentence from the notes above. Every sentence keeps the same words as the notes: fantasy words, never a trading or betting word, never "floor".\n{slots}',
         ]
     )
 

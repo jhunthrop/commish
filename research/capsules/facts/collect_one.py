@@ -32,10 +32,10 @@ from research.capsules.facts.collect import (
     active_peers_for,
     collect_color,
     facts_input_for,
+    season_reads,
 )
-from research.capsules.facts.color import current_season_summaries
 from research.capsules.facts.market_adp import run_market_adp
-from research.capsules.facts.reference import injury_snapshot, news_for_players
+from research.capsules.facts.reference import capture_day, injury_snapshot, news_for_players
 from research.model.laws.registry import chip_eligible_laws
 from research.model.priors import load_model_artifacts
 from research.season import PRODUCT_SEASON
@@ -94,14 +94,6 @@ def collect_player_facts(
     peers = active_peers_for(conn, [identity.position], PRODUCT_SEASON)
     board = served.served(conn, as_of)
     color = collect_color(conn, Population(peers, {player_id: gsis}, {gsis: identity.team}, board.teams), as_of)
-    shared = SharedReads(
-        chip_eligible_laws(load_model_artifacts(conn).laws),
-        injury_snapshot(conn, as_of),
-        news_for_players(conn, [identity.name], as_of),
-        current_season_summaries(conn, PRODUCT_SEASON, [player_id], {player_id: identity.position}),
-        color,
-        run_market_adp(conn, as_of),
-    )
     rank = board.ranks.get(player_id)
     row = BoardRow(
         player_id, gsis, identity.name, identity.position, identity.team, identity.adp, identity.pos_adp,
@@ -110,4 +102,14 @@ def collect_player_facts(
         bye_weeks_by_team(conn, PRODUCT_SEASON).get(identity.team),
         tuple(board_reasons(conn, PRODUCT_SEASON, BOARD_SOURCE, [gsis]).get(gsis, [])),
     )  # fmt: skip
+    injuries = injury_snapshot(conn, as_of)
+    shared = SharedReads(
+        chip_eligible_laws(load_model_artifacts(conn).laws),
+        injuries,
+        news_for_players(conn, [identity.name], as_of),
+        season_reads(conn, as_of, [row], injuries),
+        color,
+        run_market_adp(conn, as_of),
+        capture_day(as_of),
+    )
     return build_player_facts(facts_input_for(row, shared))

@@ -147,22 +147,48 @@ class Projection:
 
 @dataclass(frozen=True, slots=True)
 class SeasonTotals:
+    """His totals over the weeks he played, as the page's season block sums them: None where a
+    played week's line does not carry the stat."""
+
     carries: float | None
-    rushing_yards: float
+    rushing_yards: float | None
     targets: float | None
-    receptions: float
-    receiving_yards: float
-    passing_yards: float
-    touchdowns: float
-    fantasy_points: float
+    receptions: float | None
+    receiving_yards: float | None
+    passing_yards: float | None
+    touchdowns: float | None
+    fantasy_points: float | None
 
 
 @dataclass(frozen=True, slots=True)
-class SeasonSummary:
+class SeasonWeek:
+    """One week of this season that is behind him: played (with its PPR points), inactive (his
+    club's game is in the records and he has no line), or his club's bye."""
+
+    week: int
+    status: Literal["played", "inactive", "bye"]
+    points: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class SeasonSoFar:
+    """THIS SEASON SO FAR, the page's own season block (`nightly.build.player_season`): present
+    only once the season's first kickoff has passed, which is what puts the writer in the
+    in-season voice. `through` is the last week whose games are all in the records; `weeks` are the
+    weeks behind him; `injury_from_week` is the first week his club played on or after the day his
+    current injury status began."""
+
     season: int
+    through: int
     games_played: int
-    points_per_game: float
+    points_per_game: float | None
     totals: SeasonTotals
+    weeks: tuple[SeasonWeek, ...]
+    injury_from_week: int | None
+
+    @property
+    def missed_weeks(self) -> tuple[int, ...]:
+        return tuple(w.week for w in self.weeks if w.status == "inactive")
 
 
 @dataclass(frozen=True, slots=True)

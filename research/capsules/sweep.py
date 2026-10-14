@@ -11,9 +11,10 @@ key on the universe id (`research.players.id`), through the crosswalk.
 """
 
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from types import MappingProxyType
 
 from sqlalchemy import Connection, Engine
 
@@ -165,6 +166,9 @@ class SweepPlan:
     # sentences) quoted into the prompt beside the board's worn language.
     only: frozenset[str] | None = None
     avoid: tuple[str, ...] = ()
+    # The repair's per page language: each page's own six-word spans that another page carries too
+    # (`capsules.spans`), quoted into that page's prompt beside `avoid`.
+    avoid_by_page: Mapping[str, tuple[str, ...]] = field(default_factory=lambda: MappingProxyType({}))
     # Players the night has spent its call budget on (`nightly.capsule_step`), never written again.
     exclude: frozenset[str] = frozenset()
 
@@ -197,7 +201,6 @@ def sweep_capsules(engine: Engine, gateway: GatewayClient, as_of: datetime, plan
         stored = stored_capsules_for(conn, [s.universe_id for s in subjects])
     ordered = _ordered(subjects, stored, plan)
     board_worn = worn_phrases(subjects, stored)
-    worn = WornPhrases((*plan.avoid, *board_worn.sentences), board_worn.phrases)
     report = SweepReport(as_of, len(subjects), len(ordered))
     stopped = False
     for subject in ordered[: plan.budget]:
@@ -206,6 +209,8 @@ def sweep_capsules(engine: Engine, gateway: GatewayClient, as_of: datetime, plan
             break
         if report.processed and CAPSULE_CONFIG.sweep_pacing_ms > 0:
             time.sleep(CAPSULE_CONFIG.sweep_pacing_ms / 1000)
+        own = plan.avoid_by_page.get(subject.universe_id, ())
+        worn = WornPhrases((*plan.avoid, *own, *board_worn.sentences), board_worn.phrases)
         result, demoted = write_one(engine, subject, stored.get(subject.universe_id), gateway, worn)
         _tally(report, subject, result, demoted)
         report.processed.append(subject.universe_id)

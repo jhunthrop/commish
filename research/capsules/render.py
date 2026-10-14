@@ -13,8 +13,6 @@ from research.capsules.facts.build import PlayerFacts
 from research.capsules.facts.model import (
     ChangedTeamEvidence,
     EvidenceItem,
-    InjuryClean,
-    InjuryDesignated,
     LawEvidence,
     MarketUnlistedEvidence,
     NewPlayCallerEvidence,
@@ -23,7 +21,8 @@ from research.capsules.facts.model import (
     TrendMetric,
 )
 from research.capsules.render_depth import render_depth_section
-from research.capsules.render_words import ranked_clause, signed, whole
+from research.capsules.render_season import bye_line, injury_line, season_section, today_line
+from research.capsules.render_words import ranked_clause, signed, week_of, whole
 from research.capsules.voice_rules import in_fantasy_words
 from research.model.jsmath import js_round, js_to_fixed
 from research.pipeline.jscompat import js_string
@@ -34,11 +33,12 @@ def _signed_percent(fraction: float) -> str:
 
 
 def _adp_line(facts: PlayerFacts) -> str:
-    adp = facts.market.adp
+    adp, before = facts.market.adp, "" if facts.season is None else " before the season"
     if adp is None:
-        return "ADP: none on file."
+        return f"ADP{before}: none on file."
     by_adp = "" if facts.market.position_adp is None else f", {facts.market.position_adp} by ADP"
-    return f"ADP {js_string(adp)} (drafters take him around pick {whole(adp)}{by_adp})."
+    took = "take" if facts.season is None else "took"
+    return f"ADP{before} {js_string(adp)} (drafters {took} him around pick {whole(adp)}{by_adp})."
 
 
 def _board_line(facts: PlayerFacts) -> str:
@@ -48,10 +48,15 @@ def _board_line(facts: PlayerFacts) -> str:
         ranks.append(f"position rank {position}{m.position_rank} by our own board")
     ranges = (
         f"Middle range, where most outcomes fall: {whole(p.typical_low)} to {whole(p.typical_high)} points. "
-        f"Full tails: {whole(p.floor_points)} to {whole(p.ceiling_points)}, the low tail from seasons shortened by injury."
+        f"Full tails: {whole(p.floor_points)} to {whole(p.ceiling_points)}, injury-shortened seasons making the low one."
     )
     rank_text = f" {', '.join(ranks)}." if ranks else ""
-    parts = [f"Our number: {whole(p.projected_points)} season points. {ranges}{rank_text}", _adp_line(facts)]
+    number = (
+        f"Our number: {whole(p.projected_points)} season points."
+        if facts.season is None
+        else f"Our preseason number: {whole(p.projected_points)} points for the full {facts.product_season} season."
+    )
+    parts = [f"{number} {ranges}{rank_text}", _adp_line(facts)]
     if m.market_anchor_points is not None:
         parts.append(
             f"Past seasons of {position}s drafted around his ADP: about {js_string(m.market_anchor_points)} points, busts and "
@@ -68,9 +73,10 @@ def _availability_line(facts: PlayerFacts) -> str | None:
     a = facts.availability
     if a is None:
         return None
+    when = "Availability" if facts.season is None else "Availability as we saw it before the season"
     return (
-        f"Availability: expected {whole(a.expected_games)} games, with a realistic range of {whole(a.floor_games)} to "
-        f"{whole(a.ceiling_games)} once you account for injury risk."
+        f"{when}: expected games {whole(a.expected_games)}, from {whole(a.floor_games)} to "
+        f"{whole(a.ceiling_games)} with injury risk counted."
     )
 
 
@@ -97,37 +103,6 @@ def _evidence_line(item: EvidenceItem) -> str:
     raise TypeError(f"no evidence line for {item!r}")
 
 
-def _season_line(facts: PlayerFacts) -> str:
-    season = facts.season
-    if season is None:
-        return "No games played yet this season."
-    t = season.totals
-    parts = [
-        f"{'n/a' if t.carries is None else js_string(t.carries)} carries",
-        f"{js_string(t.rushing_yards)} rush yards",
-        f"{'n/a' if t.targets is None else js_string(t.targets)} targets",
-        f"{js_string(t.receptions)} catches",
-        f"{js_string(t.receiving_yards)} rec yards",
-        f"{js_string(t.passing_yards)} pass yards",
-        f"{js_string(t.touchdowns)} touchdowns",
-        f"{js_string(t.fantasy_points)} fantasy points",
-    ]
-    games = "game" if season.games_played == 1 else "games"
-    return (
-        f"Season so far ({season.season}): {season.games_played} {games}, {js_to_fixed(season.points_per_game, 1)} points per "
-        f"game. Totals: {', '.join(parts)}."
-    )
-
-
-def _injury_line(facts: PlayerFacts) -> str:
-    injury = facts.injury
-    if isinstance(injury, InjuryDesignated):
-        return f"Injury report: designation {injury.designation}, on every report since {injury.since}."
-    if isinstance(injury, InjuryClean):
-        return f"Injury report: no designation on file on any report since {injury.since}."
-    return "Injury report: no injury feed has been checked for him yet. This is not a health claim either way."
-
-
 def _news_lines(facts: PlayerFacts) -> list[str]:
     if not facts.news:
         return ["No recent headlines on file."]
@@ -146,7 +121,7 @@ def _story_line(facts: PlayerFacts) -> str | None:
     sentences = [
         f"Last season ({story.season}): {ranked_clause(position, 'total points', story.points_rank, whole)}.",
         f"Over {story.games_played} {games}, averaging {js_to_fixed(story.points_per_game, 1)} points a game.",
-        f"His best week was week {story.best_week.week} with {js_string(story.best_week.points)} points.",
+        f"His best week was {week_of(story.best_week.week, story.season)} with {js_string(story.best_week.points)} points.",
         f"He scored above the position's own weekly median in {story.weeks_above_median} of those {story.games_played} {games}.",
     ]
     if story.touches_rank is not None:
@@ -198,6 +173,7 @@ def render_facts_for_model(facts: PlayerFacts) -> str:
     identity = facts.identity
     sections = [
         f"Player: {identity.name}, {identity.position}, {identity.team}. Season: {facts.product_season}.",
+        today_line(facts),
         _board_line(facts),
     ]
     availability = _availability_line(facts)
@@ -208,9 +184,7 @@ def render_facts_for_model(facts: PlayerFacts) -> str:
     color = [line for line in (_story_line(facts), _usage_line(facts), _trend_line(facts)) if line is not None]
     if color:
         sections.append("The color:\n" + "\n".join(f"- {line}" for line in color))
-    sections.append(_season_line(facts))
-    sections.append("Bye week not yet set." if facts.bye_week is None else f"Bye: week {facts.bye_week}.")
-    sections.append(_injury_line(facts))
+    sections += [season_section(facts), bye_line(facts), injury_line(facts)]
     sections.append("Recent news:\n" + "\n".join(f"- {line}" for line in _news_lines(facts)))
     depth = render_depth_section(facts)
     if depth is not None:
