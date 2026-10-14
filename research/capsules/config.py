@@ -118,10 +118,6 @@ class CapsuleConfig:
     # A written sentence this long or longer may sit on one page only; shorter ones ("Draft him.",
     # "Let him go.") are the product's vocabulary, not stock prose (ruled in phase C's fix round 3).
     shared_sentence_min_words: int = 4
-    # A six-word span (`capsules.spans`) on two pages is queued for the repair and counted; one still on
-    # this many pages after the repairs is a stock phrase, not coincidence, and fails the run (the
-    # coordinator's Lane 17 ruling).
-    stock_span_pages: int = 3
     narrative_voice_rewrites_per_slot: int = 1
     length_correction: LengthCorrection = LengthCorrection()
     narrative_target_share_of_cap: float = 0.75

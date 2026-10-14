@@ -75,12 +75,6 @@ class CapsuleGateResult:
     # Spans two pages or more share that the sheets' labelled stats print, so not judged.
     exempt_spans: int = 0
     share_max: float = CAPSULE_CONFIG.unwritten_share_max
-    stock_span_pages: int = CAPSULE_CONFIG.stock_span_pages
-
-    @property
-    def stock_spans(self) -> tuple[SharedSpan, ...]:
-        """The spans that fail the run: on `stock_span_pages` pages or more."""
-        return tuple(s for s in self.spans if len(s.player_ids) >= self.stock_span_pages)
 
     @property
     def unwritten_share(self) -> float:
@@ -89,7 +83,8 @@ class CapsuleGateResult:
 
     @property
     def ok(self) -> bool:
-        return self.unwritten_share <= self.share_max and not self.shared and not self.stock_spans
+        # Spans are counted and repaired, never a failure (the coordinator's Lane 17 ruling 1).
+        return self.unwritten_share <= self.share_max and not self.shared
 
     def summary(self) -> str:
         verdict = "passed" if self.ok else "failed"
@@ -98,8 +93,8 @@ class CapsuleGateResult:
             f"{self.facts_blocks} facts blocks, {self.template} on the oracle's template, {self.missing} missing "
             f"({self.unwritten_share:.1%} unwritten, the line {self.share_max:.0%}), "
             f"{len(self.shared)} written sentences on two pages, {len(self.spans)} six-word spans on two pages or "
-            f"more ({len(self.span_phrases)} pages carry one, {self.queued} queued for repair), {len(self.stock_spans)} "
-            f"on {self.stock_span_pages} pages or more (failing), {self.exempt_spans} sheet-label spans exempt"
+            f"more ({len(self.span_phrases)} pages carry one, {self.queued} queued for repair, never a failure), "
+            f"{self.exempt_spans} sheet-label spans exempt"
         )
         examples = "; ".join(
             [

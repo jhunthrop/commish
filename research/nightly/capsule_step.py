@@ -32,7 +32,7 @@ demote written reads to facts blocks) and the gate still judges what is stored.
 """
 
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Final
@@ -52,9 +52,9 @@ from research.nightly.capsule_gate import (
     CapsuleGateResult,
     board_universe_ids,
     capsule_gate,
-    repair_targets,
     span_rules,
 )
+from research.nightly.capsule_repair import quoted_spans, repair_order
 from research.nightly.page_findings import PageFindings, page_findings
 
 REPAIR_PASSES: Final = 3
@@ -121,16 +121,6 @@ class CapsuleStepResult:
     findings: PageFindings
     spend: CapsuleSpend
     wrote: bool
-
-
-def _holders(gate: CapsuleGateResult) -> list[tuple[str, ...]]:
-    return [*(s.player_ids for s in gate.shared), *(s.player_ids for s in gate.spans)]
-
-
-def _quoted_spans(gate: CapsuleGateResult, pages: Sequence[str]) -> dict[str, tuple[str, ...]]:
-    """Each page's own shared spans for its repair prompt, at most `max_quoted_spans` of them."""
-    cap = CAPSULE_CONFIG.repetition.max_quoted_spans
-    return {pid: gate.span_phrases[pid][:cap] for pid in pages if pid in gate.span_phrases}
 
 
 def _sweep_line(name: str, report: SweepReport) -> str:
@@ -204,15 +194,6 @@ class _Passes:
         report = self.sweep(name, SweepPlan(self.budget, unwritten_only=self.mend_only, avoid=shared))
         self.retry("capsule retries", report.facts, shared)
         self.repair()
-        # A rewrite the repair could not get past its validator leaves a facts block, so the
-        # unwritten pages get their retries once more, the sentences now on two pages quoted.
-        with self.engine.connect() as conn:
-            gate = capsule_gate(conn, self.now, self.rules)
-        if gate.facts_blocks:
-            self.retry("capsule retries after repair", gate.facts_blocks, tuple(x.sentence for x in gate.shared))
-            # A page those retries write can share a sentence with another, so the repairs run once more
-            # (two nights in a row ended on two such sentences, 2026-10-13T21 and 2026-10-14T02).
-            self.repair()
 
     def retry(self, name: str, unwritten: int, avoid: tuple[str, ...]) -> None:
         for attempt in range(1, RETRY_PASSES + 1):
@@ -221,27 +202,38 @@ class _Passes:
             retry = self.sweep(f"{name} {attempt}", SweepPlan(self.left, unwritten_only=True, avoid=avoid))
             unwritten = retry.facts
 
+    def _judged(self) -> tuple[CapsuleGateResult, list[str], dict[str, tuple[str, ...]]]:
+        with self.engine.connect() as conn:
+            gate = capsule_gate(conn, self.now, self.rules)
+            order = board_universe_ids(conn, self.now)
+            failing = dict(page_findings(conn, self.now, self.facts).by_page)
+        return gate, order, failing
+
     def repair(self) -> None:
+        """Each attempt: the unwritten pages' retry first, then the hard targets, then the span
+        targets most shared first (`capsule_repair`), all from the budget left."""
         for attempt in range(1, REPAIR_PASSES + 1):
-            with self.engine.connect() as conn:
-                gate = capsule_gate(conn, self.now, self.rules)
-                order = board_universe_ids(conn, self.now)
-                failing = page_findings(conn, self.now, self.facts).by_page
-            place = {pid: index for index, pid in enumerate(order)}
-            shared_pages = repair_targets(_holders(gate), order)
-            targets = sorted({*shared_pages, *failing}, key=lambda pid: place.get(pid, len(place)))
-            if not targets or self.left <= 0:
-                self.log(f"capsule repair {attempt}: {'none needed' if not targets else 'no budget left'}")
+            gate, _, _ = self._judged()
+            avoid = tuple(sentence.sentence for sentence in gate.shared)
+            if gate.facts_blocks and self.left > 0:
+                self.retry(f"capsule repair {attempt}, unwritten pages first", gate.facts_blocks, avoid)
+            gate, order, failing = self._judged()
+            targets = repair_order(gate, failing, order)
+            if targets.empty or self.left <= 0:
+                self.log(f"capsule repair {attempt}: {'none needed' if targets.empty else 'no budget left'}")
                 return
             avoid = tuple(sentence.sentence for sentence in gate.shared)
-            name = (
-                f"capsule repair {attempt} ({len(gate.shared)} shared sentences, {len(gate.spans)} shared spans, "
-                f"{len(failing)} pages failing the page gate, {len(targets)} pages)"
-            )
-            plan = SweepPlan(
-                self.left, only=frozenset(targets), avoid=avoid, avoid_by_page=_quoted_spans(gate, targets)
-            )
-            self.sweep(name, plan)
+            if targets.hard:
+                name = (
+                    f"capsule repair {attempt} ({len(gate.shared)} shared sentences, {len(failing)} pages failing "
+                    f"the page gate, {len(targets.hard)} pages)"
+                )
+                self.sweep(name, SweepPlan(self.left, only=targets.hard, avoid=avoid))
+            if targets.spans and self.left > 0:
+                name = f"capsule span repair {attempt} ({len(gate.spans)} shared spans, {len(targets.spans)} pages)"
+                quoted = quoted_spans(gate, targets.spans)
+                plan = SweepPlan(self.left, only=targets.spans, avoid=avoid, avoid_by_page=quoted, keep_written=True)
+                self.sweep(name, plan)
 
 
 def run_capsule_step(

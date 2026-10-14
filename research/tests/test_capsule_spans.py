@@ -1,6 +1,6 @@
 """The capsule gate's six-word spans (`capsules.spans`, the live review's M1) and the repair's
-targets, as the coordinator ruled them: a span on two pages is queued and counted but does not fail
-the run, one on three pages is stock and fails it, a span a fact sheet prints is exempt; names break a
+targets, as the coordinator ruled them: a span on any number of pages is counted and queued but never
+fails the run, a whole sentence on two pages does, a span a fact sheet prints is exempt; names break a
 span, overlapping windows are quoted as one phrase, and the repair keeps each span on its first page."""
 
 from datetime import UTC, datetime
@@ -27,19 +27,26 @@ def test_a_span_on_two_pages_is_queued_and_counted_but_does_not_fail_the_run() -
     gate = judge_capsules(["a", "b", "c"], rows, RULES)
     assert [(s.span, s.player_ids) for s in gate.spans] == [("the target share is the whole", ("a", "b"))]
     assert set(gate.span_phrases) == {"a", "b"}
-    assert gate.stock_spans == ()
     assert gate.ok
     assert repair_targets([s.player_ids for s in gate.spans], ["a", "b", "c"]) == ["b"]
-    assert "1 six-word spans on two pages or more (2 pages carry one, 1 queued for repair), 0 on 3" in gate.summary()
+    assert "1 six-word spans on two pages or more (2 pages carry one, 1 queued for repair, never a failure)" in (
+        gate.summary()
+    )
 
 
-def test_a_span_on_three_pages_is_stock_and_fails_the_run() -> None:
+def test_a_span_on_three_pages_is_counted_and_never_fails_the_run() -> None:
     rows = {pid: _row(pid, f"Note {pid}: the target share is the whole case.") for pid in ("a", "b", "c")}
     gate = judge_capsules(["a", "b", "c"], rows, RULES)
-    assert gate.stock_spans != ()
-    assert {s.player_ids for s in gate.stock_spans} == {("a", "b", "c")}
+    assert {s.player_ids for s in gate.spans} == {("a", "b", "c")}
+    assert gate.ok
+    assert gate.queued == len(rows) - 1  # every carrier but the first
+
+
+def test_a_whole_sentence_on_two_pages_still_fails_the_run() -> None:
+    rows = {pid: _row(pid, f"Page {pid}. If he is on your roster, let him go.") for pid in ("a", "b")}
+    gate = judge_capsules(["a", "b"], rows, RULES)
+    assert [s.player_ids for s in gate.shared] == [("a", "b")]
     assert not gate.ok
-    assert f"{len(gate.stock_spans)} on 3 pages or more (failing)" in gate.summary()
 
 
 def test_a_span_the_fact_sheet_prints_is_exempt() -> None:
@@ -50,8 +57,7 @@ def test_a_span_the_fact_sheet_prints_is_exempt() -> None:
     gate = judge_capsules(["a", "b", "c"], rows, rules)
     assert gate.spans == ()
     assert gate.exempt_spans > 0
-    assert gate.ok
-    assert judge_capsules(["a", "b", "c"], rows, RULES).stock_spans != ()
+    assert judge_capsules(["a", "b", "c"], rows, RULES).spans != ()
 
 
 def test_case_and_punctuation_fold_and_a_facts_block_is_not_judged() -> None:
