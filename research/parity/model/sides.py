@@ -19,14 +19,15 @@ class OracleRun:
     error: str | None
 
 
-def run_oracle(database_url: str, *args: str) -> OracleRun:
-    """`ts/model.ts <args>` against a database: its JSON lines, and its refusal if it threw."""
+def run_oracle(database_url: str, *args: str, driver: str = _DRIVER.name, timeout: int = _TIMEOUT_SECONDS) -> OracleRun:
+    """`ts/<driver> <args>` (`model.ts` unless named) against a database: its JSON lines, and its
+    refusal if it threw."""
     completed = subprocess.run(
-        ["npx", "tsx", str(_DRIVER), *args],
+        ["npx", "tsx", str(_DRIVER.parent / driver), *args],
         cwd=_REPO,
         capture_output=True,
         text=True,
-        timeout=_TIMEOUT_SECONDS,
+        timeout=timeout,
         env={**os.environ, "DATABASE_URL": database_url},
         check=False,
     )

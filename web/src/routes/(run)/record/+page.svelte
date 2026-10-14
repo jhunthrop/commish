@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { siteContext } from '#lib/context/context.svelte.ts';
+	import ContextNote from '#lib/context/ContextNote.svelte';
+	import { SCORING_WORDS } from '#lib/league/names.ts';
 	import { fixed, plural } from '#lib/format/number.ts';
 	import { allLine, recordHeadline, weekWords } from '#lib/run/record.ts';
 	import type { RecordWeek, Score } from '#lib/run/schema.ts';
@@ -17,6 +20,12 @@
 
 	const record = $derived(data.page.record);
 	const scoring = $derived(data.page.format.label);
+	/** The record is graded in one scoring: with a league selected, the page says the league's too. */
+	const note = $derived(
+		siteContext.league
+			? `Your league scores ${SCORING_WORDS[siteContext.league.scoring]}. Our record is graded in ${scoring}.`
+			: null
+	);
 	const stat = $derived(record.statistic);
 	const headline = $derived(recordHeadline(record));
 
@@ -61,6 +70,7 @@
 			title="Our record"
 			lead="Our {scoring} board against {record.season}'s games, week by week, beside ADP"
 		/>
+		<ContextNote {note} />
 
 		<Panel padding="md">
 			<Figure value={headline.value} size="xl" caption={headline.caption} />

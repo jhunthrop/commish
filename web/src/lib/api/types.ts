@@ -105,6 +105,23 @@ export interface paths {
 		patch: operations['updateMe'];
 		trace?: never;
 	};
+	'/me/league': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		/** The site's context: one of the account's followed leagues, or a format with no league. Every page reads the selection from /me. */
+		put: operations['selectLeague'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/leagues': {
 		parameters: {
 			query?: never;
@@ -1213,13 +1230,12 @@ export interface components {
 			/** Format: uuid */
 			id: string;
 			email: string;
-			/**
-			 * Format: uuid
-			 * @description the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
-			 */
-			league_id: string | null;
-			/** @description how many leagues the account follows now (detached ones not counted); more than one, the rail's League opens the list */
-			league_count: number;
+			/** @description the selected league, the site's context; with no selection made, the newest followed league; null when the account follows none or chose a format alone */
+			league: components['schemas']['ContextLeague'] | null;
+			/** @description every league the account follows, newest first, as the shell's switcher lists them */
+			leagues: components['schemas']['ContextLeague'][];
+			/** @description the context's format, the board every page opens in: the selected league's, else the format chosen with no league, null when neither */
+			format: components['schemas']['BoardFormat'] | null;
 			first_name: string | null;
 			last_name: string | null;
 			/** @description the name shown in lobbies, 3 to 20 letters, digits or underscores, not starting with a digit */
@@ -1273,6 +1289,36 @@ export interface components {
 			| 'two_flex'
 			| 'dynasty'
 			| 'best_ball';
+		/** @description a followed league as the site's context reads it */
+		ContextLeague: {
+			/**
+			 * Format: uuid
+			 * @description the attachment (AttachedLeague.id)
+			 */
+			id: string;
+			/** @description the league's name at its last read, else its saved league's */
+			name: string;
+			host: components['schemas']['LeagueHost'];
+			/** @description the drafter's team at the last read, empty when unread */
+			team_name: string;
+			/** @description the drafter's record and place at the last read, null when unread */
+			standing: components['schemas']['LeagueStanding'] | null;
+			/** @description the preset the league's scoring is, or scores most like (its saved league's, else its last read's) */
+			scoring: components['schemas']['ScoringPreset'];
+			/** @description the board the league reads on: superflex for a superflex lineup, otherwise ppr, half_ppr or standard by the league's points per reception (TE premium reads on ppr until its exact rules have a board) */
+			format: components['schemas']['BoardFormat'];
+			/**
+			 * Format: uuid
+			 * @description the saved league a mock reruns from, null when a mock room cannot draft this league
+			 */
+			settings_league_id: string | null;
+		};
+		/** @description exactly one of league_id (a followed league) and format (no league: any board format, the web offering the ones the run carries) */
+		LeagueChoice: {
+			/** Format: uuid */
+			league_id?: string | null;
+			format?: components['schemas']['BoardFormat'] | null;
+		};
 		/** @description exactly one of preset and custom. custom needs the custom_scoring feature. */
 		Scoring: {
 			preset?: components['schemas']['ScoringPreset'] | null;
@@ -2044,7 +2090,7 @@ export interface components {
 			/** @description the league's name at its last read */
 			name: string;
 			roster_id: number;
-			/** @description the drafter's team at the last read */
+			/** @description the drafter's team at the last read, empty when unread */
 			team_name: string;
 			/** @description the drafter's record and place at the last read, null when unread */
 			standing: components['schemas']['LeagueStanding'] | null;
@@ -2162,7 +2208,12 @@ export interface components {
 			matchup: components['schemas']['LeagueMatchup'] | null;
 			/** @description the completed moves of this week and last, newest first */
 			moves: components['schemas']['LeagueMove'][];
-			/** @description the board id of every player a team in the league holds; the waiver pool is our board without them. The board is the run's own (web data/league-board), not part of this answer */
+			/** @description the roster id holding each player a team in the league holds, by his board id; the waiver pool is our board without them, and every page marks them. The board is the run's own (web data/league-board), not part of this answer */
+			held_by: Record<string, number>;
+			/**
+			 * @deprecated
+			 * @description held_by's board ids, sorted, for a web from before held_by during the deploy window. Removed after 2026-10-21 once the web that reads held_by has shipped
+			 */
 			rostered: string[];
 			/** @description the run's board the league reads on (ppr, half_ppr, standard or superflex) */
 			board_format: components['schemas']['BoardFormat'];
@@ -2542,6 +2593,24 @@ export interface operations {
 			200: components['responses']['AccountResponse'];
 			400: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
+		};
+	};
+	selectLeague: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['LeagueChoice'];
+			};
+		};
+		responses: {
+			200: components['responses']['AccountResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
 		};
 	};
 	listLeagues: {

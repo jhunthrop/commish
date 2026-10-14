@@ -4,7 +4,7 @@
  * format id and team count ("ppr-12"). A run format reaches the sheet when its id without the
  * team count, hyphens read as underscores, is a sheet format: "ppr-12" is the sheet's "ppr".
  */
-import { apiFormatOf } from '#lib/run/catalog.ts';
+import { apiFormatOf } from '#lib/run/format-ids.ts';
 import type { DirectoryPlayer } from '#lib/sheet/directory.ts';
 import type { LeagueBoardFile } from '#lib/run/league-board.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';

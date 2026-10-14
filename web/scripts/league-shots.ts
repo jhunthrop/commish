@@ -56,7 +56,7 @@ async function call<T>(who: Drafter, method: string, path: string, body?: unknow
 
 interface Sync {
 	id: string;
-	rostered: string[];
+	held_by: Record<string, number>;
 	board_format: string;
 	roster: { player: { board_id: string | null; name: string; position: string } }[];
 }
@@ -79,7 +79,7 @@ async function seed(): Promise<{ sleeper: string; mfl: string }> {
 	const response = await fetch(`${web}/data/league-board/${sleeper.board_format}.json`);
 	const board = await response.json<RunBoard>();
 	const byId = new Map(board.rows.map((p) => [p.id, p] as const));
-	const held = new Set(sleeper.rostered);
+	const held = new Set(Object.keys(sleeper.held_by));
 	const ids = [
 		...sleeper.roster.flatMap((r) => (r.player.board_id ? [r.player.board_id] : [])).slice(0, 3),
 		...board.rows

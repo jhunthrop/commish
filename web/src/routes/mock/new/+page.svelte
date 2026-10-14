@@ -11,6 +11,7 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { startMock } from '#lib/room/actions.ts';
+	import { siteContext } from '#lib/context/context.svelte.ts';
 	import {
 		ApiError,
 		isSignedOut,
@@ -42,6 +43,7 @@
 		MIN_ROUNDS,
 		TEAM_CHOICES,
 		defaultSettings,
+		inFormat,
 		nearestLobby,
 		roundsOf
 	} from '#lib/room/setup/setup.ts';
@@ -176,11 +178,19 @@
 		opened = league;
 	}
 
+	/** The setup starts from the site's context: the selected league's saved settings (or the league
+	 * a link names), else the format chosen with no league. A mock the page reruns (`?from=`) keeps
+	 * its own. */
 	async function loadLeagues(): Promise<void> {
+		await siteContext.load();
+		const params = page.url.searchParams;
+		if (!params.has('from')) settings = inFormat(settings, siteContext.format);
 		try {
 			leagues = await rooms.leagues();
-			exactRules = hasFeature((await rooms.me()).features, 'custom_scoring');
-			const id = page.url.searchParams.get('league');
+			exactRules = hasFeature(siteContext.features, 'custom_scoring');
+			const id = params.get('from')
+				? null
+				: (params.get('league') ?? siteContext.league?.settings_league_id ?? null);
 			if (id) openLeague(id);
 		} catch (e) {
 			// Signed out: setup still works, a mock against bots starts, the other verbs ask to sign in.

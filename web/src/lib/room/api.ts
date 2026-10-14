@@ -72,7 +72,6 @@ export const rooms = {
 		call<Schemas['ScoringImport']>('POST', '/leagues/import-scoring', { host, link }),
 	saveLeague: (name: string, settings: LeagueSettings) =>
 		call<League>('POST', '/leagues', { name, settings }),
-	me: () => call<Account>('GET', '/me'),
 	setHandle: (handle: string) => call<Account>('PATCH', '/me', { handle }),
 	lobbies: () => call<LobbyFilling[]>('GET', '/lobbies'),
 	join: (format: LobbyFormat) => call<LobbySeat>('POST', '/lobbies/join', { format }),

@@ -4,6 +4,7 @@ from shell import page
 SENTENCES = [
     "Commish is Press Box: a near-black or paper-white shell with the icon rail and a search that never leaves the top, dense rows that put a face before every number, and one burnt orange for the brand, the one verb and you.",
     "Every other color is a measurement that names itself, green for the round a player's value ranks in, rose below replacement, and hot-to-cold tier strips that print the drop to the next tier.",
+    "The league is the site's context: its switch closes the top bar at the right on every page, naming the selected league (or the format with none), and the board, the player page, compare, the sheet and mock setup all read it, with rostered players marked by the league's flag on their face.",
     "Two borrowings have fixed borders: the player page's capsule is set in Newsreader because it is writing, and a mock lobby with people in it wears a score bug on scoreboard black, the only clock on the site.",
 ]
 

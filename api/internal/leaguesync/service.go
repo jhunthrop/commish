@@ -77,6 +77,10 @@ type Service struct {
 	FFPC *FFPC
 	// ESPN reads a public ESPN league's scoring for the import.
 	ESPN ESPNLeagues
+	// Selection keeps the site's context and Accounts answers the Account
+	// it changes (PUT /me/league).
+	Selection Selector
+	Accounts  AccountViewer
 
 	Now func() time.Time
 	Log *slog.Logger
@@ -94,6 +98,7 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/restore", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDetachPerMinute), Handler: s.restore},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/sync", Access: httpx.SignedIn, Limit: read, Handler: s.sync},
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/refresh", Access: httpx.SignedIn, Limit: httpx.PerHour(limitRefreshPerHour), Handler: s.refresh},
+		{Method: http.MethodPut, Path: "/me/league", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitSelectPerMinute), Handler: s.selectLeague},
 	}
 }
 
