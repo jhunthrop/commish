@@ -21,6 +21,7 @@ from research.model.fits.game_variance import fit_skill_game_variance
 from research.model.priors import load_model_artifacts
 from research.parity.model.board_cases import WEEK_TWO_BOARD, board_week_one, board_week_two
 from research.parity.model.compare import Diff, diff_rows
+from research.parity.model.custom_cases import custom_board_week_two
 from research.parity.model.numerics import VectorCheck, run_committed, run_live
 from research.parity.model.outcome import CaseResult, Claim
 from research.parity.model.register_cases import (
@@ -178,6 +179,12 @@ MODEL_CASES: Final = (
         "the freeze refuses a board that names no model, and writes nothing",
         True,
         register_freeze_unknown_model,
+    ),
+    ModelCase(
+        "custom-board-2026-week2",
+        "PPR, half and standard rules through the custom board path, against the stored boards, every bit",
+        True,
+        custom_board_week_two,
     ),
     ModelCase("held-out-backtest", "the stored served board against outcomes in the held-out seasons", True, _held_out),
     ModelCase("fit-check", "the fit step's check: the live board before kickoff, the archive after", True, _fit_check),

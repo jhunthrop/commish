@@ -44,6 +44,7 @@ from research.db.url import database_url_from_env
 from research.model.arithmetic import ARITHMETIC_BY_NAME, Arithmetic, Provenance, model_version
 from research.model.instants import js_iso, ms_instant
 from research.model.market.curve import BOARD_FORMATS, BoardFormat, board_source_for
+from research.model.preseason.candidate_store import write_candidates
 from research.model.preseason.inputs import MissingInputError
 from research.model.preseason.persist import (
     PointDrift,
@@ -243,8 +244,18 @@ def persist_product_season(
     season = build_season(conn, PRODUCT_SEASON, now, artifacts, provenance.arithmetic)
     written = []
     for leg in legs_for(BOARD_FORMATS):
-        counts = write_board(conn, PRODUCT_SEASON, leg.source, season.inputs, season.boards[leg.source], provenance)
-        written.append(f"{leg.source} {counts.written} rows")
+        built = season.boards[leg.source]
+        counts = write_board(conn, PRODUCT_SEASON, leg.source, season.inputs, built, provenance)
+        kept = write_candidates(
+            conn,
+            PRODUCT_SEASON,
+            leg.source,
+            season.inputs.moment,
+            season.inputs.moment_kind,
+            built.candidates,
+            provenance.model_version,
+        )
+        written.append(f"{leg.source} {counts.written} rows, {kept} candidates")
     return StepRecord("ran", f"{PRODUCT_SEASON} {season.inputs.moment_kind} board written: {', '.join(written)}")
 
 
