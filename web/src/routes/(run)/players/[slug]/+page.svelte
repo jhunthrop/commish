@@ -3,7 +3,8 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { contextLine } from '#lib/context/context-format.ts';
-	import { contextNote, holderWords } from '#lib/context/words.ts';
+	import { holderWords } from '#lib/context/holder-words.ts';
+	import { contextNote } from '#lib/context/note-words.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, plural, signed } from '#lib/format/number.ts';

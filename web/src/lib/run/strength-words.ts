@@ -4,7 +4,7 @@
  * expected wins for the season, ..."), so these lines print it as given and never add one.
  */
 import { windowLabel } from '#lib/format/date.ts';
-import { hardestWords } from '#lib/format/number.ts';
+import { ordinal } from '#lib/format/number.ts';
 import type { Slate } from './schema.ts';
 
 type Basis = Pick<Slate, 'method' | 'window'>;
@@ -43,4 +43,11 @@ export function clubsLead(formatLabel: string, first: Basis | undefined): string
 /** A club's figure caption: "the average of ..., the hardest of 32, read Sep 7". */
 export function clubCaption(slate: Basis & Pick<Slate, 'rank'>, of: number): string {
 	return `${slate.method}, ${hardestWords(slate.rank, of)}, read ${windowLabel(slate.window)}`;
+}
+
+/** "the hardest of 32", "3rd hardest of 32", "the easiest of 32": a schedule rank where 1 is the
+ * hardest. */
+export function hardestWords(rank: number, of: number): string {
+	if (rank === of) return `the easiest of ${String(of)}`;
+	return `${rank === 1 ? 'the hardest' : `${ordinal(rank)} hardest`} of ${String(of)}`;
 }

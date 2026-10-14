@@ -8,7 +8,7 @@ import { sessionToken } from '#lib/api/session.ts';
 import type { components } from '#lib/api/types.ts';
 
 import { siteContext } from './context.svelte.ts';
-import type { Held } from './words.ts';
+import type { Held } from './held-words.ts';
 
 type LeagueSync = components['schemas']['LeagueSync'];
 

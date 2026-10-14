@@ -1,15 +1,10 @@
 // The context's words: the switch, a league's line, the basis line and the held mark. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-	contextNote,
-	heldMark,
-	holderWords,
-	labelEnds,
-	switchLabel,
-	type ContextLeague,
-	type Held
-} from './words.ts';
+import { labelEnds, switchLabel, type ContextLeague } from './words.ts';
+import { heldMark, type Held } from './held-words.ts';
+import { holderWords } from './holder-words.ts';
+import { contextNote } from './note-words.ts';
 import { leagueLine } from './menu-words.ts';
 import { clubCaption, clubsLead, scheduleLead } from '#lib/run/strength-words.ts';
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
-	import { leagueScores } from '#lib/context/words.ts';
+	import { leagueScores } from '#lib/context/note-words.ts';
 	import { fixed, plural } from '#lib/format/number.ts';
 	import {
 		allLine,

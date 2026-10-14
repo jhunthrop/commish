@@ -3,7 +3,8 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { followFormat } from '#lib/context/follow.svelte.ts';
-	import { contextNote, heldMark } from '#lib/context/words.ts';
+	import { heldMark } from '#lib/context/held-words.ts';
+	import { contextNote } from '#lib/context/note-words.ts';
 	import { POSITION_NAMES, tierGroups } from '#lib/run/derive.ts';
 	import type { BoardPage } from '#lib/server/pages/board.ts';
 	import { lazySheet } from './lazy-sheet.svelte.ts';

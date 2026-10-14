@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { followFormat } from '#lib/context/follow.svelte.ts';
-	import { heldMark } from '#lib/context/words.ts';
+	import { heldMark } from '#lib/context/held-words.ts';
 	import { windowLabel } from '#lib/format/date.ts';
 	import { plural } from '#lib/format/number.ts';
 	import { rangeScale } from '#lib/run/derive.ts';

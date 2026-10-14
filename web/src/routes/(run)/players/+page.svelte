@@ -10,7 +10,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import HeldMark from '#lib/ui/HeldMark.svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
-	import { heldMark } from '#lib/context/words.ts';
+	import { heldMark } from '#lib/context/held-words.ts';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 

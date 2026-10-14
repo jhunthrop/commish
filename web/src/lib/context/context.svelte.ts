@@ -12,7 +12,8 @@ import { apiClient } from '#lib/api/client.ts';
 import { sessionToken } from '#lib/api/session.ts';
 import type { components } from '#lib/api/types.ts';
 import { CONTEXT_KEY, LEAGUE_ATTR, LINES_KEY } from './boot.ts';
-import type { BoardFormat, ContextLeague, Held } from './words.ts';
+import type { Held } from './held-words.ts';
+import type { BoardFormat, ContextLeague } from './words.ts';
 
 type Account = components['schemas']['Account'];
 type Feature = components['schemas']['Feature'];

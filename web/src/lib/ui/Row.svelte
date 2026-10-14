@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { fixed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
-	import type { LeagueMark } from '#lib/context/words.ts';
+	import type { LeagueMark } from '#lib/context/held-words.ts';
 	import type { IndexSeason } from '#lib/run/schema.ts';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import AdpCell from './AdpCell.svelte';
