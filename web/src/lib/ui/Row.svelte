@@ -1,12 +1,11 @@
 <script lang="ts">
 	import { fixed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
-	import type { LeagueMark } from '#lib/context/held-words.ts';
+	import type { ShownMark } from '#lib/context/held-words.ts';
 	import type { IndexSeason } from '#lib/run/schema.ts';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import AdpCell from './AdpCell.svelte';
 	import Face from './Face.svelte';
-	import HeldMark from './HeldMark.svelte';
 	import NameWords from './NameWords.svelte';
 	import PositionPill from './PositionPill.svelte';
 	import RangeBar from './RangeBar.svelte';
@@ -40,8 +39,9 @@
 		 * prints "18.4 a game, 5 games" in place of his projected games, and the page's basis line
 		 * names it. Left out, the row is the preseason row. */
 		season?: IndexSeason;
-		/** The league's mark (HeldMark): yours, which tints the row with your wash, or a free agent. */
-		held?: LeagueMark | null;
+		/** The league's mark, with the component that draws it (HeldMark, loaded with the rosters):
+		 * yours, which tints the row with your wash, or a free agent. */
+		held?: ShownMark | null;
 	}
 
 	let {
@@ -73,8 +73,9 @@
 >
 	<span class="rk">{lead}</span>
 	<span class="face"
-		><Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />{#if held}<HeldMark
-				{...held}
+		><Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />{#if held}<held.Mark
+				words={held.words}
+				kind={held.kind}
 			/>{/if}</span
 	>
 	<span class="who">

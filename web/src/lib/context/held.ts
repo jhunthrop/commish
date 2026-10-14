@@ -8,6 +8,7 @@ import { sessionToken } from '#lib/api/session.ts';
 import type { components } from '#lib/api/types.ts';
 
 import { siteContext } from './context.svelte.ts';
+import HeldMark from '#lib/ui/HeldMark.svelte';
 import { marksOf } from './held-marks.ts';
 import type { Held } from './held-words.ts';
 
@@ -44,7 +45,7 @@ export function takeHeld(id: string, sync: Pick<LeagueSync, 'me' | 'teams' | 'he
 	if (siteContext.league?.id !== id || session === null) return;
 	const kept: KeptHeld = { session, id, at: Date.now(), held: heldOf(sync) };
 	siteContext.heldFor = id;
-	siteContext.held = marksOf(kept.held);
+	siteContext.held = marksOf(kept.held, HeldMark);
 	try {
 		sessionStorage.setItem(HELD_KEY, JSON.stringify(kept));
 	} catch {
@@ -69,7 +70,7 @@ export async function readHeld(id: string): Promise<void> {
 	siteContext.heldFor = id;
 	const kept = keptFor(id);
 	if (kept) {
-		siteContext.held = marksOf(kept.held);
+		siteContext.held = marksOf(kept.held, HeldMark);
 		return;
 	}
 	try {

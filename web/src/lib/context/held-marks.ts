@@ -1,6 +1,6 @@
 /** The roster marks in words, loaded with the rosters (held.ts) and never before: a row's mark and
  * whose roster a player is on. */
-import type { Held, LeagueMark, Marks } from './held-words.ts';
+import type { Held, LeagueMark, Marks, ShownMark } from './held-words.ts';
 
 const FREE_WORDS = 'Free agent in your league';
 
@@ -24,10 +24,13 @@ export function holderWords(held: Held, boardId: string): string {
 	return team === '' ? 'On a roster in your league' : `Rostered by ${team}`;
 }
 
-/** The store's lookups for a read's rosters. */
-export function marksOf(held: Held): Marks {
+/** The store's lookups for a read's rosters, each row's mark with the component that draws it. */
+export function marksOf(held: Held, Mark: ShownMark['Mark']): Marks {
 	return {
-		mark: (boardId) => heldMark(held, boardId),
+		mark: (boardId) => {
+			const mark = heldMark(held, boardId);
+			return mark === null ? null : { ...mark, Mark };
+		},
 		holder: (boardId) => holderWords(held, boardId)
 	};
 }

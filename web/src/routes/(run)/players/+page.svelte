@@ -8,7 +8,6 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import PlayerLine from '#lib/ui/PlayerLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
-	import HeldMark from '#lib/ui/HeldMark.svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
@@ -51,7 +50,7 @@
 								>
 									{#snippet trailing()}
 										{@const held = siteContext.held?.mark(player.id)}
-										{#if held}<HeldMark {...held} inline />{/if}
+										{#if held}<held.Mark words={held.words} kind={held.kind} inline />{/if}
 										<Label>{player.ourRank}</Label>
 									{/snippet}
 								</PlayerLine>

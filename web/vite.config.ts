@@ -12,7 +12,7 @@ const PRERENDER_CONCURRENCY = 8;
  * club and the front door draw them, a player page never does, so they load as one file with the
  * pages that draw rows. */
 const ROW_PARTS =
-	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|RangeBar|AdpCell|SheetMark|HeldMark|season-figures)\.|site[\\/]RowSheetMark\.)/;
+	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|RangeBar|AdpCell|SheetMark|season-figures)\.|site[\\/]RowSheetMark\.)/;
 /** The board and ADP pages' own parts: the views, the tier strip, the rail's jump list and toggles,
  * the follow of the switch's format, the chips, and a missing format's page. One file for those
  * pages. */
