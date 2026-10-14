@@ -30,6 +30,7 @@ from sqlalchemy import Connection
 
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
+from research.logging_setup import configure_logging
 from research.pipeline import coaches, vegas
 from research.pipeline.checkpoint import no_checkpoint
 from research.pipeline.commands import COMMANDS, RESEARCH_ROOT, Command, Invocation, now_ms
@@ -95,7 +96,7 @@ def _run(command: Command, args: argparse.Namespace) -> object:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    configure_logging(logging.INFO)
     if args.check:
         return _check(args.command)
     result = _run(COMMANDS[args.command], args)

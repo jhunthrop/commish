@@ -26,6 +26,7 @@ import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
+from research.logging_setup import configure_logging
 from research.model.ros.scratch import scratch_engine
 from research.parity import databases
 from research.parity.capsules.cases import CAPSULE_CASES
@@ -192,7 +193,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ros.add_argument("--database", required=True, help="a lane18_ database on the local test server, port 5433")
     sub.add_parser("list", help="every case and fixture set")
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+    configure_logging(logging.WARNING)
     commands: dict[str, Callable[[], int]] = {
         "ingest": lambda: _ingest(args.names),
         "model": lambda: _model(args.names, not args.no_store),

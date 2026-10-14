@@ -29,6 +29,7 @@ The URLs are never printed.
 """
 
 import argparse
+import logging
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -42,6 +43,7 @@ from research.db.legacy import LEGACY_SCHEMA, LEGACY_TABLES, NEW_IN_RESEARCH, NO
 from research.db.schema import METADATA, RESEARCH_SCHEMA
 from research.db.url import database_url_from_env
 from research.errors import ResearchError
+from research.logging_setup import configure_logging
 
 SOURCE_VARIABLE = "LEGACY_DATABASE_URL"
 TARGET_VARIABLE = "RESEARCH_DATABASE_URL"
@@ -225,6 +227,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="research.load_legacy", description="copy the legacy tables into research")
     parser.add_argument("--replace", action="store_true", help="truncate the research tables first")
     args = parser.parse_args(argv)
+    configure_logging(logging.WARNING)
     try:
         manifest = load(database_url_from_env(SOURCE_VARIABLE), database_url_from_env(TARGET_VARIABLE), args.replace)
     except LoadError as refusal:

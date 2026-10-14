@@ -9,6 +9,7 @@ environment URL, and anything but a local host is refused (`scratch_engine`).
 
 import argparse
 import json
+import logging
 import subprocess
 import sys
 from collections.abc import Callable, Mapping, Sequence
@@ -21,6 +22,7 @@ from sqlalchemy import text
 
 from research.cli import log_line
 from research.errors import ConfigurationError
+from research.logging_setup import configure_logging
 from research.model.arithmetic import ARM64_BOARDS, model_version
 from research.model.priors import load_model_artifacts
 from research.model.ros import gates
@@ -143,6 +145,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         run.add_argument("--out", type=Path, required=True)
         run.add_argument("--round", type=int, choices=sorted(ROUNDS), required=True)
     args = parser.parse_args(argv)
+    configure_logging(logging.WARNING)
     if args.command == "ingest-week-one-rosters":
         ingest_week_one_rosters(args.database, args.season, datetime.now(UTC))
         return 0

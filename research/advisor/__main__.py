@@ -12,6 +12,8 @@ from typing import Final
 
 import uvicorn
 
+from research.logging_setup import configure_logging
+
 DEFAULT_PORT: Final = 8080
 DEFAULT_WORKERS: Final = 2
 
@@ -29,7 +31,7 @@ def main() -> int:
     workers = _positive("ADVISOR_WORKERS", DEFAULT_WORKERS)
     if port is None or workers is None:
         return 2
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    configure_logging(logging.INFO)
     uvicorn.run(
         "research.advisor.server:create_app",
         factory=True,

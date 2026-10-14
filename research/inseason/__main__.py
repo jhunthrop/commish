@@ -30,6 +30,7 @@ from research.inseason.season_of import (
     unplaced_reason,
 )
 from research.inseason.season_week import STEPS, SeasonWeekContext, StepResult, run_season_week
+from research.logging_setup import configure_logging
 from research.nightly.publish import take_run_id
 from research.nightly.r2 import run_store
 from research.nightly.register_log import WEEKLY_SUFFIX, record_freeze, record_pass
@@ -151,7 +152,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--skip", default="", help=f"season-week: steps to skip, of {', '.join(STEPS)}")
     parser.add_argument("--out", default=None, help="season-week: a local directory for the register's trail, not R2")
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    configure_logging(logging.INFO)
     now = now_ms()
     ok = _season_week(args, now) if args.task == "season-week" else _capture_harvest(now)
     return 0 if ok else 1

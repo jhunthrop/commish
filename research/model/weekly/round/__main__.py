@@ -9,6 +9,7 @@ environment URL, and production (a Neon host, or a Cloud SQL socket) is refused.
 
 import argparse
 import json
+import logging
 import sys
 from collections.abc import Sequence
 from dataclasses import asdict
@@ -22,6 +23,7 @@ from research.cli import log_line
 from research.db.engine import make_engine
 from research.db.url import CLOUDSQL_SOCKET_ROOT, sqlalchemy_url
 from research.errors import ConfigurationError
+from research.logging_setup import configure_logging
 from research.model.arithmetic import ARM64_BOARDS, model_version
 from research.model.artifacts import read_artifact
 from research.model.weekly.model import weekly_priors_from, weekly_priors_payload
@@ -119,6 +121,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         run.add_argument("--out", type=Path, required=True)
         run.add_argument("--rerun", action="store_true", help="judge again, marked as a rerun that voids the record")
     args = parser.parse_args(argv)
+    configure_logging(logging.WARNING)
     if args.command == "ingest-gap-season":
         return _ingest_gap_season(args.database, args.season)
     judging = args.command == "judge"
