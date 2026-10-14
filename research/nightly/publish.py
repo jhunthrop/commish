@@ -15,6 +15,13 @@ its id: a `workflow_dispatch` of `web.yml` on main with the input `runId`, which
 Actions write and nothing else (a `repository_dispatch` token needs Contents write, which can push
 code). A dispatch that failed is retried by the next
 `publish`; the run's `published.json` records each attempt.
+
+NO TOKEN YET (fix round 4). WEB_DISPATCH_TOKEN needs a GitHub token only the founder can mint, and
+the web workflow rebuilds from `runs/latest.json` every day at 06:30 UTC as the backstop. So a token
+that is missing, empty or exactly `placeholder` (the Secret Manager placeholder's value), after
+trimming, is no dispatch to make: the run still goes public, the dispatch is skipped by name in the
+log line and in the run's `published.json` (`dispatch`), and `publish` exits 0. A dispatch that was
+attempted and that GitHub refused stays a failure, retried the next hour.
 """
 
 import hashlib
@@ -26,7 +33,6 @@ from typing import Any, Final
 
 import httpx
 
-from research.errors import ConfigurationError
 from research.model.instants import js_iso
 from research.nightly.config import EARLY_ACCESS, EARLY_KEY, LATEST_KEY, RUNS_PREFIX
 from research.nightly.run_store import JSON_TYPE, RunStore
@@ -39,6 +45,8 @@ DEFAULT_REPOSITORY: Final = "jhunthrop/commish"
 WEB_WORKFLOW: Final = "web.yml"
 WEB_REF: Final = "main"
 _DISPATCHED: Final = 204
+# The values that mean "no token yet": the Secret Manager placeholder's value, or nothing.
+PLACEHOLDER_TOKENS: Final = frozenset({"", "placeholder"})
 Json = dict[str, Any]
 
 
@@ -98,10 +106,14 @@ class Dispatcher:
     repository: str
 
     @classmethod
-    def from_environ(cls, http: httpx.Client, environ: Mapping[str, str]) -> "Dispatcher":
+    def from_environ(cls, http: httpx.Client, environ: Mapping[str, str]) -> "Dispatcher | str":
+        """The dispatcher, or why there is none (a missing or placeholder token)."""
         token = environ.get(DISPATCH_TOKEN_VARIABLE, "").strip()
-        if not token:
-            raise ConfigurationError(f"{DISPATCH_TOKEN_VARIABLE} is not set; the web build cannot be dispatched.")
+        if token in PLACEHOLDER_TOKENS:
+            state = "is not set" if token == "" else "is the placeholder"
+            return (
+                f"{DISPATCH_TOKEN_VARIABLE} {state}; the web's daily 06:30 UTC rebuild builds runs/latest.json instead"
+            )
         return cls(http, token, environ.get(DISPATCH_REPOSITORY_VARIABLE, DEFAULT_REPOSITORY).strip())
 
     def dispatch(self, run_id: str) -> str | None:
@@ -126,7 +138,7 @@ class PublishOutcome:
     ok: bool
 
 
-def publish(store: RunStore, dispatcher: Dispatcher | None, now: datetime) -> PublishOutcome:
+def publish(store: RunStore, dispatcher: Dispatcher | str | None, now: datetime) -> PublishOutcome:
     """Move `latest.json` to the early run once it is public, and dispatch its build (once)."""
     early = read_json(store, EARLY_KEY)
     if early is None:
@@ -144,9 +156,11 @@ def publish(store: RunStore, dispatcher: Dispatcher | None, now: datetime) -> Pu
         record["publishedAt"] = js_iso(now)
     if record.get("dispatchedAt"):
         return PublishOutcome(run_id, f"publish: run {run_id} is public and its build was dispatched", True)
-    if dispatcher is None:
+    if dispatcher is None or isinstance(dispatcher, str):
+        why = "--no-dispatch" if dispatcher is None else dispatcher
+        record["dispatch"] = f"skipped: {why}"
         store.put(run_key(run_id, PUBLISHED_FILE), encode(record), JSON_TYPE)
-        return PublishOutcome(run_id, f"publish: run {run_id} is public; dispatch skipped (--no-dispatch)", True)
+        return PublishOutcome(run_id, f"publish: run {run_id} is public; the web dispatch skipped ({why})", True)
     failure = dispatcher.dispatch(run_id)
     record["attempts"] = [*record["attempts"], {"at": js_iso(now), "error": failure}]
     if failure is None:
