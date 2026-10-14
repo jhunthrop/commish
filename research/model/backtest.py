@@ -61,6 +61,11 @@ def _pearson(xs: Sequence[float], ys: Sequence[float]) -> float | None:
     return covariance / math.sqrt(variance_x * variance_y)
 
 
+def mean_or_none(values: Sequence[float]) -> float | None:
+    """The left-fold mean, or None for no values."""
+    return None if not values else sum_left(values) / len(values)
+
+
 def sum_left(values: Sequence[float]) -> float:
     total = 0.0
     for value in values:

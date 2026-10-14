@@ -11,7 +11,6 @@ capsule row keys on rides on the pass (`universe_ids`).
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Final
 
 from sqlalchemy import Connection, text
 
@@ -26,6 +25,7 @@ from research.capsules.facts.color import (
 )
 from research.capsules.facts.depth_collect import DepthOptions, collect_depth_facts, depth_prior_seasons
 from research.capsules.facts.depth_model import EMPTY_DEPTH, Depth
+from research.capsules.facts.market_adp import MarketAdp, run_market_adp
 from research.capsules.facts.model import BooksNumbers, Identity, NewsItem, PropsLine, SeasonSummary
 from research.capsules.facts.reference import InjurySnapshot, injury_snapshot, news_for_players
 from research.model.domain import Position
@@ -37,8 +37,7 @@ from research.model.reads.teams import first_kickoff_for, team_observations_as_o
 from research.pipeline.nflverse.team_codes import source_team_code
 from research.pipeline.odds.props import PROP_MARKETS
 from research.pipeline.vegas import VEGAS_SOURCE, VegasMetric
-
-PRODUCT_SEASON: Final = 2026
+from research.season import PRODUCT_SEASON
 
 
 def active_peers_for(conn: Connection, positions: Sequence[Position], season: int) -> dict[str, Position]:
@@ -98,6 +97,8 @@ class SharedReads:
     news: Mapping[str, Sequence[NewsItem]]
     seasons: Mapping[str, SeasonSummary]
     color: ColorFacts
+    # The ADP the sheets carry (`market_adp`): the run's own, or the oracle's in the parity cases.
+    market: MarketAdp
 
 
 def facts_input_for(row: BoardRow, shared: SharedReads) -> FactsInput:
@@ -113,8 +114,9 @@ def facts_input_for(row: BoardRow, shared: SharedReads) -> FactsInput:
         PRODUCT_SEASON,
         row.reasons,
         shared.laws,
-        row.market_adp,
-        row.market_position_adp,
+        shared.market.adp(row.player_id),
+        # No positional ADP: the provider's is not the page's source (`market_adp`).
+        None,
         row.overall_rank,
         row.projected_points,
         row.floor_points,
@@ -129,6 +131,7 @@ def facts_input_for(row: BoardRow, shared: SharedReads) -> FactsInput:
         None if gsis is None else color.usage.usage.get(gsis),
         None if gsis is None else color.usage.trend.get(gsis),
         EMPTY_DEPTH if gsis is None else color.depth.get(gsis, EMPTY_DEPTH),
+        shared.market.page_ranks(row.player_id),
     )
 
 
@@ -187,7 +190,8 @@ class BoardFactsPass:
 
 
 def collect_board_facts(conn: Connection, as_of: datetime) -> BoardFactsPass:
-    """`collectBoardFacts`: every projected board player's facts, in the board's served order."""
+    """`collectBoardFacts`: every projected board player's facts, in the board's served order, with
+    the run's ADP unless `market` says otherwise."""
     prior = PRODUCT_SEASON - 1
     rows = board_rows(conn, PRODUCT_SEASON, as_of)
     if not rows:
@@ -199,12 +203,13 @@ def collect_board_facts(conn: Connection, as_of: datetime) -> BoardFactsPass:
     color = collect_color(conn, Population(positions, universe_ids, team_by_gsis), as_of)
     shared = SharedReads(
         chip_eligible_laws(load_model_artifacts(conn).laws),
-        injury_snapshot(conn),
-        news_for_players(conn, [row.name for row in rows]),
+        injury_snapshot(conn, as_of),
+        news_for_players(conn, [row.name for row in rows], as_of),
         current_season_summaries(
             conn, PRODUCT_SEASON, [row.player_id for row in rows], {r.player_id: r.position for r in rows}
         ),
         color,
+        run_market_adp(conn, as_of),
     )
     facts = tuple(build_player_facts(facts_input_for(row, shared)) for row in rows)
     peers: dict[Position, int] = {}

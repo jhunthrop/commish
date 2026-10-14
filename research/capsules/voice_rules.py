@@ -78,6 +78,15 @@ ASIDE_PATTERNS: Final = (
     _rule("a rewrite note", r"\bhere'?s (?:my|the|a) (?:rewrite|revision|draft|version)\b"),
     _rule("an editorial bracket", r"\[[^\]]*\]"),
     _rule("the model naming itself", r"\bas an? (?:AI|language model|assistant)\b"),
+    # The capsule speaks as "we" (our board, our projection); a single writer's "I" is an aside
+    # (phase D review L10: "I would still spend it elsewhere"). Case-sensitive, so "Week I" and a
+    # name's "III" never match a lone "I".
+    _rule("the first person singular", r"(?<![\w'])I(?:'d|'m|'ll|'ve)?(?![\w'])", 0),
+    # And its other cases (fix round 2, N8: "gives me pause", "in my mind"); a name is masked first.
+    _rule("the first person singular", r"\b(?:[Mm]e|[Mm]y|[Mm]ine|[Mm]yself)\b", 0),
+    # The writer's fact sheet is its own input, never the reader's (fix round 2, N13: "nothing on the
+    # sheet says that changes"). The page shows numbers, not a sheet.
+    _rule("the writer's sheet", r"\b(?:the|this|his|our) (?:fact |facts )?sheet\b|\bfacts? sheet\b"),
 )
 
 # Betting words, named. Football's own senses (the offensive line, the line of scrimmage, the Las
@@ -136,13 +145,17 @@ TRADING_TERMS: Final = (
     "price",
     "priced",
     "buy",
+    "bought",
     "sell",
+    "sold",
     "fade",
     "trade at",
     "trades at",
     "trading at",
     "undervalued",
     "overvalued",
+    "undervalue",
+    "overvalue",
     "premium",
     "discount",
     "dividend",
@@ -161,13 +174,17 @@ TRADING_REPLACEMENTS: Final = MappingProxyType(
         "price": _PRICE,
         "priced": _PRICE,
         "buy": ("draft him", "take him at that pick"),
+        "bought": ("drafted him", "took him at that pick"),
         "sell": ("let him go",),
+        "sold": ("let him go",),
         "fade": ("let him fall", "pass on him"),
         "trade at": _ADP_PICK,
         "trades at": _ADP_PICK,
         "trading at": _ADP_PICK,
         "undervalued": ("he is going a round later than he should",),
         "overvalued": ("a reach at his ADP",),
+        "undervalue": ("he is going a round later than he should",),
+        "overvalue": ("a reach at his ADP",),
         "premium": ("a reach",),
         "discount": ("a steal",),
         "dividend": ("points over replacement",),
@@ -194,10 +211,27 @@ COMPETITOR_NAMES_THAT_ARE_WORDS: Final = ("sleeper", "underdog")
 COMPETITOR_PRODUCT_CUES: Final = ("app", "league", "leagues", "draft", "drafts", "adp", "rankings", "ranking")
 
 
+# Trading words with a football sense too (fix round 3, R6): a player "fading" or a "fade route" is
+# decline or a route, a defense "sold out to stop the run", a coach "bought into him". Only the trading
+# sense is banned: fading him, selling, buying him.
+_FOOTBALL_SENSES: Final = MappingProxyType(
+    {
+        "fade": r"\bfad(?:e|es|ed|ing) (?:him|them|this|that|the)\b(?! route)",
+        "sold": r"\bsold\b(?! (?:out|on|the (?:dummy|defense|fake|run|play-action))\b)",
+        "bought": r"\bbought\b(?! (?:in(?:to)?|time|himself time|him time)\b)",
+    }
+)
+
+
 def banned_term_pattern(term: str) -> re.Pattern[str]:
-    """A single word whole, with its plain inflections; a phrase as written."""
+    """A single word whole, with every inflection (a final "e" dropped before "ing" and "y": "pricing",
+    "pricey", fix round 2 N7); a phrase as written."""
+    if term in _FOOTBALL_SENSES:
+        return re.compile(_FOOTBALL_SENSES[term], re.IGNORECASE | re.ASCII)
+    if re.fullmatch(r"[a-z]+e", term):
+        return re.compile(rf"\b{term[:-1]}(?:e|es|ed|ing|ey|y)\b", re.IGNORECASE | re.ASCII)
     if re.fullmatch(r"[a-z]+", term):
-        return re.compile(rf"\b{term}(?:s|d|ed|ing)?\b", re.IGNORECASE | re.ASCII)
+        return re.compile(rf"\b{term}(?:s|es|d|ed|ing|er|ers)?\b", re.IGNORECASE | re.ASCII)
     return re.compile(re.escape(term), re.IGNORECASE)
 
 

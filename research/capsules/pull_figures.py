@@ -63,15 +63,17 @@ def page_numbers(row: PageValues) -> tuple[PageNumber, ...]:
 
 
 def facts_page_numbers(facts: "PlayerFacts") -> tuple[PageNumber, ...]:
-    """The page numbers a sheet carries itself (the projection, its band, the ADP): the writer is
-    held to these, a subset of the page's, so a read it passes passes the gate."""
+    """The page numbers a sheet carries itself and the page prints the same (the projection and its
+    band): the writer is held to these, so a read it passes passes the gate. Not the ADP: the sheet's
+    is the stats provider's, the page's is the run's named source (`nightly/reads/adp.py`), so a read
+    whose only page number was its ADP printed a number the page does not show (phase D, measured on
+    the 2026-10-13 regeneration: 9 written pages)."""
     p = facts.projection
-    return page_numbers(
-        PageValues(p.projected_points, p.ceiling_points, p.floor_points, p.median_points, adp=facts.market.adp)
-    )
+    return page_numbers(PageValues(p.projected_points, p.ceiling_points, p.floor_points, p.median_points))
 
 
-def _renderings(value: float) -> list[str]:
+def renderings_of(value: float) -> list[str]:
+    """How a page number may be printed: to the tenth, and from ten up to the whole point."""
     tenth = js_to_fixed(value, 1)
     return [tenth, js_string(js_round(value))] if abs(value) >= _WHOLE_NUMBER_FLOOR else [tenth]
 
@@ -87,7 +89,7 @@ def pull_figures_of(
     sentences = [s.strip() for s in _SENTENCES.split(prose) if s.strip()]
     figures: list[PullFigure] = []
     for label, value in numbers:
-        for text in _renderings(value):
+        for text in renderings_of(value):
             if any(figure.text == text for figure in figures):
                 continue
             sentence = next((s for s in sentences if _prints(s, text)), None)
@@ -118,3 +120,27 @@ def capsule_findings(
     findings += [f"pull_figure_off_page:{player_id}:{f.label}:{f.text}" for f in figures if not figure_matches_value(f)]
     found = dict.fromkeys(hit.found for hit in (*gate_hits(body_full, names), *gate_hits(body_compact, names)))
     return findings + [f"capsule_voice_rule:{player_id}:{text}" for text in found]
+
+
+# AN ADP CLAIM IN THE PROSE: "ADP of 25.7", "ADP 26", "pick 53", "drafted around pick 36". The number
+# follows the word directly or through a filler; a movement ("slid 11.4 picks from 87.4") or a dated
+# figure is not a claim of where he goes now. A pick in the NFL draft ("pick 12 in the 2025 draft") is
+# not an ADP and is skipped.
+_ADP_CLAIM: Final = re.compile(
+    r"\b(?:ADP|pick)(?:\s+(?:of|is|at|around|near|about|sits at|No\.))*\s+(\d+(?:\.\d+)?)(?![\d]|[.,]\d)",
+    re.IGNORECASE,
+)
+_NFL_DRAFT_AFTER: Final = re.compile(r"^[^.]{0,40}\bdraft\b", re.IGNORECASE)
+
+
+def adp_figures_off_page(prose: str, adp: float | None) -> list[str]:
+    """Every ADP claim in `prose` that is not the page's ADP as the page prints it (to the tenth, or the
+    whole pick from ten up); every claim when the page has no ADP."""
+    allowed = set() if adp is None else set(renderings_of(adp))
+    off = []
+    for match in _ADP_CLAIM.finditer(prose):
+        if _NFL_DRAFT_AFTER.match(prose[match.end() :]):
+            continue
+        if match.group(1) not in allowed:
+            off.append(match.group(0))
+    return off

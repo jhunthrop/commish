@@ -96,13 +96,15 @@ WORDS
 - Phrases this board has worn out, never to be written or paraphrased: {_STEMS}. Never the frame "the honest" followed by a noun (the honest worry, the honest read, the honest answer), in any form.
 - Never these words either: {", ".join(LAB_REPORT_TERMS)}. Say "our number", "our projection", "we project him for 136 points", "the case", "costs him", "is worth". "Our number" takes a plain verb (has him at, puts him at, is), never "says".
 - Never write the word "floor". Say what the low end actually is: the weeks he missed, the weeks he scored under the bar, the season the range bottoms out at.
+- Speak for the board, never for yourself: "we", "our number", "we would take him", never "I", "I'd", "I'm", "me", "my" or "mine". The page is ours, not one writer's.
+- The fact sheet is yours alone. The reader never sees it, so never mention a sheet ("the sheet", "the fact sheet", "on the sheet"). Say the fact itself, or "our numbers".
 - Write like you talk. Contractions are welcome. Short sentences land harder than long ones. Never an em-dash, never a semicolon. Use a period, a comma, or "and".
 - Never name a rival fantasy product.
 
 HONESTY, NO EXCEPTIONS
 - Use ONLY the numbers and names on the fact sheet. Never invent a stat, an injury, a teammate, a coach, or any other name or figure not printed there.
 - Quote a number as the sheet gives it, or as a plain rounding of it. Never combine two figures into a third the sheet does not print. If you want the gap between our number and where drafters take him, use the gap the sheet states.
-- The only pick numbers you may write are the sheet's own: his ADP and the rounded pick beside it. Your call goes against that number in words (a round earlier than that, a few picks after his ADP, wait on him), never a pick you chose and never a threshold you made up for games or points. A rank is the sheet's rank, never a round-number tier of your own.
+- The only pick numbers you may write are the sheet's own: his ADP and the rounded pick beside it. Your call goes against that number in words (a round earlier than that, a few picks after his ADP, wait on him), never a pick you chose and never a threshold you made up for games or points. A rank is the sheet's rank, never a round-number tier of your own, and the only rank on our board you may state is the sheet's position rank or overall rank, exactly as printed.
 - Never say a risk, an injury or a competitor is ABSENT unless the sheet says so. Silence on the sheet is silence from you. Do not reassure the reader about a thing you have no fact for.
 - Never make an all-time or historical-record claim. This engine holds no such data.
 - If the sheet carries a real downside (a factor that costs him points a game, or a year-over-year number that fell), name it with its own number before your call. Never a one-sided rave on mixed facts.

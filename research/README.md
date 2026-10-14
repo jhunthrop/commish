@@ -8,7 +8,7 @@ TypeScript on the same recorded input. Phase B is `model`: the preseason board, 
 the laws, the register and the backtest, proven against the oracle on the dev store (see "The
 model"). Phase C is `model/decide` (survival, the recommendation, tiers, lineup, outlook), the
 advisor service (`advisor`) and the capsule writer (`capsules`), see "The decide layer, the advisor
-and the capsules". Phase D (`nightly`) extends the nightly entry point phase C started.
+and the capsules". Phase D is the nightly run, the in-season jobs and the history rebuild, see "The nightly run, the in-season jobs and the history rebuild".
 
 ## Running
 
@@ -480,7 +480,7 @@ store itself, except the per-game variance fit (ported, `model/fits/game_varianc
 as their numbers, not as code. None can be re-run on the store as it stands: it no longer holds
 `preseason_rosters` for 2021-2024, `player_week_observations` before 2023, `player_week_teams`
 before 2024, or the schedule, kickoffs, play-by-play and coaches in `team_week_observations` before
-2024. The re-fit path for each is the same: rebuild that history with phase A's ingests (phase D),
+2024. The re-fit path for each is the same: rebuild that history (`python -m research.pipeline history`, phase D; the dev copy holds it since 2026-10-13),
 port the fit, compare its output with the version-1 numbers, and publish the result as version 2.
 
 | Artifact | Oracle fit | Fitted on | The store lacks |
@@ -522,12 +522,16 @@ uv run python -m research.capsules facts <provider id>      # one sheet, the nar
 uv run python -m research.capsules prompt <provider id>     # the user message the writer would get
 uv run python -m research.capsules write --count 10 --spread 50   # write and gate a few: paid calls
 uv run python -m research.capsules sweep                    # the nightly sweep
-uv run python -m research.nightly [--skip fit,capsules,capsule-gate]   # the image's nightly command
+uv run python -m research.nightly run --out DIR --skip ingest,fit   # the nightly (phase D, "The nightly run")
 
 # parity
 uv run python -m research.parity decide all                 # room states, refusals, startSit, the numerics
 uv run python -m research.parity decide record              # re-record the room states (dev copy)
-PARITY_SOURCE_DATABASE_URL=... uv run python -m research.parity capsules all   # the facts, dev copy
+PARITY_SOURCE_DATABASE_URL=... uv run python -m research.parity capsules all   # the facts, dev copy, against their recording (capsules record re-records)
+# The capsule cases are a self-regression check, not parity: since phase D fix round 3 they compare the
+# port with a recording of the port's own board pass (every facts hash, a 12-sheet sample, the narrow
+# read) as of 2026-10-13, so they catch a change in the port's facts, never an error the port shares
+# with its own recording. The oracle they once matched reads the legacy tables and retires at cutover.
 ```
 
 ### Module map
@@ -617,3 +621,103 @@ correction quotes the exact banned phrases the read was caught with. The fact sh
   the oracle's defect: it looks the provider-keyed injury and college captures up by the universe id,
   so both fields are always empty and the writer never sees them. Read them through the crosswalk;
   every facts hash changes with it, so it ships as one hash bump that regenerates the board.
+
+## The nightly run, the in-season jobs and the history rebuild (phase D)
+
+```sh
+# the nightly run, into a local directory laid out as the bucket (the web builds from it with
+# PUBLIC_RUN_BASE_URL=DIR); without --out it writes R2 (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID)
+uv run python -m research.nightly run --out DIR [--skip ingest,fit,capsules,headshots] [--regenerate-all] [--mend-only]
+uv run python -m research.nightly publish --out DIR [--at ISO] [--no-dispatch]
+
+# the in-season jobs, one pass each
+uv run python -m research.inseason --task season-week [--skip props-snapshot]
+uv run python -m research.inseason --task capture-harvest
+
+# the seasons the store lost, re-created from nflverse (once per store)
+uv run python -m research.pipeline history
+
+# a run against the web's own reader and schemas (needs a web/ checkout with node_modules)
+node --experimental-strip-types nightly/contract/run-contract.ts ../web DIR RUN_ID
+
+# which unported fits the store can re-run, and what each still lacks
+uv run python -m research.model.fit_inputs
+```
+
+### The chain
+
+`research.nightly run` (`nightly/run.py`), every step isolated, every part named in the log:
+
+1. **ingest** (`nightly/steps.py`): the provider capture, tonight's ADP in the four formats (the
+   three scoring formats and two-quarterback drafts for superflex), the pre-kickoff props, the win
+   totals. Fails only when the PPR ADP capture failed.
+2. **fit** (`model.fit_check`): check only. After kickoff it rebuilds only boards made by a model
+   this code reproduces; the 2021-2024 replay boards were made by older trees, so they are named and
+   skipped (comparing them with today's model reports a model change, not drift).
+3. **capsules** (`nightly/capsule_step.py`): the sweep, a retry pass over unwritten pages, a repair
+   pass for written sentences on two pages, then the capsule gate. The sentences already shared are
+   quoted to the writer from the first call. `--regenerate-all` rewrites the whole board. One player
+   takes at most 12 calls a night across every pass (`NIGHT_CALLS_PER_PLAYER`). The writer's ADP is
+   the run's own (`capsules/facts/market_adp.py`), and a stated ADP or pick that is not the page's is a
+   violation and a page finding.
+4. **assemble** (`nightly/assemble.py`): every artifact of `web/src/lib/run/schema.ts` at one
+   instant: `boards/<format>.json`, `players/<id>.json`, `adp.json`, `record.json`, `index.json`,
+   `clubs.json`, `schedule.json`, and the manifest with its sources block.
+5. **gates** (`nightly/gates.py`), each failure a named reason: `held_out_backtest`,
+   `board_depth`, `capsules`, `basis`, `adp`, and `schema`: the web's own reader and schema
+   (`nightly/contract/run-contract.ts` under node, the web's `src/lib/run` copied into the image) over
+   the run staged in a temporary directory, before anything is copied to the store.
+6. **headshots** (`nightly/headshots.py`): every face mirrored into R2 by content
+   (`headshots/<sha256>.<ext>`), fetched conditionally, with the run's map `headshots.json`.
+7. **write**: every artifact, `report.json` (steps, gates and their reasons, the held-out scores,
+   the capsule spend, every file's bytes and SHA-256), `manifest.json` last. A run id is claimed
+   with a conditional write, so it is never reused (`2026-10-13T05`, then `2026-10-13T05-2`).
+8. **promote**: a run that passed moves `runs/early.json` (early access, spec §4) and goes public an
+   hour later, when `publish` moves `runs/latest.json` and dispatches `web.yml` with its id
+   (`workflow_dispatch`, an Actions-only token). A step that raises is a failed step with a report.
+
+### What the run reads and decides
+
+- **Formats** are the site's chooser at twelve teams: `ppr-12`, `half-ppr-12`, `standard-12`,
+  `superflex-12` (the PPR board valued for a league that can start a second quarterback). A format
+  is carried only when it has ADP; superflex's two-quarterback capture starts with phase D, so the
+  2026 run (which reads ADP from before the first kickoff) does not carry it, and says so.
+- **Boards** are the stored board's newest generation, valued per format's shape by the board
+  service's rules (`nightly/reads/board.py`). Tiers run across the whole board: the service's tiers
+  above replacement, the same rule over the rest.
+- **ADP**: before the first kickoff the newest capture, after it the newest capture before it.
+- **The record** is the register's served board by week, our order and ADP's graded on the same
+  players, by position, and the season to date as the register's running score.
+- **Schedule strength** is the mean of a slate's opponents' expected wins, set before the first
+  kickoff; the window is each slate's own.
+- **Capsules** on a page are the writer's long read with its pull figures; a facts block or no row
+  is no capsule, and the gate counts it.
+
+### The in-season jobs
+
+`research.inseason` (`inseason/`) replaces the Vercel cron's `season-week` and `capture-harvest`.
+Three changes from the oracle: weekly stats are read from nflverse's `stats_player` release, where
+they are published from 2025 (the oracle's `player_stats` tag answers 404, so it never saw a 2026
+outcome); a week is graded only 36 hours after its last kickoff; and a missed freeze (a week whose
+first kickoff passed with none) or a grade still impossible four days after the games fails the
+pass, so it is never silent.
+
+### The history rebuild
+
+`research.pipeline history` (`pipeline/history.py`) re-creates, with phase A's ingests, what the
+store lost, back to the first season any unported fit names: schedule and kickoffs 2003-2023, box
+scores 2003-2022 (snap counts from 2012, nflverse's first; 2019 from play-by-play, nflverse never
+published it), player teams 2003-2023, play-by-play context, coaches and opponent adjustment
+2003-2023, injury filings 2009-2022 (a season nflverse cannot stamp, or whose filings contradict
+themselves, is named and left out), depth charts 2003-2022, week-one rosters 2003-2024.
+`--first`/`--last` narrow it. `python -m research.model.fit_inputs` names each fit as re-runnable or
+the seasons it still lacks, and the nightly's fit step prints the same.
+
+### The register's trail and the product season
+
+The weekly pass claims its own run id in the bucket (`<hour>-weekly`, its lines in
+`runs/<id>/inseason.json`), records it for each freeze in `register/frozen-by.json`, and its outcome
+in `register/last-pass.json`, which the nightly copies into its manifest (`register`). The record's
+`frozenBy` names those ids; a week frozen before the trail is named by the first passed run that
+carries it, with a note in that run's manifest. The product season is named once,
+`research/season.py`, with the rule for moving it.

@@ -23,12 +23,12 @@ from sqlalchemy import Connection
 
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts.board import board_rows
-from research.capsules.facts.collect import PRODUCT_SEASON, universe_ids_for
+from research.capsules.facts.collect import universe_ids_for
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.narrative import normalize_sentence, sentences_verbatim
-from research.capsules.store import StoredCapsule, stored_capsules_for
+from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, stored_capsules_for
+from research.season import PRODUCT_SEASON
 
-WRITTEN_SOURCE: Final = "llm"
 _EXAMPLES: Final = 5
 
 
@@ -100,9 +100,14 @@ def judge_capsules(board_ids: Sequence[str], rows: Mapping[str, StoredCapsule]) 
     )
 
 
-def capsule_gate(conn: Connection, as_of: datetime) -> CapsuleGateResult:
-    """The gate over the board as served at `as_of` (its pages keyed on the universe id)."""
+def board_universe_ids(conn: Connection, as_of: datetime) -> list[str]:
+    """The board's pages as the capsules key them (the universe id), in served order."""
     provider_ids = [row.player_id for row in board_rows(conn, PRODUCT_SEASON, as_of)]
     universe = universe_ids_for(conn, provider_ids)
-    board_ids = list(dict.fromkeys(universe[pid] for pid in provider_ids if pid in universe))
+    return list(dict.fromkeys(universe[pid] for pid in provider_ids if pid in universe))
+
+
+def capsule_gate(conn: Connection, as_of: datetime) -> CapsuleGateResult:
+    """The gate over the board as served at `as_of` (its pages keyed on the universe id)."""
+    board_ids = board_universe_ids(conn, as_of)
     return judge_capsules(board_ids, stored_capsules_for(conn, board_ids))

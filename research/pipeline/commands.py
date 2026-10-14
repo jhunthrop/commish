@@ -23,7 +23,7 @@ from typing import Final
 from sqlalchemy import Connection
 
 from research.errors import ConfigurationError
-from research.pipeline import coaches, crosswalk, vegas
+from research.pipeline import coaches, crosswalk, history, vegas
 from research.pipeline.budget import FixedBudget
 from research.pipeline.checkpoint import Checkpoint
 from research.pipeline.http import Fetcher
@@ -170,6 +170,13 @@ def _win_totals(conn: Connection, inv: Invocation) -> object:
     return vegas.run_win_totals(conn, inv.fetcher, inv.args.last, inv.now, first_kickoff_for(conn, inv.args.last))
 
 
+def _history(conn: Connection, inv: Invocation) -> object:
+    """Every season the fits need, or only `--first`..`--last` when either is given."""
+    given = inv.args.first != DEFAULT_SEASON or inv.args.last != DEFAULT_SEASON
+    window = range(inv.args.first, inv.args.last + 1) if given else None
+    return history.rebuild_history(conn, inv.fetcher, inv.now, inv.checkpoint, window)
+
+
 def _harvest(conn: Connection, inv: Invocation) -> object:
     client = Tank01Client(inv.fetcher, inv.key(TANK01_KEY_ENV))
     return capture.run_capture_harvest(conn, client, inv.now, inv.tank01_season)
@@ -200,4 +207,5 @@ COMMANDS: Final = MappingProxyType({
     "props-backfill": Command("the historical props archive, budgeted", _props_backfill, atomic=False),
     "win-totals-seed": Command("the committed win-totals CSV", lambda c, i: vegas.ingest_win_totals_csv(c, RESEARCH_ROOT / vegas.WIN_TOTALS_CSV_PATH, i.now)),
     "win-totals": Command("the publisher's win totals before kickoff", _win_totals),
+    "history": Command("the seasons the store lost, re-created from nflverse (pipeline/history.py); --first/--last narrow it", _history, atomic=False),
 })  # fmt: skip

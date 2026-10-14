@@ -12,6 +12,14 @@ board whose inputs the store no longer holds is named as unbuildable, not failed
 retakes the product season's live board, which replaces what the site serves and what the register
 freezes next.
 
+A SECOND DIFFERENCE, from phase D: after kickoff an archived board is rebuilt only when the model
+that made it is one this code reproduces (`reproduces`): a board this lane wrote (`research@...`), or
+the TypeScript tree the port matches bit for bit (`PORTED_MODELS`). The 2021-2024 replay boards
+were made by older trees (or record none); once the history rebuild (`research.pipeline history`)
+gave the store their inputs back, comparing them with today's model reports a model change, not
+drift, and would fail every night until the offseason refit retakes them. They are named as made by
+another model and skipped.
+
 One deliberate difference from the oracle, named in the report: a reason is compared by its code
 and law id, and by value. `diffReasons` (`persist.ts`) keys by code alone, so a player's law
 reasons collapse to the last one, and compares `JSON.stringify` text, so a stored payload (jsonb
@@ -51,11 +59,33 @@ from research.model.preseason.persist import (
 )
 from research.model.priors import ModelArtifacts, load_model_artifacts
 from research.model.reads.teams import first_kickoff_for
+from research.season import PRODUCT_SEASON
 
-PRODUCT_SEASON: Final = 2026
 INGESTED_SEASONS: Final = (2021, 2022, 2023, 2024)
 FIT_POINT_TOLERANCE: Final = 0.05
 SERVED_SOURCE: Final = board_source_for("ppr")
+# The TypeScript trees the port reproduces bit for bit (phase B's board parity cases).
+PORTED_MODELS: Final = frozenset({"research-ts@7af71283"})
+_THIS_LANE: Final = "research@"
+
+
+def reproduces(model: str | None) -> bool:
+    """Whether a stored board's model is one this code rebuilds exactly."""
+    return model is not None and (model in PORTED_MODELS or model.startswith(_THIS_LANE))
+
+
+def _season_models(conn: Connection, season: int) -> list[str | None]:
+    """The models of the newest generation of each of the season's stored boards."""
+    return [
+        row[0]
+        for row in conn.execute(
+            text(
+                "select distinct model_version from research.preseason_projections p where season = :s and as_of = "
+                "(select max(as_of) from research.preseason_projections where season = :s and source = p.source)"
+            ),
+            {"s": season},
+        )
+    ]
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,16 +148,20 @@ def check_targets(conn: Connection, now: datetime) -> tuple[list[Target], list[s
     skipped: list[str] = []
     for season in INGESTED_SEASONS:
         formats = _stored_formats(conn, season)
+        models = _season_models(conn, season)
         if not formats:
             skipped.append(f"{season} (no stored board)")
+        elif not all(reproduces(model) for model in models):
+            made_by = ", ".join(sorted(model or "an unrecorded model" for model in models))
+            skipped.append(f"{season} (made by {made_by}, which this code does not reproduce)")
         elif first_kickoff_for(conn, season) is None:
             skipped.append(f"{season} (no ingested schedule)")
         else:
             targets.append(
                 Target(season, now, formats, f"archived replay board, {PRODUCT_SEASON} kicked off {js_iso(kickoff)}")
             )
-    if not targets:
-        return f"{PRODUCT_SEASON} has kicked off and no archived season can be rebuilt: {', '.join(skipped)}"
+    # With no target the step skips by name (`fit_step`): nothing rebuildable is not drift, which is
+    # the oracle's own rule for a target its store refuses (`fitStep`'s NOTHING COULD BE REBUILT).
     return targets, skipped
 
 

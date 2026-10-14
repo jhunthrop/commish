@@ -15,7 +15,7 @@ from typing import Literal
 from research.errors import ResearchError, SchemaDriftError
 from research.pipeline.http import Fetcher
 
-FfcAdpFormat = Literal["ppr", "half-ppr", "standard"]
+FfcAdpFormat = Literal["ppr", "half-ppr", "standard", "2qb"]
 _FFC_TEAM_COUNT = 12
 _END_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _ECR_DATA = re.compile(r"ecrData\s*=\s*(\{[\s\S]*?\});\s*\n")
