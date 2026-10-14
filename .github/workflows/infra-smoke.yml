@@ -24,6 +24,11 @@ jobs:
             --format 'value(name,format)'
       - name: The deployer can list Cloud Run services
         run: gcloud run services list --project "${{ vars.GCP_PROJECT }}" --region "${{ vars.GCP_REGION }}" --format 'value(name)'
+        # The deploys attach this instance to every service and job that reads a database.
+      - name: The deployer can describe the Cloud SQL instance
+        run: |
+          gcloud sql instances describe commish-pg --project "${{ vars.GCP_PROJECT }}" \
+            --format 'value(connectionName,databaseVersion,settings.tier,state)'
   cloudflare:
     runs-on: ubuntu-latest
     steps:

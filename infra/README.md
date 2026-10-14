@@ -12,7 +12,7 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
 ## Google Cloud (the services)
 
 - Project `trycommish` (number `467414876046`) in the `derbee.ai` organization, billing account shared with foreversixty, region `us-east1`.
-- APIs: Cloud Run, Artifact Registry, IAM, IAM Credentials, STS, Secret Manager, Cloud Scheduler, Resource Manager, Logging, Monitoring.
+- APIs: Cloud Run, Artifact Registry, IAM, IAM Credentials, STS, Secret Manager, Cloud Scheduler, Resource Manager, Logging, Monitoring, Cloud SQL Admin.
 - Artifact Registry: `us-east1-docker.pkg.dev/trycommish/commish` (Docker). Images: `api` (one image, two Cloud Run services `api` and `room`), `research` (the Cloud Run Job `nightly` and the service `advisor`).
 - Service accounts:
   - `deployer@trycommish.iam.gserviceaccount.com`: GitHub Actions. Roles `run.admin`, `artifactregistry.writer`, `run.jobsExecutorWithOverrides`, and `iam.serviceAccountUser` on the runtime accounts (`boards-runtime` from Lane 8 part A).
@@ -45,7 +45,7 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
   - `inseason-capture` (`research.inseason --task capture-harvest`): RESEARCH_DATABASE_URL, TANK01_API_KEY.
   - `research-runtime` holds `run.invoker` on each job (granted by the workflow), which is what the scheduler calls with.
 - Secret Manager placeholders created 2026-10-13 with the value `placeholder`, to be set before the jobs are resumed: `CLOUDFLARE_API_TOKEN` (an R2-only **account** API token, made under the account's API Tokens and not a user's: Workers R2 Storage, Object Read and Write on `commish-runs`, never the deploy token, which can redeploy the site and change DNS. `nightly/r2.py` verifies it at `/accounts/{id}/tokens/verify` and derives its S3 credentials from it, so a user-scoped token fails every nightly and every weekly trail), `TANK01_API_KEY` (the stats provider), `ODDS_API_KEY` (the odds provider), `WEB_DISPATCH_TOKEN` (a fine-grained GitHub token on `jhunthrop/commish` with Actions read and write only, enough to dispatch `web.yml` and not to push code; until the founder mints it, a missing value, an empty one or exactly `placeholder` makes `publish` skip the dispatch by name in its log line and the run's `published.json`, exit 0, and the web's daily 06:30 UTC rebuild builds the public run instead; a dispatch GitHub refuses is still a failure). `AI_GATEWAY_API_KEY` was created by phase C, `RESEARCH_DATABASE_URL` by Lane 1.
-- The research schedule, Cloud Scheduler in us-east1, created by hand 2026-10-13 (the deployer lacks the scheduler role) and PAUSED until cutover, because until then the Vercel cron writes the legacy register and the Neon research schema is a loaded copy: each is an HTTP POST to `https://run.googleapis.com/v2/projects/trycommish/locations/us-east1/jobs/<job>:run` with an OAuth token for `research-runtime` (the Run Admin API takes OAuth, not an OIDC identity token), no retries. The jobs are defined in `infra/research-schedule.sh` (bash): `apply` creates or updates each one and then verifies it, `verify` describes all six and fails unless each targets `<job>:run`. The first hand-made jobs targeted `jobs/nightlyun` (zsh read `$job:run` as `$job` with its `:r` modifier); corrected and verified 2026-10-13.
+- The research schedule, Cloud Scheduler in us-east1, created by hand 2026-10-13 (the deployer lacks the scheduler role) and PAUSED until cutover, because until then the Vercel cron writes the legacy register and the production research schema is a loaded copy: each is an HTTP POST to `https://run.googleapis.com/v2/projects/trycommish/locations/us-east1/jobs/<job>:run` with an OAuth token for `research-runtime` (the Run Admin API takes OAuth, not an OIDC identity token), no retries. The jobs are defined in `infra/research-schedule.sh` (bash): `apply` creates or updates each one and then verifies it, `verify` describes all six and fails unless each targets `<job>:run`. The first hand-made jobs targeted `jobs/nightlyun` (zsh read `$job:run` as `$job` with its `:r` modifier); corrected and verified 2026-10-13.
 
   | Scheduler job | Schedule | Time zone | Runs |
   |---|---|---|---|
@@ -64,7 +64,7 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
   - A missed freeze, an overdue grade, a calendar season with no stored schedule or an unwritten trail fails the `inseason` execution (`research.inseason`), so it emails. A date past the stored season's close (most of January and February) or before its opening is a skipped pass that exits 0 and emails nothing. Either way the pass's lines are in `register/last-pass.json` and the next nightly manifest's `register`.
 - Workload identity federation, no stored keys: pool `github`, provider `github` (OIDC from `token.actions.githubusercontent.com`, condition `assertion.repository == 'jhunthrop/commish'`), bound to the deployer for that repository's runs.
 - GitHub Actions variables: `GCP_PROJECT`, `GCP_PROJECT_NUMBER`, `GCP_REGION`, `GCP_WIF_PROVIDER`, `GCP_DEPLOYER_SA`, `GCP_ARTIFACT_REPO`.
-- `.github/workflows/infra-smoke.yml` proves the chain on demand: authenticate as the deployer and read the repository, then read the Cloudflare zone and bucket with the token.
+- `.github/workflows/infra-smoke.yml` proves the chain on demand: authenticate as the deployer, read the repository, list the services and describe the Cloud SQL instance, then read the Cloudflare zone and bucket with the token.
 
 ### Connected host accounts (FFPC, Lane 14)
 
@@ -84,9 +84,27 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
   - at Sunday's first kickoffs: `0 13 * * 0`, `15 13 * * 0`, `30 13 * * 0`
   Each is `gcloud scheduler jobs create http ffpc-refresh-<name> --schedule "<cron>" --time-zone America/New_York --uri https://us-east1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/trycommish/jobs/api-ffpc-refresh:run --http-method POST --oauth-service-account-email deployer@trycommish.iam.gserviceaccount.com`, the same way the other api jobs are scheduled.
 
-## Neon (the data)
+## Cloud SQL (the data)
 
-One database, two schemas (spec §2.5): `app` owned by Go and migrated with goose from `api/migrations`, `research` owned by the TypeScript core and migrated with Drizzle from `research/drizzle`. The `app` schema is owned by the login role `commish_app`, which also holds `create` on the database (goose's `create schema if not exists` needs it); its pooled URL is Secret Manager `DATABASE_URL`. Twenty tables as of migration 6.
+Founder ruling 2026-10-14: the database moves off Neon (AWS us-east-1) to Cloud SQL for Postgres in us-east1, beside Cloud Run, so the nightly's and the services' reads stop crossing clouds. The coordinator creates the instance, roles, databases and secrets and runs the restore; the code and workflows connect to it (Lane 20).
+
+- Instance `commish-pg`, connection name `trycommish:us-east1:commish-pg`, region `us-east1`, PostgreSQL 18, tier `db-g1-small`. Public IP with no authorized networks: nothing reaches it by address, only through the Cloud SQL connection or the Auth Proxy, both of which authenticate with IAM. Automated backups at 08:00 UTC, 7 retained, with point-in-time recovery. Needs the Cloud SQL Admin API (`sqladmin.googleapis.com`).
+- One database, `commish`, two schemas (spec §2.5): `app`, owned by the Go api and migrated with goose from `api/migrations` by the `api-migrate` job; `research`, owned by the Python research lane and migrated with alembic from `research/alembic`. Twenty app tables as of migration 6.
+- Roles, one per schema: `commish_app` owns `app` and holds `create` on the database (goose's `create schema if not exists` needs it); its URL is Secret Manager `DATABASE_URL`. `commish_research` owns `research`; its URL is Secret Manager `RESEARCH_DATABASE_URL`. The secret names do not change; their new versions carry the socket URLs, and `infra/research-secrets.sh` is unchanged.
+- How the services connect: `api.yml` and `research.yml` deploy every service and job that reads a database with `--set-cloudsql-instances trycommish:us-east1:commish-pg`, which mounts the instance's Unix socket at `/cloudsql/trycommish:us-east1:commish-pg`. The URL names that directory in its `host` parameter and has no host of its own: `postgres://<role>:<password>@/commish?host=/cloudsql/trycommish:us-east1:commish-pg` (pgx in the api, psycopg in research; both take the directory whole, colons included, and dial `.s.PGSQL.5432` in it). No VPC, no TLS settings in the URL: the connection encrypts the leg to the instance. Dev and CI keep the TCP form (`localhost:5433`).
+  - api: the `api` and `room` services and the `api-migrate`, `api-sweep`, `api-billing-reconcile`, `api-renewal-reminders`, `api-ffpc-refresh` and `api-re-encrypt-host-connections` jobs. The room's LISTEN connection is the same URL (`config.DirectURL` only rewrites a Neon pooler host).
+  - research: the `boards` service and the `nightly`, `inseason` and `inseason-capture` jobs, each of which mounts `RESEARCH_DATABASE_URL`. The `advisor` service and the `nightly-publish` job read no database (the room sends the advisor its pool; publish moves R2 pointers), so they get no connection.
+- IAM: `roles/cloudsql.client` on the three runtime accounts whose workloads connect, `api-runtime`, `research-runtime` and `boards-runtime`. `advisor-runtime` stays roleless. The deployer needs `roles/cloudsql.viewer` for `infra-smoke.yml`'s describe step.
+- Connections: there is no pooler in front of Cloud SQL, so each process's pool is a real server connection. The api's pool is 10 a process (`internal/db`) and the room adds one LISTEN connection; at the workflows' max instances (api 20, room 10, boards 4 with 2 each) that is far more than `db-g1-small`'s default `max_connections`. Size the `max_connections` flag or the tier, or lower the max instances, before traffic.
+- An operator from a laptop, with the Cloud SQL Auth Proxy (`brew install cloud-sql-proxy`) and their own `gcloud` credentials (`gcloud auth application-default login`; the account needs `roles/cloudsql.client`):
+
+    ```sh
+    cloud-sql-proxy --port 5434 trycommish:us-east1:commish-pg   # 5432 and 5433 are the dev and test Docker databases
+    psql "postgres://commish_research@127.0.0.1:5434/commish?sslmode=disable"   # the proxy encrypts; the password from Secret Manager
+    ```
+
+  Production is for backfills and single verification reads, never repeated measurement runs (those go against the dev copy).
+- Neon decommission: once the legacy writers are stopped at cutover and the first scheduled `nightly` has passed on Cloud SQL, delete the Neon project. Until then it is the restore's source and the rollback.
 
 ## Still on Vercel
 
