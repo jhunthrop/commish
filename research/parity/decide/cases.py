@@ -20,6 +20,7 @@ from research.advisor.request import RequestError, parse_request
 from research.advisor.wire import advice_json
 from research.model.arithmetic import ARM64_BOARDS, X86_64_BOARDS, Arithmetic
 from research.model.decide.survival import SurvivalCurve
+from research.parity.decide.contrast import contrast_claims
 from research.parity.decide.inputs import lineup_queries, normal_inputs, port_lineup, port_normal
 from research.parity.decide.refusals import refusals
 from research.parity.decide.rooms import RoomState, room_states
@@ -82,7 +83,8 @@ def _rows(label: str, answer: Mapping[str, Any]) -> dict[str, dict[str, dict[str
     data = answer["data"]
     sections["card"][label] = {k: data[k] for k in ("pickNumber", "nextPickNumber", "basis")}
     for index, candidate in enumerate(data["shortlist"]):
-        sections["shortlist"][f"{label} #{index + 1}"] = dict(candidate)
+        # The port's contrast why has no oracle counterpart: it is judged by `contrast_claims`.
+        sections["shortlist"][f"{label} #{index + 1}"] = {k: v for k, v in candidate.items() if k != "contrast"}
     for player_id, chance in data["survival"].items():
         sections["survival"][f"{label} {player_id}"] = {"survival": chance}
     for position, tiers in data["tiers"].items():
@@ -144,6 +146,7 @@ def advise_rooms() -> CaseResult:
             f"{len(states)} recorded room states, {answered} answered, at least {_MINIMUM_STATES}",
             answered >= _MINIMUM_STATES,
         ),
+        *contrast_claims([answer["data"] for answer in port if answer["status"] == _OK]),
     ]
     notes = [
         *_shape_counts(states, oracle),

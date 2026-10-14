@@ -70,6 +70,9 @@ type wireResponse struct {
 		Shortlist      []struct {
 			PlayerID string `json:"playerId"`
 			Why      string `json:"why"`
+			// Contrast is a row's why as its contrast to the call, null
+			// for the call itself.
+			Contrast *string `json:"contrast"`
 		} `json:"shortlist"`
 		Survival map[string]float64 `json:"survival"`
 	} `json:"data"`
@@ -179,8 +182,13 @@ func (h HTTP) Card(ctx context.Context, req Request) (Card, error) {
 		PickNumber: wire.Data.PickNumber, NextPick: wire.Data.NextPickNumber, Source: SourceAdvisor,
 		Call: wire.Data.Shortlist[0].PlayerID, StillThere: wire.Data.Survival,
 	}
-	for _, c := range wire.Data.Shortlist {
-		card.Shortlist = append(card.Shortlist, Candidate{PlayerID: c.PlayerID, Why: c.Why})
+	for i, c := range wire.Data.Shortlist {
+		why := c.Why
+		// Every row after the call says what taking him instead trades.
+		if i > 0 && c.Contrast != nil && *c.Contrast != "" {
+			why = *c.Contrast
+		}
+		card.Shortlist = append(card.Shortlist, Candidate{PlayerID: c.PlayerID, Why: why})
 	}
 	return card, nil
 }
