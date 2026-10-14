@@ -124,6 +124,7 @@
 				<PositionPill position={page.position} rank={n.positionRank} />
 				<TierChip tier={n.tier} long />
 				<a href={links.club(page.team)}>{page.team}</a>
+				<span class="holder" class:filled={rostered !== null}>{rostered ?? ''}</span>
 			{/snippet}
 			{#snippet aside()}
 				<Figure
@@ -149,7 +150,6 @@
 		</HeroCard>
 		<div class="league-lines">
 			<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
-			<ContextNote note={rostered === null ? null : `${rostered}.`} short />
 		</div>
 
 		{#if page.underway}{@render thisSeason()}{/if}
@@ -228,11 +228,25 @@
 </SiteShell>
 
 <style>
-	/* The league's two lines sit close as one block; with no league selected they take no place. */
+	/* The league's line; with no league selected it takes no place. */
 	.league-lines {
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-1);
+	}
+
+	/* Whose roster he is on, in the hero under his chips: its own line, its room kept from the first
+	   paint while a league is selected, so the rosters arriving move nothing. */
+	.holder {
+		display: none;
+		flex-basis: 100%;
+		min-height: 1lh;
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+	}
+
+	.holder.filled,
+	:global(html[data-league]) .holder {
+		display: block;
 	}
 
 	:global(html:not([data-league])) .league-lines:not(:has(:global(.filled))) {
