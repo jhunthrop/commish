@@ -157,8 +157,6 @@ func placement(snap Snapshot, placed map[string]Placement) apitypes.Placement {
 	return out
 }
 
-// standings is every team, most wins first, then fewest losses, then
-// points for.
 // standingOf is the roster's record and place in the league, nil when
 // the league has no read or the roster is not in it.
 func standingOf(teams []Team, roster int) *apitypes.LeagueStanding {
@@ -170,6 +168,8 @@ func standingOf(teams []Team, roster int) *apitypes.LeagueStanding {
 	return nil
 }
 
+// standings is every team, most wins first, then fewest losses, then
+// points for.
 func standings(teams []Team) []apitypes.LeagueTeam {
 	sorted := append([]Team(nil), teams...)
 	sort.SliceStable(sorted, func(i, j int) bool {

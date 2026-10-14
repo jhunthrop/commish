@@ -12,6 +12,7 @@
 		matchupGap,
 		rowOf,
 		scoreGap,
+		scoreUnread,
 		statusOn,
 		teamName
 	} from './model.ts';
@@ -49,7 +50,7 @@
 
 	/** In an all-play week a read score is shown even at 0: the host's own total, read, is the fact. */
 	function showsTotal(s: MatchupSide): boolean {
-		return s.points_read && (hasStarted(s) || sync.week_all_play);
+		return !scoreUnread(s) && (hasStarted(s) || sync.week_all_play);
 	}
 </script>
 
@@ -93,7 +94,7 @@
 					An all-play week on {hostWords(sync.host)}: your score is set against every other team's.
 				</p>
 			{/if}
-			{#if !matchup.mine.points_read}
+			{#if scoreUnread(matchup.mine)}
 				<p class="none">{scoreGap(sync, now)}</p>
 			{/if}
 		</div>

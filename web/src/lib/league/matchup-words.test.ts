@@ -24,3 +24,8 @@ void test('a head-to-head week says no games played only when the read shows eve
 	assert.equal(matchupAside(matchup(side(0, true)), false, false), 'No games played yet');
 	assert.equal(matchupAside(matchup(side(12.5, true)), false, true), 'Points so far');
 });
+
+void test('an api that predates points_read is read, not unread', () => {
+	const old = { roster_id: 11, points: 0, starters: [] } as unknown as MatchupSide;
+	assert.equal(matchupAside(matchup(old), false, false), 'No games played yet');
+});

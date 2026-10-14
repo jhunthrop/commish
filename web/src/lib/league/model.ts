@@ -14,6 +14,7 @@ import type {
 	LeaguePlayer,
 	LeagueSync,
 	LeagueTeam,
+	MatchupSide,
 	RosterSpot
 } from './api.ts';
 import type { components } from '#lib/api/types.ts';
@@ -82,8 +83,14 @@ export function matchupAside(
 	allPlay: boolean,
 	started: boolean
 ): string | undefined {
-	if (!matchup.mine.points_read) return undefined;
+	if (scoreUnread(matchup.mine)) return undefined;
 	return started || allPlay ? 'Points so far' : 'No games played yet';
+}
+
+/** The api said it could not read the side's score. Only an explicit false counts: an api that
+ * predates points_read omits it, and its scores were read. */
+export function scoreUnread(side: MatchupSide): boolean {
+	return (side.points_read as boolean | undefined) === false;
 }
 
 /** What the panel says when the drafter's score for the week could not be read. */

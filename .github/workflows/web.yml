@@ -66,6 +66,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Unit tests
+        run: npm test
+
       - name: Build every nightly page, timed
         # The request API the account page and the sheet's sync call, fixed at build (src/env.ts).
         env:
