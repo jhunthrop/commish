@@ -29,11 +29,13 @@ interface Kept {
 
 const client = apiClient(PUBLIC_API_URL);
 
-/** The lines a league's basis line takes on a phone, 0 with no league: two for the long sentences
- * (TE premium's Draft Pass line, a lineup, a board other than PPR the run may lack), else one. */
-function linesFor(league: ContextLeague | null): 0 | 1 | 2 {
+/** The lines a league's basis line takes on a phone, 0 with no league: three for TE premium's (plain
+ * words, plain PPR, where its exact rules rank it), two for a lineup or a board other than PPR the
+ * run may lack, else one. */
+function linesFor(league: ContextLeague | null): 0 | 1 | 2 | 3 {
 	if (!league) return 0;
-	return league.scoring === 'te_premium' || league.format !== 'ppr' ? 2 : 1;
+	if (league.scoring === 'te_premium') return 3;
+	return league.format !== 'ppr' ? 2 : 1;
 }
 
 class SiteContext {

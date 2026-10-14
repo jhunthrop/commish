@@ -51,7 +51,14 @@
 	const figures = $derived(apiFormatOf(lead.format));
 	/** The league's line. */
 	const note = $derived(
-		figures === null ? null : contextNote(siteContext.league, figures, 'These figures are')
+		figures === null
+			? null
+			: contextNote(
+					siteContext.league,
+					figures,
+					siteContext.features.includes('custom_scoring'),
+					'These figures are'
+				)
 	);
 	/** Whose roster he is on in the league, on its own line with its own room, once the rosters are
 	 * read: the free-agent read in one glance. */

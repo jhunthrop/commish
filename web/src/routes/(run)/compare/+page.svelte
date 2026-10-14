@@ -61,7 +61,14 @@
 	});
 	const figures = $derived(apiFormatOf(format));
 	const note = $derived(
-		figures === null ? null : contextNote(siteContext.league, figures, 'These figures are')
+		figures === null
+			? null
+			: contextNote(
+					siteContext.league,
+					figures,
+					siteContext.features.includes('custom_scoring'),
+					'These figures are'
+				)
 	);
 
 	function pickOf(slot: Slot): Chosen | null {

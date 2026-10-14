@@ -61,6 +61,7 @@
 		return contextNote(
 			league,
 			figures,
+			siteContext.features.includes('custom_scoring'),
 			'This board is',
 			carried.includes(runFormatId(league.format))
 		);
@@ -117,6 +118,9 @@
 {/snippet}
 
 <main class="board">
+	<!-- The league's line sits by the switch, not under the caption: atop the side column on a desk,
+	     first under the bar elsewhere. -->
+	<div class="league-line"><ContextNote {note} narrow /></div>
 	<div class="content">
 		<div class="lead">
 			<PageHead title="{season} Board" lead={page.seasonLead ?? page.format.basis.join(' · ')}>
@@ -127,7 +131,6 @@
 					<span class="to-side"><Quiet href="#{SIDE_ID}" size="sm">Basis and filters</Quiet></span>
 				{/snippet}
 			</PageHead>
-			<ContextNote {note} />
 		</div>
 		<div class="filters">
 			<FilterBar>
@@ -202,15 +205,35 @@
 </main>
 
 <style>
+	/* On a desk the content spans both rows and the league's line heads the side column, so the line
+	   takes no row of its own when there is none (the flexible second row takes the content's height). */
 	.board {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) var(--side-w);
-		gap: var(--s-5);
+		grid-template-rows: auto 1fr;
+		column-gap: var(--s-5);
 		padding: var(--s-5);
 	}
 
+	.league-line {
+		grid-column: 2;
+		grid-row: 1;
+	}
+
+	:global(html[data-league]) .league-line,
+	.league-line:has(:global(.filled)) {
+		margin-bottom: var(--s-4);
+	}
+
 	.content {
+		grid-column: 1;
+		grid-row: 1 / span 2;
 		min-width: 0;
+	}
+
+	.side {
+		grid-column: 2;
+		grid-row: 2;
 	}
 
 	.lead {
@@ -244,6 +267,18 @@
 	@media (max-width: 1180px) {
 		.board {
 			grid-template-columns: minmax(0, 1fr);
+			grid-template-rows: none;
+		}
+
+		.league-line,
+		.content,
+		.side {
+			grid-column: auto;
+			grid-row: auto;
+		}
+
+		.content {
+			margin-bottom: var(--s-5);
 		}
 
 		.to-side {
@@ -260,7 +295,10 @@
 	@media (max-width: 760px) {
 		.board {
 			padding: var(--s-4);
-			gap: var(--s-4);
+		}
+
+		.content {
+			margin-bottom: var(--s-4);
 		}
 
 		.side {

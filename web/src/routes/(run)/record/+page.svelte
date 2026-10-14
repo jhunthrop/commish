@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
-	import { SCORING_WORDS } from '#lib/league/names.ts';
+	import { leagueScores } from '#lib/context/words.ts';
 	import { fixed, plural } from '#lib/format/number.ts';
 	import {
 		allLine,
@@ -29,7 +29,7 @@
 	/** The record is graded in one scoring: with a league selected, the page says the league's too. */
 	const note = $derived(
 		siteContext.league
-			? `Your league scores ${SCORING_WORDS[siteContext.league.scoring]}. Our record is graded in ${scoring}.`
+			? `${leagueScores(siteContext.league)} Our record is graded in ${scoring}.`
 			: null
 	);
 	const stat = $derived(record.statistic);

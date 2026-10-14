@@ -13,7 +13,7 @@ export const CONTEXT_KEY = 'commish-context';
  * a session, and cleared at sign-out. */
 export const LINES_KEY = 'commish-league-lines';
 
-/** The root's attribute while a league is selected: the basis line's lines on a phone, "1" or "2".
+/** The root's attribute while a league is selected: the basis line's lines on a phone, "1" to "3".
  * The line's room comes from it (ContextNote). */
 export const LEAGUE_ATTR = 'data-league';
 
@@ -22,6 +22,6 @@ export const CONTEXT_BOOT_SCRIPT = `(function(){try{if(document.cookie.indexOf($
 	`${SESSION_CSRF_COOKIE}=`
 )})<0)return;var n=localStorage.getItem(${JSON.stringify(
 	LINES_KEY
-)});if(n==='1'||n==='2')document.documentElement.setAttribute(${JSON.stringify(
+)});if(n==='1'||n==='2'||n==='3')document.documentElement.setAttribute(${JSON.stringify(
 	LEAGUE_ATTR
 )},n);}catch(e){}})();`;
