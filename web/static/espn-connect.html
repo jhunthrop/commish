@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<meta name="referrer" content="no-referrer" />
+		<title>Sign in to ESPN</title>
+		<link rel="stylesheet" href="/espn-connect.css" />
+		<!-- Disney's own sign-in for ESPN, on a page of its own: the account page opens it in a window, it
+		     hands the two ESPN values back to that page alone, and it carries nothing else of the site.
+		     Its Content-Security-Policy is in web/_headers. -->
+		<script src="/espn-connect.js" defer></script>
+	</head>
+	<body>
+		<main>
+			<h1>Sign in to ESPN</h1>
+			<p id="line">Opening ESPN's sign-in.</p>
+			<button id="close" type="button">Close this window</button>
+		</main>
+	</body>
+</html>

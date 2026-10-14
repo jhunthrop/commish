@@ -1,7 +1,7 @@
 // Disney's sign-in hands the page a session somewhere in what it answers: run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { findSession } from './espn-oneid.ts';
+import { findSession, outcomeOf } from './espn-oneid.ts';
 
 const S2 = 'AEB'.repeat(30);
 
@@ -21,4 +21,22 @@ void test('a payload missing either value hands over nothing', () => {
 	assert.equal(findSession({ s2: S2, swid: 'not-a-swid' }), null);
 	assert.equal(findSession(null), null);
 	assert.equal(findSession('s2'), null);
+});
+
+void test('a message from the sign-in window is read by its outcome, any other is not one', () => {
+	const login = {
+		login: { token: { swid: '00000001-0000-4000-8000-000000000001' } },
+		guest: { s2: S2 }
+	};
+	assert.deepEqual(outcomeOf({ kind: 'commish-espn', outcome: 'signed-in', payload: login }), {
+		kind: 'session',
+		session: { swid: '{00000001-0000-4000-8000-000000000001}', s2: S2 }
+	});
+	assert.deepEqual(outcomeOf({ kind: 'commish-espn', outcome: 'signed-in', payload: {} }), {
+		kind: 'no-session'
+	});
+	assert.deepEqual(outcomeOf({ kind: 'commish-espn', outcome: 'closed' }), { kind: 'closed' });
+	assert.deepEqual(outcomeOf({ kind: 'commish-espn', outcome: 'failed' }), { kind: 'failed' });
+	assert.equal(outcomeOf({ kind: 'other', outcome: 'closed' }), null);
+	assert.equal(outcomeOf('closed'), null);
 });

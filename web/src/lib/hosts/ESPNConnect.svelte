@@ -42,25 +42,32 @@
 		onconnected(answer.leagues);
 	}
 
+	/** Disney's sign-in in its own window. Closing it makes the verb ready again at once; a sign-in
+	 * that hands back no session, or a window that cannot open, says so and opens the paste form. */
 	async function viaDisney(): Promise<void> {
 		busy = true;
 		problem = null;
 		try {
 			const { signInWithDisney } = await import('./espn-oneid.ts');
-			const session = await signInWithDisney();
-			if (session === null) {
-				problem =
-					'ESPN signed you in but did not hand us your session. Paste the two values below instead.';
-				pasting = true;
-				return;
+			const outcome = await signInWithDisney();
+			switch (outcome.kind) {
+				case 'session':
+					await keep(outcome.session);
+					break;
+				case 'no-session':
+					problem =
+						'ESPN signed you in but did not hand us your session. Paste the two values below instead.';
+					pasting = true;
+					break;
+				case 'failed':
+					problem = "ESPN's sign-in did not open here. Paste the two values below instead.";
+					pasting = true;
+					break;
+				case 'closed':
+					break;
 			}
-			await keep(session);
 		} catch (error) {
-			problem =
-				error instanceof ApiError
-					? failure(error)
-					: "Disney's sign-in did not open. Paste the two values below instead.";
-			pasting = true;
+			problem = failure(error);
 		} finally {
 			busy = false;
 		}
@@ -112,8 +119,7 @@
 {/snippet}
 
 {#snippet disneyVerb()}
-	<Verb disabled={busy} onclick={() => void viaDisney()}
-		>{busy ? 'Opening ESPN sign-in' : label}</Verb
+	<Verb disabled={busy} onclick={() => void viaDisney()}>{busy ? 'Signing in on ESPN' : label}</Verb
 	>
 {/snippet}
 

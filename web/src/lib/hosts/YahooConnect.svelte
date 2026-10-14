@@ -14,9 +14,11 @@
 		/** The verb sits in the page's action bar: true where connecting is the page's one verb (the
 		 * attach page), false where it sits among other rows (the account page). */
 		bar?: boolean;
+		/** The page to come back to once connected, a path on the site; the account page when unset. */
+		returnTo?: string;
 	}
 
-	let { reason, label = 'Connect Yahoo', bar = false }: Props = $props();
+	let { reason, label = 'Connect Yahoo', bar = false, returnTo }: Props = $props();
 
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
@@ -25,7 +27,7 @@
 		busy = true;
 		problem = null;
 		try {
-			await goToYahoo();
+			await goToYahoo(returnTo);
 		} catch (error) {
 			problem = error instanceof ApiError ? error.message : 'That did not go through. Try again.';
 			busy = false;

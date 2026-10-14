@@ -200,6 +200,7 @@
 			</p>
 			<HostReconnect
 				host={savedHost}
+				returnTo={here}
 				onconnected={() => {
 					failure = null;
 					void read();
@@ -242,7 +243,7 @@
 			{/if}
 			{#if sync.host_signed_out}
 				<!-- The read line says no one is signed in: the sign-in that mends it sits under it. -->
-				<HostReconnect host={sync.host} onconnected={() => void refresh()} />
+				<HostReconnect host={sync.host} returnTo={here} onconnected={() => void refresh()} />
 			{/if}
 			<StandingsStrip teams={sync.teams} me={sync.me} host={sync.host} />
 			<div class="grid">

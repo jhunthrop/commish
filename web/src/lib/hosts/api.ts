@@ -35,7 +35,11 @@ export const hostsApi = {
 	ffpcLeagues: () => client.call<HostLeague[]>('/hosts/ffpc/leagues'),
 	disconnectFFPC: () => client.call<null>('/hosts/ffpc', { method: 'DELETE' }),
 	/** Yahoo's authorize address, with a state bound to this account for ten minutes. */
-	connectYahoo: () => client.call<Redirect>('/hosts/yahoo/connect', { method: 'POST' }),
+	connectYahoo: (returnTo?: string) =>
+		client.call<Redirect>('/hosts/yahoo/connect', {
+			method: 'POST',
+			body: returnTo === undefined ? {} : { return_to: returnTo }
+		}),
 	yahooLeagues: () => client.call<HostLeague[]>('/hosts/yahoo/leagues'),
 	disconnectYahoo: () => client.call<null>('/hosts/yahoo', { method: 'DELETE' }),
 	/** The member's two ESPN cookies, kept encrypted once one read of their leagues shows they work. */
@@ -101,12 +105,20 @@ export function connectionTo(
 	return hosts.connections.find((c) => c.host === host);
 }
 
-/** Open Yahoo's own sign-in in this tab: Yahoo sends the member back to the account page, which says
- * how it went (yahooOutcome). */
-export async function goToYahoo(): Promise<void> {
-	const { url } = await hostsApi.connectYahoo();
-	window.location.assign(url);
+/** Open Yahoo's own sign-in in this tab: Yahoo sends the member back to the page they started from
+ * (returnTo, a path on the site) or to the account page, which says how it went (yahooOutcome). */
+export async function goToYahoo(returnTo?: string): Promise<void> {
+	const { url } = await hostsApi.connectYahoo(returnTo);
+	const target = new URL(url);
+	// Only Yahoo's own sign-in is ever opened from here.
+	if (target.protocol !== 'https:' || target.host !== YAHOO_SIGN_IN_HOST) {
+		throw new Error('Yahoo sign-in answered an address that is not Yahoo');
+	}
+	window.location.assign(target.toString());
 }
+
+/** The host Yahoo's sign-in lives on. */
+const YAHOO_SIGN_IN_HOST = 'api.login.yahoo.com';
 
 /** Whether an answer says the FFPC connection needs a fresh sign-in (409). */
 export function needsSignIn(error: unknown): boolean {
