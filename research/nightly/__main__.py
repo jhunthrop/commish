@@ -15,6 +15,7 @@ the dispatch failed.
 """
 
 import argparse
+import logging
 import os
 import sys
 from collections.abc import Sequence
@@ -27,6 +28,7 @@ from research.capsules.config import CAPSULE_CONFIG
 from research.cli import log_line as _line
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
+from research.logging_setup import configure_logging
 from research.nightly.capsule_step import CapsuleStepPlan
 from research.nightly.publish import Dispatcher, publish
 from research.nightly.r2 import run_store
@@ -99,6 +101,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     contract.add_argument("--runs", required=True, help="the directory laid out as the bucket (runs/<id>/...)")
     contract.add_argument("--run-id", required=True)
     args = parser.parse_args(argv)
+    configure_logging(logging.WARNING)
     commands_by_name = {"run": _run, "publish": _publish, "contract": _contract}
     return commands_by_name[args.command](args)
 
