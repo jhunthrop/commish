@@ -36,9 +36,12 @@ import httpx
 from sqlalchemy import Engine
 
 from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.facts.history import history_cache
 from research.capsules.gateway import GatewayClient
 from research.capsules.store import queue_regeneration
-from research.capsules.sweep import SweepPlan, SweepReport, sweep_capsules
+from research.capsules.sweep import FactsPassMemo, SweepPlan, SweepReport, sweep_capsules
+from research.db.code_digest import code_digest
+from research.db.read_cache import snapshot
 from research.nightly.capsule_gate import CapsuleGateResult, SharedSentence, board_universe_ids, capsule_gate
 from research.nightly.page_findings import PageFindings, page_findings
 
@@ -92,6 +95,14 @@ class CapsuleStepPlan:
     mend_only: bool = False
 
 
+def night_facts(engine: Engine) -> FactsPassMemo:
+    """The night's one board facts pass: read on its own snapshot, its finished seasons through the
+    read cache. Every reader of the night's sheets takes this memo (see `FactsPassMemo`)."""
+    return FactsPassMemo(
+        lambda: snapshot(engine), history_cache(engine, code_digest("research.capsules.facts.history"))
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class CapsuleStepResult:
     gate: CapsuleGateResult
@@ -127,8 +138,17 @@ def _regenerate_all(engine: Engine, now: datetime) -> str:
 class _Passes:
     """The writing passes of one night: one gateway, one clock, one budget shared by every pass."""
 
-    def __init__(self, engine: Engine, gateway: GatewayClient, now: datetime, plan: CapsuleStepPlan, log: Log) -> None:
+    def __init__(  # noqa: PLR0913, PLR0917 - the night's shared parts
+        self,
+        engine: Engine,
+        gateway: GatewayClient,
+        now: datetime,
+        plan: CapsuleStepPlan,
+        log: Log,
+        facts: FactsPassMemo,
+    ) -> None:
         self.engine = engine
+        self.facts = facts
         self.mend_only = plan.mend_only
         self.gateway = gateway
         self.now = now
@@ -150,7 +170,7 @@ class _Passes:
 
     def sweep(self, name: str, plan: SweepPlan) -> SweepReport:
         plan = replace(plan, exclude=plan.exclude | self.spent_out)
-        report = sweep_capsules(self.engine, self.gateway, self.now, plan)
+        report = sweep_capsules(self.engine, self.gateway, self.now, plan, self.facts)
         for pid, calls in report.calls_by_player.items():
             self.calls_by_player[pid] = self.calls_by_player.get(pid, 0) + calls
         self.spend.add(report)
@@ -188,7 +208,7 @@ class _Passes:
             with self.engine.connect() as conn:
                 gate = capsule_gate(conn, self.now)
                 order = board_universe_ids(conn, self.now)
-                failing = page_findings(conn, self.now).by_page
+                failing = page_findings(conn, self.now, self.facts).by_page
             place = {pid: index for index, pid in enumerate(order)}
             shared_pages = repair_targets(gate.shared, order)
             targets = sorted({*shared_pages, *failing}, key=lambda pid: place.get(pid, len(place)))
@@ -203,8 +223,11 @@ class _Passes:
             self.sweep(name, SweepPlan(self.left, only=frozenset(targets), avoid=avoid))
 
 
-def run_capsule_step(engine: Engine, now: datetime, plan: CapsuleStepPlan, log: Log) -> CapsuleStepResult:
-    """The capsule step, a line per pass; the result carries the gate and what the writing cost."""
+def run_capsule_step(
+    engine: Engine, now: datetime, plan: CapsuleStepPlan, log: Log, facts: FactsPassMemo
+) -> CapsuleStepResult:
+    """The capsule step, a line per pass; the result carries the gate and what the writing cost.
+    Every pass reads its sheets from `facts`, one board facts pass for the step."""
     key = os.environ.get(CAPSULE_CONFIG.gateway.api_key_variable, "").strip()
     spend = CapsuleSpend()
     if not key:
@@ -216,12 +239,12 @@ def run_capsule_step(engine: Engine, now: datetime, plan: CapsuleStepPlan, log: 
         if plan.regenerate_all:
             log(_regenerate_all(engine, now))
         with httpx.Client() as http:
-            passes = _Passes(engine, GatewayClient(key, http), now, plan, log)
+            passes = _Passes(engine, GatewayClient(key, http), now, plan, log, facts)
             passes.run()
             spend = passes.spend
         log(f"capsules spent: {spend.line()}")
     with engine.connect() as conn:
         gate = capsule_gate(conn, now)
-        findings = page_findings(conn, now)
+        findings = page_findings(conn, now, facts)
     log(f"{gate.summary()}; {len(findings.by_page)} written pages fail the page gate")
     return CapsuleStepResult(gate, findings, spend, bool(key))

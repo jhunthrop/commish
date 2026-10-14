@@ -3,8 +3,10 @@ package boards
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -16,6 +18,14 @@ import (
 // Source reads one stored scoring board.
 type Source interface {
 	Load(ctx context.Context, f Format) (*Raw, error)
+}
+
+// Versioner names the state a Source would read a board from, in a few
+// bytes: two equal versions read equal boards, so a cache whose TTL ran
+// out keeps its board when the version has not moved rather than reading
+// every row again.
+type Versioner interface {
+	Version(ctx context.Context, f Format) (string, error)
 }
 
 // schemaName is a bare Postgres identifier: the schema is configuration,
@@ -87,7 +97,7 @@ func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 	if err != nil {
 		return nil, err
 	}
-	source := fmt.Sprintf("%s_%s_12", s.SourcePrefix, f)
+	source := s.sourceFor(f)
 	rows, err := s.Pool.Query(ctx, s.boardQuery(), s.Season, source)
 	if err != nil {
 		return nil, fmt.Errorf("boards: read %s: %w", source, err)
@@ -120,6 +130,22 @@ func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 	return raw, nil
 }
 
+// Version is a digest, computed on the server, of every row Load would
+// read for f (the board query's rows and the byes), each set in a fixed
+// order: 65 bytes over the wire where Load moves about 260 KB.
+func (s *PGSource) Version(ctx context.Context, f Format) (string, error) {
+	query := `select md5(coalesce(string_agg(b::text, '|' order by b::text), '')) || ':' ||
+  (select md5(coalesce(string_agg(y::text, '|' order by y::text), '')) from (` + s.byeQuery() + `) y)
+from (` + s.boardQuery() + `) b`
+	var version string
+	if err := s.Pool.QueryRow(ctx, query, s.Season, s.sourceFor(f)).Scan(&version); err != nil {
+		return "", fmt.Errorf("boards: version of %s: %w", s.sourceFor(f), err)
+	}
+	return version, nil
+}
+
+func (s *PGSource) sourceFor(f Format) string { return fmt.Sprintf("%s_%s_12", s.SourcePrefix, f) }
+
 // directoryPlayer finishes a directory row the way every board reads it:
 // its position (false for one no room drafts) and its team's bye.
 func directoryPlayer(p *Player, position string, byes map[string]int) bool {
@@ -147,7 +173,9 @@ func (s *PGSource) byes(ctx context.Context) (map[string]int, error) {
 }
 
 // Cache holds each format's board for TTL: the board changes nightly, and
-// a pick must not read 1,500 rows.
+// a pick must not read 1,500 rows. Past its TTL a board whose Source is a
+// Versioner is kept while its version stands (one row read, not the
+// board), so a busy instance reads the board again only once it moved.
 type Cache struct {
 	Source Source
 	TTL    time.Duration
@@ -156,11 +184,14 @@ type Cache struct {
 	mu      sync.Mutex
 	entries map[Format]cached
 	loading map[Format]*sync.Mutex
+	// warned is set once a version read has failed and been logged.
+	warned atomic.Bool
 }
 
 type cached struct {
-	raw *Raw
-	at  time.Time
+	raw     *Raw
+	at      time.Time
+	version string
 }
 
 // Load answers from the cache, reloading a stale format once however many
@@ -175,14 +206,56 @@ func (c *Cache) Load(ctx context.Context, f Format) (*Raw, error) {
 	if raw, ok := c.fresh(f); ok {
 		return raw, nil
 	}
+	// The version is read before the board: a change between the two
+	// leaves an older version beside a newer board, which costs the next
+	// check a reload, never a stale board kept.
+	version := c.version(ctx, f)
+	if raw, ok := c.unmoved(f, version); ok {
+		return raw, nil
+	}
 	raw, err := c.Source.Load(ctx, f)
 	if err != nil {
 		return nil, err
 	}
 	c.mu.Lock()
-	c.entries[f] = cached{raw: raw, at: c.Now()}
+	c.entries[f] = cached{raw: raw, at: c.Now(), version: version}
 	c.mu.Unlock()
 	return raw, nil
+}
+
+// version is the Source's version of f, "" when it names none or cannot
+// be read (then the board is read in full, as without one).
+func (c *Cache) version(ctx context.Context, f Format) string {
+	v, ok := c.Source.(Versioner)
+	if !ok {
+		return ""
+	}
+	version, err := v.Version(ctx, f)
+	if err != nil {
+		// Logged once a process: a broken version read would otherwise quietly
+		// bring back a full board read every TTL.
+		if c.warned.CompareAndSwap(false, true) {
+			slog.Warn("boards: the board version could not be read; reading boards in full", "format", f, "error", err)
+		}
+		return ""
+	}
+	return version
+}
+
+// unmoved keeps the held board for another TTL when its version stands.
+func (c *Cache) unmoved(f Format, version string) (*Raw, bool) {
+	if version == "" {
+		return nil, false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e, ok := c.entries[f]
+	if !ok || e.version != version {
+		return nil, false
+	}
+	e.at = c.Now()
+	c.entries[f] = e
+	return e.raw, true
 }
 
 func (c *Cache) fresh(f Format) (*Raw, bool) {
