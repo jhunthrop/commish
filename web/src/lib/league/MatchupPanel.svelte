@@ -6,7 +6,7 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { LeagueSync, MatchupSide } from './api.ts';
 	import LeagueRow from './LeagueRow.svelte';
-	import { hostWords, rowOf, teamName } from './model.ts';
+	import { hostWords, rowOf, statusOn, teamName } from './model.ts';
 
 	/** This week's game: both lineups as the host has them set, each starter's points so far, and
 	 * each side's total. Side by side on a desk, one above the other in a hand. */
@@ -55,6 +55,7 @@
 				player={rowOf(board, starter.player)}
 				host={starter.player}
 				tags={mine ? tagsOf(starter.player.board_id) : []}
+				status={mine ? statusOn(sync.roster, starter.player.host_id) : null}
 			>
 				{#snippet trailing()}
 					{#if scored}<span class="pts">{fixed(starter.points)}</span>{/if}

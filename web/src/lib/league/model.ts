@@ -5,7 +5,15 @@ import { fixed, plural, signed } from '#lib/format/number.ts';
 import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
 import type { IndexSeason } from '#lib/run/schema.ts';
 import type { LeagueBoard, LeagueBoardPlayer } from './board.ts';
-import type { LeagueHost, LeagueMove, LeaguePlayer, LeagueSync, LeagueTeam } from './api.ts';
+import type { FaceStatus } from '#lib/ui/face-status.ts';
+import type {
+	LeagueHost,
+	LeagueMove,
+	LeaguePlayer,
+	LeagueSync,
+	LeagueTeam,
+	RosterSpot
+} from './api.ts';
 
 /** How often an open league page reads the league again. The API reads the host at most once a
  * minute whatever the number of viewers, so a faster page would only see the same read. */
@@ -125,4 +133,15 @@ export function myTeam(sync: LeagueSync): LeagueTeam | undefined {
 /** The drafter's place in the standings, 1-based. */
 export function myPlace(sync: LeagueSync): number {
 	return sync.teams.findIndex((t) => t.roster_id === sync.me) + 1;
+}
+
+/** The mark a roster slot puts on a player's face: injured reserve, or none. */
+export function slotStatus(slot: RosterSpot['slot']): FaceStatus | null {
+	return slot === 'reserve' ? 'ir' : null;
+}
+
+/** The mark on a player's face from the roster that holds him, none when it does not. */
+export function statusOn(roster: readonly RosterSpot[], hostId: string): FaceStatus | null {
+	const spot = roster.find((s) => s.player.host_id === hostId);
+	return spot ? slotStatus(spot.slot) : null;
 }

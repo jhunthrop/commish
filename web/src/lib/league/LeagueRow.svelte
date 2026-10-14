@@ -4,6 +4,7 @@
 	import { tagMarks } from '#lib/sheet/tags.ts';
 	import { links } from '#lib/site/links.ts';
 	import Face from '#lib/ui/Face.svelte';
+	import type { FaceStatus } from '#lib/ui/face-status.ts';
 	import Label from '#lib/ui/Label.svelte';
 	import NameWords from '#lib/ui/NameWords.svelte';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
@@ -28,13 +29,23 @@
 		tags?: readonly string[];
 		/** A slot label before the row: "Bench", "IR". */
 		slot?: string;
+		/** His roster status, marked on his face: on injured reserve. */
+		status?: FaceStatus | null;
 		/** The row's number, at its end. Left out, the row ends on his points a game this season. */
 		trailing?: Snippet;
 		/** End on his value over replacement, the order of a list ranked by it (the waiver pool). */
 		endsOnValue?: boolean;
 	}
 
-	let { player, host, tags = [], slot, trailing, endsOnValue = false }: Props = $props();
+	let {
+		player,
+		host,
+		tags = [],
+		slot,
+		status = null,
+		trailing,
+		endsOnValue = false
+	}: Props = $props();
 
 	const name = $derived(player?.name ?? host.name);
 	/** His value cell when the row ends on it, null otherwise or without a value. */
@@ -49,7 +60,7 @@
 
 <div class="row" class:slotted={slot !== undefined}>
 	{#if slot !== undefined}<span class="slot"><Label size="cell">{slot}</Label></span>{/if}
-	<Face src={player?.headshot ?? null} {name} size={32} />
+	<Face src={player?.headshot ?? null} {name} size={32} {status} />
 	<span class="who">
 		{#if player}
 			<a href={links.playerSeason(player.slug)}><b><NameWords {name} /></b></a>
