@@ -81,3 +81,12 @@ that check only; the judgment's fit then includes it. After the check only defec
   run as an artifact); preseason runs are unchanged.
 - **Any gate fails:** nothing ships; the results report every number; the model is not retuned and
   rerun against 2024.
+
+## Development check, as run (before the judgment)
+
+Fit 2021-2022, judged on 2023 weeks 8 and 12, tree `c0e57516`,
+`2026-10-14-rest-of-season-round3-dev-check.json`. 5 of 49 lines failed, all tight ends in half PPR
+and standard: G1 week 8 half (-0.0139) and standard (-0.0201); G2 week 8 half and standard, week 12
+half. Every other G1 and G2 cell passed; G4 passed (outcomes read 2021, 2022, 2023). The fitted
+numbers show nothing that departs from this document. **No defect, no amendment; nothing changed
+between the check and the judgment.**
