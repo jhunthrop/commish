@@ -7,6 +7,8 @@ import type { Held } from './held-words.ts';
 import { contextNote } from './note-words.ts';
 import { leagueLine } from './menu-words.ts';
 import { clubCaption, clubsLead, scheduleLead } from '#lib/run/strength-words.ts';
+import { weekLines } from '#lib/run/record.ts';
+import type { RecordWeek } from '#lib/run/schema.ts';
 
 /** The copy guard's doubled word: "the the", "is is". */
 const DOUBLED_WORD = /\b(\w+)\s+\1\b/i;
@@ -134,4 +136,31 @@ void test("copy guard: no line doubles a word, the run's strength method include
 	];
 	for (const line of lines) assert.doesNotMatch(line ?? '', DOUBLED_WORD, line ?? '');
 	assert.match('Strength is the the average', DOUBLED_WORD);
+});
+
+const missed = (week: number, note: string): RecordWeek => ({
+	week,
+	status: 'missed',
+	frozenAt: null,
+	frozenBy: null,
+	gradedAt: null,
+	population: 0,
+	lines: [],
+	note
+});
+
+void test('missed weeks share a line only while their reason agrees, and the line says why', () => {
+	const freeze = 'Our weekly freeze failed that week.';
+	const weeks = [
+		missed(3, freeze),
+		missed(4, freeze),
+		missed(5, 'Our nightly run failed that week.')
+	];
+	assert.deepEqual(
+		weekLines(weeks).map((line) => `${line.lead}, ${line.text}`),
+		[
+			'Weeks 3 to 4, not frozen because our weekly freeze failed, so not graded',
+			'Week 5, not frozen because our nightly run failed, so not graded'
+		]
+	);
 });

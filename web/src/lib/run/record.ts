@@ -78,7 +78,7 @@ function stamp(iso: string | null, week: RecordWeek): string {
 export interface WeekLine {
 	/** "Week 1", "Weeks 3 to 5". */
 	lead: string;
-	/** "frozen Sep 8, graded Oct 14", "not frozen, so not graded", "next freeze Thu Oct 22". */
+	/** "frozen Sep 8, graded Oct 14", "not frozen because our weekly freeze failed, so not graded", "next freeze Thu Oct 22". */
 	text: string;
 	/** The week a graded or frozen line speaks for, so a page can add its figures. Null for a run. */
 	week: RecordWeek | null;
@@ -97,23 +97,42 @@ function frozenWords(week: RecordWeek): string {
 		: `frozen ${stamp(week.frozenAt, week)}, waiting on the stat lines`;
 }
 
-/** A run of weeks said once: missed ones, or what is left with the next freeze from the schedule. */
+/** A missed week's reason as a clause: the run's note ("Our weekly freeze failed that week.") with its
+ * capital, its full stop and its "that week" dropped, "our weekly freeze failed". The run must say
+ * why a week was missed: the record never hides a gap. */
+function reason(week: RecordWeek): string {
+	if (week.note === undefined) throw new Error(`Week ${String(week.week)} is missed with no note.`);
+	const clause = week.note.replace(/\.$/, '').replace(/ that week$/, '');
+	return `${clause.charAt(0).toLowerCase()}${clause.slice(1)}`;
+}
+
+/** A run of weeks said once: missed ones with why, or what is left with the next freeze from the
+ * schedule. */
 function runWords(first: RecordWeek): string {
-	if (first.status === 'missed') return 'not frozen, so not graded';
+	if (first.status === 'missed') return `not frozen because ${reason(first)}, so not graded`;
 	return first.frozenAt === null
 		? 'the first board freezes before its first kickoff'
 		: `next freeze ${weekdayLabel(first.frozenAt)}`;
 }
 
-/** The season week by week, each run of missed weeks one line ("Weeks 3 to 5, not frozen, so not
- * graded") and every week still to come one line ("Weeks 7 to 18, next freeze Thu Oct 22"), so the
- * list says what happened and what is next rather than logging each week alike. */
+/** Whether a week joins the run before it: the same status, missed or upcoming, and for missed weeks
+ * the same reason, so two causes never share a line. */
+function joins(run: readonly RecordWeek[] | undefined, week: RecordWeek): boolean {
+	const first = run?.[0];
+	if (first === undefined || first.status !== week.status) return false;
+	if (week.status === 'missed') return reason(first) === reason(week);
+	return week.status === 'upcoming';
+}
+
+/** The season week by week, each run of missed weeks one line ("Weeks 3 to 5, not frozen because our
+ * weekly freeze failed, so not graded") and every week still to come one line ("Weeks 7 to 18, next
+ * freeze Thu Oct 22"), so the list says what happened and what is next rather than logging each
+ * week alike. */
 export function weekLines(weeks: readonly RecordWeek[]): WeekLine[] {
 	const runs: RecordWeek[][] = [];
 	for (const week of weeks) {
 		const last = runs.at(-1);
-		const grouped = week.status === 'missed' || week.status === 'upcoming';
-		if (grouped && last?.[0]?.status === week.status) runs[runs.length - 1] = [...last, week];
+		if (last !== undefined && joins(last, week)) runs[runs.length - 1] = [...last, week];
 		else runs.push([week]);
 	}
 	return runs.map((run) => {
