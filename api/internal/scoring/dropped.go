@@ -54,8 +54,27 @@ func SortDropped(rules []DroppedRule) {
 		if c := cmp.Compare(groupOrder[a.Group], groupOrder[b.Group]); c != 0 {
 			return c
 		}
+		if na, nb := leadingNumber(a.Rule), leadingNumber(b.Rule); na >= 0 && nb >= 0 && na != nb {
+			return cmp.Compare(na, nb)
+		}
 		return cmp.Compare(a.Rule, b.Rule)
 	})
+}
+
+// leadingNumber is the number a rule opens with ("7 to 13 points
+// allowed"), so tiers list in order, or -1 for one that opens with words.
+func leadingNumber(rule string) int {
+	n, digits := 0, 0
+	for _, r := range rule {
+		if r < '0' || r > '9' {
+			break
+		}
+		n, digits = n*10+int(r-'0'), digits+1
+	}
+	if digits == 0 {
+		return -1
+	}
+	return n
 }
 
 // DroppedWords is each rule's Words.
