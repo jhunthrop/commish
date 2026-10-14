@@ -24,8 +24,9 @@ from sqlalchemy import Engine
 from research.model.arithmetic import ARM64_BOARDS
 from research.model.fit_check import fit_step
 from research.model.fit_inputs import fit_readiness
-from research.model.priors import load_model_artifacts
+from research.model.priors import ModelArtifacts, load_model_artifacts
 from research.model.reads.teams import first_kickoff_for
+from research.model.ros.raw_line import keep_raw_line
 from research.pipeline import vegas
 from research.pipeline.host_ids import ingest_host_ids
 from research.pipeline.http import Fetcher
@@ -133,12 +134,28 @@ def ingest_step(context: IngestContext) -> StepRecord:
 def run_fit_step(engine: Engine, now: datetime) -> StepRecord:
     """The board's check, and every unported fit named: re-runnable, or the seasons it still lacks."""
     with engine.begin() as conn:
-        record = fit_step(conn, now, load_model_artifacts(conn), ARM64_BOARDS)
+        artifacts = load_model_artifacts(conn)
+        record = fit_step(conn, now, artifacts, ARM64_BOARDS)
         readiness = fit_readiness(conn)
+    raw = _raw_line(engine, now, artifacts)
     ready = [fit for fit, reason in readiness.items() if reason is None]
     blocked = [f"{fit} ({reason})" for fit, reason in readiness.items() if reason is not None]
     fits = f"unported fits with every input held: {', '.join(ready) or 'none'}" + (
         f"; blocked: {'; '.join(blocked)}" if blocked else ""
     )
     checked = " The board was not checked tonight, which is not a pass." if record.status == "skipped" else ""
-    return StepRecord("fit", record.status, f"{record.summary}.{checked} {fits}")
+    return StepRecord("fit", record.status, f"{record.summary}.{checked} {fits}; {raw}")
+
+
+def _raw_line(engine: Engine, now: datetime, artifacts: ModelArtifacts) -> str:
+    """Once the product season has kicked off, the served raw board's line for the rest-of-season
+    model (`model.ros.raw_line`), kept once per generation and code. Its failure is a line in the
+    summary, never the step's: without it the boards stay preseason and the report says why."""
+    try:
+        with engine.begin() as conn:
+            kickoff = first_kickoff_for(conn, PRODUCT_SEASON)
+            if kickoff is None or now < kickoff:
+                return "raw line: the season has not kicked off"
+            return keep_raw_line(conn, PRODUCT_SEASON, now, artifacts, ARM64_BOARDS)
+    except Exception as error:
+        return f"raw line: not kept ({type(error).__name__}: {error})"

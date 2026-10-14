@@ -43,6 +43,17 @@ export function dayYearLabel(iso: string): string {
 	return DAY_YEAR.format(parse(iso));
 }
 
+const MONTH_DAY = new Intl.DateTimeFormat('en-US', {
+	month: 'long',
+	day: 'numeric',
+	timeZone: ZONE
+});
+
+/** "October 14": the month in words, as a sentence names the day a board was refreshed. */
+export function monthDayLabel(iso: string): string {
+	return MONTH_DAY.format(parse(iso));
+}
+
 /** "Oct 12". */
 export function dayLabel(iso: string): string {
 	return DAY.format(parse(iso));

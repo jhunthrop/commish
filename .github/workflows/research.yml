@@ -169,6 +169,10 @@ jobs:
         # not on the first night (review N16).
       - name: The schema gate in the built image
         run: docker run --rm "$IMAGE" research.nightly contract --runs nightly/contract/fixture --run-id 2026-10-13T21-2
+        # An in-season run (week 7 to play): the rest-of-season board's rows, no range, the preseason
+        # rank and points beside them, and a player off the preseason board (research/nightly/build/ros.py).
+      - name: The schema gate in the built image, an in-season run
+        run: docker run --rm "$IMAGE" research.nightly contract --runs nightly/contract/fixture --run-id 2026-10-21T12-ros
       - name: Push the image
         if: env.PUSH == 'true'
         run: docker push "$IMAGE"

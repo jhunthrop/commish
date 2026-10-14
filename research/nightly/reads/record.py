@@ -29,9 +29,12 @@ MISSED_NOTE: Final = "Our weekly freeze failed that week."
 RECORD_POSITIONS: Final = ("QB", "RB", "WR", "TE", "K", "DST")
 ALL: Final = "All"
 STATISTIC: Final = {"agreement": "agreement with the finish", "placesOff": "places off, typical player"}
+# Graded against the preseason board in season too: freezing and grading the rest-of-season board is
+# a later lane's (the coordinator's ruling of 2026-10-14), so the line says which board it grades.
 METHOD: Final = (
-    "Each week our PPR board is frozen before the week's first kickoff and graded after its games against how its "
-    "players scored, with ADP graded the same way on the same players."
+    "Graded against our preseason board: each week our preseason PPR board is frozen before the week's first "
+    "kickoff and graded after its games against how its players scored, with ADP graded the same way on the same "
+    "players."
 )
 
 

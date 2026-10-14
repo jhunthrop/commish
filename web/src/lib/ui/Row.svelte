@@ -42,6 +42,8 @@
 		/** The league's mark, with the component that draws it (HeldMark, loaded with the rosters):
 		 * yours, which tints the row with your wash, or a free agent. */
 		held?: ShownMark | null;
+		/** The Drafters cell compares drafters with our rank. Off in season: the ADP alone. */
+		compare?: boolean;
 	}
 
 	let {
@@ -55,7 +57,8 @@
 		action,
 		order = 'board',
 		season,
-		held = null
+		held = null,
+		compare = true
 	}: Props = $props();
 
 	const lead = $derived(
@@ -98,10 +101,20 @@
 	<ValueCell {...vorCell(player.vor, player.vorRound)} phoneLabel={false} />
 	{#if range}
 		<span class="rng">
-			<RangeBar floor={player.floor} median={player.median} ceiling={player.ceiling} {scale} />
+			<RangeBar
+				floor={player.floor ?? 0}
+				median={player.median ?? 0}
+				ceiling={player.ceiling ?? 0}
+				{scale}
+			/>
 		</span>
 	{/if}
-	<AdpCell adp={player.adp} ourRank={player.ourRank} under={order === 'adp' ? 'rank' : 'adp'} />
+	<AdpCell
+		adp={player.adp}
+		ourRank={player.ourRank}
+		under={order === 'adp' ? 'rank' : 'adp'}
+		{compare}
+	/>
 	{#if action}<span class="action">{@render action()}</span>{/if}
 </div>
 

@@ -27,6 +27,7 @@ from research.model.ros import gates
 from research.model.ros.judge import Judgment, RoundFit, fit_round, judge_round
 from research.model.ros.payload import priors_payload
 from research.model.ros.scratch import ingest_judgment_season, ingest_week_one_rosters, scratch_engine
+from research.model.ros.ship import SHIPPED_ROUND, fit_and_publish
 
 # Each round's one judgment record. Its existence closes that judgment for good: `judge` refuses a
 # round whose record exists, and `dev-check` refuses a check that would judge a closed season.
@@ -134,6 +135,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     rosters.add_argument("--database", required=True)
     rosters.add_argument("--season", type=int, action="append", required=True)
+    fit = sub.add_parser("fit", help="fit the judged model on the named store and publish its artifact")
+    fit.add_argument("--database", required=True)
     for name in ("dev-check", "judge"):
         run = sub.add_parser(name)
         run.add_argument("--database", required=True)
@@ -142,6 +145,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "ingest-week-one-rosters":
         ingest_week_one_rosters(args.database, args.season, datetime.now(UTC))
+        return 0
+    if args.command == "fit":
+        for line in fit_and_publish(args.database, JUDGMENT_RECORDS[SHIPPED_ROUND], datetime.now(UTC)):
+            log_line(line)
         return 0
     if args.command == "ingest-judgment-season":
         ingest_judgment_season(args.database, args.season, datetime.now(UTC))

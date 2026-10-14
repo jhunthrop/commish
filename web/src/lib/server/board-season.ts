@@ -1,11 +1,13 @@
 /**
- * This season beside our board. Until the weekly projection round passes its gates, the board stays
- * ranked by points over replacement from the preseason projection, and once the run is past the
+ * This season beside our board. Until the switch week the board stays ranked by points over
+ * replacement from the preseason projection; from it the run ranks the rest of the season and the
+ * line says so (`restLead`). Once the run is past the
  * season's first kickoff every row carries what the season has delivered so far (index.json's games
  * and points a game), under one basis line that says so. Before the first kickoff nothing changes. The run decides, never the
  * reader's clock (seasonUnderway).
  */
 import { midSentence } from '#lib/format/sentence.ts';
+import { figuresLine, restLead } from '#lib/run/rest-words.ts';
 import type { BoardRow, BoardRowView, Format, SeasonedRow } from '#lib/run/schema.ts';
 import { index, manifest, seasonReach, seasonUnderway, type SeasonReach } from './run.ts';
 
@@ -34,10 +36,10 @@ export async function withSeasons(
  * season block in one format, so on a board of another scoring the figures name theirs: "this
  * season's, scored in PPR, through week 5". */
 export function seasonLead(format: Format, reach: SeasonReach, season: number): string {
+	const rest = restLead(format, reach, season);
+	if (rest !== null) return rest;
 	const sort = `Ranked by points over replacement, our preseason ${midSentence(format.label)} projection for the full ${String(season)} season.`;
-	const scoring = reach.scoring === format.label ? '' : `, scored in ${reach.scoring}`;
-	const through = reach.through === 0 ? '' : `, through week ${String(reach.through)}`;
-	return `${sort} Games and points a game are this season's${scoring}${through}.`;
+	return `${sort} ${figuresLine(format, reach)}`;
 }
 
 /** A board's rows and basis line as its page prints them. */
