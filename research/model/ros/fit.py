@@ -254,20 +254,50 @@ def fit_returns(rows: Sequence[FitRow]) -> tuple[tuple[float, float, float], tup
     return (following[0], following[1], following[2]), (later[0], later[1], later[2])
 
 
-def fit_interval(rows: Sequence[FitRow], priors: RosPriors) -> dict[str, tuple[float, float, float]]:
-    """Per position, format and band: the 10th, 50th and 90th percentiles of actual over projected."""
+def _ratios_by_key(
+    rows: Sequence[FitRow], priors: RosPriors, keys_of: Callable[[int], list[str]]
+) -> dict[str, list[float]]:
+    """Actual over projected for every population row with a projection, under each key its week feeds."""
     ratios: dict[str, list[float]] = {}
     for r in rows:
         projected = project(r.player, priors).projected
         for name in r.in_population:
             if projected[name] > 0:
-                key = f"{cell(r.player.position, name)}|{band_of(r.week)}"
-                ratios.setdefault(key, []).append(r.actual[name] / projected[name])
+                for suffix in keys_of(r.week):
+                    key = f"{cell(r.player.position, name)}|{suffix}"
+                    ratios.setdefault(key, []).append(r.actual[name] / projected[name])
+    return ratios
+
+
+def interval_weeks(t: Thresholds) -> tuple[int, ...]:
+    """The projection weeks a per-week interval is fitted for: every served week through 17."""
+    first = (t.switch_week or 1) + 1
+    return tuple(range(first, LAST_FANTASY_WEEK + 1))
+
+
+def window(week: int, collected: Sequence[int]) -> list[int]:
+    """Weeks W-1, W, W+1, clamped to the collected weeks (round 2)."""
+    low, high = min(collected), max(collected)
+    centre = min(max(week, low + 1), high - 1)
+    return [w for w in (centre - 1, centre, centre + 1) if w in collected]
+
+
+def fit_interval(rows: Sequence[FitRow], priors: RosPriors, t: Thresholds) -> dict[str, tuple[float, float, float]]:
+    """Per position and format, and per band (round 1) or projection week (round 2): the 10th, 50th
+    and 90th percentiles of actual over projected."""
+    if priors.interval_by == "week":
+        weeks = interval_weeks(t)
+        feeds = {w: [f"week{target}" for target in weeks if w in window(target, t.fit_weeks)] for w in t.fit_weeks}
+        ratios = _ratios_by_key(rows, priors, lambda week: feeds.get(week, []))
+        suffixes = [f"week{w}" for w in weeks]
+    else:
+        ratios = _ratios_by_key(rows, priors, lambda week: [band_of(week)])
+        suffixes = [band for band, _, _ in BANDS]
     found: dict[str, tuple[float, float, float]] = {}
     for position in SKILL_POSITIONS:
         for name in FORMATS:
-            for band, _, _ in BANDS:
-                key = f"{cell(position, name)}|{band}"
+            for suffix in suffixes:
+                key = f"{cell(position, name)}|{suffix}"
                 values = ratios.get(key, [])
                 if len(values) < MIN_INTERVAL_CELL:
                     raise RosFitError(f"{key} holds {len(values)} rows, fewer than {MIN_INTERVAL_CELL}")
@@ -276,18 +306,21 @@ def fit_interval(rows: Sequence[FitRow], priors: RosPriors) -> dict[str, tuple[f
     return found
 
 
-def fit_priors(rows: Sequence[FitRow], opportunity: dict[str, OpportunityLine]) -> RosPriors:
-    rates, availability = fit_offboard(rows)
+def fit_priors(rows: Sequence[FitRow], opportunity: dict[str, OpportunityLine], t: Thresholds) -> RosPriors:
+    """Every number on the search weeks' rows; the interval on every collected week's."""
+    searched = [r for r in rows if r.week in t.search_weeks]
+    rates, availability = fit_offboard(searched)
     partial = RosPriors(
         MappingProxyType(opportunity), MappingProxyType({}), MappingProxyType({}), (0.0, 0.0, 0.0),
         (0.0, 0.0, 0.0), MappingProxyType(rates), MappingProxyType(availability), MappingProxyType({}),
+        t.interval_by,
     )  # fmt: skip
-    following, later = fit_returns(rows)
+    following, later = fit_returns(searched)
     partial = replace(
         partial,
-        shrinkage=MappingProxyType(fit_shrinkage(rows, partial)),
-        availability_k=MappingProxyType(fit_availability(rows, partial)),
+        shrinkage=MappingProxyType(fit_shrinkage(searched, partial)),
+        availability_k=MappingProxyType(fit_availability(searched, partial)),
         return_next=following,
         return_later=later,
     )
-    return replace(partial, interval=MappingProxyType(fit_interval(rows, partial)))
+    return replace(partial, interval=MappingProxyType(fit_interval(rows, partial, t)))

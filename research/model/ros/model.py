@@ -13,7 +13,6 @@ from typing import Final
 
 from research.model.domain import Position
 
-MODEL_NAME: Final = "commish_ros_v1"
 FORMATS: Final = ("ppr", "half", "std")
 LAST_FANTASY_WEEK: Final = 17
 SEASON_GAMES: Final = 17
@@ -38,7 +37,7 @@ class StaleEntry:
     """The preseason board's view of him in each format: season points and points a game."""
 
     projected: Mapping[str, float]
-    per_game: Mapping[str, float]
+    per_game: Mapping[str, float] | None  # None: no line to take a rate from (the off-board rate stands in)
     availability: float  # expected games over a 17-game season, capped at 1
 
 
@@ -105,7 +104,8 @@ class RosPriors:
     return_later: tuple[float, float, float]
     offboard_rate: Mapping[str, float]
     offboard_availability: Mapping[str, float]
-    interval: Mapping[str, tuple[float, float, float]]  # `position|format|band`: p10, p50, p90 ratios
+    interval: Mapping[str, tuple[float, float, float]]  # `position|format|band` or `|week<W>`: p10, p50, p90
+    interval_by: str = "band"  # round 1: horizon bands; round 2: one cell per projection week
 
 
 def cell(position: str, format_name: str) -> str:
@@ -139,7 +139,7 @@ def opportunity_rate(player: PlayerToDate, line: OpportunityLine) -> float | Non
 
 
 def prior_rate(player: PlayerToDate, format_name: str, priors: RosPriors) -> float:
-    if player.stale is not None:
+    if player.stale is not None and player.stale.per_game is not None:
         return player.stale.per_game[format_name]
     return priors.offboard_rate[cell(player.position, format_name)]
 
@@ -206,11 +206,18 @@ def project(player: PlayerToDate, priors: RosPriors) -> RosProjection:
     )
 
 
+def interval_key(position: str, format_name: str, week: int, interval_by: str) -> str:
+    """The interval cell a projection week reads: its horizon band, or (round 2) its own week."""
+    if interval_by == "week":
+        return f"{cell(position, format_name)}|week{week}"
+    return f"{cell(position, format_name)}|{band_of(week)}"
+
+
 def interval(
     projected: float, position: str, format_name: str, week: int, priors: RosPriors
 ) -> tuple[float, float, float]:
     """Floor, median and ceiling: the projection times its cell's fitted ratio percentiles."""
     if projected <= 0:
         return 0.0, 0.0, 0.0
-    low, mid, high = priors.interval[f"{cell(position, format_name)}|{band_of(week)}"]
+    low, mid, high = priors.interval[interval_key(position, format_name, week, priors.interval_by)]
     return max(0.0, projected * low), max(0.0, projected * mid), max(0.0, projected * high)

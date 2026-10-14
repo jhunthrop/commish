@@ -7,7 +7,7 @@ the schedule published in May. Nothing here reads an outcome; outcomes go throug
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Final
@@ -45,10 +45,27 @@ class StaleBoard:
     players: Mapping[str, StalePlayer]
 
 
-def stale_entry(projected: Mapping[str, float], games: float) -> StaleEntry:
-    """Season points and points a game in each format, and the availability, from the served games."""
-    per_game = {name: projected[name] / games if games > 0 else 0.0 for name in FORMATS}
-    return StaleEntry(MappingProxyType(dict(projected)), MappingProxyType(per_game), min(1.0, games / SEASON_GAMES))
+def stale_entry(
+    projected: Mapping[str, float], games: float, per_game: Mapping[str, float] | None = None
+) -> StaleEntry:
+    """Season points, the availability from the served games, and points a game: the served points
+    over its games (round 1) unless a line's own points a game are given (round 2)."""
+    if per_game is None:
+        per_game = {name: projected[name] / games if games > 0 else 0.0 for name in FORMATS}
+    return StaleEntry(
+        MappingProxyType(dict(projected)), MappingProxyType(dict(per_game)), min(1.0, games / SEASON_GAMES)
+    )
+
+
+def raw_per_game(raw: BoardEntry) -> dict[str, float] | None:
+    """The raw board's season line scored in each format over its own expected games (round 2), so a
+    capped player's availability lives only in expected games; None when it expects no games."""
+    if raw.expected_games <= 0:
+        return None
+    return {
+        name: compute_fantasy_points(raw.season_line, raw.position, FORMAT_RULES[name]) / raw.expected_games
+        for name in FORMATS
+    }
 
 
 def format_ratios(raw: BoardEntry) -> dict[str, float]:
@@ -59,7 +76,9 @@ def format_ratios(raw: BoardEntry) -> dict[str, float]:
     return {name: compute_fantasy_points(raw.season_line, raw.position, FORMAT_RULES[name]) / ppr for name in FORMATS}
 
 
-def build_stale_board(conn: Connection, season: int, artifacts: ModelArtifacts, arithmetic: Arithmetic) -> StaleBoard:
+def build_stale_board(
+    conn: Connection, season: int, artifacts: ModelArtifacts, arithmetic: Arithmetic, prior_source: str = "served"
+) -> StaleBoard:
     """The served PPR board as the house's builder makes it for `season`, carried to half PPR and
     standard by the raw model's own ratio of format points to PPR points (Amendment 1: a past
     season's half and standard boards are flat market tails, the store holding 5-20 of their ADP rows)."""
@@ -72,9 +91,13 @@ def build_stale_board(conn: Connection, season: int, artifacts: ModelArtifacts, 
         found = raw.get(served.player_id)
         ratios = format_ratios(found) if found is not None else dict.fromkeys(FORMATS, 1.0)
         projected = {name: served.projected_points * ratios[name] for name in FORMATS}
-        players[served.player_id] = StalePlayer(
-            served.position, served.team, stale_entry(projected, served.expected_games)
-        )
+        if prior_source == "raw":
+            per_game = raw_per_game(found) if found is not None else None
+            entry = stale_entry(projected, served.expected_games, per_game)
+            entry = entry if per_game is not None else replace(entry, per_game=None)
+        else:
+            entry = stale_entry(projected, served.expected_games)
+        players[served.player_id] = StalePlayer(served.position, served.team, entry)
     return StaleBoard(season, built.inputs.moment, MappingProxyType(players))
 
 

@@ -3,8 +3,8 @@ and the one judgment. Every command names its database explicitly (`--database`)
 environment URL, and anything but a local host is refused (`scratch_engine`).
 
     uv run python -m research.model.ros ingest-judgment-season --database <scratch> --season 2025
-    uv run python -m research.model.ros dev-check --database <scratch> --out <file.json>
-    uv run python -m research.model.ros judge --database <scratch> --out <file.json>
+    uv run python -m research.model.ros dev-check --round 2 --database <scratch> --out <file.json>
+    uv run python -m research.model.ros judge --round 2 --database <scratch> --out <file.json>
 """
 
 import argparse
@@ -24,13 +24,17 @@ from research.model.arithmetic import ARM64_BOARDS, model_version
 from research.model.priors import load_model_artifacts
 from research.model.ros import gates
 from research.model.ros.judge import Judgment, RoundFit, fit_round, judge_round
-from research.model.ros.model import MODEL_NAME
 from research.model.ros.payload import priors_payload
 from research.model.ros.scratch import ingest_judgment_season, scratch_engine
 
-# The one judgment's record. Its existence closes the judgment: the preregistration says a second
-# run against 2025 voids the record, so `judge` refuses unless told it is a marked rerun.
-JUDGMENT_RECORD: Final = Path(__file__).resolve().parents[3] / "docs/research/2026-10-14-rest-of-season-results.json"
+# Each round's one judgment record. Its existence closes that judgment: a second run against 2025
+# voids the record, so `judge` refuses unless told it is a marked rerun.
+_DOCS: Final = Path(__file__).resolve().parents[3] / "docs/research"
+JUDGMENT_RECORDS: Final = {
+    1: _DOCS / "2026-10-14-rest-of-season-results.json",
+    2: _DOCS / "2026-10-14-rest-of-season-round2-results.json",
+}
+ROUNDS: Final = {1: (gates.PREREGISTERED, gates.DEVELOPMENT_CHECK), 2: (gates.ROUND_TWO, gates.ROUND_TWO_CHECK)}
 
 
 def _render(fitted: RoundFit, judged: Judgment) -> list[str]:
@@ -61,7 +65,7 @@ def _run(url: str, thresholds: gates.Thresholds, out: Path, rerun: bool = False)
     for line in report:
         log_line(line)
     payload: dict[str, Any] = {
-        "model": MODEL_NAME,
+        "model": thresholds.model_name,
         "model_version": model_version(),
         "arithmetic": ARM64_BOARDS.label,
         "thresholds": thresholds_payload(thresholds),
@@ -89,14 +93,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         run.add_argument("--database", required=True)
         run.add_argument("--out", type=Path, required=True)
         run.add_argument("--rerun", action="store_true", help="judge again, marked as a rerun that voids the record")
+        run.add_argument("--round", type=int, choices=sorted(ROUNDS), required=True)
     args = parser.parse_args(argv)
     if args.command == "ingest-judgment-season":
         ingest_judgment_season(args.database, args.season, datetime.now(UTC))
         return 0
     judging = args.command == "judge"
-    if judging and JUDGMENT_RECORD.exists() and not args.rerun:
-        raise ConfigurationError(f"the 2025 judgment was taken once ({JUDGMENT_RECORD.name}); a rerun voids it")
-    thresholds = gates.PREREGISTERED if judging else gates.DEVELOPMENT_CHECK
+    record = JUDGMENT_RECORDS[args.round]
+    if judging and record.exists() and not args.rerun:
+        raise ConfigurationError(f"round {args.round}'s 2025 judgment was taken once ({record.name}); a rerun voids it")
+    judged, checked = ROUNDS[args.round]
+    thresholds = judged if judging else checked
     return _run(args.database, thresholds, args.out, rerun=args.rerun)
 
 

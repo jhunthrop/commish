@@ -3,6 +3,7 @@
 outcome reader's refusals (G4)."""
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -10,6 +11,7 @@ from typing import Any
 import pytest
 
 from research.model.ros import gates
+from research.model.ros.fit import interval_weeks, window
 from research.model.ros.gates import PREREGISTERED, CellScore, Coverage
 from research.model.ros.model import (
     FORMATS,
@@ -22,6 +24,7 @@ from research.model.ros.model import (
     band_of,
     expected_games,
     interval,
+    interval_key,
     project,
 )
 from research.model.ros.outcomes import HeldOutReadError, fit_reader, judgment_reader
@@ -95,9 +98,11 @@ def test_the_interval_and_its_bands() -> None:
 
 def test_the_stale_entry_reads_points_a_game_and_caps_availability() -> None:
     entry = stale_entry({"ppr": 180.0, "half": 153.0, "std": 0.0}, 18.0)
-    assert dict(entry.per_game) == {"ppr": 10.0, "half": 8.5, "std": 0.0}
+    assert entry.per_game == {"ppr": 10.0, "half": 8.5, "std": 0.0}
     assert entry.availability == 1.0
-    assert stale_entry({"ppr": 10.0, "half": 8.0, "std": 6.0}, 0.0).per_game["half"] == 0.0
+    assert stale_entry({"ppr": 10.0, "half": 8.0, "std": 6.0}, 0.0).per_game == dict.fromkeys(FORMATS, 0.0)
+    given = stale_entry({"ppr": 100.0, "half": 90.0, "std": 80.0}, 10.0, {"ppr": 20.0, "half": 18.0, "std": 16.0})
+    assert given.per_game == {"ppr": 20.0, "half": 18.0, "std": 16.0}  # a line's own rate, not points over games
 
 
 def test_the_priors_round_trip_through_their_payload() -> None:
@@ -203,3 +208,40 @@ def test_every_verdict_of_the_one_judgment_rebuilds_from_its_record() -> None:
     assert stored[-1]["passed"]
     assert record["passed"] is False
     assert sum(1 for line in stored if not line["passed"]) == 11
+
+
+# --- round 2 -------------------------------------------------------------------------------------
+
+
+def test_round_two_gates_every_cell_per_week_with_the_doubled_margin() -> None:
+    t = gates.ROUND_TWO
+    lines = gates.judged_lines({}, {}, t)
+    assert len(lines) == 24 * 3
+    assert [line.subject for line in lines if line.gate == "G3"][:2] == ["8|QB|ppr", "8|QB|half"]
+    assert gates.ordering_line("8|QB|ppr", _score(0.54, 0.50), t).passed
+    assert not gates.ordering_line("8|QB|ppr", _score(0.54 - 2 * _STEP, 0.50), t).passed
+    assert gates.coverage_line("8|QB|ppr", Coverage(24, 30), t).passed
+    assert not gates.coverage_line("8|QB|ppr", Coverage(23, 29), t).passed
+    assert t.search_weeks == tuple(range(7, 16))
+    assert gates.PREREGISTERED.search_weeks == gates.PREREGISTERED.fit_weeks
+
+
+def test_round_two_reads_an_interval_cell_per_week_and_windows_clamp() -> None:
+    assert interval_key("WR", "ppr", 8, "week") == "WR|ppr|week8"
+    assert interval_key("WR", "ppr", 8, "band") == "WR|ppr|middle"
+    assert interval_weeks(gates.ROUND_TWO) == tuple(range(7, 18))
+    collected = tuple(range(6, 17))
+    assert window(8, collected) == [7, 8, 9]
+    assert window(17, collected) == [14, 15, 16]
+    assert window(7, collected) == [6, 7, 8]
+
+
+def test_without_a_raw_line_the_off_board_rate_stands_in() -> None:
+    stale = StaleEntry(_per_format(170.0), None, 1.0)
+    projection = project(_player((), (1, 2, 3), stale), _priors())
+    assert projection.per_game["ppr"] == 3.0
+
+
+def test_the_week_keyed_priors_round_trip() -> None:
+    priors = replace(_priors(), interval_by="week")
+    assert priors_from(priors_payload(priors)) == priors

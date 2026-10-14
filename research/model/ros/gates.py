@@ -28,6 +28,17 @@ class Thresholds:
     coverage_low: float
     coverage_high: float
     min_coverage_size: int
+    # Round 2's choices; the defaults are round 1's, so its record reads back unchanged.
+    model_name: str = "commish_ros_v1"
+    prior_source: str = "served"  # "served": the served board's points over its games; "raw": the raw line's
+    interval_by: str = "band"  # "band": round 1's horizon bands; "week": a three-week window per week
+    shrink_weeks: tuple[int, ...] | None = None  # the weeks k, alpha, k_q and the rates fit on; None: fit_weeks
+    coverage_per_week: bool = False
+    switch_week: int | None = None  # the last week the preseason board is served
+
+    @property
+    def search_weeks(self) -> tuple[int, ...]:
+        return self.fit_weeks if self.shrink_weeks is None else self.shrink_weeks
 
 
 PREREGISTERED: Final = Thresholds(
@@ -48,6 +59,26 @@ PREREGISTERED: Final = Thresholds(
 # The development check: the same code, fit a season short, judged on the last fit season.
 DEVELOPMENT_CHECK: Final = replace(
     PREREGISTERED, fit_seasons=(2023,), opportunity_seasons=(2021, 2022, 2023), judgment_season=2024
+)
+
+# Round 2 (`2026-10-14-rest-of-season-round2-preregistration.md`): the switch week, the raw line's
+# points a game, the interval per week, judged at weeks 8 and 12 with G1's margin doubled.
+SWITCH_WEEK: Final = 6
+ROUND_TWO: Final = replace(
+    PREREGISTERED,
+    fit_weeks=tuple(range(6, 17)),
+    shrink_weeks=tuple(range(7, 16)),
+    judgment_weeks=(8, 12),
+    rho_margin=0.04,
+    min_coverage_size=30,
+    model_name="commish_ros_v2",
+    prior_source="raw",
+    interval_by="week",
+    coverage_per_week=True,
+    switch_week=SWITCH_WEEK,
+)
+ROUND_TWO_CHECK: Final = replace(
+    ROUND_TWO, fit_seasons=(2023,), opportunity_seasons=(2021, 2022, 2023), judgment_season=2024
 )
 
 
@@ -124,14 +155,14 @@ def isolation_line(
 
 
 def judged_lines(scores: Mapping[str, CellScore], coverage: Mapping[str, Coverage], t: Thresholds) -> list[GateLine]:
-    """G1 and G2 for every judged cell, then G3 per position and format, in a fixed order."""
+    """G1 and G2 for every judged cell, then G3 per cell (round 2) or per position and format pooled
+    over the weeks (round 1), in a fixed order."""
     keys = [cell_key(w, p, f) for w in t.judgment_weeks for p in SKILL_POSITIONS for f in FORMATS]
     missing = CellScore(0, None, None, None, None)
     lines = [ordering_line(key, scores.get(key, missing), t) for key in keys]
     lines += [starters_line(key, scores.get(key, missing)) for key in keys]
-    lines += [
-        coverage_line(f"{p}|{f}", coverage.get(f"{p}|{f}", Coverage(0, 0)), t) for p in SKILL_POSITIONS for f in FORMATS
-    ]
+    coverage_keys = keys if t.coverage_per_week else [f"{p}|{f}" for p in SKILL_POSITIONS for f in FORMATS]
+    lines += [coverage_line(key, coverage.get(key, Coverage(0, 0)), t) for key in coverage_keys]
     return lines
 
 

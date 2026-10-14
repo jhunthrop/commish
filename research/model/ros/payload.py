@@ -29,6 +29,7 @@ def priors_payload(priors: RosPriors) -> dict[str, Any]:
         "offboardRate": dict(priors.offboard_rate),
         "offboardAvailability": dict(priors.offboard_availability),
         "interval": {key: list(values) for key, values in priors.interval.items()},
+        "intervalBy": priors.interval_by,
     }
 
 
@@ -51,4 +52,5 @@ def priors_from(payload: Mapping[str, Any]) -> RosPriors:
         offboard_rate=_floats(payload["offboardRate"]),
         offboard_availability=_floats(payload["offboardAvailability"]),
         interval=MappingProxyType({key: _triple(values) for key, values in payload["interval"].items()}),
+        interval_by=str(payload.get("intervalBy", "band")),
     )

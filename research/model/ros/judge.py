@@ -55,9 +55,10 @@ def fit_round(conn: Connection, t: gates.Thresholds, artifacts: ModelArtifacts, 
     lined = time.monotonic()
     rows: list[FitRow] = []
     for season in t.fit_seasons:
-        rows.extend(collect(conn, season, build_stale_board(conn, season, artifacts, arithmetic), positions, reader, t))
+        stale = build_stale_board(conn, season, artifacts, arithmetic, t.prior_source)
+        rows.extend(collect(conn, season, stale, positions, reader, t))
     read = time.monotonic()
-    priors = fit_priors(rows, opportunity)
+    priors = fit_priors(rows, opportunity, t)
     seconds = {"opportunity": lined - started, "collect": read - lined, "search": time.monotonic() - read}
     return RoundFit(priors, len(rows), tuple(reader.served), FROZEN(seconds))
 
@@ -156,7 +157,7 @@ def judge_round(
     before = table_digests(conn)
     positions = all_positions(conn)
     reader = judgment_reader()
-    stale = build_stale_board(conn, t.judgment_season, artifacts, arithmetic)
+    stale = build_stale_board(conn, t.judgment_season, artifacts, arithmetic, t.prior_source)
     outcomes = reader.season(conn, t.judgment_season, positions)
     rows = [
         r for week in t.judgment_weeks for r in _week_rows(conn, t, week, stale, positions, fitted.priors, outcomes)
@@ -164,9 +165,10 @@ def judge_round(
     after = table_digests(conn)
     cells, scores = _reported(rows, t)
     pooled = _pooled_coverage(rows, t)
+    gated = {key: gates.Coverage(**cells[key]["coverage"]) for key in cells} if t.coverage_per_week else pooled
     allowed = (*t.opportunity_seasons, *t.fit_seasons, t.judgment_season)
     served = (*fitted.served, *reader.served)
-    lines = [*gates.judged_lines(scores, pooled, t), gates.isolation_line(served, allowed, before, after)]
+    lines = [*gates.judged_lines(scores, gated, t), gates.isolation_line(served, allowed, before, after)]
     numbers = {
         "season": t.judgment_season,
         "weeks": list(t.judgment_weeks),
@@ -175,6 +177,7 @@ def judge_round(
         "rows": len(rows),
         "cells": cells,
         "coverage_pooled": {key: asdict(found) for key, found in pooled.items()},
+        "coverage_gated": {key: asdict(found) for key, found in gated.items()},
         "outcome_seasons_read": list(served),
         "digests": {"before": before, "after": after},
     }
