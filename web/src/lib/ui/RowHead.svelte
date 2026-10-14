@@ -90,9 +90,15 @@
 		}
 	}
 
-	@media (min-width: 1181px) and (max-width: 1439px) {
+	@media (min-width: 961px) and (max-width: 1439px) {
 		.games > .rng {
 			display: none;
+		}
+	}
+
+	@media (min-width: 1181px) and (max-width: 1253px) {
+		.games {
+			column-gap: 10px;
 		}
 	}
 
@@ -104,7 +110,8 @@
 	}
 
 	@media (max-width: 960px) {
-		.rng {
+		.rng,
+		.act-end {
 			display: none;
 		}
 	}
