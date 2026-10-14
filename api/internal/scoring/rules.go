@@ -75,6 +75,41 @@ func ToMap(r apitypes.ScoringRules) map[string]float64 {
 	return out
 }
 
+// Standard is STANDARD_SCORING as ScoringRules.
+func Standard() apitypes.ScoringRules {
+	m := map[string]float64{}
+	for _, r := range rules {
+		m[r.Key] = r.Standard
+	}
+	out, err := FromMap(m)
+	if err != nil {
+		panic(fmt.Sprintf("scoring: the standard figures name every rule: %v", err))
+	}
+	return out
+}
+
+// StoredPreset is the preset whose stored board a league's rules score
+// exactly the same as (domain.py's PPR_SCORING, HALF_PPR_SCORING,
+// STANDARD_SCORING: the standard figures with 1, 0.5 or 0 a catch), false
+// for any other rules. research.parity proves those three boards are what
+// the boards service builds for those rules, bit for bit.
+func StoredPreset(r apitypes.ScoringRules) (apitypes.ScoringPreset, bool) {
+	presets := []struct {
+		preset    apitypes.ScoringPreset
+		reception float64
+	}{
+		{apitypes.ScoringPresetPpr, 1}, {apitypes.ScoringPresetHalfPpr, 0.5}, {apitypes.ScoringPresetStandard, 0},
+	}
+	for _, p := range presets {
+		want := Standard()
+		want.PointsPerReception = p.reception
+		if r == want {
+			return p.preset, true
+		}
+	}
+	return "", false
+}
+
 // Problems is each rule out of bounds, keyed by rule.
 func Problems(r apitypes.ScoringRules) map[string]string {
 	out := map[string]string{}

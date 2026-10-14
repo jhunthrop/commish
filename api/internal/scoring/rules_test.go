@@ -47,6 +47,12 @@ func TestRulesAndConversions(t *testing.T) {
 	if _, err := FromMap(m); err == nil {
 		t.Error("a missing rule was read")
 	}
+	if p, ok := StoredPreset(r); !ok || p != apitypes.ScoringPresetHalfPpr {
+		t.Errorf("half PPR rules read as %q %v", p, ok)
+	}
+	if _, ok := StoredPreset(func() apitypes.ScoringRules { x := r; x.TeReceptionBonus = 0.5; return x }()); ok {
+		t.Error("a TE premium read as a stored board")
+	}
 	r.PointsPerSack = 101
 	if p := Problems(r); p["points_per_sack"] == "" || len(p) != 1 {
 		t.Errorf("problems %v", p)

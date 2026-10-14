@@ -14,6 +14,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/mock"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // RawLoader is boards.Cache: one stored board per scoring format.
@@ -81,6 +82,11 @@ func (b *Boards) For(ctx context.Context, s apitypes.LeagueSettings) (boards.Boa
 // scored exactly, a preset's stored board.
 func (b *Boards) raw(ctx context.Context, s apitypes.LeagueSettings, slots []draft.SlotConfig) (*boards.Raw, error) {
 	if s.Scoring.Custom != nil {
+		// Rules that are exactly a stored board's read it: the same board,
+		// bit for bit, without the boards service in the path.
+		if preset, ok := scoring.StoredPreset(*s.Scoring.Custom); ok {
+			return b.Raw.Load(ctx, boards.FormatFor(preset))
+		}
 		return b.Custom.Load(ctx, *s.Scoring.Custom, s.Teams, slots)
 	}
 	preset := apitypes.ScoringPresetPpr
