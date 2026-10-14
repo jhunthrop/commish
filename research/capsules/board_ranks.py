@@ -9,8 +9,9 @@ A BOARD RANK CLAIM is his own position code and a number ("RB101", "QB4") in a s
 of our board ("our board", "our number", "we have him", "puts him at", ...), unless the code is a
 season finish or a usage rank the sheet states with its own basis (followed by "among", "finish",
 "season", "in", "last", "two seasons ago"), or a roster slot ("your QB1", "a usable RB3"). An overall
-claim is "rank 422 overall" or "overall rank 12", wherever it sits ("136th overall" is an NFL draft
-slot, never the board).
+claim is "rank 422 overall", "overall rank 12" or "422nd overall" in a sentence about our board (fix
+round 3, R3); elsewhere "136th overall" is an NFL draft slot and "ranked 3 overall by scouts" is not
+ours.
 """
 
 import re
@@ -29,7 +30,7 @@ _SLOT_BEFORE: Final = re.compile(
     r"(?:\byour|\ba|\ban|locked-in|true|weekly|usable|solid|reliable|startable|instead of)\s+$", re.IGNORECASE
 )
 _OVERALL: Final = re.compile(
-    r"\b(?:rank(?:ed)?|No\.)\s+(\d+)\s+overall\b|\boverall rank (?:of )?(\d+)\b",
+    r"\brank(?:ed)?\s+(\d+)\s+overall\b|\boverall rank (?:of )?(\d+)\b|\b(\d+)(?:st|nd|rd|th)\s+overall\b",
     re.IGNORECASE,
 )
 
@@ -48,8 +49,9 @@ def rank_claims_off_page(prose: str, position: str, position_rank: int | None, o
     """Every board rank `prose` states that is not the page's (every one, when the page has none)."""
     off = []
     for sentence in _SENTENCE.split(prose):
-        if _BOARD_TALK.search(sentence):
-            off += _position_claims(sentence, position, position_rank)
+        if not _BOARD_TALK.search(sentence):
+            continue
+        off += _position_claims(sentence, position, position_rank)
         for match in _OVERALL.finditer(sentence):
             number = next(group for group in match.groups() if group is not None)
             if overall_rank is None or int(number) != overall_rank:
