@@ -27,8 +27,10 @@ const oneLeagueWords = "One league is free. The rest come with the Draft Pass."
 // is refused with 403 naming the feature. It reports whether the
 // account has the feature, for the save's own check, and whether to go
 // on. A detached league does not count; Save checks again under the
-// account's lock, so two attaches at once cannot both pass.
-func (s *Service) admitLeague(w http.ResponseWriter, r *http.Request, host, leagueID string) (many, ok bool) {
+// account's lock, so two attaches at once cannot both pass. The league is
+// the same one when host and id match, and the season too where the link
+// names it (a MyFantasyLeague link carries its year; an FFPC id does not).
+func (s *Service) admitLeague(w http.ResponseWriter, r *http.Request, ref Ref) (many, ok bool) {
 	ctx := r.Context()
 	accountID := auth.AccountID(r)
 	many, err := s.Entitlements.Can(ctx, accountID, entitlements.ManyLeagues, s.Now())
@@ -45,12 +47,19 @@ func (s *Service) admitLeague(w http.ResponseWriter, r *http.Request, host, leag
 		return false, false
 	}
 	for _, a := range live {
-		if a.Ref.Host != host || a.Ref.LeagueID != leagueID {
+		if !sameLeague(a.Ref, ref) {
 			writeManyLeagues(w, r)
 			return false, false
 		}
 	}
 	return false, true
+}
+
+// sameLeague says a followed league and an asked one are one league: the
+// asked ref's season counts only when the link names one.
+func sameLeague(followed, asked Ref) bool {
+	return followed.Host == asked.Host && followed.LeagueID == asked.LeagueID &&
+		(asked.Season == 0 || followed.Season == asked.Season)
 }
 
 func writeManyLeagues(w http.ResponseWriter, r *http.Request) {

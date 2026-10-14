@@ -49,7 +49,7 @@ func (s *Service) attach(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	many, ok := s.admitLeague(w, r, ref.Host, ref.LeagueID)
+	many, ok := s.admitLeague(w, r, ref)
 	if !ok {
 		return
 	}

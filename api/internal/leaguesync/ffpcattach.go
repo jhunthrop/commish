@@ -34,7 +34,7 @@ func (s *Service) attachFFPC(w http.ResponseWriter, r *http.Request, in apitypes
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: ffpcPickWords})
 		return
 	}
-	many, ok := s.admitLeague(w, r, HostFFPC, ref.LeagueID)
+	many, ok := s.admitLeague(w, r, Ref{Host: HostFFPC, LeagueID: ref.LeagueID})
 	if !ok {
 		return
 	}
