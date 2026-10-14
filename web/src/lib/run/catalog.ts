@@ -4,8 +4,8 @@
  * ("half-ppr-12"). The board's chooser offers CHOOSER_FORMATS whatever a run carries, so a format
  * the run lacks is a page that says so, never a missing chip or a 404.
  */
-import { DEFAULT_TEAMS } from '#lib/format/draft.ts';
-import { FORMAT_LABELS, parseFormat } from '#lib/sheet/format.ts';
+import { runFormatId } from './format-ids.ts';
+import { FORMAT_LABELS } from '#lib/sheet/format.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
 import type { Format } from './schema.ts';
 
@@ -21,18 +21,6 @@ export interface CatalogFormat {
 	/** The run's format id: "half-ppr-12". */
 	id: string;
 	label: string;
-}
-
-/** "half_ppr" at 12 teams is the run's "half-ppr-12". */
-export function runFormatId(format: BoardFormat, teams: number = DEFAULT_TEAMS): string {
-	return `${format.replaceAll('_', '-')}-${String(teams)}`;
-}
-
-/** The API's name for a run format at the default league size, or null for any other. */
-export function apiFormatOf(format: { id: string; teams: number }): BoardFormat | null {
-	const suffix = `-${String(DEFAULT_TEAMS)}`;
-	if (format.teams !== DEFAULT_TEAMS || !format.id.endsWith(suffix)) return null;
-	return parseFormat(format.id.slice(0, -suffix.length).replaceAll('-', '_'));
 }
 
 /** A format's scoring and season as its basis names them: "PPR, full 2026 season". */

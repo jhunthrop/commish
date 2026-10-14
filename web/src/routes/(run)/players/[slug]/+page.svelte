@@ -4,8 +4,7 @@
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { contextLine } from '#lib/context/follow.svelte.ts';
 	import { contextNote, heldMark } from '#lib/context/words.ts';
-	import { apiFormatOf } from '#lib/run/catalog.ts';
-	import HeldMark from '#lib/ui/HeldMark.svelte';
+	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, plural, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
@@ -107,12 +106,12 @@
 		/>
 
 		<HeroCard title={page.name}>
-			{#snippet media()}<span class="face"
-					><Face src={page.headshot} size={168} phoneSize={96} loading="eager" />{#if held}<HeldMark
-							{...held}
-							large
-						/>{/if}</span
-				>{/snippet}
+			{#snippet media()}<Face
+					src={page.headshot}
+					size={168}
+					phoneSize={96}
+					loading="eager"
+				/>{/snippet}
 			{#snippet meta()}
 				<PositionPill position={page.position} rank={n.positionRank} />
 				<TierChip tier={n.tier} long />
@@ -218,12 +217,6 @@
 </SiteShell>
 
 <style>
-	/* The face's box, kept whether or not he is held, so the held mark moves nothing. */
-	.face {
-		position: relative;
-		display: inline-grid;
-	}
-
 	.player {
 		padding: var(--s-5);
 		display: flex;

@@ -1,7 +1,7 @@
 // The context's words: the switch, a league's line, the basis line and the held mark. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { contextNote, heldWords, switchLabel, type ContextLeague, type Held } from './words.ts';
+import { contextNote, heldMark, switchLabel, type ContextLeague, type Held } from './words.ts';
 import { leagueLine } from './menu-words.ts';
 
 const league = (over: Partial<ContextLeague> = {}): ContextLeague => ({
@@ -64,9 +64,9 @@ void test('the held mark names your roster, the team, or a roster when the name 
 		teams: { 4: 'Ertz Hurts', 7: 'Gmoneyman', 9: '' },
 		by: { a: 4, b: 7, c: 9 }
 	};
-	assert.equal(heldWords(held, 'a'), 'On your roster');
-	assert.equal(heldWords(held, 'b'), 'Rostered by Gmoneyman');
-	assert.equal(heldWords(held, 'c'), 'On a roster in your league');
-	assert.equal(heldWords(held, 'free'), null);
-	assert.equal(heldWords(null, 'a'), null);
+	assert.deepEqual(heldMark(held, 'a'), { words: 'On your roster', mine: true });
+	assert.deepEqual(heldMark(held, 'b'), { words: 'Rostered by Gmoneyman', mine: false });
+	assert.deepEqual(heldMark(held, 'c'), { words: 'On a roster in your league', mine: false });
+	assert.equal(heldMark(held, 'free'), null);
+	assert.equal(heldMark(null, 'a'), null);
 });

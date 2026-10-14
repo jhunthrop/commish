@@ -11,7 +11,7 @@ const PRERENDER_CONCURRENCY = 8;
 /** A board row and its cells, with the row's sheet mark: the board, ADP, a club and the front door
  * draw them, a player page never does, so they load as one file with the pages that draw rows. */
 const ROW_PARTS =
-	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|RangeBar|AdpCell|SheetMark)\.|site[\\/]RowSheetMark\.)/;
+	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|RangeBar|AdpCell|SheetMark|HeldMark)\.|site[\\/]RowSheetMark\.)/;
 /** The board and ADP pages' own parts: the views, the tier strip, the rail's jump list and toggles,
  * the scoring chip that opens the league switch, the chips, and a missing format's page. One file for
  * those pages. */

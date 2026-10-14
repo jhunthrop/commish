@@ -55,12 +55,6 @@ export function contextNote(
 		: scores;
 }
 
-/** The record's line about the league, null with none: the record is graded in one scoring. */
-export function gradedNote(league: ContextLeague | null, graded: BoardFormat): string | null {
-	if (!league) return null;
-	return `Your league scores ${SCORING_WORDS[league.scoring]}. Our record is graded in ${figuresWords(graded)}.`;
-}
-
 /** The selected league's rosters as the pages mark them: who holds each player by our board id. */
 export interface Held {
 	/** The drafter's own roster. */
@@ -71,31 +65,16 @@ export interface Held {
 	by: Readonly<Record<string, number>>;
 }
 
-/** The rosters a league read holds, as the pages mark them. */
-export function heldOf(sync: Pick<Schemas['LeagueSync'], 'me' | 'teams' | 'held_by'>): Held {
-	return {
-		me: sync.me,
-		teams: Object.fromEntries(sync.teams.map((team) => [team.roster_id, team.name])),
-		// Copied, so an API from before held_by, which omits it, reads as no marks.
-		by: { ...sync.held_by }
-	};
-}
-
-/** The mark's words for a player, null when no team in the league holds him: "On your roster",
- * "Rostered by Gmoneyman", or "On a roster in your league" for a team with no name read. */
-export function heldWords(held: Held | null, boardId: string): string | null {
-	const roster = held?.by[boardId];
-	if (held === null || roster === undefined) return null;
-	if (roster === held.me) return 'On your roster';
-	const team = held.teams[roster] ?? '';
-	return team === '' ? 'On a roster in your league' : `Rostered by ${team}`;
-}
-
-/** A row's held mark (HeldMark): whose words, and whether he is on your roster; null when free. */
+/** A player's held mark (HeldMark), null when no team in the league holds him: whose words ("On your
+ * roster", "Rostered by Gmoneyman", or "On a roster in your league" for a team with no name read),
+ * and whether he is on your roster. */
 export function heldMark(
 	held: Held | null,
 	boardId: string
 ): { words: string; mine: boolean } | null {
-	const words = heldWords(held, boardId);
-	return words === null || held === null ? null : { words, mine: held.by[boardId] === held.me };
+	const roster = held?.by[boardId];
+	if (held === null || roster === undefined) return null;
+	if (roster === held.me) return { words: 'On your roster', mine: true };
+	const team = held.teams[roster] ?? '';
+	return { words: team === '' ? 'On a roster in your league' : `Rostered by ${team}`, mine: false };
 }

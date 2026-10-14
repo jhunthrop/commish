@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Component } from 'svelte';
-	import { afterNavigate } from '$app/navigation';
 	import Icon from '#lib/ui/Icon.svelte';
 	import { siteContext } from './context.svelte.ts';
 	import { switchLabel } from './words.ts';
@@ -8,16 +7,11 @@
 	/** The shell's league switch, at the right of the top bar on every width (founder ruling
 	 * 2026-10-13): the selected league's name, or the format with none, opening the account's leagues,
 	 * the formats and the way to follow another. The rail's Leagues opens the same menu. The menu's
-	 * code arrives on the first intent to open it, so every page carries only this button. A tap
-	 * outside the switch or Escape closes it; a tap on the rail's Leagues is its own toggle. */
+	 * code arrives on the first intent to open it, closing included (LeagueMenu), so every page
+	 * carries only this button. */
 
 	const MENU_ID = 'league-menu';
-	/** What marks another control that opens the menu (the rail's Leagues, a page's scoring chip),
-	 * whose own tap opens and closes it. */
-	const OPENER = '[data-opens-leagues]';
 
-	let root: HTMLElement | undefined = $state();
-	let button: HTMLButtonElement | undefined = $state();
 	let Menu = $state<Component | null>(null);
 	let loading: Promise<void> | null = null;
 
@@ -27,37 +21,16 @@
 		});
 	}
 
-	// A page the menu opens (a league's, the attach page) closes it.
-	afterNavigate(() => {
-		siteContext.open = false;
-	});
-
 	// Opened from the rail before any intent here: fetch the menu then.
 	$effect(() => {
 		if (siteContext.open) preload();
 	});
 
-	function onWindowPointer(event: PointerEvent): void {
-		if (!siteContext.open || !(event.target instanceof Element)) return;
-		if (root?.contains(event.target) || event.target.closest(OPENER)) return;
-		siteContext.open = false;
-	}
-
-	function onKey(event: KeyboardEvent): void {
-		if (!siteContext.open || event.key !== 'Escape') return;
-		event.preventDefault();
-		siteContext.open = false;
-		button?.focus();
-	}
-
 	const label = $derived(switchLabel(siteContext.league, siteContext.format));
 </script>
 
-<svelte:window onpointerdown={onWindowPointer} onkeydown={onKey} />
-
-<span class="switch" bind:this={root}>
+<span class="switch" data-opens-leagues>
 	<button
-		bind:this={button}
 		type="button"
 		class="face"
 		aria-expanded={siteContext.open}

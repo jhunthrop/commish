@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { HTTP_STATUS, hasStatus, isSignedOut } from '#lib/api/status.ts';
+	import { choose } from '#lib/context/choose.svelte.ts';
+	import { takeHeld } from '#lib/context/held.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
@@ -58,26 +60,28 @@
 	let boardFailed = $state(false);
 	let refreshing = $state(false);
 	let now = $state(new Date());
-	/** Whether this page has made its league the context yet: once, when the context is first read. */
-	let adopted = false;
+	/** This page has made its league the context: once, when /me first answers. After that, a switch
+	 * to another league opens that league's page. */
+	let adopted = $state(false);
+
+	onMount(() => {
+		void siteContext.load().then(() => {
+			if (siteContext.league?.id !== id && siteContext.leagues.some((l) => l.id === id)) {
+				void choose({ league: id });
+			}
+			adopted = true;
+		});
+	});
 
 	$effect(() => {
-		if (!siteContext.ready) return;
 		const selected = siteContext.league?.id ?? null;
-		if (!adopted) {
-			adopted = true;
-			if (selected !== id && siteContext.leagues.some((league) => league.id === id)) {
-				void siteContext.choose({ league: id });
-			}
-			return;
-		}
-		if (selected !== null && selected !== id) void goto(links.league(selected));
+		if (adopted && selected !== null && selected !== id) void goto(links.league(selected));
 	});
 
 	function take(answer: LeagueSync): void {
 		sync = answer;
 		// The read the page made is the league's rosters for every other page's marks.
-		siteContext.takeHeld(id, answer);
+		takeHeld(id, answer);
 		// The board is the run's own file: read once, and again only when the league reads on another.
 		// A failed board read says so and is tried again with the next read of the league.
 		if (board?.format !== answer.board_format) {

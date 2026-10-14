@@ -11,15 +11,13 @@
 		/** In a line with no face (the players list): the disc sits in the line's flow, before its
 		 * number. */
 		inline?: boolean;
-		/** Over a hero's face: a larger disc, set inside the circle's edge. */
-		large?: boolean;
 	}
 
-	let { words, mine, inline = false, large = false }: Props = $props();
+	let { words, mine, inline = false }: Props = $props();
 </script>
 
-<span class="held" class:mine class:inline class:large role="img" aria-label={words} title={words}
-	><Icon name="league" size={large ? 16 : 10} /></span
+<span class="held" class:mine class:inline role="img" aria-label={words} title={words}
+	><Icon name="league" size={10} /></span
 >
 
 <style>
@@ -37,14 +35,6 @@
 		background: var(--ink-2);
 		color: var(--bg);
 		box-shadow: 0 0 0 1.5px var(--surface);
-	}
-
-	.large {
-		right: 8px;
-		bottom: 8px;
-		width: 28px;
-		height: 28px;
-		box-shadow: 0 0 0 2px var(--surface);
 	}
 
 	.inline {

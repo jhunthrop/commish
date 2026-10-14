@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { PUBLIC_API_URL } from '$app/env/public';
+	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { hasFeature } from '#lib/account/features.ts';
 	import { apiClient } from '#lib/api/client.ts';
 	import OneLeagueFree from '#lib/league/OneLeagueFree.svelte';
 	import { links } from '#lib/site/links.ts';
 	import { FORMAT_LABELS } from '#lib/sheet/format.ts';
-	import Chip from '#lib/ui/Chip.svelte';
-	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import { choose, switchProblem } from './choose.svelte.ts';
 	import { siteContext } from './context.svelte.ts';
 	import { CONTEXT_FORMATS, leagueLine } from './menu-words.ts';
 	import { DEFAULT_CONTEXT_FORMAT, leagueName } from './words.ts';
@@ -18,16 +18,40 @@
 	/** The switch's menu: every league the account follows, its host and scoring in words, one tap
 	 * each; a format with no league; then the selected league's page and the way to follow another,
 	 * or for a free account with its one league, what more leagues come with. Signed out it is the
-	 * formats and the way to sign in. Loaded on the first intent to open the switch. */
+	 * formats and the way to sign in. Loaded on the first intent to open the switch, with how it
+	 * closes: a tap outside every control that opens it, Escape, or a page it opens. */
+
+	/** What marks a control that opens the menu (the switch, the rail's Leagues, a page's scoring
+	 * chip): its own tap opens and closes it. */
+	const OPENER = '[data-opens-leagues]';
+
+	afterNavigate(() => {
+		siteContext.open = false;
+	});
+
+	function onWindowPointer(event: PointerEvent): void {
+		if (!siteContext.open || !(event.target instanceof Element)) return;
+		if (event.target.closest(OPENER)) return;
+		siteContext.open = false;
+	}
+
+	function onKey(event: KeyboardEvent): void {
+		if (!siteContext.open || event.key !== 'Escape') return;
+		event.preventDefault();
+		siteContext.open = false;
+		document.querySelector<HTMLElement>('[aria-controls="league-menu"]')?.focus();
+	}
 
 	const signInHref = $derived(apiClient(PUBLIC_API_URL).signInUrl(page.url.pathname));
 	const many = $derived(hasFeature(siteContext.features, 'many_leagues'));
 	const league = $derived(siteContext.league);
-	/** The format chips' pressed one: the chosen format with no league, PPR before any choice. */
+	/** The pressed format: the chosen format with no league, PPR before any choice. */
 	const noLeagueFormat = $derived(
 		league === null ? (siteContext.format ?? DEFAULT_CONTEXT_FORMAT) : null
 	);
 </script>
+
+<svelte:window onpointerdown={onWindowPointer} onkeydown={onKey} />
 
 <div class="menu">
 	{#if siteContext.leagues.length > 0}
@@ -38,7 +62,7 @@
 					type="button"
 					class="league"
 					aria-pressed={candidate.id === league?.id}
-					onclick={() => void siteContext.choose({ league: candidate.id })}
+					onclick={() => void choose({ league: candidate.id })}
 				>
 					<span class="name">{leagueName(candidate)}</span>
 					<span class="line">{leagueLine(candidate)}</span>
@@ -49,17 +73,21 @@
 
 	<section class="formats" aria-label="Scoring with no league">
 		<Label>{siteContext.leagues.length > 0 ? 'No league, just a format' : 'Scoring'}</Label>
-		<ChipGroup label="Scoring">
+		<!-- The menu's own choices, not the page chips: the board chunk stays off every page that only
+		     opens the switch, and the page's styles keep their place in its first paint. -->
+		<div class="formats-row" role="group" aria-label="Scoring">
 			{#each CONTEXT_FORMATS as format (format)}
-				<Chip
-					pressed={format === noLeagueFormat}
-					onclick={() => void siteContext.choose({ format })}>{FORMAT_LABELS[format]}</Chip
+				<button
+					type="button"
+					class="choice"
+					aria-pressed={format === noLeagueFormat}
+					onclick={() => void choose({ format })}>{FORMAT_LABELS[format]}</button
 				>
 			{/each}
-		</ChipGroup>
+		</div>
 	</section>
 
-	{#if siteContext.problem}<ProblemLine>{siteContext.problem}</ProblemLine>{/if}
+	{#if switchProblem.text}<ProblemLine>{switchProblem.text}</ProblemLine>{/if}
 
 	<div class="foot">
 		{#if !siteContext.signedIn}
@@ -129,6 +157,38 @@
 	.line {
 		font-size: var(--t-sm);
 		color: var(--ink-2);
+	}
+
+	/* The formats as one segmented row, pressed in ink as a chip is. */
+	.formats-row {
+		display: flex;
+		gap: 4px;
+		padding: 3px;
+		border: 1px solid var(--line);
+		border-radius: var(--r-pill);
+		background: var(--surface);
+	}
+
+	.choice {
+		flex: 1;
+		height: 32px;
+		border: 0;
+		border-radius: var(--r-pill);
+		background: none;
+		color: var(--ink-2);
+		font: inherit;
+		font-size: var(--t-sm);
+		font-weight: 500;
+		cursor: pointer;
+	}
+
+	.choice:hover {
+		color: var(--ink);
+	}
+
+	.choice[aria-pressed='true'] {
+		background: var(--ink);
+		color: var(--bg);
 	}
 
 	.foot {

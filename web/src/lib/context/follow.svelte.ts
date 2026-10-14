@@ -2,7 +2,7 @@
  * switch in the shell turns the page into that format's in place, from the run's own prerendered
  * data (no reload, the scroll and focus kept). The page's format chooser no longer owns the choice. */
 import { goto } from '$app/navigation';
-import { runFormatId } from '#lib/run/catalog.ts';
+import { runFormatId } from '#lib/run/format-ids.ts';
 import { siteContext } from './context.svelte.ts';
 
 /** The run format id the context opens pages in, null when it names none or the run does not carry

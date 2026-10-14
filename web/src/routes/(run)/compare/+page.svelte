@@ -5,7 +5,7 @@
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { contextLine } from '#lib/context/follow.svelte.ts';
 	import { contextNote } from '#lib/context/words.ts';
-	import { apiFormatOf } from '#lib/run/catalog.ts';
+	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed } from '#lib/format/number.ts';
 	import type { IndexEntry, PlayerFormat } from '#lib/run/schema.ts';

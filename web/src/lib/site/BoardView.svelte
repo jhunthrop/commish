@@ -22,7 +22,8 @@
 	import TierJump from '#lib/ui/TierJump.svelte';
 	import TierStrip from '#lib/ui/TierStrip.svelte';
 	import Toggle from '#lib/ui/Toggle.svelte';
-	import { apiFormatOf, scoringBasis } from '#lib/run/catalog.ts';
+	import { scoringBasis } from '#lib/run/catalog.ts';
+	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import type { BoardRowView } from '#lib/run/schema.ts';
 	import { links, tierAnchor } from './links.ts';
 
