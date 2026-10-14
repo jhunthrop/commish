@@ -96,12 +96,6 @@
 		}
 	}
 
-	@media (min-width: 1181px) and (max-width: 1253px) {
-		.games > .act-end {
-			display: none;
-		}
-	}
-
 	.lead,
 	.proj,
 	.end {

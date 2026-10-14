@@ -1,8 +1,8 @@
 /* Element defaults for every page. Classes live in the components, never here.
    The breakpoints, used as literals in component media queries because a custom property
    cannot sit in a media query: 1440px (under it an in-season row drops its floor to ceiling column,
-   whose figures live on the player page, so the row fits beside the rail), 1254px (under it the
-   in-season row drops its sheet mark too), 1180px (the right rail folds under, and below it the
+   whose figures live on the player page, and its sheet mark is the disc alone, so the row fits beside
+   the rail), 1294px (under it the drafters column narrows too), 1180px (the right rail folds under, and below it the
    Games column folds into the meta line), 960px (the range column
    leaves the row), 760px (the phone layout, the rail moves to the bottom), 420px (the narrowest phones, where the score bug tightens). */
 
@@ -67,23 +67,26 @@ input {
 	--board-cols-games-act-flat: 34px 44px minmax(210px, 1fr) var(--games-w) 92px 132px 140px 72px;
 }
 
-/* From 1181 to 1439px the in-season row sits beside the 296px rail on a laptop: it keeps the Games
-   column and drops the floor to ceiling column (Row and RowHead hide its cell), on the narrower
-   widths the 960px band already uses. Under 1254px it drops the sheet mark as well, which the player
-   page carries, so the row keeps 53px at every width from 1181. */
+/* From 1181 to 1439px the in-season row sits beside the 296px rail on a laptop or an iPad: it keeps
+   the Games column and its sheet mark (the row's one verb and its on-sheet state) as a 32px disc, its
+   place on your sheet in the mark's name, and drops the floor to ceiling column (Row and RowHead hide
+   its cell), on the narrower widths the 960px band already uses. Under 1294px the drafters column
+   narrows to 124px, so the row keeps 53px at 1181 and the club stays in the meta line from 1254px
+   (its player column reaches the 204px the club needs). */
 @media (min-width: 1181px) and (max-width: 1439px) {
 	:root {
-		--board-cols-games: 28px 40px minmax(150px, 1fr) var(--games-w) 84px 124px 140px;
+		--drafters-w: 140px;
+		--board-cols-games: 28px 40px minmax(140px, 1fr) var(--games-w) 84px 124px var(--drafters-w);
 		--board-cols-games-flat: var(--board-cols-games);
-		--board-cols-games-act: 28px 40px minmax(150px, 1fr) var(--games-w) 84px 124px 140px 72px;
+		--board-cols-games-act: 28px 40px minmax(140px, 1fr) var(--games-w) 84px 124px var(--drafters-w)
+			32px;
 		--board-cols-games-act-flat: var(--board-cols-games-act);
 	}
 }
 
-@media (min-width: 1181px) and (max-width: 1253px) {
+@media (min-width: 1181px) and (max-width: 1293px) {
 	:root {
-		--board-cols-games-act: var(--board-cols-games);
-		--board-cols-games-act-flat: var(--board-cols-games);
+		--drafters-w: 124px;
 	}
 }
 

@@ -266,9 +266,14 @@
 		}
 	}
 
-	@media (min-width: 1181px) and (max-width: 1253px) {
-		.games > .action {
+	/* The band's 32px mark track holds the disc alone: his place on your sheet is in its name. */
+	@media (min-width: 1181px) and (max-width: 1439px) {
+		.games > .action :global(.place) {
 			display: none;
+		}
+
+		.games > .action :global(.add) {
+			padding-left: 2px;
 		}
 	}
 
