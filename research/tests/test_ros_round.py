@@ -209,6 +209,7 @@ _DOCS = Path(__file__).resolve().parents[2] / "docs/research"
     [
         ("2026-10-14-rest-of-season-results.json", PREREGISTERED, "coverage_pooled", 11),
         ("2026-10-14-rest-of-season-round2-results.json", gates.ROUND_TWO, "coverage_gated", 16),
+        ("2026-10-14-rest-of-season-round3-results.json", gates.ROUND_THREE, "coverage_gated", 3),
     ],
 )
 def test_every_verdict_of_each_judgment_rebuilds_from_its_record(
