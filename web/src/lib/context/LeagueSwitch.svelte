@@ -55,6 +55,7 @@
 	.switch {
 		position: relative;
 		display: flex;
+		flex: 1;
 		min-width: 0;
 	}
 
@@ -63,7 +64,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: var(--s-2);
-		width: var(--switch-w, 232px);
+		width: 100%;
 		min-width: 0;
 		height: 40px;
 		padding: 0 var(--s-3);
@@ -137,11 +138,6 @@
 		/* The phone gives the switch its bar's whole first row, the same width on every page. */
 		.switch {
 			position: static;
-			flex: 1;
-		}
-
-		.face {
-			width: 100%;
 		}
 
 		/* In a hand the menu spans the screen under the bar, whichever control opened it. */

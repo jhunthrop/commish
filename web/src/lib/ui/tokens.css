@@ -47,6 +47,9 @@
 	--tab-bar-h: 64px; /* the phone's tab bar, the rail laid along the bottom */
 	--rail-w: 84px;
 	--side-w: 296px;
+	--switch-w: 232px; /* the league switch where the bar has the room */
+	--switch-min-w: 148px; /* a cut league name with its flag and chevron, the least it gives way to */
+	--find-min-w: 160px; /* the bar's search, where its placeholder still reads */
 	--form-w: 420px; /* a form's column: its fields, its consent and the choice above it */
 	--r-sm: 4px;
 	--r-md: 8px;

@@ -204,6 +204,7 @@
 
 	.find {
 		flex: 1;
+		min-width: var(--find-min-w);
 		max-width: 620px;
 		display: flex;
 	}
@@ -218,11 +219,26 @@
 		min-height: var(--verb-h);
 	}
 
-	/* The league switch closes the bar at the right on every width. */
+	/* The league switch closes the bar at the right on every width: 232px where the bar has the room,
+	   giving way as the bar narrows (under 1024px) down to a cut name with its flag and chevron, so the
+	   bar never runs past the screen. Its width comes from the bar, never from the name, so the name's
+	   arrival moves nothing. */
 	.league {
 		display: flex;
-		flex: none;
-		min-width: 0;
+		flex: 0 1 var(--switch-w);
+		min-width: var(--switch-min-w);
+	}
+
+	/* Under 1024px the bar's title gives way, as on the phone (the rail names the section), so the
+	   search, the verb and the switch keep their room and the bar never runs past the screen. */
+	@media (max-width: 1024px) {
+		h1 {
+			display: none;
+		}
+
+		.stamp {
+			margin-left: 0;
+		}
 	}
 
 	@media (max-width: 760px) {
