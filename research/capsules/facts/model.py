@@ -218,12 +218,14 @@ class Trend:
 class InjuryDesignated:
     state: Literal["designated"]
     designation: str
+    # The capture's calendar day in Eastern time, "2026-10-13" (`reference.capture_day`), never its instant.
     as_of: str
 
 
 @dataclass(frozen=True, slots=True)
 class InjuryClean:
     state: Literal["clean"]
+    # The capture's calendar day in Eastern time, as on a designation.
     as_of: str
 
 

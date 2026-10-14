@@ -5,6 +5,8 @@
     write [--players a,b] [--count 10] [--spread 50]
                                       write and gate capsules for chosen board players: paid calls
     sweep [--budget N]                the nightly sweep: every player whose facts moved (phase D's run)
+    restamp-injury-day                once, after fix round 3: restamp capsules whose sheet moved only by
+                                      its injury status's dating (instant to Eastern day)
 
 RESEARCH_DATABASE_URL names the store (the dev copy for every measurement; never production for a
 measurement run). `write` and `sweep` read AI_GATEWAY_API_KEY from the environment, never a file.
@@ -26,6 +28,7 @@ from research.capsules.facts.model import to_js
 from research.capsules.gateway import GatewayClient
 from research.capsules.narrative import narrative_requests_for
 from research.capsules.prompt import NO_WORN_PHRASES, bundle_prompt_for
+from research.capsules.restamp import restamp_injury_day
 from research.capsules.sweep import SweepPlan, sweep_capsules
 from research.capsules.trial import Choice, gate_written, write_chosen
 from research.db.engine import make_engine
@@ -95,6 +98,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     write.add_argument("--spread", type=int, default=50)
     sweep = sub.add_parser("sweep", help="the nightly sweep")
     sweep.add_argument("--budget", type=int, default=CAPSULE_CONFIG.sweep_generation_budget)
+    sub.add_parser("restamp-injury-day", help="once: restamp capsules whose sheet moved only by its injury dating")
     args = parser.parse_args(argv)
     engine = make_engine(database_url_from_env())
     if args.command in ("facts", "prompt"):
@@ -102,6 +106,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "write":
         players = [p for p in args.players.split(",") if p]
         return _write(engine, players, args.count, args.spread)
+    if args.command == "restamp-injury-day":
+        with engine.begin() as conn:
+            restamped, stale = restamp_injury_day(conn, datetime.now(UTC))
+        _out(f"restamp-injury-day: {restamped} capsules restamped, {stale} left stale (their facts moved)")
+        return 0
     return _sweep(engine, args.budget)
 
 

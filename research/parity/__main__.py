@@ -6,7 +6,8 @@
     uv run python -m research.parity model <case>|all    the model: boards, register, backtest, fit check
     uv run python -m research.parity decide <case>|all   the decide layer and the advisor on recorded room states
     uv run python -m research.parity decide record       re-record the advisor's room states (reads the dev copy)
-    uv run python -m research.parity capsules <case>|all the capsule facts on the dev copy, oracle against port
+    uv run python -m research.parity capsules <case>|all the capsule facts on the dev copy, against their recording
+    uv run python -m research.parity capsules record     re-record the capsule facts (reads the dev copy)
     uv run python -m research.parity list                every case and fixture set
 
 `ingest` and `schema` need PARITY_DATABASE_URL (a Postgres where the harness may create its own
@@ -26,6 +27,7 @@ from pathlib import Path
 
 from research.parity import databases
 from research.parity.capsules.cases import CAPSULE_CASES
+from research.parity.capsules.cases import record as capsule_record
 from research.parity.cases import ALL_CASES, CASES_BY_NAME, all_recordings
 from research.parity.decide.cases import DECIDE_CASES
 from research.parity.decide.rooms import record as record_rooms
@@ -82,6 +84,9 @@ def _decide(names: Sequence[str]) -> int:
 
 
 def _capsules(names: Sequence[str]) -> int:
+    if names == ["record"]:
+        _print(f"capsules: recorded {capsule_record()}")
+        return 0
     by_name = {case.name: case for case in CAPSULE_CASES}
     cases = CAPSULE_CASES if names == ["all"] else tuple(by_name[name] for name in names)
     results = [case.run() for case in cases]
@@ -168,8 +173,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     model.add_argument("--no-store", action="store_true", help="run only the cases that need no dev store")
     decide = sub.add_parser("decide", help="the decide layer and the advisor, oracle against port")
     decide.add_argument("names", nargs="+", help="decide case names, all, or record")
-    capsules = sub.add_parser("capsules", help="the capsule facts on the dev copy, oracle against port")
-    capsules.add_argument("names", nargs="+", help="capsule case names, or all")
+    capsules = sub.add_parser("capsules", help="the capsule facts on the dev copy, against their recording")
+    capsules.add_argument("names", nargs="+", help="capsule case names, all, or record")
     sub.add_parser("list", help="every case and fixture set")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")

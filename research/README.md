@@ -527,7 +527,7 @@ uv run python -m research.nightly run --out DIR --skip ingest,fit   # the nightl
 # parity
 uv run python -m research.parity decide all                 # room states, refusals, startSit, the numerics
 uv run python -m research.parity decide record              # re-record the room states (dev copy)
-PARITY_SOURCE_DATABASE_URL=... uv run python -m research.parity capsules all   # the facts, dev copy
+PARITY_SOURCE_DATABASE_URL=... uv run python -m research.parity capsules all   # the facts, dev copy, against their recording (capsules record re-records)
 ```
 
 ### Module map

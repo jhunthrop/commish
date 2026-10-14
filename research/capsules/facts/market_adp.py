@@ -11,14 +11,14 @@ board (`facts.board`, its population and its order) and the scarcity reason's po
 the page prints the run's `ppr-12` board (`nightly/reads/board.py`), so 47 board ranks in the prose
 disagreed with the page. The sheet now carries the page's overall and position rank.
 
-Both are deliberate divergences from the oracle's facts: the parity cases build the sheet with the
-oracle's ADP and ranks (`MarketAdp.ORACLE`), and the facts are otherwise the oracle's, field for field.
+Both are deliberate divergences from the oracle's facts. Since fix round 3 the capsule parity cases
+compare the port with a recording of its own sheets (`parity/capsules/cases.py`), so the oracle's ADP
+and ranks are no longer built.
 """
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import ClassVar
 
 from sqlalchemy import Connection
 
@@ -37,24 +37,17 @@ class PageRanks:
 
 @dataclass(frozen=True, slots=True)
 class MarketAdp:
-    """The ADP and ranks the sheets carry: the run's, by the product's player id, or the oracle's."""
+    """The ADP and ranks the sheets carry: the run's, by the product's player id."""
 
-    by_player: Mapping[str, float] | None
-    ranks: Mapping[str, PageRanks] | None = None
-    ORACLE: ClassVar["MarketAdp"]
+    by_player: Mapping[str, float]
+    ranks: Mapping[str, PageRanks]
 
     def page_ranks(self, player_id: str) -> PageRanks | None:
-        """His ranks on the page, or None for the oracle's sheet (or a player the run's board lacks)."""
-        return None if self.ranks is None else self.ranks.get(player_id)
+        """His ranks on the page, or None for a player the run's board lacks."""
+        return self.ranks.get(player_id)
 
-    def adp(self, player_id: str, oracle_adp: float | None) -> float | None:
-        return oracle_adp if self.by_player is None else self.by_player.get(player_id)
-
-    def position_adp(self, oracle_position_adp: str | None) -> str | None:
-        return oracle_position_adp if self.by_player is None else None
-
-
-MarketAdp.ORACLE = MarketAdp(None)
+    def adp(self, player_id: str) -> float | None:
+        return self.by_player.get(player_id)
 
 
 def run_market_adp(conn: Connection, as_of: datetime) -> MarketAdp:

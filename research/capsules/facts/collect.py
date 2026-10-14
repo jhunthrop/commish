@@ -114,8 +114,9 @@ def facts_input_for(row: BoardRow, shared: SharedReads) -> FactsInput:
         PRODUCT_SEASON,
         row.reasons,
         shared.laws,
-        shared.market.adp(row.player_id, row.market_adp),
-        shared.market.position_adp(row.market_position_adp),
+        shared.market.adp(row.player_id),
+        # No positional ADP: the provider's is not the page's source (`market_adp`).
+        None,
         row.overall_rank,
         row.projected_points,
         row.floor_points,
@@ -188,7 +189,7 @@ class BoardFactsPass:
     as_of: datetime
 
 
-def collect_board_facts(conn: Connection, as_of: datetime, market: MarketAdp | None = None) -> BoardFactsPass:
+def collect_board_facts(conn: Connection, as_of: datetime) -> BoardFactsPass:
     """`collectBoardFacts`: every projected board player's facts, in the board's served order, with
     the run's ADP unless `market` says otherwise."""
     prior = PRODUCT_SEASON - 1
@@ -202,13 +203,13 @@ def collect_board_facts(conn: Connection, as_of: datetime, market: MarketAdp | N
     color = collect_color(conn, Population(positions, universe_ids, team_by_gsis), as_of)
     shared = SharedReads(
         chip_eligible_laws(load_model_artifacts(conn).laws),
-        injury_snapshot(conn),
-        news_for_players(conn, [row.name for row in rows]),
+        injury_snapshot(conn, as_of),
+        news_for_players(conn, [row.name for row in rows], as_of),
         current_season_summaries(
             conn, PRODUCT_SEASON, [row.player_id for row in rows], {r.player_id: r.position for r in rows}
         ),
         color,
-        run_market_adp(conn, as_of) if market is None else market,
+        run_market_adp(conn, as_of),
     )
     facts = tuple(build_player_facts(facts_input_for(row, shared)) for row in rows)
     peers: dict[Position, int] = {}

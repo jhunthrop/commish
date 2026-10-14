@@ -34,7 +34,7 @@ from research.capsules.facts.collect import (
     facts_input_for,
 )
 from research.capsules.facts.color import current_season_summaries
-from research.capsules.facts.market_adp import MarketAdp, run_market_adp
+from research.capsules.facts.market_adp import run_market_adp
 from research.capsules.facts.reference import injury_snapshot, news_for_players
 from research.model.laws.registry import chip_eligible_laws
 from research.model.priors import load_model_artifacts
@@ -72,7 +72,7 @@ class ServedBoardCache:
 
 
 def collect_player_facts(
-    conn: Connection, player_id: str, as_of: datetime, served: ServedBoardCache, market: MarketAdp | None = None
+    conn: Connection, player_id: str, as_of: datetime, served: ServedBoardCache
 ) -> PlayerFacts | None:
     """`collectPlayerFacts`: his sheet, or None when the board does not rank him."""
     identity = conn.execute(
@@ -96,11 +96,11 @@ def collect_player_facts(
     color = collect_color(conn, Population(peers, {player_id: gsis}, {gsis: identity.team}, board.teams), as_of)
     shared = SharedReads(
         chip_eligible_laws(load_model_artifacts(conn).laws),
-        injury_snapshot(conn),
-        news_for_players(conn, [identity.name]),
+        injury_snapshot(conn, as_of),
+        news_for_players(conn, [identity.name], as_of),
         current_season_summaries(conn, PRODUCT_SEASON, [player_id], {player_id: identity.position}),
         color,
-        run_market_adp(conn, as_of) if market is None else market,
+        run_market_adp(conn, as_of),
     )
     rank = board.ranks.get(player_id)
     row = BoardRow(
