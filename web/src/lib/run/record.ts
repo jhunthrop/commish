@@ -119,7 +119,7 @@ function runWords(first: RecordWeek): string {
  * the same reason, so two causes never share a line. */
 function joins(run: readonly RecordWeek[] | undefined, week: RecordWeek): boolean {
 	const first = run?.[0];
-	if (first === undefined || first.status !== week.status) return false;
+	if (first?.status !== week.status) return false;
 	if (week.status === 'missed') return reason(first) === reason(week);
 	return week.status === 'upcoming';
 }
