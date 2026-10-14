@@ -2,7 +2,7 @@
 	import type { Component } from 'svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 	import { siteContext } from './context.svelte.ts';
-	import { switchLabel } from './words.ts';
+	import { labelEnds, switchLabel } from './words.ts';
 
 	/** The shell's league switch, at the right of the top bar on every width (founder ruling
 	 * 2026-10-13): the selected league's name, or the format with none, opening the account's leagues,
@@ -27,6 +27,7 @@
 	});
 
 	const label = $derived(switchLabel(siteContext.league, siteContext.format));
+	const ends = $derived(labelEnds(label));
 </script>
 
 <span class="switch" data-opens-leagues>
@@ -41,7 +42,8 @@
 		onpointerenter={preload}
 	>
 		<span class="mark"><Icon name="league" size={18} /></span>
-		<span class="words">{label}</span>
+		<span class="words"><span class="head">{ends[0]}</span><span class="tail">{ends[1]}</span></span
+		>
 		<Icon name="chevron" size={16} />
 	</button>
 	<div class="pop" id={MENU_ID} hidden={!siteContext.open}>
@@ -53,6 +55,7 @@
 	.switch {
 		position: relative;
 		display: flex;
+		flex: 1;
 		min-width: 0;
 	}
 
@@ -61,7 +64,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: var(--s-2);
-		width: var(--switch-w, 232px);
+		width: 100%;
 		min-width: 0;
 		height: 40px;
 		padding: 0 var(--s-3);
@@ -89,12 +92,23 @@
 		color: var(--accent-text);
 	}
 
+	/* A long name gives way in the middle: its head takes the ellipsis and its last word, which tells
+	   one contest entry from the next, stays whole. The button's label carries the full name. */
 	.words {
 		flex: 1;
 		min-width: 0;
+		display: flex;
+		white-space: pre;
+	}
+
+	.head {
+		min-width: 0;
 		overflow: hidden;
-		white-space: nowrap;
 		text-overflow: ellipsis;
+	}
+
+	.tail {
+		flex: none;
 	}
 
 	.face :global(svg:last-child) {
@@ -121,12 +135,9 @@
 	}
 
 	@media (max-width: 760px) {
+		/* The phone gives the switch its bar's whole first row, the same width on every page. */
 		.switch {
 			position: static;
-		}
-
-		.face {
-			width: 100%;
 		}
 
 		/* In a hand the menu spans the screen under the bar, whichever control opened it. */

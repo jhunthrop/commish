@@ -1,0 +1,1829 @@
+{
+ "model": "commish_ros_v1",
+ "model_version": "research@115c6b91",
+ "arithmetic": "v8-fdlibm-fused/pow-apple-libm",
+ "thresholds": {
+  "fit_seasons": [
+   2023,
+   2024
+  ],
+  "opportunity_seasons": [
+   2021,
+   2022,
+   2023,
+   2024
+  ],
+  "fit_weeks": [
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15
+  ],
+  "judgment_season": 2025,
+  "judgment_weeks": [
+   4,
+   8,
+   12
+  ],
+  "population": {
+   "QB": 36,
+   "RB": 72,
+   "WR": 108,
+   "TE": 36
+  },
+  "starters": {
+   "QB": 12,
+   "RB": 24,
+   "WR": 36,
+   "TE": 12
+  },
+  "rho_margin": 0.02,
+  "min_population": 20,
+  "coverage_low": 0.75,
+  "coverage_high": 0.85,
+  "min_coverage_size": 60
+ },
+ "priors": {
+  "opportunity": {
+   "QB|ppr": [
+    -1.234357023389481,
+    2.0457908797426696,
+    0.8121266878520196,
+    0.2575140759166898,
+    5.767260502553577
+   ],
+   "QB|half": [
+    -1.234809142639546,
+    1.6255702248659003,
+    0.8123645814127817,
+    0.25745290077326466,
+    5.768882096555186
+   ],
+   "QB|std": [
+    -1.2352612618896084,
+    1.205349569989137,
+    0.8126024749735447,
+    0.2573917256298383,
+    5.770503690556793
+   ],
+   "RB|ppr": [
+    -0.18144287754594565,
+    1.457955019995141,
+    0.6962855937873558,
+    2.2912791971734556,
+    -0.8723472088636354
+   ],
+   "RB|half": [
+    -0.17731840534734059,
+    1.066937259741133,
+    0.6937267305620192,
+    2.116126585134039,
+    -0.8267759090905121
+   ],
+   "RB|std": [
+    -0.17319393314874085,
+    0.6759194994871266,
+    0.6911678673366822,
+    1.940973973094622,
+    -0.7812046093173906
+   ],
+   "WR|ppr": [
+    -0.14398831955430916,
+    1.7105773720922608,
+    0.8638176079296515,
+    2.2764452966571453,
+    0.21746719634726383
+   ],
+   "WR|half": [
+    -0.14074675811388457,
+    1.3793679487970993,
+    0.8266222525676397,
+    1.9977270515852399,
+    0.33816466379172455
+   ],
+   "WR|std": [
+    -0.13750519667346844,
+    1.0481585255019403,
+    0.789426897205628,
+    1.7190088065133367,
+    0.45886213123618624
+   ],
+   "TE|ppr": [
+    -0.08318883630077478,
+    1.6679238606304896,
+    1.2180163256374281,
+    0.14255755070491982,
+    0.46752116649308484
+   ],
+   "TE|half": [
+    -0.07897953618855276,
+    1.3164194831989091,
+    1.2077131763627964,
+    0.14612093696572884,
+    0.4562610539311693
+   ],
+   "TE|std": [
+    -0.07477023607632356,
+    0.9649151057673253,
+    1.197410027088165,
+    0.14968432322653785,
+    0.44500094136925394
+   ]
+  },
+  "shrinkage": {
+   "QB|ppr": {
+    "k": 0.5,
+    "alpha": 0.5
+   },
+   "QB|half": {
+    "k": 0.5,
+    "alpha": 0.5
+   },
+   "QB|std": {
+    "k": 0.5,
+    "alpha": 0.5
+   },
+   "RB|ppr": {
+    "k": 1.0,
+    "alpha": 0.6
+   },
+   "RB|half": {
+    "k": 1.5,
+    "alpha": 0.6
+   },
+   "RB|std": {
+    "k": 1.5,
+    "alpha": 0.6
+   },
+   "WR|ppr": {
+    "k": 1.0,
+    "alpha": 0.6
+   },
+   "WR|half": {
+    "k": 1.0,
+    "alpha": 0.5
+   },
+   "WR|std": {
+    "k": 1.0,
+    "alpha": 0.5
+   },
+   "TE|ppr": {
+    "k": 3.0,
+    "alpha": 0.2
+   },
+   "TE|half": {
+    "k": 3.0,
+    "alpha": 0.2
+   },
+   "TE|std": {
+    "k": 3.0,
+    "alpha": 0.2
+   }
+  },
+  "availabilityK": {
+   "QB": 6.0,
+   "RB": 4.0,
+   "WR": 6.0,
+   "TE": 12.0
+  },
+  "returnNext": [
+   0.33707865168539325,
+   0.28846153846153844,
+   0.2158273381294964
+  ],
+  "returnLater": [
+   0.6086366105377512,
+   0.5915422885572139,
+   0.47238041002277903
+  ],
+  "offboardRate": {
+   "QB|ppr": 9.129032258064516,
+   "QB|half": 9.129032258064516,
+   "QB|std": 9.129032258064516,
+   "RB|ppr": 7.735233160621762,
+   "RB|half": 6.988235294117646,
+   "RB|std": 6.067873303167421,
+   "WR|ppr": 6.505081967213115,
+   "WR|half": 5.342625607779579,
+   "WR|std": 4.21010719754977,
+   "TE|ppr": 2.422641509433962,
+   "TE|half": 1.6270833333333334,
+   "TE|std": 1.1742857142857144
+  },
+  "offboardAvailability": {
+   "QB": 0.32978723404255317,
+   "RB": 0.5530085959885387,
+   "WR": 0.8460471567267683,
+   "TE": 0.7361111111111112
+  },
+  "interval": {
+   "QB|ppr|early": [
+    0.14846033513649481,
+    1.0054819761937077,
+    1.7159491259625588
+   ],
+   "QB|ppr|middle": [
+    0.0,
+    0.979580477639125,
+    1.7201737731267928
+   ],
+   "QB|ppr|late": [
+    0.0,
+    0.9224888358009866,
+    1.8414648907325362
+   ],
+   "QB|half|early": [
+    0.1484613820584869,
+    1.005618888013716,
+    1.7160053176822985
+   ],
+   "QB|half|middle": [
+    0.0,
+    0.9816542933181833,
+    1.7193248194720558
+   ],
+   "QB|half|late": [
+    0.0,
+    0.9225038476589662,
+    1.8414803886332352
+   ],
+   "QB|std|early": [
+    0.1484624290099654,
+    1.0057485093812646,
+    1.716049708882835
+   ],
+   "QB|std|middle": [
+    0.0,
+    0.9821860113216372,
+    1.7185140998494706
+   ],
+   "QB|std|late": [
+    0.0,
+    0.9225163031305329,
+    1.8414929416227992
+   ],
+   "RB|ppr|early": [
+    0.17028595622229525,
+    0.9283385517484529,
+    2.086302180597244
+   ],
+   "RB|ppr|middle": [
+    0.20078110663942175,
+    0.9477958334882631,
+    1.9010461707884334
+   ],
+   "RB|ppr|late": [
+    0.0,
+    0.9347214750193151,
+    1.973969350596323
+   ],
+   "RB|half|early": [
+    0.18353188460652226,
+    0.9442193542301694,
+    1.9886911000981338
+   ],
+   "RB|half|middle": [
+    0.2104899113367903,
+    0.957910208129741,
+    1.9857081981516531
+   ],
+   "RB|half|late": [
+    0.0,
+    0.933669819946271,
+    2.0383004589664764
+   ],
+   "RB|std|early": [
+    0.16479046323028698,
+    0.9394769865396067,
+    2.0388429615000363
+   ],
+   "RB|std|middle": [
+    0.1790809286225796,
+    0.9261722944901213,
+    1.9948011500493503
+   ],
+   "RB|std|late": [
+    0.0,
+    0.913119065449921,
+    2.070809078307378
+   ],
+   "WR|ppr|early": [
+    0.29490119247560204,
+    0.9674415471755697,
+    1.8377347356829274
+   ],
+   "WR|ppr|middle": [
+    0.19862407019030076,
+    0.9499660688769016,
+    1.8752551831016115
+   ],
+   "WR|ppr|late": [
+    0.0,
+    0.9320242773364023,
+    1.8919360196623247
+   ],
+   "WR|half|early": [
+    0.2740996436551279,
+    0.9728077648193545,
+    1.8650431926216502
+   ],
+   "WR|half|middle": [
+    0.18166287483300803,
+    0.9487946562221016,
+    1.8866764156722826
+   ],
+   "WR|half|late": [
+    0.0,
+    0.9286290922701019,
+    1.917621347887047
+   ],
+   "WR|std|early": [
+    0.246091836594512,
+    0.9679150016908249,
+    1.8734239275734643
+   ],
+   "WR|std|middle": [
+    0.15127365304333576,
+    0.9373969503908435,
+    1.926010771984396
+   ],
+   "WR|std|late": [
+    0.0,
+    0.9193370549944265,
+    1.9741483837615497
+   ],
+   "TE|ppr|early": [
+    0.31827173952154264,
+    1.1103491990956282,
+    1.8702235092358372
+   ],
+   "TE|ppr|middle": [
+    0.32891071829834473,
+    1.0252182325422003,
+    1.870375653063126
+   ],
+   "TE|ppr|late": [
+    0.13832011494373941,
+    1.0251039669365487,
+    1.9700723705028553
+   ],
+   "TE|half|early": [
+    0.3118975855609191,
+    1.0951016798353248,
+    1.9103554436259296
+   ],
+   "TE|half|middle": [
+    0.3185548998591182,
+    1.0050499212711435,
+    1.9224570695468162
+   ],
+   "TE|half|late": [
+    0.1310237594908017,
+    1.0134542775112474,
+    1.9404669549143334
+   ],
+   "TE|std|early": [
+    0.2847335891774165,
+    1.0734113480321963,
+    1.9663857801544904
+   ],
+   "TE|std|middle": [
+    0.2741404015666133,
+    0.9785388482668165,
+    1.9551207582469956
+   ],
+   "TE|std|late": [
+    0.08136242358860274,
+    0.9770321688506609,
+    1.9226736938448588
+   ]
+  }
+ },
+ "fit_rows": 8735,
+ "fit_seconds": {
+  "opportunity": 4.793094584019855,
+  "collect": 41.12634962500306,
+  "search": 0.16349854099098593
+ },
+ "gates": [
+  {
+   "gate": "G1",
+   "subject": "4|QB|ppr",
+   "passed": true,
+   "detail": "rho 0.5728 against the stale board's 0.4924, difference +0.0804 against a margin of +0.0200, n=41"
+  },
+  {
+   "gate": "G1",
+   "subject": "4|QB|half",
+   "passed": true,
+   "detail": "rho 0.5728 against the stale board's 0.4916, difference +0.0812 against a margin of +0.0200, n=41"
+  },
+  {
+   "gate": "G1",
+   "subject": "4|QB|std",
+   "passed": true,
+   "detail": "rho 0.5728 against the stale board's 0.4916, difference +0.0812 against a margin of +0.0200, n=41"
+  },
+  {
+   "gate": "G1",
+   "subject": "4|RB|ppr",
+   "passed": true,
+   "detail": "rho 0.6755 against the stale board's 0.6121, difference +0.0634 against a margin of +0.0200, n=87"
+  },
+  {
+   "gate": "G1",
+   "subject": "4|RB|half",
+   "passed": true,
+   "detail": "rho 0.6952 against the stale board's 0.6048, difference +0.0904 against a margin of +0.0200, n=86"
+  },
+  {
+   "gate": "G1",
+   "subject": "4|RB|std",
+   "passed": true,
+   "detail": "rho 0.6906 against the stale board's 0.5994, difference +0.0912 against a margin of +0.0200, n=86"
+  },
+  {
+   "gate": "G1",
+   "subject": "4|WR|ppr",
+   "passed": false,
+   "detail": "rho 0.5966 against the stale board's 0.6126, difference -0.0160 against a margin of +0.0200, n=128"
+  },
+  {
+   "gate": "G1",
+   "subject": "4|WR|half",
+   "passed": false,
+   "detail": "rho 0.5989 against the stale board's 0.6187, difference -0.0198 against a margin of +0.0200, n=128"
+  },
+  {
+   "gate": "G1",
+   "subject": "4|WR|std",
+   "passed": false,
+   "detail": "rho 0.5920 against the stale board's 0.6163, difference -0.0243 against a margin of +0.0200, n=128"
+  },
+  {
+   "gate": "G1",
+   "subject": "4|TE|ppr",
+   "passed": true,
+   "detail": "rho 0.6804 against the stale board's 0.5810, difference +0.0994 against a margin of +0.0200, n=46"
+  },
+  {
+   "gate": "G1",
+   "subject": "4|TE|half",
+   "passed": true,
+   "detail": "rho 0.7148 against the stale board's 0.6140, difference +0.1008 against a margin of +0.0200, n=46"
+  },
+  {
+   "gate": "G1",
+   "subject": "4|TE|std",
+   "passed": true,
+   "detail": "rho 0.7546 against the stale board's 0.6572, difference +0.0974 against a margin of +0.0200, n=48"
+  },
+  {
+   "gate": "G1",
+   "subject": "8|QB|ppr",
+   "passed": true,
+   "detail": "rho 0.5634 against the stale board's 0.3897, difference +0.1738 against a margin of +0.0200, n=42"
+  },
+  {
+   "gate": "G1",
+   "subject": "8|QB|half",
+   "passed": true,
+   "detail": "rho 0.5634 against the stale board's 0.3898, difference +0.1737 against a margin of +0.0200, n=42"
+  },
+  {
+   "gate": "G1",
+   "subject": "8|QB|std",
+   "passed": true,
+   "detail": "rho 0.5667 against the stale board's 0.3898, difference +0.1769 against a margin of +0.0200, n=42"
+  },
+  {
+   "gate": "G1",
+   "subject": "8|RB|ppr",
+   "passed": true,
+   "detail": "rho 0.6674 against the stale board's 0.4892, difference +0.1782 against a margin of +0.0200, n=84"
+  },
+  {
+   "gate": "G1",
+   "subject": "8|RB|half",
+   "passed": true,
+   "detail": "rho 0.7162 against the stale board's 0.5260, difference +0.1903 against a margin of +0.0200, n=88"
+  },
+  {
+   "gate": "G1",
+   "subject": "8|RB|std",
+   "passed": true,
+   "detail": "rho 0.7259 against the stale board's 0.5334, difference +0.1924 against a margin of +0.0200, n=88"
+  },
+  {
+   "gate": "G1",
+   "subject": "8|WR|ppr",
+   "passed": true,
+   "detail": "rho 0.5987 against the stale board's 0.5397, difference +0.0590 against a margin of +0.0200, n=127"
+  },
+  {
+   "gate": "G1",
+   "subject": "8|WR|half",
+   "passed": true,
+   "detail": "rho 0.5929 against the stale board's 0.5386, difference +0.0543 against a margin of +0.0200, n=128"
+  },
+  {
+   "gate": "G1",
+   "subject": "8|WR|std",
+   "passed": true,
+   "detail": "rho 0.5667 against the stale board's 0.5330, difference +0.0338 against a margin of +0.0200, n=129"
+  },
+  {
+   "gate": "G1",
+   "subject": "8|TE|ppr",
+   "passed": true,
+   "detail": "rho 0.6119 against the stale board's 0.4743, difference +0.1375 against a margin of +0.0200, n=46"
+  },
+  {
+   "gate": "G1",
+   "subject": "8|TE|half",
+   "passed": true,
+   "detail": "rho 0.6256 against the stale board's 0.5249, difference +0.1007 against a margin of +0.0200, n=46"
+  },
+  {
+   "gate": "G1",
+   "subject": "8|TE|std",
+   "passed": true,
+   "detail": "rho 0.5883 against the stale board's 0.5064, difference +0.0819 against a margin of +0.0200, n=45"
+  },
+  {
+   "gate": "G1",
+   "subject": "12|QB|ppr",
+   "passed": true,
+   "detail": "rho 0.4748 against the stale board's 0.3810, difference +0.0938 against a margin of +0.0200, n=42"
+  },
+  {
+   "gate": "G1",
+   "subject": "12|QB|half",
+   "passed": true,
+   "detail": "rho 0.4794 against the stale board's 0.3809, difference +0.0985 against a margin of +0.0200, n=42"
+  },
+  {
+   "gate": "G1",
+   "subject": "12|QB|std",
+   "passed": true,
+   "detail": "rho 0.4794 against the stale board's 0.3809, difference +0.0985 against a margin of +0.0200, n=42"
+  },
+  {
+   "gate": "G1",
+   "subject": "12|RB|ppr",
+   "passed": true,
+   "detail": "rho 0.7496 against the stale board's 0.4956, difference +0.2540 against a margin of +0.0200, n=86"
+  },
+  {
+   "gate": "G1",
+   "subject": "12|RB|half",
+   "passed": true,
+   "detail": "rho 0.7741 against the stale board's 0.5069, difference +0.2672 against a margin of +0.0200, n=89"
+  },
+  {
+   "gate": "G1",
+   "subject": "12|RB|std",
+   "passed": true,
+   "detail": "rho 0.7746 against the stale board's 0.5081, difference +0.2665 against a margin of +0.0200, n=90"
+  },
+  {
+   "gate": "G1",
+   "subject": "12|WR|ppr",
+   "passed": true,
+   "detail": "rho 0.5746 against the stale board's 0.4819, difference +0.0927 against a margin of +0.0200, n=128"
+  },
+  {
+   "gate": "G1",
+   "subject": "12|WR|half",
+   "passed": true,
+   "detail": "rho 0.5680 against the stale board's 0.4781, difference +0.0898 against a margin of +0.0200, n=129"
+  },
+  {
+   "gate": "G1",
+   "subject": "12|WR|std",
+   "passed": true,
+   "detail": "rho 0.5544 against the stale board's 0.4688, difference +0.0855 against a margin of +0.0200, n=130"
+  },
+  {
+   "gate": "G1",
+   "subject": "12|TE|ppr",
+   "passed": true,
+   "detail": "rho 0.5258 against the stale board's 0.2607, difference +0.2651 against a margin of +0.0200, n=45"
+  },
+  {
+   "gate": "G1",
+   "subject": "12|TE|half",
+   "passed": true,
+   "detail": "rho 0.5177 against the stale board's 0.2494, difference +0.2683 against a margin of +0.0200, n=45"
+  },
+  {
+   "gate": "G1",
+   "subject": "12|TE|std",
+   "passed": true,
+   "detail": "rho 0.4812 against the stale board's 0.2372, difference +0.2440 against a margin of +0.0200, n=45"
+  },
+  {
+   "gate": "G2",
+   "subject": "4|QB|ppr",
+   "passed": false,
+   "detail": "rank error 8.000 against the stale board's 7.583"
+  },
+  {
+   "gate": "G2",
+   "subject": "4|QB|half",
+   "passed": false,
+   "detail": "rank error 8.000 against the stale board's 7.583"
+  },
+  {
+   "gate": "G2",
+   "subject": "4|QB|std",
+   "passed": false,
+   "detail": "rank error 8.000 against the stale board's 7.583"
+  },
+  {
+   "gate": "G2",
+   "subject": "4|RB|ppr",
+   "passed": true,
+   "detail": "rank error 9.833 against the stale board's 10.500"
+  },
+  {
+   "gate": "G2",
+   "subject": "4|RB|half",
+   "passed": true,
+   "detail": "rank error 9.167 against the stale board's 10.208"
+  },
+  {
+   "gate": "G2",
+   "subject": "4|RB|std",
+   "passed": true,
+   "detail": "rank error 9.333 against the stale board's 11.000"
+  },
+  {
+   "gate": "G2",
+   "subject": "4|WR|ppr",
+   "passed": false,
+   "detail": "rank error 17.361 against the stale board's 17.194"
+  },
+  {
+   "gate": "G2",
+   "subject": "4|WR|half",
+   "passed": false,
+   "detail": "rank error 17.667 against the stale board's 17.111"
+  },
+  {
+   "gate": "G2",
+   "subject": "4|WR|std",
+   "passed": false,
+   "detail": "rank error 18.778 against the stale board's 17.722"
+  },
+  {
+   "gate": "G2",
+   "subject": "4|TE|ppr",
+   "passed": true,
+   "detail": "rank error 8.750 against the stale board's 10.583"
+  },
+  {
+   "gate": "G2",
+   "subject": "4|TE|half",
+   "passed": true,
+   "detail": "rank error 8.500 against the stale board's 9.167"
+  },
+  {
+   "gate": "G2",
+   "subject": "4|TE|std",
+   "passed": true,
+   "detail": "rank error 9.417 against the stale board's 9.667"
+  },
+  {
+   "gate": "G2",
+   "subject": "8|QB|ppr",
+   "passed": true,
+   "detail": "rank error 7.750 against the stale board's 8.750"
+  },
+  {
+   "gate": "G2",
+   "subject": "8|QB|half",
+   "passed": true,
+   "detail": "rank error 7.750 against the stale board's 8.750"
+  },
+  {
+   "gate": "G2",
+   "subject": "8|QB|std",
+   "passed": true,
+   "detail": "rank error 7.750 against the stale board's 8.750"
+  },
+  {
+   "gate": "G2",
+   "subject": "8|RB|ppr",
+   "passed": true,
+   "detail": "rank error 9.042 against the stale board's 11.750"
+  },
+  {
+   "gate": "G2",
+   "subject": "8|RB|half",
+   "passed": true,
+   "detail": "rank error 8.042 against the stale board's 12.167"
+  },
+  {
+   "gate": "G2",
+   "subject": "8|RB|std",
+   "passed": true,
+   "detail": "rank error 8.292 against the stale board's 12.542"
+  },
+  {
+   "gate": "G2",
+   "subject": "8|WR|ppr",
+   "passed": true,
+   "detail": "rank error 18.500 against the stale board's 19.472"
+  },
+  {
+   "gate": "G2",
+   "subject": "8|WR|half",
+   "passed": true,
+   "detail": "rank error 17.889 against the stale board's 18.750"
+  },
+  {
+   "gate": "G2",
+   "subject": "8|WR|std",
+   "passed": false,
+   "detail": "rank error 19.389 against the stale board's 19.278"
+  },
+  {
+   "gate": "G2",
+   "subject": "8|TE|ppr",
+   "passed": true,
+   "detail": "rank error 8.583 against the stale board's 11.583"
+  },
+  {
+   "gate": "G2",
+   "subject": "8|TE|half",
+   "passed": true,
+   "detail": "rank error 7.917 against the stale board's 9.583"
+  },
+  {
+   "gate": "G2",
+   "subject": "8|TE|std",
+   "passed": true,
+   "detail": "rank error 8.167 against the stale board's 9.500"
+  },
+  {
+   "gate": "G2",
+   "subject": "12|QB|ppr",
+   "passed": true,
+   "detail": "rank error 11.500 against the stale board's 11.917"
+  },
+  {
+   "gate": "G2",
+   "subject": "12|QB|half",
+   "passed": true,
+   "detail": "rank error 11.417 against the stale board's 11.917"
+  },
+  {
+   "gate": "G2",
+   "subject": "12|QB|std",
+   "passed": true,
+   "detail": "rank error 11.417 against the stale board's 11.917"
+  },
+  {
+   "gate": "G2",
+   "subject": "12|RB|ppr",
+   "passed": true,
+   "detail": "rank error 9.625 against the stale board's 11.833"
+  },
+  {
+   "gate": "G2",
+   "subject": "12|RB|half",
+   "passed": true,
+   "detail": "rank error 9.458 against the stale board's 11.792"
+  },
+  {
+   "gate": "G2",
+   "subject": "12|RB|std",
+   "passed": true,
+   "detail": "rank error 9.708 against the stale board's 13.583"
+  },
+  {
+   "gate": "G2",
+   "subject": "12|WR|ppr",
+   "passed": true,
+   "detail": "rank error 25.361 against the stale board's 28.181"
+  },
+  {
+   "gate": "G2",
+   "subject": "12|WR|half",
+   "passed": true,
+   "detail": "rank error 23.972 against the stale board's 26.625"
+  },
+  {
+   "gate": "G2",
+   "subject": "12|WR|std",
+   "passed": true,
+   "detail": "rank error 24.472 against the stale board's 26.819"
+  },
+  {
+   "gate": "G2",
+   "subject": "12|TE|ppr",
+   "passed": true,
+   "detail": "rank error 8.167 against the stale board's 11.083"
+  },
+  {
+   "gate": "G2",
+   "subject": "12|TE|half",
+   "passed": true,
+   "detail": "rank error 8.417 against the stale board's 11.333"
+  },
+  {
+   "gate": "G2",
+   "subject": "12|TE|std",
+   "passed": true,
+   "detail": "rank error 11.167 against the stale board's 11.667"
+  },
+  {
+   "gate": "G3",
+   "subject": "QB|ppr",
+   "passed": true,
+   "detail": "coverage 0.840 against [0.75, 0.85], n=125"
+  },
+  {
+   "gate": "G3",
+   "subject": "QB|half",
+   "passed": true,
+   "detail": "coverage 0.840 against [0.75, 0.85], n=125"
+  },
+  {
+   "gate": "G3",
+   "subject": "QB|std",
+   "passed": true,
+   "detail": "coverage 0.840 against [0.75, 0.85], n=125"
+  },
+  {
+   "gate": "G3",
+   "subject": "RB|ppr",
+   "passed": true,
+   "detail": "coverage 0.759 against [0.75, 0.85], n=257"
+  },
+  {
+   "gate": "G3",
+   "subject": "RB|half",
+   "passed": true,
+   "detail": "coverage 0.753 against [0.75, 0.85], n=263"
+  },
+  {
+   "gate": "G3",
+   "subject": "RB|std",
+   "passed": true,
+   "detail": "coverage 0.758 against [0.75, 0.85], n=264"
+  },
+  {
+   "gate": "G3",
+   "subject": "WR|ppr",
+   "passed": true,
+   "detail": "coverage 0.807 against [0.75, 0.85], n=383"
+  },
+  {
+   "gate": "G3",
+   "subject": "WR|half",
+   "passed": true,
+   "detail": "coverage 0.821 against [0.75, 0.85], n=385"
+  },
+  {
+   "gate": "G3",
+   "subject": "WR|std",
+   "passed": true,
+   "detail": "coverage 0.819 against [0.75, 0.85], n=387"
+  },
+  {
+   "gate": "G3",
+   "subject": "TE|ppr",
+   "passed": true,
+   "detail": "coverage 0.847 against [0.75, 0.85], n=137"
+  },
+  {
+   "gate": "G3",
+   "subject": "TE|half",
+   "passed": false,
+   "detail": "coverage 0.854 against [0.75, 0.85], n=137"
+  },
+  {
+   "gate": "G3",
+   "subject": "TE|std",
+   "passed": true,
+   "detail": "coverage 0.826 against [0.75, 0.85], n=138"
+  },
+  {
+   "gate": "G4",
+   "subject": "isolation",
+   "passed": true,
+   "detail": "outcomes read for [2021, 2022, 2023, 2024, 2025], allowed [2021, 2022, 2023, 2024, 2025]; every table as it was"
+  }
+ ],
+ "passed": false,
+ "numbers": {
+  "season": 2025,
+  "weeks": [
+   4,
+   8,
+   12
+  ],
+  "stale_board_moment": "2025-09-05T23:59:59.999000+00:00",
+  "stale_board_players": 542,
+  "rows": 937,
+  "cells": {
+   "4|QB|ppr": {
+    "size": 41,
+    "rho": {
+     "model": 0.572822299651568,
+     "board": 0.49242028975452656,
+     "form": 0.39236867471824344,
+     "ecr": 0.4789198606271777
+    },
+    "rank_error": {
+     "model": 8.0,
+     "board": 7.583333333333333,
+     "form": 10.625,
+     "ecr": 8.333333333333334
+    },
+    "coverage": {
+     "inside": 33,
+     "size": 41
+    },
+    "points_mae": 52.18010430004247
+   },
+   "4|QB|half": {
+    "size": 41,
+    "rho": {
+     "model": 0.572822299651568,
+     "board": 0.49163763066202093,
+     "form": 0.38660220429545733,
+     "ecr": 0.4789198606271777
+    },
+    "rank_error": {
+     "model": 8.0,
+     "board": 7.583333333333333,
+     "form": 10.958333333333334,
+     "ecr": 8.333333333333334
+    },
+    "coverage": {
+     "inside": 33,
+     "size": 41
+    },
+    "points_mae": 52.26523324397375
+   },
+   "4|QB|std": {
+    "size": 41,
+    "rho": {
+     "model": 0.572822299651568,
+     "board": 0.49163763066202093,
+     "form": 0.38660220429545733,
+     "ecr": 0.4789198606271777
+    },
+    "rank_error": {
+     "model": 8.0,
+     "board": 7.583333333333333,
+     "form": 10.958333333333334,
+     "ecr": 8.333333333333334
+    },
+    "coverage": {
+     "inside": 33,
+     "size": 41
+    },
+    "points_mae": 52.35029880068613
+   },
+   "4|RB|ppr": {
+    "size": 87,
+    "rho": {
+     "model": 0.6754822049758902,
+     "board": 0.6120727037655772,
+     "form": 0.6610869360442279,
+     "ecr": 0.663442085806768
+    },
+    "rank_error": {
+     "model": 9.833333333333334,
+     "board": 10.5,
+     "form": 11.125,
+     "ecr": 9.791666666666666
+    },
+    "coverage": {
+     "inside": 65,
+     "size": 87
+    },
+    "points_mae": 42.32328518646481
+   },
+   "4|RB|half": {
+    "size": 86,
+    "rho": {
+     "model": 0.6952070226745586,
+     "board": 0.6048166589324674,
+     "form": 0.6936265625569871,
+     "ecr": 0.665785907581676
+    },
+    "rank_error": {
+     "model": 9.166666666666666,
+     "board": 10.208333333333334,
+     "form": 10.416666666666666,
+     "ecr": 9.583333333333334
+    },
+    "coverage": {
+     "inside": 63,
+     "size": 86
+    },
+    "points_mae": 39.494794751896514
+   },
+   "4|RB|std": {
+    "size": 86,
+    "rho": {
+     "model": 0.6906050746867988,
+     "board": 0.5994432318404556,
+     "form": 0.6916317469551243,
+     "ecr": 0.6653455114028324
+    },
+    "rank_error": {
+     "model": 9.333333333333334,
+     "board": 11.0,
+     "form": 10.541666666666666,
+     "ecr": 10.0
+    },
+    "coverage": {
+     "inside": 62,
+     "size": 86
+    },
+    "points_mae": 37.04322930554069
+   },
+   "4|WR|ppr": {
+    "size": 128,
+    "rho": {
+     "model": 0.5966163187163462,
+     "board": 0.6126202192427009,
+     "form": 0.5044281740294907,
+     "ecr": 0.5961698585708721
+    },
+    "rank_error": {
+     "model": 17.36111111111111,
+     "board": 17.194444444444443,
+     "form": 20.90277777777778,
+     "ecr": 17.72222222222222
+    },
+    "coverage": {
+     "inside": 99,
+     "size": 128
+    },
+    "points_mae": 39.52852600438245
+   },
+   "4|WR|half": {
+    "size": 128,
+    "rho": {
+     "model": 0.5988689572990459,
+     "board": 0.6186664606628968,
+     "form": 0.4912437354503098,
+     "ecr": 0.6072096381352364
+    },
+    "rank_error": {
+     "model": 17.666666666666668,
+     "board": 17.11111111111111,
+     "form": 22.13888888888889,
+     "ecr": 17.52777777777778
+    },
+    "coverage": {
+     "inside": 104,
+     "size": 128
+    },
+    "points_mae": 32.926982529314245
+   },
+   "4|WR|std": {
+    "size": 128,
+    "rho": {
+     "model": 0.5920016939137829,
+     "board": 0.6163028581302137,
+     "form": 0.4593717597818124,
+     "ecr": 0.6078132895042339
+    },
+    "rank_error": {
+     "model": 18.77777777777778,
+     "board": 17.72222222222222,
+     "form": 25.194444444444443,
+     "ecr": 18.083333333333332
+    },
+    "coverage": {
+     "inside": 104,
+     "size": 128
+    },
+    "points_mae": 27.011553861977344
+   },
+   "4|TE|ppr": {
+    "size": 46,
+    "rho": {
+     "model": 0.6804193647856923,
+     "board": 0.5810086820797103,
+     "form": 0.5771377473526313,
+     "ecr": 0.6363412125145039
+    },
+    "rank_error": {
+     "model": 8.75,
+     "board": 10.583333333333334,
+     "form": 9.583333333333334,
+     "ecr": 9.416666666666666
+    },
+    "coverage": {
+     "inside": 40,
+     "size": 46
+    },
+    "points_mae": 30.079589362489966
+   },
+   "4|TE|half": {
+    "size": 46,
+    "rho": {
+     "model": 0.7148143593217665,
+     "board": 0.6139755778298693,
+     "form": 0.6004872485662893,
+     "ecr": 0.6650629176234543
+    },
+    "rank_error": {
+     "model": 8.5,
+     "board": 9.166666666666666,
+     "form": 9.333333333333334,
+     "ecr": 8.083333333333334
+    },
+    "coverage": {
+     "inside": 41,
+     "size": 46
+    },
+    "points_mae": 23.573623513230967
+   },
+   "4|TE|std": {
+    "size": 48,
+    "rho": {
+     "model": 0.7545797489684198,
+     "board": 0.6572041145525556,
+     "form": 0.5869069599353769,
+     "ecr": 0.7029345704816634
+    },
+    "rank_error": {
+     "model": 9.416666666666666,
+     "board": 9.666666666666666,
+     "form": 9.458333333333334,
+     "ecr": 8.583333333333334
+    },
+    "coverage": {
+     "inside": 42,
+     "size": 48
+    },
+    "points_mae": 17.55964135762135
+   },
+   "8|QB|ppr": {
+    "size": 42,
+    "rho": {
+     "model": 0.5634293590784099,
+     "board": 0.3896745986570295,
+     "form": 0.49600907621443213,
+     "ecr": 0.40071309947400213
+    },
+    "rank_error": {
+     "model": 7.75,
+     "board": 8.75,
+     "form": 7.416666666666667,
+     "ecr": 9.5
+    },
+    "coverage": {
+     "inside": 36,
+     "size": 42
+    },
+    "points_mae": 43.86851752117419
+   },
+   "8|QB|half": {
+    "size": 42,
+    "rho": {
+     "model": 0.5634293590784099,
+     "board": 0.3897735103073711,
+     "form": 0.4955228722514708,
+     "ecr": 0.40071309947400213
+    },
+    "rank_error": {
+     "model": 7.75,
+     "board": 8.75,
+     "form": 7.583333333333333,
+     "ecr": 9.5
+    },
+    "coverage": {
+     "inside": 36,
+     "size": 42
+    },
+    "points_mae": 43.84213211724382
+   },
+   "8|QB|std": {
+    "size": 42,
+    "rho": {
+     "model": 0.5666707188314857,
+     "board": 0.3897735103073711,
+     "form": 0.4955228722514708,
+     "ecr": 0.40071309947400213
+    },
+    "rank_error": {
+     "model": 7.75,
+     "board": 8.75,
+     "form": 7.583333333333333,
+     "ecr": 9.5
+    },
+    "coverage": {
+     "inside": 36,
+     "size": 42
+    },
+    "points_mae": 43.81571510780113
+   },
+   "8|RB|ppr": {
+    "size": 84,
+    "rho": {
+     "model": 0.6674201192169187,
+     "board": 0.48917849961476195,
+     "form": 0.63585904589264,
+     "ecr": 0.5388806870024947
+    },
+    "rank_error": {
+     "model": 9.041666666666666,
+     "board": 11.75,
+     "form": 11.375,
+     "ecr": 10.708333333333334
+    },
+    "coverage": {
+     "inside": 52,
+     "size": 84
+    },
+    "points_mae": 31.173431567520645
+   },
+   "8|RB|half": {
+    "size": 88,
+    "rho": {
+     "model": 0.7162490772286854,
+     "board": 0.5259780145375457,
+     "form": 0.689210632766979,
+     "ecr": 0.5787360729452303
+    },
+    "rank_error": {
+     "model": 8.041666666666666,
+     "board": 12.166666666666666,
+     "form": 10.583333333333334,
+     "ecr": 11.208333333333334
+    },
+    "coverage": {
+     "inside": 53,
+     "size": 88
+    },
+    "points_mae": 28.09657115948854
+   },
+   "8|RB|std": {
+    "size": 88,
+    "rho": {
+     "model": 0.7258584544085451,
+     "board": 0.5334381564943755,
+     "form": 0.697889009820984,
+     "ecr": 0.5867587850903463
+    },
+    "rank_error": {
+     "model": 8.291666666666666,
+     "board": 12.541666666666666,
+     "form": 10.729166666666666,
+     "ecr": 11.375
+    },
+    "coverage": {
+     "inside": 55,
+     "size": 88
+    },
+    "points_mae": 25.987884072634767
+   },
+   "8|WR|ppr": {
+    "size": 127,
+    "rho": {
+     "model": 0.5987258771510028,
+     "board": 0.5397455342107634,
+     "form": 0.540347263129941,
+     "ecr": 0.5272825321360638
+    },
+    "rank_error": {
+     "model": 18.5,
+     "board": 19.47222222222222,
+     "form": 20.305555555555557,
+     "ecr": 20.13888888888889
+    },
+    "coverage": {
+     "inside": 96,
+     "size": 127
+    },
+    "points_mae": 29.81166067529402
+   },
+   "8|WR|half": {
+    "size": 128,
+    "rho": {
+     "model": 0.5928604179082476,
+     "board": 0.5385710524691003,
+     "form": 0.5306052116954446,
+     "ecr": 0.5303212441508915
+    },
+    "rank_error": {
+     "model": 17.88888888888889,
+     "board": 18.75,
+     "form": 20.555555555555557,
+     "ecr": 19.02777777777778
+    },
+    "coverage": {
+     "inside": 97,
+     "size": 128
+    },
+    "points_mae": 24.82889217568268
+   },
+   "8|WR|std": {
+    "size": 129,
+    "rho": {
+     "model": 0.5667157323868248,
+     "board": 0.5329515616772941,
+     "form": 0.49725897919861306,
+     "ecr": 0.5288270854596395
+    },
+    "rank_error": {
+     "model": 19.38888888888889,
+     "board": 19.27777777777778,
+     "form": 21.944444444444443,
+     "ecr": 18.77777777777778
+    },
+    "coverage": {
+     "inside": 98,
+     "size": 129
+    },
+    "points_mae": 20.421798501233283
+   },
+   "8|TE|ppr": {
+    "size": 46,
+    "rho": {
+     "model": 0.6118597554483283,
+     "board": 0.4743118553130807,
+     "form": 0.5248550635253485,
+     "ecr": 0.5565389006315608
+    },
+    "rank_error": {
+     "model": 8.583333333333334,
+     "board": 11.583333333333334,
+     "form": 9.833333333333334,
+     "ecr": 11.0
+    },
+    "coverage": {
+     "inside": 40,
+     "size": 46
+    },
+    "points_mae": 25.185363722749116
+   },
+   "8|TE|half": {
+    "size": 46,
+    "rho": {
+     "model": 0.6256128776603006,
+     "board": 0.5249167386209449,
+     "form": 0.5417990073191778,
+     "ecr": 0.6063708412022945
+    },
+    "rank_error": {
+     "model": 7.916666666666667,
+     "board": 9.583333333333334,
+     "form": 10.0,
+     "ecr": 8.75
+    },
+    "coverage": {
+     "inside": 40,
+     "size": 46
+    },
+    "points_mae": 20.884483387073093
+   },
+   "8|TE|std": {
+    "size": 45,
+    "rho": {
+     "model": 0.5882740447957839,
+     "board": 0.5064066671609837,
+     "form": 0.49881422924901186,
+     "ecr": 0.5823451910408433
+    },
+    "rank_error": {
+     "model": 8.166666666666666,
+     "board": 9.5,
+     "form": 11.0,
+     "ecr": 8.833333333333334
+    },
+    "coverage": {
+     "inside": 38,
+     "size": 45
+    },
+    "points_mae": 17.320577765424915
+   },
+   "12|QB|ppr": {
+    "size": 42,
+    "rho": {
+     "model": 0.474756813269745,
+     "board": 0.38098924826375496,
+     "form": 0.4382495673101431,
+     "ecr": 0.3834480444220102
+    },
+    "rank_error": {
+     "model": 11.5,
+     "board": 11.916666666666666,
+     "form": 9.833333333333334,
+     "ecr": 12.583333333333334
+    },
+    "coverage": {
+     "inside": 36,
+     "size": 42
+    },
+    "points_mae": 32.804423034638255
+   },
+   "12|QB|half": {
+    "size": 42,
+    "rho": {
+     "model": 0.47939136342497285,
+     "board": 0.3809274996007459,
+     "form": 0.4382495673101431,
+     "ecr": 0.3834480444220102
+    },
+    "rank_error": {
+     "model": 11.416666666666666,
+     "board": 11.916666666666666,
+     "form": 9.833333333333334,
+     "ecr": 12.583333333333334
+    },
+    "coverage": {
+     "inside": 36,
+     "size": 42
+    },
+    "points_mae": 32.827040916302806
+   },
+   "12|QB|std": {
+    "size": 42,
+    "rho": {
+     "model": 0.47939136342497285,
+     "board": 0.3809274996007459,
+     "form": 0.4387374146949039,
+     "ecr": 0.3834480444220102
+    },
+    "rank_error": {
+     "model": 11.416666666666666,
+     "board": 11.916666666666666,
+     "form": 9.666666666666666,
+     "ecr": 12.583333333333334
+    },
+    "coverage": {
+     "inside": 36,
+     "size": 42
+    },
+    "points_mae": 32.84965788257681
+   },
+   "12|RB|ppr": {
+    "size": 86,
+    "rho": {
+     "model": 0.7495963752372312,
+     "board": 0.49557193591044413,
+     "form": 0.7009168565564932,
+     "ecr": 0.547998739395223
+    },
+    "rank_error": {
+     "model": 9.625,
+     "board": 11.833333333333334,
+     "form": 9.833333333333334,
+     "ecr": 11.041666666666666
+    },
+    "coverage": {
+     "inside": 78,
+     "size": 86
+    },
+    "points_mae": 17.806715319029813
+   },
+   "12|RB|half": {
+    "size": 89,
+    "rho": {
+     "model": 0.7741213849070282,
+     "board": 0.5068922796892239,
+     "form": 0.7233982461855477,
+     "ecr": 0.5627559352387683
+    },
+    "rank_error": {
+     "model": 9.458333333333334,
+     "board": 11.791666666666666,
+     "form": 10.145833333333334,
+     "ecr": 11.416666666666666
+    },
+    "coverage": {
+     "inside": 82,
+     "size": 89
+    },
+    "points_mae": 16.506075155370002
+   },
+   "12|RB|std": {
+    "size": 90,
+    "rho": {
+     "model": 0.7745649921177961,
+     "board": 0.5080786952591785,
+     "form": 0.7316677800363729,
+     "ecr": 0.5636202114590665
+    },
+    "rank_error": {
+     "model": 9.708333333333334,
+     "board": 13.583333333333334,
+     "form": 10.458333333333334,
+     "ecr": 12.75
+    },
+    "coverage": {
+     "inside": 83,
+     "size": 90
+    },
+    "points_mae": 15.30736344451963
+   },
+   "12|WR|ppr": {
+    "size": 128,
+    "rho": {
+     "model": 0.5745686359636026,
+     "board": 0.4818644280346696,
+     "form": 0.5526125510559394,
+     "ecr": 0.47509241476492886
+    },
+    "rank_error": {
+     "model": 25.36111111111111,
+     "board": 28.180555555555557,
+     "form": 23.98611111111111,
+     "ecr": 27.13888888888889
+    },
+    "coverage": {
+     "inside": 114,
+     "size": 128
+    },
+    "points_mae": 19.946738276031272
+   },
+   "12|WR|half": {
+    "size": 129,
+    "rho": {
+     "model": 0.5679670901980952,
+     "board": 0.47813634038436564,
+     "form": 0.5406048369756394,
+     "ecr": 0.4764043968396874
+    },
+    "rank_error": {
+     "model": 23.97222222222222,
+     "board": 26.625,
+     "form": 23.083333333333332,
+     "ecr": 25.47222222222222
+    },
+    "coverage": {
+     "inside": 115,
+     "size": 129
+    },
+    "points_mae": 16.83906660961877
+   },
+   "12|WR|std": {
+    "size": 130,
+    "rho": {
+     "model": 0.5543751380650266,
+     "board": 0.46882896899306986,
+     "form": 0.5088431311477954,
+     "ecr": 0.4697282790957489
+    },
+    "rank_error": {
+     "model": 24.47222222222222,
+     "board": 26.819444444444443,
+     "form": 24.25,
+     "ecr": 25.833333333333332
+    },
+    "coverage": {
+     "inside": 115,
+     "size": 130
+    },
+    "points_mae": 13.821637516699056
+   },
+   "12|TE|ppr": {
+    "size": 45,
+    "rho": {
+     "model": 0.5258337039518122,
+     "board": 0.26071302061165486,
+     "form": 0.4226308489087569,
+     "ecr": 0.33656256749992536
+    },
+    "rank_error": {
+     "model": 8.166666666666666,
+     "board": 11.083333333333334,
+     "form": 8.25,
+     "ecr": 10.666666666666666
+    },
+    "coverage": {
+     "inside": 36,
+     "size": 45
+    },
+    "points_mae": 18.192215802237563
+   },
+   "12|TE|half": {
+    "size": 45,
+    "rho": {
+     "model": 0.5176618303724131,
+     "board": 0.24937394858424078,
+     "form": 0.43007779821901565,
+     "ecr": 0.3357828012462206
+    },
+    "rank_error": {
+     "model": 8.416666666666666,
+     "board": 11.333333333333334,
+     "form": 8.75,
+     "ecr": 11.083333333333334
+    },
+    "coverage": {
+     "inside": 36,
+     "size": 45
+    },
+    "points_mae": 15.10008533419226
+   },
+   "12|TE|std": {
+    "size": 45,
+    "rho": {
+     "model": 0.481217910296545,
+     "board": 0.23718204042142774,
+     "form": 0.4085936789699505,
+     "ecr": 0.32583124030644056
+    },
+    "rank_error": {
+     "model": 11.166666666666666,
+     "board": 11.666666666666666,
+     "form": 11.75,
+     "ecr": 11.166666666666666
+    },
+    "coverage": {
+     "inside": 34,
+     "size": 45
+    },
+    "points_mae": 12.060603214468056
+   }
+  },
+  "coverage_pooled": {
+   "QB|ppr": {
+    "inside": 105,
+    "size": 125
+   },
+   "QB|half": {
+    "inside": 105,
+    "size": 125
+   },
+   "QB|std": {
+    "inside": 105,
+    "size": 125
+   },
+   "RB|ppr": {
+    "inside": 195,
+    "size": 257
+   },
+   "RB|half": {
+    "inside": 198,
+    "size": 263
+   },
+   "RB|std": {
+    "inside": 200,
+    "size": 264
+   },
+   "WR|ppr": {
+    "inside": 309,
+    "size": 383
+   },
+   "WR|half": {
+    "inside": 316,
+    "size": 385
+   },
+   "WR|std": {
+    "inside": 317,
+    "size": 387
+   },
+   "TE|ppr": {
+    "inside": 116,
+    "size": 137
+   },
+   "TE|half": {
+    "inside": 117,
+    "size": 137
+   },
+   "TE|std": {
+    "inside": 114,
+    "size": 138
+   }
+  },
+  "outcome_seasons_read": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2023,
+   2024,
+   2025
+  ],
+  "digests": {
+   "before": {
+    "preseason_projections": "26855:2109a11f008d8020cb8c1d9e144d4c74",
+    "preseason_board_reasons": "187631:e9857b63469f70a32a29a65dede38012",
+    "register_freeze_rows": "3409:adc192c3ca6e7005d8412ea1884fa9b8",
+    "register_grade_rows": "1351:7ce3224a7476a9b1bb049931d2478bf8",
+    "model_artifacts": "15:e0d4574eb02c40cb5b060371360ac87a"
+   },
+   "after": {
+    "preseason_projections": "26855:2109a11f008d8020cb8c1d9e144d4c74",
+    "preseason_board_reasons": "187631:e9857b63469f70a32a29a65dede38012",
+    "register_freeze_rows": "3409:adc192c3ca6e7005d8412ea1884fa9b8",
+    "register_grade_rows": "1351:7ce3224a7476a9b1bb049931d2478bf8",
+    "model_artifacts": "15:e0d4574eb02c40cb5b060371360ac87a"
+   }
+  }
+ },
+ "report": [
+  "fit: 8735 population rows; opportunity 4.8s, collect 41.1s, search 0.2s",
+  "PASS  G1 4|QB|ppr       rho 0.5728 against the stale board's 0.4924, difference +0.0804 against a margin of +0.0200, n=41",
+  "PASS  G1 4|QB|half      rho 0.5728 against the stale board's 0.4916, difference +0.0812 against a margin of +0.0200, n=41",
+  "PASS  G1 4|QB|std       rho 0.5728 against the stale board's 0.4916, difference +0.0812 against a margin of +0.0200, n=41",
+  "PASS  G1 4|RB|ppr       rho 0.6755 against the stale board's 0.6121, difference +0.0634 against a margin of +0.0200, n=87",
+  "PASS  G1 4|RB|half      rho 0.6952 against the stale board's 0.6048, difference +0.0904 against a margin of +0.0200, n=86",
+  "PASS  G1 4|RB|std       rho 0.6906 against the stale board's 0.5994, difference +0.0912 against a margin of +0.0200, n=86",
+  "FAIL  G1 4|WR|ppr       rho 0.5966 against the stale board's 0.6126, difference -0.0160 against a margin of +0.0200, n=128",
+  "FAIL  G1 4|WR|half      rho 0.5989 against the stale board's 0.6187, difference -0.0198 against a margin of +0.0200, n=128",
+  "FAIL  G1 4|WR|std       rho 0.5920 against the stale board's 0.6163, difference -0.0243 against a margin of +0.0200, n=128",
+  "PASS  G1 4|TE|ppr       rho 0.6804 against the stale board's 0.5810, difference +0.0994 against a margin of +0.0200, n=46",
+  "PASS  G1 4|TE|half      rho 0.7148 against the stale board's 0.6140, difference +0.1008 against a margin of +0.0200, n=46",
+  "PASS  G1 4|TE|std       rho 0.7546 against the stale board's 0.6572, difference +0.0974 against a margin of +0.0200, n=48",
+  "PASS  G1 8|QB|ppr       rho 0.5634 against the stale board's 0.3897, difference +0.1738 against a margin of +0.0200, n=42",
+  "PASS  G1 8|QB|half      rho 0.5634 against the stale board's 0.3898, difference +0.1737 against a margin of +0.0200, n=42",
+  "PASS  G1 8|QB|std       rho 0.5667 against the stale board's 0.3898, difference +0.1769 against a margin of +0.0200, n=42",
+  "PASS  G1 8|RB|ppr       rho 0.6674 against the stale board's 0.4892, difference +0.1782 against a margin of +0.0200, n=84",
+  "PASS  G1 8|RB|half      rho 0.7162 against the stale board's 0.5260, difference +0.1903 against a margin of +0.0200, n=88",
+  "PASS  G1 8|RB|std       rho 0.7259 against the stale board's 0.5334, difference +0.1924 against a margin of +0.0200, n=88",
+  "PASS  G1 8|WR|ppr       rho 0.5987 against the stale board's 0.5397, difference +0.0590 against a margin of +0.0200, n=127",
+  "PASS  G1 8|WR|half      rho 0.5929 against the stale board's 0.5386, difference +0.0543 against a margin of +0.0200, n=128",
+  "PASS  G1 8|WR|std       rho 0.5667 against the stale board's 0.5330, difference +0.0338 against a margin of +0.0200, n=129",
+  "PASS  G1 8|TE|ppr       rho 0.6119 against the stale board's 0.4743, difference +0.1375 against a margin of +0.0200, n=46",
+  "PASS  G1 8|TE|half      rho 0.6256 against the stale board's 0.5249, difference +0.1007 against a margin of +0.0200, n=46",
+  "PASS  G1 8|TE|std       rho 0.5883 against the stale board's 0.5064, difference +0.0819 against a margin of +0.0200, n=45",
+  "PASS  G1 12|QB|ppr      rho 0.4748 against the stale board's 0.3810, difference +0.0938 against a margin of +0.0200, n=42",
+  "PASS  G1 12|QB|half     rho 0.4794 against the stale board's 0.3809, difference +0.0985 against a margin of +0.0200, n=42",
+  "PASS  G1 12|QB|std      rho 0.4794 against the stale board's 0.3809, difference +0.0985 against a margin of +0.0200, n=42",
+  "PASS  G1 12|RB|ppr      rho 0.7496 against the stale board's 0.4956, difference +0.2540 against a margin of +0.0200, n=86",
+  "PASS  G1 12|RB|half     rho 0.7741 against the stale board's 0.5069, difference +0.2672 against a margin of +0.0200, n=89",
+  "PASS  G1 12|RB|std      rho 0.7746 against the stale board's 0.5081, difference +0.2665 against a margin of +0.0200, n=90",
+  "PASS  G1 12|WR|ppr      rho 0.5746 against the stale board's 0.4819, difference +0.0927 against a margin of +0.0200, n=128",
+  "PASS  G1 12|WR|half     rho 0.5680 against the stale board's 0.4781, difference +0.0898 against a margin of +0.0200, n=129",
+  "PASS  G1 12|WR|std      rho 0.5544 against the stale board's 0.4688, difference +0.0855 against a margin of +0.0200, n=130",
+  "PASS  G1 12|TE|ppr      rho 0.5258 against the stale board's 0.2607, difference +0.2651 against a margin of +0.0200, n=45",
+  "PASS  G1 12|TE|half     rho 0.5177 against the stale board's 0.2494, difference +0.2683 against a margin of +0.0200, n=45",
+  "PASS  G1 12|TE|std      rho 0.4812 against the stale board's 0.2372, difference +0.2440 against a margin of +0.0200, n=45",
+  "FAIL  G2 4|QB|ppr       rank error 8.000 against the stale board's 7.583",
+  "FAIL  G2 4|QB|half      rank error 8.000 against the stale board's 7.583",
+  "FAIL  G2 4|QB|std       rank error 8.000 against the stale board's 7.583",
+  "PASS  G2 4|RB|ppr       rank error 9.833 against the stale board's 10.500",
+  "PASS  G2 4|RB|half      rank error 9.167 against the stale board's 10.208",
+  "PASS  G2 4|RB|std       rank error 9.333 against the stale board's 11.000",
+  "FAIL  G2 4|WR|ppr       rank error 17.361 against the stale board's 17.194",
+  "FAIL  G2 4|WR|half      rank error 17.667 against the stale board's 17.111",
+  "FAIL  G2 4|WR|std       rank error 18.778 against the stale board's 17.722",
+  "PASS  G2 4|TE|ppr       rank error 8.750 against the stale board's 10.583",
+  "PASS  G2 4|TE|half      rank error 8.500 against the stale board's 9.167",
+  "PASS  G2 4|TE|std       rank error 9.417 against the stale board's 9.667",
+  "PASS  G2 8|QB|ppr       rank error 7.750 against the stale board's 8.750",
+  "PASS  G2 8|QB|half      rank error 7.750 against the stale board's 8.750",
+  "PASS  G2 8|QB|std       rank error 7.750 against the stale board's 8.750",
+  "PASS  G2 8|RB|ppr       rank error 9.042 against the stale board's 11.750",
+  "PASS  G2 8|RB|half      rank error 8.042 against the stale board's 12.167",
+  "PASS  G2 8|RB|std       rank error 8.292 against the stale board's 12.542",
+  "PASS  G2 8|WR|ppr       rank error 18.500 against the stale board's 19.472",
+  "PASS  G2 8|WR|half      rank error 17.889 against the stale board's 18.750",
+  "FAIL  G2 8|WR|std       rank error 19.389 against the stale board's 19.278",
+  "PASS  G2 8|TE|ppr       rank error 8.583 against the stale board's 11.583",
+  "PASS  G2 8|TE|half      rank error 7.917 against the stale board's 9.583",
+  "PASS  G2 8|TE|std       rank error 8.167 against the stale board's 9.500",
+  "PASS  G2 12|QB|ppr      rank error 11.500 against the stale board's 11.917",
+  "PASS  G2 12|QB|half     rank error 11.417 against the stale board's 11.917",
+  "PASS  G2 12|QB|std      rank error 11.417 against the stale board's 11.917",
+  "PASS  G2 12|RB|ppr      rank error 9.625 against the stale board's 11.833",
+  "PASS  G2 12|RB|half     rank error 9.458 against the stale board's 11.792",
+  "PASS  G2 12|RB|std      rank error 9.708 against the stale board's 13.583",
+  "PASS  G2 12|WR|ppr      rank error 25.361 against the stale board's 28.181",
+  "PASS  G2 12|WR|half     rank error 23.972 against the stale board's 26.625",
+  "PASS  G2 12|WR|std      rank error 24.472 against the stale board's 26.819",
+  "PASS  G2 12|TE|ppr      rank error 8.167 against the stale board's 11.083",
+  "PASS  G2 12|TE|half     rank error 8.417 against the stale board's 11.333",
+  "PASS  G2 12|TE|std      rank error 11.167 against the stale board's 11.667",
+  "PASS  G3 QB|ppr         coverage 0.840 against [0.75, 0.85], n=125",
+  "PASS  G3 QB|half        coverage 0.840 against [0.75, 0.85], n=125",
+  "PASS  G3 QB|std         coverage 0.840 against [0.75, 0.85], n=125",
+  "PASS  G3 RB|ppr         coverage 0.759 against [0.75, 0.85], n=257",
+  "PASS  G3 RB|half        coverage 0.753 against [0.75, 0.85], n=263",
+  "PASS  G3 RB|std         coverage 0.758 against [0.75, 0.85], n=264",
+  "PASS  G3 WR|ppr         coverage 0.807 against [0.75, 0.85], n=383",
+  "PASS  G3 WR|half        coverage 0.821 against [0.75, 0.85], n=385",
+  "PASS  G3 WR|std         coverage 0.819 against [0.75, 0.85], n=387",
+  "PASS  G3 TE|ppr         coverage 0.847 against [0.75, 0.85], n=137",
+  "FAIL  G3 TE|half        coverage 0.854 against [0.75, 0.85], n=137",
+  "PASS  G3 TE|std         coverage 0.826 against [0.75, 0.85], n=138",
+  "PASS  G4 isolation      outcomes read for [2021, 2022, 2023, 2024, 2025], allowed [2021, 2022, 2023, 2024, 2025]; every table as it was",
+  "DECISION: a gate failed; nothing ships"
+ ],
+ "rerun": false
+}

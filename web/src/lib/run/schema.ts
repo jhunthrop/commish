@@ -305,7 +305,8 @@ export const slateSchema = z.object({
 	strength: points,
 	/** 1 is the hardest slate of the 32. */
 	rank: z.number().int().min(1).max(32),
-	/** How strength is measured, as the page prints it beside the number. */
+	/** How strength is measured, as the page prints it beside the number: a noun phrase with its own
+	 * article, "the average of its opponents' expected wins for the season, ...". */
 	method: phrase,
 	/** When the inputs were read, from their own stamps. */
 	window: windowSchema

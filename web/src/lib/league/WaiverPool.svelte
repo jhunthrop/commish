@@ -18,11 +18,9 @@
 		basis: string;
 		/** Once the season is on the rows end on points a game, the projection beside them. */
 		inSeason: boolean;
-		/** Positions the league starts that the run does not rank: "No kickers on this run." */
-		missing: readonly string[];
 	}
 
-	let { rows, tagsOf, basis, inSeason, missing }: Props = $props();
+	let { rows, tagsOf, basis, inSeason }: Props = $props();
 
 	const FIRST_ROWS = 25;
 	const MORE_ROWS = 25;
@@ -52,7 +50,6 @@
 				<Chip size="sm" pressed={position === p} onclick={() => choose(p)}>{p}</Chip>
 			{/each}
 		</ChipGroup>
-		{#each missing as line (line)}<p class="basis">{line}</p>{/each}
 	</div>
 	{#each visible.slice(0, shown) as player (player.id)}
 		<LeagueRow

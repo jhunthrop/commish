@@ -4,7 +4,8 @@
 
 	/** Every club's slate, one row each: the club's face and name lead, its rank follows in the number
 	 * face with the strength, then a week grid that scrolls sideways in its own frame, so the page
-	 * never runs past its width. Each week names the opponent (at or vs) and his number, and a week
+	 * never runs past its width. On the phone the rank leads the club's name and the strength stays
+	 * pinned beside it, so only the weeks scroll. Each week names the opponent (at or vs) and his number, and a week
 	 * against one of the strongest opponents is shaded; the page states that population. */
 	interface Props {
 		rows: readonly ScheduleRow[];
@@ -13,9 +14,12 @@
 		caption: string;
 		/** The strength column's head: "Opp. avg wins". */
 		strengthLabel: string;
+		/** The last week played, 0 before the first kickoff: weeks up to it are set back, so what is
+		 * left reads at a glance. The page's lead says so. */
+		played?: number;
 	}
 
-	let { rows, weeks, caption, strengthLabel }: Props = $props();
+	let { rows, weeks, caption, strengthLabel, played = 0 }: Props = $props();
 </script>
 
 <!-- The frame scrolls, so it takes focus: a keyboard reaches week 18 with the arrow keys. -->
@@ -29,7 +33,7 @@
 				<th scope="col" class="rank">Rank</th>
 				<th scope="col" class="strength">{strengthLabel}</th>
 				{#each weeks as week (week)}
-					<th scope="col" class="week">Wk {week}</th>
+					<th scope="col" class="week" class:played={week <= played}>Wk {week}</th>
 				{/each}
 			</tr>
 		</thead>
@@ -38,6 +42,7 @@
 				<tr>
 					<th scope="row" class="club">
 						<span class="who">
+							<span class="rank-lead" aria-hidden="true">{row.rank}</span>
 							<Face src={row.face?.src ?? null} size={32} />
 							<span class="names">
 								<a href={row.href}>{row.name}</a>
@@ -49,9 +54,9 @@
 					<td class="strength">{row.strength}</td>
 					{#each row.cells as cell (cell.week)}
 						{#if cell.opponent === null}
-							<td class="week bye">Bye</td>
+							<td class="week bye" class:played={cell.week <= played}>Bye</td>
 						{:else}
-							<td class="week" class:hard={cell.hard}>
+							<td class="week" class:hard={cell.hard} class:played={cell.week <= played}>
 								<span class="opp">{cell.home ? 'vs' : 'at'} {cell.opponent}</span>
 								<span class="value">{cell.value}</span>
 							</td>
@@ -170,11 +175,17 @@
 		text-decoration: underline;
 	}
 
+	/* The rank is quiet at body size; the strength it comes from carries the number face. */
 	.rank b {
+		font-weight: 500;
+		color: var(--ink-3);
+		font-variant-numeric: tabular-nums;
+	}
+
+	td.strength {
 		font-family: var(--font-num);
 		font-weight: 700;
-		font-size: var(--t-xl);
-		font-variant-numeric: tabular-nums;
+		font-size: var(--t-lg);
 	}
 
 	.week {
@@ -209,14 +220,57 @@
 		color: var(--ink-3);
 	}
 
+	/* A played week steps back behind the weeks still to come in muted ink, which holds 4.5:1. */
+	.played,
+	.played .value {
+		color: var(--played-ink);
+		font-weight: 400;
+	}
+
+	.rank-lead {
+		display: none;
+	}
+
+	/* The phone keeps the club and its strength in view and scrolls only the weeks: the rank becomes
+	   a small lead before the face, the club's cell holds its width (a long name wraps), and the
+	   strength pins right after it, so its head is never cut. */
 	@media (max-width: 760px) {
 		.frame {
-			--club-w: 168px;
+			--club-w: 196px;
+			--strength-w: 80px;
 		}
 
-		.rank,
+		.club,
 		.strength {
-			position: static;
+			padding-inline: var(--s-2);
+		}
+
+		.club .who {
+			width: calc(var(--club-w) - 2 * var(--s-2));
+			font-size: var(--t-sm);
+		}
+
+		.names a {
+			white-space: normal;
+		}
+
+		.rank-lead {
+			display: inline;
+			flex: none;
+			min-width: 2ch;
+			font-size: var(--t-xs);
+			font-weight: 500;
+			color: var(--ink-3);
+			font-variant-numeric: tabular-nums;
+		}
+
+		.rank {
+			display: none;
+		}
+
+		.strength {
+			left: var(--club-w);
+			min-width: var(--strength-w);
 		}
 	}
 </style>

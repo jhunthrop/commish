@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { windowLabel } from '#lib/format/date.ts';
-	import { fixed, hardestWords } from '#lib/format/number.ts';
+	import { fixed } from '#lib/format/number.ts';
+	import { clubCaption, playedWords } from '#lib/run/strength-words.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
 	import Crumb from '#lib/ui/Crumb.svelte';
@@ -20,9 +20,7 @@
 	const club = $derived(page.club);
 	const name = $derived(`${club.city} ${club.nickname}`);
 	const names = $derived(new Map(page.clubs.map((other) => [other.abbr, other])));
-	const caption = $derived(
-		`the ${page.slate.method}, ${hardestWords(page.slate.rank, page.clubs.length)}, read ${windowLabel(page.slate.window)}`
-	);
+	const caption = $derived(clubCaption(page.slate, page.clubs.length));
 </script>
 
 <SiteShell title={name} run={data.run}>
@@ -45,7 +43,7 @@
 			<PanelHead title="On our {page.format.label} board" />
 			{#if page.scale}
 				<Panel padding="none">
-					<RowHead />
+					<RowHead games={page.rows.some((row) => row.season !== undefined)} />
 					{#each page.rows as player (player.id)}
 						<Row
 							{player}
@@ -53,6 +51,7 @@
 							scale={page.scale}
 							showTier
 							unit={page.format.unit}
+							season={player.season}
 						/>
 					{/each}
 				</Panel>
@@ -63,7 +62,9 @@
 
 		<section aria-label="Schedule">
 			<Table
-				caption="{page.schedule.season} schedule"
+				caption={page.played === 0
+					? `${String(page.schedule.season)} schedule`
+					: `${String(page.schedule.season)} schedule, ${playedWords(page.played)}`}
 				showCaption
 				columns={[
 					{ label: 'Week' },
@@ -73,7 +74,7 @@
 			>
 				{#each page.games as game (game.week)}
 					{@const opponent = names.get(game.opponent)}
-					<tr>
+					<tr class:played={game.week <= page.played}>
 						<td>Week {game.week}</td>
 						<td>
 							{game.home ? 'vs' : 'at'}
@@ -90,6 +91,12 @@
 </SiteShell>
 
 <style>
+	/* A week already played is set back, so what is left reads first. */
+	.played,
+	.played :global(a) {
+		color: var(--played-ink);
+	}
+
 	.club {
 		padding: var(--s-5);
 		display: flex;

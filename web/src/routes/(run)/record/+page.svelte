@@ -1,10 +1,15 @@
 <script lang="ts">
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
-	import { SCORING_WORDS } from '#lib/league/names.ts';
 	import { fixed, plural } from '#lib/format/number.ts';
-	import { allLine, recordHeadline, weekWords } from '#lib/run/record.ts';
-	import type { RecordWeek, Score } from '#lib/run/schema.ts';
+	import {
+		allLine,
+		rankAgreement,
+		recordHeadline,
+		weekLines,
+		type WeekLine
+	} from '#lib/run/record.ts';
+	import type { Score } from '#lib/run/schema.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
 	import Footnote from '#lib/ui/Footnote.svelte';
@@ -21,11 +26,11 @@
 	const record = $derived(data.page.record);
 	const scoring = $derived(data.page.format.label);
 	/** The record is graded in one scoring: with a league selected, the page says the league's too. */
-	const note = $derived(
-		siteContext.league
-			? `Your league scores ${SCORING_WORDS[siteContext.league.scoring]}. Our record is graded in ${scoring}.`
-			: null
-	);
+	const note = $derived.by(() => {
+		const { league, notes } = siteContext;
+		if (league === null || notes === null) return null;
+		return `${notes.leagueScores(league)} Our record is graded in ${scoring}.`;
+	});
 	const stat = $derived(record.statistic);
 	const headline = $derived(recordHeadline(record));
 
@@ -34,22 +39,23 @@
 		return value === null ? 'Too few' : fixed(value, digits);
 	}
 
-	/** Each week as a person says it, with the week's agreement once it is graded. */
-	function weekLine(week: RecordWeek): { lead: string; text: string; figure?: string } {
-		const lead = `Week ${String(week.week)}`;
-		const line = allLine(week.lines);
-		if (week.status !== 'graded' || line?.ours.agreement == null) {
-			return { lead, text: weekWords(week) };
-		}
+	/** Each line as a person says it, with the week's agreement once it is graded. */
+	function withFigure({ lead, text, week }: WeekLine): {
+		lead: string;
+		text: string;
+		figure?: string;
+	} {
+		const line = week === null ? undefined : allLine(week.lines);
+		if (week?.status !== 'graded' || line?.ours.agreement == null) return { lead, text };
 		const adp = line.adp.agreement === null ? '' : `, ADP ${fixed(line.adp.agreement, 2)}`;
 		return {
 			lead,
-			text: `${weekWords(week)}. Our ${stat.agreement} over ${plural(line.ours.graded, 'player')}${adp}`,
+			text: `${text}. Our ${rankAgreement(record)} over ${plural(line.ours.graded, 'player')}${adp}`,
 			figure: fixed(line.ours.agreement, 2)
 		};
 	}
 
-	const lines = $derived(record.weeks.map(weekLine));
+	const lines = $derived(weekLines(record.weeks).map(withFigure));
 
 	const positionColumns: Column[] = [
 		{ label: 'Position' },
@@ -76,17 +82,10 @@
 			<Figure value={headline.value} size="xl" caption={headline.caption} />
 		</Panel>
 
-		{#if lines.length > 0}
-			<section aria-label="Week by week">
-				<PanelHead title="Week by week" level={2} />
-				<LineList label="Every week of the season" {lines} />
-			</section>
-		{/if}
-
 		{#if record.toDate.length > 0}
 			<section aria-label="By position">
 				<Table
-					caption="By position, every graded week: {stat.agreement}, and {stat.placesOff}"
+					caption="By position, every graded week: {rankAgreement(record)}, and {stat.placesOff}"
 					showCaption
 					columns={positionColumns}
 				>
@@ -95,11 +94,22 @@
 							<td>{line.position}</td>
 							<td class="num">{line.ours.graded}</td>
 							{#each scoreCells(line.ours, line.adp) as cell, i (i)}
-								<td class="num" class:wide={i > 1}>{cell}</td>
+								<td class="num" class:wide={i > 1}>
+									{cell}{#if i === 2}<span class="rank-basis"
+											>{line.position === 'All' ? 'overall rank' : 'position rank'}</span
+										>{/if}
+								</td>
 							{/each}
 						</tr>
 					{/each}
 				</Table>
+			</section>
+		{/if}
+
+		{#if lines.length > 0}
+			<section aria-label="Week by week">
+				<PanelHead title="Week by week" level={2} />
+				<LineList label="Every week of the season" {lines} />
 			</section>
 		{/if}
 
@@ -111,6 +121,14 @@
 </SiteShell>
 
 <style>
+	/* Places off counts overall rank on All and position rank on each position: the cell says which. */
+	.rank-basis {
+		display: block;
+		font-family: var(--font-ui);
+		font-size: var(--t-xs);
+		color: var(--ink-3);
+	}
+
 	.record {
 		padding: var(--s-5);
 		display: flex;

@@ -68,14 +68,11 @@ function splitLog(log: readonly GameLogRow[]): [GameLogRow[], GameLogRow[]] {
 }
 
 function basisWords(season: PlayerSeason, position: Position, format: Format): string {
-	const parts = [`Stat lines from the league's own records, scored in ${format.label}.`];
-	if (season.games > 0) {
-		parts.push(`Points a game average the ${plural(season.games, 'game')} he played.`);
-		if (STAT_COLUMNS[position].some((column) => column.snaps))
-			parts.push("Snap % is his share of his team's offensive snaps.");
-		if (position === 'QB' && season.totals.completions === null)
-			parts.push('Completions are not in our records yet.');
-	}
+	const source = `Stat lines from the NFL's records, scored in ${format.label}`;
+	if (season.games === 0) return `${source}.`;
+	const parts = [`${source}, averaged over the ${plural(season.games, 'game')} he played.`];
+	if (position === 'QB' && season.totals.completions === null)
+		parts.push('Completions are not in our records yet.');
 	return parts.join(' ');
 }
 

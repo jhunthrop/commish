@@ -204,6 +204,7 @@
 
 	.find {
 		flex: 1;
+		min-width: var(--find-min-w);
 		max-width: 620px;
 		display: flex;
 	}
@@ -218,11 +219,34 @@
 		min-height: var(--verb-h);
 	}
 
-	/* The league switch closes the bar at the right on every width. */
+	/* The league switch closes the bar at the right on every width: 232px where the bar has the room,
+	   giving way as the bar narrows (under 1024px) down to a cut name with its flag and chevron, so the
+	   bar never runs past the screen. Its width comes from the bar, never from the name, so the name's
+	   arrival moves nothing. */
 	.league {
 		display: flex;
-		flex: none;
+		flex: 0 1 var(--switch-w);
+		min-width: var(--switch-min-w);
+	}
+
+	/* With no league selected (signed out, or a format only) the switch says a format, "PPR", and
+	   takes only its words' width, so the search keeps the room for its placeholder. The boot script
+	   marks a selected league before the first paint, so the width never changes as a page loads. */
+	:global(html:not([data-league])) .league {
+		flex: 0 1 auto;
 		min-width: 0;
+	}
+
+	/* Under 1024px the bar's title gives way, as on the phone (the rail names the section), so the
+	   search, the verb and the switch keep their room and the bar never runs past the screen. */
+	@media (max-width: 1024px) {
+		h1 {
+			display: none;
+		}
+
+		.stamp {
+			margin-left: 0;
+		}
 	}
 
 	@media (max-width: 760px) {
@@ -264,29 +288,22 @@
 			border-top-color: var(--accent);
 		}
 
-		/* The phone bar is a grid with the account in its first row's last cell on every page, so the
-		   one way to the account, the pass and the companion is always in the same place, and the
-		   league switch, the bar's one menu, takes the rest of that row: after the run's date, or
-		   before the page's verb on a page with no date. Under a date the verb has its own row, and
-		   the search runs across the last. */
+		/* The phone bar is one grid on every page, so it never changes size between pages: the league
+		   switch, the bar's one menu, takes the whole first row with the account in its last cell; the
+		   run's date and the page's verb share the second, a verb's height whether or not the page has
+		   either; the search runs across the last. */
 		.top {
 			display: grid;
-			grid-template-columns: minmax(0, 1fr) auto auto;
+			grid-template-columns: auto minmax(0, 1fr) auto;
+			grid-template-rows: auto var(--verb-h) auto;
 			grid-template-areas:
-				'league tail account'
+				'league league account'
+				'stamp tail tail'
 				'find find find';
 			align-items: center;
 			padding: var(--s-2) var(--s-4);
 			gap: var(--s-2);
 			min-height: 0;
-		}
-
-		.top:has(.stamp) {
-			grid-template-columns: auto minmax(0, 1fr) auto;
-			grid-template-areas:
-				'stamp league account'
-				'tail tail tail'
-				'find find find';
 		}
 
 		.league {
@@ -311,11 +328,6 @@
 		.tail {
 			grid-area: tail;
 			justify-content: flex-end;
-		}
-
-		/* An empty tail takes no row under a date. */
-		.tail:not(:has(*)) {
-			display: none;
 		}
 
 		.find {

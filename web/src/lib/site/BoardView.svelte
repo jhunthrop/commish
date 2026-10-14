@@ -3,8 +3,6 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { followFormat } from '#lib/context/follow.svelte.ts';
-	import ScoringChoice from '#lib/context/ScoringChoice.svelte';
-	import { contextNote, heldMark } from '#lib/context/words.ts';
 	import { POSITION_NAMES, tierGroups } from '#lib/run/derive.ts';
 	import type { BoardPage } from '#lib/server/pages/board.ts';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
@@ -23,7 +21,7 @@
 	import TierStrip from '#lib/ui/TierStrip.svelte';
 	import Toggle from '#lib/ui/Toggle.svelte';
 	import { scoringBasis } from '#lib/run/catalog.ts';
-	import { apiFormatOf, runFormatId } from '#lib/run/format-ids.ts';
+	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import type { BoardRowView } from '#lib/run/schema.ts';
 	import { links, tierAnchor } from './links.ts';
 
@@ -56,16 +54,7 @@
 	);
 	const figures = $derived(apiFormatOf(page.format));
 	/** What this board is against the league's scoring, also when a link named another board. */
-	const note = $derived.by(() => {
-		const league = siteContext.league;
-		if (figures === null || league === null) return null;
-		return contextNote(
-			league,
-			figures,
-			'This board is',
-			carried.includes(runFormatId(league.format))
-		);
-	});
+	const note = $derived(siteContext.notes?.lineFor(figures, 'This board is', carried) ?? null);
 	$effect(() => {
 		if (onlySheet) void lazySheet.load();
 	});
@@ -92,6 +81,7 @@
 			means: `The round his points over replacement rank in, among ${String(page.boardSize)}`
 		},
 		{ term: 'Rose', means: 'Below replacement' },
+		{ term: 'Range', means: 'Floor to ceiling' },
 		{ term: 'Drafters', means: `Their ADP from ${page.adpBasis.join(' and ')}, against our rank` }
 	]);
 
@@ -109,7 +99,7 @@
 		{range}
 		eager={i < EAGER_ROWS}
 		season={player.season}
-		held={heldMark(siteContext.held, player.id)}
+		held={siteContext.held?.mark(player.id) ?? null}
 	>
 		{#snippet action()}
 			<RowSheetMark {player} />
@@ -118,6 +108,11 @@
 {/snippet}
 
 <main class="board">
+	<!-- The league's line sits by the switch, not under the caption: atop the side column on a desk,
+	     first under the bar elsewhere. -->
+	<div class="league-line">
+		<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
+	</div>
 	<div class="content">
 		<div class="lead">
 			<PageHead title="{season} Board" lead={page.seasonLead ?? page.format.basis.join(' · ')}>
@@ -128,11 +123,9 @@
 					<span class="to-side"><Quiet href="#{SIDE_ID}" size="sm">Basis and filters</Quiet></span>
 				{/snippet}
 			</PageHead>
-			<ContextNote {note} />
 		</div>
 		<div class="filters">
 			<FilterBar>
-				<ScoringChoice label={page.format.label} />
 				<ChipGroup label="Position">
 					<Chip href={links.board(page.format.id)} pressed={page.position === null}>All</Chip>
 					{#each page.positions as position (position)}
@@ -145,7 +138,7 @@
 		</div>
 
 		<section aria-label="{page.position ?? 'All'} {page.format.label} board">
-			<RowHead {range} action />
+			<RowHead {range} action games={page.seasonLead !== null} />
 			{#if page.position === null}
 				{#each visible as player, i (player.id)}
 					{@render row(player, i)}
@@ -191,28 +184,62 @@
 		<Panel>
 			<PanelHead title="Show" />
 			<Toggle label="Players below replacement" bind:checked={belowReplacement} />
-			<Toggle label="Floor to ceiling" bind:checked={range} />
+			<span class="range-toggle"><Toggle label="Floor to ceiling" bind:checked={range} /></span>
 			<Toggle label="Only my sheet" bind:checked={onlySheet} />
 		</Panel>
 		<Panel>
 			<PanelHead title="Basis" />
 			<BasisList terms={basisTerms} />
 		</Panel>
-		<!-- Last in the column, so the rail arriving with the sheet moves nothing above it. -->
-		{#if Rail}<Rail />{/if}
+		<!-- Last in the column, so the rail arriving with the sheet moves nothing above it, in a slot
+		     holding an empty sheet's height, so the column does not grow when it arrives. -->
+		<div class="rail-slot">
+			{#if Rail}<Rail />{/if}
+		</div>
 	</aside>
 </main>
 
 <style>
+	/* On a desk the content spans both rows and the league's line heads the side column, so the line
+	   takes no row of its own when there is none (the flexible second row takes the content's height). */
 	.board {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) var(--side-w);
-		gap: var(--s-5);
+		grid-template-rows: auto 1fr;
+		column-gap: var(--s-5);
 		padding: var(--s-5);
 	}
 
+	.league-line {
+		grid-column: 2;
+		grid-row: 1;
+	}
+
+	/* On a desk the line sits in the side column, as narrow as a phone, so it keeps the phone's room. */
+	@media (min-width: 1181px) {
+		:global(html[data-league='2']) .league-line :global(.note) {
+			min-height: 2lh;
+		}
+
+		:global(html[data-league='3']) .league-line :global(.note) {
+			min-height: 3lh;
+		}
+	}
+
+	:global(html[data-league]) .league-line,
+	.league-line:has(:global(.filled)) {
+		margin-bottom: var(--s-4);
+	}
+
 	.content {
+		grid-column: 1;
+		grid-row: 1 / span 2;
 		min-width: 0;
+	}
+
+	.side {
+		grid-column: 2;
+		grid-row: 2;
 	}
 
 	.lead {
@@ -243,9 +270,37 @@
 		display: none;
 	}
 
+	.range-toggle {
+		display: contents;
+	}
+
+	/* From 1181 to 1439px an in-season row has no floor to ceiling column, so no switch for it. */
+	@media (min-width: 1181px) and (max-width: 1439px) {
+		.board:has(:global(.row.games)) .range-toggle {
+			display: none;
+		}
+	}
+
+	/* The sheet card's height with no one on it yet ("Your sheet", "No one yet"). */
+	.rail-slot {
+		min-height: 86px;
+	}
+
 	@media (max-width: 1180px) {
 		.board {
 			grid-template-columns: minmax(0, 1fr);
+			grid-template-rows: none;
+		}
+
+		.league-line,
+		.content,
+		.side {
+			grid-column: auto;
+			grid-row: auto;
+		}
+
+		.content {
+			margin-bottom: var(--s-5);
 		}
 
 		.to-side {
@@ -262,7 +317,10 @@
 	@media (max-width: 760px) {
 		.board {
 			padding: var(--s-4);
-			gap: var(--s-4);
+		}
+
+		.content {
+			margin-bottom: var(--s-4);
 		}
 
 		.side {

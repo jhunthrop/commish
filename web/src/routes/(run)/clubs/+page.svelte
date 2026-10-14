@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { windowLabel } from '#lib/format/date.ts';
-	import { fixed, hardestWords, plural } from '#lib/format/number.ts';
+	import { fixed, plural } from '#lib/format/number.ts';
+	import { clubsLead, hardestWords } from '#lib/run/strength-words.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
 	import Figure from '#lib/ui/Figure.svelte';
@@ -13,13 +13,7 @@
 	let { data }: PageProps = $props();
 
 	const page = $derived(data.page);
-	const lead = $derived.by(() => {
-		const [first] = page.clubs;
-		const strength = first
-			? ` · schedule strength is the ${first.slate.method}, read ${windowLabel(first.slate.window)}`
-			: '';
-		return `Every club's players on our ${page.format.label} board${strength}`;
-	});
+	const lead = $derived(clubsLead(page.format.label, page.clubs[0]?.slate));
 </script>
 
 <SiteShell title="Clubs" run={data.run}>

@@ -420,7 +420,7 @@ function scheduleFrom(
 		slates: unranked.map((slate) => ({
 			...slate,
 			rank: ordered.findIndex((other) => other.abbr === slate.abbr) + 1,
-			method: "average of its opponents' published season win totals",
+			method: "the average of its opponents' published season win totals",
 			window: winTotals.window
 		}))
 	};
