@@ -45,7 +45,10 @@ type Snapshot struct {
 	Season int `json:"season"`
 	// Week is the host's current week for this league's season, 0 when
 	// the season has no current week (before it starts, or a past season).
-	Week     int       `json:"week"`
+	Week int `json:"week"`
+	// AllPlay says the host's schedule sets Week as all-play: every team
+	// is scored against every other and no side has an opponent.
+	AllPlay  bool      `json:"all_play,omitempty"`
 	Teams    []Team    `json:"teams"`
 	Matchups []Side    `json:"matchups"`
 	Moves    []Move    `json:"moves"`

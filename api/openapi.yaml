@@ -2330,6 +2330,7 @@ components:
         - name
         - status
         - week
+        - week_all_play
         - me
         - settings_league_id
         - settings_note
@@ -2356,6 +2357,11 @@ components:
         name: { type: string }
         status: { type: string, description: the host's league state (in_season and the like), empty where the host shows none }
         week: { type: integer, description: the host's current week, 0 before the season or for a past one }
+        week_all_play:
+          type: boolean
+          description: >-
+            the host's schedule sets this week as all-play (every team scored against every other, no head-to-head
+            game); the matchup then holds the drafter's side alone
         me: { type: integer, description: the drafter's roster id }
         settings_league_id:
           type: string

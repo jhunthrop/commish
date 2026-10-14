@@ -2047,6 +2047,8 @@ export interface components {
 			status: string;
 			/** @description the host's current week */
 			week: number;
+			/** @description the host's schedule sets this week as all-play (every team scored against every other, no head-to-head game); the matchup then holds the drafter's side alone */
+			week_all_play: boolean;
 			/** @description the drafter's roster id */
 			me: number;
 			/**

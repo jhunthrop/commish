@@ -77,6 +77,11 @@ func TestFFPCSnapshotFromTheFixtures(t *testing.T) {
 	if NearestPreset(snap.Scoring.Rules) != apitypes.ScoringPresetTePremium {
 		t.Fatalf("scores like %s", NearestPreset(snap.Scoring.Rules))
 	}
+	// Week 6 is an all-play week on FFPC's schedule ("All Play Week", no
+	// games listed): the member's side stands alone with their starters.
+	if !snap.AllPlay || len(snap.Matchups) != 1 || snap.Matchups[0].RosterID != 11 || len(snap.Matchups[0].Starters) != 10 {
+		t.Fatalf("week 6: all play %v, sides %+v", snap.AllPlay, snap.Matchups)
+	}
 	want := Shape{Teams: 12, QB: 1, RB: 2, WR: 2, TE: 1, K: 1, DEF: 1, Flex: 2, Bench: 10}
 	if snap.Shape.Teams != want.Teams || snap.Shape.Bench != want.Bench || snap.Shape.Flex != want.Flex || len(snap.Shape.Unfollowed) != 0 {
 		t.Fatalf("shape %+v", snap.Shape)
@@ -86,10 +91,6 @@ func TestFFPCSnapshotFromTheFixtures(t *testing.T) {
 	}
 	if len(snap.Moves) != 4 || snap.Moves[0].Kind != MoveAdd || len(snap.Moves[0].Adds) != 1 {
 		t.Fatalf("moves %+v", snap.Moves)
-	}
-	// The week is the all-play week: no head-to-head games.
-	if len(snap.Matchups) != 0 {
-		t.Fatalf("matchups %+v", snap.Matchups)
 	}
 	for _, id := range namedPlayers(snap) {
 		if p, ok := snap.Players[id]; !ok || p.Name == "" || p.Position == "" {
@@ -205,6 +206,11 @@ func TestAttachFFPC(t *testing.T) {
 	scrubbed := ownLineupOnly(ffpcSnapshot(fixtureLeagueRead(t), clock.now), 3)
 	if me, _ := scrubbed.TeamByRoster(11); len(me.Starters) != 0 {
 		t.Fatalf("team 3's view shows team 11's starters: %v", me.Starters)
+	}
+	for _, side := range scrubbed.Matchups {
+		if side.RosterID != 3 && len(side.Starters) != 0 {
+			t.Fatalf("team 3's view shows team %d's matchup starters", side.RosterID)
+		}
 	}
 
 	if err := (&hosts.Store{Pool: pool}).Delete(ctx, alice.ID, ffpc.Host); err != nil {

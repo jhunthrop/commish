@@ -1380,6 +1380,9 @@ type LeagueSync struct {
 
 	// Week the host's current week
 	Week int `json:"week"`
+
+	// WeekAllPlay the host's schedule sets this week as all-play (every team scored against every other, no head-to-head game); the matchup then holds the drafter's side alone
+	WeekAllPlay bool `json:"week_all_play"`
 }
 
 // LeagueTeam defines model for LeagueTeam.

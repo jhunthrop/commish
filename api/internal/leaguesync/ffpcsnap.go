@@ -74,7 +74,10 @@ func ffpcSnapshot(l ffpc.League, now time.Time) Snapshot {
 	}
 	sort.Slice(snap.Teams, func(i, j int) bool { return snap.Teams[i].RosterID < snap.Teams[j].RosterID })
 	snap.Week = ffpcWeek(l, now)
-	snap.Matchups = ffpcGames(l.Schedule, snap.Week)
+	snap.Matchups, snap.AllPlay = ffpcGames(l.Schedule, snap.Week)
+	if l.Banner.TeamID > 0 {
+		snap.Matchups = withMemberSide(snap.Matchups, snap.AllPlay, *team(l.Banner.TeamID))
+	}
 	snap.Moves = ffpcMoves(l.Moves, &snap)
 	if l.Rules != nil {
 		snap.Scoring = ffpcScoring(*l.Rules)
@@ -118,22 +121,41 @@ func ffpcWeek(l ffpc.League, now time.Time) int {
 	return ffpc.WeekOf(l.Schedule, now)
 }
 
-// ffpcGames is the week's games as sides; the member's side carries their
-// starters (FFPC's live scoring page is where each starter's points
-// would come from, and it is read only when it answers).
-func ffpcGames(weeks []ffpc.Week, number int) []Side {
+// ffpcGames is the week's games as sides, and whether the schedule sets
+// the week as all-play (a Big Gorilla week every team plays every other,
+// with no games listed).
+func ffpcGames(weeks []ffpc.Week, number int) ([]Side, bool) {
 	var out []Side
+	allPlay := false
 	for _, w := range weeks {
 		if w.Number != number {
 			continue
 		}
+		allPlay = w.AllPlay
 		for i, g := range w.Games {
 			out = append(out,
 				Side{RosterID: g.Away, Game: i + 1, Points: round2(g.AwayPoints), PlayerPoints: map[string]float64{}},
 				Side{RosterID: g.Home, Game: i + 1, Points: round2(g.HomePoints), PlayerPoints: map[string]float64{}})
 		}
 	}
-	return out
+	return out, allPlay
+}
+
+// withMemberSide gives the member's side their starters from their
+// lineup page (FFPC's live scoring page is where each starter's points
+// would come from, and it is read only when it answers), and in an
+// all-play week, when the schedule lists no game, a side of their own.
+func withMemberSide(sides []Side, allPlay bool, member Team) []Side {
+	found := false
+	for i := range sides {
+		if sides[i].RosterID == member.RosterID {
+			sides[i].Starters, found = member.Starters, true
+		}
+	}
+	if !found && allPlay {
+		sides = append(sides, Side{RosterID: member.RosterID, Starters: member.Starters, PlayerPoints: map[string]float64{}})
+	}
+	return sides
 }
 
 // ffpcMoves is the moves panel's moves, newest first.
@@ -181,6 +203,13 @@ func ownLineupOnly(snap Snapshot, me int) Snapshot {
 			t.Starters = nil
 		}
 		out.Teams[i] = t
+	}
+	out.Matchups = make([]Side, len(snap.Matchups))
+	for i, s := range snap.Matchups {
+		if s.RosterID != me {
+			s.Starters = nil
+		}
+		out.Matchups[i] = s
 	}
 	return out
 }
