@@ -42,7 +42,7 @@
 	}
 </script>
 
-<SetupRow label="Scoring" note={own ? 'every rule on your league' : undefined}>
+<SetupRow label="Scoring" note={own ? "your league's own rules" : undefined}>
 	<ChipGroup label="Scoring">
 		{#each SCORING_CHOICES as c (c.preset)}
 			<Chip
