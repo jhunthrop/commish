@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { fixed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
+	import type { IndexSeason } from '#lib/run/schema.ts';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import AdpCell from './AdpCell.svelte';
 	import Face from './Face.svelte';
@@ -10,6 +11,7 @@
 	import TierChip from './TierChip.svelte';
 	import ValueCell from './ValueCell.svelte';
 	import { vorCell } from './heat.ts';
+	import { seasonFigures } from './season-figures.ts';
 
 	interface Props {
 		player: BoardPlayer;
@@ -32,6 +34,10 @@
 		/** What the row is ordered by. board leads with our rank and names his ADP at the end. adp
 		 * leads with his ADP, the order drafters take players in, and names our rank at the end. */
 		order?: 'board' | 'adp';
+		/** His season so far, passed once the run is past the season's first kickoff: the meta line
+		 * prints "18.4 a game, 5 games" in place of his projected games, and the page's basis line
+		 * names it. Left out, the row is the preseason row. */
+		season?: IndexSeason;
 	}
 
 	let {
@@ -43,7 +49,8 @@
 		eager = false,
 		range = true,
 		action,
-		order = 'board'
+		order = 'board',
+		season
 	}: Props = $props();
 
 	const lead = $derived(
@@ -65,9 +72,12 @@
 			<PositionPill position={player.position} rank={player.positionRank} />
 			{#if showTier}<span class="wide tier"><TierChip tier={player.tier} /></span>{/if}
 			<span class="wide team">{player.team}</span>
-			<span class="wide">{fixed(player.expectedGames)} games</span>
+			{#if season === undefined}
+				<span class="wide">{fixed(player.expectedGames)} games</span>
+			{/if}
 			<span class="narrow">{fixed(player.projected)} pts</span>
 		</span>
+		{#if season !== undefined}<span class="season">{seasonFigures(season)}</span>{/if}
 	</span>
 	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
 	<ValueCell {...vorCell(player.vor, player.vorRound)} phoneLabel={false} />
@@ -180,6 +190,15 @@
 
 	.meta > :global(*) {
 		flex: none;
+	}
+
+	/* The season's own line, the same on every row of a view whatever the column's width, so the rows
+	   keep one height. A column narrower than the figures wraps their words rather than cutting them. */
+	.season {
+		font-size: var(--t-sm);
+		line-height: 1.2;
+		color: var(--ink-2);
+		font-variant-numeric: tabular-nums;
 	}
 
 	@container (max-width: 204px) {

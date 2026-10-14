@@ -19,7 +19,7 @@
 	import TierJump from '#lib/ui/TierJump.svelte';
 	import TierStrip from '#lib/ui/TierStrip.svelte';
 	import Toggle from '#lib/ui/Toggle.svelte';
-	import type { BoardRow } from '#lib/run/schema.ts';
+	import type { BoardRowView } from '#lib/server/board-season.ts';
 	import { links, tierAnchor } from './links.ts';
 
 	interface Props {
@@ -44,7 +44,7 @@
 
 	const Rail = $derived(lazySheet.parts?.Rail);
 
-	function shown(row: BoardRow): boolean {
+	function shown(row: BoardRowView): boolean {
 		if (!belowReplacement && row.vor < 0) return false;
 		return !onlySheet || lazySheet.has(row.id);
 	}
@@ -67,7 +67,7 @@
 	const SIDE_ID = 'board-side';
 </script>
 
-{#snippet row(player: BoardRow, i: number)}
+{#snippet row(player: BoardRowView, i: number)}
 	<Row
 		{player}
 		href={links.player(player.slug)}
@@ -76,6 +76,7 @@
 		{unit}
 		{range}
 		eager={i < EAGER_ROWS}
+		season={player.season}
 	>
 		{#snippet action()}
 			<RowSheetMark {player} />
@@ -86,7 +87,7 @@
 <main class="board">
 	<div class="content">
 		<div class="lead">
-			<PageHead title="{season} Board" lead={page.format.basis.join(' · ')}>
+			<PageHead title="{season} Board" lead={page.seasonLead ?? page.format.basis.join(' · ')}>
 				{#snippet actions()}
 					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
 					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>

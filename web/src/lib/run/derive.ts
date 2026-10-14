@@ -32,22 +32,25 @@ export function positionsIn(rows: readonly BoardRow[]): Position[] {
 }
 
 /** A position's rows, best first. */
-export function rowsAt(rows: readonly BoardRow[], position: Position): BoardRow[] {
+export function rowsAt<R extends BoardRow>(rows: readonly R[], position: Position): R[] {
 	return rows
 		.filter((row) => row.position === position)
 		.sort((a, b) => a.positionRank - b.positionRank);
 }
 
-export interface TierGroup {
+export interface TierGroup<R extends BoardRow = BoardRow> {
 	tier: number;
-	rows: BoardRow[];
+	rows: R[];
 	cliff: TierCliff | null;
 }
 
 /** A position's tiers in order, each with its players and the drop in projected points from its
  * last player to the next tier's first. The last tier has no drop. */
-export function tierGroups(rows: readonly BoardRow[], position: Position): TierGroup[] {
-	const groups: TierGroup[] = [];
+export function tierGroups<R extends BoardRow>(
+	rows: readonly R[],
+	position: Position
+): TierGroup<R>[] {
+	const groups: TierGroup<R>[] = [];
 	for (const row of rowsAt(rows, position)) {
 		const last = groups.at(-1);
 		if (last?.tier === row.tier) last.rows.push(row);
