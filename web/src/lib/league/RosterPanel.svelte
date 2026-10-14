@@ -4,7 +4,7 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { LeagueHost, RosterSpot } from './api.ts';
 	import LeagueRow from './LeagueRow.svelte';
-	import { hostWords, rowOf, slotStatus } from './model.ts';
+	import { hostWords, rowOf, spotStatus } from './model.ts';
 
 	/** Your roster as the host has it set: starters in lineup order, then the bench, injured reserve
 	 * and the taxi squad, each player with his place on our board, his bye and your sheet's tags. The
@@ -36,7 +36,7 @@
 			host={spot.player}
 			tags={tagsOf(spot.player.board_id)}
 			slot={SLOT_WORDS[spot.slot]}
-			status={slotStatus(spot.slot)}
+			status={spotStatus(spot)}
 		/>
 	{/each}
 </Panel>

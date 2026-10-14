@@ -2263,13 +2263,18 @@ components:
         points_for: { type: number, format: double }
     LeaguePlayer:
       type: object
-      required: [host_id, board_id, name, position, team]
+      required: [host_id, board_id, name, position, team, injured_reserve]
       properties:
         host_id: { type: string }
         board_id: { type: string, nullable: true, description: the player's id on our board, null when unplaced }
         name: { type: string }
         position: { type: string }
         team: { type: string }
+        injured_reserve:
+          type: boolean
+          description: >-
+            the host marks him injured reserve beside his name (FFPC's IR designation); a player on a roster's IR
+            slot is said by the slot
     RosterSpot:
       type: object
       required: [player, slot]

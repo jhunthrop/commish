@@ -70,7 +70,7 @@
 				player={rowOf(board, starter.player)}
 				host={starter.player}
 				tags={mine ? tagsOf(starter.player.board_id) : []}
-				status={mine ? statusOn(sync.roster, starter.player.host_id) : null}
+				status={statusOn(mine ? sync.roster : [], starter.player)}
 			>
 				{#snippet trailing()}
 					{#if scored}<span class="pts">{fixed(starter.points)}</span>{/if}

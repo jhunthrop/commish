@@ -18,6 +18,7 @@ func (p players) player(id string) apitypes.LeaguePlayer {
 	out := apitypes.LeaguePlayer{HostId: id, Name: unlistedName}
 	if ok {
 		out.Name, out.Position, out.Team = hp.Name, hp.Position, ourTeam(hp.Team)
+		out.InjuredReserve = hp.InjuredReserve
 	}
 	if pl, ok := p.placed[id]; ok {
 		board := pl.BoardID

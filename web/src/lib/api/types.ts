@@ -1990,6 +1990,8 @@ export interface components {
 			name: string;
 			position: string;
 			team: string;
+			/** @description the host marks him injured reserve beside his name (FFPC's IR designation); a player on a roster's IR slot is said by the slot */
+			injured_reserve: boolean;
 		};
 		RosterSpot: {
 			player: components['schemas']['LeaguePlayer'];

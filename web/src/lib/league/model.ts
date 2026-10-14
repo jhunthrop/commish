@@ -221,13 +221,15 @@ export function myPlace(sync: LeagueSync): number {
 	return sync.teams.findIndex((t) => t.roster_id === sync.me) + 1;
 }
 
-/** The mark a roster slot puts on a player's face: injured reserve, or none. */
-export function slotStatus(slot: RosterSpot['slot']): FaceStatus | null {
-	return slot === 'reserve' ? 'ir' : null;
+/** The mark on a player's face: IR when the host says so, by his roster's IR slot or the IR it
+ * writes beside his name; none otherwise, whatever slot he is on. */
+export function spotStatus(spot: Pick<RosterSpot, 'slot' | 'player'>): FaceStatus | null {
+	return spot.slot === 'reserve' || spot.player.injured_reserve ? 'ir' : null;
 }
 
-/** The mark on a player's face from the roster that holds him, none when it does not. */
-export function statusOn(roster: readonly RosterSpot[], hostId: string): FaceStatus | null {
-	const spot = roster.find((s) => s.player.host_id === hostId);
-	return spot ? slotStatus(spot.slot) : null;
+/** The mark on a player's face from the roster that holds him, else from his own word. */
+export function statusOn(roster: readonly RosterSpot[], player: LeaguePlayer): FaceStatus | null {
+	const spot = roster.find((s) => s.player.host_id === player.host_id);
+	if (spot) return spotStatus(spot);
+	return player.injured_reserve ? 'ir' : null;
 }

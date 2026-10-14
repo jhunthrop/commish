@@ -16,10 +16,13 @@ type League struct {
 	Standings []Standing `json:"standings"`
 	Owners    []Owner    `json:"owners"`
 	Rosters   []Roster   `json:"rosters"`
-	Lineup    *Lineup    `json:"lineup"`
-	Schedule  []Week     `json:"schedule"`
-	Moves     []Move     `json:"moves"`
-	Rules     *Rules     `json:"rules"`
+	// OtherRosterColumns are rosters page headings we do not know: their
+	// players are rostered, unmarked, and the heading is worth naming.
+	OtherRosterColumns []string `json:"other_roster_columns,omitempty"`
+	Lineup             *Lineup  `json:"lineup"`
+	Schedule           []Week   `json:"schedule"`
+	Moves              []Move   `json:"moves"`
+	Rules              *Rules   `json:"rules"`
 	// Scoreboard is the live scoring page, read only in an all-play
 	// week, when it is where the member's score comes from.
 	Scoreboard *Scoreboard `json:"scoreboard,omitempty"`
@@ -67,7 +70,11 @@ func Parse(pages map[PageName][]byte, official []byte) (League, error) {
 	}
 	read(PageStandings, func(p []byte) (err error) { l.Standings, err = ParseStandings(p); return })
 	read(PageOwners, func(p []byte) (err error) { l.Owners, err = ParseOwners(p); return })
-	read(PageRosters, func(p []byte) (err error) { l.Rosters, err = ParseRosters(p); return })
+	read(PageRosters, func(p []byte) error {
+		page, err := ParseRostersPage(p)
+		l.Rosters, l.OtherRosterColumns = page.Teams, page.OtherColumns
+		return err
+	})
 	read(PageSchedule, func(p []byte) (err error) { l.Schedule, err = ParseSchedule(p); return })
 	read(PageLineup, func(p []byte) error {
 		lineup, err := ParseLineup(p)

@@ -98,9 +98,20 @@ func (s *Snapshot) addPlayer(p ffpc.Player) string {
 		sum := sha256.Sum256([]byte(p.Name + "|" + p.Position + "|" + p.Team))
 		id = "n" + hex.EncodeToString(sum[:])[:15]
 	}
-	if _, ok := s.Players[id]; !ok {
-		s.Players[id] = HostPlayer{ID: id, Name: cleanHostText(p.Name), Position: p.Position, Team: cleanTeam(p.Team)}
+	hp, ok := s.Players[id]
+	if !ok {
+		hp = HostPlayer{ID: id, Name: cleanHostText(p.Name)}
 	}
+	// A later page fills what an earlier line left out: a line under a
+	// team's name writes no position, the lineup page does.
+	if hp.Position == "" {
+		hp.Position = p.Position
+	}
+	if hp.Team == "" {
+		hp.Team = cleanTeam(p.Team)
+	}
+	hp.InjuredReserve = hp.InjuredReserve || p.IR
+	s.Players[id] = hp
 	return id
 }
 

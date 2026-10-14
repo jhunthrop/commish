@@ -50,6 +50,8 @@ type FFPC struct {
 
 	mu    sync.Mutex
 	rules map[string]rulesEntry
+	// columns are the unknown rosters headings already logged.
+	columns sync.Map
 }
 
 type rulesEntry struct {
@@ -107,8 +109,20 @@ func (f *FFPC) ReadAs(ctx context.Context, accountID uuid.UUID, ltuid string) (S
 	if err != nil {
 		return Snapshot{}, 0, ffpcErr(err)
 	}
+	f.nameColumns(l.OtherRosterColumns)
 	snap := ffpcSnapshot(l, f.Now(), f.week(ctx, l))
 	return snap, l.Banner.TeamID, nil
+}
+
+// nameColumns logs, once per process, each rosters page heading we do
+// not know: its players are rostered with no mark, and the heading says
+// what the page has grown.
+func (f *FFPC) nameColumns(headings []string) {
+	for _, h := range headings {
+		if _, seen := f.columns.LoadOrStore(h, true); !seen {
+			f.warn("leaguesync: ffpc rosters column we do not know", "heading", h)
+		}
+	}
 }
 
 // WeekSource is the NFL week a moment falls in, from the run's schedule.

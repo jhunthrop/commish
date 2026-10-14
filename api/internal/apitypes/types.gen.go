@@ -1292,11 +1292,14 @@ type LeagueMoveKind string
 // LeaguePlayer defines model for LeaguePlayer.
 type LeaguePlayer struct {
 	// BoardId the player's id on our board
-	BoardId  *string `json:"board_id"`
-	HostId   string  `json:"host_id"`
-	Name     string  `json:"name"`
-	Position string  `json:"position"`
-	Team     string  `json:"team"`
+	BoardId *string `json:"board_id"`
+	HostId  string  `json:"host_id"`
+
+	// InjuredReserve the host marks him injured reserve beside his name (FFPC's IR designation); a player on a roster's IR slot is said by the slot
+	InjuredReserve bool   `json:"injured_reserve"`
+	Name           string `json:"name"`
+	Position       string `json:"position"`
+	Team           string `json:"team"`
 }
 
 // LeagueSettings defines model for LeagueSettings.

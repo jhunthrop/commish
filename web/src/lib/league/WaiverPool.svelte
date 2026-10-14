@@ -62,7 +62,8 @@
 				board_id: player.id,
 				name: player.name,
 				position: player.position,
-				team: player.team
+				team: player.team,
+				injured_reserve: false
 			}}
 			tags={tagsOf(player.id)}
 			endsOnValue={!inSeason}

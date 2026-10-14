@@ -33,6 +33,8 @@ type HostPlayer struct {
 	Team     string `json:"team"`
 	// ESPNID is the player's ESPN id, the key our board's ids share.
 	ESPNID string `json:"espn_id,omitempty"`
+	// InjuredReserve says the host marks him IR beside his name.
+	InjuredReserve bool `json:"injured_reserve,omitempty"`
 }
 
 // Hosts are the hosts a link may name, in the order they are tried.
