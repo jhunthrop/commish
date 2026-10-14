@@ -11,7 +11,8 @@ a flag: a sheet carries this season so far once the season's first kickoff has p
 - In season, a week of this season still to play is only looked ahead to: never a score in it,
   never a past-tense verb told of it.
 - In season, nothing speaks to a draft still ahead ("draft him", "take him at his ADP", "on draft
-  day", a round or pick to spend), and nothing is placed by a month ("by October"): weeks place it.
+  day", a round or pick to spend), and nothing about this season is placed by a month ("by
+  October"): weeks place it. A month in a sentence about an earlier season is history and passes.
 - In season, a long note for a player who has missed weeks this season names them (by week, or by
   their count with a word for missing them).
 
@@ -175,10 +176,26 @@ def time_frame_hits(text: str, clock: SeasonClock) -> list[VoiceRuleHit]:
     ]
     if not clock.in_season:
         return hits
-    month = MONTHS.pattern.search(text)
-    if month is not None:
-        hits.append(VoiceRuleHit(MONTHS.name, month.group(0)))
+    hits += _month_hits(text, clock)
     hits += _draft_voice_hits(text, DRAFT_VOICE_PATTERNS)
+    return hits
+
+
+_EARLIER_SEASON: Final = re.compile(r"\b(?:last (?:season|year)|that (?:season|year)|(?:19|20)\d\d)\b", re.IGNORECASE)
+
+
+def _month_hits(text: str, clock: SeasonClock) -> list[VoiceRuleHit]:
+    """A month in a sentence about this season; one in a sentence about an earlier season is history
+    told on its own calendar ("an early-October dud last season"), not a date the reader is held to."""
+    hits = []
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        month = MONTHS.pattern.search(sentence)
+        if month is None:
+            continue
+        years = [m.group(0) for m in _EARLIER_SEASON.finditer(sentence)]
+        earlier = [y for y in years if not y.isdigit() or int(y) < clock.season]
+        if not earlier or str(clock.season) in years:
+            hits.append(VoiceRuleHit(MONTHS.name, month.group(0)))
     return hits
 
 

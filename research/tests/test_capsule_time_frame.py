@@ -63,6 +63,9 @@ def test_the_draft_and_the_calendar_are_preseason_words_only() -> None:
     for text in ("Draft him at 18.", "Take him at his ADP of 9.6.", "Let him fall a round.", "On draft day, wait."):
         assert any(rule.startswith("draft voice") for rule in _rules(text, OCTOBER)), text
     assert _rules("Start him and hold him through his week 11 of 2026 bye.", OCTOBER) == []
+    assert _rules("That early-October dud last season is rare for him.", OCTOBER) == []
+    assert _rules("He sat three weeks in October of 2025.", OCTOBER) == []
+    assert "time frame (a month)" in _rules("He sat in October of 2025 and again this October of 2026.", OCTOBER)
 
 
 def test_missed_weeks_are_named_in_season() -> None:
@@ -73,6 +76,11 @@ def test_missed_weeks_are_named_in_season() -> None:
     assert names_missed_weeks(puka, PRESEASON)
     correction = soft_correction_for(missed_weeks_violation(OCTOBER))
     assert correction is not None and "weeks 2 and 3 of 2026" in correction
+
+
+def test_a_doubled_word_is_read_on_the_text_as_written() -> None:
+    names = ["Jaylen Wright", "Ollie Gordon"]
+    assert voice_rule_hits("Behind him are Jaylen Wright Ollie Gordon and nobody else.", names) == []
 
 
 def test_a_doubled_word_is_a_voice_rule_hit() -> None:

@@ -47,6 +47,12 @@ def test_a_name_breaks_the_run() -> None:
     assert page_runs(["A reach at that spot is a real risk for you."], NAMES) != ()
 
 
+def test_a_dated_week_breaks_the_run() -> None:
+    a = page_runs(["The dud came in week 3 of 2026 is what people remember."], NAMES)
+    b = page_runs(["His touchdown in week 3 of 2026 is what people remember now."], NAMES)
+    assert shared_spans({"a": a, "b": b}) == ()
+
+
 def test_overlapping_windows_are_quoted_as_one_phrase() -> None:
     runs = page_runs(["The low end comes from seasons cut short by injury, nothing more."], NAMES)
     shared = frozenset({"comes from seasons cut short by", "from seasons cut short by injury"})

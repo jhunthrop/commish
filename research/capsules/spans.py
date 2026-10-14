@@ -9,7 +9,7 @@ across players as a defect, so the capsule gate holds every written page to this
 A page's words are read across both sizes of its read, case folded with the punctuation stripped
 (a decimal keeps its point, a contraction its apostrophe). Player and club names are not words of a
 span: a name breaks the run, so two pages that name the same teammate or club do not share a span
-for it. A name is a capitalised word of any player's name in the store or any spelling of a club.
+for it, and so does a week with its season, the citation every page must carry. A name is a capitalised word of any player's name in the store or any spelling of a club.
 """
 
 import re
@@ -22,6 +22,13 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 SPAN_WORDS: Final = 6
 _TOKEN: Final = re.compile(r"[A-Za-z0-9]+(?:\.[0-9]+)?(?:'[A-Za-z]+)?")
 _POSSESSIVE: Final = re.compile(r"'s?$")
+# A week with its season ("week 7 of 2025", "weeks 2 and 3 of 2026") is a citation the floor requires
+# on every page (`season_voice`), so like a name it breaks a run rather than making one.
+_DATED_WEEK: Final = re.compile(
+    r"\bweeks?\s+\d{1,2}(?:\s*(?:,|and|or|to|through|-)\s*(?:weeks?\s+)?\d{1,2})*\s*(?:of|in|,)\s*(?:19|20)\d\d\b",
+    re.IGNORECASE,
+)
+_BREAK: Final = "SPANBREAK"
 # A token stream with the names cut out: each run is the words between two names.
 Runs = tuple[tuple[str, ...], ...]
 
@@ -45,11 +52,11 @@ def name_words(player_names: Iterable[str]) -> frozenset[str]:
 
 
 def runs_of(text: str, names: frozenset[str]) -> Runs:
-    """The text's words, lower case, split into runs wherever a name stands."""
+    """The text's words, lower case, split into runs wherever a name or a dated week stands."""
     runs: list[tuple[str, ...]] = []
     run: list[str] = []
-    for token in _TOKEN.findall(text.replace(chr(0x2019), "'")):
-        if token[:1].isupper() and _POSSESSIVE.sub("", token) in names:
+    for token in _TOKEN.findall(_DATED_WEEK.sub(f" {_BREAK} ", text.replace(chr(0x2019), "'"))):
+        if token == _BREAK or (token[:1].isupper() and _POSSESSIVE.sub("", token) in names):
             runs.append(tuple(run))
             run = []
             continue
