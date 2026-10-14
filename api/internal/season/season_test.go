@@ -73,3 +73,32 @@ func TestSaleFallback(t *testing.T) {
 		t.Errorf("logged %d times, want once:\n%s", n, logs.String())
 	}
 }
+
+// countingSchedule counts its reads and has no season loaded.
+type countingSchedule struct{ reads int }
+
+func (c *countingSchedule) FirstKickoff(context.Context, int) (time.Time, bool, error) {
+	c.reads++
+	return time.Time{}, false, nil
+}
+
+// The fallback is kept: with the schedule not loaded, requests inside
+// the retry window do not read it again, and the first one after does.
+func TestSaleKeepsTheFallback(t *testing.T) {
+	sched := &countingSchedule{}
+	clock := time.Date(2027, 8, 1, 12, 0, 0, 0, time.UTC)
+	sale := &Sale{Schedule: sched, Now: func() time.Time { return clock }}
+	for range 50 {
+		if got := sale.Season(context.Background(), clock); got != 2027 {
+			t.Fatalf("season %d", got)
+		}
+	}
+	if sched.reads != 1 {
+		t.Fatalf("%d schedule reads inside the window, want 1", sched.reads)
+	}
+	clock = clock.Add(fallbackRetry)
+	sale.Season(context.Background(), clock)
+	if sched.reads != 2 {
+		t.Fatalf("%d schedule reads after the window, want 2", sched.reads)
+	}
+}
