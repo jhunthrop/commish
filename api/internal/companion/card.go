@@ -100,6 +100,11 @@ func (s *Service) conditionalFor(ctx context.Context, f followed) (*apitypes.Roo
 		return &card, nil
 	}
 	built, err, _ := s.building.Do(key.String(), func() (any, error) {
+		// A viewer that missed the cache just before another made the card
+		// joins nothing in flight; it takes the card kept, never makes a second.
+		if card, ok := s.conditional.Get(key); ok {
+			return card, nil
+		}
 		st := f.built.Draft.State
 		c, err := s.Conditional.Conditional(ctx, advisor.Request{
 			State: st, TeamID: f.built.Draft.HumanTeamID, Board: f.board, Teams: len(st.DraftOrder), Seed: seedOf(f.row.HostDraftID),
