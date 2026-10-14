@@ -38,7 +38,9 @@ export function ordinal(count: number): string {
 	return `${String(count)}${ORDINAL_SUFFIX[ORDINAL.select(count)]}`;
 }
 
-/** "the hardest of 32", "3rd hardest of 32": a schedule rank where 1 is the hardest. */
+/** "the hardest of 32", "3rd hardest of 32", "the easiest of 32": a schedule rank where 1 is the
+ * hardest. */
 export function hardestWords(rank: number, of: number): string {
+	if (rank === of) return `the easiest of ${String(of)}`;
 	return `${rank === 1 ? 'the hardest' : `${ordinal(rank)} hardest`} of ${String(of)}`;
 }
