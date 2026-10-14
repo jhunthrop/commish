@@ -87,7 +87,7 @@ func (c *countingSchedule) FirstKickoff(context.Context, int) (time.Time, bool, 
 func TestSaleKeepsTheFallback(t *testing.T) {
 	sched := &countingSchedule{}
 	clock := time.Date(2027, 8, 1, 12, 0, 0, 0, time.UTC)
-	sale := &Sale{Schedule: sched, Now: func() time.Time { return clock }}
+	sale := &Sale{Schedule: sched}
 	for range 50 {
 		if got := sale.Season(context.Background(), clock); got != 2027 {
 			t.Fatalf("season %d", got)

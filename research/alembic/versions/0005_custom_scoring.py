@@ -62,9 +62,6 @@ def _candidates() -> None:
         sa.PrimaryKeyConstraint("season", "source", "as_of", "player_id"),
         schema=_SCHEMA,
     )
-    op.create_index(
-        "preseason_candidates_board_idx", "preseason_candidates", ["season", "source", "as_of"], schema=_SCHEMA
-    )
 
 
 def _custom_boards() -> None:
@@ -88,7 +85,6 @@ def _custom_boards() -> None:
 
 def downgrade() -> None:
     op.drop_table("custom_boards", schema=_SCHEMA)
-    op.drop_index("preseason_candidates_board_idx", "preseason_candidates", schema=_SCHEMA)
     op.drop_table("preseason_candidates", schema=_SCHEMA)
     for column in reversed(_HOST_IDS):
         op.drop_index(f"players_{column}_idx", "players", schema=_SCHEMA)

@@ -205,7 +205,7 @@ func carry(r mflRule, kind string, put func(string, float64), te map[string]floa
 
 // ruleWords is a dropped rule in the league's own terms: "FG 31-99 *.1 (PK)".
 func ruleWords(r mfl.Rule) string {
-	return cleanHostText(fmt.Sprintf("%s %s %s (%s)", r.Event, r.Range, r.Points, strings.ReplaceAll(r.Positions, "|", " ")))
+	return scoring.HostText(fmt.Sprintf("%s %s %s (%s)", r.Event, r.Range, r.Points, strings.ReplaceAll(r.Positions, "|", " ")))
 }
 
 // mflShape counts the league's lineup from its starter limits: each
@@ -233,7 +233,7 @@ func mflShape(l mfl.League) Shape {
 		case "Def":
 			s.DEF = p.Min
 		default:
-			if slot := cleanHostText(p.Position); p.Max > 0 && slot != "" {
+			if slot := scoring.HostText(p.Position); p.Max > 0 && slot != "" {
 				unfollowed[slot] = true
 			}
 		}

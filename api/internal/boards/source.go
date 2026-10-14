@@ -102,11 +102,9 @@ func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 			rows.Close()
 			return nil, fmt.Errorf("boards: scan %s: %w", source, err)
 		}
-		p.Position = draft.Position(position)
-		if !p.Position.Valid() {
+		if !directoryPlayer(&p, position, byes) {
 			continue
 		}
-		p.Bye = byes[p.Team]
 		if floor != nil && median != nil && ceiling != nil {
 			p.Range = &Range{Floor: *floor, Median: *median, Ceiling: *ceiling}
 		}
@@ -120,6 +118,14 @@ func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 	}
 	raw.AsOf = asOf.UTC()
 	return raw, nil
+}
+
+// directoryPlayer finishes a directory row the way every board reads it:
+// its position (false for one no room drafts) and its team's bye.
+func directoryPlayer(p *Player, position string, byes map[string]int) bool {
+	p.Position = draft.Position(position)
+	p.Bye = byes[p.Team]
+	return p.Position.Valid()
 }
 
 func (s *PGSource) byes(ctx context.Context) (map[string]int, error) {

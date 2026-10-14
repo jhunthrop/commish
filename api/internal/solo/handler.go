@@ -86,7 +86,7 @@ func (s *Service) fail(w http.ResponseWriter, r *http.Request, op string, err er
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, refusal.Reason, nil)
 	case errors.Is(err, boards.ErrCustomUnavailable):
 		s.Log.Warn("solo: custom board", "op", op, "err", err)
-		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "Your league's scoring cannot be scored right now. Try again in a moment", nil)
+		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, boards.CustomUnavailableWords, nil)
 	default:
 		httpx.WriteInternal(w, r, s.Log, op, err)
 	}

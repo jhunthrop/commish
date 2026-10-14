@@ -115,8 +115,12 @@ type Client struct {
 	Base string
 }
 
-// New is a client on ESPN with the read timeout.
-func New() *Client { return &Client{HTTP: &http.Client{Timeout: readTimeout}, Base: DefaultBase} }
+// New is a client on ESPN with the read timeout. A redirect is never
+// followed: an answer from anywhere but the read host is not ESPN's.
+func New() *Client {
+	refuse := func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	return &Client{HTTP: &http.Client{Timeout: readTimeout, CheckRedirect: refuse}, Base: DefaultBase}
+}
 
 // League is a public league's scoring settings for a season.
 func (c *Client) League(ctx context.Context, ref Ref, season int) (League, error) {

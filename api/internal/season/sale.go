@@ -51,8 +51,6 @@ func FallbackKickoff(s int) time.Time {
 type Sale struct {
 	Schedule Schedule
 	Log      *slog.Logger
-	// Now is the clock the fallback's retry is timed on, time.Now when nil.
-	Now func() time.Time
 
 	mu       sync.Mutex
 	known    map[int]time.Time
@@ -68,20 +66,15 @@ const fallbackRetry = 10 * time.Minute
 // Season is the season a pass bought at t is for.
 func (s *Sale) Season(ctx context.Context, t time.Time) int {
 	y := Of(t)
-	if t.Before(s.kickoff(ctx, y)) {
+	if t.Before(s.kickoff(ctx, y, t)) {
 		return y
 	}
 	return y + 1
 }
 
-func (s *Sale) now() time.Time {
-	if s.Now != nil {
-		return s.Now()
-	}
-	return time.Now()
-}
-
-func (s *Sale) kickoff(ctx context.Context, y int) time.Time {
+// kickoff is season y's first kickoff as of now, the one clock the
+// decision is made on.
+func (s *Sale) kickoff(ctx context.Context, y int, now time.Time) time.Time {
 	s.mu.Lock()
 	k, ok := s.known[y]
 	since, fell := s.fellBack[y]
@@ -89,7 +82,7 @@ func (s *Sale) kickoff(ctx context.Context, y int) time.Time {
 	if ok {
 		return k
 	}
-	if fell && s.now().Sub(since) < fallbackRetry {
+	if fell && now.Sub(since) < fallbackRetry {
 		return FallbackKickoff(y)
 	}
 	if s.Schedule != nil {
@@ -105,22 +98,22 @@ func (s *Sale) kickoff(ctx context.Context, y int) time.Time {
 		}
 		if err != nil {
 			s.warn(y, "the schedule could not be read", err)
-			return s.fallBack(y)
+			return s.fallBack(y, now)
 		}
 	}
 	s.warn(y, "the schedule is not loaded", nil)
-	return s.fallBack(y)
+	return s.fallBack(y, now)
 }
 
 // fallBack is the stand-in, kept for fallbackRetry before the schedule is
 // read again.
-func (s *Sale) fallBack(y int) time.Time {
+func (s *Sale) fallBack(y int, now time.Time) time.Time {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.fellBack == nil {
 		s.fellBack = map[int]time.Time{}
 	}
-	s.fellBack[y] = s.now()
+	s.fellBack[y] = now
 	return FallbackKickoff(y)
 }
 

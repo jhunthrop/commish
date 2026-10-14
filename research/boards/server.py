@@ -134,6 +134,11 @@ def _not_found(request: Request, exc: Exception) -> Response:
     return _envelope(404, error=f"no route {request.method} {request.url.path}")
 
 
+def _not_allowed(request: Request, exc: Exception) -> Response:
+    del request, exc
+    return _envelope(405, error="use POST", headers={"allow": "POST"})
+
+
 def _load_priors(state: BoardsState) -> None:
     """The pinned priors; a failure is logged and the instance stays unready, so the platform's
     startup probe replaces it rather than routing a call to it."""
@@ -175,4 +180,4 @@ def create_app(engine: Engine, workers: int) -> Starlette:
         Route("/readyz", readyz, methods=["GET"]),
         Route("/boards/custom", _custom_handler(state), methods=["GET", "POST", "PUT", "PATCH", "DELETE"]),
     ]
-    return Starlette(routes=routes, lifespan=lifespan, exception_handlers={404: _not_found, 405: _not_found})
+    return Starlette(routes=routes, lifespan=lifespan, exception_handlers={404: _not_found, 405: _not_allowed})

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // ffpcSnapshot is an FFPC league's pages as the snapshot every host
@@ -21,7 +22,7 @@ import (
 // week is the league's current week, chosen by the caller (FFPC.week).
 func ffpcSnapshot(l ffpc.League, now time.Time, week int) Snapshot {
 	snap := Snapshot{
-		Ref: Ref{Host: HostFFPC, LeagueID: l.Banner.LeagueID, Season: l.Banner.Season}, Name: cleanHostText(l.Banner.LeagueName),
+		Ref: Ref{Host: HostFFPC, LeagueID: l.Banner.LeagueID, Season: l.Banner.Season}, Name: scoring.HostText(l.Banner.LeagueName),
 		Status: "in_season", Season: l.Banner.Season, Players: map[string]HostPlayer{}, ReadAt: now,
 	}
 	teams := map[int]*Team{}
@@ -70,7 +71,7 @@ func ffpcSnapshot(l ffpc.League, now time.Time, week int) Snapshot {
 		t.Taxi = snap.addPlayers(t.Taxi, l.Lineup.Taxi)
 	}
 	if l.Banner.TeamID > 0 && team(l.Banner.TeamID).Name == "" {
-		team(l.Banner.TeamID).Name = cleanHostText(l.Banner.TeamName)
+		team(l.Banner.TeamID).Name = scoring.HostText(l.Banner.TeamName)
 	}
 	for _, t := range teams {
 		snap.Teams = append(snap.Teams, *t)
@@ -100,7 +101,7 @@ func (s *Snapshot) addPlayer(p ffpc.Player) string {
 	}
 	hp, ok := s.Players[id]
 	if !ok {
-		hp = HostPlayer{ID: id, Name: cleanHostText(p.Name)}
+		hp = HostPlayer{ID: id, Name: scoring.HostText(p.Name)}
 	}
 	// A later page fills what an earlier line left out: a line under a
 	// team's name writes no position, the lineup page does.
@@ -219,7 +220,7 @@ func ffpcMoves(moves []ffpc.Move, snap *Snapshot) []Move {
 func ffpcScoring(r ffpc.Rules) Scoring {
 	sc := sleeperScoring(r.Scoring)
 	for _, line := range r.Unread {
-		if w := cleanHostText(line); w != "" {
+		if w := scoring.HostText(line); w != "" {
 			sc.Dropped = append(sc.Dropped, w)
 		}
 	}
@@ -260,7 +261,7 @@ func ffpcShape(r ffpc.Rules, teams int) Shape {
 		s.Bench = r.RosterSpots - l.Starters()
 	}
 	for _, o := range l.Other {
-		s.Unfollowed = append(s.Unfollowed, cleanHostText(o))
+		s.Unfollowed = append(s.Unfollowed, scoring.HostText(o))
 	}
 	if !r.HasLineup {
 		s.Unfollowed = append(s.Unfollowed, fmt.Sprintf("a lineup %s does not state", "the rules page"))

@@ -27,6 +27,10 @@ import (
 // than ranking the league on a stored board it does not score by.
 var ErrCustomUnavailable = errors.New("boards: a board for this league's own scoring cannot be built right now")
 
+// CustomUnavailableWords is what a room says when a league's own scoring
+// cannot be built right now, the one sentence solo and the companion use.
+const CustomUnavailableWords = "We cannot build your league's board right now. Try again in a moment"
+
 // ErrCustomRefused is the boards service refusing a request the api built
 // (a 400): a contract bug between the two, never a reason to try again.
 var ErrCustomRefused = errors.New("boards: the boards service refused the request")

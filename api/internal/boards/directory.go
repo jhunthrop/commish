@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/jhunthrop/commish/api/internal/draft"
 )
 
 // Projection is one player's season on a board the api did not read
@@ -25,7 +23,8 @@ const maxHostIDs = 20000
 // players by: players.sleeper_id (revision 0005) through the crosswalk.
 func (s *PGSource) SleeperIDs(ctx context.Context) (map[string]string, error) {
 	rows, err := s.Pool.Query(ctx, `select p.sleeper_id, c.provider_player_id from `+s.table("players")+` p
-join `+s.table("player_crosswalk")+` c on c.player_id = p.id where p.sleeper_id is not null limit `+fmt.Sprint(maxHostIDs))
+join `+s.table("player_crosswalk")+` c on c.player_id = p.id where p.sleeper_id is not null
+order by p.sleeper_id, c.provider_player_id limit `+fmt.Sprint(maxHostIDs+1))
 	if err != nil {
 		return nil, fmt.Errorf("boards: read sleeper ids: %w", err)
 	}
@@ -36,7 +35,15 @@ join `+s.table("player_crosswalk")+` c on c.player_id = p.id where p.sleeper_id 
 		if err := rows.Scan(&hostID, &id); err != nil {
 			return nil, fmt.Errorf("boards: scan sleeper ids: %w", err)
 		}
+		if _, twice := out[hostID]; twice {
+			// Two provider ids for one player: the crosswalk is wrong, and a
+			// pick placed on either would be a guess.
+			return nil, fmt.Errorf("boards: sleeper id %s crosses to two provider players", hostID)
+		}
 		out[hostID] = id
+	}
+	if len(out) > maxHostIDs {
+		return nil, fmt.Errorf("boards: over %d sleeper ids; the map is not the one expected", maxHostIDs)
 	}
 	return out, rows.Err()
 }
@@ -69,11 +76,9 @@ func (s *PGSource) LoadScored(ctx context.Context, f Format, source string, asOf
 		if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &p.Headshot, &p.ADP, &universe); err != nil {
 			return nil, fmt.Errorf("boards: scan the directory: %w", err)
 		}
-		p.Position = draft.Position(position)
-		if !p.Position.Valid() {
+		if !directoryPlayer(&p, position, byes) {
 			continue
 		}
-		p.Bye = byes[p.Team]
 		if proj, ok := points[universe]; ok && universe != "" {
 			pts := proj.Points
 			p.Points = &pts

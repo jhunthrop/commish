@@ -10,7 +10,7 @@ the shape; a new generation is a new key, so nothing in it is ever stale.
 
 from typing import Final
 
-from sqlalchemy import CheckConstraint, Column, DateTime, Double, ForeignKeyConstraint, Index, Integer, Table, Text
+from sqlalchemy import CheckConstraint, Column, DateTime, Double, ForeignKeyConstraint, Integer, Table, Text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from research.db.schema._base import METADATA, POSITIONS, RESEARCH_SCHEMA, one_of, recorded_at
@@ -41,7 +41,6 @@ PRESEASON_CANDIDATES: Final = Table(
     ForeignKeyConstraint(
         ["player_id"], [f"{RESEARCH_SCHEMA}.players.id"], ondelete="CASCADE", name="preseason_candidates_player_fk"
     ),
-    Index("preseason_candidates_board_idx", "season", "source", "as_of"),
 )
 
 CUSTOM_BOARDS: Final = Table(

@@ -157,7 +157,7 @@ func (s *Service) writeHostError(w http.ResponseWriter, r *http.Request, err err
 		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "Sleeper has no draft at that link", nil)
 	case errors.Is(err, boards.ErrCustomUnavailable):
 		s.Log.Warn("companion: custom board", "err", err)
-		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "Your league's scoring cannot be scored right now. Try again in a moment", nil)
+		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, boards.CustomUnavailableWords, nil)
 	case errors.Is(err, sleeper.ErrUnavailable), errors.Is(err, sleeper.ErrMalformed):
 		s.Log.Warn("companion: host", "err", err)
 		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "Sleeper is not answering right now. Try again in a moment", nil)

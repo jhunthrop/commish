@@ -3,6 +3,7 @@ package leaguesync
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -26,7 +27,8 @@ const (
 	espnLinkWords     = "Paste your league's link from ESPN, or its league id"
 	espnPrivateWords  = "This ESPN league is private. Make it viewable to the public in its settings, or enter your rules by hand"
 	importNeedsPass   = "Your league's own scoring comes with the Draft Pass"
-	espnNotFoundWords = "ESPN has no league at that link for that season"
+	// maxImportLink is the contract's ScoringImportInput.link maxLength.
+	maxImportLink = 300
 )
 
 // importScoring reads a league's scoring from its host and answers it as
@@ -35,6 +37,10 @@ const (
 func (s *Service) importScoring(w http.ResponseWriter, r *http.Request) {
 	var in apitypes.ScoringImportInput
 	if !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
+		return
+	}
+	if len(in.Link) > maxImportLink {
+		httpx.WriteInvalid(w, r, map[string]string{fieldLink: "A league link is at most 300 characters"})
 		return
 	}
 	if !in.Host.Valid() {
@@ -112,7 +118,8 @@ func (s *Service) espnScoring(w http.ResponseWriter, r *http.Request, link strin
 	case errors.Is(err, espn.ErrPrivate):
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, espnPrivateWords, nil)
 	case errors.Is(err, espn.ErrNotFound):
-		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, espnNotFoundWords, nil)
+		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound,
+			fmt.Sprintf("ESPN has no league at that link for the %d season. A league not renewed yet: paste the link with its seasonId", yr), nil)
 	case errors.Is(err, espn.ErrNotALink):
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: espnLinkWords})
 	default:

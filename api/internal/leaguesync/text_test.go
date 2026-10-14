@@ -19,9 +19,9 @@ func TestHostTextIsCleaned(t *testing.T) {
 		strings.Repeat("é", 90): strings.Repeat("é", scoring.MaxHostText),
 	}
 	for in, want := range cases {
-		got := cleanHostText(in)
+		got := scoring.HostText(in)
 		if got != want || !utf8.ValidString(got) {
-			t.Errorf("cleanHostText(%q) = %q, want %q", in, got, want)
+			t.Errorf("scoring.HostText(%q) = %q, want %q", in, got, want)
 		}
 	}
 	for in, want := range map[string]string{"KC": "KC", "JAC": "JAC", "kc": "", "K\u202eC": "", "TOOLONG": ""} {
