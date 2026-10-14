@@ -163,6 +163,7 @@
 
 	.figures {
 		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
 	}
 
 	.tags {

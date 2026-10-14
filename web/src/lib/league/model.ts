@@ -5,6 +5,7 @@ import { fixed, plural, signed } from '#lib/format/number.ts';
 import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
 import type { IndexSeason } from '#lib/run/schema.ts';
 import type { LeagueBoard, LeagueBoardPlayer } from './board.ts';
+import { FORMAT_LABELS } from '#lib/sheet/format.ts';
 import type { FaceStatus } from '#lib/ui/face-status.ts';
 import type {
 	LeagueHost,
@@ -14,6 +15,10 @@ import type {
 	LeagueTeam,
 	RosterSpot
 } from './api.ts';
+import type { components } from '#lib/api/types.ts';
+
+type BoardFormat = components['schemas']['BoardFormat'];
+type ScoringPreset = components['schemas']['ScoringPreset'];
 
 /** How often an open league page reads the league again. The API reads the host at most once a
  * minute whatever the number of viewers, so a faster page would only see the same read. */
@@ -62,6 +67,13 @@ export function readLine(sync: LeagueSync, now: Date): string {
 	return read;
 }
 
+/** What the matchup panel says with no side for the drafter: a league with no current week has no
+ * games, and a week we hold no game for is a read we could not make, never a claim about the team. */
+export function matchupGap(sync: LeagueSync, now: Date): string {
+	if (sync.week === 0) return 'Your league has no games this week.';
+	return `We could not read this week's game from ${hostWords(sync.host)}. ${readLine(sync, now)}`;
+}
+
 /** "5-1", or "5-1-1" with ties. */
 export function recordWords(team: LeagueTeam): string {
 	const base = `${String(team.wins)}-${String(team.losses)}`;
@@ -95,7 +107,11 @@ export function moveWords(sync: LeagueSync, move: LeagueMove): string {
 /** His season so far with its basis: "5 games, 18.4 a game", or "No games yet". */
 export function seasonWords(season: IndexSeason): string {
 	if (season.pointsPerGame === null) return 'No games yet';
-	const figure = fixed(season.pointsPerGame, POINTS_PER_GAME_DECIMALS);
+	// A negative figure takes the minus sign, as every other negative on the page does.
+	const figure =
+		season.pointsPerGame < 0
+			? signed(season.pointsPerGame, POINTS_PER_GAME_DECIMALS)
+			: fixed(season.pointsPerGame, POINTS_PER_GAME_DECIMALS);
 	return `${plural(season.games, 'game')}, ${figure} a game`;
 }
 
@@ -118,11 +134,54 @@ export function rowOf(board: LeagueBoard, player: LeaguePlayer): LeagueBoardPlay
 	return null;
 }
 
-/** The waiver pool: our board without every player a team in the league holds, in the board's own
- * order, best first by points over replacement. */
+/** Whether the season has kicked off on the run's board: any player has a game. */
+export function seasonStarted(board: LeagueBoard): boolean {
+	return board.players.some((p) => p.season.games > 0);
+}
+
+/** Before kickoff our board's order (points over replacement); after, points a game this season,
+ * best first, a player with no game after every one with one, ties by the preseason projection. */
+function poolOrder(a: LeagueBoardPlayer, b: LeagueBoardPlayer): number {
+	const ppg = (p: LeagueBoardPlayer): number => p.season.pointsPerGame ?? Number.NEGATIVE_INFINITY;
+	return ppg(b) - ppg(a) || (b.points ?? 0) - (a.points ?? 0);
+}
+
+/** The waiver pool: our board without every player a team in the league holds, ranked as
+ * poolBasis says. */
 export function poolRows(board: LeagueBoard, sync: LeagueSync): readonly LeagueBoardPlayer[] {
 	const held = new Set(sync.rostered);
-	return board.players.filter((p) => !held.has(p.id));
+	const pool = board.players.filter((p) => !held.has(p.id));
+	return seasonStarted(board) ? pool.toSorted(poolOrder) : pool;
+}
+
+/** How the pool is ranked, said once above it. */
+export function poolBasis(board: LeagueBoard): string {
+	return seasonStarted(board)
+		? 'Unrostered in your league, ranked by points a game this season, then by our preseason projection.'
+		: "Unrostered in your league, ranked by our preseason board's points over replacement.";
+}
+
+/** The page's one basis line: which scoring the figures are in, and, when the league scores
+ * otherwise and the account lacks its exact rules, where those come from. */
+export function figuresLine(
+	boardFormat: BoardFormat,
+	scoringLike: ScoringPreset,
+	exactRules: boolean
+): string {
+	const figures = `Figures are ${FORMAT_LABELS[boardFormat]}.`;
+	if (exactRules || scoringLike === boardFormat) return figures;
+	return `${figures} Your league scores ${FORMAT_LABELS[scoringLike]}, and its exact rules come with the Draft Pass.`;
+}
+
+/** The kicker and defense the league starts that the run's board does not rank, said as the pool's
+ * missing chips: "No kickers on this run." */
+export function missingFromRun(sync: LeagueSync, board: LeagueBoard): readonly string[] {
+	const ranked = new Set(board.players.map((p) => p.position as string));
+	const held = new Set(sync.roster.map((s) => s.player.position));
+	const words: Readonly<Record<string, string>> = { K: 'kickers', DEF: 'defenses' };
+	return Object.entries(words)
+		.filter(([pos]) => held.has(pos) && !ranked.has(pos))
+		.map(([, plural]) => `No ${plural} on this run.`);
 }
 
 /** The drafter's team. */

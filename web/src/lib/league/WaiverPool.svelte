@@ -14,11 +14,15 @@
 	interface Props {
 		rows: readonly LeagueBoardPlayer[];
 		tagsOf: (boardId: string | null) => readonly string[];
-		/** Whose points the rows carry. */
+		/** How the rows are ranked, said once above them. */
 		basis: string;
+		/** Once the season is on the rows end on points a game, the projection beside them. */
+		inSeason: boolean;
+		/** Positions the league starts that the run does not rank: "No kickers on this run." */
+		missing: readonly string[];
 	}
 
-	let { rows, tagsOf, basis }: Props = $props();
+	let { rows, tagsOf, basis, inSeason, missing }: Props = $props();
 
 	const FIRST_ROWS = 25;
 	const MORE_ROWS = 25;
@@ -26,7 +30,7 @@
 	let position = $state<Position | null>(null);
 	let shown = $state(FIRST_ROWS);
 
-	/** The board's own order: best first by points over replacement. */
+	/** The rows' own order, as basis says. */
 	const visible = $derived(position === null ? rows : rows.filter((r) => r.position === position));
 
 	/** Only the positions the board ranks: a run without kickers offers no K chip. */
@@ -41,13 +45,14 @@
 <Panel as="section" label="Waiver pool" padding="none">
 	<div class="head">
 		<PanelHead title="Waiver pool" aside={`${count(visible.length)} players`} level={2} />
-		<p class="basis">Unrostered in your league. {basis}</p>
+		<p class="basis">{basis}</p>
 		<ChipGroup label="Position">
 			<Chip size="sm" pressed={position === null} onclick={() => choose(null)}>All</Chip>
 			{#each positions as p (p)}
 				<Chip size="sm" pressed={position === p} onclick={() => choose(p)}>{p}</Chip>
 			{/each}
 		</ChipGroup>
+		{#each missing as line (line)}<p class="basis">{line}</p>{/each}
 	</div>
 	{#each visible.slice(0, shown) as player (player.id)}
 		<LeagueRow
@@ -60,7 +65,7 @@
 				team: player.team
 			}}
 			tags={tagsOf(player.id)}
-			endsOnValue
+			endsOnValue={!inSeason}
 		/>
 	{:else}
 		<p class="none">Every player we rank at this position is on a roster in your league.</p>

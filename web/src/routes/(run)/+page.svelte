@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { railLeague } from '#lib/account/rail-league.svelte.ts';
 	import { runStampText } from '#lib/run/stamp.ts';
 	import RowSheetMark from '#lib/site/RowSheetMark.svelte';
 	import SiteShell from '#lib/site/SiteShell.svelte';
@@ -26,6 +27,10 @@
 	const headline = $derived(page.record);
 
 	onMount(() => lazySheet.armOnFirstIntent(window));
+
+	/** A member who follows a league is sent back to it, the newest when there are several; anyone
+	 * else to follow one. */
+	const leagueId = $derived(railLeague.account?.leagueId ?? null);
 </script>
 
 <svelte:head>
@@ -44,7 +49,11 @@
 			{/snippet}
 			{#snippet aside()}
 				<Verb href={sectionHref('mock')} size="lg" fill>Start a mock draft</Verb>
-				<Quiet href={links.leagueNew()} size="lg" fill>Follow your league</Quiet>
+				{#if leagueId}
+					<Quiet href={links.league(leagueId)} size="lg" fill>Open your league</Quiet>
+				{:else}
+					<Quiet href={links.leagueNew()} size="lg" fill>Follow your league</Quiet>
+				{/if}
 				<Quiet href={sectionHref('sheet')} size="lg" fill>Build your cheat sheet</Quiet>
 			{/snippet}
 		</HeroCard>

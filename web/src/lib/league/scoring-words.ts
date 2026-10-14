@@ -15,7 +15,8 @@ const KINDS: readonly (readonly [RegExp, string])[] = [
 	[/^idp_/, 'defensive players'],
 	[/_2pt$|^(P2|R2|C2|D2)$/, 'two-point plays'],
 	[/^(fum_rec_td|#FR|#FT)$/, 'fumble return touchdowns'],
-	[/^(ff|blk_kick)$/, 'forced fumbles and blocked kicks'],
+	[/^ff$/, 'forced fumbles'],
+	[/^blk_kick$/, 'blocked kicks'],
 	[/^(kr_|pr_)/, 'kick and punt returns'],
 	[/^fum/, 'fumbles']
 ];
@@ -23,10 +24,13 @@ const KINDS: readonly (readonly [RegExp, string])[] = [
 function kindOf(rule: string): string {
 	const [head = ''] = rule.split(' ');
 	const kind = KINDS.find(([pattern]) => pattern.test(head));
-	return kind ? kind[1] : 'other scoring rules';
+	return kind ? kind[1] : OTHER;
 }
 
-/** Each kind of dropped rule once, in the order first met. */
+const OTHER = 'other scoring rules';
+
+/** Each kind of dropped rule once, in the order first met, the unnamed ones last. */
 export function droppedKinds(dropped: readonly string[]): string[] {
-	return [...new Set(dropped.map(kindOf))];
+	const kinds = [...new Set(dropped.map(kindOf))];
+	return [...kinds.filter((k) => k !== OTHER), ...kinds.filter((k) => k === OTHER)];
 }

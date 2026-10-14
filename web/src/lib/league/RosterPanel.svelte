@@ -2,34 +2,33 @@
 	import type { LeagueBoard } from './board.ts';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
-	import type { RosterSpot } from './api.ts';
+	import type { LeagueHost, RosterSpot } from './api.ts';
 	import LeagueRow from './LeagueRow.svelte';
-	import { rowOf, slotStatus } from './model.ts';
+	import { hostWords, rowOf, slotStatus } from './model.ts';
 
-	/** Your roster as the host has it: starters in lineup order, then the bench, injured reserve and
-	 * the taxi squad, each player with his place on our board, his bye and your sheet's tags. */
+	/** Your roster as the host has it set: starters in lineup order, then the bench, injured reserve
+	 * and the taxi squad, each player with his place on our board, his bye and your sheet's tags. The
+	 * slot words are where he is on the host, never advice: our start and sit call is its own tool. */
 	interface Props {
 		roster: readonly RosterSpot[];
 		board: LeagueBoard;
 		tagsOf: (boardId: string | null) => readonly string[];
-		/** Whose numbers the rows carry. */
-		basis: string;
+		host: LeagueHost;
 	}
 
-	let { roster, board, tagsOf, basis }: Props = $props();
+	let { roster, board, tagsOf, host }: Props = $props();
 
 	const SLOT_WORDS: Readonly<Record<RosterSpot['slot'], string>> = {
-		starter: 'Start',
+		starter: 'Starting',
 		bench: 'Bench',
 		reserve: 'IR',
 		taxi: 'Taxi'
 	};
 </script>
 
-<Panel as="section" label="Your roster" padding="none">
+<Panel as="section" label="Your lineup" padding="none">
 	<div class="head">
-		<PanelHead title="Your roster" aside="Points a game" level={2} />
-		<p class="basis">{basis}</p>
+		<PanelHead title={`Your lineup as set on ${hostWords(host)}`} aside="Points a game" level={2} />
 	</div>
 	{#each roster as spot (spot.player.host_id)}
 		<LeagueRow
@@ -45,11 +44,5 @@
 <style>
 	.head {
 		padding: var(--s-3) var(--s-3) var(--s-2);
-	}
-
-	.basis {
-		margin: var(--s-1) 0 0;
-		font-size: var(--t-xs);
-		color: var(--ink-3);
 	}
 </style>

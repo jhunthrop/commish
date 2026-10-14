@@ -6,7 +6,7 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { LeagueSync, MatchupSide } from './api.ts';
 	import LeagueRow from './LeagueRow.svelte';
-	import { hostWords, rowOf, statusOn, teamName } from './model.ts';
+	import { hostWords, matchupGap, rowOf, statusOn, teamName } from './model.ts';
 
 	/** This week's game: both lineups as the host has them set, each starter's points so far, and
 	 * each side's total. Side by side on a desk, one above the other in a hand. */
@@ -14,9 +14,11 @@
 		sync: LeagueSync;
 		board: LeagueBoard;
 		tagsOf: (boardId: string | null) => readonly string[];
+		/** The clock the page's read line uses, for a week we could not read. */
+		now: Date;
 	}
 
-	let { sync, board, tagsOf }: Props = $props();
+	let { sync, board, tagsOf, now }: Props = $props();
 
 	const matchup = $derived(sync.matchup);
 
@@ -73,23 +75,24 @@
 				aside={started ? 'Points so far' : 'No games played yet'}
 				level={2}
 			/>
+			{#if sync.week_all_play}
+				<p class="none">
+					An all-play week on {hostWords(sync.host)}: your score is set against every other team's.
+				</p>
+			{/if}
 		</div>
 		<div class="sides">
 			{@render side(matchup.mine, true)}
 			{#if matchup.opponent}
 				{@render side(matchup.opponent, false)}
-			{:else}
+			{:else if !sync.week_all_play}
 				<p class="none"><Label>No opponent this week</Label></p>
 			{/if}
 		</div>
 	{:else}
 		<div class="head">
 			<PanelHead title="This week" level={2} />
-			<p class="none">
-				{sync.week === 0
-					? 'Your league has no games this week.'
-					: `Your team has no game in week ${String(sync.week)}.`}
-			</p>
+			<p class="none">{matchupGap(sync, now)}</p>
 		</div>
 	{/if}
 </Panel>
