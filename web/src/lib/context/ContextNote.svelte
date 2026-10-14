@@ -57,6 +57,23 @@
 		}
 	}
 
+	/* Between the phone and the desk the longer lines (a TE premium league's, a board the run lacks)
+	   take two lines at their 90ch measure, and the board's line runs full width until its rail folds
+	   back beside it at 1401px. */
+	@media (min-width: 761px) and (max-width: 1180px) {
+		:global(html[data-league='2']) .note:not(.short),
+		:global(html[data-league='3']) .note:not(.short) {
+			min-height: 2lh;
+		}
+	}
+
+	@media (min-width: 1181px) and (max-width: 1400px) {
+		:global(html[data-league='2']) .narrow,
+		:global(html[data-league='3']) .narrow {
+			min-height: 2lh;
+		}
+	}
+
 	@media (max-width: 760px) {
 		:global(html[data-league='2']) .note:not(.short) {
 			min-height: 2lh;
