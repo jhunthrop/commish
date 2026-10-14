@@ -194,7 +194,9 @@
 		<Panel>
 			<PanelHead title="Show" />
 			<Toggle label="Players below replacement" bind:checked={belowReplacement} />
-			<Toggle label="Floor to ceiling" bind:checked={range} />
+			<span class="range-toggle" class:in-season={page.seasonLead !== null}
+				><Toggle label="Floor to ceiling" bind:checked={range} /></span
+			>
 			<Toggle label="Only my sheet" bind:checked={onlySheet} />
 		</Panel>
 		<Panel>
@@ -269,12 +271,23 @@
 		display: none;
 	}
 
+	.range-toggle {
+		display: contents;
+	}
+
+	/* From 1181 to 1439px an in-season row has no floor to ceiling column, so no switch for it. */
+	@media (min-width: 1181px) and (max-width: 1439px) {
+		.range-toggle.in-season {
+			display: none;
+		}
+	}
+
 	/* The sheet card's height with no one on it yet ("Your sheet", "No one yet"). */
 	.rail-slot {
 		min-height: 86px;
 	}
 
-	@media (max-width: 1400px) {
+	@media (max-width: 1180px) {
 		.board {
 			grid-template-columns: minmax(0, 1fr);
 			grid-template-rows: none;

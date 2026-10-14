@@ -260,6 +260,18 @@
 		}
 	}
 
+	@media (min-width: 1181px) and (max-width: 1439px) {
+		.games > .rng {
+			display: none;
+		}
+	}
+
+	@media (min-width: 1181px) and (max-width: 1253px) {
+		.games > .action {
+			display: none;
+		}
+	}
+
 	@media (max-width: 1180px) {
 		.gp {
 			display: none;

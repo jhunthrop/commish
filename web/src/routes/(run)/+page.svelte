@@ -131,7 +131,7 @@
 		margin-top: var(--s-3);
 	}
 
-	@media (max-width: 1400px) {
+	@media (max-width: 1180px) {
 		.body {
 			grid-template-columns: minmax(0, 1fr);
 		}
