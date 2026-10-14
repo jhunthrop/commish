@@ -121,8 +121,10 @@
 	}
 
 	@media (max-width: 760px) {
+		/* The phone gives the switch its bar's whole first row, the same width on every page. */
 		.switch {
 			position: static;
+			flex: 1;
 		}
 
 		.face {

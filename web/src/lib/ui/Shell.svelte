@@ -264,29 +264,22 @@
 			border-top-color: var(--accent);
 		}
 
-		/* The phone bar is a grid with the account in its first row's last cell on every page, so the
-		   one way to the account, the pass and the companion is always in the same place, and the
-		   league switch, the bar's one menu, takes the rest of that row: after the run's date, or
-		   before the page's verb on a page with no date. Under a date the verb has its own row, and
-		   the search runs across the last. */
+		/* The phone bar is one grid on every page, so it never changes size between pages: the league
+		   switch, the bar's one menu, takes the whole first row with the account in its last cell; the
+		   run's date and the page's verb share the second, a verb's height whether or not the page has
+		   either; the search runs across the last. */
 		.top {
 			display: grid;
-			grid-template-columns: minmax(0, 1fr) auto auto;
+			grid-template-columns: auto minmax(0, 1fr) auto;
+			grid-template-rows: auto var(--verb-h) auto;
 			grid-template-areas:
-				'league tail account'
+				'league league account'
+				'stamp tail tail'
 				'find find find';
 			align-items: center;
 			padding: var(--s-2) var(--s-4);
 			gap: var(--s-2);
 			min-height: 0;
-		}
-
-		.top:has(.stamp) {
-			grid-template-columns: auto minmax(0, 1fr) auto;
-			grid-template-areas:
-				'stamp league account'
-				'tail tail tail'
-				'find find find';
 		}
 
 		.league {
@@ -311,11 +304,6 @@
 		.tail {
 			grid-area: tail;
 			justify-content: flex-end;
-		}
-
-		/* An empty tail takes no row under a date. */
-		.tail:not(:has(*)) {
-			display: none;
 		}
 
 		.find {
