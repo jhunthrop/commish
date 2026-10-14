@@ -3,7 +3,6 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { followFormat } from '#lib/context/follow.svelte.ts';
-	import ScoringChoice from '#lib/context/ScoringChoice.svelte';
 	import { contextNote, heldMark } from '#lib/context/words.ts';
 	import { POSITION_NAMES, tierGroups } from '#lib/run/derive.ts';
 	import type { BoardPage } from '#lib/server/pages/board.ts';
@@ -132,7 +131,6 @@
 		</div>
 		<div class="filters">
 			<FilterBar>
-				<ScoringChoice label={page.format.label} />
 				<ChipGroup label="Position">
 					<Chip href={links.board(page.format.id)} pressed={page.position === null}>All</Chip>
 					{#each page.positions as position (position)}

@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { followFormat } from '#lib/context/follow.svelte.ts';
-	import ScoringChoice from '#lib/context/ScoringChoice.svelte';
 	import { heldMark } from '#lib/context/words.ts';
 	import { windowLabel } from '#lib/format/date.ts';
 	import { plural } from '#lib/format/number.ts';
@@ -10,7 +9,6 @@
 	import type { AdpPage } from '#lib/server/pages/adp.ts';
 	import type { RunStamp } from '#lib/run/stamp.ts';
 	import BasisList from '#lib/ui/BasisList.svelte';
-	import FilterBar from '#lib/ui/FilterBar.svelte';
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
@@ -71,11 +69,6 @@
 						.label} board · earliest pick first"
 				/>
 			</div>
-			<div class="filters">
-				<FilterBar>
-					<ScoringChoice label={page.format.label} />
-				</FilterBar>
-			</div>
 			<section aria-label="{page.format.label} ADP">
 				<RowHead action order="adp" />
 				{#each page.rows as player, i (player.id)}
@@ -122,8 +115,7 @@
 		min-width: 0;
 	}
 
-	.lead,
-	.filters {
+	.lead {
 		margin-bottom: var(--s-4);
 	}
 
