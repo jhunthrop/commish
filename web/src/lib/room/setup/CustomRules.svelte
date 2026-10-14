@@ -104,12 +104,12 @@
 			{#if result.defaulted.length > 0}
 				<p class="note">
 					Your league does not set these, so they score the standard way: {listWords(
-						result.defaulted.map(ruleLabel)
+						result.defaulted.map((d) => ruleLabel(d).toLowerCase())
 					)}.
 				</p>
 			{/if}
 		{/if}
-		<p class="note">On Yahoo, enter your league's rules below.</p>
+		{#if !result}<p class="note">On Yahoo, enter your league's rules below.</p>{/if}
 	</div>
 	<div class="groups">
 		{#each RULE_GROUPS.filter((g) => !g.boardless) as group (group.label)}

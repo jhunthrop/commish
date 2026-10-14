@@ -87,7 +87,8 @@
 		color: var(--ink-2);
 	}
 
+	/* The bottom room clears the phone's fixed action bar under the last field. */
 	.rules {
-		padding: var(--s-3) 0 var(--s-4);
+		padding: var(--s-3) 0 var(--s-7);
 	}
 </style>
