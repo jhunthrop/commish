@@ -11,7 +11,7 @@
 	import TierChip from './TierChip.svelte';
 	import ValueCell from './ValueCell.svelte';
 	import { vorCell } from './heat.ts';
-	import { seasonFigures } from './season-figures.ts';
+	import { seasonParts } from './season-figures.ts';
 
 	interface Props {
 		player: BoardPlayer;
@@ -75,7 +75,11 @@
 			{#if season === undefined}
 				<span class="wide">{fixed(player.expectedGames)} games</span>
 			{:else}
-				<span class="season">{seasonFigures(season)}</span>
+				{@const parts = seasonParts(season)}
+				<span class="season"
+					>{parts.perGame}{#if parts.games !== null}<span class="games">{parts.games}</span
+						>{/if}</span
+				>
 			{/if}
 			<span class="narrow">{fixed(player.projected)} pts</span>
 		</span>
@@ -193,10 +197,16 @@
 		flex: none;
 	}
 
-	/* His season so far takes the projected games' place. */
+	/* His season so far takes the projected games' place: "18.4 a game". The count after it prints
+	   only where the figures have a line of their own; on the meta line the basis line's "through
+	   week 5" and his page carry it. */
 	.season {
 		color: var(--ink-2);
 		font-variant-numeric: tabular-nums;
+	}
+
+	.games {
+		display: none;
 	}
 
 	@container (max-width: 204px) {
@@ -205,24 +215,10 @@
 		}
 	}
 
-	/* In season his figures (128px at their widest) take the projected games' place (75px), so the
-	   meta line needs more room, measured on the stand-in's 400 rows: 264px with the club and the tier
-	   chip, 229px without the club, 189px with the pill alone. A narrower column drops the club, then
-	   the tier chip (the All view at 1440 is 210px, and its round tint still reads the value), and a
-	   column under the pill and figures (the phone, and 760 to 960px) gives the figures a line of
-	   their own, wrapping their words rather than losing their end. */
-	@container (max-width: 264px) {
-		.seasoned .team {
-			display: none;
-		}
-	}
-
-	@container (max-width: 232px) {
-		.seasoned .tier {
-			display: none;
-		}
-	}
-
+	/* In season the meta line with the club and the tier chip ("WR 12 · T3 · LAR · 18.4 a game") fits
+	   the 210px player column of the board at 1440, measured on the stand-in's 400 rows. A column
+	   under the pill and the figures (the phone, and 760 to 960px) gives the figures a line of their
+	   own with the games count, wrapping their words rather than losing their end. */
 	@container (max-width: 196px) {
 		.seasoned {
 			flex-wrap: wrap;
@@ -233,6 +229,10 @@
 			order: 1;
 			flex: 0 0 100%;
 			white-space: normal;
+		}
+
+		.seasoned .games {
+			display: inline;
 		}
 	}
 
