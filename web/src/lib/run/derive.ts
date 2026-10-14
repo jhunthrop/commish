@@ -73,10 +73,19 @@ export function tierOf(rows: readonly BoardRow[], player: BoardRow): TierGroup {
 	return group;
 }
 
-/** The scale every range bar in one view shares, so spans compare across rows. */
+/** The scale every range bar in one view shares, so spans compare across rows. In season the rows
+ * carry no range, and the scale is one step from zero, drawn by no bar. */
 export function rangeScale(rows: readonly Pick<BoardRow, 'floor' | 'ceiling'>[]): RangeScale {
 	if (rows.length === 0) throw new Error('A range scale needs at least one row.');
-	const lo = Math.floor(Math.min(...rows.map((row) => row.floor)) / SCALE_STEP) * SCALE_STEP;
-	const hi = Math.max(...rows.map((row) => row.ceiling));
+	const floors = rows.flatMap((row) => (row.floor === null ? [] : [row.floor]));
+	const ceilings = rows.flatMap((row) => (row.ceiling === null ? [] : [row.ceiling]));
+	if (floors.length === 0 || ceilings.length === 0) return { lo: 0, hi: SCALE_STEP };
+	const lo = Math.floor(Math.min(...floors) / SCALE_STEP) * SCALE_STEP;
+	const hi = Math.max(...ceilings);
 	return { lo, hi: hi > lo ? hi : lo + SCALE_STEP };
+}
+
+/** Whether a board's rows carry a range: preseason they do, in season none does. */
+export function carriesRange(rows: readonly Pick<BoardRow, 'floor' | 'ceiling'>[]): boolean {
+	return rows.some((row) => row.floor !== null && row.ceiling !== null);
 }

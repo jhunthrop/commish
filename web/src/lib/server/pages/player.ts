@@ -2,6 +2,8 @@
  * him and from which sources, his season so far, his capsule, and his numbers in every other format
  * the run carries. */
 import { windowLabel } from '#lib/format/date.ts';
+import { draftersGap } from '#lib/format/draft.ts';
+import { fixed, plural } from '#lib/format/number.ts';
 import { tierOf } from '#lib/run/derive.ts';
 import type { AdpSource, Capsule, Format, IndexEntry, PlayerFormat } from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
@@ -15,8 +17,11 @@ import {
 	manifest,
 	player,
 	schedule,
-	seasonUnderway
+	seasonReach,
+	seasonUnderway,
+	type SeasonReach
 } from '../run.ts';
+import { restLead } from '#lib/run/rest-words.ts';
 
 export interface TierMate {
 	id: string;
@@ -29,9 +34,30 @@ export interface TierMate {
 	projected: number;
 }
 
+/** In season, his rest-of-season figures beside the preseason board's, and the basis line the board
+ * prints. */
+export interface RestFigures {
+	lead: string;
+	preseasonRank: number;
+	preseasonPoints: number;
+}
+
+/** A format line's sentences, as the page prints them for it. */
+export interface LineWords {
+	/** The big figure's caption. */
+	caption: string;
+	/** Where drafters take him against our rank. */
+	drafters: string;
+	/** His value's round, or below replacement, among the board. */
+	value: string;
+}
+
 export interface FormatLine {
 	format: Format;
 	numbers: PlayerFormat;
+	words: LineWords;
+	/** Null on a preseason board. */
+	rest: RestFigures | null;
 	/** The drafts behind this format's ADP and their window: "PPR drafts, Sep 5 to Sep 9". */
 	adpSources: string[];
 	/** How many players this format's board ranks. */
@@ -52,6 +78,10 @@ export interface PlayerPage {
 	 * leads with the context's when the run carries it. */
 	lines: FormatLine[];
 	tier: { tier: number; cliff: TierCliff | null; mates: TierMate[] };
+	/** The default format's sentences, as its line carries them. */
+	words: LineWords;
+	/** The default format's rest-of-season figures, as its line carries them. */
+	rest: RestFigures | null;
 	/** The default format's ADP drafts and board size, as its line carries them. */
 	adpSources: string[];
 	boardSize: number;
@@ -67,24 +97,81 @@ export async function playerEntries(): Promise<{ slug: string }[]> {
 
 /** His formats in the manifest's order, the first one that ranks him leading, each with the drafts
  * behind its ADP and its board's size. */
+/** "We have him at pick 12, so drafters take him 3 picks later. ADP 15.0 from PPR drafts, Sep 5 to
+ * Sep 9." */
+function draftersWords(numbers: PlayerFormat, sources: readonly string[]): string {
+	const gap = draftersGap(numbers.adp, numbers.ourRank);
+	if (numbers.adp === null || gap === null) {
+		return `None of our ADP sources has him yet. We have him at pick ${String(numbers.ourRank)}.`;
+	}
+	const where =
+		gap === 0
+			? 'drafters take him right where we would'
+			: `drafters take him ${plural(Math.abs(gap), 'pick')} ${gap > 0 ? 'later' : 'earlier'}`;
+	return `We have him at pick ${String(numbers.ourRank)}, so ${where}. ADP ${fixed(numbers.adp)} from ${sources.join(' and ')}.`;
+}
+
+function lineWords(
+	line: { format: Format; numbers: PlayerFormat; rest: RestFigures | null },
+	sources: readonly string[],
+	boardSize: number,
+	season: { year: number; underway: boolean }
+): LineWords {
+	const { numbers, format, rest } = line;
+	const year = String(season.year);
+	const games = fixed(numbers.expectedGames);
+	const caption =
+		rest !== null
+			? `${format.label} points for the rest of ${year}, our rank ${String(numbers.ourRank)}`
+			: season.underway
+				? `${format.label} points in ${year}, projected preseason over ${games} games`
+				: `projected ${format.label} points in ${year}, over ${games} expected games`;
+	const value =
+		numbers.vor < 0
+			? `Below replacement, among the ${String(boardSize)} on our board`
+			: `Round ${String(numbers.vorRound)} value among the ${String(boardSize)} on our board`;
+	return { caption, drafters: draftersWords(numbers, sources), value };
+}
+
 async function linesFor(
 	formats: readonly Format[],
 	numbers: Readonly<Record<string, PlayerFormat>>,
-	sources: readonly AdpSource[]
+	sources: readonly AdpSource[],
+	season: { year: number; underway: boolean }
 ): Promise<FormatLine[]> {
+	const reach = await seasonReach();
 	const ranked = formats.flatMap((format) => {
 		const found = numbers[format.id];
 		return found ? [{ format, numbers: found }] : [];
 	});
 	return Promise.all(
-		ranked.map(async (line) => ({
-			...line,
-			adpSources: sources
+		ranked.map(async (line) => {
+			const rest = restFigures(line.format, line.numbers, reach, season.year);
+			const adpSources = sources
 				.filter((source) => source.formats.includes(line.format.id))
-				.map((source) => `${source.drafts}, ${windowLabel(source.window)}`),
-			boardSize: (await board(line.format.id)).rows.length
-		}))
+				.map((source) => `${source.drafts}, ${windowLabel(source.window)}`);
+			const boardSize = (await board(line.format.id)).rows.length;
+			const words = lineWords({ ...line, rest }, adpSources, boardSize, season);
+			return { ...line, rest, words, adpSources, boardSize };
+		})
 	);
+}
+
+function restFigures(
+	format: Format,
+	numbers: PlayerFormat,
+	reach: SeasonReach,
+	season: number
+): RestFigures | null {
+	const lead = restLead(format, reach, season);
+	const { preseasonRank, preseasonPoints } = numbers;
+	if (lead === null) return null;
+	if (preseasonRank === undefined || preseasonPoints === undefined) {
+		throw new Error(
+			`The ${format.id} board ranks the rest of the season without his preseason figures.`
+		);
+	}
+	return { lead, preseasonRank, preseasonPoints };
 }
 
 async function mates(format: Format, entry: IndexEntry): Promise<PlayerPage['tier']> {
@@ -127,7 +214,10 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		kickoffsOf(entry.team),
 		seasonUnderway()
 	]);
-	const lines = await linesFor(run.formats, loaded.formats, sources.sources);
+	const lines = await linesFor(run.formats, loaded.formats, sources.sources, {
+		year: run.season,
+		underway
+	});
 	const [lead] = lines;
 	if (!lead) throw new Error(`${loaded.name} has a page but no format ranks him.`);
 	return {
@@ -141,6 +231,8 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		numbers: lead.numbers,
 		lines,
 		tier: await mates(lead.format, entry),
+		words: lead.words,
+		rest: lead.rest,
 		adpSources: lead.adpSources,
 		boardSize: lead.boardSize,
 		capsule: loaded.capsule,

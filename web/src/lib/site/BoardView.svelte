@@ -20,7 +20,6 @@
 	import TierJump from '#lib/ui/TierJump.svelte';
 	import TierStrip from '#lib/ui/TierStrip.svelte';
 	import Toggle from '#lib/ui/Toggle.svelte';
-	import { scoringBasis } from '#lib/run/catalog.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import type { BoardRowView } from '#lib/run/schema.ts';
 	import { links, tierAnchor } from './links.ts';
@@ -36,7 +35,9 @@
 	const EAGER_ROWS = 8;
 
 	let belowReplacement = $state(true);
-	let range = $state(true);
+	let rangeOn = $state(true);
+	/** The floor to ceiling column: shown while the switch is on, and only on a board with a range. */
+	const range = $derived(page.range && rangeOn);
 	let onlySheet = $state<boolean>(false);
 
 	// The sheet loads on the reader's first intent, and at once when they ask for only their sheet.
@@ -70,20 +71,6 @@
 	const visible = $derived(page.rows.filter(shown));
 	const group = $derived(POSITION_NAMES[page.position ?? 'WR']);
 	const unit = $derived(page.format.unit);
-	const basisTerms = $derived([
-		{ term: 'Scoring', means: scoringBasis(page.format) },
-		// In season the lead names the sort and the season, so the order and the tiers move here.
-		...(page.seasonLead === null
-			? []
-			: [{ term: 'Order', means: page.format.basis.slice(1).join(', ') }]),
-		{
-			term: 'Green',
-			means: `The round his points over replacement rank in, among ${String(page.boardSize)}`
-		},
-		{ term: 'Rose', means: 'Below replacement' },
-		{ term: 'Range', means: 'Floor to ceiling' },
-		{ term: 'Drafters', means: `Their ADP from ${page.adpBasis.join(' and ')}, against our rank` }
-	]);
 
 	/** The side column's anchor: the basis, the toggles and the tiers. */
 	const SIDE_ID = 'board-side';
@@ -184,12 +171,14 @@
 		<Panel>
 			<PanelHead title="Show" />
 			<Toggle label="Players below replacement" bind:checked={belowReplacement} />
-			<span class="range-toggle"><Toggle label="Floor to ceiling" bind:checked={range} /></span>
+			{#if page.range}<span class="range-toggle"
+					><Toggle label="Floor to ceiling" bind:checked={rangeOn} /></span
+				>{/if}
 			<Toggle label="Only my sheet" bind:checked={onlySheet} />
 		</Panel>
 		<Panel>
 			<PanelHead title="Basis" />
-			<BasisList terms={basisTerms} />
+			<BasisList terms={page.basisTerms} />
 		</Panel>
 		<!-- Last in the column, so the rail arriving with the sheet moves nothing above it, in a slot
 		     holding an empty sheet's height, so the column does not grow when it arrives. -->

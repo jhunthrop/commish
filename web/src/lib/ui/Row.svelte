@@ -98,7 +98,12 @@
 	<ValueCell {...vorCell(player.vor, player.vorRound)} phoneLabel={false} />
 	{#if range}
 		<span class="rng">
-			<RangeBar floor={player.floor} median={player.median} ceiling={player.ceiling} {scale} />
+			<RangeBar
+				floor={player.floor ?? 0}
+				median={player.median ?? 0}
+				ceiling={player.ceiling ?? 0}
+				{scale}
+			/>
 		</span>
 	{/if}
 	<AdpCell adp={player.adp} ourRank={player.ourRank} under={order === 'adp' ? 'rank' : 'adp'} />

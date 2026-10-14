@@ -69,14 +69,16 @@
 
 	const picks = $derived(SLOTS.map(pickOf));
 	const both = $derived(picks.filter((pick): pick is Chosen => pick !== null));
-	const scale = $derived(
-		both.length === 0
+	/** The two ranges' shared scale; in season the rows carry none, and the cards draw no range. */
+	const scale = $derived.by(() => {
+		const floors = both.flatMap(({ numbers }) => (numbers.floor === null ? [] : [numbers.floor]));
+		const ceilings = both.flatMap(({ numbers }) =>
+			numbers.ceiling === null ? [] : [numbers.ceiling]
+		);
+		return floors.length === 0 || ceilings.length === 0
 			? undefined
-			: {
-					lo: Math.min(...both.map(({ numbers }) => numbers.floor)),
-					hi: Math.max(...both.map(({ numbers }) => numbers.ceiling))
-				}
-	);
+			: { lo: Math.min(...floors), hi: Math.max(...ceilings) };
+	});
 
 	/** Our board's call between the two: the one it ranks higher, by how much, and the other. */
 	/** Our call between the two, once both are in. */
@@ -216,15 +218,17 @@
 									{#if numbers.adp !== null}<Label>ADP {fixed(numbers.adp)}</Label>{/if}
 								</dd>
 							</dl>
-							<div class="range">
-								<Label>Floor, median, ceiling</Label>
-								<OutcomeBar
-									floor={numbers.floor}
-									median={numbers.median}
-									ceiling={numbers.ceiling}
-									{scale}
-								/>
-							</div>
+							{#if numbers.floor !== null && numbers.median !== null && numbers.ceiling !== null}
+								<div class="range">
+									<Label>Floor, median, ceiling</Label>
+									<OutcomeBar
+										floor={numbers.floor}
+										median={numbers.median}
+										ceiling={numbers.ceiling}
+										{scale}
+									/>
+								</div>
+							{/if}
 							<Quiet size="sm" onclick={() => clear(slot)}>Pick someone else</Quiet>
 						</div>
 					{:else}

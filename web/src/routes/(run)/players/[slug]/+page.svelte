@@ -5,7 +5,7 @@
 	import { contextLine } from '#lib/context/context-format.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { draftersGap } from '#lib/format/draft.ts';
-	import { fixed, plural, signed } from '#lib/format/number.ts';
+	import { fixed, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import SheetAdd from '#lib/site/SheetAdd.svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
@@ -46,7 +46,6 @@
 	const unit = $derived(lead.format.unit);
 	const scoring = $derived(lead.format.label);
 	const gap = $derived(draftersGap(n.adp, n.ourRank));
-	const sources = $derived(lead.adpSources.join(' and '));
 	const figures = $derived(apiFormatOf(lead.format));
 	/** The league's line. */
 	const note = $derived(siteContext.notes?.lineFor(figures, 'These figures are') ?? null);
@@ -55,21 +54,6 @@
 	const rostered = $derived.by(() => {
 		return siteContext.held?.holder(page.id) ?? null;
 	});
-	const drafters = $derived.by(() => {
-		if (n.adp === null || gap === null) {
-			return `None of our ADP sources has him yet. We have him at pick ${String(n.ourRank)}.`;
-		}
-		const where =
-			gap === 0
-				? 'drafters take him right where we would'
-				: `drafters take him ${plural(Math.abs(gap), 'pick')} ${gap > 0 ? 'later' : 'earlier'}`;
-		return `We have him at pick ${String(n.ourRank)}, so ${where}. ADP ${fixed(n.adp)} from ${sources}.`;
-	});
-	const valueWords = $derived(
-		n.vor < 0
-			? `Below replacement, among the ${String(lead.boardSize)} on our board`
-			: `Round ${String(n.vorRound)} value among the ${String(lead.boardSize)} on our board`
-	);
 	const mates = $derived(
 		page.tier.mates.map((mate) => ({ ...mate, href: links.player(mate.slug) }))
 	);
@@ -123,10 +107,17 @@
 					size="xl"
 					align="end"
 					phoneAlign="start"
-					caption={page.underway
-						? `${scoring} points in ${String(season)}, projected preseason over ${fixed(n.expectedGames)} games`
-						: `projected ${scoring} points in ${String(season)}, over ${fixed(n.expectedGames)} expected games`}
+					caption={lead.words.caption}
 				/>
+				{#if lead.rest}
+					<Figure
+						value={fixed(lead.rest.preseasonPoints)}
+						size="sm"
+						align="end"
+						phoneAlign="start"
+						caption="projected preseason for all {season}, our rank {lead.rest.preseasonRank}"
+					/>
+				{/if}
 				<SheetAdd
 					player={{
 						id: page.id,
@@ -139,6 +130,7 @@
 				/>
 			{/snippet}
 		</HeroCard>
+		{#if lead.rest}<Footnote>{lead.rest.lead}</Footnote>{/if}
 		<div class="league-lines">
 			<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
 		</div>
@@ -151,21 +143,27 @@
 					<Figure value={n.adp === null ? 'No ADP' : `Pick ${fixed(n.adp, 0)}`} />
 					<GapChip {gap} />
 				{/snippet}
-				{drafters}
+				{lead.words.drafters}
 			</Fact>
 			<Fact label="Over replacement" heat={heatFor(n.vor, n.vorRound)}>
 				{#snippet value()}<Figure value={signed(n.vor)} /><span>{unit}</span>{/snippet}
-				{valueWords}
+				{lead.words.value}
 			</Fact>
-			<Fact label="Floor, median, ceiling">
-				{#snippet value()}
-					<span class="bar"
-						><OutcomeBar floor={n.floor} median={n.median} ceiling={n.ceiling} /></span
-					>
-				{/snippet}
-				{season}
-				{scoring} points, from his low case to his high case
-			</Fact>
+			{#if n.floor !== null && n.median !== null && n.ceiling !== null}
+				<Fact label="Floor, median, ceiling">
+					{#snippet value()}
+						<span class="bar"
+							><OutcomeBar
+								floor={n.floor ?? 0}
+								median={n.median ?? 0}
+								ceiling={n.ceiling ?? 0}
+							/></span
+						>
+					{/snippet}
+					{season}
+					{scoring} points, from his low case to his high case
+				</Fact>
+			{/if}
 		</section>
 
 		{#if !page.underway}{@render thisSeason()}{/if}

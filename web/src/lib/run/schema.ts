@@ -59,7 +59,13 @@ export const formatSchema = z.object({
 	unit: phrase,
 	teams: z.number().int().min(2),
 	/** The basis of every number on this format's board, phrase by phrase, as the board's lead prints them. */
-	basis: z.array(phrase).min(1)
+	basis: z.array(phrase).min(1),
+	/** In season, once the board ranks the rest of the season: the first week it ranks. Absent preseason. */
+	rosFromWeek: z.number().int().min(1).optional(),
+	/** In season, the last week whose games are in the season figures. */
+	rosThroughWeek: z.number().int().min(0).optional(),
+	/** In season, when the run refreshed the rest-of-season board. */
+	refreshedAt: isoTime.optional()
 });
 
 export const manifestSchema = z.object({
@@ -96,11 +102,15 @@ export const boardRowSchema = z.object({
 	projected: points,
 	vor: points,
 	expectedGames: points.nonnegative(),
-	floor: points,
-	median: points,
-	ceiling: points,
+	/** Null in season: the rest-of-season board gives no range. */
+	floor: points.nullable(),
+	median: points.nullable(),
+	ceiling: points.nullable(),
 	/** Tier within his position, 1 is the top. */
-	tier: z.number().int().min(1)
+	tier: z.number().int().min(1),
+	/** In season, where the preseason board ranked him, and its points for the full season. */
+	preseasonRank: z.number().int().min(1).optional(),
+	preseasonPoints: points.optional()
 });
 
 export const boardSchema = z.object({

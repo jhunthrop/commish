@@ -155,13 +155,19 @@
 			{#snippet value()}<Figure value={signed(n.vor)} /><span>{unit}</span>{/snippet}
 			Round {n.vorRound} value among the {page.boardSize} on our board
 		</Fact>
-		<Fact label="Floor, median, ceiling">
-			{#snippet value()}<span class="grow"
-					><OutcomeBar floor={n.floor} median={n.median} ceiling={n.ceiling} /></span
-				>{/snippet}
-			{run.season}
-			{page.format.label} points, from his low case to his high case
-		</Fact>
+		{#if n.floor !== null && n.median !== null && n.ceiling !== null}
+			<Fact label="Floor, median, ceiling">
+				{#snippet value()}<span class="grow"
+						><OutcomeBar
+							floor={n.floor ?? 0}
+							median={n.median ?? 0}
+							ceiling={n.ceiling ?? 0}
+						/></span
+					>{/snippet}
+				{run.season}
+				{page.format.label} points, from his low case to his high case
+			</Fact>
+		{/if}
 	</Parts>
 	<Parts>
 		<Part
