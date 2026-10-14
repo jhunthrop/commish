@@ -8,7 +8,7 @@
     restamp-injury-day                once, after fix round 3: restamp capsules whose sheet moved only by
                                       its injury status's dating (instant to Eastern day)
     export --out FILE                 the board's written capsules on their current sheets, to one file
-    import --in FILE                  each into this store where its sheet hashes the same; the rest refused
+    import --in FILE [--dry-run]      each into this store where its sheet hashes the same; the rest refused
 
 RESEARCH_DATABASE_URL names the store (the dev copy for every measurement; never production for a
 measurement run). `write` and `sweep` read AI_GATEWAY_API_KEY from the environment, never a file.
@@ -96,9 +96,15 @@ def _transfer(engine: Engine, args: argparse.Namespace) -> int:
             count = export_capsules(conn, now, Path(args.out))
         _out(f"export: {count} written capsules on their current sheets, to {args.out}")
         return 0
-    with engine.begin() as conn:
+    dry_run = getattr(args, "dry_run", False)
+    with engine.connect() as conn, conn.begin() as transaction:
         report = import_capsules(conn, now, Path(args.source))
-    _out(f"import: {report.imported} imported, {len(report.refused)} refused")
+        if dry_run:
+            transaction.rollback()
+    verb = "would import" if dry_run else "imported"
+    _out(
+        f"import{' (dry run, nothing written)' if dry_run else ''}: {report.imported} {verb}, {len(report.refused)} refused"
+    )
     for line in report.refused:
         _out(f"  refused {line}")
     return 0
@@ -119,9 +125,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     sweep.add_argument("--budget", type=int, default=CAPSULE_CONFIG.sweep_generation_budget)
     sub.add_parser("restamp-injury-day", help="once: restamp capsules whose sheet moved only by its injury dating")
     sub.add_parser("export", help="the board's written capsules to a file").add_argument("--out", required=True)
-    sub.add_parser("import", help="capsules from an export, where the sheet matches").add_argument(
-        "--in", dest="source", required=True
-    )
+    imported = sub.add_parser("import", help="capsules from an export, where the sheet matches")
+    imported.add_argument("--in", dest="source", required=True)
+    imported.add_argument("--dry-run", action="store_true", help="print what would land and be refused, write nothing")
     args = parser.parse_args(argv)
     engine = make_engine(database_url_from_env())
     if args.command in ("facts", "prompt"):
