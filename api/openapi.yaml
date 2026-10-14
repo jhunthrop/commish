@@ -102,6 +102,23 @@ paths:
         "200": { $ref: "#/components/responses/AccountResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
         "409": { $ref: "#/components/responses/ErrorResponse" }
+  /me/league:
+    put:
+      tags: [league-sync]
+      operationId: selectLeague
+      summary: >-
+        The site's context: one of the account's followed leagues, or a format with no league. Every page reads the
+        selection from /me.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LeagueChoice" }
+      responses:
+        "200": { $ref: "#/components/responses/AccountResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
 
   /leagues:
     get:
@@ -1360,18 +1377,26 @@ components:
 
     Account:
       type: object
-      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, league_id, league_count, created_at]
+      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, league, leagues, format, created_at]
       properties:
         id: { type: string, format: uuid }
         email: { type: string }
-        league_id:
-          type: string
-          format: uuid
+        league:
           nullable: true
-          description: the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
-        league_count:
-          type: integer
-          description: how many leagues the account follows now (detached ones not counted); more than one, the rail's League opens the list
+          allOf: [{ $ref: "#/components/schemas/ContextLeague" }]
+          description: >-
+            the selected league, the site's context; with no selection made, the newest followed league; null when the
+            account follows none or chose a format alone
+        leagues:
+          type: array
+          description: every league the account follows, newest first, as the shell's switcher lists them
+          items: { $ref: "#/components/schemas/ContextLeague" }
+        format:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/BoardFormat" }]
+          description: >-
+            the context's format, the board every page opens in: the selected league's, else the format chosen with
+            no league, null when neither
         first_name: { type: string, nullable: true }
         last_name: { type: string, nullable: true }
         handle:
@@ -1430,6 +1455,44 @@ components:
     BoardFormat:
       type: string
       enum: [ppr, half_ppr, standard, te_premium, superflex, two_flex, dynasty, best_ball]
+    ContextLeague:
+      type: object
+      description: a followed league as the site's context reads it
+      required: [id, name, host, team_name, standing, scoring, format, settings_league_id]
+      properties:
+        id: { type: string, format: uuid, description: the attachment (AttachedLeague.id) }
+        name: { type: string, description: "the league's name at its last read, else its saved league's" }
+        host: { $ref: "#/components/schemas/LeagueHost" }
+        team_name: { type: string, description: "the drafter's team at the last read, empty when unread" }
+        standing:
+          allOf: [{ $ref: "#/components/schemas/LeagueStanding" }]
+          nullable: true
+          description: the drafter's record and place at the last read, null when unread
+        scoring:
+          allOf: [{ $ref: "#/components/schemas/ScoringPreset" }]
+          description: the preset the league's scoring is, or scores most like (its saved league's, else its last read's)
+        format:
+          allOf: [{ $ref: "#/components/schemas/BoardFormat" }]
+          description: >-
+            the board the league reads on: superflex for a superflex lineup, otherwise ppr, half_ppr or standard by
+            the league's points per reception (TE premium reads on ppr until its exact rules have a board)
+        settings_league_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: the saved league a mock reruns from, null when a mock room cannot draft this league
+    ContextFormat:
+      type: string
+      description: a format chosen with no league
+      enum: [ppr, half_ppr, standard]
+    LeagueChoice:
+      type: object
+      description: exactly one of league_id (a followed league) and format (no league)
+      properties:
+        league_id: { type: string, format: uuid, nullable: true }
+        format:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/ContextFormat" }]
     Scoring:
       type: object
       description: exactly one of preset and custom. custom needs the custom_scoring feature.
@@ -2248,7 +2311,7 @@ components:
         season: { type: integer }
         name: { type: string, description: the league's name at its last read }
         roster_id: { type: integer }
-        team_name: { type: string, description: the drafter's team at the last read, empty when unread }
+        team_name: { type: string, description: "the drafter's team at the last read, empty when unread" }
         standing:
           allOf: [{ $ref: "#/components/schemas/LeagueStanding" }]
           nullable: true
@@ -2364,7 +2427,7 @@ components:
         - roster
         - matchup
         - moves
-        - rostered
+        - held_by
         - board_format
         - byes
         - placement
@@ -2415,12 +2478,13 @@ components:
           type: array
           description: the completed moves of this week and last, newest first
           items: { $ref: "#/components/schemas/LeagueMove" }
-        rostered:
-          type: array
+        held_by:
+          type: object
           description: >-
-            the board id of every player a team in the league holds; the waiver pool is our board without them. The
-            board is the run's own (web data/league-board), not part of this answer
-          items: { type: string }
+            the roster id holding each player a team in the league holds, by his board id; the waiver pool is our
+            board without them, and every page marks them. The board is the run's own (web data/league-board), not
+            part of this answer
+          additionalProperties: { type: integer }
         board_format:
           allOf: [{ $ref: "#/components/schemas/BoardFormat" }]
           description: the run's board the league reads on (ppr, half_ppr, standard or superflex)

@@ -169,7 +169,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		lobbies.Routes(),
 		companions.Routes(),
 		(&devices.Service{Store: deviceStore, Tokens: bearer, CodeKey: codeKey, Now: now, Log: log}).Routes(),
-		leagueSyncService(cfg, pool, draftBoards, leagueStore, ents, ff, log).Routes(),
+		leagueSyncService(cfg, pool, draftBoards, leagueStore, ents, viewer, ff, log).Routes(),
 		ff.routes(log),
 		devRoutes,
 	)

@@ -75,6 +75,10 @@ type Service struct {
 	// FFPC is the FFPC host when it is set up (HOST_CREDENTIALS_KEY), nil
 	// otherwise; it is also among Hosts, which reads it on the poll.
 	FFPC *FFPC
+	// Selection keeps the site's context and Accounts answers the Account
+	// it changes (PUT /me/league).
+	Selection Selector
+	Accounts  AccountViewer
 
 	Now func() time.Time
 	Log *slog.Logger
@@ -91,6 +95,7 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/restore", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDetachPerMinute), Handler: s.restore},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/sync", Access: httpx.SignedIn, Limit: read, Handler: s.sync},
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/refresh", Access: httpx.SignedIn, Limit: httpx.PerHour(limitRefreshPerHour), Handler: s.refresh},
+		{Method: http.MethodPut, Path: "/me/league", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitSelectPerMinute), Handler: s.selectLeague},
 	}
 }
 

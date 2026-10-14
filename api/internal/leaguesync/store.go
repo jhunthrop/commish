@@ -133,67 +133,6 @@ func (s *Store) Get(ctx context.Context, accountID, id uuid.UUID) (Link, error) 
 	return l, nil
 }
 
-// Attached is one link as the account page and the rail list it: the
-// league's name and the drafter's team at the last read.
-type Attached struct {
-	Link
-	Season   int
-	Name     string
-	TeamName string
-	// Teams are the league's teams at the last read, none when unread.
-	Teams []Team
-}
-
-// Attached is the account's links, newest first, each with its league's
-// name and team from the last read. With no read kept, the name is the
-// saved league's the attach made, so a league is never nameless.
-func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, error) {
-	rows, err := s.Pool.Query(ctx, `select l.id, l.account_id, l.league_id, l.host, l.host_league_id, l.host_season,
-		l.roster_id, l.attached_at, l.last_read_at,
-		coalesce((sn.snapshot->>'season')::int, l.host_season), coalesce(nullif(sn.snapshot->>'name', ''), saved.name, ''),
-		coalesce((select t->>'name' from jsonb_array_elements(sn.snapshot->'teams') t
-			where (t->>'roster_id')::int = l.roster_id limit 1), ''),
-		sn.snapshot->'teams'
-		from app.league_links l
-		left join app.league_snapshots sn
-			on sn.host = l.host and sn.host_league_id = l.host_league_id and sn.host_season = l.host_season
-		left join app.leagues saved on saved.id = l.league_id and saved.account_id = l.account_id
-		where l.account_id = $1 and l.detached_at is null order by l.attached_at desc, l.id limit $2`, accountID, MaxLinksPerAccount)
-	if err != nil {
-		return nil, fmt.Errorf("leaguesync: attached: %w", err)
-	}
-	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Attached, error) {
-		var a Attached
-		var teams []byte
-		err := r.Scan(&a.ID, &a.AccountID, &a.LeagueID, &a.Ref.Host, &a.Ref.LeagueID, &a.Ref.Season, &a.RosterID,
-			&a.AttachedAt, &a.LastReadAt, &a.Season, &a.Name, &a.TeamName, &teams)
-		if err == nil && len(teams) > 0 {
-			err = json.Unmarshal(teams, &a.Teams)
-		}
-		return a, err
-	})
-	if err != nil {
-		return nil, fmt.Errorf("leaguesync: attached: %w", err)
-	}
-	return out, nil
-}
-
-// Newest is the account's newest attached league, nil when it has none,
-// and how many the account follows.
-func (s *Store) Newest(ctx context.Context, accountID uuid.UUID) (*uuid.UUID, int, error) {
-	var id uuid.UUID
-	var count int
-	err := s.Pool.QueryRow(ctx, `select id, count(*) over () from app.league_links where account_id = $1 and detached_at is null
-		order by attached_at desc, id limit 1`, accountID).Scan(&id, &count)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, 0, nil
-	}
-	if err != nil {
-		return nil, 0, fmt.Errorf("leaguesync: newest for %s: %w", accountID, err)
-	}
-	return &id, count, nil
-}
-
 // Detach marks the account's link detached. The row and the saved league
 // it made stay, so the detach can be undone (Restore) and mocks saved
 // from the league keep their settings.

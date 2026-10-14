@@ -120,6 +120,27 @@ func (e ConnectedHost) Valid() bool {
 	}
 }
 
+// Defines values for ContextFormat.
+const (
+	ContextFormatHalfPpr  ContextFormat = "half_ppr"
+	ContextFormatPpr      ContextFormat = "ppr"
+	ContextFormatStandard ContextFormat = "standard"
+)
+
+// Valid indicates whether the value is a known member of the ContextFormat enum.
+func (e ContextFormat) Valid() bool {
+	switch e {
+	case ContextFormatHalfPpr:
+		return true
+	case ContextFormatPpr:
+		return true
+	case ContextFormatStandard:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeviceScope.
 const (
 	DeviceScopeDraftWrite  DeviceScope = "draft:write"
@@ -785,17 +806,20 @@ type Account struct {
 	Features  []Feature       `json:"features"`
 	FirstName *string         `json:"first_name"`
 
+	// Format the context's format, the board every page opens in: the selected league's, else the format chosen with no league, null when neither
+	Format *BoardFormat `json:"format"`
+
 	// Handle the name shown in lobbies, 3 to 20 letters, digits or underscores, not starting with a digit
 	Handle   *string            `json:"handle"`
 	Id       openapi_types.UUID `json:"id"`
 	LastName *string            `json:"last_name"`
 
-	// LeagueCount how many leagues the account follows now (detached ones not counted); more than one, the rail's League opens the list
-	LeagueCount int `json:"league_count"`
+	// League the selected league, the site's context; with no selection made, the newest followed league; null when the account follows none or chose a format alone
+	League *ContextLeague `json:"league"`
 
-	// LeagueId the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
-	LeagueId   *openapi_types.UUID `json:"league_id"`
-	Membership *MembershipState    `json:"membership"`
+	// Leagues every league the account follows, newest first, as the shell's switcher lists them
+	Leagues    []ContextLeague  `json:"leagues"`
+	Membership *MembershipState `json:"membership"`
 }
 
 // AccountUpdate defines model for AccountUpdate.
@@ -862,7 +886,7 @@ type AttachedLeague struct {
 	// Standing the drafter's record and place at the last read, null when unread
 	Standing *LeagueStanding `json:"standing"`
 
-	// TeamName the drafter's team at the last read
+	// TeamName the drafter's team at the last read, empty when unread
 	TeamName string `json:"team_name"`
 }
 
@@ -1039,6 +1063,36 @@ type CompanionSummary struct {
 
 // ConnectedHost a host the member connects their own account on, named as a mechanism
 type ConnectedHost string
+
+// ContextFormat a format chosen with no league
+type ContextFormat string
+
+// ContextLeague a followed league as the site's context reads it
+type ContextLeague struct {
+	// Format the board the league reads on: superflex for a superflex lineup, otherwise ppr, half_ppr or standard by the league's points per reception (TE premium reads on ppr until its exact rules have a board)
+	Format BoardFormat `json:"format"`
+
+	// Host the host a league runs on, named as a mechanism
+	Host LeagueHost `json:"host"`
+
+	// Id the attachment (AttachedLeague.id)
+	Id openapi_types.UUID `json:"id"`
+
+	// Name the league's name at its last read, else its saved league's
+	Name string `json:"name"`
+
+	// Scoring the preset the league's scoring is, or scores most like (its saved league's, else its last read's)
+	Scoring ScoringPreset `json:"scoring"`
+
+	// SettingsLeagueId the saved league a mock reruns from, null when a mock room cannot draft this league
+	SettingsLeagueId *openapi_types.UUID `json:"settings_league_id"`
+
+	// Standing the drafter's record and place at the last read, null when unread
+	Standing *LeagueStanding `json:"standing"`
+
+	// TeamName the drafter's team at the last read, empty when unread
+	TeamName string `json:"team_name"`
+}
 
 // Device defines model for Device.
 type Device struct {
@@ -1264,6 +1318,12 @@ type League struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 }
 
+// LeagueChoice exactly one of league_id (a followed league) and format (no league)
+type LeagueChoice struct {
+	Format   *ContextFormat      `json:"format,omitempty"`
+	LeagueId *openapi_types.UUID `json:"league_id,omitempty"`
+}
+
 // LeagueHost the host a league runs on, named as a mechanism
 type LeagueHost string
 
@@ -1341,6 +1401,9 @@ type LeagueSync struct {
 	// Byes each NFL team's bye week this season, by team code
 	Byes map[string]int `json:"byes"`
 
+	// HeldBy the roster id holding each player a team in the league holds, by his board id; the waiver pool is our board without them, and every page marks them. The board is the run's own (web data/league-board), not part of this answer
+	HeldBy map[string]int `json:"held_by"`
+
 	// Host the host a league runs on, named as a mechanism
 	Host LeagueHost `json:"host"`
 
@@ -1369,9 +1432,6 @@ type LeagueSync struct {
 	// ReadAt when the host was last read for this league
 	ReadAt time.Time    `json:"read_at"`
 	Roster []RosterSpot `json:"roster"`
-
-	// Rostered the board id of every player a team in the league holds; the waiver pool is our board without them. The board is the run's own (web data/league-board), not part of this answer
-	Rostered []string `json:"rostered"`
 
 	// ScoringDefaulted the ScoringRules keys the league does not state, each at its standard figure ("key figure")
 	ScoringDefaulted []string `json:"scoring_defaulted"`
@@ -2296,6 +2356,9 @@ type JoinLobbyJSONRequestBody = LobbyJoin
 
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = AccountUpdate
+
+// SelectLeagueJSONRequestBody defines body for SelectLeague for application/json ContentType.
+type SelectLeagueJSONRequestBody = LeagueChoice
 
 // CreateMockJSONRequestBody defines body for CreateMock for application/json ContentType.
 type CreateMockJSONRequestBody = MockCreate
