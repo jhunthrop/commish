@@ -64,7 +64,7 @@ export function missedWords(missed: Missed<ToFollow>): string {
 }
 
 /** The line a free account reads where a second league would be. */
-export const ONE_LEAGUE_FREE = 'One league is free. The rest come with the Draft Pass.';
+export const ONE_LEAGUE_FREE = 'One league is free. Follow more leagues with the Draft Pass.';
 
 /** The most leagues one account follows (the API's MaxLinksPerAccount), so a count read from an
  * address is believed only inside it. */
