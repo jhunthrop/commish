@@ -14,7 +14,7 @@ import {
 export const LEAGUE_HOST_PARAM = 'host';
 
 /** The hosts whose leagues are followed from the member's own list, the attach page's other ways in. */
-export const MEMBER_WAYS = ['ffpc', 'yahoo'] as const;
+export const MEMBER_WAYS = ['ffpc', 'yahoo', 'espn'] as const;
 export type MemberWay = (typeof MEMBER_WAYS)[number];
 
 export { FOLLOWED_PARAM, LEAGUES_ANCHOR };

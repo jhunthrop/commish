@@ -1,13 +1,14 @@
 <script lang="ts">
+	import ESPNConnect from './ESPNConnect.svelte';
 	import FFPCSignIn from './FFPCSignIn.svelte';
 	import YahooConnect from './YahooConnect.svelte';
 	import type { components } from '#lib/api/types.ts';
 
 	/** The way back in for a league read as a member, on its own host's terms: FFPC's sign-in form
-	 * here, or Yahoo's own sign-in one verb away. */
+	 * here, Yahoo's own sign-in one verb away, or ESPN's through Disney's. */
 	interface Props {
 		host: components['schemas']['LeagueHost'];
-		/** FFPC signed in again here: the league reads now. */
+		/** Connected again here: the league reads now. */
 		onconnected: () => void;
 	}
 
@@ -16,6 +17,8 @@
 
 {#if host === 'yahoo'}
 	<YahooConnect label="Connect Yahoo again" />
+{:else if host === 'espn'}
+	<ESPNConnect label="Connect ESPN again" onconnected={() => onconnected()} />
 {:else}
 	<FFPCSignIn onconnected={() => onconnected()} />
 {/if}

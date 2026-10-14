@@ -10,17 +10,13 @@ const HOST_WORDS: Readonly<Record<LeagueHost, string>> = {
 	sleeper: 'Sleeper',
 	mfl: 'MyFantasyLeague',
 	ffpc: 'FFPC',
-	yahoo: 'Yahoo'
+	yahoo: 'Yahoo',
+	espn: 'ESPN'
 };
 
 /** The host as a sentence names it. */
 export function hostWords(host: LeagueHost): string {
 	return HOST_WORDS[host];
-}
-
-/** How a league read as a member is reached: FFPC is signed in to, every other host connected to. */
-export function memberWords(host: LeagueHost): string {
-	return host === 'ffpc' ? 'signed in to' : 'connected to';
 }
 
 /** A followed league's own name, or its host's when the read has none yet. */

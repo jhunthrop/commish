@@ -19,10 +19,11 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { hasFeature } from '#lib/account/features.ts';
 	import FFPCLeagues from '#lib/hosts/FFPCLeagues.svelte';
-	import YahooLeagues from '#lib/hosts/YahooLeagues.svelte';
+	import MemberLeagues from '#lib/hosts/MemberLeagues.svelte';
 	import {
 		ffpcOpen,
 		hostsApi,
+		espnOpen,
 		needsSignIn,
 		yahooOpen,
 		type HostLeague,
@@ -48,13 +49,15 @@
 	type View = 'loading' | 'signed-out' | 'form' | 'unreachable';
 
 	let view = $state<View>('loading');
-	/** How the league comes in: a pasted link (Sleeper, MyFantasyLeague), or a host read as you (FFPC,
-	 * Yahoo). A `?host=ffpc` starts on FFPC, and rides the sign-in's return path with the rest of the
+	/** How the league comes in: a pasted link (Sleeper, MyFantasyLeague, a public ESPN league), or a
+	 * host read as you (FFPC, Yahoo, ESPN). A `?host=ffpc` starts on FFPC, and rides the sign-in's return path with the rest of the
 	 * search. */
 	let way = $state<'link' | MemberWay>(startWay(page.url.searchParams.get(LEAGUE_HOST_PARAM)));
-	/** FFPC and Yahoo are offered only where each is open (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED). */
+	/** FFPC, Yahoo and ESPN are offered only where each is open (HOST_FFPC_ENABLED,
+	 * HOST_YAHOO_ENABLED, HOST_ESPN_ENABLED). */
 	let ffpcOn = $state(false);
 	let yahooOn = $state(false);
+	let espnOn = $state(false);
 
 	function startWay(asked: string | null): 'link' | MemberWay {
 		return MEMBER_WAYS.find((w) => w === asked) ?? 'link';
@@ -78,10 +81,12 @@
 			.then((hosts) => {
 				ffpcOn = ffpcOpen(hosts);
 				yahooOn = yahooOpen(hosts);
+				espnOn = espnOpen(hosts);
 			})
 			.catch(() => {
 				ffpcOn = false;
 				yahooOn = false;
+				espnOn = false;
 			});
 		leagueApi
 			.attached()
@@ -221,7 +226,7 @@
 		{:else}
 			<DisplayTitle size="page">Follow your league</DisplayTitle>
 			{@render gives(way === 'link')}
-			{#if ffpcOn || yahooOn}
+			{#if ffpcOn || yahooOn || espnOn}
 				<ChipGroup label="Your league is on" fit>
 					<Chip pressed={way === 'link'} onclick={() => (way = 'link')}
 						>Sleeper or MyFantasyLeague</Chip
@@ -231,6 +236,9 @@
 					{/if}
 					{#if yahooOn}
 						<Chip pressed={way === 'yahoo'} onclick={() => (way = 'yahoo')}>Yahoo</Chip>
+					{/if}
+					{#if espnOn}
+						<Chip pressed={way === 'espn'} onclick={() => (way = 'espn')}>ESPN</Chip>
 					{/if}
 				</ChipGroup>
 			{/if}
@@ -242,14 +250,18 @@
 					followed={followedOn('ffpc')}
 					limit={many ? undefined : oneLeagueFree}
 				/>
-			{:else if yahooOn && way === 'yahoo'}
-				<YahooLeagues
-					verb={(count: number) => followVerb(count, room)}
-					onpick={(leagues: HostLeague[]) => followOn('yahoo', leagues)}
-					most={room}
-					followed={followedOn('yahoo')}
-					limit={many ? undefined : oneLeagueFree}
-				/>
+			{:else if (yahooOn && way === 'yahoo') || (espnOn && way === 'espn')}
+				{@const host = way === 'yahoo' ? 'yahoo' : 'espn'}
+				{#key host}
+					<MemberLeagues
+						{host}
+						verb={(count: number) => followVerb(count, room)}
+						onpick={(leagues: HostLeague[]) => followOn(host, leagues)}
+						most={room}
+						followed={followedOn(host)}
+						limit={many ? undefined : oneLeagueFree}
+					/>
+				{/key}
 			{:else}
 				<div class="form">
 					<Field
@@ -324,7 +336,7 @@
 		We keep your roster, this week's matchup and every player nobody in your league holds up to date,
 		on our board. Free.
 	</p>
-	<p class="hosts">{hostsLine({ ffpc: ffpcOn, yahoo: yahooOn })}</p>
+	<p class="hosts">{hostsLine({ ffpc: ffpcOn, yahoo: yahooOn, espn: espnOn })}</p>
 {/snippet}
 
 {#snippet oneLeagueFree()}

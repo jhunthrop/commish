@@ -1,4 +1,4 @@
-/** Connected host accounts (FFPC and Yahoo, read as the member) and paired devices, typed from the
+/** Connected host accounts (FFPC, Yahoo and ESPN, read as the member) and paired devices, typed from the
  * contract.
  * The password goes to the API once, on connect, and is never read back: no route answers it. */
 import { PUBLIC_API_URL } from '$app/env/public';
@@ -38,6 +38,14 @@ export const hostsApi = {
 	connectYahoo: () => client.call<Redirect>('/hosts/yahoo/connect', { method: 'POST' }),
 	yahooLeagues: () => client.call<HostLeague[]>('/hosts/yahoo/leagues'),
 	disconnectYahoo: () => client.call<null>('/hosts/yahoo', { method: 'DELETE' }),
+	/** The member's two ESPN cookies, kept encrypted once one read of their leagues shows they work. */
+	connectESPN: (swid: string, s2: string) =>
+		client.call<HostConnected>('/hosts/espn/connect', {
+			method: 'POST',
+			body: { swid, espn_s2: s2, consent: true }
+		}),
+	espnLeagues: () => client.call<HostLeague[]>('/hosts/espn/leagues'),
+	disconnectESPN: () => client.call<null>('/hosts/espn', { method: 'DELETE' }),
 	devices: () => client.call<Device[]>('/devices'),
 	pairCode: () => client.call<PairCode>('/devices/codes', { method: 'POST' }),
 	revokeDevice: (id: string) =>
@@ -62,6 +70,28 @@ export function ffpcOpen(hosts: HostConnections): boolean {
 export function yahooOpen(hosts: HostConnections): boolean {
 	return hosts.enabled.includes('yahoo');
 }
+
+/** Whether connecting ESPN is open here (HOST_ESPN_ENABLED with the key), from the hosts answer. */
+export function espnOpen(hosts: HostConnections): boolean {
+	return hosts.enabled.includes('espn');
+}
+
+/** Disconnect one host: what we keep for it is deleted at once. */
+export function disconnect(host: ConnectedHost): Promise<null> {
+	switch (host) {
+		case 'ffpc':
+			return hostsApi.disconnectFFPC();
+		case 'yahoo':
+			return hostsApi.disconnectYahoo();
+		case 'espn':
+			return hostsApi.disconnectESPN();
+	}
+}
+
+/** The words that keep an ESPN session, said beside the verb that connects: consent version 1
+ * (api/internal/hosts consentVersions). Change the words, raise the version. */
+export const ESPN_CONSENT =
+	'We keep an encrypted copy of your ESPN session so your league stays in sync, and never make a move. Disconnect deletes it at once.';
 
 /** The account's connection to one host, if any. */
 export function connectionTo(

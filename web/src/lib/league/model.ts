@@ -18,7 +18,7 @@ import type {
 	RosterSpot
 } from './api.ts';
 import type { components } from '#lib/api/types.ts';
-import { SCORING_WORDS, hostWords, memberWords } from './names.ts';
+import { SCORING_WORDS, hostWords } from './names.ts';
 
 export { followedName, hostWords } from './names.ts';
 
@@ -28,12 +28,17 @@ type ScoringPreset = components['schemas']['ScoringPreset'];
  * minute whatever the number of viewers, so a faster page would only see the same read. */
 export const POLL_MS = 60_000;
 
-/** The hosts a league may come from here, as the attach page says it: FFPC and Yahoo only where each
- * is open (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED). */
-export function hostsLine(open: { readonly ffpc: boolean; readonly yahoo: boolean }): string {
+/** The hosts a league may come from here, as the attach page says it: FFPC, Yahoo and ESPN only where
+ * each is open (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED, HOST_ESPN_ENABLED). */
+export function hostsLine(open: {
+	readonly ffpc: boolean;
+	readonly yahoo: boolean;
+	readonly espn: boolean;
+}): string {
 	const hosts = ['Sleeper leagues', 'public MyFantasyLeague leagues'];
 	if (open.ffpc) hosts.push('FFPC leagues');
 	if (open.yahoo) hosts.push('Yahoo leagues');
+	if (open.espn) hosts.push('ESPN leagues');
 	const last = hosts.pop() ?? '';
 	return `Works with ${hosts.join(', ')} and ${last}.`;
 }
@@ -47,6 +52,11 @@ export function agoWords(seconds: number): string {
 	if (seconds < MINUTE * SECOND) return 'just now';
 	if (seconds < HOUR) return `${plural(Math.floor(seconds / MINUTE), 'minute')} ago`;
 	return `${plural(Math.floor(seconds / HOUR), 'hour')} ago`;
+}
+
+/** How a league read as a member is reached: FFPC is signed in to, every other host connected to. */
+function memberWords(host: LeagueSync['host']): string {
+	return host === 'ffpc' ? 'signed in to' : 'connected to';
 }
 
 /** The read's line: when the host was last read, and, when the last read failed, why, and that this

@@ -9,6 +9,7 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import ESPNConnect from './ESPNConnect.svelte';
 	import FFPCSignIn from './FFPCSignIn.svelte';
 	import YahooConnect from './YahooConnect.svelte';
 	import { plural } from '#lib/format/number.ts';
@@ -17,7 +18,10 @@
 	import { hostWords } from '#lib/league/names.ts';
 	import {
 		ApiError,
+		disconnect as disconnectHost,
+		espnOpen,
 		ffpcOpen,
+		goToYahoo,
 		hostsApi,
 		yahooOpen,
 		type ConnectedHost,
@@ -25,11 +29,11 @@
 	} from './api.ts';
 	import { yahooOutcome } from './yahoo.ts';
 
-	/** The hosts the account reads as the member (FFPC, Yahoo), each with its state, a one-tap
+	/** The hosts the account reads as the member (FFPC, Yahoo, ESPN), each with its state, a one-tap
 	 * disconnect that deletes what we keep at once, and, when a host has dropped the connection, the
-	 * way back in right here. Yahoo not yet connected is one verb. It reads its own list. */
+	 * way back in right here. Yahoo or ESPN not yet connected is one verb each. It reads its own list. */
 	let connections = $state<HostConnection[] | null>(null);
-	let open = $state<{ ffpc: boolean; yahoo: boolean }>({ ffpc: false, yahoo: false });
+	let open = $state<Record<ConnectedHost, boolean>>({ ffpc: false, yahoo: false, espn: false });
 	let failed = $state(false);
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
@@ -45,7 +49,7 @@
 			.connections()
 			.then((hosts) => {
 				connections = hosts.connections;
-				open = { ffpc: ffpcOpen(hosts), yahoo: yahooOpen(hosts) };
+				open = { ffpc: ffpcOpen(hosts), yahoo: yahooOpen(hosts), espn: espnOpen(hosts) };
 			})
 			.catch(() => (failed = true));
 		leagueApi
@@ -54,7 +58,8 @@
 				(list) =>
 					(followed = {
 						ffpc: list.filter((l) => l.host === 'ffpc').length,
-						yahoo: list.filter((l) => l.host === 'yahoo').length
+						yahoo: list.filter((l) => l.host === 'yahoo').length,
+						espn: list.filter((l) => l.host === 'espn').length
 					})
 			)
 			.catch(() => (followed = null));
@@ -64,14 +69,16 @@
 
 	const STATUS: Readonly<Record<ConnectedHost, Record<HostConnection['status'], string>>> = {
 		ffpc: { connected: 'Signed in', signed_out: 'Signed out by FFPC' },
-		yahoo: { connected: 'Connected', signed_out: 'Yahoo asks you to connect again' }
+		yahoo: { connected: 'Connected', signed_out: 'Yahoo asks you to connect again' },
+		espn: { connected: 'Connected', signed_out: 'ESPN no longer accepts your saved sign-in' }
 	};
 
 	/** What disconnecting deleted, said once it went through. */
 	const GONE: Readonly<Record<ConnectedHost, string>> = {
 		ffpc: 'FFPC disconnected. Your password and session are deleted. Your FFPC league keeps its last read.',
 		yahoo:
-			'Yahoo disconnected. What Yahoo gave us to read with is deleted. Your Yahoo league keeps its last read.'
+			'Yahoo disconnected. What Yahoo gave us to read with is deleted. Your Yahoo league keeps its last read.',
+		espn: 'ESPN disconnected. Your ESPN session is deleted. Your ESPN league keeps its last read.'
 	};
 
 	/** A read's age: "1 minute ago" within a day, its date after. */
@@ -99,7 +106,7 @@
 		busy = true;
 		problem = null;
 		try {
-			await (gone.host === 'ffpc' ? hostsApi.disconnectFFPC() : hostsApi.disconnectYahoo());
+			await disconnectHost(gone.host);
 			connections = (connections ?? []).filter((c) => c !== gone);
 			disconnected = gone.host;
 		} catch (error) {
@@ -116,9 +123,27 @@
 	/** A host dropped the connection here, so the way back in shows. */
 	const ffpcAgain = $derived(open.ffpc && connectionOf('ffpc')?.status === 'signed_out');
 	const yahooAgain = $derived(open.yahoo && connectionOf('yahoo')?.status === 'signed_out');
-	/** Yahoo is open and not connected: one verb connects it. */
+	const espnAgain = $derived(open.espn && connectionOf('espn')?.status === 'signed_out');
+	/** ESPN's connect form, opened from its row. */
+	let espnForm = $state(false);
+
+	/** Open Yahoo's own sign-in from its row. */
+	async function connectYahoo(): Promise<void> {
+		busy = true;
+		problem = null;
+		try {
+			await goToYahoo();
+		} catch (error) {
+			problem = error instanceof ApiError ? error.message : 'That did not go through. Try again.';
+			busy = false;
+		}
+	}
+
+	/** Yahoo is open and not connected: its row connects it. */
 	const yahooNew = $derived(open.yahoo && connections !== null && !connectionOf('yahoo'));
-	const anyOpen = $derived(open.ffpc || open.yahoo);
+	/** ESPN is open and not connected: one verb connects it. */
+	const espnNew = $derived(open.espn && connections !== null && !connectionOf('espn'));
+	const anyOpen = $derived(open.ffpc || open.yahoo || open.espn);
 	/** The section shows once there is something to say or a host to connect. */
 	const shown = $derived(
 		failed ||
@@ -168,15 +193,41 @@
 				{#if yahooAgain}
 					<div class="again"><YahooConnect label="Connect Yahoo again" /></div>
 				{/if}
-				{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
-			{:else if anyOpen && !yahooNew}
+				{#if espnAgain}
+					<div class="again">
+						<ESPNConnect label="Connect ESPN again" onconnected={load} />
+					</div>
+				{/if}
+			{:else if anyOpen && !yahooNew && !espnNew}
 				<EmptyState level={3} title="No connected accounts">
 					{#snippet actions()}{@render follow()}{/snippet}
 				</EmptyState>
 			{/if}
-			{#if yahooNew}
-				<div class="again"><YahooConnect /></div>
+			{#if yahooNew || espnNew}
+				<ActionRows label="Hosts to connect">
+					{#if yahooNew}
+						<ActionRow lead="Yahoo" text="Not connected. Connect to follow your Yahoo leagues.">
+							{#snippet action()}
+								<Quiet size="sm" disabled={busy} onclick={() => void connectYahoo()}>Connect</Quiet>
+							{/snippet}
+						</ActionRow>
+					{/if}
+					{#if espnNew}
+						<ActionRow
+							lead="ESPN"
+							text="Not connected. Connect to follow a private ESPN league. A public one needs only its link."
+						>
+							{#snippet action()}
+								<Quiet size="sm" onclick={() => (espnForm = !espnForm)}>Connect</Quiet>
+							{/snippet}
+						</ActionRow>
+					{/if}
+				</ActionRows>
+				{#if espnNew && espnForm}
+					<div class="again"><ESPNConnect onconnected={load} /></div>
+				{/if}
 			{/if}
+			{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 			{#if disconnected === 'ffpc' && open.ffpc}<div class="again">{@render follow()}</div>{/if}
 		{/if}
 	</section>

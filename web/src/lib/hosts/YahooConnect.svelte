@@ -11,9 +11,12 @@
 		reason?: string;
 		/** The verb's words: "Connect Yahoo", "Connect Yahoo again". */
 		label?: string;
+		/** The verb sits in the page's action bar: true where connecting is the page's one verb (the
+		 * attach page), false where it sits among other rows (the account page). */
+		bar?: boolean;
 	}
 
-	let { reason, label = 'Connect Yahoo' }: Props = $props();
+	let { reason, label = 'Connect Yahoo', bar = false }: Props = $props();
 
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
@@ -36,10 +39,17 @@
 		Yahoo asks you to allow read-only access to your fantasy leagues. We read your league with it
 		and never make a move. Disconnect on your account page deletes it at once.
 	</p>
-	<ActionBar alert={problem ? alert : undefined}>
-		<Verb disabled={busy} onclick={() => void go()}>{busy ? 'Opening Yahoo' : label}</Verb>
-	</ActionBar>
+	{#if bar}
+		<ActionBar alert={problem ? alert : undefined}>{@render verb()}</ActionBar>
+	{:else}
+		<div class="act">{@render verb()}</div>
+		{#if problem}{@render alert()}{/if}
+	{/if}
 </div>
+
+{#snippet verb()}
+	<Verb disabled={busy} onclick={() => void go()}>{busy ? 'Opening Yahoo' : label}</Verb>
+{/snippet}
 
 {#snippet alert()}
 	<ProblemLine>{problem}</ProblemLine>
@@ -61,5 +71,10 @@
 	.note {
 		font-size: var(--t-sm);
 		color: var(--ink-2);
+	}
+
+	.act {
+		display: flex;
+		margin-top: var(--s-1);
 	}
 </style>
