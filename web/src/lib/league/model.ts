@@ -8,7 +8,6 @@ import type { LeagueBoard, LeagueBoardPlayer } from './board.ts';
 import type { FaceStatus } from '#lib/ui/face-status.ts';
 import type {
 	AttachedLeague,
-	LeagueHost,
 	LeagueMatchup,
 	LeagueMove,
 	LeaguePlayer,
@@ -18,23 +17,15 @@ import type {
 	RosterSpot
 } from './api.ts';
 import type { components } from '#lib/api/types.ts';
+import { SCORING_WORDS, hostWords } from './names.ts';
+
+export { followedName, hostWords } from './names.ts';
 
 type ScoringPreset = components['schemas']['ScoringPreset'];
 
 /** How often an open league page reads the league again. The API reads the host at most once a
  * minute whatever the number of viewers, so a faster page would only see the same read. */
 export const POLL_MS = 60_000;
-
-const HOST_WORDS: Readonly<Record<LeagueHost, string>> = {
-	sleeper: 'Sleeper',
-	mfl: 'MyFantasyLeague',
-	ffpc: 'FFPC'
-};
-
-/** The host as a sentence names it. */
-export function hostWords(host: LeagueHost): string {
-	return HOST_WORDS[host];
-}
 
 /** The hosts a league may come from here, as the attach page says it: FFPC only where it is open
  * (HOST_FFPC_ENABLED). */
@@ -102,11 +93,6 @@ export function scoreGap(sync: LeagueSync, now: Date): string {
 export function recordWords(team: Pick<LeagueTeam, 'wins' | 'losses' | 'ties'>): string {
 	const base = `${String(team.wins)}-${String(team.losses)}`;
 	return team.ties > 0 ? `${base}-${String(team.ties)}` : base;
-}
-
-/** A followed league's own name, or its host's when the read has none yet. */
-export function followedName(league: AttachedLeague): string {
-	return league.name !== '' ? league.name : `Your ${hostWords(league.host)} league`;
 }
 
 /** Where the drafter stands in a followed league: "2-3, 9 of 12", empty before a read. */
@@ -202,7 +188,7 @@ function poolOrder(a: LeagueBoardPlayer, b: LeagueBoardPlayer): number {
 /** The waiver pool: our board without every player a team in the league holds, ranked as
  * poolBasis says. */
 export function poolRows(board: LeagueBoard, sync: LeagueSync): readonly LeagueBoardPlayer[] {
-	const held = new Set(sync.rostered);
+	const held = new Set(Object.keys(sync.held_by));
 	const pool = board.players.filter((p) => !held.has(p.id));
 	return seasonStarted(board) ? pool.toSorted(poolOrder) : pool;
 }
@@ -213,14 +199,6 @@ export function poolBasis(board: LeagueBoard): string {
 		? `Unrostered in your league, ranked by points a game this season, players with ${String(POOL_MIN_GAMES)} games or more first, then by our preseason projection.`
 		: "Unrostered in your league, ranked by our preseason board's points over replacement.";
 }
-
-/** A league's scoring in a sentence, from its rules as the host states them (the nearest preset). */
-const SCORING_WORDS: Readonly<Record<ScoringPreset, string>> = {
-	ppr: 'PPR',
-	half_ppr: 'half PPR',
-	standard: 'standard',
-	te_premium: 'TE premium'
-};
 
 /** A label in a sentence: a word drops its capital ("Half PPR" to "half PPR"), an acronym keeps it. */
 function midSentence(label: string): string {

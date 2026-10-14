@@ -2,7 +2,7 @@
 // (api/tools/ffpcfake) and COMPANION_REPLAY on, in both themes at 1440 and 390: the FFPC picker for a
 // Membership (every league chosen, "Follow my leagues") and for a free account (one league, the line
 // on the rest), the done state after one tap (the stand-in serves one league, so the second is
-// named as missed), the account's list with the summary, the league page's title switch open, the
+// named as missed), the account's list with the summary, the shell's league switch open, the
 // free account's list, and the IR mark on the system page.
 //
 //   node scripts/multi-league-shots.ts [web origin] [out dir]
@@ -166,9 +166,9 @@ await shoot({
 	path: `/league/${ffpc.id}`,
 	ready: 'Waiver pool',
 	act: async (page) => {
-		await page.locator('button.as-title').filter({ visible: true }).first().click();
+		await page.locator('button[aria-controls="league-menu"]').click();
 	},
-	after: 'All your leagues'
+	after: 'Your leagues'
 });
 
 await call(free, 'POST', '/leagues/attach', { host: 'ffpc', link: FFPC_LEAGUE, me: {} });

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { HTTP_STATUS, hasStatus, isSignedOut } from '#lib/api/status.ts';
+	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
@@ -15,8 +17,7 @@
 	import { plural } from '#lib/format/number.ts';
 	import { droppedKinds } from './scoring-words.ts';
 	import FFPCSignIn from '#lib/hosts/FFPCSignIn.svelte';
-	import { ApiError, leagueApi, type AttachedLeague, type LeagueSync } from './api.ts';
-	import LeagueTitle from './LeagueTitle.svelte';
+	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
 	import { loadBoard, type LeagueBoard } from './board.ts';
 	import MatchupPanel from './MatchupPanel.svelte';
 	import MovesPanel from './MovesPanel.svelte';
@@ -39,7 +40,8 @@
 
 	/** One attached league: read on open and once a minute while open (the API reads the host at most
 	 * once a minute whatever the number of viewers), and again on the drafter's one tap. Everything is
-	 * read in the browser; the shell paints first. */
+	 * read in the browser; the shell paints first. The page is the selected league: opening it
+	 * selects it in the shell's switch, and switching there opens the league switched to. */
 	interface Props {
 		id: string;
 	}
@@ -55,12 +57,27 @@
 	/** The run's board file could not be read; cleared when one loads. */
 	let boardFailed = $state(false);
 	let refreshing = $state(false);
-	/** Every league the account follows, for the title's switch; empty until read or when it fails. */
-	let followed = $state<readonly AttachedLeague[]>([]);
 	let now = $state(new Date());
+	/** Whether this page has made its league the context yet: once, when the context is first read. */
+	let adopted = false;
+
+	$effect(() => {
+		if (!siteContext.ready) return;
+		const selected = siteContext.league?.id ?? null;
+		if (!adopted) {
+			adopted = true;
+			if (selected !== id && siteContext.leagues.some((league) => league.id === id)) {
+				void siteContext.choose({ league: id });
+			}
+			return;
+		}
+		if (selected !== null && selected !== id) void goto(links.league(selected));
+	});
 
 	function take(answer: LeagueSync): void {
 		sync = answer;
+		// The read the page made is the league's rosters for every other page's marks.
+		siteContext.takeHeld(id, answer);
 		// The board is the run's own file: read once, and again only when the league reads on another.
 		// A failed board read says so and is tried again with the next read of the league.
 		if (board?.format !== answer.board_format) {
@@ -113,10 +130,6 @@
 	onMount(() => {
 		void lazySheet.load();
 		void read();
-		leagueApi
-			.attached()
-			.then((list) => (followed = list))
-			.catch(() => (followed = []));
 		const timer = setInterval(() => void read(), POLL_MS);
 		return () => clearInterval(timer);
 	});
@@ -147,9 +160,6 @@
 </svelte:head>
 
 <Shell title="League" active="league">
-	{#snippet tail()}
-		{#if sync && failure === null}<Quiet href={links.leagueNew()}>Follow another league</Quiet>{/if}
-	{/snippet}
 	{#if failure === 'signed-out'}
 		<div class="pad">
 			<EmptyState
@@ -192,11 +202,9 @@
 		<main class="league">
 			<header class="lead">
 				<div class="title">
-					<LeagueTitle
-						{id}
-						name={sync.name || `Your ${hostWords(sync.host)} league`}
-						leagues={followed}
-					/>
+					<DisplayTitle size="page"
+						>{sync.name || `Your ${hostWords(sync.host)} league`}</DisplayTitle
+					>
 					<p class="sub">
 						{#if team}
 							{team.name}, {recordWords(team)}, {myPlace(sync)} of {sync.teams.length}.

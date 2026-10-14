@@ -5,6 +5,7 @@
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import AdpCell from './AdpCell.svelte';
 	import Face from './Face.svelte';
+	import HeldMark from './HeldMark.svelte';
 	import NameWords from './NameWords.svelte';
 	import PositionPill from './PositionPill.svelte';
 	import RangeBar from './RangeBar.svelte';
@@ -38,6 +39,8 @@
 		 * prints "18.4 a game, 5 games" in place of his projected games, and the page's basis line
 		 * names it. Left out, the row is the preseason row. */
 		season?: IndexSeason;
+		/** A team in your league holds him (HeldMark): whose, in words, and whether it is yours. */
+		held?: { words: string; mine: boolean } | null;
 	}
 
 	let {
@@ -50,7 +53,8 @@
 		range = true,
 		action,
 		order = 'board',
-		season
+		season,
+		held = null
 	}: Props = $props();
 
 	const lead = $derived(
@@ -65,7 +69,11 @@
 	class:act-flat={action !== undefined && !range}
 >
 	<span class="rk">{lead}</span>
-	<Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />
+	<span class="face"
+		><Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />{#if held}<HeldMark
+				{...held}
+			/>{/if}</span
+	>
 	<span class="who">
 		<a class="name" {href}><NameWords name={player.name} /></a>
 		<span class="meta" class:seasoned={season !== undefined}>
@@ -145,6 +153,12 @@
 
 	.row:hover {
 		background: var(--surface);
+	}
+
+	/* The face's box, kept for every row, so a held mark arriving over its edge moves nothing. */
+	.face {
+		position: relative;
+		display: inline-grid;
 	}
 
 	.rk {

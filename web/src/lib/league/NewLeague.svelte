@@ -16,7 +16,7 @@
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { railLeague } from '#lib/account/rail-league.svelte.ts';
+	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { hasFeature } from '#lib/account/features.ts';
 	import FFPCLeagues from '#lib/hosts/FFPCLeagues.svelte';
 	import {
@@ -132,7 +132,7 @@
 		try {
 			const me = by === 'team' ? { roster_id: rosterId } : { username: username.trim() };
 			const made = await leagueApi.attach({ host: preview.host, link: link.trim(), me });
-			void railLeague.refresh();
+			void siteContext.refresh();
 			await goto(resolve('/league/[id]', { id: made.id }));
 		} catch (error) {
 			problem = failure(error);
@@ -141,7 +141,7 @@
 	}
 
 	/** What the reader may use, from the rail's one read of /me (Can). */
-	const many = $derived(hasFeature(railLeague.features, 'many_leagues'));
+	const many = $derived(hasFeature(siteContext.features, 'many_leagues'));
 	/** How many more leagues this account can follow now. */
 	const room = $derived(roomToFollow(many, attached.length));
 	/** The FFPC leagues already followed, by FFPC league id, to their page here. */
@@ -153,7 +153,7 @@
 
 	async function reread(): Promise<void> {
 		attached = await leagueApi.attached();
-		void railLeague.refresh();
+		void siteContext.refresh();
 	}
 
 	/** Each chosen FFPC league through the one attach, in order. All followed: one league opens its

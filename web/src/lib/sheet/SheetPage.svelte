@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { plural } from '#lib/format/number.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -52,6 +53,14 @@
 
 	const sheet = $derived(store.sheet);
 	const rows = $derived(sheet.rows);
+	/** The sheet's format. An empty sheet in this browser takes the context's (the selected league's),
+	 * so starting from our board starts from the league's; a sheet with rows, or one on the account,
+	 * keeps its own. */
+	const format = $derived(
+		rows.length === 0 && store.stored.sync === null
+			? (siteContext.format ?? sheet.format)
+			: sheet.format
+	);
 	const ranks = $derived(ranksOf(rows));
 	const own = $derived(ownTags(rows.map((row) => row.tags)));
 	const positionsHere = $derived(POSITIONS.filter((p) => rows.some((row) => row.position === p)));
@@ -89,12 +98,12 @@
 		starting = true;
 		boardProblem = null;
 		try {
-			const board = await directory.board(sheet.format);
+			const board = await directory.board(format);
 			if (!board) {
-				boardProblem = `We have no ${FORMAT_LABELS[sheet.format]} board yet`;
+				boardProblem = `We have no ${FORMAT_LABELS[format]} board yet`;
 				return;
 			}
-			store.replace(board.slice(0, SHEET_LIMITS.rows).map(rowFor));
+			store.replace(board.slice(0, SHEET_LIMITS.rows).map(rowFor), format);
 		} catch {
 			boardProblem = 'Our board did not load. Try again in a moment';
 		} finally {
@@ -130,7 +139,7 @@
 	});
 
 	$effect(() => {
-		if (store.loaded) void ourBoard.follow(sheet.format);
+		if (store.loaded) void ourBoard.follow(format);
 	});
 </script>
 
@@ -187,7 +196,7 @@
 					<h2><button type="button" onclick={() => (renaming = true)}>{sheet.name}</button></h2>
 				{/if}
 				<p>
-					{FORMAT_LABELS[sheet.format]}
+					{FORMAT_LABELS[format]}
 					{#if store.loaded}
 						· {plural(rows.length, 'player')} ·
 						<span aria-live="polite">{status}</span>
@@ -233,7 +242,7 @@
 			<EmptySheet
 				board={ourBoard.players}
 				boardState={ourBoard.state}
-				format={sheet.format}
+				{format}
 				{starting}
 				problem={boardProblem}
 				onstart={() => void startFromBoard()}

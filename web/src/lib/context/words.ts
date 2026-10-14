@@ -1,0 +1,101 @@
+/** The site's context in words (founder ruling 2026-10-13: the league is the site's context): what
+ * the shell's switch says, the one basis line a page prints about
+ * the league, and the mark on a player another team holds. Pure, so the switch, the pages and the
+ * tests read one spelling. */
+import type { components } from '#lib/api/types.ts';
+import { SCORING_WORDS, followedName } from '#lib/league/names.ts';
+import { FORMAT_LABELS } from '#lib/sheet/format.ts';
+
+type Schemas = components['schemas'];
+export type ContextLeague = Schemas['ContextLeague'];
+export type ContextFormat = Schemas['ContextFormat'];
+export type BoardFormat = Schemas['BoardFormat'];
+
+/** The format every page opens in when the context names none: the run's default board. */
+export const DEFAULT_CONTEXT_FORMAT: ContextFormat = 'ppr';
+
+/** A followed league's name, or its host's when its read has none yet. */
+export const leagueName = followedName;
+
+/** The switch's own words: the selected league's name, else the format pages are in. */
+export function switchLabel(league: ContextLeague | null, format: BoardFormat | null): string {
+	return league ? leagueName(league) : FORMAT_LABELS[format ?? DEFAULT_CONTEXT_FORMAT];
+}
+
+/** The scoring the figures are in, as a sentence names it: "PPR", "half PPR". */
+function figuresWords(format: BoardFormat): string {
+	const label = FORMAT_LABELS[format];
+	return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
+}
+
+/** What a page's figures are, as its basis line opens: "This board is", "These figures are". */
+export type FiguresSubject = 'This board is' | 'These figures are';
+
+/** The page's one line about the league, null with no league selected. The figures' scoring names
+ * its basis against the league's: the same, the nearest preset until exact rules arrive with the
+ * Draft Pass (TE premium), or a format this run does not carry. */
+export function contextNote(
+	league: ContextLeague | null,
+	figures: BoardFormat,
+	subject: FiguresSubject = 'This board is'
+): string | null {
+	if (!league) return null;
+	const scoring = SCORING_WORDS[league.scoring];
+	const scores = `Your league scores ${scoring}.`;
+	const figuresAre = `${subject} ${figuresWords(figures)}`;
+	if (league.format !== figures) {
+		const lower = figuresAre.charAt(0).toLowerCase() + figuresAre.slice(1);
+		return `${scores} This run has no ${figuresWords(league.format)} board, so ${lower}.`;
+	}
+	if (league.scoring === 'te_premium') {
+		return `${scores} ${figuresAre} until exact rules arrive with the Draft Pass.`;
+	}
+	return league.format === 'superflex'
+		? `Your league scores ${scoring} and starts a superflex.`
+		: scores;
+}
+
+/** The record's line about the league, null with none: the record is graded in one scoring. */
+export function gradedNote(league: ContextLeague | null, graded: BoardFormat): string | null {
+	if (!league) return null;
+	return `Your league scores ${SCORING_WORDS[league.scoring]}. Our record is graded in ${figuresWords(graded)}.`;
+}
+
+/** The selected league's rosters as the pages mark them: who holds each player by our board id. */
+export interface Held {
+	/** The drafter's own roster. */
+	me: number;
+	/** Each team's name by its roster id. */
+	teams: Readonly<Record<number, string>>;
+	/** The roster holding each held player, by his board id. */
+	by: Readonly<Record<string, number>>;
+}
+
+/** The rosters a league read holds, as the pages mark them. */
+export function heldOf(sync: Pick<Schemas['LeagueSync'], 'me' | 'teams' | 'held_by'>): Held {
+	return {
+		me: sync.me,
+		teams: Object.fromEntries(sync.teams.map((team) => [team.roster_id, team.name])),
+		// Copied, so an API from before held_by, which omits it, reads as no marks.
+		by: { ...sync.held_by }
+	};
+}
+
+/** The mark's words for a player, null when no team in the league holds him: "On your roster",
+ * "Rostered by Gmoneyman", or "On a roster in your league" for a team with no name read. */
+export function heldWords(held: Held | null, boardId: string): string | null {
+	const roster = held?.by[boardId];
+	if (held === null || roster === undefined) return null;
+	if (roster === held.me) return 'On your roster';
+	const team = held.teams[roster] ?? '';
+	return team === '' ? 'On a roster in your league' : `Rostered by ${team}`;
+}
+
+/** A row's held mark (HeldMark): whose words, and whether he is on your roster; null when free. */
+export function heldMark(
+	held: Held | null,
+	boardId: string
+): { words: string; mine: boolean } | null {
+	const words = heldWords(held, boardId);
+	return words === null || held === null ? null : { words, mine: held.by[boardId] === held.me };
+}

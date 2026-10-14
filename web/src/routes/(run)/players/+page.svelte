@@ -8,9 +8,16 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import PlayerLine from '#lib/ui/PlayerLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import HeldMark from '#lib/ui/HeldMark.svelte';
+	import { siteContext } from '#lib/context/context.svelte.ts';
+	import { heldMark } from '#lib/context/words.ts';
+	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	// The league's rosters mark who is held.
+	onMount(() => siteContext.wantHeld());
 </script>
 
 <SiteShell title="Players" run={data.run}>
@@ -43,7 +50,11 @@
 									team={player.team}
 									href={links.player(player.slug)}
 								>
-									{#snippet trailing()}<Label>{player.ourRank}</Label>{/snippet}
+									{#snippet trailing()}
+										{@const held = heldMark(siteContext.held, player.id)}
+										{#if held}<HeldMark {...held} inline />{/if}
+										<Label>{player.ourRank}</Label>
+									{/snippet}
 								</PlayerLine>
 							</li>
 						{/each}

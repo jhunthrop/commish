@@ -1,10 +1,13 @@
 <script lang="ts">
-	import type { FormatChip } from '#lib/server/pages/format-route.ts';
 	import { onMount } from 'svelte';
+	import { siteContext } from '#lib/context/context.svelte.ts';
+	import ContextNote from '#lib/context/ContextNote.svelte';
+	import { followFormat } from '#lib/context/follow.svelte.ts';
+	import ScoringChoice from '#lib/context/ScoringChoice.svelte';
+	import { contextNote, heldMark } from '#lib/context/words.ts';
 	import { POSITION_NAMES, tierGroups } from '#lib/run/derive.ts';
 	import type { BoardPage } from '#lib/server/pages/board.ts';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
-	import FormatChips from './FormatChips.svelte';
 	import RowSheetMark from './RowSheetMark.svelte';
 	import BasisList from '#lib/ui/BasisList.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
@@ -19,7 +22,7 @@
 	import TierJump from '#lib/ui/TierJump.svelte';
 	import TierStrip from '#lib/ui/TierStrip.svelte';
 	import Toggle from '#lib/ui/Toggle.svelte';
-	import { scoringBasis } from '#lib/run/catalog.ts';
+	import { apiFormatOf, scoringBasis } from '#lib/run/catalog.ts';
 	import type { BoardRowView } from '#lib/run/schema.ts';
 	import { links, tierAnchor } from './links.ts';
 
@@ -38,7 +41,22 @@
 	let onlySheet = $state<boolean>(false);
 
 	// The sheet loads on the reader's first intent, and at once when they ask for only their sheet.
-	onMount(() => lazySheet.armOnFirstIntent(window));
+	// The league's rosters mark who is held.
+	onMount(() => {
+		lazySheet.armOnFirstIntent(window);
+		siteContext.wantHeld();
+	});
+	// The board opens in the context's format and turns with the switch.
+	const carried = $derived(page.formats.filter((chip) => chip.onRun).map((chip) => chip.id));
+	followFormat(
+		() => page.format.id,
+		() => carried,
+		(id) => links.board(id, page.position)
+	);
+	const figures = $derived(apiFormatOf(page.format));
+	const note = $derived(
+		figures === null ? null : contextNote(siteContext.league, figures, 'This board is')
+	);
 	$effect(() => {
 		if (onlySheet) void lazySheet.load();
 	});
@@ -82,6 +100,7 @@
 		{range}
 		eager={i < EAGER_ROWS}
 		season={player.season}
+		held={heldMark(siteContext.held, player.id)}
 	>
 		{#snippet action()}
 			<RowSheetMark {player} />
@@ -100,14 +119,11 @@
 					<span class="to-side"><Quiet href="#{SIDE_ID}" size="sm">Basis and filters</Quiet></span>
 				{/snippet}
 			</PageHead>
+			<ContextNote {note} />
 		</div>
 		<div class="filters">
 			<FilterBar>
-				<FormatChips
-					formats={page.formats}
-					current={page.format.id}
-					href={(chip: FormatChip) => links.board(chip.id, chip.onRun ? page.position : null)}
-				/>
+				<ScoringChoice label={page.format.label} />
 				<ChipGroup label="Position">
 					<Chip href={links.board(page.format.id)} pressed={page.position === null}>All</Chip>
 					{#each page.positions as position (position)}
@@ -191,6 +207,9 @@
 	}
 
 	.lead {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
 		margin-bottom: var(--s-4);
 	}
 

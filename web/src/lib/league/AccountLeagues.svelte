@@ -9,7 +9,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import ActionRow from '#lib/ui/ActionRow.svelte';
 	import ActionRows from '#lib/ui/ActionRows.svelte';
-	import { railLeague } from '#lib/account/rail-league.svelte.ts';
+	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { ApiError, leagueApi, type AttachedLeague } from './api.ts';
 	import { followedCount, followingWords } from './follow-many.ts';
 	import { followedLine, followedName } from './model.ts';
@@ -72,7 +72,7 @@
 		return act(league.id, async () => {
 			await leagueApi.detach(league.id);
 			detached = new Set([...detached, league.id]);
-			void railLeague.refresh();
+			void siteContext.refresh();
 			setTimeout(() => {
 				if (!detached.has(league.id)) return;
 				detached = without(detached, league.id);
@@ -85,7 +85,7 @@
 		return act(league.id, async () => {
 			await leagueApi.restore(league.id);
 			detached = without(detached, league.id);
-			void railLeague.refresh();
+			void siteContext.refresh();
 		});
 	}
 </script>

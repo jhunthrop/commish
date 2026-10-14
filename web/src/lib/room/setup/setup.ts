@@ -1,5 +1,6 @@
 /** The setup page's league: the defaults, the bounds the API checks (api/internal/leagues), the round
  * count the roster makes, and the lobby closest to it. */
+import type { BoardFormat } from '#lib/sheet/model.ts';
 import type { LeagueSettings, LobbyFormat } from '../api.ts';
 import { presetWords } from '../words.ts';
 
@@ -37,6 +38,21 @@ export const ROSTER_FIELDS: readonly { key: keyof Roster; label: string; max: nu
 /** The draft's round bounds (api/internal/leagues). */
 export const MIN_ROUNDS = 8;
 export const MAX_ROUNDS = 25;
+
+/** The setup in the site's format with no league selected: a scoring board sets the scoring, the
+ * superflex board the lineup; any other format (or none) leaves the setup as it is. */
+export function inFormat(settings: LeagueSettings, format: BoardFormat | null): LeagueSettings {
+	switch (format) {
+		case 'ppr':
+		case 'half_ppr':
+		case 'standard':
+			return { ...settings, scoring: { preset: format, custom: null } };
+		case 'superflex':
+			return { ...settings, lineup: 'superflex' };
+		default:
+			return settings;
+	}
+}
 
 export function defaultSettings(): LeagueSettings {
 	return {

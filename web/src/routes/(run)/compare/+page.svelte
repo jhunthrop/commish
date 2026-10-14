@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { siteContext } from '#lib/context/context.svelte.ts';
+	import ContextNote from '#lib/context/ContextNote.svelte';
+	import { contextLine } from '#lib/context/follow.svelte.ts';
+	import { contextNote } from '#lib/context/words.ts';
+	import { apiFormatOf } from '#lib/run/catalog.ts';
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed } from '#lib/format/number.ts';
 	import type { IndexEntry, PlayerFormat } from '#lib/run/schema.ts';
@@ -47,7 +52,17 @@
 	let missing = $state<Record<Slot, string | null>>({ a: null, b: null });
 	let failed = $state(false);
 
-	const format = $derived(data.format);
+	/** The context's format when the run carries it, else the run's default. */
+	const format = $derived.by(() => {
+		const formats = data.formats.map((candidate) => ({ format: candidate }));
+		const lead = contextLine(formats)?.format;
+		if (!lead) throw new Error('The run lists no formats.');
+		return lead;
+	});
+	const figures = $derived(apiFormatOf(format));
+	const note = $derived(
+		figures === null ? null : contextNote(siteContext.league, figures, 'These figures are')
+	);
 
 	function pickOf(slot: Slot): Chosen | null {
 		const player = chosen[slot];
@@ -141,6 +156,7 @@
 				? 'The players are not loading. Try again in a moment.'
 				: `Our ${format.label} board · ${String(data.run.season)} season`}
 		/>
+		<ContextNote {note} />
 
 		{#if verdict?.kind === 'same'}
 			<EmptyState level={2} title="Pick two different players" line={SAME_PLAYER} />

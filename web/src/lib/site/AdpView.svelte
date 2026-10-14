@@ -1,6 +1,9 @@
 <script lang="ts">
-	import type { FormatChip } from '#lib/server/pages/format-route.ts';
 	import { onMount } from 'svelte';
+	import { siteContext } from '#lib/context/context.svelte.ts';
+	import { followFormat } from '#lib/context/follow.svelte.ts';
+	import ScoringChoice from '#lib/context/ScoringChoice.svelte';
+	import { heldMark } from '#lib/context/words.ts';
 	import { windowLabel } from '#lib/format/date.ts';
 	import { plural } from '#lib/format/number.ts';
 	import { rangeScale } from '#lib/run/derive.ts';
@@ -15,7 +18,6 @@
 	import RowHead from '#lib/ui/RowHead.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
-	import FormatChips from './FormatChips.svelte';
 	import RowSheetMark from './RowSheetMark.svelte';
 	import SiteShell from './SiteShell.svelte';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
@@ -31,7 +33,16 @@
 	/** Faces in the first screen load eagerly so they count toward the first paint. */
 	const EAGER_ROWS = 8;
 
-	onMount(() => lazySheet.armOnFirstIntent(window));
+	onMount(() => {
+		lazySheet.armOnFirstIntent(window);
+		siteContext.wantHeld();
+	});
+	// ADP opens in the context's format and turns with the switch.
+	followFormat(
+		() => page.format.id,
+		() => run.formats,
+		(id) => links.adp(id)
+	);
 
 	const scale = $derived(rangeScale(page.rows));
 	const sourceNames = $derived(
@@ -49,7 +60,7 @@
 	<link rel="canonical" href={links.adp(page.format.id)} />
 </svelte:head>
 
-<SiteShell title="{page.format.label} ADP" {run}>
+<SiteShell title="{page.format.label} ADP" heading="ADP" {run}>
 	{#snippet tail()}<Verb href={sectionHref('mock')}>Start a mock draft</Verb>{/snippet}
 	<main class="adp">
 		<div class="content">
@@ -62,11 +73,7 @@
 			</div>
 			<div class="filters">
 				<FilterBar>
-					<FormatChips
-						formats={page.formats}
-						current={page.format.id}
-						href={(chip: FormatChip) => links.adp(chip.id)}
-					/>
+					<ScoringChoice label={page.format.label} />
 				</FilterBar>
 			</div>
 			<section aria-label="{page.format.label} ADP">
@@ -80,6 +87,7 @@
 						unit={page.format.unit}
 						order="adp"
 						eager={i < EAGER_ROWS}
+						held={heldMark(siteContext.held, player.id)}
 					>
 						{#snippet action()}
 							<RowSheetMark {player} />
