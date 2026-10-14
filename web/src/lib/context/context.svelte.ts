@@ -160,9 +160,15 @@ class SiteContext {
 		this.leagues = leagues;
 		this.format = league ? league.format : format;
 		if (league && !this.notes) {
-			void import('./note-words.ts').then((module) => {
-				this.notes = module;
-			});
+			import('./note-words.ts')
+				.then((module) => {
+					this.notes = module;
+				})
+				.catch(() => {
+					// A chunk that fails to load (a deploy between pages) leaves the line unsaid in its
+					// kept room, never a broken page or an unhandled rejection; the next page loads it again.
+					this.notes = null;
+				});
 		}
 		if (this.heldFor !== league?.id) {
 			this.held = null;

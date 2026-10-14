@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { fixed, plural } from '#lib/format/number.ts';
-	import { hardestWords } from '#lib/run/strength-words.ts';
-	import { clubsLead } from '#lib/run/strength-words.ts';
+	import { clubsLead, hardestWords } from '#lib/run/strength-words.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
 	import Figure from '#lib/ui/Figure.svelte';
