@@ -8,7 +8,7 @@
  * rosters arrive through held.ts, loaded only with a league selected).
  */
 import { PUBLIC_API_URL } from '$app/env/public';
-import { apiClient } from '#lib/api/client.ts';
+import { ApiError, apiClient } from '#lib/api/client.ts';
 import { sessionToken } from '#lib/api/session.ts';
 import type { components } from '#lib/api/types.ts';
 import { CONTEXT_KEY, LEAGUE_ATTR, LINES_KEY } from './boot.ts';
@@ -38,6 +38,16 @@ function linesFor(league: ContextLeague | null): 0 | 1 | 2 | 3 {
 	if (!league) return 0;
 	if (league.scoring === 'te_premium') return 3;
 	return league.format !== 'ppr' ? 2 : 1;
+}
+
+/** A read of the context that failed, for whoever has the console open: what failed and its HTTP
+ * status (or the error). The page says nothing, as the context it already holds still stands. */
+function warnContext(what: string, error: unknown): void {
+	// eslint-disable-next-line no-console -- the one record of a failed context read, no user-facing text
+	console.warn(
+		`The site context could not read ${what}:`,
+		error instanceof ApiError ? error.status : error
+	);
 }
 
 class SiteContext {
@@ -108,8 +118,9 @@ class SiteContext {
 			try {
 				this.take(await client.call<Account>('/me'));
 				return;
-			} catch {
+			} catch (error) {
 				// The session's own copy, or nothing, stands: the pages read the format they were built in.
+				warnContext('/me', error);
 				this.features = [];
 			}
 		}
@@ -166,7 +177,9 @@ class SiteContext {
 				})
 				// A chunk that fails to load (a deploy between pages) leaves the line unsaid in its kept
 				// room, never an unhandled rejection; the next page loads it again.
-				.catch(() => undefined);
+				.catch((error: unknown) => {
+					warnContext('the league line', error);
+				});
 		}
 		if (this.heldFor !== league?.id) {
 			this.held = null;
