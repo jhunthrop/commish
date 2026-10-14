@@ -143,11 +143,15 @@ func TestPollerHoldsTheGap(t *testing.T) {
 // answers one for the seat it was asked about.
 type countingConditional struct {
 	calls atomic.Int64
-	gate  chan struct{}
+	// entered is closed by the first call to reach the gate.
+	entered chan struct{}
+	gate    chan struct{}
 }
 
 func (c *countingConditional) Conditional(_ context.Context, req advisor.Request) (advisor.Card, error) {
-	c.calls.Add(1)
+	if c.calls.Add(1) == 1 && c.entered != nil {
+		close(c.entered)
+	}
 	if c.gate != nil {
 		<-c.gate
 	}
@@ -166,7 +170,7 @@ func followedAt(row Row, picks int) followed {
 // count, however many viewers ask at once; a new pick or a seat changed
 // by a re-follow is a new card, never the old seat's.
 func TestConditionalCardIsKeptPerSeatAndPick(t *testing.T) {
-	cond := &countingConditional{gate: make(chan struct{})}
+	cond := &countingConditional{entered: make(chan struct{}), gate: make(chan struct{})}
 	s := &Service{Conditional: cond}
 	row := Row{ID: uuid.New(), HostDraftID: "1", Seat: 5, CreatedAt: time.Unix(1, 0)}
 
@@ -180,7 +184,7 @@ func TestConditionalCardIsKeptPerSeatAndPick(t *testing.T) {
 			}
 		}()
 	}
-	time.Sleep(50 * time.Millisecond)
+	<-cond.entered
 	close(cond.gate)
 	wg.Wait()
 	if n := cond.calls.Load(); n != 1 {

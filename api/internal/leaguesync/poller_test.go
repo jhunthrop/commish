@@ -92,6 +92,17 @@ func readAll(t *testing.T, p *Poller, n int) []Read {
 	return out
 }
 
+// settle waits for the read a view past the minute sent upstream behind
+// its answer: a refresh inside the floor joins the read in flight and
+// returns once it lands, and sends none of its own, so the host's count
+// is final when it returns.
+func settle(t *testing.T, p *Poller) {
+	t.Helper()
+	if _, err := p.Refresh(context.Background(), testRef); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // 25 viewers of one league make one upstream read a minute, the host up
 // or down, and past the minute a view answers the last read while the
 // next one goes upstream; a refresh reads at once but shares a read
@@ -109,6 +120,7 @@ func TestPollerOneReadPerLeaguePerMinute(t *testing.T) {
 	}
 	clock.Advance(31 * time.Second)
 	readAll(t, p, 25)
+	settle(t, p)
 	if got := host.reads.Load(); got != 2 {
 		t.Fatalf("a view past the minute made %d reads in all, want 2", got)
 	}
@@ -120,6 +132,7 @@ func TestPollerOneReadPerLeaguePerMinute(t *testing.T) {
 			t.Fatalf("a view past the minute waited on the host instead of answering the last read")
 		}
 	}
+	settle(t, p)
 	if got := host.reads.Load(); got != 3 {
 		t.Fatalf("the host down: %d reads in all, want 3", got)
 	}
