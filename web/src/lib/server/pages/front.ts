@@ -1,9 +1,9 @@
 /** The front door: the top of the default board, and the record's headline, from the run. */
 import { rangeScale } from '#lib/run/derive.ts';
 import { recordHeadline, type RecordHeadline } from '#lib/run/record.ts';
-import type { Format } from '#lib/run/schema.ts';
+import type { BoardRowView, Format } from '#lib/run/schema.ts';
 import type { RangeScale } from '#lib/types/player.ts';
-import { boardSeason, type BoardRowView } from '../board-season.ts';
+import { boardSeason } from '../board-season.ts';
 import { board, defaultFormat, record } from '../run.ts';
 
 /** How many of the board's top rows the front door shows. */

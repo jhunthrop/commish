@@ -57,6 +57,7 @@
 					aside="{page.rows.length} of {page.boardSize}"
 					level={2}
 				/>
+				{#if page.seasonLead !== null}<Footnote>{page.seasonLead}</Footnote>{/if}
 				<div class="rows">
 					<RowHead range={false} action />
 					{#each page.rows as player, i (player.id)}
@@ -74,7 +75,6 @@
 						</Row>
 					{/each}
 				</div>
-				{#if page.seasonLead !== null}<Footnote>{page.seasonLead}</Footnote>{/if}
 				<div class="more">
 					<Quiet href={links.board(format.id)}>All {page.boardSize} on the board</Quiet>
 					<Quiet href={links.adp(format.id)}>ADP</Quiet>

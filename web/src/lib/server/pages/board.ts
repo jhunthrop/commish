@@ -2,11 +2,11 @@
  * position, ranked within it and drawn in tiers. */
 import { error } from '@sveltejs/kit';
 import { positionFromSegment, positionsIn, rangeScale, rowsAt } from '#lib/run/derive.ts';
-import type { Format } from '#lib/run/schema.ts';
+import type { BoardRowView, Format } from '#lib/run/schema.ts';
 import type { Position, RangeScale } from '#lib/types/player.ts';
 import { links } from '#lib/site/links.ts';
 import { windowLabel } from '#lib/format/date.ts';
-import { boardSeason, type BoardRowView } from '../board-season.ts';
+import { boardSeason } from '../board-season.ts';
 import { adp, board, manifest } from '../run.ts';
 import {
 	absentFormatPage,

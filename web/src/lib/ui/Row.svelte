@@ -68,16 +68,17 @@
 	<Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />
 	<span class="who">
 		<a class="name" {href}><NameWords name={player.name} /></a>
-		<span class="meta">
+		<span class="meta" class:seasoned={season !== undefined}>
 			<PositionPill position={player.position} rank={player.positionRank} />
 			{#if showTier}<span class="wide tier"><TierChip tier={player.tier} /></span>{/if}
 			<span class="wide team">{player.team}</span>
 			{#if season === undefined}
 				<span class="wide">{fixed(player.expectedGames)} games</span>
+			{:else}
+				<span class="season">{seasonFigures(season)}</span>
 			{/if}
 			<span class="narrow">{fixed(player.projected)} pts</span>
 		</span>
-		{#if season !== undefined}<span class="season">{seasonFigures(season)}</span>{/if}
 	</span>
 	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
 	<ValueCell {...vorCell(player.vor, player.vorRound)} phoneLabel={false} />
@@ -192,11 +193,8 @@
 		flex: none;
 	}
 
-	/* The season's own line, the same on every row of a view whatever the column's width, so the rows
-	   keep one height. A column narrower than the figures wraps their words rather than cutting them. */
+	/* His season so far takes the projected games' place. */
 	.season {
-		font-size: var(--t-sm);
-		line-height: 1.2;
 		color: var(--ink-2);
 		font-variant-numeric: tabular-nums;
 	}
@@ -204,6 +202,37 @@
 	@container (max-width: 204px) {
 		.team {
 			display: none;
+		}
+	}
+
+	/* In season his figures (128px at their widest) take the projected games' place (75px), so the
+	   meta line needs more room, measured on the stand-in's 400 rows: 264px with the club and the tier
+	   chip, 229px without the club, 189px with the pill alone. A narrower column drops the club, then
+	   the tier chip (the All view at 1440 is 210px, and its round tint still reads the value), and a
+	   column under the pill and figures (the phone, and 760 to 960px) gives the figures a line of
+	   their own, wrapping their words rather than losing their end. */
+	@container (max-width: 264px) {
+		.seasoned .team {
+			display: none;
+		}
+	}
+
+	@container (max-width: 232px) {
+		.seasoned .tier {
+			display: none;
+		}
+	}
+
+	@container (max-width: 196px) {
+		.seasoned {
+			flex-wrap: wrap;
+			row-gap: 2px;
+		}
+
+		.seasoned > .season {
+			order: 1;
+			flex: 0 0 100%;
+			white-space: normal;
 		}
 	}
 

@@ -5,14 +5,9 @@
  * basis line that says so. Before the first kickoff nothing changes. The run decides, never the
  * reader's clock (seasonUnderway).
  */
-import type { BoardRow, Format, IndexSeason } from '#lib/run/schema.ts';
+import { scoringBasis } from '#lib/run/catalog.ts';
+import type { BoardRow, BoardRowView, Format, SeasonedRow } from '#lib/run/schema.ts';
 import { index, seasonReach, seasonUnderway, type SeasonReach } from './run.ts';
-
-/** A board row with his games and points a game this season. */
-export type SeasonedRow = BoardRow & { season: IndexSeason };
-
-/** A board row as a page prints it: his season figures only once the season is underway. */
-export type BoardRowView = BoardRow & { season?: IndexSeason };
 
 export interface BoardSeason {
 	rows: BoardRowView[];
@@ -34,10 +29,12 @@ export async function withSeasons(
 }
 
 /** "Sorted by our preseason projection, PPR, full 2026 season. Games and points a game are this
- * season's, through week 5." The season figures name their scoring only when it is not the board's. */
+ * season's, through week 5." The run scores every season block in one format, so on a board of
+ * another scoring the figures name theirs: "this season's, scored in PPR, through week 5". The
+ * stand-in carries only PPR, so that branch waits on a run with a second format. */
 export function seasonLead(format: Format, reach: SeasonReach): string {
-	const sort = `Sorted by our preseason projection, ${format.basis[0] ?? format.label}.`;
-	const scoring = reach.scoring === format.label ? '' : `, ${reach.scoring}`;
+	const sort = `Sorted by our preseason projection, ${scoringBasis(format)}.`;
+	const scoring = reach.scoring === format.label ? '' : `, scored in ${reach.scoring}`;
 	const through = reach.through === 0 ? '' : `, through week ${String(reach.through)}`;
 	return `${sort} Games and points a game are this season's${scoring}${through}.`;
 }
