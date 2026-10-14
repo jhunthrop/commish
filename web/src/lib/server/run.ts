@@ -167,6 +167,12 @@ export function seasonReach(): Promise<SeasonReach> {
 	});
 }
 
+/** The last week whose games are all in, 0 before the season's first kickoff: the weeks a
+ * schedule sets back as played. */
+export async function playedThrough(): Promise<number> {
+	return (await seasonUnderway()) ? (await seasonReach()).through : 0;
+}
+
 export function adp(): Promise<Adp> {
 	return once('adp', () => read(RUN_PATHS.adp, adpSchema));
 }

@@ -82,7 +82,7 @@ void test('the held mark names your roster, the team, or a roster when the name 
 	assert.equal(heldMark(null, 'a'), null);
 });
 
-void test('copy guard: no line doubles a word, the run\'s strength method included', () => {
+void test("copy guard: no line doubles a word, the run's strength method included", () => {
 	// The real run's method carries its own article; the pages once added a second ("the the").
 	const slate = {
 		method: "the average of its opponents' expected wins for the season, one per game",
@@ -90,7 +90,7 @@ void test('copy guard: no line doubles a word, the run\'s strength method includ
 		rank: 32
 	};
 	const lines = [
-		scheduleLead(slate, 'Expected wins, set before the season', { count: 9, atLeast: '10.5' }),
+		scheduleLead(slate, 'Expected wins, set before the season', { count: 9, atLeast: '10.5' }, 5),
 		clubsLead('PPR', slate),
 		clubCaption(slate, 32),
 		contextNote(league({ scoring: 'te_premium' }), 'ppr'),

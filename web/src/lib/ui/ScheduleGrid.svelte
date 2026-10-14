@@ -13,9 +13,12 @@
 		caption: string;
 		/** The strength column's head: "Opp. avg wins". */
 		strengthLabel: string;
+		/** The last week played, 0 before the first kickoff: weeks up to it are set back, so what is
+		 * left reads at a glance. The page's lead says so. */
+		played?: number;
 	}
 
-	let { rows, weeks, caption, strengthLabel }: Props = $props();
+	let { rows, weeks, caption, strengthLabel, played = 0 }: Props = $props();
 </script>
 
 <!-- The frame scrolls, so it takes focus: a keyboard reaches week 18 with the arrow keys. -->
@@ -29,7 +32,7 @@
 				<th scope="col" class="rank">Rank</th>
 				<th scope="col" class="strength">{strengthLabel}</th>
 				{#each weeks as week (week)}
-					<th scope="col" class="week">Wk {week}</th>
+					<th scope="col" class="week" class:played={week <= played}>Wk {week}</th>
 				{/each}
 			</tr>
 		</thead>
@@ -49,9 +52,9 @@
 					<td class="strength">{row.strength}</td>
 					{#each row.cells as cell (cell.week)}
 						{#if cell.opponent === null}
-							<td class="week bye">Bye</td>
+							<td class="week bye" class:played={cell.week <= played}>Bye</td>
 						{:else}
-							<td class="week" class:hard={cell.hard}>
+							<td class="week" class:hard={cell.hard} class:played={cell.week <= played}>
 								<span class="opp">{cell.home ? 'vs' : 'at'} {cell.opponent}</span>
 								<span class="value">{cell.value}</span>
 							</td>
@@ -207,6 +210,11 @@
 
 	.bye {
 		color: var(--ink-3);
+	}
+
+	/* A played week stays readable but steps back behind the weeks still to come. */
+	.played {
+		opacity: 0.45;
 	}
 
 	@media (max-width: 760px) {

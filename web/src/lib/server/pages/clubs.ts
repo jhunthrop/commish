@@ -7,7 +7,7 @@ import { fixed } from '#lib/format/number.ts';
 import { links } from '#lib/site/links.ts';
 import type { ScheduleRow } from '#lib/ui/schedule-grid.ts';
 import type { RangeScale } from '#lib/types/player.ts';
-import { board, clubs, defaultFormat, schedule } from '../run.ts';
+import { board, clubs, defaultFormat, playedThrough, schedule } from '../run.ts';
 
 /** The share of opponents the schedule grid shades as the strongest: the top quarter of the league
  * (win totals move in halves, so ties can carry a few more). */
@@ -43,6 +43,8 @@ export interface ClubPage {
 	rows: BoardRow[];
 	scale: RangeScale | null;
 	clubs: Club[];
+	/** The last week played, 0 before the first kickoff: the schedule sets those weeks back. */
+	played: number;
 }
 
 export interface SchedulePage {
@@ -58,6 +60,8 @@ export interface SchedulePage {
 	opponentBasis: string;
 	/** How many opponents are shaded as the strongest, and the number they reach. */
 	strong: { count: number; atLeast: string };
+	/** The last week played, 0 before the first kickoff: the grid sets those weeks back. */
+	played: number;
 }
 
 /** The opponent values that count as the strongest: the top share of the league, ties kept in. */
@@ -104,7 +108,12 @@ export async function clubEntries(): Promise<{ abbr: string }[]> {
 
 export async function clubPage(abbr: string): Promise<ClubPage> {
 	const format = await defaultFormat();
-	const [list, loaded, rows] = await Promise.all([clubs(), schedule(), board(format.id)]);
+	const [list, loaded, rows, played] = await Promise.all([
+		clubs(),
+		schedule(),
+		board(format.id),
+		playedThrough()
+	]);
 	const club = list.find((candidate) => candidate.abbr.toLowerCase() === abbr);
 	if (!club) error(NOT_FOUND, 'No such club.');
 	const slate = slateOf(loaded, club.abbr);
@@ -120,13 +129,19 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 		schedule: { opponentBasis: loaded.opponentBasis, season: loaded.season },
 		rows: own,
 		scale: own.length > 0 ? rangeScale(own) : null,
-		clubs: list
+		clubs: list,
+		played
 	};
 }
 
 export async function schedulePage(): Promise<SchedulePage> {
 	const format = await defaultFormat();
-	const [loaded, list, rows] = await Promise.all([schedule(), clubs(), board(format.id)]);
+	const [loaded, list, rows, played] = await Promise.all([
+		schedule(),
+		clubs(),
+		board(format.id),
+		playedThrough()
+	]);
 	const lastWeek = Math.max(
 		...loaded.slates.flatMap((slate) => slate.games.map((game) => game.week))
 	);
@@ -143,6 +158,7 @@ export async function schedulePage(): Promise<SchedulePage> {
 		window: first.window,
 		opponentBasis: loaded.opponentBasis,
 		strong: { count: strong.count, atLeast: fixed(strong.floor, 1) },
+		played,
 		rows: slates.map((slate) => {
 			const club = list.find((candidate) => candidate.abbr === slate.abbr);
 			const lead = rows.rows.find((row) => row.team === slate.abbr);

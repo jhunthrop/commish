@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { fixed } from '#lib/format/number.ts';
-	import { clubCaption } from '#lib/run/strength-words.ts';
+	import { clubCaption, playedWords } from '#lib/run/strength-words.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
 	import Crumb from '#lib/ui/Crumb.svelte';
@@ -61,7 +61,9 @@
 
 		<section aria-label="Schedule">
 			<Table
-				caption="{page.schedule.season} schedule"
+				caption={page.played === 0
+					? `${String(page.schedule.season)} schedule`
+					: `${String(page.schedule.season)} schedule, ${playedWords(page.played)}`}
 				showCaption
 				columns={[
 					{ label: 'Week' },
@@ -71,7 +73,7 @@
 			>
 				{#each page.games as game (game.week)}
 					{@const opponent = names.get(game.opponent)}
-					<tr>
+					<tr class:played={game.week <= page.played}>
 						<td>Week {game.week}</td>
 						<td>
 							{game.home ? 'vs' : 'at'}
@@ -88,6 +90,11 @@
 </SiteShell>
 
 <style>
+	/* A week already played is set back, so what is left reads first. */
+	.played {
+		opacity: 0.5;
+	}
+
 	.club {
 		padding: var(--s-5);
 		display: flex;

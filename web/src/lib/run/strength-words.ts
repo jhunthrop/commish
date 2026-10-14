@@ -14,13 +14,24 @@ export function strengthBasis(slate: Basis): string {
 	return `${slate.method}, read ${windowLabel(slate.window)}`;
 }
 
+/** The weeks a schedule sets back, said where it does so: "weeks 1 to 5 are played, so faded",
+ * or nothing before the first kickoff. */
+export function playedWords(played: number): string {
+	if (played === 0) return '';
+	return played === 1
+		? 'week 1 is played, so faded'
+		: `weeks 1 to ${String(played)} are played, so faded`;
+}
+
 /** The schedule page's lead: "Strength is the average of ..., read Sep 7 · hardest first · ...". */
 export function scheduleLead(
 	slate: Basis,
 	opponentBasis: string,
-	strong: { count: number; atLeast: string }
+	strong: { count: number; atLeast: string },
+	played: number
 ): string {
-	return `Strength is ${strengthBasis(slate)} · hardest first · each week shows the opponent's ${opponentBasis.toLowerCase()}, shaded for the ${String(strong.count)} highest of the 32 (${strong.atLeast} or more)`;
+	const faded = played === 0 ? '' : ` · ${playedWords(played)}`;
+	return `Strength is ${strengthBasis(slate)} · hardest first · each week shows the opponent's ${opponentBasis.toLowerCase()}, shaded for the ${String(strong.count)} highest of the 32 (${strong.atLeast} or more)${faded}`;
 }
 
 /** The clubs page's lead: "Every club's players on our PPR board · schedule strength is ...". */

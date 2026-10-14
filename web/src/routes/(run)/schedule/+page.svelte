@@ -8,7 +8,7 @@
 	let { data }: PageProps = $props();
 
 	const page = $derived(data.page);
-	const lead = $derived(scheduleLead(page, page.opponentBasis, page.strong));
+	const lead = $derived(scheduleLead(page, page.opponentBasis, page.strong, page.played));
 </script>
 
 <SiteShell title="Schedule strength" run={data.run}>
@@ -19,6 +19,7 @@
 			weeks={page.weeks}
 			caption="Every club's schedule, hardest first"
 			strengthLabel="Strength"
+			played={page.played}
 		/>
 	</main>
 </SiteShell>
