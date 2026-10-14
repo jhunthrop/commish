@@ -3,14 +3,17 @@
 outcome reader's refusals (G4)."""
 
 import json
-from dataclasses import replace
+from collections.abc import Callable
+from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
+from research.errors import ConfigurationError
 from research.model.ros import gates
+from research.model.ros.__main__ import JUDGMENT_RECORDS, closed_seasons, thresholds_for
 from research.model.ros.fit import interval_weeks, window
 from research.model.ros.gates import PREREGISTERED, CellScore, Coverage
 from research.model.ros.model import (
@@ -21,6 +24,7 @@ from research.model.ros.model import (
     RosPriors,
     Shrinkage,
     StaleEntry,
+    UnknownModeError,
     band_of,
     expected_games,
     interval,
@@ -30,6 +34,8 @@ from research.model.ros.model import (
 from research.model.ros.outcomes import HeldOutReadError, fit_reader, judgment_reader
 from research.model.ros.payload import priors_from, priors_payload
 from research.model.ros.reads import stale_entry
+from research.model.ros.scratch import check_scratch_url
+from research.model.ros.statistics import JudgedRow, cell_report, population
 
 _STEP = 1e-12
 _ALL = dict.fromkeys(FORMATS)
@@ -161,12 +167,11 @@ def test_g4_refuses_a_stray_season_and_a_moved_table() -> None:
 
 
 def test_the_fit_reader_refuses_the_judgment_season_and_after() -> None:
-    reader = fit_reader(2025)
-    reader.admit(2024)
+    reader = fit_reader(2025).admit(2024)
     for season in (2025, 2026, 2027):
         with pytest.raises(HeldOutReadError):
             reader.admit(season)
-    assert reader.served == [2024]
+    assert reader.served == (2024,)
     dev = fit_reader(2024)
     for season in (2024, 2025):
         with pytest.raises(HeldOutReadError):
@@ -174,11 +179,10 @@ def test_the_fit_reader_refuses_the_judgment_season_and_after() -> None:
 
 
 def test_the_judgment_reader_refuses_every_later_season() -> None:
-    reader = judgment_reader(2025)
-    reader.admit(2025)
+    reader = judgment_reader(2025).admit(2025)
     with pytest.raises(HeldOutReadError):
         reader.admit(2026)
-    assert reader.served == [2025]
+    assert reader.served == (2025,)
     round_three = judgment_reader(2024)
     round_three.admit(2024)
     for season in (2025, 2026):
@@ -275,3 +279,115 @@ def test_without_a_raw_line_the_off_board_rate_stands_in() -> None:
 def test_the_week_keyed_priors_round_trip() -> None:
     priors = replace(_priors(), interval_by="week")
     assert priors_from(priors_payload(priors)) == priors
+
+
+# --- the record review's fixes (H1, M3, M4, M5, M9) ---------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgres://commish:commish@localhost:5432/lane18_ros",  # dev's port
+        "postgres://commish:commish@localhost/lane18_ros",  # no port given
+        "postgres://commish:commish@localhost:5433/commish",  # dev's name
+        "postgres://commish:commish@localhost:5433/commish_test",  # the parity database
+        "postgres://commish:commish@localhost:5433/lane12_weekly",  # another lane's copy
+        "postgres://u:p@ep-cool-1.us-east-2.aws.neon.tech:5433/lane18_ros",  # Neon
+        "postgres://u:p@db.example.com:5433/lane18_ros",  # any remote host
+    ],
+)
+def test_the_scratch_guard_refuses_everything_but_a_lane18_copy_on_5433(url: str) -> None:
+    with pytest.raises(ConfigurationError):
+        check_scratch_url(url)
+
+
+def test_the_scratch_guard_admits_the_scratch_copy() -> None:
+    check_scratch_url("postgres://commish:commish@localhost:5433/lane18_ros")
+    check_scratch_url("postgres://commish:commish@127.0.0.1:5433/lane18_other")
+
+
+def _records(*present: int) -> Callable[[Path], bool]:
+    paths = {JUDGMENT_RECORDS[number] for number in present}
+    return lambda path: path in paths
+
+
+def test_a_closed_judgment_is_never_taken_again_and_names_its_season() -> None:
+    with pytest.raises(ConfigurationError, match="round 3's 2024 judgment"):
+        thresholds_for("judge", 3, _records(1, 2, 3))
+    with pytest.raises(ConfigurationError, match="round 1's 2025 judgment"):
+        thresholds_for("judge", 1, _records(1))
+    assert thresholds_for("judge", 3, _records(1, 2)) is gates.ROUND_THREE
+
+
+def test_a_development_check_of_a_closed_season_is_refused() -> None:
+    closed = _records(1, 2, 3)
+    for number in (1, 2):  # both checks judge 2024, which round 3 closed
+        with pytest.raises(ConfigurationError, match="2024"):
+            thresholds_for("dev-check", number, closed)
+    assert thresholds_for("dev-check", 3, closed) is gates.ROUND_THREE_CHECK  # 2023 carries no judgment
+    assert thresholds_for("dev-check", 2, _records(1, 2)) is gates.ROUND_TWO_CHECK
+    assert closed_seasons(closed) == {2024, 2025}
+
+
+def test_an_unknown_mode_is_refused_never_read_as_the_default() -> None:
+    with pytest.raises(UnknownModeError):
+        replace(gates.ROUND_TWO, prior_source=cast("Any", "Raw"))
+    with pytest.raises(UnknownModeError):
+        replace(gates.ROUND_TWO, interval_by=cast("Any", "weeks"))
+    with pytest.raises(UnknownModeError):
+        replace(_priors(), interval_by=cast("Any", "Band"))
+    with pytest.raises(UnknownModeError):
+        interval_key("WR", "ppr", 8, cast("Any", "bands"))
+    with pytest.raises(UnknownModeError):
+        priors_from({**priors_payload(_priors()), "intervalBy": "weekly"})
+
+
+def test_admitting_a_season_returns_a_new_ledger_and_leaves_the_old_one() -> None:
+    start = fit_reader(2025)
+    after = start.admit(2023).admit(2024)
+    assert start.served == ()
+    assert after.served == (2023, 2024)
+    with pytest.raises(FrozenInstanceError):
+        start.served = (2021,)  # type: ignore[misc]
+
+
+def _row(player_id: str, model: float, board: float | None, actual: float) -> JudgedRow:
+    one = _per_format
+    return JudgedRow(
+        8, player_id, "WR", one(model), None, None, None, None if board is None else one(board), None, None,
+        one(actual), 5.0, 5, frozenset(FORMATS),
+    )  # fmt: skip
+
+
+def test_rho_and_the_starters_rank_error_by_hand() -> None:
+    # Actual order a > b > c > d. The model has it exactly; the board swaps a and b, and has no
+    # opinion on d (ranked below everyone, NO_OPINION).
+    cell = [_row("a", 40, 30, 100), _row("b", 30, 40, 80), _row("c", 20, 20, 60), _row("d", 10, None, 40)]
+    report = cell_report(cell, "ppr", starters=2)
+    assert report.rho["model"] == pytest.approx(1.0)
+    # Board ranks (highest first): b 1, a 2, c 3, d 4; actual 1-4. rho = 1 - 6 * (1 + 1) / (4 * 15) = 0.8.
+    assert report.rho["board"] == pytest.approx(0.8)
+    assert report.rank_error["model"] == 0.0
+    assert report.rank_error["board"] == 1.0  # the top-2 finishers a and b, each one place off
+    assert report.size == 4
+
+
+def test_ties_take_average_ranks_and_only_the_top_n_finishers_count() -> None:
+    # The model ties b and c (ranks 2.5 each); the starters are the top 3 finishers a, b, c.
+    cell = [_row("a", 40, 1, 100), _row("b", 20, 2, 80), _row("c", 20, 3, 60), _row("d", 10, 4, 40)]
+    report = cell_report(cell, "ppr", starters=3)
+    assert report.rank_error["model"] == pytest.approx((0 + 0.5 + 0.5) / 3)
+    assert report.rank_error["board"] == pytest.approx((3 + 1 + 1) / 3)  # board order d, c, b, a
+    assert report.rho["board"] == pytest.approx(-1.0)
+
+
+def test_the_population_unions_the_board_top_k_and_the_points_top_k() -> None:
+    stale = StaleEntry(_per_format(100.0), _per_format(5.0), 1.0)
+    low = StaleEntry(_per_format(10.0), _per_format(1.0), 1.0)
+    players = [
+        PlayerToDate("board-top", "WR", (1,), (), (2, 3), stale),
+        PlayerToDate("board-low", "WR", (1,), (), (2, 3), low),
+        PlayerToDate("breakout", "WR", (1,), (_game(1, 30, 9, 0),), (2, 3), None),
+        PlayerToDate("a-back", "RB", (1,), (_game(1, 50, 0, 20),), (2, 3), None),
+    ]
+    assert population(players, "WR", "ppr", 1) == {"board-top", "breakout"}

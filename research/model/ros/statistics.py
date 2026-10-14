@@ -14,7 +14,8 @@ from typing import Final
 from research.model.backtest import Observation, _average_ranks, spearman
 from research.model.domain import Position
 from research.model.ros.gates import CellScore, Coverage
-from research.model.ros.model import PlayerToDate
+from research.model.ros.model import FORMATS, PlayerToDate
+from research.model.weekly.round.scoring import SKILL_POSITIONS
 
 NO_OPINION: Final = -1.0
 SOURCES: Final = ("model", "board", "form", "ecr")
@@ -30,6 +31,20 @@ def population(players: Sequence[PlayerToDate], position: str, format_name: str,
     board = {p.player_id: p.stale.projected[format_name] for p in at if p.stale is not None}
     so_far = {p.player_id: sum(g.points[format_name] for g in p.played) for p in at if p.played}
     return frozenset(_top(board, size)) | frozenset(_top(so_far, size))
+
+
+def population_formats(
+    players: Sequence[PlayerToDate], sizes: Mapping[str, int]
+) -> list[tuple[PlayerToDate, frozenset[str]]]:
+    """Each player in a population, with the formats whose population holds him: the one rule the fit
+    and the judgment share."""
+    pops = {(p, f): population(players, p, f, sizes[p]) for p in SKILL_POSITIONS for f in FORMATS}
+    found = []
+    for player in players:
+        formats = frozenset(f for f in FORMATS if player.player_id in pops[(player.position, f)])
+        if formats:
+            found.append((player, formats))
+    return found
 
 
 @dataclass(frozen=True, slots=True)

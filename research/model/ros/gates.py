@@ -10,7 +10,7 @@ from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Final
 
-from research.model.ros.model import FORMATS
+from research.model.ros.model import FORMATS, IntervalBy, PriorSource, interval_by_of, prior_source_of
 from research.model.weekly.round.scoring import SKILL_POSITIONS
 
 
@@ -30,12 +30,16 @@ class Thresholds:
     min_coverage_size: int
     # Round 2's choices; the defaults are round 1's, so its record reads back unchanged.
     model_name: str = "commish_ros_v1"
-    prior_source: str = "served"  # "served": the served board's points over its games; "raw": the raw line's
-    interval_by: str = "band"  # "band": round 1's horizon bands; "week": a three-week window per week
+    prior_source: PriorSource = "served"  # the served board's points over its games, or the raw line's
+    interval_by: IntervalBy = "band"  # round 1's horizon bands, round 2's three-week windows, or none
     shrink_weeks: tuple[int, ...] | None = None  # the weeks k, alpha, k_q and the rates fit on; None: fit_weeks
     coverage_per_week: bool = False
     switch_week: int | None = None  # the last week the preseason board is served
     gate_coverage: bool = True  # round 3 gives no range in season, so G3 is not a gate
+
+    def __post_init__(self) -> None:
+        prior_source_of(self.prior_source)
+        interval_by_of(self.interval_by)
 
     @property
     def search_weeks(self) -> tuple[int, ...]:

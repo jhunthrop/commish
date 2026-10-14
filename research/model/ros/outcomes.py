@@ -7,7 +7,7 @@ gate checks against the preregistered seasons.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final
 
@@ -48,21 +48,25 @@ class SeasonOutcomes:
         return points, sum(1 for o in kept if o.played)
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class OutcomeReader:
-    """Serves a season's outcomes once it is allowed; `served` is the ledger."""
+    """Serves a season's outcomes once it is allowed; `served` is the ledger. Immutable: admitting a
+    season returns the reader with that season on its ledger, so no two runs can share one ledger."""
 
     refused: frozenset[int]
-    served: list[int] = field(default_factory=list)
+    served: tuple[int, ...] = ()
 
-    def admit(self, season: int) -> None:
-        """Refuse a season the round may not see here; record one it may."""
+    def admit(self, season: int) -> "OutcomeReader":
+        """Refuse a season the round may not see here; return the reader with it on the ledger."""
         if season >= PRISTINE_SEASON or season in self.refused:
             raise HeldOutReadError(f"the round may not read {season} outcomes here")
-        self.served.append(season)
+        return OutcomeReader(self.refused, (*self.served, season))
 
-    def season(self, conn: Connection, season: int, positions: Mapping[str, Position]) -> SeasonOutcomes:
-        self.admit(season)
+    def season(
+        self, conn: Connection, season: int, positions: Mapping[str, Position]
+    ) -> tuple[SeasonOutcomes, "OutcomeReader"]:
+        """The season's outcomes, and the reader with the season on its ledger."""
+        admitted = self.admit(season)
         query = ObservationQuery(season, WeekRange(1, LAST_FANTASY_WEEK), FAR_FUTURE)
         found: dict[str, dict[int, WeekOutcome]] = {}
         for row in stat_lines_for_measurement(conn, query):
@@ -76,7 +80,7 @@ class OutcomeReader:
             weeks = found.setdefault(usage.player_id, {})
             if usage.week not in weeks and (usage.snap_share or 0.0) > 0:
                 weeks[usage.week] = WeekOutcome(zero, True)
-        return SeasonOutcomes(season, MappingProxyType({p: MappingProxyType(w) for p, w in found.items()}))
+        return SeasonOutcomes(season, MappingProxyType({p: MappingProxyType(w) for p, w in found.items()})), admitted
 
 
 def fit_reader(judgment_season: int) -> OutcomeReader:

@@ -21,7 +21,16 @@ from research.model.preseason.persist import build_season
 from research.model.priors import ModelArtifacts
 from research.model.reads.observations import ObservationQuery, WeekRange, stat_lines_as_of, usage_as_of
 from research.model.reads.teams import player_teams_as_of, team_observations_as_of
-from research.model.ros.model import FORMATS, LAST_FANTASY_WEEK, SEASON_GAMES, GamePlayed, PlayerToDate, StaleEntry
+from research.model.ros.model import (
+    FORMATS,
+    LAST_FANTASY_WEEK,
+    SEASON_GAMES,
+    GamePlayed,
+    PlayerToDate,
+    PriorSource,
+    StaleEntry,
+    prior_source_of,
+)
 from research.model.weekly.inputs import week_moment
 from research.model.weekly.round.scoring import FORMATS as FORMAT_RULES
 from research.model.weekly.round.scoring import SKILL_POSITIONS
@@ -77,7 +86,11 @@ def format_ratios(raw: BoardEntry) -> dict[str, float]:
 
 
 def build_stale_board(
-    conn: Connection, season: int, artifacts: ModelArtifacts, arithmetic: Arithmetic, prior_source: str = "served"
+    conn: Connection,
+    season: int,
+    artifacts: ModelArtifacts,
+    arithmetic: Arithmetic,
+    prior_source: PriorSource = "served",
 ) -> StaleBoard:
     """The served PPR board as the house's builder makes it for `season`, carried to half PPR and
     standard by the raw model's own ratio of format points to PPR points (Amendment 1: a past
@@ -91,7 +104,7 @@ def build_stale_board(
         found = raw.get(served.player_id)
         ratios = format_ratios(found) if found is not None else dict.fromkeys(FORMATS, 1.0)
         projected = {name: served.projected_points * ratios[name] for name in FORMATS}
-        if prior_source == "raw":
+        if prior_source_of(prior_source) == "raw":
             per_game = raw_per_game(found) if found is not None else None
             entry = stale_entry(projected, served.expected_games, per_game)
             entry = entry if per_game is not None else replace(entry, per_game=None)

@@ -9,7 +9,7 @@ so the judgment and the nightly run the same arithmetic on inputs they read thei
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Final
+from typing import Final, Literal
 
 from research.model.domain import Position
 
@@ -17,7 +17,31 @@ FORMATS: Final = ("ppr", "half", "std")
 LAST_FANTASY_WEEK: Final = 17
 SEASON_GAMES: Final = 17
 STREAK_CAP: Final = 3
-NO_INTERVAL: Final = "none"  # round 3: the in-season board gives no range
+PriorSource = Literal["served", "raw"]  # the served board's points over its games, or the raw line's
+IntervalBy = Literal["band", "week", "none"]  # round 1's bands, round 2's weeks, round 3's no range
+PRIOR_SOURCES: Final[tuple[PriorSource, ...]] = ("served", "raw")
+INTERVAL_KINDS: Final[tuple[IntervalBy, ...]] = ("band", "week", "none")
+NO_INTERVAL: Final[IntervalBy] = "none"
+
+
+class UnknownModeError(ValueError):
+    """A mode switch with a value no round defines: refused, never read as the default."""
+
+
+def prior_source_of(value: str) -> PriorSource:
+    for known in PRIOR_SOURCES:
+        if value == known:
+            return known
+    raise UnknownModeError(f"prior source {value!r} is not one of {PRIOR_SOURCES}")
+
+
+def interval_by_of(value: str) -> IntervalBy:
+    for known in INTERVAL_KINDS:
+        if value == known:
+            return known
+    raise UnknownModeError(f"interval {value!r} is not one of {INTERVAL_KINDS}")
+
+
 BANDS: Final = (("early", 2, 5), ("middle", 6, 10), ("late", 11, 15))
 
 
@@ -106,7 +130,10 @@ class RosPriors:
     offboard_rate: Mapping[str, float]
     offboard_availability: Mapping[str, float]
     interval: Mapping[str, tuple[float, float, float]]  # `position|format|band` or `|week<W>`: p10, p50, p90
-    interval_by: str = "band"  # round 1: horizon bands; round 2: one cell per projection week
+    interval_by: IntervalBy = "band"  # round 1: horizon bands; round 2: one cell per projection week
+
+    def __post_init__(self) -> None:
+        interval_by_of(self.interval_by)
 
 
 def cell(position: str, format_name: str) -> str:
@@ -207,11 +234,15 @@ def project(player: PlayerToDate, priors: RosPriors) -> RosProjection:
     )
 
 
-def interval_key(position: str, format_name: str, week: int, interval_by: str) -> str:
+def interval_key(position: str, format_name: str, week: int, interval_by: IntervalBy) -> str:
     """The interval cell a projection week reads: its horizon band, or (round 2) its own week."""
-    if interval_by == "week":
-        return f"{cell(position, format_name)}|week{week}"
-    return f"{cell(position, format_name)}|{band_of(week)}"
+    match interval_by_of(interval_by):
+        case "week":
+            return f"{cell(position, format_name)}|week{week}"
+        case "band":
+            return f"{cell(position, format_name)}|{band_of(week)}"
+        case "none":
+            raise UnknownModeError("a round with no interval reads no interval cell")
 
 
 def interval(

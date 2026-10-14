@@ -9,8 +9,9 @@ environment URL, and anything but a local host is refused (`scratch_engine`).
 
 import argparse
 import json
+import subprocess
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, fields
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,9 +28,10 @@ from research.model.ros.judge import Judgment, RoundFit, fit_round, judge_round
 from research.model.ros.payload import priors_payload
 from research.model.ros.scratch import ingest_judgment_season, ingest_week_one_rosters, scratch_engine
 
-# Each round's one judgment record. Its existence closes that judgment: a second run against 2025
-# voids the record, so `judge` refuses unless told it is a marked rerun.
-_DOCS: Final = Path(__file__).resolve().parents[3] / "docs/research"
+# Each round's one judgment record. Its existence closes that judgment for good: `judge` refuses a
+# round whose record exists, and `dev-check` refuses a check that would judge a closed season.
+_ROOT: Final = Path(__file__).resolve().parents[3]
+_DOCS: Final = _ROOT / "docs/research"
 JUDGMENT_RECORDS: Final = {
     1: _DOCS / "2026-10-14-rest-of-season-results.json",
     2: _DOCS / "2026-10-14-rest-of-season-round2-results.json",
@@ -58,14 +60,47 @@ def thresholds_payload(thresholds: gates.Thresholds) -> dict[str, Any]:
     }
 
 
-def _run(url: str, thresholds: gates.Thresholds, out: Path, rerun: bool = False) -> int:
+def closed_seasons(exists: Callable[[Path], bool] = Path.exists) -> frozenset[int]:
+    """Every season a round has taken its one judgment on (its record exists)."""
+    return frozenset(ROUNDS[number][0].judgment_season for number, path in JUDGMENT_RECORDS.items() if exists(path))
+
+
+def thresholds_for(command: str, number: int, exists: Callable[[Path], bool] = Path.exists) -> gates.Thresholds:
+    """The constant a command runs under, or the refusal: a round's judgment is taken once, and a
+    development check may not judge a season that already carries a closed judgment."""
+    judged, checked = ROUNDS[number]
+    if command == "judge":
+        record = JUDGMENT_RECORDS[number]
+        if exists(record):
+            raise ConfigurationError(
+                f"round {number}'s {judged.judgment_season} judgment was taken once ({record.name}); it is never rerun"
+            )
+        return judged
+    if checked.judgment_season in closed_seasons(exists):
+        raise ConfigurationError(
+            f"round {number}'s development check would judge {checked.judgment_season}, "
+            "which carries a closed judgment; refused"
+        )
+    return checked
+
+
+def tree_status() -> list[str]:
+    """`git status --porcelain` of the tree the run used: empty when every file is committed."""
+    found = subprocess.run(["git", "status", "--porcelain"], cwd=_ROOT, capture_output=True, text=True, check=True)
+    return found.stdout.splitlines()
+
+
+def _run(url: str, thresholds: gates.Thresholds, out: Path) -> int:
+    status = tree_status()
     engine = scratch_engine(url)
-    with engine.connect() as conn:
-        conn.execute(text("set transaction read only"))
-        artifacts = load_model_artifacts(conn)
-        fitted = fit_round(conn, thresholds, artifacts, ARM64_BOARDS)
-        judged = judge_round(conn, thresholds, fitted, artifacts, ARM64_BOARDS)
-    engine.dispose()
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("set transaction read only"))
+            artifacts = load_model_artifacts(conn)
+            fitted = fit_round(conn, thresholds, artifacts, ARM64_BOARDS)
+            judged = judge_round(conn, thresholds, fitted, artifacts, ARM64_BOARDS)
+    finally:
+        engine.dispose()
     report = _render(fitted, judged)
     for line in report:
         log_line(line)
@@ -81,7 +116,8 @@ def _run(url: str, thresholds: gates.Thresholds, out: Path, rerun: bool = False)
         "passed": judged.passed,
         "numbers": dict(judged.numbers),
         "report": report,
-        "rerun": rerun,
+        "tree_status": status,
+        "tree_clean": not status,
     }  # fmt: skip
     out.write_text(json.dumps(payload, indent=1, default=str))
     return 0 if judged.passed else 1
@@ -102,7 +138,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         run = sub.add_parser(name)
         run.add_argument("--database", required=True)
         run.add_argument("--out", type=Path, required=True)
-        run.add_argument("--rerun", action="store_true", help="judge again, marked as a rerun that voids the record")
         run.add_argument("--round", type=int, choices=sorted(ROUNDS), required=True)
     args = parser.parse_args(argv)
     if args.command == "ingest-week-one-rosters":
@@ -111,13 +146,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "ingest-judgment-season":
         ingest_judgment_season(args.database, args.season, datetime.now(UTC))
         return 0
-    judging = args.command == "judge"
-    record = JUDGMENT_RECORDS[args.round]
-    if judging and record.exists() and not args.rerun:
-        raise ConfigurationError(f"round {args.round}'s 2025 judgment was taken once ({record.name}); a rerun voids it")
-    judged, checked = ROUNDS[args.round]
-    thresholds = judged if judging else checked
-    return _run(args.database, thresholds, args.out, rerun=args.rerun)
+    return _run(args.database, thresholds_for(args.command, args.round), args.out)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ every other number. Every outcome is read through the fit's reader, which refuse
 season and the pristine one. A search's tie keeps the smaller value (the grid's earlier cell).
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Final
@@ -40,7 +40,7 @@ from research.model.ros.model import (
 )
 from research.model.ros.outcomes import OutcomeReader
 from research.model.ros.reads import StaleBoard, games_played, week_inputs
-from research.model.ros.statistics import population
+from research.model.ros.statistics import population_formats
 from research.model.weekly.round.scoring import SKILL_POSITIONS
 
 K_GRID: Final = (0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 25, 32)
@@ -59,7 +59,7 @@ class FitRow:
     season: int
     week: int
     player: PlayerToDate
-    actual: dict[str, float]
+    actual: Mapping[str, float]
     actual_games: int
     next_played: bool | None
     later_games: int
@@ -68,11 +68,12 @@ class FitRow:
 
 def fit_opportunity(
     conn: Connection, seasons: Sequence[int], positions: dict[str, Position], reader: OutcomeReader
-) -> dict[str, OpportunityLine]:
-    """Per position and format, a game's points on its targets, carries, pass attempts and snap share."""
+) -> tuple[dict[str, OpportunityLine], OutcomeReader]:
+    """Per position and format, a game's points on its targets, carries, pass attempts and snap share;
+    and the reader with the seasons it read on its ledger."""
     rows: dict[str, list[tuple[list[float], float]]] = {}
     for season in seasons:
-        reader.admit(season)
+        reader = reader.admit(season)
         query = ObservationQuery(season, WeekRange(1, LAST_FANTASY_WEEK), FAR_FUTURE)
         for player_id, games in games_played(conn, query, positions).items():
             position = positions[player_id]
@@ -90,7 +91,7 @@ def fit_opportunity(
             y = np.array([points for _, points in found])
             coefficients = np.linalg.lstsq(x, y, rcond=None)[0]
             lines[cell(position, name)] = OpportunityLine(*(float(c) for c in coefficients))
-    return lines
+    return lines, reader
 
 
 def collect(  # noqa: PLR0913, PLR0917 - the reads one fit season needs
@@ -100,24 +101,21 @@ def collect(  # noqa: PLR0913, PLR0917 - the reads one fit season needs
     positions: dict[str, Position],
     reader: OutcomeReader,
     t: Thresholds,
-) -> list[FitRow]:
-    """Every population player at every fit week of one season, with his rest-of-season outcome."""
-    outcomes = reader.season(conn, season, positions)
+) -> tuple[list[FitRow], OutcomeReader]:
+    """Every population player at every fit week of one season, with his rest-of-season outcome;
+    and the reader with the season on its ledger."""
+    outcomes, reader = reader.season(conn, season, positions)
     rows: list[FitRow] = []
     for week in t.fit_weeks:
         players = week_inputs(conn, season, week, stale, positions).players
-        pops = {(p, f): population(players, p, f, t.population[p]) for p in SKILL_POSITIONS for f in FORMATS}
-        for player in players:
-            formats = frozenset(f for f in FORMATS if player.player_id in pops[(player.position, f)])
-            if not formats:
-                continue
+        for player, formats in population_formats(players, t.population):
             actual, games = outcomes.rest_of_season(player.player_id, week)
             weeks = outcomes.by_player.get(player.player_id, {})
             ahead = player.remaining_weeks
             next_played = None if not ahead else (ahead[0] in weeks and weeks[ahead[0]].played)
             later = sum(1 for w in ahead[1:] if w in weeks and weeks[w].played)
-            rows.append(FitRow(season, week, player, actual, games, next_played, later, formats))
-    return rows
+            rows.append(FitRow(season, week, player, MappingProxyType(actual), games, next_played, later, formats))
+    return rows, reader
 
 
 def _ratio(numerator: float, denominator: float, what: str) -> float:

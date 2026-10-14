@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any, Final
 
-from research.model.ros.model import OpportunityLine, RosPriors, Shrinkage
+from research.model.ros.model import OpportunityLine, RosPriors, Shrinkage, interval_by_of
 
 ARTIFACT_NAME: Final = "model/ros-priors"
 
@@ -52,5 +52,5 @@ def priors_from(payload: Mapping[str, Any]) -> RosPriors:
         offboard_rate=_floats(payload["offboardRate"]),
         offboard_availability=_floats(payload["offboardAvailability"]),
         interval=MappingProxyType({key: _triple(values) for key, values in payload["interval"].items()}),
-        interval_by=str(payload.get("intervalBy", "band")),
+        interval_by=interval_by_of(str(payload.get("intervalBy", "band"))),
     )

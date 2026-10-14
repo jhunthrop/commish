@@ -31,7 +31,7 @@ from research.model.ros.statistics import (
     cell_score,
     coverage,
     points_error,
-    population,
+    population_formats,
 )
 from research.model.weekly.round.judge import table_digests
 from research.model.weekly.round.scoring import SKILL_POSITIONS
@@ -50,17 +50,17 @@ class RoundFit:
 def fit_round(conn: Connection, t: gates.Thresholds, artifacts: ModelArtifacts, arithmetic: Arithmetic) -> RoundFit:
     started = time.monotonic()
     positions = all_positions(conn)
-    reader = fit_reader(t.judgment_season)
-    opportunity = fit_opportunity(conn, t.opportunity_seasons, positions, reader)
+    opportunity, reader = fit_opportunity(conn, t.opportunity_seasons, positions, fit_reader(t.judgment_season))
     lined = time.monotonic()
     rows: list[FitRow] = []
     for season in t.fit_seasons:
         stale = build_stale_board(conn, season, artifacts, arithmetic, t.prior_source)
-        rows.extend(collect(conn, season, stale, positions, reader, t))
+        found, reader = collect(conn, season, stale, positions, reader, t)
+        rows.extend(found)
     read = time.monotonic()
     priors = fit_priors(rows, opportunity, t)
     seconds = {"opportunity": lined - started, "collect": read - lined, "search": time.monotonic() - read}
-    return RoundFit(priors, len(rows), tuple(reader.served), FROZEN(seconds))
+    return RoundFit(priors, len(rows), reader.served, FROZEN(seconds))
 
 
 def _judged_row(  # noqa: PLR0913, PLR0917 - one player's every view at one judged week
@@ -112,13 +112,10 @@ def _week_rows(  # noqa: PLR0913, PLR0917 - the reads one judged week needs
 ) -> list[JudgedRow]:
     inputs = week_inputs(conn, t.judgment_season, week, stale, positions)
     ecr = {r.player_id: r.rank for r in preseason_rankings_as_of(conn, t.judgment_season, ECR_SOURCE, inputs.moment)}
-    pops = {(p, f): population(inputs.players, p, f, t.population[p]) for p in SKILL_POSITIONS for f in FORMATS}
-    rows = []
-    for player in inputs.players:
-        formats = frozenset(f for f in FORMATS if player.player_id in pops[(player.position, f)])
-        if formats:
-            rows.append(_judged_row(player, week, priors, outcomes, ecr, formats))
-    return rows
+    return [
+        _judged_row(player, week, priors, outcomes, ecr, formats)
+        for player, formats in population_formats(inputs.players, t.population)
+    ]
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,9 +157,8 @@ def judge_round(
 ) -> Judgment:
     before = table_digests(conn)
     positions = all_positions(conn)
-    reader = judgment_reader(t.judgment_season)
     stale = build_stale_board(conn, t.judgment_season, artifacts, arithmetic, t.prior_source)
-    outcomes = reader.season(conn, t.judgment_season, positions)
+    outcomes, reader = judgment_reader(t.judgment_season).season(conn, t.judgment_season, positions)
     rows = [
         r for week in t.judgment_weeks for r in _week_rows(conn, t, week, stale, positions, fitted.priors, outcomes)
     ]
