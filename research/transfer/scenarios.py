@@ -16,13 +16,13 @@ from typing import Final
 import httpx
 from sqlalchemy import Engine, text
 
-from research.boards.custom import candidate_format
+from research.boards.custom import CandidateMemo, candidate_format
 from research.capsules.store import stored_capsules_for
 from research.capsules.sweep import subjects_of
 from research.cli import log_line
 from research.model.market.curve import board_source_for
 from research.model.preseason.candidate_store import read_candidates, served_generation
-from research.model.priors import load_model_artifacts
+from research.model.priors import load_game_variance
 from research.nightly.capsule_step import CapsuleStepPlan
 from research.nightly.run import RunDeps, RunOptions, run_nightly
 from research.nightly.run_store import LocalRunStore
@@ -46,7 +46,7 @@ NIGHTLY_STEPS: Final = {
     "held_out": "held-out backtest",
 }
 BOARDS_STEPS: Final = {
-    "load_model_artifacts": "startup: pinned artifacts",
+    "load_game_variance": "startup: game-variance priors",
     "served_generation": "request: served generation",
     "read_candidates": "request: candidate set",
 }
@@ -104,15 +104,17 @@ def sweep_reads(engine: Engine, skip: frozenset[str]) -> str:
 
 
 def boards(engine: Engine, skip: frozenset[str]) -> str:
-    """The boards service's startup read, then one uncached request's reads for each scoring format."""
+    """The boards service's startup read, then two uncached builds for each scoring format (two
+    leagues' rules) on one instance, through its candidate memo."""
     del skip
+    memo = CandidateMemo(read_candidates)
     with engine.connect() as conn:
-        load_model_artifacts(conn)
+        load_game_variance(conn)
         sizes = []
-        for reception in (1.0, 0.5, 0.0):
+        for reception in (1.0, 1.0, 0.5, 0.5, 0.0, 0.0):
             source = board_source_for(candidate_format(reception))
             as_of = served_generation(conn, PRODUCT_SEASON, source)
-            sizes.append(0 if as_of is None else len(read_candidates(conn, PRODUCT_SEASON, source, as_of)))
+            sizes.append(0 if as_of is None else len(memo(conn, PRODUCT_SEASON, source, as_of)))
     return f"candidate sets of {sizes}"
 
 
