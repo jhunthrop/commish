@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { fixed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
+	import type { IndexSeason } from '#lib/run/schema.ts';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import AdpCell from './AdpCell.svelte';
 	import Face from './Face.svelte';
@@ -10,6 +11,7 @@
 	import TierChip from './TierChip.svelte';
 	import ValueCell from './ValueCell.svelte';
 	import { vorCell } from './heat.ts';
+	import { seasonParts } from './season-figures.ts';
 
 	interface Props {
 		player: BoardPlayer;
@@ -32,6 +34,10 @@
 		/** What the row is ordered by. board leads with our rank and names his ADP at the end. adp
 		 * leads with his ADP, the order drafters take players in, and names our rank at the end. */
 		order?: 'board' | 'adp';
+		/** His season so far, passed once the run is past the season's first kickoff: the meta line
+		 * prints "18.4 a game, 5 games" in place of his projected games, and the page's basis line
+		 * names it. Left out, the row is the preseason row. */
+		season?: IndexSeason;
 	}
 
 	let {
@@ -43,7 +49,8 @@
 		eager = false,
 		range = true,
 		action,
-		order = 'board'
+		order = 'board',
+		season
 	}: Props = $props();
 
 	const lead = $derived(
@@ -61,11 +68,19 @@
 	<Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />
 	<span class="who">
 		<a class="name" {href}><NameWords name={player.name} /></a>
-		<span class="meta">
+		<span class="meta" class:seasoned={season !== undefined}>
 			<PositionPill position={player.position} rank={player.positionRank} />
 			{#if showTier}<span class="wide tier"><TierChip tier={player.tier} /></span>{/if}
 			<span class="wide team">{player.team}</span>
-			<span class="wide">{fixed(player.expectedGames)} games</span>
+			{#if season === undefined}
+				<span class="wide">{fixed(player.expectedGames)} games</span>
+			{:else}
+				{@const parts = seasonParts(season)}
+				<span class="season"
+					>{parts.perGame}{#if parts.games !== null}<span class="games">{parts.games}</span
+						>{/if}</span
+				>
+			{/if}
 			<span class="narrow">{fixed(player.projected)} pts</span>
 		</span>
 	</span>
@@ -182,9 +197,42 @@
 		flex: none;
 	}
 
+	/* His season so far takes the projected games' place: "18.4 a game". The count after it prints
+	   only where the figures have a line of their own; on the meta line the basis line's "through
+	   week 5" and his page carry it. */
+	.season {
+		color: var(--ink-2);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.games {
+		display: none;
+	}
+
 	@container (max-width: 204px) {
 		.team {
 			display: none;
+		}
+	}
+
+	/* In season the meta line with the club and the tier chip ("WR 12 · T3 · LAR · 18.4 a game") fits
+	   the 210px player column of the board at 1440, measured on the stand-in's 400 rows. A column
+	   under the pill and the figures (the phone, and 760 to 960px) gives the figures a line of their
+	   own with the games count, wrapping their words rather than losing their end. */
+	@container (max-width: 196px) {
+		.seasoned {
+			flex-wrap: wrap;
+			row-gap: 2px;
+		}
+
+		.seasoned > .season {
+			order: 1;
+			flex: 0 0 100%;
+			white-space: normal;
+		}
+
+		.seasoned .games {
+			display: inline;
 		}
 	}
 

@@ -1,8 +1,9 @@
 /** The front door: the top of the default board, and the record's headline, from the run. */
 import { rangeScale } from '#lib/run/derive.ts';
 import { recordHeadline, type RecordHeadline } from '#lib/run/record.ts';
-import type { BoardRow, Format } from '#lib/run/schema.ts';
+import type { BoardRowView, Format } from '#lib/run/schema.ts';
 import type { RangeScale } from '#lib/types/player.ts';
+import { boardSeason } from '../board-season.ts';
 import { board, defaultFormat, record } from '../run.ts';
 
 /** How many of the board's top rows the front door shows. */
@@ -10,7 +11,10 @@ const TOP_ROWS = 10;
 
 export interface FrontPage {
 	format: Format;
-	rows: BoardRow[];
+	/** Each with his season figures once the season is underway. */
+	rows: BoardRowView[];
+	/** The strip's basis line once the season is underway, null before the first kickoff. */
+	seasonLead: string | null;
 	scale: RangeScale;
 	/** How many players the whole board ranks. */
 	boardSize: number;
@@ -21,10 +25,11 @@ export interface FrontPage {
 export async function frontPage(): Promise<FrontPage> {
 	const format = await defaultFormat();
 	const [loaded, kept] = await Promise.all([board(format.id), record()]);
-	const rows = loaded.rows.slice(0, TOP_ROWS);
+	const { rows, lead } = await boardSeason(format, loaded.rows.slice(0, TOP_ROWS));
 	return {
 		format,
 		rows,
+		seasonLead: lead,
 		scale: rangeScale(rows),
 		boardSize: loaded.rows.length,
 		record: { ...recordHeadline(kept), season: kept.season }

@@ -6,6 +6,7 @@
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
 	import Figure from '#lib/ui/Figure.svelte';
+	import Footnote from '#lib/ui/Footnote.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
@@ -56,6 +57,7 @@
 					aside="{page.rows.length} of {page.boardSize}"
 					level={2}
 				/>
+				{#if page.seasonLead !== null}<Footnote>{page.seasonLead}</Footnote>{/if}
 				<div class="rows">
 					<RowHead range={false} action />
 					{#each page.rows as player, i (player.id)}
@@ -67,6 +69,7 @@
 							unit={format.unit}
 							range={false}
 							eager={i < EAGER_ROWS}
+							season={player.season}
 						>
 							{#snippet action()}<RowSheetMark {player} />{/snippet}
 						</Row>

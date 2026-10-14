@@ -2,10 +2,11 @@
  * position, ranked within it and drawn in tiers. */
 import { error } from '@sveltejs/kit';
 import { positionFromSegment, positionsIn, rangeScale, rowsAt } from '#lib/run/derive.ts';
-import type { BoardRow, Format } from '#lib/run/schema.ts';
+import type { BoardRowView, Format } from '#lib/run/schema.ts';
 import type { Position, RangeScale } from '#lib/types/player.ts';
 import { links } from '#lib/site/links.ts';
 import { windowLabel } from '#lib/format/date.ts';
+import { boardSeason } from '../board-season.ts';
 import { adp, board, manifest } from '../run.ts';
 import {
 	absentFormatPage,
@@ -26,7 +27,10 @@ export interface BoardPage {
 	/** null is the All view. */
 	position: Position | null;
 	positions: Position[];
-	rows: BoardRow[];
+	/** Each with his season figures once the season is underway. */
+	rows: BoardRowView[];
+	/** The basis line once the season is underway, which the page prints in place of the format's. */
+	seasonLead: string | null;
 	scale: RangeScale;
 	/** How many players the whole board ranks, the population every round tint is counted in. */
 	boardSize: number;
@@ -43,14 +47,16 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 	if (segment !== null && position === null) error(NOT_FOUND, 'No such position.');
 	const format = await formatForRoute(formatId, (id) => links.board(id, position));
 	const [loaded, formats, sources] = await Promise.all([board(format.id), formatChips(), adp()]);
-	const rows = position === null ? loaded.rows : rowsAt(loaded.rows, position);
-	if (rows.length === 0) error(NOT_FOUND, 'This board ranks nobody at that position.');
+	const ranked = position === null ? loaded.rows : rowsAt(loaded.rows, position);
+	if (ranked.length === 0) error(NOT_FOUND, 'This board ranks nobody at that position.');
+	const { rows, lead } = await boardSeason(format, ranked);
 	return {
 		format,
 		formats,
 		position,
 		positions: positionsIn(loaded.rows),
 		rows,
+		seasonLead: lead,
 		scale: rangeScale(rows),
 		boardSize: loaded.rows.length,
 		adpBasis: sources.sources

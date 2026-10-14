@@ -354,6 +354,10 @@ export type RecordWeekStatus = z.infer<typeof recordWeekStatus>;
 export type RunRecord = z.infer<typeof recordSchema>;
 export type IndexEntry = z.infer<typeof indexEntrySchema>;
 export type IndexSeason = z.infer<typeof indexSeasonSchema>;
+/** A board row with his games and points a game this season, from index.json. */
+export type SeasonedRow = BoardRow & { season: IndexSeason };
+/** A board row as a page prints it: his season figures only once the season is underway. */
+export type BoardRowView = BoardRow & { season?: IndexSeason };
 export type Club = z.infer<typeof clubSchema>;
 export type Game = z.infer<typeof gameSchema>;
 export type Slate = z.infer<typeof slateSchema>;
