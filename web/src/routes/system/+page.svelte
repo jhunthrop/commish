@@ -143,6 +143,17 @@
 						/>{/snippet}
 				</Part>
 				<Part
+					name="Face, on injured reserve"
+					about="A player on his roster's IR slot carries a solid IR tag at the photo's top left, over the circle's edge at row sizes and inside the corner from 72px, clear of the eyes."
+				>
+					{#snippet show()}<Face src={row.headshot} name={row.name} size={32} status="ir" /><Face
+							src={row.headshot}
+							name={row.name}
+							size={96}
+							status="ir"
+						/>{/snippet}
+				</Part>
+				<Part
 					name="Name"
 					about="Outfit 600 at 15px. It truncates only after the face and pill fit."
 				>

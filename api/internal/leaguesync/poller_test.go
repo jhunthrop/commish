@@ -3,6 +3,7 @@ package leaguesync
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"sync"
@@ -91,6 +92,17 @@ func readAll(t *testing.T, p *Poller, n int) []Read {
 	return out
 }
 
+// settle waits for the read a view past the minute sent upstream behind
+// its answer: a refresh inside the floor joins the read in flight and
+// returns once it lands, and sends none of its own, so the host's count
+// is final when it returns.
+func settle(t *testing.T, p *Poller) {
+	t.Helper()
+	if _, err := p.Refresh(context.Background(), testRef); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // 25 viewers of one league make one upstream read a minute, the host up
 // or down, and past the minute a view answers the last read while the
 // next one goes upstream; a refresh reads at once but shares a read
@@ -108,6 +120,7 @@ func TestPollerOneReadPerLeaguePerMinute(t *testing.T) {
 	}
 	clock.Advance(31 * time.Second)
 	readAll(t, p, 25)
+	settle(t, p)
 	if got := host.reads.Load(); got != 2 {
 		t.Fatalf("a view past the minute made %d reads in all, want 2", got)
 	}
@@ -119,6 +132,7 @@ func TestPollerOneReadPerLeaguePerMinute(t *testing.T) {
 			t.Fatalf("a view past the minute waited on the host instead of answering the last read")
 		}
 	}
+	settle(t, p)
 	if got := host.reads.Load(); got != 3 {
 		t.Fatalf("the host down: %d reads in all, want 3", got)
 	}
@@ -173,5 +187,68 @@ func TestPollerStoredReadAndFirstFailure(t *testing.T) {
 	}
 	if got := down.reads.Load(); got != 1 {
 		t.Fatalf("five views of a failing league made %d reads, want 1", got)
+	}
+}
+
+// failingHost answers a league until it is down, then fails with err.
+type failingHost struct {
+	countingHost
+	err error
+}
+
+func (h *failingHost) Read(ctx context.Context, ref Ref) (Snapshot, error) {
+	if h.down.Load() {
+		h.reads.Add(1)
+		return Snapshot{}, h.err
+	}
+	return h.countingHost.Read(ctx, ref)
+}
+
+// A stale read says it is stale for want of a signed-in member only when
+// the last try failed that way: a host that is down is not signed out.
+func TestPollerStaleReadSaysSignedOut(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"no member signed in", ErrNotConnected, true},
+		{"the member signed out", ErrSignInAgain, true},
+		{"the host down", ErrUnavailable, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			clock := &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
+			host := &failingHost{err: fmt.Errorf("%w: test", c.err)}
+			p := &Poller{Hosts: Hosts{host}, Store: &memorySnapshots{}, Now: clock.Now, Log: quietLog()}
+			fresh, err := p.Read(context.Background(), testRef)
+			if err != nil || fresh.Stale != 0 || fresh.SignedOut {
+				t.Fatalf("a fresh read answered %v, stale %s, signed out %v", err, fresh.Stale, fresh.SignedOut)
+			}
+			host.down.Store(true)
+			clock.Advance(time.Minute)
+			r, err := p.Refresh(context.Background(), testRef)
+			if err != nil || r.Stale != time.Minute {
+				t.Fatalf("a failed refresh answered %v, stale %s, want the last read a minute stale", err, r.Stale)
+			}
+			if !r.Failed || r.SignedOut != c.want {
+				t.Fatalf("failed %v, signed out %v, want failed and signed out %v", r.Failed, r.SignedOut, c.want)
+			}
+		})
+	}
+}
+
+// A read kept from before this process is stale while the next goes to the
+// host, but nothing failed, so it never reads as a failure.
+func TestPollerKeptReadIsNotAFailure(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
+	store := &memorySnapshots{}
+	if _, err := newPoller(&countingHost{}, store, clock).Read(context.Background(), testRef); err != nil {
+		t.Fatal(err)
+	}
+	clock.Advance(3 * time.Minute)
+	r, err := newPoller(&countingHost{}, store, clock).Read(context.Background(), testRef)
+	if err != nil || r.Stale == 0 || r.Failed || r.SignedOut {
+		t.Fatalf("a kept read answered %v, stale %s, failed %v, signed out %v; want stale and not failed", err, r.Stale, r.Failed, r.SignedOut)
 	}
 }

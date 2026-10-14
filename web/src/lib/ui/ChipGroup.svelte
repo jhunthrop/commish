@@ -7,16 +7,22 @@
 		label: string;
 		/** joined draws the chips on one pill track, loose lays them out as a wrapping row. */
 		variant?: 'joined' | 'loose';
+		/** As wide as its chips, never wider than a form (--form-w): a choice above a form's fields. */
+		fit?: boolean;
+		/** one: a single choice, the pressed chip is it. many: any number pressed at once, each marked
+		 * with a check, like the leagues to follow. */
+		choose?: 'one' | 'many';
 		children: Snippet;
 	}
 
-	let { label, variant = 'joined', children }: Props = $props();
+	let { label, variant = 'joined', fit = false, choose = 'one', children }: Props = $props();
 
-	// The variant fixes the group's shape for its lifetime, so reading it once at setup is the intent.
-	markChipGroup(untrack(() => variant) === 'joined');
+	// The variant and the choice fix the group's shape for its lifetime, so reading them once at
+	// setup is the intent.
+	markChipGroup(untrack(() => ({ joined: variant === 'joined', many: choose === 'many' })));
 </script>
 
-<div class="group {variant}" role="group" aria-label={label}>
+<div class="group {variant}" class:fit role="group" aria-label={label}>
 	{@render children()}
 </div>
 
@@ -37,5 +43,11 @@
 	.loose {
 		flex-wrap: wrap;
 		gap: var(--s-2);
+	}
+
+	.fit {
+		align-self: flex-start;
+		width: fit-content;
+		max-width: min(100%, var(--form-w));
 	}
 </style>

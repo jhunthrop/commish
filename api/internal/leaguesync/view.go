@@ -18,6 +18,9 @@ const unlistedName = "A player not yet listed"
 // view is the league as the link's drafter sees it.
 func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.LeagueSync, error) {
 	snap := read.Snapshot
+	if snap.Ref.Host == HostFFPC {
+		snap = ownLineupOnly(snap, link.RosterID)
+	}
 	saved, err := s.savedSettings(ctx, link)
 	if err != nil {
 		return apitypes.LeagueSync{}, err
@@ -27,19 +30,22 @@ func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.Leag
 		return apitypes.LeagueSync{}, fmt.Errorf("leaguesync: board: %w", err)
 	}
 	ids := namedPlayers(snap)
-	dir, err := s.Players.For(ctx, snap.Ref.Host, directorySeason(snap, s.Now()), ids)
-	if err != nil {
-		return apitypes.LeagueSync{}, fmt.Errorf("leaguesync: directory: %w", err)
+	dir := snap.Players
+	if dir == nil {
+		if dir, err = s.Players.For(ctx, snap.Ref.Host, directorySeason(snap, s.Now()), ids); err != nil {
+			return apitypes.LeagueSync{}, fmt.Errorf("leaguesync: directory: %w", err)
+		}
 	}
 	placed := Place(board.Raw, dir, ids)
 	p := players{dir: dir, placed: placed}
 	out := apitypes.LeagueSync{
 		Id: link.ID, Host: apitypes.LeagueHost(snap.Ref.Host), HostLeagueId: snap.Ref.LeagueID, Season: snap.Season,
-		Name: snap.Name, Status: snap.Status, Week: snap.Week, Me: link.RosterID, SettingsLeagueId: link.LeagueID,
+		Name: snap.Name, Status: snap.Status, Week: snap.Week, WeekAllPlay: snap.AllPlay, Me: link.RosterID, SettingsLeagueId: link.LeagueID,
 		ScoringDropped: nonNil(snap.Scoring.Dropped), ScoringDefaulted: nonNil(snap.Scoring.Defaulted),
 		ScoringLike: NearestPreset(snap.Scoring.Rules), Teams: standings(snap.Teams), Moves: p.moves(snap.Moves),
 		Rostered: rosteredIDs(rosteredOnBoard(snap, placed)), BoardFormat: boardFormat(snap), Byes: byes(board.Raw.Players),
 		Placement: placement(snap, placed), ReadAt: snap.ReadAt, HostStaleSeconds: int(math.Round(read.Stale.Seconds())),
+		HostFailed: read.Failed, HostSignedOut: read.SignedOut,
 		Roster: []apitypes.RosterSpot{},
 	}
 	if saved == nil {
@@ -149,6 +155,17 @@ func placement(snap Snapshot, placed map[string]Placement) apitypes.Placement {
 		}
 	}
 	return out
+}
+
+// standingOf is the roster's record and place in the league, nil when
+// the league has no read or the roster is not in it.
+func standingOf(teams []Team, roster int) *apitypes.LeagueStanding {
+	for i, t := range standings(teams) {
+		if t.RosterId == roster {
+			return &apitypes.LeagueStanding{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties, Place: i + 1, Teams: len(teams)}
+		}
+	}
+	return nil
 }
 
 // standings is every team, most wins first, then fewest losses, then

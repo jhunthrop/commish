@@ -165,7 +165,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Attach the drafter's own league on another host by its link. Free. The league's roster and scoring become a saved league (custom scoring, exactly as the host states it) a mock reruns from, when a mock room can draft its shape. The drafter's seat is the team their Sleeper username runs, or the team they pick. Attaching the same league again updates the seat. */
+		/** Attach the drafter's own league on another host by its link. Free. The league's roster and scoring become a saved league (custom scoring, exactly as the host states it) a mock reruns from, when a mock room can draft its shape. The drafter's seat is the team their Sleeper username runs, or the team they pick. Attaching the same league again updates the seat. One live league is free; a second needs the many_leagues feature (the Draft Pass or the Membership), refused with 403 naming it. A detached league does not count. */
 		post: operations['attachLeague'];
 		delete?: never;
 		options?: never;
@@ -220,7 +220,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Undo a detach. The league is followed again with the seat and saved league it had. */
+		/** Undo a detach. The league is followed again with the seat and saved league it had. Like an attach, a second live league needs the many_leagues feature (403 naming it). */
 		post: operations['restoreLeague'];
 		delete?: never;
 		options?: never;
@@ -969,6 +969,161 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/devices': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The account's paired browsers, newest first, each with its scopes and when it last sent a page. */
+		get: operations['listDevices'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/devices/codes': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** A one-time pairing code for the browser extension: six words, good for ten minutes and one pairing. A new code replaces the account's earlier one. */
+		post: operations['createPairCode'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/devices/pair': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** The extension trades a pairing code for its device token, answered this once and never again. The token goes in Authorization Bearer on the device routes only, never in a cookie. 10 a minute an address. */
+		post: operations['pairDevice'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/devices/me': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The paired device asking, and the account it writes for, so the extension's popup can say so. */
+		get: operations['deviceMe'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/devices/{id}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post?: never;
+		/** Unpair a browser. Its token opens nothing from the next request on. */
+		delete: operations['revokeDevice'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The hosts connecting is open for here (HOST_FFPC_ENABLED), and the hosts the account is connected to, each with its state and when it was last read. No credential is ever answered. Signed out it answers the switches with no connections: a switch is not account data. */
+		get: operations['listHostConnections'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/ffpc/connect': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Sign in to FFPC as the member, through FFPC's own sign-in form, and keep what FFPC hands back (its session, and the sign-in because FFPC offers no other way to renew a session), envelope encrypted. Answers the member's FFPC leagues. Needs consent, kept with its time and words. Three refused sign-ins in an hour pause connecting for the hour (423). 5 an hour an account. 502 when FFPC is not answering or answers a sign-in in a way we do not expect; 503 when FFPC is not open here or its sign-in page changed. */
+		post: operations['connectFFPC'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/ffpc/leagues': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The member's FFPC leagues, read from FFPC as them. 409 when the connection needs a fresh sign-in. */
+		get: operations['ffpcLeagues'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/ffpc': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post?: never;
+		/** Disconnect FFPC. The kept sign-in and session are deleted at once; leagues read from FFPC stop updating. */
+		delete: operations['disconnectFFPC'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/rooms/{id}/ws': {
 		parameters: {
 			query?: never;
@@ -1031,7 +1186,8 @@ export interface components {
 			| 'early_run'
 			| 'start_sit'
 			| 'waiver_ranks'
-			| 'trade_finder';
+			| 'trade_finder'
+			| 'many_leagues';
 		/** @enum {string} */
 		Product: 'draft_pass' | 'membership' | 'group_pass';
 		/** @enum {string} */
@@ -1045,6 +1201,8 @@ export interface components {
 			 * @description the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
 			 */
 			league_id: string | null;
+			/** @description how many leagues the account follows now (detached ones not counted); more than one, the rail's League opens the list */
+			league_count: number;
 			first_name: string | null;
 			last_name: string | null;
 			/** @description the name shown in lobbies, 3 to 20 letters, digits or underscores, not starting with a digit */
@@ -1062,12 +1220,22 @@ export interface components {
 			/** @enum {string} */
 			source: 'purchase' | 'group_pass' | 'grant';
 		};
+		/** @description the account's Membership, from its live membership entitlement whatever its source, else its latest subscription. A subscription carries its billing (interval, current_period_end and cancel_at_period_end). A grant bought nothing, so those three are null. */
 		MembershipState: {
+			/** @enum {string} */
+			source: 'subscription' | 'grant';
 			status: string;
+			/** Format: date-time */
+			starts_at: string;
+			/**
+			 * Format: date-time
+			 * @description when access ends, null for a grant with no end
+			 */
+			ends_at: string | null;
 			interval: components['schemas']['Interval'] | null;
 			/** Format: date-time */
 			current_period_end: string | null;
-			cancel_at_period_end: boolean;
+			cancel_at_period_end: boolean | null;
 		};
 		AccountUpdate: {
 			handle: string;
@@ -1551,7 +1719,7 @@ export interface components {
 			share_code?: string;
 		};
 		/** @enum {string} */
-		CompanionHost: 'sleeper';
+		CompanionHost: 'sleeper' | 'ffpc';
 		CompanionCreate: {
 			host: components['schemas']['CompanionHost'];
 			/** @description the draft link as pasted */
@@ -1570,6 +1738,7 @@ export interface components {
 		CompanionSummary: {
 			/** Format: uuid */
 			id: string;
+			host: components['schemas']['CompanionHost'];
 			host_draft_id: string;
 			/** @description the draft's name on the host, empty when it has none */
 			name: string;
@@ -1761,7 +1930,7 @@ export interface components {
 		 * @description the host a league runs on, named as a mechanism
 		 * @enum {string}
 		 */
-		LeagueHost: 'sleeper' | 'mfl';
+		LeagueHost: 'sleeper' | 'mfl' | 'ffpc';
 		AttachPreviewInput: {
 			host?: components['schemas']['LeagueHost'];
 			/** @description the league link as pasted */
@@ -1799,8 +1968,18 @@ export interface components {
 			roster_id: number;
 			/** @description the drafter's team at the last read */
 			team_name: string;
+			/** @description the drafter's record and place at the last read, null when unread */
+			standing: components['schemas']['LeagueStanding'] | null;
 			/** Format: date-time */
 			attached_at: string;
+		};
+		LeagueStanding: {
+			wins: number;
+			losses: number;
+			ties: number;
+			/** @description 1-based, by record then points for, as the league page's strip orders it */
+			place: number;
+			teams: number;
 		};
 		LeagueTeam: {
 			roster_id: number;
@@ -1821,6 +2000,8 @@ export interface components {
 			name: string;
 			position: string;
 			team: string;
+			/** @description the host marks him injured reserve beside his name (FFPC's IR designation); a player on a roster's IR slot is said by the slot */
+			injured_reserve: boolean;
 		};
 		RosterSpot: {
 			player: components['schemas']['LeaguePlayer'];
@@ -1839,6 +2020,8 @@ export interface components {
 			roster_id: number;
 			/** Format: double */
 			points: number;
+			/** @description the host's score for this side was read; false when it could not be (an FFPC all-play week whose scoring page did not answer), and points is then 0 and says nothing */
+			points_read: boolean;
 			starters: components['schemas']['MatchupStarter'][];
 		};
 		LeagueMatchup: {
@@ -1878,6 +2061,8 @@ export interface components {
 			status: string;
 			/** @description the host's current week */
 			week: number;
+			/** @description the host's schedule sets this week as all-play (every team scored against every other, no head-to-head game); the matchup then holds the drafter's side alone */
+			week_all_play: boolean;
 			/** @description the drafter's roster id */
 			me: number;
 			/**
@@ -1913,6 +2098,93 @@ export interface components {
 			read_at: string;
 			/** @description how stale the answer is because the host failed since, 0 when the last read reached it */
 			host_stale_seconds: number;
+			/** @description the stale answer's last read failed. False for a read kept from before this process while the next one goes to the host, so a stale answer names a failure only when there was one */
+			host_failed: boolean;
+			/** @description the stale answer's last read failed because no member of the league is signed in to the host (FFPC), so a sign-in mends it. False when fresh */
+			host_signed_out: boolean;
+		};
+		/**
+		 * @description what a paired browser may write
+		 * @enum {string}
+		 */
+		DeviceScope: 'league:write' | 'draft:write';
+		Device: {
+			/** Format: uuid */
+			id: string;
+			/** @description what the browser called itself at pairing */
+			name: string;
+			scopes: components['schemas']['DeviceScope'][];
+			/** Format: date-time */
+			created_at: string;
+			/**
+			 * Format: date-time
+			 * @description when it last sent a page, to the hour; null when it never has
+			 */
+			last_used_at: string | null;
+		};
+		DeviceMe: {
+			device: components['schemas']['Device'];
+			/** @description the account's public name */
+			handle: string | null;
+		};
+		PairCode: {
+			/** @description six words separated by spaces */
+			code: string;
+			/** Format: date-time */
+			expires_at: string;
+		};
+		PairInput: {
+			/** @description the six words as typed */
+			code: string;
+			/** @description what the browser calls itself */
+			name?: string;
+		};
+		Paired: {
+			/** @description the device token */
+			token: string;
+			device: components['schemas']['Device'];
+		};
+		/**
+		 * @description a host the member connects their own account on, named as a mechanism
+		 * @enum {string}
+		 */
+		ConnectedHost: 'ffpc';
+		/**
+		 * @description connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did not mend it; the member signs in again on our form
+		 * @enum {string}
+		 */
+		HostConnectionStatus: 'connected' | 'signed_out';
+		HostConnection: {
+			host: components['schemas']['ConnectedHost'];
+			status: components['schemas']['HostConnectionStatus'];
+			/** Format: date-time */
+			connected_at: string;
+			/** Format: date-time */
+			last_read_at: string | null;
+		};
+		HostConnectInput: {
+			/** @description the member's FFPC sign-in (FFPC's form calls it the username) */
+			email: string;
+			/** @description sent to FFPC's sign-in only */
+			password: string;
+			/** @description the member agrees that we sign in to FFPC as them to read their league, never make a move or a bid, and that they can disconnect any time; must be true */
+			consent: boolean;
+		};
+		HostConnections: {
+			/** @description the hosts connecting is open for */
+			enabled: components['schemas']['ConnectedHost'][];
+			connections: components['schemas']['HostConnection'][];
+		};
+		HostLeague: {
+			league_id: string;
+			name: string;
+			team_name: string;
+			/** @description the team's record as FFPC writes it, 2 - 3 */
+			record: string;
+		};
+		HostConnected: {
+			connection: components['schemas']['HostConnection'];
+			leagues: components['schemas']['HostLeague'][];
 		};
 	};
 	responses: {
@@ -2320,6 +2592,7 @@ export interface operations {
 		responses: {
 			201: components['responses']['LeagueSyncResponse'];
 			400: components['responses']['ErrorResponse'];
+			403: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 			422: components['responses']['ErrorResponse'];
@@ -2373,6 +2646,7 @@ export interface operations {
 		requestBody?: never;
 		responses: {
 			200: components['responses']['EmptyResponse'];
+			403: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 		};
@@ -3246,6 +3520,194 @@ export interface operations {
 			200: components['responses']['MockReportResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
+		};
+	};
+	listDevices: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description up to ten */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['Device'][];
+					};
+				};
+			};
+		};
+	};
+	createPairCode: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the code, shown once */
+			201: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['PairCode'];
+					};
+				};
+			};
+		};
+	};
+	pairDevice: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['PairInput'];
+			};
+		};
+		responses: {
+			/** @description the device and its token */
+			201: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['Paired'];
+					};
+				};
+			};
+			400: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+		};
+	};
+	deviceMe: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the device */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['DeviceMe'];
+					};
+				};
+			};
+			401: components['responses']['ErrorResponse'];
+		};
+	};
+	revokeDevice: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['EmptyResponse'];
+			404: components['responses']['ErrorResponse'];
+		};
+	};
+	listHostConnections: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the connections */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['HostConnections'];
+					};
+				};
+			};
+		};
+	};
+	connectFFPC: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['HostConnectInput'];
+			};
+		};
+		responses: {
+			/** @description connected */
+			201: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['HostConnected'];
+					};
+				};
+			};
+			400: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			423: components['responses']['ErrorResponse'];
+			429: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	ffpcLeagues: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the leagues */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['HostLeague'][];
+					};
+				};
+			};
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	disconnectFFPC: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['EmptyResponse'];
+			404: components['responses']['ErrorResponse'];
 		};
 	};
 	roomSocket: {

@@ -19,6 +19,8 @@
 	import { MAX_TEAMS } from '#lib/room/setup/setup.ts';
 	import { ApiError, companions, type CompanionCreate, type CompanionSummary } from './api.ts';
 	import { has, recentLine } from './model.ts';
+	import FFPCLeagues from '#lib/hosts/FFPCLeagues.svelte';
+	import { ffpcOpen, hostsApi, type HostLeague } from '#lib/hosts/api.ts';
 
 	/** Start following a draft: paste the Sleeper link, say which seat is yours, one verb. Without the
 	 * live draft feature (answered by Can through /me) the page says where it comes from. */
@@ -30,6 +32,10 @@
 	type View = 'loading' | 'signed-out' | 'no-pass' | 'form' | 'unreachable';
 
 	let view = $state<View>('loading');
+	/** Where the draft runs: Sleeper by its link, or FFPC read as you. */
+	let way = $state<'sleeper' | 'ffpc'>('sleeper');
+	/** FFPC is offered only where it is open (HOST_FFPC_ENABLED). */
+	let ffpcOn = $state(false);
 	let link = $state('');
 	let by = $state<'slot' | 'username'>('slot');
 	let slot = $state(1);
@@ -44,6 +50,10 @@
 
 	onMount(() => {
 		replay = page.url.searchParams.get('replay') === '1';
+		hostsApi
+			.connections()
+			.then((hosts) => (ffpcOn = ffpcOpen(hosts)))
+			.catch(() => (ffpcOn = false));
 		if (replay) link = REPLAY_WORDS;
 		companions
 			.me()
@@ -70,6 +80,18 @@
 	});
 
 	const ready = $derived(link.trim() !== '' && (by === 'slot' || username.trim() !== '') && !busy);
+
+	async function followFFPC(league: HostLeague): Promise<void> {
+		const made = await companions.create({ host: 'ffpc', draft: league.league_id, seat: {} });
+		await goto(resolve('/companion/[id]', { id: made.id }));
+	}
+
+	/** The FFPC list is a single choice here: its one league is the draft. */
+	async function followFirstFFPC(leagues: HostLeague[]): Promise<null> {
+		const [league] = leagues;
+		if (league) await followFFPC(league);
+		return null;
+	}
 
 	async function follow(): Promise<void> {
 		if (!ready) return;
@@ -124,43 +146,52 @@
 		{:else}
 			<DisplayTitle size="page">Follow your draft</DisplayTitle>
 			<p class="lede">
-				Paste the link to your Sleeper draft. At each of your picks you get our call, against the
-				picks your league actually makes.
+				At each of your picks you get our call, against the picks your league actually makes.
 			</p>
-			<div class="form">
-				<Field
-					label="Your Sleeper draft link"
-					bind:value={link}
-					placeholder="sleeper.com/draft/nfl/1234567890"
-					maxlength={300}
-					onenter={() => void follow()}
-				/>
-				<div class="seat">
-					<ChipGroup label="Find your seat by">
-						<Chip pressed={by === 'slot'} onclick={() => (by = 'slot')}>My draft slot</Chip>
-						<Chip pressed={by === 'username'} onclick={() => (by = 'username')}
-							>My Sleeper username</Chip
-						>
-					</ChipGroup>
-					{#if by === 'slot'}
-						<ChipGroup label="Your draft slot" variant="loose">
-							{#each SLOTS as n (n)}
-								<Chip size="sm" pressed={slot === n} onclick={() => (slot = n)}>{n}</Chip>
-							{/each}
+			{#if ffpcOn}
+				<ChipGroup label="Your draft is on" fit>
+					<Chip pressed={way === 'sleeper'} onclick={() => (way = 'sleeper')}>Sleeper</Chip>
+					<Chip pressed={way === 'ffpc'} onclick={() => (way = 'ffpc')}>FFPC</Chip>
+				</ChipGroup>
+			{/if}
+			{#if ffpcOn && way === 'ffpc'}
+				<FFPCLeagues verb={() => 'Follow my draft'} onpick={followFirstFFPC} typed />
+			{:else}
+				<div class="form">
+					<Field
+						label="Your Sleeper draft link"
+						bind:value={link}
+						placeholder="sleeper.com/draft/nfl/1234567890"
+						maxlength={300}
+						onenter={() => void follow()}
+					/>
+					<div class="seat">
+						<ChipGroup label="Find your seat by">
+							<Chip pressed={by === 'slot'} onclick={() => (by = 'slot')}>My draft slot</Chip>
+							<Chip pressed={by === 'username'} onclick={() => (by = 'username')}
+								>My Sleeper username</Chip
+							>
 						</ChipGroup>
-					{:else}
-						<Field
-							label="Sleeper username"
-							bind:value={username}
-							maxlength={40}
-							onenter={() => void follow()}
-						/>
-					{/if}
+						{#if by === 'slot'}
+							<ChipGroup label="Your draft slot" variant="loose">
+								{#each SLOTS as n (n)}
+									<Chip size="sm" pressed={slot === n} onclick={() => (slot = n)}>{n}</Chip>
+								{/each}
+							</ChipGroup>
+						{:else}
+							<Field
+								label="Sleeper username"
+								bind:value={username}
+								maxlength={40}
+								onenter={() => void follow()}
+							/>
+						{/if}
+					</div>
 				</div>
-			</div>
-			<ActionBar alert={problem ? alert : undefined}>
-				<Verb disabled={!ready} onclick={() => void follow()}>Follow my draft</Verb>
-			</ActionBar>
+				<ActionBar alert={problem ? alert : undefined}>
+					<Verb disabled={!ready} onclick={() => void follow()}>Follow my draft</Verb>
+				</ActionBar>
+			{/if}
 			{#if recentFailed}
 				<p class="lede">The drafts you followed can't be read right now.</p>
 			{:else if recent.length > 0}

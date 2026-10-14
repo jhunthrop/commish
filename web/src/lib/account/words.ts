@@ -36,7 +36,21 @@ export function hasLiveMembership(account: Pick<Account, 'membership'>): boolean
 	return account.membership !== null && ACTIVE_MEMBERSHIP.has(account.membership.status);
 }
 
-function membershipWords(membership: NonNullable<Account['membership']>): PlanWords {
+type Membership = NonNullable<Account['membership']>;
+
+/** A granted Membership: nothing was bought, so no billing and nothing to cancel. Its end is a real
+ * instant read in UTC with its year, as the pass's end is. */
+function grantWords(membership: Membership): PlanWords {
+	return {
+		title: 'Membership',
+		line: membership.ends_at
+			? `Granted, good through ${dateLabel(membership.ends_at)}.`
+			: 'Granted.',
+		action: null
+	};
+}
+
+function subscriptionWords(membership: Membership): PlanWords {
 	const interval = membership.interval === 'month' ? 'Monthly' : 'Yearly';
 	// A real instant (Stripe's period end), read on the Eastern clock with its year.
 	const end = membership.current_period_end ? dayYearLabel(membership.current_period_end) : null;
@@ -61,10 +75,23 @@ function membershipWords(membership: NonNullable<Account['membership']>): PlanWo
 	};
 }
 
+/** The Membership's card by how it came to be, as PASS_SOURCES words the pass's. */
+const MEMBERSHIP_SOURCES: Readonly<Record<Membership['source'], (m: Membership) => PlanWords>> = {
+	subscription: subscriptionWords,
+	grant: grantWords
+};
+
+/** Whether the account bought its Membership, so it has receipts and a card on file. */
+export function boughtMembership(account: Pick<Account, 'membership'>): boolean {
+	return account.membership?.source === 'subscription';
+}
+
 /** Membership first, since it includes the pass; then the pass; then free. */
 export function planWords(account: Account): PlanWords {
 	const { membership, draft_pass: pass } = account;
-	if (membership && hasLiveMembership(account)) return membershipWords(membership);
+	if (membership && hasLiveMembership(account)) {
+		return MEMBERSHIP_SOURCES[membership.source](membership);
+	}
 	if (pass) {
 		return {
 			title: `${String(pass.season)} Draft Pass`,

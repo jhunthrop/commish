@@ -44,17 +44,28 @@ type Sessions interface {
 	Middleware(next http.Handler) http.Handler
 }
 
+// Devices is what Mount needs from auth.Bearer: a rate key read from
+// the token alone, and the middleware that resolves the device.
+type Devices interface {
+	RateKey(r *http.Request) string
+	Require(scope auth.Scope) httpx.Middleware
+}
+
 // Mount registers routes on mux. Each route runs, in order: its name
 // for the access log and the metrics, its rate limit, then the session
 // lookup, then the session requirement. The limit comes before the
 // lookup, so a flood costs no database read: its key is read from the
 // sealed cookie alone (or the address), never from the sessions table.
 // A route without a limit is a programming error and refuses to mount,
-// so no endpoint ships unlimited.
-func Mount(mux *http.ServeMux, routes []httpx.Route, sessions Sessions, now func() time.Time) error {
+// so no endpoint ships unlimited, and so is a device route without a
+// scope or without devices to resolve it.
+func Mount(mux *http.ServeMux, routes []httpx.Route, sessions Sessions, devices Devices, now func() time.Time) error {
 	for _, rt := range routes {
 		if rt.Limit.N <= 0 || rt.Limit.Per <= 0 {
 			return fmt.Errorf("server: route %s has no rate limit", rt.Pattern())
+		}
+		if rt.Access == httpx.Device && (rt.Scope == "" || devices == nil) {
+			return fmt.Errorf("server: device route %s has no scope or no devices", rt.Pattern())
 		}
 		var h http.Handler = rt.Handler
 		if rt.Access == httpx.SignedIn {
@@ -63,7 +74,12 @@ func Mount(mux *http.ServeMux, routes []httpx.Route, sessions Sessions, now func
 		if rt.Access.ResolvesSession() {
 			h = sessions.Middleware(h)
 		}
-		h = httpx.RateLimit(httpx.NewLimiter(rt.Limit, now), sessions.RateKey)(h)
+		rateKey := sessions.RateKey
+		if rt.Access == httpx.Device {
+			h = devices.Require(auth.Scope(rt.Scope))(h)
+			rateKey = devices.RateKey
+		}
+		h = httpx.RateLimit(httpx.NewLimiter(rt.Limit, now), rateKey)(h)
 		h = httpx.NameRoute(rt.Pattern())(h)
 		mux.Handle(rt.Pattern(), h)
 	}

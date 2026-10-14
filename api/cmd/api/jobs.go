@@ -18,6 +18,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/billing"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/db"
+	"github.com/jhunthrop/commish/api/internal/devices"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/exports"
@@ -40,10 +41,16 @@ func jobTable() map[string]job {
 		"billing-reconcile": runReconcile,
 		// renewal-reminders runs daily: the mail seven days before a renewal.
 		"renewal-reminders": runReminders,
-		// sweep runs daily: expired sessions and exports.
+		// sweep runs daily: expired sessions, pairing codes and exports.
 		"sweep": runSweep,
 		// stripe-setup runs by hand once per Stripe mode.
 		"stripe-setup": runStripeSetup,
+		// ffpc-refresh runs hourly and in bursts: every FFPC league read as
+		// a connected member (ffpcjob.go).
+		"ffpc-refresh": runFFPCRefresh,
+		// re-encrypt-host-connections runs by hand during a key rotation:
+		// every connection's data key re-wrapped under the current key.
+		"re-encrypt-host-connections": runRekey,
 		// grant runs by hand: a pass or membership for support.
 		"grant": runGrant,
 	}
@@ -130,6 +137,11 @@ func runSweep(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpo
 		return err
 	}
 	log.Info("swept unclaimed anonymous mocks", "deleted", unclaimed)
+	codes, err := (&devices.Store{Pool: pool}).SweepCodes(ctx, now)
+	if err != nil {
+		return err
+	}
+	log.Info("swept device pairing codes", "deleted", codes)
 	if !cfg.R2.Configured() {
 		log.Warn("r2 not configured", "effect", "exports not swept")
 		return nil

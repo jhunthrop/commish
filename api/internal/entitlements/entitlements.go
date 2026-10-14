@@ -29,6 +29,9 @@ const (
 	StartSit    = apitypes.FeatureStartSit
 	WaiverRanks = apitypes.FeatureWaiverRanks
 	TradeFinder = apitypes.FeatureTradeFinder
+	// ManyLeagues is following more than one league at once: one league
+	// is free, every other live league comes with the Draft Pass.
+	ManyLeagues = apitypes.FeatureManyLeagues
 )
 
 // Product is what a row grants. app.product_features maps it to

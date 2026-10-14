@@ -146,6 +146,27 @@ export async function player(id: string): Promise<Player> {
 	return readPlayer(id);
 }
 
+/** What every player's season figures are: the format they are scored in and the last week whose
+ * games they reach, which every season block in the run shares (season-checks.ts holds them to it). */
+export interface SeasonReach {
+	/** The format id the figures are scored in. */
+	format: string;
+	/** That format as a chip prints it: "PPR". */
+	scoring: string;
+	/** The last week whose games are all in, 0 before week 1's. */
+	through: number;
+}
+
+export function seasonReach(): Promise<SeasonReach> {
+	return once('season:reach', async () => {
+		const [first] = await index();
+		if (!first) throw new Error('The run indexes no players.');
+		const { season } = await player(first.id);
+		const { label } = await formatById(season.format);
+		return { format: season.format, scoring: label, through: season.through };
+	});
+}
+
 export function adp(): Promise<Adp> {
 	return once('adp', () => read(RUN_PATHS.adp, adpSchema));
 }

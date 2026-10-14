@@ -1,0 +1,399 @@
+package ffpc
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"regexp"
+	"sort"
+	"strings"
+	"time"
+
+	"golang.org/x/time/rate"
+
+	"github.com/jhunthrop/commish/api/internal/hosts"
+)
+
+// The client reads FFPC as a connected member: it signs in through FFPC's
+// own sign-in form, posted exactly as the page's form posts it, keeps
+// the cookies FFPC hands back, and reads league pages with them. It never
+// posts anything else but the My Teams page's own link to open a league;
+// it never sets a lineup, places a bid or makes any other move.
+
+// BaseURL is FFPC's site.
+const BaseURL = "https://myffpc.com"
+
+// UserAgent names the product and a contact on every request.
+const UserAgent = "Commish/1.0 (+https://trycommish.app; hello@trycommish.app)"
+
+// Timing: one request a second across the whole process, however many
+// members and leagues are read, and each request bounded.
+const (
+	Gap     = time.Second
+	Timeout = 15 * time.Second
+	// maxQueue is how long a read waits for its turn before it gives up.
+	maxQueue = 2 * time.Minute
+)
+
+// Errors a caller tells apart. None of them carries a credential.
+var (
+	// ErrBadSignIn is FFPC refusing the email and password.
+	ErrBadSignIn = errors.New("ffpc: sign-in refused")
+	// ErrSignedOut is a session FFPC no longer honors.
+	ErrSignedOut = errors.New("ffpc: signed out")
+	// ErrUnavailable is FFPC failing or answering what we cannot read.
+	ErrUnavailable = errors.New("ffpc: not answering")
+	// ErrBusy is a read whose turn is more than maxQueue away.
+	ErrBusy = hosts.ErrBusy
+	// ErrFormChanged is a sign-in page that is not the form we know: a
+	// field renamed, a challenge added. The password is not posted.
+	ErrFormChanged = errors.New("ffpc: sign-in form changed")
+	// ErrUnexpected is a sign-in that ends on a page we do not know.
+	ErrUnexpected = errors.New("ffpc: sign-in ended on an unknown page")
+	// ErrNoSuchLeague is a league id the member's My Teams page lacks.
+	ErrNoSuchLeague = errors.New("ffpc: not one of the member's leagues")
+)
+
+// Pace waits for a request's turn. *hosts.Gate paces every process
+// together; a local limiter paces one process (tests, a stand-in).
+type Pace interface {
+	Wait(ctx context.Context) error
+}
+
+// localPace is one process's pace.
+type localPace struct{ lim *rate.Limiter }
+
+func (p localPace) Wait(ctx context.Context) error {
+	r := p.lim.Reserve()
+	if d := r.Delay(); d > maxQueue {
+		r.Cancel()
+		return ErrBusy
+	}
+	t := time.NewTimer(r.Delay())
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		r.Cancel()
+		return ctx.Err()
+	}
+}
+
+// LocalPace is a pace of one request a gap within this process.
+func LocalPace(gap time.Duration) Pace { return localPace{lim: rate.NewLimiter(rate.Every(gap), 1)} }
+
+// MaxQueue is how long a read waits for its turn before it gives up.
+const MaxQueue = maxQueue
+
+// Cookies is a session as FFPC handed it back, by cookie name: every
+// cookie FFPC set, kept and sent back whole. FFPC's sign-in lives in
+// HttpOnly cookies a browser's script never shows, so no list of names
+// could be trusted to hold it.
+type Cookies map[string]string
+
+// names is the jar's cookie names, sorted: what a log may say of a
+// session, never a value.
+func (c Cookies) names() []string {
+	out := make([]string, 0, len(c))
+	for k := range c {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Client is FFPC over HTTP.
+type Client struct {
+	Base string
+	HTTP *http.Client
+	Pace Pace
+}
+
+// New is the client for FFPC's site.
+func New() *Client { return NewAt(BaseURL) }
+
+// NewAt is a client for another base, a test server.
+func NewAt(base string) *Client {
+	return &Client{
+		Base: strings.TrimRight(base, "/"),
+		HTTP: &http.Client{
+			Timeout: Timeout,
+			// Redirects are read, never followed: a redirect off a league
+			// page is a session FFPC no longer honors.
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		},
+		Pace: LocalPace(Gap),
+	}
+}
+
+func (c *Client) wait(ctx context.Context) error { return c.Pace.Wait(ctx) }
+
+// response is one answer: its status, where it sends us, its body and
+// the cookies it set, an expired one as an empty value.
+type response struct {
+	status   int
+	location string
+	body     []byte
+	set      Cookies
+}
+
+func (c *Client) do(ctx context.Context, method, path string, form url.Values, jar Cookies) (response, error) {
+	if err := c.wait(ctx); err != nil {
+		return response{}, err
+	}
+	var body io.Reader
+	if form != nil {
+		body = strings.NewReader(form.Encode())
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.Base+path, body)
+	if err != nil {
+		return response{}, fmt.Errorf("ffpc: request: %w", err)
+	}
+	req.Header.Set("User-Agent", UserAgent)
+	if form != nil {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
+	for _, name := range jar.names() {
+		req.AddCookie(&http.Cookie{Name: name, Value: jar[name]})
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		// The error names the path only; the jar never reaches it.
+		return response{}, fmt.Errorf("%w: %s %s", ErrUnavailable, method, pathOnly(path))
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, MaxPage+1))
+	if err != nil || len(raw) > MaxPage {
+		return response{}, fmt.Errorf("%w: %s body", ErrUnavailable, pathOnly(path))
+	}
+	return response{status: resp.StatusCode, location: resp.Header.Get("Location"), body: raw, set: setCookies(resp)}, nil
+}
+
+// setCookies is every cookie an answer set, a redirect's too (redirects
+// are read, not followed), with an expired one as an empty value.
+func setCookies(resp *http.Response) Cookies {
+	now := time.Now()
+	out := Cookies{}
+	for _, ck := range resp.Cookies() {
+		expired := ck.MaxAge < 0 || (!ck.Expires.IsZero() && ck.Expires.Before(now))
+		if expired {
+			out[ck.Name] = ""
+			continue
+		}
+		out[ck.Name] = ck.Value
+	}
+	return out
+}
+
+// merged is the jar with the answer's cookies laid over it, a new map.
+func merged(jar, set Cookies) Cookies {
+	out := Cookies{}
+	for k, v := range jar {
+		out[k] = v
+	}
+	for k, v := range set {
+		if v == "" {
+			delete(out, k)
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
+
+const (
+	loginPath   = "/account/Login.aspx"
+	myTeamsPath = "/MyTeams.aspx"
+	// The sign-in form's own field names (Login.aspx, 2026-10-13).
+	fieldUser   = "txtExistingUsername"
+	fieldPass   = "txtExistingPassword"
+	fieldSubmit = "btnSignIn"
+	submitValue = "SIGN IN"
+)
+
+// SignIn posts the member's email and password to FFPC's sign-in form,
+// with the hidden fields the form carries, and answers the session FFPC
+// sets. The password goes to FFPC and nowhere else.
+func (c *Client) SignIn(ctx context.Context, username, password string) (Cookies, []MyLeague, error) {
+	page, err := c.do(ctx, http.MethodGet, loginPath, nil, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	if page.status != http.StatusOK {
+		return nil, nil, fmt.Errorf("%w: sign-in page %d", ErrUnavailable, page.status)
+	}
+	form, err := signInForm(page.body)
+	if err != nil {
+		return nil, nil, err
+	}
+	form.Set(fieldUser, username)
+	form.Set(fieldPass, password)
+	form.Set(fieldSubmit, submitValue)
+	jar := merged(nil, page.set)
+	posted, err := c.do(ctx, http.MethodPost, loginPath, form, jar)
+	if err != nil {
+		return nil, nil, err
+	}
+	jar = merged(jar, posted.set)
+	// Signed in is My Teams answering: FFPC sends a signed-out visitor
+	// from it to the public front page.
+	leagues, err := c.MyTeams(ctx, jar)
+	switch {
+	case errors.Is(err, ErrSignedOut) && refused(posted):
+		return nil, nil, ErrBadSignIn
+	case errors.Is(err, ErrSignedOut), errors.Is(err, ErrNotThisPage):
+		// Names and status codes only: the operator's reason, never a value.
+		return nil, nil, fmt.Errorf("%w: post %d%s, then %v; cookies sent %s", ErrUnexpected,
+			posted.status, redirectTo(posted), err, strings.Join(jar.names(), ","))
+	case err != nil:
+		return nil, nil, err
+	}
+	return jar, leagues, nil
+}
+
+// refusedText is what FFPC's sign-in page says to a wrong email or
+// password (Login.aspx, 2026-10-13).
+const refusedText = "Invalid email/password"
+
+// refused reports a post FFPC answered with its sign-in page refusing
+// the email and password.
+func refused(r response) bool {
+	return r.status == http.StatusOK && bytes.Contains(r.body, []byte(refusedText))
+}
+
+// redirectTo is " to <path>" for a redirect, its query dropped, and
+// nothing otherwise.
+func redirectTo(r response) string {
+	if r.location == "" {
+		return ""
+	}
+	return " to " + pathOnly(r.location)
+}
+
+// signedOut reports an answer that sends a member's read away: to the
+// public front page, the sign-in page or My Teams.
+func signedOut(r response) bool {
+	if r.status < 300 || r.status >= 400 {
+		return false
+	}
+	loc := strings.ToLower(r.location)
+	return strings.Contains(loc, "/cms/public") || strings.Contains(loc, "login.aspx") || strings.Contains(loc, "myteams.aspx")
+}
+
+var ltuidShape = regexp.MustCompile(`^[0-9A-F]{3}-[0-9A-F]{12}$`)
+
+// ValidLTUID reports a league-team id of FFPC's shape, the only thing a
+// league page's address takes.
+func ValidLTUID(s string) bool { return ltuidShape.MatchString(s) }
+
+// Page is one league page as the member sees it: path is one of the
+// pages named in Pages, ltuid the member's own league-team id.
+func (c *Client) Page(ctx context.Context, jar Cookies, page PageName, ltuid string) ([]byte, Cookies, error) {
+	path, ok := pagePaths[page]
+	if !ok || !ValidLTUID(ltuid) {
+		return nil, jar, fmt.Errorf("ffpc: page %q", page)
+	}
+	r, err := c.do(ctx, http.MethodGet, path+"?ltuid="+url.QueryEscape(ltuid), nil, jar)
+	if err != nil {
+		return nil, jar, err
+	}
+	jar = merged(jar, r.set)
+	switch {
+	case signedOut(r):
+		return nil, jar, ErrSignedOut
+	case r.status != http.StatusOK:
+		return nil, jar, fmt.Errorf("%w: %s %d", ErrUnavailable, page, r.status)
+	}
+	return r.body, jar, nil
+}
+
+// MyTeams is the member's leagues.
+func (c *Client) MyTeams(ctx context.Context, jar Cookies) ([]MyLeague, error) {
+	r, err := c.do(ctx, http.MethodGet, myTeamsPath, nil, jar)
+	if err != nil {
+		return nil, err
+	}
+	if signedOut(r) {
+		return nil, fmt.Errorf("%w: my teams %d%s", ErrSignedOut, r.status, redirectTo(r))
+	}
+	if r.status != http.StatusOK {
+		return nil, fmt.Errorf("%w: my teams %d", ErrUnavailable, r.status)
+	}
+	return ParseMyTeams(r.body)
+}
+
+var ltuidInLocation = regexp.MustCompile(`(?i)ltuid=([0-9A-F]{3}-[0-9A-F]{12})`)
+
+// OpenLeague follows My Teams' own link to one of the member's leagues
+// (a postback, as the page's link does) and answers its league-team id.
+func (c *Client) OpenLeague(ctx context.Context, jar Cookies, leagueID string) (string, error) {
+	r, err := c.do(ctx, http.MethodGet, myTeamsPath, nil, jar)
+	if err != nil {
+		return "", err
+	}
+	if signedOut(r) {
+		return "", ErrSignedOut
+	}
+	leagues, err := ParseMyTeams(r.body)
+	if err != nil {
+		return "", err
+	}
+	target := ""
+	for _, l := range leagues {
+		if l.LeagueID == leagueID {
+			target = l.Target
+		}
+	}
+	if target == "" {
+		return "", ErrNoSuchLeague
+	}
+	form, err := hiddenFields(r.body, "form1")
+	if err != nil {
+		return "", err
+	}
+	form.Set("__EVENTTARGET", target)
+	form.Set("__EVENTARGUMENT", "")
+	posted, err := c.do(ctx, http.MethodPost, myTeamsPath, form, merged(jar, r.set))
+	if err != nil {
+		return "", err
+	}
+	if m := ltuidInLocation.FindStringSubmatch(posted.location); m != nil {
+		return strings.ToUpper(m[1]), nil
+	}
+	if m := ltuidInLocation.FindStringSubmatch(string(posted.body)); m != nil {
+		return strings.ToUpper(m[1]), nil
+	}
+	return "", ErrNotThisPage
+}
+
+// hiddenFields is the hidden inputs of the form with the id: ASP.NET's
+// view state and its kin, which a post must echo.
+func hiddenFields(page []byte, formID string) (url.Values, error) {
+	doc, err := parse(page)
+	if err != nil {
+		return nil, err
+	}
+	form := first(doc, func(n *node) bool { return isTag(n, "form") && attr(n, "id") == formID })
+	if form == nil {
+		return nil, ErrNotThisPage
+	}
+	out := url.Values{}
+	for _, in := range all(form, tag("input")) {
+		if strings.EqualFold(attr(in, "type"), "hidden") && attr(in, "name") != "" {
+			out.Set(attr(in, "name"), attr(in, "value"))
+		}
+	}
+	return out, nil
+}
+
+// pathOnly is a path without its query: a league-team id never reaches
+// an error or a log.
+func pathOnly(path string) string {
+	p, _, _ := strings.Cut(path, "?")
+	return p
+}

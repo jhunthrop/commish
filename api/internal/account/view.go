@@ -20,7 +20,7 @@ import (
 type Entitlements interface {
 	Features(ctx context.Context, accountID uuid.UUID, now time.Time) ([]entitlements.Feature, error)
 	LivePass(ctx context.Context, accountID uuid.UUID, now time.Time) (*entitlements.Pass, error)
-	LatestMembership(ctx context.Context, accountID uuid.UUID) (*entitlements.Membership, error)
+	AccountMembership(ctx context.Context, accountID uuid.UUID, now time.Time) (*entitlements.HeldMembership, error)
 }
 
 // Viewer builds Account answers.
@@ -34,7 +34,7 @@ type Viewer struct {
 
 // Leagues is the part of the league sync store the account answer reads.
 type Leagues interface {
-	Newest(ctx context.Context, accountID uuid.UUID) (*uuid.UUID, error)
+	Newest(ctx context.Context, accountID uuid.UUID) (*uuid.UUID, int, error)
 }
 
 // View is a's Account answer at now.
@@ -48,7 +48,7 @@ func (v *Viewer) View(ctx context.Context, a auth.Account) (apitypes.Account, er
 	if err != nil {
 		return apitypes.Account{}, fmt.Errorf("account: view %s: %w", a.ID, err)
 	}
-	membership, err := v.Entitlements.LatestMembership(ctx, a.ID)
+	membership, err := v.Entitlements.AccountMembership(ctx, a.ID, now)
 	if err != nil {
 		return apitypes.Account{}, fmt.Errorf("account: view %s: %w", a.ID, err)
 	}
@@ -56,15 +56,16 @@ func (v *Viewer) View(ctx context.Context, a auth.Account) (apitypes.Account, er
 		features = []entitlements.Feature{}
 	}
 	var league *uuid.UUID
+	var count int
 	if v.Leagues != nil {
-		if league, err = v.Leagues.Newest(ctx, a.ID); err != nil {
+		if league, count, err = v.Leagues.Newest(ctx, a.ID); err != nil {
 			return apitypes.Account{}, fmt.Errorf("account: view %s: %w", a.ID, err)
 		}
 	}
 	return apitypes.Account{
 		Id: a.ID, Email: a.Email, FirstName: a.FirstName, LastName: a.LastName, Handle: a.Handle,
 		Features: features, DraftPass: passView(pass), Membership: membershipView(membership),
-		LeagueId: league, CreatedAt: a.CreatedAt,
+		LeagueId: league, LeagueCount: count, CreatedAt: a.CreatedAt,
 	}, nil
 }
 
@@ -77,13 +78,20 @@ func passView(p *entitlements.Pass) *apitypes.DraftPassState {
 	}
 }
 
-func membershipView(m *entitlements.Membership) *apitypes.MembershipState {
+func membershipView(m *entitlements.HeldMembership) *apitypes.MembershipState {
 	if m == nil {
 		return nil
 	}
 	out := &apitypes.MembershipState{
-		Status: m.Status, CurrentPeriodEnd: m.CurrentPeriodEnd, CancelAtPeriodEnd: m.CancelAtPeriodEnd,
+		Source: apitypes.MembershipStateSource(m.Source), Status: m.Status,
+		StartsAt: m.StartsAt, EndsAt: m.EndsAt,
 	}
+	if m.Source != entitlements.SourceSubscription {
+		// A grant bought nothing: no interval, no period, nothing to cancel.
+		return out
+	}
+	cancel := m.CancelAtPeriodEnd
+	out.CurrentPeriodEnd, out.CancelAtPeriodEnd = m.CurrentPeriodEnd, &cancel
 	if m.Interval != nil {
 		iv := apitypes.Interval(*m.Interval)
 		out.Interval = &iv

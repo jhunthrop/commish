@@ -34,7 +34,10 @@ type Row struct {
 	// empty for a mock draft.
 	SeatNames []string
 	// DraftName is the draft's name on the host, empty when it has none.
-	DraftName    string
+	DraftName string
+	// TeamKey is the member's own league-team id on a host whose pages
+	// are keyed by it (FFPC's ltuid), empty elsewhere.
+	TeamKey      string
 	Settings     apitypes.LeagueSettings
 	Status       string
 	LastHostPick int
@@ -46,13 +49,14 @@ type Row struct {
 type Store struct{ Pool *pgxpool.Pool }
 
 const rowColumns = `id, account_id, host, host_draft_id, coalesce(host_league_id, ''), replay, seat,
-	coalesce(host_username, ''), seat_names, draft_name, settings, status, last_host_pick, created_at, finished_at`
+	coalesce(host_username, ''), seat_names, draft_name, settings, status, last_host_pick, created_at, finished_at,
+	coalesce(host_team_key, '')`
 
 func scanRow(row pgx.Row) (Row, error) {
 	var r Row
 	var settings []byte
 	err := row.Scan(&r.ID, &r.AccountID, &r.Host, &r.HostDraftID, &r.HostLeagueID, &r.Replay, &r.Seat, &r.HostUsername, &r.SeatNames, &r.DraftName, &settings,
-		&r.Status, &r.LastHostPick, &r.CreatedAt, &r.FinishedAt)
+		&r.Status, &r.LastHostPick, &r.CreatedAt, &r.FinishedAt, &r.TeamKey)
 	if err != nil {
 		return Row{}, err
 	}
@@ -79,18 +83,18 @@ func (s *Store) Upsert(ctx context.Context, r Row) (Row, error) {
 		return Row{}, fmt.Errorf("companion: encode settings: %w", err)
 	}
 	out, err := scanRow(s.Pool.QueryRow(ctx, `
-		insert into app.companions (account_id, host, host_draft_id, host_league_id, replay, seat, settings, status, last_host_pick, host_username, seat_names, draft_name)
-		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		insert into app.companions (account_id, host, host_draft_id, host_league_id, replay, seat, settings, status, last_host_pick, host_username, seat_names, draft_name, host_team_key)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, nullif($13, ''))
 		on conflict (account_id, host, host_draft_id, replay) do update set
 		  seat = excluded.seat, settings = excluded.settings, host_league_id = excluded.host_league_id,
 		  host_username = excluded.host_username, seat_names = excluded.seat_names, draft_name = excluded.draft_name,
-		  status = excluded.status, last_host_pick = excluded.last_host_pick,
+		  status = excluded.status, last_host_pick = excluded.last_host_pick, host_team_key = excluded.host_team_key,
 		  report = case when excluded.replay or app.companions.seat <> excluded.seat then null else app.companions.report end,
 		  created_at = case when excluded.replay then now() else app.companions.created_at end,
 		  finished_at = null
 		returning `+rowColumns,
 		r.AccountID, r.Host, r.HostDraftID, nullable(r.HostLeagueID), r.Replay, r.Seat, settings, r.Status, r.LastHostPick,
-		nullable(r.HostUsername), seatNamesOrEmpty(r.SeatNames), r.DraftName))
+		nullable(r.HostUsername), seatNamesOrEmpty(r.SeatNames), r.DraftName, r.TeamKey))
 	if err != nil {
 		return Row{}, fmt.Errorf("companion: upsert %s: %w", r.HostDraftID, err)
 	}

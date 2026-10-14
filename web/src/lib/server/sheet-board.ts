@@ -8,7 +8,8 @@ import { apiFormatOf } from '#lib/run/catalog.ts';
 import type { DirectoryPlayer } from '#lib/sheet/directory.ts';
 import type { LeagueBoardFile } from '#lib/run/league-board.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
-import { board, formatById, index, manifest, player } from './run.ts';
+import { withSeasons } from './board-season.ts';
+import { board, manifest, seasonReach } from './run.ts';
 
 /** The run's formats the sheet can read, by the sheet's name, each with its run format id. */
 async function sheetFormats(): Promise<Map<BoardFormat, string>> {
@@ -27,13 +28,10 @@ export async function sheetBoardFormats(): Promise<BoardFormat[]> {
 	return [...(await sheetFormats()).keys()];
 }
 
-/** What every player's season figures are: the one format and the one through week every season
- * block in the run shares, which the run's reader holds them to (season-checks.ts). */
+/** What every player's season figures are, as the league page's board file carries it. */
 async function seasonBasis(): Promise<LeagueBoardFile['season']> {
-	const [first] = await index();
-	if (!first) throw new Error('The run indexes no players.');
-	const { season } = await player(first.id);
-	return { scoring: (await formatById(season.format)).label, through: season.through };
+	const { scoring, through } = await seasonReach();
+	return { scoring, through };
 }
 
 /** The run's whole board for a sheet format, its format with it and each player's season so far, or
@@ -41,21 +39,10 @@ async function seasonBasis(): Promise<LeagueBoardFile['season']> {
 export async function runBoardFor(format: BoardFormat): Promise<LeagueBoardFile | null> {
 	const id = (await sheetFormats()).get(format);
 	if (id === undefined) return null;
-	const [loaded, { formats }, entries, season] = await Promise.all([
-		board(id),
-		manifest(),
-		index(),
-		seasonBasis()
-	]);
+	const [loaded, { formats }, season] = await Promise.all([board(id), manifest(), seasonBasis()]);
 	const run = formats.find((f) => f.id === id);
 	if (!run) return null;
-	const seasons = new Map(entries.map((entry) => [entry.id, entry.season] as const));
-	const rows = loaded.rows.map((row) => {
-		const own = seasons.get(row.id);
-		if (!own) throw new Error(`${row.name} is on the ${id} board but not in index.json.`);
-		return { ...row, season: own };
-	});
-	return { format: run, rows, season };
+	return { format: run, rows: await withSeasons(loaded.rows, id), season };
 }
 
 /** Our board for a sheet format, best first by our rank, or null when the run has none for it. */

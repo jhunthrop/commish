@@ -13,6 +13,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leagues"
 )
@@ -31,11 +32,11 @@ const (
 // Links is the part of Store the handlers use.
 type Links interface {
 	Find(ctx context.Context, accountID uuid.UUID, ref Ref) (Link, bool, error)
-	Save(ctx context.Context, l Link) (Link, error)
+	Save(ctx context.Context, l Link, many bool) (Link, error)
 	Get(ctx context.Context, accountID, id uuid.UUID) (Link, error)
 	Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, error)
 	Detach(ctx context.Context, accountID, id uuid.UUID) error
-	Restore(ctx context.Context, accountID, id uuid.UUID) (Link, error)
+	Restore(ctx context.Context, accountID, id uuid.UUID, many bool) (Link, error)
 	Touch(ctx context.Context, accountID, id uuid.UUID, at time.Time) error
 	Linked(ctx context.Context, ref Ref) (bool, error)
 }
@@ -69,8 +70,14 @@ type Service struct {
 	Links     Links
 	Saved     SavedLeagues
 	Boards    BoardSource
-	Now       func() time.Time
-	Log       *slog.Logger
+	// Entitlements answers many_leagues: one live league is free.
+	Entitlements Checker
+	// FFPC is the FFPC host when it is set up (HOST_CREDENTIALS_KEY), nil
+	// otherwise; it is also among Hosts, which reads it on the poll.
+	FFPC *FFPC
+
+	Now func() time.Time
+	Log *slog.Logger
 }
 
 // Routes is every route this package serves.
@@ -89,8 +96,11 @@ func (s *Service) Routes() []httpx.Route {
 
 // hostWords is a host's name as a sentence says it.
 func hostWords(host string) string {
-	if host == HostMFL {
+	switch host {
+	case HostMFL:
 		return "MyFantasyLeague"
+	case HostFFPC:
+		return "FFPC"
 	}
 	return "Sleeper"
 }
@@ -108,6 +118,9 @@ const (
 
 // writeHostError says what went wrong reading the league, in our words.
 func (s *Service) writeHostError(w http.ResponseWriter, r *http.Request, host string, err error) {
+	if writeFFPCError(w, r, err) {
+		return
+	}
 	switch {
 	case errors.Is(err, ErrNotALink):
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: linkWords})
@@ -159,6 +172,11 @@ func (s *Service) preview(w http.ResponseWriter, r *http.Request) {
 	}
 	h, ref, ok := s.resolve(w, r, in.Host, in.Link)
 	if !ok {
+		return
+	}
+	if h.Key() == HostFFPC {
+		// An FFPC league is picked from the member's own list, read as them.
+		httpx.WriteInvalid(w, r, map[string]string{fieldLink: ffpcPickWords})
 		return
 	}
 	read, err := s.readFor(r.Context(), auth.AccountID(r), ref)
@@ -265,7 +283,8 @@ func (s *Service) attached(w http.ResponseWriter, r *http.Request) {
 	for _, a := range list {
 		out = append(out, apitypes.AttachedLeague{
 			Id: a.ID, Host: apitypes.LeagueHost(a.Ref.Host), HostLeagueId: a.Ref.LeagueID, Season: a.Season,
-			Name: a.Name, RosterId: a.RosterID, TeamName: a.TeamName, AttachedAt: a.AttachedAt,
+			Name: a.Name, RosterId: a.RosterID, TeamName: a.TeamName, Standing: standingOf(a.Teams, a.RosterID),
+			AttachedAt: a.AttachedAt,
 		})
 	}
 	httpx.WriteOK(w, r, http.StatusOK, out)
@@ -311,13 +330,18 @@ func (s *Service) restore(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	_, err := s.Links.Restore(r.Context(), auth.AccountID(r), id)
+	ctx := r.Context()
+	accountID := auth.AccountID(r)
+	many, err := s.Entitlements.Can(ctx, accountID, entitlements.ManyLeagues, s.Now())
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "leaguesync: can many leagues", err)
+		return
+	}
+	_, err = s.Links.Restore(ctx, accountID, id, many)
 	switch {
 	case errors.Is(err, ErrLinkNotFound):
 		httpx.WriteNotFound(w, r)
-	case errors.Is(err, ErrTooMany):
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict,
-			fmt.Sprintf("You follow %d leagues, the most allowed. Detach one first", MaxLinksPerAccount), nil)
+	case writeCapError(w, r, err):
 	case err != nil:
 		httpx.WriteInternal(w, r, s.Log, "leaguesync: restore", err)
 	default:

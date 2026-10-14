@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
+	import { scoringBasis } from '#lib/run/catalog.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import type { SystemNightly } from '#lib/server/pages/system.ts';
 	import { runStampText, type RunStamp } from '#lib/run/stamp.ts';
@@ -225,7 +226,7 @@
 			<PanelHead title="Basis" />
 			<BasisList
 				terms={[
-					{ term: 'Scoring', means: page.format.basis[0] ?? page.format.label },
+					{ term: 'Scoring', means: scoringBasis(page.format) },
 					{ term: 'Rose', means: 'Below replacement' }
 				]}
 			/>

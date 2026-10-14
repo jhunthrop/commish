@@ -7,6 +7,7 @@
 import { DEFAULT_TEAMS } from '#lib/format/draft.ts';
 import { FORMAT_LABELS, parseFormat } from '#lib/sheet/format.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
+import type { Format } from './schema.ts';
 
 /** The chooser's formats, in the order the chips draw. */
 export const CHOOSER_FORMATS = [
@@ -32,6 +33,11 @@ export function apiFormatOf(format: { id: string; teams: number }): BoardFormat 
 	const suffix = `-${String(DEFAULT_TEAMS)}`;
 	if (format.teams !== DEFAULT_TEAMS || !format.id.endsWith(suffix)) return null;
 	return parseFormat(format.id.slice(0, -suffix.length).replaceAll('-', '_'));
+}
+
+/** A format's scoring and season as its basis names them: "PPR, full 2026 season". */
+export function scoringBasis(format: Format): string {
+	return format.basis[0] ?? format.label;
 }
 
 /** The chooser's formats as run format ids and chip words. */

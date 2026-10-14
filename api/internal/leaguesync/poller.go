@@ -37,10 +37,15 @@ type SnapshotStore interface {
 	PutSnapshot(ctx context.Context, snap Snapshot) error
 }
 
-// Read is a snapshot and how stale it is (poll.Read's rule).
+// Read is a snapshot and how stale it is (poll.Read's rule). Failed is a
+// stale read whose last try failed, never a kept read waiting on the next;
+// SignedOut is one that failed because no member of the league is signed
+// in to the host, so a sign-in mends it.
 type Read struct {
 	Snapshot
-	Stale time.Duration
+	Stale     time.Duration
+	Failed    bool
+	SignedOut bool
 }
 
 // Poller shares one upstream read per league between every viewer.
@@ -83,6 +88,9 @@ func (p *Poller) Refresh(ctx context.Context, ref Ref) (Read, error) {
 
 func (p *Poller) read(ctx context.Context, ref Ref, gap time.Duration, mode poll.Mode) (Read, error) {
 	host, ok := p.Hosts.ByKey(ref.Host)
+	if !ok && ref.Host == HostFFPC {
+		return Read{}, ErrHostOff
+	}
 	if !ok {
 		return Read{}, ErrNotALink
 	}
@@ -97,7 +105,13 @@ func (p *Poller) read(ctx context.Context, ref Ref, gap time.Duration, mode poll
 	}
 	snap := r.Value
 	snap.ReadAt = r.At
-	return Read{Snapshot: snap, Stale: r.Stale}, nil
+	failed := r.Stale > 0 && r.Err != nil
+	return Read{Snapshot: snap, Stale: r.Stale, Failed: failed, SignedOut: failed && signedOut(r.Err)}, nil
+}
+
+// signedOut reports whether a read failed for want of a signed-in member.
+func signedOut(err error) bool {
+	return errors.Is(err, ErrNotConnected) || errors.Is(err, ErrSignInAgain)
 }
 
 // Keep stores a good read; the store keeps it only for a linked league,
@@ -109,6 +123,10 @@ func (p *Poller) Keep(snap Snapshot) {
 		p.Log.Warn("leaguesync: keep snapshot", "league", snap.Ref.Key(), "err", err)
 	}
 }
+
+// Prime gives the poller a read made outside it (an FFPC attach, read as
+// the attaching member), so the first view answers it fresh.
+func (p *Poller) Prime(snap Snapshot) { p.shared().Prime(snap.Ref.Key(), snap, snap.ReadAt) }
 
 // snapshots is the store as poll keeps reads: by the league's key.
 type snapshots struct{ store SnapshotStore }

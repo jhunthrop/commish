@@ -13,7 +13,8 @@
 		teams?: number;
 		/** Whose draft the strip is told for: your own, or a draft someone shared with you. */
 		whose?: 'your' | 'their';
-		/** The room keeps a queue: off for a draft followed on another host, which has none here. */
+		/** Say how many came from the queue: off for a draft followed on another host, which has none
+		 * here, and for a drafter whose queue is empty. */
 		queue?: boolean;
 	}
 

@@ -22,6 +22,10 @@
 		onenter?: () => void;
 		/** Takes focus when it appears, for a field opened by a tap. */
 		autofocus?: boolean;
+		/** What the field takes: a password is masked and never offered back. */
+		kind?: 'text' | 'email' | 'password';
+		/** The browser's autofill hint, "username" or "current-password". */
+		autocomplete?: AutoFill;
 	}
 
 	let {
@@ -38,7 +42,9 @@
 		onkeydown,
 		autofocus = false,
 		list,
-		onenter
+		onenter,
+		kind = 'text',
+		autocomplete
 	}: Props = $props();
 
 	function focusOnMount(node: HTMLElement): void {
@@ -61,7 +67,8 @@
 	{:else}
 		<input
 			bind:value
-			type="text"
+			type={kind}
+			{autocomplete}
 			{maxlength}
 			{placeholder}
 			{list}

@@ -35,6 +35,10 @@ func (s *Service) create(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
 		return
 	}
+	if in.Host == apitypes.CompanionHostFfpc {
+		s.createFFPC(w, r, in)
+		return
+	}
 	replay := in.Replay != nil && *in.Replay
 	draftID, errs := s.checkCreate(in, replay)
 	if errs != nil {

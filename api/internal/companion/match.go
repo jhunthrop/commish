@@ -23,7 +23,14 @@ type Matcher interface {
 const (
 	MatchExact      = "exact"
 	MatchNormalized = "normalized"
+	// MatchPrefix places a name a host's board cut short ("Jaxon
+	// Smith-Nji..."): the one board player at the position and team whose
+	// name starts with it.
+	MatchPrefix = "prefix"
 )
+
+// minPrefix is the shortest cut name the prefix rule trusts.
+const minPrefix = 8
 
 // NameMatcher matches by exact name and position first, then by the name
 // with punctuation, case and a generational suffix (Jr, Sr, II to V)
@@ -34,12 +41,17 @@ type NameMatcher struct {
 	raw    *boards.Raw
 	exact  map[string]string
 	folded map[string]string
+	byTeam map[string][]teamName
 }
 
 type nameIndex struct {
 	exact  map[string]string
 	folded map[string]string
+	// byTeam is each position and team's players, for the prefix rule.
+	byTeam map[string][]teamName
 }
+
+type teamName struct{ folded, id string }
 
 // ambiguous marks a key two players share.
 const ambiguous = ""
@@ -53,7 +65,7 @@ func put(m map[string]string, key, id string) {
 }
 
 func buildIndex(raw *boards.Raw) nameIndex {
-	idx := nameIndex{exact: map[string]string{}, folded: map[string]string{}}
+	idx := nameIndex{exact: map[string]string{}, folded: map[string]string{}, byTeam: map[string][]teamName{}}
 	for _, p := range raw.Players {
 		if p.Position == draft.DEF {
 			put(idx.exact, defenseKey(p.Team), p.ID)
@@ -61,6 +73,8 @@ func buildIndex(raw *boards.Raw) nameIndex {
 		}
 		put(idx.exact, string(p.Position)+"|"+p.Name, p.ID)
 		put(idx.folded, string(p.Position)+"|"+FoldName(p.Name), p.ID)
+		key := string(p.Position) + "|" + strings.ToUpper(p.Team)
+		idx.byTeam[key] = append(idx.byTeam[key], teamName{folded: FoldName(p.Name), id: p.ID})
 	}
 	return idx
 }
@@ -70,9 +84,9 @@ func (m *NameMatcher) index(raw *boards.Raw) nameIndex {
 	defer m.mu.Unlock()
 	if m.raw != raw {
 		idx := buildIndex(raw)
-		m.raw, m.exact, m.folded = raw, idx.exact, idx.folded
+		m.raw, m.exact, m.folded, m.byTeam = raw, idx.exact, idx.folded, idx.byTeam
 	}
-	return nameIndex{exact: m.exact, folded: m.folded}
+	return nameIndex{exact: m.exact, folded: m.folded, byTeam: m.byTeam}
 }
 
 // Match is the board id of the host's pick and which rule placed him.
@@ -86,8 +100,29 @@ func (m *NameMatcher) Match(raw *boards.Raw, p sleeper.Pick) (string, string, bo
 	if id := idx.exact[string(pos)+"|"+p.Name]; id != ambiguous {
 		return id, MatchExact, true
 	}
-	id := idx.folded[string(pos)+"|"+FoldName(p.Name)]
-	return id, MatchNormalized, id != ambiguous
+	if id := idx.folded[string(pos)+"|"+FoldName(p.Name)]; id != ambiguous {
+		return id, MatchNormalized, true
+	}
+	return prefixMatch(idx, pos, p)
+}
+
+// prefixMatch is the one player at the pick's position and team whose
+// folded name starts with the pick's, for a name the host cut short.
+func prefixMatch(idx nameIndex, pos draft.Position, p sleeper.Pick) (string, string, bool) {
+	cut := FoldName(p.Name)
+	if len(cut) < minPrefix || p.Team == "" {
+		return "", "", false
+	}
+	found := ""
+	for _, c := range idx.byTeam[string(pos)+"|"+strings.ToUpper(p.Team)] {
+		if strings.HasPrefix(c.folded, cut) {
+			if found != "" && found != c.id {
+				return "", "", false
+			}
+			found = c.id
+		}
+	}
+	return found, MatchPrefix, found != ""
 }
 
 func defenseKey(team string) string { return "DEF|" + strings.ToUpper(team) }

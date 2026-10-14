@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { railLeague } from '#lib/account/rail-league.svelte.ts';
 	import { runStampText } from '#lib/run/stamp.ts';
 	import RowSheetMark from '#lib/site/RowSheetMark.svelte';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
 	import Figure from '#lib/ui/Figure.svelte';
+	import Footnote from '#lib/ui/Footnote.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
@@ -26,6 +28,10 @@
 	const headline = $derived(page.record);
 
 	onMount(() => lazySheet.armOnFirstIntent(window));
+
+	/** A member who follows a league is sent back to it, the newest when there are several; anyone
+	 * else to follow one. */
+	const leagueId = $derived(railLeague.account?.leagueId ?? null);
 </script>
 
 <svelte:head>
@@ -38,14 +44,18 @@
 
 <SiteShell title="Draft prep" run={data.run}>
 	<main class="front">
-		<HeroCard title="Our {data.run.season} board, ready for your draft">
+		<HeroCard title="Our {data.run.season} board, for your draft and your league">
 			{#snippet meta()}
 				<span>{format.basis.join(' · ')} · {runStampText(data.run)}</span>
 			{/snippet}
 			{#snippet aside()}
 				<Verb href={sectionHref('mock')} size="lg" fill>Start a mock draft</Verb>
+				{#if leagueId}
+					<Quiet href={links.league(leagueId)} size="lg" fill>Open your league</Quiet>
+				{:else}
+					<Quiet href={links.leagueNew()} size="lg" fill>Follow your league</Quiet>
+				{/if}
 				<Quiet href={sectionHref('sheet')} size="lg" fill>Build your cheat sheet</Quiet>
-				<Quiet href={links.leagueNew()} size="lg" fill>Follow your league</Quiet>
 			{/snippet}
 		</HeroCard>
 
@@ -56,6 +66,7 @@
 					aside="{page.rows.length} of {page.boardSize}"
 					level={2}
 				/>
+				{#if page.seasonLead !== null}<Footnote>{page.seasonLead}</Footnote>{/if}
 				<div class="rows">
 					<RowHead range={false} action />
 					{#each page.rows as player, i (player.id)}
@@ -67,6 +78,7 @@
 							unit={format.unit}
 							range={false}
 							eager={i < EAGER_ROWS}
+							season={player.season}
 						>
 							{#snippet action()}<RowSheetMark {player} />{/snippet}
 						</Row>

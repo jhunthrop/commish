@@ -47,6 +47,7 @@
 	--tab-bar-h: 64px; /* the phone's tab bar, the rail laid along the bottom */
 	--rail-w: 84px;
 	--side-w: 296px;
+	--form-w: 420px; /* a form's column: its fields, its consent and the choice above it */
 	--r-sm: 4px;
 	--r-md: 8px;
 	--r-pill: 999px;
@@ -88,6 +89,9 @@
 	--gain-ink: #11663a;
 	--loss-bg: #fbe1e4;
 	--loss-ink: #a3243a;
+	/* A player's status on his face: injured reserve, a solid tag at the photo's top left. */
+	--status-ir-bg: #a3243a;
+	--status-ir-ink: #ffffff;
 
 	/* Tiers run hot to cold down the board. Each band's label carries the tier number
      and the drop to the next tier, so the colour is never the only channel. */
@@ -151,6 +155,8 @@
 		--gain-ink: #6fdc99;
 		--loss-bg: #3a161c;
 		--loss-ink: #ff8f9f;
+		--status-ir-bg: #ff8f9f;
+		--status-ir-ink: #1a0a0d;
 		--tier-1: #cf3350;
 		--tier-2: #c0338a;
 		--tier-3: #8d52cc;
@@ -197,6 +203,8 @@
 	--gain-ink: #6fdc99;
 	--loss-bg: #3a161c;
 	--loss-ink: #ff8f9f;
+	--status-ir-bg: #ff8f9f;
+	--status-ir-ink: #1a0a0d;
 	--tier-1: #cf3350;
 	--tier-2: #c0338a;
 	--tier-3: #8d52cc;

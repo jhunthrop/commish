@@ -25,7 +25,7 @@ func (s *Service) recent(w http.ResponseWriter, r *http.Request) {
 	out := make([]apitypes.CompanionSummary, 0, len(rows))
 	for _, row := range rows {
 		v := apitypes.CompanionSummary{
-			Id: row.ID, HostDraftId: row.HostDraftID, Name: row.DraftName, Slot: row.Seat, Replay: row.Replay,
+			Id: row.ID, Host: apitypes.CompanionHost(row.Host), HostDraftId: row.HostDraftID, Name: row.DraftName, Slot: row.Seat, Replay: row.Replay,
 			Status: apitypes.CompanionStatus(row.Status), CreatedAt: row.CreatedAt,
 		}
 		if row.HostUsername != "" {

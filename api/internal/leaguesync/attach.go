@@ -3,7 +3,6 @@ package leaguesync
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -38,11 +37,19 @@ func (s *Service) attach(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
 		return
 	}
+	if in.Host != nil && *in.Host == apitypes.LeagueHostFfpc {
+		s.attachFFPC(w, r, in)
+		return
+	}
 	if errs := checkSeat(in.Me); errs != nil {
 		httpx.WriteInvalid(w, r, errs)
 		return
 	}
 	h, ref, ok := s.resolve(w, r, in.Host, in.Link)
+	if !ok {
+		return
+	}
+	many, ok := s.admitLeague(w, r, ref)
 	if !ok {
 		return
 	}
@@ -58,10 +65,8 @@ func (s *Service) attach(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	accountID := auth.AccountID(r)
-	link, err := s.save(ctx, accountID, read.Snapshot, roster)
-	if errors.Is(err, ErrTooMany) {
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict,
-			fmt.Sprintf("You have attached %d leagues, the most allowed. Detach one first", MaxLinksPerAccount), nil)
+	link, err := s.save(ctx, accountID, read.Snapshot, roster, "", many)
+	if writeCapError(w, r, err) {
 		return
 	}
 	if err != nil {
@@ -99,7 +104,7 @@ func (s *Service) writeSeatError(w http.ResponseWriter, r *http.Request, host st
 // save writes the saved league a mock reruns from (when a mock room can
 // draft the league) and the link. A saved league made here is deleted
 // again if the link cannot be written.
-func (s *Service) save(ctx context.Context, accountID uuid.UUID, snap Snapshot, roster int) (Link, error) {
+func (s *Service) save(ctx context.Context, accountID uuid.UUID, snap Snapshot, roster int, teamKey string, many bool) (Link, error) {
 	prev, found, err := s.Links.Find(ctx, accountID, snap.Ref)
 	if err != nil {
 		return Link{}, err
@@ -113,7 +118,7 @@ func (s *Service) save(ctx context.Context, accountID uuid.UUID, snap Snapshot, 
 		return Link{}, err
 	}
 	at := snap.ReadAt
-	link, err := s.Links.Save(ctx, Link{AccountID: accountID, LeagueID: leagueID, Ref: snap.Ref, RosterID: roster, LastReadAt: &at})
+	link, err := s.Links.Save(ctx, Link{AccountID: accountID, LeagueID: leagueID, Ref: snap.Ref, RosterID: roster, LastReadAt: &at, TeamKey: teamKey}, many)
 	if err != nil && made && leagueID != nil {
 		if derr := s.Saved.Delete(ctx, accountID, *leagueID); derr != nil {
 			s.Log.Warn("leaguesync: undo saved league", "league", *leagueID, "err", derr)

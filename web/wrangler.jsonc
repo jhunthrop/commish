@@ -10,8 +10,12 @@
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
 	},
-	// The workers.dev preview is the deploy target until cutover. The custom domain route on
-	// trycommish.app is added at cutover (spec §10), not here.
+	// Cutover 2026-10-13 (founder: rip and replace): the apex and www are custom domains on this
+	// Worker; wrangler keeps their DNS records. The workers.dev preview stays for checks.
+	"routes": [
+		{ "pattern": "trycommish.app", "custom_domain": true },
+		{ "pattern": "www.trycommish.app", "custom_domain": true }
+	],
 	"workers_dev": true,
 	"preview_urls": true,
 	"observability": {

@@ -33,10 +33,12 @@
 		type Arrival
 	} from './arrival.ts';
 	import AccountLeagues from '#lib/league/AccountLeagues.svelte';
+	import AccountConnections from '#lib/hosts/AccountConnections.svelte';
+	import AccountDevices from '#lib/hosts/AccountDevices.svelte';
 	import GroupPasses from './GroupPasses.svelte';
 	import { accountLinks } from './links.ts';
 	import { hasFeature } from './features.ts';
-	import { displayName, mockLine, planWords, sheetLine } from './words.ts';
+	import { boughtMembership, displayName, mockLine, planWords, sheetLine } from './words.ts';
 
 	/** Your account: who you are, your sheets and mocks, your pass or membership with its one-click
 	 * cancel, and sign out. Signed out, the sign-in verb and what an account keeps. The shell is
@@ -171,7 +173,7 @@
 <Shell title="Account">
 	{#snippet tail()}
 		{#if view?.kind === 'signed-in'}
-			<Verb href={sectionHref('mock')}>Start a mock draft</Verb>
+			<Quiet href={sectionHref('mock')}>Start a mock draft</Quiet>
 		{/if}
 	{/snippet}
 	<main class="account" aria-busy={view === null}>
@@ -237,7 +239,9 @@
 						{/if}
 					</section>
 
-					<AccountLeagues />
+					<AccountLeagues features={account.features} />
+					<AccountConnections />
+					<AccountDevices />
 
 					{#if groupPasses.length > 0}
 						<GroupPasses
@@ -269,7 +273,7 @@
 							<Quiet href={accountLinks.pass()}>See the Draft Pass</Quiet>
 						{/if}
 						<!-- Receipts are a purchase question, not a feature one: a claimer's pass has none. -->
-						{#if account.membership !== null || account.draft_pass?.source === 'purchase' || groupPasses.length > 0}
+						{#if boughtMembership(account) || account.draft_pass?.source === 'purchase' || groupPasses.length > 0}
 							<Quiet disabled={busy} onclick={() => void billing()}>Billing and receipts</Quiet>
 						{/if}
 						<Quiet disabled={busy} onclick={() => void signOut()}>Sign out</Quiet>
@@ -278,7 +282,7 @@
 				</aside>
 			</div>
 		{/if}
-		<!-- The phone's top bar leaves the theme switch out. It lives here, signed in or out. -->
+		<!-- The theme switch lives here at every width, signed in or out, and on no page bar. -->
 		<section class="theme" aria-label="Theme">
 			<PanelHead title="Theme" level={2} />
 			<ThemeSwitch />
@@ -292,7 +296,6 @@
 		flex-direction: column;
 		gap: var(--s-5);
 		padding: var(--s-5);
-		max-width: 1180px;
 	}
 
 	.reserve {
@@ -300,16 +303,10 @@
 	}
 
 	.theme {
-		display: none;
-	}
-
-	@media (max-width: 760px) {
-		.theme {
-			display: flex;
-			flex-direction: column;
-			align-items: flex-start;
-			gap: var(--s-3);
-		}
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--s-3);
 	}
 
 	.grid {

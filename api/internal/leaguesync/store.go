@@ -18,8 +18,27 @@ var ErrLinkNotFound = errors.New("leaguesync: link not found")
 // ErrTooMany is an attach past MaxLinksPerAccount.
 var ErrTooMany = errors.New("leaguesync: too many leagues")
 
+// ErrManyLeagues is a second live league for an account without the
+// many_leagues feature (the Draft Pass, and the Membership with it).
+var ErrManyLeagues = errors.New("leaguesync: a second league needs many_leagues")
+
 // MaxLinksPerAccount bounds the leagues one account attaches.
 const MaxLinksPerAccount = 20
+
+// MostFree is the live leagues an account follows without many_leagues.
+const MostFree = 1
+
+// overCap says why one more live league is refused when the account
+// already follows n others, nil when it is not.
+func overCap(n int, many bool) error {
+	switch {
+	case !many && n >= MostFree:
+		return ErrManyLeagues
+	case n >= MaxLinksPerAccount:
+		return ErrTooMany
+	}
+	return nil
+}
 
 // Link is one account's attachment to a host league.
 type Link struct {
@@ -30,17 +49,21 @@ type Link struct {
 	RosterID   int
 	AttachedAt time.Time
 	LastReadAt *time.Time
+	// TeamKey is the member's own league-team id on a host whose pages are
+	// keyed by it (FFPC's ltuid), empty elsewhere.
+	TeamKey string
 }
 
 // Store reads and writes the sync tables. Every link query is scoped by
 // account, so one drafter never reads or changes another's attachment.
 type Store struct{ Pool *pgxpool.Pool }
 
-const linkColumns = `id, account_id, league_id, host, host_league_id, host_season, roster_id, attached_at, last_read_at`
+const linkColumns = `id, account_id, league_id, host, host_league_id, host_season, roster_id, attached_at, last_read_at,
+	coalesce(host_team_key, '')`
 
 func scanLink(row pgx.Row) (Link, error) {
 	var l Link
-	err := row.Scan(&l.ID, &l.AccountID, &l.LeagueID, &l.Ref.Host, &l.Ref.LeagueID, &l.Ref.Season, &l.RosterID, &l.AttachedAt, &l.LastReadAt)
+	err := row.Scan(&l.ID, &l.AccountID, &l.LeagueID, &l.Ref.Host, &l.Ref.LeagueID, &l.Ref.Season, &l.RosterID, &l.AttachedAt, &l.LastReadAt, &l.TeamKey)
 	return l, err
 }
 
@@ -59,8 +82,9 @@ func (s *Store) Find(ctx context.Context, accountID uuid.UUID, ref Ref) (Link, b
 }
 
 // Save inserts or updates the account's link to the host league,
-// refusing a new one past MaxLinksPerAccount.
-func (s *Store) Save(ctx context.Context, l Link) (Link, error) {
+// refusing a new one past MostFree without many, and past
+// MaxLinksPerAccount with it.
+func (s *Store) Save(ctx context.Context, l Link, many bool) (Link, error) {
 	var out Link
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext('league_links:' || $1::text))`, l.AccountID); err != nil {
@@ -72,21 +96,22 @@ func (s *Store) Save(ctx context.Context, l Link) (Link, error) {
 			l.AccountID, l.Ref.Host, l.Ref.LeagueID, l.Ref.Season).Scan(&n); err != nil {
 			return err
 		}
-		if n >= MaxLinksPerAccount {
-			return ErrTooMany
+		if err := overCap(n, many); err != nil {
+			return err
 		}
 		saved, err := scanLink(tx.QueryRow(ctx, `insert into app.league_links
-			(account_id, league_id, host, host_league_id, host_season, roster_id, last_read_at)
-			values ($1, $2, $3, $4, $5, $6, $7)
+			(account_id, league_id, host, host_league_id, host_season, roster_id, last_read_at, host_team_key)
+			values ($1, $2, $3, $4, $5, $6, $7, nullif($8, ''))
 			on conflict (account_id, host, host_league_id, host_season)
 			do update set league_id = excluded.league_id, roster_id = excluded.roster_id, last_read_at = excluded.last_read_at,
+				host_team_key = excluded.host_team_key,
 				detached_at = null
 			returning `+linkColumns,
-			l.AccountID, l.LeagueID, l.Ref.Host, l.Ref.LeagueID, l.Ref.Season, l.RosterID, l.LastReadAt))
+			l.AccountID, l.LeagueID, l.Ref.Host, l.Ref.LeagueID, l.Ref.Season, l.RosterID, l.LastReadAt, l.TeamKey))
 		out = saved
 		return err
 	})
-	if errors.Is(err, ErrTooMany) {
+	if errors.Is(err, ErrTooMany) || errors.Is(err, ErrManyLeagues) {
 		return Link{}, err
 	}
 	if err != nil {
@@ -115,27 +140,36 @@ type Attached struct {
 	Season   int
 	Name     string
 	TeamName string
+	// Teams are the league's teams at the last read, none when unread.
+	Teams []Team
 }
 
 // Attached is the account's links, newest first, each with its league's
-// name and team from the last read.
+// name and team from the last read. With no read kept, the name is the
+// saved league's the attach made, so a league is never nameless.
 func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, error) {
 	rows, err := s.Pool.Query(ctx, `select l.id, l.account_id, l.league_id, l.host, l.host_league_id, l.host_season,
 		l.roster_id, l.attached_at, l.last_read_at,
-		coalesce((sn.snapshot->>'season')::int, l.host_season), coalesce(sn.snapshot->>'name', ''),
+		coalesce((sn.snapshot->>'season')::int, l.host_season), coalesce(nullif(sn.snapshot->>'name', ''), saved.name, ''),
 		coalesce((select t->>'name' from jsonb_array_elements(sn.snapshot->'teams') t
-			where (t->>'roster_id')::int = l.roster_id limit 1), '')
+			where (t->>'roster_id')::int = l.roster_id limit 1), ''),
+		sn.snapshot->'teams'
 		from app.league_links l
 		left join app.league_snapshots sn
 			on sn.host = l.host and sn.host_league_id = l.host_league_id and sn.host_season = l.host_season
+		left join app.leagues saved on saved.id = l.league_id and saved.account_id = l.account_id
 		where l.account_id = $1 and l.detached_at is null order by l.attached_at desc, l.id limit $2`, accountID, MaxLinksPerAccount)
 	if err != nil {
 		return nil, fmt.Errorf("leaguesync: attached: %w", err)
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Attached, error) {
 		var a Attached
+		var teams []byte
 		err := r.Scan(&a.ID, &a.AccountID, &a.LeagueID, &a.Ref.Host, &a.Ref.LeagueID, &a.Ref.Season, &a.RosterID,
-			&a.AttachedAt, &a.LastReadAt, &a.Season, &a.Name, &a.TeamName)
+			&a.AttachedAt, &a.LastReadAt, &a.Season, &a.Name, &a.TeamName, &teams)
+		if err == nil && len(teams) > 0 {
+			err = json.Unmarshal(teams, &a.Teams)
+		}
 		return a, err
 	})
 	if err != nil {
@@ -144,18 +178,20 @@ func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, 
 	return out, nil
 }
 
-// Newest is the account's newest attached league, nil when it has none.
-func (s *Store) Newest(ctx context.Context, accountID uuid.UUID) (*uuid.UUID, error) {
+// Newest is the account's newest attached league, nil when it has none,
+// and how many the account follows.
+func (s *Store) Newest(ctx context.Context, accountID uuid.UUID) (*uuid.UUID, int, error) {
 	var id uuid.UUID
-	err := s.Pool.QueryRow(ctx, `select id from app.league_links where account_id = $1 and detached_at is null
-		order by attached_at desc, id limit 1`, accountID).Scan(&id)
+	var count int
+	err := s.Pool.QueryRow(ctx, `select id, count(*) over () from app.league_links where account_id = $1 and detached_at is null
+		order by attached_at desc, id limit 1`, accountID).Scan(&id, &count)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
+		return nil, 0, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("leaguesync: newest for %s: %w", accountID, err)
+		return nil, 0, fmt.Errorf("leaguesync: newest for %s: %w", accountID, err)
 	}
-	return &id, nil
+	return &id, count, nil
 }
 
 // Detach marks the account's link detached. The row and the saved league
@@ -173,29 +209,36 @@ func (s *Store) Detach(ctx context.Context, accountID, id uuid.UUID) error {
 	return nil
 }
 
-// Restore undoes a detach of the account's link, within the attach cap.
-func (s *Store) Restore(ctx context.Context, accountID, id uuid.UUID) (Link, error) {
+// Restore undoes a detach of the account's link, within the same caps
+// as Save.
+func (s *Store) Restore(ctx context.Context, accountID, id uuid.UUID, many bool) (Link, error) {
 	var out Link
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext('league_links:' || $1::text))`, accountID); err != nil {
 			return err
 		}
-		var n int
-		if err := tx.QueryRow(ctx, `select count(*) from app.league_links where account_id = $1 and detached_at is null`, accountID).Scan(&n); err != nil {
-			return err
-		}
-		if n >= MaxLinksPerAccount {
-			return ErrTooMany
-		}
+		// The undo first, so another account's link is not found before
+		// any cap is counted; a cap refusal rolls it back.
 		l, err := scanLink(tx.QueryRow(ctx, `update app.league_links set detached_at = null
 			where id = $1 and account_id = $2 and detached_at is not null returning `+linkColumns, id, accountID))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrLinkNotFound
 		}
+		if err != nil {
+			return err
+		}
+		var others int
+		if err := tx.QueryRow(ctx, `select count(*) from app.league_links where account_id = $1 and detached_at is null and id <> $2`,
+			accountID, id).Scan(&others); err != nil {
+			return err
+		}
+		if err := overCap(others, many); err != nil {
+			return err
+		}
 		out = l
-		return err
+		return nil
 	})
-	if errors.Is(err, ErrLinkNotFound) || errors.Is(err, ErrTooMany) {
+	if errors.Is(err, ErrLinkNotFound) || errors.Is(err, ErrTooMany) || errors.Is(err, ErrManyLeagues) {
 		return Link{}, err
 	}
 	if err != nil {
@@ -309,4 +352,44 @@ func (s *Store) PutHostPlayers(ctx context.Context, host string, players []HostP
 		}
 		return nil
 	})
+}
+
+// FFPCReader is a connected member who has an FFPC league attached, to
+// read it as: the one whose connection read most recently, so one member
+// signed out never stops the league for the rest.
+func (s *Store) FFPCReader(ctx context.Context, ref Ref) (uuid.UUID, string, error) {
+	var accountID uuid.UUID
+	var ltuid string
+	err := s.Pool.QueryRow(ctx, `select l.account_id, l.host_team_key from app.league_links l
+		join app.host_connections c on c.account_id = l.account_id and c.host = l.host and c.status = 'connected'
+		where l.host = 'ffpc' and l.host_league_id = $1 and l.host_season = $2 and l.detached_at is null
+			and l.host_team_key is not null
+		order by c.last_read_at desc nulls last, l.attached_at limit 1`, ref.LeagueID, ref.Season).Scan(&accountID, &ltuid)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, "", ErrNotConnected
+	}
+	if err != nil {
+		return uuid.Nil, "", fmt.Errorf("leaguesync: ffpc reader %s: %w", ref.Key(), err)
+	}
+	return accountID, ltuid, nil
+}
+
+// FFPCLeagues is every attached FFPC league with a connected member, for
+// the background read.
+func (s *Store) FFPCLeagues(ctx context.Context) ([]Ref, error) {
+	rows, err := s.Pool.Query(ctx, `select distinct l.host_league_id, l.host_season from app.league_links l
+		join app.host_connections c on c.account_id = l.account_id and c.host = l.host and c.status = 'connected'
+		where l.host = 'ffpc' and l.detached_at is null order by 1, 2`)
+	if err != nil {
+		return nil, fmt.Errorf("leaguesync: ffpc leagues: %w", err)
+	}
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Ref, error) {
+		ref := Ref{Host: HostFFPC}
+		err := r.Scan(&ref.LeagueID, &ref.Season)
+		return ref, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("leaguesync: ffpc leagues: %w", err)
+	}
+	return out, nil
 }

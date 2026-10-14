@@ -76,6 +76,8 @@
   /* Drafters versus us. Later is a gain for you, earlier is a cost. Always with the word. */
   --gain-bg: #dcf3e4; --gain-ink: #11663a;
   --loss-bg: #fbe1e4; --loss-ink: #a3243a;
+  /* A player's status on his face: injured reserve, a solid tag at the photo's top left. */
+  --status-ir-bg: #a3243a; --status-ir-ink: #ffffff;
 
   /* Tiers run hot to cold down the board. Each band's label carries the tier number
      and the drop to the next tier, so the colour is never the only channel. */
@@ -110,7 +112,7 @@
     --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
     --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
     --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
-    --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f;
+    --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f; --status-ir-bg: #ff8f9f; --status-ir-ink: #1a0a0d;
     --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
     --tier-ink: #ffffff; --tier-wash: 16%;
     --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
@@ -123,7 +125,7 @@
   --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
   --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
   --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
-  --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f;
+  --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f; --status-ir-bg: #ff8f9f; --status-ir-ink: #1a0a0d;
   --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
   --tier-ink: #ffffff; --tier-wash: 16%;
     --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;

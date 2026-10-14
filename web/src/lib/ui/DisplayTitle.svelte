@@ -18,13 +18,16 @@
 		size?: Size;
 		/** A tracked label after the title on the same line: what the section counts. */
 		note?: string;
+		/** heading is the title's own heading. face draws the same title as a plain block, for a title
+		 * that holds a control (a switch) whose page names its heading another way. */
+		as?: 'heading' | 'face';
 		children: Snippet;
 	}
 
-	let { size = 'section', note, children }: Props = $props();
+	let { size = 'section', note, as = 'heading', children }: Props = $props();
 </script>
 
-<svelte:element this={TAGS[size]} class="title {size}">
+<svelte:element this={as === 'heading' ? TAGS[size] : 'div'} class="title {size}">
 	{@render children()}
 	{#if note}<span>{note}</span>{/if}
 </svelte:element>
