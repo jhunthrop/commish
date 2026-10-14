@@ -60,32 +60,60 @@ export function recordHeadline(record: RunRecord): RecordHeadline {
 	};
 }
 
-/** A missed week's reason as the end of its line: "our nightly run failed that week". */
-function reason(week: RecordWeek): string {
-	if (week.note === undefined) throw new Error(`Week ${String(week.week)} is missed with no note.`);
-	const text = week.note.replace(/\.$/, '');
-	return `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
-}
-
 /** A time the schema guarantees for the status, read without a fallback that could print. */
 function stamp(iso: string | null, week: RecordWeek): string {
 	if (iso === null) throw new Error(`Week ${String(week.week)} is ${week.status} with no date.`);
 	return dayLabel(iso);
 }
 
-/** Each week as a person says it, by its status: "frozen Sep 8, waiting on the stat lines",
- * "not frozen, our nightly run failed that week", "freezes Thu Oct 15". */
-export function weekWords(week: RecordWeek): string {
-	switch (week.status) {
-		case 'graded':
-			return `frozen ${stamp(week.frozenAt, week)}, graded ${stamp(week.gradedAt, week)}`;
-		case 'frozen':
-			return `frozen ${stamp(week.frozenAt, week)}, waiting on the stat lines`;
-		case 'missed':
-			return `not frozen, ${reason(week)}`;
-		case 'upcoming':
-			return week.frozenAt === null
-				? 'freezes before its first kickoff'
-				: `freezes ${weekdayLabel(week.frozenAt)}`;
+/** One line of the week list: a week, or a run of missed or upcoming weeks said once. */
+export interface WeekLine {
+	/** "Week 1", "Weeks 3 to 5". */
+	lead: string;
+	/** "frozen Sep 8, graded Oct 14", "not frozen, so not graded", "next freeze Thu Oct 22". */
+	text: string;
+	/** The week a graded or frozen line speaks for, so a page can add its figures. Null for a run. */
+	week: RecordWeek | null;
+}
+
+/** "Week 1", "Weeks 3 to 5". */
+function lead(weeks: readonly RecordWeek[]): string {
+	const span = weekSpan(weeks);
+	return `${span.charAt(0).toUpperCase()}${span.slice(1)}`;
+}
+
+/** A graded or frozen week as a person says it: "frozen Sep 8, graded Oct 14". */
+function frozenWords(week: RecordWeek): string {
+	return week.status === 'graded'
+		? `frozen ${stamp(week.frozenAt, week)}, graded ${stamp(week.gradedAt, week)}`
+		: `frozen ${stamp(week.frozenAt, week)}, waiting on the stat lines`;
+}
+
+/** A run of weeks said once: missed ones, or what is left with the next freeze from the schedule. */
+function runWords(first: RecordWeek): string {
+	if (first.status === 'missed') return 'not frozen, so not graded';
+	return first.frozenAt === null
+		? 'the first board freezes before its first kickoff'
+		: `next freeze ${weekdayLabel(first.frozenAt)}`;
+}
+
+/** The season week by week, each run of missed weeks one line ("Weeks 3 to 5, not frozen, so not
+ * graded") and every week still to come one line ("Weeks 7 to 18, next freeze Thu Oct 22"), so the
+ * list says what happened and what is next rather than logging each week alike. */
+export function weekLines(weeks: readonly RecordWeek[]): WeekLine[] {
+	const runs: RecordWeek[][] = [];
+	for (const week of weeks) {
+		const last = runs.at(-1);
+		const grouped = week.status === 'missed' || week.status === 'upcoming';
+		if (grouped && last?.[0]?.status === week.status) runs[runs.length - 1] = [...last, week];
+		else runs.push([week]);
 	}
+	return runs.map((run) => {
+		const [first] = run;
+		if (first === undefined) throw new Error('A run of weeks is never empty.');
+		const grouped = first.status === 'missed' || first.status === 'upcoming';
+		return grouped
+			? { lead: lead(run), text: runWords(first), week: null }
+			: { lead: lead(run), text: frozenWords(first), week: first };
+	});
 }

@@ -3,8 +3,8 @@
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { SCORING_WORDS } from '#lib/league/names.ts';
 	import { fixed, plural } from '#lib/format/number.ts';
-	import { allLine, recordHeadline, weekWords } from '#lib/run/record.ts';
-	import type { RecordWeek, Score } from '#lib/run/schema.ts';
+	import { allLine, recordHeadline, weekLines, type WeekLine } from '#lib/run/record.ts';
+	import type { Score } from '#lib/run/schema.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
 	import Footnote from '#lib/ui/Footnote.svelte';
@@ -34,22 +34,23 @@
 		return value === null ? 'Too few' : fixed(value, digits);
 	}
 
-	/** Each week as a person says it, with the week's agreement once it is graded. */
-	function weekLine(week: RecordWeek): { lead: string; text: string; figure?: string } {
-		const lead = `Week ${String(week.week)}`;
-		const line = allLine(week.lines);
-		if (week.status !== 'graded' || line?.ours.agreement == null) {
-			return { lead, text: weekWords(week) };
-		}
+	/** Each line as a person says it, with the week's agreement once it is graded. */
+	function withFigure({ lead, text, week }: WeekLine): {
+		lead: string;
+		text: string;
+		figure?: string;
+	} {
+		const line = week === null ? undefined : allLine(week.lines);
+		if (week?.status !== 'graded' || line?.ours.agreement == null) return { lead, text };
 		const adp = line.adp.agreement === null ? '' : `, ADP ${fixed(line.adp.agreement, 2)}`;
 		return {
 			lead,
-			text: `${weekWords(week)}. Our ${stat.agreement} over ${plural(line.ours.graded, 'player')}${adp}`,
+			text: `${text}. Our ${stat.agreement} over ${plural(line.ours.graded, 'player')}${adp}`,
 			figure: fixed(line.ours.agreement, 2)
 		};
 	}
 
-	const lines = $derived(record.weeks.map(weekLine));
+	const lines = $derived(weekLines(record.weeks).map(withFigure));
 
 	const positionColumns: Column[] = [
 		{ label: 'Position' },
@@ -76,13 +77,6 @@
 			<Figure value={headline.value} size="xl" caption={headline.caption} />
 		</Panel>
 
-		{#if lines.length > 0}
-			<section aria-label="Week by week">
-				<PanelHead title="Week by week" level={2} />
-				<LineList label="Every week of the season" {lines} />
-			</section>
-		{/if}
-
 		{#if record.toDate.length > 0}
 			<section aria-label="By position">
 				<Table
@@ -100,6 +94,13 @@
 						</tr>
 					{/each}
 				</Table>
+			</section>
+		{/if}
+
+		{#if lines.length > 0}
+			<section aria-label="Week by week">
+				<PanelHead title="Week by week" level={2} />
+				<LineList label="Every week of the season" {lines} />
 			</section>
 		{/if}
 
