@@ -90,17 +90,6 @@ export default defineConfig(
 		}
 	},
 	{
-		// The ESPN sign-in window's own script (static/espn-connect.js) is served as it is, outside the
-		// app's build, so it is plain browser JavaScript, linted without type information.
-		files: ['static/**/*.js'],
-		languageOptions: {
-			sourceType: 'script',
-			globals: { ...globals.browser },
-			parserOptions: { projectService: false, program: null }
-		},
-		rules: ts.configs.disableTypeChecked.rules
-	},
-	{
 		// Lighthouse CI loads its config with require(), so the one CommonJS file is plain JavaScript,
 		// linted without type information.
 		files: ['**/*.cjs'],

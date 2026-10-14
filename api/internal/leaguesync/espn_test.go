@@ -96,7 +96,9 @@ type fakeESPNMember struct {
 	connected map[uuid.UUID]string
 	league    espn.FullLeague
 	refused   bool
-	as        []uuid.UUID
+	// refusedFor refuses one account's cookies alone.
+	refusedFor uuid.UUID
+	as         []uuid.UUID
 }
 
 func (f *fakeESPNMember) Cookies(_ context.Context, accountID uuid.UUID) (espn.Cookies, error) {
@@ -112,7 +114,7 @@ func (f *fakeESPNMember) ReadLeague(_ context.Context, accountID uuid.UUID, leag
 		return espn.FullLeague{}, hosts.ErrNotConnected
 	}
 	f.as = append(f.as, accountID)
-	if f.refused {
+	if f.refused || accountID == f.refusedFor {
 		return espn.FullLeague{}, espnhost.ErrReconnect
 	}
 	if leagueID != espnFixtureLeague {
@@ -277,5 +279,44 @@ func TestPrivateESPNLeagueIsReadOnlyForItsMember(t *testing.T) {
 	}
 	if rig.member.readAs(bob) != 0 {
 		t.Fatal("a read was made as bob")
+	}
+}
+
+// Two members of one private league, each connected, each attach it from
+// their own list: each league is read with its own member's cookies, and
+// when ESPN refuses one member's cookies only that member is asked to
+// connect again while the other's reads go on.
+func TestTwoMembersReadOnePrivateLeagueApart(t *testing.T) {
+	rig, alice, bob := newESPNRig(t)
+	rig.member.connected[bob] = "{00000005-0000-4000-8000-000000000005}"
+	rig.public.private = true
+	a, b := caller{t, rig.svc, alice}, caller{t, rig.svc, bob}
+	eh := apitypes.LeagueHostEspn
+
+	var mine, theirs apitypes.LeagueSync
+	status, body := a.do(rig.svc.attach, http.MethodPost, "/", apitypes.AttachInput{Host: &eh, Link: espnLink}, "")
+	if status != http.StatusCreated || json.Unmarshal(body, &mine) != nil || mine.Me != 1 {
+		t.Fatalf("alice: %d %s", status, body)
+	}
+	status, body = b.do(rig.svc.attach, http.MethodPost, "/", apitypes.AttachInput{Host: &eh, Link: espnLink}, "")
+	if status != http.StatusCreated || json.Unmarshal(body, &theirs) != nil || theirs.Me != 4 {
+		t.Fatalf("bob: %d me %d %s", status, theirs.Me, body)
+	}
+	if rig.member.readAs(alice) != 1 || rig.member.readAs(bob) != 1 {
+		t.Fatalf("reads as %v", rig.member.as)
+	}
+
+	rig.member.refusedFor = alice
+	rig.clock.now = rig.clock.now.Add(2 * MinUpstreamGap)
+	status, body = a.do(rig.svc.refresh, http.MethodPost, "/", nil, mine.Id.String())
+	if status != http.StatusOK || json.Unmarshal(body, &mine) != nil || !mine.HostSignedOut {
+		t.Fatalf("alice refused: %d signed out %v", status, mine.HostSignedOut)
+	}
+	status, body = b.do(rig.svc.refresh, http.MethodPost, "/", nil, theirs.Id.String())
+	if status != http.StatusOK || json.Unmarshal(body, &theirs) != nil || theirs.HostSignedOut || theirs.HostFailed {
+		t.Fatalf("bob still reads: %d signed out %v failed %v", status, theirs.HostSignedOut, theirs.HostFailed)
+	}
+	if rig.member.readAs(bob) != 2 {
+		t.Fatalf("bob's reads %d, want his attach and his refresh", rig.member.readAs(bob))
 	}
 }

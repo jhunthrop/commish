@@ -3,6 +3,7 @@ package leaguesync
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -49,6 +50,11 @@ func TestYahooSnapshot(t *testing.T) {
 	l := yahooFixtureRead(t)
 	l.Waivers = []yahoo.Waiver{{Player: yahoo.Player{ID: "35010", Name: "Tank Bigsby", Position: "RB", Team: "JAX"}, Until: "2026-10-16"}}
 	snap := yahooSnapshot(l, map[string]string{"30977": "board-allen"}, now)
+	unread := l
+	unread.Waivers, unread.WaiversErr = nil, errors.New("waiver wire refused")
+	if u := yahooSnapshot(unread, nil, now); !u.PoolUnknown || len(u.Pool) != 0 || len(u.Teams) != 10 {
+		t.Fatalf("an unread waiver wire: unknown %v, pool %v", u.PoolUnknown, u.Pool)
+	}
 	if len(snap.Pool) != 1 || snap.Pool[0] != (PoolPlayer{PlayerID: "35010", Status: PoolWaivers, Until: "2026-10-16"}) || snap.Players["35010"].Name != "Tank Bigsby" {
 		t.Fatalf("the waiver pool: %+v", snap.Pool)
 	}

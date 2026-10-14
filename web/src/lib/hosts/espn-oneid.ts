@@ -1,15 +1,16 @@
-/** Disney's own sign-in for ESPN, in a window of its own: the account page opens /espn-connect
- * (static/espn-connect.html and .js, under the CSP in web/_headers), the member signs in on
- * Disney's form there (two-factor is Disney's to ask), and that window hands back what Disney
- * answered to this page alone. This page picks out the two ESPN values and passes them to the API,
- * which keeps them encrypted. No Disney script ever runs on a page of the site. */
+/** Disney's own sign-in for ESPN, in a window of its own on the workers.dev origin, where no Commish
+ * cookie lives (ESPN_SIGN_IN_ORIGIN, src/lib/site/origins.ts): the member signs in on Disney's form
+ * there (two-factor is Disney's to ask), and that window hands what Disney answered to this page by
+ * postMessage, at the site's origin alone (espn-window.ts). This page takes a message only from that
+ * window on that origin, picks out the two ESPN values and passes them to the API with the session.
+ * No Disney script ever runs on an origin that carries our cookies. */
+import { ESPN_SIGN_IN_ORIGIN } from '#lib/site/origins.ts';
+import { MESSAGE_KIND } from './espn-window.ts';
 
 /** The window Disney's sign-in runs in, and how it is opened. */
-const CONNECT_PAGE = '/espn-connect';
+const CONNECT_PAGE = `${ESPN_SIGN_IN_ORIGIN}/espn-connect`;
 const WINDOW_NAME = 'commish-espn';
 const WINDOW_FEATURES = 'popup,width=480,height=720';
-/** What the window's messages say they are. */
-const MESSAGE_KIND = 'commish-espn';
 /** How often the page looks whether the window was closed. */
 const CLOSED_POLL_MS = 400;
 
@@ -75,8 +76,20 @@ export function outcomeOf(message: unknown): DisneyOutcome | null {
 	return null;
 }
 
-/** Open Disney's sign-in in its own window and wait for how it ends. A message is taken only from
- * that window, on our own origin. Closing the window ends the wait at once. */
+/** The outcome a message event carries when it comes from the sign-in window on the sign-in
+ * origin, null for any other: a message from another origin, or another window, is never read. */
+export function fromSignInWindow(
+	event: { readonly origin: string; readonly source: unknown; readonly data: unknown },
+	opened: unknown
+): DisneyOutcome | null {
+	if (event.origin !== ESPN_SIGN_IN_ORIGIN || opened === null || event.source !== opened) {
+		return null;
+	}
+	return outcomeOf(event.data);
+}
+
+/** Open Disney's sign-in in its own window and wait for how it ends. The window is opened at once,
+ * inside the tap, so no browser takes it for an unasked popup. Closing it ends the wait at once. */
 export function signInWithDisney(): Promise<DisneyOutcome> {
 	const opened = window.open(CONNECT_PAGE, WINDOW_NAME, WINDOW_FEATURES);
 	if (!opened) return Promise.resolve({ kind: 'failed' });
@@ -90,8 +103,7 @@ export function signInWithDisney(): Promise<DisneyOutcome> {
 			resolve(outcome);
 		};
 		const onMessage = (event: MessageEvent): void => {
-			if (event.origin !== window.location.origin || event.source !== opened) return;
-			const outcome = outcomeOf(event.data);
+			const outcome = fromSignInWindow(event, opened);
 			if (outcome) finish(outcome);
 		};
 		const watch = setInterval(() => {

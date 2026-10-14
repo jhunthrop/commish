@@ -92,6 +92,12 @@ func (f *fakeRefresher) Refresh(_ context.Context, refresh string, now time.Time
 // 401 to any other.
 func yahooAPI(t *testing.T, good string) (*Client, *[]string) {
 	t.Helper()
+	return yahooAPIWith(t, good, false)
+}
+
+// yahooAPIWith is yahooAPI whose waiver wire answers 400 when failWaivers.
+func yahooAPIWith(t *testing.T, good string, failWaivers bool) (*Client, *[]string) {
+	t.Helper()
 	var paths []string
 	var mu sync.Mutex
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -110,6 +116,9 @@ func yahooAPI(t *testing.T, good string) (*Client, *[]string) {
 			name = "yahoo-my-teams.xml"
 		case strings.Contains(r.URL.Path, "games;game_codes=nfl"):
 			name = "yahoo-games-2026.xml"
+		case strings.Contains(r.URL.Path, "/players;status=W") && failWaivers:
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		case strings.Contains(r.URL.Path, "/players;status=W"):
 			name = "yahoo-league-waivers.xml"
 		case strings.HasSuffix(r.URL.Path, "/teams;out=roster"):
@@ -285,5 +294,20 @@ func TestSignOutSparesAReconnect(t *testing.T) {
 	m.signedOut(context.Background(), id, []byte("an older key"), "test")
 	if store.signedOut {
 		t.Fatal("a reconnected connection was signed out by an old read")
+	}
+}
+
+// N1: a waiver wire Yahoo will not answer leaves waiver status unknown for
+// the read; the league reads whole without it.
+func TestMemberReadsTheLeagueWithoutItsWaiverWire(t *testing.T) {
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	m, _, id, _ := member(t, "kept-access", now.Add(time.Hour), now, "kept-access", &fakeRefresher{})
+	m.Client, _ = yahooAPIWith(t, "kept-access", true)
+	l, err := m.ReadLeague(context.Background(), id, 2026, "128934")
+	if err != nil {
+		t.Fatalf("a failed waiver wire failed the league: %v", err)
+	}
+	if len(l.Teams) != 10 || l.Waivers != nil || !errors.Is(l.WaiversErr, ErrNoSuchLeague) {
+		t.Fatalf("%d teams, waivers %v, err %v", len(l.Teams), l.Waivers, l.WaiversErr)
 	}
 }

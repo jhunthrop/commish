@@ -90,6 +90,10 @@ type Snapshot struct {
 	// neither listed nor rostered is a free agent. Empty for a host that
 	// does not say.
 	Pool []PoolPlayer `json:"pool,omitempty"`
+	// PoolUnknown says the host's pool status could not be read this
+	// time (Yahoo's waiver wire did not answer): nobody is known to be on
+	// waivers or free, rather than everyone free.
+	PoolUnknown bool `json:"pool_unknown,omitempty"`
 }
 
 // Pool statuses, as the waiver tool reads them.

@@ -6,6 +6,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { ApiError, ESPN_CONSENT, hostsApi, type HostLeague } from './api.ts';
+	import { signInWithDisney } from './espn-oneid.ts';
 
 	/** Connect ESPN: one verb opens Disney's own sign-in on this page, and the session it hands back is
 	 * kept encrypted. The two values can be pasted from ESPN's site instead, the way in when Disney's
@@ -45,11 +46,12 @@
 	/** Disney's sign-in in its own window. Closing it makes the verb ready again at once; a sign-in
 	 * that hands back no session, or a window that cannot open, says so and opens the paste form. */
 	async function viaDisney(): Promise<void> {
+		// The window opens first, inside the tap, before anything is awaited.
+		const signingIn = signInWithDisney();
 		busy = true;
 		problem = null;
 		try {
-			const { signInWithDisney } = await import('./espn-oneid.ts');
-			const outcome = await signInWithDisney();
+			const outcome = await signingIn;
 			switch (outcome.kind) {
 				case 'session':
 					await keep(outcome.session);

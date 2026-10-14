@@ -110,6 +110,9 @@ func (m *Member) ReadLeague(ctx context.Context, accountID uuid.UUID, season int
 			return err
 		}
 		l, err := m.Client.League(ctx, access, key)
+		if err == nil && l.WaiversErr != nil {
+			m.Log.Warn("yahoo: waiver wire not read, waiver status unknown", "league", key, "err", l.WaiversErr)
+		}
 		out = l
 		return err
 	})

@@ -56,6 +56,7 @@ func yahooSnapshot(l yahoo.League, ids map[string]string, now time.Time) Snapsho
 		}
 	}
 	snap.Moves = yahooMoves(l.Moves, &snap, ids)
+	snap.PoolUnknown = l.WaiversErr != nil
 	for _, w := range l.Waivers {
 		snap.Pool = append(snap.Pool, PoolPlayer{PlayerID: snap.addYahooPlayer(w.Player, ids), Status: PoolWaivers, Until: w.Until})
 	}

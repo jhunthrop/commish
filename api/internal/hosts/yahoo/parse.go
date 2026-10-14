@@ -51,6 +51,9 @@ type League struct {
 	// Waivers is every unrostered player on waivers; every other
 	// unrostered player is a free agent.
 	Waivers []Waiver
+	// WaiversErr is why the waiver wire could not be read, nil when it
+	// was: waiver status is then unknown for this read.
+	WaiversErr error
 }
 
 // Team is one team, with its record and its roster this week.

@@ -169,8 +169,14 @@ func (c *Client) League(ctx context.Context, access, leagueKey string) (League, 
 	if err != nil {
 		return League{}, err
 	}
-	l.Waivers, err = c.waivers(ctx, access, leagueKey)
-	return l, err
+	// The waiver wire is a part the league reads without: a failed read
+	// of it leaves waiver status unknown for this read (WaiversErr says
+	// why), never fails the league.
+	l.Waivers, l.WaiversErr = c.waivers(ctx, access, leagueKey)
+	if ctx.Err() != nil {
+		return League{}, ctx.Err()
+	}
+	return l, nil
 }
 
 // Bounds on the waiver read: Yahoo answers at most a page of 25 players,
