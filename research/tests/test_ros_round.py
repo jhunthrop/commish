@@ -181,12 +181,21 @@ def test_the_judgment_reader_refuses_only_the_pristine_season() -> None:
     assert reader.served == [2025]
 
 
-_RECORD = Path(__file__).resolve().parents[2] / "docs/research/2026-10-14-rest-of-season-results.json"
+_DOCS = Path(__file__).resolve().parents[2] / "docs/research"
 
 
-def test_every_verdict_of_the_one_judgment_rebuilds_from_its_record() -> None:
-    """The judgment is never rerun; this reads its stored numbers and re-derives every gate line."""
-    record: dict[str, Any] = json.loads(_RECORD.read_text())
+@pytest.mark.parametrize(
+    ("record_name", "thresholds", "coverage_block", "failed"),
+    [
+        ("2026-10-14-rest-of-season-results.json", PREREGISTERED, "coverage_pooled", 11),
+        ("2026-10-14-rest-of-season-round2-results.json", gates.ROUND_TWO, "coverage_gated", 16),
+    ],
+)
+def test_every_verdict_of_each_judgment_rebuilds_from_its_record(
+    record_name: str, thresholds: gates.Thresholds, coverage_block: str, failed: int
+) -> None:
+    """A judgment is never rerun; this reads its stored numbers and re-derives every gate line."""
+    record: dict[str, Any] = json.loads((_DOCS / record_name).read_text())
     numbers = record["numbers"]
     scores = {
         key: CellScore(
@@ -198,8 +207,8 @@ def test_every_verdict_of_the_one_judgment_rebuilds_from_its_record() -> None:
         )
         for key, cell in numbers["cells"].items()
     }
-    pooled = {key: Coverage(found["inside"], found["size"]) for key, found in numbers["coverage_pooled"].items()}
-    rebuilt = gates.judged_lines(scores, pooled, PREREGISTERED)
+    coverage = {key: Coverage(found["inside"], found["size"]) for key, found in numbers[coverage_block].items()}
+    rebuilt = gates.judged_lines(scores, coverage, thresholds)
     stored = record["gates"]
     assert [(line.gate, line.subject, line.passed) for line in rebuilt] == [
         (line["gate"], line["subject"], line["passed"]) for line in stored[:-1]
@@ -207,7 +216,7 @@ def test_every_verdict_of_the_one_judgment_rebuilds_from_its_record() -> None:
     assert stored[-1]["gate"] == "G4"
     assert stored[-1]["passed"]
     assert record["passed"] is False
-    assert sum(1 for line in stored if not line["passed"]) == 11
+    assert sum(1 for line in stored if not line["passed"]) == failed
 
 
 # --- round 2 -------------------------------------------------------------------------------------
