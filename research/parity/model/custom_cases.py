@@ -17,6 +17,7 @@ import statistics
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
+from datetime import timedelta
 from typing import Any, Final
 
 from sqlalchemy import Connection, text
@@ -124,6 +125,23 @@ def custom_board_week_two() -> CaseResult:
                     f"{fmt}: the second request came from the cache, row for row", hit.cached and hit.rows == cold.rows
                 ),
             ]
+        stale = WEEK_TWO_BOARD - timedelta(days=1)
+        conn.execute(
+            text(
+                "insert into research.custom_boards (season, as_of, rules_hash, shape_hash, source, rules, shape, rows, "
+                "model_version) values (2026, :as_of, 'stale', 'stale', :source, '{}', '{}', '[]', :model)"
+            ),
+            {"as_of": stale, "source": board_source_for("ppr"), "model": _MODEL},
+        )
         notes, timed = _latency(conn, artifacts.game_variance)
+        kept = conn.execute(
+            text("select count(*), count(distinct as_of) from research.custom_boards where season = 2026")
+        ).one()
+        timed.append(
+            Claim(
+                f"the cache holds the current run only: {kept[0]} boards at {kept[1]} generation, an earlier run's dropped",
+                kept[1] == 1,
+            )
+        )
     engine.dispose()
     return CaseResult("custom-board-2026-week2", diffs, notes, True, claims + timed)

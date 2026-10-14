@@ -90,18 +90,33 @@ def board_rows(board: Sequence[BoardEntry]) -> list[dict[str, Any]]:
 _KEY: Final = "season = :season and as_of = :as_of and rules_hash = :rules_hash and shape_hash = :shape_hash"
 
 
-def _cached(conn: Connection, key: Mapping[str, Any]) -> list[dict[str, Any]] | None:
-    row = conn.execute(text(f"select rows from research.custom_boards where {_KEY}"), key).first()
+def _cached(conn: Connection, key: Mapping[str, Any], model: str) -> list[dict[str, Any]] | None:
+    """A kept board, only when this code built it: a deploy that changes the board under the same
+    generation builds again."""
+    row = conn.execute(
+        text(f"select rows from research.custom_boards where {_KEY} and model_version = :model_version"),
+        {**key, "model_version": model},
+    ).first()
     return None if row is None else list(row[0])
 
 
 def _keep(conn: Connection, key: Mapping[str, Any], request: CustomRequest, board: CustomBoard, model: str) -> None:
+    """Keep a built board, and drop every board kept from the same stored board's earlier runs or
+    another model: the cache holds the current run only, so it never grows past one run's rules."""
     rules = {name: getattr(request.rules, name) for name in RULE_KEYS}
+    conn.execute(
+        text(
+            "delete from research.custom_boards where season = :season and source = :source "
+            "and (as_of <> :as_of or model_version <> :model_version)"
+        ),
+        {"season": key["season"], "source": board.source, "as_of": key["as_of"], "model_version": model},
+    )
     conn.execute(
         text(
             "insert into research.custom_boards (season, as_of, rules_hash, shape_hash, source, rules, shape, rows, "
             "model_version) values (:season, :as_of, :rules_hash, :shape_hash, :source, cast(:rules as jsonb), "
-            "cast(:shape as jsonb), cast(:rows as jsonb), :model_version) on conflict do nothing"
+            "cast(:shape as jsonb), cast(:rows as jsonb), :model_version) on conflict on constraint custom_boards_pkey "
+            "do update set rows = excluded.rows, model_version = excluded.model_version, source = excluded.source"
         ),
         {
             **key,
@@ -128,7 +143,7 @@ def custom_board(
         "rules_hash": request.rules_hash,
         "shape_hash": request.shape_hash,
     }
-    rows = _cached(conn, key)
+    rows = _cached(conn, key, model_version)
     if rows is not None:
         return CustomBoard(request.season, source, as_of, rows, cached=True)
     candidates = read_candidates(conn, request.season, source, as_of)
