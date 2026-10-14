@@ -32,7 +32,7 @@ from research.pipeline.preseason.benchmarks import (
 from research.pipeline.preseason.ingest import (
     BOARD_FORMATS,
     DEFAULT_BOARD_FORMAT,
-    PRODUCT_SEASON,
+    SUPERFLEX_ADP_SNAPSHOT,
     RankingRow,
     crossed_roster_identities,
     ingest_depth_charts,
@@ -47,6 +47,7 @@ from research.pipeline.preseason.publishers import (
     fetch_expert_consensus,
 )
 from research.pipeline.tolerated import TOLERATED_FAILURES
+from research.season import PRODUCT_SEASON
 
 LOG = logging.getLogger(__name__)
 MINIMUM_RESOLUTION: Final = 0.7
@@ -208,3 +209,16 @@ def ingest_adp_snapshot(
     if primary.error is not None:
         raise ResearchError(f"adp-snapshot: the {DEFAULT_BOARD_FORMAT} capture failed ({primary.error}).")
     return results
+
+
+def ingest_superflex_adp_snapshot(
+    conn: Connection, fetcher: Fetcher, captured_at: datetime, season: int = PRODUCT_SEASON
+) -> AdpSnapshotFormat:
+    """The two-quarterback ADP capture the superflex board reads, at the same instant and through the
+    same resolution as the three formats; a failure is the returned row's error, never a raise."""
+    snapshot = SnapshotPass(season, captured_at, roster_identities_for(conn, season))
+    try:
+        with conn.begin_nested():
+            return _capture_format(conn, fetcher, snapshot, SUPERFLEX_ADP_SNAPSHOT)
+    except TOLERATED_FAILURES as error:
+        return AdpSnapshotFormat(SUPERFLEX_ADP_SNAPSHOT[0], 0, 0, str(error))

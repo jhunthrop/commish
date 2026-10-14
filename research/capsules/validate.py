@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
+from research.capsules.board_ranks import rank_claims_off_page
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts.model import LawEvidence
 from research.capsules.grounding import (
@@ -25,7 +26,7 @@ from research.capsules.grounding import (
     proper_name_phrases,
     round_half_up,
 )
-from research.capsules.pull_figures import facts_page_numbers, pull_figures_of
+from research.capsules.pull_figures import adp_figures_off_page, facts_page_numbers, pull_figures_of, renderings_of
 from research.capsules.render import render_facts_for_model
 from research.capsules.voice_rules import (
     BANNED_VOCABULARY,
@@ -49,14 +50,23 @@ NARRATIVE_MIN_WORDS: Final = 3
 UNFRAMED_FLOOR_VIOLATION: Final = (
     'The text says "floor" beside a number without saying that the number comes from seasons shortened by injury.'
 )
+# The read must print one of the page's numbers exactly as the page prints it. The violation names
+# the renderings that count, so the correction can hand them to the writer (phase D: a deep player's
+# projection under ten points counts only to the tenth, which reads that wrote "about 6 points" kept
+# missing within the six calls).
 NO_PAGE_NUMBER_VIOLATION: Final = (
-    "The long note never prints one of the page's own numbers: his projected points, its range, or his ADP."
+    "The long note never prints one of the page's own numbers exactly as the page prints them"
 )
+
+
+def no_page_number_violation(numbers: tuple[tuple[str, float], ...]) -> str:
+    choices = "; ".join(f"{' or '.join(renderings_of(value))} ({label})" for label, value in numbers)
+    return f"{NO_PAGE_NUMBER_VIOLATION}: {choices}."
+
+
 SOFT_CORRECTIONS: Final = {
     UNFRAMED_FLOOR_VIOLATION: 'One sentence uses "floor" beside a number. Rewrite that sentence, in your own words, so a '
     'reader knows the number comes from seasons shortened by injury, or take the word "floor" out of it.',
-    NO_PAGE_NUMBER_VIOLATION: "Work our projected points for him, or his ADP, into one sentence as the sheet prints it "
-    "(the whole number is fine), in your own words, and leave everything else as it is.",
 }
 _AVAILABILITY: Final = re.compile(
     r"injur|health|hurt|miss(?:es|ed|ing)?\s+(?:time|games?|weeks?|snaps?)|games?\s+(?:he\s+)?miss|availab|durab|absen|"
@@ -100,6 +110,12 @@ class Grounding:
     prompt_text: str
     tension: float | None
     page_numbers: tuple[tuple[str, float], ...]
+    # The page's ADP (the run's, `facts.market_adp`): any ADP or pick a read states must be it.
+    adp: float | None = None
+    # His position code and the page's position and overall rank: any board rank a read states must be them.
+    position: str = ""
+    position_rank: int | None = None
+    board_rank: int | None = None
 
 
 def word_count(text: str) -> int:
@@ -193,6 +209,10 @@ def grounding_of(facts: "PlayerFacts") -> Grounding:
         render_facts_for_model(facts),
         strongest_negative_law_effect(facts),
         facts_page_numbers(facts),
+        facts.market.adp,
+        facts.identity.position,
+        facts.market.position_rank,
+        facts.market.board_rank,
     )
 
 
@@ -223,10 +243,26 @@ def voice_rule_correction_for(violation: str) -> str | None:
     )
 
 
+def _page_correction(violation: str) -> str | None:
+    """The corrections that hand the writer the page's own numbers: its ADP, or the renderings that count."""
+    if violation.startswith(ADP_FIGURE_VIOLATION):
+        return f"{violation.removeprefix(ADP_FIGURE_VIOLATION + ': ')} Rewrite only that sentence and leave everything else as it is."
+    if violation.startswith(NO_PAGE_NUMBER_VIOLATION):
+        choices = violation.removeprefix(NO_PAGE_NUMBER_VIOLATION).removeprefix(": ").removesuffix(".")
+        return (
+            "Work one of these numbers into one sentence, printed exactly as written here, in your own words: "
+            f"{choices}. Leave everything else as it is."
+        )
+    return None
+
+
 def soft_correction_for(violation: str) -> str | None:
     """The correction a soft violation is handed back with, or None for one that costs a rewrite."""
     if violation in SOFT_CORRECTIONS:
         return SOFT_CORRECTIONS[violation]
+    page = _page_correction(violation)
+    if page is not None:
+        return page
     banned = _BANNED_TERM_VIOLATION.match(violation)
     if banned is not None and banned.group(1) in TRADING_REPLACEMENTS:
         return (
@@ -297,8 +333,33 @@ def _validate(
             f"Mixed evidence: the strongest downside ({figure} pts/game) is never cited. It has to appear, with that number, before the call."
         )
     if page_number and not pull_figures_of(trimmed, source.page_numbers, 1):
-        violations.append(NO_PAGE_NUMBER_VIOLATION)
+        violations.append(no_page_number_violation(source.page_numbers))
+    violations += [adp_figure_violation(claim, source.adp) for claim in adp_figures_off_page(trimmed, source.adp)]
+    violations += [
+        rank_violation(claim, source)
+        for claim in rank_claims_off_page(trimmed, source.position, source.position_rank, source.board_rank)
+    ]
     return ValidationResult(not violations, tuple(violations))
+
+
+RANK_VIOLATION: Final = "The text states a board rank that is not his rank on the page"
+
+
+def rank_violation(claim: str, source: Grounding) -> str:
+    ranks = [f"{source.position}{source.position_rank}"] if source.position_rank is not None else []
+    ranks += [f"rank {source.board_rank} overall"] if source.board_rank is not None else []
+    allowed = " and ".join(ranks) or "no board rank"
+    return f'{RANK_VIOLATION}: "{claim}". His ranks on our board are {allowed}. Say exactly that, or no rank.'
+
+
+ADP_FIGURE_VIOLATION: Final = "The text states an ADP or a pick that is not his ADP on the page"
+
+
+def adp_figure_violation(claim: str, adp: float | None) -> str:
+    if adp is None:
+        return f'{ADP_FIGURE_VIOLATION}: "{claim}", and the page has no ADP for him. Say no ADP or pick at all.'
+    choices = " or ".join(renderings_of(adp))
+    return f'{ADP_FIGURE_VIOLATION}: "{claim}". His ADP is {choices}. Say exactly that, or say no ADP.'
 
 
 def overrun_cap(max_words: int) -> int:

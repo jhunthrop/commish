@@ -81,6 +81,29 @@ class SeasonStatLine:
     week: int
     values: Mapping[str, float]
     as_of: datetime
+    # Pass completions, which no scoring rule reads: carried for the player card's game log (phase D),
+    # written as their own metric (`completion_observations`), never as a scored field.
+    completions: float | None = None
+
+
+COMPLETIONS_METRIC = "completions"
+
+
+def completion_observations(rows: Sequence[SeasonStatLine]) -> list[PlayerWeekObservation]:
+    """Each line's completions, under the weekly stats' source, for the lines that carry them."""
+    return [
+        PlayerWeekObservation(
+            season=row.season,
+            week=row.week,
+            player_id=row.player_id,
+            source=STAT_LINE_SOURCE,
+            metric=COMPLETIONS_METRIC,
+            value=row.completions,
+            as_of=row.as_of,
+        )
+        for row in rows
+        if row.completions is not None
+    ]
 
 
 @dataclass(frozen=True)
@@ -139,6 +162,7 @@ def map_stat_lines(
                 week=int(week),
                 values={field: _stat_value(row, _NFLVERSE_COLUMN[field]) for field in STAT_FIELDS},
                 as_of=as_of,
+                completions=_stat_value(row, ("completions",)) if "completions" in row else None,
             )
         )
     return StatLinesResult(

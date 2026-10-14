@@ -27,7 +27,6 @@ from research.capsules.facts.board import (
 )
 from research.capsules.facts.build import PlayerFacts, build_player_facts
 from research.capsules.facts.collect import (
-    PRODUCT_SEASON,
     Population,
     SharedReads,
     active_peers_for,
@@ -35,9 +34,11 @@ from research.capsules.facts.collect import (
     facts_input_for,
 )
 from research.capsules.facts.color import current_season_summaries
+from research.capsules.facts.market_adp import run_market_adp
 from research.capsules.facts.reference import injury_snapshot, news_for_players
 from research.model.laws.registry import chip_eligible_laws
 from research.model.priors import load_model_artifacts
+from research.season import PRODUCT_SEASON
 
 BOARD_MEMO_SECONDS: Final = 60 * 60
 
@@ -95,10 +96,11 @@ def collect_player_facts(
     color = collect_color(conn, Population(peers, {player_id: gsis}, {gsis: identity.team}, board.teams), as_of)
     shared = SharedReads(
         chip_eligible_laws(load_model_artifacts(conn).laws),
-        injury_snapshot(conn),
-        news_for_players(conn, [identity.name]),
+        injury_snapshot(conn, as_of),
+        news_for_players(conn, [identity.name], as_of),
         current_season_summaries(conn, PRODUCT_SEASON, [player_id], {player_id: identity.position}),
         color,
+        run_market_adp(conn, as_of),
     )
     rank = board.ranks.get(player_id)
     row = BoardRow(

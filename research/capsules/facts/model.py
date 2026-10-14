@@ -125,7 +125,8 @@ class Availability:
 class Market:
     adp: float | None
     position_adp: str | None
-    board_rank: int
+    # The page's overall rank, None for a player the run's board lacks (review R4).
+    board_rank: int | None
     position_rank: int | None
     replacement_level: float | None
     players_left_in_tier: int | None
@@ -218,13 +219,18 @@ class Trend:
 class InjuryDesignated:
     state: Literal["designated"]
     designation: str
-    as_of: str
+    # The Eastern day the status began: the first capture of the unbroken run of captures showing him
+    # with this designation (`reference.injury_snapshot`). Never a capture's own day or time, so a
+    # night that sees the same status hashes the same sheet.
+    since: str
 
 
 @dataclass(frozen=True, slots=True)
 class InjuryClean:
     state: Literal["clean"]
-    as_of: str
+    # The Eastern day his clean run began: the first capture after his last designation, or the first
+    # capture on file.
+    since: str
 
 
 @dataclass(frozen=True, slots=True)

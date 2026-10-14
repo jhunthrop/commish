@@ -43,14 +43,15 @@ def _adp_line(facts: PlayerFacts) -> str:
 
 def _board_line(facts: PlayerFacts) -> str:
     m, p, position = facts.market, facts.projection, facts.identity.position
-    ranks = [f"overall rank {m.board_rank}"]
+    ranks = [] if m.board_rank is None else [f"overall rank {m.board_rank}"]
     if m.position_rank is not None:
         ranks.append(f"position rank {position}{m.position_rank} by our own board")
     ranges = (
         f"Middle range, where most outcomes fall: {whole(p.typical_low)} to {whole(p.typical_high)} points. "
         f"Full tails: {whole(p.floor_points)} to {whole(p.ceiling_points)}, the low tail from seasons shortened by injury."
     )
-    parts = [f"Our number: {whole(p.projected_points)} season points. {ranges} {', '.join(ranks)}.", _adp_line(facts)]
+    rank_text = f" {', '.join(ranks)}." if ranks else ""
+    parts = [f"Our number: {whole(p.projected_points)} season points. {ranges}{rank_text}", _adp_line(facts)]
     if m.market_anchor_points is not None:
         parts.append(
             f"Past seasons of {position}s drafted around his ADP: about {js_string(m.market_anchor_points)} points, busts and "
@@ -121,9 +122,9 @@ def _season_line(facts: PlayerFacts) -> str:
 def _injury_line(facts: PlayerFacts) -> str:
     injury = facts.injury
     if isinstance(injury, InjuryDesignated):
-        return f"Injury report: designation {injury.designation} as of {injury.as_of[:10]}."
+        return f"Injury report: designation {injury.designation}, on every report since {injury.since}."
     if isinstance(injury, InjuryClean):
-        return f"Injury report: checked as of {injury.as_of[:10]} and no designation was on file that day."
+        return f"Injury report: no designation on file on any report since {injury.since}."
     return "Injury report: no injury feed has been checked for him yet. This is not a health claim either way."
 
 

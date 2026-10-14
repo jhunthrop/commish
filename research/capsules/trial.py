@@ -15,13 +15,13 @@ from datetime import datetime
 from sqlalchemy import Engine
 
 from research.capsules.facts.board import BoardRow, board_rows
-from research.capsules.facts.collect import PRODUCT_SEASON
 from research.capsules.gateway import GatewayClient
 from research.capsules.generate import CapsuleResult, describe_fallback
 from research.capsules.pull_figures import PageValues, capsule_findings, page_numbers, pull_figures_of
 from research.capsules.store import stored_capsules_for
 from research.capsules.sweep import Subject, subjects_of, worn_phrases, write_one
 from research.nightly.capsule_gate import judge_capsules
+from research.season import PRODUCT_SEASON
 
 
 @dataclass(frozen=True, slots=True)

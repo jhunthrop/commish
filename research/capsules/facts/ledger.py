@@ -175,7 +175,7 @@ def _derived_numbers(facts: FactsContent) -> list[float]:
 def _printed_text_numbers(facts: FactsContent) -> list[float]:
     numbers: list[float] = []
     if not isinstance(facts.injury, InjuryUnknown):
-        numbers += [js_number(part) for part in facts.injury.as_of[:10].split("-")]
+        numbers += [js_number(part) for part in facts.injury.since.split("-")]
     for story in facts.news:
         text = f"{story.title} {'' if story.published_at is None else story.published_at[:10]}"
         numbers += [js_number(raw) for raw in _NUMBER.findall(text)]
@@ -185,7 +185,7 @@ def _printed_text_numbers(facts: FactsContent) -> list[float]:
 def number_ledger(facts: FactsContent, depth_numbers: list[float]) -> list[float]:
     """`buildNumberLedger`, the sheet's own fields in its declared order."""
     m, p, a, season = facts.market, facts.projection, facts.availability, facts.season
-    numbers: list[float] = [facts.product_season, m.board_rank]
+    numbers: list[float] = [facts.product_season, *_present(m.board_rank)]
     numbers += _present(m.adp, m.position_rank, m.replacement_level, m.players_left_in_tier, m.drop_to_next_tier)
     numbers += _present(m.market_anchor_points, m.market_anchor_delta)
     numbers += [p.projected_points, p.floor_points, p.median_points, p.ceiling_points, p.typical_low, p.typical_high]

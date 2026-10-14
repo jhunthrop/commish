@@ -16,13 +16,15 @@ from urllib.parse import urlencode, urljoin
 
 from research.errors import ConfigurationError, ResearchError
 from research.pipeline.http import Fetcher, HttpResponse
+from research.season import PRODUCT_SEASON
 
 TANK01_HOST: Final = "tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com"
 TANK01_BASE_URL: Final = f"https://{TANK01_HOST}"
 BURST_RETRY_DELAY_SECONDS: Final = 1.1
 API_KEY_ENV: Final = "TANK01_API_KEY"
 SEASON_ENV: Final = "TANK01_SEASON"
-DEFAULT_SEASON: Final = 2026
+# The provider store holds the product season (`research.season`).
+DEFAULT_SEASON: Final = PRODUCT_SEASON
 
 
 class Paths:

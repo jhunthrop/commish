@@ -97,11 +97,14 @@ class SweepReport:
     cost_usd: float = 0.0
     queued: int | None = None
     detail: list[str] = field(default_factory=list)
+    # Universe id to the gateway calls his capsule took in this sweep.
+    calls_by_player: dict[str, int] = field(default_factory=dict)
 
 
 def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted: bool) -> None:
     usage = result.usage
     report.calls += result.calls
+    report.calls_by_player[subject.universe_id] = report.calls_by_player.get(subject.universe_id, 0) + result.calls
     if usage is not None:
         report.prompt_tokens += usage.prompt_tokens or 0
         report.completion_tokens += usage.completion_tokens or 0
@@ -157,15 +160,26 @@ class SweepPlan:
     budget: int = CAPSULE_CONFIG.sweep_generation_budget
     deadline: Callable[[], bool] | None = None
     unwritten_only: bool = False
+    # The repair pass the nightly runs when its capsule gate finds a written sentence on two pages:
+    # exactly these universe ids are rewritten, whatever their rows hold, with `avoid` (the shared
+    # sentences) quoted into the prompt beside the board's worn language.
+    only: frozenset[str] | None = None
+    avoid: tuple[str, ...] = ()
+    # Players the night has spent its call budget on (`nightly.capsule_step`), never written again.
+    exclude: frozenset[str] = frozenset()
 
 
-def _eligible(subject: Subject, row: StoredCapsule | None, unwritten_only: bool) -> bool:
-    return _unwritten(row) if unwritten_only else _needs_generation(subject, row)
+def _eligible(subject: Subject, row: StoredCapsule | None, plan: SweepPlan) -> bool:
+    if subject.universe_id in plan.exclude:
+        return False
+    if plan.only is not None:
+        return subject.universe_id in plan.only
+    return _unwritten(row) if plan.unwritten_only else _needs_generation(subject, row)
 
 
-def _ordered(subjects: Sequence[Subject], stored: dict[str, StoredCapsule], unwritten_only: bool) -> list[Subject]:
+def _ordered(subjects: Sequence[Subject], stored: dict[str, StoredCapsule], plan: SweepPlan) -> list[Subject]:
     """The demoted first, then every unwritten page, then the rest in board order."""
-    eligible = [s for s in subjects if _eligible(s, stored.get(s.universe_id), unwritten_only)]
+    eligible = [s for s in subjects if _eligible(s, stored.get(s.universe_id), plan)]
     demoted = [
         s
         for s in eligible
@@ -181,8 +195,9 @@ def sweep_capsules(engine: Engine, gateway: GatewayClient, as_of: datetime, plan
     with engine.connect() as conn:
         subjects = subjects_of(conn, as_of)
         stored = stored_capsules_for(conn, [s.universe_id for s in subjects])
-    ordered = _ordered(subjects, stored, plan.unwritten_only)
-    worn = worn_phrases(subjects, stored)
+    ordered = _ordered(subjects, stored, plan)
+    board_worn = worn_phrases(subjects, stored)
+    worn = WornPhrases((*plan.avoid, *board_worn.sentences), board_worn.phrases)
     report = SweepReport(as_of, len(subjects), len(ordered))
     stopped = False
     for subject in ordered[: plan.budget]:

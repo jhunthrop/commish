@@ -16,6 +16,8 @@ from typing import Final
 from sqlalchemy import Connection, text
 
 REGENERATE_FACTS_HASH: Final = "stale:repetition"
+# A capsule the writer wrote (the others are a facts block, or the oracle's template).
+WRITTEN_SOURCE: Final = "llm"
 RETRY_FIRST_FACTS_HASH: Final = "stale:demoted"
 
 

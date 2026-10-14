@@ -32,7 +32,12 @@ from research.pipeline.nflverse.schedule import (
     map_schedule,
     week_as_of_from_schedule,
 )
-from research.pipeline.nflverse.stat_lines import STAT_LINE_GAPS, map_stat_lines, stat_line_observations
+from research.pipeline.nflverse.stat_lines import (
+    STAT_LINE_GAPS,
+    completion_observations,
+    map_stat_lines,
+    stat_line_observations,
+)
 from research.pipeline.nflverse.team_map import (
     line_continuity_observations,
     map_player_teams,
@@ -93,9 +98,22 @@ def ingest_player_universe(conn: Connection, client: NflverseClient) -> PlayerUn
     return PlayerUniverse(players)
 
 
-def _fetch_player_week(client: NflverseClient, season: int) -> list[dict[str, str]]:
+# nflverse moved the weekly player stats to the `stats_player` release: from 2025 the old
+# `player_stats` tag answers 404 (checked 2026-10-13: 2024 is served by both tags, 2025 and 2026
+# only by `stats_player`, the same file name and columns). The oracle still reads `player_stats`,
+# so it never saw a 2025 or 2026 outcome and the register could not grade a 2026 week; the parity
+# cases pass the oracle's tag explicitly.
+PLAYER_WEEK_MOVED_SEASON = 2025
+
+
+def player_week_release(season: int) -> str:
+    """The release tag that publishes `season`'s weekly player stats."""
+    return Releases.STATS_PLAYER if season >= PLAYER_WEEK_MOVED_SEASON else Releases.PLAYER_WEEK
+
+
+def _fetch_player_week(client: NflverseClient, season: int, release: str) -> list[dict[str, str]]:
     try:
-        return client.get_csv(Releases.PLAYER_WEEK, f"stats_player_week_{season}.csv")
+        return client.get_csv(release, f"stats_player_week_{season}.csv")
     except NflverseError as error:
         if error.kind != "not_found":
             raise
@@ -168,16 +186,22 @@ def _merged_unresolved(refs: Sequence[UnresolvedRef]) -> list[UnresolvedSummary]
     return list(unresolved.values())
 
 
-def ingest_season(
+def ingest_season(  # noqa: PLR0913 - the oracle's four, its schedule stamps, and the release keyword
     conn: Connection,
     client: NflverseClient,
     universe: PlayerUniverse,
     season: int,
     schedule_as_of: Mapping[float, datetime] | None = None,
+    *,
+    release: str | None = None,
+    completions: bool = True,
 ) -> SeasonIngestReport:
-    """`ingestSeason`: participation, stat lines, team edges and line continuity for one season."""
+    """`ingestSeason`: participation, stat lines, team edges and line continuity for one season.
+    `release` names the weekly stats' release tag, `player_week_release(season)` when not given.
+    `completions` also writes each line's pass completions (the player card's game log reads them;
+    the oracle never wrote them, so its parity cases turn them off)."""
     snap_counts = _fetch_snap_counts(client, season)
-    player_week = _fetch_player_week(client, season)
+    player_week = _fetch_player_week(client, season, release or player_week_release(season))
     week_as_of = _week_as_of(season, snap_counts, schedule_as_of)
     participation = map_participation(snap_counts, player_week, universe)
     stat_lines = map_stat_lines(player_week, week_as_of, universe)
@@ -192,6 +216,8 @@ def ingest_season(
     written = record_observations(conn, participation_rows) + record_observations(
         conn, stat_line_observations(stat_lines.stat_lines)
     )
+    if completions:
+        written += record_observations(conn, completion_observations(stat_lines.stat_lines))
     player_teams = (
         map_player_teams(snap_counts, universe)
         if snap_counts

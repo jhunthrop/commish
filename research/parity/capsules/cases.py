@@ -1,17 +1,31 @@
-"""THE CAPSULE FACTS CASES: the sheet the writer is given, oracle against port, exact.
+"""THE CAPSULE FACTS CASES: the sheet the writer is given, against a recording of it, exact. A
+self-regression check against the port's own recording, not parity with the oracle: it catches a change
+in the port's facts, never an error the port shares with its recording.
 
     uv run python -m research.parity capsules <case>|all
+    uv run python -m research.parity capsules record
 
-Both sides read the dev copy (PARITY_SOURCE_DATABASE_URL), read only, at one instant: the oracle its
-legacy `public` tables through its own `collectBoardFacts` and `collectPlayerFacts`, the port the
-`research` schema the loader filled from them. Every field of every sheet is compared, the number and
-name ledgers and the facts hash included (the hash is order-sensitive JSON, so equal hashes prove the
-key order too), and the board pass's order and counts.
+Phase D fix round 3 re-recorded these cases. They once compared the port with the TypeScript oracle
+live, but the oracle reads the legacy `public` tables, which stopped moving when the nightly took
+over (its injury captures, news and history no longer match the store), and fix round 3 changed the
+facts hash itself (an injury status is dated by its capture's Eastern day, `facts.reference`). The
+oracle retires at cutover. What the cases now hold is the port against `fixtures/capsules-facts/
+record.json`, a recording of the port's own board pass on the dev copy at `AS_OF`, with the
+product's sheet (the run's ADP and board ranks, `facts.market_adp`):
+
+- `facts-board`: every board player's facts hash (the hash is over every content field, in order),
+  and every field of a sample of sheets (every 45th), ledgers included, so a difference names its
+  section; the pass's order and counts.
+- `facts-one`: the narrow single-player read for the sample, a market-order kicker and an unknown id,
+  equal to the recorded sheet and to the board pass's sheet for the same player.
+
+Both read the dev copy (PARITY_SOURCE_DATABASE_URL), read only, as of `AS_OF`: every capture and
+observation after it is ignored, so a later nightly does not move them. An ingest that writes rows
+stamped before `AS_OF` (a history rebuild) does; then `capsules record` writes the recording again,
+and the report says why.
 """
 
 import json
-import os
-import subprocess
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -20,7 +34,7 @@ from typing import Any, Final
 
 from sqlalchemy import Connection, create_engine
 
-from research.capsules.facts.collect import collect_board_facts
+from research.capsules.facts.collect import BoardFactsPass, collect_board_facts
 from research.capsules.facts.collect_one import ServedBoardCache, collect_player_facts
 from research.capsules.facts.model import to_js
 from research.db.url import sqlalchemy_url
@@ -28,28 +42,11 @@ from research.parity.model.compare import diff_rows
 from research.parity.model.outcome import CaseResult, Claim
 from research.parity.model.store import source_url
 
-_REPO: Final = Path(__file__).resolve().parents[3]
-_DRIVER: Final = _REPO / "research" / "parity" / "ts" / "capsules.ts"
 AS_OF: Final = datetime(2026, 10, 13, tzinfo=UTC)
-_TIMEOUT_SECONDS: Final = 1800
+RECORD: Final = Path(__file__).resolve().parents[1] / "fixtures" / "capsules-facts" / "record.json"
 _SAMPLE_EVERY: Final = 45
 # An id nobody holds: no sheet, on either side.
-_NO_SHEET: Final = ("no-such-player",)
-
-
-def _oracle(*args: str) -> list[Any]:
-    completed = subprocess.run(
-        ["npx", "tsx", str(_DRIVER), *args],
-        cwd=_REPO,
-        capture_output=True,
-        text=True,
-        timeout=_TIMEOUT_SECONDS,
-        env={**os.environ, "DATABASE_URL": source_url()},
-        check=False,
-    )
-    if completed.returncode != 0:
-        raise RuntimeError(f"the oracle's capsules {args[0]} failed: {completed.stderr.strip()[-2000:]}")
-    return [json.loads(line) for line in completed.stdout.splitlines() if line.startswith("{")]
+_NO_SHEET: Final = "no-such-player"
 
 
 def _read_only[T](read: Callable[[Connection], T]) -> T:
@@ -62,44 +59,80 @@ def _read_only[T](read: Callable[[Connection], T]) -> T:
         engine.dispose()
 
 
-def _sections(by_id: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[str, dict[str, Any]]]:
+def _board() -> BoardFactsPass:
+    return _read_only(lambda conn: collect_board_facts(conn, AS_OF))
+
+
+def _pass_counts(board: BoardFactsPass) -> dict[str, Any]:
+    return {
+        "order": [facts.identity.id for facts in board.facts],
+        "priorSeasonPlayerCount": board.prior_season_player_count,
+        "peerCountByPosition": {str(position): count for position, count in board.peer_count_by_position.items()},
+    }
+
+
+def _kicker() -> str:
+    return str(
+        _read_only(
+            lambda conn: conn.exec_driver_sql(
+                "select id from research.provider_players where position = 'K' and adp is not null order by adp limit 1"
+            ).scalar_one()
+        )
+    )
+
+
+def record() -> Path:
+    """Writes the recording from the dev copy as it stands: the pass, every hash, the sample's sheets."""
+    board = _board()
+    sheets = {facts.identity.id: to_js(facts) for facts in board.facts}
+    sample = [*list(sheets)[::_SAMPLE_EVERY], _kicker()]
+    recording = {
+        "asOf": AS_OF.isoformat().replace("+00:00", "Z"),
+        "recordedAt": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "pass": _pass_counts(board),
+        "hashes": {player_id: sheet["factsHash"] for player_id, sheet in sheets.items()},
+        "sample": {player_id: sheets.get(player_id) for player_id in sample},
+    }
+    RECORD.parent.mkdir(parents=True, exist_ok=True)
+    RECORD.write_text(json.dumps(recording, indent=1, sort_keys=True) + "\n")
+    return RECORD
+
+
+def _recording() -> dict[str, Any]:
+    return dict(json.loads(RECORD.read_text()))
+
+
+def _sections(by_id: Mapping[str, Mapping[str, Any] | None]) -> dict[str, dict[str, dict[str, Any]]]:
     """Each sheet as one row per top-level field, so a difference names its section."""
     out: dict[str, dict[str, dict[str, Any]]] = {}
     for player_id, facts in by_id.items():
-        for key, value in facts.items():
+        for key, value in (facts or {}).items():
             out.setdefault(key, {})[player_id] = {"value": value}
     return out
 
 
 def facts_board() -> CaseResult:
-    oracle_lines = _oracle("board", AS_OF.isoformat().replace("+00:00", "Z"))
-    oracle_facts = [line["facts"] for line in oracle_lines if "facts" in line]
-    oracle_pass = next(line["pass"] for line in oracle_lines if "pass" in line)
-    port = _read_only(lambda conn: collect_board_facts(conn, AS_OF))
-    port_facts = [to_js(facts) for facts in port.facts]
-    left = _sections({f["identity"]["id"]: f for f in oracle_facts})
-    right = _sections({f["identity"]["id"]: f for f in port_facts})
-    diffs = [
-        diff_rows(f"sheet {key}", left.get(key, {}), right.get(key, {}))
-        for key in [*left, *(k for k in right if k not in left)]
-    ]
-    peers = {str(position): count for position, count in port.peer_count_by_position.items()}
+    recorded = _recording()
+    board = _board()
+    sheets = {facts.identity.id: to_js(facts) for facts in board.facts}
+    hashes = {pid: {"factsHash": h} for pid, h in recorded["hashes"].items()}
+    port_hashes = {pid: {"factsHash": sheet["factsHash"]} for pid, sheet in sheets.items()}
+    left = _sections(recorded["sample"])
+    right = _sections({pid: sheets.get(pid) for pid in recorded["sample"]})
+    diffs = [diff_rows(f"every board sheet's facts hash, recorded at {recorded['recordedAt']}", hashes, port_hashes)]
+    diffs += [diff_rows(f"sample sheet {key}", left[key], right.get(key, {})) for key in left]
+    counts = _pass_counts(board)
     claims = [
         Claim(
-            f"the pass's order: {len(oracle_facts)} sheets in the board's served order on both sides",
-            [f["identity"]["id"] for f in oracle_facts] == [f["identity"]["id"] for f in port_facts],
+            f"the pass's order: {len(recorded['pass']['order'])} sheets", recorded["pass"]["order"] == counts["order"]
         ),
         Claim(
-            f"the prior season's story count, {oracle_pass['priorSeasonPlayerCount']}",
-            oracle_pass["priorSeasonPlayerCount"] == port.prior_season_player_count,
+            f"the prior season's story count, {recorded['pass']['priorSeasonPlayerCount']}",
+            recorded["pass"]["priorSeasonPlayerCount"] == counts["priorSeasonPlayerCount"],
         ),
         Claim(
-            f"the active peers by position, {oracle_pass['peerCountByPosition']}",
-            oracle_pass["peerCountByPosition"] == peers,
-        ),
-        Claim(
-            "every facts hash equal",
-            all(a["factsHash"] == b["factsHash"] for a, b in zip(oracle_facts, port_facts, strict=False)),
+            f"the active peers by position, {recorded['pass']['peerCountByPosition']}",
+            recorded["pass"]["peerCountByPosition"] == counts["peerCountByPosition"],
         ),
     ]
     return CaseResult("facts-board", diffs, claims=claims)
@@ -108,36 +141,14 @@ def facts_board() -> CaseResult:
 @dataclass(frozen=True, slots=True)
 class _Sample:
     ids: tuple[str, ...]
+    recorded: dict[str, Any]
     board: dict[str, dict[str, Any]]
 
 
-def _sample() -> _Sample:
-    board = _read_only(lambda conn: collect_board_facts(conn, AS_OF))
-    sheets = {facts.identity.id: to_js(facts) for facts in board.facts}
-    chosen = list(sheets)[::_SAMPLE_EVERY]
-    kicker = _read_only(
-        lambda conn: conn.exec_driver_sql(
-            "select id from research.provider_players where position = 'K' and adp is not null order by adp limit 1"
-        ).scalar_one()
-    )
-    return _Sample((*chosen, str(kicker), *_NO_SHEET), sheets)
-
-
-_KNOWN_DEFECT: Final = "is not one of the 32 product team codes"
-
-
 def facts_one() -> CaseResult:
-    """The narrow read, oracle against port. Where the oracle's narrow read throws on its own team-code
-    defect (`depth_collect._depth_rows`), the port's sheet is compared with the oracle's board-pass
-    sheet for the same player instead, the sheet the narrow read promises to equal."""
-    sample = _sample()
-    instant = AS_OF.isoformat().replace("+00:00", "Z")
-    lines = _oracle("one", instant, *sample.ids)
-    oracle = {line["id"]: line.get("facts") for line in lines}
-    errors = {line["id"]: line["error"] for line in lines if "error" in line}
-    oracle_board = {
-        line["facts"]["identity"]["id"]: line["facts"] for line in _oracle("board", instant) if "facts" in line
-    }
+    """The narrow read for the sample, against the recording and against the board pass's sheet."""
+    recorded = _recording()["sample"]
+    sample = _Sample((*recorded, _NO_SHEET), recorded, {f.identity.id: to_js(f) for f in _board().facts})
     served = ServedBoardCache()
 
     def port_one(conn: Connection) -> dict[str, Any]:
@@ -148,33 +159,17 @@ def facts_one() -> CaseResult:
         return out
 
     port = _read_only(port_one)
-    expected = {pid: oracle_board.get(pid) if pid in errors else oracle.get(pid) for pid in sample.ids}
-    left = {pid: {"facts": value} for pid, value in expected.items()}
-    right = {pid: {"facts": value} for pid, value in port.items()}
-    absent = [pid for pid in sample.ids if pid not in errors and oracle.get(pid) is None]
+    left = {pid: {"facts": sample.recorded.get(pid)} for pid in sample.ids}
+    right = {pid: {"facts": port.get(pid)} for pid in sample.ids}
     claims = [
+        Claim(f"no sheet for {_NO_SHEET}", port.get(_NO_SHEET) is None),
         Claim(
-            f"{len(sample.ids)} ids asked: every {_SAMPLE_EVERY}th board player, a market-order kicker, an unknown id",
-            len(lines) == len(sample.ids),
-        ),
-        Claim(f"no sheet for {', '.join(absent)}, on both sides", all(port.get(pid) is None for pid in absent)),
-        Claim(
-            f"the oracle's narrow read threw for {len(errors)} of {len(sample.ids)}, every time on its team-code defect",
-            all(_KNOWN_DEFECT in message for message in errors.values()),
-        ),
-        Claim(
-            "each port narrow read equals the board pass's sheet for the same player",
-            all(port[pid] == sample.board[pid] for pid in sample.ids if port.get(pid) is not None),
+            "each narrow read equals the board pass's sheet for the same player, where the board carries him",
+            all(port[pid] == sample.board[pid] for pid in sample.ids if pid in sample.board),
         ),
     ]
-    notes = [f"oracle narrow read threw for {pid}: {message[:120]}" for pid, message in errors.items()]
-    direct = len(sample.ids) - len(errors) - len(absent)
-    what = (
-        f"collectPlayerFacts sheets: {len(errors)} of {len(sample.ids)} against the oracle's board-pass sheet "
-        f"(its narrow read threw), {len(absent)} None on both sides ({', '.join(absent)}), "
-        f"{direct} against the oracle's narrow read"
-    )
-    return CaseResult("facts-one", [diff_rows(what, left, right)], notes, claims=claims)
+    what = f"collectPlayerFacts sheets: {len(sample.ids)} ids (every {_SAMPLE_EVERY}th board player, a kicker, an unknown id)"
+    return CaseResult("facts-one", [diff_rows(what, left, right)], claims=claims)
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,7 +181,7 @@ class CapsuleCase:
 
 CAPSULE_CASES: Final = (
     CapsuleCase(
-        "facts-board", "the sweep's facts pass for every board player, every field, ledgers and hash", facts_board
+        "facts-board", "the board pass against its recording: every facts hash, a sample's every field", facts_board
     ),
-    CapsuleCase("facts-one", "the narrow single-player read, and its equality with the board pass", facts_one),
+    CapsuleCase("facts-one", "the narrow read against the recording and the board pass", facts_one),
 )
