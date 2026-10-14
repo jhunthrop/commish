@@ -12,6 +12,7 @@ from research.capsules.facts.model import InjuryClean, InjuryDesignated, SeasonS
 from research.capsules.render_words import week_of
 from research.model.jsmath import js_to_fixed
 from research.pipeline.jscompat import js_string
+from research.season import REGULAR_SEASON_WEEKS
 
 if TYPE_CHECKING:
     from research.capsules.facts.build import PlayerFacts
@@ -40,9 +41,18 @@ def today_line(facts: "PlayerFacts") -> str:
         else f"every game through {week_of(season.through, year)} is in our records"
     )
     return (
-        f"Today is {facts.run_day}. The {year} season is under way: {reach}, and {week_of(season.through + 1, year)} "
-        "is the next to play. The reader drafted before the season began and is managing his roster now."
+        f"Today is {facts.run_day}. The {year} season is under way: {reach}{_next_week(season)}. The reader "
+        "drafted before the season began and is managing his roster now."
     )
+
+
+def _next_week(season: SeasonSoFar) -> str:
+    """The week after `through`: none past the regular season, and under way when he has played it."""
+    following = season.through + 1
+    if following > REGULAR_SEASON_WEEKS:
+        return ""
+    played = any(w.week == following and w.status == "played" for w in season.weeks)
+    return f", and {week_of(following, season.season)} is {'under way' if played else 'the next to play'}"
 
 
 def _week_line(week: SeasonWeek, season: int) -> str:

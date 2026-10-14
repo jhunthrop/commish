@@ -105,3 +105,49 @@ def test_every_slip_gets_a_sentence_correction(rule: str, found: str, advice: st
     assert is_voice_rule_violation(violation)
     correction = soft_correction_for(violation)
     assert correction is not None and advice in correction
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "After a lost 2025, he needs to be back by November.",
+        "Like last season, he needs to be healthy by December for your playoff run.",
+        "He sat in October of 2025 and needs to be back this October.",
+    ],
+)
+def test_a_month_on_this_seasons_calendar_fails_whatever_else_the_sentence_names(text: str) -> None:
+    assert "time frame (a month)" in _rules(text, OCTOBER)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "He is worth a second-round pick, no more.",
+        "Spend a third-round pick on him and do not look back.",
+        "Grab him in round two and move on.",
+        "Take him over Bijan Robinson.",
+        "Draft day is the time to pounce.",
+        "Snag him at 18.",
+    ],
+)
+def test_the_draft_voice_the_review_found_missing(text: str) -> None:
+    assert any(rule.startswith("draft voice") for rule in _rules(text, OCTOBER)), text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Target him before your league's trade deadline while he is cheap to get.",
+        "Managers waiting on him to come back from IR should hold.",
+        "He needs 15 points in week 7 of 2026 to stay in your lineup.",
+    ],
+)
+def test_in_season_sentences_the_review_found_refused_pass(text: str) -> None:
+    assert _rules(text, OCTOBER) == []
+
+
+def test_points_a_game_against_the_season_number_is_handed_back() -> None:
+    nacua = "At 25.9 points a game he is tracking exactly where our 344-point projection wanted him."
+    assert "time frame (points a game against the season number)" in _rules(nacua, OCTOBER)
+    assert _rules("Our preseason number was 344 points for the season.", OCTOBER) == []
+    assert _rules(nacua, PRESEASON) == []

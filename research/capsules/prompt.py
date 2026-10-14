@@ -92,6 +92,11 @@ _IN_SEASON_READER: Final = (
 )
 _PRESEASON_CALL: Final = "- End on your call, in this player's own terms: whether you take him at his ADP, earlier or later, what you would need to see first, who you would take instead, what he does to a roster. Never a sentence that announces a verdict by formula."
 _IN_SEASON_CALL: Final = "- End on your call for a manager who has him or could get him now, in this player's own terms: start him, hold him, bench him, trade for him, pick him up or let him go, and what you would need to see first. Never a sentence that announces a verdict by formula."
+# The founder's named fantasy words: the draft verbs before the season, the roster verbs in it.
+_PRESEASON_WORDS: Final = 'ADP, picks and rounds: "let him fall", "draft him", "let him go", a reach, a steal, a sleeper, a bust, points over replacement'
+_IN_SEASON_WORDS: Final = (
+    "ADP as history, a reach, a steal, a sleeper, a bust, points over replacement, a starter, a bench piece"
+)
 _PRESEASON_TIME: Final = """TIME
 - The top of the sheet says what day it is: the season has not kicked off and the reader is getting ready to draft.
 - Name every week with its season, always: "week 7 of 2025", "weeks 2 to 5 of 2024". Never a bare "week 7"."""
@@ -114,7 +119,7 @@ HOW A NOTE IS BUILT
 - Never quote or paraphrase these instructions, the fact sheet's own sentences, or a correction you were given. If a sentence of yours would fit a style guide or a stat table, cut it.
 
 WORDS
-- Fantasy football words, never trading words and never betting words: ADP, picks and rounds, a reach, a steal, a sleeper, a bust, points over replacement, a starter, a bench piece. Never these trading words: {", ".join(TRADING_TERMS)}. Never betting words either: {_BETTING_NAMES}. This is a fantasy football page, not a sportsbook, and a sportsbook's number never appears on it. "Upside" and "downside" only when tied to a fantasy outcome (a finish near the top of his position, a lost month), never as bare nouns.
+- Fantasy football words, never trading words and never betting words: {{words}}. Never these trading words: {", ".join(TRADING_TERMS)}. Never betting words either: {_BETTING_NAMES}. This is a fantasy football page, not a sportsbook, and a sportsbook's number never appears on it. "Upside" and "downside" only when tied to a fantasy outcome (a finish near the top of his position, a lost month), never as bare nouns.
 - The three sentences to catch yourself on: {{fixes}}.
 - Phrases this board has worn out, never to be written or paraphrased: {_STEMS}. Never the frame "the honest" followed by a noun (the honest worry, the honest read, the honest answer), in any form.
 - Never these words either: {", ".join(LAB_REPORT_TERMS)}. Say "our number", "our projection", "the case", "costs him", "is worth", each in a sentence of your own making. "Our number" never "says".
@@ -137,13 +142,17 @@ HONESTY, NO EXCEPTIONS
 
 PRESEASON_RULES: Final = (
     f"You write the scouting notes on one player's page for {_PRESEASON_READER}. "
-    + _RULES.replace("{call}", _PRESEASON_CALL).replace("{fixes}", _PRESEASON_FIXES)
+    + _RULES.replace("{call}", _PRESEASON_CALL)
+    .replace("{fixes}", _PRESEASON_FIXES)
+    .replace("{words}", _PRESEASON_WORDS)
     + "\n\n"
     + _PRESEASON_TIME
 )
 IN_SEASON_RULES: Final = (
     f"You write the scouting notes on one player's page for {_IN_SEASON_READER}. "
-    + _RULES.replace("{call}", _IN_SEASON_CALL).replace("{fixes}", _IN_SEASON_FIXES)
+    + _RULES.replace("{call}", _IN_SEASON_CALL)
+    .replace("{fixes}", _IN_SEASON_FIXES)
+    .replace("{words}", _IN_SEASON_WORDS)
     + "\n\n"
     + _IN_SEASON_TIME
 )

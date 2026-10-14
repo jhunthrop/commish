@@ -32,6 +32,8 @@ from research.capsules.repetition import (
     players_to_regenerate,
     stock_sentences,
 )
+from research.capsules.span_rules import span_rules_for
+from research.capsules.spans import SpanRules, TonightSpans, page_texts
 from research.capsules.store import (
     RETRY_FIRST_FACTS_HASH,
     CapsuleWrite,
@@ -169,6 +171,9 @@ class SweepPlan:
     # The repair's per page language: each page's own six-word spans that another page carries too
     # (`capsules.spans`), quoted into that page's prompt beside `avoid`.
     avoid_by_page: Mapping[str, tuple[str, ...]] = field(default_factory=lambda: MappingProxyType({}))
+    # The night's span rules (`capsules.span_rules`), built once by the nightly; None builds them here.
+    # Each writer call is told the spans tonight's latest pages already share (`spans.TonightSpans`).
+    span_rules: SpanRules | None = None
     # Players the night has spent its call budget on (`nightly.capsule_step`), never written again.
     exclude: frozenset[str] = frozenset()
 
@@ -199,8 +204,11 @@ def sweep_capsules(engine: Engine, gateway: GatewayClient, as_of: datetime, plan
     with engine.connect() as conn:
         subjects = subjects_of(conn, as_of)
         stored = stored_capsules_for(conn, [s.universe_id for s in subjects])
+        rules = plan.span_rules or span_rules_for(conn, (s.facts for s in subjects))
     ordered = _ordered(subjects, stored, plan)
     board_worn = worn_phrases(subjects, stored)
+    repetition = CAPSULE_CONFIG.repetition
+    tonight = TonightSpans(rules, repetition.tonight_window_pages)
     report = SweepReport(as_of, len(subjects), len(ordered))
     stopped = False
     for subject in ordered[: plan.budget]:
@@ -210,8 +218,11 @@ def sweep_capsules(engine: Engine, gateway: GatewayClient, as_of: datetime, plan
         if report.processed and CAPSULE_CONFIG.sweep_pacing_ms > 0:
             time.sleep(CAPSULE_CONFIG.sweep_pacing_ms / 1000)
         own = plan.avoid_by_page.get(subject.universe_id, ())
-        worn = WornPhrases((*plan.avoid, *own, *board_worn.sentences), board_worn.phrases)
+        repeated = tonight.repeated(repetition.max_quoted_spans)
+        worn = WornPhrases((*plan.avoid, *own, *repeated, *board_worn.sentences), board_worn.phrases)
         result, demoted = write_one(engine, subject, stored.get(subject.universe_id), gateway, worn)
+        if result.source == "llm":
+            tonight.add(page_texts(result.compact.text, result.full.text, result.narrative.slots))
         _tally(report, subject, result, demoted)
         report.processed.append(subject.universe_id)
     if stopped:

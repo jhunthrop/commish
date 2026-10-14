@@ -6,13 +6,20 @@ the sentences around it differed: "is the whole story", "comes from seasons cut 
 across players as a defect, so the capsule gate holds every written page to this: no span of
 `SPAN_WORDS` words appears on two pages.
 
-A page's words are read across both sizes of its read, case folded with the punctuation stripped
+A page's words are read across both sizes of its read and its narrative sentences (each beside a
+module on the page: prose too, and the most templated), case folded with the punctuation stripped
 (a decimal keeps its point, a contraction its apostrophe). Player and club names are not words of a
 span: a name breaks the run, so two pages that name the same teammate or club do not share a span
-for it, and so does a week with its season, the citation every page must carry. A name is a capitalised word of any player's name in the store or any spelling of a club.
+for it, and so does a week with its season, the citation every page must carry. A name is a
+capitalised word of any player's name in the store or any spelling of a club.
+
+`TonightSpans` keeps the spans of the pages written tonight (the most recent `window`), so each
+writer call is told the phrasing tonight's pages already repeat, and collisions are avoided as they
+are written rather than repaired after.
 """
 
 import re
+from collections import Counter, deque
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
@@ -85,6 +92,11 @@ def spans_of(runs: Runs) -> frozenset[str]:
     return frozenset(" ".join(run[i : i + SPAN_WORDS]) for run in runs for i in range(len(run) - SPAN_WORDS + 1))
 
 
+def page_texts(compact: str, full: str, narrative: Mapping[str, str] | None) -> tuple[str, ...]:
+    """Every prose text of a page: both reads and each narrative sentence."""
+    return (compact, full, *(narrative or {}).values())
+
+
 def page_runs(bodies: Sequence[str], names: frozenset[str]) -> Runs:
     """A page's runs over every size of its read."""
     return tuple(run for body in bodies for run in runs_of(body, names))
@@ -118,3 +130,20 @@ def phrases_on_page(runs: Runs, shared: frozenset[str]) -> tuple[str, ...]:
         if begin is not None:
             phrases.append(" ".join(run[begin:end]))
     return tuple(dict.fromkeys(phrases))
+
+
+class TonightSpans:
+    """The spans of the most recent `window` pages written tonight; `repeated` is what two or more of
+    them already share, most widely first, for the next writer call to avoid."""
+
+    def __init__(self, rules: SpanRules, window: int) -> None:
+        self._rules = rules
+        self._pages: deque[frozenset[str]] = deque(maxlen=window)
+
+    def add(self, texts: Sequence[str]) -> None:
+        self._pages.append(spans_of(page_runs(texts, self._rules.names)) - self._rules.exempt)
+
+    def repeated(self, cap: int) -> tuple[str, ...]:
+        counts = Counter(span for page in self._pages for span in page)
+        shared = sorted((span for span, n in counts.items() if n > 1), key=lambda s: (-counts[s], s))
+        return tuple(shared[:cap])

@@ -19,7 +19,7 @@ from research.model.backtest import HeldOutScore, held_out_scores
 from research.model.instants import js_iso
 from research.nightly.assemble import Assembled
 from research.nightly.build.season import format_json
-from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate
+from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate, span_rules
 from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan, run_capsule_step
 from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION
 from research.nightly.headshots import Face, mirror_headshots
@@ -61,7 +61,7 @@ def _capsules(
         record = StepRecord("capsules", status, f"{result.spend.line()}; {result.gate.summary()}")
         return StepOutcome(record, result.gate, tuple(result.findings.reasons), result.spend)
     with engine.connect() as conn:
-        gate = capsule_gate(conn, clock())
+        gate = capsule_gate(conn, clock(), span_rules(conn, clock()))
         findings = page_findings(conn, clock())
     return StepOutcome(
         StepRecord("capsules", "skipped", "skipped by --skip; the gate judges what is stored"),
@@ -89,7 +89,8 @@ def run_steps(  # noqa: PLR0913, PLR0917 - the steps' shared dependencies
     if capsule.capsule_gate is None:
         # The step raised: the gate still judges the board as stored.
         with engine.connect() as conn:
-            gate, findings = capsule_gate(conn, clock()), page_findings(conn, clock())
+            gate = capsule_gate(conn, clock(), span_rules(conn, clock()))
+            findings = page_findings(conn, clock())
         steps[-1] = StepOutcome(capsule.record, gate, tuple(findings.reasons))
     return steps
 

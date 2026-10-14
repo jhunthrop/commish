@@ -44,10 +44,14 @@ class SeasonSubject:
     position: Position
 
 
-def in_season(conn: Connection, season: int, as_of: datetime) -> bool:
-    """The writer's voice: in season once the season's first kickoff is at or before `as_of`."""
-    kickoff = first_kickoff_for(conn, season)
+def is_in_season(kickoff: datetime | None, as_of: datetime) -> bool:
+    """The writer's voice: in season once the season's first kickoff is at or before `as_of`; no
+    schedule on file is preseason."""
     return kickoff is not None and kickoff <= as_of
+
+
+def in_season(conn: Connection, season: int, as_of: datetime) -> bool:
+    return is_in_season(first_kickoff_for(conn, season), as_of)
 
 
 def _touchdowns(totals: Mapping[str, Any]) -> float | None:

@@ -163,6 +163,7 @@ TRADING_TERMS: Final = (
     "discount",
     "dividend",
     "return on",
+    "fetch",
 )
 DRAFTING_SENTENCES: Final = (
     ("the price is right", "he is going a round later than he should"),
@@ -198,9 +199,10 @@ TRADING_REPLACEMENTS: Final = MappingProxyType(
         "discount": ("a steal",),
         "dividend": ("points over replacement",),
         "return on": ("what he gives back",),
+        "fetch": ("what he would bring back in a trade",),
     }
 )
-_SPENT: Final = ("where he went before the season", "what he cost you")
+_SPENT: Final = ("where he went before the season",)
 # The drafting phrases above speak to a draft still ahead; in season the same words for a roster.
 IN_SEASON_REPLACEMENTS: Final = MappingProxyType(
     {
@@ -219,10 +221,11 @@ IN_SEASON_REPLACEMENTS: Final = MappingProxyType(
         "overvalued": ("not worth where he went",),
         "undervalue": ("better than where he went",),
         "overvalue": ("not worth where he went",),
-        "premium": ("a steep cost",),
-        "discount": ("a bargain",),
+        "premium": ("a reach",),
+        "discount": ("a steal", "a waiver steal"),
         "dividend": ("points over replacement",),
         "return on": ("what he gives back",),
+        "fetch": ("what he would bring back in a trade",),
     }
 )
 BANNED_VOCABULARY: Final = (*LAB_REPORT_TERMS, *ALL_TIME_TERMS, *TRADING_TERMS)

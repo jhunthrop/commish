@@ -24,6 +24,11 @@ prints it (`facts.season_so_far`, the in-season voice of the live review's H2) i
 provider's season lines, so every facts hash moved by design; and the season block reads the store
 as of `AS_OF` like every other read here.
 
+There is no pre-kickoff case: `AS_OF` is in season, and the 2026 preseason is no longer the store's
+as-of view of anything the cases hold (an as-of before 2026-09-10 would read a board, captures and
+ADP the dev copy was not recorded against). The preseason voice is held by the unit tests instead
+(`tests/test_capsule_voice_switch.py`: the kickoff boundary, the preseason sheet lines and rules).
+
 Both read the dev copy (PARITY_SOURCE_DATABASE_URL), read only, as of `AS_OF`: every capture and
 observation after it is ignored, so a later nightly does not move them. An ingest that writes rows
 stamped before `AS_OF` (a history rebuild) does; then `capsules record` writes the recording again,

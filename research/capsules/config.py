@@ -52,6 +52,8 @@ class Repetition:
     # The six-word spans shared across pages (`capsules.spans`) a prompt quotes: the board's most
     # widely shared to every writer, and a repaired page its own.
     max_quoted_spans: int = 12
+    # The pages written tonight whose spans the next writer call is checked against (`TonightSpans`).
+    tonight_window_pages: int = 60
     opener_words: int = 4
     max_opener_family_share: float = 0.1
     max_refrain_share: float = 0.1
@@ -127,11 +129,14 @@ class CapsuleConfig:
     repetition: Repetition = Repetition()
     # A law group's |net effect| at or above this is a real, citable downside.
     tension_threshold_points: float = 1.0
-    # Pages one night may write, every pass together. Measured in Lane 17 (2026-10-14, the in-season
-    # floor): a page costs $0.0027 to $0.0038. In season most of the board's sheets move on the morning
-    # a week lands, so that night rewrites about 536 pages, about $1.60 to $2.00, and the retries and
-    # repairs take the rest: the ceiling is about $2.10 to $2.65 a night. Other nights write only what moved.
-    sweep_generation_budget: int = 700
+    # Pages one night may write, every pass together (raised from 700 by the Lane 17 fix-round ruling so a
+    # full rewrite leaves room for the retries and repairs). Measured in Lane 17 (2026-10-14, the
+    # in-season floor): a page costs $0.0027 to $0.0038, so the ceiling is about $2.70 to $3.80 a night,
+    # ruled at about $3.50. In season every page's sheet moves on the morning a week lands (about 536
+    # pages, $1.60 to $2.00 before retries and repairs), injury designations move pages through the week,
+    # and the span repairs rewrite two-page carriers every night, so steady nights spend real budget too,
+    # up to the same ceiling. The board-scale measurement is in the Lane 17 report.
+    sweep_generation_budget: int = 1000
     # Zero: every gateway call is spaced at `gateway.min_call_spacing_ms`, which paces the sweep.
     sweep_pacing_ms: int = 0
 

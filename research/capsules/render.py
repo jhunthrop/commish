@@ -168,6 +168,19 @@ def _trend_line(facts: PlayerFacts) -> str | None:
     return None if not written else " ".join(written)
 
 
+def label_sections(facts: PlayerFacts) -> list[str]:
+    """The sheet's labelled stats: the case (each factor's name and worth) and the color (each
+    ranked stat with its label). A read that names one of these stats copies its label, so the span
+    gate exempts these words (`capsules.span_rules`); the sheet's framing sentences are not here."""
+    sections = []
+    if facts.evidence:
+        sections.append("The case:\n" + "\n".join(f"- {_evidence_line(item)}" for item in facts.evidence))
+    color = [line for line in (_story_line(facts), _usage_line(facts), _trend_line(facts)) if line is not None]
+    if color:
+        sections.append("The color:\n" + "\n".join(f"- {line}" for line in color))
+    return sections
+
+
 def render_facts_for_model(facts: PlayerFacts) -> str:
     """`renderFactsForModel`: the whole sheet, plain text, the user message's first half."""
     identity = facts.identity
@@ -179,11 +192,7 @@ def render_facts_for_model(facts: PlayerFacts) -> str:
     availability = _availability_line(facts)
     if availability is not None:
         sections.append(availability)
-    if facts.evidence:
-        sections.append("The case:\n" + "\n".join(f"- {_evidence_line(item)}" for item in facts.evidence))
-    color = [line for line in (_story_line(facts), _usage_line(facts), _trend_line(facts)) if line is not None]
-    if color:
-        sections.append("The color:\n" + "\n".join(f"- {line}" for line in color))
+    sections += label_sections(facts)
     sections += [season_section(facts), bye_line(facts), injury_line(facts)]
     sections.append("Recent news:\n" + "\n".join(f"- {line}" for line in _news_lines(facts)))
     depth = render_depth_section(facts)

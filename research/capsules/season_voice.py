@@ -59,6 +59,11 @@ _SEASON_BEFORE: Final = re.compile(r"\b(?P<season>(?:19|20)\d\d)(?:'s|,)?\s+$", 
 _SCORE_BEFORE: Final = re.compile(
     r"\d+(?:\.\d+)?\s*(?:fantasy\s+)?(?:points?|pts)?\s+(?:in|during|from|on)\s+(?:his\s+)?$", re.IGNORECASE
 )
+# A score said of a week ahead as a need or a hope ("he needs 15 points in week 7 of 2026") looks
+# ahead; the cue sits just before the score.
+_FORWARD_CUE: Final = re.compile(
+    r"\b(?:needs?|wants?|would|could|should|can|will|might|must|to|for)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
+)
 _PAST_AFTER: Final = re.compile(
     r"^\s*,?\s*(?:when\s+|where\s+)?(?:he\s+)?(?:scored|had|was|went|missed|played|caught|ran|posted|finished|sat|"
     r"put up|managed|logged|dropped)\b",
@@ -80,15 +85,23 @@ MONTHS: Final = named_rule(
 # What speaks to a draft that is still ahead: the in-season voice never does (H2).
 DRAFT_VOICE_PATTERNS: Final = (
     named_rule("draft voice (draft him)", r"\bdraft(?:s|ing)? (?:him|them)\b"),
-    named_rule("draft voice (draft day)", r"\b(?:on|before|at|by) draft day\b|\b(?:in|at|for|before) your draft\b"),
+    named_rule("draft voice (draft day)", r"\bdraft day\b|\b(?:in|at|for|before) your draft\b"),
     named_rule("draft voice (when you draft)", r"\bwhen (?:you|you're|you are) (?:draft|on the clock)"),
     named_rule(
         "draft voice (a pick to spend)",
-        r"\b(?:take|takes|taking|grab|grabbing|select|target|targeting) (?:him|them) "
-        r"(?:at|around|near|before|after|ahead of|in the|with your)\b",
+        r"\b(?:take|takes|taking|grab|grabbing|snag|snagging|select|target|targeting) (?:him|them) "
+        r"(?:at|around|near|before(?! (?:the |your |your league's )?trade deadline)|after|ahead of|in the|"
+        r"with your|over)\b",
+    ),
+    named_rule("draft voice (a round to spend)", r"\bin (?:the )?round (?:one|two|three|four|five|six|seven|\d+)\b"),
+    named_rule(
+        "draft voice (a round-pick to spend)",
+        r"\b(?:worth|spend|spending|use|using|burn|burning)\b[^.]{0,20}?\b(?:a|an|your)\s+[a-z0-9]+[- ]round "
+        r"(?:pick|selection)\b",
     ),
     named_rule(
-        "draft voice (let him fall)", r"\blet (?:him|them) (?:fall|slide)\b|\b(?:wait|waiting) on (?:him|them)\b"
+        "draft voice (let him fall)",
+        r"\blet (?:him|them) (?:fall|slide)\b|\bwait on (?:him|them) (?:until|a round|in the)\b",
     ),
     named_rule("draft voice (reach for him)", r"\breach(?:ing)? for (?:him|them)\b"),
     # Drafters' history ("backs drafted at his ADP", "taken at his ADP") is past and passes.
@@ -167,7 +180,10 @@ def _unplayed_told_as_past(reference: WeekReference, clock: SeasonClock) -> bool
     ahead = [week for week in reference.weeks if week > clock.through and week not in clock.played]
     if not ahead:
         return False
-    return bool(_SCORE_BEFORE.search(reference.before[-40:]) or _PAST_AFTER.match(reference.after))
+    before = reference.before[-60:]
+    score = _SCORE_BEFORE.search(before)
+    told_as_past = score is not None and _FORWARD_CUE.search(before[: score.start()]) is None
+    return told_as_past or _PAST_AFTER.match(reference.after) is not None
 
 
 def time_frame_hits(text: str, clock: SeasonClock) -> list[VoiceRuleHit]:
@@ -183,25 +199,59 @@ def time_frame_hits(text: str, clock: SeasonClock) -> list[VoiceRuleHit]:
         return hits
     hits += _month_hits(text, clock)
     hits += _draft_voice_hits(text, DRAFT_VOICE_PATTERNS)
+    hits += [VoiceRuleHit(PER_GAME_AGAINST_SEASON.name, m.group(0)) for m in _per_game_against_season(text)]
     return hits
 
 
-_EARLIER_SEASON: Final = re.compile(r"\b(?:last (?:season|year)|that (?:season|year)|(?:19|20)\d\d)\b", re.IGNORECASE)
+# In season, points a game set against our full-season number compare two different things (the
+# live review of Lane 17, M7: "at 25.9 points a game he is tracking exactly where our 344-point
+# projection wanted him"). A sentence carrying both is handed back.
+PER_GAME_AGAINST_SEASON: Final = named_rule(
+    "time frame (points a game against the season number)",
+    r"\b\d{3}(?:\.\d)?(?:-point| points?)\s+(?:preseason\s+)?(?:projection|number|preseason number)\b|"
+    r"\b(?:projection|preseason number|our number)\b[^.]{0,30}?\b\d{3}(?:\.\d)?(?: points?)?\b",
+)
+_PER_GAME: Final = re.compile(r"\b(?:a|per) game\b", re.IGNORECASE)
+
+
+def _per_game_against_season(text: str) -> list[re.Match[str]]:
+    found = []
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        match = PER_GAME_AGAINST_SEASON.pattern.search(sentence)
+        if match is not None and _PER_GAME.search(sentence):
+            found.append(match)
+    return found[:1]
+
+
+_EARLIER_BESIDE: Final = re.compile(
+    r"^\W{0,2}(?:of\s+|in\s+)?(?P<year>(?:19|20)\d\d)\b|^[\w-]*\s+\w+\s+last (?:season|year)\b|^[\w-]*\s+last (?:season|year)\b",
+    re.IGNORECASE,
+)
+_DEADLINE_BEFORE: Final = re.compile(
+    r"\b(?:by|until|till|before|into|through)\s+(?:early\s+|mid\s*-?\s*|late\s+)?$", re.IGNORECASE
+)
+_THIS_SEASON: Final = re.compile(r"\bthis (?:season|year|fall)\b", re.IGNORECASE)
+
+
+def _month_is_history(sentence: str, month: re.Match[str], season: int) -> bool:
+    """History only when an earlier season stands right beside the month ("October of 2025", "an
+    early-October dud last season") and nothing in the sentence puts it on this season's calendar."""
+    if _DEADLINE_BEFORE.search(sentence[: month.start()]) or _THIS_SEASON.search(sentence) or str(season) in sentence:
+        return False
+    beside = _EARLIER_BESIDE.search(sentence[month.end() :])
+    return beside is not None and (beside.group("year") is None or int(beside.group("year")) < season)
 
 
 def _month_hits(text: str, clock: SeasonClock) -> list[VoiceRuleHit]:
-    """A month in a sentence about this season; one in a sentence about an earlier season is history
-    told on its own calendar ("an early-October dud last season"), not a date the reader is held to."""
+    """Every month that places something on this season's calendar."""
     hits = []
     for sentence in re.split(r"(?<=[.!?])\s+", text):
-        month = MONTHS.pattern.search(sentence)
-        if month is None:
-            continue
-        years = [m.group(0) for m in _EARLIER_SEASON.finditer(sentence)]
-        earlier = [y for y in years if not y.isdigit() or int(y) < clock.season]
-        if not earlier or str(clock.season) in years:
-            hits.append(VoiceRuleHit(MONTHS.name, month.group(0)))
-    return hits
+        hits += [
+            VoiceRuleHit(MONTHS.name, month.group(0))
+            for month in MONTHS.pattern.finditer(sentence)
+            if not _month_is_history(sentence, month, clock.season)
+        ]
+    return hits[:1]
 
 
 def _draft_voice_hits(text: str, rules: tuple[NamedPattern, ...]) -> list[VoiceRuleHit]:

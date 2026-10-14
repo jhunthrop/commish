@@ -6,7 +6,9 @@ The order, and why each pass exists:
    the sweep rewrites the whole board with the current writer. The first Python run does this once,
    to replace the oracle-era rows (their prose template and their repeated verdict sentences).
 2. **The sweep** (`capsules.sweep`): every page whose facts moved, whose row is missing or whose row
-   the writer did not write, within the night's budget.
+   the writer did not write, within the night's budget. Each writer call in every pass is told the
+   six-word spans the pass's latest pages already share (`spans.TonightSpans`), so tonight's
+   collisions are avoided as they are written; the span rules are built once for the night.
 3. **The retry passes** (up to `RETRY_PASSES`): another attempt at the pages still unwritten (facts blocks), from the budget
    left, because a throttled or refused read often succeeds on a second try.
 4. **The repair pass**: the capsule gate fails a run when a written sentence of four words or more
@@ -40,9 +42,16 @@ from sqlalchemy import Engine
 
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.gateway import GatewayClient
+from research.capsules.spans import SpanRules
 from research.capsules.store import queue_regeneration
 from research.capsules.sweep import SweepPlan, SweepReport, sweep_capsules
-from research.nightly.capsule_gate import CapsuleGateResult, board_universe_ids, capsule_gate
+from research.nightly.capsule_gate import (
+    CapsuleGateResult,
+    board_universe_ids,
+    capsule_gate,
+    repair_targets,
+    span_rules,
+)
 from research.nightly.page_findings import PageFindings, page_findings
 
 REPAIR_PASSES: Final = 3
@@ -103,17 +112,6 @@ class CapsuleStepResult:
     wrote: bool
 
 
-def repair_targets(holders: Sequence[tuple[str, ...]], board_order: Sequence[str]) -> list[str]:
-    """Every page but the first (in board order) of each shared sentence or span (`holders`, each one's
-    pages), each once, in board order."""
-    place = {player_id: index for index, player_id in enumerate(board_order)}
-    rewrite: set[str] = set()
-    for player_ids in holders:
-        ordered = sorted(player_ids, key=lambda pid: place.get(pid, len(place)))
-        rewrite.update(ordered[1:])
-    return sorted(rewrite, key=lambda pid: place.get(pid, len(place)))
-
-
 def _holders(gate: CapsuleGateResult) -> list[tuple[str, ...]]:
     return [*(s.player_ids for s in gate.shared), *(s.player_ids for s in gate.spans)]
 
@@ -141,8 +139,19 @@ def _regenerate_all(engine: Engine, now: datetime) -> str:
 class _Passes:
     """The writing passes of one night: one gateway, one clock, one budget shared by every pass."""
 
-    def __init__(self, engine: Engine, gateway: GatewayClient, now: datetime, plan: CapsuleStepPlan, log: Log) -> None:
+    def __init__(  # noqa: PLR0913 - the night's shared state
+        self,
+        engine: Engine,
+        gateway: GatewayClient,
+        now: datetime,
+        plan: CapsuleStepPlan,
+        log: Log,
+        *,
+        rules: SpanRules,
+    ) -> None:
         self.engine = engine
+        # Built once: the sheets, and so the exempt spans, are fixed by the run's instant.
+        self.rules = rules
         self.mend_only = plan.mend_only
         self.gateway = gateway
         self.now = now
@@ -163,7 +172,7 @@ class _Passes:
         return frozenset(pid for pid, calls in self.calls_by_player.items() if calls > last_start)
 
     def sweep(self, name: str, plan: SweepPlan) -> SweepReport:
-        plan = replace(plan, exclude=plan.exclude | self.spent_out)
+        plan = replace(plan, exclude=plan.exclude | self.spent_out, span_rules=self.rules)
         report = sweep_capsules(self.engine, self.gateway, self.now, plan)
         for pid, calls in report.calls_by_player.items():
             self.calls_by_player[pid] = self.calls_by_player.get(pid, 0) + calls
@@ -175,7 +184,7 @@ class _Passes:
         # The sentences already on two pages are quoted to the writer from the first call, so the
         # sweep does not write them again and the repair pass is left the few it still does.
         with self.engine.connect() as conn:
-            gate = capsule_gate(conn, self.now)
+            gate = capsule_gate(conn, self.now, self.rules)
         cap = CAPSULE_CONFIG.repetition.max_quoted_spans
         shared = (*(s.sentence for s in gate.shared), *(s.span for s in gate.spans[:cap]))
         name = "capsules (mend only: pages whose facts moved wait for a full night)" if self.mend_only else "capsules"
@@ -185,7 +194,7 @@ class _Passes:
         # A rewrite the repair could not get past its validator leaves a facts block, so the
         # unwritten pages get their retries once more, the sentences now on two pages quoted.
         with self.engine.connect() as conn:
-            gate = capsule_gate(conn, self.now)
+            gate = capsule_gate(conn, self.now, self.rules)
         if gate.facts_blocks:
             self.retry("capsule retries after repair", gate.facts_blocks, tuple(x.sentence for x in gate.shared))
             # A page those retries write can share a sentence with another, so the repairs run once more
@@ -202,7 +211,7 @@ class _Passes:
     def repair(self) -> None:
         for attempt in range(1, REPAIR_PASSES + 1):
             with self.engine.connect() as conn:
-                gate = capsule_gate(conn, self.now)
+                gate = capsule_gate(conn, self.now, self.rules)
                 order = board_universe_ids(conn, self.now)
                 failing = page_findings(conn, self.now).by_page
             place = {pid: index for index, pid in enumerate(order)}
@@ -226,6 +235,8 @@ def run_capsule_step(engine: Engine, now: datetime, plan: CapsuleStepPlan, log: 
     """The capsule step, a line per pass; the result carries the gate and what the writing cost."""
     key = os.environ.get(CAPSULE_CONFIG.gateway.api_key_variable, "").strip()
     spend = CapsuleSpend()
+    with engine.connect() as conn:
+        rules = span_rules(conn, now)
     if not key:
         log(
             f"capsules: writing skipped, {CAPSULE_CONFIG.gateway.api_key_variable} is not set "
@@ -235,12 +246,12 @@ def run_capsule_step(engine: Engine, now: datetime, plan: CapsuleStepPlan, log: 
         if plan.regenerate_all:
             log(_regenerate_all(engine, now))
         with httpx.Client() as http:
-            passes = _Passes(engine, GatewayClient(key, http), now, plan, log)
+            passes = _Passes(engine, GatewayClient(key, http), now, plan, log, rules=rules)
             passes.run()
             spend = passes.spend
         log(f"capsules spent: {spend.line()}")
     with engine.connect() as conn:
-        gate = capsule_gate(conn, now)
+        gate = capsule_gate(conn, now, rules)
         findings = page_findings(conn, now)
     log(f"{gate.summary()}; {len(findings.by_page)} written pages fail the page gate")
     return CapsuleStepResult(gate, findings, spend, bool(key))
