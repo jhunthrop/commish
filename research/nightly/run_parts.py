@@ -21,7 +21,9 @@ from research.model.arithmetic import model_version
 from research.model.artifacts import read_artifact
 from research.model.backtest import HeldOutScore, held_out_scores
 from research.model.instants import js_iso
+from research.model.ros.live import RawPrior, load_ros_priors, raw_priors
 from research.nightly.assemble import Assembled
+from research.nightly.build.ros import RosSetup
 from research.nightly.build.season import format_json
 from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate
 from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan, night_facts, run_capsule_step
@@ -42,6 +44,10 @@ Log = Callable[[str], None]
 # before, the statements' fingerprints after.
 HELD_OUT_CODEC: Final = ValueCodec((HeldOutScore,))
 HELD_OUT_CACHE: Final = "nightly/held-out-scores"
+# The rest-of-season model's prior, the season's raw board, moves only when a new generation is
+# written, so it is read through the cache too (one statement, its fingerprint on later nights).
+ROS_CODEC: Final = ValueCodec((RawPrior,))
+ROS_RAW_CACHE: Final = "nightly/ros-raw-priors"
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,6 +124,22 @@ def held_out(engine: Engine, store: RunStore) -> tuple[list[HeldOutScore], Mappi
     return scores, previous
 
 
+def ros_setup(engine: Engine, instant: datetime, log: Log) -> RosSetup:
+    """The rest-of-season model's stored inputs: the pinned artifact and the raw board's points a
+    game. A read that fails leaves the artifact missing, so the boards stay preseason and say why."""
+    cache = ReadCache(engine, ROS_CODEC, code_digest("research.model.ros.live"), log)
+    try:
+        with snapshot(engine) as conn:
+            priors = load_ros_priors(conn)
+            raw = cache.through(
+                conn, ROS_RAW_CACHE, [PRODUCT_SEASON], instant, lambda: raw_priors(conn, PRODUCT_SEASON, instant)
+            )
+    except Exception as error:
+        log(f"rest of season: the model's inputs could not be read ({type(error).__name__}: {error})")
+        return RosSetup(None, {})
+    return RosSetup(priors, {row.player_id: row for row in raw})
+
+
 def mirror_faces(http: httpx.Client, store: RunStore, assembled: Assembled, skip: bool) -> tuple[Json, str]:
     if skip:
         return {}, "skipped by --skip"
@@ -138,7 +160,7 @@ def manifest_of(  # noqa: PLR0913, PLR0917 - every field the manifest names
         "season": PRODUCT_SEASON,
         "implementation": IMPLEMENTATION,
         "standIn": False,
-        "formats": [format_json(f, PRODUCT_SEASON) for f in assembled.formats],
+        "formats": [format_json(f, PRODUCT_SEASON, assembled.rest) for f in assembled.formats],
         "players": len(assembled.people),
         "sources": list(assembled.sources),
         # Past the web's schema, which reads only the fields above: who made the numbers, the

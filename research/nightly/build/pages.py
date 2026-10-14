@@ -75,7 +75,7 @@ def identities(boards: Sequence[FormatBoard]) -> list[Identity]:
 def numbers_of(entry: BoardEntry, adp: float | None) -> Json:
     """A board row without the identity: the page's numbers for one format (`playerFormatSchema`)."""
     row = entry.row
-    return {
+    numbers: Json = {
         "positionRank": entry.position_rank,
         "ourRank": entry.our_rank,
         "vorRound": math.ceil(entry.our_rank / TEAMS),
@@ -88,6 +88,10 @@ def numbers_of(entry: BoardEntry, adp: float | None) -> Json:
         "ceiling": row.ceiling,
         "tier": entry.tier,
     }
+    if entry.preseason is not None:
+        # In season, beside the rest-of-season figures: where the preseason board had him.
+        numbers |= {"preseasonRank": entry.preseason.our_rank, "preseasonPoints": entry.preseason.row.projected}
+    return numbers
 
 
 def board_json(board: FormatBoard, slugs: Mapping[str, Identity], adp: Mapping[str, float]) -> Json:
@@ -109,7 +113,11 @@ def board_json(board: FormatBoard, slugs: Mapping[str, Identity], adp: Mapping[s
 
 
 def page_values(entry: BoardEntry, adp: float | None) -> PageValues:
+    """The numbers his capsule was written about: the preseason board's, in season too."""
+    entry = entry.preseason or entry
     row = entry.row
+    if row.floor is None or row.median is None or row.ceiling is None:
+        raise ValueError(f"{row.name}'s preseason row has no range")
     return PageValues(
         row.projected, row.ceiling, row.floor, row.median, entry.value_over_replacement, entry.drop_to_next_tier, adp
     )

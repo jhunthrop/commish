@@ -2,7 +2,8 @@
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import Any, Final
+from typing import Any, Final, Protocol
+from zoneinfo import ZoneInfo
 
 from research.model.instants import js_iso
 from research.nightly.config import PAGE_FORMAT, TEAMS, RunFormat
@@ -122,16 +123,49 @@ def schedule_json(
     }
 
 
-def format_json(run_format: RunFormat, season: int) -> Json:
-    """A format as the manifest lists it, with the basis its board's lead prints, phrase by phrase."""
-    basis = [f"{run_format.scoring_words}, full {season} season", "projected before the season's first kickoff"]
-    if run_format.shape_words is not None:
-        basis.append(run_format.shape_words)
+def format_json(run_format: RunFormat, season: int, rest: "RestOfSeason | None" = None) -> Json:
+    """A format as the manifest lists it, with the basis its board's lead prints, phrase by phrase. In
+    season (`rest`), the rest-of-season window and the refresh, as additive fields and in the basis."""
+    span = (
+        [f"{run_format.scoring_words}, full {season} season", "projected before the season's first kickoff"]
+        if rest is None
+        else [
+            f"{run_format.scoring_words}, rest of the {season} season from week {rest.from_week}, "
+            f"refreshed {month_day(rest.refreshed_at)}"
+        ]
+    )
+    basis = [*span, *([] if run_format.shape_words is None else [run_format.shape_words])]
     basis += [f"ranked by points over replacement in a {TEAMS}-team league", "tiers drawn within each position"]
-    return {
+    out: Json = {
         "id": run_format.id,
         "label": run_format.label,
         "unit": run_format.unit,
         "teams": TEAMS,
         "basis": basis,
     }
+    if rest is not None:
+        out |= {"rosFromWeek": rest.from_week, "rosThroughWeek": rest.through, "refreshedAt": iso(rest.refreshed_at)}
+    return out
+
+
+class RestOfSeason(Protocol):
+    @property
+    def from_week(self) -> int: ...
+    @property
+    def through(self) -> int: ...
+    @property
+    def refreshed_at(self) -> datetime: ...
+
+
+# The day a run refreshed the board, in the product's time zone (the league's Sunday is Eastern).
+_PRODUCT_ZONE: Final = ZoneInfo("America/New_York")
+_MONTHS: Final = (
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+)  # fmt: skip
+
+
+def month_day(instant: datetime) -> str:
+    """ "October 14": the month in words and the day, in the product's time zone."""
+    local = instant.astimezone(_PRODUCT_ZONE)
+    return f"{_MONTHS[local.month - 1]} {local.day}"

@@ -14,7 +14,7 @@ own, numbered after the last tier above replacement. The tiers above replacement
 capsule quotes, are the service's exactly.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -55,9 +55,10 @@ class StoredRow:
     headshot_url: str | None
     market_adp: float | None  # the provider's ADP, the served order's tiebreak (`compareBoardOrder`)
     projected: float
-    floor: float
-    median: float
-    ceiling: float
+    # None in season: the rest-of-season board gives no range (`nightly.build.ros`).
+    floor: float | None
+    median: float | None
+    ceiling: float | None
     expected_games: float
 
 
@@ -71,6 +72,9 @@ class BoardEntry:
     # for a player at or below replacement.
     drop_to_next_tier: float | None
     our_rank: int
+    # In season, the preseason board's own entry for him (its rank and points, and the numbers his
+    # capsule was written about); None on a preseason board.
+    preseason: "BoardEntry | None" = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,7 +159,14 @@ def format_board(conn: Connection, season: int, run_format: RunFormat, as_of: da
     board = stored_board(conn, season, run_format.board_source, as_of)
     if board is None:
         return None
-    rows = stored_rows(conn, season, board)
+    return FormatBoard(run_format, board, board_entries(stored_rows(conn, season, board), run_format))
+
+
+def board_entries(
+    rows: Sequence[StoredRow], run_format: RunFormat, preseason: Mapping[str, BoardEntry] | None = None
+) -> tuple[BoardEntry, ...]:
+    """Rows valued under the format's shape, in the served order, ranked and tiered; `preseason`
+    (by universe id) links each in-season entry to his preseason one."""
     valued = value_board(
         [SeasonProjection(row.universe_id, row.position, row.projected) for row in rows],
         LeagueShape(TEAMS, run_format.slots),
@@ -163,14 +174,14 @@ def format_board(conn: Connection, season: int, run_format: RunFormat, as_of: da
     by_id = {player.player_id: player for player in valued}
     tiers = board_tiers(valued)
     ordered = sorted(rows, key=lambda row: _served_order(row, by_id[row.universe_id]))
-    entries = tuple(
+    return tuple(
         BoardEntry(
             row,
             by_id[row.universe_id].value_over_replacement,
             by_id[row.universe_id].position_rank,
             *tiers[row.universe_id],
             rank,
+            None if preseason is None else preseason[row.universe_id],
         )
         for rank, row in enumerate(ordered, start=1)
     )
-    return FormatBoard(run_format, board, entries)
