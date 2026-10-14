@@ -1,4 +1,8 @@
 <script lang="ts">
+	import { links } from '#lib/site/links.ts';
+	import { sectionHref } from '#lib/ui/nav.ts';
+	import type { NoteLink } from './note-words.ts';
+
 	/** A page's line about the selected league: what the figures are against the league's scoring
 	 * (words.ts), or one short fact (whose roster a player is on). Its room is kept from the first
 	 * paint while a league is selected (the boot script's data-league), so filling it in moves nothing
@@ -13,12 +17,19 @@
 		/** On a desk the line sits in a column as narrow as a phone's (the board's side column, under
 		 * the switch), so it keeps the phone's room there too. */
 		narrow?: boolean;
+		/** The one link the line ends on: where a Draft Pass holder's exact board lives. */
+		link?: NoteLink | null;
 	}
 
-	let { note, short = false, narrow = false }: Props = $props();
+	let { note, short = false, narrow = false, link = null }: Props = $props();
 </script>
 
-<p class="note" class:filled={note !== null} class:short class:narrow>{note ?? ''}</p>
+<p class="note" class:filled={note !== null} class:short class:narrow>
+	{note ?? ''}{#if link}{' '}
+		<a href={link.savedLeague === null ? sectionHref('mock') : links.mockLeague(link.savedLeague)}
+			>{link.words}</a
+		>{/if}
+</p>
 
 <style>
 	.note {

@@ -120,7 +120,9 @@
 <main class="board">
 	<!-- The league's line sits by the switch, not under the caption: atop the side column on a desk,
 	     first under the bar elsewhere. -->
-	<div class="league-line"><ContextNote {note} narrow /></div>
+	<div class="league-line">
+		<ContextNote note={note?.text ?? null} link={note?.link ?? null} narrow />
+	</div>
 	<div class="content">
 		<div class="lead">
 			<PageHead title="{season} Board" lead={page.seasonLead ?? page.format.basis.join(' · ')}>

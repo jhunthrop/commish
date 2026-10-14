@@ -148,7 +148,7 @@
 			{/snippet}
 		</HeroCard>
 		<div class="league-lines">
-			<ContextNote {note} />
+			<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
 			<ContextNote note={rostered === null ? null : `${rostered}.`} short />
 		</div>
 

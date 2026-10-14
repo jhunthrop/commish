@@ -162,7 +162,7 @@
 				? 'The players are not loading. Try again in a moment.'
 				: `Our ${format.label} board · ${String(data.run.season)} season`}
 		/>
-		<ContextNote {note} />
+		<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
 
 		{#if verdict?.kind === 'same'}
 			<EmptyState level={2} title="Pick two different players" line={SAME_PLAYER} />

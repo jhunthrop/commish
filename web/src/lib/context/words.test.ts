@@ -52,41 +52,43 @@ void test("a league's line is its host and scoring, and superflex when it reads 
 void test('a TE premium league on the PPR board says it in plain words, and where exact rules rank it', () => {
 	const te = league({ scoring: 'te_premium' });
 	assert.equal(
-		contextNote(te, 'ppr', false),
+		contextNote(te, 'ppr', false)?.text,
 		"Your league gives tight ends extra points per catch. This board is plain PPR. The Draft Pass ranks it by your league's exact rules."
 	);
 	assert.equal(
-		contextNote(te, 'ppr', false, 'These figures are'),
+		contextNote(te, 'ppr', false, 'These figures are')?.text,
 		"Your league gives tight ends extra points per catch. These figures are plain PPR. The Draft Pass ranks it by your league's exact rules."
 	);
-	assert.equal(
-		contextNote({ ...te, settings_league_id: '3f0c1a52-0000-4000-8000-000000000009' }, 'ppr', true),
-		"Your league gives tight ends extra points per catch. This board is plain PPR. Your league's exact board is in its mock draft."
-	);
-	assert.equal(
-		contextNote(te, 'ppr', true),
-		'Your league gives tight ends extra points per catch. This board is plain PPR.'
-	);
+	const saved = '3f0c1a52-0000-4000-8000-000000000009';
+	assert.deepEqual(contextNote({ ...te, settings_league_id: saved }, 'ppr', true), {
+		text: 'Your league gives tight ends extra points per catch. This board is plain PPR.',
+		link: { words: "Your league's exact board is in its mock draft.", savedLeague: saved }
+	});
+	assert.deepEqual(contextNote(te, 'ppr', true), {
+		text: 'Your league gives tight ends extra points per catch. This board is plain PPR.',
+		link: { words: "Set up your league's exact rules to rank by them.", savedLeague: null }
+	});
+	assert.equal(contextNote(te, 'ppr', false)?.link, null);
 });
 
 void test('a format the run does not carry says so and names what the page is in', () => {
 	assert.equal(
-		contextNote(league({ scoring: 'half_ppr', format: 'half_ppr' }), 'ppr', false),
+		contextNote(league({ scoring: 'half_ppr', format: 'half_ppr' }), 'ppr', false)?.text,
 		'Your league scores half PPR. This run has no half PPR board, so this board is PPR.'
 	);
 });
 
 void test('a link to another board the run carries says what this board is', () => {
 	assert.equal(
-		contextNote(league(), 'half_ppr', false, 'This board is', true),
+		contextNote(league(), 'half_ppr', false, 'This board is', true)?.text,
 		'Your league scores PPR. This board is half PPR.'
 	);
 });
 
 void test('a matching league says its scoring, and no league says nothing', () => {
-	assert.equal(contextNote(league(), 'ppr', false), 'Your league scores PPR.');
+	assert.equal(contextNote(league(), 'ppr', false)?.text, 'Your league scores PPR.');
 	assert.equal(
-		contextNote(league({ format: 'superflex' }), 'superflex', false),
+		contextNote(league({ format: 'superflex' }), 'superflex', false)?.text,
 		'Your league scores PPR and starts a superflex.'
 	);
 	assert.equal(contextNote(null, 'ppr', false), null);
@@ -130,8 +132,8 @@ void test("copy guard: no line doubles a word, the run's strength method include
 		scheduleLead(slate, 'Expected wins, set before the season', { count: 9, atLeast: '10.5' }, 5),
 		clubsLead('PPR', slate),
 		clubCaption(slate, 32),
-		contextNote(league({ scoring: 'te_premium' }), 'ppr', false),
-		contextNote(league({ scoring: 'half_ppr', format: 'half_ppr' }), 'ppr', false),
+		contextNote(league({ scoring: 'te_premium' }), 'ppr', false)?.text,
+		contextNote(league({ scoring: 'half_ppr', format: 'half_ppr' }), 'ppr', false)?.text,
 		leagueLine(league({ host: 'sleeper', scoring: 'half_ppr', format: 'superflex' }))
 	];
 	for (const line of lines) assert.doesNotMatch(line ?? '', DOUBLED_WORD, line ?? '');

@@ -21,14 +21,35 @@ export function leagueScores(league: ContextLeague): string {
 		: `Your league scores ${SCORING_WORDS[league.scoring]}.`;
 }
 
-/** Where a TE premium league's exact rules rank it, after "This board is plain PPR.": the Draft
- * Pass without custom_scoring, the league's own mock draft with it (its exact board), or nothing
- * when a mock room cannot draft the league. */
-function exactWords(league: ContextLeague, exactRules: boolean): string {
-	if (!exactRules) return " The Draft Pass ranks it by your league's exact rules.";
-	return league.settings_league_id === null
-		? ''
-		: " Your league's exact board is in its mock draft.";
+/** Where the line sends a Draft Pass holder for the league's exact board: its saved league's mock
+ * (the setup with the league filled in), or the mock setup to enter its rules when no saved league
+ * exists yet. */
+export interface NoteLink {
+	words: string;
+	/** The saved league the mock opens on, null for the setup itself. */
+	savedLeague: string | null;
+}
+
+/** The line, and the one link it ends on for an account with exact rules. */
+export interface LeagueNote {
+	text: string;
+	link: NoteLink | null;
+}
+
+const plain = (text: string): LeagueNote => ({ text, link: null });
+
+/** A TE premium league on its plain PPR figures: where its exact rules rank it. Without
+ * custom_scoring the Draft Pass does; with it, the league's own mock draft, as a link. */
+function exactNote(league: ContextLeague, exactRules: boolean, opening: string): LeagueNote {
+	if (!exactRules) return plain(`${opening} The Draft Pass ranks it by your league's exact rules.`);
+	const saved = league.settings_league_id;
+	return {
+		text: opening,
+		link:
+			saved === null
+				? { words: "Set up your league's exact rules to rank by them.", savedLeague: null }
+				: { words: "Your league's exact board is in its mock draft.", savedLeague: saved }
+	};
 }
 
 /** The page's one line about the league, null with no league selected. The figures' scoring names
@@ -41,19 +62,21 @@ export function contextNote(
 	exactRules: boolean,
 	subject: FiguresSubject = 'This board is',
 	leagueBoardOnRun = false
-): string | null {
+): LeagueNote | null {
 	if (!league) return null;
 	const scores = leagueScores(league);
 	const figuresAre = `${subject} ${figuresWords(figures)}`;
 	if (league.format !== figures) {
-		if (leagueBoardOnRun) return `${scores} ${figuresAre}.`;
+		if (leagueBoardOnRun) return plain(`${scores} ${figuresAre}.`);
 		const lower = figuresAre.charAt(0).toLowerCase() + figuresAre.slice(1);
-		return `${scores} This run has no ${figuresWords(league.format)} board, so ${lower}.`;
+		return plain(`${scores} This run has no ${figuresWords(league.format)} board, so ${lower}.`);
 	}
 	if (league.scoring === 'te_premium') {
-		return `${scores} ${subject} plain ${figuresWords(figures)}.${exactWords(league, exactRules)}`;
+		return exactNote(league, exactRules, `${scores} ${subject} plain ${figuresWords(figures)}.`);
 	}
-	return league.format === 'superflex'
-		? `Your league scores ${SCORING_WORDS[league.scoring]} and starts a superflex.`
-		: scores;
+	return plain(
+		league.format === 'superflex'
+			? `Your league scores ${SCORING_WORDS[league.scoring]} and starts a superflex.`
+			: scores
+	);
 }
