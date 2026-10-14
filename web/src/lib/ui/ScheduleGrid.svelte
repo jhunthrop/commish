@@ -4,7 +4,8 @@
 
 	/** Every club's slate, one row each: the club's face and name lead, its rank follows in the number
 	 * face with the strength, then a week grid that scrolls sideways in its own frame, so the page
-	 * never runs past its width. Each week names the opponent (at or vs) and his number, and a week
+	 * never runs past its width. On the phone the rank leads the club's name and the strength stays
+	 * pinned beside it, so only the weeks scroll. Each week names the opponent (at or vs) and his number, and a week
 	 * against one of the strongest opponents is shaded; the page states that population. */
 	interface Props {
 		rows: readonly ScheduleRow[];
@@ -41,6 +42,7 @@
 				<tr>
 					<th scope="row" class="club">
 						<span class="who">
+							<span class="rank-lead" aria-hidden="true">{row.rank}</span>
 							<Face src={row.face?.src ?? null} size={32} />
 							<span class="names">
 								<a href={row.href}>{row.name}</a>
@@ -217,14 +219,50 @@
 		opacity: 0.45;
 	}
 
+	.rank-lead {
+		display: none;
+	}
+
+	/* The phone keeps the club and its strength in view and scrolls only the weeks: the rank becomes
+	   a small lead before the face, the club's cell holds its width (a long name wraps), and the
+	   strength pins right after it, so its head is never cut. */
 	@media (max-width: 760px) {
 		.frame {
-			--club-w: 168px;
+			--club-w: 196px;
+			--strength-w: 80px;
 		}
 
-		.rank,
+		.club,
 		.strength {
-			position: static;
+			padding-inline: var(--s-2);
+		}
+
+		.club .who {
+			width: calc(var(--club-w) - 2 * var(--s-2));
+			font-size: var(--t-sm);
+		}
+
+		.names a {
+			white-space: normal;
+		}
+
+		.rank-lead {
+			display: inline;
+			flex: none;
+			min-width: 2ch;
+			font-size: var(--t-xs);
+			font-weight: 500;
+			color: var(--ink-3);
+			font-variant-numeric: tabular-nums;
+		}
+
+		.rank {
+			display: none;
+		}
+
+		.strength {
+			left: var(--club-w);
+			min-width: var(--strength-w);
 		}
 	}
 </style>
