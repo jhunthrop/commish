@@ -75,12 +75,13 @@ input {
    (its player column reaches the 204px the club needs). */
 @media (min-width: 1181px) and (max-width: 1439px) {
 	:root {
+		--rank-w: 28px;
 		--face-w: 40px;
 		--drafters-w: 140px;
-		--board-cols-games: 28px var(--face-w) minmax(140px, 1fr) var(--games-w) 84px 124px
+		--board-cols-games: var(--rank-w) var(--face-w) minmax(140px, 1fr) var(--games-w) 84px 124px
 			var(--drafters-w);
 		--board-cols-games-flat: var(--board-cols-games);
-		--board-cols-games-act: 28px var(--face-w) minmax(140px, 1fr) var(--games-w) 84px 124px
+		--board-cols-games-act: var(--rank-w) var(--face-w) minmax(140px, 1fr) var(--games-w) 84px 124px
 			var(--drafters-w) 32px;
 		--board-cols-games-act-flat: var(--board-cols-games-act);
 	}
@@ -92,11 +93,12 @@ input {
 	}
 }
 
-/* At 1181 to 1253px (iPad landscape) the row finds the tier chip's room: a 32px face, 116px for the
-   drafters and 10px between columns (Row and RowHead), so the player column reaches the 170px the
-   tier chip needs and the meta line drops only the club. */
+/* At 1181 to 1253px (iPad landscape) the row finds the tier chip's room: a 24px rank (three digits),
+   a 32px face, 116px for the drafters and 9px between columns (Row and RowHead), so the player
+   column holds the widest meta line with the tier chip and the meta line drops only the club. */
 @media (min-width: 1181px) and (max-width: 1253px) {
 	:root {
+		--rank-w: 24px;
 		--face-w: 32px;
 		--drafters-w: 116px;
 	}

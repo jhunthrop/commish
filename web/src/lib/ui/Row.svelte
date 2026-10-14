@@ -293,7 +293,7 @@
 	/* iPad landscape: tighter columns and a 32px face, so the tier chip keeps its room. */
 	@media (min-width: 1181px) and (max-width: 1253px) {
 		.games {
-			column-gap: 10px;
+			column-gap: 9px;
 		}
 
 		.games > .face :global(.face) {

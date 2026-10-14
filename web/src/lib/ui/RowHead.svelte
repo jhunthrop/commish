@@ -98,7 +98,7 @@
 
 	@media (min-width: 1181px) and (max-width: 1253px) {
 		.games {
-			column-gap: 10px;
+			column-gap: 9px;
 		}
 	}
 
