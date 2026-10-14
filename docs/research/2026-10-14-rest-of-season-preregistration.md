@@ -211,6 +211,46 @@ nothing; they are recorded in `2026-10-14-rest-of-season-dev-check.json`). After
 amendment with the check's numbers and committed before the judgment. No model choice, grid,
 population, statistic, threshold or judged week changes after the check.
 
+## Amendments, after the development check and before the judgment
+
+The check ran twice on 2024 (fit 2023), before any 2025 outcome was read. Its second run is
+`2026-10-14-rest-of-season-dev-check.json`.
+
+**Amendment 1: the half PPR and standard stale boards (an error of fact in this document, not a
+model choice).** "What the store holds" says the builder makes the stale board in each format. For
+PPR it does. For half PPR and standard it does not: the store holds 5 to 20 half and standard ADP
+rows a season for 2021-2025 (`preseason_rankings`), so the blended board falls to its market tail
+and gives nearly every player at a position one number (2024: every top-12 running back 38 points
+in half PPR, every top-12 receiver 70; 142 to 159 distinct values among about 345 backs and
+receivers in 2023-2025). That is not a board a drafter was shown. In the first run of the check, the
+model's half and standard rho beat that flat board by +0.25 to +0.62 at weeks 8 and 12, a comparison
+that measures nothing. The blended PPR board's season line is points only (it scores the same in all
+three formats), so it cannot be re-scored. The stale board in half PPR and standard is therefore
+**the served PPR board carried to the format by the raw model's own ratio**: for each player, the
+served board's projected points times (the raw board `commish_board_v1_ppr_12`'s season line scored
+in the format, over the same line scored in PPR); ratio 1 for a player the raw board lacks or scores
+at 0 PPR points. Its points a game divide by the served board's expected games. The amendment was
+decided from the boards' content, not from any score of the model, and it makes half and standard
+harder for the model to beat (the second run: half and standard G1 at week 4 fail beside PPR's).
+
+**Defect 1 (output only).** The command wrote no results file: `asdict` cannot copy the thresholds'
+read-only mappings. The thresholds are now written field by field. No number changed.
+
+**Found by the check and not changed** (each is a model choice this document fixed, so under the
+rule above it stands for the judgment and goes to the next round):
+
+- A player the preseason board capped for availability (week-one PUP or reserve) keeps the blended
+  board's season points over few expected games, so his points a game are inflated (2024: Nick Chubb
+  37.4 a game from 102 points over 2.7 games; Jonathon Brooks 34.9; Elijah Mitchell 28.7), and with
+  the return rates the model projects him as a starter (Chubb 232 rest-of-season points at week 4;
+  he scored 63).
+- The fitted shrinkage gives the stale board almost no weight for QB, RB and WR (k = 0.5 to 1 game,
+  2023 fit), so a three-game season decides most of a week-4 projection.
+- Second run, against the amended boards: G1 failed at week 4 for RB and WR in all three formats
+  (PPR: RB +0.0063, WR -0.0012); G2 failed at week 4 for RB and WR and at week 8 for WR in all
+  three formats; G3 failed for RB PPR (0.864), RB standard (0.878) and TE standard (0.703); every
+  week-8 and week-12 G1 cell passed (PPR +0.067 to +0.260); G4 passed. 18 of 85 lines failed.
+
 ## Decision rule
 
 - **All gates pass:** once the product season has kicked off (the run date against the first
