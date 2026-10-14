@@ -19,7 +19,16 @@ export interface NoticeView {
 	quiet?: NoticeLink;
 }
 
-const HTTP = { badRequest: 400, unauthorized: 401, forbidden: 403, notFound: 404 } as const;
+const HTTP = {
+	badRequest: 400,
+	unauthorized: 401,
+	forbidden: 403,
+	notFound: 404,
+	unprocessable: 422
+} as const;
+
+/** The API marks a board it could not build for a league's own rules in this field. */
+const SCORING_FIELD = 'scoring';
 
 /** The API names the site a refused signed-out start belongs on in this field. */
 const SITE_FIELD = 'site';
@@ -105,6 +114,13 @@ export function noticeFor(error: unknown, subject: NoticeSubject, returnTo: stri
 				return {
 					text: "That link doesn't hold a draft. Ask for the link again, or set up your own mock.",
 					verb: newMock()
+				};
+			return { text: error.message };
+		case HTTP.unprocessable:
+			if (error.fields[SCORING_FIELD] === 'refused')
+				return {
+					text: error.message,
+					verb: { label: 'Open the setup page', href: resolve('/mock/new') }
 				};
 			return { text: error.message };
 		case 0:
