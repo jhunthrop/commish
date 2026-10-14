@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { contextNote, heldMark, switchLabel, type ContextLeague, type Held } from './words.ts';
 import { leagueLine } from './menu-words.ts';
+import { clubCaption, clubsLead, scheduleLead } from '#lib/run/strength-words.ts';
+
+/** The copy guard's doubled word: "the the", "is is". */
+const DOUBLED_WORD = /\b(\w+)\s+\1\b/i;
 
 const league = (over: Partial<ContextLeague> = {}): ContextLeague => ({
 	id: '3f0c1a52-0000-4000-8000-000000000001',
@@ -76,4 +80,23 @@ void test('the held mark names your roster, the team, or a roster when the name 
 	assert.deepEqual(heldMark(held, 'c'), { words: 'On a roster in your league', mine: false });
 	assert.equal(heldMark(held, 'free'), null);
 	assert.equal(heldMark(null, 'a'), null);
+});
+
+void test('copy guard: no line doubles a word, the run\'s strength method included', () => {
+	// The real run's method carries its own article; the pages once added a second ("the the").
+	const slate = {
+		method: "the average of its opponents' expected wins for the season, one per game",
+		window: { from: '2026-09-07T12:00:00.000Z', to: '2026-09-07T12:00:00.000Z' },
+		rank: 32
+	};
+	const lines = [
+		scheduleLead(slate, 'Expected wins, set before the season', { count: 9, atLeast: '10.5' }),
+		clubsLead('PPR', slate),
+		clubCaption(slate, 32),
+		contextNote(league({ scoring: 'te_premium' }), 'ppr'),
+		contextNote(league({ scoring: 'half_ppr', format: 'half_ppr' }), 'ppr'),
+		leagueLine(league({ host: 'sleeper', scoring: 'half_ppr', format: 'superflex' }))
+	];
+	for (const line of lines) assert.doesNotMatch(line ?? '', DOUBLED_WORD, line ?? '');
+	assert.match('Strength is the the average', DOUBLED_WORD);
 });
