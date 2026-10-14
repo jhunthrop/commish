@@ -13,7 +13,9 @@ const cloudSQLSocketDir = "/cloudsql/trycommish:us-east1:commish-pg"
 
 const (
 	socketURL = "postgres://commish_app:s3cr%40t@/commish?host=" + cloudSQLSocketDir
-	tcpURL    = "postgres://commish:commish@localhost:5433/commish_test?sslmode=disable"
+	// prodURL is the exact shape of Secret Manager DATABASE_URL.
+	prodURL = socketURL + "&sslmode=disable"
+	tcpURL  = "postgres://commish:commish@localhost:5433/commish_test?sslmode=disable"
 )
 
 func env(vars map[string]string) Getenv {
@@ -23,7 +25,7 @@ func env(vars map[string]string) Getenv {
 // Production's form: no host in the authority, the socket directory in
 // the host parameter. Dev and CI keep the TCP form.
 func TestDatabaseURLAcceptsTheSocketAndTCPForms(t *testing.T) {
-	for _, raw := range []string{socketURL, tcpURL, "postgresql://u:p@/commish?host=/var/run/postgresql"} {
+	for _, raw := range []string{socketURL, prodURL, tcpURL, "postgresql://u:p@/commish?host=/var/run/postgresql"} {
 		d, err := LoadMigrate(env(map[string]string{"DATABASE_URL": raw}))
 		if err != nil {
 			t.Fatalf("%q refused: %v", raw, err)
@@ -52,16 +54,18 @@ func TestDatabaseURLRefusesNoHostAtAll(t *testing.T) {
 // on the default port, with no TLS (libpq's rule for a Unix socket), so
 // it dials <dir>/.s.PGSQL.5432.
 func TestPgxParsesTheSocketForm(t *testing.T) {
-	cfg, err := pgxpool.ParseConfig(socketURL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	c := cfg.ConnConfig
-	if c.Host != cloudSQLSocketDir || c.Port != 5432 || c.Database != "commish" || c.User != "commish_app" || c.Password != "s3cr@t" {
-		t.Fatalf("parsed %q:%d db %q user %q", c.Host, c.Port, c.Database, c.User)
-	}
-	if c.TLSConfig != nil || len(c.Fallbacks) != 0 {
-		t.Fatalf("a socket connection carries TLS or fallbacks: %v, %d", c.TLSConfig != nil, len(c.Fallbacks))
+	for _, raw := range []string{socketURL, prodURL} {
+		cfg, err := pgxpool.ParseConfig(raw)
+		if err != nil {
+			t.Fatalf("%q: %v", raw, err)
+		}
+		c := cfg.ConnConfig
+		if c.Host != cloudSQLSocketDir || c.Port != 5432 || c.Database != "commish" || c.User != "commish_app" || c.Password != "s3cr@t" {
+			t.Fatalf("%q parsed %q:%d db %q user %q", raw, c.Host, c.Port, c.Database, c.User)
+		}
+		if c.TLSConfig != nil || len(c.Fallbacks) != 0 {
+			t.Fatalf("%q carries TLS or fallbacks: %v, %d", raw, c.TLSConfig != nil, len(c.Fallbacks))
+		}
 	}
 }
 
