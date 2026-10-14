@@ -23,6 +23,8 @@ const SWITCH = 'button[aria-controls="league-menu"]';
 const MENU = '#league-menu';
 /** A player the recorded leagues hold, for the player page's mark. */
 const HELD_PLAYER = '/players/puka-nacua';
+/** Layout shift entries arrive after the frame that made them: wait this long before reading. */
+const SHIFT_SETTLE_MS = 1_000;
 
 const web = process.argv[2] ?? 'http://localhost:4173';
 const out = new URL(process.argv[3] ?? '../screenshots/context/', import.meta.url);
@@ -143,6 +145,8 @@ async function measureSwitch(): Promise<void> {
 			.getByText('Big Gorilla', { exact: false })
 			.waitFor({ timeout: READY_TIMEOUT_MS });
 		await settle(page);
+		await page.waitForTimeout(SHIFT_SETTLE_MS);
+		// Every shift since the load began (the observer's buffer), then only what comes after.
 		await page.evaluate(() => {
 			const store = window as unknown as { shifts: { value: number; input: boolean }[] };
 			store.shifts = [];
@@ -153,16 +157,19 @@ async function measureSwitch(): Promise<void> {
 				}[]) {
 					store.shifts.push({ value: entry.value, input: entry.hadRecentInput });
 				}
-			}).observe({ type: 'layout-shift', buffered: false });
+			}).observe({ type: 'layout-shift', buffered: true });
 		});
-		const read = async (): Promise<{ all: number; counted: number }> =>
-			page.evaluate(() => {
+		const read = async (): Promise<{ all: number; counted: number }> => {
+			await page.waitForTimeout(SHIFT_SETTLE_MS);
+			return page.evaluate(() => {
 				const { shifts } = window as unknown as { shifts: { value: number; input: boolean }[] };
 				const sum = (list: { value: number }[]): number => list.reduce((s, e) => s + e.value, 0);
 				const result = { all: sum(shifts), counted: sum(shifts.filter((e) => !e.input)) };
 				shifts.length = 0;
 				return result;
 			});
+		};
+		const load = await read();
 		let taps = 0;
 		await openSwitch(page);
 		taps += 1;
@@ -177,7 +184,7 @@ async function measureSwitch(): Promise<void> {
 		await settle(page);
 		const format = await read();
 		process.stdout.write(
-			`switch at ${String(width)}: ${String(taps)} taps; league to league shift ${league.all.toFixed(4)} (counted ${league.counted.toFixed(4)}); league to a format ${format.all.toFixed(4)} (counted ${format.counted.toFixed(4)})\n`
+			`at ${String(width)}: load shift ${load.all.toFixed(4)}; switch ${String(taps)} taps; league to league shift ${league.all.toFixed(4)} (counted ${league.counted.toFixed(4)}); league to a format ${format.all.toFixed(4)} (counted ${format.counted.toFixed(4)})\n`
 		);
 		// Put the account back on its newest league for the next run.
 		await openSwitch(page);

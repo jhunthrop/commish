@@ -8,7 +8,7 @@
 import { PUBLIC_API_URL } from '$app/env/public';
 import { apiClient, hasSessionCookie } from '#lib/api/client.ts';
 import type { components } from '#lib/api/types.ts';
-import { CONTEXT_KEY, LEAGUE_ATTR, ONE_PHONE_LINE } from './boot.ts';
+import { CONTEXT_KEY, LEAGUE_ATTR, LINES_KEY, ONE_PHONE_LINE } from './boot.ts';
 import {
 	contextNote,
 	heldOf,
@@ -28,13 +28,12 @@ export type Choice = { league: string } | { format: ContextFormat };
 /** A league's rosters are read again after this long in one session. */
 const HELD_FRESH_MS = 10 * 60_000;
 
-/** What the session keeps: the context, the rosters last read, and the basis line's phone lines. */
+/** What the session keeps: the context and the rosters last read. */
 interface Kept {
 	league: ContextLeague | null;
 	leagues: readonly ContextLeague[];
 	format: BoardFormat | null;
 	held: { id: string; at: number; held: Held } | null;
-	lines: 0 | 1 | 2;
 }
 
 const client = apiClient(PUBLIC_API_URL);
@@ -48,7 +47,7 @@ function readKept(): Kept | null {
 }
 
 /** The lines a league's basis line takes on a phone, 0 with no league. */
-function linesFor(league: ContextLeague | null): Kept['lines'] {
+function linesFor(league: ContextLeague | null): 0 | 1 | 2 {
 	if (!league) return 0;
 	return (contextNote(league, league.format)?.length ?? 0) > ONE_PHONE_LINE ? 2 : 1;
 }
@@ -201,15 +200,11 @@ class SiteContext {
 		const lines = this.signedIn ? linesFor(this.league) : 0;
 		const held =
 			this.held && this.#heldFor ? { id: this.#heldFor, at: this.#heldAt, held: this.held } : null;
-		const kept: Kept = {
-			league: this.league,
-			leagues: this.leagues,
-			format: this.format,
-			held,
-			lines
-		};
+		const kept: Kept = { league: this.league, leagues: this.leagues, format: this.format, held };
 		try {
 			sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(kept));
+			if (lines === 0) localStorage.removeItem(LINES_KEY);
+			else localStorage.setItem(LINES_KEY, String(lines));
 		} catch {
 			// Storage can be off or full: the context still holds for this page.
 		}
