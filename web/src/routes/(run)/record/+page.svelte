@@ -94,7 +94,11 @@
 							<td>{line.position}</td>
 							<td class="num">{line.ours.graded}</td>
 							{#each scoreCells(line.ours, line.adp) as cell, i (i)}
-								<td class="num" class:wide={i > 1}>{cell}</td>
+								<td class="num" class:wide={i > 1}>
+									{cell}{#if i === 2}<span class="rank-basis"
+											>{line.position === 'All' ? 'overall rank' : 'position rank'}</span
+										>{/if}
+								</td>
 							{/each}
 						</tr>
 					{/each}
@@ -117,6 +121,14 @@
 </SiteShell>
 
 <style>
+	/* Places off counts overall rank on All and position rank on each position: the cell says which. */
+	.rank-basis {
+		display: block;
+		font-family: var(--font-ui);
+		font-size: var(--t-xs);
+		color: var(--ink-3);
+	}
+
 	.record {
 		padding: var(--s-5);
 		display: flex;
