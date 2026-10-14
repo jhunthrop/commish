@@ -26,6 +26,8 @@ FF_PLAYER_IDS_URL: Final = "https://github.com/dynastyprocess/data/raw/master/fi
 HOST_ID_COLUMNS: Final = ("sleeper_id", "yahoo_id", "mfl_id")
 _MISSING: Final = frozenset(("", "NA", "NaN"))
 _CHUNK_ROWS: Final = 2_000
+# The share of the players carrying an id now that a fresh map must still name to be taken.
+KEEP_AT_LEAST: Final = 0.9
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,34 +63,44 @@ def _value(row: CsvRow, column: str) -> str | None:
     return None if trimmed in _MISSING else trimmed
 
 
-def map_host_ids(rows: Sequence[CsvRow]) -> tuple[list[HostIds], int]:
-    """Each gsis id's host ids, ambiguous ones dropped, and how many ids were dropped."""
-    if rows and any(column not in rows[0] for column in ("gsis_id", *HOST_ID_COLUMNS)):
-        raise SchemaDriftError("the fantasy id map lost one of gsis_id, sleeper_id, yahoo_id, mfl_id")
-    by_player: dict[str, dict[str, str | None]] = {}
-    clashing: set[str] = set()
+def _stated(rows: Sequence[CsvRow]) -> tuple[dict[str, tuple[str | None, ...]], frozenset[str]]:
+    """Each gsis id's ids as the map states them, and the gsis ids it states two ways."""
+    seen: dict[str, set[tuple[str | None, ...]]] = {}
     for row in rows:
         player_id = _value(row, "gsis_id")
-        if player_id is None:
-            continue
-        ids = {column: _value(row, column) for column in HOST_ID_COLUMNS}
-        known = by_player.get(player_id)
-        if known is not None and known != ids:
-            clashing.add(player_id)
-        by_player[player_id] = ids
-    dropped = sum(1 for player_id in clashing for value in by_player[player_id].values() if value is not None)
-    for player_id in clashing:
-        by_player[player_id] = dict.fromkeys(HOST_ID_COLUMNS)
-    for column in HOST_ID_COLUMNS:
-        counts = Counter(ids[column] for ids in by_player.values() if ids[column] is not None)
-        for ids in by_player.values():
-            if ids[column] is not None and counts[ids[column]] > 1:
-                ids[column] = None
-                dropped += 1
+        if player_id is not None:
+            seen.setdefault(player_id, set()).add(tuple(_value(row, column) for column in HOST_ID_COLUMNS))
+    clashing = frozenset(player_id for player_id, ids in seen.items() if len(ids) > 1)
+    return {player_id: next(iter(ids)) for player_id, ids in seen.items() if player_id not in clashing}, clashing
+
+
+def map_host_ids(rows: Sequence[CsvRow]) -> tuple[list[HostIds], int]:
+    """Each gsis id's host ids, ambiguous ones dropped, and how many ids were dropped."""
+    if not rows:
+        raise SchemaDriftError("the fantasy id map came back empty; nothing was changed")
+    if any(column not in rows[0] for column in ("gsis_id", *HOST_ID_COLUMNS)):
+        raise SchemaDriftError("the fantasy id map lost one of gsis_id, sleeper_id, yahoo_id, mfl_id")
+    stated, clashing = _stated(rows)
+    shared = [
+        frozenset(
+            value for value, n in Counter(ids[i] for ids in stated.values() if ids[i] is not None).items() if n > 1
+        )
+        for i in range(len(HOST_ID_COLUMNS))
+    ]
+    cleaned = {
+        player_id: tuple(None if value in shared[i] else value for i, value in enumerate(ids))
+        for player_id, ids in stated.items()
+    }
+    dropped = len(clashing) + sum(
+        1
+        for player_id, ids in stated.items()
+        for i, value in enumerate(ids)
+        if value is not None and cleaned[player_id][i] is None
+    )
     mapped = [
-        HostIds(player_id, ids["sleeper_id"], ids["yahoo_id"], ids["mfl_id"])
-        for player_id, ids in sorted(by_player.items())
-        if any(value is not None for value in ids.values())
+        HostIds(player_id, *ids)
+        for player_id, ids in sorted(cleaned.items())
+        if any(value is not None for value in ids)
     ]
     return mapped, dropped
 
@@ -128,11 +140,27 @@ def _counts(mapped: Sequence[HostIds]) -> Mapping[str, int]:
     return {column: sum(1 for ids in mapped if getattr(ids, column) is not None) for column in HOST_ID_COLUMNS}
 
 
+def _stored(conn: Connection) -> int:
+    """How many universe players carry a host id now."""
+    count = conn.execute(
+        text("select count(*) from research.players where coalesce(sleeper_id, yahoo_id, mfl_id) is not null")
+    ).scalar_one()
+    return int(count)
+
+
 def ingest_host_ids(conn: Connection, fetcher: Fetcher) -> HostIdReport:
-    """Fetch the map, keep the rows the universe knows, and write the three columns."""
+    """Fetch the map, keep the rows the universe knows, and write the three columns. A map that
+    would leave fewer than 90% of the players who carry an id now is refused whole: an upstream
+    hiccup (an empty or cut file) never wipes the ids the companion places picks by."""
     mapped, dropped = map_host_ids(fetch_host_id_rows(fetcher))
     universe = _universe(conn)
     kept = [ids for ids in mapped if ids.player_id in universe]
+    stored = _stored(conn)
+    if len(kept) < KEEP_AT_LEAST * stored:
+        raise SchemaDriftError(
+            f"the fantasy id map names {len(kept)} of our players, under {KEEP_AT_LEAST:.0%} of the {stored} "
+            "who carry an id now; it was refused and nothing was changed"
+        )
     record_host_ids(conn, kept)
     counts = _counts(kept)
     return HostIdReport(
