@@ -82,8 +82,8 @@ func (s *Service) hostScoring(w http.ResponseWriter, r *http.Request, host, link
 	if !ok {
 		return scoring.Imported{}, false
 	}
-	if h.Key() == HostFFPC {
-		httpx.WriteInvalid(w, r, map[string]string{fieldLink: ffpcPickWords})
+	if readAsMember(h.Key()) {
+		httpx.WriteInvalid(w, r, map[string]string{fieldLink: wordsFor(h.Key()).pick})
 		return scoring.Imported{}, false
 	}
 	read, err := s.readFor(r.Context(), auth.AccountID(r), ref)

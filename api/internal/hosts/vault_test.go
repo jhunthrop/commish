@@ -112,4 +112,42 @@ func TestVaultWithoutKey(t *testing.T) {
 	if _, err := v.Seal("a", "ffpc", nil, SignIn{}); !errors.Is(err, ErrNoKey) {
 		t.Fatalf("seal without a key: %v", err)
 	}
+	if _, err := v.SealTokens("a", "yahoo", nil, nil); !errors.Is(err, ErrNoKey) {
+		t.Fatalf("seal tokens without a key: %v", err)
+	}
+}
+
+// A token-based connection: the renewal opens only as a renewal, never as
+// a sign-in, a reseal keeps the data key, and a session never prints.
+func TestVaultTokens(t *testing.T) {
+	v, err := NewVault(OneKey(key(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealed, err := v.SealTokens("acct", "yahoo", Session{"access": "a1"}, Session{"refresh": "r1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r, err := v.OpenRenewal("acct", "yahoo", sealed); err != nil || r["refresh"] != "r1" {
+		t.Fatalf("renewal: %v", err)
+	}
+	if _, err := v.OpenSignIn("acct", "yahoo", sealed); err == nil {
+		t.Fatal("a renewal opened as a sign-in")
+	}
+	if _, err := v.OpenRenewal("other", "yahoo", sealed); err == nil {
+		t.Fatal("a renewal opened for another account")
+	}
+	next, err := v.ResealTokens("acct", "yahoo", sealed, Session{"access": "a2"}, Session{"refresh": "r2"})
+	if err != nil || !bytes.Equal(next.WrappedKey, sealed.WrappedKey) {
+		t.Fatalf("reseal: %v", err)
+	}
+	s, err := v.OpenSession("acct", "yahoo", next)
+	if err != nil || s["access"] != "a2" {
+		t.Fatalf("resealed session: %v", err)
+	}
+	var buf bytes.Buffer
+	slog.New(slog.NewTextHandler(&buf, nil)).Info("session", "s", s)
+	if printed := fmt.Sprintf("%v %+v %#v %s", s, s, s, buf.String()); strings.Contains(printed, "a2") {
+		t.Fatalf("a session printed: %s", printed)
+	}
 }

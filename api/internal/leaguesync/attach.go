@@ -41,6 +41,10 @@ func (s *Service) attach(w http.ResponseWriter, r *http.Request) {
 		s.attachFFPC(w, r, in)
 		return
 	}
+	if in.Host != nil && *in.Host == apitypes.LeagueHostYahoo {
+		s.attachMember(w, r, in, HostYahoo)
+		return
+	}
 	if errs := checkSeat(in.Me); errs != nil {
 		httpx.WriteInvalid(w, r, errs)
 		return

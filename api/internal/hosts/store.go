@@ -22,6 +22,20 @@ const (
 // Version 3 names what is kept, the password, inside the ticked words.
 const ConsentVersion = 3
 
+// consentVersions is each host's consent words' version: FFPC's
+// (ConsentVersion), Yahoo's own authorize page (version 1, the scope it
+// shows: Fantasy Sports, read only) and ESPN's (web/src/lib/hosts/api.ts
+// ESPN_CONSENT, version 1).
+var consentVersions = map[string]int{"ffpc": ConsentVersion, "yahoo": 1, "espn": 1}
+
+// consentVersion is the host's consent version, 1 for a host not listed.
+func consentVersion(host string) int {
+	if v, ok := consentVersions[host]; ok {
+		return v
+	}
+	return 1
+}
+
 // ErrNotConnected is an account with no connection to the host.
 var ErrNotConnected = errors.New("hosts: not connected")
 
@@ -63,7 +77,7 @@ func (s *Store) Put(ctx context.Context, accountID uuid.UUID, host string, seale
 			signin_ct = excluded.signin_ct, key_version = excluded.key_version, status = 'connected',
 			last_signin_at = excluded.last_signin_at, consented_at = excluded.consented_at, consent_version = excluded.consent_version
 		returning `+connColumns,
-		accountID, host, sealed.WrappedKey, sealed.SessionCT, sealed.SignInCT, sealed.KeyVersion, now, ConsentVersion))
+		accountID, host, sealed.WrappedKey, sealed.SessionCT, sealed.SignInCT, sealed.KeyVersion, now, consentVersion(host)))
 	if err != nil {
 		return Connection{}, fmt.Errorf("hosts: put connection: %w", err)
 	}
@@ -131,6 +145,20 @@ func (s *Store) SessionKept(ctx context.Context, accountID uuid.UUID, host strin
 		accountID, host, sessionCT, wrappedKey)
 	if err != nil {
 		return fmt.Errorf("hosts: keep session: %w", err)
+	}
+	return nil
+}
+
+// TokensKept keeps a refreshed session and renewal, both under the row's
+// own data key, guarded by the wrapped key the refresh began with as
+// SessionKept is: after a reconnect a stale refresh keeps nothing. Kept
+// tokens are working ones, so the connection is connected again.
+func (s *Store) TokensKept(ctx context.Context, accountID uuid.UUID, host string, wrappedKey, sessionCT, renewalCT []byte) error {
+	_, err := s.Pool.Exec(ctx, `update app.host_connections set session_ct = $3, signin_ct = $4, status = 'connected'
+		where account_id = $1 and host = $2 and wrapped_key = $5`,
+		accountID, host, sessionCT, renewalCT, wrappedKey)
+	if err != nil {
+		return fmt.Errorf("hosts: keep tokens: %w", err)
 	}
 	return nil
 }

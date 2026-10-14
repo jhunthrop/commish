@@ -313,6 +313,44 @@ func (s *Store) FFPCReader(ctx context.Context, ref Ref) (uuid.UUID, string, err
 	return accountID, ltuid, nil
 }
 
+// MemberReader is a connected member who follows a league on a host
+// read as its members (Yahoo), to read it as: the one whose connection
+// read most recently, so one member's lapsed connection never stops the
+// league for the rest.
+func (s *Store) MemberReader(ctx context.Context, ref Ref) (uuid.UUID, error) {
+	var accountID uuid.UUID
+	err := s.Pool.QueryRow(ctx, `select l.account_id from app.league_links l
+		join app.host_connections c on c.account_id = l.account_id and c.host = l.host and c.status = 'connected'
+		where l.host = $1 and l.host_league_id = $2 and l.host_season = $3 and l.detached_at is null
+		order by c.last_read_at desc nulls last, l.attached_at limit 1`, ref.Host, ref.LeagueID, ref.Season).Scan(&accountID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, ErrNotConnected
+	}
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("leaguesync: member reader %s: %w", ref.Key(), err)
+	}
+	return accountID, nil
+}
+
+// FollowedIDs is the account's live leagues on a host, keyed "id/season"
+// (yahoo.FollowKey), for a host's league list to mark.
+func (s *Store) FollowedIDs(ctx context.Context, accountID uuid.UUID, host string) (map[string]bool, error) {
+	rows, err := s.Pool.Query(ctx, `select host_league_id || '/' || host_season from app.league_links
+		where account_id = $1 and host = $2 and detached_at is null`, accountID, host)
+	if err != nil {
+		return nil, fmt.Errorf("leaguesync: followed %s: %w", host, err)
+	}
+	keys, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, fmt.Errorf("leaguesync: followed %s: %w", host, err)
+	}
+	out := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		out[k] = true
+	}
+	return out, nil
+}
+
 // FFPCLeagues is every attached FFPC league with a connected member, for
 // the background read.
 func (s *Store) FFPCLeagues(ctx context.Context) ([]Ref, error) {

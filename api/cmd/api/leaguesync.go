@@ -7,12 +7,14 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/espn"
 	"github.com/jhunthrop/commish/api/internal/hosts"
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
+	"github.com/jhunthrop/commish/api/internal/hosts/yahoo"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leagues"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
@@ -68,11 +70,62 @@ func (f ffpcWiring) host(store *leaguesync.Store, weeks leaguesync.WeekSource, l
 	return &leaguesync.FFPC{Member: f.member, Readers: store, Weeks: weeks, Now: time.Now, Log: log}
 }
 
+// yahooWiring is Yahoo read as connected members: the app's OAuth
+// registration, the one client every read goes through (paced with every
+// other process by the database gate) and the member reader, over the
+// vault FFPC's wiring opened. On is HOST_YAHOO_ENABLED with the vault's
+// key and the app's id and secret present.
+type yahooWiring struct {
+	on     bool
+	oauth  *yahoo.OAuth
+	member *yahoo.Member
+}
+
+func newYahooWiring(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) yahooWiring {
+	on := cfg.Hosts.YahooEnabled && ff.vault.Ready() && cfg.Hosts.YahooConfigured()
+	if !on {
+		log.Warn("yahoo is off", "enabled", cfg.Hosts.YahooEnabled, "key", ff.vault.Ready(), "app", cfg.Hosts.YahooConfigured())
+	}
+	oauth := yahoo.NewOAuth(cfg.Hosts.YahooClientID, cfg.Hosts.YahooClientSecret, cfg.HTTP.APIBaseURL+"/hosts/yahoo/callback")
+	client := yahoo.New()
+	client.Pace = &hosts.Gate{Pool: pool, Host: yahoo.Host, Gap: yahoo.Gap, MaxWait: yahoo.MaxQueue}
+	member := &yahoo.Member{Client: client, OAuth: oauth, Store: ff.store, Vault: ff.vault, Now: time.Now, Log: log}
+	return yahooWiring{on: on, oauth: oauth, member: member}
+}
+
+// routes are connecting, listing and disconnecting Yahoo.
+func (y yahooWiring) routes(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) []httpx.Route {
+	return (&yahoo.Service{
+		Enabled: y.on, OAuth: y.oauth, States: &yahoo.States{Pool: pool}, Store: ff.store, Vault: ff.vault,
+		Leagues: y.member, Followed: &leaguesync.Store{Pool: pool}, PublicBaseURL: cfg.HTTP.PublicBaseURL, Now: time.Now, Log: log,
+	}).Routes()
+}
+
+// host is the Yahoo league host over the link store, nil when Yahoo is off.
+func (y yahooWiring) host(store *leaguesync.Store, ids leaguesync.HostIDs, log *slog.Logger) *leaguesync.Yahoo {
+	if !y.on {
+		return nil
+	}
+	return &leaguesync.Yahoo{Member: y.member, Readers: store, IDs: ids, Now: time.Now, Log: log}
+}
+
+// hostList is GET /hosts: every host open here, in the account page's order.
+func hostList(ff ffpcWiring, y yahooWiring, log *slog.Logger) []httpx.Route {
+	var open []apitypes.ConnectedHost
+	if ff.on {
+		open = append(open, apitypes.ConnectedHostFfpc)
+	}
+	if y.on {
+		open = append(open, apitypes.ConnectedHostYahoo)
+	}
+	return (&hosts.List{Enabled: open, Store: ff.store, Log: log}).Routes()
+}
+
 // leagueSyncService wires league sync: Sleeper first, MyFantasyLeague
-// second and FFPC third behind one poller, the rooms' board, and the
+// second, FFPC third and Yahoo fourth behind one poller, the rooms' board, and the
 // recorded leagues when COMPANION_REPLAY is on (development only). The
 // host directories are read at start, so the first view finds them.
-func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ents *entitlements.Store, accounts leaguesync.AccountViewer, ff ffpcWiring, log *slog.Logger) *leaguesync.Service {
+func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ents *entitlements.Store, accounts leaguesync.AccountViewer, ff ffpcWiring, y yahooWiring, log *slog.Logger) *leaguesync.Service {
 	now := time.Now
 	var sleeperAPI leaguesync.SleeperAPI = sleeper.New()
 	var mflAPI leaguesync.MFLAPI = mfl.New()
@@ -89,6 +142,9 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 	ffpcHost := ff.host(store, board.Schedule, log)
 	if ffpcHost != nil {
 		hostList = append(hostList, ffpcHost)
+	}
+	if yahooHost := y.host(store, board.Schedule, log); yahooHost != nil {
+		hostList = append(hostList, yahooHost)
 	}
 	players := &leaguesync.Directory{Hosts: hostList, Store: store, Now: now, Log: log}
 	go players.Warm(context.Background(), cfg.Board.Season)

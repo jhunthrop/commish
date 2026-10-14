@@ -69,6 +69,7 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
 ### Connected host accounts (FFPC, Lane 14)
 
 - `HOST_FFPC_ENABLED` (repository variable, default `true` in `api.yml`) is the one switch for FFPC: off, the connect routes answer 503, the league poller and the companion have no FFPC host, the refresh job reads nothing and the web hides the FFPC choice. The founder accepted FFPC's terms risk in writing on 2026-10-13.
+- `HOST_YAHOO_ENABLED` (repository variable, default `true`) is Yahoo's switch (Lane 21): off, or without Secret Manager `YAHOO_CLIENT_ID` and `YAHOO_CLIENT_SECRET` (mounted `:latest` in `api.yml`, api-runtime has accessor), the Yahoo routes answer 503, the poller has no Yahoo host and the web hides Yahoo. The Yahoo developer app's redirect URI is exactly `https://api.trycommish.app/hosts/yahoo/callback`, permission Fantasy Sports read.
 - Secret Manager `HOST_CREDENTIALS_KEY`: base64 of 32 random bytes (`openssl rand -base64 32 | gcloud secrets create HOST_CREDENTIALS_KEY --data-file=-`). It wraps each member's own data key; the api refuses to start in production without it while FFPC is on. `api.yml` pins it to a numbered version (`HOST_CREDENTIALS_KEY:1`, `HOST_CREDENTIALS_KEY_VERSION=1`), never `latest`, so adding a version never rotates it by accident.
 - Rotating it, in one sitting:
   1. Add the new secret version.

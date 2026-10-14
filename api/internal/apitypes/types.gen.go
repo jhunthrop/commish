@@ -107,13 +107,16 @@ func (e CompanionStatus) Valid() bool {
 
 // Defines values for ConnectedHost.
 const (
-	ConnectedHostFfpc ConnectedHost = "ffpc"
+	ConnectedHostFfpc  ConnectedHost = "ffpc"
+	ConnectedHostYahoo ConnectedHost = "yahoo"
 )
 
 // Valid indicates whether the value is a known member of the ConnectedHost enum.
 func (e ConnectedHost) Valid() bool {
 	switch e {
 	case ConnectedHostFfpc:
+		return true
+	case ConnectedHostYahoo:
 		return true
 	default:
 		return false
@@ -323,6 +326,7 @@ const (
 	LeagueHostFfpc    LeagueHost = "ffpc"
 	LeagueHostMfl     LeagueHost = "mfl"
 	LeagueHostSleeper LeagueHost = "sleeper"
+	LeagueHostYahoo   LeagueHost = "yahoo"
 )
 
 // Valid indicates whether the value is a known member of the LeagueHost enum.
@@ -333,6 +337,8 @@ func (e LeagueHost) Valid() bool {
 	case LeagueHostMfl:
 		return true
 	case LeagueHostSleeper:
+		return true
+	case LeagueHostYahoo:
 		return true
 	default:
 		return false
@@ -1306,11 +1312,11 @@ type HostConnection struct {
 	Host       ConnectedHost `json:"host"`
 	LastReadAt *time.Time    `json:"last_read_at"`
 
-	// Status connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did not mend it; the member signs in again on our form
+	// Status connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, or a Yahoo refresh Yahoo refused); the member connects again
 	Status HostConnectionStatus `json:"status"`
 }
 
-// HostConnectionStatus connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did not mend it; the member signs in again on our form
+// HostConnectionStatus connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, or a Yahoo refresh Yahoo refused); the member connects again
 type HostConnectionStatus string
 
 // HostConnections defines model for HostConnections.
@@ -1323,12 +1329,20 @@ type HostConnections struct {
 
 // HostLeague defines model for HostLeague.
 type HostLeague struct {
+	// Attached whether the account follows the league already
+	Attached *bool  `json:"attached,omitempty"`
 	LeagueId string `json:"league_id"`
 	Name     string `json:"name"`
 
-	// Record the team's record as FFPC writes it, 2 - 3
-	Record   string `json:"record"`
-	TeamName string `json:"team_name"`
+	// Record the team's record as the host writes it (FFPC 2 - 3), empty when the list does not carry it
+	Record string `json:"record"`
+
+	// ScoringType the league's scoring type in our words: points, categories, best ball
+	ScoringType *string `json:"scoring_type,omitempty"`
+	TeamName    string  `json:"team_name"`
+
+	// Teams the league's team count
+	Teams *int `json:"teams,omitempty"`
 }
 
 // ImportSkip defines model for ImportSkip.
@@ -2403,6 +2417,13 @@ type GetCompanionParams struct {
 type ListExportsParams struct {
 	Page    *Page    `form:"page,omitempty" json:"page,omitempty"`
 	PerPage *PerPage `form:"per_page,omitempty" json:"per_page,omitempty"`
+}
+
+// YahooCallbackParams defines parameters for YahooCallback.
+type YahooCallbackParams struct {
+	Code  *string `form:"code,omitempty" json:"code,omitempty"`
+	State *string `form:"state,omitempty" json:"state,omitempty"`
+	Error *string `form:"error,omitempty" json:"error,omitempty"`
 }
 
 // ListLeaguesParams defines parameters for ListLeagues.

@@ -109,6 +109,8 @@ func hostWords(host string) string {
 		return "MyFantasyLeague"
 	case HostFFPC:
 		return "FFPC"
+	case HostYahoo:
+		return "Yahoo"
 	}
 	return "Sleeper"
 }
@@ -126,7 +128,7 @@ const (
 
 // writeHostError says what went wrong reading the league, in our words.
 func (s *Service) writeHostError(w http.ResponseWriter, r *http.Request, host string, err error) {
-	if writeFFPCError(w, r, err) {
+	if writeMemberError(w, r, host, err) {
 		return
 	}
 	switch {
@@ -182,9 +184,9 @@ func (s *Service) preview(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if h.Key() == HostFFPC {
-		// An FFPC league is picked from the member's own list, read as them.
-		httpx.WriteInvalid(w, r, map[string]string{fieldLink: ffpcPickWords})
+	if readAsMember(h.Key()) {
+		// A league read as a member is picked from their own list.
+		httpx.WriteInvalid(w, r, map[string]string{fieldLink: wordsFor(h.Key()).pick})
 		return
 	}
 	read, err := s.readFor(r.Context(), auth.AccountID(r), ref)

@@ -20,8 +20,12 @@ func TestHostsSwitchAndKeys(t *testing.T) {
 		t.Fatalf("production with FFPC on and no key: enabled %v, err %v", h.FFPCEnabled, l.err())
 	}
 	l = hostLoader(map[string]string{"HOST_FFPC_ENABLED": "false"})
-	if h := l.hosts(EnvProduction); h.FFPCEnabled || l.err() != nil {
-		t.Fatalf("production with FFPC off and no key: enabled %v, err %v", h.FFPCEnabled, l.err())
+	if h := l.hosts(EnvProduction); h.FFPCEnabled || !h.YahooEnabled || l.err() == nil {
+		t.Fatalf("production with Yahoo on and no key: ffpc %v, yahoo %v, err %v", h.FFPCEnabled, h.YahooEnabled, l.err())
+	}
+	l = hostLoader(map[string]string{"HOST_FFPC_ENABLED": "false", "HOST_YAHOO_ENABLED": "false"})
+	if h := l.hosts(EnvProduction); h.FFPCEnabled || h.YahooEnabled || l.err() != nil {
+		t.Fatalf("production with every host off and no key: enabled %v, err %v", h.FFPCEnabled, l.err())
 	}
 	l = hostLoader(map[string]string{"HOST_CREDENTIALS_KEY": key, "HOST_CREDENTIALS_KEY_VERSION": "2", "HOST_CREDENTIALS_KEY_PREVIOUS": key})
 	h := l.hosts(EnvProduction)
@@ -36,5 +40,13 @@ func TestHostsSwitchAndKeys(t *testing.T) {
 	l = hostLoader(map[string]string{"HOST_FFPC_ENABLED": "maybe"})
 	if l.hosts(EnvDevelopment); l.err() == nil {
 		t.Fatal("a switch that is not true or false was accepted")
+	}
+	l = hostLoader(map[string]string{"YAHOO_CLIENT_ID": "id"})
+	if l.hosts(EnvDevelopment); l.err() == nil {
+		t.Fatal("a Yahoo id with no secret was accepted")
+	}
+	l = hostLoader(map[string]string{"YAHOO_CLIENT_ID": "id", "YAHOO_CLIENT_SECRET": "secret"})
+	if h := l.hosts(EnvDevelopment); !h.YahooConfigured() || l.err() != nil {
+		t.Fatalf("the Yahoo app: %v", l.err())
 	}
 }

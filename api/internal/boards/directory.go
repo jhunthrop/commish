@@ -22,28 +22,50 @@ const maxHostIDs = 20000
 // SleeperIDs is Sleeper's player id to the provider id the boards name
 // players by: players.sleeper_id (revision 0005) through the crosswalk.
 func (s *PGSource) SleeperIDs(ctx context.Context) (map[string]string, error) {
-	rows, err := s.Pool.Query(ctx, `select p.sleeper_id, c.provider_player_id from `+s.table("players")+` p
-join `+s.table("player_crosswalk")+` c on c.player_id = p.id where p.sleeper_id is not null
-order by p.sleeper_id, c.provider_player_id limit `+fmt.Sprint(maxHostIDs+1))
+	return s.hostIDs(ctx, sleeperIDColumn)
+}
+
+// YahooIDs is Yahoo's player id to the provider id the boards name
+// players by: players.yahoo_id (revision 0005, DynastyProcess's id map)
+// through the crosswalk.
+func (s *PGSource) YahooIDs(ctx context.Context) (map[string]string, error) {
+	return s.hostIDs(ctx, yahooIDColumn)
+}
+
+// The players table's host id columns hostIDs reads, never a caller's.
+const (
+	sleeperIDColumn = "sleeper_id"
+	yahooIDColumn   = "yahoo_id"
+)
+
+// hostIDs is one host id column to the provider ids, refused whole when
+// one host id crosses to two provider players.
+func (s *PGSource) hostIDs(ctx context.Context, column string) (map[string]string, error) {
+	if column != sleeperIDColumn && column != yahooIDColumn {
+		return nil, fmt.Errorf("boards: no host id column %q", column)
+	}
+	rows, err := s.Pool.Query(ctx, `select p.`+column+`, c.provider_player_id from `+s.table("players")+` p
+join `+s.table("player_crosswalk")+` c on c.player_id = p.id where p.`+column+` is not null
+order by p.`+column+`, c.provider_player_id limit `+fmt.Sprint(maxHostIDs+1))
 	if err != nil {
-		return nil, fmt.Errorf("boards: read sleeper ids: %w", err)
+		return nil, fmt.Errorf("boards: read %s: %w", column, err)
 	}
 	defer rows.Close()
 	out := map[string]string{}
 	for rows.Next() {
 		var hostID, id string
 		if err := rows.Scan(&hostID, &id); err != nil {
-			return nil, fmt.Errorf("boards: scan sleeper ids: %w", err)
+			return nil, fmt.Errorf("boards: scan %s: %w", column, err)
 		}
 		if _, twice := out[hostID]; twice {
 			// Two provider ids for one player: the crosswalk is wrong, and a
 			// pick placed on either would be a guess.
-			return nil, fmt.Errorf("boards: sleeper id %s crosses to two provider players", hostID)
+			return nil, fmt.Errorf("boards: %s %s crosses to two provider players", column, hostID)
 		}
 		out[hostID] = id
 	}
 	if len(out) > maxHostIDs {
-		return nil, fmt.Errorf("boards: over %d sleeper ids; the map is not the one expected", maxHostIDs)
+		return nil, fmt.Errorf("boards: over %d %s values; the map is not the one expected", maxHostIDs, column)
 	}
 	return out, rows.Err()
 }
