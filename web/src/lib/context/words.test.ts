@@ -42,7 +42,10 @@ void test("the switch keeps a league name's last word whole and cuts the head", 
 });
 
 void test("a league's line is its host and scoring, and superflex when it reads on that board", () => {
-	assert.equal(leagueLine(league({ scoring: 'te_premium' })), 'FFPC, TE premium');
+	assert.equal(
+		leagueLine(league({ scoring: 'te_premium' })),
+		'FFPC, extra points per catch for tight ends'
+	);
 	assert.equal(
 		leagueLine(league({ host: 'sleeper', scoring: 'half_ppr', format: 'superflex' })),
 		'Sleeper, half PPR, superflex'

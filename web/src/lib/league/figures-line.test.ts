@@ -1,22 +1,29 @@
-// The basis line names scorings only, never a lineup shape, and promises nothing: run with `npm test`.
+// The league page's basis line names scorings only, never a lineup shape, and promises nothing: run
+// with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { figuresLine } from './model.ts';
+import { leagueBasis } from './model.ts';
 
-void test('a TE premium league on the PPR figures says both scorings', () => {
-	assert.equal(figuresLine('PPR', 'te_premium'), 'Figures are PPR. Your league scores TE premium.');
+void test('a TE premium league on the PPR figures says the figures once and the league in plain words', () => {
+	assert.equal(
+		leagueBasis('PPR', 5, 'te_premium'),
+		"PPR. This season's games and points a game through week 5, beside our preseason proj and over repl. Your league gives tight ends extra points per catch."
+	);
 });
 
-void test('a league scoring like the figures says the same', () => {
-	assert.equal(figuresLine('PPR', 'ppr'), 'Figures are PPR. Your league scores the same.');
+void test('a league scoring like the figures says nothing more', () => {
 	assert.equal(
-		figuresLine('Half PPR', 'half_ppr'),
-		'Figures are half PPR. Your league scores the same.'
+		leagueBasis('PPR', 5, 'ppr'),
+		"PPR. This season's games and points a game through week 5, beside our preseason proj and over repl."
+	);
+	assert.equal(
+		leagueBasis('Half PPR', 0, 'half_ppr'),
+		"Half PPR. This season's games and points a game, beside our preseason proj and over repl."
 	);
 });
 
 void test('the line never names a lineup shape or promises exact rules', () => {
-	const line = figuresLine('PPR', 'standard');
-	assert.equal(line, 'Figures are PPR. Your league scores standard.');
+	const line = leagueBasis('PPR', 5, 'standard');
+	assert.match(line, /Your league scores standard\.$/);
 	assert.doesNotMatch(line, /superflex|Draft Pass|exact rules/i);
 });

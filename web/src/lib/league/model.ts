@@ -3,6 +3,7 @@
  * over the API's answer. */
 import { fixed, plural, signed } from '#lib/format/number.ts';
 import { midSentence } from '#lib/format/sentence.ts';
+import { scoresSentence } from '#lib/context/note-words.ts';
 import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
 import type { IndexSeason } from '#lib/run/schema.ts';
 import type { LeagueBoard, LeagueBoardPlayer } from './board.ts';
@@ -192,14 +193,21 @@ export function poolBasis(board: LeagueBoard): string {
 	return seasonStarted(board) ? `${order} The figure is his points a game this season.` : order;
 }
 
-/** The page's one basis line: the scoring the figures are in (the run's season scoring, never a
- * lineup shape such as superflex) and the league's own: "Figures are PPR. Your league scores TE
- * premium." No page promises the league's exact rules until they ship. */
-export function figuresLine(figuresScoring: string, scoringLike: ScoringPreset): string {
-	const figures = midSentence(figuresScoring);
-	const league = SCORING_WORDS[scoringLike];
-	const same = figures.toLowerCase() === league.toLowerCase();
-	return `Figures are ${figures}. Your league scores ${same ? 'the same' : league}.`;
+/** The page's one basis line, once: the scoring the figures are in (the run's season scoring,
+ * never a lineup shape such as superflex), which figures are this season's and which are preseason,
+ * and the league's own scoring in plain words when it differs: "PPR. This season's games and points
+ * a game through week 5, beside our preseason proj and over repl. Your league gives tight ends extra
+ * points per catch." No page promises the league's exact rules here. */
+export function leagueBasis(
+	figuresScoring: string,
+	through: number,
+	scoringLike: ScoringPreset
+): string {
+	const reach = through === 0 ? '' : ` through week ${String(through)}`;
+	const same =
+		midSentence(figuresScoring).toLowerCase() === SCORING_WORDS[scoringLike].toLowerCase();
+	const own = same ? '' : ` ${scoresSentence(scoringLike)}`;
+	return `${figuresScoring}. This season's games and points a game${reach}, beside our preseason proj and over repl.${own}`;
 }
 
 /** The drafter's team. */

@@ -28,7 +28,7 @@
 	import WaiverPool from './WaiverPool.svelte';
 	import {
 		POLL_MS,
-		figuresLine,
+		leagueBasis,
 		hostWords,
 		myPlace,
 		myTeam,
@@ -153,9 +153,7 @@
 	/** What every number on the page is, said once under the title: the scoring, the season's
 	 * figures, then the preseason board's. */
 	const basis = $derived(
-		board && sync
-			? `${figuresLine(board.seasonScoring, sync.scoring_like)} ${board.seasonBasis} Proj and over repl are our preseason board's.`
-			: ''
+		board && sync ? leagueBasis(board.seasonScoring, board.seasonThrough, sync.scoring_like) : ''
 	);
 </script>
 

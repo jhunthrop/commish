@@ -16,9 +16,14 @@ export type FiguresSubject = 'This board is' | 'These figures are';
 /** The league's scoring as a basis line opens, in plain words: TE premium is jargon a first-timer
  * cannot act on, so it says what it does. */
 export function leagueScores(league: ContextLeague): string {
-	return league.scoring === 'te_premium'
+	return scoresSentence(league.scoring);
+}
+
+/** The same sentence for a scoring preset (the league page reads it off its sync). */
+export function scoresSentence(scoring: ContextLeague['scoring']): string {
+	return scoring === 'te_premium'
 		? 'Your league gives tight ends extra points per catch.'
-		: `Your league scores ${SCORING_WORDS[league.scoring]}.`;
+		: `Your league scores ${SCORING_WORDS[scoring]}.`;
 }
 
 /** Where the line sends a Draft Pass holder for the league's exact board: its saved league's mock
