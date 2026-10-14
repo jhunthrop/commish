@@ -77,7 +77,7 @@ def write_chosen(engine: Engine, gateway: GatewayClient, as_of: datetime, choice
     worn = worn_phrases(subjects, stored)
     written: list[Written] = []
     for subject in _chosen(subjects, choice):
-        result, _ = write_one(engine, subject, stored.get(subject.universe_id), gateway, worn)
+        result, _, _ = write_one(engine, subject, stored.get(subject.universe_id), gateway, worn)
         row = rows[subject.facts.identity.id]
         numbers = page_numbers(page_values_of(row))
         findings = capsule_findings(

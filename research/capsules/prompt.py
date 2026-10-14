@@ -97,6 +97,9 @@ _PRESEASON_WORDS: Final = 'ADP, picks and rounds: "let him fall", "draft him", "
 _IN_SEASON_WORDS: Final = (
     "ADP as history, a reach, a steal, a sleeper, a bust, points over replacement, a starter, a bench piece"
 )
+# The pick numbers a note may write, per voice: in season the draft is history, so no round or pick advice.
+_PRESEASON_PICKS: Final = "The only pick numbers you may write are the sheet's own: his ADP and the rounded pick beside it. Your call goes against that number in words (a round earlier than that, a few picks after his ADP, wait on him), never a pick you chose and never a threshold you made up for games or points."
+_IN_SEASON_PICKS: Final = "His ADP is history: where drafters took him before the season, written as the sheet prints it, and no other pick number at all, and never a threshold you made up for games or points."
 _PRESEASON_TIME: Final = """TIME
 - The top of the sheet says what day it is: the season has not kicked off and the reader is getting ready to draft.
 - Name every week with its season, always: "week 7 of 2025", "weeks 2 to 5 of 2024". Never a bare "week 7"."""
@@ -106,7 +109,7 @@ _IN_SEASON_TIME: Final = """TIME
 - Our preseason number is points for the full season. Never set his points so far against it as if he were behind it: compare points a game with points a game.
 - A week of this season that is still to play can only be looked ahead to, never told as if it happened.
 - Place things by week and season, never by a date or the name of a month.
-- His ADP is the sheet's number, written exactly as the sheet prints it (7.4, never "pick 7"); with no ADP on file, no pick at all.
+- His ADP is the sheet's number, written exactly as the sheet prints it (7.4, never "pick 7"). With no ADP on file, no pick at all.
 - If he has missed weeks this season, the long note names them by week, before any talk of how many games to expect. Our games expectation and our projection were set before the season: say so if you use them, beside what has happened since."""
 _RULES: Final = f"""You sound like a sharp analyst talking to a friend in the same league: direct, specific, opinionated, never a lab report and never a style guide.
 
@@ -125,7 +128,7 @@ WORDS
 - Phrases this board has worn out, never to be written or paraphrased: {_STEMS}. Never the frame "the honest" followed by a noun (the honest worry, the honest read, the honest answer), in any form.
 - Never these words either: {", ".join(LAB_REPORT_TERMS)}. Say "our number", "our projection", "the case", "costs him", "is worth", each in a sentence of your own making. "Our number" never "says".
 - Never write the word "floor". Say what the low end actually is: the weeks he missed, the weeks he scored under the bar, the season the range bottoms out at.
-- Speak for the board, never for yourself: "we", "our number", "we would take him", never "I", "I'd", "I'm", "me", "my" or "mine". The page is ours, not one writer's.
+- Speak for the board, never for yourself: "we", "our number", "{{we_would}}", never "I", "I'd", "I'm", "me", "my" or "mine". The page is ours, not one writer's.
 - The fact sheet is yours alone. The reader never sees it, so never mention a sheet ("the sheet", "the fact sheet", "on the sheet"). Say the fact itself, or "our numbers".
 - Write like you talk. Contractions are welcome. Short sentences land harder than long ones. Never an em-dash, never a semicolon. Use a period, a comma, or "and".
 - Never name a rival fantasy product.
@@ -133,7 +136,7 @@ WORDS
 HONESTY, NO EXCEPTIONS
 - Use ONLY the numbers and names on the fact sheet. Never invent a stat, an injury, a teammate, a coach, or any other name or figure not printed there.
 - Quote a number as the sheet gives it, or as a plain rounding of it. Never combine two figures into a third the sheet does not print. If you want the gap between our number and where drafters take him, use the gap the sheet states.
-- The only pick numbers you may write are the sheet's own: his ADP and the rounded pick beside it. Your call goes against that number in words (a round earlier than that, a few picks after his ADP, wait on him), never a pick you chose and never a threshold you made up for games or points. A rank is the sheet's rank, never a round-number tier of your own, and the only rank on our board you may state is the sheet's position rank or overall rank, exactly as printed.
+- {{picks}} A rank is the sheet's rank, never a round-number tier of your own, and the only rank on our board you may state is the sheet's position rank or overall rank, exactly as printed.
 - Never say a risk, an injury or a competitor is ABSENT unless the sheet says so. Silence on the sheet is silence from you. Do not reassure the reader about a thing you have no fact for.
 - Never make an all-time or historical-record claim. This engine holds no such data.
 - If the sheet carries a real downside (a factor that costs him points a game, or a year-over-year number that fell), name it with its own number before your call. Never a one-sided rave on mixed facts.
@@ -146,6 +149,8 @@ PRESEASON_RULES: Final = (
     + _RULES.replace("{call}", _PRESEASON_CALL)
     .replace("{fixes}", _PRESEASON_FIXES)
     .replace("{words}", _PRESEASON_WORDS)
+    .replace("{picks}", _PRESEASON_PICKS)
+    .replace("{we_would}", "we would take him")
     + "\n\n"
     + _PRESEASON_TIME
 )
@@ -154,6 +159,8 @@ IN_SEASON_RULES: Final = (
     + _RULES.replace("{call}", _IN_SEASON_CALL)
     .replace("{fixes}", _IN_SEASON_FIXES)
     .replace("{words}", _IN_SEASON_WORDS)
+    .replace("{picks}", _IN_SEASON_PICKS)
+    .replace("{we_would}", "we would hold him")
     + "\n\n"
     + _IN_SEASON_TIME
 )

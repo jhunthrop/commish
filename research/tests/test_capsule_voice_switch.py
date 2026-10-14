@@ -8,7 +8,9 @@ from typing import TYPE_CHECKING, cast
 from research.capsules.facts.model import InjuryClean, InjuryDesignated, SeasonSoFar, SeasonTotals, SeasonWeek
 from research.capsules.facts.season_so_far import is_in_season
 from research.capsules.prompt import IN_SEASON_RULES, PRESEASON_RULES, writer_rules_for
+from research.capsules.render import _adp_line
 from research.capsules.render_season import bye_line, injury_line, season_section, today_line
+from research.capsules.season_voice import SeasonClock, time_frame_hits
 
 if TYPE_CHECKING:
     from research.capsules.facts.build import PlayerFacts
@@ -59,6 +61,30 @@ def test_in_season_rules_and_lines() -> None:
     assert bye_line(facts) == "Bye: week 11 of 2026, still to come."
     assert injury_line(facts) == "Injury report: designation Q, on every report since the run-up to week 6 of 2026."
     assert "Weeks he has missed this season: week 4 of 2026 (1 in all)." in season_section(facts)
+
+
+def test_the_in_season_instructions_carry_no_phrase_the_in_season_floor_refuses() -> None:
+    for phrase in ("a round earlier", "a few picks after his ADP", "wait on him", "rounded pick", "around pick"):
+        assert phrase not in IN_SEASON_RULES, phrase
+        assert not any(rule.startswith("draft voice") for rule in _floor(IN_SEASON_RULES.split("TIME")[0]))
+    assert "a round earlier than that" in PRESEASON_RULES and "we would take him" in PRESEASON_RULES
+    assert "we would hold him" in IN_SEASON_RULES
+
+
+def test_the_in_season_sheet_prints_adp_as_on_file_with_no_pick_word() -> None:
+    market = SimpleNamespace(adp=7.4, position_adp=None)
+    october = cast("PlayerFacts", SimpleNamespace(market=market, season=_season(5)))
+    august = cast("PlayerFacts", SimpleNamespace(market=market, season=None))
+    assert _adp_line(october) == "ADP before the season 7.4 (where drafters took him)."
+    assert "around pick 7" in _adp_line(august)
+    none_on_file = cast(
+        "PlayerFacts", SimpleNamespace(market=SimpleNamespace(adp=None, position_adp=None), season=_season(5))
+    )
+    assert "pick" not in _adp_line(none_on_file)
+
+
+def _floor(text: str) -> list[str]:
+    return [hit.rule for hit in time_frame_hits(text, SeasonClock(2026, 5))]
 
 
 def test_the_next_week_reads_true_at_the_edges() -> None:

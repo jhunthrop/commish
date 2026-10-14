@@ -31,7 +31,7 @@ def test_a_span_on_two_pages_is_queued_and_counted_but_does_not_fail_the_run() -
     assert set(gate.span_phrases) == {"a", "b"}
     assert gate.ok
     assert repair_targets([s.player_ids for s in gate.spans], ["a", "b", "c"]) == ["b"]
-    assert "1 six-word spans on two pages or more (2 pages carry one, 1 queued for repair, never a failure)" in (
+    assert "1 six-word spans on two pages or more, never a failure (2 pages carry one, 1 eligible for a span" in (
         gate.summary()
     )
 

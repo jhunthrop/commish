@@ -8,7 +8,7 @@ so the site keeps building from the last clean run. Every failure is a named rea
 2. `board_depth`: every format's board covers, league-wide, every starting slot its ranked positions
    alone can fill, and every roster spot but the kicker's and the defense's (market order, never
    board rows).
-3. `capsules`: at most 2% of the board's pages unwritten, no written sentence on two pages (the capsule step's gate;
+3. `capsules`: at most the run's line of the board's pages unwritten (2% preseason, 3% in season), no written sentence on two pages (the capsule step's gate;
    six-word spans are counted and repaired, never a failure), and every page with a capsule prints at least one of
    its numbers, each word for word and equal to the page's value at the precision printed, with no
    voice-rule hit, no doubled word and no time frame slip for the run's day.

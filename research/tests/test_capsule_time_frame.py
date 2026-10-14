@@ -163,3 +163,19 @@ def test_points_a_game_against_the_season_number_is_handed_back() -> None:
     assert "time frame (points a game against the season number)" in _rules(nacua, OCTOBER)
     assert _rules("Our preseason number was 344 points for the season.", OCTOBER) == []
     assert _rules(nacua, PRESEASON) == []
+
+
+def test_the_points_a_game_rule_reads_a_figure_and_two_digit_projections() -> None:
+    rule = "time frame (points a game against the season number)"
+    assert _rules("Our preseason number was 231 points, and he has not missed a game.", OCTOBER) == []
+    assert rule in _rules("He is at 12.4 a game against our 231-point projection.", OCTOBER)
+    assert rule in _rules("His 85-point projection looks light at 9.1 points a game.", OCTOBER)
+    # Our number read as points a game over a full season is the per-game reading the TIME rule asks for.
+    assert _rules("Our number has him at 231 points, 13.6 a game over a full season.", OCTOBER) == []
+
+
+def test_number_word_weeks_read_whole_and_a_score_held_to_is_past() -> None:
+    assert week_references("weeks fourteen to sixteen of 2026")[0].weeks == (14, 16)
+    told = "time frame (a week still to play told as past)"
+    assert told in _rules("Week fourteen of 2026 he had 30 points.", OCTOBER)
+    assert told in _rules("He was held to 3 points in week 7 of 2026.", OCTOBER)

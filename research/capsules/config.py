@@ -125,13 +125,11 @@ class CapsuleConfig:
     corrections_per_read: int = 2
     # The share of the board's pages the nightly lets go unwritten (facts blocks, the oracle's template
     # rows and missing pages together), one line per voice, the run's date deciding which.
-    unwritten_line_preseason: UnwrittenLine = UnwrittenLine(
-        "preseason", 0.02, "the preseason line, the share the board was built to"
-    )
+    unwritten_line_preseason: UnwrittenLine = UnwrittenLine("preseason", 0.02, "the share the board was built to")
     unwritten_line_in_season: UnwrittenLine = UnwrittenLine(
         "in-season",
         0.03,
-        "the in-season line: a full in-season rewrite's estimate tops out near 2.5% (Lane 17's 80-page sample), "
+        "a full in-season rewrite's estimate tops out near 2.5% (Lane 17's 80-page sample), "
         "and one page moves an 80-page rate by 1.25 points",
     )
     # A written sentence this long or longer may sit on one page only; shorter ones ("Draft him.",
@@ -146,8 +144,9 @@ class CapsuleConfig:
     tension_threshold_points: float = 1.0
     # Pages one night may write, every pass together (raised from 700 by the Lane 17 fix-round ruling so a
     # full rewrite leaves room for the retries and repairs). Measured in Lane 17 (2026-10-14, the
-    # in-season floor): a page costs $0.0027 to $0.0038, so the ceiling is about $2.70 to $3.80 a night,
-    # ruled at about $3.50. In season every page's sheet moves on the morning a week lands (about 536
+    # in-season floor): a page costs $0.0027 to $0.0038, so a full night is expected at about $2.70 to
+    # $3.80 (ruled about $3.50). The hard bound is 1,000 pages at six calls each, about $4.15 at the board
+    # run's $0.00069 a call (a page's one generation past the call ceiling comes out of the same budget). In season every page's sheet moves on the morning a week lands (about 536
     # pages, $1.60 to $2.00 before retries and repairs), injury designations move pages through the week,
     # and the span repairs rewrite two-page carriers every night, so steady nights spend real budget too,
     # up to the same ceiling. The board-scale measurement is in the Lane 17 report.

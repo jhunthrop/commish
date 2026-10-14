@@ -37,8 +37,10 @@ def _adp_line(facts: PlayerFacts) -> str:
     if adp is None:
         return f"ADP{before}: none on file."
     by_adp = "" if facts.market.position_adp is None else f", {facts.market.position_adp} by ADP"
-    took = "take" if facts.season is None else "took"
-    return f"ADP{before} {js_string(adp)} (drafters {took} him around pick {whole(adp)}{by_adp})."
+    if facts.season is not None:
+        # In season the ADP is history, printed as on file and with no pick word (the floor refuses one).
+        return f"ADP{before} {js_string(adp)} (where drafters took him{by_adp})."
+    return f"ADP {js_string(adp)} (drafters take him around pick {whole(adp)}{by_adp})."
 
 
 def _board_line(facts: PlayerFacts) -> str:

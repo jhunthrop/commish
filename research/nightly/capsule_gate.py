@@ -10,13 +10,11 @@ across players is a defect. The run fails when
   two players' pages (compared normalized, as the repetition measures compare, across both sizes of
   every written read on the board). Shorter ones, "Draft him." and "Let him go.", are the
   product's vocabulary, not stock prose; or
-- any six words in a row (`capsules.spans`, case folded, punctuation stripped, player and club names
-  breaking the run) still appear on `stock_span_pages` (three) players' written pages or more once the
-  repairs have run: a stock phrase, not coincidence (the live review's M1, as the coordinator ruled
-  it). A span on exactly two pages is counted and queued for the repair but does not fail the run,
-  and a span the sheets' labelled stats print (a label or a stat name copied word for word,
-  `capsules.span_rules`) is exempt. Spans read the narrative sentences too; the whole-sentence
-  rule reads the two reads only, as it always has.
+- never for six words in a row (`capsules.spans`, case folded, punctuation stripped, player and club
+  names breaking the run) on two or more pages (the live review's M1, as the coordinator ruled it):
+  those are counted, named and repaired within the budget, never a failure. A span the sheets'
+  labelled stats print (a label or a stat name copied word for word, `capsules.span_rules`) is
+  exempt. Spans read the narrative sentences too; the whole-sentence rule reads the two reads only.
   Each page's shared spans are kept, joined where they overlap, for the repair's prompt.
 
 Phase D extends this gate (the page findings of `capsules.pull_figures`, the run's other gates);
@@ -68,15 +66,17 @@ class CapsuleGateResult:
     template: int
     missing: int
     shared: tuple[SharedSentence, ...]
+    # The run's unwritten line (`CapsuleConfig.unwritten_line`), required: a gate never assumes one.
+    line: UnwrittenLine
     # Every span on two pages or more that no fact sheet prints, queued for the repair.
     spans: tuple[SharedSpan, ...] = ()
     # Each page that carries a shared span, to its shared spans joined where they overlap.
     span_phrases: Mapping[str, tuple[str, ...]] = field(default_factory=lambda: MappingProxyType({}))
-    # The carriers the repair rewrites: every one but the first in board order.
+    # The carriers eligible for a span rewrite (every one but the first in board order); the night
+    # rewrites as many as its budget reaches.
     queued: int = 0
     # Spans two pages or more share that the sheets' labelled stats print, so not judged.
     exempt_spans: int = 0
-    line: UnwrittenLine = CAPSULE_CONFIG.unwritten_line_preseason
 
     @property
     def unwritten_share(self) -> float:
@@ -96,7 +96,8 @@ class CapsuleGateResult:
             f"({self.unwritten_share:.1%} unwritten, the {self.line.voice} line {self.line.share_max:.0%}: "
             f"{self.line.basis}), "
             f"{len(self.shared)} written sentences on two pages, {len(self.spans)} six-word spans on two pages or "
-            f"more ({len(self.span_phrases)} pages carry one, {self.queued} queued for repair, never a failure), "
+            f"more, never a failure ({len(self.span_phrases)} pages carry one, {self.queued} eligible for a span "
+            "rewrite: every carrier but the first, as the budget reaches them), "
             f"{self.exempt_spans} sheet-label spans exempt"
         )
         examples = "; ".join(

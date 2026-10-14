@@ -96,6 +96,8 @@ class SweepReport:
     llm: int = 0
     facts: int = 0
     demoted: int = 0
+    # Span repairs whose rewrite fell short and left the page's written read as it was.
+    kept: int = 0
     calls: int = 0
     prompt_tokens: int = 0
     completion_tokens: int = 0
@@ -106,7 +108,7 @@ class SweepReport:
     calls_by_player: dict[str, int] = field(default_factory=dict)
 
 
-def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted: bool) -> None:
+def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted: bool, kept: bool) -> None:
     usage = result.usage
     report.calls += result.calls
     report.calls_by_player[subject.universe_id] = report.calls_by_player.get(subject.universe_id, 0) + result.calls
@@ -119,6 +121,10 @@ def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted
     if result.source == "llm":
         report.llm += 1
         report.detail.append(f"{name}: llm, {result.calls} calls, ${(usage.cost_usd or 0.0) if usage else 0.0:.6f}")
+        return
+    if kept:
+        report.kept += 1
+        report.detail.append(f"{name}: {describe_fallback(result.compact, result.full)}, kept the written read")
         return
     report.facts += 1
     report.demoted += int(demoted)
@@ -134,13 +140,14 @@ def write_one(  # noqa: PLR0913 - one write's parts
     worn: WornPhrases,
     *,
     keep_written: bool = False,
-) -> tuple[CapsuleResult, bool]:
-    """One player's capsule, generated and committed on its own. With `keep_written` a rewrite that
-    falls to the facts block leaves a written row as it was (a span repair's failure costs nothing)."""
+) -> tuple[CapsuleResult, bool, bool]:
+    """One player's capsule, generated and committed on its own: the result, whether a written row was
+    demoted, and whether it was kept. With `keep_written` a rewrite that falls to the facts block leaves
+    a written row as it was (a span repair's failure costs nothing)."""
     result = generate_capsule(subject.facts, gateway, worn)
     demoted = stored is not None and stored.source == "llm" and result.source == FACTS_SOURCE
     if demoted and keep_written:
-        return result, False
+        return result, False, True
     row = CapsuleWrite(
         subject.universe_id,
         RETRY_FIRST_FACTS_HASH if demoted else subject.facts.facts_hash,
@@ -152,7 +159,7 @@ def write_one(  # noqa: PLR0913 - one write's parts
     )
     with engine.begin() as conn:
         upsert_capsule(conn, row, datetime.now(UTC))
-    return result, demoted
+    return result, demoted, False
 
 
 def subjects_of(conn: Connection, as_of: datetime, history: ReadThrough = UNCACHED) -> list[Subject]:
@@ -278,12 +285,12 @@ def sweep_capsules(
         own = plan.avoid_by_page.get(subject.universe_id, ())
         repeated = tonight.repeated(repetition.max_quoted_spans)
         worn = WornPhrases((*plan.avoid, *own, *repeated, *board_worn.sentences), board_worn.phrases)
-        result, demoted = write_one(
+        result, demoted, kept = write_one(
             engine, subject, stored.get(subject.universe_id), gateway, worn, keep_written=plan.keep_written
         )
         if result.source == "llm":
             tonight.add(page_texts(result.compact.text, result.full.text, result.narrative.slots))
-        _tally(report, subject, result, demoted)
+        _tally(report, subject, result, demoted, kept)
         report.processed.append(subject.universe_id)
     if stopped:
         # A half-swept board would flag sentences the rest of tonight's work is about to rewrite.

@@ -23,6 +23,7 @@ import re
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Final
 
+from research.capsules.render_season import week_list
 from research.capsules.voice_rules import NamedPattern, VoiceRuleHit, named_rule
 
 if TYPE_CHECKING:
@@ -48,7 +49,8 @@ _NUMBER_WORDS: Final = (
     "seventeen",
     "eighteen",
 )
-_WEEK_NUMBER: Final = rf"(?:\d{{1,2}}|{'|'.join(_NUMBER_WORDS)})"
+# The longer words first, so "fourteen" is never read as "four" (an alternation takes its first match).
+_WEEK_NUMBER: Final = rf"(?:\d{{1,2}}|{'|'.join(sorted(_NUMBER_WORDS, key=len, reverse=True))})"
 _JOINER: Final = r"\s*(?:,|and|or|to|through|-)\s*(?:weeks?\s+)?"
 # "week 7", "weeks 2, 3 and 5", "weeks 15 to 17": one reference, its numbers captured whole.
 _WEEK_REFERENCE: Final = re.compile(
@@ -61,8 +63,10 @@ _SCORE_BEFORE: Final = re.compile(
 )
 # A score said of a week ahead as a need or a hope ("he needs 15 points in week 7 of 2026") looks
 # ahead; the cue sits just before the score.
+# How far before a week reference a score is read as told of that week.
+_SCORE_WINDOW: Final = 60
 _FORWARD_CUE: Final = re.compile(
-    r"\b(?:needs?|wants?|would|could|should|can|will|might|must|to|for)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
+    r"\b(?:needs?|wants?|would|could|should|can|will|might|must)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
 )
 _PAST_AFTER: Final = re.compile(
     r"^\s*,?\s*(?:when\s+|where\s+)?(?:he\s+)?(?:scored|had|was|went|missed|played|caught|ran|posted|finished|sat|"
@@ -83,6 +87,8 @@ MONTHS: Final = named_rule(
     r"Nov\.|Dec\.)(?![a-z])",
     0,
 )
+# How many characters may stand between a spend verb and the round pick it spends.
+_SPEND_GAP: Final = 20
 # What speaks to a draft that is still ahead: the in-season voice never does (H2).
 DRAFT_VOICE_PATTERNS: Final = (
     named_rule("draft voice (draft him)", r"\bdraft(?:s|ing)? (?:him|them)\b"),
@@ -97,7 +103,7 @@ DRAFT_VOICE_PATTERNS: Final = (
     named_rule("draft voice (a round to spend)", r"\bin (?:the )?round (?:one|two|three|four|five|six|seven|\d+)\b"),
     named_rule(
         "draft voice (a round-pick to spend)",
-        r"\b(?:worth|spend|spending|use|using|burn|burning)\b[^.]{0,20}?\b(?:a|an|your)\s+[a-z0-9]+[- ]round "
+        rf"\b(?:worth|spend|spending|use|using|burn|burning)\b[^.]{{0,{_SPEND_GAP}}}?\b(?:a|an|your)\s+[a-z0-9]+[- ]round "
         r"(?:pick|selection)\b",
     ),
     named_rule(
@@ -147,7 +153,7 @@ def clock_of(facts: "PlayerFacts") -> SeasonClock:
 
 def _week_numbers(raw: str) -> tuple[int, ...]:
     words = {word: index + 1 for index, word in enumerate(_NUMBER_WORDS)}
-    tokens = re.findall(rf"{_WEEK_NUMBER}", raw, re.IGNORECASE | re.ASCII)
+    tokens = re.findall(rf"\b{_WEEK_NUMBER}\b", raw, re.IGNORECASE | re.ASCII)
     return tuple(int(token) if token.isdigit() else words[token.lower()] for token in tokens)
 
 
@@ -181,7 +187,7 @@ def _unplayed_told_as_past(reference: WeekReference, clock: SeasonClock) -> bool
     ahead = [week for week in reference.weeks if week > clock.through and week not in clock.played]
     if not ahead:
         return False
-    before = reference.before[-60:]
+    before = reference.before[-_SCORE_WINDOW:]
     score = _SCORE_BEFORE.search(before)
     told_as_past = score is not None and _FORWARD_CUE.search(before[: score.start()]) is None
     return told_as_past or _PAST_AFTER.match(reference.after) is not None
@@ -216,19 +222,36 @@ def time_frame_hits(text: str, clock: SeasonClock) -> list[VoiceRuleHit]:
 # In season, points a game set against our full-season number compare two different things (the
 # live review of Lane 17, M7: "at 25.9 points a game he is tracking exactly where our 344-point
 # projection wanted him"). A sentence carrying both is handed back.
+# How many characters may stand between "our number" and the season figure it names.
+_SEASON_FIGURE_GAP: Final = 30
 PER_GAME_AGAINST_SEASON: Final = named_rule(
     "time frame (points a game against the season number)",
-    r"\b\d{3}(?:\.\d)?(?:-point| points?)\s+(?:preseason\s+)?(?:projection|number|preseason number)\b|"
-    r"\b(?:projection|preseason number|our number)\b[^.]{0,30}?\b\d{3}(?:\.\d)?(?: points?)?\b",
+    r"\b(?P<a>\d{2,3}(?:\.\d)?)(?:-point| points?)\s+(?:preseason\s+)?(?:projection|number|preseason number)\b|"
+    rf"\b(?:projection|preseason number|our number)\b[^.]{{0,{_SEASON_FIGURE_GAP}}}?\b(?P<b>\d{{2,3}}(?:\.\d)?)(?: points?)?\b",
 )
-_PER_GAME: Final = re.compile(r"\b(?:a|per) game\b", re.IGNORECASE)
+# A points-a-game figure ("12.4 a game", "13 points per game"); "has not missed a game" is not one.
+_PER_GAME: Final = re.compile(r"\b(?P<rate>\d+(?:\.\d+)?)\s*(?:points?\s+)?(?:a|per)\s+game\b", re.IGNORECASE)
+_GAMES: Final = re.compile(r"\b(\d{1,2})\s+(?:expected\s+)?games\b", re.IGNORECASE)
+_FULL_SEASON_GAMES: Final = 17
+_RATE_TOLERANCE: Final = 0.1
+
+
+def _honest_rate(season_points: float, rate: float, sentence: str) -> bool:
+    """The season number read as points a game over the games the sentence states (or a full
+    season): the per-game reading the TIME rule asks for, not a comparison of unlike things."""
+    games = [int(g) for g in _GAMES.findall(sentence)] + [_FULL_SEASON_GAMES]
+    return any(g > 0 and abs(season_points / g - rate) <= _RATE_TOLERANCE for g in games)
 
 
 def _per_game_against_season(text: str) -> list[re.Match[str]]:
     found = []
     for sentence in re.split(r"(?<=[.!?])\s+", text):
         match = PER_GAME_AGAINST_SEASON.pattern.search(sentence)
-        if match is not None and _PER_GAME.search(sentence):
+        rate = _PER_GAME.search(sentence)
+        if match is None or rate is None:
+            continue
+        season_points = float(match.group("a") or match.group("b"))
+        if not _honest_rate(season_points, float(rate.group("rate")), sentence):
             found.append(match)
     return found[:1]
 
@@ -286,9 +309,7 @@ def names_missed_weeks(text: str, clock: SeasonClock) -> bool:
 
 
 def missed_weeks_violation(clock: SeasonClock) -> str:
-    listed = " and ".join(str(week) for week in clock.missed)
-    plural = "week" if len(clock.missed) == 1 else "weeks"
     return (
-        f"{MISSED_WEEKS_UNNAMED}: he did not play {plural} {listed} of {clock.season}. Name them, by week and "
+        f"{MISSED_WEEKS_UNNAMED}: he did not play {week_list(clock.missed, clock.season)}. Name them, by week and "
         "season, in one sentence of your own before any talk of how many games to expect."
     )

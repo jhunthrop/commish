@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import Engine
 
 from research.capsules import sweep
+from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.prompt import NO_WORN_PHRASES
 from research.capsules.spans import SharedSpan
 from research.capsules.store import StoredCapsule
@@ -20,7 +21,7 @@ ORDER = ["a", "b", "c", "d", "e"]
 
 
 def _gate(shared: tuple[SharedSentence, ...], spans: tuple[SharedSpan, ...]) -> CapsuleGateResult:
-    return CapsuleGateResult(5, 5, 0, 0, 0, shared, spans)
+    return CapsuleGateResult(5, 5, 0, 0, 0, shared, CAPSULE_CONFIG.unwritten_line_in_season, spans)
 
 
 def test_hard_targets_come_before_spans_and_spans_go_most_shared_first() -> None:
@@ -49,7 +50,7 @@ def test_a_span_repair_that_falls_to_the_facts_block_keeps_the_written_read(monk
     stored = StoredCapsule("a", "h", "c", "f", "llm", None, None, datetime(2026, 10, 14, tzinfo=UTC))
     subject = cast("sweep.Subject", SimpleNamespace(universe_id="a", facts=None))
     # No engine is touched: nothing is written.
-    result, demoted = sweep.write_one(
+    result, demoted, kept = sweep.write_one(
         cast("Engine", None), subject, stored, cast("Any", None), NO_WORN_PHRASES, keep_written=True
     )
-    assert result.source == "facts" and not demoted
+    assert result.source == "facts" and not demoted and kept

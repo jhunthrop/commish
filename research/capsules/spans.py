@@ -3,8 +3,10 @@
 The live review of 2026-10-14 (M1) found stock language the sentence check could not see, because
 the sentences around it differed: "is the whole story", "comes from seasons cut short by injury",
 "a realistic range of 9 to 17 once injury risk is in". The founder's rule treats a stock sentence
-across players as a defect, so the capsule gate holds every written page to this: no span of
-`SPAN_WORDS` words appears on two pages.
+across players as a defect, so the capsule gate counts every span of `SPAN_WORDS` words on two
+pages or more and the repair rewrites them within the night's budget. Spans never fail a run (the
+coordinator's Lane 17 ruling: one model writing a board from one sheet repeats six-word phrases by
+nature); a whole sentence on two pages still does.
 
 A page's words are read across both sizes of its read and its narrative sentences (each beside a
 module on the page: prose too, and the most templated), case folded with the punctuation stripped
