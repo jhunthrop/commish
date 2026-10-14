@@ -2,6 +2,7 @@
  * record, a move in words, and the drafter's roster and the pool as board players. Pure functions
  * over the API's answer. */
 import { fixed, plural, signed } from '#lib/format/number.ts';
+import { midSentence } from '#lib/format/sentence.ts';
 import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
 import type { IndexSeason } from '#lib/run/schema.ts';
 import type { LeagueBoard, LeagueBoardPlayer } from './board.ts';
@@ -173,60 +174,42 @@ export function seasonStarted(board: LeagueBoard): boolean {
 	return board.players.some((p) => p.season.games > 0);
 }
 
-/** Games a season figure needs before it leads the pool: a two-game backup's average is noise. */
-export const POOL_MIN_GAMES = 3;
-
-/** Before kickoff our board's order (points over replacement); after, points a game this season,
- * best first, players with POOL_MIN_GAMES or more ahead of the rest, then a player with no game,
- * ties by the preseason projection. */
-function poolOrder(a: LeagueBoardPlayer, b: LeagueBoardPlayer): number {
-	const sampled = (p: LeagueBoardPlayer): number => (p.season.games >= POOL_MIN_GAMES ? 1 : 0);
-	const ppg = (p: LeagueBoardPlayer): number => p.season.pointsPerGame ?? Number.NEGATIVE_INFINITY;
-	return sampled(b) - sampled(a) || ppg(b) - ppg(a) || (b.points ?? 0) - (a.points ?? 0);
-}
-
-/** The waiver pool: our board without every player a team in the league holds, ranked as
- * poolBasis says. */
+/** The waiver pool: our board without every player a team in the league holds, in our board's
+ * order (points over replacement), so a one-QB league's pickups lead rather than its backup
+ * quarterbacks. In season each row shows his points a game. */
 export function poolRows(board: LeagueBoard, sync: LeagueSync): readonly LeagueBoardPlayer[] {
 	// An API from before held_by omits it and still names the rostered ids: read those then.
 	const byId = sync.held_by as LeagueSync['held_by'] | undefined;
 	// eslint-disable-next-line @typescript-eslint/no-deprecated -- the deploy window's fallback, removed with the field.
 	const held = new Set(byId === undefined ? sync.rostered : Object.keys(byId));
-	const pool = board.players.filter((p) => !held.has(p.id));
-	return seasonStarted(board) ? pool.toSorted(poolOrder) : pool;
+	return board.players.filter((p) => !held.has(p.id));
 }
 
-/** How the pool is ranked, said once above it. */
+/** How the pool is ranked and what its figure is, said once above it. */
 export function poolBasis(board: LeagueBoard): string {
-	return seasonStarted(board)
-		? `Unrostered in your league, ranked by points a game this season, players with ${String(POOL_MIN_GAMES)} games or more first, then by our preseason projection.`
-		: "Unrostered in your league, ranked by our preseason board's points over replacement.";
+	const order =
+		"Unrostered in your league, ranked by our preseason board's points over replacement.";
+	return seasonStarted(board) ? `${order} The figure is his points a game this season.` : order;
 }
 
-/** A label in a sentence: a word drops its capital ("Half PPR" to "half PPR"), an acronym keeps it. */
-function midSentence(label: string): string {
-	return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
-}
-
-/** The page's one basis line: the scoring the figures are in (the run's season scoring, never a
- * lineup shape such as superflex) and the league's own: "Figures are PPR. Your league scores TE
- * premium." No page promises the league's exact rules until they ship. */
-export function figuresLine(figuresScoring: string, scoringLike: ScoringPreset): string {
-	const figures = midSentence(figuresScoring);
-	const league = SCORING_WORDS[scoringLike];
-	const same = figures.toLowerCase() === league.toLowerCase();
-	return `Figures are ${figures}. Your league scores ${same ? 'the same' : league}.`;
-}
-
-/** The kicker and defense the league starts that the run's board does not rank, said as the pool's
- * missing chips: "No kickers on this run." */
-export function missingFromRun(sync: LeagueSync, board: LeagueBoard): readonly string[] {
-	const ranked = new Set(board.players.map((p) => p.position as string));
-	const held = new Set(sync.roster.map((s) => s.player.position));
-	const words: Readonly<Record<string, string>> = { K: 'kickers', DEF: 'defenses' };
-	return Object.entries(words)
-		.filter(([pos]) => held.has(pos) && !ranked.has(pos))
-		.map(([, plural]) => `No ${plural} on this run.`);
+/** The page's one basis line, once: the scoring the figures are in (the run's season scoring, never
+ * a lineup shape such as superflex), which figures are this season's and which are preseason, in
+ * words, and the league's own scoring in plain words when it differs: "PPR. This season's games and
+ * points a game through week 5, beside our preseason projection and points over replacement. Your
+ * league gives tight ends extra points per catch." The league's sentence is note-words'
+ * scoresSentence, handed in so this module never pulls the league line in. No page promises the
+ * league's exact rules here. */
+export function leagueBasis(
+	figuresScoring: string,
+	through: number,
+	scoringLike: ScoringPreset,
+	scoresSentence: (scoring: ScoringPreset) => string
+): string {
+	const reach = through === 0 ? '' : ` through week ${String(through)}`;
+	const same =
+		midSentence(figuresScoring).toLowerCase() === SCORING_WORDS[scoringLike].toLowerCase();
+	const own = same ? '' : ` ${scoresSentence(scoringLike)}`;
+	return `${figuresScoring}. This season's games and points a game${reach}, beside our preseason projection and points over replacement.${own}`;
 }
 
 /** The drafter's team. */

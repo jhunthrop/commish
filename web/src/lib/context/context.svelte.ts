@@ -8,11 +8,13 @@
  * rosters arrive through held.ts, loaded only with a league selected).
  */
 import { PUBLIC_API_URL } from '$app/env/public';
-import { apiClient } from '#lib/api/client.ts';
+import { ApiError, apiClient } from '#lib/api/client.ts';
 import { sessionToken } from '#lib/api/session.ts';
 import type { components } from '#lib/api/types.ts';
 import { CONTEXT_KEY, LEAGUE_ATTR, LINES_KEY } from './boot.ts';
-import type { BoardFormat, ContextLeague, Held } from './words.ts';
+import type { Marks } from './held-words.ts';
+import type * as NoteLine from './note-line.ts';
+import type { BoardFormat, ContextLeague } from './words.ts';
 
 type Account = components['schemas']['Account'];
 type Feature = components['schemas']['Feature'];
@@ -29,11 +31,13 @@ interface Kept {
 
 const client = apiClient(PUBLIC_API_URL);
 
-/** The lines a league's basis line takes on a phone, 0 with no league: two for the long sentences
- * (TE premium's Draft Pass line, a lineup, a board other than PPR the run may lack), else one. */
-function linesFor(league: ContextLeague | null): 0 | 1 | 2 {
+/** The lines a league's basis line takes on a phone, 0 with no league: three for TE premium's (plain
+ * words, plain PPR, where its exact rules rank it), two for a lineup or a board other than PPR the
+ * run may lack, else one. */
+function linesFor(league: ContextLeague | null): 0 | 1 | 2 | 3 {
 	if (!league) return 0;
-	return league.scoring === 'te_premium' || league.format !== 'ppr' ? 2 : 1;
+	if (league.scoring === 'te_premium') return 3;
+	return league.format !== 'ppr' ? 2 : 1;
 }
 
 class SiteContext {
@@ -47,8 +51,11 @@ class SiteContext {
 	format = $state<BoardFormat | null>(null);
 	/** What the account may use, from the same /me read: many_leagues on the attach page. */
 	features = $state<readonly Feature[]>([]);
-	/** The selected league's rosters, null until read or with no league (held.ts). */
-	held = $state<Held | null>(null);
+	/** The selected league's roster marks, null until read or with no league (held.ts). */
+	held = $state<Marks | null>(null);
+	/** The basis line's words (note-line.ts), loaded once a league is selected: a page with none
+	 * prints no line and carries none of them. */
+	notes = $state<typeof NoteLine | null>(null);
 	/** The league the rosters are, or are being read, for. */
 	heldFor: string | null = null;
 	/** The switch's menu is open: the bar's switch and the rail's Leagues open the one menu. */
@@ -101,8 +108,11 @@ class SiteContext {
 			try {
 				this.take(await client.call<Account>('/me'));
 				return;
-			} catch {
+			} catch (error) {
 				// The session's own copy, or nothing, stands: the pages read the format they were built in.
+				// The one record of a failed /me, with its status, for whoever has the console open.
+				// eslint-disable-next-line no-console -- no user-facing text: the context held still stands
+				console.warn('Site context: /me', error instanceof ApiError ? error.status : error);
 				this.features = [];
 			}
 		}
@@ -152,6 +162,15 @@ class SiteContext {
 		this.league = league;
 		this.leagues = leagues;
 		this.format = league ? league.format : format;
+		if (league && !this.notes) {
+			import('./note-line.ts')
+				.then((module) => {
+					this.notes = module;
+				})
+				// A chunk that fails to load (a deploy between pages) leaves the line unsaid in its kept
+				// room, never an unhandled rejection; the next page loads it again.
+				.catch(() => undefined);
+		}
 		if (this.heldFor !== league?.id) {
 			this.held = null;
 			this.heldFor = null;

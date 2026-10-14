@@ -1,7 +1,7 @@
 /**
  * A player's season so far, as `players/<id>.json` carries it under `season`: the season line and a
  * game log with every week of the regular season, scored in one of the run's formats. Stat lines
- * come from the league's own records; nothing here is a projection.
+ * come from the NFL's records; nothing here is a projection.
  *
  * The stat fields are named as the research store names its metrics (snake_case), plus
  * `completions`, `snapShare` (his share of his team's offensive snaps, 0 to 1) and `points` (the

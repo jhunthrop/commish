@@ -4,7 +4,6 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { contextLine } from '#lib/context/context-format.ts';
-	import { contextNote } from '#lib/context/words.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed } from '#lib/format/number.ts';
@@ -60,9 +59,7 @@
 		return lead;
 	});
 	const figures = $derived(apiFormatOf(format));
-	const note = $derived(
-		figures === null ? null : contextNote(siteContext.league, figures, 'These figures are')
-	);
+	const note = $derived(siteContext.notes?.lineFor(figures, 'These figures are') ?? null);
 
 	function pickOf(slot: Slot): Chosen | null {
 		const player = chosen[slot];
@@ -156,7 +153,7 @@
 				? 'The players are not loading. Try again in a moment.'
 				: `Our ${format.label} board · ${String(data.run.season)} season`}
 		/>
-		<ContextNote {note} />
+		<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
 
 		{#if verdict?.kind === 'same'}
 			<EmptyState level={2} title="Pick two different players" line={SAME_PLAYER} />

@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { fixed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
+	import type { ShownMark } from '#lib/context/held-words.ts';
 	import type { IndexSeason } from '#lib/run/schema.ts';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import AdpCell from './AdpCell.svelte';
 	import Face from './Face.svelte';
-	import HeldMark from './HeldMark.svelte';
 	import NameWords from './NameWords.svelte';
 	import PositionPill from './PositionPill.svelte';
 	import RangeBar from './RangeBar.svelte';
 	import TierChip from './TierChip.svelte';
 	import ValueCell from './ValueCell.svelte';
 	import { vorCell } from './heat.ts';
-	import { seasonParts } from './season-figures.ts';
+	import { seasonFigures } from './season-figures.ts';
 
 	interface Props {
 		player: BoardPlayer;
@@ -39,8 +39,9 @@
 		 * prints "18.4 a game, 5 games" in place of his projected games, and the page's basis line
 		 * names it. Left out, the row is the preseason row. */
 		season?: IndexSeason;
-		/** A team in your league holds him (HeldMark): whose, in words, and whether it is yours. */
-		held?: { words: string; mine: boolean } | null;
+		/** The league's mark, with the component that draws it (HeldMark, loaded with the rosters):
+		 * yours, which tints the row with your wash, or a free agent. */
+		held?: ShownMark | null;
 	}
 
 	let {
@@ -64,14 +65,17 @@
 
 <div
 	class="row"
+	class:mine={held?.kind === 'mine'}
 	class:flat={!range}
 	class:act={action !== undefined}
 	class:act-flat={action !== undefined && !range}
+	class:games={season !== undefined}
 >
 	<span class="rk">{lead}</span>
 	<span class="face"
-		><Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />{#if held}<HeldMark
-				{...held}
+		><Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />{#if held}<held.Mark
+				words={held.words}
+				kind={held.kind}
 			/>{/if}</span
 	>
 	<span class="who">
@@ -83,15 +87,13 @@
 			{#if season === undefined}
 				<span class="wide">{fixed(player.expectedGames)} games</span>
 			{:else}
-				{@const parts = seasonParts(season)}
-				<span class="season"
-					>{parts.perGame}{#if parts.games !== null}<span class="games">{parts.games}</span
-						>{/if}</span
-				>
+				{@const figures = seasonFigures(season)}
+				<span class="season">{figures.perGame}<span class="count">{figures.games}</span></span>
 			{/if}
 			<span class="narrow">{fixed(player.projected)} pts</span>
 		</span>
 	</span>
+	<span class="gp">{season?.games}</span>
 	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
 	<ValueCell {...vorCell(player.vor, player.vorRound)} phoneLabel={false} />
 	{#if range}
@@ -129,6 +131,31 @@
 		grid-template-columns: var(--board-cols-act-flat);
 	}
 
+	.games {
+		grid-template-columns: var(--board-cols-games);
+	}
+
+	.games.flat {
+		grid-template-columns: var(--board-cols-games-flat);
+	}
+
+	.games.act {
+		grid-template-columns: var(--board-cols-games-act);
+	}
+
+	.games.act-flat {
+		grid-template-columns: var(--board-cols-games-act-flat);
+	}
+
+	/* This season's games, a bare count under the Games head, in a row that carries the season. */
+	.gp {
+		display: none;
+		text-align: right;
+		font-family: var(--font-num);
+		font-size: var(--t-lg);
+		font-variant-numeric: tabular-nums;
+	}
+
 	.action {
 		position: relative;
 		z-index: 1;
@@ -153,6 +180,12 @@
 
 	.row:hover {
 		background: var(--surface);
+	}
+
+	/* Your own player's row takes your wash, the one tint that means you. */
+	.mine,
+	.mine:hover {
+		background: var(--accent-wash);
 	}
 
 	/* The face's box, kept for every row, so a held mark arriving over its edge moves nothing. */
@@ -211,42 +244,64 @@
 		flex: none;
 	}
 
-	/* His season so far takes the projected games' place: "18.4 a game". The count after it prints
-	   only where the figures have a line of their own; on the meta line the basis line's "through
-	   week 5" and his page carry it. */
+	/* His season so far takes the projected games' place. On a desk (1181 px and up) the count has
+	   its own Games column and the line prints "25.9 a game"; below it the line prints the count too,
+	   "8.2 a game, 3 games", taking a line of its own where the column is under the widest such line
+	   (256px, measured on the real run's 536 rows), wrapping its words rather than losing its end. */
 	.season {
 		color: var(--ink-2);
 		font-variant-numeric: tabular-nums;
 	}
 
-	.games {
-		display: none;
+	@media (min-width: 1181px) {
+		.count {
+			display: none;
+		}
+
+		.games > .gp {
+			display: block;
+		}
+	}
+
+	@media (min-width: 1181px) and (max-width: 1439px) {
+		.games > .rng {
+			display: none;
+		}
+	}
+
+	/* The band's 32px mark track holds the disc alone: his place on your sheet is in its name. */
+	@media (min-width: 1181px) and (max-width: 1439px) {
+		.games > .action :global(.place) {
+			display: none;
+		}
+
+		.games > .action :global(.add) {
+			padding-left: 2px;
+		}
+	}
+
+	@media (max-width: 1180px) {
+		.gp {
+			display: none;
+		}
+
+		@container (max-width: 259px) {
+			.seasoned {
+				flex-wrap: wrap;
+				row-gap: 2px;
+			}
+
+			.seasoned > .season {
+				order: 1;
+				flex: 0 0 100%;
+				white-space: normal;
+			}
+		}
 	}
 
 	@container (max-width: 204px) {
 		.team {
 			display: none;
-		}
-	}
-
-	/* In season the meta line with the club and the tier chip ("WR 12 · T3 · LAR · 18.4 a game") fits
-	   the 210px player column of the board at 1440, measured on the stand-in's 400 rows. A column
-	   under the pill and the figures (the phone, and 760 to 960px) gives the figures a line of their
-	   own with the games count, wrapping their words rather than losing their end. */
-	@container (max-width: 196px) {
-		.seasoned {
-			flex-wrap: wrap;
-			row-gap: 2px;
-		}
-
-		.seasoned > .season {
-			order: 1;
-			flex: 0 0 100%;
-			white-space: normal;
-		}
-
-		.seasoned .games {
-			display: inline;
 		}
 	}
 

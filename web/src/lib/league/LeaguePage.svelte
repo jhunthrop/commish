@@ -5,6 +5,7 @@
 	import { choose } from '#lib/context/choose.svelte.ts';
 	import { takeHeld } from '#lib/context/held.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
+	import { scoresSentence } from '#lib/context/note-words.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
@@ -28,9 +29,8 @@
 	import WaiverPool from './WaiverPool.svelte';
 	import {
 		POLL_MS,
-		figuresLine,
+		leagueBasis,
 		hostWords,
-		missingFromRun,
 		myPlace,
 		myTeam,
 		poolBasis,
@@ -155,7 +155,7 @@
 	 * figures, then the preseason board's. */
 	const basis = $derived(
 		board && sync
-			? `${figuresLine(board.seasonScoring, sync.scoring_like)} ${board.seasonBasis} Proj and over repl are our preseason board's.`
+			? leagueBasis(board.seasonScoring, board.seasonThrough, sync.scoring_like, scoresSentence)
 			: ''
 	);
 </script>
@@ -274,7 +274,6 @@
 						{tagsOf}
 						basis={poolBasis(board)}
 						inSeason={seasonStarted(board)}
-						missing={missingFromRun(sync, board)}
 					/>
 					<MovesPanel {sync} />
 				</div>

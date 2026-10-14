@@ -9,9 +9,11 @@
 		action?: boolean;
 		/** What the rows under it are ordered by. Match the Rows' order. */
 		order?: 'board' | 'adp';
+		/** The rows under it carry this season's figures: a Games column on a desk. */
+		games?: boolean;
 	}
 
-	let { range = true, action = false, order = 'board' }: Props = $props();
+	let { range = true, action = false, order = 'board', games = false }: Props = $props();
 </script>
 
 <div
@@ -19,6 +21,7 @@
 	class:flat={!range}
 	class:act={action}
 	class:act-flat={action && !range}
+	class:games
 	aria-hidden="true"
 >
 	<span class="lead"
@@ -26,13 +29,14 @@
 	>
 	<span></span>
 	<Label>Player</Label>
+	{#if games}<span class="gp"><Label align="end">Games</Label></span>{/if}
 	<span class="proj"><Label align="end">Projected</Label></span>
 	<span class="end"
 		><Label align="end"
 			><span class="wide">Over replacement</span><span class="narrow">Over repl</span></Label
 		></span
 	>
-	{#if range}<span class="rng"><Label>Floor to ceiling</Label></span>{/if}
+	{#if range}<span class="rng"><Label>Range</Label></span>{/if}
 	<Label><span class="wide">Drafters vs us</span><span class="narrow">Drafters</span></Label>
 	{#if action}<span class="act-end"></span>{/if}
 </div>
@@ -57,6 +61,39 @@
 
 	.act-flat {
 		grid-template-columns: var(--board-cols-act-flat);
+	}
+
+	.games {
+		grid-template-columns: var(--board-cols-games);
+	}
+
+	.games.flat {
+		grid-template-columns: var(--board-cols-games-flat);
+	}
+
+	.games.act {
+		grid-template-columns: var(--board-cols-games-act);
+	}
+
+	.games.act-flat {
+		grid-template-columns: var(--board-cols-games-act-flat);
+	}
+
+	.gp {
+		display: flex;
+		justify-content: flex-end;
+	}
+
+	@media (max-width: 1180px) {
+		.gp {
+			display: none;
+		}
+	}
+
+	@media (min-width: 1181px) and (max-width: 1439px) {
+		.games > .rng {
+			display: none;
+		}
 	}
 
 	.lead,

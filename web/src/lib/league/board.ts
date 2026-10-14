@@ -38,9 +38,8 @@ export interface LeagueBoard {
 	byId: ReadonlyMap<string, LeagueBoardPlayer>;
 	/** The run's basis for the board's numbers, phrase by phrase. */
 	basis: string;
-	/** What a row's season figures are: "Games and points a game are this season's, PPR, through
-	 * week 5." */
-	seasonBasis: string;
+	/** The last week whose games are all in, 0 before week 1's: the basis line's "through week 5". */
+	seasonThrough: number;
 	/** The scoring the season figures are in, as the run names it: "PPR". */
 	seasonScoring: string;
 	format: BoardFormat;
@@ -77,11 +76,6 @@ function playerOf(
 	};
 }
 
-function seasonBasisOf({ season }: LeagueBoardFile): string {
-	const reach = season.through === 0 ? '' : `, through week ${String(season.through)}`;
-	return `Games and points a game are this season's, ${season.scoring}${reach}.`;
-}
-
 /** The run's board for the league's format, or PPR's when the run lacks it. */
 export async function loadBoard(
 	format: BoardFormat,
@@ -96,7 +90,7 @@ export async function loadBoard(
 		players,
 		byId: new Map(players.map((p) => [p.id, p] as const)),
 		basis: `${run.format.basis.join(', ')}.`,
-		seasonBasis: seasonBasisOf(run),
+		seasonThrough: run.season.through,
 		seasonScoring: run.season.scoring,
 		format: own === null ? FALLBACK : format
 	};

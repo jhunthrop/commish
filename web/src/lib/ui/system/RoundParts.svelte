@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { recordHeadline, weekWords } from '#lib/run/record.ts';
+	import { recordHeadline, weekLines } from '#lib/run/record.ts';
 	import { runStampText, type RunStamp } from '#lib/run/stamp.ts';
 	import { absentWords } from '#lib/site/absent.ts';
 	import { verdict } from '#lib/site/verdict.ts';
@@ -129,13 +129,7 @@
 	</Parts>
 
 	<Specimen>
-		<LineList
-			label="Every week of the season"
-			lines={nightly.record.weeks.map((week) => ({
-				lead: `Week ${String(week.week)}`,
-				text: weekWords(week)
-			}))}
-		/>
+		<LineList label="Every week of the season" lines={weekLines(nightly.record.weeks)} />
 		<Footnote>{nightly.record.method}</Footnote>
 	</Specimen>
 	<Parts>

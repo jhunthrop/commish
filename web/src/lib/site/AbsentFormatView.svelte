@@ -3,13 +3,11 @@
 	import { runStampText, type RunStamp } from '#lib/run/stamp.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import { absentWords } from './absent.ts';
-	import FilterBar from '#lib/ui/FilterBar.svelte';
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
 	import { followFormat } from '#lib/context/follow.svelte.ts';
-	import ScoringChoice from '#lib/context/ScoringChoice.svelte';
 	import SiteShell from './SiteShell.svelte';
 
 	/** A format page for a format the chooser offers and this run does not carry: its scoring, which
@@ -49,9 +47,6 @@
 	{#snippet tail()}<Verb href={sectionHref('mock')}>Start a mock draft</Verb>{/snippet}
 	<main class="absent">
 		<PageHead title="{run.season} {noun}" />
-		<FilterBar>
-			<ScoringChoice label={page.format.label} />
-		</FilterBar>
 		<EmptyState title={words.title} line={words.line}>
 			{#snippet actions()}
 				{#each carried as chip (chip.id)}
