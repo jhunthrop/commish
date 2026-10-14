@@ -9,6 +9,7 @@ export type LeagueTeam = Schemas['LeagueTeam'];
 export type LeaguePlayer = Schemas['LeaguePlayer'];
 export type LeagueMove = Schemas['LeagueMove'];
 export type MatchupSide = Schemas['MatchupSide'];
+export type LeagueMatchup = Schemas['LeagueMatchup'];
 export type RosterSpot = Schemas['RosterSpot'];
 export type AttachPreview = Schemas['AttachPreview'];
 export type AttachInput = Schemas['AttachInput'];

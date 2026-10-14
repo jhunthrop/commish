@@ -64,7 +64,8 @@ func (p players) roster(t Team) []apitypes.RosterSpot {
 }
 
 func (p players) side(s Side) apitypes.MatchupSide {
-	out := apitypes.MatchupSide{RosterId: s.RosterID, Points: s.Points, Starters: make([]apitypes.MatchupStarter, 0, len(s.Starters))}
+	out := apitypes.MatchupSide{RosterId: s.RosterID, Points: s.Points, PointsRead: !s.PointsUnread,
+		Starters: make([]apitypes.MatchupStarter, 0, len(s.Starters))}
 	for _, id := range s.Starters {
 		out.Starters = append(out.Starters, apitypes.MatchupStarter{Player: p.player(id), Points: round2(s.PlayerPoints[id])})
 	}

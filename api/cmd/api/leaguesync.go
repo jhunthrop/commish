@@ -59,11 +59,12 @@ func (f ffpcWiring) routes(log *slog.Logger) []httpx.Route {
 }
 
 // host is the FFPC league host over the link store, nil when FFPC is off.
-func (f ffpcWiring) host(store *leaguesync.Store) *leaguesync.FFPC {
+// weeks is the run's schedule, the source of the league's current week.
+func (f ffpcWiring) host(store *leaguesync.Store, weeks leaguesync.WeekSource, log *slog.Logger) *leaguesync.FFPC {
 	if !f.on {
 		return nil
 	}
-	return &leaguesync.FFPC{Member: f.member, Readers: store, Now: time.Now}
+	return &leaguesync.FFPC{Member: f.member, Readers: store, Weeks: weeks, Now: time.Now, Log: log}
 }
 
 // leagueSyncService wires league sync: Sleeper first, MyFantasyLeague
@@ -84,7 +85,7 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 		&leaguesync.Sleeper{API: sleeperAPI, Now: now},
 		&leaguesync.MFL{API: mflAPI, Now: now},
 	}
-	ffpcHost := ff.host(store)
+	ffpcHost := ff.host(store, board.Schedule, log)
 	if ffpcHost != nil {
 		hostList = append(hostList, ffpcHost)
 	}

@@ -1469,9 +1469,12 @@ type LobbySeatViewKind string
 
 // MatchupSide defines model for MatchupSide.
 type MatchupSide struct {
-	Points   float64          `json:"points"`
-	RosterId int              `json:"roster_id"`
-	Starters []MatchupStarter `json:"starters"`
+	Points float64 `json:"points"`
+
+	// PointsRead the host's score for this side was read; false when it could not be (an FFPC all-play week whose scoring page did not answer), and points is then 0 and says nothing
+	PointsRead bool             `json:"points_read"`
+	RosterId   int              `json:"roster_id"`
+	Starters   []MatchupStarter `json:"starters"`
 }
 
 // MatchupStarter defines model for MatchupStarter.

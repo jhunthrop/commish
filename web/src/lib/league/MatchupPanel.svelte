@@ -6,7 +6,15 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { LeagueSync, MatchupSide } from './api.ts';
 	import LeagueRow from './LeagueRow.svelte';
-	import { hostWords, matchupGap, rowOf, statusOn, teamName } from './model.ts';
+	import {
+		hostWords,
+		matchupAside,
+		matchupGap,
+		rowOf,
+		scoreGap,
+		statusOn,
+		teamName
+	} from './model.ts';
 
 	/** This week's game: both lineups as the host has them set, each starter's points so far, and
 	 * each side's total. Side by side on a desk, one above the other in a hand. */
@@ -38,10 +46,15 @@
 		matchup !== null &&
 			[matchup.mine, ...(matchup.opponent ? [matchup.opponent] : [])].some(hasStarted)
 	);
+
+	/** In an all-play week a read score is shown even at 0: the host's own total, read, is the fact. */
+	function showsTotal(s: MatchupSide): boolean {
+		return s.points_read && (hasStarted(s) || sync.week_all_play);
+	}
 </script>
 
 {#snippet side(s: MatchupSide, mine: boolean)}
-	{@const live = hasStarted(s)}
+	{@const live = showsTotal(s)}
 	{@const scored = playersScored(s)}
 	<section class="side" class:mine aria-label={teamName(sync, s.roster_id)}>
 		<header>
@@ -72,13 +85,16 @@
 		<div class="head">
 			<PanelHead
 				title={`Week ${String(matchup.week)}`}
-				aside={started ? 'Points so far' : 'No games played yet'}
+				aside={matchupAside(matchup, sync.week_all_play, started)}
 				level={2}
 			/>
 			{#if sync.week_all_play}
 				<p class="none">
 					An all-play week on {hostWords(sync.host)}: your score is set against every other team's.
 				</p>
+			{/if}
+			{#if !matchup.mine.points_read}
+				<p class="none">{scoreGap(sync, now)}</p>
 			{/if}
 		</div>
 		<div class="sides">

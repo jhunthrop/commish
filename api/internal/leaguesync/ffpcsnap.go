@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
@@ -16,7 +17,9 @@ import (
 // the member's starters from their lineup page, this week's games from
 // the schedule, the moves panel, and the rules' scoring through the
 // 21-key map.
-func ffpcSnapshot(l ffpc.League, now time.Time) Snapshot {
+//
+// week is the league's current week, chosen by the caller (FFPC.week).
+func ffpcSnapshot(l ffpc.League, now time.Time, week int) Snapshot {
 	snap := Snapshot{
 		Ref: Ref{Host: HostFFPC, LeagueID: l.Banner.LeagueID, Season: l.Banner.Season}, Name: cleanHostText(l.Banner.LeagueName),
 		Status: "in_season", Season: l.Banner.Season, Players: map[string]HostPlayer{}, ReadAt: now,
@@ -73,10 +76,10 @@ func ffpcSnapshot(l ffpc.League, now time.Time) Snapshot {
 		snap.Teams = append(snap.Teams, *t)
 	}
 	sort.Slice(snap.Teams, func(i, j int) bool { return snap.Teams[i].RosterID < snap.Teams[j].RosterID })
-	snap.Week = ffpcWeek(l, now)
+	snap.Week = week
 	snap.Matchups, snap.AllPlay = ffpcGames(l.Schedule, snap.Week)
 	if l.Banner.TeamID > 0 {
-		snap.Matchups = withMemberSide(snap.Matchups, snap.AllPlay, *team(l.Banner.TeamID))
+		snap.Matchups = withMemberSide(snap.Matchups, snap.AllPlay, *team(l.Banner.TeamID), memberScore(l, week))
 	}
 	snap.Moves = ffpcMoves(l.Moves, &snap)
 	if l.Rules != nil {
@@ -142,10 +145,10 @@ func ffpcGames(weeks []ffpc.Week, number int) ([]Side, bool) {
 }
 
 // withMemberSide gives the member's side their starters from their
-// lineup page (FFPC's live scoring page is where each starter's points
-// would come from, and it is read only when it answers), and in an
-// all-play week, when the schedule lists no game, a side of their own.
-func withMemberSide(sides []Side, allPlay bool, member Team) []Side {
+// lineup page, and in an all-play week, when the schedule lists no game,
+// a side of their own scored from the scoring page: score, when nil, was
+// not read, and the side says so instead of reading as 0.
+func withMemberSide(sides []Side, allPlay bool, member Team, score *float64) []Side {
 	found := false
 	for i := range sides {
 		if sides[i].RosterID == member.RosterID {
@@ -153,9 +156,30 @@ func withMemberSide(sides []Side, allPlay bool, member Team) []Side {
 		}
 	}
 	if !found && allPlay {
-		sides = append(sides, Side{RosterID: member.RosterID, Starters: member.Starters, PlayerPoints: map[string]float64{}})
+		side := Side{RosterID: member.RosterID, Starters: member.Starters, PlayerPoints: map[string]float64{}, PointsUnread: score == nil}
+		if score != nil {
+			side.Points = round2(*score)
+		}
+		sides = append(sides, side)
 	}
 	return sides
+}
+
+// memberScore is the member's total for the week from the scoring page,
+// nil when the page was not read, is set to another week, or carries
+// another team's card.
+func memberScore(l ffpc.League, week int) *float64 {
+	b := l.Scoreboard
+	if b == nil || b.Week != week || !sameTeam(b.Team, l.Banner.TeamName) {
+		return nil
+	}
+	points := b.Points
+	return &points
+}
+
+// sameTeam compares two of FFPC's renderings of one team's name.
+func sameTeam(a, b string) bool {
+	return a != "" && strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
 // ffpcMoves is the moves panel's moves, newest first.

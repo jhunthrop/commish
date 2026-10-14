@@ -2008,6 +2008,8 @@ export interface components {
 			roster_id: number;
 			/** Format: double */
 			points: number;
+			/** @description the host's score for this side was read; false when it could not be (an FFPC all-play week whose scoring page did not answer), and points is then 0 and says nothing */
+			points_read: boolean;
 			starters: components['schemas']['MatchupStarter'][];
 		};
 		LeagueMatchup: {

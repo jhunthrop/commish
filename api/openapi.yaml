@@ -2284,10 +2284,15 @@ components:
         points: { type: number, format: double, description: his points so far this week }
     MatchupSide:
       type: object
-      required: [roster_id, points, starters]
+      required: [roster_id, points, points_read, starters]
       properties:
         roster_id: { type: integer }
         points: { type: number, format: double }
+        points_read:
+          type: boolean
+          description: >-
+            the host's score for this side was read; false when it could not be (an FFPC all-play week whose
+            scoring page did not answer), and points is then 0 and says nothing
         starters: { type: array, items: { $ref: "#/components/schemas/MatchupStarter" } }
     LeagueMatchup:
       type: object

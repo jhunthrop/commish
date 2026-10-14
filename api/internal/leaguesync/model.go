@@ -83,8 +83,12 @@ type Side struct {
 	RosterID int `json:"roster_id"`
 	// Game pairs two sides; sides with the same Game play each other. 0
 	// is a team with no opponent this week.
-	Game         int                `json:"game"`
-	Points       float64            `json:"points"`
+	Game   int     `json:"game"`
+	Points float64 `json:"points"`
+	// PointsUnread says the host's score for the side could not be read,
+	// so Points says nothing (an FFPC all-play week whose scoring page
+	// did not answer).
+	PointsUnread bool               `json:"points_unread,omitempty"`
 	Starters     []string           `json:"starters"`
 	PlayerPoints map[string]float64 `json:"player_points"`
 }

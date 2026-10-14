@@ -9,6 +9,7 @@ import { FORMAT_LABELS } from '#lib/sheet/format.ts';
 import type { FaceStatus } from '#lib/ui/face-status.ts';
 import type {
 	LeagueHost,
+	LeagueMatchup,
 	LeagueMove,
 	LeaguePlayer,
 	LeagueSync,
@@ -72,6 +73,23 @@ export function readLine(sync: LeagueSync, now: Date): string {
 export function matchupGap(sync: LeagueSync, now: Date): string {
 	if (sync.week === 0) return 'Your league has no games this week.';
 	return `We could not read this week's game from ${hostWords(sync.host)}. ${readLine(sync, now)}`;
+}
+
+/** The matchup head's aside: nothing when the drafter's score was not read (the panel says so),
+ * points so far once a game is on or in an all-play week whose read score is the fact, and no games
+ * played only when the read shows every side at 0. */
+export function matchupAside(
+	matchup: LeagueMatchup,
+	allPlay: boolean,
+	started: boolean
+): string | undefined {
+	if (!matchup.mine.points_read) return undefined;
+	return started || allPlay ? 'Points so far' : 'No games played yet';
+}
+
+/** What the panel says when the drafter's score for the week could not be read. */
+export function scoreGap(sync: LeagueSync, now: Date): string {
+	return `We could not read your score for this week from ${hostWords(sync.host)}. ${readLine(sync, now)}`;
 }
 
 /** "5-1", or "5-1-1" with ties. */
