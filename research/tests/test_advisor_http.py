@@ -5,7 +5,6 @@ parity bypasses: routing, the body cap, strict parsing, the bounds and the readi
 """
 
 import json
-import re
 import threading
 import time
 from collections.abc import Iterator
@@ -115,13 +114,16 @@ def test_health_answers_while_a_call_is_worked(monkeypatch: pytest.MonkeyPatch) 
         call.join()
 
 
-def test_contrast_frames_never_repeat_on_a_card() -> None:
-    """Whatever shortlist size is asked for (the request allows 1 to 20), no two rows of a card share
-    a frame: rows past the frames carry no contrast and keep their plain why."""
+def test_contrasts_differ_and_state_the_cost_once() -> None:
+    """Whatever shortlist size is asked for (the request allows 1 to 20), every row after the call
+    carries a contrast, no two rows of a card say the same thing, and the cost clause is stated in
+    full on the first row only."""
     state = shape_only_state()
     for size in range(1, MAX_SHORTLIST + 1):
         advice = advise(parse_request(json.dumps({**state, "shortlistSize": size})), SurvivalCurve(ARM64_BOARDS))
         said = contrasts([c.recommendation for c in advice.shortlist], advice.pick_number, True)
-        frames = [re.sub(r"\d+(?:\.\d+)?", "#", s) for s in said if s is not None]
+        rows = [s for s in said[1:] if s is not None]
         assert said[:1] in ([], [None])
-        assert len(frames) == len(set(frames)), (size, frames)
+        assert len(rows) == len(said) - 1, (size, said)
+        assert len(rows) == len(set(rows)), (size, rows)
+        assert sum("over this pick and your next" in s for s in rows) <= 1, (size, rows)

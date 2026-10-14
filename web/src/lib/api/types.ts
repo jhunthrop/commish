@@ -1375,12 +1375,29 @@ export interface components {
 			/** @description the league link as pasted */
 			link: string;
 		};
+		NamedPick: {
+			/** @description the player as the host names him */
+			host_name: string;
+			/** @description the player as our board names him */
+			board_name: string;
+		};
+		DroppedRule: {
+			/** @enum {string} */
+			group: 'offense' | 'bonus' | 'kicking' | 'defense' | 'other';
+			/** @description the rule in drafter words */
+			rule: string;
+			/**
+			 * Format: double
+			 * @description the host's figure, null when the rule's own words carry it
+			 */
+			points: number | null;
+		};
 		ScoringImport: {
 			rules: components['schemas']['ScoringRules'];
 			/** @description the rules the host states */
 			applied: string[];
-			/** @description every host rule the 21 do not carry, in the host's words with its figure, never silently lost */
-			dropped: string[];
+			/** @description every host rule the 21 do not carry, in drafter words by group with its figure, never silently lost */
+			dropped: components['schemas']['DroppedRule'][];
 			/** @description the rules the host does not state, each at the standard figure */
 			defaulted: string[];
 		};
@@ -1928,8 +1945,8 @@ export interface components {
 			picks: components['schemas']['CompanionPick'][];
 			/** @description picks so far we could not place on our board; they take nobody from it */
 			unplaced: number;
-			/** @description Sleeper picks placed by exact name, position and team because our players do not carry their Sleeper id yet */
-			placed_by_name: number;
+			/** @description Sleeper picks placed by name, position and team because our players do not carry their Sleeper id yet, each by both names */
+			placed_by_name: components['schemas']['NamedPick'][];
 			/** @description the pick our draft could not follow (out of order, or no roster spot takes him); no call after it */
 			lost_at: number | null;
 			/** @description picks made by a team other than the slot's own */

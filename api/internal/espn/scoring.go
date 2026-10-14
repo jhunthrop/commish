@@ -2,7 +2,6 @@ package espn
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/jhunthrop/commish/api/internal/scoring"
 )
@@ -89,7 +88,7 @@ type mapper struct {
 	stated  map[int]float64
 	used    map[int]bool
 	rules   map[string]float64
-	dropped []string
+	dropped []scoring.DroppedRule
 }
 
 func (m *mapper) take(stat int) (float64, bool) {
@@ -143,10 +142,11 @@ func (m *mapper) fieldGoals() {
 		return
 	}
 	m.rules["points_per_field_goal"] = base
+	// The longer buckets are taken with the short one: a kicker is not
+	// projected, so how they were read belongs to the league's record, not
+	// to a list of what the board leaves out.
 	for _, stat := range fieldGoalsByDistance[1:] {
-		if v, ok := m.take(stat); ok && v != base {
-			m.dropped = append(m.dropped, fmt.Sprintf("%s %g (read as %g)", label(stat), v, base))
-		}
+		m.take(stat)
 	}
 }
 
@@ -177,10 +177,10 @@ func (m *mapper) alike() {
 func (m *mapper) finish() scoring.Imported {
 	for stat, v := range m.stated {
 		if !m.used[stat] && v != 0 {
-			m.dropped = append(m.dropped, fmt.Sprintf("%s %g", label(stat), v))
+			m.dropped = append(m.dropped, scoring.Dropped(label(stat), v))
 		}
 	}
-	sort.Strings(m.dropped)
+	scoring.SortDropped(m.dropped)
 	out := scoring.Imported{Rules: m.rules, Dropped: m.dropped}
 	for _, r := range scoring.Rules() {
 		if _, ok := out.Rules[r.Key]; !ok {

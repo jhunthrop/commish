@@ -75,5 +75,5 @@ func sortedKeys(m map[string]bool) []string {
 // figure outside the saved league's bounds, by its key and figure.
 func sleeperScoring(settings map[string]float64) Scoring {
 	im := scoring.FromSleeper(settings)
-	return Scoring{Rules: im.Rules, Dropped: im.Dropped, Defaulted: im.Defaulted}
+	return Scoring{Rules: im.Rules, Dropped: scoring.DroppedWords(im.Dropped), DroppedRules: im.Dropped, Defaulted: im.Defaulted}
 }

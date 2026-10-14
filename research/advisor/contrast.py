@@ -1,21 +1,20 @@
-"""EACH SHORTLIST ROW'S WHY, AS ITS CONTRAST TO THE CALL: one sentence, from measured facts only.
+"""EACH SHORTLIST ROW'S WHY, AS ITS CONTRAST TO THE CALL: one sentence, its fact first.
 
 The call's own why stays the oracle's (`why.py`, compared bit for bit by the parity harness). Every
-row after it says what choosing him instead of the call trades: the points over replacement he
-gives up (or gains) against the call, whether he plays another position, and the one fact that
-sets him apart, the tier he closes or how much likelier he is than the call to last to your next
-turn. The row already prints his position rank and his chance of lasting, so neither number is
-ever repeated here.
+row after it leads with the one fact that sets him apart from the call, in this order: the tier he
+closes, how much likelier (or less likely) he is than the call to last to your next turn, another
+position, another slot, and only when none holds, that he is the same kind of pick. The cost comes
+second: the first row says it in full, with its basis ("costing 20.2 points over this pick and your
+next", the points over replacement `recommend_pick` adds up across this pick and the best player
+left at your next), and every row after says only the figure ("4.7 points less"), so no row repeats
+the clause once a card has stated it. The row already prints his position rank and his chance of
+lasting, so neither number is repeated here.
 
-No stock sentence across rows: the rows of one card are dealt different frames, rotated by the
-pick, and each frame words its trailing fact its own way, so two rows never share a sentence with
-only the names and numbers swapped. The voice is the capsules' (`research.capsules.voice_rules`,
-which the parity case runs over every recorded room): fantasy words, second person, no em-dash, no
-semicolon.
+The voice is the capsules' (`research.capsules.voice_rules`, which the parity case runs over every
+recorded room): fantasy words, second person, no em-dash, no semicolon.
 """
 
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
 from typing import Final
 
 from research.advisor.why import tier_clause
@@ -29,33 +28,6 @@ from research.model.jsmath import js_to_fixed
 _LEVEL: Final = 0.05
 # How much likelier (or less likely) than the call a row must be to last before it is said.
 _LASTS_APART: Final = 0.2
-# Each frame's words for "likelier to last" and "less likely to last", in frame order.
-_LIKELIER: Final = (
-    "likelier than the call to last to your next turn",
-    "more likely than the call to still be there at your next turn",
-    "likelier to wait for your next turn than the call",
-    "the one more likely to be there when you pick again",
-)
-_LESS_LIKELY: Final = (
-    "less likely than the call to last to your next turn",
-    "less likely than the call to still be there at your next turn",
-    "less likely to wait for your next turn than the call",
-    "the one less likely to be there when you pick again",
-)
-
-
-@dataclass(frozen=True, slots=True)
-class _Row:
-    gap: float
-    same_position: bool
-    one: str
-    call_one: str
-    slot: RosterSlotType | None
-    call_slot: RosterSlotType | None
-    tier: str | None
-    # +1 likelier than the call to last, -1 less likely, 0 neither said.
-    lasts: int
-    has_next: bool
 
 
 def _slot_of(r: Recommendation) -> RosterSlotType | None:
@@ -72,86 +44,62 @@ def _tier_of(r: Recommendation) -> str | None:
     return tier_clause(position_word(r.position, False), position_word(r.position, True), cliff)
 
 
-def _lasts(row: Recommendation, call: Recommendation, has_next: bool) -> int:
-    if not has_next:
-        return 0
-    apart = row.survival_probability - call.survival_probability
+def _capitalize(text: str) -> str:
+    return text[:1].upper() + text[1:]
+
+
+_ORDINALS: Final = ("second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth")
+
+
+def _facts(r: Recommendation, call: Recommendation, has_next: bool, place: int) -> list[str]:
+    """The facts that set this row apart from the call, strongest first, ending with its place in
+    line, which no other row shares."""
+    out: list[str] = []
+    tier = _tier_of(r)
+    if tier is not None:
+        out.append(_capitalize(tier))
+    apart = r.survival_probability - call.survival_probability if has_next else 0.0
     if apart >= _LASTS_APART:
-        return 1
-    if apart <= -_LASTS_APART:
-        return -1
-    return 0
+        out.append("Likelier than the call to last to your next pick")
+    elif apart <= -_LASTS_APART:
+        out.append("Less likely than the call to last to your next pick")
+    one = position_word(r.position, False)
+    if r.position != call.position:
+        out.append(f"A {one} where the call is a {position_word(call.position, False)}")
+    slot = _slot_of(r)
+    if slot is not None and slot not in {_slot_of(call), BENCH_SLOT}:
+        out.append(f"A {one} who fills your {slot} slot")
+    if r.position == call.position:
+        out.append(f"Another {one} like the call")
+    word = _ORDINALS[place] if place < len(_ORDINALS) else f"{place + 2}th"
+    out.append(f"The {word} player in line on this list, a {one}")
+    return out
 
 
-def _gap(row: _Row) -> str:
-    """The value he trades against the call, with its basis: points over replacement across this
-    pick and the best player left at your next (`recommend_pick`'s expected value added)."""
-    basis = "across this pick and your next" if row.has_next else "at this last pick"
-    if abs(row.gap) < _LEVEL:
-        return f"level with the call {basis}"
-    points = js_to_fixed(abs(row.gap), 1)
-    return f"{points} points over replacement {'behind' if row.gap > 0 else 'ahead of'} the call {basis}"
-
-
-def _position(row: _Row) -> str:
-    return f"another {row.one}" if row.same_position else f"a {row.one} instead of a {row.call_one}"
-
-
-def _extra(row: _Row, frame: int) -> str:
-    """The one fact that sets him apart, as a trailing clause worded by the frame, or nothing."""
-    if row.tier is not None:
-        return f", and he is {row.tier}"
-    if row.lasts:
-        return f", and he is {(_LIKELIER if row.lasts > 0 else _LESS_LIKELY)[frame]}"
-    if row.slot is not None and row.slot not in {row.call_slot, BENCH_SLOT}:
-        return f", and he fills your {row.slot} slot"
-    return ""
-
-
-def _frame_gives(row: _Row) -> str:
-    return f"Taking him gives you {_position(row)}, {_gap(row)}{_extra(row, 0)}."
-
-
-def _frame_is(row: _Row) -> str:
-    return f"He is {_position(row)}, {_gap(row)}{_extra(row, 1)}."
-
-
-def _frame_if(row: _Row) -> str:
-    want = f"would rather have this {row.one}" if row.same_position else f"want a {row.one} now"
-    return f"If you {want}, he sits {_gap(row)}{_extra(row, 2)}."
-
-
-def _frame_swap(row: _Row) -> str:
-    swap = f"swaps one {row.one} for another" if row.same_position else f"takes a {row.one} over the {row.call_one}"
-    return f"Picking him {swap}, {_gap(row)}{_extra(row, 3)}."
-
-
-_FRAMES: Final[tuple[Callable[[_Row], str], ...]] = (_frame_gives, _frame_is, _frame_if, _frame_swap)
+def _cost(gap: float, first: bool, has_next: bool) -> str:
+    """What taking him costs against the call: in full with its basis once, then the figure."""
+    basis = "over this pick and your next" if has_next else "at this last pick"
+    if abs(gap) < _LEVEL:
+        return f"even with the call {basis}" if first else "even with the call"
+    points = js_to_fixed(abs(gap), 1)
+    if first:
+        return f"costing {points} points {basis}" if gap > 0 else f"adding {points} points {basis}"
+    return f"{points} points less" if gap > 0 else f"{points} points more"
 
 
 def contrasts(shortlist: Sequence[Recommendation], pick_number: int, has_next: bool) -> list[str | None]:
-    """Each row's contrast to the call (the first row), None for the call itself. The rows of one
-    card take different frames, so no two share a sentence with only the numbers swapped: past the
-    frames there are (a shortlist longer than the api's five), a row carries None and keeps its
-    plain why, whatever size the caller asks for."""
+    """Each row's contrast to the call (the first row), None for the call itself."""
+    del pick_number  # a row's words are its facts, never dealt by the pick
     if not shortlist:
         return []
     call = shortlist[0]
     out: list[str | None] = [None]
+    said: set[str] = set()
     for index, r in enumerate(shortlist[1:]):
-        if index >= len(_FRAMES):
-            out.append(None)
-            continue
-        row = _Row(
-            gap=call.expected_value_added - r.expected_value_added,
-            same_position=r.position == call.position,
-            one=position_word(r.position, False),
-            call_one=position_word(call.position, False),
-            slot=_slot_of(r),
-            call_slot=_slot_of(call),
-            tier=_tier_of(r),
-            lasts=_lasts(r, call, has_next),
-            has_next=has_next,
-        )
-        out.append(_FRAMES[(pick_number + index) % len(_FRAMES)](row))
+        cost = _cost(call.expected_value_added - r.expected_value_added, index == 0, has_next)
+        # The strongest fact no earlier row on the card has led with, so each row gives its own reason;
+        # its place in line, which no other row shares, when every other fact is taken.
+        fact = next(fact for fact in _facts(r, call, has_next, index) if fact not in said)
+        said.add(fact)
+        out.append(f"{fact}, {cost}.")
     return out

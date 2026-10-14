@@ -15,7 +15,7 @@ import (
 // taken at the standard figure.
 type Imported struct {
 	Rules     map[string]float64
-	Dropped   []string
+	Dropped   []DroppedRule
 	Defaulted []string
 }
 
@@ -164,10 +164,10 @@ var settingKey = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)
 // leaving it loses nothing and it is not named.
 func FromSleeper(settings map[string]float64) Imported {
 	host := map[string]float64{}
-	var dropped []string
+	var dropped []DroppedRule
 	for k, v := range settings {
 		if !settingKey.MatchString(k) || math.IsNaN(v) || math.IsInf(v, 0) || math.Abs(v) > MaxPoints {
-			dropped = append(dropped, sleeperWords(k, v, nil))
+			dropped = append(dropped, sleeperDropped(k, v))
 			continue
 		}
 		host[k] = v
@@ -177,13 +177,15 @@ func FromSleeper(settings map[string]float64) Imported {
 		if host[k] == 0 {
 			continue
 		}
-		var readAs *float64
-		if v, ok := m.ReadAs[k]; ok {
-			readAs = &v
+		// A longer field goal range is read with the short ones: a kicker
+		// is not projected, so its reading is the league's record, not a
+		// rule the board leaves out.
+		if _, read := m.ReadAs[k]; read {
+			continue
 		}
-		dropped = append(dropped, sleeperWords(k, host[k], readAs))
+		dropped = append(dropped, sleeperDropped(k, host[k]))
 	}
-	sort.Strings(dropped)
+	SortDropped(dropped)
 	return Imported{Rules: m.Rules, Dropped: dropped, Defaulted: m.Defaulted}
 }
 

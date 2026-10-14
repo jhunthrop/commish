@@ -33,9 +33,7 @@ type Built struct {
 	Placed []Placed
 	// Unplaced counts the picks we could not place on our board.
 	Unplaced int
-	// PlacedByName counts the Sleeper picks placed by exact name, position
-	// and team because our players do not carry their Sleeper id yet.
-	PlacedByName int
+
 	// LostAt is the pick our engine could not follow (a pick out of
 	// order, or one no roster slot takes), nil while it follows them all.
 	LostAt *int
@@ -137,11 +135,8 @@ func replayOnce(settings mock.Settings, seat int, sorted []sleeper.Pick, ids, ho
 	}}
 	for _, p := range sorted {
 		placed := Placed{Pick: p, PlayerID: ids[p.PickNo], How: how[p.PickNo]}
-		switch {
-		case placed.PlayerID == "":
+		if placed.PlayerID == "" {
 			out.Unplaced++
-		case placed.How == MatchSleeperName:
-			out.PlacedByName++
 		}
 		next, action, err := apply(state, p, placed.PlayerID)
 		if err != nil {

@@ -70,7 +70,7 @@ func (s *Service) importScoring(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteOK(w, r, http.StatusOK, apitypes.ScoringImport{
-		Rules: rules, Applied: im.Applied(), Dropped: nonNil(im.Dropped), Defaulted: nonNil(im.Defaulted),
+		Rules: rules, Applied: im.Applied(), Dropped: droppedView(im.Dropped), Defaulted: nonNil(im.Defaulted),
 	})
 }
 
@@ -96,7 +96,14 @@ func (s *Service) hostScoring(w http.ResponseWriter, r *http.Request, host, link
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, "This league states no scoring we can read. Enter your rules by hand", nil)
 		return scoring.Imported{}, false
 	}
-	return scoring.Imported{Rules: sc.Rules, Dropped: sc.Dropped, Defaulted: sc.Defaulted}, true
+	dropped := sc.DroppedRules
+	if dropped == nil {
+		// The host's own rule text carries its figure: listed as it stands.
+		for _, words := range sc.Dropped {
+			dropped = append(dropped, scoring.DroppedRule{Group: scoring.GroupOther, Rule: words})
+		}
+	}
+	return scoring.Imported{Rules: sc.Rules, Dropped: dropped, Defaulted: sc.Defaulted}, true
 }
 
 // espnScoring is a public ESPN league's rules, for the link's season or
@@ -127,4 +134,13 @@ func (s *Service) espnScoring(w http.ResponseWriter, r *http.Request, link strin
 		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "ESPN is not answering right now. Try again in a moment", nil)
 	}
 	return scoring.Imported{}, false
+}
+
+// droppedView is the left-out rules on the wire, never null.
+func droppedView(rules []scoring.DroppedRule) []apitypes.DroppedRule {
+	out := make([]apitypes.DroppedRule, 0, len(rules))
+	for _, d := range rules {
+		out = append(out, apitypes.DroppedRule{Group: apitypes.DroppedRuleGroup(d.Group), Rule: d.Rule, Points: d.Points})
+	}
+	return out
 }
