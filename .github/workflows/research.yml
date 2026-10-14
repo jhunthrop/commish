@@ -63,6 +63,11 @@ env:
   # The boards service's own identity: secretAccessor on RESEARCH_DATABASE_URL alone, so code in
   # the service can read no other secret (infra/README.md, boards-runtime).
   BOARDS_SA: boards-runtime@trycommish.iam.gserviceaccount.com
+  # Cloud SQL for Postgres (infra/README.md). What reads RESEARCH_DATABASE_URL mounts the instance's
+  # socket at /cloudsql/<instance>, which that URL names in its host parameter: the boards service and
+  # the nightly, inseason and inseason-capture jobs. The advisor and nightly-publish read no database,
+  # so they get no connection.
+  CLOUDSQL_INSTANCE: trycommish:us-east1:commish-pg
 jobs:
   research:
     runs-on: ubuntu-latest
@@ -239,7 +244,7 @@ jobs:
           secrets_update_strategy: overwrite
           flags: >-
             --service-account=${{ env.BOARDS_SA }} --ingress=all --no-allow-unauthenticated
-            --args=research.boards
+            --args=research.boards --set-cloudsql-instances=${{ env.CLOUDSQL_INSTANCE }}
             --cpu=1 --memory=1Gi --concurrency=8 --min-instances=0 --max-instances=4
             --cpu-boost --timeout=15 --port=8080
             --startup-probe=httpGet.path=/readyz,httpGet.port=8080,periodSeconds=2,failureThreshold=30,timeoutSeconds=2
@@ -268,8 +273,11 @@ jobs:
           nightly="$nightly,TANK01_API_KEY=TANK01_API_KEY:latest,ODDS_API_KEY=ODDS_API_KEY:latest"
           publish="CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest,WEB_DISPATCH_TOKEN=WEB_DISPATCH_TOKEN:latest"
           deploy() { # name, args, secrets, cpu, memory, task timeout
+            # A job that reads the database gets its socket; one that does not (publish) gets none.
+            sql=()
+            case "$3" in *RESEARCH_DATABASE_URL=*) sql=(--set-cloudsql-instances "$CLOUDSQL_INSTANCE") ;; esac
             gcloud run jobs deploy "$1" --image "$IMAGE" --region "$REGION" --service-account "$RUNTIME_SA" \
-              --args "$2" --set-secrets "$3" --set-env-vars "CLOUDFLARE_ACCOUNT_ID=$ACCOUNT_ID" \
+              --args "$2" --set-secrets "$3" --set-env-vars "CLOUDFLARE_ACCOUNT_ID=$ACCOUNT_ID" "${sql[@]}" \
               --cpu "$4" --memory "$5" --task-timeout "$6" --max-retries 0 --quiet
             gcloud run jobs add-iam-policy-binding "$1" --region "$REGION" \
               --member "serviceAccount:$RUNTIME_SA" --role roles/run.invoker --quiet
