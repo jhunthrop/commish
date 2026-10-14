@@ -129,6 +129,19 @@ export const IMPORT_HOSTS: readonly { host: ImportHost; label: string; hint: str
 	{ host: 'mfl', label: 'MyFantasyLeague', hint: 'myfantasyleague.com/2026/home/...' }
 ];
 
+/** The host a pasted link names, by its address, or null for a bare league id (the chip then says
+ * which host it is). The API reads the id out of the link itself. */
+export function hostOfLink(link: string): ImportHost | null {
+	const text = link.trim();
+	if (!URL.canParse(text)) return null;
+	const host = new URL(text).hostname.toLowerCase();
+	const on = (domain: string): boolean => host === domain || host.endsWith(`.${domain}`);
+	if (on('sleeper.com') || on('sleeper.app')) return 'sleeper';
+	if (on('espn.com')) return 'espn';
+	if (on('myfantasyleague.com')) return 'mfl';
+	return null;
+}
+
 const LABELS: ReadonlyMap<string, string> = new Map(
 	RULE_GROUPS.flatMap((g) => g.rules.map((r) => [r.key, r.label] as const))
 );

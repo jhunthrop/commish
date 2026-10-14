@@ -11,6 +11,7 @@
 		IMPORT_HOSTS,
 		RULE_GROUPS,
 		droppedGroups,
+		hostOfLink,
 		importLine,
 		pointsWords,
 		ruleLabel,
@@ -63,11 +64,6 @@
 
 <div class="custom">
 	<div class="bring">
-		<ChipGroup label="Your league's host">
-			{#each IMPORT_HOSTS as h (h.host)}
-				<Chip size="sm" pressed={host === h.host} onclick={() => (host = h.host)}>{h.label}</Chip>
-			{/each}
-		</ChipGroup>
 		<div class="link">
 			<Field
 				label="League link"
@@ -75,8 +71,18 @@
 				placeholder={hint}
 				maxlength={300}
 				onenter={bringIn}
+				oninput={(text: string) => (host = hostOfLink(text) ?? host)}
 			/>
 			<Quiet disabled={busy || link.trim() === ''} onclick={bringIn}>Bring in your rules</Quiet>
+		</div>
+		<!-- The link names its host; the chips confirm it, and say which host a bare league id is on. -->
+		<div class="host">
+			<span class="note">On</span>
+			<ChipGroup label="Your league's host">
+				{#each IMPORT_HOSTS as h (h.host)}
+					<Chip size="sm" pressed={host === h.host} onclick={() => (host = h.host)}>{h.label}</Chip>
+				{/each}
+			</ChipGroup>
 		</div>
 		{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 		{#if result}
@@ -158,6 +164,13 @@
 		grid-template-columns: minmax(0, 1fr) auto;
 		gap: var(--s-2);
 		align-items: end;
+	}
+
+	.host {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--s-2);
 	}
 
 	.took {
