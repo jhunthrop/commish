@@ -11,6 +11,10 @@ on:
     paths: ['web/**', '.github/workflows/web.yml']
   repository_dispatch:
     types: [nightly-run]
+  # The daily backstop: the nightly publishes to R2 by 05:30 UTC and asks for this build; if that
+  # dispatch ever fails, the site is never more than a day behind the run.
+  schedule:
+    - cron: '30 6 * * *'
   workflow_dispatch:
     inputs:
       runId:
