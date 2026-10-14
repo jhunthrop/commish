@@ -25,7 +25,7 @@ from research.model.priors import load_model_artifacts
 from research.model.ros import gates
 from research.model.ros.judge import Judgment, RoundFit, fit_round, judge_round
 from research.model.ros.payload import priors_payload
-from research.model.ros.scratch import ingest_judgment_season, scratch_engine
+from research.model.ros.scratch import ingest_judgment_season, ingest_week_one_rosters, scratch_engine
 
 # Each round's one judgment record. Its existence closes that judgment: a second run against 2025
 # voids the record, so `judge` refuses unless told it is a marked rerun.
@@ -88,6 +88,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     ingest = sub.add_parser("ingest-judgment-season", help="the house's ingests of one season, into the named database")
     ingest.add_argument("--database", required=True)
     ingest.add_argument("--season", type=int, required=True)
+    rosters = sub.add_parser("ingest-week-one-rosters", help="the house's week-one roster ingest, into the named database")
+    rosters.add_argument("--database", required=True)
+    rosters.add_argument("--season", type=int, action="append", required=True)
     for name in ("dev-check", "judge"):
         run = sub.add_parser(name)
         run.add_argument("--database", required=True)
@@ -95,6 +98,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         run.add_argument("--rerun", action="store_true", help="judge again, marked as a rerun that voids the record")
         run.add_argument("--round", type=int, choices=sorted(ROUNDS), required=True)
     args = parser.parse_args(argv)
+    if args.command == "ingest-week-one-rosters":
+        ingest_week_one_rosters(args.database, args.season, datetime.now(UTC))
+        return 0
     if args.command == "ingest-judgment-season":
         ingest_judgment_season(args.database, args.season, datetime.now(UTC))
         return 0

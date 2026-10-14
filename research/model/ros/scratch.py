@@ -33,6 +33,21 @@ def scratch_engine(url: str) -> Engine:
     return make_engine(sqlalchemy_url(url))
 
 
+def ingest_week_one_rosters(url: str, seasons: list[int], now: datetime) -> list[str]:
+    """The house's week-one roster ingest (`ingest_week1_rosters`) for `seasons`, into `url`."""
+    engine = scratch_engine(url)
+    client = NflverseClient(LiveFetcher())
+    lines: list[str] = []
+    with engine.begin() as conn:
+        for season in seasons:
+            roster = ingest_week1_rosters(conn, client, season, now)
+            lines.append(f"week-one roster {season}: {roster.written} written of {roster.entries_read} ({roster.mode})")
+    engine.dispose()
+    for line in lines:
+        log_line(line)
+    return lines
+
+
 def ingest_judgment_season(url: str, season: int, now: datetime) -> list[str]:
     """Published weekly stats, injury filings and the week-one roster of `season`, into `url`."""
     engine = scratch_engine(url)
