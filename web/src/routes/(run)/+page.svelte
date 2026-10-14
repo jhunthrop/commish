@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
-	import { runStampText } from '#lib/run/stamp.ts';
 	import RowSheetMark from '#lib/site/RowSheetMark.svelte';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
@@ -46,7 +45,7 @@
 	<main class="front">
 		<HeroCard title="Our {data.run.season} board, for your draft and your league">
 			{#snippet meta()}
-				<span>{format.basis.join(' · ')} · {runStampText(data.run)}</span>
+				<span>{format.basis.join(' · ')}</span>
 			{/snippet}
 			{#snippet aside()}
 				<Verb href={sectionHref('mock')} size="lg" fill>Start a mock draft</Verb>
