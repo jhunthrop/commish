@@ -57,15 +57,28 @@ class InjurySnapshot:
         )
 
 
-def _designations(payload: object) -> dict[str, str]:
-    listed = payload.get("injList") if isinstance(payload, dict) else None
+def _designations(entries: object) -> dict[str, str]:
+    """Each `[playerID, designation]` pair the capture lists (`_INJURY_ENTRIES`), the last one a
+    player has winning; an entry without a text id and a non-empty text designation is skipped."""
     designations: dict[str, str] = {}
-    for raw in listed if isinstance(listed, list) else []:
-        entry = raw if isinstance(raw, dict) else {}
-        player_id, designation = entry.get("playerID"), entry.get("designation")
+    for entry in entries if isinstance(entries, list) else []:
+        player_id, designation = entry if isinstance(entry, list) and len(entry) == 2 else (None, None)  # noqa: PLR2004 - a pair
         if isinstance(player_id, str) and isinstance(designation, str) and designation != "":
             designations[player_id] = designation
     return designations
+
+
+# The injury captures' `injList`, each entry as its `[playerID, designation]` pair in the list's order,
+# projected on the server: the payload is about fifty kilobytes a capture and the snapshot reads every
+# capture of the season, so shipping whole payloads moved some 22 MB a facts pass for these two fields.
+# An entry that is not an object, or a payload with no `injList` array, projects as nothing to read,
+# as the payload read in Python found nothing in it.
+_INJURY_ENTRIES: Final = text(
+    "select captured_at, case when jsonb_typeof(payload) = 'object' and jsonb_typeof(payload->'injList') = 'array' "
+    "then (select coalesce(jsonb_agg(jsonb_build_array(e->'playerID', e->'designation') order by n), '[]'::jsonb) "
+    "from jsonb_array_elements(payload->'injList') with ordinality as listed(e, n)) else '[]'::jsonb end as entries "
+    "from research.capture_snapshots where source = :source and captured_at <= :as_of order by captured_at"
+)
 
 
 def _latest(conn: Connection, source: str, as_of: datetime) -> tuple[object, datetime | None]:
@@ -82,19 +95,13 @@ def _latest(conn: Connection, source: str, as_of: datetime) -> tuple[object, dat
 def injury_snapshot(conn: Connection, as_of: datetime) -> InjurySnapshot:
     """Every by-date injury capture at or before `as_of`, oldest first: each player's status on the
     newest, dated by the first capture of its unbroken run (fix round 4, review N1)."""
-    rows = conn.execute(
-        text(
-            "select payload, captured_at from research.capture_snapshots where source = :source "
-            "and captured_at <= :as_of order by captured_at"
-        ),
-        {"source": INJURY_SOURCE, "as_of": as_of},
-    ).all()
+    rows = conn.execute(_INJURY_ENTRIES, {"source": INJURY_SOURCE, "as_of": as_of}).all()
     if not rows:
         return InjurySnapshot(None, {}, "")
     runs: dict[str, tuple[str | None, str]] = {}
     for row in rows:
         day = capture_day(ms_instant(row.captured_at))
-        designations = _designations(row.payload)
+        designations = _designations(row.entries)
         for player_id, designation in designations.items():
             if runs.get(player_id, (None, ""))[0] != designation:
                 runs[player_id] = (designation, day)
