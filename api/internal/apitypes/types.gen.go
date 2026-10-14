@@ -998,8 +998,8 @@ type Companion struct {
 	// PicksUntilTurn picks before the drafter's next
 	PicksUntilTurn *int `json:"picks_until_turn"`
 
-	// PlacedByName Sleeper picks placed by exact name, position and team because our players do not carry their Sleeper id yet
-	PlacedByName int `json:"placed_by_name"`
+	// PlacedByName Sleeper picks placed by name, position and team because our players do not carry their Sleeper id yet, each by both names
+	PlacedByName []NamedPick `json:"placed_by_name"`
 
 	// Ranges floor, median and ceiling for each shortlist player, with range_of_outcomes only
 	Ranges *map[string]OutcomeRange `json:"ranges"`
@@ -1733,6 +1733,15 @@ type MovePlayer struct {
 
 	// RosterId the team that took him (adds) or let him go (drops)
 	RosterId int `json:"roster_id"`
+}
+
+// NamedPick defines model for NamedPick.
+type NamedPick struct {
+	// BoardName the player as our board names him
+	BoardName string `json:"board_name"`
+
+	// HostName the player as the host names him
+	HostName string `json:"host_name"`
 }
 
 // OutcomeRange defines model for OutcomeRange.

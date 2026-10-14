@@ -1375,6 +1375,12 @@ export interface components {
 			/** @description the league link as pasted */
 			link: string;
 		};
+		NamedPick: {
+			/** @description the player as the host names him */
+			host_name: string;
+			/** @description the player as our board names him */
+			board_name: string;
+		};
 		DroppedRule: {
 			/** @enum {string} */
 			group: 'offense' | 'bonus' | 'kicking' | 'defense' | 'other';
@@ -1939,8 +1945,8 @@ export interface components {
 			picks: components['schemas']['CompanionPick'][];
 			/** @description picks so far we could not place on our board; they take nobody from it */
 			unplaced: number;
-			/** @description Sleeper picks placed by exact name, position and team because our players do not carry their Sleeper id yet */
-			placed_by_name: number;
+			/** @description Sleeper picks placed by name, position and team because our players do not carry their Sleeper id yet, each by both names */
+			placed_by_name: components['schemas']['NamedPick'][];
 			/** @description the pick our draft could not follow (out of order, or no roster spot takes him); no call after it */
 			lost_at: number | null;
 			/** @description picks made by a team other than the slot's own */

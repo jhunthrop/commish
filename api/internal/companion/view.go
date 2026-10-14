@@ -128,7 +128,7 @@ func (s *Service) view(f followed, since int) apitypes.Companion {
 		Id: f.row.ID, Host: apitypes.CompanionHost(f.row.Host), HostDraftId: f.row.HostDraftID, Replay: f.row.Replay,
 		Name: d.Name, Status: apitypes.CompanionStatus(d.Status), Teams: d.Teams, Rounds: d.Rounds, Slot: f.row.Seat,
 		Settings: f.row.Settings, Basis: basisWords(f.board), PickCount: len(f.read.Picks), TotalPicks: total,
-		Since: min(since, len(f.read.Picks)), Unplaced: f.built.Unplaced, PlacedByName: f.built.PlacedByName, LostAt: f.built.LostAt,
+		Since: min(since, len(f.read.Picks)), Unplaced: f.built.Unplaced, PlacedByName: namedPicks(f), LostAt: f.built.LostAt,
 		Traded: traded(d, f.read.Picks), CreatedAt: f.row.CreatedAt, Picks: []apitypes.CompanionPick{},
 		SeatNames: seatNamesOrEmpty(f.row.SeatNames),
 	}
@@ -185,6 +185,21 @@ func traded(d sleeper.Draft, picks []sleeper.Pick) int {
 		}
 	}
 	return n
+}
+
+// namedPicks is each pick placed by name, by the host's name and ours,
+// so the drafter can check the match himself.
+func namedPicks(f followed) []apitypes.NamedPick {
+	out := []apitypes.NamedPick{}
+	for _, p := range f.built.Placed {
+		if p.How != MatchSleeperName {
+			continue
+		}
+		if player, ok := f.board.Player(p.PlayerID); ok {
+			out = append(out, apitypes.NamedPick{HostName: p.Pick.Name, BoardName: player.Name})
+		}
+	}
+	return out
 }
 
 // basisWords names the board our call reads: a league's own rules, or a

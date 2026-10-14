@@ -75,9 +75,7 @@
 			c.unplaced > 0
 				? `${plural(c.unplaced, 'pick')} on ${host} ${c.unplaced === 1 ? 'is a player' : 'are players'} we do not rank. Each fills his team's roster and takes nobody from our board.`
 				: null,
-			c.placed_by_name > 0
-				? `${plural(c.placed_by_name, 'pick')} on ${host} ${c.placed_by_name === 1 ? 'was' : 'were'} matched to our board by name, position and team, since our list does not carry ${c.placed_by_name === 1 ? 'his' : 'their'} ${host} id yet.`
-				: null,
+			...c.placed_by_name.map((p) => `${p.host_name} on ${host} is our ${p.board_name}.`),
 			c.traded > 0
 				? `${plural(c.traded, 'pick')} changed hands on ${host}. Our call follows the draft order by slot.`
 				: null

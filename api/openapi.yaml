@@ -1565,6 +1565,12 @@ components:
       properties:
         host: { type: string, enum: [sleeper, espn, mfl] }
         link: { type: string, minLength: 1, maxLength: 300, description: the league link as pasted, or its id }
+    NamedPick:
+      type: object
+      required: [host_name, board_name]
+      properties:
+        host_name: { type: string, description: the player as the host names him }
+        board_name: { type: string, description: the player as our board names him }
     DroppedRule:
       type: object
       required: [group, rule, points]
@@ -2214,8 +2220,9 @@ components:
           items: { $ref: "#/components/schemas/CompanionPick" }
         unplaced: { type: integer, description: picks so far we could not place on our board; they take nobody from it }
         placed_by_name:
-          type: integer
-          description: Sleeper picks placed by exact name, position and team because our players do not carry their Sleeper id yet
+          type: array
+          description: Sleeper picks placed by name, position and team because our players do not carry their Sleeper id yet, each by both names
+          items: { $ref: "#/components/schemas/NamedPick" }
         lost_at:
           type: integer
           nullable: true
