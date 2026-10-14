@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { PUBLIC_API_URL } from '$app/env/public';
-	import { onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { hasFeature } from '#lib/account/features.ts';
@@ -13,7 +12,7 @@
 	import { choose, switchProblem } from './choose.svelte.ts';
 	import { siteContext } from './context.svelte.ts';
 	import { leagueLine } from './menu-words.ts';
-	import { runBoards, type RunBoard } from './run-boards.ts';
+	import { FALLBACK_BOARDS, runBoards, type RunBoard } from './run-boards.ts';
 	import { DEFAULT_CONTEXT_FORMAT, leagueName } from './words.ts';
 
 	/** The switch's menu: every league the account follows, its host and scoring in words, one tap
@@ -43,13 +42,29 @@
 		document.querySelector<HTMLElement>('[aria-controls="league-menu"]')?.focus();
 	}
 
-	/** The boards the run carries, offered with no league; none until they load. */
+	/** The boards the run carries, offered with no league. Read when the menu opens; when the file
+	 * fails or takes too long the three the api always accepts stand in, and the next opening tries
+	 * the file once more. */
 	let boards = $state<readonly RunBoard[]>([]);
-	let boardsFailed = $state(false);
-	onMount(() => {
+	let boardsLoaded = false;
+	let boardsAsked = false;
+
+	function readBoards(): void {
+		if (boardsLoaded || boardsAsked) return;
+		boardsAsked = true;
 		runBoards()
-			.then((loaded) => (boards = loaded))
-			.catch(() => (boardsFailed = true));
+			.then((loaded) => {
+				boards = loaded;
+				boardsLoaded = true;
+			})
+			.catch(() => {
+				boards = FALLBACK_BOARDS;
+			})
+			.finally(() => (boardsAsked = false));
+	}
+
+	$effect(() => {
+		if (siteContext.open) readBoards();
 	});
 
 	const signInHref = $derived(apiClient(PUBLIC_API_URL).signInUrl(page.url.pathname));
@@ -95,8 +110,6 @@
 				>
 			{/each}
 		</div>
-		{#if boardsFailed}<ProblemLine>Our boards did not load. Reopen this in a moment.</ProblemLine
-			>{/if}
 	</section>
 
 	{#if switchProblem.text}<ProblemLine>{switchProblem.text}</ProblemLine>{/if}
