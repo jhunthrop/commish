@@ -15,7 +15,8 @@ The order, and why each pass exists:
    pages are rewritten with the shared sentences quoted as worn language, at most `REPAIR_PASSES`
    times, from the budget left.
 5. **The retry passes again**, when a repair's rewrite could not pass its validator and left a facts
-   block, with the sentences still on two pages quoted.
+   block, with the sentences still on two pages quoted, and then the repairs once more, since a page
+   those retries write can share a sentence.
 6. **The capsule gate** (`capsule_gate`), whose verdict is the step's.
 
 Every pass shares one ceiling per player for the night, `NIGHT_CALLS_PER_PLAYER` (12, two of phase C's
@@ -171,6 +172,9 @@ class _Passes:
             gate = capsule_gate(conn, self.now)
         if gate.facts_blocks:
             self.retry("capsule retries after repair", gate.facts_blocks, tuple(x.sentence for x in gate.shared))
+            # A page those retries write can share a sentence with another, so the repairs run once more
+            # (two nights in a row ended on two such sentences, 2026-10-13T21 and 2026-10-14T02).
+            self.repair()
 
     def retry(self, name: str, unwritten: int, avoid: tuple[str, ...]) -> None:
         for attempt in range(1, RETRY_PASSES + 1):
