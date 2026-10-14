@@ -37,6 +37,10 @@ const CustomUnavailableWords = "We cannot build your league's board right now. T
 // web links through CustomRefusedField.
 const CustomRefusedWords = "We could not build a board for your league's rules. Draft on a preset from the setup page meanwhile."
 
+// CompanionRefusedWords is the same refusal in a live draft, which the
+// drafter cannot move to a preset: it says what the call follows instead.
+const CompanionRefusedWords = "Your league's board could not be built, so this draft follows the PPR board."
+
 // CustomRefusedField marks the refusal for the web, which answers it with
 // a link to the setup page.
 var CustomRefusedField = map[string]string{"scoring": "refused"}

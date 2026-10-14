@@ -70,16 +70,27 @@
 	const names = $derived(seatNames(c));
 	const strip = $derived(landingStrip(picks, board, teams, c.slot, names));
 	const went = $derived(wentSince(placed, prev ?? 0, new Set(), board));
+	/** How many name-matched picks the drafter has already been told of: on his turn only the new
+	 * ones show, between turns all of them, and never more than two lines. */
+	let namedSeen = $state(0);
+	$effect(() => {
+		if (!c.your_turn) namedSeen = c.placed_by_name.length;
+	});
+	const namedShown = $derived(c.your_turn ? c.placed_by_name.slice(namedSeen) : c.placed_by_name);
+	const NAMED_LINES = 2;
 	const notes = $derived(
 		[
 			c.unplaced > 0
 				? `${plural(c.unplaced, 'pick')} on ${host} ${c.unplaced === 1 ? 'is a player' : 'are players'} we do not rank. Each fills his team's roster and takes nobody from our board.`
 				: null,
-			...c.placed_by_name.map(
+			...namedShown.slice(0, NAMED_LINES).map(
 				(p) =>
 					// A name that ends in "Jr." ends the sentence too.
 					`${p.host_name} on ${host} is our ${p.board_name}${p.board_name.endsWith('.') ? '' : '.'}`
 			),
+			namedShown.length > NAMED_LINES
+				? `And ${String(namedShown.length - NAMED_LINES)} more placed by name.`
+				: null,
 			c.traded > 0
 				? `${plural(c.traded, 'pick')} changed hands on ${host}. Our call follows the draft order by slot.`
 				: null
