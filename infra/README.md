@@ -96,15 +96,15 @@ Founder ruling 2026-10-14: the database moves off Neon (AWS us-east-1) to Cloud 
   - research: the `boards` service and the `nightly`, `inseason` and `inseason-capture` jobs, each of which mounts `RESEARCH_DATABASE_URL`. The `advisor` service and the `nightly-publish` job read no database (the room sends the advisor its pool; publish moves R2 pointers), so they get no connection.
 - IAM: `roles/cloudsql.client` on the three runtime accounts whose workloads connect, `api-runtime`, `research-runtime` and `boards-runtime`. `advisor-runtime` stays roleless. The deployer needs `roles/cloudsql.viewer` for `infra-smoke.yml`'s describe step.
 - Connections: there is no pooler in front of Cloud SQL, so every pool slot is a real server connection. The instance's `max_connections` flag is 200, about 190 usable after Cloud SQL's reserved superuser slots. The worst case at the workflows' max instances: `api` 10 instances × `MaxConns` 10 (`internal/db`) = 100; `room` 5 × (10 + 1 LISTEN) = 55; `boards` 4 × 2 workers = 8; the jobs about 25 when they overlap; 188 in all. Raising any max instance, `MaxConns` or a worker count spends that margin: redo this sum first.
-- An operator from a laptop, with the Cloud SQL Auth Proxy (`brew install cloud-sql-proxy`) and their own `gcloud` credentials (`gcloud auth application-default login`; the account needs `roles/cloudsql.client`):
+- An operator from a laptop, with the Cloud SQL Auth Proxy (`brew install cloud-sql-proxy`) and their own `gcloud` login (`gcloud auth login`; `--gcloud-auth` makes the proxy use it, not Application Default Credentials; the account needs `roles/cloudsql.client`):
 
     ```sh
-    cloud-sql-proxy --port 5434 trycommish:us-east1:commish-pg   # 5432 and 5433 are the dev and test Docker databases
-    psql "postgres://commish_research@127.0.0.1:5434/commish?sslmode=disable"   # the proxy encrypts; the password from Secret Manager
+    cloud-sql-proxy trycommish:us-east1:commish-pg --port 5440 --gcloud-auth   # clear of the dev and test Docker ports
+    psql "postgres://commish_research@127.0.0.1:5440/commish?sslmode=disable"   # the proxy encrypts; the password from Secret Manager
     ```
 
   Production is for backfills and single verification reads, never repeated measurement runs (those go against the dev copy).
-- Neon decommission: once the legacy writers are stopped at cutover and the first scheduled `nightly` has passed on Cloud SQL, delete the Neon project. Until then it is the restore's source and the rollback.
+- Neon decommission: once the legacy writers are stopped at cutover and the first scheduled `nightly` has passed on Cloud SQL, delete the Neon project. Until then it is the restore's source and the rollback. In the same change, retire the api's Neon-pooler accommodations: `config.DirectURL` (a no-op on Cloud SQL) and `ROOM_LISTEN_DATABASE_URL`'s derivation from it, the `QueryExecModeCacheDescribe` default in `internal/db/db.go`, and the comments in `internal/db/db.go`, `internal/db/lock.go` and `cmd/api/main.go` that justify choices by Neon's pooler or a waking Neon compute.
 
 ## Still on Vercel
 
