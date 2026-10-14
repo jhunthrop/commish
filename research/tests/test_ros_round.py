@@ -2,7 +2,10 @@
 """The rest-of-season round: the model's arithmetic by hand, the gates at their thresholds, and the
 outcome reader's refusals (G4)."""
 
+import json
+from pathlib import Path
 from types import MappingProxyType
+from typing import Any
 
 import pytest
 
@@ -171,3 +174,32 @@ def test_the_judgment_reader_refuses_only_the_pristine_season() -> None:
     with pytest.raises(HeldOutReadError):
         reader.admit(2026)
     assert reader.served == [2025]
+
+
+_RECORD = Path(__file__).resolve().parents[2] / "docs/research/2026-10-14-rest-of-season-results.json"
+
+
+def test_every_verdict_of_the_one_judgment_rebuilds_from_its_record() -> None:
+    """The judgment is never rerun; this reads its stored numbers and re-derives every gate line."""
+    record: dict[str, Any] = json.loads(_RECORD.read_text())
+    numbers = record["numbers"]
+    scores = {
+        key: CellScore(
+            cell["size"],
+            cell["rho"]["model"],
+            cell["rho"]["board"],
+            cell["rank_error"]["model"],
+            cell["rank_error"]["board"],
+        )
+        for key, cell in numbers["cells"].items()
+    }
+    pooled = {key: Coverage(found["inside"], found["size"]) for key, found in numbers["coverage_pooled"].items()}
+    rebuilt = gates.judged_lines(scores, pooled, PREREGISTERED)
+    stored = record["gates"]
+    assert [(line.gate, line.subject, line.passed) for line in rebuilt] == [
+        (line["gate"], line["subject"], line["passed"]) for line in stored[:-1]
+    ]
+    assert stored[-1]["gate"] == "G4"
+    assert stored[-1]["passed"]
+    assert record["passed"] is False
+    assert sum(1 for line in stored if not line["passed"]) == 11
