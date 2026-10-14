@@ -18,10 +18,12 @@
 		scoring: Scoring;
 		/** The account has custom_scoring (from /me, never a plan name). */
 		exactRules: boolean;
+		/** Where a signed-out drafter signs in, null when signed in. */
+		signInTo: string | null;
 		onchange: (scoring: Scoring) => void;
 	}
 
-	let { scoring, exactRules, onchange }: Props = $props();
+	let { scoring, exactRules, signInTo, onchange }: Props = $props();
 
 	/** The last rules on the form, kept while a preset is tried, so going back loses nothing. */
 	let kept = $state<ScoringRules | null>(null);
@@ -43,10 +45,11 @@
 </script>
 
 <SetupRow label="Scoring" note={own ? "your league's own rules" : undefined}>
-	<ChipGroup label="Scoring">
+	<!-- Loose, so the five chips wrap inside a phone's width. -->
+	<ChipGroup label="Scoring" variant="loose">
 		{#each SCORING_CHOICES as c (c.preset)}
 			<Chip
-				pressed={!own && scoring.preset === c.preset}
+				pressed={!own && !asked && scoring.preset === c.preset}
 				onclick={() => {
 					if (scoring.custom) kept = scoring.custom;
 					asked = false;
@@ -54,11 +57,16 @@
 				}}>{c.label}</Chip
 			>
 		{/each}
-		<Chip pressed={own} onclick={chooseOwn}>Your league's</Chip>
+		<Chip pressed={own || asked} onclick={chooseOwn}>Your league's</Chip>
 	</ChipGroup>
-	{#if asked && !exactRules}
+	{#if asked && !exactRules && signInTo !== null}
 		<span class="pass">
-			Your league's exact scoring comes with the Draft Pass.
+			Sign in to follow your league and bring in its scoring. Until then a mock drafts on PPR.
+			<Quiet size="sm" href={signInTo}>Sign in</Quiet>
+		</span>
+	{:else if asked && !exactRules}
+		<span class="pass">
+			Your league's exact scoring comes with the Draft Pass. Until then a mock drafts on PPR.
 			<Quiet size="sm" href={resolve('/pass')}>See the Draft Pass</Quiet>
 		</span>
 	{/if}
