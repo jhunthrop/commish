@@ -98,8 +98,8 @@ def capsule_gate(step: CapsuleGateResult, page_reasons: Sequence[str]) -> GateRe
     """The capsule step's gate (the unwritten share, shared sentences and six-word spans) and every
     written page's findings."""
     reasons = (
-        [f"capsule_unwritten_share:{step.unwritten_share:.4f}>{step.share_max}"]
-        if step.unwritten_share > step.share_max
+        [f"capsule_unwritten_share:{step.unwritten_share:.4f}>{step.line.share_max}:{step.line.voice}"]
+        if step.unwritten_share > step.line.share_max
         else []
     )
     reasons += [f"capsule_shared_sentence:{len(s.player_ids)}:{s.sentence}" for s in step.shared]

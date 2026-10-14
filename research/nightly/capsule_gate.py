@@ -2,7 +2,8 @@
 
 The founder's rule: every non-stat sentence on a page comes from the writer, and a stock sentence
 across players is a defect. The run fails when
-- the board's unwritten pages pass `unwritten_share_max` (2%) of the board: a facts block (the
+- the board's unwritten pages pass the run's line (`CapsuleConfig.unwritten_line`: 2% before the
+  season's first kickoff, 3% from it on, the run's date deciding): a facts block (the
   fallback for a player the writer could not serve, `capsules.facts_block`), a row still on the
   oracle's template, or no row at all; or
 - any sentence of four words or more (`shared_sentence_min_words`) of a written capsule appears on
@@ -30,9 +31,10 @@ from typing import Final
 
 from sqlalchemy import Connection
 
-from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.config import CAPSULE_CONFIG, UnwrittenLine
 from research.capsules.facts.board import board_rows
 from research.capsules.facts.collect import universe_ids_for
+from research.capsules.facts.season_so_far import in_season
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.narrative import normalize_sentence, sentences_verbatim
 from research.capsules.span_rules import span_rules_for
@@ -74,7 +76,7 @@ class CapsuleGateResult:
     queued: int = 0
     # Spans two pages or more share that the sheets' labelled stats print, so not judged.
     exempt_spans: int = 0
-    share_max: float = CAPSULE_CONFIG.unwritten_share_max
+    line: UnwrittenLine = CAPSULE_CONFIG.unwritten_line_preseason
 
     @property
     def unwritten_share(self) -> float:
@@ -84,14 +86,15 @@ class CapsuleGateResult:
     @property
     def ok(self) -> bool:
         # Spans are counted and repaired, never a failure (the coordinator's Lane 17 ruling 1).
-        return self.unwritten_share <= self.share_max and not self.shared
+        return self.unwritten_share <= self.line.share_max and not self.shared
 
     def summary(self) -> str:
         verdict = "passed" if self.ok else "failed"
         line = (
             f"capsule gate: {verdict}, {self.board_players} board pages, {self.written} written, "
             f"{self.facts_blocks} facts blocks, {self.template} on the oracle's template, {self.missing} missing "
-            f"({self.unwritten_share:.1%} unwritten, the line {self.share_max:.0%}), "
+            f"({self.unwritten_share:.1%} unwritten, the {self.line.voice} line {self.line.share_max:.0%}: "
+            f"{self.line.basis}), "
             f"{len(self.shared)} written sentences on two pages, {len(self.spans)} six-word spans on two pages or "
             f"more ({len(self.span_phrases)} pages carry one, {self.queued} queued for repair, never a failure), "
             f"{self.exempt_spans} sheet-label spans exempt"
@@ -130,8 +133,11 @@ def _written_runs(rows: Mapping[str, StoredCapsule], names: frozenset[str]) -> d
     }
 
 
-def judge_capsules(board_ids: Sequence[str], rows: Mapping[str, StoredCapsule], rules: SpanRules) -> CapsuleGateResult:
-    """The gate over the board's universe ids and their stored rows, spans judged by `rules`."""
+def judge_capsules(
+    board_ids: Sequence[str], rows: Mapping[str, StoredCapsule], rules: SpanRules, line: UnwrittenLine
+) -> CapsuleGateResult:
+    """The gate over the board's universe ids and their stored rows, spans judged by `rules`, the
+    unwritten share held to `line`."""
     on_board = {pid: rows[pid] for pid in board_ids if pid in rows}
     sources = [row.source for row in on_board.values()]
     runs = _written_runs(on_board, rules.names)
@@ -151,6 +157,7 @@ def judge_capsules(board_ids: Sequence[str], rows: Mapping[str, StoredCapsule], 
         span_phrases=MappingProxyType({pid: phrases_on_page(runs[pid], held) for pid in sorted(carriers)}),
         queued=len(queued),
         exempt_spans=exempt,
+        line=line,
     )
 
 
@@ -181,4 +188,5 @@ def span_rules(conn: Connection, as_of: datetime, subjects_at: Subjects) -> Span
 def capsule_gate(conn: Connection, as_of: datetime, rules: SpanRules) -> CapsuleGateResult:
     """The gate over the board as served at `as_of` (its pages keyed on the universe id)."""
     board_ids = board_universe_ids(conn, as_of)
-    return judge_capsules(board_ids, stored_capsules_for(conn, board_ids), rules)
+    line = CAPSULE_CONFIG.unwritten_line(in_season=in_season(conn, PRODUCT_SEASON, as_of))
+    return judge_capsules(board_ids, stored_capsules_for(conn, board_ids), rules, line)

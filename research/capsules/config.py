@@ -98,6 +98,17 @@ class Repetition:
 
 
 @dataclass(frozen=True, slots=True)
+class UnwrittenLine:
+    """The share of the board the nightly lets go unwritten, and why. Ruled for Lane 17: in season a
+    gate failure keeps the site on a stale run, which costs more than a few pages without a read that
+    the next night retries first; the line still fails a broken writer."""
+
+    voice: str
+    share_max: float
+    basis: str
+
+
+@dataclass(frozen=True, slots=True)
 class CapsuleConfig:
     gateway: Gateway = Gateway()
     compact: Size = Size(75, 120, 500)
@@ -112,9 +123,17 @@ class CapsuleConfig:
     # a betting word the first correction leaves (or brings) is worth a second sentence rewrite
     # before the read falls to the facts block, which the nightly counts against its 2% line.
     corrections_per_read: int = 2
-    # The share of the board's pages the nightly lets go unwritten: facts blocks, the oracle's
-    # template rows and missing pages together.
-    unwritten_share_max: float = 0.02
+    # The share of the board's pages the nightly lets go unwritten (facts blocks, the oracle's template
+    # rows and missing pages together), one line per voice, the run's date deciding which.
+    unwritten_line_preseason: UnwrittenLine = UnwrittenLine(
+        "preseason", 0.02, "the preseason line, the share the board was built to"
+    )
+    unwritten_line_in_season: UnwrittenLine = UnwrittenLine(
+        "in-season",
+        0.03,
+        "the in-season line: a full in-season rewrite's estimate tops out near 2.5% (Lane 17's 80-page sample), "
+        "and one page moves an 80-page rate by 1.25 points",
+    )
     # A written sentence this long or longer may sit on one page only; shorter ones ("Draft him.",
     # "Let him go.") are the product's vocabulary, not stock prose (ruled in phase C's fix round 3).
     shared_sentence_min_words: int = 4
@@ -135,6 +154,10 @@ class CapsuleConfig:
     sweep_generation_budget: int = 1000
     # Zero: every gateway call is spaced at `gateway.min_call_spacing_ms`, which paces the sweep.
     sweep_pacing_ms: int = 0
+
+    def unwritten_line(self, *, in_season: bool) -> UnwrittenLine:
+        """The line in use for a run: in season from the season's first kickoff on, preseason before."""
+        return self.unwritten_line_in_season if in_season else self.unwritten_line_preseason
 
     def size(self, name: str) -> Size:
         if name == "compact":

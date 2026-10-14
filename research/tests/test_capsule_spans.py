@@ -5,12 +5,14 @@ span, overlapping windows are quoted as one phrase, and the repair keeps each sp
 
 from datetime import UTC, datetime
 
+from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.spans import SpanRules, name_words, page_runs, phrases_on_page, shared_spans, sheet_spans
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule
 from research.nightly.capsule_gate import judge_capsules, repair_targets
 
 NAMES = name_words(["Puka Nacua", "Davante Adams", "Jaxon Smith-Njigba", "A.J. Brown"])
 RULES = SpanRules(NAMES)
+LINE = CAPSULE_CONFIG.unwritten_line_preseason
 _AT = datetime(2026, 10, 14, tzinfo=UTC)
 
 
@@ -24,7 +26,7 @@ def test_a_span_on_two_pages_is_queued_and_counted_but_does_not_fail_the_run() -
         "b": _row("b", "For Jaxon, the target share is the whole story."),
         "c": _row("c", "Nothing alike here at all, a different note entirely."),
     }
-    gate = judge_capsules(["a", "b", "c"], rows, RULES)
+    gate = judge_capsules(["a", "b", "c"], rows, RULES, LINE)
     assert [(s.span, s.player_ids) for s in gate.spans] == [("the target share is the whole", ("a", "b"))]
     assert set(gate.span_phrases) == {"a", "b"}
     assert gate.ok
@@ -36,7 +38,7 @@ def test_a_span_on_two_pages_is_queued_and_counted_but_does_not_fail_the_run() -
 
 def test_a_span_on_three_pages_is_counted_and_never_fails_the_run() -> None:
     rows = {pid: _row(pid, f"Note {pid}: the target share is the whole case.") for pid in ("a", "b", "c")}
-    gate = judge_capsules(["a", "b", "c"], rows, RULES)
+    gate = judge_capsules(["a", "b", "c"], rows, RULES, LINE)
     assert {s.player_ids for s in gate.spans} == {("a", "b", "c")}
     assert gate.ok
     assert gate.queued == len(rows) - 1  # every carrier but the first
@@ -44,7 +46,7 @@ def test_a_span_on_three_pages_is_counted_and_never_fails_the_run() -> None:
 
 def test_a_whole_sentence_on_two_pages_still_fails_the_run() -> None:
     rows = {pid: _row(pid, f"Page {pid}. If he is on your roster, let him go.") for pid in ("a", "b")}
-    gate = judge_capsules(["a", "b"], rows, RULES)
+    gate = judge_capsules(["a", "b"], rows, RULES, LINE)
     assert [s.player_ids for s in gate.shared] == [("a", "b")]
     assert not gate.ok
 
@@ -54,10 +56,10 @@ def test_a_span_the_fact_sheet_prints_is_exempt() -> None:
     rules = SpanRules(NAMES, sheet_spans([sheet], NAMES))
     lead = {"a": "Alpha", "b": "Bravo", "c": "Charlie"}
     rows = {pid: _row(pid, f"{word}: red-zone share of his own touches.") for pid, word in lead.items()}
-    gate = judge_capsules(["a", "b", "c"], rows, rules)
+    gate = judge_capsules(["a", "b", "c"], rows, rules, LINE)
     assert gate.spans == ()
     assert gate.exempt_spans > 0
-    assert judge_capsules(["a", "b", "c"], rows, RULES).spans != ()
+    assert judge_capsules(["a", "b", "c"], rows, RULES, LINE).spans != ()
 
 
 def test_case_and_punctuation_fold_and_a_facts_block_is_not_judged() -> None:
@@ -66,7 +68,7 @@ def test_case_and_punctuation_fold_and_a_facts_block_is_not_judged() -> None:
         "b": _row("b", "OUR NUMBER, puts him: at 231 points!"),
         "c": _row("c", "Our number puts him at 231 points.", source="facts"),
     }
-    gate = judge_capsules(["a", "b", "c"], rows, RULES)
+    gate = judge_capsules(["a", "b", "c"], rows, RULES, LINE)
     assert {s.player_ids for s in gate.spans} == {("a", "b")}
 
 

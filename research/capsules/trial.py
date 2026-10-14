@@ -14,7 +14,9 @@ from datetime import datetime
 
 from sqlalchemy import Engine
 
+from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts.board import BoardRow, board_rows
+from research.capsules.facts.season_so_far import in_season
 from research.capsules.gateway import GatewayClient
 from research.capsules.generate import CapsuleResult, describe_fallback
 from research.capsules.pull_figures import PageValues, capsule_findings, page_numbers, pull_figures_of
@@ -94,6 +96,7 @@ def gate_written(engine: Engine, written: Sequence[Written], as_of: datetime) ->
     with engine.connect() as conn:
         stored = stored_capsules_for(conn, [w.subject.universe_id for w in written])
         rules = span_rules(conn, as_of, subjects_of)  # the trial's own pass: a CLI tool, not the nightly
+        line = CAPSULE_CONFIG.unwritten_line(in_season=in_season(conn, PRODUCT_SEASON, as_of))
     lines: list[str] = []
     calls = prompt = completion = 0
     cost = 0.0
@@ -123,7 +126,7 @@ def gate_written(engine: Engine, written: Sequence[Written], as_of: datetime) ->
             f"completion tokens, ${d:.6f}; pull figures {figures or 'none'}; {verdict}; "
             f"narrative slots kept {len(w.result.narrative.slots)}, refused {len(w.result.narrative.refused)}"
         )
-    judged = judge_capsules([w.subject.universe_id for w in written], stored, rules)
+    judged = judge_capsules([w.subject.universe_id for w in written], stored, rules, line)
     lines.append(f"the nightly's capsule gate over these pages alone: {judged.summary()}")
     n = max(1, len(written))
     lines.append(
