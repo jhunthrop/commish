@@ -8,7 +8,7 @@
  * rosters arrive through held.ts, loaded only with a league selected).
  */
 import { PUBLIC_API_URL } from '$app/env/public';
-import { apiClient } from '#lib/api/client.ts';
+import { ApiError, apiClient } from '#lib/api/client.ts';
 import { sessionToken } from '#lib/api/session.ts';
 import type { components } from '#lib/api/types.ts';
 import { CONTEXT_KEY, LEAGUE_ATTR, LINES_KEY } from './boot.ts';
@@ -112,7 +112,7 @@ class SiteContext {
 				// The session's own copy, or nothing, stands: the pages read the format they were built in.
 				// The one record of a failed /me, with its status, for whoever has the console open.
 				// eslint-disable-next-line no-console -- no user-facing text: the context held still stands
-				console.warn('Site context: /me', (error as { status?: number }).status ?? error);
+				console.warn('Site context: /me', error instanceof ApiError ? error.status : error);
 				this.features = [];
 			}
 		}
