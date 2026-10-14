@@ -10,6 +10,8 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
+
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 )
 
 // Body size caps. Every JSON body is read through one of these.
@@ -48,7 +50,10 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, limit int64, dst any) bo
 func writeDecodeError(w http.ResponseWriter, r *http.Request, err error) {
 	var tooLarge *http.MaxBytesError
 	var typeErr *json.UnmarshalTypeError
+	var fieldErr *apitypes.FieldError
 	switch {
+	case errors.As(err, &fieldErr):
+		WriteInvalid(w, r, map[string]string{fieldErr.Field: fieldErr.Problem})
 	case errors.As(err, &tooLarge):
 		WriteError(w, r, http.StatusRequestEntityTooLarge, CodePayloadTooLarge,
 			fmt.Sprintf("The body is over %d bytes", tooLarge.Limit), nil)

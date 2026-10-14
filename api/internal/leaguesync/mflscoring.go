@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/jhunthrop/commish/api/internal/mfl"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // MyFantasyLeague states scoring as rules: an event code (TYPE=allRules
@@ -83,7 +84,7 @@ func parseRule(r mfl.Rule) (mflRule, bool) {
 	pts := strings.TrimSpace(r.Points)
 	per := strings.HasPrefix(pts, "*")
 	v, err := strconv.ParseFloat(strings.TrimPrefix(pts, "*"), 64)
-	if err != nil || math.IsNaN(v) || math.Abs(v) > maxCustomPoints {
+	if err != nil || math.IsNaN(v) || math.Abs(v) > scoring.MaxPoints {
 		return mflRule{}, false
 	}
 	return mflRule{Rule: r, lo: lo, hi: hi, value: v, perUnit: per}, true

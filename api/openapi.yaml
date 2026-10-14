@@ -161,6 +161,35 @@ paths:
         "200": { $ref: "#/components/responses/EmptyResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
 
+  /leagues/import-scoring:
+    post:
+      tags: [leagues]
+      operationId: importScoring
+      summary: >-
+        Read a league's scoring from its host by its link and answer it as ScoringRules: Sleeper from the league's
+        scoring settings, ESPN from a public league's settings (a private league is refused with a sentence saying to
+        make it viewable or enter the rules by hand), MyFantasyLeague from a public league's rules. Yahoo is entered
+        by hand. Needs the custom_scoring feature (403 naming it). Nothing is saved.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ScoringImportInput" }
+      responses:
+        "200":
+          description: the league's rules, what was applied, dropped and defaulted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/ScoringImport" } }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attach/preview:
     post:
       tags: [league-sync]
@@ -1438,10 +1467,57 @@ components:
           nullable: true
           allOf: [{ $ref: "#/components/schemas/ScoringPreset" }]
         custom:
-          type: object
           nullable: true
-          description: points per stat, keyed by stat (snake_case), at most 200 stats
-          additionalProperties: { type: number, format: double }
+          allOf: [{ $ref: "#/components/schemas/ScoringRules" }]
+    ScoringRules:
+      type: object
+      additionalProperties: false
+      description: >-
+        A league's exact scoring, the 21 rules research/model/domain.py ScoringRules names, every one required. An
+        unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest.
+      required: [points_per_passing_yard, points_per_passing_touchdown, points_per_interception, points_per_rushing_yard, points_per_rushing_touchdown, points_per_receiving_yard, points_per_receiving_touchdown, points_per_reception, points_per_fumble_lost, te_reception_bonus, points_per_field_goal, points_per_extra_point, points_per_sack, points_per_defensive_interception, points_per_defensive_touchdown, points_per_two_point_conversion, points_per_field_goal_missed, points_per_extra_point_missed, points_per_return_touchdown, points_per_defensive_fumble_recovery, points_per_safety]
+      properties:
+        points_per_passing_yard: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_passing_touchdown: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_interception: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_rushing_yard: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_rushing_touchdown: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_receiving_yard: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_receiving_touchdown: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_reception: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_fumble_lost: { type: number, format: double, minimum: -100, maximum: 100 }
+        te_reception_bonus: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_field_goal: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_extra_point: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_sack: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_defensive_interception: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_defensive_touchdown: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_two_point_conversion: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_field_goal_missed: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_extra_point_missed: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_return_touchdown: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_defensive_fumble_recovery: { type: number, format: double, minimum: -100, maximum: 100 }
+        points_per_safety: { type: number, format: double, minimum: -100, maximum: 100 }
+    ScoringImportInput:
+      type: object
+      required: [host, link]
+      properties:
+        host: { type: string, enum: [sleeper, espn, mfl] }
+        link: { type: string, minLength: 1, maxLength: 300, description: the league link as pasted, or its id }
+    ScoringImport:
+      type: object
+      required: [rules, applied, dropped, defaulted]
+      properties:
+        rules: { $ref: "#/components/schemas/ScoringRules" }
+        applied: { type: array, items: { type: string }, description: the rules the host states, by our names }
+        dropped:
+          type: array
+          items: { type: string }
+          description: every host rule the 21 do not carry, in the host's words with its figure, never silently lost
+        defaulted:
+          type: array
+          items: { type: string }
+          description: the rules the host does not state, each at the standard figure
     RosterCounts:
       type: object
       description: starters per position and the bench. Flex spots come from the lineup.

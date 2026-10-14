@@ -8,6 +8,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/leagues"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 	"github.com/jhunthrop/commish/api/internal/sleeper"
 )
 
@@ -104,29 +105,23 @@ func rosterOf(d sleeper.Draft) (apitypes.RosterCounts, apitypes.Lineup, error) {
 	return r, lineup, nil
 }
 
-// Scoring stats the reception points are read from.
-const (
-	statReception = "rec"
-	pprPoints     = 1.0
-	halfPoints    = 0.5
-)
-
-// presetOf is a stand-in until Lane 8 part A (custom scoring from the
-// league's exact rules).
-//
-// presetOf is the scoring preset nearest the league's own points, or,
-// for a mock draft with no league, its scoring type.
-func presetOf(d sleeper.Draft, league *sleeper.League) apitypes.ScoringPreset {
-	if league != nil {
-		switch rec := league.Scoring[statReception]; {
-		case rec >= pprPoints:
-			return apitypes.ScoringPresetPpr
-		case rec >= halfPoints:
-			return apitypes.ScoringPresetHalfPpr
-		default:
-			return apitypes.ScoringPresetStandard
+// scoringOf is the draft's scoring: its league's exact rules (the
+// boards service scores them, Lane 8 part A), or, for a mock draft with
+// no league, the preset its scoring type names.
+func scoringOf(d sleeper.Draft, league *sleeper.League) (apitypes.Scoring, error) {
+	if league != nil && len(league.Scoring) > 0 {
+		rules, err := scoring.FromMap(scoring.FromSleeper(league.Scoring).Rules)
+		if err != nil {
+			return apitypes.Scoring{}, fmt.Errorf("companion: the league's rules: %w", err)
 		}
+		return apitypes.Scoring{Custom: &rules}, nil
 	}
+	preset := presetOf(d)
+	return apitypes.Scoring{Preset: &preset}, nil
+}
+
+// presetOf is the preset a mock draft's scoring type names.
+func presetOf(d sleeper.Draft) apitypes.ScoringPreset {
 	switch t := strings.ToLower(d.ScoringType); {
 	case strings.Contains(t, "half"):
 		return apitypes.ScoringPresetHalfPpr
@@ -152,9 +147,12 @@ func SettingsFor(d sleeper.Draft, league *sleeper.League, seat int) (apitypes.Le
 	if err != nil {
 		return apitypes.LeagueSettings{}, err
 	}
-	preset := presetOf(d, league)
+	sc, err := scoringOf(d, league)
+	if err != nil {
+		return apitypes.LeagueSettings{}, err
+	}
 	s := apitypes.LeagueSettings{
-		Scoring: apitypes.Scoring{Preset: &preset}, Teams: d.Teams, Slot: &seat, Roster: roster, Lineup: lineup,
+		Scoring: sc, Teams: d.Teams, Slot: &seat, Roster: roster, Lineup: lineup,
 		Keepers: []apitypes.Keeper{}, BotStyle: apitypes.BotStyleAdp,
 	}
 	if errs := leagues.Validate(s, ""); errs != nil {

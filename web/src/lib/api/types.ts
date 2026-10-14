@@ -139,6 +139,23 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/leagues/import-scoring': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Read a league's scoring from its host by its link and answer it as ScoringRules: Sleeper from the league's scoring settings, ESPN from a public league's settings (a private league is refused with a sentence saying to make it viewable or enter the rules by hand), MyFantasyLeague from a public league's rules. Yahoo is entered by hand. Needs the custom_scoring feature (403 naming it). Nothing is saved. */
+		post: operations['importScoring'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/leagues/attach/preview': {
 		parameters: {
 			query?: never;
@@ -1259,8 +1276,67 @@ export interface components {
 		/** @description exactly one of preset and custom. custom needs the custom_scoring feature. */
 		Scoring: {
 			preset?: components['schemas']['ScoringPreset'] | null;
-			/** @description points per stat, keyed by stat (snake_case), at most 200 stats */
-			custom?: Record<string, number> | null;
+			custom?: components['schemas']['ScoringRules'] | null;
+		};
+		/** @description A league's exact scoring, the 21 rules research/model/domain.py ScoringRules names, every one required. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest. */
+		ScoringRules: {
+			/** Format: double */
+			points_per_passing_yard: number;
+			/** Format: double */
+			points_per_passing_touchdown: number;
+			/** Format: double */
+			points_per_interception: number;
+			/** Format: double */
+			points_per_rushing_yard: number;
+			/** Format: double */
+			points_per_rushing_touchdown: number;
+			/** Format: double */
+			points_per_receiving_yard: number;
+			/** Format: double */
+			points_per_receiving_touchdown: number;
+			/** Format: double */
+			points_per_reception: number;
+			/** Format: double */
+			points_per_fumble_lost: number;
+			/** Format: double */
+			te_reception_bonus: number;
+			/** Format: double */
+			points_per_field_goal: number;
+			/** Format: double */
+			points_per_extra_point: number;
+			/** Format: double */
+			points_per_sack: number;
+			/** Format: double */
+			points_per_defensive_interception: number;
+			/** Format: double */
+			points_per_defensive_touchdown: number;
+			/** Format: double */
+			points_per_two_point_conversion: number;
+			/** Format: double */
+			points_per_field_goal_missed: number;
+			/** Format: double */
+			points_per_extra_point_missed: number;
+			/** Format: double */
+			points_per_return_touchdown: number;
+			/** Format: double */
+			points_per_defensive_fumble_recovery: number;
+			/** Format: double */
+			points_per_safety: number;
+		};
+		ScoringImportInput: {
+			/** @enum {string} */
+			host: 'sleeper' | 'espn' | 'mfl';
+			/** @description the league link as pasted */
+			link: string;
+		};
+		ScoringImport: {
+			rules: components['schemas']['ScoringRules'];
+			/** @description the rules the host states */
+			applied: string[];
+			/** @description every host rule the 21 do not carry, in the host's words with its figure, never silently lost */
+			dropped: string[];
+			/** @description the rules the host does not state, each at the standard figure */
+			defaulted: string[];
 		};
 		/** @description starters per position and the bench. Flex spots come from the lineup. */
 		RosterCounts: {
@@ -2555,6 +2631,35 @@ export interface operations {
 		responses: {
 			200: components['responses']['EmptyResponse'];
 			404: components['responses']['ErrorResponse'];
+		};
+	};
+	importScoring: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['ScoringImportInput'];
+			};
+		};
+		responses: {
+			/** @description the league's rules, what was applied, dropped and defaulted */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['ScoringImport'];
+					};
+				};
+			};
+			400: components['responses']['ErrorResponse'];
+			403: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
 		};
 	};
 	previewAttach: {

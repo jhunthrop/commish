@@ -1,7 +1,7 @@
 # .github/workflows/research.yml
 # The Python research lane: lint, types, the smoke tests, the schema gate and the parity harness;
-# then, from main, the one research image (research/Dockerfile) and the advisor service on Cloud
-# Run. The parity run replays recorded provider responses only (no secrets, no network beyond the
+# then, from main, the one research image (research/Dockerfile) and the advisor and boards services
+# on Cloud Run. The parity run replays recorded provider responses only (no secrets, no network beyond the
 # package registries), against a Postgres service the harness creates its own parity_* scratch
 # databases in. The TypeScript oracle runs from research-ts/ (and the app modules
 # under src/ it still imports, and the root drizzle journal that builds its legacy tables) with the
@@ -58,8 +58,10 @@ env:
   # running in the advisor can read nothing (research-runtime, which holds secretAccessor, is the
   # nightly job's).
   ADVISOR_SA: advisor-runtime@trycommish.iam.gserviceaccount.com
-  # The api and room services' identity, the only callers the advisor admits.
+  # The api and room services' identity, the only callers the advisor and the boards service admit.
   CALLER_SA: api-runtime@trycommish.iam.gserviceaccount.com
+  # The research schema's reader and writer (the nightly's identity), which the boards service runs as.
+  RUNTIME_SA: research-runtime@trycommish.iam.gserviceaccount.com
 jobs:
   research:
     runs-on: ubuntu-latest
@@ -217,6 +219,39 @@ jobs:
           URL: ${{ steps.advisor.outputs.url }}
         run: echo "advisor deployed at $URL (set the repository variable ADVISOR_URL to it)" >> "$GITHUB_STEP_SUMMARY"
 
+        # THE BOARDS SERVICE (Lane 8, part A): a board for a league's exact scoring rules, called only
+        # by api with an identity token, never by a browser. Like the advisor, ingress all behind IAM
+        # with run.invoker on api-runtime alone: api has no VPC egress, so an internal-ingress service
+        # would be unreachable from it, and IAM, not the network path, is the gate. Unlike the
+        # advisor it reads the research schema (the stored boards' candidate sets) and writes its
+        # cache (custom_boards), so it runs as research-runtime with RESEARCH_DATABASE_URL and no other
+        # secret. One process, BOARDS_WORKERS threads, ready once the pinned priors are loaded.
+      - uses: google-github-actions/deploy-cloudrun@251330ba9a8a34bfbc1622895f42e1d53fd14522 # v2.7.6
+        id: boards
+        with:
+          service: boards
+          region: ${{ vars.GCP_REGION }}
+          image: ${{ env.IMAGE }}
+          env_vars: BOARDS_WORKERS=2
+          env_vars_update_strategy: overwrite
+          secrets: RESEARCH_DATABASE_URL=RESEARCH_DATABASE_URL:latest
+          secrets_update_strategy: overwrite
+          flags: >-
+            --service-account=${{ env.RUNTIME_SA }} --ingress=all --no-allow-unauthenticated
+            --args=research.boards
+            --cpu=1 --memory=1Gi --concurrency=8 --min-instances=0 --max-instances=4
+            --cpu-boost --timeout=15 --port=8080
+            --startup-probe=httpGet.path=/readyz,httpGet.port=8080,periodSeconds=2,failureThreshold=30,timeoutSeconds=2
+            --liveness-probe=httpGet.path=/healthz,httpGet.port=8080,periodSeconds=30,timeoutSeconds=2
+      - name: Only the api may invoke the boards service
+        run: |
+          gcloud run services add-iam-policy-binding boards --region "$REGION" \
+            --member "serviceAccount:$CALLER_SA" --role roles/run.invoker --quiet
+      - name: The boards service's URL, for the api's BOARDS_URL
+        env:
+          URL: ${{ steps.boards.outputs.url }}
+        run: echo "boards deployed at $URL (set the repository variable BOARDS_URL to it)" >> "$GITHUB_STEP_SUMMARY"
+
         # THE NIGHTLY AND IN-SEASON JOBS (spec §4, research/JOBS.md): one image, one Cloud Run Job per
         # command, each running as research-runtime with only the secrets its command reads. Cloud
         # Scheduler runs them (infra/README.md, "The research schedule"); the deployer lacks the
@@ -224,7 +259,6 @@ jobs:
         # (research-runtime) run.invoker on each job and nothing wider.
       - name: The nightly and in-season jobs
         env:
-          RUNTIME_SA: research-runtime@trycommish.iam.gserviceaccount.com
           ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           db="RESEARCH_DATABASE_URL=RESEARCH_DATABASE_URL:latest"

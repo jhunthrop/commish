@@ -130,6 +130,9 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	if err != nil {
 		return nil, err
 	}
+	if err := customBoards(ctx, cfg.Board, draftBoards, now, log); err != nil {
+		return nil, err
+	}
 	sale := &season.Sale{Schedule: draftBoards.Schedule, Log: log}
 	billingService := &billing.Service{
 		Store: &billing.Store{Pool: pool}, Entitlements: ents, Gateway: gateway(cfg, log),
@@ -152,7 +155,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	if err != nil {
 		return nil, err
 	}
-	companions, err := companionService(cfg, pool, solo, ents, ff, log)
+	companions, err := companionService(cfg, pool, solo, draftBoards.Schedule, ents, ff, log)
 	if err != nil {
 		return nil, err
 	}

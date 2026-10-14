@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // A host's words reach a page with control and format characters gone,
@@ -14,7 +16,7 @@ func TestHostTextIsCleaned(t *testing.T) {
 		"IDP\u202e_FLEX":        "IDP_FLEX",
 		"  st\x00_td 6 ":        "st_td 6",
 		"bad\xffbyte":           "badbyte",
-		strings.Repeat("é", 90): strings.Repeat("é", maxHostText),
+		strings.Repeat("é", 90): strings.Repeat("é", scoring.MaxHostText),
 	}
 	for in, want := range cases {
 		got := cleanHostText(in)

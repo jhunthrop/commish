@@ -15,6 +15,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
+	"github.com/jhunthrop/commish/api/internal/espn"
 )
 
 var (
@@ -114,5 +115,76 @@ func TestAMembershipFollowsTwoLeagues(t *testing.T) {
 	list, err := (&Store{Pool: pool}).Attached(ctx, bob)
 	if err != nil || len(list) != 2 {
 		t.Fatalf("bob follows %d leagues (%v), want 2", len(list), err)
+	}
+}
+
+// fakeESPN answers one public league and one private one.
+type fakeESPN struct{}
+
+func (fakeESPN) League(_ context.Context, ref espn.Ref, season int) (espn.League, error) {
+	switch {
+	case ref.LeagueID == "48153503" && season == 2019:
+		return espn.League{Name: "Agbo", Items: []espn.Item{{StatID: 53, Points: 1}, {StatID: 4, Points: 6}, {StatID: 18, Points: 2}}}, nil
+	case ref.LeagueID == "368876":
+		return espn.League{}, espn.ErrPrivate
+	}
+	return espn.League{}, espn.ErrNotFound
+}
+
+func importAs(t *testing.T, svc *Service, accountID uuid.UUID, host, link string) (int, apitypes.ScoringImport, *apitypes.ErrorBody) {
+	t.Helper()
+	body, err := json.Marshal(apitypes.ScoringImportInput{Host: apitypes.ScoringImportInputHost(host), Link: link})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest(http.MethodPost, "/leagues/import-scoring", bytes.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = r.WithContext(auth.WithAccount(r.Context(), auth.Account{ID: accountID}))
+	w := httptest.NewRecorder()
+	svc.importScoring(w, r)
+	var env struct {
+		Data  apitypes.ScoringImport `json:"data"`
+		Error *apitypes.ErrorBody    `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
+		t.Fatalf("import %s: %d %s", link, w.Code, w.Body.String())
+	}
+	return w.Code, env.Data, env.Error
+}
+
+// A league's scoring imports as the 21 rules with what was applied,
+// dropped and defaulted named, from Sleeper, MyFantasyLeague and a public
+// ESPN league; a private ESPN league says how to make it readable; and the
+// import itself needs custom_scoring.
+func TestImportScoring(t *testing.T) {
+	pool := dbtest.Pool(t)
+	svc := replayService(pool)
+	svc.ESPN = fakeESPN{}
+	alice := newAccount(t, &auth.Store{Pool: pool}, "importer")
+	status, _, e := importAs(t, svc, alice, "sleeper", sleeperLink)
+	if status != http.StatusForbidden || e == nil || e.Feature == nil || *e.Feature != entitlements.CustomScoring {
+		t.Fatalf("without the pass: %d %+v", status, e)
+	}
+	ents := &entitlements.Store{Pool: pool}
+	if err := ents.Grant(context.Background(), alice, entitlements.ProductDraftPass, 2026, svc.Now().AddDate(0, 6, 0), "test"); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct{ host, link string }{{"sleeper", sleeperLink}, {"mfl", mflLink}} {
+		status, got, e := importAs(t, svc, alice, c.host, c.link)
+		if status != http.StatusOK || len(got.Applied) == 0 || len(got.Applied)+len(got.Defaulted) != 21 || got.Dropped == nil {
+			t.Errorf("%s: %d %+v %+v", c.host, status, got, e)
+		}
+	}
+	status, got, _ := importAs(t, svc, alice, "espn", "https://fantasy.espn.com/football/league?leagueId=48153503&seasonId=2019")
+	if status != http.StatusOK || got.Rules.PointsPerReception != 1 || got.Rules.PointsPerPassingTouchdown != 6 ||
+		len(got.Dropped) != 1 || got.Dropped[0] != "400+ yard passing game 2" {
+		t.Errorf("espn: %d %+v", status, got)
+	}
+	status, _, e = importAs(t, svc, alice, "espn", "368876")
+	if status != http.StatusUnprocessableEntity || e == nil || e.Message != espnPrivateWords {
+		t.Errorf("a private espn league: %d %+v", status, e)
+	}
+	if status, _, _ := importAs(t, svc, alice, "espn", "https://evil.example/?leagueId=1"); status != http.StatusBadRequest {
+		t.Errorf("a link that is not espn's: %d", status)
 	}
 }

@@ -69,7 +69,13 @@ func (s *Service) follow(ctx context.Context, row Row) (followed, error) {
 		return followed{}, err
 	}
 	settings := mock.Settings{League: row.Settings, Pool: board.Pool()}
-	built, err := Build(settings, board.Raw, row.Seat, read.Picks, s.Matcher)
+	matcher := s.Matcher
+	if row.Host == HostFFPC {
+		// FFPC names players by its own ids, which our players do not
+		// carry: its picks are placed by name.
+		matcher = s.Names
+	}
+	built, err := Build(settings, board.Raw, row.Seat, read.Picks, matcher)
 	if err != nil {
 		return followed{}, err
 	}
@@ -181,8 +187,11 @@ func traded(d sleeper.Draft, picks []sleeper.Pick) int {
 	return n
 }
 
-// basisWords names the board our call reads. A stand-in until Lane 8
-// part A, whose line is "Your league's scoring".
+// basisWords names the board our call reads: a league's own rules, or a
+// mock draft's preset board.
 func basisWords(b boards.Board) string {
-	return "Our " + b.Raw.Format.Words() + " board, the nearest of ours to your league's scoring, valued for its roster."
+	if b.Raw.Custom {
+		return "Your league's scoring, valued for its roster."
+	}
+	return "Our " + b.Raw.Format.Words() + " board, valued for this draft's roster."
 }

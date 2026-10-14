@@ -19,11 +19,14 @@ import (
 // companionService wires the live-draft companion: Sleeper through one
 // client and one shared poller, the rooms' board and card, and the
 // recorded draft when COMPANION_REPLAY is on (development only).
-func companionService(cfg config.API, pool *pgxpool.Pool, rooms *solo.Service, ents *entitlements.Store, ff ffpcWiring, log *slog.Logger) (*companion.Service, error) {
+func companionService(cfg config.API, pool *pgxpool.Pool, rooms *solo.Service, ids companion.SleeperIDs, ents *entitlements.Store, ff ffpcWiring, log *slog.Logger) (*companion.Service, error) {
 	host := sleeper.New()
 	s := &companion.Service{
 		Store: &companion.Store{Pool: pool}, Poller: &companion.Poller{Host: host, Now: time.Now}, Directory: host,
-		Boards: rooms.Boards, Matcher: &companion.NameMatcher{}, Advisor: rooms.Advisor, Entitlements: ents,
+		Boards: rooms.Boards, Advisor: rooms.Advisor, Entitlements: ents, Names: &companion.NameMatcher{},
+		Matcher: &companion.IDMatcher{
+			IDs: ids, Teams: &companion.NameMatcher{}, TTL: cfg.Board.TTL, Now: time.Now, Log: log,
+		},
 		Conditional:   advisor.Engine{Runs: sim.RoomOddsRuns, Workers: runtime.GOMAXPROCS(0)},
 		ReportWorkers: runtime.GOMAXPROCS(0), Now: time.Now, Log: log,
 	}

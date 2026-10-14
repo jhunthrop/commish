@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -83,6 +84,9 @@ func (s *Service) fail(w http.ResponseWriter, r *http.Request, op string, err er
 		httpx.WriteInvalid(w, r, map[string]string{"code": "That link does not hold a draft"})
 	case errors.As(err, &refusal):
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, refusal.Reason, nil)
+	case errors.Is(err, boards.ErrCustomUnavailable):
+		s.Log.Warn("solo: custom board", "op", op, "err", err)
+		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "Your league's scoring cannot be scored right now. Try again in a moment", nil)
 	default:
 		httpx.WriteInternal(w, r, s.Log, op, err)
 	}

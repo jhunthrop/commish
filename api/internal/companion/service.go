@@ -82,8 +82,11 @@ type Service struct {
 	Poller    *Poller
 	Directory Directory
 	Boards    BoardSource
-	Matcher   Matcher
-	Advisor   advisor.Advisor
+	// Matcher places a Sleeper pick (by its Sleeper id); Names places a
+	// pick from a host whose ids our players do not carry (by name).
+	Matcher Matcher
+	Names   Matcher
+	Advisor advisor.Advisor
 	// Conditional makes the call between turns, the lobby's.
 	// advisor.Engine implements it.
 	Conditional  ConditionalAdvisor
@@ -152,6 +155,9 @@ func (s *Service) writeHostError(w http.ResponseWriter, r *http.Request, err err
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, refusal.Reason, nil)
 	case errors.Is(err, sleeper.ErrNotFound):
 		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "Sleeper has no draft at that link", nil)
+	case errors.Is(err, boards.ErrCustomUnavailable):
+		s.Log.Warn("companion: custom board", "err", err)
+		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "Your league's scoring cannot be scored right now. Try again in a moment", nil)
 	case errors.Is(err, sleeper.ErrUnavailable), errors.Is(err, sleeper.ErrMalformed):
 		s.Log.Warn("companion: host", "err", err)
 		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, "Sleeper is not answering right now. Try again in a moment", nil)

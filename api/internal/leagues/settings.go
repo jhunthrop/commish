@@ -6,10 +6,9 @@ package leagues
 
 import (
 	"fmt"
-	"math"
-	"regexp"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // Bounds, matching openapi.yaml's LeagueSettings.
@@ -19,11 +18,7 @@ const (
 	MinRounds         = 8
 	MaxRounds         = 25
 	MaxKeepersPerTeam = 4
-	MaxCustomStats    = 200
-	maxStatPoints     = 100
 )
-
-var statKey = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)
 
 // flexSpots is how many flex starters each lineup adds to the roster
 // counts: standard has one flex, superflex a flex and a superflex, two
@@ -89,16 +84,8 @@ func validateScoring(sc apitypes.Scoring, add func(string, string)) {
 	case sc.Preset != nil && !sc.Preset.Valid():
 		add("scoring.preset", "Pick PPR, half PPR, standard or TE premium")
 	case sc.Custom != nil:
-		custom := *sc.Custom
-		if len(custom) == 0 || len(custom) > MaxCustomStats {
-			add("scoring.custom", fmt.Sprintf("Custom scoring needs 1 to %d stats", MaxCustomStats))
-		}
-		for k, v := range custom {
-			if !statKey.MatchString(k) {
-				add("scoring.custom."+k, "Stat names are lowercase letters, digits and underscores")
-			} else if math.IsNaN(v) || math.Abs(v) > maxStatPoints {
-				add("scoring.custom."+k, fmt.Sprintf("Points per stat stay within %d either way", maxStatPoints))
-			}
+		for k, msg := range scoring.Problems(*sc.Custom) {
+			add("scoring.custom."+k, msg)
 		}
 	}
 }

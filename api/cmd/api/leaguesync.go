@@ -10,6 +10,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
+	"github.com/jhunthrop/commish/api/internal/espn"
 	"github.com/jhunthrop/commish/api/internal/hosts"
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -96,6 +97,6 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 		Poller:    &leaguesync.Poller{Hosts: hostList, Store: store, Now: now, Log: log},
 		Admission: &leaguesync.Admission{Now: now},
 		Players:   players,
-		Links:     store, Saved: saved, Boards: board, FFPC: ffpcHost, Entitlements: ents, Now: now, Log: log,
+		Links:     store, Saved: saved, Boards: board, FFPC: ffpcHost, Entitlements: ents, ESPN: espn.New(), Now: now, Log: log,
 	}
 }

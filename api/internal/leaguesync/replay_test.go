@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // Both recorded leagues read through the same checks a live answer
@@ -61,8 +62,8 @@ func TestRecordedLeaguesRead(t *testing.T) {
 				t.Errorf("%s: a setting of 0 is named dropped: %q", c.link, d)
 			}
 		}
-		if len(snap.Scoring.Rules) != len(ruleKeys) {
-			t.Errorf("%s: %d rule keys, want the %d of ScoringRules", c.link, len(snap.Scoring.Rules), len(ruleKeys))
+		if len(snap.Scoring.Rules) != len(scoring.Rules()) {
+			t.Errorf("%s: %d rule keys, want the %d of ScoringRules", c.link, len(snap.Scoring.Rules), len(scoring.Rules()))
 		}
 		settings, reason := SettingsFor(snap)
 		if reason != "" {

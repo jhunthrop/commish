@@ -1,12 +1,10 @@
 package leaguesync
 
 import (
-	"fmt"
-	"math"
-	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/jhunthrop/commish/api/internal/scoring"
 	"github.com/jhunthrop/commish/api/internal/sleeper"
 )
 
@@ -72,30 +70,10 @@ func sortedKeys(m map[string]bool) []string {
 
 // The saved league's custom scoring bounds (leagues.Validate): a stat
 // key is snake_case, points stay within 100 either way, 200 stats at most.
-var customKey = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)
-
-const maxCustomPoints = 100
-
 // sleeperScoring maps the league's scoring_settings to ScoringRules
 // (rules.go), naming every setting that does not land there, and any
 // figure outside the saved league's bounds, by its key and figure.
 func sleeperScoring(settings map[string]float64) Scoring {
-	host := map[string]float64{}
-	var dropped []string
-	for k, v := range settings {
-		if !customKey.MatchString(k) || math.IsNaN(v) || math.IsInf(v, 0) || math.Abs(v) > maxCustomPoints {
-			dropped = append(dropped, cleanHostText(fmt.Sprintf("%s %g", k, v)))
-			continue
-		}
-		host[k] = v
-	}
-	m := toRules(host)
-	for _, k := range m.left {
-		// A setting of 0 scores nothing, so dropping it loses nothing.
-		if host[k] != 0 {
-			dropped = append(dropped, fmt.Sprintf("%s %g", k, host[k]))
-		}
-	}
-	sort.Strings(dropped)
-	return Scoring{Rules: m.rules, Dropped: dropped, Defaulted: m.defaulted}
+	im := scoring.FromSleeper(settings)
+	return Scoring{Rules: im.Rules, Dropped: im.Dropped, Defaulted: im.Defaulted}
 }

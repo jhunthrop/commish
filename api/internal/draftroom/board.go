@@ -28,6 +28,9 @@ type Boards struct {
 	// Schedule is the research schedule the board reads byes from, which
 	// also answers a season's first kickoff (season.Sale).
 	Schedule *boards.PGSource
+	// Custom scores a league's own rules exactly (the boards service);
+	// nil answers boards.ErrCustomUnavailable for them.
+	Custom *boards.CustomSource
 
 	mu     sync.Mutex
 	valued map[shapeKey]boards.Board
@@ -45,11 +48,11 @@ const maxShapes = 256
 
 // For is the board a league drafts from, valued for its roster.
 func (b *Boards) For(ctx context.Context, s apitypes.LeagueSettings) (boards.Board, error) {
-	raw, err := b.Raw.Load(ctx, boards.FormatFor(s.Scoring))
+	slots, err := mock.SlotConfig(s)
 	if err != nil {
 		return boards.Board{}, err
 	}
-	slots, err := mock.SlotConfig(s)
+	raw, err := b.raw(ctx, s, slots)
 	if err != nil {
 		return boards.Board{}, err
 	}
@@ -72,6 +75,19 @@ func (b *Boards) For(ctx context.Context, s apitypes.LeagueSettings) (boards.Boa
 	b.valued[key] = v
 	b.mu.Unlock()
 	return v, nil
+}
+
+// raw is the league's board before it is valued: a league's own rules
+// scored exactly, a preset's stored board.
+func (b *Boards) raw(ctx context.Context, s apitypes.LeagueSettings, slots []draft.SlotConfig) (*boards.Raw, error) {
+	if s.Scoring.Custom != nil {
+		return b.Custom.Load(ctx, *s.Scoring.Custom, s.Teams, slots)
+	}
+	preset := apitypes.ScoringPresetPpr
+	if s.Scoring.Preset != nil {
+		preset = *s.Scoring.Preset
+	}
+	return b.Raw.Load(ctx, boards.FormatFor(preset))
 }
 
 func slotKey(slots []draft.SlotConfig) string {
