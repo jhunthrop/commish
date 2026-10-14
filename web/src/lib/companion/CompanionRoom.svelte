@@ -75,7 +75,11 @@
 			c.unplaced > 0
 				? `${plural(c.unplaced, 'pick')} on ${host} ${c.unplaced === 1 ? 'is a player' : 'are players'} we do not rank. Each fills his team's roster and takes nobody from our board.`
 				: null,
-			...c.placed_by_name.map((p) => `${p.host_name} on ${host} is our ${p.board_name}.`),
+			...c.placed_by_name.map(
+				(p) =>
+					// A name that ends in "Jr." ends the sentence too.
+					`${p.host_name} on ${host} is our ${p.board_name}${p.board_name.endsWith('.') ? '' : '.'}`
+			),
 			c.traded > 0
 				? `${plural(c.traded, 'pick')} changed hands on ${host}. Our call follows the draft order by slot.`
 				: null
