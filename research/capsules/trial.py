@@ -14,13 +14,16 @@ from datetime import datetime
 
 from sqlalchemy import Engine
 
+from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts.board import BoardRow, board_rows
+from research.capsules.facts.season_so_far import in_season
 from research.capsules.gateway import GatewayClient
 from research.capsules.generate import CapsuleResult, describe_fallback
 from research.capsules.pull_figures import PageValues, capsule_findings, page_numbers, pull_figures_of
+from research.capsules.season_voice import clock_of
 from research.capsules.store import stored_capsules_for
 from research.capsules.sweep import Subject, subjects_of, worn_phrases, write_one
-from research.nightly.capsule_gate import judge_capsules
+from research.nightly.capsule_gate import judge_capsules, span_rules
 from research.season import PRODUCT_SEASON
 
 
@@ -74,20 +77,26 @@ def write_chosen(engine: Engine, gateway: GatewayClient, as_of: datetime, choice
     worn = worn_phrases(subjects, stored)
     written: list[Written] = []
     for subject in _chosen(subjects, choice):
-        result, _ = write_one(engine, subject, stored.get(subject.universe_id), gateway, worn)
+        result, _, _ = write_one(engine, subject, stored.get(subject.universe_id), gateway, worn)
         row = rows[subject.facts.identity.id]
         numbers = page_numbers(page_values_of(row))
         findings = capsule_findings(
-            subject.facts.identity.id, (result.compact.text, result.full.text), numbers, subject.facts.name_ledger
+            subject.facts.identity.id,
+            (result.compact.text, result.full.text),
+            numbers,
+            subject.facts.name_ledger,
+            clock_of(subject.facts),
         )
         written.append(Written(subject, row, result, tuple(findings)))
     return written
 
 
-def gate_written(engine: Engine, written: Sequence[Written]) -> list[str]:
+def gate_written(engine: Engine, written: Sequence[Written], as_of: datetime) -> list[str]:
     """One line per capsule (outcome, cost, pull figures, gate findings), read back from the store, and the totals."""
     with engine.connect() as conn:
         stored = stored_capsules_for(conn, [w.subject.universe_id for w in written])
+        rules = span_rules(conn, as_of, subjects_of)  # the trial's own pass: a CLI tool, not the nightly
+        line = CAPSULE_CONFIG.unwritten_line(in_season=in_season(conn, PRODUCT_SEASON, as_of))
     lines: list[str] = []
     calls = prompt = completion = 0
     cost = 0.0
@@ -95,7 +104,11 @@ def gate_written(engine: Engine, written: Sequence[Written]) -> list[str]:
         row = stored[w.subject.universe_id]
         numbers = page_numbers(page_values_of(w.row))
         findings = capsule_findings(
-            w.subject.facts.identity.id, (row.body_compact, row.body_full), numbers, w.subject.facts.name_ledger
+            w.subject.facts.identity.id,
+            (row.body_compact, row.body_full),
+            numbers,
+            w.subject.facts.name_ledger,
+            clock_of(w.subject.facts),
         )
         figures = ", ".join(f"{f.label} {f.text}" for f in pull_figures_of(row.body_full, numbers))
         usage = w.result.usage
@@ -113,7 +126,7 @@ def gate_written(engine: Engine, written: Sequence[Written]) -> list[str]:
             f"completion tokens, ${d:.6f}; pull figures {figures or 'none'}; {verdict}; "
             f"narrative slots kept {len(w.result.narrative.slots)}, refused {len(w.result.narrative.refused)}"
         )
-    judged = judge_capsules([w.subject.universe_id for w in written], stored)
+    judged = judge_capsules([w.subject.universe_id for w in written], stored, rules, line)
     lines.append(f"the nightly's capsule gate over these pages alone: {judged.summary()}")
     n = max(1, len(written))
     lines.append(

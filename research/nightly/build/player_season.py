@@ -22,6 +22,7 @@ feed's own final flag where the stand-in estimated one):
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Final
 
 from sqlalchemy import Connection, text
@@ -37,6 +38,7 @@ from research.model.domain import (
 )
 from research.model.jsmath import js_round
 from research.nightly.config import RunFormat
+from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.schedule import Game
 from research.pipeline.nflverse.participation import NflverseSource, ParticipationMetric
 from research.pipeline.nflverse.team_codes import product_team_code
@@ -72,16 +74,23 @@ class SeasonStore:
     in_records: frozenset[tuple[str, int]]  # (club, week) final and with lines
 
 
-def read_season_store(conn: Connection, season: int, ids: Sequence[str]) -> SeasonStore:
+def read_season_store(conn: Connection, season: int, ids: Sequence[str], as_of: datetime) -> SeasonStore:
+    """The store's season as known at `as_of`: every line, club and final result stamped at or before it."""
     rows = conn.execute(
         text(
             "select distinct on (o.player_id, o.week, o.source, o.metric) c.provider_player_id as id, o.week, o.source, "
             "o.metric, o.value from research.player_week_observations o "
             "join research.player_crosswalk c on c.player_id = o.player_id "
             "where o.season = :s and o.source in (:stats, :snaps) and c.provider_player_id = any(:ids) "
-            "order by o.player_id, o.week, o.source, o.metric, o.as_of desc"
+            "and o.as_of <= :as_of order by o.player_id, o.week, o.source, o.metric, o.as_of desc"
         ),
-        {"s": season, "stats": NflverseSource.PLAYER_WEEK, "snaps": NflverseSource.SNAP_COUNTS, "ids": list(ids)},
+        {
+            "s": season,
+            "stats": NflverseSource.PLAYER_WEEK,
+            "snaps": NflverseSource.SNAP_COUNTS,
+            "ids": list(ids),
+            "as_of": as_of,
+        },
     )
     lines: dict[str, dict[int, Metrics]] = {}
     snaps: dict[str, dict[int, Metrics]] = {}
@@ -93,30 +102,36 @@ def read_season_store(conn: Connection, season: int, ids: Sequence[str]) -> Seas
         text(
             "select distinct on (t.player_id, t.week) c.provider_player_id as id, t.week, t.team "
             "from research.player_week_teams t join research.player_crosswalk c on c.player_id = t.player_id "
-            "where t.season = :s and c.provider_player_id = any(:ids) order by t.player_id, t.week, t.as_of desc"
+            "where t.season = :s and c.provider_player_id = any(:ids) and t.as_of <= :as_of "
+            "order by t.player_id, t.week, t.as_of desc"
         ),
-        {"s": season, "ids": list(ids)},
+        {"s": season, "ids": list(ids), "as_of": as_of},
     ):
         teams.setdefault(row.id, {})[int(row.week)] = product_team_code(row.team)
     carried: dict[int, set[str]] = {}
     for row in conn.execute(
-        text("select distinct week, metric from research.player_week_observations where season = :s and source = :src"),
-        {"s": season, "src": NflverseSource.PLAYER_WEEK},
+        text(
+            "select distinct week, metric from research.player_week_observations "
+            "where season = :s and source = :src and as_of <= :as_of"
+        ),
+        {"s": season, "src": NflverseSource.PLAYER_WEEK, "as_of": as_of},
     ):
         carried.setdefault(int(row.week), set()).add(row.metric)
     lined = {
         (product_team_code(r.team), int(r.week))
         for r in conn.execute(
-            text("select distinct week, team from research.player_week_teams where season = :s"), {"s": season}
+            text("select distinct week, team from research.player_week_teams where season = :s and as_of <= :as_of"),
+            {"s": season, "as_of": as_of},
         )
     }
     final = {
         (product_team_code(r.team), int(r.week))
         for r in conn.execute(
             text(
-                "select distinct week, team from research.team_week_observations where season = :s and metric = 'game_result'"
+                "select distinct week, team from research.team_week_observations where season = :s "
+                "and metric = 'game_result' and as_of <= :as_of"
             ),
-            {"s": season},
+            {"s": season, "as_of": as_of},
         )
     }
     return SeasonStore(lines, snaps, teams, {w: frozenset(m) for w, m in carried.items()}, frozenset(lined & final))
@@ -200,6 +215,17 @@ class SeasonContext:
     games: Mapping[str, Sequence[Game]]
     byes: Mapping[str, int | None]
     store: SeasonStore
+
+
+def season_context(conn: Connection, season: int, player_ids: Sequence[str], as_of: datetime) -> SeasonContext:
+    """The season so far for these players at `as_of`: the slate, the byes, the records' reach, the
+    store's lines. The page and the capsule writer read it alike, so a capsule is told the season the
+    page prints."""
+    games = schedule_read.slates_by_club(conn, season)
+    weeks = max(game.week for slate in games.values() for game in slate)
+    store = read_season_store(conn, season, player_ids, as_of)
+    byes = {club.abbr: club.bye for club in schedule_read.clubs_of(games)}
+    return SeasonContext(season, weeks, through_of(games, weeks, store), games, byes, store)
 
 
 def season_block(player_id: str, team: str, run_format: RunFormat, position: Position, context: SeasonContext) -> Json:

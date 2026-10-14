@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Final
 
 from research.capsules.bundle import CapsuleBundle, parse_bundle
 from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.corrections import banned_phrases_in, soft_correction_for
 from research.capsules.facts_block import FACTS_SOURCE, render_facts_block
 from research.capsules.gateway import GatewayClient, GenerationError, Usage, add_usage
 from research.capsules.narrative import (
@@ -34,19 +35,17 @@ from research.capsules.narrative import (
 )
 from research.capsules.prompt import (
     NO_WORN_PHRASES,
-    WRITER_RULES,
     FreshDraft,
     PriorAttempt,
     WornPhrases,
     bundle_prompt_for,
     correction_prompt_for,
+    writer_rules_for,
 )
 from research.capsules.validate import (
     NARRATIVE_MIN_WORDS,
     ValidationResult,
-    banned_phrases_in,
     grounding_of,
-    soft_correction_for,
     validate_capsule,
     validate_narrative_slot,
     word_count,
@@ -95,8 +94,9 @@ class CapsuleResult:
     calls: int
 
 
-def _msgs(user: str) -> list[dict[str, str]]:
-    return [{"role": "system", "content": WRITER_RULES}, {"role": "user", "content": user}]
+def _msgs(facts: "PlayerFacts", user: str) -> list[dict[str, str]]:
+    """One request: the writer's rules in the voice of the run's day, then the user message."""
+    return [{"role": "system", "content": writer_rules_for(facts)}, {"role": "user", "content": user}]
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,7 +113,7 @@ def _bundle_once(
     prompt = bundle_prompt_for(facts, requests, worn)
     try:
         answer = gateway.complete(
-            _msgs(prompt if note is None else f"{prompt}\n\n{note}"), CAPSULE_CONFIG.bundle_max_tokens
+            _msgs(facts, prompt if note is None else f"{prompt}\n\n{note}"), CAPSULE_CONFIG.bundle_max_tokens
         )
     except GenerationError as error:
         return _BundleOutcome(None, error.billed, Fallback("throttled"), 1)
@@ -217,7 +217,7 @@ def _settle(
             return _facts_block(facts, read, Fallback("failed_validation", first)), read.calls
         try:
             answer = gateway.complete(
-                _msgs(correction_prompt_for(facts, size, prior)), CAPSULE_CONFIG.size(size).max_tokens
+                _msgs(facts, correction_prompt_for(facts, size, prior)), CAPSULE_CONFIG.size(size).max_tokens
             )
         except GenerationError as error:
             spent = replace(read, usage=add_usage(read.usage, error.billed))
@@ -246,7 +246,9 @@ def _rewrite_voice_slots(
             calls += 1
             try:
                 answer = gateway.complete(
-                    _msgs(slot_rewrite_prompt(request, current)), CAPSULE_CONFIG.bundle_max_tokens, NARRATIVE_MIN_WORDS
+                    _msgs(facts, slot_rewrite_prompt(request, current)),
+                    CAPSULE_CONFIG.bundle_max_tokens,
+                    NARRATIVE_MIN_WORDS,
                 )
             except GenerationError as error:
                 usage = add_usage(usage, error.billed)

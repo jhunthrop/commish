@@ -8,9 +8,10 @@ so the site keeps building from the last clean run. Every failure is a named rea
 2. `board_depth`: every format's board covers, league-wide, every starting slot its ranked positions
    alone can fill, and every roster spot but the kicker's and the defense's (market order, never
    board rows).
-3. `capsules`: at most 2% of the board's pages unwritten and no written sentence on two pages (the
-   capsule step's gate), and every page with a capsule prints at least one of its numbers, each word
-   for word and equal to the page's value at the precision printed, with no voice-rule hit.
+3. `capsules`: at most the run's line of the board's pages unwritten (2% preseason, 3% in season), no written sentence on two pages (the capsule step's gate;
+   six-word spans are counted and repaired, never a failure), and every page with a capsule prints at least one of
+   its numbers, each word for word and equal to the page's value at the precision printed, with no
+   voice-rule hit, no doubled word and no time frame slip for the run's day.
 4. `basis`: every number names its basis: each format its basis phrases and unit, each ADP source
    its drafts and window, each slate its method and window, the record its method and statistics,
    the manifest a source for every feed.
@@ -94,10 +95,11 @@ def depth_gate(formats: Sequence[RunFormat], boards: Mapping[str, Json]) -> Gate
 
 
 def capsule_gate(step: CapsuleGateResult, page_reasons: Sequence[str]) -> GateRecord:
-    """The capsule step's gate (the unwritten share, shared sentences) and every written page's findings."""
+    """The capsule step's gate (the unwritten share, shared sentences and six-word spans) and every
+    written page's findings."""
     reasons = (
-        [f"capsule_unwritten_share:{step.unwritten_share:.4f}>{step.share_max}"]
-        if step.unwritten_share > step.share_max
+        [f"capsule_unwritten_share:{step.unwritten_share:.4f}>{step.line.share_max}:{step.line.voice}"]
+        if step.unwritten_share > step.line.share_max
         else []
     )
     reasons += [f"capsule_shared_sentence:{len(s.player_ids)}:{s.sentence}" for s in step.shared]
