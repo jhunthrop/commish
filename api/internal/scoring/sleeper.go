@@ -66,7 +66,10 @@ var fieldGoalRanges = map[string]struct{ short, long []string }{
 	"points_per_field_goal_missed": {[]string{"fgmiss_0_19", "fgmiss_20_29", "fgmiss_30_39"}, []string{"fgmiss_40_49", "fgmiss_50p"}},
 }
 
-func byDistance(host, rules map[string]float64, used map[string]bool) {
+// byDistance carries the short ranges' figure and answers each longer
+// range that scores differently with the figure it is read as.
+func byDistance(host, rules map[string]float64, used map[string]bool) map[string]float64 {
+	readAs := map[string]float64{}
 	for key, ranges := range fieldGoalRanges {
 		if _, ok := rules[key]; ok {
 			continue
@@ -82,9 +85,12 @@ func byDistance(host, rules map[string]float64, used map[string]bool) {
 		for _, k := range ranges.long {
 			if long, stated := host[k]; stated && long == v {
 				used[k] = true
+			} else if stated {
+				readAs[k] = v
 			}
 		}
 	}
+	return readAs
 }
 
 // Mapped is settings in Sleeper's names as ScoringRules: the rules, the
@@ -94,6 +100,9 @@ type Mapped struct {
 	Rules     map[string]float64
 	Left      []string
 	Defaulted []string
+	// ReadAs is a left setting that is still counted, at another figure: a
+	// field goal range scored apart from the short ranges.
+	ReadAs map[string]float64
 }
 
 // MapSleeperNames maps settings in Sleeper's names to ScoringRules.
@@ -113,7 +122,7 @@ func MapSleeperNames(host map[string]float64) Mapped {
 			}
 		}
 	}
-	byDistance(host, out.Rules, used)
+	out.ReadAs = byDistance(host, out.Rules, used)
 	for k := range host {
 		if !used[k] {
 			out.Left = append(out.Left, k)
@@ -158,16 +167,21 @@ func FromSleeper(settings map[string]float64) Imported {
 	var dropped []string
 	for k, v := range settings {
 		if !settingKey.MatchString(k) || math.IsNaN(v) || math.IsInf(v, 0) || math.Abs(v) > MaxPoints {
-			dropped = append(dropped, HostText(fmt.Sprintf("%s %g", k, v)))
+			dropped = append(dropped, sleeperWords(k, v, nil))
 			continue
 		}
 		host[k] = v
 	}
 	m := MapSleeperNames(host)
 	for _, k := range m.Left {
-		if host[k] != 0 {
-			dropped = append(dropped, fmt.Sprintf("%s %g", k, host[k]))
+		if host[k] == 0 {
+			continue
 		}
+		var readAs *float64
+		if v, ok := m.ReadAs[k]; ok {
+			readAs = &v
+		}
+		dropped = append(dropped, sleeperWords(k, host[k], readAs))
 	}
 	sort.Strings(dropped)
 	return Imported{Rules: m.Rules, Dropped: dropped, Defaulted: m.Defaulted}

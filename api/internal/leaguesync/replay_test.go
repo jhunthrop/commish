@@ -30,7 +30,7 @@ func TestRecordedLeaguesRead(t *testing.T) {
 			map[string]float64{
 				"points_per_reception": 1, "te_reception_bonus": 0.5, "points_per_passing_touchdown": 5,
 				"points_per_passing_yard": 0.04, "points_per_two_point_conversion": 2, "points_per_interception": -1,
-			}, "st_td 6"},
+			}, "special teams touchdown 6"},
 		{"https://www43.myfantasyleague.com/2026/home/" + ReplayMFLLeague, apitypes.LineupStandard, 23,
 			map[string]float64{
 				"points_per_reception": 1, "points_per_passing_touchdown": 4, "points_per_passing_yard": 0.04,
