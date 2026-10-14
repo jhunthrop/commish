@@ -180,6 +180,7 @@ const (
 	FeatureEarlyRun         Feature = "early_run"
 	FeatureFullReasoning    Feature = "full_reasoning"
 	FeatureLiveDraftAdvisor Feature = "live_draft_advisor"
+	FeatureManyLeagues      Feature = "many_leagues"
 	FeatureRangeOfOutcomes  Feature = "range_of_outcomes"
 	FeatureStartSit         Feature = "start_sit"
 	FeatureSyncedSheet      Feature = "synced_sheet"
@@ -197,6 +198,8 @@ func (e Feature) Valid() bool {
 	case FeatureFullReasoning:
 		return true
 	case FeatureLiveDraftAdvisor:
+		return true
+	case FeatureManyLeagues:
 		return true
 	case FeatureRangeOfOutcomes:
 		return true
@@ -787,6 +790,9 @@ type Account struct {
 	Id       openapi_types.UUID `json:"id"`
 	LastName *string            `json:"last_name"`
 
+	// LeagueCount how many leagues the account follows now (detached ones not counted); more than one, the rail's League opens the list
+	LeagueCount int `json:"league_count"`
+
 	// LeagueId the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
 	LeagueId   *openapi_types.UUID `json:"league_id"`
 	Membership *MembershipState    `json:"membership"`
@@ -852,6 +858,9 @@ type AttachedLeague struct {
 	Name     string `json:"name"`
 	RosterId int    `json:"roster_id"`
 	Season   int    `json:"season"`
+
+	// Standing the drafter's record and place at the last read, null when unread
+	Standing *LeagueStanding `json:"standing"`
 
 	// TeamName the drafter's team at the last read
 	TeamName string `json:"team_name"`
@@ -1286,11 +1295,14 @@ type LeagueMoveKind string
 // LeaguePlayer defines model for LeaguePlayer.
 type LeaguePlayer struct {
 	// BoardId the player's id on our board
-	BoardId  *string `json:"board_id"`
-	HostId   string  `json:"host_id"`
-	Name     string  `json:"name"`
-	Position string  `json:"position"`
-	Team     string  `json:"team"`
+	BoardId *string `json:"board_id"`
+	HostId  string  `json:"host_id"`
+
+	// InjuredReserve the host marks him injured reserve beside his name (FFPC's IR designation); a player on a roster's IR slot is said by the slot
+	InjuredReserve bool   `json:"injured_reserve"`
+	Name           string `json:"name"`
+	Position       string `json:"position"`
+	Team           string `json:"team"`
 }
 
 // LeagueSettings defines model for LeagueSettings.
@@ -1308,6 +1320,17 @@ type LeagueSettings struct {
 	// Slot null drafts from a random slot
 	Slot  *int `json:"slot"`
 	Teams int  `json:"teams"`
+}
+
+// LeagueStanding defines model for LeagueStanding.
+type LeagueStanding struct {
+	Losses int `json:"losses"`
+
+	// Place 1-based, by record then points for, as the league page's strip orders it
+	Place int `json:"place"`
+	Teams int `json:"teams"`
+	Ties  int `json:"ties"`
+	Wins  int `json:"wins"`
 }
 
 // LeagueSync defines model for LeagueSync.
@@ -1374,6 +1397,9 @@ type LeagueSync struct {
 
 	// Week the host's current week
 	Week int `json:"week"`
+
+	// WeekAllPlay the host's schedule sets this week as all-play (every team scored against every other, no head-to-head game); the matchup then holds the drafter's side alone
+	WeekAllPlay bool `json:"week_all_play"`
 }
 
 // LeagueTeam defines model for LeagueTeam.
@@ -1460,9 +1486,12 @@ type LobbySeatViewKind string
 
 // MatchupSide defines model for MatchupSide.
 type MatchupSide struct {
-	Points   float64          `json:"points"`
-	RosterId int              `json:"roster_id"`
-	Starters []MatchupStarter `json:"starters"`
+	Points float64 `json:"points"`
+
+	// PointsRead the host's score for this side was read; false when it could not be (an FFPC all-play week whose scoring page did not answer), and points is then 0 and says nothing
+	PointsRead bool             `json:"points_read"`
+	RosterId   int              `json:"roster_id"`
+	Starters   []MatchupStarter `json:"starters"`
 }
 
 // MatchupStarter defines model for MatchupStarter.

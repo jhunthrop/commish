@@ -2,13 +2,18 @@
 import { resolve } from '$app/paths';
 import { positionSegment } from '#lib/run/derive.ts';
 import type { Position } from '#lib/types/player.ts';
-import { COMPANION_START, LEAGUE_START, sectionHref } from '#lib/ui/nav.ts';
+import {
+	COMPANION_START,
+	FOLLOWED_PARAM,
+	LEAGUES_ANCHOR,
+	LEAGUE_START,
+	sectionHref
+} from '#lib/ui/nav.ts';
 
 /** The attach page's search parameter naming the way in it starts from: `?host=ffpc`. */
 export const LEAGUE_HOST_PARAM = 'host';
 
-/** The anchor of the account page's Your leagues. */
-export const LEAGUES_ANCHOR = 'your-leagues';
+export { FOLLOWED_PARAM, LEAGUES_ANCHOR };
 
 /** The anchor of a player page's This season block. */
 export const SEASON_ANCHOR = 'this-season';
@@ -40,8 +45,10 @@ export const links = {
 	/** Your cheat sheet. Every page outside the sheet links it through here. */
 	sheet: (): string => resolve('/sheet'),
 	account: (): string => resolve('/account'),
-	/** The account page at Your leagues, every league the account follows. */
-	accountLeagues: (): string => `${resolve('/account')}#${LEAGUES_ANCHOR}`,
+	/** The account page at Your leagues, every league the account follows, saying how many were
+	 * just followed when it is told. */
+	accountLeagues: (followed?: number): string =>
+		`${resolve('/account')}${followed === undefined ? '' : `?${new URLSearchParams({ [FOLLOWED_PARAM]: String(followed) }).toString()}`}#${LEAGUES_ANCHOR}`,
 	/** The Draft Pass, the Membership and the Group Draft Pass. */
 	pass: (): string => resolve('/pass'),
 	/** Where a live draft starts being followed. */

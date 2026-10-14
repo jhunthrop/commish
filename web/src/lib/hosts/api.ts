@@ -10,6 +10,12 @@ export type HostConnections = Schemas['HostConnections'];
 export type HostConnected = Schemas['HostConnected'];
 export type HostLeague = Schemas['HostLeague'];
 export type Device = Schemas['Device'];
+
+/** What a pick of several FFPC leagues came to, said under the verb: a summary and each miss. */
+export interface PickAnswer {
+	status: string;
+	problems: readonly string[];
+}
 export type PairCode = Schemas['PairCode'];
 
 const client = apiClient(PUBLIC_API_URL);

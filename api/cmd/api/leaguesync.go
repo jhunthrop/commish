@@ -9,6 +9,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
+	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/hosts"
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -58,18 +59,19 @@ func (f ffpcWiring) routes(log *slog.Logger) []httpx.Route {
 }
 
 // host is the FFPC league host over the link store, nil when FFPC is off.
-func (f ffpcWiring) host(store *leaguesync.Store) *leaguesync.FFPC {
+// weeks is the run's schedule, the source of the league's current week.
+func (f ffpcWiring) host(store *leaguesync.Store, weeks leaguesync.WeekSource, log *slog.Logger) *leaguesync.FFPC {
 	if !f.on {
 		return nil
 	}
-	return &leaguesync.FFPC{Member: f.member, Readers: store, Now: time.Now}
+	return &leaguesync.FFPC{Member: f.member, Readers: store, Weeks: weeks, Now: time.Now, Log: log}
 }
 
 // leagueSyncService wires league sync: Sleeper first, MyFantasyLeague
 // second and FFPC third behind one poller, the rooms' board, and the
 // recorded leagues when COMPANION_REPLAY is on (development only). The
 // host directories are read at start, so the first view finds them.
-func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ff ffpcWiring, log *slog.Logger) *leaguesync.Service {
+func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ents *entitlements.Store, ff ffpcWiring, log *slog.Logger) *leaguesync.Service {
 	now := time.Now
 	var sleeperAPI leaguesync.SleeperAPI = sleeper.New()
 	var mflAPI leaguesync.MFLAPI = mfl.New()
@@ -83,7 +85,7 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 		&leaguesync.Sleeper{API: sleeperAPI, Now: now},
 		&leaguesync.MFL{API: mflAPI, Now: now},
 	}
-	ffpcHost := ff.host(store)
+	ffpcHost := ff.host(store, board.Schedule, log)
 	if ffpcHost != nil {
 		hostList = append(hostList, ffpcHost)
 	}
@@ -94,6 +96,6 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 		Poller:    &leaguesync.Poller{Hosts: hostList, Store: store, Now: now, Log: log},
 		Admission: &leaguesync.Admission{Now: now},
 		Players:   players,
-		Links:     store, Saved: saved, Boards: board, FFPC: ffpcHost, Now: now, Log: log,
+		Links:     store, Saved: saved, Boards: board, FFPC: ffpcHost, Entitlements: ents, Now: now, Log: log,
 	}
 }

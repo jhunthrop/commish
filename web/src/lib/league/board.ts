@@ -12,6 +12,24 @@ import type { BoardFormat } from '#lib/sheet/model.ts';
 export interface LeagueBoardPlayer extends RoomPlayer {
 	slug: string;
 	season: IndexSeason;
+	/** His projection is the board's depth floor at his position: a fill value several players share
+	 * below the last one we project, said in words, never as a measured number. */
+	belowDepth: boolean;
+}
+
+/** How many players at a position must share its lowest projection for it to read as a fill value. */
+const FLOOR_SHARED_BY = 3;
+
+/** The players whose projection is their position's floor, shared by FLOOR_SHARED_BY or more. */
+function depthFloor(rows: LeagueBoardFile['rows']): ReadonlySet<string> {
+	const byPosition = Map.groupBy(rows, (r) => r.position);
+	const out = new Set<string>();
+	for (const group of byPosition.values()) {
+		const floor = Math.min(...group.map((r) => r.projected));
+		const atFloor = group.filter((r) => r.projected === floor);
+		if (atFloor.length >= FLOOR_SHARED_BY) for (const r of atFloor) out.add(r.id);
+	}
+	return out;
 }
 
 export interface LeagueBoard {
@@ -23,6 +41,8 @@ export interface LeagueBoard {
 	/** What a row's season figures are: "Games and points a game are this season's, PPR, through
 	 * week 5." */
 	seasonBasis: string;
+	/** The scoring the season figures are in, as the run names it: "PPR". */
+	seasonScoring: string;
 	format: BoardFormat;
 }
 
@@ -36,7 +56,8 @@ async function fetchBoard(format: BoardFormat): Promise<LeagueBoardFile | null> 
 
 function playerOf(
 	row: LeagueBoardFile['rows'][number],
-	byes: Readonly<Record<string, number>>
+	byes: Readonly<Record<string, number>>,
+	floor: ReadonlySet<string>
 ): LeagueBoardPlayer {
 	return {
 		id: row.id,
@@ -51,7 +72,8 @@ function playerOf(
 		vor: row.vor,
 		vorRound: row.vorRound,
 		bye: byes[row.team] ?? null,
-		season: row.season
+		season: row.season,
+		belowDepth: floor.has(row.id)
 	};
 }
 
@@ -68,12 +90,14 @@ export async function loadBoard(
 	const own = await fetchBoard(format);
 	const run = own ?? (await fetchBoard(FALLBACK));
 	if (run === null) throw new Error('The run carries no board for a league.');
-	const players = run.rows.map((row) => playerOf(row, byes));
+	const floor = depthFloor(run.rows);
+	const players = run.rows.map((row) => playerOf(row, byes, floor));
 	return {
 		players,
 		byId: new Map(players.map((p) => [p.id, p] as const)),
 		basis: `${run.format.basis.join(', ')}.`,
 		seasonBasis: seasonBasisOf(run),
+		seasonScoring: run.season.scoring,
 		format: own === null ? FALLBACK : format
 	};
 }

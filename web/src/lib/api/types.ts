@@ -165,7 +165,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Attach the drafter's own league on another host by its link. Free. The league's roster and scoring become a saved league (custom scoring, exactly as the host states it) a mock reruns from, when a mock room can draft its shape. The drafter's seat is the team their Sleeper username runs, or the team they pick. Attaching the same league again updates the seat. */
+		/** Attach the drafter's own league on another host by its link. Free. The league's roster and scoring become a saved league (custom scoring, exactly as the host states it) a mock reruns from, when a mock room can draft its shape. The drafter's seat is the team their Sleeper username runs, or the team they pick. Attaching the same league again updates the seat. One live league is free; a second needs the many_leagues feature (the Draft Pass or the Membership), refused with 403 naming it. A detached league does not count. */
 		post: operations['attachLeague'];
 		delete?: never;
 		options?: never;
@@ -220,7 +220,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Undo a detach. The league is followed again with the seat and saved league it had. */
+		/** Undo a detach. The league is followed again with the seat and saved league it had. Like an attach, a second live league needs the many_leagues feature (403 naming it). */
 		post: operations['restoreLeague'];
 		delete?: never;
 		options?: never;
@@ -1186,7 +1186,8 @@ export interface components {
 			| 'early_run'
 			| 'start_sit'
 			| 'waiver_ranks'
-			| 'trade_finder';
+			| 'trade_finder'
+			| 'many_leagues';
 		/** @enum {string} */
 		Product: 'draft_pass' | 'membership' | 'group_pass';
 		/** @enum {string} */
@@ -1200,6 +1201,8 @@ export interface components {
 			 * @description the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
 			 */
 			league_id: string | null;
+			/** @description how many leagues the account follows now (detached ones not counted); more than one, the rail's League opens the list */
+			league_count: number;
 			first_name: string | null;
 			last_name: string | null;
 			/** @description the name shown in lobbies, 3 to 20 letters, digits or underscores, not starting with a digit */
@@ -1965,8 +1968,18 @@ export interface components {
 			roster_id: number;
 			/** @description the drafter's team at the last read */
 			team_name: string;
+			/** @description the drafter's record and place at the last read, null when unread */
+			standing: components['schemas']['LeagueStanding'] | null;
 			/** Format: date-time */
 			attached_at: string;
+		};
+		LeagueStanding: {
+			wins: number;
+			losses: number;
+			ties: number;
+			/** @description 1-based, by record then points for, as the league page's strip orders it */
+			place: number;
+			teams: number;
 		};
 		LeagueTeam: {
 			roster_id: number;
@@ -1987,6 +2000,8 @@ export interface components {
 			name: string;
 			position: string;
 			team: string;
+			/** @description the host marks him injured reserve beside his name (FFPC's IR designation); a player on a roster's IR slot is said by the slot */
+			injured_reserve: boolean;
 		};
 		RosterSpot: {
 			player: components['schemas']['LeaguePlayer'];
@@ -2005,6 +2020,8 @@ export interface components {
 			roster_id: number;
 			/** Format: double */
 			points: number;
+			/** @description the host's score for this side was read; false when it could not be (an FFPC all-play week whose scoring page did not answer), and points is then 0 and says nothing */
+			points_read: boolean;
 			starters: components['schemas']['MatchupStarter'][];
 		};
 		LeagueMatchup: {
@@ -2044,6 +2061,8 @@ export interface components {
 			status: string;
 			/** @description the host's current week */
 			week: number;
+			/** @description the host's schedule sets this week as all-play (every team scored against every other, no head-to-head game); the matchup then holds the drafter's side alone */
+			week_all_play: boolean;
 			/** @description the drafter's roster id */
 			me: number;
 			/**
@@ -2573,6 +2592,7 @@ export interface operations {
 		responses: {
 			201: components['responses']['LeagueSyncResponse'];
 			400: components['responses']['ErrorResponse'];
+			403: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 			422: components['responses']['ErrorResponse'];
@@ -2626,6 +2646,7 @@ export interface operations {
 		requestBody?: never;
 		responses: {
 			200: components['responses']['EmptyResponse'];
+			403: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 		};

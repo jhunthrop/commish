@@ -10,12 +10,15 @@ import type { components } from '#lib/api/types.ts';
 import type { RailAccount } from '#lib/ui/nav.ts';
 
 type Account = components['schemas']['Account'];
+type Feature = components['schemas']['Feature'];
 
 const client = apiClient(PUBLIC_API_URL);
 
 class RailLeague {
 	/** The signed-in account's league, null signed out or before /me answers. */
 	account = $state<RailAccount | null>(null);
+	/** What the account may use (/me, Can), from the same one read: many_leagues on the attach page. */
+	features = $state<readonly Feature[]>([]);
 	#asked: Promise<void> | null = null;
 
 	/** Reads /me the first time any page asks in this page load. */
@@ -28,12 +31,16 @@ class RailLeague {
 	async refresh(): Promise<void> {
 		if (!hasSessionCookie()) {
 			this.account = null;
+			this.features = [];
 			return;
 		}
 		try {
-			this.account = { leagueId: (await client.call<Account>('/me')).league_id };
+			const me = await client.call<Account>('/me');
+			this.account = { leagueId: me.league_id, leagueCount: me.league_count };
+			this.features = me.features;
 		} catch {
 			this.account = null;
+			this.features = [];
 		}
 	}
 }

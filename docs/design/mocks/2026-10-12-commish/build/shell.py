@@ -135,6 +135,9 @@ button{font:inherit;color:inherit}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 """
 
+# The theme switch lives in the account room only (founder ruling, UX review 7 H3): no page bar
+# draws it. THEME_JS still applies a saved theme, so a reviewer sets one from the console with
+# localStorage.setItem('commish-theme', 'dark').
 THEME_SWITCH = (
     '<div class="theme" role="group" aria-label="Theme">'
     '<button type="button" data-set="auto" aria-pressed="true">Auto</button>'
@@ -199,7 +202,6 @@ def page(title, active, heading, top_tail, body, css, js="", with_read=False, se
   <h1>{escape(heading)}</h1>
   {SEARCH if search else ""}
   <div class="tail">
-    {THEME_SWITCH}
     {top_tail}
   </div>
 </header>

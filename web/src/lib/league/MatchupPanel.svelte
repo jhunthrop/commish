@@ -6,7 +6,16 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { LeagueSync, MatchupSide } from './api.ts';
 	import LeagueRow from './LeagueRow.svelte';
-	import { hostWords, rowOf, teamName } from './model.ts';
+	import {
+		hostWords,
+		matchupAside,
+		matchupGap,
+		rowOf,
+		scoreGap,
+		scoreUnread,
+		statusOn,
+		teamName
+	} from './model.ts';
 
 	/** This week's game: both lineups as the host has them set, each starter's points so far, and
 	 * each side's total. Side by side on a desk, one above the other in a hand. */
@@ -14,9 +23,11 @@
 		sync: LeagueSync;
 		board: LeagueBoard;
 		tagsOf: (boardId: string | null) => readonly string[];
+		/** The clock the page's read line uses, for a week we could not read. */
+		now: Date;
 	}
 
-	let { sync, board, tagsOf }: Props = $props();
+	let { sync, board, tagsOf, now }: Props = $props();
 
 	const matchup = $derived(sync.matchup);
 
@@ -36,10 +47,15 @@
 		matchup !== null &&
 			[matchup.mine, ...(matchup.opponent ? [matchup.opponent] : [])].some(hasStarted)
 	);
+
+	/** In an all-play week a read score is shown even at 0: the host's own total, read, is the fact. */
+	function showsTotal(s: MatchupSide): boolean {
+		return !scoreUnread(s) && (hasStarted(s) || sync.week_all_play);
+	}
 </script>
 
 {#snippet side(s: MatchupSide, mine: boolean)}
-	{@const live = hasStarted(s)}
+	{@const live = showsTotal(s)}
 	{@const scored = playersScored(s)}
 	<section class="side" class:mine aria-label={teamName(sync, s.roster_id)}>
 		<header>
@@ -55,6 +71,7 @@
 				player={rowOf(board, starter.player)}
 				host={starter.player}
 				tags={mine ? tagsOf(starter.player.board_id) : []}
+				status={statusOn(mine ? sync.roster : [], starter.player)}
 			>
 				{#snippet trailing()}
 					{#if scored}<span class="pts">{fixed(starter.points)}</span>{/if}
@@ -69,26 +86,30 @@
 		<div class="head">
 			<PanelHead
 				title={`Week ${String(matchup.week)}`}
-				aside={started ? 'Points so far' : 'No games played yet'}
+				aside={matchupAside(matchup, sync.week_all_play, started)}
 				level={2}
 			/>
+			{#if sync.week_all_play}
+				<p class="none">
+					An all-play week on {hostWords(sync.host)}: your score is set against every other team's.
+				</p>
+			{/if}
+			{#if scoreUnread(matchup.mine)}
+				<p class="none">{scoreGap(sync, now)}</p>
+			{/if}
 		</div>
 		<div class="sides">
 			{@render side(matchup.mine, true)}
 			{#if matchup.opponent}
 				{@render side(matchup.opponent, false)}
-			{:else}
+			{:else if !sync.week_all_play}
 				<p class="none"><Label>No opponent this week</Label></p>
 			{/if}
 		</div>
 	{:else}
 		<div class="head">
 			<PanelHead title="This week" level={2} />
-			<p class="none">
-				{sync.week === 0
-					? 'Your league has no games this week.'
-					: `Your team has no game in week ${String(sync.week)}.`}
-			</p>
+			<p class="none">{matchupGap(sync, now)}</p>
 		</div>
 	{/if}
 </Panel>

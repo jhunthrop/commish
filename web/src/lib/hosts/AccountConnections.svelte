@@ -9,6 +9,9 @@
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import FFPCSignIn from './FFPCSignIn.svelte';
+	import { plural } from '#lib/format/number.ts';
+	import { leagueApi } from '#lib/league/api.ts';
+	import { agoWords } from '#lib/league/model.ts';
 	import { ApiError, ffpcOpen, hostsApi, type HostConnection } from './api.ts';
 
 	/** The hosts the account reads as the member (FFPC), each with its state, a one-tap disconnect
@@ -21,6 +24,8 @@
 	let problem = $state<string | null>(null);
 	/** Set once Disconnect went through: one line stands where the row was. */
 	let disconnected = $state(false);
+	/** How many FFPC leagues the account follows, null until read or when it cannot be. */
+	let ffpcLeagues = $state<number | null>(null);
 
 	function load(): void {
 		hostsApi
@@ -31,6 +36,10 @@
 				disconnected = false;
 			})
 			.catch(() => (failed = true));
+		leagueApi
+			.attached()
+			.then((list) => (ffpcLeagues = list.filter((l) => l.host === 'ffpc').length))
+			.catch(() => (ffpcLeagues = null));
 	}
 
 	onMount(load);
@@ -40,10 +49,23 @@
 		signed_out: 'Signed out by FFPC'
 	};
 
-	/** "Signed out by FFPC. Last read Oct 12." */
+	/** A read's age: "1 minute ago" within a day, its date after. */
+	const DAY_SECONDS = 86_400;
+	function readWhen(at: string): string {
+		const age = Math.max(0, (Date.now() - Date.parse(at)) / 1000);
+		return age < DAY_SECONDS ? agoWords(age) : `on ${dayLabel(at)}`;
+	}
+
+	/** "Signed in. Reads your 2 FFPC leagues, last read 1 minute ago." "Signed out by FFPC. Last
+	 * read on Oct 12." */
 	function line(c: HostConnection): string {
-		const read = c.last_read_at ? ` Last read ${dayLabel(c.last_read_at)}.` : '';
-		return `${STATUS[c.status]}.${read}`;
+		const when = c.last_read_at ? readWhen(c.last_read_at) : null;
+		const reads =
+			c.status === 'connected' && ffpcLeagues !== null && ffpcLeagues > 0
+				? `Reads your ${plural(ffpcLeagues, 'FFPC league')}`
+				: null;
+		if (reads) return `${STATUS[c.status]}. ${reads}${when ? `, last read ${when}` : ''}.`;
+		return `${STATUS[c.status]}.${when ? ` Last read ${when}.` : ''}`;
 	}
 
 	async function disconnect(gone: HostConnection): Promise<void> {

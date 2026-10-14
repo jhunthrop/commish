@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { FACE_OVERFILL, headshotSources } from './headshot.ts';
 	import { INITIALS_SCALE, initialsOf } from './initials.ts';
+	import { FACE_STATUS, type FaceStatus } from './face-status.ts';
 
 	interface Props {
 		/** The headshot URL; null or empty for a player with none. */
@@ -19,6 +20,8 @@
 		phoneSize?: number;
 		/** Whose face: with no headshot, or one that fails to load, his initials hold the circle. */
 		name?: string;
+		/** His roster status, marked at the photo's top left: ir is injured reserve. */
+		status?: FaceStatus | null;
 	}
 
 	let {
@@ -29,7 +32,8 @@
 		ringed = false,
 		marked = false,
 		phoneSize,
-		name
+		name,
+		status = null
 	}: Props = $props();
 
 	/** The URL that failed to load, so a new src gets its own try. */
@@ -42,34 +46,82 @@
 	const initials = $derived(name === undefined ? '' : initialsOf(name));
 </script>
 
-<span
-	class="face"
-	class:ringed
-	class:marked
-	class:initials={!showImage && initials !== ''}
-	style:--face-size="{size}px"
-	style:--face-phone-size={phoneSize === undefined ? undefined : `${String(phoneSize)}px`}
-	style:--face-overfill="{FACE_OVERFILL * 100}%"
-	style:--face-initials-scale={INITIALS_SCALE}
->
-	{#if showImage && sources}
-		<img
-			src={sources.src}
-			srcset={sources.srcset}
-			sizes={sources.sizes}
-			{alt}
-			{loading}
-			width={size}
-			height={size}
-			decoding="async"
-			onerror={() => (failed = src)}
-		/>
-	{:else if initials !== ''}
-		<span aria-hidden="true">{initials}</span>
-	{/if}
-</span>
+<!-- The wrapper that holds a status mark over the circle's edge is drawn only with a mark. -->
+{#snippet circle()}
+	<span
+		class="face"
+		class:ringed
+		class:marked
+		class:initials={!showImage && initials !== ''}
+		style:--face-size="{size}px"
+		style:--face-phone-size={phoneSize === undefined ? undefined : `${String(phoneSize)}px`}
+		style:--face-overfill="{FACE_OVERFILL * 100}%"
+		style:--face-initials-scale={INITIALS_SCALE}
+	>
+		{#if showImage && sources}
+			<img
+				src={sources.src}
+				srcset={sources.srcset}
+				sizes={sources.sizes}
+				{alt}
+				{loading}
+				width={size}
+				height={size}
+				decoding="async"
+				onerror={() => (failed = src)}
+			/>
+		{:else if initials !== ''}
+			<span aria-hidden="true">{initials}</span>
+		{/if}
+	</span>
+{/snippet}
+
+{#if status}
+	<span class="hold">
+		{@render circle()}
+		<span
+			class="status"
+			class:lg={(phoneSize ?? size) >= FACE_STATUS.largeFrom}
+			role="img"
+			aria-label={FACE_STATUS.words[status]}>{FACE_STATUS.marks[status]}</span
+		>
+	</span>
+{:else}
+	{@render circle()}
+{/if}
 
 <style>
+	.hold {
+		position: relative;
+		display: inline-grid;
+		flex: none;
+	}
+
+	/* A solid tag over the circle's top left edge, clear of the eyes, ringed in the surface so it
+	   parts from the photo. */
+	.status {
+		position: absolute;
+		top: -3px;
+		left: -6px;
+		padding: 1px 3px;
+		border-radius: var(--r-sm);
+		background: var(--status-ir-bg);
+		color: var(--status-ir-ink);
+		box-shadow: 0 0 0 1.5px var(--surface);
+		font-family: var(--font-ui);
+		font-weight: 700;
+		font-size: 9px;
+		line-height: 1;
+		letter-spacing: 0.04em;
+	}
+
+	.status.lg {
+		top: 4px;
+		left: 2px;
+		padding: 2px 5px;
+		font-size: 13px;
+	}
+
 	.face {
 		flex: none;
 		width: var(--face-size);

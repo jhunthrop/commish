@@ -45,5 +45,5 @@ func (s *Store) ProductFeatures(ctx context.Context) (map[Product][]Feature, err
 
 // AllFeatures is every feature in the contract's order.
 func AllFeatures() []Feature {
-	return []Feature{LiveDraftAdvisor, CustomScoring, FullReasoning, RangeOfOutcomes, SyncedSheet, EarlyRun, StartSit, WaiverRanks, TradeFinder}
+	return []Feature{LiveDraftAdvisor, CustomScoring, FullReasoning, RangeOfOutcomes, SyncedSheet, EarlyRun, StartSit, WaiverRanks, TradeFinder, ManyLeagues}
 }

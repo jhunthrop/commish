@@ -22,6 +22,12 @@ const MOCK_SETUP = '/mock/new';
 export const COMPANION_START = '/companion/new' as const;
 /** Where a league on another host is attached. */
 export const LEAGUE_START = '/league/new' as const;
+/** The anchor of the account page's Your leagues, where every league the account follows is. */
+export const LEAGUES_ANCHOR = 'your-leagues';
+/** The account page's search parameter for how many leagues were just followed: `?followed=2`. */
+export const FOLLOWED_PARAM = 'followed';
+/** Every league the account follows: the account page at Your leagues. */
+export const LEAGUES_LIST = `/account#${LEAGUES_ANCHOR}` as const;
 
 /** The rail, top to bottom. The phone shows every item not marked wideOnly along the bottom.
  * A page lights the item whose `owns` holds its first path segment: the board's companions (ADP,
@@ -80,30 +86,38 @@ export const RAIL: readonly RailItem[] = [
 ];
 
 /** Your league, on the rail for everyone after the cheat sheet: the in-season half of the rail. It
- * opens the account's newest league (account/rail-league.svelte.ts), or, with none yet or signed
- * out, the page that attaches one, which signed out leads to sign in. The phone's bar holds five, so
- * League has Our record's place there; Our record stays on the desk's rail. */
-export function leagueItem(leagueId: string | null): RailItem {
+ * opens the account's one league (account/rail-league.svelte.ts), the list of them when it follows
+ * more than one, or, with none yet or signed out, the page that attaches one, which signed out leads
+ * to sign in. The phone's bar holds five, so League has Our record's place there; Our record stays on
+ * the desk's rail. */
+export function leagueItem(account: RailAccount | null): RailItem {
+	const leagueId = account?.leagueId ?? null;
+	let href: string = LEAGUE_START;
+	if (leagueId !== null) {
+		href =
+			(account?.leagueCount ?? 0) > 1 ? LEAGUES_LIST : `/league/${encodeURIComponent(leagueId)}`;
+	}
 	return {
 		section: 'league',
 		label: 'League',
-		href: leagueId === null ? LEAGUE_START : `/league/${encodeURIComponent(leagueId)}`,
+		href,
 		icon: 'league',
 		wideOnly: false,
 		owns: ['league']
 	};
 }
 
-/** A signed-in account as the rail reads it: its newest attached league's id, or null with none. */
+/** A signed-in account as the rail reads it: its newest attached league's id, or null with none,
+ * and how many leagues it follows. */
 export interface RailAccount {
 	leagueId: string | null;
+	leagueCount: number;
 }
 
-/** The rail, with League opening the account's newest league once /me names one. */
+/** The rail, with League opening the account's league, or its leagues, once /me names them. */
 export function railItems(account: RailAccount | null): readonly RailItem[] {
-	const leagueId = account?.leagueId ?? null;
-	if (leagueId === null) return RAIL;
-	return RAIL.map((item) => (item.section === 'league' ? leagueItem(leagueId) : item));
+	if ((account?.leagueId ?? null) === null) return RAIL;
+	return RAIL.map((item) => (item.section === 'league' ? leagueItem(account) : item));
 }
 
 /** Pinned to the foot of the rail. */

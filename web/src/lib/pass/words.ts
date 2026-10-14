@@ -53,6 +53,10 @@ export const FEATURE_WORDS: Readonly<Record<Feature, FeatureWords>> = {
 	trade_finder: {
 		lead: 'Trades that help both teams',
 		text: 'two rosters side by side, with the players who make each team better'
+	},
+	many_leagues: {
+		lead: 'Follow every league you play in',
+		text: "each one kept up to date: your roster, this week's matchup and the players nobody holds"
 	}
 };
 
@@ -140,8 +144,8 @@ export const ALWAYS_FREE: readonly FeatureWords[] = [
 		text: 'ranks, tiers, tags and notes, on every device you sign in on'
 	},
 	{
-		lead: 'Your league',
-		text: "kept up to date: your roster, this week's matchup, the players nobody holds and every move"
+		lead: 'One league',
+		text: "yours, kept up to date: your roster, this week's matchup, the players nobody holds and every move"
 	}
 ];
 

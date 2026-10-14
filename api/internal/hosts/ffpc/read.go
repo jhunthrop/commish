@@ -16,11 +16,17 @@ type League struct {
 	Standings []Standing `json:"standings"`
 	Owners    []Owner    `json:"owners"`
 	Rosters   []Roster   `json:"rosters"`
-	Lineup    *Lineup    `json:"lineup"`
-	Schedule  []Week     `json:"schedule"`
-	Moves     []Move     `json:"moves"`
-	Rules     *Rules     `json:"rules"`
-	Missing   []string   `json:"missing"`
+	// OtherRosterColumns are rosters page headings we do not know: their
+	// players are rostered, unmarked, and the heading is worth naming.
+	OtherRosterColumns []string `json:"other_roster_columns,omitempty"`
+	Lineup             *Lineup  `json:"lineup"`
+	Schedule           []Week   `json:"schedule"`
+	Moves              []Move   `json:"moves"`
+	Rules              *Rules   `json:"rules"`
+	// Scoreboard is the live scoring page, read only in an all-play
+	// week, when it is where the member's score comes from.
+	Scoreboard *Scoreboard `json:"scoreboard,omitempty"`
+	Missing    []string    `json:"missing"`
 }
 
 // LeaguePages are the pages one league read takes, in the order read.
@@ -64,12 +70,23 @@ func Parse(pages map[PageName][]byte, official []byte) (League, error) {
 	}
 	read(PageStandings, func(p []byte) (err error) { l.Standings, err = ParseStandings(p); return })
 	read(PageOwners, func(p []byte) (err error) { l.Owners, err = ParseOwners(p); return })
-	read(PageRosters, func(p []byte) (err error) { l.Rosters, err = ParseRosters(p); return })
+	read(PageRosters, func(p []byte) error {
+		page, err := ParseRostersPage(p)
+		l.Rosters, l.OtherRosterColumns = page.Teams, page.OtherColumns
+		return err
+	})
 	read(PageSchedule, func(p []byte) (err error) { l.Schedule, err = ParseSchedule(p); return })
 	read(PageLineup, func(p []byte) error {
 		lineup, err := ParseLineup(p)
 		if err == nil {
 			l.Lineup = &lineup
+		}
+		return err
+	})
+	read(PageScoreboard, func(p []byte) error {
+		board, err := ParseScoreboard(p)
+		if err == nil {
+			l.Scoreboard = &board
 		}
 		return err
 	})
@@ -102,6 +119,16 @@ func (m *Member) ReadLeague(ctx context.Context, accountID uuid.UUID, ltuid stri
 	if err != nil {
 		return League{}, err
 	}
+	if allPlayNow(pages) {
+		// One more page, only in an all-play week: the schedule lists no
+		// game, so the member's score is read from the scoring page.
+		// Its failure leaves the score unread, never the league.
+		if more, err := m.Pages(ctx, accountID, ltuid, PageScoreboard); err == nil {
+			pages[PageScoreboard] = more[PageScoreboard]
+		} else {
+			m.Log.Warn("ffpc: scoreboard", "err", err)
+		}
+	}
 	var official []byte
 	if rules {
 		if r, err := ParseRules(pages[PageRules]); err == nil && len(r.Scoring) == 0 && r.OfficialRules != "" {
@@ -112,6 +139,24 @@ func (m *Member) ReadLeague(ctx context.Context, accountID uuid.UUID, ltuid stri
 		}
 	}
 	return Parse(pages, official)
+}
+
+// allPlayNow says the schedule sets the lineup page's week as all-play.
+func allPlayNow(pages map[PageName][]byte) bool {
+	lineup, err := ParseLineup(pages[PageLineup])
+	if err != nil || lineup.Week == 0 {
+		return false
+	}
+	weeks, err := ParseSchedule(pages[PageSchedule])
+	if err != nil {
+		return false
+	}
+	for _, w := range weeks {
+		if w.Number == lineup.Week {
+			return w.AllPlay
+		}
+	}
+	return false
 }
 
 // ReadDraft reads the member's draft board as them.

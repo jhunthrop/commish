@@ -4,7 +4,6 @@
 	import { railLeague } from '#lib/account/rail-league.svelte.ts';
 	import Icon from './Icon.svelte';
 	import Stamp from './Stamp.svelte';
-	import ThemeSwitch from './ThemeSwitch.svelte';
 	import {
 		HOME_HREF,
 		RAIL_FOOT,
@@ -25,9 +24,8 @@
 		active?: Section | null;
 		/** The top bar's search, usually a Search. */
 		search?: Snippet;
-		/** The top bar's right end, after the theme switch: the page's verb or a quiet action. On the
-		 * phone the switch lives in the account room, so the bar holds only the account, the verb and
-		 * search. */
+		/** The top bar's right end: the page's verb or a quiet action. The theme switch lives in the
+		 * account room at every width, so the bar holds only the account, the verb and search. */
 		tail?: Snippet;
 		children: Snippet;
 	}
@@ -76,7 +74,6 @@
 				><Icon name={RAIL_FOOT.icon} /></a
 			>
 			<div class="tail">
-				<span class="theme"><ThemeSwitch /></span>
 				{@render tail?.()}
 			</div>
 		</header>
@@ -198,10 +195,6 @@
 		display: flex;
 	}
 
-	.theme {
-		display: contents;
-	}
-
 	.tail {
 		margin-left: auto;
 		display: flex;
@@ -278,10 +271,6 @@
 			display: none;
 		}
 
-		.theme {
-			display: none;
-		}
-
 		.stamp {
 			grid-area: stamp;
 			margin-left: 0;
@@ -298,8 +287,8 @@
 			justify-content: flex-end;
 		}
 
-		/* A tail holding only the theme switch (hidden here) takes no row under a date. */
-		.tail:not(:has(> :not(.theme))) {
+		/* An empty tail takes no row under a date. */
+		.tail:not(:has(*)) {
 			display: none;
 		}
 

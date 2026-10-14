@@ -72,3 +72,32 @@ func (s *PGSource) FirstKickoff(ctx context.Context, seasonYear int) (time.Time,
 	}
 	return first, !first.IsZero(), nil
 }
+
+// WeekAt is the NFL week a moment falls in, from the provider's schedule
+// the board reads: a week runs from the day after the previous week's
+// last game day to the end of its own last game day, Eastern. false when
+// the season's schedule is not loaded or the moment is past its last week.
+func (s *PGSource) WeekAt(ctx context.Context, seasonYear int, at time.Time) (int, bool, error) {
+	rows, err := s.Pool.Query(ctx, `select week, max(game_date) from `+s.table("provider_games")+`
+		where season = $1 and game_date is not null group by week order by week`, seasonYear)
+	if err != nil {
+		return 0, false, fmt.Errorf("boards: week at %d: %w", seasonYear, err)
+	}
+	defer rows.Close()
+	east := season.Eastern()
+	for rows.Next() {
+		var week int
+		var last time.Time
+		if err := rows.Scan(&week, &last); err != nil {
+			return 0, false, fmt.Errorf("boards: week at %d: %w", seasonYear, err)
+		}
+		end := time.Date(last.Year(), last.Month(), last.Day()+1, 0, 0, 0, 0, east)
+		if at.Before(end) {
+			return week, true, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, false, fmt.Errorf("boards: week at %d: %w", seasonYear, err)
+	}
+	return 0, false, nil
+}

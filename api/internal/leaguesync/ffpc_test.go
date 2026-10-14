@@ -16,6 +16,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
+	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/hosts"
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
 	"github.com/jhunthrop/commish/api/internal/leagues"
@@ -42,6 +43,7 @@ func fixtureLeagueRead(t *testing.T) ffpc.League {
 		ffpc.PageLeagueHome: read("ffpc-league-home.html"), ffpc.PageStandings: read("ffpc-standings.html"),
 		ffpc.PageRosters: read("ffpc-rosters.html"), ffpc.PageLineup: read("ffpc-team-lineup.html"),
 		ffpc.PageSchedule: read("ffpc-schedule.html"), ffpc.PageOwners: read("ffpc-owners.html"), ffpc.PageRules: read("ffpc-rules.html"),
+		ffpc.PageScoreboard: read("ffpc-scoreboard.html"),
 	}
 	l, err := ffpc.Parse(pages, read("public-big-gorilla-official-rules.html"))
 	if err != nil {
@@ -55,7 +57,7 @@ func fixtureLeagueRead(t *testing.T) ffpc.League {
 
 func TestFFPCSnapshotFromTheFixtures(t *testing.T) {
 	now := time.Date(2026, 10, 13, 14, 0, 0, 0, time.UTC)
-	snap := ffpcSnapshot(fixtureLeagueRead(t), now)
+	snap := ffpcSnapshot(fixtureLeagueRead(t), now, 6)
 	if snap.Ref.Key() != "ffpc/2026/104870" || snap.Season != 2026 || snap.Week != 6 || len(snap.Teams) != 12 {
 		t.Fatalf("league %s season %d week %d, %d teams", snap.Ref.Key(), snap.Season, snap.Week, len(snap.Teams))
 	}
@@ -76,6 +78,19 @@ func TestFFPCSnapshotFromTheFixtures(t *testing.T) {
 	if NearestPreset(snap.Scoring.Rules) != apitypes.ScoringPresetTePremium {
 		t.Fatalf("scores like %s", NearestPreset(snap.Scoring.Rules))
 	}
+	// Week 6 is an all-play week on FFPC's schedule ("All Play Week", no
+	// games listed): the member's side stands alone with their starters,
+	// scored from the scoring page (0.00, read).
+	if !snap.AllPlay || len(snap.Matchups) != 1 || snap.Matchups[0].RosterID != 11 || len(snap.Matchups[0].Starters) != 10 ||
+		snap.Matchups[0].PointsUnread {
+		t.Fatalf("week 6: all play %v, sides %+v", snap.AllPlay, snap.Matchups)
+	}
+	// Without the scoring page the side says its score was not read.
+	unscored := fixtureLeagueRead(t)
+	unscored.Scoreboard = nil
+	if side := ffpcSnapshot(unscored, now, 6).Matchups[0]; !side.PointsUnread {
+		t.Fatalf("an unread score read as %+v", side)
+	}
 	want := Shape{Teams: 12, QB: 1, RB: 2, WR: 2, TE: 1, K: 1, DEF: 1, Flex: 2, Bench: 10}
 	if snap.Shape.Teams != want.Teams || snap.Shape.Bench != want.Bench || snap.Shape.Flex != want.Flex || len(snap.Shape.Unfollowed) != 0 {
 		t.Fatalf("shape %+v", snap.Shape)
@@ -85,10 +100,6 @@ func TestFFPCSnapshotFromTheFixtures(t *testing.T) {
 	}
 	if len(snap.Moves) != 4 || snap.Moves[0].Kind != MoveAdd || len(snap.Moves[0].Adds) != 1 {
 		t.Fatalf("moves %+v", snap.Moves)
-	}
-	// The week is the all-play week: no head-to-head games.
-	if len(snap.Matchups) != 0 {
-		t.Fatalf("matchups %+v", snap.Matchups)
 	}
 	for _, id := range namedPlayers(snap) {
 		if p, ok := snap.Players[id]; !ok || p.Name == "" || p.Position == "" {
@@ -160,7 +171,8 @@ func TestAttachFFPC(t *testing.T) {
 	svc := &Service{
 		Hosts: hostList, Poller: &Poller{Hosts: hostList, Store: store, Now: clock.Now, Log: quietLog()},
 		Admission: &Admission{Now: clock.Now}, Players: memoryPlayers{hostList}, Links: store,
-		Saved: &leagues.Store{Pool: pool}, Boards: smallBoard{}, FFPC: host, Now: clock.Now, Log: quietLog(),
+		Saved: &leagues.Store{Pool: pool}, Boards: smallBoard{}, FFPC: host, Entitlements: &entitlements.Store{Pool: pool},
+		Now: clock.Now, Log: quietLog(),
 	}
 	a, b := caller{t, svc, alice.ID}, caller{t, svc, bob.ID}
 	ffpcHost := apitypes.LeagueHostFfpc
@@ -200,9 +212,14 @@ func TestAttachFFPC(t *testing.T) {
 	if got.Roster[0].Slot != apitypes.RosterSpotSlotStarter {
 		t.Fatalf("the member's own starters: %+v", got.Roster[0])
 	}
-	scrubbed := ownLineupOnly(ffpcSnapshot(fixtureLeagueRead(t), clock.now), 3)
+	scrubbed := ownLineupOnly(ffpcSnapshot(fixtureLeagueRead(t), clock.now, 6), 3)
 	if me, _ := scrubbed.TeamByRoster(11); len(me.Starters) != 0 {
 		t.Fatalf("team 3's view shows team 11's starters: %v", me.Starters)
+	}
+	for _, side := range scrubbed.Matchups {
+		if side.RosterID != 3 && len(side.Starters) != 0 {
+			t.Fatalf("team 3's view shows team %d's matchup starters", side.RosterID)
+		}
 	}
 
 	if err := (&hosts.Store{Pool: pool}).Delete(ctx, alice.ID, ffpc.Host); err != nil {

@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jhunthrop/commish/api/internal/config"
+	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
@@ -23,7 +25,13 @@ func runFFPCRefresh(ctx context.Context, log *slog.Logger, cfg config.API, pool 
 		return err
 	}
 	store := &leaguesync.Store{Pool: pool}
-	host := ff.host(store)
+	// The run's schedule answers the league's current week.
+	board, closeBoard, err := draftroom.OpenBoards(pool, cfg.Board, time.Now)
+	if err != nil {
+		return err
+	}
+	defer closeBoard()
+	host := ff.host(store, board.Schedule, log)
 	if host == nil {
 		log.Warn("ffpc is off", "effect", "no FFPC league read")
 		return nil

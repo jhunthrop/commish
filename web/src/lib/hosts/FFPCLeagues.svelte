@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import ActionBar from '#lib/ui/ActionBar.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -13,21 +13,31 @@
 		hostsApi,
 		needsSignIn,
 		notConnected,
-		type HostLeague
+		type HostLeague,
+		type PickAnswer
 	} from './api.ts';
 
-	/** FFPC as a way in: sign in once on our form, then tap your league and the verb. A connection
+	/** FFPC as a way in: sign in once on our form, then tap your leagues and the verb. A connection
 	 * FFPC has signed out asks for the sign-in again. Used by the league and companion pages. */
 	interface Props {
-		/** The verb under the list: "Follow my league", "Follow my draft". */
-		verb: string;
-		onpick: (league: HostLeague) => Promise<void>;
+		/** The verb under the list for a count of chosen leagues: "Follow my leagues". */
+		verb: (count: number) => string;
+		/** The chosen leagues, in the list's order. */
+		onpick: (leagues: HostLeague[]) => Promise<PickAnswer | null>;
 		/** Offer a league number typed by hand too: a draft still running may not be on FFPC's list of
 		 * finished drafts. */
 		typed?: boolean;
+		/** How many leagues can be chosen at once: 1 is a single choice, more is the many-choice group
+		 * with every league starting chosen, 0 is none (each chip shown, none to take). */
+		most?: number;
+		/** Leagues already followed, by FFPC league id, to our league's page: shown as such, never
+		 * chosen again. */
+		followed?: ReadonlyMap<string, string>;
+		/** A line under the chips, like what more leagues come with. */
+		limit?: Snippet;
 	}
 
-	let { verb, onpick, typed = false }: Props = $props();
+	let { verb, onpick, typed = false, most = 1, followed = new Map(), limit }: Props = $props();
 
 	type View = 'loading' | 'off' | 'signin' | 'again' | 'leagues' | 'unreachable';
 
@@ -35,11 +45,18 @@
 
 	let view = $state<View>('loading');
 	let leagues = $state<HostLeague[]>([]);
-	let picked = $state<string | null>(null);
+	let picked = $state<readonly string[]>([]);
 	let busy = $state(false);
-	let problem = $state<string | null>(null);
+	let problems = $state<readonly string[]>([]);
+	let status = $state<string | null>(null);
 	/** Why the sign-in is asked for again, in the API's own words. */
 	let reason = $state('FFPC signed you out. Sign in again to keep reading your leagues.');
+
+	const many = $derived(most > 1);
+	/** The leagues still to follow, in the list's order. */
+	const open = $derived(leagues.filter((l) => !followed.has(l.league_id)));
+	/** What is chosen now: a league followed since it was tapped drops out. */
+	const chosen = $derived(open.filter((l) => picked.includes(l.league_id)));
 
 	/** A 409 asks for the sign-in again with the API's sentence as the reason. */
 	function signInAgain(error: unknown): void {
@@ -83,39 +100,65 @@
 		return league.record ? `${league.name}, ${recordWords(league.record)}` : league.name;
 	}
 
+	/** Who starts chosen: every league to follow, up to the most, when several can be; the one
+	 * league when there is exactly one; nobody otherwise. */
+	function firstPick(list: readonly HostLeague[]): string[] {
+		const ids = list.filter((l) => !followed.has(l.league_id)).map((l) => l.league_id);
+		if (many) return ids.slice(0, most);
+		return most === 1 && ids.length === 1 ? ids : [];
+	}
+
 	function connected(list: HostLeague[]): void {
 		leagues = list;
-		picked = list.length === 1 ? (list[0]?.league_id ?? null) : null;
+		picked = firstPick(list);
 		view = 'leagues';
+	}
+
+	function tap(id: string): void {
+		if (!many) {
+			picked = [id];
+			return;
+		}
+		if (picked.includes(id)) picked = picked.filter((p) => p !== id);
+		else if (chosen.length < most) picked = [...picked, id];
 	}
 
 	const LEAGUE_NUMBER = /^[0-9]{1,12}$/;
 
-	function chosen(): HostLeague | undefined {
+	function toFollow(): HostLeague[] {
 		const n = number.trim();
 		if (typed && LEAGUE_NUMBER.test(n)) {
-			return { league_id: n, name: `FFPC league ${n}`, team_name: '', record: '' };
+			return [{ league_id: n, name: `FFPC league ${n}`, team_name: '', record: '' }];
 		}
-		return leagues.find((l) => l.league_id === picked);
+		return chosen;
 	}
 
 	async function go(): Promise<void> {
-		const league = chosen();
-		if (!league || busy) return;
+		const list = toFollow();
+		if (list.length === 0 || busy) return;
 		busy = true;
-		problem = null;
+		problems = [];
+		status = null;
 		try {
-			await onpick(league);
+			const answer = await onpick(list);
+			if (answer !== null) {
+				status = answer.status;
+				problems = answer.problems;
+			}
 		} catch (error) {
 			if (needsSignIn(error)) {
 				signInAgain(error);
 			} else {
-				problem = error instanceof ApiError ? error.message : 'That did not go through. Try again.';
+				problems = [
+					error instanceof ApiError ? error.message : 'That did not go through. Try again.'
+				];
 			}
 		} finally {
 			busy = false;
 		}
 	}
+
+	const count = $derived(toFollow().length);
 </script>
 
 {#if view === 'loading'}
@@ -131,16 +174,31 @@
 {:else if leagues.length === 0 && !typed}
 	<p class="line">Your FFPC account has no league with a finished draft yet.</p>
 {:else}
-	<ChipGroup label="Your FFPC league" variant="loose">
+	<ChipGroup
+		label={many ? 'Your FFPC leagues' : 'Your FFPC league'}
+		variant="loose"
+		choose={many ? 'many' : 'one'}
+	>
 		{#each leagues as league (league.league_id)}
-			<Chip
-				pressed={picked === league.league_id}
-				onclick={() => (picked = league.league_id)}
-				label={`${league.name}, as ${league.team_name}, ${recordWords(league.record)}`}
-				>{chipWords(league)}</Chip
-			>
+			{@const page = followed.get(league.league_id)}
+			{#if page}
+				<Chip
+					href={page}
+					label={`${league.name}, as ${league.team_name}, ${recordWords(league.record)}, following`}
+					>{chipWords(league)}, following</Chip
+				>
+			{:else}
+				<Chip
+					pressed={chosen.some((l) => l.league_id === league.league_id)}
+					disabled={most === 0}
+					onclick={() => tap(league.league_id)}
+					label={`${league.name}, as ${league.team_name}, ${recordWords(league.record)}`}
+					>{chipWords(league)}</Chip
+				>
+			{/if}
 		{/each}
 	</ChipGroup>
+	{#if limit && open.length > most}{@render limit()}{/if}
 	{#if typed}
 		<Field
 			label="Or your FFPC league number"
@@ -149,15 +207,16 @@
 			onenter={() => void go()}
 		/>
 	{/if}
-	<ActionBar alert={problem ? alert : undefined}>
-		<Verb disabled={(picked === null && number.trim() === '') || busy} onclick={() => void go()}
-			>{verb}</Verb
-		>
-	</ActionBar>
+	{#if open.length > 0 || typed}
+		<ActionBar alert={problems.length > 0 || status ? alert : undefined}>
+			<Verb disabled={count === 0 || busy} onclick={() => void go()}>{verb(count)}</Verb>
+		</ActionBar>
+	{/if}
 {/if}
 
 {#snippet alert()}
-	<ProblemLine>{problem}</ProblemLine>
+	{#if status}<p class="line" role="status">{status}</p>{/if}
+	{#each problems as problem, i (i)}<ProblemLine>{problem}</ProblemLine>{/each}
 {/snippet}
 
 <style>

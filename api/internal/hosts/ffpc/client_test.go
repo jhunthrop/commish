@@ -36,6 +36,21 @@ type fakeFFPC struct {
 	// ignoreSignIn answers a right sign-in with the form again and no
 	// refusal, as a sign-in FFPC drops without saying why.
 	ignoreSignIn bool
+	// headToHead serves the schedule with week 6 as a head-to-head week
+	// (its all-play mark taken out).
+	headToHead bool
+	// scoreboardDown answers the scoring page with a server error.
+	scoreboardDown bool
+	// scoreboards counts requests for the scoring page.
+	scoreboards int
+}
+
+// leaguePages are the captured league pages the stand-in serves to a
+// signed-in member, by path.
+var leaguePages = map[string]string{
+	"/LeagueHome.aspx": "ffpc-league-home.html", "/Rosters.aspx": "ffpc-rosters.html",
+	"/SetLineup.aspx": "ffpc-team-lineup.html", "/Schedule.aspx": "ffpc-schedule.html",
+	"/Owners.aspx": "ffpc-owners.html", "/Scoreboard.aspx": "ffpc-scoreboard.html",
 }
 
 // The stand-in's own cookies: the server session the form is issued
@@ -119,9 +134,33 @@ func (f *fakeFFPC) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/Standings.aspx":
 		page, _ := os.ReadFile(filepath.Join("testdata", "ffpc-standings.html"))
 		_, _ = w.Write(page)
+	case leaguePages[r.URL.Path] != "" && (!signedIn || f.stillOut):
+		http.Redirect(w, r, "/MyTeams.aspx", http.StatusFound)
+	case leaguePages[r.URL.Path] != "":
+		f.leaguePage(w, r.URL.Path)
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+// leaguePage serves one captured league page, as the stand-in's switches
+// shape it.
+func (f *fakeFFPC) leaguePage(w http.ResponseWriter, path string) {
+	if path == "/Scoreboard.aspx" {
+		f.mu.Lock()
+		f.scoreboards++
+		down := f.scoreboardDown
+		f.mu.Unlock()
+		if down {
+			http.Error(w, "down", http.StatusInternalServerError)
+			return
+		}
+	}
+	page, _ := os.ReadFile(filepath.Join("testdata", leaguePages[path]))
+	if path == "/Schedule.aspx" && f.headToHead {
+		page = []byte(strings.Replace(string(page), " All Play Week", "", 1))
+	}
+	_, _ = w.Write(page)
 }
 
 func testClient(t *testing.T) (*Client, *fakeFFPC) {

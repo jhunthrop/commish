@@ -2,12 +2,26 @@ import { getContext, setContext } from 'svelte';
 
 const CHIP_GROUP = Symbol('chip-group');
 
-/** A joined ChipGroup tells its chips they sit on its track, so they drop their own outline.
- * A loose group says so too, so a loose group nested in a joined one resets it. */
-export function markChipGroup(joined: boolean): void {
-	setContext(CHIP_GROUP, joined);
+/** What a ChipGroup tells its chips. joined: they sit on its track, so they drop their own outline
+ * (a loose group says so too, so a loose group nested in a joined one resets it). many: the group
+ * holds any number of choices, so a chip marks itself chosen with a check, not by fill alone. */
+export interface ChipGroupMark {
+	joined: boolean;
+	many: boolean;
+}
+
+export function markChipGroup(mark: ChipGroupMark): void {
+	setContext(CHIP_GROUP, mark);
+}
+
+function chipGroup(): ChipGroupMark | undefined {
+	return getContext<ChipGroupMark | undefined>(CHIP_GROUP);
 }
 
 export function inChipGroup(): boolean {
-	return getContext<boolean | undefined>(CHIP_GROUP) === true;
+	return chipGroup()?.joined === true;
+}
+
+export function inManyChipGroup(): boolean {
+	return chipGroup()?.many === true;
 }

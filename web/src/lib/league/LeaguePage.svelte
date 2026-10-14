@@ -13,17 +13,29 @@
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import { listWords } from '#lib/format/list.ts';
 	import { plural } from '#lib/format/number.ts';
-	import { presetWords } from '#lib/room/setup/scoring.ts';
 	import { droppedKinds } from './scoring-words.ts';
 	import FFPCSignIn from '#lib/hosts/FFPCSignIn.svelte';
-	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
+	import { ApiError, leagueApi, type AttachedLeague, type LeagueSync } from './api.ts';
+	import LeagueTitle from './LeagueTitle.svelte';
 	import { loadBoard, type LeagueBoard } from './board.ts';
 	import MatchupPanel from './MatchupPanel.svelte';
 	import MovesPanel from './MovesPanel.svelte';
 	import RosterPanel from './RosterPanel.svelte';
 	import StandingsStrip from './StandingsStrip.svelte';
 	import WaiverPool from './WaiverPool.svelte';
-	import { POLL_MS, hostWords, myPlace, myTeam, poolRows, readLine, recordWords } from './model.ts';
+	import {
+		POLL_MS,
+		figuresLine,
+		hostWords,
+		missingFromRun,
+		myPlace,
+		myTeam,
+		poolBasis,
+		poolRows,
+		readLine,
+		recordWords,
+		seasonStarted
+	} from './model.ts';
 
 	/** One attached league: read on open and once a minute while open (the API reads the host at most
 	 * once a minute whatever the number of viewers), and again on the drafter's one tap. Everything is
@@ -43,6 +55,8 @@
 	/** The run's board file could not be read; cleared when one loads. */
 	let boardFailed = $state(false);
 	let refreshing = $state(false);
+	/** Every league the account follows, for the title's switch; empty until read or when it fails. */
+	let followed = $state<readonly AttachedLeague[]>([]);
 	let now = $state(new Date());
 
 	function take(answer: LeagueSync): void {
@@ -99,6 +113,10 @@
 	onMount(() => {
 		void lazySheet.load();
 		void read();
+		leagueApi
+			.attached()
+			.then((list) => (followed = list))
+			.catch(() => (followed = []));
 		const timer = setInterval(() => void read(), POLL_MS);
 		return () => clearInterval(timer);
 	});
@@ -110,11 +128,16 @@
 	}
 
 	const here = $derived(links.league(id));
+	/** The waiver pool's place on the page, one tap from the top on a phone. */
+	const POOL_ANCHOR = 'waiver-pool';
 	const dropped = $derived(sync ? droppedKinds(sync.scoring_dropped) : []);
 	const team = $derived(sync ? myTeam(sync) : undefined);
-	/** What every row's numbers are: the season's first, then the preseason board's. */
+	/** What every number on the page is, said once under the title: the scoring, the season's
+	 * figures, then the preseason board's. */
 	const basis = $derived(
-		board ? `${board.seasonBasis} Proj and over repl are our preseason board's: ${board.basis}` : ''
+		board && sync
+			? `${figuresLine(board.seasonScoring, sync.scoring_like)} ${board.seasonBasis} Proj and over repl are our preseason board's.`
+			: ''
 	);
 </script>
 
@@ -169,9 +192,11 @@
 		<main class="league">
 			<header class="lead">
 				<div class="title">
-					<DisplayTitle size="page"
-						>{sync.name || `Your ${hostWords(sync.host)} league`}</DisplayTitle
-					>
+					<LeagueTitle
+						{id}
+						name={sync.name || `Your ${hostWords(sync.host)} league`}
+						leagues={followed}
+					/>
 					<p class="sub">
 						{#if team}
 							{team.name}, {recordWords(team)}, {myPlace(sync)} of {sync.teams.length}.
@@ -179,10 +204,14 @@
 						<span class="read" role="status">{readLine(sync, now)}</span>
 					</p>
 				</div>
-				<Quiet size="sm" disabled={refreshing} onclick={() => void refresh()}
-					>{refreshing ? 'Reading' : `Read ${hostWords(sync.host)} now`}</Quiet
-				>
+				<div class="reads">
+					<span class="jump"><Quiet size="sm" href={`#${POOL_ANCHOR}`}>Waiver pool</Quiet></span>
+					<Quiet size="sm" disabled={refreshing} onclick={() => void refresh()}
+						>{refreshing ? 'Reading' : `Read ${hostWords(sync.host)} now`}</Quiet
+					>
+				</div>
 			</header>
+			{#if basis}<p class="basis">{basis}</p>{/if}
 			{#if problem}
 				<Panel edge="loss" padding="sm"><ProblemLine>{problem}</ProblemLine></Panel>
 			{/if}
@@ -190,48 +219,52 @@
 				<!-- The read line says no one is signed in: the sign-in that mends it sits under it. -->
 				<FFPCSignIn onconnected={() => void refresh()} />
 			{/if}
-			<StandingsStrip teams={sync.teams} me={sync.me} />
+			<StandingsStrip teams={sync.teams} me={sync.me} host={sync.host} />
 			<div class="grid">
 				<div class="col">
-					<MatchupPanel {sync} {board} {tagsOf} />
-					<RosterPanel roster={sync.roster} {board} {tagsOf} {basis} />
+					<MatchupPanel {sync} {board} {tagsOf} {now} />
+					<RosterPanel roster={sync.roster} {board} {tagsOf} host={sync.host} />
+					<footer class="foot">
+						{#if sync.settings_league_id}
+							<Footnote>
+								Your league's roster and scoring are saved for mock drafts, under its name in your
+								saved leagues.
+								{#if dropped.length > 0}
+									Mock drafts use them except {listWords(dropped)}.
+								{/if}
+								{#if sync.scoring_defaulted.length > 0}
+									For {plural(sync.scoring_defaulted.length, 'rule')} your league does not state, they
+									use our standard points.
+								{/if}
+							</Footnote>
+							<Quiet href={links.mockLeague(sync.settings_league_id)} size="sm"
+								>Start a mock draft</Quiet
+							>
+						{:else if sync.settings_note}
+							<Footnote>{sync.settings_note}</Footnote>
+						{/if}
+
+						{#if sync.placement.unplaced > 0}
+							<Footnote>
+								{sync.placement.unplaced} rostered
+								{sync.placement.unplaced === 1 ? 'player is' : 'players are'} not on our board, so the
+								waiver pool cannot rule them out.
+							</Footnote>
+						{/if}
+					</footer>
 				</div>
 				<div class="col">
-					<WaiverPool rows={poolRows(board, sync)} {tagsOf} {basis} />
+					<div id={POOL_ANCHOR} class="anchor"></div>
+					<WaiverPool
+						rows={poolRows(board, sync)}
+						{tagsOf}
+						basis={poolBasis(board)}
+						inSeason={seasonStarted(board)}
+						missing={missingFromRun(sync, board)}
+					/>
 					<MovesPanel {sync} />
 				</div>
 			</div>
-			<footer class="foot">
-				{#if sync.settings_league_id}
-					<Footnote>
-						Your league's roster and scoring are saved for mock drafts, under its name in your saved
-						leagues. It scores like {presetWords(sync.scoring_like)}.
-					</Footnote>
-					<Quiet href={links.mockLeague(sync.settings_league_id)} size="sm"
-						>Start a mock draft</Quiet
-					>
-				{:else if sync.settings_note}
-					<Footnote>{sync.settings_note}</Footnote>
-				{/if}
-				{#if dropped.length > 0}
-					<Footnote>
-						Your league also scores {listWords(dropped)}, which mock drafts do not use yet.
-					</Footnote>
-				{/if}
-				{#if sync.scoring_defaulted.length > 0}
-					<Footnote>
-						For {plural(sync.scoring_defaulted.length, 'rule')} your league does not state, mock drafts
-						use our standard points.
-					</Footnote>
-				{/if}
-				{#if sync.placement.unplaced > 0}
-					<Footnote>
-						{sync.placement.unplaced} rostered
-						{sync.placement.unplaced === 1 ? 'player is' : 'players are'} not on our board, so the waiver
-						pool cannot rule them out.
-					</Footnote>
-				{/if}
-			</footer>
 		</main>
 	{:else}
 		<div class="reserve"></div>
@@ -239,6 +272,33 @@
 </Shell>
 
 <style>
+	.reads {
+		display: flex;
+		align-items: center;
+		gap: var(--s-3);
+	}
+
+	.jump {
+		display: none;
+	}
+
+	.anchor {
+		scroll-margin-top: var(--s-6);
+	}
+
+	@media (max-width: 760px) {
+		.jump {
+			display: contents;
+		}
+	}
+
+	.basis {
+		margin: 0;
+		max-width: 90ch;
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+	}
+
 	.pad {
 		padding: var(--s-4) var(--s-5) 0;
 	}

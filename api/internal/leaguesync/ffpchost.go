@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"sync"
@@ -41,10 +42,16 @@ type FFPCReaders interface {
 type FFPC struct {
 	Member  FFPCMember
 	Readers FFPCReaders
-	Now     func() time.Time
+	// Weeks is the run's schedule, the source of the current week; nil
+	// falls back to FFPC's own week.
+	Weeks WeekSource
+	Now   func() time.Time
+	Log   *slog.Logger
 
 	mu    sync.Mutex
 	rules map[string]rulesEntry
+	// columns are the unknown rosters headings already logged.
+	columns sync.Map
 }
 
 type rulesEntry struct {
@@ -102,8 +109,51 @@ func (f *FFPC) ReadAs(ctx context.Context, accountID uuid.UUID, ltuid string) (S
 	if err != nil {
 		return Snapshot{}, 0, ffpcErr(err)
 	}
-	snap := ffpcSnapshot(l, f.Now())
+	f.nameColumns(l.OtherRosterColumns)
+	snap := ffpcSnapshot(l, f.Now(), f.week(ctx, l))
 	return snap, l.Banner.TeamID, nil
+}
+
+// nameColumns logs, once per process, each rosters page heading we do
+// not know: its players are rostered with no mark, and the heading says
+// what the page has grown.
+func (f *FFPC) nameColumns(headings []string) {
+	for _, h := range headings {
+		if _, seen := f.columns.LoadOrStore(h, true); !seen {
+			f.warn("leaguesync: ffpc rosters column we do not know", "heading", h)
+		}
+	}
+}
+
+// WeekSource is the NFL week a moment falls in, from the run's schedule.
+// *boards.PGSource implements it.
+type WeekSource interface {
+	WeekAt(ctx context.Context, season int, at time.Time) (int, bool, error)
+}
+
+// week is the league's current week: the run's, from its kickoffs, with
+// FFPC's own (its lineup page, else its schedule) as the cross-check,
+// logged when the two differ, and the answer when the run has none.
+func (f *FFPC) week(ctx context.Context, l ffpc.League) int {
+	own := ffpcWeek(l, f.Now())
+	if f.Weeks == nil || l.Banner.Season == 0 {
+		return own
+	}
+	run, ok, err := f.Weeks.WeekAt(ctx, l.Banner.Season, f.Now())
+	if err != nil || !ok {
+		f.warn("leaguesync: ffpc week from the run", "league", l.Banner.LeagueID, "ok", ok, "err", err)
+		return own
+	}
+	if run != own {
+		f.warn("leaguesync: ffpc week differs from the run's", "league", l.Banner.LeagueID, "ffpc", own, "run", run)
+	}
+	return run
+}
+
+func (f *FFPC) warn(msg string, args ...any) {
+	if f.Log != nil {
+		f.Log.Warn(msg, args...)
+	}
 }
 
 func (f *FFPC) read(ctx context.Context, accountID uuid.UUID, ltuid string) (ffpc.League, error) {

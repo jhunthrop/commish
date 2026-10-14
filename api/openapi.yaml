@@ -188,7 +188,8 @@ paths:
         Attach the drafter's own league on another host by its link. Free. The league's roster and scoring become a
         saved league (custom scoring, exactly as the host states it) a mock reruns from, when a mock room can draft
         its shape. The drafter's seat is the team their Sleeper username runs, or the team they pick. Attaching the
-        same league again updates the seat.
+        same league again updates the seat. One live league is free; a second needs the many_leagues feature
+        (the Draft Pass or the Membership), refused with 403 naming it. A detached league does not count.
       security: [{ session: [] }]
       requestBody:
         required: true
@@ -198,6 +199,7 @@ paths:
       responses:
         "201": { $ref: "#/components/responses/LeagueSyncResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
@@ -234,10 +236,13 @@ paths:
     post:
       tags: [league-sync]
       operationId: restoreLeague
-      summary: Undo a detach. The league is followed again with the seat and saved league it had.
+      summary: >-
+        Undo a detach. The league is followed again with the seat and saved league it had. Like an attach, a second
+        live league needs the many_leagues feature (403 naming it).
       security: [{ session: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
+        "403": { $ref: "#/components/responses/ErrorResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
         "409": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/sync:
@@ -1345,7 +1350,7 @@ components:
 
     Feature:
       type: string
-      enum: [live_draft_advisor, custom_scoring, full_reasoning, range_of_outcomes, synced_sheet, early_run, start_sit, waiver_ranks, trade_finder]
+      enum: [live_draft_advisor, custom_scoring, full_reasoning, range_of_outcomes, synced_sheet, early_run, start_sit, waiver_ranks, trade_finder, many_leagues]
     Product:
       type: string
       enum: [draft_pass, membership, group_pass]
@@ -1355,7 +1360,7 @@ components:
 
     Account:
       type: object
-      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, league_id, created_at]
+      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, league_id, league_count, created_at]
       properties:
         id: { type: string, format: uuid }
         email: { type: string }
@@ -1364,6 +1369,9 @@ components:
           format: uuid
           nullable: true
           description: the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
+        league_count:
+          type: integer
+          description: how many leagues the account follows now (detached ones not counted); more than one, the rail's League opens the list
         first_name: { type: string, nullable: true }
         last_name: { type: string, nullable: true }
         handle:
@@ -2232,7 +2240,7 @@ components:
         seat_by_username: { type: boolean, description: whether the host finds a seat by username (Sleeper does) }
     AttachedLeague:
       type: object
-      required: [id, host, host_league_id, season, name, roster_id, team_name, attached_at]
+      required: [id, host, host_league_id, season, name, roster_id, team_name, standing, attached_at]
       properties:
         id: { type: string, format: uuid }
         host: { $ref: "#/components/schemas/LeagueHost" }
@@ -2241,7 +2249,20 @@ components:
         name: { type: string, description: the league's name at its last read }
         roster_id: { type: integer }
         team_name: { type: string, description: the drafter's team at the last read, empty when unread }
+        standing:
+          allOf: [{ $ref: "#/components/schemas/LeagueStanding" }]
+          nullable: true
+          description: the drafter's record and place at the last read, null when unread
         attached_at: { type: string, format: date-time }
+    LeagueStanding:
+      type: object
+      required: [wins, losses, ties, place, teams]
+      properties:
+        wins: { type: integer }
+        losses: { type: integer }
+        ties: { type: integer }
+        place: { type: integer, description: "1-based, by record then points for, as the league page's strip orders it" }
+        teams: { type: integer }
     LeagueTeam:
       type: object
       required: [roster_id, name, owner, wins, losses, ties, points_for]
@@ -2255,13 +2276,18 @@ components:
         points_for: { type: number, format: double }
     LeaguePlayer:
       type: object
-      required: [host_id, board_id, name, position, team]
+      required: [host_id, board_id, name, position, team, injured_reserve]
       properties:
         host_id: { type: string }
         board_id: { type: string, nullable: true, description: the player's id on our board, null when unplaced }
         name: { type: string }
         position: { type: string }
         team: { type: string }
+        injured_reserve:
+          type: boolean
+          description: >-
+            the host marks him injured reserve beside his name (FFPC's IR designation); a player on a roster's IR
+            slot is said by the slot
     RosterSpot:
       type: object
       required: [player, slot]
@@ -2276,10 +2302,15 @@ components:
         points: { type: number, format: double, description: his points so far this week }
     MatchupSide:
       type: object
-      required: [roster_id, points, starters]
+      required: [roster_id, points, points_read, starters]
       properties:
         roster_id: { type: integer }
         points: { type: number, format: double }
+        points_read:
+          type: boolean
+          description: >-
+            the host's score for this side was read; false when it could not be (an FFPC all-play week whose
+            scoring page did not answer), and points is then 0 and says nothing
         starters: { type: array, items: { $ref: "#/components/schemas/MatchupStarter" } }
     LeagueMatchup:
       type: object
@@ -2322,6 +2353,7 @@ components:
         - name
         - status
         - week
+        - week_all_play
         - me
         - settings_league_id
         - settings_note
@@ -2348,6 +2380,11 @@ components:
         name: { type: string }
         status: { type: string, description: the host's league state (in_season and the like), empty where the host shows none }
         week: { type: integer, description: the host's current week, 0 before the season or for a past one }
+        week_all_play:
+          type: boolean
+          description: >-
+            the host's schedule sets this week as all-play (every team scored against every other, no head-to-head
+            game); the matchup then holds the drafter's side alone
         me: { type: integer, description: the drafter's roster id }
         settings_league_id:
           type: string

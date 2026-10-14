@@ -18,6 +18,7 @@ func (p players) player(id string) apitypes.LeaguePlayer {
 	out := apitypes.LeaguePlayer{HostId: id, Name: unlistedName}
 	if ok {
 		out.Name, out.Position, out.Team = hp.Name, hp.Position, ourTeam(hp.Team)
+		out.InjuredReserve = hp.InjuredReserve
 	}
 	if pl, ok := p.placed[id]; ok {
 		board := pl.BoardID
@@ -64,7 +65,8 @@ func (p players) roster(t Team) []apitypes.RosterSpot {
 }
 
 func (p players) side(s Side) apitypes.MatchupSide {
-	out := apitypes.MatchupSide{RosterId: s.RosterID, Points: s.Points, Starters: make([]apitypes.MatchupStarter, 0, len(s.Starters))}
+	out := apitypes.MatchupSide{RosterId: s.RosterID, Points: s.Points, PointsRead: !s.PointsUnread,
+		Starters: make([]apitypes.MatchupStarter, 0, len(s.Starters))}
 	for _, id := range s.Starters {
 		out.Starters = append(out.Starters, apitypes.MatchupStarter{Player: p.player(id), Points: round2(s.PlayerPoints[id])})
 	}

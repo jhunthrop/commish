@@ -19,6 +19,9 @@ type Player struct {
 	// NameCut says the page showed the name cut short (a draft board
 	// cell ends a long last name in "..."), so it is matched by its start.
 	NameCut bool `json:"name_cut,omitempty"`
+	// IR says FFPC marks him injured reserve: an IR designation beside
+	// his name, or a column or table it heads IR.
+	IR bool `json:"ir,omitempty"`
 }
 
 // Positions as our engine names them.

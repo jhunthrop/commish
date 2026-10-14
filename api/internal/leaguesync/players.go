@@ -221,18 +221,24 @@ func Place(raw *boards.Raw, dir map[string]HostPlayer, ids []string) map[string]
 	byID := map[string]boards.Player{}
 	defense := map[string]string{}
 	byName := map[string]string{}
+	keep := func(key, id string) {
+		if prev, ok := byName[key]; ok && prev != id {
+			byName[key] = ""
+			return
+		}
+		byName[key] = id
+	}
 	for _, p := range raw.Players {
 		byID[p.ID] = p
 		if p.Position == draft.DEF {
 			defense[p.Team] = p.ID
 			continue
 		}
-		key := string(p.Position) + "|" + companion.FoldName(p.Name)
-		if prev, ok := byName[key]; ok && prev != p.ID {
-			byName[key] = ""
-			continue
-		}
-		byName[key] = p.ID
+		name := companion.FoldName(p.Name)
+		keep(string(p.Position)+"|"+name, p.ID)
+		// A host line with no position (an FFPC reserve line) is placed
+		// by the name alone, when only one of our players carries it.
+		keep("|"+name, p.ID)
 	}
 	out := make(map[string]Placement, len(ids))
 	for _, id := range ids {

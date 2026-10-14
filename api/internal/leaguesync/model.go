@@ -45,7 +45,10 @@ type Snapshot struct {
 	Season int `json:"season"`
 	// Week is the host's current week for this league's season, 0 when
 	// the season has no current week (before it starts, or a past season).
-	Week     int       `json:"week"`
+	Week int `json:"week"`
+	// AllPlay says the host's schedule sets Week as all-play: every team
+	// is scored against every other and no side has an opponent.
+	AllPlay  bool      `json:"all_play,omitempty"`
 	Teams    []Team    `json:"teams"`
 	Matchups []Side    `json:"matchups"`
 	Moves    []Move    `json:"moves"`
@@ -80,8 +83,12 @@ type Side struct {
 	RosterID int `json:"roster_id"`
 	// Game pairs two sides; sides with the same Game play each other. 0
 	// is a team with no opponent this week.
-	Game         int                `json:"game"`
-	Points       float64            `json:"points"`
+	Game   int     `json:"game"`
+	Points float64 `json:"points"`
+	// PointsUnread says the host's score for the side could not be read,
+	// so Points says nothing (an FFPC all-play week whose scoring page
+	// did not answer).
+	PointsUnread bool               `json:"points_unread,omitempty"`
 	Starters     []string           `json:"starters"`
 	PlayerPoints map[string]float64 `json:"player_points"`
 }
