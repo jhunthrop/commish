@@ -5,10 +5,19 @@
 -- free map of points per stat, in ScoringRules' names (an attached league)
 -- or Sleeper's (an older import), and the rooms only ever read its
 -- reception points. Each stored one becomes the 21 rules: its own figure
--- under either name, the two-point trio and the return touchdowns from
--- the first Sleeper name it states, and the standard figure for a rule it
+-- under either name, the two-point trio and the return touchdowns only
+-- when every Sleeper name it states scores alike (the import's rule), and the standard figure for a rule it
 -- does not state. A saved league's settings_version moves to 2, the
 -- version every league saved from now on is written at.
+
+-- +goose StatementBegin
+-- The one figure every stated key scores, null when none is stated or two
+-- differ: the import's own rule for the two-point trio and the returns.
+create function app.alike_of(c jsonb, keys text[]) returns float8 language sql immutable as $$
+  select case when count(distinct (c->>k)::float8) = 1 then max((c->>k)::float8) end
+  from unnest(keys) as k where c ? k
+$$;
+-- +goose StatementEnd
 
 -- +goose StatementBegin
 create function app.scoring_rules_of(c jsonb) returns jsonb language sql immutable as $$
@@ -28,10 +37,10 @@ create function app.scoring_rules_of(c jsonb) returns jsonb language sql immutab
     'points_per_sack', coalesce((c->>'points_per_sack')::float8, (c->>'sack')::float8, 1),
     'points_per_defensive_interception', coalesce((c->>'points_per_defensive_interception')::float8, (c->>'int')::float8, 2),
     'points_per_defensive_touchdown', coalesce((c->>'points_per_defensive_touchdown')::float8, (c->>'def_td')::float8, 6),
-    'points_per_two_point_conversion', coalesce((c->>'points_per_two_point_conversion')::float8, (c->>'pass_2pt')::float8, (c->>'rush_2pt')::float8, (c->>'rec_2pt')::float8, 2),
+    'points_per_two_point_conversion', coalesce((c->>'points_per_two_point_conversion')::float8, app.alike_of(c, array['pass_2pt', 'rush_2pt', 'rec_2pt']), 2),
     'points_per_field_goal_missed', coalesce((c->>'points_per_field_goal_missed')::float8, (c->>'fgmiss')::float8, -1),
     'points_per_extra_point_missed', coalesce((c->>'points_per_extra_point_missed')::float8, (c->>'xpmiss')::float8, 0),
-    'points_per_return_touchdown', coalesce((c->>'points_per_return_touchdown')::float8, (c->>'kr_td')::float8, (c->>'pr_td')::float8, 6),
+    'points_per_return_touchdown', coalesce((c->>'points_per_return_touchdown')::float8, app.alike_of(c, array['kr_td', 'pr_td']), 6),
     'points_per_defensive_fumble_recovery', coalesce((c->>'points_per_defensive_fumble_recovery')::float8, (c->>'fum_rec')::float8, 2),
     'points_per_safety', coalesce((c->>'points_per_safety')::float8, (c->>'safe')::float8, 2)
   )
@@ -48,6 +57,7 @@ update app.companions set settings = jsonb_set(settings, '{scoring,custom}', app
   where jsonb_typeof(settings->'scoring'->'custom') = 'object';
 
 drop function app.scoring_rules_of(jsonb);
+drop function app.alike_of(jsonb, text[]);
 alter table app.leagues alter column settings_version set default 2;
 
 -- +goose Down

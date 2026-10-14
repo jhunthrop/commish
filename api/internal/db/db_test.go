@@ -104,7 +104,7 @@ func TestMigrationsApplyCleanly(t *testing.T) {
 	scoringRulesMigration(ctx, t, url, pool)
 }
 
-// 00018: a custom scoring saved as the old free map becomes the 21
+// 00019: a custom scoring saved as the old free map becomes the 21
 // ScoringRules, its own figures kept under either name, the rest at the
 // standard figure, and a saved league's settings move to version 2.
 func scoringRulesMigration(ctx context.Context, t *testing.T, url string, pool *pgxpool.Pool) {
@@ -120,13 +120,13 @@ func scoringRulesMigration(ctx context.Context, t *testing.T, url string, pool *
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.DownTo(ctx, 17); err != nil {
-		t.Fatalf("down to 17: %v", err)
+	if _, err := provider.DownTo(ctx, 18); err != nil {
+		t.Fatalf("down to 18: %v", err)
 	}
 	var league string
-	if err := pool.QueryRow(ctx, `with a as (insert into app.accounts (workos_user_id, email) values ('user_00018', 'a@b.c') returning id)
+	if err := pool.QueryRow(ctx, `with a as (insert into app.accounts (workos_user_id, email) values ('user_00019', 'a@b.c') returning id)
 		insert into app.leagues (account_id, name, settings) select id, 'Old custom',
-		'{"scoring": {"preset": null, "custom": {"rec": 0.5, "pass_td": 6, "points_per_safety": 3, "rush_2pt": 1}}, "teams": 12}'::jsonb
+		'{"scoring": {"preset": null, "custom": {"rec": 0.5, "pass_td": 6, "points_per_safety": 3, "rush_2pt": 1, "kr_td": 4, "pr_td": 8}}, "teams": 12}'::jsonb
 		from a returning id`).Scan(&league); err != nil {
 		t.Fatal(err)
 	}
@@ -142,6 +142,8 @@ func scoringRulesMigration(ctx context.Context, t *testing.T, url string, pool *
 	want := map[string]float64{
 		"points_per_reception": 0.5, "points_per_passing_touchdown": 6, "points_per_safety": 3,
 		"points_per_two_point_conversion": 1, "points_per_passing_yard": 0.04, "te_reception_bonus": 0,
+		// Kick and punt returns scored differently are not one figure: the standard one stands.
+		"points_per_return_touchdown": 6,
 	}
 	for k, v := range want {
 		if rules[k] != v {
