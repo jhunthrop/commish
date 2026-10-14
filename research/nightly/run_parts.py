@@ -15,6 +15,7 @@ from sqlalchemy import Engine
 
 from research.capsules.facts.history import history_cache
 from research.capsules.sweep import FactsPassMemo
+from research.db.code_digest import code_digest
 from research.db.read_cache import ReadCache
 from research.db.value_codec import ValueCodec
 from research.model.arithmetic import model_version
@@ -90,7 +91,7 @@ def run_steps(  # noqa: PLR0913, PLR0917 - the steps' shared dependencies
 ) -> list[StepOutcome]:
     skipped = StepOutcome(StepRecord("ingest", "skipped", "skipped by --skip"))
     # One facts pass for the capsule step, its finished seasons read through the cache.
-    facts = FactsPassMemo(history_cache(engine, model_version()))
+    facts = FactsPassMemo(history_cache(engine, code_digest("research.capsules.facts.history")))
     steps = [
         _isolated("ingest", lambda: skipped if "ingest" in skip else StepOutcome(ingest_step(IngestContext(engine, fetcher, clock(), environ))), log),
         _isolated("fit", lambda: StepOutcome(StepRecord("fit", "skipped", "skipped by --skip") if "fit" in skip else run_fit_step(engine, clock())), log),
@@ -106,7 +107,7 @@ def run_steps(  # noqa: PLR0913, PLR0917 - the steps' shared dependencies
 
 
 def held_out(engine: Engine, store: RunStore) -> tuple[list[HeldOutScore], Mapping[int, float] | None]:
-    cache = ReadCache(engine, HELD_OUT_CODEC, model_version())
+    cache = ReadCache(engine, HELD_OUT_CODEC, code_digest("research.model.backtest"))
     with engine.connect() as conn:
         seasons = [int(s) for s in read_artifact(conn, "model/weekly-priors").payload["heldOutSeasons"]]
         scores = cache.through(conn, HELD_OUT_CACHE, [seasons], None, lambda: held_out_scores(conn, seasons))
