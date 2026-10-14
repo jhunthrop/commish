@@ -163,10 +163,11 @@ def format_board(conn: Connection, season: int, run_format: RunFormat, as_of: da
 
 
 def board_entries(
-    rows: Sequence[StoredRow], run_format: RunFormat, preseason: Mapping[str, BoardEntry] | None = None
+    rows: Sequence[StoredRow], run_format: RunFormat, preseason: Mapping[str, "BoardEntry | None"] | None = None
 ) -> tuple[BoardEntry, ...]:
     """Rows valued under the format's shape, in the served order, ranked and tiered; `preseason`
-    (by universe id) links each in-season entry to his preseason one."""
+    (by universe id) links each in-season entry to his preseason one (None for a player the
+    preseason board did not rank)."""
     valued = value_board(
         [SeasonProjection(row.universe_id, row.position, row.projected) for row in rows],
         LeagueShape(TEAMS, run_format.slots),

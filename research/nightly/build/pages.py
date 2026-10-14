@@ -88,9 +88,14 @@ def numbers_of(entry: BoardEntry, adp: float | None) -> Json:
         "ceiling": row.ceiling,
         "tier": entry.tier,
     }
-    if entry.preseason is not None:
-        # In season, beside the rest-of-season figures: where the preseason board had him.
-        numbers |= {"preseasonRank": entry.preseason.our_rank, "preseasonPoints": entry.preseason.row.projected}
+    if row.floor is None:
+        # In season, beside the rest-of-season figures: where the preseason board had him, or null
+        # for a player it did not rank.
+        before = entry.preseason
+        numbers |= {
+            "preseasonRank": None if before is None else before.our_rank,
+            "preseasonPoints": None if before is None else before.row.projected,
+        }
     return numbers
 
 
@@ -112,12 +117,13 @@ def board_json(board: FormatBoard, slugs: Mapping[str, Identity], adp: Mapping[s
     return {"format": board.format.id, "rows": rows}
 
 
-def page_values(entry: BoardEntry, adp: float | None) -> PageValues:
-    """The numbers his capsule was written about: the preseason board's, in season too."""
+def page_values(entry: BoardEntry, adp: float | None) -> PageValues | None:
+    """The numbers his capsule was written about: the preseason board's, in season too; None for a
+    player the preseason board did not rank (no capsule was written about him)."""
     entry = entry.preseason or entry
     row = entry.row
     if row.floor is None or row.median is None or row.ceiling is None:
-        raise ValueError(f"{row.name}'s preseason row has no range")
+        return None
     return PageValues(
         row.projected, row.ceiling, row.floor, row.median, entry.value_over_replacement, entry.drop_to_next_tier, adp
     )

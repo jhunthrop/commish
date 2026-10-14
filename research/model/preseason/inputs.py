@@ -108,11 +108,11 @@ def board_moment_for(conn: Connection, season: int, now: datetime) -> BoardMomen
         return replay_moment_for(conn, season)
 
 
-def _assert_season_invisible(conn: Connection, season: int, moment: BoardMoment) -> None:
+def _assert_season_invisible(conn: Connection, season: int, moment: BoardMoment, rebuild: bool = False) -> None:
     earliest = _earliest_game_derived_stamp(conn, season)
     if earliest is None:
         return
-    if moment.kind == "live":
+    if moment.kind == "live" and not rebuild:
         raise BoardMomentError(
             f"A {season} LIVE board taken at {js_iso(moment.at)} can see a {season} game-derived observation stamped {js_iso(earliest)}."
         )
@@ -165,9 +165,12 @@ def _prior_seasons(
     return history, usage, teams, observations, priors
 
 
-def load_preseason(conn: Connection, season: int, moment: BoardMoment) -> PreseasonInputs:
-    """`loadPreseason`."""
-    _assert_season_invisible(conn, season, moment)
+def load_preseason(conn: Connection, season: int, moment: BoardMoment, rebuild: bool = False) -> PreseasonInputs:
+    """`loadPreseason`. With `rebuild`, a live board already served is rebuilt at its own stored moment
+    after the season has started (the rest-of-season model's raw line, `model.ros.raw_line`): every
+    read is gated at that moment, so the guard refuses only an observation of the season stamped at or
+    before it, as a replay board's does."""
+    _assert_season_invisible(conn, season, moment, rebuild)
     roster = preseason_rosters_as_of(conn, season, moment.at)
     if not roster:
         raise MissingInputError(f"The store holds no {season} week-one roster knowable at {js_iso(moment.at)}.")

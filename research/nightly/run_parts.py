@@ -21,9 +21,10 @@ from research.model.arithmetic import model_version
 from research.model.artifacts import read_artifact
 from research.model.backtest import HeldOutScore, held_out_scores
 from research.model.instants import js_iso
-from research.model.ros.live import RawPrior, load_ros_priors, raw_priors
+from research.model.ros.live import FIRST_MODEL_WEEK, SeasonPlayer, load_ros_priors, season_players
+from research.model.ros.raw_line import RawLine, latest_raw_line, raw_generation
 from research.nightly.assemble import Assembled
-from research.nightly.build.ros import RosSetup
+from research.nightly.build.ros import RosSetup, pending_weeks
 from research.nightly.build.season import format_json
 from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate, span_rules
 from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan, night_facts, run_capsule_step
@@ -31,6 +32,7 @@ from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION
 from research.nightly.headshots import Face, mirror_headshots
 from research.nightly.page_findings import page_findings
 from research.nightly.publish import read_json
+from research.nightly.reads.schedule import slates_by_club
 from research.nightly.register_log import FrozenBy, carried_note, last_pass
 from research.nightly.run_store import RunStore
 from research.nightly.steps import IngestContext, StepRecord, ingest_step, run_fit_step
@@ -46,8 +48,8 @@ HELD_OUT_CODEC: Final = ValueCodec((HeldOutScore,))
 HELD_OUT_CACHE: Final = "nightly/held-out-scores"
 # The rest-of-season model's prior, the season's raw board, moves only when a new generation is
 # written, so it is read through the cache too (one statement, its fingerprint on later nights).
-ROS_CODEC: Final = ValueCodec((RawPrior,))
-ROS_RAW_CACHE: Final = "nightly/ros-raw-priors"
+ROS_CODEC: Final = ValueCodec((RawLine, SeasonPlayer))
+ROS_RAW_CACHE: Final = "nightly/ros-raw-line"
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,19 +145,33 @@ def held_out(engine: Engine, store: RunStore) -> tuple[list[HeldOutScore], Mappi
 
 
 def ros_setup(engine: Engine, instant: datetime, log: Log) -> RosSetup:
-    """The rest-of-season model's stored inputs: the pinned artifact and the raw board's points a
-    game. A read that fails leaves the artifact missing, so the boards stay preseason and say why."""
-    cache = ReadCache(engine, ROS_CODEC, code_digest("research.model.ros.live"), log)
+    """The rest-of-season model's stored inputs: the pinned artifact, the raw line the fit step kept
+    (through the read cache), and, once the switch week is reached by the stored schedule, the season's
+    players with a line. A read that fails leaves the artifact missing, so the boards stay preseason
+    and say why."""
+    cache = ReadCache(engine, ROS_CODEC, code_digest("research.model.ros.raw_line"), log)
     try:
         with snapshot(engine) as conn:
             priors = load_ros_priors(conn)
-            raw = cache.through(
-                conn, ROS_RAW_CACHE, [PRODUCT_SEASON], instant, lambda: raw_priors(conn, PRODUCT_SEASON, instant)
+            moment = raw_generation(conn, PRODUCT_SEASON)
+            raw = (
+                None
+                if moment is None
+                else cache.through(
+                    conn,
+                    ROS_RAW_CACHE,
+                    [PRODUCT_SEASON, js_iso(moment.at)],
+                    None,
+                    lambda: latest_raw_line(conn, PRODUCT_SEASON, moment),
+                )
             )
+            weeks = pending_weeks(slates_by_club(conn, PRODUCT_SEASON), instant)
+            switched = priors is not None and bool(weeks) and min(weeks) >= FIRST_MODEL_WEEK
+            players = season_players(conn, PRODUCT_SEASON, instant) if switched else ()
     except Exception as error:
         log(f"rest of season: the model's inputs could not be read ({type(error).__name__}: {error})")
-        return RosSetup(None, {})
-    return RosSetup(priors, {row.player_id: row for row in raw})
+        return RosSetup(None, None)
+    return RosSetup(priors, raw, players)
 
 
 def mirror_faces(http: httpx.Client, store: RunStore, assembled: Assembled, skip: bool) -> tuple[Json, str]:
@@ -178,7 +194,10 @@ def manifest_of(  # noqa: PLR0913, PLR0917 - every field the manifest names
         "season": PRODUCT_SEASON,
         "implementation": IMPLEMENTATION,
         "standIn": False,
-        "formats": [format_json(f, PRODUCT_SEASON, assembled.rest) for f in assembled.formats],
+        "formats": [
+            format_json(f, PRODUCT_SEASON, assembled.rest if f.id in assembled.rest_formats else None)
+            for f in assembled.formats
+        ],
         "players": len(assembled.people),
         "sources": list(assembled.sources),
         # Past the web's schema, which reads only the fields above: who made the numbers, the

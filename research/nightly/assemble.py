@@ -54,6 +54,8 @@ class Assembled:
     rest: RosBasis | None = None
     # Why the boards are preseason or rest of season tonight, for the run's report.
     rest_status: str = NO_REST_INPUTS
+    # The format ids whose board ranks the rest of the season tonight.
+    rest_formats: frozenset[str] = frozenset()
 
 
 def _boards(conn: Connection, as_of: datetime, formats: Sequence[RunFormat]) -> tuple[FormatBoard, ...]:
@@ -158,14 +160,19 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     captures, formats, dropped = _captures(conn, as_of)
     boards = _boards(conn, as_of, formats)
     adp_by_format = {f.id: season.format_adp(f, captures) for f in formats}
+    # The season so far for every board player, and in season for every player with a line this
+    # season (the judged universe ranks him whether or not the preseason board did).
+    extra = () if ros is None else tuple(p.provider_id for p in ros.season_players)
+    on_boards = {e.row.player_id for b in boards for e in b.entries}
+    context = season_context(conn, PRODUCT_SEASON, sorted({*on_boards, *extra}), as_of)
+    rest = None if ros is None else ros_boards(boards, context, as_of, ros)
+    if rest is not None:
+        boards = rest.boards
+    # The pages and the search index in the order of the boards the run prints.
     people = tuple(pages.identities(boards))
     by_slug = {p.id: p for p in people}
     universe_ids = sorted({e.row.universe_id for b in boards for e in b.entries})
     capsules = stored_capsules_for(conn, universe_ids)
-    context = season_context(conn, PRODUCT_SEASON, sorted(by_slug), as_of)
-    rest = None if ros is None else ros_boards(boards, context, as_of, ros)
-    if rest is not None:
-        boards = rest.boards
     inputs = pages.page_inputs(boards, adp_by_format, capsules, context)
     players = [pages.player_json(who, inputs) for who in people]
     schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of)
@@ -206,6 +213,7 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
         dropped,
         None if rest is None else rest.basis,
         NO_REST_INPUTS if rest is None else rest.status,
+        frozenset() if rest is None else rest.in_season,
     )
 
 

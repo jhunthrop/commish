@@ -6,10 +6,11 @@ week the boards rank by the model's rest-of-season points, ordering only, no int
 whenever an input is missing (the artifact, the season's lines, a week still to play), the board is
 the preseason board as today, and the run's report says why.
 
-Two reads, both here: the artifact (one row), and the raw board's points a game for the season's
-served raw generation (one statement, kept by the read cache). The season so far comes from the
-store the player pages already read (`nightly.build.player_season.SeasonStore`), so the switch adds
-no read of the season's lines. Everything else is the model's own arithmetic (`model.py`).
+Three reads, all here or in `raw_line`: the artifact (one row), the raw board's line kept by the fit
+step (one row, through the read cache), and the season's players with a line (one statement, so a
+player off the preseason board is ranked too, as the judged universe ranked him). The season so far
+comes from the store the player pages already read (`nightly.build.player_season`); everything else is
+the model's own arithmetic (`model.py`).
 """
 
 from collections.abc import Mapping, Sequence
@@ -21,6 +22,7 @@ from sqlalchemy import Connection, text
 
 from research.model.artifacts import MissingArtifactError, read_artifact
 from research.model.domain import Position, ScoringRules, StatLine, compute_fantasy_points
+from research.model.reads.observations import STAT_LINE_SOURCE
 from research.model.ros.model import (
     FORMATS,
     LAST_FANTASY_WEEK,
@@ -31,13 +33,12 @@ from research.model.ros.model import (
     StaleEntry,
 )
 from research.model.ros.payload import ARTIFACT_NAME, priors_from
+from research.model.weekly.round.scoring import SKILL_POSITIONS
 
 ARTIFACT_VERSION: Final = 1
-RAW_SOURCE: Final = "commish_board_v1_ppr_12"
-# The first week the model's board is served (the coordinator's step-4 ruling, 2026-10-14: "the first
-# in-season week with the model is week 6"). Round 3's preregistration had the preseason board through
-# week 6; this ships the model a week earlier, at a week no round judged (concern named in the report).
-FIRST_MODEL_WEEK: Final = 6
+# The first week the model's board is served: round 3's preregistration, the preseason board through
+# the switch week (6) and the model from week 7 (the coordinator's ruling of 2026-10-14: "the record wins").
+FIRST_MODEL_WEEK: Final = 7
 _STAT_FIELDS: Final = (
     "passing_yards", "passing_touchdowns", "interceptions", "rushing_yards", "rushing_touchdowns",
     "receiving_yards", "receiving_touchdowns", "receptions", "fumbles_lost", "field_goals_made",
@@ -57,26 +58,35 @@ def load_ros_priors(conn: Connection, version: int = ARTIFACT_VERSION) -> RosPri
 
 
 @dataclass(frozen=True, slots=True)
-class RawPrior:
-    """The raw board's season points (PPR) and expected games for one player, by universe id."""
+class SeasonPlayer:
+    """A player with a stat line this season, as the product names him (the judged universe takes
+    every such player, on the preseason board or not)."""
 
-    player_id: str
-    projected: float
-    expected_games: float
+    universe_id: str
+    provider_id: str
+    name: str
+    position: Position
+    team: str
+    headshot_url: str | None
+    market_adp: float | None
 
 
-_RAW_PRIORS: Final = text(
-    "select player_id, projected_points, expected_games from research.preseason_projections "
-    "where season = :s and source = :source and as_of = ("
-    "select max(as_of) from research.preseason_projections where season = :s and source = :source and as_of <= :a"
-    ") order by player_id"
+_SEASON_PLAYERS: Final = text(
+    "select distinct on (pp.id) o.player_id, pp.id, pp.name, pp.position, pp.team, pp.headshot_url, pp.adp "
+    "from research.player_week_observations o "
+    "join research.player_crosswalk c on c.player_id = o.player_id "
+    "join research.provider_players pp on pp.id = c.provider_player_id "
+    "where o.season = :s and o.source = :source and o.as_of <= :a and pp.position = any(:positions) "
+    "order by pp.id, o.player_id"
 )
 
 
-def raw_priors(conn: Connection, season: int, as_of: datetime) -> tuple[RawPrior, ...]:
-    """The newest raw generation at or before `as_of`: one statement, cacheable (no side effect)."""
-    rows = conn.execute(_RAW_PRIORS, {"s": season, "source": RAW_SOURCE, "a": as_of})
-    return tuple(RawPrior(r.player_id, float(r.projected_points), float(r.expected_games)) for r in rows)
+def season_players(conn: Connection, season: int, as_of: datetime) -> tuple[SeasonPlayer, ...]:
+    """Every QB, RB, WR and TE with a published line this season at `as_of`: one statement."""
+    rows = conn.execute(
+        _SEASON_PLAYERS, {"s": season, "source": STAT_LINE_SOURCE, "a": as_of, "positions": list(SKILL_POSITIONS)}
+    )
+    return tuple(SeasonPlayer(r.player_id, r.id, r.name, r.position, r.team, r.headshot_url, r.adp) for r in rows)
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,17 +146,13 @@ def game_played(
     )
 
 
-def stale_prior(raw: RawPrior | None, served_projected: Mapping[str, float], served_games: float) -> StaleEntry:
-    """The model's prior for one player: the raw board's PPR points a game, carried to half PPR and
-    standard by the served boards' own ratio to PPR (the raw line's format split is not stored), and
-    the served board's expected games as availability. No raw row: the off-board rate stands in."""
-    ppr = served_projected["ppr"]
-    ratios = {name: served_projected[name] / ppr if ppr > 0 else 1.0 for name in FORMATS}
-    per_game = (
-        None
-        if raw is None or raw.expected_games <= 0
-        else {name: raw.projected / raw.expected_games * ratios[name] for name in FORMATS}
-    )
+def stale_prior(
+    raw_per_game: Mapping[str, float] | None, served_projected: Mapping[str, float], served_games: float
+) -> StaleEntry:
+    """The model's prior for one player on the preseason board, as judged: the raw board's line scored
+    in each format over its expected games (`raw_line`), and the served board's expected games as
+    availability. A player the raw line lacks takes the off-board rate (`per_game` None)."""
+    per_game = None if raw_per_game is None else dict(raw_per_game)
     return StaleEntry(dict(served_projected), per_game, min(1.0, served_games / SEASON_GAMES))
 
 
@@ -165,7 +171,7 @@ def player_to_date(
     who: PlayerWeeks,
     window: Window,
     schedule: Mapping[str, Sequence[int]],
-    stale: StaleEntry,
+    stale: StaleEntry | None,
     rules: Mapping[str, ScoringRules],
 ) -> PlayerToDate:
     """The model's input at the window: games through `through`, his club's games from `from_week`."""

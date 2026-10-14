@@ -9,7 +9,6 @@ import pytest
 from research.model.ros.live import (
     FIRST_MODEL_WEEK,
     PlayerWeeks,
-    RawPrior,
     WeekFacts,
     Window,
     game_played,
@@ -17,22 +16,25 @@ from research.model.ros.live import (
     stale_prior,
     window_of,
 )
+from research.model.ros.raw_line import RawLine, line_of, payload_of
+from research.model.ros.ship import first_difference
 from research.nightly.build.player_season import SCORING
-from research.nightly.build.ros import RosBasis
+from research.nightly.build.ros import RosBasis, carried
 from research.nightly.build.season import format_json, month_day
 from research.nightly.config import RUN_FORMATS
+from research.nightly.reads.record import METHOD
 
 _SERVED = {"ppr": 200.0, "half": 170.0, "std": 140.0}
 
 
 def test_the_switch_reads_the_first_week_still_to_play() -> None:
-    assert FIRST_MODEL_WEEK == 6
-    assert window_of([6, 7, 18], through=5) == Window(6, 5)
+    assert FIRST_MODEL_WEEK == 7  # the preregistration's: the preseason board through week 6
+    assert window_of([7, 8, 18], through=6) == Window(7, 6)
     assert window_of([7, 8], through=5) == Window(7, 5)  # week 6's lines not yet in: the window still starts at 7
-    assert window_of([5, 6], through=4) == "week 5 is before the switch week (6)"
+    assert window_of([6, 7], through=5) == "week 6 is before the switch week (7)"
     assert window_of([18], through=17) == "week 18 is past week 17, the last the model ranks"
     assert window_of([], through=17) == "the season's schedule has no game left to play"
-    assert window_of([6], through=0) == "the store holds no week of this season's lines"
+    assert window_of([7], through=0) == "the store holds no week of this season's lines"
 
 
 def test_a_week_is_played_with_a_stat_line_or_snaps() -> None:
@@ -52,12 +54,32 @@ def test_a_week_is_played_with_a_stat_line_or_snaps() -> None:
     assert game_played(5, WeekFacts({}, {"offensive_snaps": 0.0}), "WR", SCORING) is None
 
 
-def test_the_prior_is_the_raw_points_a_game_carried_by_the_served_ratio() -> None:
-    entry = stale_prior(RawPrior("p", 150.0, 15.0), _SERVED, 15.3)
-    assert entry.per_game == pytest.approx({"ppr": 10.0, "half": 8.5, "std": 7.0})
+def test_the_prior_is_the_raw_lines_points_a_game_in_each_format() -> None:
+    line = {"ppr": 10.0, "half": 8.75, "std": 7.5}
+    entry = stale_prior(line, _SERVED, 15.3)
+    assert entry.per_game == line  # the raw line's own split, never the served boards' ratio
     assert entry.availability == pytest.approx(0.9)
-    assert stale_prior(None, _SERVED, 15.3).per_game is None
-    assert stale_prior(RawPrior("p", 10.0, 0.0), _SERVED, 15.3).per_game is None
+    assert stale_prior(None, _SERVED, 15.3).per_game is None  # no raw line for him: the off-board rate
+
+
+def test_the_raw_line_reads_back_and_a_format_it_lacks_is_named() -> None:
+    line = RawLine(2026, "2026-09-09T02:20:29.697Z", "research@abc", {"p": {"ppr": 10.0, "half": 8.5, "std": 7.0}})
+    assert line_of(payload_of(line)) == line
+    short = RawLine(2026, line.as_of, line.model_version, {"p": {"ppr": 10.0, "half": 8.5}})
+    assert carried(line) == {"ppr", "half", "std"}
+    assert carried(short) == {"ppr", "half"}
+
+
+def test_the_one_shot_fit_still_refuses_any_number_off_the_judged_record() -> None:
+    judged = {"shrinkage": {"WR|ppr": {"k": 1.5, "alpha": 0.5}}, "availabilityK": {"WR": 8.0}}
+    assert first_difference(judged, judged) is None
+    moved = {**judged, "availabilityK": {"WR": 8.000000001}}
+    assert first_difference(moved, judged) == "availabilityK"
+    assert first_difference({**judged, "rawLine": {}}, judged) == "rawLine"
+
+
+def test_the_record_says_it_grades_the_preseason_board() -> None:
+    assert METHOD.startswith("Graded against our preseason board: ")
 
 
 def test_the_players_input_stops_at_the_lines_and_ranks_from_the_window() -> None:
