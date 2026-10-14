@@ -204,7 +204,8 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 	}
 	_, body = a.do(svc.attached, http.MethodGet, "/", nil, "")
 	var list []apitypes.AttachedLeague
-	if err := json.Unmarshal(body, &list); err != nil || len(list) != 1 || list[0].Id != aliceSync.Id || list[0].TeamName == "" {
+	if err := json.Unmarshal(body, &list); err != nil || len(list) != 1 || list[0].Id != aliceSync.Id || list[0].TeamName == "" ||
+		list[0].Standing == nil || list[0].Standing.Teams != 12 || list[0].Standing.Place < 1 {
 		t.Fatalf("alice's list %s", body)
 	}
 

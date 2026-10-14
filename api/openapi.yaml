@@ -2240,7 +2240,7 @@ components:
         seat_by_username: { type: boolean, description: whether the host finds a seat by username (Sleeper does) }
     AttachedLeague:
       type: object
-      required: [id, host, host_league_id, season, name, roster_id, team_name, attached_at]
+      required: [id, host, host_league_id, season, name, roster_id, team_name, standing, attached_at]
       properties:
         id: { type: string, format: uuid }
         host: { $ref: "#/components/schemas/LeagueHost" }
@@ -2249,7 +2249,20 @@ components:
         name: { type: string, description: the league's name at its last read }
         roster_id: { type: integer }
         team_name: { type: string, description: the drafter's team at the last read, empty when unread }
+        standing:
+          allOf: [{ $ref: "#/components/schemas/LeagueStanding" }]
+          nullable: true
+          description: the drafter's record and place at the last read, null when unread
         attached_at: { type: string, format: date-time }
+    LeagueStanding:
+      type: object
+      required: [wins, losses, ties, place, teams]
+      properties:
+        wins: { type: integer }
+        losses: { type: integer }
+        ties: { type: integer }
+        place: { type: integer, description: "1-based, by record then points for, as the league page's strip orders it" }
+        teams: { type: integer }
     LeagueTeam:
       type: object
       required: [roster_id, name, owner, wins, losses, ties, points_for]

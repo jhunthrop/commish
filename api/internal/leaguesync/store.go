@@ -140,6 +140,8 @@ type Attached struct {
 	Season   int
 	Name     string
 	TeamName string
+	// Teams are the league's teams at the last read, none when unread.
+	Teams []Team
 }
 
 // Attached is the account's links, newest first, each with its league's
@@ -150,7 +152,8 @@ func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, 
 		l.roster_id, l.attached_at, l.last_read_at,
 		coalesce((sn.snapshot->>'season')::int, l.host_season), coalesce(nullif(sn.snapshot->>'name', ''), saved.name, ''),
 		coalesce((select t->>'name' from jsonb_array_elements(sn.snapshot->'teams') t
-			where (t->>'roster_id')::int = l.roster_id limit 1), '')
+			where (t->>'roster_id')::int = l.roster_id limit 1), ''),
+		sn.snapshot->'teams'
 		from app.league_links l
 		left join app.league_snapshots sn
 			on sn.host = l.host and sn.host_league_id = l.host_league_id and sn.host_season = l.host_season
@@ -161,8 +164,12 @@ func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, 
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Attached, error) {
 		var a Attached
+		var teams []byte
 		err := r.Scan(&a.ID, &a.AccountID, &a.LeagueID, &a.Ref.Host, &a.Ref.LeagueID, &a.Ref.Season, &a.RosterID,
-			&a.AttachedAt, &a.LastReadAt, &a.Season, &a.Name, &a.TeamName)
+			&a.AttachedAt, &a.LastReadAt, &a.Season, &a.Name, &a.TeamName, &teams)
+		if err == nil && len(teams) > 0 {
+			err = json.Unmarshal(teams, &a.Teams)
+		}
 		return a, err
 	})
 	if err != nil {

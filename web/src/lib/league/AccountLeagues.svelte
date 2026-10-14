@@ -12,7 +12,7 @@
 	import { railLeague } from '#lib/account/rail-league.svelte.ts';
 	import { ApiError, leagueApi, type AttachedLeague } from './api.ts';
 	import { followedCount, followingWords } from './follow-many.ts';
-	import { hostWords } from './model.ts';
+	import { followedLine, followedName } from './model.ts';
 	import OneLeagueFree from './OneLeagueFree.svelte';
 
 	interface Props {
@@ -88,10 +88,6 @@
 			void railLeague.refresh();
 		});
 	}
-
-	function name(league: AttachedLeague): string {
-		return league.name !== '' ? league.name : `Your ${hostWords(league.host)} league`;
-	}
 </script>
 
 <section id={LEAGUES_ANCHOR} aria-label="Your leagues">
@@ -103,9 +99,9 @@
 		<ActionRows label="Your leagues">
 			{#each leagues as league (league.id)}
 				<ActionRow
-					lead={name(league)}
+					lead={followedName(league)}
 					href={resolve('/league/[id]', { id: league.id })}
-					text={`${league.team_name !== '' ? `as ${league.team_name}, ` : ''}on ${hostWords(league.host)}`}
+					text={followedLine(league)}
 				>
 					{#snippet action()}
 						{#if detached.has(league.id)}

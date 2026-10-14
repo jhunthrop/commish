@@ -7,6 +7,7 @@ import type { IndexSeason } from '#lib/run/schema.ts';
 import type { LeagueBoard, LeagueBoardPlayer } from './board.ts';
 import type { FaceStatus } from '#lib/ui/face-status.ts';
 import type {
+	AttachedLeague,
 	LeagueHost,
 	LeagueMatchup,
 	LeagueMove,
@@ -91,9 +92,27 @@ export function scoreGap(sync: LeagueSync, now: Date): string {
 }
 
 /** "5-1", or "5-1-1" with ties. */
-export function recordWords(team: LeagueTeam): string {
+export function recordWords(team: Pick<LeagueTeam, 'wins' | 'losses' | 'ties'>): string {
 	const base = `${String(team.wins)}-${String(team.losses)}`;
 	return team.ties > 0 ? `${base}-${String(team.ties)}` : base;
+}
+
+/** A followed league's own name, or its host's when the read has none yet. */
+export function followedName(league: AttachedLeague): string {
+	return league.name !== '' ? league.name : `Your ${hostWords(league.host)} league`;
+}
+
+/** Where the drafter stands in a followed league: "2-3, 9 of 12", empty before a read. */
+export function standingWords(league: AttachedLeague): string {
+	const s = league.standing;
+	return s ? `${recordWords(s)}, ${String(s.place)} of ${String(s.teams)}` : '';
+}
+
+/** A followed league's line under its name, so two alike names part: "My Ball Zach Ertz, 2-3, 9
+ * of 12, on FFPC". */
+export function followedLine(league: AttachedLeague): string {
+	const parts = [league.team_name, standingWords(league)].filter((p) => p !== '');
+	return [...parts, `on ${hostWords(league.host)}`].join(', ');
 }
 
 /** A team's name for a sentence, by roster id. */

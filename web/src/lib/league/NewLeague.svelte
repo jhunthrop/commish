@@ -34,7 +34,7 @@
 		missedWords,
 		roomToFollow
 	} from './follow-many.ts';
-	import { hostWords, hostsLine } from './model.ts';
+	import { followedLine, followedName, hostWords, hostsLine } from './model.ts';
 	import OneLeagueFree from './OneLeagueFree.svelte';
 
 	/** Attach a league: paste its link, say which team is yours (a tap on it, or a Sleeper username),
@@ -180,8 +180,8 @@
 	const attachedLines = $derived(
 		attached.map((a) => ({
 			key: a.id,
-			lead: a.name || `Your ${hostWords(a.host)} league`,
-			text: a.team_name ? `as ${a.team_name}, on ${hostWords(a.host)}` : `on ${hostWords(a.host)}`,
+			lead: followedName(a),
+			text: followedLine(a),
 			href: links.league(a.id)
 		}))
 	);

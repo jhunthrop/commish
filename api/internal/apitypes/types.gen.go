@@ -859,6 +859,9 @@ type AttachedLeague struct {
 	RosterId int    `json:"roster_id"`
 	Season   int    `json:"season"`
 
+	// Standing the drafter's record and place at the last read, null when unread
+	Standing *LeagueStanding `json:"standing"`
+
 	// TeamName the drafter's team at the last read
 	TeamName string `json:"team_name"`
 }
@@ -1317,6 +1320,17 @@ type LeagueSettings struct {
 	// Slot null drafts from a random slot
 	Slot  *int `json:"slot"`
 	Teams int  `json:"teams"`
+}
+
+// LeagueStanding defines model for LeagueStanding.
+type LeagueStanding struct {
+	Losses int `json:"losses"`
+
+	// Place 1-based, by record then points for, as the league page's strip orders it
+	Place int `json:"place"`
+	Teams int `json:"teams"`
+	Ties  int `json:"ties"`
+	Wins  int `json:"wins"`
 }
 
 // LeagueSync defines model for LeagueSync.

@@ -1968,8 +1968,18 @@ export interface components {
 			roster_id: number;
 			/** @description the drafter's team at the last read */
 			team_name: string;
+			/** @description the drafter's record and place at the last read, null when unread */
+			standing: components['schemas']['LeagueStanding'] | null;
 			/** Format: date-time */
 			attached_at: string;
+		};
+		LeagueStanding: {
+			wins: number;
+			losses: number;
+			ties: number;
+			/** @description 1-based, by record then points for, as the league page's strip orders it */
+			place: number;
+			teams: number;
 		};
 		LeagueTeam: {
 			roster_id: number;
