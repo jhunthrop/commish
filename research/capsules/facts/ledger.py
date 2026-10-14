@@ -175,7 +175,7 @@ def _derived_numbers(facts: FactsContent) -> list[float]:
 def _printed_text_numbers(facts: FactsContent) -> list[float]:
     numbers: list[float] = []
     if not isinstance(facts.injury, InjuryUnknown):
-        numbers += [js_number(part) for part in facts.injury.as_of[:10].split("-")]
+        numbers += [js_number(part) for part in facts.injury.since.split("-")]
     for story in facts.news:
         text = f"{story.title} {'' if story.published_at is None else story.published_at[:10]}"
         numbers += [js_number(raw) for raw in _NUMBER.findall(text)]

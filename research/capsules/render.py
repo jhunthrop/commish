@@ -122,9 +122,9 @@ def _season_line(facts: PlayerFacts) -> str:
 def _injury_line(facts: PlayerFacts) -> str:
     injury = facts.injury
     if isinstance(injury, InjuryDesignated):
-        return f"Injury report: designation {injury.designation} as of {injury.as_of[:10]}."
+        return f"Injury report: designation {injury.designation}, on every report since {injury.since}."
     if isinstance(injury, InjuryClean):
-        return f"Injury report: checked as of {injury.as_of[:10]} and no designation was on file that day."
+        return f"Injury report: no designation on file on any report since {injury.since}."
     return "Injury report: no injury feed has been checked for him yet. This is not a health claim either way."
 
 

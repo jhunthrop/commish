@@ -239,10 +239,11 @@ jobs:
               --member "serviceAccount:$RUNTIME_SA" --role roles/run.invoker --quiet
           }
           # A season's first night rewrites every capsule (hours at the gateway's pace); a night after, minutes.
-          # A plain night: since an injury status is dated by its day (fix round 3) only the sheets whose
-          # facts truly moved are rewritten, about 12 a night on the dev copy (news), a few cents. A store
-          # whose capsules predate that change is restamped once first: `python -m research.capsules
-          # restamp-injury-day`, or its first night rewrites the board.
+          # A plain night: an injury status is dated by the day it began (fix round 4), so only sheets
+          # whose facts truly moved are rewritten. Measured night to night on the dev copy, Oct 6 to 14:
+          # 31 to 69 of 536 sheets (mean 48, 8.9%; new designations and headlines), about $0.11 a night.
+          # A store whose capsules predate the change is restamped once first (`python -m
+          # research.capsules restamp-injury-day`, idempotent), or its first night rewrites the board.
           deploy nightly "research.nightly,run" "$nightly" 2 2Gi 8h
           deploy nightly-publish "research.nightly,publish" "$publish" 1 512Mi 10m
           deploy inseason "research.inseason,--task,season-week" "$db,ODDS_API_KEY=ODDS_API_KEY:latest,CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest" 2 2Gi 1h
