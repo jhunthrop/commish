@@ -212,8 +212,16 @@ _CAPSULE_PLAYER: Final = Derived(
     why="capsules key on the universe now; the legacy key was the provider id, mapped through the crosswalk",
 )
 
+_HOST_ID_WHY: Final = "the oracle's universe never kept the hosts' ids; `pipeline host-ids` fills them (revision 0005)"
+
 _ENTRIES: Final = (
-    LegacyTable("players", "nfl_players"),
+    LegacyTable(
+        "players",
+        "nfl_players",
+        derived=MappingProxyType(
+            {column: Derived("NULL", (), _HOST_ID_WHY) for column in ("sleeper_id", "yahoo_id", "mfl_id")}
+        ),
+    ),
     LegacyTable(
         "provider_players",
         "players",
@@ -353,6 +361,14 @@ _ENTRIES: Final = (
 
 LEGACY_TABLES: Final[Mapping[str, LegacyTable]] = MappingProxyType({entry.table: entry for entry in _ENTRIES})
 
+# Research tables with no legacy counterpart at all, and why: nothing to copy or compare.
+NEW_IN_RESEARCH: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "preseason_candidates": "each board's candidate set, kept from revision 0005 so a custom board can be built",
+        "custom_boards": "the custom-scoring board cache (revision 0005), rebuilt on demand from the candidates",
+    }
+)
+
 # Legacy tables the research schema does not carry at all, and why.
 NOT_CARRIED: Final[Mapping[str, str]] = MappingProxyType(
     {
@@ -365,7 +381,7 @@ NOT_CARRIED: Final[Mapping[str, str]] = MappingProxyType(
 def check_complete() -> None:
     """Every research table has exactly one entry. Run at import by the two readers."""
     research = {t.name for t in METADATA.tables.values()}
-    missing = sorted(research - set(LEGACY_TABLES))
+    missing = sorted(research - set(LEGACY_TABLES) - set(NEW_IN_RESEARCH))
     extra = sorted(set(LEGACY_TABLES) - research)
     if missing or extra:
         raise LookupError(f"research.db.legacy is out of step with the schema: missing {missing}, unknown {extra}")

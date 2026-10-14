@@ -8,6 +8,9 @@ and the props skipped by name without ODDS_API_KEY). Each part runs in its own t
 failed feed keeps the others. The step fails only when the PPR ADP capture failed, the one every
 page reads.
 
+The fantasy hosts' player ids (`pipeline.host_ids`) are refreshed beside them, so a Sleeper draft
+or a MyFantasyLeague league joins the universe on tonight's map.
+
 FIT: the board rebuilt and compared, check only (`model.fit_check.fit_step`).
 """
 
@@ -24,6 +27,7 @@ from research.model.fit_inputs import fit_readiness
 from research.model.priors import load_model_artifacts
 from research.model.reads.teams import first_kickoff_for
 from research.pipeline import vegas
+from research.pipeline.host_ids import ingest_host_ids
 from research.pipeline.http import Fetcher
 from research.pipeline.odds.ingest import KickoffGate, run_props_preseason_snapshot
 from research.pipeline.preseason.boards import ingest_adp_snapshot, ingest_superflex_adp_snapshot
@@ -104,10 +108,22 @@ def _win_totals(context: IngestContext) -> str:
         )
 
 
+def _host_ids(context: IngestContext) -> str:
+    with context.engine.begin() as conn:
+        return str(ingest_host_ids(conn, context.fetcher))
+
+
 def ingest_step(context: IngestContext) -> StepRecord:
     lines = []
     adp_failed = False
-    for name, body in (("capture", _capture), ("adp", _adp), ("props", _props), ("win totals", _win_totals)):
+    parts = (
+        ("capture", _capture),
+        ("adp", _adp),
+        ("host ids", _host_ids),
+        ("props", _props),
+        ("win totals", _win_totals),
+    )
+    for name, body in parts:
         line, failed = _guarded(name, body, context)
         lines.append(line)
         adp_failed = adp_failed or (name == "adp" and failed)

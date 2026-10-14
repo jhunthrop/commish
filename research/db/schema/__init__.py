@@ -8,6 +8,7 @@ Every table lives in the `research` Postgres schema and is defined once here, by
     provider      the Tank01 current-season store, the capture and odds archives
     market        preseason_rosters, preseason_rankings, adp_snapshots
     boards        model_artifacts, the boards and reasons, the register, player_capsules
+    custom        preseason_candidates (each board's candidate set), custom_boards (revision 0005)
 
 `alembic/versions/0001_research_schema.py` creates exactly this, and the schema gate checks the
 two agree. What changed from the legacy `public` tables, and why, is in the README; the column
@@ -23,6 +24,7 @@ from research.db.schema.boards import (
     REGISTER_FREEZE_ROWS,
     REGISTER_GRADE_ROWS,
 )
+from research.db.schema.custom import CUSTOM_BOARDS, PRESEASON_CANDIDATES
 from research.db.schema.identity import PLAYER_CROSSWALK, PLAYERS, PROPS_PLAYER_MAP, PROVIDER_PLAYERS
 from research.db.schema.market import ADP_SNAPSHOTS, PRESEASON_RANKINGS, PRESEASON_ROSTERS
 from research.db.schema.nflverse import (
@@ -46,6 +48,7 @@ __all__ = [
     "ADP_SNAPSHOTS",
     "CAPTURE_SNAPSHOTS",
     "COACHES",
+    "CUSTOM_BOARDS",
     "METADATA",
     "MODEL_ARTIFACTS",
     "NFLVERSE_INJURIES",
@@ -60,6 +63,7 @@ __all__ = [
     "PLAYER_WEEK_OBSERVATIONS",
     "PLAYER_WEEK_TEAMS",
     "PRESEASON_BOARD_REASONS",
+    "PRESEASON_CANDIDATES",
     "PRESEASON_PROJECTIONS",
     "PRESEASON_RANKINGS",
     "PRESEASON_ROSTERS",
