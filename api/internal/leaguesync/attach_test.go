@@ -187,8 +187,13 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 		t.Fatalf("alice's league: settings %v, %d teams, %d on her roster", aliceSync.SettingsLeagueId, len(aliceSync.Teams), len(aliceSync.Roster))
 	}
 	_, free := aliceSync.HeldBy["9999999"]
-	if aliceSync.HeldBy["8439"] == 0 || aliceSync.HeldBy["DST-MIN"] == 0 || free {
+	_, heldA := aliceSync.HeldBy["8439"]
+	_, heldB := aliceSync.HeldBy["DST-MIN"]
+	if !heldA || !heldB || free {
 		t.Fatalf("held by %v, want the two held players by their rosters and not the free one", aliceSync.HeldBy)
+	}
+	if len(aliceSync.Rostered) != len(aliceSync.HeldBy) || !contains(aliceSync.Rostered, "8439") {
+		t.Fatalf("rostered %v, want held_by's ids for a web from before held_by", aliceSync.Rostered)
 	}
 	if aliceSync.BoardFormat != apitypes.BoardFormatPpr || aliceSync.ScoringLike != apitypes.ScoringPresetTePremium {
 		t.Fatalf("board %s, scoring like %s", aliceSync.BoardFormat, aliceSync.ScoringLike)

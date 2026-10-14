@@ -36,6 +36,8 @@ func TestLeagueScoring(t *testing.T) {
 		{"saved superflex lineup", &apitypes.LeagueSettings{Scoring: apitypes.Scoring{Custom: &tePremium}, Lineup: apitypes.LineupSuperflex}, nil, false, apitypes.ScoringPresetTePremium, apitypes.BoardFormatSuperflex},
 		{"saved lineup over the read's", &apitypes.LeagueSettings{Scoring: apitypes.Scoring{Preset: &half}, Lineup: apitypes.LineupStandard}, nil, true, half, apitypes.BoardFormatHalfPpr},
 		{"read rules", nil, standard, false, apitypes.ScoringPresetStandard, apitypes.BoardFormatStandard},
+		{"read TE premium", nil, tePremium, false, apitypes.ScoringPresetTePremium, apitypes.BoardFormatPpr},
+		{"read half", nil, map[string]float64{"points_per_reception": 0.5}, false, half, apitypes.BoardFormatHalfPpr},
 		{"read superflex", nil, standard, true, apitypes.ScoringPresetStandard, apitypes.BoardFormatSuperflex},
 		{"nothing read", nil, nil, false, apitypes.ScoringPresetPpr, apitypes.BoardFormatPpr},
 	}
@@ -96,10 +98,15 @@ func TestTheLeagueIsTheContext(t *testing.T) {
 		*me.Format != apitypes.BoardFormatPpr || len(me.Leagues) != 2 {
 		t.Fatalf("choosing the Sleeper league: %d %+v", status, me)
 	}
-	half := apitypes.ContextFormatHalfPpr
+	half := apitypes.BoardFormatHalfPpr
 	status, me = selectAs(t, svc, carol, apitypes.LeagueChoice{Format: &half})
 	if status != http.StatusOK || me.League != nil || me.Format == nil || *me.Format != apitypes.BoardFormatHalfPpr {
 		t.Fatalf("choosing half PPR with no league: %d %+v", status, me)
+	}
+	superflex := apitypes.BoardFormatSuperflex
+	status, me = selectAs(t, svc, carol, apitypes.LeagueChoice{Format: &superflex})
+	if status != http.StatusOK || me.League != nil || me.Format == nil || *me.Format != superflex {
+		t.Fatalf("choosing the superflex board with no league: %d %+v", status, me)
 	}
 
 	refusals := []struct {
@@ -110,7 +117,7 @@ func TestTheLeagueIsTheContext(t *testing.T) {
 		{"another account's league", apitypes.LeagueChoice{LeagueId: &daveID}, http.StatusNotFound},
 		{"both", apitypes.LeagueChoice{LeagueId: &sleeperID, Format: &half}, http.StatusBadRequest},
 		{"neither", apitypes.LeagueChoice{}, http.StatusBadRequest},
-		{"a format the context does not offer", map[string]string{"format": "superflex"}, http.StatusBadRequest},
+		{"a format we have no board for", map[string]string{"format": "quarter_ppr"}, http.StatusBadRequest},
 	}
 	for _, r := range refusals {
 		if status, _ := selectAs(t, svc, carol, r.choice); status != r.want {

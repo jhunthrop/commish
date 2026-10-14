@@ -1481,18 +1481,16 @@ components:
           format: uuid
           nullable: true
           description: the saved league a mock reruns from, null when a mock room cannot draft this league
-    ContextFormat:
-      type: string
-      description: a format chosen with no league
-      enum: [ppr, half_ppr, standard]
     LeagueChoice:
       type: object
-      description: exactly one of league_id (a followed league) and format (no league)
+      description: >-
+        exactly one of league_id (a followed league) and format (no league: any board format, the web offering
+        the ones the run carries)
       properties:
         league_id: { type: string, format: uuid, nullable: true }
         format:
           nullable: true
-          allOf: [{ $ref: "#/components/schemas/ContextFormat" }]
+          allOf: [{ $ref: "#/components/schemas/BoardFormat" }]
     Scoring:
       type: object
       description: exactly one of preset and custom. custom needs the custom_scoring feature.
@@ -2428,6 +2426,7 @@ components:
         - matchup
         - moves
         - held_by
+        - rostered
         - board_format
         - byes
         - placement
@@ -2485,6 +2484,13 @@ components:
             board without them, and every page marks them. The board is the run's own (web data/league-board), not
             part of this answer
           additionalProperties: { type: integer }
+        rostered:
+          type: array
+          deprecated: true
+          description: >-
+            held_by's board ids, sorted, for a web from before held_by during the deploy window. Removed after
+            2026-10-21 once the web that reads held_by has shipped
+          items: { type: string }
         board_format:
           allOf: [{ $ref: "#/components/schemas/BoardFormat" }]
           description: the run's board the league reads on (ppr, half_ppr, standard or superflex)

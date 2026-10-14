@@ -60,7 +60,7 @@ func (s *Store) Context(ctx context.Context, accountID uuid.UUID) (account.Leagu
 		return account.LeagueContext{}, err
 	}
 	var link *uuid.UUID
-	var format *apitypes.ContextFormat
+	var format *apitypes.BoardFormat
 	err = s.Pool.QueryRow(ctx, `select link_id, format from app.league_selections where account_id = $1`,
 		accountID).Scan(&link, &format)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -72,7 +72,7 @@ func (s *Store) Context(ctx context.Context, accountID uuid.UUID) (account.Leagu
 // contextOf is the context from the followed leagues and the selection:
 // the selected league while it is followed, none when a format was
 // chosen, and otherwise the newest league.
-func contextOf(list []Attached, link *uuid.UUID, format *apitypes.ContextFormat) account.LeagueContext {
+func contextOf(list []Attached, link *uuid.UUID, format *apitypes.BoardFormat) account.LeagueContext {
 	out := account.LeagueContext{Leagues: make([]apitypes.ContextLeague, 0, len(list))}
 	for _, a := range list {
 		out.Leagues = append(out.Leagues, contextLeague(a))
@@ -83,13 +83,13 @@ func contextOf(list []Attached, link *uuid.UUID, format *apitypes.ContextFormat)
 		f := out.League.Format
 		out.Format = &f
 	case format != nil:
-		f := apitypes.BoardFormat(*format)
+		f := *format
 		out.Format = &f
 	}
 	return out
 }
 
-func selected(leagues []apitypes.ContextLeague, link *uuid.UUID, format *apitypes.ContextFormat) *apitypes.ContextLeague {
+func selected(leagues []apitypes.ContextLeague, link *uuid.UUID, format *apitypes.BoardFormat) *apitypes.ContextLeague {
 	if link != nil {
 		for _, l := range leagues {
 			if l.Id == *link {

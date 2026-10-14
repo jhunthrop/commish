@@ -1296,16 +1296,11 @@ export interface components {
 			 */
 			settings_league_id: string | null;
 		};
-		/**
-		 * @description a format chosen with no league
-		 * @enum {string}
-		 */
-		ContextFormat: 'ppr' | 'half_ppr' | 'standard';
-		/** @description exactly one of league_id (a followed league) and format (no league) */
+		/** @description exactly one of league_id (a followed league) and format (no league: any board format, the web offering the ones the run carries) */
 		LeagueChoice: {
 			/** Format: uuid */
 			league_id?: string | null;
-			format?: components['schemas']['ContextFormat'] | null;
+			format?: components['schemas']['BoardFormat'] | null;
 		};
 		/** @description exactly one of preset and custom. custom needs the custom_scoring feature. */
 		Scoring: {
@@ -2137,6 +2132,11 @@ export interface components {
 			moves: components['schemas']['LeagueMove'][];
 			/** @description the roster id holding each player a team in the league holds, by his board id; the waiver pool is our board without them, and every page marks them. The board is the run's own (web data/league-board), not part of this answer */
 			held_by: Record<string, number>;
+			/**
+			 * @deprecated
+			 * @description held_by's board ids, sorted, for a web from before held_by during the deploy window. Removed after 2026-10-21 once the web that reads held_by has shipped
+			 */
+			rostered: string[];
 			/** @description the run's board the league reads on (ppr, half_ppr, standard or superflex) */
 			board_format: components['schemas']['BoardFormat'];
 			/** @description each NFL team's bye week this season, by team code */

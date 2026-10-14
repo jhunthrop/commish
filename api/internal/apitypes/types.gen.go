@@ -120,27 +120,6 @@ func (e ConnectedHost) Valid() bool {
 	}
 }
 
-// Defines values for ContextFormat.
-const (
-	ContextFormatHalfPpr  ContextFormat = "half_ppr"
-	ContextFormatPpr      ContextFormat = "ppr"
-	ContextFormatStandard ContextFormat = "standard"
-)
-
-// Valid indicates whether the value is a known member of the ContextFormat enum.
-func (e ContextFormat) Valid() bool {
-	switch e {
-	case ContextFormatHalfPpr:
-		return true
-	case ContextFormatPpr:
-		return true
-	case ContextFormatStandard:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for DeviceScope.
 const (
 	DeviceScopeDraftWrite  DeviceScope = "draft:write"
@@ -1064,9 +1043,6 @@ type CompanionSummary struct {
 // ConnectedHost a host the member connects their own account on, named as a mechanism
 type ConnectedHost string
 
-// ContextFormat a format chosen with no league
-type ContextFormat string
-
 // ContextLeague a followed league as the site's context reads it
 type ContextLeague struct {
 	// Format the board the league reads on: superflex for a superflex lineup, otherwise ppr, half_ppr or standard by the league's points per reception (TE premium reads on ppr until its exact rules have a board)
@@ -1318,9 +1294,9 @@ type League struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 }
 
-// LeagueChoice exactly one of league_id (a followed league) and format (no league)
+// LeagueChoice exactly one of league_id (a followed league) and format (no league: any board format, the web offering the ones the run carries)
 type LeagueChoice struct {
-	Format   *ContextFormat      `json:"format,omitempty"`
+	Format   *BoardFormat        `json:"format,omitempty"`
 	LeagueId *openapi_types.UUID `json:"league_id,omitempty"`
 }
 
@@ -1432,6 +1408,10 @@ type LeagueSync struct {
 	// ReadAt when the host was last read for this league
 	ReadAt time.Time    `json:"read_at"`
 	Roster []RosterSpot `json:"roster"`
+
+	// Rostered held_by's board ids, sorted, for a web from before held_by during the deploy window. Removed after 2026-10-21 once the web that reads held_by has shipped
+	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	Rostered []string `json:"rostered"`
 
 	// ScoringDefaulted the ScoringRules keys the league does not state, each at its standard figure ("key figure")
 	ScoringDefaulted []string `json:"scoring_defaulted"`

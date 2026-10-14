@@ -27,13 +27,13 @@ type AccountViewer interface {
 }
 
 // checkChoice says what is wrong with a selection, nil when it names
-// exactly one of a league and a format the context offers.
+// exactly one of a league and one of our board formats.
 func checkChoice(c apitypes.LeagueChoice) map[string]string {
 	switch {
 	case (c.LeagueId == nil) == (c.Format == nil):
 		return map[string]string{"league_id": "Choose a league or a format"}
 	case c.Format != nil && !c.Format.Valid():
-		return map[string]string{"format": "Choose PPR, half PPR or standard"}
+		return map[string]string{"format": "Choose one of our boards"}
 	}
 	return nil
 }
