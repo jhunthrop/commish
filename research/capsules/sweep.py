@@ -164,7 +164,12 @@ class FactsPassMemo:
 
     The pass reads on its own connection from `snapshot_of` (`db.read_cache.snapshot`: one
     REPEATABLE READ snapshot, so its history reads may be kept by the read cache), never the
-    caller's, which is why a caller's `conn` is not used."""
+    caller's, which is why a caller's `conn` is not used.
+
+    WHERE A NEW READER OF THE NIGHT'S FACTS HOOKS IN: anything in the nightly that needs the board's
+    sheets (a gate, a span rule, a repair) takes a `Subjects` (`subjects_at`) and is handed the
+    step's memo (`nightly.capsule_step.night_facts`, built once in `nightly.run_parts.run_steps`);
+    it never calls `subjects_of` itself, which is a whole uncached pass (about 196 MB)."""
 
     def __init__(
         self,
