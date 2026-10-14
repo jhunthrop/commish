@@ -69,6 +69,7 @@
 	class:flat={!range}
 	class:act={action !== undefined}
 	class:act-flat={action !== undefined && !range}
+	class:games={season !== undefined}
 >
 	<span class="rk">{lead}</span>
 	<span class="face"
@@ -85,11 +86,16 @@
 			{#if season === undefined}
 				<span class="wide">{fixed(player.expectedGames)} games</span>
 			{:else}
-				<span class="season">{seasonFigures(season)}</span>
+				{@const figures = seasonFigures(season)}
+				<span class="season"
+					>{figures.perGame}{#if figures.games !== null}<span class="count">{figures.games}</span
+						>{/if}</span
+				>
 			{/if}
 			<span class="narrow">{fixed(player.projected)} pts</span>
 		</span>
 	</span>
+	{#if season !== undefined}<span class="gp">{season.games}</span>{/if}
 	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
 	<ValueCell {...vorCell(player.vor, player.vorRound)} phoneLabel={false} />
 	{#if range}
@@ -125,6 +131,30 @@
 
 	.act-flat {
 		grid-template-columns: var(--board-cols-act-flat);
+	}
+
+	.games {
+		grid-template-columns: var(--board-cols-games);
+	}
+
+	.games.flat {
+		grid-template-columns: var(--board-cols-games-flat);
+	}
+
+	.games.act {
+		grid-template-columns: var(--board-cols-games-act);
+	}
+
+	.games.act-flat {
+		grid-template-columns: var(--board-cols-games-act-flat);
+	}
+
+	/* This season's games, a bare count under the Games head. */
+	.gp {
+		text-align: right;
+		font-family: var(--font-num);
+		font-size: var(--t-lg);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.action {
@@ -215,27 +245,37 @@
 		flex: none;
 	}
 
-	/* His season so far takes the projected games' place with its games count on every width, "8.2 a
-	   game, 3 games": a points a game figure never stands without its basis, and the desk and the
-	   phone print the same words. The widest in-season line with the club ("WR 120 · T10 · CHI · 10.5
-	   a game, 5 games") needs 256px, measured on the real run's 536 rows. A narrower column (the
-	   board at 1440, whose player column is 210px, and the phone) gives the figures a line of their
-	   own, wrapping their words rather than losing their end. */
+	/* His season so far takes the projected games' place. On a desk (1181 px and up) the count has
+	   its own Games column and the line prints "25.9 a game"; below it the line prints the count too,
+	   "8.2 a game, 3 games", taking a line of its own where the column is under the widest such line
+	   (256px, measured on the real run's 536 rows), wrapping its words rather than losing its end. */
 	.season {
 		color: var(--ink-2);
 		font-variant-numeric: tabular-nums;
 	}
 
-	@container (max-width: 259px) {
-		.seasoned {
-			flex-wrap: wrap;
-			row-gap: 2px;
+	@media (min-width: 1181px) {
+		.count {
+			display: none;
+		}
+	}
+
+	@media (max-width: 1180px) {
+		.gp {
+			display: none;
 		}
 
-		.seasoned > .season {
-			order: 1;
-			flex: 0 0 100%;
-			white-space: normal;
+		@container (max-width: 259px) {
+			.seasoned {
+				flex-wrap: wrap;
+				row-gap: 2px;
+			}
+
+			.seasoned > .season {
+				order: 1;
+				flex: 0 0 100%;
+				white-space: normal;
+			}
 		}
 	}
 

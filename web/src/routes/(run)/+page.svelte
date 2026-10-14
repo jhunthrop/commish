@@ -67,7 +67,7 @@
 				/>
 				{#if page.seasonLead !== null}<Footnote>{page.seasonLead}</Footnote>{/if}
 				<div class="rows">
-					<RowHead range={false} action />
+					<RowHead range={false} action games={page.seasonLead !== null} />
 					{#each page.rows as player, i (player.id)}
 						<Row
 							{player}
@@ -131,7 +131,7 @@
 		margin-top: var(--s-3);
 	}
 
-	@media (max-width: 1180px) {
+	@media (max-width: 1400px) {
 		.body {
 			grid-template-columns: minmax(0, 1fr);
 		}

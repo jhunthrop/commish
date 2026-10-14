@@ -29,7 +29,7 @@
 		<span class="span" style:left="{left.toFixed(1)}%" style:width="{width.toFixed(1)}%"></span>
 		<span class="med" style:left="{mid.toFixed(1)}%"></span>
 	</span>
-	<Label size="cell">{floor.toFixed(0)} floor to {ceiling.toFixed(0)} ceiling</Label>
+	<Label size="cell">{floor.toFixed(0)} to {ceiling.toFixed(0)}</Label>
 </span>
 
 <style>

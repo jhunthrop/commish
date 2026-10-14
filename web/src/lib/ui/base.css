@@ -1,6 +1,8 @@
 /* Element defaults for every page. Classes live in the components, never here.
    The breakpoints, used as literals in component media queries because a custom property
-   cannot sit in a media query: 1180px (the right rail folds under), 960px (the range column
+   cannot sit in a media query: 1400px (the board's and the front door's right rail folds under, as
+   their in-season rows with the Games column need 992px), 1180px (every other right rail folds
+   under, and below it the Games column folds into the meta line), 960px (the range column
    leaves the row), 760px (the phone layout, the rail moves to the bottom), 420px (the narrowest phones, where the score bug tightens). */
 
 *,
@@ -52,6 +54,26 @@ input {
 	--board-cols-flat: 34px 44px minmax(170px, 1fr) 92px 132px 150px;
 	--board-cols-act: 34px 44px minmax(210px, 1fr) 92px 132px minmax(110px, 170px) 140px 72px;
 	--board-cols-act-flat: 34px 44px minmax(210px, 1fr) 92px 132px 140px 72px;
+	/* In season a desk row gives the games count a narrow Games column after the player, its width
+	   taken from the floor to ceiling column (whose cell prints "242 to 446" under its head), so the
+	   meta line keeps "25.9 a game" on one line and the row its 53px. */
+	--games-w: 48px;
+	--board-cols-games: 34px 44px minmax(170px, 1fr) var(--games-w) 92px 132px minmax(110px, 142px)
+		150px;
+	--board-cols-games-flat: 34px 44px minmax(170px, 1fr) var(--games-w) 92px 132px 150px;
+	--board-cols-games-act: 34px 44px minmax(210px, 1fr) var(--games-w) 92px 132px
+		minmax(100px, 122px) 140px 72px;
+	--board-cols-games-act-flat: 34px 44px minmax(210px, 1fr) var(--games-w) 92px 132px 140px 72px;
+}
+
+/* Under 1181 px the count rides the meta line ("8.2 a game, 3 games") and the grid has no Games track. */
+@media (max-width: 1180px) {
+	:root {
+		--board-cols-games: var(--board-cols);
+		--board-cols-games-flat: var(--board-cols-flat);
+		--board-cols-games-act: var(--board-cols-act);
+		--board-cols-games-act-flat: var(--board-cols-act-flat);
+	}
 }
 
 @media (max-width: 960px) {

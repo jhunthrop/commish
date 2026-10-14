@@ -36,7 +36,7 @@
 		min-height: 1lh;
 	}
 
-	@media (min-width: 1181px) {
+	@media (min-width: 1401px) {
 		:global(html[data-league='2']) .narrow {
 			min-height: 2lh;
 		}

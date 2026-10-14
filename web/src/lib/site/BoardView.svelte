@@ -146,7 +146,7 @@
 		</div>
 
 		<section aria-label="{page.position ?? 'All'} {page.format.label} board">
-			<RowHead {range} action />
+			<RowHead {range} action games={page.seasonLead !== null} />
 			{#if page.position === null}
 				{#each visible as player, i (player.id)}
 					{@render row(player, i)}
@@ -264,7 +264,7 @@
 		display: none;
 	}
 
-	@media (max-width: 1180px) {
+	@media (max-width: 1400px) {
 		.board {
 			grid-template-columns: minmax(0, 1fr);
 			grid-template-rows: none;

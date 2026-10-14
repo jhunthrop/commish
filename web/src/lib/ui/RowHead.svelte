@@ -9,9 +9,11 @@
 		action?: boolean;
 		/** What the rows under it are ordered by. Match the Rows' order. */
 		order?: 'board' | 'adp';
+		/** The rows under it carry this season's figures: a Games column on a desk. */
+		games?: boolean;
 	}
 
-	let { range = true, action = false, order = 'board' }: Props = $props();
+	let { range = true, action = false, order = 'board', games = false }: Props = $props();
 </script>
 
 <div
@@ -19,6 +21,7 @@
 	class:flat={!range}
 	class:act={action}
 	class:act-flat={action && !range}
+	class:games
 	aria-hidden="true"
 >
 	<span class="lead"
@@ -26,6 +29,7 @@
 	>
 	<span></span>
 	<Label>Player</Label>
+	{#if games}<span class="gp"><Label align="end">Games</Label></span>{/if}
 	<span class="proj"><Label align="end">Projected</Label></span>
 	<span class="end"
 		><Label align="end"
@@ -59,11 +63,44 @@
 		grid-template-columns: var(--board-cols-act-flat);
 	}
 
+	.games {
+		grid-template-columns: var(--board-cols-games);
+	}
+
+	.games.flat {
+		grid-template-columns: var(--board-cols-games-flat);
+	}
+
+	.games.act {
+		grid-template-columns: var(--board-cols-games-act);
+	}
+
+	.games.act-flat {
+		grid-template-columns: var(--board-cols-games-act-flat);
+	}
+
+	.gp {
+		display: flex;
+		justify-content: flex-end;
+	}
+
+	@media (max-width: 1180px) {
+		.gp {
+			display: none;
+		}
+	}
+
 	.lead,
 	.proj,
 	.end {
 		display: flex;
 		justify-content: flex-end;
+	}
+
+	/* At 1440 the in-season range column is about 100px: its head takes two lines rather than run
+	   into the next. */
+	.rng :global(.label) {
+		white-space: normal;
 	}
 
 	@media (max-width: 960px) {
