@@ -122,7 +122,7 @@ def _frame_if(row: _Row) -> str:
 
 
 def _frame_swap(row: _Row) -> str:
-    swap = f"swaps one {row.one} for another" if row.same_position else f"trades the {row.call_one} for a {row.one}"
+    swap = f"swaps one {row.one} for another" if row.same_position else f"takes a {row.one} over the {row.call_one}"
     return f"Picking him {swap}, {_gap(row)}{_extra(row, 3)}."
 
 
@@ -131,12 +131,17 @@ _FRAMES: Final[tuple[Callable[[_Row], str], ...]] = (_frame_gives, _frame_is, _f
 
 def contrasts(shortlist: Sequence[Recommendation], pick_number: int, has_next: bool) -> list[str | None]:
     """Each row's contrast to the call (the first row), None for the call itself. The rows of one
-    card take different frames, so no two share a sentence with only the numbers swapped."""
+    card take different frames, so no two share a sentence with only the numbers swapped: past the
+    frames there are (a shortlist longer than the api's five), a row carries None and keeps its
+    plain why, whatever size the caller asks for."""
     if not shortlist:
         return []
     call = shortlist[0]
     out: list[str | None] = [None]
     for index, r in enumerate(shortlist[1:]):
+        if index >= len(_FRAMES):
+            out.append(None)
+            continue
         row = _Row(
             gap=call.expected_value_added - r.expected_value_added,
             same_position=r.position == call.position,

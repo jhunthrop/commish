@@ -5,6 +5,7 @@ parity bypasses: routing, the body cap, strict parsing, the bounds and the readi
 """
 
 import json
+import re
 import threading
 import time
 from collections.abc import Iterator
@@ -16,9 +17,11 @@ from starlette.testclient import TestClient
 
 from research.advisor import server
 from research.advisor.advise import Advice, advise
-from research.advisor.request import MAX_POOL, AdviseRequest
+from research.advisor.contrast import contrasts
+from research.advisor.request import MAX_POOL, MAX_SHORTLIST, AdviseRequest, parse_request
 from research.advisor.server import MAX_BODY_BYTES, create_app
 from research.advisor.warm import shape_only_state
+from research.model.arithmetic import ARM64_BOARDS
 from research.model.decide.survival import SurvivalCurve
 
 _READY_WITHIN_SECONDS: Final = 30.0
@@ -110,3 +113,15 @@ def test_health_answers_while_a_call_is_worked(monkeypatch: pytest.MonkeyPatch) 
         assert test_client.get("/healthz").status_code == HTTPStatus.OK
         assert time.perf_counter() - probed < _SLOW_CALL_SECONDS / 2
         call.join()
+
+
+def test_contrast_frames_never_repeat_on_a_card() -> None:
+    """Whatever shortlist size is asked for (the request allows 1 to 20), no two rows of a card share
+    a frame: rows past the frames carry no contrast and keep their plain why."""
+    state = shape_only_state()
+    for size in range(1, MAX_SHORTLIST + 1):
+        advice = advise(parse_request(json.dumps({**state, "shortlistSize": size})), SurvivalCurve(ARM64_BOARDS))
+        said = contrasts([c.recommendation for c in advice.shortlist], advice.pick_number, True)
+        frames = [re.sub(r"\d+(?:\.\d+)?", "#", s) for s in said if s is not None]
+        assert said[:1] in ([], [None])
+        assert len(frames) == len(set(frames)), (size, frames)
