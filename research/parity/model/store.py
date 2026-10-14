@@ -90,9 +90,14 @@ _REASONS_OF_A_KEPT_GENERATION: Final = (
 _BOARD_AT_ITS_MOMENT: Final = ' where "as_of" <= %(moment)s'
 
 
+# The read cache's rows (`db.read_cache`, `cache/<name>`) are a store's own derived results, never an
+# input a case copies.
+_NO_CACHE_ROWS: Final = " where name not like 'cache/%%'"
+
+
 def _filter_for(table: str, columns: list[str]) -> str:
     if table in _COPIED_WHOLE:
-        return ""
+        return _NO_CACHE_ROWS
     if table == "preseason_board_reasons":
         return _REASONS_OF_A_KEPT_GENERATION
     if table == "preseason_projections":

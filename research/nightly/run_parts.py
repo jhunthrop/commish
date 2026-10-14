@@ -8,11 +8,15 @@ is stored, so a crashed sweep still gates the board as it stands.
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Final
 
 import httpx
 from sqlalchemy import Engine
 
+from research.capsules.sweep import FactsPassMemo
+from research.db.code_digest import code_digest
+from research.db.read_cache import ReadCache, snapshot
+from research.db.value_codec import ValueCodec
 from research.model.arithmetic import model_version
 from research.model.artifacts import read_artifact
 from research.model.backtest import HeldOutScore, held_out_scores
@@ -20,7 +24,7 @@ from research.model.instants import js_iso
 from research.nightly.assemble import Assembled
 from research.nightly.build.season import format_json
 from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate
-from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan, run_capsule_step
+from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan, night_facts, run_capsule_step
 from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION
 from research.nightly.headshots import Face, mirror_headshots
 from research.nightly.page_findings import page_findings
@@ -33,6 +37,11 @@ from research.season import PRODUCT_SEASON
 
 Json = dict[str, Any]
 Log = Callable[[str], None]
+# The held-out scores move only when the served board or a held-out season's outcomes do, so the
+# nightly reads them through the read cache (`db.read_cache`): about 30 MB of outcomes a night
+# before, the statements' fingerprints after.
+HELD_OUT_CODEC: Final = ValueCodec((HeldOutScore,))
+HELD_OUT_CACHE: Final = "nightly/held-out-scores"
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,17 +61,17 @@ def _isolated(name: str, body: Callable[[], StepOutcome], log: Log) -> StepOutco
     return outcome
 
 
-def _capsules(
-    engine: Engine, clock: Callable[[], datetime], log: Log, skip: bool, plan: CapsuleStepPlan
+def _capsules(  # noqa: PLR0913, PLR0917 - the step's parts
+    engine: Engine, clock: Callable[[], datetime], log: Log, skip: bool, plan: CapsuleStepPlan, facts: FactsPassMemo
 ) -> StepOutcome:
     if not skip:
-        result = run_capsule_step(engine, clock(), plan, log)
+        result = run_capsule_step(engine, clock(), plan, log, facts)
         status = "ran" if result.wrote else "skipped"
         record = StepRecord("capsules", status, f"{result.spend.line()}; {result.gate.summary()}")
         return StepOutcome(record, result.gate, tuple(result.findings.reasons), result.spend)
     with engine.connect() as conn:
         gate = capsule_gate(conn, clock())
-        findings = page_findings(conn, clock())
+        findings = page_findings(conn, clock(), facts)
     return StepOutcome(
         StepRecord("capsules", "skipped", "skipped by --skip; the gate judges what is stored"),
         gate,
@@ -80,24 +89,28 @@ def run_steps(  # noqa: PLR0913, PLR0917 - the steps' shared dependencies
     plan: CapsuleStepPlan,
 ) -> list[StepOutcome]:
     skipped = StepOutcome(StepRecord("ingest", "skipped", "skipped by --skip"))
+    # One facts pass for the capsule step and every gate after it (`FactsPassMemo`).
+    facts = night_facts(engine)
     steps = [
         _isolated("ingest", lambda: skipped if "ingest" in skip else StepOutcome(ingest_step(IngestContext(engine, fetcher, clock(), environ))), log),
         _isolated("fit", lambda: StepOutcome(StepRecord("fit", "skipped", "skipped by --skip") if "fit" in skip else run_fit_step(engine, clock())), log),
-        _isolated("capsules", lambda: _capsules(engine, clock, log, "capsules" in skip, plan), log),
+        _isolated("capsules", lambda: _capsules(engine, clock, log, "capsules" in skip, plan, facts), log),
     ]  # fmt: skip
     capsule = steps[-1]
     if capsule.capsule_gate is None:
         # The step raised: the gate still judges the board as stored.
         with engine.connect() as conn:
-            gate, findings = capsule_gate(conn, clock()), page_findings(conn, clock())
+            gate, findings = capsule_gate(conn, clock()), page_findings(conn, clock(), facts)
         steps[-1] = StepOutcome(capsule.record, gate, tuple(findings.reasons))
     return steps
 
 
 def held_out(engine: Engine, store: RunStore) -> tuple[list[HeldOutScore], Mapping[int, float] | None]:
-    with engine.connect() as conn:
+    cache = ReadCache(engine, HELD_OUT_CODEC, code_digest("research.model.backtest"))
+    # One snapshot for the read and its fingerprints, so the cache may keep it (`db.read_cache`).
+    with snapshot(engine) as conn:
         seasons = [int(s) for s in read_artifact(conn, "model/weekly-priors").payload["heldOutSeasons"]]
-        scores = held_out_scores(conn, seasons)
+        scores = cache.through(conn, HELD_OUT_CACHE, [seasons], None, lambda: held_out_scores(conn, seasons))
     baseline = read_json(store, HELD_OUT_BASELINE_KEY)
     previous = (
         None if baseline is None else {int(s["season"]): float(s["rankCorrelation"]) for s in baseline["heldOut"]}

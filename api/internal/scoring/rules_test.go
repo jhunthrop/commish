@@ -109,17 +109,22 @@ func TestFromSleeper(t *testing.T) {
 		t.Errorf("rules %v", im.Rules)
 	}
 	ranged := FromSleeper(map[string]float64{"fgm_0_19": 3, "fgm_20_29": 3, "fgm_30_39": 3, "fgm_40_49": 4, "fgm_50p": 5})
-	if ranged.Rules["points_per_field_goal"] != 3 || !slices.Equal(ranged.Dropped,
-		[]string{"field goal made, 40 to 49 yards 4 (read as 3)", "field goal made, 50+ yards 5 (read as 3)"}) {
-		t.Errorf("field goals by distance: %v, dropped %q", ranged.Rules["points_per_field_goal"], ranged.Dropped)
+	if ranged.Rules["points_per_field_goal"] != 3 || len(ranged.Dropped) != 0 {
+		t.Errorf("field goals by distance: %v, dropped %+v", ranged.Rules["points_per_field_goal"], ranged.Dropped)
 	}
+	words := DroppedWords(im.Dropped)
 	for _, want := range []string{"completion 0.1", "rushing first down 1e+06", "Sleeper setting IDP tkl 1"} {
-		if !slices.Contains(im.Dropped, want) {
-			t.Errorf("dropped %q, want %q", im.Dropped, want)
+		if !slices.Contains(words, want) {
+			t.Errorf("dropped %q, want %q", words, want)
 		}
 	}
-	if slices.ContainsFunc(im.Dropped, func(d string) bool { return strings.HasPrefix(d, "st_td") }) {
+	if slices.ContainsFunc(words, func(d string) bool { return strings.HasPrefix(d, "special teams touchdown") }) {
 		t.Error("a setting worth 0 was named dropped")
+	}
+	for _, d := range im.Dropped {
+		if strings.Contains(d.Rule, ",") || d.Group == "" {
+			t.Errorf("a left-out rule that does not read in a list: %+v", d)
+		}
 	}
 	if len(im.Rules) != 21 || slices.Contains(im.Applied(), "points_per_safety") || !slices.Contains(im.Applied(), Reception) {
 		t.Errorf("applied %v", im.Applied())

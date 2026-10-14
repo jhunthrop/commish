@@ -24,7 +24,7 @@ export const FEATURE_WORDS: Readonly<Record<Feature, FeatureWords>> = {
 	},
 	custom_scoring: {
 		lead: "Your league's exact scoring",
-		text: 'every player scored by your own points per stat, brought in from your Sleeper, ESPN or MyFantasyLeague league, or entered by hand for Yahoo'
+		text: 'every player but kickers and defenses projected under the 21 scoring rules you set, brought in from your Sleeper, ESPN or MyFantasyLeague league, or entered by hand for Yahoo'
 	},
 	full_reasoning: {
 		lead: 'The why on each player we would take next',

@@ -11,7 +11,7 @@ from typing import Any, cast
 
 from sqlalchemy import Connection
 
-from research.model.artifacts import read_pinned
+from research.model.artifacts import read_artifact, read_pinned
 from research.model.domain import Position
 from research.model.laws.discovery import CandidateLaw, QuantileTable, generate_candidates_from
 from research.model.laws.registry import Law, discovered_laws_from, registry_from
@@ -251,3 +251,13 @@ def model_artifacts_from(payloads: Mapping[str, Any]) -> ModelArtifacts:
 def load_model_artifacts(conn: Connection) -> ModelArtifacts:
     """The pinned artifacts, read from the store and parsed."""
     return model_artifacts_from(read_pinned(conn))
+
+
+def load_game_variance(conn: Connection) -> Mapping[str, Mapping[str, float]]:
+    """The game-variance priors alone, as `load_model_artifacts(conn).game_variance` parses them: two
+    of the catalog's artifacts (a few hundred bytes) for a reader that needs nothing else, where the
+    whole catalog is some 430 KB."""
+    return parse_game_variance(
+        read_artifact(conn, "preseason/game-variance-skill").payload,
+        read_artifact(conn, "preseason/game-variance-kdef").payload,
+    )

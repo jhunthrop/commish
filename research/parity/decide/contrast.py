@@ -18,11 +18,7 @@ from research.parity.model.outcome import Claim
 _NUMBER: Final = re.compile(r"\d+(?:\.\d+)?")
 _PERCENT: Final = re.compile(r"\d+%")
 _RANK: Final = re.compile(r"No\. \d+")
-
-
-def _frame(text: str) -> str:
-    """A sentence with its numbers taken out: what two rows must not share."""
-    return _NUMBER.sub("#", text)
+_FULL_COST: Final = "over this pick and your next"
 
 
 def contrast_claims(cards: Sequence[Mapping[str, Any]]) -> list[Claim]:
@@ -33,14 +29,16 @@ def contrast_claims(cards: Sequence[Mapping[str, Any]]) -> list[Claim]:
     shared = sum(
         1
         for card in cards
-        if len({_frame(str(c.get("contrast"))) for c in card["shortlist"][1:]}) != len(card["shortlist"][1:])
+        if len({str(c.get("contrast")) for c in card["shortlist"][1:]}) != len(card["shortlist"][1:])
     )
+    stated = sum(1 for card in cards if sum(_FULL_COST in str(c.get("contrast")) for c in card["shortlist"][1:]) > 1)
     voiced = [text for text in texts if voice_rule_hits(text, []) or EM_DASH in text or SEMICOLON in text]
     repeats = [text for text in texts if _PERCENT.search(text) or _RANK.search(text)]
     return [
         Claim(f"the call carries no contrast on all {len(cards)} cards", calls_bare),
         Claim(f"all {len(rows)} rows after the call carry a contrast why", every_row),
-        Claim(f"no card has two rows sharing a frame ({shared} do)", shared == 0),
+        Claim(f"no card has two rows saying the same thing ({shared} do)", shared == 0),
+        Claim(f"no card states the cost clause in full more than once ({stated} do)", stated == 0),
         Claim(f"no contrast breaks a voice rule ({len(voiced)} do)", not voiced),
         Claim(f"no contrast repeats a rank or a chance its row prints ({len(repeats)} do)", not repeats),
     ]

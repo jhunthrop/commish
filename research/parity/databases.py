@@ -2,7 +2,7 @@
 
 The harness never touches a database it did not create. It is handed an ADMIN URL
 (`PARITY_DATABASE_URL`, any database on a server where it may CREATE DATABASE: a local Postgres,
-or the CI service container) and makes its own scratch databases beside it, named with a
+or the CI service container, in the TCP form; production's Cloud SQL socket form is never a target) and makes its own scratch databases beside it, named with a
 `parity_` prefix so nothing else on the server can be mistaken for one.
 """
 

@@ -15,6 +15,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // Host keys, as the contract (openapi.yaml LeagueHost) spells them.
@@ -116,6 +118,10 @@ type Scoring struct {
 	Rules     map[string]float64 `json:"rules"`
 	Dropped   []string           `json:"dropped"`
 	Defaulted []string           `json:"defaulted"`
+	// DroppedRules is Dropped by rule, group and figure, for the scoring
+	// import's list; nil for a host whose words carry their own figures
+	// (MyFantasyLeague) and in a snapshot kept before it existed.
+	DroppedRules []scoring.DroppedRule `json:"dropped_rules,omitempty"`
 }
 
 // Shape is the league's starting lineup and bench, by our slot names.

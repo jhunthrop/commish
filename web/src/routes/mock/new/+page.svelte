@@ -238,6 +238,7 @@
 			<ScoringRow
 				scoring={settings.scoring}
 				{exactRules}
+				signInTo={signedOut ? signInHref(page.url.pathname) : null}
 				onchange={(scoring: LeagueSettings['scoring']) => set({ scoring })}
 			/>
 			<SetupRow label="Teams">
