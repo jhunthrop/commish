@@ -175,11 +175,17 @@
 		text-decoration: underline;
 	}
 
+	/* The rank is quiet at body size; the strength it comes from carries the number face. */
 	.rank b {
+		font-weight: 500;
+		color: var(--ink-3);
+		font-variant-numeric: tabular-nums;
+	}
+
+	td.strength {
 		font-family: var(--font-num);
 		font-weight: 700;
-		font-size: var(--t-xl);
-		font-variant-numeric: tabular-nums;
+		font-size: var(--t-lg);
 	}
 
 	.week {
