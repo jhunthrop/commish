@@ -106,3 +106,22 @@ clean test left is 2026 itself, registered prospectively.
    ingest can add).
 3. **Stamped weekly roster statuses**, captured nightly, so designations can enter a later model
    (the next lane's item).
+
+## The ruling this judgment was taken under
+
+Quoted from the coordinator of this session, 2026-10-14, after round 1 failed (also appended to
+the round-2 preregistration):
+
+> "Round 2 dispatched with a new preregistration: switch week S (prior 6), raw-line points a game,
+> per-week interval, judged at weeks 8 and 12 on 2025 with G1 margin doubled and the
+> multiple-testing cost named."
+
+## Errata (2026-10-14, after the record review)
+
+- **The switch week's rationale has an arithmetic error.** The preregistration says round 1's
+  "week 8's smallest ordering margin, +0.034, already clears even this round's doubled margin". It
+  does not: +0.034 is below +0.04. That cell, week-8 standard receivers, then failed G1 here at
+  +0.0297. S = 6 was not supported by round 1's weakest week-8 cell.
+- **2021 and 2022 could have been fit.** The preregistration names 2021 and 2022 as unusable for
+  lack of a week-one roster. The store held both (2,721 and 2,873 rows), as round 3's
+  preregistration corrects. The consequence: this round fit on 2023-2024 only.

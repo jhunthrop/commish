@@ -165,3 +165,23 @@ On the founder's laptop: the fit and the judgment together in under two minutes 
 stale board takes about 12 s to build, each week's inputs under a second). No model call, no prose:
 this round spent nothing. Had it passed, the nightly would have needed no new table reads: the
 season-so-far store the player pages already read (`read_season_store`) holds every input.
+
+## Errata (2026-10-14, after the record review)
+
+- **The shrinkage line under "The fit" is wrong for half PPR and standard.** It says "QB 0.5, 0.5;
+  RB 1.0, 0.6; WR 1.0, 0.6; TE 3.0, 0.2 (the same cells in half and standard)". The JSON's
+  `priors.shrinkage` holds (k, alpha): QB 0.5, 0.5 in all three formats; RB 1.0, 0.6 in PPR and
+  **1.5, 0.6** in half PPR and standard; WR 1.0, 0.6 in PPR and **1.0, 0.5** in half PPR and
+  standard; TE 3.0, 0.2 in all three. The shrinkage is not format-invariant.
+- **The development check ran on an uncommitted tree.** Its JSON names `research@58393132`, the
+  preregistration commit, which holds only the preregistration, `__init__.py` and `scratch.py`; the
+  model, fit and gates were in the working tree and were first committed in `115c6b91`. The check's
+  first run (whose half and standard rho margins of +0.25 to +0.62 against the flat boards led to
+  Amendment 1) wrote no file, because of Defect 1, and its console output was not kept; only the
+  figures quoted in the preregistration's amendment survive. From this correction on, every run
+  records `git status --porcelain` in its JSON (`tree_status`, `tree_clean`).
+- **2021 and 2022 could have been fit.** This round's preregistration said the store held no
+  week-one roster for 2021 or 2022. It held both (2,721 and 2,873 rows), as round 3's
+  preregistration (`2026-10-14-rest-of-season-round3-preregistration.md`) corrects. The consequence:
+  this round fit everything that shrinks toward the board on 2023-2024 only, half of the brief's
+  2021-2024, for a reason that was not true.

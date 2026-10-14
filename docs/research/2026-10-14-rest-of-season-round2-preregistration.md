@@ -134,3 +134,16 @@ three formats; G3 failed in 16 of 24 cells, on both sides of the band (week-12 r
 projections found no defect (a capped player's points a game now come from the raw line: 2024
 Christian McCaffrey 21.4 a game over 3.8 expected games at week 8). **No amendment; nothing changed
 between the check and the judgment.**
+
+## Note appended 2026-10-14 (after the record review): the authority for a second look at 2025
+
+Round 1's decision rule says its model "is not retuned and rerun against 2025", and the brief says a
+failed judgment is "never rerun on 2025". This round is a new model under a new preregistration, and
+its judgment on 2025 was authorised by the coordinator of this session on 2026-10-14, after round 1
+failed, in these words:
+
+> "Round 2 dispatched with a new preregistration: switch week S (prior 6), raw-line points a game,
+> per-week interval, judged at weeks 8 and 12 on 2025 with G1 margin doubled and the
+> multiple-testing cost named."
+
+The text above this note is unchanged.

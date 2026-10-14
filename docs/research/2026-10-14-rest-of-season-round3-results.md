@@ -87,3 +87,11 @@ starters) and, while it was gated, the interval. A next decision is a ruling mor
 whether "no worse than the stale board among week-8 receiver starters" is the right bar for "better
 than stale", or whether a later switch week (where week 12's G2 passes everywhere) answers it. Any
 next round needs a clean season: 2024 now carries a judgment, 2025 three, and 2026 is pristine.
+
+## The ruling this judgment was taken under
+
+Quoted from the coordinator of this session, 2026-10-14, after round 2 failed:
+
+> "round 3 gates ordering only (G1 +0.04, G2, G4), the in-season board ships with no interval (null
+> floor/ceiling, basis says so), fit 2021-2023 after ingesting 2021-22 week-one rosters into the
+> scratch copy, judged once on 2024 at weeks 8 and 12; 2025 closed, 2026 pristine; S=6."
