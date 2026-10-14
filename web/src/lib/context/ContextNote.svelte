@@ -12,17 +12,14 @@
 		/** A short fact that always fits one line: it keeps one line's room whatever the basis line
 		 * takes on a phone. */
 		short?: boolean;
-		/** On a desk the line sits in a column as narrow as a phone's (the board's side column, under
-		 * the switch), so it keeps the phone's room there too. */
-		narrow?: boolean;
 		/** The one link the line ends on: where a Draft Pass holder's exact board lives. */
 		link?: LeagueLine['link'];
 	}
 
-	let { note, short = false, narrow = false, link = null }: Props = $props();
+	let { note, short = false, link = null }: Props = $props();
 </script>
 
-<p class="note" class:filled={note !== null} class:short class:narrow>
+<p class="note" class:filled={note !== null} class:short>
 	{note ?? ''}{#if link}
 		<a href={link.href}>{link.words}</a>{/if}
 </p>
@@ -46,16 +43,6 @@
 	:global(html[data-league]) .note {
 		display: block;
 		min-height: 1lh;
-	}
-
-	@media (min-width: 1181px) {
-		:global(html[data-league='2']) .narrow {
-			min-height: 2lh;
-		}
-
-		:global(html[data-league='3']) .narrow {
-			min-height: 3lh;
-		}
 	}
 
 	/* Between the phone and the desk the longer lines (a TE premium league's, a board the run lacks)

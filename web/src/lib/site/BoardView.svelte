@@ -81,7 +81,7 @@
 			means: `The round his points over replacement rank in, among ${String(page.boardSize)}`
 		},
 		{ term: 'Rose', means: 'Below replacement' },
-		{ term: 'Range', means: 'Floor to ceiling, the low and high ends of his projection' },
+		{ term: 'Range', means: 'Floor to ceiling' },
 		{ term: 'Drafters', means: `Their ADP from ${page.adpBasis.join(' and ')}, against our rank` }
 	]);
 
@@ -111,7 +111,7 @@
 	<!-- The league's line sits by the switch, not under the caption: atop the side column on a desk,
 	     first under the bar elsewhere. -->
 	<div class="league-line">
-		<ContextNote note={note?.text ?? null} link={note?.link ?? null} narrow />
+		<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
 	</div>
 	<div class="content">
 		<div class="lead">
@@ -213,6 +213,17 @@
 	.league-line {
 		grid-column: 2;
 		grid-row: 1;
+	}
+
+	/* On a desk the line sits in the side column, as narrow as a phone, so it keeps the phone's room. */
+	@media (min-width: 1181px) {
+		:global(html[data-league='2']) .league-line :global(.note) {
+			min-height: 2lh;
+		}
+
+		:global(html[data-league='3']) .league-line :global(.note) {
+			min-height: 3lh;
+		}
 	}
 
 	:global(html[data-league]) .league-line,

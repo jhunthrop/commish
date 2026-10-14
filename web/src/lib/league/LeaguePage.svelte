@@ -5,6 +5,7 @@
 	import { choose } from '#lib/context/choose.svelte.ts';
 	import { takeHeld } from '#lib/context/held.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
+	import { scoresSentence } from '#lib/context/note-words.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
@@ -153,7 +154,9 @@
 	/** What every number on the page is, said once under the title: the scoring, the season's
 	 * figures, then the preseason board's. */
 	const basis = $derived(
-		board && sync ? leagueBasis(board.seasonScoring, board.seasonThrough, sync.scoring_like) : ''
+		board && sync
+			? leagueBasis(board.seasonScoring, board.seasonThrough, sync.scoring_like, scoresSentence)
+			: ''
 	);
 </script>
 

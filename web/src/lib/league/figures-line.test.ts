@@ -2,7 +2,14 @@
 // with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { leagueBasis } from './model.ts';
+import { scoresSentence } from '#lib/context/note-words.ts';
+import { leagueBasis as basisOf } from './model.ts';
+
+const leagueBasis = (
+	scoring: string,
+	through: number,
+	like: Parameters<typeof scoresSentence>[0]
+): string => basisOf(scoring, through, like, scoresSentence);
 
 void test('a TE premium league on the PPR figures says the figures once and the league in plain words', () => {
 	assert.equal(

@@ -29,11 +29,3 @@ export const SCORING_WORDS: Readonly<Record<ScoringPreset, string>> = {
 	standard: 'standard',
 	te_premium: 'TE premium'
 };
-
-/** A league's scoring as a sentence, in plain words: TE premium is jargon a first-timer cannot act
- * on, so it says what it does. The league line and the league page's basis both read it. */
-export function scoresSentence(scoring: ScoringPreset): string {
-	return scoring === 'te_premium'
-		? 'Your league gives tight ends extra points per catch.'
-		: `Your league scores ${SCORING_WORDS[scoring]}.`;
-}

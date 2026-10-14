@@ -1,7 +1,7 @@
 /** The one basis line a page prints about the selected league: what its figures are against the
  * league's scoring. Its own module, so only the pages that print it carry it. */
 import { midSentence } from '#lib/format/sentence.ts';
-import { SCORING_WORDS, scoresSentence } from '#lib/league/names.ts';
+import { SCORING_WORDS } from '#lib/league/names.ts';
 import { FORMAT_LABELS } from '#lib/sheet/format.ts';
 import type { BoardFormat, ContextLeague } from './words.ts';
 
@@ -48,6 +48,14 @@ function exactNote(league: ContextLeague, exactRules: boolean, opening: string):
 				? { words: "Set up your league's exact rules to rank by them.", savedLeague: null }
 				: { words: "Your league's exact board is in its mock draft.", savedLeague: saved }
 	};
+}
+
+/** A league's scoring as a sentence, in plain words: TE premium is jargon a first-timer cannot act
+ * on, so it says what it does. The league line and the league page's basis both read it. */
+export function scoresSentence(scoring: ContextLeague['scoring']): string {
+	return scoring === 'te_premium'
+		? 'Your league gives tight ends extra points per catch.'
+		: `Your league scores ${SCORING_WORDS[scoring]}.`;
 }
 
 /** The page's one line about the league, null with no league selected. The figures' scoring names

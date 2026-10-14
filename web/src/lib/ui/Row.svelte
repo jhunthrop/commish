@@ -88,15 +88,12 @@
 				<span class="wide">{fixed(player.expectedGames)} games</span>
 			{:else}
 				{@const figures = seasonFigures(season)}
-				<span class="season"
-					>{figures.perGame}{#if figures.games !== null}<span class="count">{figures.games}</span
-						>{/if}</span
-				>
+				<span class="season">{figures.perGame}<span class="count">{figures.games}</span></span>
 			{/if}
 			<span class="narrow">{fixed(player.projected)} pts</span>
 		</span>
 	</span>
-	{#if season !== undefined}<span class="gp">{season.games}</span>{/if}
+	<span class="gp">{season?.games}</span>
 	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
 	<ValueCell {...vorCell(player.vor, player.vorRound)} phoneLabel={false} />
 	{#if range}
@@ -150,8 +147,9 @@
 		grid-template-columns: var(--board-cols-games-act-flat);
 	}
 
-	/* This season's games, a bare count under the Games head. */
+	/* This season's games, a bare count under the Games head, in a row that carries the season. */
 	.gp {
+		display: none;
 		text-align: right;
 		font-family: var(--font-num);
 		font-size: var(--t-lg);
@@ -258,6 +256,10 @@
 	@media (min-width: 1181px) {
 		.count {
 			display: none;
+		}
+
+		.games > .gp {
+			display: block;
 		}
 	}
 

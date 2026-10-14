@@ -11,11 +11,12 @@ const NO_GAMES_YET = 'no games yet';
  * px and on the phone the line prints both, "18.4 a game, 5 games". */
 export interface SeasonParts {
 	perGame: string;
-	games: string | null;
+	/** ", 5 games", or "" before his first game. */
+	games: string;
 }
 
 export function seasonFigures(season: IndexSeason): SeasonParts {
-	if (season.pointsPerGame === null) return { perGame: NO_GAMES_YET, games: null };
+	if (season.pointsPerGame === null) return { perGame: NO_GAMES_YET, games: '' };
 	const perGame = fixed(season.pointsPerGame, POINTS_PER_GAME_DECIMALS);
 	return { perGame: `${perGame} a game`, games: `, ${plural(season.games, 'game')}` };
 }

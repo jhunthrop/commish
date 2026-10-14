@@ -18,7 +18,7 @@ import type {
 	RosterSpot
 } from './api.ts';
 import type { components } from '#lib/api/types.ts';
-import { SCORING_WORDS, hostWords, scoresSentence } from './names.ts';
+import { SCORING_WORDS, hostWords } from './names.ts';
 
 export { followedName, hostWords } from './names.ts';
 
@@ -196,11 +196,14 @@ export function poolBasis(board: LeagueBoard): string {
  * a lineup shape such as superflex), which figures are this season's and which are preseason, in
  * words, and the league's own scoring in plain words when it differs: "PPR. This season's games and
  * points a game through week 5, beside our preseason projection and points over replacement. Your
- * league gives tight ends extra points per catch." No page promises the league's exact rules here. */
+ * league gives tight ends extra points per catch." The league's sentence is note-words'
+ * scoresSentence, handed in so this module never pulls the league line in. No page promises the
+ * league's exact rules here. */
 export function leagueBasis(
 	figuresScoring: string,
 	through: number,
-	scoringLike: ScoringPreset
+	scoringLike: ScoringPreset,
+	scoresSentence: (scoring: ScoringPreset) => string
 ): string {
 	const reach = through === 0 ? '' : ` through week ${String(through)}`;
 	const same =
