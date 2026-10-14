@@ -8,11 +8,13 @@ is stored, so a crashed sweep still gates the board as it stands.
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Final
 
 import httpx
 from sqlalchemy import Engine
 
+from research.db.read_cache import ReadCache
+from research.db.value_codec import ValueCodec
 from research.model.arithmetic import model_version
 from research.model.artifacts import read_artifact
 from research.model.backtest import HeldOutScore, held_out_scores
@@ -33,6 +35,11 @@ from research.season import PRODUCT_SEASON
 
 Json = dict[str, Any]
 Log = Callable[[str], None]
+# The held-out scores move only when the served board or a held-out season's outcomes do, so the
+# nightly reads them through the read cache (`db.read_cache`): about 30 MB of outcomes a night
+# before, the statements' fingerprints after.
+HELD_OUT_CODEC: Final = ValueCodec((HeldOutScore,))
+HELD_OUT_CACHE: Final = "nightly/held-out-scores"
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,9 +102,10 @@ def run_steps(  # noqa: PLR0913, PLR0917 - the steps' shared dependencies
 
 
 def held_out(engine: Engine, store: RunStore) -> tuple[list[HeldOutScore], Mapping[int, float] | None]:
+    cache = ReadCache(engine, HELD_OUT_CODEC, model_version())
     with engine.connect() as conn:
         seasons = [int(s) for s in read_artifact(conn, "model/weekly-priors").payload["heldOutSeasons"]]
-        scores = held_out_scores(conn, seasons)
+        scores = cache.through(conn, HELD_OUT_CACHE, [seasons], None, lambda: held_out_scores(conn, seasons))
     baseline = read_json(store, HELD_OUT_BASELINE_KEY)
     previous = (
         None if baseline is None else {int(s["season"]): float(s["rankCorrelation"]) for s in baseline["heldOut"]}
