@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { fixed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
+	import type { LeagueMark } from '#lib/context/words.ts';
 	import type { IndexSeason } from '#lib/run/schema.ts';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import AdpCell from './AdpCell.svelte';
@@ -39,8 +40,8 @@
 		 * prints "18.4 a game, 5 games" in place of his projected games, and the page's basis line
 		 * names it. Left out, the row is the preseason row. */
 		season?: IndexSeason;
-		/** A team in your league holds him (HeldMark): whose, in words, and whether it is yours. */
-		held?: { words: string; mine: boolean } | null;
+		/** The league's mark (HeldMark): yours, which tints the row with your wash, or a free agent. */
+		held?: LeagueMark | null;
 	}
 
 	let {
@@ -64,6 +65,7 @@
 
 <div
 	class="row"
+	class:mine={held?.kind === 'mine'}
 	class:flat={!range}
 	class:act={action !== undefined}
 	class:act-flat={action !== undefined && !range}
@@ -149,6 +151,12 @@
 
 	.row:hover {
 		background: var(--surface);
+	}
+
+	/* Your own player's row takes your wash, the one tint that means you. */
+	.mine,
+	.mine:hover {
+		background: var(--accent-wash);
 	}
 
 	/* The face's box, kept for every row, so a held mark arriving over its edge moves nothing. */

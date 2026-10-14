@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
 	contextNote,
 	heldMark,
+	holderWords,
 	labelEnds,
 	switchLabel,
 	type ContextLeague,
@@ -85,17 +86,32 @@ void test('a matching league says its scoring, and no league says nothing', () =
 	assert.equal(contextNote(null, 'ppr'), null);
 });
 
-void test('the held mark names your roster, the team, or a roster when the name is unread', () => {
+void test('a row marks your own players by your team and the free agents, never the taken', () => {
 	const held: Held = {
 		me: 4,
 		teams: { 4: 'Ertz Hurts', 7: 'Gmoneyman', 9: '' },
 		by: { a: 4, b: 7, c: 9 }
 	};
-	assert.deepEqual(heldMark(held, 'a'), { words: 'On your roster', mine: true });
-	assert.deepEqual(heldMark(held, 'b'), { words: 'Rostered by Gmoneyman', mine: false });
-	assert.deepEqual(heldMark(held, 'c'), { words: 'On a roster in your league', mine: false });
-	assert.equal(heldMark(held, 'free'), null);
+	assert.deepEqual(heldMark(held, 'a'), { words: 'On Ertz Hurts', kind: 'mine' });
+	assert.deepEqual(heldMark({ ...held, teams: { 4: '' } }, 'a'), {
+		words: 'On your roster',
+		kind: 'mine'
+	});
+	assert.equal(heldMark(held, 'b'), null);
+	assert.deepEqual(heldMark(held, 'free'), { words: 'Free agent in your league', kind: 'free' });
 	assert.equal(heldMark(null, 'a'), null);
+});
+
+void test('his page names whose roster he is on, or that he is a free agent', () => {
+	const held: Held = {
+		me: 4,
+		teams: { 4: 'Ertz Hurts', 7: 'Gmoneyman', 9: '' },
+		by: { a: 4, b: 7, c: 9 }
+	};
+	assert.equal(holderWords(held, 'a'), 'On your roster');
+	assert.equal(holderWords(held, 'b'), 'Rostered by Gmoneyman');
+	assert.equal(holderWords(held, 'c'), 'On a roster in your league');
+	assert.equal(holderWords(held, 'free'), 'Free agent in your league');
 });
 
 void test("copy guard: no line doubles a word, the run's strength method included", () => {

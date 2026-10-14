@@ -1,22 +1,23 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 
-	/** A team in your league holds him: the league's flag on a disc over the bottom right edge of his
-	 * face, ink for another team's player and the accent for yours. The words say whose ("On your
-	 * roster", "Rostered by Gmoneyman") on hover and to assistive tech. It sits in a positioned box
-	 * the face shares, kept whether or not he is held, so the mark's arrival moves nothing. */
+	/** The league's mark on a player: the league's flag on a disc over the bottom right edge of his
+	 * face, the accent for yours and the gain green for a free agent (another team's player carries
+	 * none). The words say which ("On Grand Illusion BG 3", "Free agent in your league") on hover and
+	 * to assistive tech. It sits in a positioned box the face shares, kept whether or not he is
+	 * marked, so the mark's arrival moves nothing. */
 	interface Props {
 		words: string;
-		mine: boolean;
+		kind: 'mine' | 'free';
 		/** In a line with no face (the players list): the disc sits in the line's flow, before its
 		 * number. */
 		inline?: boolean;
 	}
 
-	let { words, mine, inline = false }: Props = $props();
+	let { words, kind, inline = false }: Props = $props();
 </script>
 
-<span class="held" class:mine class:inline role="img" aria-label={words} title={words}
+<span class="held {kind}" class:inline role="img" aria-label={words} title={words}
 	><Icon name="league" size={10} /></span
 >
 
@@ -32,9 +33,12 @@
 		width: 16px;
 		height: 16px;
 		border-radius: 50%;
-		background: var(--ink-2);
-		color: var(--bg);
 		box-shadow: 0 0 0 1.5px var(--surface);
+	}
+
+	.free {
+		background: var(--gain-bg);
+		color: var(--gain-ink);
 	}
 
 	.inline {

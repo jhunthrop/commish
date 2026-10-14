@@ -3,7 +3,7 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { contextLine } from '#lib/context/context-format.ts';
-	import { contextNote, heldMark } from '#lib/context/words.ts';
+	import { contextNote, holderWords } from '#lib/context/words.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, plural, signed } from '#lib/format/number.ts';
@@ -57,7 +57,7 @@
 	 * read: the free-agent read in one glance. */
 	const rostered = $derived.by(() => {
 		if (siteContext.held === null) return null;
-		return heldMark(siteContext.held, page.id)?.words ?? 'Unrostered in your league';
+		return holderWords(siteContext.held, page.id);
 	});
 	const drafters = $derived.by(() => {
 		if (n.adp === null || gap === null) {

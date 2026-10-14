@@ -79,16 +79,34 @@ export interface Held {
 	by: Readonly<Record<string, number>>;
 }
 
-/** A player's held mark (HeldMark), null when no team in the league holds him: whose words ("On your
- * roster", "Rostered by Gmoneyman", or "On a roster in your league" for a team with no name read),
- * and whether he is on your roster. */
-export function heldMark(
-	held: Held | null,
-	boardId: string
-): { words: string; mine: boolean } | null {
-	const roster = held?.by[boardId];
-	if (held === null || roster === undefined) return null;
-	if (roster === held.me) return { words: 'On your roster', mine: true };
+/** A row's league mark (HeldMark): the two that tell a reader something in October, when nearly every
+ * top row is taken. */
+export interface LeagueMark {
+	/** Its accessible name: "On Grand Illusion BG 3", "Free agent in your league". */
+	words: string;
+	/** Yours (the accent, and the row takes your wash) or free to pick up. */
+	kind: 'mine' | 'free';
+}
+
+const FREE_WORDS = 'Free agent in your league';
+
+/** A row's mark, null with no rosters read or for a player another team holds: on your roster,
+ * named by your team ("On Grand Illusion BG 3"), or a free agent. */
+export function heldMark(held: Held | null, boardId: string): LeagueMark | null {
+	if (held === null) return null;
+	const roster = held.by[boardId];
+	if (roster === undefined) return { words: FREE_WORDS, kind: 'free' };
+	if (roster !== held.me) return null;
 	const team = held.teams[roster] ?? '';
-	return { words: team === '' ? 'On a roster in your league' : `Rostered by ${team}`, mine: false };
+	return { words: team === '' ? 'On your roster' : `On ${team}`, kind: 'mine' };
+}
+
+/** Whose roster a player is on, as his page says it: "On your roster", "Rostered by Gmoneyman" ("On
+ * a roster in your league" for a team with no name read), or a free agent. */
+export function holderWords(held: Held, boardId: string): string {
+	const roster = held.by[boardId];
+	if (roster === undefined) return FREE_WORDS;
+	if (roster === held.me) return 'On your roster';
+	const team = held.teams[roster] ?? '';
+	return team === '' ? 'On a roster in your league' : `Rostered by ${team}`;
 }
