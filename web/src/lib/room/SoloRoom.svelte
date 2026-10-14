@@ -255,7 +255,7 @@
 		<!-- Once the first turn has passed, the strip's place is held, so its arrival after a pick never
 		     pushes the call down: a strip's height, or one line when the next turn comes straight
 		     back. -->
-		<div class="since" class:straight>
+		<div class="since strip-height" class:straight>
 			{#if room.waiting && !inFlight}
 				<SinceStrip since={prev} {went} {teams} {whose} queue={queueAll.size > 0} />
 			{/if}
@@ -353,7 +353,7 @@
 
 	/* The strip's panel: its strip and the panel's two borders. */
 	.since {
-		min-block-size: calc(var(--pick-strip-h) + 2px);
+		min-block-size: calc(var(--strip-h) + 2px);
 	}
 
 	.since.straight {
