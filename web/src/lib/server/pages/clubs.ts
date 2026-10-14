@@ -2,11 +2,20 @@
  * and the default board. */
 import { error } from '@sveltejs/kit';
 import { rangeScale } from '#lib/run/derive.ts';
-import type { BoardRow, Club, Format, Game, Schedule, Slate } from '#lib/run/schema.ts';
+import type {
+	BoardRow,
+	BoardRowView,
+	Club,
+	Format,
+	Game,
+	Schedule,
+	Slate
+} from '#lib/run/schema.ts';
 import { fixed } from '#lib/format/number.ts';
 import { links } from '#lib/site/links.ts';
 import type { ScheduleRow } from '#lib/ui/schedule-grid.ts';
 import type { RangeScale } from '#lib/types/player.ts';
+import { boardSeason } from '../board-season.ts';
 import { board, clubs, defaultFormat, playedThrough, schedule } from '../run.ts';
 
 /** The share of opponents the schedule grid shades as the strongest: the top quarter of the league
@@ -40,7 +49,8 @@ export interface ClubPage {
 	slate: Slate;
 	games: ScheduleGame[];
 	schedule: Pick<Schedule, 'opponentBasis' | 'season'>;
-	rows: BoardRow[];
+	/** The club's players on the default board, each with his season so far once it is underway. */
+	rows: BoardRowView[];
 	scale: RangeScale | null;
 	clubs: Club[];
 	/** The last week played, 0 before the first kickoff: the schedule sets those weeks back. */
@@ -118,6 +128,7 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 	if (!club) error(NOT_FOUND, 'No such club.');
 	const slate = slateOf(loaded, club.abbr);
 	const own = rows.rows.filter((row) => row.team === club.abbr);
+	const seasoned = (await boardSeason(format, own)).rows;
 	return {
 		club,
 		format,
@@ -127,7 +138,7 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 			value: opponentValue(loaded, game.opponent)
 		})),
 		schedule: { opponentBasis: loaded.opponentBasis, season: loaded.season },
-		rows: own,
+		rows: seasoned,
 		scale: own.length > 0 ? rangeScale(own) : null,
 		clubs: list,
 		played

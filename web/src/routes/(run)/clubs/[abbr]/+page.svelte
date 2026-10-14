@@ -43,7 +43,7 @@
 			<PanelHead title="On our {page.format.label} board" />
 			{#if page.scale}
 				<Panel padding="none">
-					<RowHead />
+					<RowHead games={page.rows.some((row) => row.season !== undefined)} />
 					{#each page.rows as player (player.id)}
 						<Row
 							{player}
@@ -51,6 +51,7 @@
 							scale={page.scale}
 							showTier
 							unit={page.format.unit}
+							season={player.season}
 						/>
 					{/each}
 				</Panel>
