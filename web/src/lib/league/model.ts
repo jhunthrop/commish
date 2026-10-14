@@ -2,6 +2,7 @@
  * record, a move in words, and the drafter's roster and the pool as board players. Pure functions
  * over the API's answer. */
 import { fixed, plural, signed } from '#lib/format/number.ts';
+import { midSentence } from '#lib/format/sentence.ts';
 import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
 import type { IndexSeason } from '#lib/run/schema.ts';
 import type { LeagueBoard, LeagueBoardPlayer } from './board.ts';
@@ -189,11 +190,6 @@ export function poolBasis(board: LeagueBoard): string {
 	const order =
 		"Unrostered in your league, ranked by our preseason board's points over replacement.";
 	return seasonStarted(board) ? `${order} The figure is his points a game this season.` : order;
-}
-
-/** A label in a sentence: a word drops its capital ("Half PPR" to "half PPR"), an acronym keeps it. */
-function midSentence(label: string): string {
-	return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
 }
 
 /** The page's one basis line: the scoring the figures are in (the run's season scoring, never a

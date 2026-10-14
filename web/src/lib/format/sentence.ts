@@ -29,3 +29,9 @@ export function firstSentence(text: string): string {
 	}
 	return text;
 }
+
+/** A format label inside a sentence: a word drops its capital ("Half PPR" to "half PPR"), an
+ * acronym keeps it ("PPR"). */
+export function midSentence(label: string): string {
+	return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
+}

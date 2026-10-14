@@ -1,13 +1,13 @@
 /** The one basis line a page prints about the selected league: what its figures are against the
  * league's scoring. Its own module, so only the pages that print it carry it. */
+import { midSentence } from '#lib/format/sentence.ts';
 import { SCORING_WORDS } from '#lib/league/names.ts';
 import { FORMAT_LABELS } from '#lib/sheet/format.ts';
 import type { BoardFormat, ContextLeague } from './words.ts';
 
 /** The scoring the figures are in, as a sentence names it: "PPR", "half PPR". */
 function figuresWords(format: BoardFormat): string {
-	const label = FORMAT_LABELS[format];
-	return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
+	return midSentence(FORMAT_LABELS[format]);
 }
 
 /** What a page's figures are, as its basis line opens: "This board is", "These figures are". */

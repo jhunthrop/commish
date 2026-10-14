@@ -5,6 +5,7 @@
  * and points a game), under one basis line that says so. Before the first kickoff nothing changes. The run decides, never the
  * reader's clock (seasonUnderway).
  */
+import { midSentence } from '#lib/format/sentence.ts';
 import type { BoardRow, BoardRowView, Format, SeasonedRow } from '#lib/run/schema.ts';
 import { index, manifest, seasonReach, seasonUnderway, type SeasonReach } from './run.ts';
 
@@ -33,7 +34,7 @@ export async function withSeasons(
  * season block in one format, so on a board of another scoring the figures name theirs: "this
  * season's, scored in PPR, through week 5". */
 export function seasonLead(format: Format, reach: SeasonReach, season: number): string {
-	const sort = `Ranked by points over replacement, our preseason ${format.label} projection for the full ${String(season)} season.`;
+	const sort = `Ranked by points over replacement, our preseason ${midSentence(format.label)} projection for the full ${String(season)} season.`;
 	const scoring = reach.scoring === format.label ? '' : `, scored in ${reach.scoring}`;
 	const through = reach.through === 0 ? '' : `, through week ${String(reach.through)}`;
 	return `${sort} Games and points a game are this season's${scoring}${through}.`;
