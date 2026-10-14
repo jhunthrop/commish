@@ -224,7 +224,7 @@ func (f fakeFollowed) FollowedIDs(context.Context, uuid.UUID, string) (map[strin
 // connection Yahoo refused asks for a reconnect.
 func TestLeagues(t *testing.T) {
 	s, _, _, _ := service(t)
-	s.Leagues, s.Followed = fakeLeagues{}, fakeFollowed{FollowKey("128934", 2026): true}
+	s.Leagues, s.Followed = fakeLeagues{}, fakeFollowed{hosts.FollowKey("128934", 2026): true}
 	w := httptest.NewRecorder()
 	s.leagues(w, as(httptest.NewRequest(http.MethodGet, "/hosts/yahoo/leagues", nil), uuid.New()))
 	var body struct {

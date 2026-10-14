@@ -156,6 +156,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		return nil, err
 	}
 	yh := newYahooWiring(cfg, pool, ff, log)
+	es := newESPNWiring(cfg, ff, log)
 	companions, err := companionService(cfg, pool, solo, draftBoards.Schedule, ents, ff, log)
 	if err != nil {
 		return nil, err
@@ -173,10 +174,11 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		lobbies.Routes(),
 		companions.Routes(),
 		(&devices.Service{Store: deviceStore, Tokens: bearer, CodeKey: codeKey, Now: now, Log: log}).Routes(),
-		leagueSyncService(cfg, pool, draftBoards, leagueStore, ents, viewer, ff, yh, log).Routes(),
-		hostList(ff, yh, log),
+		leagueSyncService(cfg, pool, draftBoards, leagueStore, ents, viewer, ff, yh, es, log).Routes(),
+		hostList(ff, yh, es, log),
 		ff.routes(log),
 		yh.routes(cfg, pool, ff, log),
+		es.routes(pool, ff, log),
 		devRoutes,
 	)
 	mux := http.NewServeMux()

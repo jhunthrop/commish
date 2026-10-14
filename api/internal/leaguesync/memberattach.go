@@ -20,9 +20,13 @@ type MemberHost interface {
 	ReadAs(ctx context.Context, accountID uuid.UUID, ref Ref) (Snapshot, int, error)
 }
 
-// readAsMember reports a host whose leagues are read as a connected
-// member, so a league on it with the host switched off says so.
-func readAsMember(host string) bool { return host == HostFFPC || host == HostYahoo }
+// pickedFromList reports a host whose leagues are attached only from the
+// member's own list, never previewed from a link.
+func pickedFromList(host string) bool { return host == HostFFPC || host == HostYahoo }
+
+// switchable reports a host with its own switch, so a league on it with
+// the host switched off says so.
+func switchable(host string) bool { return pickedFromList(host) || host == HostESPN }
 
 // memberWords is a member host's sentences, in its own name: Yahoo is
 // connected, FFPC is signed in to.

@@ -197,7 +197,7 @@ func TestAttachYahoo(t *testing.T) {
 		t.Fatalf("the league: me %d, season %d, %d teams, %d on my roster, matchup %+v", got.Me, got.Season, len(got.Teams), len(got.Roster), got.Matchup)
 	}
 	followed, err := store.FollowedIDs(ctx, alice.ID, HostYahoo)
-	if err != nil || !followed[yahoo.FollowKey(yahooFixtureLeague, 2026)] {
+	if err != nil || !followed[hosts.FollowKey(yahooFixtureLeague, 2026)] {
 		t.Fatalf("followed %v %v", followed, err)
 	}
 	ref := Ref{Host: HostYahoo, LeagueID: yahooFixtureLeague, Season: 2026}

@@ -333,7 +333,7 @@ func (s *Store) MemberReader(ctx context.Context, ref Ref) (uuid.UUID, error) {
 }
 
 // FollowedIDs is the account's live leagues on a host, keyed "id/season"
-// (yahoo.FollowKey), for a host's league list to mark.
+// (hosts.FollowKey), for a host's league list to mark.
 func (s *Store) FollowedIDs(ctx context.Context, accountID uuid.UUID, host string) (map[string]bool, error) {
 	rows, err := s.Pool.Query(ctx, `select host_league_id || '/' || host_season from app.league_links
 		where account_id = $1 and host = $2 and detached_at is null`, accountID, host)

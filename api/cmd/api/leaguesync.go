@@ -13,6 +13,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/espn"
 	"github.com/jhunthrop/commish/api/internal/hosts"
+	"github.com/jhunthrop/commish/api/internal/hosts/espnhost"
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
 	"github.com/jhunthrop/commish/api/internal/hosts/yahoo"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -109,8 +110,45 @@ func (y yahooWiring) host(store *leaguesync.Store, ids leaguesync.HostIDs, log *
 	return &leaguesync.Yahoo{Member: y.member, Readers: store, IDs: ids, Now: time.Now, Log: log}
 }
 
+// espnWiring is ESPN: public leagues read as the public reads them, and a
+// connected member's private leagues read with their kept cookies. The
+// host is HOST_ESPN_ENABLED; connecting needs the vault's key as well.
+type espnWiring struct {
+	host    bool
+	connect bool
+	client  *espn.Client
+	member  *espnhost.Member
+}
+
+func newESPNWiring(cfg config.API, ff ffpcWiring, log *slog.Logger) espnWiring {
+	connect := cfg.Hosts.ESPNEnabled && ff.vault.Ready()
+	if !connect {
+		log.Warn("espn connecting is off", "enabled", cfg.Hosts.ESPNEnabled, "key", ff.vault.Ready())
+	}
+	client := espn.New()
+	member := &espnhost.Member{Client: client, Store: ff.store, Vault: ff.vault, Now: time.Now, Log: log}
+	return espnWiring{host: cfg.Hosts.ESPNEnabled, connect: connect, client: client, member: member}
+}
+
+// routes are connecting, listing and disconnecting ESPN.
+func (e espnWiring) routes(pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) []httpx.Route {
+	return (&espnhost.Service{
+		Enabled: e.connect, Client: e.client, Store: ff.store, Vault: ff.vault, Leagues: e.member,
+		Followed: &leaguesync.Store{Pool: pool}, Now: time.Now, Log: log,
+	}).Routes()
+}
+
+// leagueHost is the ESPN league host over the link store, nil when ESPN
+// is off.
+func (e espnWiring) leagueHost(store *leaguesync.Store, log *slog.Logger) *leaguesync.ESPN {
+	if !e.host {
+		return nil
+	}
+	return &leaguesync.ESPN{Member: e.member, Public: e.client, Readers: store, Now: time.Now, Log: log}
+}
+
 // hostList is GET /hosts: every host open here, in the account page's order.
-func hostList(ff ffpcWiring, y yahooWiring, log *slog.Logger) []httpx.Route {
+func hostList(ff ffpcWiring, y yahooWiring, e espnWiring, log *slog.Logger) []httpx.Route {
 	var open []apitypes.ConnectedHost
 	if ff.on {
 		open = append(open, apitypes.ConnectedHostFfpc)
@@ -118,14 +156,17 @@ func hostList(ff ffpcWiring, y yahooWiring, log *slog.Logger) []httpx.Route {
 	if y.on {
 		open = append(open, apitypes.ConnectedHostYahoo)
 	}
+	if e.connect {
+		open = append(open, apitypes.ConnectedHostEspn)
+	}
 	return (&hosts.List{Enabled: open, Store: ff.store, Log: log}).Routes()
 }
 
 // leagueSyncService wires league sync: Sleeper first, MyFantasyLeague
-// second, FFPC third and Yahoo fourth behind one poller, the rooms' board, and the
+// second, FFPC third, Yahoo fourth and ESPN fifth behind one poller, the rooms' board, and the
 // recorded leagues when COMPANION_REPLAY is on (development only). The
 // host directories are read at start, so the first view finds them.
-func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ents *entitlements.Store, accounts leaguesync.AccountViewer, ff ffpcWiring, y yahooWiring, log *slog.Logger) *leaguesync.Service {
+func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ents *entitlements.Store, accounts leaguesync.AccountViewer, ff ffpcWiring, y yahooWiring, e espnWiring, log *slog.Logger) *leaguesync.Service {
 	now := time.Now
 	var sleeperAPI leaguesync.SleeperAPI = sleeper.New()
 	var mflAPI leaguesync.MFLAPI = mfl.New()
@@ -145,6 +186,9 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 	}
 	if yahooHost := y.host(store, board.Schedule, log); yahooHost != nil {
 		hostList = append(hostList, yahooHost)
+	}
+	if espnHost := e.leagueHost(store, log); espnHost != nil {
+		hostList = append(hostList, espnHost)
 	}
 	players := &leaguesync.Directory{Hosts: hostList, Store: store, Now: now, Log: log}
 	go players.Warm(context.Background(), cfg.Board.Season)

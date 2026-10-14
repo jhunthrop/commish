@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 
@@ -57,6 +58,12 @@ func (l *List) list(w http.ResponseWriter, r *http.Request) {
 		out.Connections = append(out.Connections, View(c))
 	}
 	httpx.WriteOK(w, r, http.StatusOK, out)
+}
+
+// FollowKey is a followed league's key in a host's league list: its id
+// and season, as leaguesync.Store.FollowedIDs answers them.
+func FollowKey(leagueID string, season int) string {
+	return leagueID + "/" + strconv.Itoa(season)
 }
 
 // View is a connection on the wire: its host, its state and when it was

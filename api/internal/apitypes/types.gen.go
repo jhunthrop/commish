@@ -107,6 +107,7 @@ func (e CompanionStatus) Valid() bool {
 
 // Defines values for ConnectedHost.
 const (
+	ConnectedHostEspn  ConnectedHost = "espn"
 	ConnectedHostFfpc  ConnectedHost = "ffpc"
 	ConnectedHostYahoo ConnectedHost = "yahoo"
 )
@@ -114,6 +115,8 @@ const (
 // Valid indicates whether the value is a known member of the ConnectedHost enum.
 func (e ConnectedHost) Valid() bool {
 	switch e {
+	case ConnectedHostEspn:
+		return true
 	case ConnectedHostFfpc:
 		return true
 	case ConnectedHostYahoo:
@@ -323,6 +326,7 @@ func (e Interval) Valid() bool {
 
 // Defines values for LeagueHost.
 const (
+	LeagueHostEspn    LeagueHost = "espn"
 	LeagueHostFfpc    LeagueHost = "ffpc"
 	LeagueHostMfl     LeagueHost = "mfl"
 	LeagueHostSleeper LeagueHost = "sleeper"
@@ -332,6 +336,8 @@ const (
 // Valid indicates whether the value is a known member of the LeagueHost enum.
 func (e LeagueHost) Valid() bool {
 	switch e {
+	case LeagueHostEspn:
+		return true
 	case LeagueHostFfpc:
 		return true
 	case LeagueHostMfl:
@@ -1175,6 +1181,18 @@ type DroppedRule struct {
 // DroppedRuleGroup defines model for DroppedRule.Group.
 type DroppedRuleGroup string
 
+// ESPNConnectInput defines model for ESPNConnectInput.
+type ESPNConnectInput struct {
+	// Consent the member agrees that we keep an encrypted copy of their ESPN session to keep their league in sync, never make a move, and that disconnect deletes it; must be true
+	Consent bool `json:"consent"`
+
+	// EspnS2 ESPN's espn_s2 cookie, kept encrypted, never answered or logged
+	EspnS2 string `json:"espn_s2"`
+
+	// Swid ESPN's SWID cookie, a braced id: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
+	Swid string `json:"swid"`
+}
+
 // Envelope defines model for Envelope.
 type Envelope struct {
 	// Data the payload
@@ -1312,11 +1330,11 @@ type HostConnection struct {
 	Host       ConnectedHost `json:"host"`
 	LastReadAt *time.Time    `json:"last_read_at"`
 
-	// Status connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, or a Yahoo refresh Yahoo refused); the member connects again
+	// Status connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, a Yahoo refresh Yahoo refused, ESPN cookies ESPN no longer accepts); the member connects again
 	Status HostConnectionStatus `json:"status"`
 }
 
-// HostConnectionStatus connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, or a Yahoo refresh Yahoo refused); the member connects again
+// HostConnectionStatus connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, a Yahoo refresh Yahoo refused, ESPN cookies ESPN no longer accepts); the member connects again
 type HostConnectionStatus string
 
 // HostConnections defines model for HostConnections.
@@ -2460,6 +2478,9 @@ type CreateCompanionJSONRequestBody = CompanionCreate
 
 // PairDeviceJSONRequestBody defines body for PairDevice for application/json ContentType.
 type PairDeviceJSONRequestBody = PairInput
+
+// ConnectESPNJSONRequestBody defines body for ConnectESPN for application/json ContentType.
+type ConnectESPNJSONRequestBody = ESPNConnectInput
 
 // ConnectFFPCJSONRequestBody defines body for ConnectFFPC for application/json ContentType.
 type ConnectFFPCJSONRequestBody = HostConnectInput

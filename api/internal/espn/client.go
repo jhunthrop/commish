@@ -113,6 +113,8 @@ type wireLeague struct {
 type Client struct {
 	HTTP *http.Client
 	Base string
+	// FanBase is the fan API, FanBase when empty.
+	FanBase string
 }
 
 // New is a client on ESPN with the read timeout. A redirect is never
@@ -151,11 +153,11 @@ func (c *Client) League(ctx context.Context, ref Ref, season int) (League, error
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&wire); err != nil {
 		return League{}, fmt.Errorf("%w: %w", ErrMalformed, err)
 	}
-	return check(wire)
+	return checkScoring(wire.Settings.Name, wire.Settings.ScoringSettings.ScoringItems)
 }
 
-func check(wire wireLeague) (League, error) {
-	items := wire.Settings.ScoringSettings.ScoringItems
+// checkScoring bounds a league's name and scoring items.
+func checkScoring(rawName string, items []Item) (League, error) {
 	if len(items) == 0 || len(items) > maxItems {
 		return League{}, fmt.Errorf("%w: %d scoring items", ErrMalformed, len(items))
 	}
@@ -169,7 +171,7 @@ func check(wire wireLeague) (League, error) {
 			}
 		}
 	}
-	name := []rune(strings.TrimSpace(wire.Settings.Name))
+	name := []rune(strings.TrimSpace(rawName))
 	if len(name) > maxNameRunes {
 		name = name[:maxNameRunes]
 	}

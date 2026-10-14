@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -265,16 +264,11 @@ func scoringWords(t string) string {
 	return ""
 }
 
-// FollowKey is a league's key in Followed: its id and season.
-func FollowKey(leagueID string, season int) string {
-	return leagueID + "/" + strconv.Itoa(season)
-}
-
 func leagueViews(list []MyLeague, followed map[string]bool) []apitypes.HostLeague {
 	out := make([]apitypes.HostLeague, 0, len(list))
 	for _, l := range list {
 		v := apitypes.HostLeague{LeagueId: l.LeagueID, Name: l.Name, TeamName: l.TeamName}
-		attached := followed[FollowKey(l.LeagueID, l.Season)]
+		attached := followed[hosts.FollowKey(l.LeagueID, l.Season)]
 		v.Attached = &attached
 		if l.Teams > 0 {
 			teams := l.Teams

@@ -24,9 +24,10 @@ const (
 
 // hostQueueCap is how many reads of new leagues each host serves at
 // once: MyFantasyLeague's one second a request makes a whole read about
-// seven seconds, so two at a time is a fair share of its gap.
+// seven seconds, so two at a time is a fair share of its gap. A public
+// ESPN league is one read, as Sleeper's are.
 func hostQueueCap() map[string]int {
-	return map[string]int{HostSleeper: 8, HostMFL: 2}
+	return map[string]int{HostSleeper: 8, HostMFL: 2, HostESPN: 8}
 }
 
 // Errors an admission answers.

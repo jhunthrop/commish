@@ -45,6 +45,12 @@ func (s *Service) attach(w http.ResponseWriter, r *http.Request) {
 		s.attachMember(w, r, in, HostYahoo)
 		return
 	}
+	if in.Host != nil && *in.Host == apitypes.LeagueHostEspn && in.Me.RosterId == nil && in.Me.Username == nil {
+		// An ESPN league from the member's own list: read with their
+		// cookies, seated at the team their ESPN account owns.
+		s.attachMember(w, r, in, HostESPN)
+		return
+	}
 	if errs := checkSeat(in.Me); errs != nil {
 		httpx.WriteInvalid(w, r, errs)
 		return

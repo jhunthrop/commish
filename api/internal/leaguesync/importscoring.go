@@ -23,7 +23,6 @@ type ESPNLeagues interface {
 
 // The import's words.
 const (
-	hostESPN         = "espn"
 	espnLinkWords    = "Paste your league's link from ESPN, or its league id"
 	espnPrivateWords = "This ESPN league is private. Make it viewable to the public in its settings, or enter your rules by hand"
 	importNeedsPass  = "Your league's own scoring comes with the Draft Pass"
@@ -57,7 +56,7 @@ func (s *Service) importScoring(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var im scoring.Imported
-	if string(in.Host) == hostESPN {
+	if string(in.Host) == HostESPN {
 		if im, ok = s.espnScoring(w, r, in.Link); !ok {
 			return
 		}
@@ -82,7 +81,7 @@ func (s *Service) hostScoring(w http.ResponseWriter, r *http.Request, host, link
 	if !ok {
 		return scoring.Imported{}, false
 	}
-	if readAsMember(h.Key()) {
+	if pickedFromList(h.Key()) {
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: wordsFor(h.Key()).pick})
 		return scoring.Imported{}, false
 	}

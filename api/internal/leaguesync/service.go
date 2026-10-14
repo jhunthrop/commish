@@ -111,6 +111,8 @@ func hostWords(host string) string {
 		return "FFPC"
 	case HostYahoo:
 		return "Yahoo"
+	case HostESPN:
+		return "ESPN"
 	}
 	return "Sleeper"
 }
@@ -121,9 +123,12 @@ const (
 	fieldMe   = "me"
 	fieldHost = "host"
 
-	linkWords     = "Paste your league's link from Sleeper or MyFantasyLeague"
+	linkWords     = "Paste your league's link from Sleeper, MyFantasyLeague or ESPN"
 	seatWords     = "Give your Sleeper username, or pick your team"
 	pickTeamWords = "Pick your team from the list"
+	// espnPrivateFollowWords sends a private ESPN league to the account
+	// page, where connecting ESPN reads it as the member.
+	espnPrivateFollowWords = "This ESPN league is private. Connect ESPN on your account page to follow it"
 )
 
 // writeHostError says what went wrong reading the league, in our words.
@@ -136,6 +141,8 @@ func (s *Service) writeHostError(w http.ResponseWriter, r *http.Request, host st
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: linkWords})
 	case errors.Is(err, ErrNotFound):
 		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, hostWords(host)+" has no league at that link", nil)
+	case errors.Is(err, ErrPrivate) && host == HostESPN:
+		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, espnPrivateFollowWords, nil)
 	case errors.Is(err, ErrPrivate):
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid,
 			"This league is private on "+hostWords(host)+". We follow public leagues today", nil)
@@ -184,7 +191,7 @@ func (s *Service) preview(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if readAsMember(h.Key()) {
+	if pickedFromList(h.Key()) {
 		// A league read as a member is picked from their own list.
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: wordsFor(h.Key()).pick})
 		return

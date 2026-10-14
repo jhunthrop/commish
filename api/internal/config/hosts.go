@@ -23,6 +23,10 @@ type Hosts struct {
 	YahooEnabled      bool
 	YahooClientID     string
 	YahooClientSecret string
+	// ESPNEnabled is HOST_ESPN_ENABLED, ESPN's switch: connecting, the
+	// league poller's ESPN host (public leagues too) and the web's ESPN
+	// choice read it. On unless set false.
+	ESPNEnabled bool
 	// Keys wrap each connected account's own data key: KeyVersion is the
 	// current key's version (HOST_CREDENTIALS_KEY_VERSION, 1 unless set),
 	// Key is HOST_CREDENTIALS_KEY, and Previous is
@@ -37,7 +41,8 @@ type Hosts struct {
 const hostKeyLen = 32
 
 func (l *loader) hosts(env Env) Hosts {
-	h := Hosts{FFPCEnabled: l.hostSwitch("HOST_FFPC_ENABLED"), YahooEnabled: l.hostSwitch("HOST_YAHOO_ENABLED"), KeyVersion: 1}
+	h := Hosts{FFPCEnabled: l.hostSwitch("HOST_FFPC_ENABLED"), YahooEnabled: l.hostSwitch("HOST_YAHOO_ENABLED"),
+		ESPNEnabled: l.hostSwitch("HOST_ESPN_ENABLED"), KeyVersion: 1}
 	h.YahooClientID = strings.TrimSpace(l.get("YAHOO_CLIENT_ID"))
 	h.YahooClientSecret = strings.TrimSpace(l.get("YAHOO_CLIENT_SECRET"))
 	if (h.YahooClientID == "") != (h.YahooClientSecret == "") {
@@ -52,9 +57,9 @@ func (l *loader) hosts(env Env) Hosts {
 	}
 	h.Key = l.hostKey("HOST_CREDENTIALS_KEY")
 	h.Previous = l.hostKey("HOST_CREDENTIALS_KEY_PREVIOUS")
-	if h.Key == nil && env == EnvProduction && (h.FFPCEnabled || h.YahooEnabled) {
+	if h.Key == nil && env == EnvProduction && (h.FFPCEnabled || h.YahooEnabled || h.ESPNEnabled) {
 		l.errs = append(l.errs, &VarError{Name: "HOST_CREDENTIALS_KEY", Err: ErrMissing,
-			Reason: "production with a host switched on (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED) keeps connected host accounts encrypted under it"})
+			Reason: "production with a host switched on (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED, HOST_ESPN_ENABLED) keeps connected host accounts encrypted under it"})
 	}
 	if h.Previous != nil && h.KeyVersion < 2 {
 		l.invalid("HOST_CREDENTIALS_KEY_PREVIOUS", "needs HOST_CREDENTIALS_KEY_VERSION of 2 or more")

@@ -24,7 +24,11 @@ func TestHostsSwitchAndKeys(t *testing.T) {
 		t.Fatalf("production with Yahoo on and no key: ffpc %v, yahoo %v, err %v", h.FFPCEnabled, h.YahooEnabled, l.err())
 	}
 	l = hostLoader(map[string]string{"HOST_FFPC_ENABLED": "false", "HOST_YAHOO_ENABLED": "false"})
-	if h := l.hosts(EnvProduction); h.FFPCEnabled || h.YahooEnabled || l.err() != nil {
+	if h := l.hosts(EnvProduction); !h.ESPNEnabled || l.err() == nil {
+		t.Fatalf("production with ESPN on and no key: espn %v, err %v", h.ESPNEnabled, l.err())
+	}
+	l = hostLoader(map[string]string{"HOST_FFPC_ENABLED": "false", "HOST_YAHOO_ENABLED": "false", "HOST_ESPN_ENABLED": "false"})
+	if h := l.hosts(EnvProduction); h.FFPCEnabled || h.YahooEnabled || h.ESPNEnabled || l.err() != nil {
 		t.Fatalf("production with every host off and no key: enabled %v, err %v", h.FFPCEnabled, l.err())
 	}
 	l = hostLoader(map[string]string{"HOST_CREDENTIALS_KEY": key, "HOST_CREDENTIALS_KEY_VERSION": "2", "HOST_CREDENTIALS_KEY_PREVIOUS": key})
