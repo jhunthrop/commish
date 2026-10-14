@@ -110,7 +110,7 @@ func (s *Service) attachMember(w http.ResponseWriter, r *http.Request, in apityp
 	}
 	ctx, accountID := r.Context(), auth.AccountID(r)
 	snap, team, err := h.ReadAs(ctx, accountID, ref)
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrPrivate) {
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: words.notInList})
 		return
 	}
@@ -122,6 +122,9 @@ func (s *Service) attachMember(w http.ResponseWriter, r *http.Request, in apityp
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: words.notInList})
 		return
 	}
+	// Read with this account's own credential, the league is kept and
+	// answered for this account alone.
+	snap.Ref.As = accountID
 	link, err := s.save(ctx, accountID, snap, team, "", many)
 	if writeCapError(w, r, err) {
 		return

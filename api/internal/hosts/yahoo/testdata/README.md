@@ -12,6 +12,7 @@ nesting are Yahoo's; the values are ours.
 - `yahoo-games-2026.xml`: `games;game_codes=nfl;seasons=2026`
 - `yahoo-league-head.xml`: `league/{key};out=settings,standings,scoreboard,transactions`
 - `yahoo-league-rosters.xml`: `league/{key}/teams;out=roster`
+- `yahoo-league-waivers.xml`: `league/{key}/players;status=W;out=ownership;start=0;count=25`
 - `yahoo-token.json`: the token endpoint's answer, with fixture tokens
 
 Replace each with a recorded answer once a member connects, and keep the tests'

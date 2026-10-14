@@ -25,6 +25,7 @@ type memStore struct {
 	conn      hosts.Connection
 	signedOut bool
 	reads     int
+	locks     int
 }
 
 func (s *memStore) Get(_ context.Context, _ uuid.UUID, _ string) (hosts.Connection, error) {
@@ -40,6 +41,20 @@ func (s *memStore) TokensKept(_ context.Context, _ uuid.UUID, _ string, wrapped,
 		s.conn.Sealed.SessionCT, s.conn.Sealed.SignInCT = session, renewal
 	}
 	return nil
+}
+
+func (s *memStore) Locked(ctx context.Context, _ uuid.UUID, _ string, fn func(context.Context) error) error {
+	s.mu.Lock()
+	s.locks++
+	s.mu.Unlock()
+	return fn(ctx)
+}
+
+func (s *memStore) SignedOutAt(_ context.Context, _ uuid.UUID, _ string, wrapped []byte) error {
+	if !bytes.Equal(wrapped, s.conn.Sealed.WrappedKey) {
+		return nil
+	}
+	return s.SignedOut(context.Background(), uuid.Nil, "")
 }
 
 func (s *memStore) SignedOut(context.Context, uuid.UUID, string) error {
@@ -95,6 +110,8 @@ func yahooAPI(t *testing.T, good string) (*Client, *[]string) {
 			name = "yahoo-my-teams.xml"
 		case strings.Contains(r.URL.Path, "games;game_codes=nfl"):
 			name = "yahoo-games-2026.xml"
+		case strings.Contains(r.URL.Path, "/players;status=W"):
+			name = "yahoo-league-waivers.xml"
 		case strings.HasSuffix(r.URL.Path, "/teams;out=roster"):
 			name = "yahoo-league-rosters.xml"
 		case strings.Contains(r.URL.Path, ";out=settings"):
@@ -148,8 +165,8 @@ func TestMemberReadsWithTheKeptToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(l.Teams) != 10 || ref.calls != 0 || store.reads != 1 {
-		t.Fatalf("%d teams, %d refreshes, %d reads noted", len(l.Teams), ref.calls, store.reads)
+	if len(l.Teams) != 10 || ref.calls != 0 || store.reads != 1 || len(l.Waivers) != 3 {
+		t.Fatalf("%d teams, %d refreshes, %d reads noted, %d on waivers", len(l.Teams), ref.calls, store.reads, len(l.Waivers))
 	}
 }
 
@@ -163,8 +180,8 @@ func TestMemberRefreshesNearExpiry(t *testing.T) {
 	if _, err := m.Leagues(context.Background(), id); err != nil {
 		t.Fatal(err)
 	}
-	if ref.calls != 1 || ref.sent[0] != "kept-refresh" {
-		t.Fatalf("%d refreshes with %v", ref.calls, ref.sent)
+	if ref.calls != 1 || ref.sent[0] != "kept-refresh" || store.locks != 1 {
+		t.Fatalf("%d refreshes with %v, %d locks taken", ref.calls, ref.sent, store.locks)
 	}
 	after := store.conn.Sealed
 	if bytes.Equal(after.SessionCT, before.SessionCT) || !bytes.Equal(after.WrappedKey, before.WrappedKey) {
@@ -229,7 +246,44 @@ func TestMemberReadsTheGameKeyOnce(t *testing.T) {
 			leagues++
 		}
 	}
-	if games != 1 || leagues != 4 {
+	if games != 1 || leagues != 6 {
 		t.Fatalf("%d game reads in %v", games, *paths)
+	}
+}
+
+// A refresh another process made while this one waited for the lock is
+// used as it is: Yahoo is not asked again.
+func TestMemberUsesARefreshMadeElsewhere(t *testing.T) {
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	ref := &fakeRefresher{}
+	m, store, id, _ := member(t, "old-access", now.Add(time.Minute), now, "elsewhere-access", ref)
+	// Another process kept fresh tokens; this read began with the old row.
+	fresh, err := m.Vault.ResealTokens(id.String(), Host, store.conn.Sealed,
+		session(Tokens{Access: "elsewhere-access", Expiry: now.Add(time.Hour)}), hosts.Session{keyRefresh: "r2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := m.refresh(context.Background(), id, "")
+	if err != nil || got != "fresh-access" {
+		t.Fatalf("an old row near its expiry: %q %v", got, err)
+	}
+	store.conn.Sealed = fresh
+	got, err = m.refresh(context.Background(), id, "")
+	if err != nil || got != "elsewhere-access" {
+		t.Fatalf("a fresh row: %q %v", got, err)
+	}
+	if ref.calls != 1 {
+		t.Fatalf("%d refreshes, want the first alone", ref.calls)
+	}
+}
+
+// A sign-out from a read of the old connection never marks a connection
+// made again since.
+func TestSignOutSparesAReconnect(t *testing.T) {
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	m, store, id, _ := member(t, "a", now.Add(time.Hour), now, "a", &fakeRefresher{})
+	m.signedOut(context.Background(), id, []byte("an older key"), "test")
+	if store.signedOut {
+		t.Fatal("a reconnected connection was signed out by an old read")
 	}
 }

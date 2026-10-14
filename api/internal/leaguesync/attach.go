@@ -59,6 +59,12 @@ func (s *Service) attach(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if pickedFromList(h.Key()) {
+		// A league read only as a member is attached from that member's
+		// own list (attachMember), never by a link and a team picked.
+		httpx.WriteInvalid(w, r, map[string]string{fieldLink: wordsFor(h.Key()).pick})
+		return
+	}
 	many, ok := s.admitLeague(w, r, ref)
 	if !ok {
 		return

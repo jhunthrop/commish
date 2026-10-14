@@ -156,7 +156,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		return nil, err
 	}
 	yh := newYahooWiring(cfg, pool, ff, log)
-	es := newESPNWiring(cfg, ff, log)
+	es := newESPNWiring(cfg, pool, ff, log)
 	companions, err := companionService(cfg, pool, solo, draftBoards.Schedule, ents, ff, log)
 	if err != nil {
 		return nil, err

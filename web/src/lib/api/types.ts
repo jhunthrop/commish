@@ -1167,7 +1167,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Start connecting Yahoo: answers Yahoo's authorize address for the member to open, carrying a state bound to the account that expires in ten minutes, one use, and a PKCE S256 challenge. The permission Yahoo shows is Fantasy Sports, read only. 5 an hour an account. 503 when Yahoo is not open here. */
+		/** Start connecting Yahoo: answers Yahoo's authorize address for the member to open, carrying a state bound to the account that expires in ten minutes, one use, and a PKCE S256 challenge. The permission Yahoo shows is Fantasy Sports, read only. The page the member started from may ride along (return_to), a path on the site the callback sends them back to once connected. 5 an hour an account. 503 when Yahoo is not open here. */
 		post: operations['connectYahoo'];
 		delete?: never;
 		options?: never;
@@ -1182,7 +1182,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Yahoo returns here. The state must be one this account started in the last ten minutes, and the browser must be signed in as that account. The code is exchanged for Yahoo's tokens, which are kept envelope encrypted. Always redirects to the site's account page with yahoo=connected, or yahoo=refused and why (denied, expired, signed_out, failed, off), never anywhere else. */
+		/** Yahoo returns here. The state must be one this account started in the last ten minutes, and the browser must be signed in as that account. The code is exchanged for Yahoo's tokens, which are kept envelope encrypted. Always redirects to the site: the page the sign-in started from (return_to) or the account page with yahoo=connected, or the account page with yahoo=refused and why (denied, expired, signed_out, failed, off), never anywhere else. */
 		get: operations['yahooCallback'];
 		put?: never;
 		post?: never;
@@ -1235,7 +1235,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Keep the member's two ESPN cookies, SWID and espn_s2 (handed to our page by Disney's own sign-in widget, or pasted from ESPN's site), envelope encrypted, after one read of their own ESPN leagues with them shows they work. Never a password. Answers the member's ESPN football leagues this season. Needs consent. 422 when ESPN does not accept the two values; three refusals in an hour pause connecting for the hour (423). 5 an hour an account. 503 when ESPN is not open here. */
+		/** Keep the member's two ESPN cookies, SWID and espn_s2 (handed to our page by Disney's own sign-in widget, or pasted from ESPN's site), envelope encrypted, once they prove themselves: the member's league list read with them, then one of their leagues the public cannot read, read with them (what needs espn_s2). Never a password. Answers the member's ESPN football leagues this season. Needs consent. 422 when ESPN does not accept the two values, or the member has no private league to connect; three refusals in an hour pause connecting for the hour (423). 5 an hour an account. 503 when ESPN is not open here. */
 		post: operations['connectESPN'];
 		delete?: never;
 		options?: never;
@@ -2452,6 +2452,10 @@ export interface components {
 			scoring_type?: string;
 			/** @description whether the account follows the league already */
 			attached?: boolean;
+		};
+		YahooConnectInput: {
+			/** @description a page on the site to come back to once connected, like /league/{id}; the account page when absent */
+			return_to?: string;
 		};
 		ESPNConnectInput: {
 			/** @description ESPN's SWID cookie, a braced id: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX} */
@@ -4043,7 +4047,11 @@ export interface operations {
 			path?: never;
 			cookie?: never;
 		};
-		requestBody?: never;
+		requestBody?: {
+			content: {
+				'application/json': components['schemas']['YahooConnectInput'];
+			};
+		};
 		responses: {
 			/** @description the authorize address */
 			200: {

@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -47,6 +48,9 @@ type League struct {
 	Settings    Settings
 	Scoreboard  Scoreboard
 	Moves       []Move
+	// Waivers is every unrostered player on waivers; every other
+	// unrostered player is a free agent.
+	Waivers []Waiver
 }
 
 // Team is one team, with its record and its roster this week.
@@ -361,8 +365,71 @@ func ParseLeague(headBody, rostersBody []byte) (League, error) {
 	if err != nil {
 		return League{}, err
 	}
+	if l.DraftStatus == draftDone && noRosters(teams) {
+		// A league past its draft always has players on its rosters: an
+		// answer with none is one we do not read, never an empty league
+		// whose every player reads as free.
+		return League{}, fmt.Errorf("%w: a drafted league read with no player on any roster", ErrMalformed)
+	}
 	l.Teams = teams
 	return l, nil
+}
+
+// draftDone is Yahoo's draft status for a league past its draft.
+const draftDone = "postdraft"
+
+func noRosters(teams []Team) bool {
+	for _, t := range teams {
+		if len(t.Players) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// Ownership kinds a waiver read names.
+const ownedByWaivers = "waivers"
+
+// Waiver is a player on waivers, and the day his claim clears, empty when
+// Yahoo does not say.
+type Waiver struct {
+	Player Player
+	Until  string
+}
+
+type xmlWaiverPlayer struct {
+	xmlPlayer
+	Ownership struct {
+		Type       string `xml:"ownership_type"`
+		WaiverDate string `xml:"waiver_date"`
+	} `xml:"ownership"`
+}
+
+var waiverDate = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
+
+// ParseWaivers reads one page of a league's players on waivers
+// (players;status=W;out=ownership), and how many players the page held.
+func ParseWaivers(body []byte) ([]Waiver, int, error) {
+	var root struct {
+		XMLName xml.Name          `xml:"fantasy_content"`
+		Players []xmlWaiverPlayer `xml:"league>players>player"`
+	}
+	if err := xml.NewDecoder(bytes.NewReader(body)).Decode(&root); err != nil {
+		return nil, 0, fmt.Errorf("%w: %w", ErrMalformed, err)
+	}
+	out := []Waiver{}
+	for _, p := range root.Players {
+		pl, ok := player(p.xmlPlayer)
+		if !ok || (p.Ownership.Type != "" && p.Ownership.Type != ownedByWaivers) {
+			continue
+		}
+		w := Waiver{Player: pl}
+		if waiverDate.MatchString(p.Ownership.WaiverDate) {
+			w.Until = p.Ownership.WaiverDate
+		}
+		out = append(out, w)
+	}
+	return out, len(root.Players), nil
 }
 
 // leagueTeams is every team: its record from the standings, its name,

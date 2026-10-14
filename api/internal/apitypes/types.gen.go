@@ -2246,6 +2246,12 @@ type SheetUpdate struct {
 	Name string `json:"name"`
 }
 
+// YahooConnectInput defines model for YahooConnectInput.
+type YahooConnectInput struct {
+	// ReturnTo a page on the site to come back to once connected, like /league/{id}; the account page when absent
+	ReturnTo *string `json:"return_to,omitempty"`
+}
+
 // ClaimCode defines model for ClaimCode.
 type ClaimCode = string
 
@@ -2484,6 +2490,9 @@ type ConnectESPNJSONRequestBody = ESPNConnectInput
 
 // ConnectFFPCJSONRequestBody defines body for ConnectFFPC for application/json ContentType.
 type ConnectFFPCJSONRequestBody = HostConnectInput
+
+// ConnectYahooJSONRequestBody defines body for ConnectYahoo for application/json ContentType.
+type ConnectYahooJSONRequestBody = YahooConnectInput
 
 // CreateLeagueJSONRequestBody defines body for CreateLeague for application/json ContentType.
 type CreateLeagueJSONRequestBody = LeagueInput

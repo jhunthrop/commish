@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
@@ -52,8 +53,8 @@ type ConnectionStore interface {
 
 // StateStore keeps sign-ins in flight. *States implements it.
 type StateStore interface {
-	Start(ctx context.Context, accountID uuid.UUID, state, verifier string, now time.Time) error
-	Finish(ctx context.Context, state string, now time.Time) (uuid.UUID, string, error)
+	Start(ctx context.Context, f Flight, state string, now time.Time) error
+	Finish(ctx context.Context, state string, now time.Time) (Flight, error)
 }
 
 // Exchanger trades a code for tokens. *OAuth implements it.
@@ -99,7 +100,7 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodPost, Path: "/hosts/yahoo/connect", Access: httpx.SignedIn, Limit: httpx.PerHour(limitConnectPerHour), Handler: s.connect},
 		{Method: http.MethodGet, Path: "/hosts/yahoo/callback", Access: httpx.Public, Limit: httpx.PerMinute(limitCallbackPerMin), Handler: s.callback},
 		{Method: http.MethodGet, Path: "/hosts/yahoo/leagues", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitLeaguesPerMin), Handler: s.leagues},
-		{Method: http.MethodDelete, Path: "/hosts/yahoo", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDisconnectPerMin), Handler: s.disconnect},
+		{Method: http.MethodDelete, Path: "/hosts/yahoo", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDisconnectPerMin), Handler: hosts.Disconnect(s.Store, Host, s.Log)},
 	}
 }
 
@@ -124,22 +125,48 @@ func (s *Service) connect(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, s.Log, "yahoo: verifier", err)
 		return
 	}
-	if err := s.States.Start(r.Context(), auth.AccountID(r), state, verifier, s.Now()); err != nil {
+	var in apitypes.YahooConnectInput
+	if r.ContentLength != 0 && !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
+		return
+	}
+	f := Flight{Account: auth.AccountID(r), Verifier: verifier}
+	if in.ReturnTo != nil {
+		if !returnPath.MatchString(*in.ReturnTo) {
+			httpx.WriteInvalid(w, r, map[string]string{"return_to": "A page on this site, like /league/..."})
+			return
+		}
+		f.ReturnTo = *in.ReturnTo
+	}
+	if err := s.States.Start(r.Context(), f, state, s.Now()); err != nil {
 		httpx.WriteInternal(w, r, s.Log, "yahoo: keep state", err)
 		return
 	}
 	httpx.WriteOK(w, r, http.StatusOK, apitypes.Redirect{Url: s.OAuth.AuthorizeURL(state, challenge)})
 }
 
+// returnPath is a page on the site a sign-in may return to: one leading
+// slash, path characters only, so it never names another host.
+var returnPath = regexp.MustCompile(`^/[A-Za-z0-9_-][A-Za-z0-9/_-]{0,199}$`)
+
 // back redirects to the site's account page with the outcome, and
 // nowhere else.
 func (s *Service) back(w http.ResponseWriter, r *http.Request, outcome, why string) {
+	s.backTo(w, r, accountPath, outcome, why)
+}
+
+// backTo redirects to a page on the site with the outcome: the account
+// page, or the page the member started from, a checked path on
+// PublicBaseURL and never another host.
+func (s *Service) backTo(w http.ResponseWriter, r *http.Request, path, outcome, why string) {
+	if !returnPath.MatchString(path) {
+		path = accountPath
+	}
 	q := url.Values{paramOutcome: {outcome}}
 	if why != "" {
 		q.Set(paramWhy, why)
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	http.Redirect(w, r, s.PublicBaseURL+accountPath+"?"+q.Encode(), http.StatusFound)
+	http.Redirect(w, r, s.PublicBaseURL+path+"?"+q.Encode(), http.StatusFound)
 }
 
 // callback finishes a sign-in Yahoo sent back. The state must be one the
@@ -157,7 +184,7 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx, now := r.Context(), s.Now()
-	accountID, verifier, err := s.finish(ctx, state, now)
+	f, err := s.finish(ctx, state, now)
 	switch {
 	case q.Get("error") != "":
 		s.back(w, r, outRefused, whyDenied)
@@ -170,7 +197,7 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		s.back(w, r, outRefused, whyFailed)
 		return
 	}
-	if me, ok := auth.AccountFrom(ctx); !ok || me.ID != accountID {
+	if me, ok := auth.AccountFrom(ctx); !ok || me.ID != f.Account {
 		s.back(w, r, outRefused, whySignedOut)
 		return
 	}
@@ -178,9 +205,13 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		s.back(w, r, outRefused, whyFailed)
 		return
 	}
-	if err := s.keep(ctx, accountID, code, verifier, now); err != nil {
-		s.Log.Warn("yahoo: connect", "account", accountID, "err", err)
+	if err := s.keep(ctx, f.Account, code, f.Verifier, now); err != nil {
+		s.Log.Warn("yahoo: connect", "account", f.Account, "err", err)
 		s.back(w, r, outRefused, whyFailed)
+		return
+	}
+	if f.ReturnTo != "" {
+		s.backTo(w, r, f.ReturnTo, outConnected, "")
 		return
 	}
 	s.back(w, r, outConnected, "")
@@ -188,9 +219,9 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 
 // finish takes the state, empty or not: a denied sign-in still uses up
 // the state it carries.
-func (s *Service) finish(ctx context.Context, state string, now time.Time) (uuid.UUID, string, error) {
+func (s *Service) finish(ctx context.Context, state string, now time.Time) (Flight, error) {
 	if state == "" {
-		return uuid.Nil, "", ErrNoState
+		return Flight{}, ErrNoState
 	}
 	return s.States.Finish(ctx, state, now)
 }
@@ -236,19 +267,6 @@ func (s *Service) leagues(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, http.StatusOK, leagueViews(list, followed))
 }
 
-func (s *Service) disconnect(w http.ResponseWriter, r *http.Request) {
-	err := s.Store.Delete(r.Context(), auth.AccountID(r), Host)
-	if errors.Is(err, hosts.ErrNotConnected) {
-		httpx.WriteNotFound(w, r)
-		return
-	}
-	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "yahoo: disconnect", err)
-		return
-	}
-	httpx.WriteOK(w, r, http.StatusOK, nil)
-}
-
 // scoringWords is Yahoo's scoring type in our words.
 func scoringWords(t string) string {
 	switch t {
@@ -267,17 +285,9 @@ func scoringWords(t string) string {
 func leagueViews(list []MyLeague, followed map[string]bool) []apitypes.HostLeague {
 	out := make([]apitypes.HostLeague, 0, len(list))
 	for _, l := range list {
-		v := apitypes.HostLeague{LeagueId: l.LeagueID, Name: l.Name, TeamName: l.TeamName}
-		attached := followed[hosts.FollowKey(l.LeagueID, l.Season)]
-		v.Attached = &attached
-		if l.Teams > 0 {
-			teams := l.Teams
-			v.Teams = &teams
-		}
-		if words := scoringWords(l.ScoringType); words != "" {
-			v.ScoringType = &words
-		}
-		out = append(out, v)
+		out = append(out, hosts.LeagueView(hosts.LeagueLine{
+			LeagueID: l.LeagueID, Season: l.Season, Name: l.Name, TeamName: l.TeamName, Teams: l.Teams, Scoring: scoringWords(l.ScoringType),
+		}, followed))
 	}
 	return out
 }

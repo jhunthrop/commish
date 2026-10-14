@@ -102,12 +102,12 @@ func (y yahooWiring) routes(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, l
 	}).Routes()
 }
 
-// host is the Yahoo league host over the link store, nil when Yahoo is off.
-func (y yahooWiring) host(store *leaguesync.Store, ids leaguesync.HostIDs, log *slog.Logger) *leaguesync.Yahoo {
+// host is the Yahoo league host, nil when Yahoo is off.
+func (y yahooWiring) host(ids leaguesync.HostIDs, log *slog.Logger) *leaguesync.Yahoo {
 	if !y.on {
 		return nil
 	}
-	return &leaguesync.Yahoo{Member: y.member, Readers: store, IDs: ids, Now: time.Now, Log: log}
+	return &leaguesync.Yahoo{Member: y.member, IDs: ids, Now: time.Now, Log: log}
 }
 
 // espnWiring is ESPN: public leagues read as the public reads them, and a
@@ -120,12 +120,13 @@ type espnWiring struct {
 	member  *espnhost.Member
 }
 
-func newESPNWiring(cfg config.API, ff ffpcWiring, log *slog.Logger) espnWiring {
+func newESPNWiring(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) espnWiring {
 	connect := cfg.Hosts.ESPNEnabled && ff.vault.Ready()
 	if !connect {
 		log.Warn("espn connecting is off", "enabled", cfg.Hosts.ESPNEnabled, "key", ff.vault.Ready())
 	}
 	client := espn.New()
+	client.Pace = &hosts.Gate{Pool: pool, Host: espnhost.Host, Gap: espn.Gap, MaxWait: espn.MaxQueue}
 	member := &espnhost.Member{Client: client, Store: ff.store, Vault: ff.vault, Now: time.Now, Log: log}
 	return espnWiring{host: cfg.Hosts.ESPNEnabled, connect: connect, client: client, member: member}
 }
@@ -138,13 +139,13 @@ func (e espnWiring) routes(pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) 
 	}).Routes()
 }
 
-// leagueHost is the ESPN league host over the link store, nil when ESPN
+// leagueHost is the ESPN league host, nil when ESPN
 // is off.
-func (e espnWiring) leagueHost(store *leaguesync.Store, log *slog.Logger) *leaguesync.ESPN {
+func (e espnWiring) leagueHost(log *slog.Logger) *leaguesync.ESPN {
 	if !e.host {
 		return nil
 	}
-	return &leaguesync.ESPN{Member: e.member, Public: e.client, Readers: store, Now: time.Now, Log: log}
+	return &leaguesync.ESPN{Member: e.member, Public: e.client, Now: time.Now, Log: log}
 }
 
 // hostList is GET /hosts: every host open here, in the account page's order.
@@ -184,10 +185,10 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 	if ffpcHost != nil {
 		hostList = append(hostList, ffpcHost)
 	}
-	if yahooHost := y.host(store, board.Schedule, log); yahooHost != nil {
+	if yahooHost := y.host(board.Schedule, log); yahooHost != nil {
 		hostList = append(hostList, yahooHost)
 	}
-	if espnHost := e.leagueHost(store, log); espnHost != nil {
+	if espnHost := e.leagueHost(log); espnHost != nil {
 		hostList = append(hostList, espnHost)
 	}
 	players := &leaguesync.Directory{Hosts: hostList, Store: store, Now: now, Log: log}

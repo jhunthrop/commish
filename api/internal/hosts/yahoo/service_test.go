@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -18,34 +19,23 @@ import (
 	"github.com/jhunthrop/commish/api/internal/hosts"
 )
 
-type memStates struct {
-	byState map[string]struct {
-		account  uuid.UUID
-		verifier string
-	}
-}
+type memStates struct{ byState map[string]Flight }
 
-func (s *memStates) Start(_ context.Context, accountID uuid.UUID, state, verifier string, _ time.Time) error {
+func (s *memStates) Start(_ context.Context, f Flight, state string, _ time.Time) error {
 	if s.byState == nil {
-		s.byState = map[string]struct {
-			account  uuid.UUID
-			verifier string
-		}{}
+		s.byState = map[string]Flight{}
 	}
-	s.byState[state] = struct {
-		account  uuid.UUID
-		verifier string
-	}{accountID, verifier}
+	s.byState[state] = f
 	return nil
 }
 
-func (s *memStates) Finish(_ context.Context, state string, _ time.Time) (uuid.UUID, string, error) {
-	e, ok := s.byState[state]
+func (s *memStates) Finish(_ context.Context, state string, _ time.Time) (Flight, error) {
+	f, ok := s.byState[state]
 	if !ok {
-		return uuid.Nil, "", ErrNoState
+		return Flight{}, ErrNoState
 	}
 	delete(s.byState, state)
-	return e.account, e.verifier, nil
+	return f, nil
 }
 
 type fakeExchanger struct {
@@ -100,8 +90,20 @@ func as(r *http.Request, id uuid.UUID) *http.Request {
 // the state it carries.
 func startConnect(t *testing.T, s *Service, id uuid.UUID) string {
 	t.Helper()
+	return startConnectFrom(t, s, id, "")
+}
+
+// startConnectFrom starts a sign-in from a page, a body carrying it when set.
+func startConnectFrom(t *testing.T, s *Service, id uuid.UUID, from string) string {
+	t.Helper()
 	w := httptest.NewRecorder()
-	s.connect(w, as(httptest.NewRequest(http.MethodPost, "/hosts/yahoo/connect", nil), id))
+	var in io.Reader = http.NoBody
+	if from != "" {
+		in = strings.NewReader(`{"return_to":"` + from + `"}`)
+	}
+	r := httptest.NewRequest(http.MethodPost, "/hosts/yahoo/connect", in)
+	r.Header.Set("Content-Type", "application/json")
+	s.connect(w, as(r, id))
 	if w.Code != http.StatusOK {
 		t.Fatalf("connect answered %d", w.Code)
 	}
@@ -134,8 +136,8 @@ func callback(t *testing.T, s *Service, query url.Values, who *uuid.UUID) *url.U
 	if err != nil {
 		t.Fatal(err)
 	}
-	if to.Scheme+"://"+to.Host != "https://trycommish.app" || to.Path != "/account" {
-		t.Fatalf("redirected to %s, outside the site's account page", to)
+	if to.Scheme+"://"+to.Host != "https://trycommish.app" {
+		t.Fatalf("redirected to %s, outside the site", to)
 	}
 	return to
 }
@@ -151,7 +153,7 @@ func TestCallbackConnects(t *testing.T) {
 	s, states, ex, store := service(t)
 	me := uuid.New()
 	state := startConnect(t, s, me)
-	verifier := states.byState[state].verifier
+	verifier := states.byState[state].Verifier
 	to := callback(t, s, url.Values{"state": {state}, "code": {"the-code"}}, &me)
 	if outcome(to) != outConnected || len(store.put) != 1 || store.put[0] != me || ex.verifier != verifier {
 		t.Fatalf("outcome %q, put %v, verifier sent %q", outcome(to), store.put, ex.verifier)
@@ -254,7 +256,7 @@ func TestDisconnect(t *testing.T) {
 	s, _, _, store := service(t)
 	for _, want := range []int{http.StatusOK, http.StatusNotFound} {
 		w := httptest.NewRecorder()
-		s.disconnect(w, as(httptest.NewRequest(http.MethodDelete, "/hosts/yahoo", nil), uuid.New()))
+		hosts.Disconnect(s.Store, Host, s.Log)(w, as(httptest.NewRequest(http.MethodDelete, "/hosts/yahoo", nil), uuid.New()))
 		if w.Code != want {
 			t.Fatalf("disconnect %d answered %d", store.deleted, w.Code)
 		}
@@ -269,5 +271,30 @@ func TestConnectOff(t *testing.T) {
 	s.connect(w, as(httptest.NewRequest(http.MethodPost, "/hosts/yahoo/connect", nil), uuid.New()))
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("off: %d", w.Code)
+	}
+}
+
+// A sign-in started from a league page returns there once connected; a
+// return that is not a page on the site is refused at the start.
+func TestCallbackReturnsToThePageItStartedFrom(t *testing.T) {
+	s, _, _, _ := service(t)
+	me := uuid.New()
+	state := startConnectFrom(t, s, me, "/league/7b0c1f9e-1111-4a1a-9a1a-000000000001")
+	to := callback(t, s, url.Values{"state": {state}, "code": {"c"}}, &me)
+	if to.Path != "/league/7b0c1f9e-1111-4a1a-9a1a-000000000001" || outcome(to) != outConnected {
+		t.Fatalf("returned to %s", to)
+	}
+	for _, bad := range []string{"//evil.example", "https://evil.example", "/a?b", "/../x"} {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/hosts/yahoo/connect", strings.NewReader(`{"return_to":"`+bad+`"}`))
+		r.Header.Set("Content-Type", "application/json")
+		s.connect(w, as(r, me))
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("return to %q: %d", bad, w.Code)
+		}
+	}
+	state = startConnect(t, s, me)
+	if to := callback(t, s, url.Values{"state": {state}, "code": {"c"}}, &me); to.Path != "/account" {
+		t.Fatalf("no return path: %s", to)
 	}
 }

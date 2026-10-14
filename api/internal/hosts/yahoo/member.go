@@ -33,7 +33,8 @@ const (
 type Connections interface {
 	Get(ctx context.Context, accountID uuid.UUID, host string) (hosts.Connection, error)
 	TokensKept(ctx context.Context, accountID uuid.UUID, host string, wrappedKey, sessionCT, renewalCT []byte) error
-	SignedOut(ctx context.Context, accountID uuid.UUID, host string) error
+	SignedOutAt(ctx context.Context, accountID uuid.UUID, host string, wrappedKey []byte) error
+	Locked(ctx context.Context, accountID uuid.UUID, host string, fn func(context.Context) error) error
 	Read(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error
 }
 
@@ -153,20 +154,20 @@ func (m *Member) as(ctx context.Context, accountID uuid.UUID, read func(access s
 	}
 	refreshed := false
 	if m.Now().Add(RefreshWithin).After(expiry) {
-		if access, err = m.refresh(ctx, accountID, conn); err != nil {
+		if access, err = m.refresh(ctx, accountID, ""); err != nil {
 			return err
 		}
 		refreshed = true
 	}
 	err = read(access)
 	if errors.Is(err, ErrUnauthorized) && !refreshed {
-		if access, err = m.refresh(ctx, accountID, conn); err != nil {
+		if access, err = m.refresh(ctx, accountID, access); err != nil {
 			return err
 		}
 		err = read(access)
 	}
 	if errors.Is(err, ErrUnauthorized) {
-		m.signedOut(ctx, accountID, "a fresh access token was refused")
+		m.signedOut(ctx, accountID, conn.Sealed.WrappedKey, "a fresh access token was refused")
 		return ErrReconnect
 	}
 	if err != nil {
@@ -183,7 +184,7 @@ func (m *Member) as(ctx context.Context, accountID uuid.UUID, read func(access s
 func (m *Member) open(ctx context.Context, accountID uuid.UUID, conn hosts.Connection) (string, time.Time, error) {
 	s, err := m.Vault.OpenSession(accountID.String(), Host, conn.Sealed)
 	if errors.Is(err, hosts.ErrSealed) {
-		m.signedOut(ctx, accountID, "the kept tokens no longer open")
+		m.signedOut(ctx, accountID, conn.Sealed.WrappedKey, "the kept tokens no longer open")
 		return "", time.Time{}, ErrReconnect
 	}
 	if err != nil {
@@ -198,17 +199,47 @@ func (m *Member) open(ctx context.Context, accountID uuid.UUID, conn hosts.Conne
 	return s[keyAccess], expiry, nil
 }
 
-// refresh trades the kept refresh token for new tokens and keeps them.
+// refresh answers a fresh access token, under the account's lock across
+// every process. The row is read again under the lock: when another
+// process refreshed meanwhile (a token neither near its expiry nor the
+// refused one), that token is used and Yahoo is not asked again.
+// Otherwise the kept refresh token is traded and the new tokens kept;
 // Yahoo refusing it signs the connection out.
-func (m *Member) refresh(ctx context.Context, accountID uuid.UUID, conn hosts.Connection) (string, error) {
+func (m *Member) refresh(ctx context.Context, accountID uuid.UUID, refused string) (string, error) {
+	var access string
+	err := m.Store.Locked(ctx, accountID, Host, func(ctx context.Context) error {
+		conn, err := m.Store.Get(ctx, accountID, Host)
+		if err != nil {
+			return err
+		}
+		if conn.Status != hosts.StatusConnected {
+			return ErrReconnect
+		}
+		kept, expiry, err := m.open(ctx, accountID, conn)
+		if err != nil {
+			return err
+		}
+		if kept != "" && kept != refused && !m.Now().Add(RefreshWithin).After(expiry) {
+			access = kept
+			return nil
+		}
+		access, err = m.trade(ctx, accountID, conn)
+		return err
+	})
+	return access, err
+}
+
+// trade trades the connection's refresh token for new tokens and keeps
+// them under the row's own key.
+func (m *Member) trade(ctx context.Context, accountID uuid.UUID, conn hosts.Connection) (string, error) {
 	renewal, err := m.Vault.OpenRenewal(accountID.String(), Host, conn.Sealed)
 	if err != nil || renewal[keyRefresh] == "" {
-		m.signedOut(ctx, accountID, "the kept refresh token no longer opens")
+		m.signedOut(ctx, accountID, conn.Sealed.WrappedKey, "the kept refresh token no longer opens")
 		return "", ErrReconnect
 	}
 	t, err := m.OAuth.Refresh(ctx, renewal[keyRefresh], m.Now())
 	if errors.Is(err, ErrRefused) {
-		m.signedOut(ctx, accountID, "Yahoo refused the refresh")
+		m.signedOut(ctx, accountID, conn.Sealed.WrappedKey, "Yahoo refused the refresh")
 		return "", ErrReconnect
 	}
 	if err != nil {
@@ -226,9 +257,11 @@ func (m *Member) refresh(ctx context.Context, accountID uuid.UUID, conn hosts.Co
 	return t.Access, nil
 }
 
-func (m *Member) signedOut(ctx context.Context, accountID uuid.UUID, why string) {
+// signedOut marks the connection the read began with for a reconnect; a
+// connection made again since keeps its state.
+func (m *Member) signedOut(ctx context.Context, accountID uuid.UUID, wrapped []byte, why string) {
 	m.Log.Warn("yahoo: connection needs a reconnect", "account", accountID, "why", why)
-	if err := m.Store.SignedOut(ctx, accountID, Host); err != nil {
+	if err := m.Store.SignedOutAt(ctx, accountID, Host, wrapped); err != nil {
 		m.Log.Warn("yahoo: mark signed out", "account", accountID, "err", err)
 	}
 }

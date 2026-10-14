@@ -30,12 +30,6 @@ type YahooMember interface {
 	ReadLeague(ctx context.Context, accountID uuid.UUID, season int, leagueID string) (yahoo.League, error)
 }
 
-// MemberReaders finds a connected member who follows a league on a host
-// read as its members, to read it as. *Store implements it.
-type MemberReaders interface {
-	MemberReader(ctx context.Context, ref Ref) (uuid.UUID, error)
-}
-
 // HostIDs is a host's player id to our board's, from the research
 // players table's host id columns (players.yahoo_id through the
 // crosswalk). *boards.PGSource implements it.
@@ -43,11 +37,11 @@ type HostIDs interface {
 	YahooIDs(ctx context.Context) (map[string]string, error)
 }
 
-// Yahoo is the Yahoo host: one read per league per interval, as any host,
-// read as whichever connected member read most recently.
+// Yahoo is the Yahoo host: one read per attachment per interval, each
+// read with the token of the account that attached it, for that account
+// alone (a host credential reads only for the account that stored it).
 type Yahoo struct {
-	Member  YahooMember
-	Readers MemberReaders
+	Member YahooMember
 	// IDs places a Yahoo player on our board by id; nil places by name.
 	IDs HostIDs
 	Now func() time.Time
@@ -90,21 +84,15 @@ func (y *Yahoo) Parse(pasted string) (Ref, error) {
 	return Ref{Host: HostYahoo, LeagueID: m[1]}, nil
 }
 
-// Read reads the league as a connected member who follows it. One
-// member's refused connection is not the viewer's news: the next member
-// is tried once.
+// Read reads the league as the account it is attached for. A Yahoo
+// league is never read for anyone else: a ref with no account has no
+// reader.
 func (y *Yahoo) Read(ctx context.Context, ref Ref) (Snapshot, error) {
-	for range 2 {
-		accountID, err := y.Readers.MemberReader(ctx, ref)
-		if err != nil {
-			return Snapshot{}, err
-		}
-		snap, _, err := y.ReadAs(ctx, accountID, ref)
-		if !errors.Is(err, ErrSignInAgain) && !errors.Is(err, ErrNotConnected) {
-			return snap, err
-		}
+	if ref.As == uuid.Nil {
+		return Snapshot{}, fmt.Errorf("%w: a Yahoo league is read only as the account that attached it", ErrNotConnected)
 	}
-	return Snapshot{}, fmt.Errorf("%w: two members needed a reconnect in one read", ErrSignInAgain)
+	snap, _, err := y.ReadAs(ctx, ref.As, ref)
+	return snap, err
 }
 
 // ReadAs reads the league as one member, answering it and the member's

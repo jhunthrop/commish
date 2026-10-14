@@ -29,13 +29,21 @@ func stateHash(state string) []byte {
 	return sum[:]
 }
 
+// Flight is one sign-in in flight: the account that started it, its PKCE
+// verifier, and the site page to return to (empty for the account page).
+type Flight struct {
+	Account  uuid.UUID
+	Verifier string
+	ReturnTo string
+}
+
 // Start keeps a new sign-in in flight, dropping every expired one.
-func (s *States) Start(ctx context.Context, accountID uuid.UUID, state, verifier string, now time.Time) error {
+func (s *States) Start(ctx context.Context, f Flight, state string, now time.Time) error {
 	if _, err := s.Pool.Exec(ctx, `delete from app.host_oauth_states where expires_at < $1`, now); err != nil {
 		return fmt.Errorf("yahoo: drop expired states: %w", err)
 	}
-	_, err := s.Pool.Exec(ctx, `insert into app.host_oauth_states (state_hash, account_id, host, verifier, expires_at)
-		values ($1, $2, $3, $4, $5)`, stateHash(state), accountID, Host, verifier, now.Add(StateTTL))
+	_, err := s.Pool.Exec(ctx, `insert into app.host_oauth_states (state_hash, account_id, host, verifier, return_to, expires_at)
+		values ($1, $2, $3, $4, nullif($5, ''), $6)`, stateHash(state), f.Account, Host, f.Verifier, f.ReturnTo, now.Add(StateTTL))
 	if err != nil {
 		return fmt.Errorf("yahoo: keep state: %w", err)
 	}
@@ -44,16 +52,15 @@ func (s *States) Start(ctx context.Context, accountID uuid.UUID, state, verifier
 
 // Finish takes a sign-in in flight, once: the account that started it
 // and its verifier, or ErrNoState.
-func (s *States) Finish(ctx context.Context, state string, now time.Time) (uuid.UUID, string, error) {
-	var accountID uuid.UUID
-	var verifier string
+func (s *States) Finish(ctx context.Context, state string, now time.Time) (Flight, error) {
+	var f Flight
 	err := s.Pool.QueryRow(ctx, `delete from app.host_oauth_states where state_hash = $1 and host = $2 and expires_at >= $3
-		returning account_id, verifier`, stateHash(state), Host, now).Scan(&accountID, &verifier)
+		returning account_id, verifier, coalesce(return_to, '')`, stateHash(state), Host, now).Scan(&f.Account, &f.Verifier, &f.ReturnTo)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, "", ErrNoState
+		return Flight{}, ErrNoState
 	}
 	if err != nil {
-		return uuid.Nil, "", fmt.Errorf("yahoo: take state: %w", err)
+		return Flight{}, fmt.Errorf("yahoo: take state: %w", err)
 	}
-	return accountID, verifier, nil
+	return f, nil
 }

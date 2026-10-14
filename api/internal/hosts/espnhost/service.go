@@ -38,7 +38,8 @@ const (
 	pausedWords    = "ESPN refused three tries, so connecting is paused for an hour."
 	swidWords      = "Paste your SWID, the value in braces."
 	s2Words        = "Paste your espn_s2 value."
-	consentWords   = "Tick the box to agree to how we keep your ESPN session."
+	consentWords   = "Agree to how we keep your ESPN session to connect ESPN."
+	nothingWords   = "ESPN shows no private league on your account this season, so there is nothing to connect. A public league follows by its link."
 )
 
 // ConnectionStore is the part of hosts.Store the routes use.
@@ -79,7 +80,7 @@ func (s *Service) Routes() []httpx.Route {
 	return []httpx.Route{
 		{Method: http.MethodPost, Path: "/hosts/espn/connect", Access: httpx.SignedIn, Limit: httpx.PerHour(limitConnectPerHour), Handler: s.connect},
 		{Method: http.MethodGet, Path: "/hosts/espn/leagues", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitLeaguesPerMin), Handler: s.leagues},
-		{Method: http.MethodDelete, Path: "/hosts/espn", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDisconnectPerMin), Handler: s.disconnect},
+		{Method: http.MethodDelete, Path: "/hosts/espn", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDisconnectPerMin), Handler: hosts.Disconnect(s.Store, Host, s.Log)},
 	}
 }
 
@@ -143,6 +144,10 @@ func (s *Service) connect(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, refusedWords, nil)
 		return
 	}
+	if errors.Is(err, errNothingPrivate) {
+		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, nothingWords, nil)
+		return
+	}
 	if err != nil {
 		s.Log.Warn("espnhost: connect", "err", err)
 		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, notAnswering, nil)
@@ -165,15 +170,40 @@ func (s *Service) connect(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, http.StatusCreated, apitypes.HostConnected{Connection: hosts.View(conn), Leagues: views})
 }
 
-// verify reads the member's leagues with the cookies, and the first of
-// them, since a private league's read is what proves espn_s2.
+// maxProbes bounds the league reads a connect makes to find a private
+// league that proves the cookies.
+const maxProbes = 5
+
+// errNothingPrivate is a member with no private league to prove the
+// cookies by: there is nothing to connect.
+var errNothingPrivate = errors.New("espnhost: no private league to read")
+
+// verify proves both cookies: the member's league list read with them,
+// then a league the public cannot read (ESPN refuses it with no cookies)
+// read with them, which is what needs espn_s2. A SWID alone is no proof:
+// any public league answers its members' SWIDs.
 func (s *Service) verify(ctx context.Context, c espn.Cookies, yr int) ([]espn.MyLeague, error) {
 	list, err := s.Client.MyLeagues(ctx, c, yr)
-	if err != nil || len(list) == 0 {
-		return list, err
+	if err != nil {
+		return nil, err
 	}
-	_, err = s.Client.Read(ctx, list[0].LeagueID, yr, &c)
-	return list, err
+	for i, l := range list {
+		if i >= maxProbes {
+			break
+		}
+		_, err := s.Client.Read(ctx, l.LeagueID, yr, nil)
+		if err == nil {
+			continue
+		}
+		if !errors.Is(err, espn.ErrPrivate) {
+			return nil, err
+		}
+		if _, err := s.Client.Read(ctx, l.LeagueID, yr, &c); err != nil {
+			return nil, err
+		}
+		return list, nil
+	}
+	return nil, errNothingPrivate
 }
 
 func (s *Service) leagues(w http.ResponseWriter, r *http.Request) {
@@ -206,27 +236,9 @@ func (s *Service) views(w http.ResponseWriter, r *http.Request, list []espn.MyLe
 	}
 	out := make([]apitypes.HostLeague, 0, len(list))
 	for _, l := range list {
-		v := apitypes.HostLeague{LeagueId: l.LeagueID, Name: l.Name, TeamName: l.TeamName}
-		attached := followed[hosts.FollowKey(l.LeagueID, l.Season)]
-		v.Attached = &attached
-		if l.Teams > 0 {
-			teams := l.Teams
-			v.Teams = &teams
-		}
-		out = append(out, v)
+		out = append(out, hosts.LeagueView(hosts.LeagueLine{
+			LeagueID: l.LeagueID, Season: l.Season, Name: l.Name, TeamName: l.TeamName, Teams: l.Teams,
+		}, followed))
 	}
 	return out, true
-}
-
-func (s *Service) disconnect(w http.ResponseWriter, r *http.Request) {
-	err := s.Store.Delete(r.Context(), auth.AccountID(r), Host)
-	if errors.Is(err, hosts.ErrNotConnected) {
-		httpx.WriteNotFound(w, r)
-		return
-	}
-	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "espnhost: disconnect", err)
-		return
-	}
-	httpx.WriteOK(w, r, http.StatusOK, nil)
 }

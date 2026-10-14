@@ -2,6 +2,7 @@ package hosts
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -64,6 +65,57 @@ func (l *List) list(w http.ResponseWriter, r *http.Request) {
 // and season, as leaguesync.Store.FollowedIDs answers them.
 func FollowKey(leagueID string, season int) string {
 	return leagueID + "/" + strconv.Itoa(season)
+}
+
+// Deleter is the part of Store a disconnect uses.
+type Deleter interface {
+	Delete(ctx context.Context, accountID uuid.UUID, host string) error
+}
+
+// Disconnect is DELETE /hosts/{host}: the account's connection to the
+// host and everything kept with it deleted at once.
+func Disconnect(store Deleter, host string, log *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := store.Delete(r.Context(), auth.AccountID(r), host)
+		if errors.Is(err, ErrNotConnected) {
+			httpx.WriteNotFound(w, r)
+			return
+		}
+		if err != nil {
+			httpx.WriteInternal(w, r, log, host+": disconnect", err)
+			return
+		}
+		httpx.WriteOK(w, r, http.StatusOK, nil)
+	}
+}
+
+// LeagueLine is one of a member's leagues as a host's list names it.
+type LeagueLine struct {
+	LeagueID string
+	Season   int
+	Name     string
+	TeamName string
+	// Teams is the league's size, 0 when the list does not say.
+	Teams int
+	// Scoring is the scoring type in our words, empty when unsaid.
+	Scoring string
+}
+
+// LeagueView is a list line on the wire, marked followed when followed
+// (keyed by FollowKey) holds it.
+func LeagueView(l LeagueLine, followed map[string]bool) apitypes.HostLeague {
+	v := apitypes.HostLeague{LeagueId: l.LeagueID, Name: l.Name, TeamName: l.TeamName}
+	attached := followed[FollowKey(l.LeagueID, l.Season)]
+	v.Attached = &attached
+	if l.Teams > 0 {
+		teams := l.Teams
+		v.Teams = &teams
+	}
+	if l.Scoring != "" {
+		scoring := l.Scoring
+		v.ScoringType = &scoring
+	}
+	return v
 }
 
 // View is a connection on the wire: its host, its state and when it was

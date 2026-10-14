@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/jhunthrop/commish/api/internal/poll"
 )
 
@@ -95,7 +97,9 @@ func (p *Poller) read(ctx context.Context, ref Ref, gap time.Duration, mode poll
 		return Read{}, ErrNotALink
 	}
 	r, err := p.shared().Read(ctx, ref.Key(), gap, mode, func(ctx context.Context) (Snapshot, error) {
-		return host.Read(ctx, ref)
+		snap, err := host.Read(ctx, ref)
+		snap.Ref.As = ref.As
+		return snap, err
 	})
 	if errors.Is(err, poll.ErrNoRead) {
 		return Read{}, fmt.Errorf("%w: %v", ErrUnavailable, err)
@@ -140,13 +144,18 @@ func (s snapshots) Last(ctx context.Context, key string) (Snapshot, time.Time, b
 	return snap, snap.ReadAt, found, err
 }
 
-func (s snapshots) Keep(ctx context.Context, _ string, snap Snapshot, at time.Time) error {
+func (s snapshots) Keep(ctx context.Context, key string, snap Snapshot, at time.Time) error {
 	snap.ReadAt = at
+	if ref, ok := refOfKey(key); ok {
+		snap.Ref.As = ref.As
+	}
 	return s.store.PutSnapshot(ctx, snap)
 }
 
-// refOfKey reads Ref.Key back: "host/season/id".
+// refOfKey reads Ref.Key back: "host/season/id", with "@account" for a
+// read made as one account.
 func refOfKey(key string) (Ref, bool) {
+	key, as, member := strings.Cut(key, asSeparator)
 	parts := strings.SplitN(key, "/", 3)
 	if len(parts) != 3 {
 		return Ref{}, false
@@ -155,5 +164,13 @@ func refOfKey(key string) (Ref, bool) {
 	if err != nil {
 		return Ref{}, false
 	}
-	return Ref{Host: parts[0], Season: season, LeagueID: parts[2]}, true
+	ref := Ref{Host: parts[0], Season: season, LeagueID: parts[2]}
+	if member {
+		id, err := uuid.Parse(as)
+		if err != nil {
+			return Ref{}, false
+		}
+		ref.As = id
+	}
+	return ref, true
 }

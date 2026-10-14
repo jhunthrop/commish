@@ -40,13 +40,14 @@ type ESPNPublic interface {
 	Read(ctx context.Context, id string, season int, cookies *espn.Cookies) (espn.FullLeague, error)
 }
 
-// ESPN is the ESPN host.
+// ESPN is the ESPN host: a public league read with no cookies, for
+// anyone; a league attached as a member read with that account's own
+// cookies, for that account alone.
 type ESPN struct {
-	Member  ESPNMember
-	Public  ESPNPublic
-	Readers MemberReaders
-	Now     func() time.Time
-	Log     *slog.Logger
+	Member ESPNMember
+	Public ESPNPublic
+	Now    func() time.Time
+	Log    *slog.Logger
 }
 
 // Key is the host's contract name.
@@ -71,23 +72,20 @@ func (e *ESPN) Parse(pasted string) (Ref, error) {
 	return Ref{Host: HostESPN, LeagueID: ref.LeagueID, Season: ref.Season}, nil
 }
 
-// Read reads the league with the cookies of a connected member who
-// follows it, or as the public does when none is: a public league needs
-// nobody, and a member whose cookies ESPN refused is not the viewer's
-// news while the league is public.
+// Read reads the league as ref says: with no account, as the public
+// does, with no cookies at all; for an account that attached it as a
+// member, with that account's cookies. When ESPN no longer takes that
+// account's cookies a public league still reads as the public does, and a
+// private one asks that account to connect again.
 func (e *ESPN) Read(ctx context.Context, ref Ref) (Snapshot, error) {
-	accountID, err := e.Readers.MemberReader(ctx, ref)
-	if err != nil && !errors.Is(err, ErrNotConnected) {
-		return Snapshot{}, err
-	}
-	if err == nil {
-		snap, _, err := e.ReadAs(ctx, accountID, ref)
+	if ref.As != uuid.Nil {
+		snap, _, err := e.ReadAs(ctx, ref.As, ref)
 		if !errors.Is(err, ErrSignInAgain) && !errors.Is(err, ErrNotConnected) {
 			return snap, err
 		}
 	}
 	l, err := e.Public.Read(ctx, ref.LeagueID, ref.Season, nil)
-	if errors.Is(err, espn.ErrPrivate) && accountID != uuid.Nil {
+	if errors.Is(err, espn.ErrPrivate) && ref.As != uuid.Nil {
 		return Snapshot{}, fmt.Errorf("%w: espn refused the member's cookies and the league is private", ErrSignInAgain)
 	}
 	if err != nil {

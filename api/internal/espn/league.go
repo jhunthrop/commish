@@ -223,6 +223,13 @@ func (c *Client) Read(ctx context.Context, id string, season int, cookies *Cooki
 // cookies is ErrSignedOut, without them ErrPrivate. Its errors name a
 // status, never a cookie.
 func (c *Client) get(ctx context.Context, path string, cookies *Cookies, limit int64) ([]byte, error) {
+	if c.Pace != nil {
+		if err := c.Pace.Wait(ctx); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrUnavailable, err)
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, leagueTimeout)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("espn: request: %w", err)

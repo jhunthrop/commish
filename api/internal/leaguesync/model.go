@@ -16,6 +16,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
@@ -28,14 +30,37 @@ const (
 // Ref names one league on one host. Season is part of the name on
 // MyFantasyLeague, where a league keeps its id from season to season, and
 // 0 on Sleeper, where a league has a new id each season.
+//
+// As is the account a league attached as a member is read for (every
+// Yahoo league, a private ESPN league), uuid.Nil for a read anyone may
+// share: a host credential reads only for the account that stored it, so
+// such a league is read, kept and answered apart for each such account.
 type Ref struct {
-	Host     string `json:"host"`
-	LeagueID string `json:"league_id"`
-	Season   int    `json:"season"`
+	Host     string    `json:"host"`
+	LeagueID string    `json:"league_id"`
+	Season   int       `json:"season"`
+	As       uuid.UUID `json:"-"`
 }
 
-// Key is the poller's and the store's key for the league.
-func (r Ref) Key() string { return fmt.Sprintf("%s/%d/%s", r.Host, r.Season, r.LeagueID) }
+// Key is the poller's and the store's key for the league: one read for
+// everyone, or one for the account it is read as.
+func (r Ref) Key() string {
+	base := fmt.Sprintf("%s/%d/%s", r.Host, r.Season, r.LeagueID)
+	if r.As == uuid.Nil {
+		return base
+	}
+	return base + asSeparator + r.As.String()
+}
+
+// asSeparator divides a member read's key from the account it is read as.
+const asSeparator = "@"
+
+// Shared is the ref read as anyone: the league itself, not an account's
+// read of it.
+func (r Ref) Shared() Ref {
+	r.As = uuid.Nil
+	return r
+}
 
 // Snapshot is a league as one read found it, the same shape for every
 // host. It is persisted whole per host league (app.league_snapshots).
@@ -60,6 +85,25 @@ type Snapshot struct {
 	// Players names the players of a pushed host's league, from its own
 	// pages: a pushed host has no directory of ours to read.
 	Players map[string]HostPlayer `json:"players,omitempty"`
+	// Pool is the host's own status for the unrostered players it names
+	// apart (Yahoo's waiver wire): a player listed here is on waivers, one
+	// neither listed nor rostered is a free agent. Empty for a host that
+	// does not say.
+	Pool []PoolPlayer `json:"pool,omitempty"`
+}
+
+// Pool statuses, as the waiver tool reads them.
+const (
+	PoolWaivers = "waivers"
+)
+
+// PoolPlayer is one unrostered player's status on the host, and the day
+// a waiver claim on him clears (YYYY-MM-DD), empty when the host does not
+// say.
+type PoolPlayer struct {
+	PlayerID string `json:"player_id"`
+	Status   string `json:"status"`
+	Until    string `json:"until,omitempty"`
 }
 
 // Team is one roster in the league.

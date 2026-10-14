@@ -188,6 +188,31 @@ func (s *Store) SignedOut(ctx context.Context, accountID uuid.UUID, host string)
 	return nil
 }
 
+// Locked runs fn holding the account's lock for the host across every
+// process (a transaction-scoped advisory lock), so two instances never
+// refresh one member's tokens at once. fn reads and writes through the
+// store as usual; the lock is released when it returns.
+func (s *Store) Locked(ctx context.Context, accountID uuid.UUID, host string, fn func(context.Context) error) error {
+	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext('host_refresh:' || $1::text || ':' || $2))`,
+			accountID, host); err != nil {
+			return fmt.Errorf("hosts: lock %s: %w", host, err)
+		}
+		return fn(ctx)
+	})
+}
+
+// SignedOutAt stops reading as the member until they connect again, only
+// if the connection is still the one kept under wrappedKey: a slow read
+// of a connection made again since never marks the new one.
+func (s *Store) SignedOutAt(ctx context.Context, accountID uuid.UUID, host string, wrappedKey []byte) error {
+	if _, err := s.Pool.Exec(ctx, `update app.host_connections set status = 'signed_out'
+		where account_id = $1 and host = $2 and wrapped_key = $3`, accountID, host, wrappedKey); err != nil {
+		return fmt.Errorf("hosts: signed out: %w", err)
+	}
+	return nil
+}
+
 // Read notes a good read as the member.
 func (s *Store) Read(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error {
 	if _, err := s.Pool.Exec(ctx, `update app.host_connections set last_read_at = $3 where account_id = $1 and host = $2`,

@@ -59,11 +59,16 @@ type Link struct {
 type Store struct{ Pool *pgxpool.Pool }
 
 const linkColumns = `id, account_id, league_id, host, host_league_id, host_season, roster_id, attached_at, last_read_at,
-	coalesce(host_team_key, '')`
+	coalesce(host_team_key, ''), read_as_member`
 
 func scanLink(row pgx.Row) (Link, error) {
 	var l Link
-	err := row.Scan(&l.ID, &l.AccountID, &l.LeagueID, &l.Ref.Host, &l.Ref.LeagueID, &l.Ref.Season, &l.RosterID, &l.AttachedAt, &l.LastReadAt, &l.TeamKey)
+	var member bool
+	err := row.Scan(&l.ID, &l.AccountID, &l.LeagueID, &l.Ref.Host, &l.Ref.LeagueID, &l.Ref.Season, &l.RosterID, &l.AttachedAt, &l.LastReadAt, &l.TeamKey, &member)
+	if member {
+		// A league attached as a member is read for this account alone.
+		l.Ref.As = l.AccountID
+	}
 	return l, err
 }
 
@@ -100,14 +105,14 @@ func (s *Store) Save(ctx context.Context, l Link, many bool) (Link, error) {
 			return err
 		}
 		saved, err := scanLink(tx.QueryRow(ctx, `insert into app.league_links
-			(account_id, league_id, host, host_league_id, host_season, roster_id, last_read_at, host_team_key)
-			values ($1, $2, $3, $4, $5, $6, $7, nullif($8, ''))
+			(account_id, league_id, host, host_league_id, host_season, roster_id, last_read_at, host_team_key, read_as_member)
+			values ($1, $2, $3, $4, $5, $6, $7, nullif($8, ''), $9)
 			on conflict (account_id, host, host_league_id, host_season)
 			do update set league_id = excluded.league_id, roster_id = excluded.roster_id, last_read_at = excluded.last_read_at,
-				host_team_key = excluded.host_team_key,
+				host_team_key = excluded.host_team_key, read_as_member = excluded.read_as_member,
 				detached_at = null
 			returning `+linkColumns,
-			l.AccountID, l.LeagueID, l.Ref.Host, l.Ref.LeagueID, l.Ref.Season, l.RosterID, l.LastReadAt, l.TeamKey))
+			l.AccountID, l.LeagueID, l.Ref.Host, l.Ref.LeagueID, l.Ref.Season, l.RosterID, l.LastReadAt, l.TeamKey, l.Ref.As != uuid.Nil))
 		out = saved
 		return err
 	})
@@ -199,7 +204,8 @@ func (s *Store) Touch(ctx context.Context, accountID, id uuid.UUID, at time.Time
 func (s *Store) LastSnapshot(ctx context.Context, ref Ref) (Snapshot, bool, error) {
 	var raw []byte
 	err := s.Pool.QueryRow(ctx, `select snapshot from app.league_snapshots
-		where host = $1 and host_league_id = $2 and host_season = $3`, ref.Host, ref.LeagueID, ref.Season).Scan(&raw)
+		where host = $1 and host_league_id = $2 and host_season = $3 and read_as = $4`,
+		ref.Host, ref.LeagueID, ref.Season, ref.As).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Snapshot{}, false, nil
 	}
@@ -210,15 +216,22 @@ func (s *Store) LastSnapshot(ctx context.Context, ref Ref) (Snapshot, bool, erro
 	if err := json.Unmarshal(raw, &snap); err != nil {
 		return Snapshot{}, false, fmt.Errorf("leaguesync: decode snapshot %s: %w", ref.Key(), err)
 	}
+	snap.Ref.As = ref.As
 	return snap, true, nil
 }
 
-// Linked reports whether any account has the league attached.
+// linkedAs is the filter that finds the links a read serves: the links
+// read as anyone for a shared read, the one account's member link for a
+// read made as it.
+const linkedAs = `detached_at is null and (case when read_as_member then account_id else '00000000-0000-0000-0000-000000000000'::uuid end) = $4`
+
+// Linked reports whether any account has the league attached, read the
+// way ref is read.
 func (s *Store) Linked(ctx context.Context, ref Ref) (bool, error) {
 	var linked bool
 	err := s.Pool.QueryRow(ctx, `select exists (select 1 from app.league_links
-		where host = $1 and host_league_id = $2 and host_season = $3 and detached_at is null)`,
-		ref.Host, ref.LeagueID, ref.Season).Scan(&linked)
+		where host = $1 and host_league_id = $2 and host_season = $3 and `+linkedAs+`)`,
+		ref.Host, ref.LeagueID, ref.Season, ref.As).Scan(&linked)
 	if err != nil {
 		return false, fmt.Errorf("leaguesync: linked %s: %w", ref.Key(), err)
 	}
@@ -234,12 +247,12 @@ func (s *Store) PutSnapshot(ctx context.Context, snap Snapshot) error {
 		return fmt.Errorf("leaguesync: encode snapshot: %w", err)
 	}
 	ref := snap.Ref
-	_, err = s.Pool.Exec(ctx, `insert into app.league_snapshots (host, host_league_id, host_season, snapshot, read_at)
-		select $1, $2, $3, $4, $5
+	_, err = s.Pool.Exec(ctx, `insert into app.league_snapshots (host, host_league_id, host_season, read_as, snapshot, read_at)
+		select $1, $2, $3, $4, $5, $6
 		where exists (select 1 from app.league_links where host = $1 and host_league_id = $2 and host_season = $3
-			and detached_at is null)
-		on conflict (host, host_league_id, host_season) do update set snapshot = excluded.snapshot, read_at = excluded.read_at`,
-		ref.Host, ref.LeagueID, ref.Season, raw, snap.ReadAt)
+			and `+linkedAs+`)
+		on conflict (host, host_league_id, host_season, read_as) do update set snapshot = excluded.snapshot, read_at = excluded.read_at`,
+		ref.Host, ref.LeagueID, ref.Season, ref.As, raw, snap.ReadAt)
 	if err != nil {
 		return fmt.Errorf("leaguesync: keep snapshot %s: %w", ref.Key(), err)
 	}
@@ -311,25 +324,6 @@ func (s *Store) FFPCReader(ctx context.Context, ref Ref) (uuid.UUID, string, err
 		return uuid.Nil, "", fmt.Errorf("leaguesync: ffpc reader %s: %w", ref.Key(), err)
 	}
 	return accountID, ltuid, nil
-}
-
-// MemberReader is a connected member who follows a league on a host
-// read as its members (Yahoo), to read it as: the one whose connection
-// read most recently, so one member's lapsed connection never stops the
-// league for the rest.
-func (s *Store) MemberReader(ctx context.Context, ref Ref) (uuid.UUID, error) {
-	var accountID uuid.UUID
-	err := s.Pool.QueryRow(ctx, `select l.account_id from app.league_links l
-		join app.host_connections c on c.account_id = l.account_id and c.host = l.host and c.status = 'connected'
-		where l.host = $1 and l.host_league_id = $2 and l.host_season = $3 and l.detached_at is null
-		order by c.last_read_at desc nulls last, l.attached_at limit 1`, ref.Host, ref.LeagueID, ref.Season).Scan(&accountID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, ErrNotConnected
-	}
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("leaguesync: member reader %s: %w", ref.Key(), err)
-	}
-	return accountID, nil
 }
 
 // FollowedIDs is the account's live leagues on a host, keyed "id/season"

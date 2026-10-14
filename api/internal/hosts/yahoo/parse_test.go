@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -135,4 +136,72 @@ func TestLeagueKeyChecksItsParts(t *testing.T) {
 			t.Fatalf("%v accepted", bad)
 		}
 	}
+}
+
+// H1: a league past its draft whose rosters answer carries no player on
+// any roster (a shape we do not read) fails the read with a reason, never
+// an empty league whose every player reads as free.
+func TestParseLeagueRefusesADraftedLeagueWithNoRosters(t *testing.T) {
+	bare := []byte(`<fantasy_content><league><league_id>128934</league_id><teams count="2">` +
+		`<team><team_key>470.l.128934.t.1</team_key><team_id>1</team_id><name>A</name></team>` +
+		`<team><team_key>470.l.128934.t.2</team_key><team_id>2</team_id><name>B</name></team>` +
+		`</teams></league></fantasy_content>`)
+	_, err := ParseLeague(fixture(t, "yahoo-league-head.xml"), bare)
+	if !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "no player on any roster") {
+		t.Fatalf("a drafted league with no rosters: %v", err)
+	}
+	predraft := strings.Replace(string(fixture(t, "yahoo-league-head.xml")), "<draft_status>postdraft</draft_status>", "<draft_status>predraft</draft_status>", 1)
+	if _, err := ParseLeague([]byte(predraft), bare); err != nil {
+		t.Fatalf("a league before its draft has empty rosters: %v", err)
+	}
+}
+
+// The waiver wire: each player on waivers and the day his claim clears.
+func TestParseWaivers(t *testing.T) {
+	list, n, err := ParseWaivers(fixture(t, "yahoo-league-waivers.xml"))
+	if err != nil || n != 3 || len(list) != 3 {
+		t.Fatalf("%d of %d, %v", len(list), n, err)
+	}
+	if list[0].Player.ID != "29999" || list[0].Until != "2026-10-16" || list[2].Until != "" || list[1].Player.Team != "JAX" {
+		t.Fatalf("%+v", list)
+	}
+	if _, _, err := ParseWaivers([]byte("<html>")); !errors.Is(err, ErrMalformed) {
+		t.Fatalf("not xml: %v", err)
+	}
+}
+
+// L8: no answer, however malformed, makes a parser panic.
+func FuzzParseLeague(f *testing.F) {
+	head, err := os.ReadFile(filepath.Join("testdata", "yahoo-league-head.xml"))
+	if err != nil {
+		f.Fatal(err)
+	}
+	rosters, err := os.ReadFile(filepath.Join("testdata", "yahoo-league-rosters.xml"))
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(head, rosters)
+	f.Add([]byte("<fantasy_content><league><league_id>1</league_id></league></fantasy_content>"), []byte("<x/>"))
+	f.Fuzz(func(t *testing.T, head, rosters []byte) {
+		l, err := ParseLeague(head, rosters)
+		if err == nil {
+			_ = l.Settings.Scoring()
+		}
+		_, _, _ = ParseWaivers(rosters)
+	})
+}
+
+func FuzzParseMyLeagues(f *testing.F) {
+	leagues, err := os.ReadFile(filepath.Join("testdata", "yahoo-my-leagues.xml"))
+	if err != nil {
+		f.Fatal(err)
+	}
+	teams, err := os.ReadFile(filepath.Join("testdata", "yahoo-my-teams.xml"))
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(leagues, teams)
+	f.Fuzz(func(t *testing.T, leagues, teams []byte) {
+		_, _ = ParseMyLeagues(leagues, teams)
+	})
 }

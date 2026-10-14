@@ -35,7 +35,7 @@ const (
 // Connections is the part of hosts.Store a member read needs.
 type Connections interface {
 	Get(ctx context.Context, accountID uuid.UUID, host string) (hosts.Connection, error)
-	SignedOut(ctx context.Context, accountID uuid.UUID, host string) error
+	SignedOutAt(ctx context.Context, accountID uuid.UUID, host string, wrappedKey []byte) error
 	Read(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error
 }
 
@@ -62,53 +62,83 @@ func Seal(v *hosts.Vault, accountID uuid.UUID, c espn.Cookies) (hosts.Sealed, er
 
 // Cookies is the member's kept cookies, for a connection that reads.
 func (m *Member) Cookies(ctx context.Context, accountID uuid.UUID) (espn.Cookies, error) {
+	c, _, err := m.open(ctx, accountID)
+	return c, err
+}
+
+// open is the member's kept cookies and the wrapped key they were kept
+// under, which guards marking them signed out.
+func (m *Member) open(ctx context.Context, accountID uuid.UUID) (espn.Cookies, []byte, error) {
 	conn, err := m.Store.Get(ctx, accountID, Host)
 	if err != nil {
-		return espn.Cookies{}, err
+		return espn.Cookies{}, nil, err
 	}
 	if conn.Status != hosts.StatusConnected {
-		return espn.Cookies{}, ErrReconnect
+		return espn.Cookies{}, nil, ErrReconnect
 	}
+	wrapped := conn.Sealed.WrappedKey
 	s, err := m.Vault.OpenSession(accountID.String(), Host, conn.Sealed)
 	if errors.Is(err, hosts.ErrSealed) {
-		m.signedOut(ctx, accountID, "the kept cookies no longer open")
-		return espn.Cookies{}, ErrReconnect
+		m.signedOut(ctx, accountID, wrapped, "the kept cookies no longer open")
+		return espn.Cookies{}, nil, ErrReconnect
 	}
 	if err != nil {
-		return espn.Cookies{}, fmt.Errorf("espnhost: open session: %w", err)
+		return espn.Cookies{}, nil, fmt.Errorf("espnhost: open session: %w", err)
 	}
 	c := espn.Cookies{SWID: s[keySWID], S2: s[keyS2]}
 	if !c.Valid() {
-		m.signedOut(ctx, accountID, "the kept cookies are out of shape")
-		return espn.Cookies{}, ErrReconnect
+		m.signedOut(ctx, accountID, wrapped, "the kept cookies are out of shape")
+		return espn.Cookies{}, nil, ErrReconnect
 	}
-	return c, nil
+	return c, wrapped, nil
 }
 
 // Leagues is the member's football leagues in a season.
 func (m *Member) Leagues(ctx context.Context, accountID uuid.UUID, season int) ([]espn.MyLeague, error) {
-	c, err := m.Cookies(ctx, accountID)
+	c, wrapped, err := m.open(ctx, accountID)
 	if err != nil {
 		return nil, err
 	}
 	list, err := m.Client.MyLeagues(ctx, c, season)
-	return list, m.after(ctx, accountID, err)
+	return list, m.after(ctx, accountID, wrapped, err)
 }
 
-// ReadLeague is one whole read of a league as the member.
+// ReadLeague is one whole read of a league as the member. ESPN refuses a
+// private league to cookies that work but are not a member's of it as it
+// refuses cookies that no longer work; the member's own league list tells
+// the two apart, so a league they are not in never signs them out.
 func (m *Member) ReadLeague(ctx context.Context, accountID uuid.UUID, leagueID string, season int) (espn.FullLeague, error) {
-	c, err := m.Cookies(ctx, accountID)
+	c, wrapped, err := m.open(ctx, accountID)
 	if err != nil {
 		return espn.FullLeague{}, err
 	}
 	l, err := m.Client.Read(ctx, leagueID, season, &c)
-	return l, m.after(ctx, accountID, err)
+	if errors.Is(err, espn.ErrSignedOut) && !m.inList(ctx, c, leagueID, season) {
+		return espn.FullLeague{}, fmt.Errorf("%w: not a league of this member", espn.ErrPrivate)
+	}
+	return l, m.after(ctx, accountID, wrapped, err)
+}
+
+// inList reports whether the cookies still read the member's list and
+// it does not hold the league, which is a league they are not in; any
+// other answer is the cookies refused.
+func (m *Member) inList(ctx context.Context, c espn.Cookies, leagueID string, season int) bool {
+	list, err := m.Client.MyLeagues(ctx, c, season)
+	if err != nil {
+		return true
+	}
+	for _, l := range list {
+		if l.LeagueID == leagueID {
+			return true
+		}
+	}
+	return false
 }
 
 // after notes a good read, or marks a refused one for a reconnect.
-func (m *Member) after(ctx context.Context, accountID uuid.UUID, err error) error {
+func (m *Member) after(ctx context.Context, accountID uuid.UUID, wrapped []byte, err error) error {
 	if errors.Is(err, espn.ErrSignedOut) {
-		m.signedOut(ctx, accountID, "ESPN refused the cookies")
+		m.signedOut(ctx, accountID, wrapped, "ESPN refused the cookies")
 		return ErrReconnect
 	}
 	if err != nil {
@@ -120,9 +150,11 @@ func (m *Member) after(ctx context.Context, accountID uuid.UUID, err error) erro
 	return nil
 }
 
-func (m *Member) signedOut(ctx context.Context, accountID uuid.UUID, why string) {
+// signedOut marks the connection the read began with for a reconnect;
+// a connection made again since keeps its state.
+func (m *Member) signedOut(ctx context.Context, accountID uuid.UUID, wrapped []byte, why string) {
 	m.Log.Warn("espnhost: connection needs a reconnect", "account", accountID, "why", why)
-	if err := m.Store.SignedOut(ctx, accountID, Host); err != nil {
+	if err := m.Store.SignedOutAt(ctx, accountID, Host, wrapped); err != nil {
 		m.Log.Warn("espnhost: mark signed out", "account", accountID, "err", err)
 	}
 }

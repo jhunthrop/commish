@@ -46,7 +46,12 @@ func yahooFixtureRead(t *testing.T) yahoo.League {
 // a player the id map names placed on our board by id.
 func TestYahooSnapshot(t *testing.T) {
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
-	snap := yahooSnapshot(yahooFixtureRead(t), map[string]string{"30977": "board-allen"}, now)
+	l := yahooFixtureRead(t)
+	l.Waivers = []yahoo.Waiver{{Player: yahoo.Player{ID: "35010", Name: "Tank Bigsby", Position: "RB", Team: "JAX"}, Until: "2026-10-16"}}
+	snap := yahooSnapshot(l, map[string]string{"30977": "board-allen"}, now)
+	if len(snap.Pool) != 1 || snap.Pool[0] != (PoolPlayer{PlayerID: "35010", Status: PoolWaivers, Until: "2026-10-16"}) || snap.Players["35010"].Name != "Tank Bigsby" {
+		t.Fatalf("the waiver pool: %+v", snap.Pool)
+	}
 	if snap.Ref.Key() != "yahoo/2026/128934" || snap.Week != 6 || snap.Status != "in_season" || len(snap.Teams) != 10 {
 		t.Fatalf("league %s week %d status %s, %d teams", snap.Ref.Key(), snap.Week, snap.Status, len(snap.Teams))
 	}
@@ -167,7 +172,7 @@ func TestAttachYahoo(t *testing.T) {
 	}
 	store := &Store{Pool: pool}
 	member := &fakeYahooMember{owner: alice.ID, league: yahooFixtureRead(t)}
-	host := &Yahoo{Member: member, Readers: store, Now: clock.Now}
+	host := &Yahoo{Member: member, Now: clock.Now}
 	hostList := Hosts{host}
 	svc := &Service{
 		Hosts: hostList, Poller: &Poller{Hosts: hostList, Store: store, Now: clock.Now, Log: quietLog()},
@@ -200,9 +205,32 @@ func TestAttachYahoo(t *testing.T) {
 	if err != nil || !followed[hosts.FollowKey(yahooFixtureLeague, 2026)] {
 		t.Fatalf("followed %v %v", followed, err)
 	}
+	// The league is read and kept as alice alone: her link reads as her,
+	// and no read is kept for anyone else.
+	link, err := store.Get(ctx, alice.ID, got.Id)
+	if err != nil || link.Ref.As != alice.ID {
+		t.Fatalf("alice's link reads as %s, %v", link.Ref.As, err)
+	}
 	ref := Ref{Host: HostYahoo, LeagueID: yahooFixtureLeague, Season: 2026}
-	if reader, err := store.MemberReader(ctx, ref); err != nil || reader != alice.ID {
-		t.Fatalf("reader %s %v", reader, err)
+	if _, found, err := store.LastSnapshot(ctx, ref); err != nil || found {
+		t.Fatalf("a read kept for anyone: %v %v", found, err)
+	}
+	if _, found, err := store.LastSnapshot(ctx, link.Ref); err != nil || !found {
+		t.Fatalf("alice's read not kept: %v %v", found, err)
+	}
+	// M1: a Yahoo league is never attached by its link and a team picked:
+	// with no host the public path refuses it, and named as Yahoo it goes
+	// the member path, which reads as bob alone and asks him to connect.
+	roster := 2
+	yahooLink := "https://football.fantasysports.yahoo.com/f1/128934"
+	if status, _ := b.do(svc.attach, http.MethodPost, "/", apitypes.AttachInput{Link: yahooLink, Me: apitypes.AttachSeat{RosterId: &roster}}, ""); status != http.StatusBadRequest {
+		t.Fatalf("bob's attach of a Yahoo link with a team picked: %d", status)
+	}
+	if status, _ := b.do(svc.attach, http.MethodPost, "/", apitypes.AttachInput{Host: &yh, Link: yahooLink, Me: apitypes.AttachSeat{RosterId: &roster}}, ""); status != http.StatusConflict {
+		t.Fatalf("bob's attach of a Yahoo link as Yahoo: %d", status)
+	}
+	if member.reads != 1 {
+		t.Fatalf("%d reads, want alice's attach alone", member.reads)
 	}
 
 	// Yahoo refuses the refresh: the read keeps the last one, stale, and
@@ -216,10 +244,4 @@ func TestAttachYahoo(t *testing.T) {
 		}
 	}
 
-	if err := (&hosts.Store{Pool: pool}).Delete(ctx, alice.ID, yahoo.Host); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.MemberReader(ctx, ref); err == nil {
-		t.Fatal("a disconnected member still reads the league")
-	}
 }

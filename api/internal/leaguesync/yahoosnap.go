@@ -56,6 +56,9 @@ func yahooSnapshot(l yahoo.League, ids map[string]string, now time.Time) Snapsho
 		}
 	}
 	snap.Moves = yahooMoves(l.Moves, &snap, ids)
+	for _, w := range l.Waivers {
+		snap.Pool = append(snap.Pool, PoolPlayer{PlayerID: snap.addYahooPlayer(w.Player, ids), Status: PoolWaivers, Until: w.Until})
+	}
 	im := l.Settings.Scoring()
 	snap.Scoring = Scoring{Rules: im.Rules, Dropped: scoring.DroppedWords(im.Dropped), DroppedRules: im.Dropped, Defaulted: im.Defaulted}
 	snap.Shape = yahooShape(l.Settings, len(snap.Teams))

@@ -154,7 +154,8 @@ func (c *Client) GameKey(ctx context.Context, access string, season int) (string
 }
 
 // League is one whole read of a league: its settings, standings, the
-// week's scoreboard and recent moves, then every team's roster.
+// week's scoreboard and recent moves, every team's roster, and the
+// players on waivers.
 func (c *Client) League(ctx context.Context, access, leagueKey string) (League, error) {
 	head, err := c.get(ctx, access, "league/"+leagueKey+";out=settings,standings,scoreboard,transactions")
 	if err != nil {
@@ -164,5 +165,39 @@ func (c *Client) League(ctx context.Context, access, leagueKey string) (League, 
 	if err != nil {
 		return League{}, err
 	}
-	return ParseLeague(head, rosters)
+	l, err := ParseLeague(head, rosters)
+	if err != nil {
+		return League{}, err
+	}
+	l.Waivers, err = c.waivers(ctx, access, leagueKey)
+	return l, err
+}
+
+// Bounds on the waiver read: Yahoo answers at most a page of 25 players,
+// and a league's waiver wire is a few dozen at most.
+const (
+	waiverPage  = 25
+	waiverPages = 4
+)
+
+// waivers is the league's players on waivers, a page at a time until a
+// page comes back short.
+func (c *Client) waivers(ctx context.Context, access, leagueKey string) ([]Waiver, error) {
+	var out []Waiver
+	for page := range waiverPages {
+		body, err := c.get(ctx, access, fmt.Sprintf("league/%s/players;status=W;out=ownership;start=%d;count=%d",
+			leagueKey, page*waiverPage, waiverPage))
+		if err != nil {
+			return nil, err
+		}
+		list, n, err := ParseWaivers(body)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, list...)
+		if n < waiverPage {
+			break
+		}
+	}
+	return out, nil
 }

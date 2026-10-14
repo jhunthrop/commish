@@ -2,6 +2,7 @@ package espn
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -143,5 +144,51 @@ func TestCookiesShapeAndPrinting(t *testing.T) {
 	}
 	if s := fmt.Sprintf("%v %+v %#v", testCookies, testCookies, testCookies); strings.Contains(s, "AEB") {
 		t.Fatalf("cookies printed: %s", s)
+	}
+}
+
+// L8: no answer, however malformed or mistyped, makes a reader panic.
+func FuzzReadLeague(f *testing.F) {
+	full, err := os.ReadFile(fullFixture)
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(full)
+	f.Add([]byte(`{"id":"x","teams":[{"roster":{"entries":[{"playerId":"y"}]}}]}`))
+	f.Add([]byte(`{"id":1,"teams":[{}],"schedule":[{"matchupPeriodId":0,"away":null}]}`))
+	f.Fuzz(func(t *testing.T, body []byte) {
+		var wire wireFull
+		if json.Unmarshal(body, &wire) == nil {
+			_, _ = checkFull(wire)
+		}
+	})
+}
+
+func FuzzParseMyLeagues(f *testing.F) {
+	fan, err := os.ReadFile("testdata/fan-2026.json")
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(fan)
+	f.Add([]byte(`{"preferences":[{"metaData":{"entry":{"abbrev":"ffl","seasonId":2026,"groups":[]}}}]}`))
+	f.Fuzz(func(t *testing.T, body []byte) {
+		_, _ = ParseMyLeagues(body, 2026)
+	})
+}
+
+// A mistyped answer is ErrMalformed, never a league.
+func TestReadRefusesMistypedAnswers(t *testing.T) {
+	for _, body := range []string{`{"id":"x"}`, `[]`, `{"id":1,"teams":[]}`} {
+		var wire wireFull
+		err := json.Unmarshal([]byte(body), &wire)
+		if err == nil {
+			_, err = checkFull(wire)
+		}
+		if err == nil {
+			t.Fatalf("%s read as a league", body)
+		}
+	}
+	if _, err := ParseMyLeagues([]byte(`{"preferences":"x"}`), 2026); !errors.Is(err, ErrMalformed) {
+		t.Fatalf("a mistyped fan answer: %v", err)
 	}
 }

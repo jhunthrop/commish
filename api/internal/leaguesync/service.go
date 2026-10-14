@@ -123,13 +123,21 @@ const (
 	fieldMe   = "me"
 	fieldHost = "host"
 
-	linkWords     = "Paste your league's link from Sleeper, MyFantasyLeague or ESPN"
 	seatWords     = "Give your Sleeper username, or pick your team"
 	pickTeamWords = "Pick your team from the list"
 	// espnPrivateFollowWords sends a private ESPN league to the account
 	// page, where connecting ESPN reads it as the member.
-	espnPrivateFollowWords = "This ESPN league is private. Connect ESPN on your account page to follow it"
+	espnPrivateFollowWords = "This ESPN league is private. Connect ESPN first, then pick it from your ESPN list"
 )
+
+// linkWords asks for a link from the hosts a link may name here: ESPN
+// only while it is switched on.
+func (s *Service) linkWords() string {
+	if _, on := s.Hosts.ByKey(HostESPN); on {
+		return "Paste your league's link from Sleeper, MyFantasyLeague or ESPN"
+	}
+	return "Paste your league's link from Sleeper or MyFantasyLeague"
+}
 
 // writeHostError says what went wrong reading the league, in our words.
 func (s *Service) writeHostError(w http.ResponseWriter, r *http.Request, host string, err error) {
@@ -138,7 +146,7 @@ func (s *Service) writeHostError(w http.ResponseWriter, r *http.Request, host st
 	}
 	switch {
 	case errors.Is(err, ErrNotALink):
-		httpx.WriteInvalid(w, r, map[string]string{fieldLink: linkWords})
+		httpx.WriteInvalid(w, r, map[string]string{fieldLink: s.linkWords()})
 	case errors.Is(err, ErrNotFound):
 		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, hostWords(host)+" has no league at that link", nil)
 	case errors.Is(err, ErrPrivate) && host == HostESPN:
@@ -171,7 +179,7 @@ func hostKey(h *apitypes.LeagueHost) string {
 // resolve is the host and league the request names, or an answer.
 func (s *Service) resolve(w http.ResponseWriter, r *http.Request, host *apitypes.LeagueHost, link string) (Host, Ref, bool) {
 	if host != nil && !host.Valid() {
-		httpx.WriteInvalid(w, r, map[string]string{fieldHost: linkWords})
+		httpx.WriteInvalid(w, r, map[string]string{fieldHost: s.linkWords()})
 		return nil, Ref{}, false
 	}
 	h, ref, err := s.Hosts.Resolve(hostKey(host), link)
