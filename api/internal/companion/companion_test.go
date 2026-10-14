@@ -471,7 +471,7 @@ func (s *scriptedIDs) SleeperIDs(context.Context) (map[string]string, error) {
 func TestIDMatcherSurvivesAFailedRead(t *testing.T) {
 	raw := &boards.Raw{Players: []boards.Player{
 		{ID: "p1", Name: "Jaxon Smith-Njigba", Position: draft.WR, Team: "SEA"},
-		{ID: "p2", Name: "Mike Washington", Position: draft.RB, Team: "LV"},
+		{ID: "p2", Name: "Mike Washington Jr.", Position: draft.RB, Team: "LV"},
 	}}
 	jsn := sleeper.Pick{PlayerID: "9488", Name: "Jaxon Smith-Njigba", Position: "WR", Team: "SEA"}
 	rookie := sleeper.Pick{PlayerID: "13305", Name: "Mike Washington", Position: "RB", Team: "LV"}

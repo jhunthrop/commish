@@ -20,8 +20,8 @@ const (
 	// under, through players.sleeper_id (Lane 8 part A).
 	MatchSleeperID = "sleeper_id"
 	// MatchSleeperName places a pick whose Sleeper id our players do not
-	// carry yet (a rookie the id map lags on) by his exact name, position
-	// and team, only when one board player has all three.
+	// carry yet (a rookie the id map lags on) by his name, position and
+	// team, only when one board player has all three (nameKey).
 	MatchSleeperName = "sleeper_name"
 )
 
@@ -82,8 +82,11 @@ func (m *IDMatcher) Match(raw *boards.Raw, p sleeper.Pick) (string, string, bool
 	return "", "", false
 }
 
+// nameKey is a player's name as written (case, punctuation and a
+// generational suffix aside: Sleeper's "Mike Washington" is our "Mike
+// Washington Jr."), his position and his team.
 func nameKey(position, name, team string) string {
-	return position + "|" + name + "|" + strings.ToUpper(team)
+	return position + "|" + FoldName(name) + "|" + strings.ToUpper(team)
 }
 
 // board is the board's own ids and its exact name, position and team
