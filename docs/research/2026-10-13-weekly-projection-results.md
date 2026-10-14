@@ -7,7 +7,8 @@
 **Tree:** `47719c12` (`model_version` `research@47719c12`), arithmetic `v8-fdlibm-fused/pow-apple-libm`.
 **Data:** the scratch copy `lane12_weekly` (local test server, port 5433): the dev copy's `research`
 schema as dumped 2026-10-13, plus 2025's published weekly stats from the house's season ingest
-(6,655 stat lines, 7,565 participation rows, resolution 0.997).
+(6,655 stat lines, 7,565 participation rows, resolution 0.997, from the ingest's log line. The JSON
+carries them in a hand-added `ingest` block, since the judgment itself did not write them).
 **Every number:** `2026-10-13-weekly-projection-results.json` (the judgment's whole output: the
 fitted priors, the interval, every gate, every reported number, per-week rho, table digests).
 
@@ -18,7 +19,7 @@ fitted priors, the interval, every gate, every reported number, per-week rho, ta
 Twelve of the twenty-three gate lines failed: three of four positions against ADP (G1), all four
 against recent form (G2), both places-off comparisons (G3) and quarterback calibration in all three
 formats (G4). Isolation (G5) passed. Under the preregistered decision rule the weekly board does not
-join the nightly, writes no rows and is not frozen by the register; the in-season screens keep the
+join the nightly, writes no rows and is not frozen by the register. The in-season screens keep the
 season projection and the stat lines, labelled. The model is not retuned and rerun against 2025.
 
 ## The run, verbatim
@@ -100,8 +101,12 @@ the shape of this failure is a property of the model on two independent seasons,
 
 ## The fit
 
-Fit on 2021-2024 with 2020 as history, the oracle's four procedures, ported and proven bit for bit
-(`weekly-fit` parity case). The search chose the same cell as the oracle's own 2021-2022 fit: decay
+Fit on 2021-2024 with 2020 as history by the oracle's four fit procedures. The procedures are proven
+bit for bit on identical inputs (`weekly-fit`, 2021-2022): those inputs are the port's reads. The
+reads themselves are proven against the oracle fit script's own reads on 2024-2025, 67,611 rows
+of usage, lines, club edges and team facts with no difference (`weekly-fit-reads`). The dev
+copy's legacy schema no longer holds 2020-2023 whole, so the reads of those seasons are the same
+functions, not a separate comparison. The search chose the same cell as the oracle's own 2021-2022 fit: decay
 0.7, season shrinkage 2, in-season shrinkage 0.25, team-volume shrinkage 4. League team volume per
 game: 32.15 targets, 26.95 carries, 33.55 pass attempts. Scheme elasticities (tempo, pass lean):
 targets 0.0800, 0.1255; carries 0.2068, -0.1631; pass attempts 0.0284, 0.1339 (league pace 32.76
@@ -113,10 +118,18 @@ s/play, neutral pass rate 0.5518). Game context (opponent, rest): passing 0.4357
 Fit 2021-2023 (2020 history), judged on 2024 weeks 1 to 17 against 2024 ADP and recent form, same
 code (`2026-10-13-weekly-projection-dev-check.json`). Its gates read: G1 passed for RB only (QB
 +0.0169, RB +0.1248, WR +0.0548, TE +0.0673 against ADP, lower bounds -0.1045, +0.0706, -0.0180,
--0.0777); G2 failed for all four (QB -0.0497, RB -0.0000, WR +0.0286, TE +0.0513, every lower bound
-below zero); G3 passed against ADP (+0.7627, bound +0.2520) and failed against form (-0.0295); G4
-passed all twelve cells; G5 passed. It found no defect, so the preregistration carries no
+-0.0777). G2 failed for all four (QB -0.0497, RB -0.0000, WR +0.0286, TE +0.0513, every lower bound
+below zero). G3 passed against ADP (+0.7627, bound +0.2520) and failed against form (-0.0295). G4
+passed all twelve cells, and G5 passed. It found no defect, so the preregistration carries no
 amendment and nothing changed between the check and the judgment.
+
+## 2025 inputs before the preregistration
+
+The `weekly-projection-2025` parity case ran the oracle's weekly model over 2025 weeks 1, 6, 11 and
+17 before the preregistration was committed (the preregistration cites its row counts). It read
+2025 inputs, not outcomes: no 2025 line existed in that store to score against, and the replay's
+score was discarded unread. No fit, gate or statistic of this round read a 2025 outcome before the
+one judgment.
 
 ## Refused benchmarks
 
@@ -127,6 +140,6 @@ and one provider projection capture (2026-09-09).
 ## Cost
 
 On the founder's laptop (Apple silicon, one core): the fit reads in 6 s and fits in 39 min (the
-share search, 720 cells over 72 weeks, is nearly all of it); the interval takes 2.5 min; one week's
+share search, 720 cells over 72 weeks, is nearly all of it). The interval takes 2.5 min. One week's
 board, reads included, takes 2.2 s. The priors are fixed once fitted, so an in-season job would run
 the board build only: about 2 s a week. No model call, no prose: this round spent nothing.

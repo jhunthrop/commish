@@ -1654,5 +1654,18 @@
   "PASS  G4 TE std                 below floor 0.083, above ceiling 0.101, each against [0.05, 0.15], n=1183",
   "PASS  G5 isolation              every table as it was",
   "DECISION: a gate failed; no weekly number ships"
- ]
+ ],
+ "ingest": {
+  "note": "added by hand after the run, copied from the ingest-gap-season log line of 2026-10-14T03:38:51Z; the judgment did not write it",
+  "season": 2025,
+  "participation_rows": 7565,
+  "stat_lines": 6655,
+  "observations_written": 145249,
+  "participation_resolution": 0.9970845481049563,
+  "stat_line_resolution": 1.0,
+  "unresolved": [
+   "WhitCo05 Cody White (10)",
+   "CartNa00 Nathan Carter (7)"
+  ]
+ }
 }
