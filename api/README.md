@@ -20,6 +20,8 @@ make build        # bin/api, bin/room, bin/migrate
 
 Every setting is in `.env.example`. The test helper refuses any database whose name does not end in `_test`.
 
+Development and CI connect over TCP (`localhost:5433`). Production's `DATABASE_URL` is the Cloud SQL socket form, `postgres://commish_app:<password>@/commish?host=/cloudsql/trycommish:us-east1:commish-pg`: Cloud Run mounts the socket for every service and job (`--set-cloudsql-instances` in `api.yml`), and the config accepts either a host or a `host` parameter naming a socket directory (`infra/README.md`, Cloud SQL).
+
 ## Infrastructure this module relies on
 
 These belong in `infra/README.md`. They are kept here until Lane 1 moves them.

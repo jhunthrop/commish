@@ -17,6 +17,8 @@ services:
       timeout: 3s
       retries: 10
 
+  # Dev and tests connect to these over TCP (localhost:5432, localhost:5433). Production's URL is
+  # the Cloud SQL socket form, ?host=/cloudsql/<instance> (infra/README.md), never used here.
   postgres-test:
     image: postgres:17-alpine
     environment:

@@ -11,6 +11,14 @@ export type ImportHost = components['schemas']['ScoringImportInput']['host'];
 export type RuleKey = keyof ScoringRules;
 type Preset = NonNullable<LeagueSettings['scoring']['preset']>;
 
+/** A group of the form: `boardless` for the kicking and defense rules, which move nothing on the
+ * board (kickers and defenses rank in draft order) and are kept for the league's record. */
+export interface RuleGroup {
+	label: string;
+	boardless?: boolean;
+	rules: readonly RuleField[];
+}
+
 export interface RuleField {
 	key: RuleKey;
 	label: string;
@@ -21,7 +29,7 @@ const YARD_STEP = 0.01;
 const POINT_STEP = 0.5;
 
 /** The form's groups, in a league settings page's order. */
-export const RULE_GROUPS: readonly { label: string; rules: readonly RuleField[] }[] = [
+export const RULE_GROUPS: readonly RuleGroup[] = [
 	{
 		label: 'Passing',
 		rules: [
@@ -55,6 +63,7 @@ export const RULE_GROUPS: readonly { label: string; rules: readonly RuleField[] 
 	},
 	{
 		label: 'Kicking',
+		boardless: true,
 		rules: [
 			{ key: 'points_per_field_goal', label: 'Field goal made', step: POINT_STEP },
 			{ key: 'points_per_field_goal_missed', label: 'Field goal missed', step: POINT_STEP },
@@ -64,6 +73,7 @@ export const RULE_GROUPS: readonly { label: string; rules: readonly RuleField[] 
 	},
 	{
 		label: 'Defense',
+		boardless: true,
 		rules: [
 			{ key: 'points_per_sack', label: 'Sack', step: POINT_STEP },
 			{ key: 'points_per_defensive_interception', label: 'Interception', step: POINT_STEP },
@@ -119,6 +129,19 @@ export const IMPORT_HOSTS: readonly { host: ImportHost; label: string; hint: str
 	{ host: 'mfl', label: 'MyFantasyLeague', hint: 'myfantasyleague.com/2026/home/...' }
 ];
 
+/** The host a pasted link names, by its address, or null for a bare league id (the chip then says
+ * which host it is). The API reads the id out of the link itself. */
+export function hostOfLink(link: string): ImportHost | null {
+	const text = link.trim();
+	if (!URL.canParse(text)) return null;
+	const host = new URL(text).hostname.toLowerCase();
+	const on = (domain: string): boolean => host === domain || host.endsWith(`.${domain}`);
+	if (on('sleeper.com') || on('sleeper.app')) return 'sleeper';
+	if (on('espn.com')) return 'espn';
+	if (on('myfantasyleague.com')) return 'mfl';
+	return null;
+}
+
 const LABELS: ReadonlyMap<string, string> = new Map(
 	RULE_GROUPS.flatMap((g) => g.rules.map((r) => [r.key, r.label] as const))
 );
@@ -127,6 +150,36 @@ const LABELS: ReadonlyMap<string, string> = new Map(
 export function ruleLabel(defaulted: string): string {
 	const key = defaulted.split(' ')[0] ?? defaulted;
 	return LABELS.get(key) ?? key;
+}
+
+export type DroppedRule = components['schemas']['DroppedRule'];
+
+const GROUP_WORDS: Readonly<Record<DroppedRule['group'], string>> = {
+	offense: 'Offense',
+	bonus: 'Bonuses',
+	kicking: 'Kicking',
+	defense: 'Defense',
+	other: 'Other'
+};
+
+/** The left-out rules by group, in the API's order, each group named once. */
+export function droppedGroups(
+	rules: readonly DroppedRule[]
+): { label: string; rules: DroppedRule[] }[] {
+	const out: { label: string; rules: DroppedRule[] }[] = [];
+	for (const rule of rules) {
+		const label = GROUP_WORDS[rule.group];
+		const last = out.at(-1);
+		if (last?.label === label) last.rules.push(rule);
+		else out.push({ label, rules: [rule] });
+	}
+	return out;
+}
+
+/** "+10 points", "-4 points", "1 point". */
+export function pointsWords(points: number): string {
+	const sign = points > 0 ? '+' : '';
+	return `${sign}${String(points)} ${Math.abs(points) === 1 ? 'point' : 'points'}`;
 }
 
 /** The line that says what an import brought in, with its count's basis. */

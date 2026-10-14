@@ -93,7 +93,7 @@ def gate_written(engine: Engine, written: Sequence[Written], as_of: datetime) ->
     """One line per capsule (outcome, cost, pull figures, gate findings), read back from the store, and the totals."""
     with engine.connect() as conn:
         stored = stored_capsules_for(conn, [w.subject.universe_id for w in written])
-        rules = span_rules(conn, as_of)
+        rules = span_rules(conn, as_of, subjects_of)  # the trial's own pass: a CLI tool, not the nightly
     lines: list[str] = []
     calls = prompt = completion = 0
     cost = 0.0

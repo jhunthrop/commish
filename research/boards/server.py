@@ -30,12 +30,12 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.routing import Route
 
-from research.boards.custom import NoBoardError, custom_board
+from research.boards.custom import CandidateMemo, NoBoardError, custom_board
 from research.boards.request import RequestError, parse_request
 from research.model.arithmetic import model_version
 from research.model.preseason.board import GameVariancePriors
 from research.model.preseason.candidate_store import MissingCandidatesError
-from research.model.priors import load_model_artifacts
+from research.model.priors import load_game_variance
 
 MAX_BODY_BYTES: Final = 64_000
 _OK: Final = 200
@@ -67,6 +67,7 @@ class BoardsState:
     engine: Engine
     workers: int
     game_variance: GameVariancePriors | None = None
+    candidates: CandidateMemo = field(default_factory=CandidateMemo)
     pool: ThreadPoolExecutor = field(init=False)
 
     def __post_init__(self) -> None:
@@ -79,7 +80,7 @@ def _answer(raw: bytes, state: BoardsState) -> tuple[int, bytes, bool]:
         request = parse_request(raw)
         assert state.game_variance is not None
         with state.engine.begin() as conn:
-            board = custom_board(conn, request, state.game_variance, model_version())
+            board = custom_board(conn, request, state.game_variance, model_version(), state.candidates)
         data = {
             "season": board.season,
             "source": board.source,
@@ -140,11 +141,12 @@ def _not_allowed(request: Request, exc: Exception) -> Response:
 
 
 def _load_priors(state: BoardsState) -> None:
-    """The pinned priors; a failure is logged and the instance stays unready, so the platform's
+    """The pinned game-variance priors, the only artifact a board reads here (two catalog rows, not
+    the whole catalog); a failure is logged and the instance stays unready, so the platform's
     startup probe replaces it rather than routing a call to it."""
     try:
         with state.engine.connect() as conn:
-            state.game_variance = load_model_artifacts(conn).game_variance
+            state.game_variance = load_game_variance(conn)
     except Exception:
         _LOG.exception("boards: the pinned artifacts could not be loaded")
         raise

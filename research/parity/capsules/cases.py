@@ -189,9 +189,18 @@ class CapsuleCase:
     run: Callable[[], CaseResult]
 
 
+def _facts_cached() -> CaseResult:
+    from research.parity.capsules.cached_case import facts_cached  # noqa: PLC0415 - it reads AS_OF from here
+
+    return facts_cached()
+
+
 CAPSULE_CASES: Final = (
     CapsuleCase(
         "facts-board", "the board pass against its recording: every facts hash, a sample's every field", facts_board
     ),
     CapsuleCase("facts-one", "the narrow read against the recording and the board pass", facts_one),
+    CapsuleCase(
+        "facts-cached", "the board pass through a cold and a warm read cache against it uncached", _facts_cached
+    ),
 )

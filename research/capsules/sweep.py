@@ -12,6 +12,7 @@ key on the universe id (`research.players.id`), through the crosswalk.
 
 import time
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from types import MappingProxyType
@@ -42,6 +43,7 @@ from research.capsules.store import (
     stored_capsules_for,
     upsert_capsule,
 )
+from research.db.read_cache import UNCACHED, ReadThrough
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,14 +146,51 @@ def write_one(
     return result, demoted
 
 
-def subjects_of(conn: Connection, as_of: datetime) -> list[Subject]:
+def subjects_of(conn: Connection, as_of: datetime, history: ReadThrough = UNCACHED) -> list[Subject]:
     """The board facts pass, each sheet with the universe id its capsule row keys on."""
-    facts_pass = collect_board_facts(conn, as_of)
+    facts_pass = collect_board_facts(conn, as_of, history)
     return [
         Subject(facts, facts_pass.universe_ids[facts.identity.id])
         for facts in facts_pass.facts
         if facts.identity.id in facts_pass.universe_ids
     ]
+
+
+Subjects = Callable[[Connection, datetime], Sequence[Subject]]
+
+
+class FactsPassMemo:
+    """ONE BOARD FACTS PASS AN INSTANT: the nightly's capsule step runs a sweep, its retries, its
+    repairs and the page gate at one instant, and the sheets are the same for each (the step writes
+    only capsule rows, which no sheet reads), so the pass is read once and handed to every one.
+    Before this each of them read it again, up to seventeen passes a night (2026-10-14).
+
+    The pass reads on its own connection from `snapshot_of` (`db.read_cache.snapshot`: one
+    REPEATABLE READ snapshot, so its history reads may be kept by the read cache), never the
+    caller's, which is why a caller's `conn` is not used.
+
+    WHERE A NEW READER OF THE NIGHT'S FACTS HOOKS IN: anything in the nightly that needs the board's
+    sheets (a gate, a span rule, a repair) takes a `Subjects` (`subjects_at`) and is handed the
+    step's memo (`nightly.capsule_step.night_facts`, built once in `nightly.run_parts.run_steps`);
+    it never calls `subjects_of` itself, which is a whole uncached pass (about 196 MB)."""
+
+    def __init__(
+        self,
+        snapshot_of: Callable[[], AbstractContextManager[Connection]],
+        history: ReadThrough = UNCACHED,
+        read: Callable[[Connection, datetime, ReadThrough], Sequence[Subject]] = subjects_of,
+    ) -> None:
+        self._snapshot_of = snapshot_of
+        self._history = history
+        self._read = read
+        self._held: tuple[datetime, tuple[Subject, ...]] | None = None
+
+    def __call__(self, conn: Connection, as_of: datetime) -> tuple[Subject, ...]:
+        del conn  # the pass reads its own snapshot
+        if self._held is None or self._held[0] != as_of:
+            with self._snapshot_of() as snapshot:
+                self._held = (as_of, tuple(self._read(snapshot, as_of, self._history)))
+        return self._held[1]
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,11 +237,14 @@ def _ordered(subjects: Sequence[Subject], stored: dict[str, StoredCapsule], plan
     return [*demoted, *unwritten, *(s for s in eligible if s not in demoted and s not in unwritten)]
 
 
-def sweep_capsules(engine: Engine, gateway: GatewayClient, as_of: datetime, plan: SweepPlan) -> SweepReport:
+def sweep_capsules(
+    engine: Engine, gateway: GatewayClient, as_of: datetime, plan: SweepPlan, subjects_at: Subjects = subjects_of
+) -> SweepReport:
     """`sweepCapsules`: write every eligible player in `_ordered`'s order within `plan`, then run
-    the repetition check."""
+    the repetition check. The sheets come from `subjects_at` (a fresh facts pass unless the caller
+    holds one, `FactsPassMemo`)."""
     with engine.connect() as conn:
-        subjects = subjects_of(conn, as_of)
+        subjects = subjects_at(conn, as_of)
         stored = stored_capsules_for(conn, [s.universe_id for s in subjects])
         rules = plan.span_rules or span_rules_for(conn, (s.facts for s in subjects))
     ordered = _ordered(subjects, stored, plan)

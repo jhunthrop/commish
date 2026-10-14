@@ -86,7 +86,7 @@ func (s *Service) fail(w http.ResponseWriter, r *http.Request, op string, err er
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, refusal.Reason, nil)
 	case errors.Is(err, boards.ErrCustomRefused):
 		s.Log.Error("solo: the boards service refused a request the api built", "op", op, "err", err)
-		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, boards.CustomRefusedWords, nil)
+		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, boards.CustomRefusedWords, boards.CustomRefusedField)
 	case errors.Is(err, boards.ErrCustomUnavailable):
 		s.Log.Warn("solo: custom board", "op", op, "err", err)
 		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, boards.CustomUnavailableWords, nil)

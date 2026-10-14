@@ -177,7 +177,8 @@ func TestImportScoring(t *testing.T) {
 	}
 	status, got, _ := importAs(t, svc, alice, "espn", "https://fantasy.espn.com/football/league?leagueId=48153503&seasonId=2019")
 	if status != http.StatusOK || got.Rules.PointsPerReception != 1 || got.Rules.PointsPerPassingTouchdown != 6 ||
-		len(got.Dropped) != 1 || got.Dropped[0] != "400+ yard passing game 2" {
+		len(got.Dropped) != 1 || got.Dropped[0].Rule != "400 yard passing game" || *got.Dropped[0].Points != 2 ||
+		got.Dropped[0].Group != apitypes.DroppedRuleGroupBonus {
 		t.Errorf("espn: %d %+v", status, got)
 	}
 	status, _, e = importAs(t, svc, alice, "espn", "368876")

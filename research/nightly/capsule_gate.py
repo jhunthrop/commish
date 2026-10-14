@@ -46,7 +46,7 @@ from research.capsules.spans import (
     shared_spans,
 )
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, stored_capsules_for
-from research.capsules.sweep import subjects_of
+from research.capsules.sweep import Subjects
 from research.season import PRODUCT_SEASON
 
 _EXAMPLES: Final = 5
@@ -177,9 +177,10 @@ def repair_targets(holders: Sequence[tuple[str, ...]], board_order: Sequence[str
     return sorted(rewrite, key=lambda pid: place.get(pid, len(place)))
 
 
-def span_rules(conn: Connection, as_of: datetime) -> SpanRules:
-    """The span rules for the board's sheets at `as_of`: build once a night, they are fixed by it."""
-    return span_rules_for(conn, (subject.facts for subject in subjects_of(conn, as_of)))
+def span_rules(conn: Connection, as_of: datetime, subjects_at: Subjects) -> SpanRules:
+    """The span rules for the board's sheets at `as_of`, read from the night's facts pass (`subjects_at`,
+    the step's `FactsPassMemo`): build once a night, they are fixed by the instant."""
+    return span_rules_for(conn, (subject.facts for subject in subjects_at(conn, as_of)))
 
 
 def capsule_gate(conn: Connection, as_of: datetime, rules: SpanRules) -> CapsuleGateResult:

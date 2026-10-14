@@ -64,7 +64,9 @@ func (e *VarError) Unwrap() error { return e.Err }
 
 // Database is what every command that touches Postgres needs.
 type Database struct {
-	// URL is the runtime connection, usually Neon's pooled endpoint.
+	// URL is the runtime connection: in production the Cloud SQL socket
+	// form (postgres://u:p@/commish?host=/cloudsql/<instance>), in dev and
+	// CI a TCP URL.
 	URL string
 	// MigrateURL is the connection migrations run on. Falls back to URL.
 	MigrateURL string
@@ -261,14 +263,23 @@ func (l *loader) database() Database {
 	return d
 }
 
+// postgresURL accepts a TCP host (dev and CI) or a Unix socket directory
+// in the host parameter (production: the Cloud SQL connection mounts
+// /cloudsql/<instance>, and the URL is postgres://u:p@/db?host=<dir>).
 func (l *loader) postgresURL(name, v string) {
 	if v == "" {
 		return
 	}
 	u, err := url.Parse(v)
-	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") || u.Host == "" {
-		l.invalid(name, "must be a postgres:// URL with a host")
+	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") || (u.Host == "" && !socketDir(u)) {
+		l.invalid(name, "must be a postgres:// URL with a host, or a host parameter naming a socket directory")
 	}
+}
+
+// socketDir reports whether the URL names an absolute socket directory in
+// its host parameter.
+func socketDir(u *url.URL) bool {
+	return strings.HasPrefix(u.Query().Get("host"), "/")
 }
 
 func (l *loader) baseURL(name string, env Env) string {

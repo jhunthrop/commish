@@ -1,6 +1,6 @@
 """THE ROUND'S COMMAND LINE: the gap season's ingest into a scratch copy, the development check, and
 the one judgment. Every command names its database explicitly (`--database`); none reads an
-environment URL, and a Neon host is refused.
+environment URL, and production (a Neon host, or a Cloud SQL socket) is refused.
 
     uv run python -m research.model.weekly.round ingest-gap-season --database <scratch> --season 2025
     uv run python -m research.model.weekly.round dev-check --database <scratch> --out <file.json>
@@ -14,13 +14,13 @@ from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Final
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from sqlalchemy import Engine, text
 
 from research.cli import log_line
 from research.db.engine import make_engine
-from research.db.url import sqlalchemy_url
+from research.db.url import CLOUDSQL_SOCKET_ROOT, sqlalchemy_url
 from research.errors import ConfigurationError
 from research.model.arithmetic import ARM64_BOARDS, model_version
 from research.model.artifacts import read_artifact
@@ -33,9 +33,10 @@ from research.pipeline.nflverse.client import NflverseClient
 
 
 def _engine(url: str) -> Engine:
-    host = urlparse(url).hostname or ""
-    if "neon" in host:
-        raise ConfigurationError("the weekly round runs on a local copy, never on Neon")
+    parts = urlparse(url)
+    socket = parse_qs(parts.query).get("host", [""])[0]
+    if "neon" in (parts.hostname or "") or socket.startswith(CLOUDSQL_SOCKET_ROOT):
+        raise ConfigurationError("the weekly round runs on a local copy, never on production")
     return make_engine(sqlalchemy_url(url))
 
 

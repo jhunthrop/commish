@@ -118,7 +118,9 @@
 		align-items: center;
 		padding: 6px;
 		min-height: 54px;
-		min-width: 0;
+		/* Every team's column is at least a cell this wide, so a short head ("You") never narrows its
+		   column below a last name, and a long handle widens its own. */
+		min-width: 70px;
 		border-bottom: 1px solid var(--line);
 		border-left: 1px solid var(--line);
 		font-size: var(--t-sm);

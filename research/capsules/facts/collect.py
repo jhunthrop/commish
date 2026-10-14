@@ -14,20 +14,17 @@ from datetime import datetime
 
 from sqlalchemy import Connection, text
 
+from research.capsules.facts import history as cached
 from research.capsules.facts.board import BOARD_SOURCE, BoardRow, board_rows, market_order_positions_on_board
 from research.capsules.facts.build import FactsInput, PlayerFacts, build_player_facts
-from research.capsules.facts.color import (
-    StoryWithoutTouches,
-    UsageTouchesAndTrend,
-    last_season_stories_for,
-    usage_touches_and_trend_for,
-)
+from research.capsules.facts.color import StoryWithoutTouches, UsageTouchesAndTrend
 from research.capsules.facts.depth_collect import DepthOptions, collect_depth_facts, depth_prior_seasons
 from research.capsules.facts.depth_model import EMPTY_DEPTH, Depth
 from research.capsules.facts.market_adp import MarketAdp, run_market_adp
 from research.capsules.facts.model import BooksNumbers, Identity, NewsItem, PropsLine, SeasonSoFar
 from research.capsules.facts.reference import InjurySnapshot, capture_day, injury_snapshot, news_for_players
 from research.capsules.facts.season_so_far import SeasonSubject, seasons_so_far
+from research.db.read_cache import UNCACHED, ReadThrough
 from research.model.domain import Position
 from research.model.laws.registry import Law, chip_eligible_laws
 from research.model.market.props_anchor import load_archived_prop_lines, median_prop_lines_by_player
@@ -159,8 +156,11 @@ class Population:
     room_teams: Mapping[str, str] | None = None
 
 
-def collect_color(conn: Connection, population: Population, as_of: datetime) -> ColorFacts:
-    """The color and depth reads for the prior season, each once for the whole population."""
+def collect_color(
+    conn: Connection, population: Population, as_of: datetime, history: ReadThrough = UNCACHED
+) -> ColorFacts:
+    """The color and depth reads for the prior season, each once for the whole population; the
+    finished seasons' reads through `history` (`facts.history`)."""
     prior = PRODUCT_SEASON - 1
     positions = population.positions
     depth_options = DepthOptions(
@@ -171,13 +171,15 @@ def collect_color(conn: Connection, population: Population, as_of: datetime) -> 
         as_of,
         population.room_teams,
     )
+    # The finished seasons any history read covers: the depth facts' three, last season's two among them.
+    played = cached.players_with_history(conn, depth_options.prior_seasons)
     return ColorFacts(
-        last_season_stories_for(conn, prior, positions, as_of),
-        usage_touches_and_trend_for(conn, prior, positions, as_of),
+        cached.stories(history, conn, prior, positions, played, as_of),
+        cached.usage_and_trend(history, conn, prior, positions, played, as_of),
         props_lines_by_player(conn, PRODUCT_SEASON),
         vegas_win_totals_by_team(conn, PRODUCT_SEASON, as_of),
         population.universe_ids,
-        collect_depth_facts(conn, depth_options),
+        collect_depth_facts(conn, depth_options, history, played),
     )
 
 
@@ -202,9 +204,9 @@ class BoardFactsPass:
     as_of: datetime
 
 
-def collect_board_facts(conn: Connection, as_of: datetime) -> BoardFactsPass:
+def collect_board_facts(conn: Connection, as_of: datetime, history: ReadThrough = UNCACHED) -> BoardFactsPass:
     """`collectBoardFacts`: every projected board player's facts, in the board's served order, with
-    the run's ADP unless `market` says otherwise."""
+    the run's ADP unless `market` says otherwise; the finished seasons' reads through `history`."""
     prior = PRODUCT_SEASON - 1
     rows = board_rows(conn, PRODUCT_SEASON, as_of)
     if not rows:
@@ -213,7 +215,7 @@ def collect_board_facts(conn: Connection, as_of: datetime) -> BoardFactsPass:
     positions = active_peers_for(conn, board_positions, PRODUCT_SEASON)
     universe_ids = universe_ids_for(conn, [row.player_id for row in rows])
     team_by_gsis = {universe_ids[row.player_id]: row.team for row in rows if row.player_id in universe_ids}
-    color = collect_color(conn, Population(positions, universe_ids, team_by_gsis), as_of)
+    color = collect_color(conn, Population(positions, universe_ids, team_by_gsis), as_of, history)
     injuries = injury_snapshot(conn, as_of)
     shared = SharedReads(
         chip_eligible_laws(load_model_artifacts(conn).laws),
