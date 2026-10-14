@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { forgetContext } from '#lib/context/forget.ts';
-	import { THEN_PARAM, safeThen } from '#lib/context/sign-in.ts';
+	import { THEN_PARAM, safeThen } from '#lib/context/then-path.ts';
 	import { page } from '$app/state';
 	import { PUBLIC_API_URL } from '$app/env/public';
 	import { ApiError, apiClient } from '#lib/api/client.ts';
@@ -100,7 +100,7 @@
 	onMount(() => {
 		// Back from signing in on a content page: the store reads the account and keeps the league
 		// line's hint, then the reader goes on to the page they left, which paints with its room.
-		const then = safeThen(page.url.searchParams.get(THEN_PARAM));
+		const then = safeThen(page.url.searchParams.get(THEN_PARAM), page.url.origin);
 		if (then !== null) {
 			void siteContext.load().then(() => window.location.replace(then));
 			return;

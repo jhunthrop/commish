@@ -5,6 +5,7 @@ import { labelEnds, switchLabel, type ContextLeague } from './words.ts';
 import { heldMark, holderWords } from './held-marks.ts';
 import type { Held } from './held-words.ts';
 import { contextNote, scoresSentence } from './note-words.ts';
+import { safeThen } from './then-path.ts';
 import { leagueLine } from './menu-words.ts';
 import {
 	clubCaption,
@@ -228,4 +229,14 @@ void test('missed weeks share a line only while their reason agrees, and the lin
 			'Week 5, not frozen because our nightly run failed, so not graded'
 		]
 	);
+});
+
+void test('the account page goes on only to a path on this site', () => {
+	const origin = 'https://trycommish.app';
+	assert.equal(safeThen('/board?x=1#top', origin), '/board?x=1#top');
+	assert.equal(safeThen('/\t/evil.example', origin), null);
+	assert.equal(safeThen('//evil.example', origin), null);
+	assert.equal(safeThen('https://evil.example/board', origin), null);
+	assert.equal(safeThen('javascript:alert(1)', origin), null);
+	assert.equal(safeThen(null, origin), null);
 });
