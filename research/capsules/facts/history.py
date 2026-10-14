@@ -9,13 +9,21 @@ and its statements' rows that passes `as_of` to its statements and computes noth
 condition the cache is sound under.
 
 The single-player read (`collect_one`) and the parity cases read without the cache (`UNCACHED`).
+
+THE POPULATION EACH READ IS KEYED ON. A cached read's key is its arguments, and the pass's population
+(the board and every active peer) moves whenever a player debuts this season, which would miss every
+history read about weekly (review MEDIUM-2). Each read here is given only the players who have a row
+in the finished seasons it reads (`players_with_history`): its result is about those players alone
+(a player with no row in those seasons adds no row, no rank and no pool entry to any of them), so
+the narrower population gives the same result and moves only when a player with a finished-season
+row joins or leaves. The parity cases hold the sheets to their recording with this in place.
 """
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Final
 
-from sqlalchemy import Connection, Engine
+from sqlalchemy import Connection, Engine, text
 
 from research.capsules.facts import depth_reads as reads
 from research.capsules.facts.color import (
@@ -53,13 +61,32 @@ def history_cache(engine: Engine, code_version: str) -> ReadCache:
     return ReadCache(engine, HISTORY_CODEC, code_version)
 
 
+def players_with_history(conn: Connection, seasons: Sequence[int]) -> frozenset[str]:
+    """Every player with an observation in any of `seasons`."""
+    rows = conn.execute(
+        text("select distinct player_id from research.player_week_observations where season = any(:seasons)"),
+        {"seasons": list(seasons)},
+    )
+    return frozenset(str(row.player_id) for row in rows)
+
+
+def _with_rows(positions: Mapping[str, Position], played: frozenset[str]) -> dict[str, Position]:
+    return {player_id: position for player_id, position in positions.items() if player_id in played}
+
+
 def _pairs(positions: Mapping[str, Position]) -> list[list[str]]:
     return [[player_id, position] for player_id, position in positions.items()]
 
 
-def usage_and_trend(
-    history: ReadThrough, conn: Connection, season: int, positions: Mapping[str, Position], as_of: datetime
+def usage_and_trend(  # noqa: PLR0913, PLR0917 - the read's arguments and its population
+    history: ReadThrough,
+    conn: Connection,
+    season: int,
+    positions: Mapping[str, Position],
+    played: frozenset[str],
+    as_of: datetime,
 ) -> UsageTouchesAndTrend:
+    positions = _with_rows(positions, played)
     return history.through(
         conn,
         f"facts/usage-and-trend/{season}",
@@ -69,9 +96,15 @@ def usage_and_trend(
     )
 
 
-def stories(
-    history: ReadThrough, conn: Connection, season: int, positions: Mapping[str, Position], as_of: datetime
+def stories(  # noqa: PLR0913, PLR0917 - the read's arguments and its population
+    history: ReadThrough,
+    conn: Connection,
+    season: int,
+    positions: Mapping[str, Position],
+    played: frozenset[str],
+    as_of: datetime,
 ) -> dict[str, StoryWithoutTouches]:
+    positions = _with_rows(positions, played)
     return history.through(
         conn,
         f"facts/stories/{season}",
@@ -81,9 +114,15 @@ def stories(
     )
 
 
-def week_scores(
-    history: ReadThrough, conn: Connection, season: int, positions: Mapping[str, Position], as_of: datetime
+def week_scores(  # noqa: PLR0913, PLR0917 - the read's arguments and its population
+    history: ReadThrough,
+    conn: Connection,
+    season: int,
+    positions: Mapping[str, Position],
+    played: frozenset[str],
+    as_of: datetime,
 ) -> dict[str, list[WeekPoints]]:
+    positions = _with_rows(positions, played)
     return history.through(
         conn,
         f"facts/week-scores/{season}",
@@ -93,9 +132,15 @@ def week_scores(
     )
 
 
-def season_targets(
-    history: ReadThrough, conn: Connection, season: int, ids: Sequence[str], as_of: datetime
+def season_targets(  # noqa: PLR0913, PLR0917 - the read's arguments and its population
+    history: ReadThrough,
+    conn: Connection,
+    season: int,
+    ids: Sequence[str],
+    played: frozenset[str],
+    as_of: datetime,
 ) -> tuple[dict[str, TeamPlayerTargets], dict[str, str]]:
+    ids = [player_id for player_id in ids if player_id in played]
     return history.through(
         conn,
         f"facts/season-targets/{season}",
@@ -117,9 +162,15 @@ def weekly_shares(
     )
 
 
-def scoring_tallies(
-    history: ReadThrough, conn: Connection, season: int, ids: Sequence[str], as_of: datetime
+def scoring_tallies(  # noqa: PLR0913, PLR0917 - the read's arguments and its population
+    history: ReadThrough,
+    conn: Connection,
+    season: int,
+    ids: Sequence[str],
+    played: frozenset[str],
+    as_of: datetime,
 ) -> dict[str, ScoringTally]:
+    ids = [player_id for player_id in ids if player_id in played]
     return history.through(
         conn,
         f"facts/scoring-tallies/{season}",

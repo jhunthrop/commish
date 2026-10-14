@@ -157,13 +157,15 @@ def collect_color(
         as_of,
         population.room_teams,
     )
+    # The finished seasons any history read covers: the depth facts' three, last season's two among them.
+    played = cached.players_with_history(conn, depth_options.prior_seasons)
     return ColorFacts(
-        cached.stories(history, conn, prior, positions, as_of),
-        cached.usage_and_trend(history, conn, prior, positions, as_of),
+        cached.stories(history, conn, prior, positions, played, as_of),
+        cached.usage_and_trend(history, conn, prior, positions, played, as_of),
         props_lines_by_player(conn, PRODUCT_SEASON),
         vegas_win_totals_by_team(conn, PRODUCT_SEASON, as_of),
         population.universe_ids,
-        collect_depth_facts(conn, depth_options, history),
+        collect_depth_facts(conn, depth_options, history, played),
     )
 
 

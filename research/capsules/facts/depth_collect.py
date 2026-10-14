@@ -215,8 +215,11 @@ def _depth_rows(
     return rooms
 
 
-def collect_depth_facts(conn: Connection, options: DepthOptions, history: ReadThrough = UNCACHED) -> dict[str, Depth]:
-    """`collectDepthFacts`: one `Depth` per subject; the finished seasons' reads through `history`."""
+def collect_depth_facts(
+    conn: Connection, options: DepthOptions, history: ReadThrough = UNCACHED, played: frozenset[str] | None = None
+) -> dict[str, Depth]:
+    """`collectDepthFacts`: one `Depth` per subject; the finished seasons' reads through `history`,
+    each over the players with a row in them (`played`, read here when not given)."""
     subjects = list(options.team_by_player_id)
     if not subjects:
         return {}
@@ -224,8 +227,14 @@ def collect_depth_facts(conn: Connection, options: DepthOptions, history: ReadTh
     prior = options.prior_seasons[0] if options.prior_seasons else None
     season, as_of = options.product_season, options.as_of
     names = reads.names_for(conn, list(dict.fromkeys([*population, *subjects])))
-    week_scores = {s: cached.week_scores(history, conn, s, options.positions, as_of) for s in options.prior_seasons}
-    targets, team_of = ({}, {}) if prior is None else cached.season_targets(history, conn, prior, population, as_of)
+    if played is None:
+        played = cached.players_with_history(conn, options.prior_seasons)
+    week_scores = {
+        s: cached.week_scores(history, conn, s, options.positions, played, as_of) for s in options.prior_seasons
+    }
+    targets, team_of = (
+        ({}, {}) if prior is None else cached.season_targets(history, conn, prior, population, played, as_of)
+    )
     by_team: dict[str, list[TeamPlayerTargets]] = {}
     for player_id, row in targets.items():
         team = team_of.get(player_id)
@@ -252,7 +261,7 @@ def collect_depth_facts(conn: Connection, options: DepthOptions, history: ReadTh
         scoring_usage={}
         if prior is None
         else scoring_usage_for(
-            prior, cached.scoring_tallies(history, conn, prior, population, as_of), options.positions, names
+            prior, cached.scoring_tallies(history, conn, prior, population, played, as_of), options.positions, names
         ),
         play_callers=read_coach_rows(conn),
         prior_team_rows={} if prior is None else cached.team_rows(history, conn, prior, window, as_of),
