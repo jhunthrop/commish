@@ -36,11 +36,15 @@ uv run python -m research.parity ingest all                 # every ingest, reco
 uv run python -m research.parity record <fixture-set> --env-file ../.env.local   # re-record from the provider
 ```
 
-Databases. Production is the Neon database `commish`, schema `research`, owned by the role
-`commish_research` (`RESEARCH_DATABASE_URL`, also Secret Manager `RESEARCH_DATABASE_URL`). The legacy
-database (`neondb`, schema `public`) keeps serving the old app and the TypeScript oracle until
-cutover, then is deleted. In development the `research` schema sits beside the legacy `public`
-tables in the dev Docker database (`localhost:5432/commish`), loaded from them by `load_legacy`.
+Databases. Production is the Cloud SQL database `commish` on the instance `commish-pg`
+(`infra/README.md`), schema `research`, owned by the role `commish_research` (Secret Manager
+`RESEARCH_DATABASE_URL`). Production's URL is the socket form Cloud Run mounts,
+`postgres://commish_research:<password>@/commish?host=/cloudsql/trycommish:us-east1:commish-pg`;
+`research.db.url` and `make_engine` take it as they take the TCP form, which development, tests and
+the parity harness keep (`localhost:5432`, `localhost:5433`). The legacy database (`neondb`, schema
+`public`) keeps serving the old app and the TypeScript oracle until cutover, then is deleted. In
+development the `research` schema sits beside the legacy `public` tables in the dev Docker database
+(`localhost:5432/commish`), loaded from them by `load_legacy`.
 
 ## Layout
 
@@ -177,7 +181,8 @@ stated row filter explains it exactly, or any fingerprint that differs, fails th
 
 Cutover, in order: stop the legacy writers (the Vercel cron's jobs and the operator scripts);
 `alembic upgrade head` against `RESEARCH_DATABASE_URL`; `load_legacy` from production; `parity schema
---against` the Neon database; start the Python nightly. Run 2026-10-12 against the dev copy:
+--against` the production database (through the Cloud SQL Auth Proxy, `infra/README.md`); start the
+Python nightly. Run 2026-10-12 against the dev copy:
 
 ```
 research table                 legacy table                      legacy      kept    landed  rows  result
