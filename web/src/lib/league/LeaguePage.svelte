@@ -23,7 +23,6 @@
 	import RosterPanel from './RosterPanel.svelte';
 	import StandingsStrip from './StandingsStrip.svelte';
 	import WaiverPool from './WaiverPool.svelte';
-	import { hasFeature, type Feature } from '#lib/account/features.ts';
 	import {
 		POLL_MS,
 		figuresLine,
@@ -58,8 +57,6 @@
 	let refreshing = $state(false);
 	/** Every league the account follows, for the title's switch; empty until read or when it fails. */
 	let followed = $state<readonly AttachedLeague[]>([]);
-	/** What the reader may use (/me, Can): with custom_scoring the basis line leaves out the pass. */
-	let features = $state<readonly Feature[]>([]);
 	let now = $state(new Date());
 
 	function take(answer: LeagueSync): void {
@@ -120,10 +117,6 @@
 			.attached()
 			.then((list) => (followed = list))
 			.catch(() => (followed = []));
-		leagueApi
-			.me()
-			.then((me) => (features = me.features))
-			.catch(() => (features = []));
 		const timer = setInterval(() => void read(), POLL_MS);
 		return () => clearInterval(timer);
 	});
@@ -143,7 +136,7 @@
 	 * figures, then the preseason board's. */
 	const basis = $derived(
 		board && sync
-			? `${figuresLine(board.format, sync.scoring_like, hasFeature(features, 'custom_scoring'))} ${board.seasonBasis} Proj and over repl are our preseason board's.`
+			? `${figuresLine(board.seasonScoring, sync.scoring_like)} ${board.seasonBasis} Proj and over repl are our preseason board's.`
 			: ''
 	);
 </script>

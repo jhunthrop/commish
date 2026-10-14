@@ -5,7 +5,6 @@ import { fixed, plural, signed } from '#lib/format/number.ts';
 import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
 import type { IndexSeason } from '#lib/run/schema.ts';
 import type { LeagueBoard, LeagueBoardPlayer } from './board.ts';
-import { FORMAT_LABELS } from '#lib/sheet/format.ts';
 import type { FaceStatus } from '#lib/ui/face-status.ts';
 import type {
 	LeagueHost,
@@ -18,7 +17,6 @@ import type {
 } from './api.ts';
 import type { components } from '#lib/api/types.ts';
 
-type BoardFormat = components['schemas']['BoardFormat'];
 type ScoringPreset = components['schemas']['ScoringPreset'];
 
 /** How often an open league page reads the league again. The API reads the host at most once a
@@ -179,16 +177,27 @@ export function poolBasis(board: LeagueBoard): string {
 		: "Unrostered in your league, ranked by our preseason board's points over replacement.";
 }
 
-/** The page's one basis line: which scoring the figures are in, and, when the league scores
- * otherwise and the account lacks its exact rules, where those come from. */
-export function figuresLine(
-	boardFormat: BoardFormat,
-	scoringLike: ScoringPreset,
-	exactRules: boolean
-): string {
-	const figures = `Figures are ${FORMAT_LABELS[boardFormat]}.`;
-	if (exactRules || scoringLike === boardFormat) return figures;
-	return `${figures} Your league scores ${FORMAT_LABELS[scoringLike]}, and its exact rules come with the Draft Pass.`;
+/** A league's scoring in a sentence, from its rules as the host states them (the nearest preset). */
+const SCORING_WORDS: Readonly<Record<ScoringPreset, string>> = {
+	ppr: 'PPR',
+	half_ppr: 'half PPR',
+	standard: 'standard',
+	te_premium: 'TE premium'
+};
+
+/** A label in a sentence: a word drops its capital ("Half PPR" to "half PPR"), an acronym keeps it. */
+function midSentence(label: string): string {
+	return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
+}
+
+/** The page's one basis line: the scoring the figures are in (the run's season scoring, never a
+ * lineup shape such as superflex) and the league's own: "Figures are PPR. Your league scores TE
+ * premium." No page promises the league's exact rules until they ship. */
+export function figuresLine(figuresScoring: string, scoringLike: ScoringPreset): string {
+	const figures = midSentence(figuresScoring);
+	const league = SCORING_WORDS[scoringLike];
+	const same = figures.toLowerCase() === league.toLowerCase();
+	return `Figures are ${figures}. Your league scores ${same ? 'the same' : league}.`;
 }
 
 /** The kicker and defense the league starts that the run's board does not rank, said as the pool's

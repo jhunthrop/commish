@@ -23,6 +23,8 @@ export interface LeagueBoard {
 	/** What a row's season figures are: "Games and points a game are this season's, PPR, through
 	 * week 5." */
 	seasonBasis: string;
+	/** The scoring the season figures are in, as the run names it: "PPR". */
+	seasonScoring: string;
 	format: BoardFormat;
 }
 
@@ -74,6 +76,7 @@ export async function loadBoard(
 		byId: new Map(players.map((p) => [p.id, p] as const)),
 		basis: `${run.format.basis.join(', ')}.`,
 		seasonBasis: seasonBasisOf(run),
+		seasonScoring: run.season.scoring,
 		format: own === null ? FALLBACK : format
 	};
 }
