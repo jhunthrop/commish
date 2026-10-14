@@ -36,7 +36,7 @@
 			><span class="wide">Over replacement</span><span class="narrow">Over repl</span></Label
 		></span
 	>
-	{#if range}<span class="rng"><Label>Floor to ceiling</Label></span>{/if}
+	{#if range}<span class="rng"><Label>Range</Label></span>{/if}
 	<Label><span class="wide">Drafters vs us</span><span class="narrow">Drafters</span></Label>
 	{#if action}<span class="act-end"></span>{/if}
 </div>
@@ -101,12 +101,6 @@
 	.end {
 		display: flex;
 		justify-content: flex-end;
-	}
-
-	/* At 1440 the in-season range column is about 100px: its head takes two lines rather than run
-	   into the next. */
-	.rng :global(.label) {
-		white-space: normal;
 	}
 
 	@media (max-width: 960px) {
