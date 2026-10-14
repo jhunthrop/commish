@@ -1,0 +1,1671 @@
+{
+ "model": "commish_weekly_v1",
+ "model_version": "research@47719c12",
+ "arithmetic": "v8-fdlibm-fused/pow-apple-libm",
+ "thresholds": {
+  "fit_seasons": [
+   2021,
+   2022,
+   2023,
+   2024
+  ],
+  "history_seasons": [
+   2020
+  ],
+  "held_out_seasons": [
+   2025,
+   2026
+  ],
+  "judgment_season": 2025,
+  "judgment_weeks": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "adp_margin": 0.03,
+  "form_margin": 0.02,
+  "places_margin": 0.5,
+  "calibration_low": 0.05,
+  "calibration_high": 0.15,
+  "calibration_min_size": 100,
+  "resamples": 10000,
+  "seed": 12,
+  "bootstrap_comparisons": 10,
+  "family_alpha": 0.05
+ },
+ "priors": {
+  "opportunity": {
+   "recencyDecay": 0.7,
+   "byPosition": {
+    "QB": {
+     "snapShare": 0.8061717716023163,
+     "targetsPerSnap": 0.00043078319201118675,
+     "carriesPerSnap": 0.15328448059773853,
+     "passAttemptsPerSnap": 0.9990429893132217
+    },
+    "RB": {
+     "snapShare": 0.3124096338255956,
+     "targetsPerSnap": 0.17010103689069384,
+     "carriesPerSnap": 0.7318126423072994,
+     "passAttemptsPerSnap": 0.0003096203814581316
+    },
+    "WR": {
+     "snapShare": 0.49634702045503043,
+     "targetsPerSnap": 0.23358658905540747,
+     "carriesPerSnap": 0.01206106539640169,
+     "passAttemptsPerSnap": 0.0004211140342783019
+    },
+    "TE": {
+     "snapShare": 0.4265252742121873,
+     "targetsPerSnap": 0.16432294059279604,
+     "carriesPerSnap": 0.004775004601722241,
+     "passAttemptsPerSnap": 0.002045775598087197
+    },
+    "K": {
+     "snapShare": 1.1988228333210872e-05,
+     "targetsPerSnap": 0.0,
+     "carriesPerSnap": 0.0,
+     "passAttemptsPerSnap": 1.0967741935483872
+    },
+    "DEF": {
+     "snapShare": 0.0,
+     "targetsPerSnap": 0.0,
+     "carriesPerSnap": 0.0,
+     "passAttemptsPerSnap": 0.0
+    }
+   },
+   "shrinkage": {
+    "season": 2.0,
+    "inSeason": 0.25,
+    "teamVolume": 4.0
+   },
+   "leagueTeamVolume": {
+    "targets": 32.14861111111111,
+    "carries": 26.94537037037037,
+    "passAttempts": 33.552314814814814
+   }
+  },
+  "efficiency": {
+   "byPosition": {
+    "QB": {
+     "receptionsPerTarget": 0.8148148148148148,
+     "receivingYardsPerTarget": 0.8148148148148148,
+     "receivingTouchdownsPerTarget": 0.1111111111111111,
+     "rushingYardsPerCarry": 4.393477059148701,
+     "rushingTouchdownsPerCarry": 0.04521835268103925,
+     "passingYardsPerAttempt": 7.065747424100501,
+     "passingTouchdownsPerAttempt": 0.04308777343104303,
+     "interceptionsPerAttempt": 0.022880048487519972,
+     "fumblesLostPerPlay": 0.005889699760003918
+    },
+    "RB": {
+     "receptionsPerTarget": 0.7773719850871186,
+     "receivingYardsPerTarget": 5.752111390093586,
+     "receivingTouchdownsPerTarget": 0.029521418245453852,
+     "rushingYardsPerCarry": 4.290646021068664,
+     "rushingTouchdownsPerCarry": 0.030693404408342853,
+     "passingYardsPerAttempt": 4.130434782608695,
+     "passingTouchdownsPerAttempt": 0.34782608695652173,
+     "interceptionsPerAttempt": 0.13043478260869565,
+     "fumblesLostPerPlay": 0.004334877564526804
+    },
+    "WR": {
+     "receptionsPerTarget": 0.6322603891424453,
+     "receivingYardsPerTarget": 7.932332452558251,
+     "receivingTouchdownsPerTarget": 0.04787412923372568,
+     "rushingYardsPerCarry": 5.83165548098434,
+     "rushingTouchdownsPerCarry": 0.046420581655480984,
+     "passingYardsPerAttempt": 9.296296296296296,
+     "passingTouchdownsPerAttempt": 0.12345679012345678,
+     "interceptionsPerAttempt": 0.04938271604938271,
+     "fumblesLostPerPlay": 0.003816179682291547
+    },
+    "TE": {
+     "receptionsPerTarget": 0.703795104382045,
+     "receivingYardsPerTarget": 7.275595277796305,
+     "receivingTouchdownsPerTarget": 0.0502234376042153,
+     "rushingYardsPerCarry": 4.765743073047859,
+     "rushingTouchdownsPerCarry": 0.07556675062972293,
+     "passingYardsPerAttempt": 7.730994152046784,
+     "passingTouchdownsPerAttempt": 0.04093567251461988,
+     "interceptionsPerAttempt": 0.04093567251461988,
+     "fumblesLostPerPlay": 0.003920056551635499
+    },
+    "K": {
+     "receptionsPerTarget": 0.0,
+     "receivingYardsPerTarget": 0.0,
+     "receivingTouchdownsPerTarget": 0.0,
+     "rushingYardsPerCarry": 0.0,
+     "rushingTouchdownsPerCarry": 0.0,
+     "passingYardsPerAttempt": 0.0,
+     "passingTouchdownsPerAttempt": 0.0,
+     "interceptionsPerAttempt": 0.0,
+     "fumblesLostPerPlay": 0.0
+    },
+    "DEF": {
+     "receptionsPerTarget": 0.0,
+     "receivingYardsPerTarget": 0.0,
+     "receivingTouchdownsPerTarget": 0.0,
+     "rushingYardsPerCarry": 0.0,
+     "rushingTouchdownsPerCarry": 0.0,
+     "passingYardsPerAttempt": 0.0,
+     "passingTouchdownsPerAttempt": 0.0,
+     "interceptionsPerAttempt": 0.0,
+     "fumblesLostPerPlay": 0.0
+    }
+   },
+   "regression": {
+    "receptionsPerTarget": 96.7279075053835,
+    "receivingYardsPerTarget": 177.89845191439906,
+    "receivingTouchdownsPerTarget": 286.9431471106485,
+    "rushingYardsPerCarry": 64.05546200155727,
+    "rushingTouchdownsPerCarry": 493.62229380864045,
+    "passingYardsPerAttempt": 272.55094035299464,
+    "passingTouchdownsPerAttempt": 10000.0,
+    "interceptionsPerAttempt": 3199.508129947579,
+    "fumblesLostPerPlay": 994.9336662462646
+   }
+  },
+  "context": {
+   "scheme": {
+    "league": {
+     "paceSecondsPerPlay": 32.757613177499124,
+     "passRate": 0.5517869923808582,
+     "passRateOverExpected": -1.5392683120570374
+    },
+    "targets": {
+     "tempo": 0.08000483960536264,
+     "passLean": 0.1255281360634327
+    },
+    "carries": {
+     "tempo": 0.20681659867940025,
+     "passLean": -0.16312349803381737
+    },
+    "passAttempts": {
+     "tempo": 0.02835006686771511,
+     "passLean": 0.13390567065736295
+    }
+   },
+   "gameContext": {
+    "passing": {
+     "opponent": 0.43566264266359794,
+     "rest": -0.05431208933182331
+    },
+    "rushing": {
+     "opponent": 0.464567876275139,
+     "rest": -0.008179191897303432
+    },
+    "leaguePassingYardsPerAttempt": 7.068764408826436,
+    "leagueRushingYardsPerCarry": 4.357018323533434
+   }
+  },
+  "fitSeasons": [
+   2021,
+   2022,
+   2023,
+   2024
+  ],
+  "heldOutSeasons": [
+   2025,
+   2026
+  ]
+ },
+ "interval": {
+  "QB|ppr": {
+   "edges": [
+    11.18,
+    14.35,
+    15.7,
+    17.37
+   ],
+   "offsets": [
+    [
+     -7.348000000000001,
+     -1.4700000000000002,
+     10.381999999999998
+    ],
+    [
+     -11.063,
+     -1.4600000000000009,
+     8.228
+    ],
+    [
+     -9.7,
+     -0.879999999999999,
+     9.884000000000004
+    ],
+    [
+     -9.542,
+     -0.5899999999999999,
+     9.138000000000003
+    ],
+    [
+     -10.259999999999998,
+     0.4399999999999977,
+     11.379999999999999
+    ]
+   ]
+  },
+  "QB|half": {
+   "edges": [
+    11.18,
+    14.35,
+    15.7,
+    17.36
+   ],
+   "offsets": [
+    [
+     -7.348000000000001,
+     -1.4700000000000002,
+     10.389999999999999
+    ],
+    [
+     -11.063,
+     -1.4600000000000009,
+     8.228
+    ],
+    [
+     -9.7,
+     -0.8699999999999992,
+     9.815000000000001
+    ],
+    [
+     -9.546000000000001,
+     -0.629999999999999,
+     9.164000000000003
+    ],
+    [
+     -10.283999999999997,
+     0.4399999999999995,
+     11.433
+    ]
+   ]
+  },
+  "QB|std": {
+   "edges": [
+    11.18,
+    14.34,
+    15.7,
+    17.35
+   ],
+   "offsets": [
+    [
+     -7.348000000000001,
+     -1.4700000000000002,
+     10.391999999999998
+    ],
+    [
+     -11.065000000000001,
+     -1.4600000000000009,
+     8.35
+    ],
+    [
+     -9.716,
+     -0.8699999999999992,
+     9.898
+    ],
+    [
+     -9.548,
+     -0.620000000000001,
+     9.177000000000005
+    ],
+    [
+     -10.283999999999997,
+     0.41999999999999993,
+     11.433
+    ]
+   ]
+  },
+  "RB|ppr": {
+   "edges": [
+    1.69,
+    4.406000000000003,
+    8.402,
+    13.06
+   ],
+   "offsets": [
+    [
+     -1.11,
+     -0.12,
+     3.8800000000000137
+    ],
+    [
+     -3.025,
+     -0.7999999999999998,
+     6.734999999999999
+    ],
+    [
+     -5.489999999999999,
+     -1.3599999999999994,
+     7.8
+    ],
+    [
+     -8.227,
+     -1.629999999999999,
+     9.962000000000003
+    ],
+    [
+     -10.766,
+     -1.9100000000000001,
+     9.944
+    ]
+   ]
+  },
+  "RB|half": {
+   "edges": [
+    1.48,
+    3.87,
+    7.46,
+    11.83
+   ],
+   "offsets": [
+    [
+     -0.94,
+     -0.11,
+     3.2800000000000002
+    ],
+    [
+     -2.66,
+     -0.7400000000000001,
+     6.019999999999995
+    ],
+    [
+     -4.908,
+     -1.5199999999999996,
+     7.248000000000006
+    ],
+    [
+     -7.5,
+     -1.705000000000001,
+     9.197999999999997
+    ],
+    [
+     -10.072000000000001,
+     -1.6300000000000008,
+     9.810000000000006
+    ]
+   ]
+  },
+  "RB|std": {
+   "edges": [
+    1.22,
+    3.37,
+    6.57,
+    10.65
+   ],
+   "offsets": [
+    [
+     -0.8,
+     -0.11,
+     2.618000000000002
+    ],
+    [
+     -2.34,
+     -0.76,
+     5.708999999999998
+    ],
+    [
+     -4.393,
+     -1.6349999999999998,
+     6.737999999999998
+    ],
+    [
+     -6.898,
+     -1.5199999999999996,
+     8.97000000000001
+    ],
+    [
+     -9.225,
+     -1.545,
+     9.503
+    ]
+   ]
+  },
+  "WR|ppr": {
+   "edges": [
+    2.23,
+    5.04,
+    8.37,
+    12.4
+   ],
+   "offsets": [
+    [
+     -1.62,
+     -0.19,
+     4.878000000000002
+    ],
+    [
+     -3.7469999999999994,
+     -1.0,
+     6.974000000000001
+    ],
+    [
+     -5.92,
+     -1.5,
+     8.879999999999999
+    ],
+    [
+     -8.23,
+     -1.5399999999999991,
+     9.739999999999998
+    ],
+    [
+     -10.956,
+     -2.3500000000000014,
+     10.83
+    ]
+   ]
+  },
+  "WR|half": {
+   "edges": [
+    1.84,
+    4.13,
+    6.85,
+    10.16
+   ],
+   "offsets": [
+    [
+     -1.35,
+     -0.19,
+     3.91
+    ],
+    [
+     -3.0909999999999997,
+     -1.0300000000000002,
+     6.111000000000001
+    ],
+    [
+     -4.94,
+     -1.49,
+     7.86
+    ],
+    [
+     -6.91,
+     -1.5750000000000002,
+     8.565000000000008
+    ],
+    [
+     -9.36,
+     -2.3100000000000005,
+     9.790000000000001
+    ]
+   ]
+  },
+  "WR|std": {
+   "edges": [
+    1.44,
+    3.22,
+    5.32,
+    7.88
+   ],
+   "offsets": [
+    [
+     -1.09,
+     -0.19,
+     2.872000000000003
+    ],
+    [
+     -2.5039999999999996,
+     -1.06,
+     5.416000000000004
+    ],
+    [
+     -3.98,
+     -1.4300000000000002,
+     6.742000000000001
+    ],
+    [
+     -5.612,
+     -1.6350000000000007,
+     7.462000000000002
+    ],
+    [
+     -7.776000000000001,
+     -2.3200000000000003,
+     8.676000000000002
+    ]
+   ]
+  },
+  "TE|ppr": {
+   "edges": [
+    1.43,
+    3.04,
+    5.4,
+    8.434000000000001
+   ],
+   "offsets": [
+    [
+     -1.065,
+     0.22999999999999998,
+     4.665
+    ],
+    [
+     -2.272,
+     -0.020000000000000018,
+     6.290000000000002
+    ],
+    [
+     -3.8039999999999994,
+     -0.6799999999999997,
+     5.754000000000001
+    ],
+    [
+     -5.822,
+     -0.6449999999999996,
+     8.381000000000004
+    ],
+    [
+     -8.543999999999999,
+     -1.67,
+     8.484000000000007
+    ]
+   ]
+  },
+  "TE|half": {
+   "edges": [
+    1.14,
+    2.42,
+    4.31,
+    6.7540000000000004
+   ],
+   "offsets": [
+    [
+     -0.86,
+     -0.01,
+     3.461999999999998
+    ],
+    [
+     -1.84,
+     -0.17000000000000015,
+     5.576
+    ],
+    [
+     -3.14,
+     -0.81,
+     4.776000000000003
+    ],
+    [
+     -4.699,
+     -0.7299999999999998,
+     7.097999999999999
+    ],
+    [
+     -7.172,
+     -1.5600000000000005,
+     7.636000000000002
+    ]
+   ]
+  },
+  "TE|std": {
+   "edges": [
+    0.84,
+    1.81,
+    3.227999999999997,
+    5.11
+   ],
+   "offsets": [
+    [
+     -0.64,
+     -0.06,
+     2.325
+    ],
+    [
+     -1.4309999999999998,
+     -0.35000000000000003,
+     5.123000000000001
+    ],
+    [
+     -2.4419999999999997,
+     -0.8750000000000001,
+     4.178000000000002
+    ],
+    [
+     -3.763,
+     -1.075,
+     6.24
+    ],
+    [
+     -5.811000000000001,
+     -1.555,
+     6.7370000000000045
+    ]
+   ]
+  }
+ },
+ "fit_seconds": {
+  "read": 6.2232829999993555,
+  "fit": 2341.9431557080243,
+  "interval": 148.41649241698906
+ },
+ "share_rmse": 0.1045341039412475,
+ "gates": [
+  {
+   "gate": "G1",
+   "subject": "QB vs ADP",
+   "passed": false,
+   "detail": "difference -0.0179 against a margin of +0.0300, lower bound -0.1136 against 0, over 17 weeks"
+  },
+  {
+   "gate": "G1",
+   "subject": "RB vs ADP",
+   "passed": true,
+   "detail": "difference +0.0939 against a margin of +0.0300, lower bound +0.0367 against 0, over 17 weeks"
+  },
+  {
+   "gate": "G1",
+   "subject": "WR vs ADP",
+   "passed": false,
+   "detail": "difference +0.0303 against a margin of +0.0300, lower bound -0.0255 against 0, over 17 weeks"
+  },
+  {
+   "gate": "G1",
+   "subject": "TE vs ADP",
+   "passed": false,
+   "detail": "difference +0.0332 against a margin of +0.0300, lower bound -0.0686 against 0, over 17 weeks"
+  },
+  {
+   "gate": "G2",
+   "subject": "QB vs recent form",
+   "passed": false,
+   "detail": "difference -0.0138 against a margin of +0.0200, lower bound -0.1088 against 0, over 17 weeks"
+  },
+  {
+   "gate": "G2",
+   "subject": "RB vs recent form",
+   "passed": false,
+   "detail": "difference +0.0180 against a margin of +0.0200, lower bound -0.0161 against 0, over 17 weeks"
+  },
+  {
+   "gate": "G2",
+   "subject": "WR vs recent form",
+   "passed": false,
+   "detail": "difference +0.0332 against a margin of +0.0200, lower bound -0.0166 against 0, over 17 weeks"
+  },
+  {
+   "gate": "G2",
+   "subject": "TE vs recent form",
+   "passed": false,
+   "detail": "difference +0.0096 against a margin of +0.0200, lower bound -0.0569 against 0, over 17 weeks"
+  },
+  {
+   "gate": "G3",
+   "subject": "places off vs adp",
+   "passed": false,
+   "detail": "difference +0.3075 against a margin of +0.5000, lower bound -0.2541 against 0, over 17 weeks"
+  },
+  {
+   "gate": "G3",
+   "subject": "places off vs form",
+   "passed": false,
+   "detail": "difference +0.3062 against a margin of +0.5000, lower bound -0.2198 against 0, over 17 weeks"
+  },
+  {
+   "gate": "G4",
+   "subject": "QB ppr",
+   "passed": false,
+   "detail": "below floor 0.166, above ceiling 0.126, each against [0.05, 0.15], n=604"
+  },
+  {
+   "gate": "G4",
+   "subject": "QB half",
+   "passed": false,
+   "detail": "below floor 0.166, above ceiling 0.126, each against [0.05, 0.15], n=604"
+  },
+  {
+   "gate": "G4",
+   "subject": "QB std",
+   "passed": false,
+   "detail": "below floor 0.166, above ceiling 0.123, each against [0.05, 0.15], n=604"
+  },
+  {
+   "gate": "G4",
+   "subject": "RB ppr",
+   "passed": true,
+   "detail": "below floor 0.101, above ceiling 0.102, each against [0.05, 0.15], n=1509"
+  },
+  {
+   "gate": "G4",
+   "subject": "RB half",
+   "passed": true,
+   "detail": "below floor 0.108, above ceiling 0.101, each against [0.05, 0.15], n=1509"
+  },
+  {
+   "gate": "G4",
+   "subject": "RB std",
+   "passed": true,
+   "detail": "below floor 0.107, above ceiling 0.103, each against [0.05, 0.15], n=1509"
+  },
+  {
+   "gate": "G4",
+   "subject": "WR ppr",
+   "passed": true,
+   "detail": "below floor 0.092, above ceiling 0.090, each against [0.05, 0.15], n=2298"
+  },
+  {
+   "gate": "G4",
+   "subject": "WR half",
+   "passed": true,
+   "detail": "below floor 0.094, above ceiling 0.091, each against [0.05, 0.15], n=2298"
+  },
+  {
+   "gate": "G4",
+   "subject": "WR std",
+   "passed": true,
+   "detail": "below floor 0.099, above ceiling 0.094, each against [0.05, 0.15], n=2298"
+  },
+  {
+   "gate": "G4",
+   "subject": "TE ppr",
+   "passed": true,
+   "detail": "below floor 0.073, above ceiling 0.098, each against [0.05, 0.15], n=1183"
+  },
+  {
+   "gate": "G4",
+   "subject": "TE half",
+   "passed": true,
+   "detail": "below floor 0.072, above ceiling 0.101, each against [0.05, 0.15], n=1183"
+  },
+  {
+   "gate": "G4",
+   "subject": "TE std",
+   "passed": true,
+   "detail": "below floor 0.083, above ceiling 0.101, each against [0.05, 0.15], n=1183"
+  },
+  {
+   "gate": "G5",
+   "subject": "isolation",
+   "passed": true,
+   "detail": "every table as it was"
+  }
+ ],
+ "passed": false,
+ "numbers": {
+  "season": 2025,
+  "weeks": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "scored_rows": 5594,
+  "board_rows": 11901,
+  "against_adp": {
+   "QB": {
+    "value": -0.0179338127295341,
+    "lower_bound": -0.11364287846514314,
+    "weeks": 17
+   },
+   "RB": {
+    "value": 0.09390882519992866,
+    "lower_bound": 0.036696819636261695,
+    "weeks": 17
+   },
+   "WR": {
+    "value": 0.03026874753082319,
+    "lower_bound": -0.025548340272333006,
+    "weeks": 17
+   },
+   "TE": {
+    "value": 0.03316629184880721,
+    "lower_bound": -0.06860215109327791,
+    "weeks": 17
+   }
+  },
+  "against_form": {
+   "QB": {
+    "value": -0.013784652886987422,
+    "lower_bound": -0.10876738259588369,
+    "weeks": 17
+   },
+   "RB": {
+    "value": 0.018025647810429393,
+    "lower_bound": -0.016092150910249618,
+    "weeks": 17
+   },
+   "WR": {
+    "value": 0.03315872894821806,
+    "lower_bound": -0.016586281377947338,
+    "weeks": 17
+   },
+   "TE": {
+    "value": 0.009634704182578011,
+    "lower_bound": -0.05691798718493991,
+    "weeks": 17
+   }
+  },
+  "places": {
+   "adp": {
+    "value": 0.3074712643678161,
+    "lower_bound": -0.25412680595898723,
+    "weeks": 17
+   },
+   "form": {
+    "value": 0.30623973727422005,
+    "lower_bound": -0.2198103371634091,
+    "weeks": 17
+   }
+  },
+  "calibration": {
+   "QB|ppr": {
+    "below": 0.16556291390728478,
+    "above": 0.12582781456953643,
+    "size": 604
+   },
+   "QB|half": {
+    "below": 0.16556291390728478,
+    "above": 0.12582781456953643,
+    "size": 604
+   },
+   "QB|std": {
+    "below": 0.16556291390728478,
+    "above": 0.12251655629139073,
+    "size": 604
+   },
+   "RB|ppr": {
+    "below": 0.10139165009940358,
+    "above": 0.10205434062292909,
+    "size": 1509
+   },
+   "RB|half": {
+    "below": 0.10801855533465872,
+    "above": 0.10072895957587806,
+    "size": 1509
+   },
+   "RB|std": {
+    "below": 0.10669317428760769,
+    "above": 0.10271703114645461,
+    "size": 1509
+   },
+   "WR|ppr": {
+    "below": 0.09225413402959094,
+    "above": 0.08964316797214969,
+    "size": 2298
+   },
+   "WR|half": {
+    "below": 0.09399477806788512,
+    "above": 0.09138381201044386,
+    "size": 2298
+   },
+   "WR|std": {
+    "below": 0.09878154917319408,
+    "above": 0.09399477806788512,
+    "size": 2298
+   },
+   "TE|ppr": {
+    "below": 0.07269653423499578,
+    "above": 0.09805579036348266,
+    "size": 1183
+   },
+   "TE|half": {
+    "below": 0.07185122569737955,
+    "above": 0.10059171597633136,
+    "size": 1183
+   },
+   "TE|std": {
+    "below": 0.08284023668639054,
+    "above": 0.10059171597633136,
+    "size": 1183
+   }
+  },
+  "digests": {
+   "before": {
+    "preseason_projections": "26855:2109a11f008d8020cb8c1d9e144d4c74",
+    "preseason_board_reasons": "187631:e9857b63469f70a32a29a65dede38012",
+    "register_freeze_rows": "3409:adc192c3ca6e7005d8412ea1884fa9b8",
+    "register_grade_rows": "1351:7ce3224a7476a9b1bb049931d2478bf8",
+    "model_artifacts": "15:e0d4574eb02c40cb5b060371360ac87a"
+   },
+   "after": {
+    "preseason_projections": "26855:2109a11f008d8020cb8c1d9e144d4c74",
+    "preseason_board_reasons": "187631:e9857b63469f70a32a29a65dede38012",
+    "register_freeze_rows": "3409:adc192c3ca6e7005d8412ea1884fa9b8",
+    "register_grade_rows": "1351:7ce3224a7476a9b1bb049931d2478bf8",
+    "model_artifacts": "15:e0d4574eb02c40cb5b060371360ac87a"
+   }
+  },
+  "reported": {
+   "mean_rho": {
+    "ppr": {
+     "QB": {
+      "model": 0.18300531125951217,
+      "adp": 0.2009391239890463,
+      "form": 0.19678996414649963
+     },
+     "RB": {
+      "model": 0.5915880208426336,
+      "adp": 0.49767919564270485,
+      "form": 0.5735623730322041
+     },
+     "WR": {
+      "model": 0.4477747532697466,
+      "adp": 0.41750600573892344,
+      "form": 0.41461602432152855
+     },
+     "TE": {
+      "model": 0.31802152444949305,
+      "adp": 0.2848552326006858,
+      "form": 0.308386820266915
+     }
+    },
+    "half": {
+     "QB": {
+      "model": 0.18261527242430176,
+      "adp": 0.20226809392426115,
+      "form": 0.19543132296948
+     },
+     "RB": {
+      "model": 0.5760038900382621,
+      "adp": 0.4840187210809541,
+      "form": 0.5574324144124181
+     },
+     "WR": {
+      "model": 0.4296816172924918,
+      "adp": 0.4042091163811092,
+      "form": 0.3886459940516512
+     },
+     "TE": {
+      "model": 0.3271835161279105,
+      "adp": 0.2785390541228362,
+      "form": 0.3184146480467636
+     }
+    },
+    "std": {
+     "QB": {
+      "model": 0.18100785284078233,
+      "adp": 0.20226809392426115,
+      "form": 0.19702259617279821
+     },
+     "RB": {
+      "model": 0.5492018543398796,
+      "adp": 0.45406882824639133,
+      "form": 0.5289246470878544
+     },
+     "WR": {
+      "model": 0.40555366763021206,
+      "adp": 0.380620370238469,
+      "form": 0.350742852647751
+     },
+     "TE": {
+      "model": 0.31067063838228615,
+      "adp": 0.25406211853015037,
+      "form": 0.2870547067938376
+     }
+    }
+   },
+   "places_off": {
+    "QB": {
+     "model": 6.519607843137255,
+     "adp": 6.411764705882353,
+     "form": 6.757352941176471
+    },
+    "RB": {
+     "model": 10.431372549019608,
+     "adp": 10.965686274509803,
+     "form": 10.564950980392156
+    },
+    "WR": {
+     "model": 15.791563275434243,
+     "adp": 16.081885856079406,
+     "form": 16.387096774193548
+    },
+    "TE": {
+     "model": 5.169950738916256,
+     "adp": 5.472906403940887,
+     "form": 5.317733990147783
+    }
+   },
+   "places_off_pooled": {
+    "model": 10.672824302134647,
+    "adp": 10.980295566502463,
+    "form": 10.979064039408867
+   },
+   "per_week_rho": [
+    {
+     "week": 1,
+     "position": "QB",
+     "n": 26,
+     "model": 0.14051282051282052,
+     "adp": 0.36553257501238534,
+     "form": 0.17264957264957265
+    },
+    {
+     "week": 2,
+     "position": "QB",
+     "n": 27,
+     "model": 0.14806899882479801,
+     "adp": 0.24595419847328245,
+     "form": -0.1798198769233114
+    },
+    {
+     "week": 3,
+     "position": "QB",
+     "n": 24,
+     "model": 0.5878260869565217,
+     "adp": 0.49043478260869566,
+     "form": 0.45652173913043476
+    },
+    {
+     "week": 4,
+     "position": "QB",
+     "n": 26,
+     "model": 0.027008547008547008,
+     "adp": 0.2602154252426803,
+     "form": 0.052658574884852524
+    },
+    {
+     "week": 5,
+     "position": "QB",
+     "n": 21,
+     "model": -0.023376623376623377,
+     "adp": 0.1292627544628221,
+     "form": 0.12467532467532468
+    },
+    {
+     "week": 6,
+     "position": "QB",
+     "n": 23,
+     "model": 0.25945145343582615,
+     "adp": 0.2891030481142063,
+     "form": 0.33300395256917
+    },
+    {
+     "week": 7,
+     "position": "QB",
+     "n": 23,
+     "model": 0.29347826086956524,
+     "adp": 0.25945145343582615,
+     "form": 0.26976284584980237
+    },
+    {
+     "week": 8,
+     "position": "QB",
+     "n": 16,
+     "model": 0.29411764705882354,
+     "adp": 0.07211186646889438,
+     "form": 0.21176470588235294
+    },
+    {
+     "week": 9,
+     "position": "QB",
+     "n": 23,
+     "model": 0.29058562784812525,
+     "adp": 0.09881422924901186,
+     "form": 0.18181818181818182
+    },
+    {
+     "week": 10,
+     "position": "QB",
+     "n": 21,
+     "model": 0.548051948051948,
+     "adp": 0.3488145685755551,
+     "form": 0.4935064935064935
+    },
+    {
+     "week": 11,
+     "position": "QB",
+     "n": 24,
+     "model": -0.00608695652173913,
+     "adp": 0.2287453848377985,
+     "form": 0.10521739130434783
+    },
+    {
+     "week": 12,
+     "position": "QB",
+     "n": 18,
+     "model": -0.013422820580716616,
+     "adp": -0.22394220846233232,
+     "form": 0.14138286893704852
+    },
+    {
+     "week": 13,
+     "position": "QB",
+     "n": 24,
+     "model": 0.3278260869565217,
+     "adp": 0.41043478260869565,
+     "form": 0.26260869565217393
+    },
+    {
+     "week": 14,
+     "position": "QB",
+     "n": 22,
+     "model": -0.06949152542372881,
+     "adp": -0.05535159780169856,
+     "form": -0.0909347678170762
+    },
+    {
+     "week": 15,
+     "position": "QB",
+     "n": 24,
+     "model": -0.02,
+     "adp": 0.08869565217391304,
+     "form": 0.07739130434782608
+    },
+    {
+     "week": 16,
+     "position": "QB",
+     "n": 23,
+     "model": -0.14130434782608695,
+     "adp": 0.05731225296442688,
+     "form": 0.2490118577075099
+    },
+    {
+     "week": 17,
+     "position": "QB",
+     "n": 20,
+     "model": 0.4678450876171049,
+     "adp": 0.35037593984962406,
+     "form": 0.4842105263157895
+    },
+    {
+     "week": 1,
+     "position": "RB",
+     "n": 45,
+     "model": 0.6424194560622637,
+     "adp": 0.7758450353982723,
+     "form": 0.5878438557756692
+    },
+    {
+     "week": 2,
+     "position": "RB",
+     "n": 55,
+     "model": 0.5165701570858515,
+     "adp": 0.42762042660774463,
+     "form": 0.43363103356259536
+    },
+    {
+     "week": 3,
+     "position": "RB",
+     "n": 54,
+     "model": 0.5603233083472282,
+     "adp": 0.5226848205963612,
+     "form": 0.5281849943132162
+    },
+    {
+     "week": 4,
+     "position": "RB",
+     "n": 53,
+     "model": 0.638912969103487,
+     "adp": 0.5482622369163778,
+     "form": 0.5108759198699615
+    },
+    {
+     "week": 5,
+     "position": "RB",
+     "n": 45,
+     "model": 0.5957306640944003,
+     "adp": 0.46822808806562755,
+     "form": 0.5543549886850568
+    },
+    {
+     "week": 6,
+     "position": "RB",
+     "n": 49,
+     "model": 0.637370530138204,
+     "adp": 0.4232742353646656,
+     "form": 0.6136886014078927
+    },
+    {
+     "week": 7,
+     "position": "RB",
+     "n": 48,
+     "model": 0.6267101124965692,
+     "adp": 0.4234099807701451,
+     "form": 0.6022693450023855
+    },
+    {
+     "week": 8,
+     "position": "RB",
+     "n": 47,
+     "model": 0.5055663358316669,
+     "adp": 0.49664566709746566,
+     "form": 0.49833735024725156
+    },
+    {
+     "week": 9,
+     "position": "RB",
+     "n": 42,
+     "model": 0.45980551204462666,
+     "adp": 0.3817666138953536,
+     "form": 0.47106969360511364
+    },
+    {
+     "week": 10,
+     "position": "RB",
+     "n": 47,
+     "model": 0.6935931536949231,
+     "adp": 0.5026886391750665,
+     "form": 0.6905663653179467
+    },
+    {
+     "week": 11,
+     "position": "RB",
+     "n": 47,
+     "model": 0.5955939752120497,
+     "adp": 0.4334904162093818,
+     "form": 0.5660017355514981
+    },
+    {
+     "week": 12,
+     "position": "RB",
+     "n": 44,
+     "model": 0.6880704884271828,
+     "adp": 0.48923348291057933,
+     "form": 0.6370172039608555
+    },
+    {
+     "week": 13,
+     "position": "RB",
+     "n": 51,
+     "model": 0.5259752035299065,
+     "adp": 0.48410453782763296,
+     "form": 0.6334962465985684
+    },
+    {
+     "week": 14,
+     "position": "RB",
+     "n": 46,
+     "model": 0.57976560438458,
+     "adp": 0.45479504513281216,
+     "form": 0.627822361760148
+    },
+    {
+     "week": 15,
+     "position": "RB",
+     "n": 49,
+     "model": 0.6318797783933954,
+     "adp": 0.571917030887965,
+     "form": 0.6777914001176784
+    },
+    {
+     "week": 16,
+     "position": "RB",
+     "n": 48,
+     "model": 0.5600043483812669,
+     "adp": 0.5592833950397803,
+     "form": 0.50427513735656
+    },
+    {
+     "week": 17,
+     "position": "RB",
+     "n": 47,
+     "model": 0.5987047570971687,
+     "adp": 0.4972966740307521,
+     "form": 0.6133341084150733
+    },
+    {
+     "week": 1,
+     "position": "WR",
+     "n": 63,
+     "model": 0.13674393278365932,
+     "adp": 0.18547816444637497,
+     "form": 0.061265891233128256
+    },
+    {
+     "week": 2,
+     "position": "WR",
+     "n": 73,
+     "model": 0.44700709705388125,
+     "adp": 0.4003825955960358,
+     "form": 0.21275709461494444
+    },
+    {
+     "week": 3,
+     "position": "WR",
+     "n": 72,
+     "model": 0.42090452425922814,
+     "adp": 0.4201386123835076,
+     "form": 0.2934228515113526
+    },
+    {
+     "week": 4,
+     "position": "WR",
+     "n": 73,
+     "model": 0.5063772934792818,
+     "adp": 0.5254816949085348,
+     "form": 0.5390129734046204
+    },
+    {
+     "week": 5,
+     "position": "WR",
+     "n": 58,
+     "model": 0.5508022291847734,
+     "adp": 0.6548833296334182,
+     "form": 0.6310705091346742
+    },
+    {
+     "week": 6,
+     "position": "WR",
+     "n": 59,
+     "model": 0.3832753690599255,
+     "adp": 0.5295570557520588,
+     "form": 0.2639347656990107
+    },
+    {
+     "week": 7,
+     "position": "WR",
+     "n": 60,
+     "model": 0.5245928372256765,
+     "adp": 0.4215493059596264,
+     "form": 0.5681025788293758
+    },
+    {
+     "week": 8,
+     "position": "WR",
+     "n": 51,
+     "model": 0.4820656824508753,
+     "adp": 0.4869880188055237,
+     "form": 0.5631591001856071
+    },
+    {
+     "week": 9,
+     "position": "WR",
+     "n": 62,
+     "model": 0.4744584533389102,
+     "adp": 0.457601305660868,
+     "form": 0.5000189089378483
+    },
+    {
+     "week": 10,
+     "position": "WR",
+     "n": 62,
+     "model": 0.4717411566280599,
+     "adp": 0.42313556914477146,
+     "form": 0.4398372945923504
+    },
+    {
+     "week": 11,
+     "position": "WR",
+     "n": 64,
+     "model": 0.43737693089977264,
+     "adp": 0.4075100198427332,
+     "form": 0.38869363335837426
+    },
+    {
+     "week": 12,
+     "position": "WR",
+     "n": 55,
+     "model": 0.48109124406512077,
+     "adp": 0.43948471808199113,
+     "form": 0.4808386459021703
+    },
+    {
+     "week": 13,
+     "position": "WR",
+     "n": 69,
+     "model": 0.2978101417524729,
+     "adp": 0.3025159456954305,
+     "form": 0.2998118108906395
+    },
+    {
+     "week": 14,
+     "position": "WR",
+     "n": 61,
+     "model": 0.4917954804825606,
+     "adp": 0.3928387300407828,
+     "form": 0.3892157811336413
+    },
+    {
+     "week": 15,
+     "position": "WR",
+     "n": 66,
+     "model": 0.5846619949564887,
+     "adp": 0.5510869191875254,
+     "form": 0.5314010948971681
+    },
+    {
+     "week": 16,
+     "position": "WR",
+     "n": 70,
+     "model": 0.45533206975575813,
+     "adp": 0.34714214633327517,
+     "form": 0.5282110979062743
+    },
+    {
+     "week": 17,
+     "position": "WR",
+     "n": 69,
+     "model": 0.46613436820924736,
+     "adp": 0.1518279660892402,
+     "form": 0.35771838123480554
+    },
+    {
+     "week": 1,
+     "position": "TE",
+     "n": 21,
+     "model": 0.29369726797805445,
+     "adp": 0.4113061297126293,
+     "form": 0.3183886312151475
+    },
+    {
+     "week": 2,
+     "position": "TE",
+     "n": 22,
+     "model": 0.5542373765899679,
+     "adp": 0.2870056955226337,
+     "form": 0.5685222041035428
+    },
+    {
+     "week": 3,
+     "position": "TE",
+     "n": 21,
+     "model": 0.06430659644130346,
+     "adp": 0.20721014408864447,
+     "form": -0.04548408057179987
+    },
+    {
+     "week": 4,
+     "position": "TE",
+     "n": 22,
+     "model": 0.39039554253177144,
+     "adp": 0.2197740463746152,
+     "form": 0.6107345607479666
+    },
+    {
+     "week": 5,
+     "position": "TE",
+     "n": 20,
+     "model": 0.1910492801523226,
+     "adp": 0.32355163410646676,
+     "form": 0.19849624060150375
+    },
+    {
+     "week": 6,
+     "position": "TE",
+     "n": 20,
+     "model": 0.39578641753488725,
+     "adp": 0.4555722891566265,
+     "form": 0.5349888647667392
+    },
+    {
+     "week": 7,
+     "position": "TE",
+     "n": 19,
+     "model": 0.31283000860241067,
+     "adp": 0.16615399061819255,
+     "form": 0.15290006038432433
+    },
+    {
+     "week": 8,
+     "position": "TE",
+     "n": 20,
+     "model": 0.20759685559858673,
+     "adp": 0.2016553799849511,
+     "form": 0.15914221218961624
+    },
+    {
+     "week": 9,
+     "position": "TE",
+     "n": 19,
+     "model": 0.10004388852526419,
+     "adp": 0.3849868305531168,
+     "form": 0.08600264101294641
+    },
+    {
+     "week": 10,
+     "position": "TE",
+     "n": 19,
+     "model": 0.5524813883697118,
+     "adp": 0.4264383371279731,
+     "form": 0.3722565087039293
+    },
+    {
+     "week": 11,
+     "position": "TE",
+     "n": 19,
+     "model": 0.4466871864856094,
+     "adp": 0.5346795434591747,
+     "form": 0.5089952223215196
+    },
+    {
+     "week": 12,
+     "position": "TE",
+     "n": 19,
+     "model": 0.26842105263157895,
+     "adp": 0.2229048042580448,
+     "form": 0.4087719298245614
+    },
+    {
+     "week": 13,
+     "position": "TE",
+     "n": 23,
+     "model": 0.5035829162878226,
+     "adp": 0.4967870107685298,
+     "form": 0.4357707509881423
+    },
+    {
+     "week": 14,
+     "position": "TE",
+     "n": 22,
+     "model": -0.005081874647092038,
+     "adp": 0.04462016557483863,
+     "form": 0.01637492941840768
+    },
+    {
+     "week": 15,
+     "position": "TE",
+     "n": 19,
+     "model": 0.3833992464600623,
+     "adp": 0.22124679290893912,
+     "form": 0.30465332198175343
+    },
+    {
+     "week": 16,
+     "position": "TE",
+     "n": 21,
+     "model": 0.3547759033540215,
+     "adp": -0.08159947984395319,
+     "form": 0.3105913586139602
+    },
+    {
+     "week": 17,
+     "position": "TE",
+     "n": 17,
+     "model": 0.39215686274509803,
+     "adp": 0.32024563984023513,
+     "form": 0.3014705882352941
+    }
+   ],
+   "points_error": {
+    "QB": {
+     "mae": 6.491225165562914,
+     "rmse": 8.09486968590527,
+     "n": 604
+    },
+    "RB": {
+     "mae": 4.172630881378396,
+     "rmse": 6.066647951092243,
+     "n": 1509
+    },
+    "WR": {
+     "mae": 4.179308093994778,
+     "rmse": 5.873115626543566,
+     "n": 2298
+    },
+    "TE": {
+     "mae": 3.4208537616229924,
+     "rmse": 5.02696896655446,
+     "n": 1183
+    }
+   },
+   "oracle_v1": {
+    "mean_rho": {
+     "QB": 0.17409054531947385,
+     "RB": 0.586015181625821,
+     "WR": 0.44631038464114886,
+     "TE": 0.3013735497386201
+    },
+    "places_off_pooled": 10.741379310344827
+   }
+  }
+ },
+ "seconds_per_week": 2.2330986445886083,
+ "report": [
+  "fit: 2341.9s, read 6.2s, interval over 72 weeks 148.4s",
+  "search: decay 0.7, shrinkage OpportunityShrinkage(season=2.0, in_season=0.25, team_volume=4.0), share RMSE 0.10453 over 118960 shares",
+  "board: 11901 rows over 17 weeks, 5594 scored, 2.23s a week",
+  "FAIL  G1 QB vs ADP              difference -0.0179 against a margin of +0.0300, lower bound -0.1136 against 0, over 17 weeks",
+  "PASS  G1 RB vs ADP              difference +0.0939 against a margin of +0.0300, lower bound +0.0367 against 0, over 17 weeks",
+  "FAIL  G1 WR vs ADP              difference +0.0303 against a margin of +0.0300, lower bound -0.0255 against 0, over 17 weeks",
+  "FAIL  G1 TE vs ADP              difference +0.0332 against a margin of +0.0300, lower bound -0.0686 against 0, over 17 weeks",
+  "FAIL  G2 QB vs recent form      difference -0.0138 against a margin of +0.0200, lower bound -0.1088 against 0, over 17 weeks",
+  "FAIL  G2 RB vs recent form      difference +0.0180 against a margin of +0.0200, lower bound -0.0161 against 0, over 17 weeks",
+  "FAIL  G2 WR vs recent form      difference +0.0332 against a margin of +0.0200, lower bound -0.0166 against 0, over 17 weeks",
+  "FAIL  G2 TE vs recent form      difference +0.0096 against a margin of +0.0200, lower bound -0.0569 against 0, over 17 weeks",
+  "FAIL  G3 places off vs adp      difference +0.3075 against a margin of +0.5000, lower bound -0.2541 against 0, over 17 weeks",
+  "FAIL  G3 places off vs form     difference +0.3062 against a margin of +0.5000, lower bound -0.2198 against 0, over 17 weeks",
+  "FAIL  G4 QB ppr                 below floor 0.166, above ceiling 0.126, each against [0.05, 0.15], n=604",
+  "FAIL  G4 QB half                below floor 0.166, above ceiling 0.126, each against [0.05, 0.15], n=604",
+  "FAIL  G4 QB std                 below floor 0.166, above ceiling 0.123, each against [0.05, 0.15], n=604",
+  "PASS  G4 RB ppr                 below floor 0.101, above ceiling 0.102, each against [0.05, 0.15], n=1509",
+  "PASS  G4 RB half                below floor 0.108, above ceiling 0.101, each against [0.05, 0.15], n=1509",
+  "PASS  G4 RB std                 below floor 0.107, above ceiling 0.103, each against [0.05, 0.15], n=1509",
+  "PASS  G4 WR ppr                 below floor 0.092, above ceiling 0.090, each against [0.05, 0.15], n=2298",
+  "PASS  G4 WR half                below floor 0.094, above ceiling 0.091, each against [0.05, 0.15], n=2298",
+  "PASS  G4 WR std                 below floor 0.099, above ceiling 0.094, each against [0.05, 0.15], n=2298",
+  "PASS  G4 TE ppr                 below floor 0.073, above ceiling 0.098, each against [0.05, 0.15], n=1183",
+  "PASS  G4 TE half                below floor 0.072, above ceiling 0.101, each against [0.05, 0.15], n=1183",
+  "PASS  G4 TE std                 below floor 0.083, above ceiling 0.101, each against [0.05, 0.15], n=1183",
+  "PASS  G5 isolation              every table as it was",
+  "DECISION: a gate failed; no weekly number ships"
+ ],
+ "ingest": {
+  "note": "added by hand after the run, copied from the ingest-gap-season log line of 2026-10-14T03:38:51Z; the judgment did not write it",
+  "season": 2025,
+  "participation_rows": 7565,
+  "stat_lines": 6655,
+  "observations_written": 145249,
+  "participation_resolution": 0.9970845481049563,
+  "stat_line_resolution": 1.0,
+  "unresolved": [
+   "WhitCo05 Cody White (10)",
+   "CartNa00 Nathan Carter (7)"
+  ]
+ }
+}

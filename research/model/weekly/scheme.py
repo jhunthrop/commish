@@ -14,8 +14,9 @@ from typing import Final
 
 from research.model.jsmath import js_max, js_min, js_pow
 from research.model.reads.observations import LAST_POSSIBLE_WEEK
-from research.model.reads.teams import TeamContext, TeamMetricLookup, WeekRef, index_team_metrics, latest_teams
+from research.model.reads.teams import TeamContext, TeamMetricLookup, WeekRef, index_team_metrics
 from research.model.weekly.opportunity import PredictedOpportunity
+from research.model.weekly.teams import TeamsOf, oracle_latest_teams
 from research.pipeline.nflverse.context import CoachMetric
 from research.pipeline.nflverse.pbp import PbpMetric
 
@@ -164,12 +165,14 @@ def contextualise_opportunity(  # noqa: PLR0913, PLR0917 - the oracle's own para
     team_context: TeamContext,
     features: FeatureFlags,
     priors: SchemePriors,
+    teams_of: TeamsOf = oracle_latest_teams,
 ) -> dict[str, PredictedOpportunity]:
-    """`contextualiseOpportunity`: each player's team volume scaled by his club's scheme."""
+    """`contextualiseOpportunity`: each player's team volume scaled by his club's scheme. The club
+    is the oracle's `latestTeams` unless the caller names another rule (`weekly/teams.py`)."""
     if not features.scheme:
         return dict(opportunity)
     metrics = index_team_metrics(team_context)
-    teams = latest_teams(team_context.player_teams)
+    teams = teams_of(team_context)
     factors: dict[str, _Factors | None] = {}
 
     def factors_for(team: str) -> _Factors | None:
