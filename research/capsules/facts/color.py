@@ -1,7 +1,8 @@
-"""THE COLOR FACTS: last season's story, his usage and its trend, and this season's numbers so far.
+"""THE COLOR FACTS: last season's story, his usage and its trend.
 
 Ported from `research-ts/src/capsules/collect.ts` (`lastSeasonStoriesFor`,
-`usageTouchesAndTrendFactsFor`, `currentSeasonSummaries`), each read once for the whole board.
+`usageTouchesAndTrendFactsFor`), each read once for the whole board. This season so far is the
+page's own season block (`facts.season_so_far`), no longer the provider's lines.
 Ranks are taken among the position's peers with a real reading of the same quantity; a share the
 store has no evidence for is None, never a zero.
 """
@@ -11,14 +12,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Final
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection
 
 from research.capsules.facts.depth_reads import names_for
 from research.capsules.facts.model import (
     LastSeasonStory,
     RankedStat,
-    SeasonSummary,
-    SeasonTotals,
     Trend,
     TrendMetric,
     Usage,
@@ -27,9 +26,7 @@ from research.capsules.facts.model import (
 from research.capsules.facts.rank import RankableStat, build_trend_metric, rank_within_groups
 from research.model.domain import (
     PPR_SCORING,
-    STAT_LINE_FIELDS,
     Position,
-    StatLine,
     compute_fantasy_points,
     round_points,
 )
@@ -268,55 +265,3 @@ def usage_touches_and_trend_for(
         for pid, entry in facts.items()
     }
     return UsageTouchesAndTrend(usage, touches, _trends(conn, facts, season, as_of))
-
-
-def current_season_summaries(
-    conn: Connection, season: int, provider_ids: Sequence[str], position_of: Mapping[str, Position]
-) -> dict[str, SeasonSummary]:
-    """`currentSeasonSummaries`: this season's played weeks on the provider's lines, PPR."""
-    if not provider_ids:
-        return {}
-    played = [
-        r.week
-        for r in conn.execute(
-            text("select week from research.provider_weeks where season = :s and status <> 'scheduled'"), {"s": season}
-        )
-    ]
-    if not played:
-        return {}
-    rows = conn.execute(
-        text(
-            "select * from research.provider_stat_lines where season = :s and provider_player_id = any(:ids) "
-            "and week = any(:weeks) order by provider_player_id, week"
-        ),
-        {"s": season, "ids": list(provider_ids), "weeks": played},
-    ).mappings()
-    lines: dict[str, list[StatLine]] = {}
-    for row in rows:
-        values = {
-            field: row[field] for field in STAT_LINE_FIELDS if field not in ("player_id", "week") and field in row
-        }
-        lines.setdefault(row["provider_player_id"], []).append(
-            StatLine(row["provider_player_id"], row["week"], **values)
-        )
-    out: dict[str, SeasonSummary] = {}
-    for pid, mine in lines.items():
-        position = position_of.get(pid)
-        if position is not None:
-            out[pid] = _summary(season, mine, position)
-    return out
-
-
-def _summary(season: int, lines: Sequence[StatLine], position: Position) -> SeasonSummary:
-    carries = rushing = targets = receptions = receiving = passing = touchdowns = points = 0.0
-    for line in lines:
-        carries += line.carries or 0.0
-        rushing += line.rushing_yards
-        targets += line.targets or 0.0
-        receptions += line.receptions
-        receiving += line.receiving_yards
-        passing += line.passing_yards
-        touchdowns += line.rushing_touchdowns + line.receiving_touchdowns + line.passing_touchdowns
-        points += compute_fantasy_points(line, position, PPR_SCORING)
-    totals = SeasonTotals(carries, rushing, targets, receptions, receiving, passing, touchdowns, round_points(points))
-    return SeasonSummary(season, len(lines), round_points(points / len(lines)), totals)

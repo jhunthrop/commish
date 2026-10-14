@@ -1,5 +1,6 @@
 """THE SMALL WORDS THE FACT SHEET IS WRITTEN IN, shared by `render.py` and `render_depth.py`: a
-whole number, a signed one, a position's plural, and one ranked quantity as a clause."""
+week with its season, a whole number, a signed one, a position's plural, and one ranked quantity
+as a clause."""
 
 from collections.abc import Callable
 from types import MappingProxyType
@@ -21,6 +22,11 @@ POSITION_PLURAL: Final = MappingProxyType[Position, str](
         "DEF": "defenses",
     }
 )
+
+
+def week_of(week: int, season: int) -> str:
+    """A week as every sheet line and every capsule names it: with its season, "week 7 of 2025"."""
+    return f"week {week} of {season}"
 
 
 def whole(value: float) -> str:

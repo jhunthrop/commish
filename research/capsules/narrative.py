@@ -12,6 +12,7 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.config import CAPSULE_MODEL
+from research.capsules.corrections import is_voice_rule_violation, voice_rule_correction_for
 from research.capsules.facts.model import (
     ChangedTeamEvidence,
     EvidenceItem,
@@ -20,12 +21,7 @@ from research.capsules.facts.model import (
     RookieEvidence,
     ShareEvidence,
 )
-from research.capsules.validate import (
-    grounding_of,
-    is_voice_rule_violation,
-    validate_narrative_slot,
-    voice_rule_correction_for,
-)
+from research.capsules.validate import grounding_of, validate_narrative_slot
 from research.capsules.voice_rules import in_fantasy_words
 
 if TYPE_CHECKING:
@@ -182,7 +178,9 @@ def narrative_requests_for(facts: "PlayerFacts") -> list[SlotRequest]:
             SlotRequest(
                 "tier",
                 MODULE_WORDS,
-                "Where he sits in his tier and what the drop behind him is worth to a drafter. Never call a small step a cliff.",
+                "Where he sits in his tier and what the drop behind him is worth"
+                + (" to a drafter" if facts.season is None else " on a roster now")
+                + ". Never call a small step a cliff.",
             )
         )
     for item in facts.evidence:

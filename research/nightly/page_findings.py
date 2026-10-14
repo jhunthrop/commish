@@ -1,7 +1,8 @@
 """THE PAGE FINDINGS OF EVERY WRITTEN CAPSULE, judged as the run's player page will print it.
 
 `capsules.pull_figures.capsule_findings` for each page the writer wrote: at least one of the page's
-numbers printed word for word and equal at the precision printed, and no voice-rule hit, with the
+numbers printed word for word and equal at the precision printed, no voice-rule hit (a doubled word
+included) and no time frame slip for the run's day (`capsules.season_voice`), with the
 sheet's own name ledger masked (so "Price" in Jadarian Price and "Vegas" in a club's name are names,
 not words). The page's numbers are the PPR board row the writer read (`capsules.facts.board`, the
 same values the run's `ppr-12` row prints) with the run's ADP (the page format's named source at the
@@ -18,6 +19,7 @@ from sqlalchemy import Connection
 from research.capsules.board_ranks import rank_claims_off_page
 from research.capsules.facts.board import board_rows
 from research.capsules.pull_figures import PageValues, adp_figures_off_page, capsule_findings, page_numbers
+from research.capsules.season_voice import clock_of
 from research.capsules.store import WRITTEN_SOURCE, stored_capsules_for
 from research.capsules.sweep import Subjects, subjects_of
 from research.model.reads.teams import first_kickoff_for
@@ -63,7 +65,11 @@ def page_findings(conn: Connection, as_of: datetime, subjects_at: Subjects = sub
             row.value_over_replacement, row.drop_to_next_tier, adp.get(row.player_id),
         )  # fmt: skip
         reasons = capsule_findings(
-            row.player_id, (capsule.body_compact, capsule.body_full), page_numbers(values), subject.facts.name_ledger
+            row.player_id,
+            (capsule.body_compact, capsule.body_full),
+            page_numbers(values),
+            subject.facts.name_ledger,
+            clock_of(subject.facts),
         )
         page_adp = adp.get(row.player_id)
         reasons += [

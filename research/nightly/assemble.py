@@ -17,7 +17,7 @@ from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, stored_capsul
 from research.errors import ResearchError
 from research.model.reads.teams import first_kickoff_for
 from research.nightly.build import pages, season
-from research.nightly.build.player_season import SeasonContext, read_season_store, through_of
+from research.nightly.build.player_season import season_context
 from research.nightly.build.ros import MODEL_NAME as ROS_MODEL
 from research.nightly.build.ros import RosBasis, RosSetup, ros_boards
 from research.nightly.config import PAGE_FORMAT, RUN_FORMATS, RunFormat
@@ -91,15 +91,6 @@ def _schedule(conn: Connection, as_of: datetime) -> tuple[Json, list[Json], Json
     return season.schedule_json(PRODUCT_SEASON, slates, values), clubs, sources[0], sources[1]
 
 
-def _season_context(conn: Connection, player_ids: Sequence[str]) -> SeasonContext:
-    """The season so far for every page: the slate, the byes, the records' reach, the store's lines."""
-    games = schedule_read.slates_by_club(conn, PRODUCT_SEASON)
-    weeks = max(game.week for slate in games.values() for game in slate)
-    store = read_season_store(conn, PRODUCT_SEASON, player_ids)
-    byes = {club.abbr: club.bye for club in schedule_read.clubs_of(games)}
-    return SeasonContext(PRODUCT_SEASON, weeks, through_of(games, weeks, store), games, byes, store)
-
-
 def _record(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> tuple[Json, Json | None]:
     """The record, and its source; a season with no freeze yet has an empty record and no source."""
     weeks, rows_by_week = record_read.read_record(conn, PRODUCT_SEASON, as_of)
@@ -171,7 +162,7 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     by_slug = {p.id: p for p in people}
     universe_ids = sorted({e.row.universe_id for b in boards for e in b.entries})
     capsules = stored_capsules_for(conn, universe_ids)
-    context = _season_context(conn, sorted(by_slug))
+    context = season_context(conn, PRODUCT_SEASON, sorted(by_slug), as_of)
     rest = None if ros is None else ros_boards(boards, context, as_of, ros)
     if rest is not None:
         boards = rest.boards

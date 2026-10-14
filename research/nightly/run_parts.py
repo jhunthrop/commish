@@ -25,7 +25,7 @@ from research.model.ros.live import RawPrior, load_ros_priors, raw_priors
 from research.nightly.assemble import Assembled
 from research.nightly.build.ros import RosSetup
 from research.nightly.build.season import format_json
-from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate
+from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate, span_rules
 from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan, night_facts, run_capsule_step
 from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION
 from research.nightly.headshots import Face, mirror_headshots
@@ -75,14 +75,27 @@ def _capsules(  # noqa: PLR0913, PLR0917 - the step's parts
         status = "ran" if result.wrote else "skipped"
         record = StepRecord("capsules", status, f"{result.spend.line()}; {result.gate.summary()}")
         return StepOutcome(record, result.gate, tuple(result.findings.reasons), result.spend)
+    at = clock()  # one instant for the gate, the span rules and the page findings: one facts pass
     with engine.connect() as conn:
-        gate = capsule_gate(conn, clock())
-        findings = page_findings(conn, clock(), facts)
+        gate = capsule_gate(conn, at, span_rules(conn, at, facts))
+        findings = page_findings(conn, at, facts)
     return StepOutcome(
         StepRecord("capsules", "skipped", "skipped by --skip; the gate judges what is stored"),
         gate,
         tuple(findings.reasons),
     )
+
+
+def held_clock(clock: Callable[[], datetime]) -> Callable[[], datetime]:
+    """A clock that reads `clock` once, on its first call, and returns that instant from then on."""
+    held: list[datetime] = []
+
+    def read() -> datetime:
+        if not held:
+            held.append(clock())
+        return held[0]
+
+    return read
 
 
 def run_steps(  # noqa: PLR0913, PLR0917 - the steps' shared dependencies
@@ -97,16 +110,21 @@ def run_steps(  # noqa: PLR0913, PLR0917 - the steps' shared dependencies
     skipped = StepOutcome(StepRecord("ingest", "skipped", "skipped by --skip"))
     # One facts pass for the capsule step and every gate after it (`FactsPassMemo`).
     facts = night_facts(engine)
+    # The capsule step's instant, held from its first read, so the fallback gate below reads the facts
+    # pass the step already holds rather than a second one (`FactsPassMemo` keys on the instant).
+    capsule_clock = held_clock(clock)
     steps = [
         _isolated("ingest", lambda: skipped if "ingest" in skip else StepOutcome(ingest_step(IngestContext(engine, fetcher, clock(), environ))), log),
         _isolated("fit", lambda: StepOutcome(StepRecord("fit", "skipped", "skipped by --skip") if "fit" in skip else run_fit_step(engine, clock())), log),
-        _isolated("capsules", lambda: _capsules(engine, clock, log, "capsules" in skip, plan, facts), log),
+        _isolated("capsules", lambda: _capsules(engine, capsule_clock, log, "capsules" in skip, plan, facts), log),
     ]  # fmt: skip
     capsule = steps[-1]
     if capsule.capsule_gate is None:
         # The step raised: the gate still judges the board as stored.
+        at = capsule_clock()
         with engine.connect() as conn:
-            gate, findings = capsule_gate(conn, clock()), page_findings(conn, clock(), facts)
+            gate = capsule_gate(conn, at, span_rules(conn, at, facts))
+            findings = page_findings(conn, at, facts)
         steps[-1] = StepOutcome(capsule.record, gate, tuple(findings.reasons))
     return steps
 

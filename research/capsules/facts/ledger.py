@@ -26,7 +26,7 @@ from research.capsules.facts.model import (
     Projection,
     RankedStat,
     RookieEvidence,
-    SeasonSummary,
+    SeasonSoFar,
     ShareEvidence,
     Trend,
     TrendMetric,
@@ -58,7 +58,7 @@ class FactsContent(Protocol):
     @property
     def availability(self) -> Availability | None: ...
     @property
-    def season(self) -> SeasonSummary | None: ...
+    def season(self) -> SeasonSoFar | None: ...
     @property
     def bye_week(self) -> int | None: ...
     @property
@@ -140,7 +140,7 @@ def _points_differences(facts: FactsContent) -> list[float]:
         p.ceiling_points,
         *_present(m.replacement_level, m.market_anchor_points),
         *([] if story is None else [story.points_rank.value]),
-        *([] if season is None else [season.totals.fantasy_points]),
+        *([] if season is None else _present(season.totals.fantasy_points)),
     ]
     numbers: list[float] = []
     for figure in against:
@@ -151,7 +151,7 @@ def _points_differences(facts: FactsContent) -> list[float]:
 def _derived_numbers(facts: FactsContent) -> list[float]:
     p, availability, season, story = facts.projection, facts.availability, facts.season, facts.last_season_story
     numbers = _points_differences(facts)
-    if season is not None and availability is not None:
+    if season is not None and season.points_per_game is not None and availability is not None:
         numbers.append(season.points_per_game * availability.expected_games)
     if story is not None:
         numbers.append(story.points_per_game * story.games_played)
@@ -165,11 +165,22 @@ def _derived_numbers(facts: FactsContent) -> list[float]:
             total += effect
         numbers.append(total)
     if season is not None:
-        t = season.totals
-        numbers += [t.rushing_yards + t.receiving_yards, t.rushing_yards + t.receiving_yards + t.passing_yards]
-        if t.carries is not None:
-            numbers.append(t.carries + t.receptions)
+        numbers += _season_derived(season)
     return numbers
+
+
+def _season_derived(season: SeasonSoFar) -> list[float]:
+    """The sums a reader works out from the season's printed totals, and its weeks counted."""
+    t = season.totals
+    numbers: list[float] = []
+    if t.rushing_yards is not None and t.receiving_yards is not None:
+        numbers.append(t.rushing_yards + t.receiving_yards)
+        if t.passing_yards is not None:
+            numbers.append(t.rushing_yards + t.receiving_yards + t.passing_yards)
+    if t.carries is not None and t.receptions is not None:
+        numbers.append(t.carries + t.receptions)
+    missed = len(season.missed_weeks)
+    return [*numbers, missed, season.through + 1, season.through - missed]
 
 
 def _printed_text_numbers(facts: FactsContent) -> list[float]:
@@ -180,6 +191,16 @@ def _printed_text_numbers(facts: FactsContent) -> list[float]:
         text = f"{story.title} {'' if story.published_at is None else story.published_at[:10]}"
         numbers += [js_number(raw) for raw in _NUMBER.findall(text)]
     return [value for value in numbers if math.isfinite(value)]
+
+
+def _season_numbers(season: SeasonSoFar) -> list[float]:
+    t = season.totals
+    numbers: list[float] = [season.season, season.through, season.games_played, *_present(season.points_per_game)]
+    numbers += _present(t.carries, t.rushing_yards, t.targets, t.receptions, t.receiving_yards, t.passing_yards)
+    numbers += _present(t.touchdowns, t.fantasy_points, season.injury_from_week)
+    for week in season.weeks:
+        numbers += [week.week, *_present(week.points)]
+    return numbers
 
 
 def number_ledger(facts: FactsContent, depth_numbers: list[float]) -> list[float]:
@@ -193,10 +214,7 @@ def number_ledger(facts: FactsContent, depth_numbers: list[float]) -> list[float
         numbers += [a.expected_games, a.floor_games, a.ceiling_games]
     numbers += _evidence_numbers(facts.evidence)
     if season is not None:
-        t = season.totals
-        numbers += [season.season, season.games_played, season.points_per_game, *_present(t.carries), t.rushing_yards]
-        numbers += [*_present(t.targets), t.receptions, t.receiving_yards, t.passing_yards, t.touchdowns]
-        numbers.append(t.fantasy_points)
+        numbers += _season_numbers(season)
     numbers += _present(facts.bye_week)
     numbers += _color_numbers(facts)
     numbers += depth_numbers
