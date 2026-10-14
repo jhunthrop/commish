@@ -211,9 +211,23 @@ COMPETITOR_NAMES_THAT_ARE_WORDS: Final = ("sleeper", "underdog")
 COMPETITOR_PRODUCT_CUES: Final = ("app", "league", "leagues", "draft", "drafts", "adp", "rankings", "ranking")
 
 
+# Trading words with a football sense too (fix round 3, R6): a player "fading" or a "fade route" is
+# decline or a route, a defense "sold out to stop the run", a coach "bought into him". Only the trading
+# sense is banned: fading him, selling, buying him.
+_FOOTBALL_SENSES: Final = MappingProxyType(
+    {
+        "fade": r"\bfad(?:e|es|ed|ing) (?:him|them|this|that|the)\b(?! route)",
+        "sold": r"\bsold\b(?! (?:out|on)\b)",
+        "bought": r"\bbought\b(?! in(?:to)?\b)",
+    }
+)
+
+
 def banned_term_pattern(term: str) -> re.Pattern[str]:
     """A single word whole, with every inflection (a final "e" dropped before "ing" and "y": "pricing",
     "pricey", fix round 2 N7); a phrase as written."""
+    if term in _FOOTBALL_SENSES:
+        return re.compile(_FOOTBALL_SENSES[term], re.IGNORECASE | re.ASCII)
     if re.fullmatch(r"[a-z]+e", term):
         return re.compile(rf"\b{term[:-1]}(?:e|es|ed|ing|ey|y)\b", re.IGNORECASE | re.ASCII)
     if re.fullmatch(r"[a-z]+", term):
