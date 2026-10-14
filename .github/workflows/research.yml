@@ -60,8 +60,9 @@ env:
   ADVISOR_SA: advisor-runtime@trycommish.iam.gserviceaccount.com
   # The api and room services' identity, the only callers the advisor and the boards service admit.
   CALLER_SA: api-runtime@trycommish.iam.gserviceaccount.com
-  # The research schema's reader and writer (the nightly's identity), which the boards service runs as.
-  RUNTIME_SA: research-runtime@trycommish.iam.gserviceaccount.com
+  # The boards service's own identity: secretAccessor on RESEARCH_DATABASE_URL alone, so code in
+  # the service can read no other secret (infra/README.md, boards-runtime).
+  BOARDS_SA: boards-runtime@trycommish.iam.gserviceaccount.com
 jobs:
   research:
     runs-on: ubuntu-latest
@@ -224,8 +225,8 @@ jobs:
         # with run.invoker on api-runtime alone: api has no VPC egress, so an internal-ingress service
         # would be unreachable from it, and IAM, not the network path, is the gate. Unlike the
         # advisor it reads the research schema (the stored boards' candidate sets) and writes its
-        # cache (custom_boards), so it runs as research-runtime with RESEARCH_DATABASE_URL and no other
-        # secret. One process, BOARDS_WORKERS threads, ready once the pinned priors are loaded.
+        # cache (custom_boards), so it runs as its own boards-runtime, which can read
+        # RESEARCH_DATABASE_URL and no other secret. One process, BOARDS_WORKERS threads, ready once the pinned priors are loaded.
       - uses: google-github-actions/deploy-cloudrun@251330ba9a8a34bfbc1622895f42e1d53fd14522 # v2.7.6
         id: boards
         with:
@@ -237,7 +238,7 @@ jobs:
           secrets: RESEARCH_DATABASE_URL=RESEARCH_DATABASE_URL:latest
           secrets_update_strategy: overwrite
           flags: >-
-            --service-account=${{ env.RUNTIME_SA }} --ingress=all --no-allow-unauthenticated
+            --service-account=${{ env.BOARDS_SA }} --ingress=all --no-allow-unauthenticated
             --args=research.boards
             --cpu=1 --memory=1Gi --concurrency=8 --min-instances=0 --max-instances=4
             --cpu-boost --timeout=15 --port=8080
@@ -259,6 +260,7 @@ jobs:
         # (research-runtime) run.invoker on each job and nothing wider.
       - name: The nightly and in-season jobs
         env:
+          RUNTIME_SA: research-runtime@trycommish.iam.gserviceaccount.com
           ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           db="RESEARCH_DATABASE_URL=RESEARCH_DATABASE_URL:latest"
