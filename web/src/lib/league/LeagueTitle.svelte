@@ -25,15 +25,29 @@
 	}
 </script>
 
-<DisplayTitle size="page">
-	{#if others.length > 0}
+{#if others.length > 0}
+	<!-- The switch's list cannot sit inside a heading, so the heading is named apart and the title is
+	     drawn in its face around the switch. -->
+	<h2 class="named">{name}</h2>
+	<DisplayTitle size="page" as="face">
 		<Menu label={name} id="league-switch" face="title">
 			{#each others as league (league.id)}
 				<Quiet size="sm" href={links.league(league.id)}>{leagueName(league)}</Quiet>
 			{/each}
 			<Quiet size="sm" href={links.accountLeagues()}>All your leagues</Quiet>
 		</Menu>
-	{:else}
-		{name}
-	{/if}
-</DisplayTitle>
+	</DisplayTitle>
+{:else}
+	<DisplayTitle size="page">{name}</DisplayTitle>
+{/if}
+
+<style>
+	.named {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+</style>

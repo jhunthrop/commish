@@ -46,7 +46,8 @@
 	const initials = $derived(name === undefined ? '' : initialsOf(name));
 </script>
 
-<span class="hold">
+<!-- The wrapper that holds a status mark over the circle's edge is drawn only with a mark. -->
+{#snippet circle()}
 	<span
 		class="face"
 		class:ringed
@@ -73,15 +74,21 @@
 			<span aria-hidden="true">{initials}</span>
 		{/if}
 	</span>
-	{#if status}
+{/snippet}
+
+{#if status}
+	<span class="hold">
+		{@render circle()}
 		<span
 			class="status"
 			class:lg={(phoneSize ?? size) >= FACE_STATUS.largeFrom}
 			role="img"
 			aria-label={FACE_STATUS.words[status]}>{FACE_STATUS.marks[status]}</span
 		>
-	{/if}
-</span>
+	</span>
+{:else}
+	{@render circle()}
+{/if}
 
 <style>
 	.hold {

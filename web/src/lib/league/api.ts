@@ -15,7 +15,6 @@ export type AttachPreview = Schemas['AttachPreview'];
 export type AttachInput = Schemas['AttachInput'];
 export type AttachedLeague = Schemas['AttachedLeague'];
 export type LeagueHost = Schemas['LeagueHost'];
-export type Account = Schemas['Account'];
 
 const client = apiClient(PUBLIC_API_URL);
 
@@ -30,8 +29,6 @@ export const leagueApi = {
 	attach: (body: AttachInput) =>
 		client.call<LeagueSync>('/leagues/attach', { method: 'POST', body }),
 	attached: () => client.call<AttachedLeague[]>('/leagues/attached'),
-	/** Who is reading, for the features Can answers (many_leagues). */
-	me: () => client.call<Account>('/me'),
 	detach: (id: string) =>
 		client.call<null>(`/leagues/attached/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 	restore: (id: string) =>

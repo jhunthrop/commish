@@ -131,8 +131,14 @@ export function seasonWords(season: IndexSeason): string {
 	return `${plural(season.games, 'game')}, ${figure} a game`;
 }
 
-/** His preseason numbers with their basis: "proj 288, over repl +61". */
-export function projectionWords(player: { points: number | null; vor: number | null }): string {
+/** His preseason numbers with their basis: "proj 288, over repl +61", or for a player at his
+ * position's depth floor, "below our board's depth". */
+export function projectionWords(player: {
+	points: number | null;
+	vor: number | null;
+	belowDepth?: boolean;
+}): string {
+	if (player.belowDepth === true) return "below our board's depth";
 	const parts = [
 		player.points === null ? null : `proj ${fixed(player.points, 0)}`,
 		player.vor === null ? null : `over repl ${signed(player.vor, 0)}`
@@ -155,11 +161,16 @@ export function seasonStarted(board: LeagueBoard): boolean {
 	return board.players.some((p) => p.season.games > 0);
 }
 
+/** Games a season figure needs before it leads the pool: a two-game backup's average is noise. */
+export const POOL_MIN_GAMES = 3;
+
 /** Before kickoff our board's order (points over replacement); after, points a game this season,
- * best first, a player with no game after every one with one, ties by the preseason projection. */
+ * best first, players with POOL_MIN_GAMES or more ahead of the rest, then a player with no game,
+ * ties by the preseason projection. */
 function poolOrder(a: LeagueBoardPlayer, b: LeagueBoardPlayer): number {
+	const sampled = (p: LeagueBoardPlayer): number => (p.season.games >= POOL_MIN_GAMES ? 1 : 0);
 	const ppg = (p: LeagueBoardPlayer): number => p.season.pointsPerGame ?? Number.NEGATIVE_INFINITY;
-	return ppg(b) - ppg(a) || (b.points ?? 0) - (a.points ?? 0);
+	return sampled(b) - sampled(a) || ppg(b) - ppg(a) || (b.points ?? 0) - (a.points ?? 0);
 }
 
 /** The waiver pool: our board without every player a team in the league holds, ranked as
@@ -173,7 +184,7 @@ export function poolRows(board: LeagueBoard, sync: LeagueSync): readonly LeagueB
 /** How the pool is ranked, said once above it. */
 export function poolBasis(board: LeagueBoard): string {
 	return seasonStarted(board)
-		? 'Unrostered in your league, ranked by points a game this season, then by our preseason projection.'
+		? `Unrostered in your league, ranked by points a game this season, players with ${String(POOL_MIN_GAMES)} games or more first, then by our preseason projection.`
 		: "Unrostered in your league, ranked by our preseason board's points over replacement.";
 }
 

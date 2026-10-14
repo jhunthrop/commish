@@ -24,6 +24,8 @@ export const COMPANION_START = '/companion/new' as const;
 export const LEAGUE_START = '/league/new' as const;
 /** The anchor of the account page's Your leagues, where every league the account follows is. */
 export const LEAGUES_ANCHOR = 'your-leagues';
+/** The account page's search parameter for how many leagues were just followed: `?followed=2`. */
+export const FOLLOWED_PARAM = 'followed';
 /** Every league the account follows: the account page at Your leagues. */
 export const LEAGUES_LIST = `/account#${LEAGUES_ANCHOR}` as const;
 

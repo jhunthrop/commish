@@ -2,15 +2,18 @@
 import { resolve } from '$app/paths';
 import { positionSegment } from '#lib/run/derive.ts';
 import type { Position } from '#lib/types/player.ts';
-import { COMPANION_START, LEAGUES_ANCHOR, LEAGUE_START, sectionHref } from '#lib/ui/nav.ts';
+import {
+	COMPANION_START,
+	FOLLOWED_PARAM,
+	LEAGUES_ANCHOR,
+	LEAGUE_START,
+	sectionHref
+} from '#lib/ui/nav.ts';
 
 /** The attach page's search parameter naming the way in it starts from: `?host=ffpc`. */
 export const LEAGUE_HOST_PARAM = 'host';
 
-/** The account page's search parameter for how many leagues were just followed: `?followed=2`. */
-export const FOLLOWED_PARAM = 'followed';
-
-export { LEAGUES_ANCHOR };
+export { FOLLOWED_PARAM, LEAGUES_ANCHOR };
 
 /** The anchor of a player page's This season block. */
 export const SEASON_ANCHOR = 'this-season';

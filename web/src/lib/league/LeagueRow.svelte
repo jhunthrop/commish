@@ -74,7 +74,11 @@
 				{#if player.bye !== null}<span>bye {player.bye}</span>{/if}
 				{#if seasonInMeta}<span class="figures">{seasonWords(player.season)}</span>{/if}
 				<span class="figures"
-					>{projectionWords(endsOnValue ? { points: player.points, vor: null } : player)}</span
+					>{projectionWords(
+						endsOnValue
+							? { points: player.points, vor: null, belowDepth: player.belowDepth }
+							: player
+					)}</span
 				>
 			{:else}
 				<span>{host.position} {host.team}</span>

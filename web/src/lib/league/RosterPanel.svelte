@@ -26,9 +26,9 @@
 	};
 </script>
 
-<Panel as="section" label="Your lineup" padding="none">
+<Panel as="section" label="Your roster" padding="none">
 	<div class="head">
-		<PanelHead title={`Your lineup as set on ${hostWords(host)}`} aside="Points a game" level={2} />
+		<PanelHead title={`Your roster as set on ${hostWords(host)}`} aside="Points a game" level={2} />
 	</div>
 	{#each roster as spot (spot.player.host_id)}
 		<LeagueRow

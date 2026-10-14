@@ -17,7 +17,7 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { railLeague } from '#lib/account/rail-league.svelte.ts';
-	import { hasFeature, type Feature } from '#lib/account/features.ts';
+	import { hasFeature } from '#lib/account/features.ts';
 	import FFPCLeagues from '#lib/hosts/FFPCLeagues.svelte';
 	import {
 		ffpcOpen,
@@ -62,8 +62,6 @@
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
 	let attached = $state<AttachedLeague[]>([]);
-	/** What the reader may use, from /me (Can): many_leagues follows more than one league. */
-	let features = $state<readonly Feature[]>([]);
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	/** The link a preview was asked for, so a late answer for an older link is dropped. */
 	let asked = '';
@@ -73,10 +71,6 @@
 			.connections()
 			.then((hosts) => (ffpcOn = ffpcOpen(hosts)))
 			.catch(() => (ffpcOn = false));
-		leagueApi
-			.me()
-			.then((me) => (features = me.features))
-			.catch(() => (features = []));
 		leagueApi
 			.attached()
 			.then((list) => {
@@ -146,7 +140,8 @@
 		}
 	}
 
-	const many = $derived(hasFeature(features, 'many_leagues'));
+	/** What the reader may use, from the rail's one read of /me (Can). */
+	const many = $derived(hasFeature(railLeague.features, 'many_leagues'));
 	/** How many more leagues this account can follow now. */
 	const room = $derived(roomToFollow(many, attached.length));
 	/** The FFPC leagues already followed, by FFPC league id, to their page here. */
@@ -224,7 +219,7 @@
 			{/if}
 			{#if ffpcOn && way === 'ffpc'}
 				<FFPCLeagues
-					verb={followVerb}
+					verb={(count: number) => followVerb(count, room)}
 					onpick={followFFPC}
 					most={room}
 					followed={followedFFPC}

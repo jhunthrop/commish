@@ -1,6 +1,6 @@
 /** Following several leagues in one tap: each through the one attach, in order, a failure kept to
  * its own league. Pure but for the attach it is handed, so the page and its words agree. */
-import { FOLLOWED_PARAM } from '#lib/site/links.ts';
+import { FOLLOWED_PARAM } from '#lib/ui/nav.ts';
 
 /** One league to follow: what the attach needs and what a sentence calls it. */
 export interface ToFollow {
@@ -47,9 +47,10 @@ export async function followInOrder<T extends ToFollow>(
 	return { made, missed };
 }
 
-/** The verb over a count of chosen leagues: one league is singular, anything else plural. */
-export function followVerb(count: number): string {
-	return count === 1 ? 'Follow my league' : 'Follow my leagues';
+/** The verb over a count of chosen leagues: singular when one is chosen or only one can be, plural
+ * otherwise. */
+export function followVerb(count: number, most: number): string {
+	return count === 1 || most <= 1 ? 'Follow my league' : 'Follow my leagues';
 }
 
 /** The one summary line: "Following 2 leagues." */
