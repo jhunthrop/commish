@@ -173,7 +173,7 @@
 <Shell title="Account">
 	{#snippet tail()}
 		{#if view?.kind === 'signed-in'}
-			<Verb href={sectionHref('mock')}>Start a mock draft</Verb>
+			<Quiet href={sectionHref('mock')}>Start a mock draft</Quiet>
 		{/if}
 	{/snippet}
 	<main class="account" aria-busy={view === null}>
@@ -282,7 +282,7 @@
 				</aside>
 			</div>
 		{/if}
-		<!-- The phone's top bar leaves the theme switch out. It lives here, signed in or out. -->
+		<!-- The theme switch lives here at every width, signed in or out, and on no page bar. -->
 		<section class="theme" aria-label="Theme">
 			<PanelHead title="Theme" level={2} />
 			<ThemeSwitch />
@@ -296,7 +296,6 @@
 		flex-direction: column;
 		gap: var(--s-5);
 		padding: var(--s-5);
-		max-width: 1180px;
 	}
 
 	.reserve {
@@ -304,16 +303,10 @@
 	}
 
 	.theme {
-		display: none;
-	}
-
-	@media (max-width: 760px) {
-		.theme {
-			display: flex;
-			flex-direction: column;
-			align-items: flex-start;
-			gap: var(--s-3);
-		}
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--s-3);
 	}
 
 	.grid {
