@@ -8,7 +8,10 @@ non-zero when any step failed.
 2. **props-snapshot**: the odds provider's player props for the coming fourteen days.
 3. **grade**: every frozen week not yet graded, whose games are complete (below), against the
    stats now held. Each grade row is stamped `implementation = 'python'`.
-4. **freeze**: the coming week, if no freeze holds it yet, strictly before its first kickoff.
+4. **freeze**: the coming week, if no freeze holds it yet, strictly before its first kickoff. A week
+   already frozen is ok; a week whose first kickoff passed unfrozen is listed as MISSED (the record
+   marks it) but never fails the pass, since nothing can be done for it. The step fails only when
+   the coming week could not be frozen.
 5. **scoreboard**: the running score, read fresh.
 
 ONE CHANGE FROM THE ORACLE, on purpose: a week is graded only once its last kickoff is
@@ -43,10 +46,6 @@ GRADE_AFTER: Final = timedelta(hours=36)
 # A week still ungradeable this long after its last kickoff fails the pass: nflverse publishes within
 # two days, so a refusal past this is an outage an operator must see, not a wait.
 GRADE_OVERDUE: Final = timedelta(days=4)
-# A week whose first kickoff passed with no freeze is missed for good (the register never re-freezes
-# a played week). The pass fails while the miss is this recent, so the operator sees it that week;
-# older misses are listed and the record marks them.
-MISSED_ALERT: Final = timedelta(days=7)
 LAST_POSSIBLE_WEEK: Final = 22
 STEPS: Final = ("stats-ingest", "props-snapshot", "grade", "freeze", "scoreboard")
 
@@ -208,22 +207,19 @@ def missed_weeks(kickoffs: Mapping[int, datetime], frozen: set[int], now: dateti
 
 
 def freeze(context: SeasonWeekContext) -> StepResult:
-    """The coming week's freeze, unless one already holds it (a re-freeze is an operator's act), then
-    the missed weeks: a recent one fails the pass, so a freeze never fails silently."""
+    """The coming week's freeze, unless one already holds it (a re-freeze is an operator's act), with
+    every missed week listed. A miss is past repair and the record already marks it, so it never
+    fails the step; only a coming week that could not be frozen does, which raises out of here."""
     with context.engine.connect() as conn:
         kickoffs = kickoff_instants_by_week(conn, context.season)
         candidate = week_to_freeze(kickoffs, context.now)
         frozen, _ = _frozen_and_graded(conn, context.season)
     taken = _take_freeze(context, candidate)
     missed = missed_weeks(kickoffs, set(frozen), context.now)
-    recent = [week for week, kickoff in missed if context.now - kickoff < MISSED_ALERT]
     detail = (
         *taken.detail,
         *(f"week {week}: MISSED, no freeze before its first kickoff {js_iso(k)}" for week, k in missed),
     )
-    if recent:
-        weeks = ", ".join(str(week) for week in recent)
-        return StepResult("freeze", "failed", f"{taken.summary}; week {weeks} missed its freeze this week", detail)
     return StepResult("freeze", taken.status, taken.summary, detail)
 
 
@@ -234,7 +230,7 @@ def _take_freeze(context: SeasonWeekContext, candidate: tuple[int, datetime] | N
     with context.engine.connect() as conn:
         existing = latest_freeze_for(conn, context.season, week)
     if existing is not None:
-        return StepResult("freeze", "skipped", f"week {week} already frozen at {js_iso(existing)}")
+        return StepResult("freeze", "ok", f"week {week} already frozen at {js_iso(existing)}")
     with context.engine.begin() as conn:
         result = take_freeze(conn, context.season, week, context.now)
     context.on_freeze(week, result.frozen_at)
