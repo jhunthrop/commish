@@ -155,6 +155,9 @@ func (s *Service) writeHostError(w http.ResponseWriter, r *http.Request, err err
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, refusal.Reason, nil)
 	case errors.Is(err, sleeper.ErrNotFound):
 		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "Sleeper has no draft at that link", nil)
+	case errors.Is(err, boards.ErrCustomRefused):
+		s.Log.Error("companion: the boards service refused a request the api built", "err", err)
+		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, boards.CustomRefusedWords, nil)
 	case errors.Is(err, boards.ErrCustomUnavailable):
 		s.Log.Warn("companion: custom board", "err", err)
 		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, boards.CustomUnavailableWords, nil)

@@ -204,7 +204,7 @@ func (b Board) Basis() string {
 	tail := fmt.Sprintf("over replacement for %d teams on this roster. Kickers and defenses carry no projection and sit where drafters take them.", b.teams)
 	if b.Raw.Custom {
 		return fmt.Sprintf("Your league's scoring. Points are our %d projections with every one of its rules applied exactly, "+
-			"built on our %s board's players and where drafters take them (the board its points a catch are nearest), %s",
+			"built on our %s board's players and where drafters take them (the board closest to its points per catch), %s",
 			b.Raw.Season, b.Raw.Format.Words(), tail)
 	}
 	ranked := ""

@@ -3,7 +3,11 @@ package scoring
 import (
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -119,5 +123,104 @@ func TestFromSleeper(t *testing.T) {
 	}
 	if len(im.Rules) != 21 || slices.Contains(im.Applied(), "points_per_safety") || !slices.Contains(im.Applied(), Reception) {
 		t.Errorf("applied %v", im.Applied())
+	}
+}
+
+// repoFile is a file of the repository, read by the cross-check below.
+func repoFile(t *testing.T, rel string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", rel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// figures are every "key<sep>number" pair in text between start and end.
+func figures(t *testing.T, text, start, end string, pair *regexp.Regexp) map[string]float64 {
+	t.Helper()
+	i := strings.Index(text, start)
+	if i < 0 {
+		t.Fatalf("%q is gone", start)
+	}
+	block := text[i:]
+	if j := strings.Index(block, end); j >= 0 {
+		block = block[:j]
+	}
+	out := map[string]float64{}
+	for _, m := range pair.FindAllStringSubmatch(block, -1) {
+		v, err := strconv.ParseFloat(m[2], 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out[m[1]] = v
+	}
+	return out
+}
+
+func one(t *testing.T, text string, pattern string) float64 {
+	t.Helper()
+	m := regexp.MustCompile(pattern).FindStringSubmatch(text)
+	if m == nil {
+		t.Fatalf("%q is gone", pattern)
+	}
+	v, err := strconv.ParseFloat(m[1], 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+// The standard figures, the half and PPR reception points and the preset
+// thresholds are one set across Go, research/model/domain.py, the web and
+// the 00019 migration, so StoredPreset never serves a stored board for
+// rules the research side scores differently.
+func TestScoringFiguresAgreeEverywhere(t *testing.T) {
+	want := map[string]float64{}
+	for _, r := range Rules() {
+		want[r.Key] = r.Standard
+	}
+	number := `(-?[0-9]+(?:\.[0-9]+)?)`
+	py := repoFile(t, "research/model/domain.py")
+	ts := repoFile(t, "web/src/lib/room/setup/rules.ts")
+	sql := repoFile(t, "api/migrations/00019_scoring_rules.sql")
+	sides := map[string]map[string]float64{
+		"domain.py STANDARD_SCORING": figures(t, py, "STANDARD_SCORING: Final = ScoringRules(", ")",
+			regexp.MustCompile(`(\w+)=`+number)),
+		"rules.ts STANDARD": figures(t, ts, "const STANDARD:", "};", regexp.MustCompile(`(\w+): `+number)),
+		"00019 defaults": figures(t, sql, "jsonb_build_object(", "$$;",
+			regexp.MustCompile(`'(\w+)', coalesce\(.*, `+number+`\)`)),
+	}
+	for side, got := range sides {
+		if len(got) != len(want) {
+			t.Errorf("%s: %d figures, want %d", side, len(got), len(want))
+		}
+		for k, v := range want {
+			if g, ok := got[k]; !ok || g != v {
+				t.Errorf("%s: %s = %g (%v), want %g", side, k, g, ok, v)
+			}
+		}
+	}
+	presets := map[string][2]float64{
+		"PPR":  {one(t, py, `PPR_SCORING: Final = replace\(STANDARD_SCORING, points_per_reception=`+number), one(t, ts, `\sppr: \{ points_per_reception: `+number)},
+		"half": {one(t, py, `HALF_PPR_SCORING: Final = replace\(STANDARD_SCORING, points_per_reception=`+number), one(t, ts, `half_ppr: \{ points_per_reception: `+number)},
+	}
+	for name, p := range presets {
+		r := Standard()
+		r.PointsPerReception = p[0]
+		if got, ok := StoredPreset(r); !ok || p[0] != p[1] {
+			t.Errorf("%s: domain.py %g, web %g, Go reads %q %v", name, p[0], p[1], got, ok)
+		}
+	}
+	boardsPy := repoFile(t, "research/boards/custom.py")
+	web := repoFile(t, "web/src/lib/room/setup/scoring.ts")
+	thresholds := map[string][3]float64{
+		"PPR":  {PPRFrom, one(t, boardsPy, `PPR_RECEPTION_FROM: Final = `+number), one(t, web, `const PPR_FROM = `+number)},
+		"half": {HalfFrom, one(t, boardsPy, `HALF_RECEPTION_FROM: Final = `+number), one(t, web, `const HALF_FROM = `+number)},
+	}
+	for name, th := range thresholds {
+		if th[0] != th[1] || th[0] != th[2] {
+			t.Errorf("%s threshold: Go %g, boards service %g, web %g", name, th[0], th[1], th[2])
+		}
 	}
 }

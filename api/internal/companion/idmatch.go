@@ -108,11 +108,8 @@ func (m *IDMatcher) board(raw *boards.Raw) (map[string]bool, map[string]string) 
 // in the background while a map is held, or by this caller (one read
 // shared by every caller) when none is yet.
 func (m *IDMatcher) current() map[string]string {
-	m.mu.Lock()
-	ids, at, retryAt := m.ids, m.at, m.retryAt
-	m.mu.Unlock()
-	now := m.Now()
-	if (ids != nil && now.Sub(at) <= m.TTL) || now.Before(retryAt) {
+	ids, settled := m.settled()
+	if settled {
 		return ids
 	}
 	if ids != nil {
@@ -122,9 +119,24 @@ func (m *IDMatcher) current() map[string]string {
 	return m.refresh()
 }
 
+// settled is the map held, and whether it needs no read now: fresh, or a
+// failed read's retry not yet due.
+func (m *IDMatcher) settled() (map[string]string, bool) {
+	m.mu.Lock()
+	ids, at, retryAt := m.ids, m.at, m.retryAt
+	m.mu.Unlock()
+	now := m.Now()
+	return ids, (ids != nil && now.Sub(at) <= m.TTL) || now.Before(retryAt)
+}
+
 // refresh reads the map once however many callers ask, outside the lock.
 func (m *IDMatcher) refresh() map[string]string {
 	v, _, _ := m.refreshing.Do(refreshFlightName, func() (any, error) {
+		// A flight that finished just before this one began already read
+		// the map, or set the retry: take its answer, never a second read.
+		if ids, settled := m.settled(); settled {
+			return ids, nil
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), idLoadTimeout)
 		ids, err := m.IDs.SleeperIDs(ctx)
 		cancel()

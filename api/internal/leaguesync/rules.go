@@ -39,11 +39,11 @@ func toRules(host map[string]float64) mapped {
 	return mapped{rules: m.Rules, left: m.Left, defaulted: m.Defaulted}
 }
 
-// Reception points a league must reach to read like PPR or half PPR, as
-// the boards read a custom rule.
+// Reception points a league must reach to read like PPR or half PPR, the
+// boards service's own thresholds (scoring.PPRFrom, scoring.HalfFrom).
 const (
-	pprFrom  = 0.75
-	halfFrom = 0.25
+	pprFrom  = scoring.PPRFrom
+	halfFrom = scoring.HalfFrom
 )
 
 // NearestPreset is the preset a league's rules score most like: by

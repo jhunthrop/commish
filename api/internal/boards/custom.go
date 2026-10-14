@@ -31,6 +31,10 @@ var ErrCustomUnavailable = errors.New("boards: a board for this league's own sco
 // cannot be built right now, the one sentence solo and the companion use.
 const CustomUnavailableWords = "We cannot build your league's board right now. Try again in a moment"
 
+// CustomRefusedWords is what a room says when the boards service refuses
+// a league's rules or roster outright: a retry would get the same answer.
+const CustomRefusedWords = "We cannot build a board for this league's rules or roster as set. Check the scoring and roster on the setup page"
+
 // ErrCustomRefused is the boards service refusing a request the api built
 // (a 400): a contract bug between the two, never a reason to try again.
 var ErrCustomRefused = errors.New("boards: the boards service refused the request")

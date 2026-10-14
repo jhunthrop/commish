@@ -37,6 +37,16 @@ var rules = []Rule{
 // Rules is every rule in domain.py's order.
 func Rules() []Rule { return append([]Rule(nil), rules...) }
 
+// Reception points from which a league's rules read like PPR or half PPR:
+// the boards service picks its candidate set by them
+// (research/boards/custom.py), and the web reads a league's nearest preset
+// by them (web/src/lib/room/setup/scoring.ts). rules_test.go holds the
+// three to one figure.
+const (
+	PPRFrom  = 0.75
+	HalfFrom = 0.25
+)
+
 // Keys a reader looks for by name.
 const (
 	Reception = "points_per_reception"

@@ -23,10 +23,10 @@ type ESPNLeagues interface {
 
 // The import's words.
 const (
-	hostESPN          = "espn"
-	espnLinkWords     = "Paste your league's link from ESPN, or its league id"
-	espnPrivateWords  = "This ESPN league is private. Make it viewable to the public in its settings, or enter your rules by hand"
-	importNeedsPass   = "Your league's own scoring comes with the Draft Pass"
+	hostESPN         = "espn"
+	espnLinkWords    = "Paste your league's link from ESPN, or its league id"
+	espnPrivateWords = "This ESPN league is private. Make it viewable to the public in its settings, or enter your rules by hand"
+	importNeedsPass  = "Your league's own scoring comes with the Draft Pass"
 	// maxImportLink is the contract's ScoringImportInput.link maxLength.
 	maxImportLink = 300
 )
