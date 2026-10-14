@@ -21,7 +21,7 @@
 	import TierStrip from '#lib/ui/TierStrip.svelte';
 	import Toggle from '#lib/ui/Toggle.svelte';
 	import { scoringBasis } from '#lib/run/catalog.ts';
-	import { apiFormatOf, runFormatId } from '#lib/run/format-ids.ts';
+	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import type { BoardRowView } from '#lib/run/schema.ts';
 	import { links, tierAnchor } from './links.ts';
 
@@ -54,18 +54,7 @@
 	);
 	const figures = $derived(apiFormatOf(page.format));
 	/** What this board is against the league's scoring, also when a link named another board. */
-	const note = $derived.by(() => {
-		const league = siteContext.league;
-		const notes = siteContext.notes;
-		if (figures === null || league === null || notes === null) return null;
-		return notes.contextLine(
-			league,
-			figures,
-			siteContext.features.includes('custom_scoring'),
-			'This board is',
-			carried.includes(runFormatId(league.format))
-		);
-	});
+	const note = $derived(siteContext.notes?.lineFor(figures, 'This board is', carried) ?? null);
 	$effect(() => {
 		if (onlySheet) void lazySheet.load();
 	});
@@ -194,9 +183,7 @@
 		<Panel>
 			<PanelHead title="Show" />
 			<Toggle label="Players below replacement" bind:checked={belowReplacement} />
-			<span class="range-toggle" class:in-season={page.seasonLead !== null}
-				><Toggle label="Floor to ceiling" bind:checked={range} /></span
-			>
+			<span class="range-toggle"><Toggle label="Floor to ceiling" bind:checked={range} /></span>
 			<Toggle label="Only my sheet" bind:checked={onlySheet} />
 		</Panel>
 		<Panel>
@@ -277,7 +264,7 @@
 
 	/* From 1181 to 1439px an in-season row has no floor to ceiling column, so no switch for it. */
 	@media (min-width: 1181px) and (max-width: 1439px) {
-		.range-toggle.in-season {
+		.board:has(:global(.row.games)) .range-toggle {
 			display: none;
 		}
 	}

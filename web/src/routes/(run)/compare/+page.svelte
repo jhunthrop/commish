@@ -59,16 +59,7 @@
 		return lead;
 	});
 	const figures = $derived(apiFormatOf(format));
-	const note = $derived(
-		figures === null
-			? null
-			: (siteContext.notes?.contextLine(
-					siteContext.league,
-					figures,
-					siteContext.features.includes('custom_scoring'),
-					'These figures are'
-				) ?? null)
-	);
+	const note = $derived(siteContext.notes?.lineFor(figures, 'These figures are') ?? null);
 
 	function pickOf(slot: Slot): Chosen | null {
 		const player = chosen[slot];

@@ -49,16 +49,7 @@
 	const sources = $derived(lead.adpSources.join(' and '));
 	const figures = $derived(apiFormatOf(lead.format));
 	/** The league's line. */
-	const note = $derived(
-		figures === null
-			? null
-			: (siteContext.notes?.contextLine(
-					siteContext.league,
-					figures,
-					siteContext.features.includes('custom_scoring'),
-					'These figures are'
-				) ?? null)
-	);
+	const note = $derived(siteContext.notes?.lineFor(figures, 'These figures are') ?? null);
 	/** Whose roster he is on in the league, on its own line with its own room, once the rosters are
 	 * read: the free-agent read in one glance. */
 	const rostered = $derived.by(() => {
