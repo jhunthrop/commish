@@ -98,6 +98,10 @@ func TestFromSleeper(t *testing.T) {
 	if im.Rules[Reception] != 1 || im.Rules["points_per_two_point_conversion"] != 2 || im.Rules[TEBonus] != 0.5 {
 		t.Errorf("rules %v", im.Rules)
 	}
+	ranged := FromSleeper(map[string]float64{"fgm_0_19": 3, "fgm_20_29": 3, "fgm_30_39": 3, "fgm_40_49": 4, "fgm_50p": 5})
+	if ranged.Rules["points_per_field_goal"] != 3 || !slices.Equal(ranged.Dropped, []string{"fgm_40_49 4", "fgm_50p 5"}) {
+		t.Errorf("field goals by distance: %v, dropped %q", ranged.Rules["points_per_field_goal"], ranged.Dropped)
+	}
 	for _, want := range []string{"pass_cmp 0.1", "rush_fd 1e+06", "IDP_tkl 1"} {
 		if !slices.Contains(im.Dropped, want) {
 			t.Errorf("dropped %q, want %q", im.Dropped, want)

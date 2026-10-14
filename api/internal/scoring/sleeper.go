@@ -57,6 +57,36 @@ func alike() map[string][]string {
 	}
 }
 
+// Sleeper scores field goals by distance when a league says so: the short
+// ranges carry the one field goal figure a league states no flat one for,
+// and a longer range scoring the same is taken with them. A longer range
+// scoring differently is left for the caller to name.
+var fieldGoalRanges = map[string]struct{ short, long []string }{
+	"points_per_field_goal":        {[]string{"fgm_0_19", "fgm_20_29", "fgm_30_39"}, []string{"fgm_40_49", "fgm_50p"}},
+	"points_per_field_goal_missed": {[]string{"fgmiss_0_19", "fgmiss_20_29", "fgmiss_30_39"}, []string{"fgmiss_40_49", "fgmiss_50p"}},
+}
+
+func byDistance(host, rules map[string]float64, used map[string]bool) {
+	for key, ranges := range fieldGoalRanges {
+		if _, ok := rules[key]; ok {
+			continue
+		}
+		v, ok := sameFigure(host, ranges.short)
+		if !ok {
+			continue
+		}
+		rules[key] = v
+		for _, k := range ranges.short {
+			used[k] = true
+		}
+		for _, k := range ranges.long {
+			if long, stated := host[k]; stated && long == v {
+				used[k] = true
+			}
+		}
+	}
+}
+
 // Mapped is settings in Sleeper's names as ScoringRules: the rules, the
 // settings the map left (for the caller to name in the host's words), and
 // the rules taken at the standard figure.
@@ -83,6 +113,7 @@ func MapSleeperNames(host map[string]float64) Mapped {
 			}
 		}
 	}
+	byDistance(host, out.Rules, used)
 	for k := range host {
 		if !used[k] {
 			out.Left = append(out.Left, k)
