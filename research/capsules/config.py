@@ -49,6 +49,11 @@ class LengthCorrection:
 class Repetition:
     max_share: float = 0.02
     max_quoted_sentences: int = 8
+    # The six-word spans shared across pages (`capsules.spans`) a prompt quotes: the board's most
+    # widely shared to every writer, and a repaired page its own.
+    max_quoted_spans: int = 12
+    # The pages written tonight whose spans the next writer call is checked against (`TonightSpans`).
+    tonight_window_pages: int = 60
     opener_words: int = 4
     max_opener_family_share: float = 0.1
     max_refrain_share: float = 0.1
@@ -81,7 +86,26 @@ class Repetition:
         "it says nothing about whether he can play",
         "nobody is drafting",
         "the number that decides",
+        # The live review of 2026-10-14 (M1): stock lines across the board's pages.
+        "is the whole story",
+        "is the whole case",
+        "the call is easy",
+        "get cute",
+        "cut short by injury",
+        "our number puts him at",
+        "once injury risk is in",
     )
+
+
+@dataclass(frozen=True, slots=True)
+class UnwrittenLine:
+    """The share of the board the nightly lets go unwritten, and why. Ruled for Lane 17: in season a
+    gate failure keeps the site on a stale run, which costs more than a few pages without a read that
+    the next night retries first; the line still fails a broken writer."""
+
+    voice: str
+    share_max: float
+    basis: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,9 +123,15 @@ class CapsuleConfig:
     # a betting word the first correction leaves (or brings) is worth a second sentence rewrite
     # before the read falls to the facts block, which the nightly counts against its 2% line.
     corrections_per_read: int = 2
-    # The share of the board's pages the nightly lets go unwritten: facts blocks, the oracle's
-    # template rows and missing pages together.
-    unwritten_share_max: float = 0.02
+    # The share of the board's pages the nightly lets go unwritten (facts blocks, the oracle's template
+    # rows and missing pages together), one line per voice, the run's date deciding which.
+    unwritten_line_preseason: UnwrittenLine = UnwrittenLine("preseason", 0.02, "the share the board was built to")
+    unwritten_line_in_season: UnwrittenLine = UnwrittenLine(
+        "in-season",
+        0.03,
+        "a full in-season rewrite's estimate tops out near 2.5% (Lane 17's 80-page sample), "
+        "and one page moves an 80-page rate by 1.25 points",
+    )
     # A written sentence this long or longer may sit on one page only; shorter ones ("Draft him.",
     # "Let him go.") are the product's vocabulary, not stock prose (ruled in phase C's fix round 3).
     shared_sentence_min_words: int = 4
@@ -112,9 +142,21 @@ class CapsuleConfig:
     repetition: Repetition = Repetition()
     # A law group's |net effect| at or above this is a real, citable downside.
     tension_threshold_points: float = 1.0
-    sweep_generation_budget: int = 700
+    # Pages one night may write, every pass together (raised from 700 by the Lane 17 fix-round ruling so a
+    # full rewrite leaves room for the retries and repairs). Measured in Lane 17 (2026-10-14, the
+    # in-season floor): a page costs $0.0027 to $0.0038, so a full night is expected at about $2.70 to
+    # $3.80 (ruled about $3.50). The hard bound is 1,000 pages at six calls each, about $4.15 at the board
+    # run's $0.00069 a call (a page's one generation past the call ceiling comes out of the same budget). In season every page's sheet moves on the morning a week lands (about 536
+    # pages, $1.60 to $2.00 before retries and repairs), injury designations move pages through the week,
+    # and the span repairs rewrite two-page carriers every night, so steady nights spend real budget too,
+    # up to the same ceiling. The board-scale measurement is in the Lane 17 report.
+    sweep_generation_budget: int = 1000
     # Zero: every gateway call is spaced at `gateway.min_call_spacing_ms`, which paces the sweep.
     sweep_pacing_ms: int = 0
+
+    def unwritten_line(self, *, in_season: bool) -> UnwrittenLine:
+        """The line in use for a run: in season from the season's first kickoff on, preseason before."""
+        return self.unwritten_line_in_season if in_season else self.unwritten_line_preseason
 
     def size(self, name: str) -> Size:
         if name == "compact":

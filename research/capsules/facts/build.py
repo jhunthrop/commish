@@ -3,7 +3,8 @@
 Ported from `research-ts/src/capsules/facts.ts` (`buildPlayerFacts`) and `projections/preseason/
 band-quartiles.ts`. `facts_hash` is SHA-256 of the content fields as `JSON.stringify` writes them
 (`js_json_stringify`, construction order), the cache key the sweep compares with the stored row, so
-two calls with the same inputs hash alike and the oracle's stored hashes stay valid.
+two calls with the same inputs hash alike. The run's day rides on the sheet for the writer but is
+never hashed; this season so far is, so a page is rewritten when a week lands, not every night.
 """
 
 import hashlib
@@ -26,7 +27,7 @@ from research.capsules.facts.model import (
     Market,
     NewsItem,
     Projection,
-    SeasonSummary,
+    SeasonSoFar,
     Trend,
     Usage,
     to_js,
@@ -65,13 +66,16 @@ class FactsInput:
     median_points: float
     ceiling_points: float
     bye_week: int | None
-    season: SeasonSummary | None
+    season: SeasonSoFar | None
     injury: InjuryStatus
     news: tuple[NewsItem, ...]
     last_season_story: LastSeasonStory | None
     books_numbers: BooksNumbers
     usage: Usage | None
     trend: Trend | None
+    # The run's Eastern day, told to the writer and never hashed: a night that sees the same season
+    # rewrites nothing (the season so far moves the hash when a week lands).
+    run_day: str
     depth: Depth = EMPTY_DEPTH
     # The page's overall and position rank (`market_adp`), which replace the oracle's board rank and
     # the scarcity reason's position rank; None keeps the oracle's (the parity cases).
@@ -88,7 +92,8 @@ class PlayerFacts:
     market: Market
     projection: Projection
     availability: Availability | None
-    season: SeasonSummary | None
+    # This season so far: None before the first kickoff, which is the preseason voice.
+    season: SeasonSoFar | None
     bye_week: int | None
     injury: InjuryStatus
     news: tuple[NewsItem, ...]
@@ -97,6 +102,7 @@ class PlayerFacts:
     usage: Usage | None
     trend: Trend | None
     depth: Depth
+    run_day: str = ""
     number_ledger: tuple[float, ...] = ()
     name_ledger: tuple[str, ...] = ()
     facts_hash: str = ""
@@ -157,6 +163,7 @@ def build_player_facts(given: FactsInput) -> PlayerFacts:
         given.usage,
         given.trend,
         given.depth,
+        given.run_day,
     )
     depth = content.depth
     numbers = tuple(number_ledger(content, depth_numbers(depth)))

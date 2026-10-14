@@ -11,10 +11,11 @@ key on the universe id (`research.players.id`), through the crosswalk.
 """
 
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from types import MappingProxyType
 
 from sqlalchemy import Connection, Engine
 
@@ -32,6 +33,8 @@ from research.capsules.repetition import (
     players_to_regenerate,
     stock_sentences,
 )
+from research.capsules.span_rules import span_rules_for
+from research.capsules.spans import SpanRules, TonightSpans, page_texts
 from research.capsules.store import (
     RETRY_FIRST_FACTS_HASH,
     CapsuleWrite,
@@ -93,6 +96,8 @@ class SweepReport:
     llm: int = 0
     facts: int = 0
     demoted: int = 0
+    # Span repairs whose rewrite fell short and left the page's written read as it was.
+    kept: int = 0
     calls: int = 0
     prompt_tokens: int = 0
     completion_tokens: int = 0
@@ -103,7 +108,7 @@ class SweepReport:
     calls_by_player: dict[str, int] = field(default_factory=dict)
 
 
-def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted: bool) -> None:
+def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted: bool, kept: bool) -> None:
     usage = result.usage
     report.calls += result.calls
     report.calls_by_player[subject.universe_id] = report.calls_by_player.get(subject.universe_id, 0) + result.calls
@@ -117,18 +122,32 @@ def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted
         report.llm += 1
         report.detail.append(f"{name}: llm, {result.calls} calls, ${(usage.cost_usd or 0.0) if usage else 0.0:.6f}")
         return
+    if kept:
+        report.kept += 1
+        report.detail.append(f"{name}: {describe_fallback(result.compact, result.full)}, kept the written read")
+        return
     report.facts += 1
     report.demoted += int(demoted)
     suffix = ", kept nothing, was written" if demoted else ""
     report.detail.append(f"{name}: {describe_fallback(result.compact, result.full)}{suffix}")
 
 
-def write_one(
-    engine: Engine, subject: Subject, stored: StoredCapsule | None, gateway: GatewayClient, worn: WornPhrases
-) -> tuple[CapsuleResult, bool]:
-    """One player's capsule, generated and committed on its own."""
+def write_one(  # noqa: PLR0913 - one write's parts
+    engine: Engine,
+    subject: Subject,
+    stored: StoredCapsule | None,
+    gateway: GatewayClient,
+    worn: WornPhrases,
+    *,
+    keep_written: bool = False,
+) -> tuple[CapsuleResult, bool, bool]:
+    """One player's capsule, generated and committed on its own: the result, whether a written row was
+    demoted, and whether it was kept. With `keep_written` a rewrite that falls to the facts block leaves
+    a written row as it was (a span repair's failure costs nothing)."""
     result = generate_capsule(subject.facts, gateway, worn)
     demoted = stored is not None and stored.source == "llm" and result.source == FACTS_SOURCE
+    if demoted and keep_written:
+        return result, False, True
     row = CapsuleWrite(
         subject.universe_id,
         RETRY_FIRST_FACTS_HASH if demoted else subject.facts.facts_hash,
@@ -140,7 +159,7 @@ def write_one(
     )
     with engine.begin() as conn:
         upsert_capsule(conn, row, datetime.now(UTC))
-    return result, demoted
+    return result, demoted, False
 
 
 def subjects_of(conn: Connection, as_of: datetime, history: ReadThrough = UNCACHED) -> list[Subject]:
@@ -202,8 +221,17 @@ class SweepPlan:
     # The repair pass the nightly runs when its capsule gate finds a written sentence on two pages:
     # exactly these universe ids are rewritten, whatever their rows hold, with `avoid` (the shared
     # sentences) quoted into the prompt beside the board's worn language.
-    only: frozenset[str] | None = None
+    only: tuple[str, ...] | None = None
     avoid: tuple[str, ...] = ()
+    # The repair's per page language: each page's own six-word spans that another page carries too
+    # (`capsules.spans`), quoted into that page's prompt beside `avoid`.
+    avoid_by_page: Mapping[str, tuple[str, ...]] = field(default_factory=lambda: MappingProxyType({}))
+    # The night's span rules (`capsules.span_rules`), built once by the nightly; None builds them here.
+    # Each writer call is told the spans tonight's latest pages already share (`spans.TonightSpans`).
+    span_rules: SpanRules | None = None
+    # A span repair (`nightly.capsule_repair`): a rewrite that cannot pass its validator leaves the
+    # page's written read as it is, never a facts block (a shared span costs less than no prose).
+    keep_written: bool = False
     # Players the night has spent its call budget on (`nightly.capsule_step`), never written again.
     exclude: frozenset[str] = frozenset()
 
@@ -217,8 +245,12 @@ def _eligible(subject: Subject, row: StoredCapsule | None, plan: SweepPlan) -> b
 
 
 def _ordered(subjects: Sequence[Subject], stored: dict[str, StoredCapsule], plan: SweepPlan) -> list[Subject]:
-    """The demoted first, then every unwritten page, then the rest in board order."""
+    """The demoted first, then every unwritten page, then the rest in board order; a repair's own
+    pages (`plan.only`) in the order it gives them."""
     eligible = [s for s in subjects if _eligible(s, stored.get(s.universe_id), plan)]
+    if plan.only is not None:
+        by_id = {s.universe_id: s for s in eligible}
+        return [by_id[pid] for pid in plan.only if pid in by_id]
     demoted = [
         s
         for s in eligible
@@ -237,9 +269,11 @@ def sweep_capsules(
     with engine.connect() as conn:
         subjects = subjects_at(conn, as_of)
         stored = stored_capsules_for(conn, [s.universe_id for s in subjects])
+        rules = plan.span_rules or span_rules_for(conn, (s.facts for s in subjects))
     ordered = _ordered(subjects, stored, plan)
     board_worn = worn_phrases(subjects, stored)
-    worn = WornPhrases((*plan.avoid, *board_worn.sentences), board_worn.phrases)
+    repetition = CAPSULE_CONFIG.repetition
+    tonight = TonightSpans(rules, repetition.tonight_window_pages)
     report = SweepReport(as_of, len(subjects), len(ordered))
     stopped = False
     for subject in ordered[: plan.budget]:
@@ -248,8 +282,15 @@ def sweep_capsules(
             break
         if report.processed and CAPSULE_CONFIG.sweep_pacing_ms > 0:
             time.sleep(CAPSULE_CONFIG.sweep_pacing_ms / 1000)
-        result, demoted = write_one(engine, subject, stored.get(subject.universe_id), gateway, worn)
-        _tally(report, subject, result, demoted)
+        own = plan.avoid_by_page.get(subject.universe_id, ())
+        repeated = tonight.repeated(repetition.max_quoted_spans)
+        worn = WornPhrases((*plan.avoid, *own, *repeated, *board_worn.sentences), board_worn.phrases)
+        result, demoted, kept = write_one(
+            engine, subject, stored.get(subject.universe_id), gateway, worn, keep_written=plan.keep_written
+        )
+        if result.source == "llm":
+            tonight.add(page_texts(result.compact.text, result.full.text, result.narrative.slots))
+        _tally(report, subject, result, demoted, kept)
         report.processed.append(subject.universe_id)
     if stopped:
         # A half-swept board would flag sentences the rest of tonight's work is about to rewrite.

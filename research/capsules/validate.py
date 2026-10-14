@@ -28,12 +28,20 @@ from research.capsules.grounding import (
 )
 from research.capsules.pull_figures import adp_figures_off_page, facts_page_numbers, pull_figures_of, renderings_of
 from research.capsules.render import render_facts_for_model
+from research.capsules.season_voice import (
+    SeasonClock,
+    clock_of,
+    missed_weeks_violation,
+    names_missed_weeks,
+    time_frame_hits,
+)
 from research.capsules.voice_rules import (
     BANNED_VOCABULARY,
     COMPETITOR_NAMES,
     COMPETITOR_NAMES_THAT_ARE_WORDS,
     COMPETITOR_PRODUCT_CUES,
     EM_DASH,
+    IN_SEASON_REPLACEMENTS,
     SEMICOLON,
     TRADING_REPLACEMENTS,
     VoiceRuleHit,
@@ -64,10 +72,6 @@ def no_page_number_violation(numbers: tuple[tuple[str, float], ...]) -> str:
     return f"{NO_PAGE_NUMBER_VIOLATION}: {choices}."
 
 
-SOFT_CORRECTIONS: Final = {
-    UNFRAMED_FLOOR_VIOLATION: 'One sentence uses "floor" beside a number. Rewrite that sentence, in your own words, so a '
-    'reader knows the number comes from seasons shortened by injury, or take the word "floor" out of it.',
-}
 _AVAILABILITY: Final = re.compile(
     r"injur|health|hurt|miss(?:es|ed|ing)?\s+(?:time|games?|weeks?|snaps?)|games?\s+(?:he\s+)?miss|availab|durab|absen|"
     r"sidelin|out for|stay(?:s|ing)? on the field|on the field for all",
@@ -75,13 +79,6 @@ _AVAILABILITY: Final = re.compile(
 )
 _COST_CUE: Final = re.compile(r"\b(costs?|minus|down|shaves?)\b", re.IGNORECASE | re.ASCII)
 _SENTENCE_SPLIT: Final = re.compile(r"(?<=[.!?])\s+")
-_BANNED_TERM_VIOLATION: Final = re.compile(
-    r'^The text uses the banned term "([^"]+)" in the sentence "(.+)"\. (?:Rewrite without it\.|Say it in drafting words instead)'
-)
-_VOICE_RULE_VIOLATION: Final = re.compile(
-    r'^The text carries an? (set phrase|aside \([^)]+\)|betting word \([^)]+\)), "([^"]+)", in the sentence "(.+)"\. Rewrite that sentence\.$'
-)
-_TENSION_NUMBER: Final = re.compile(r"\((-?\d+(?:\.\d+)?) pts/game\)")
 _PRODUCT_CUE_AFTER: Final = re.compile(rf"^(?:['\u2019]s)?\s+(?:{'|'.join(COMPETITOR_PRODUCT_CUES)})\b", re.IGNORECASE)
 _ON_BEFORE: Final = re.compile(r"\bon\s+$", re.IGNORECASE)
 _SENTENCE_OPENERS: Final = re.compile(r"[\s\"'\u201c\u2018(]+$")
@@ -111,11 +108,13 @@ class Grounding:
     tension: float | None
     page_numbers: tuple[tuple[str, float], ...]
     # The page's ADP (the run's, `facts.market_adp`): any ADP or pick a read states must be it.
-    adp: float | None = None
+    adp: float | None
     # His position code and the page's position and overall rank: any board rank a read states must be them.
-    position: str = ""
-    position_rank: int | None = None
-    board_rank: int | None = None
+    position: str
+    position_rank: int | None
+    board_rank: int | None
+    # The run's day: in season or not, how far the season has gone, the weeks he played and missed.
+    clock: SeasonClock
 
 
 def word_count(text: str) -> int:
@@ -134,12 +133,13 @@ def _quoted(phrases: tuple[str, ...]) -> str:
     return ", ".join(f'"{phrase}"' for phrase in phrases)
 
 
-def _banned_term_violation(term: str, text: str) -> str:
+def _banned_term_violation(term: str, text: str, clock: SeasonClock) -> str:
     pattern = banned_term_pattern(term)
     sentence = next((s for s in split_sentences(text) if pattern.search(s)), text)
-    replacement = TRADING_REPLACEMENTS.get(term)
+    replacement = (IN_SEASON_REPLACEMENTS if clock.in_season else TRADING_REPLACEMENTS).get(term)
+    words = "fantasy" if clock.in_season else "drafting"
     remedy = (
-        "Rewrite without it." if replacement is None else f"Say it in drafting words instead: {_quoted(replacement)}."
+        "Rewrite without it." if replacement is None else f"Say it in {words} words instead: {_quoted(replacement)}."
     )
     return f'The text uses the banned term "{term}" in the sentence "{sentence}". {remedy}'
 
@@ -213,6 +213,7 @@ def grounding_of(facts: "PlayerFacts") -> Grounding:
         facts.identity.position,
         facts.market.position_rank,
         facts.market.board_rank,
+        clock_of(facts),
     )
 
 
@@ -220,7 +221,7 @@ def _voice_violation(hit: VoiceRuleHit, text: str) -> str:
     """The violation, naming the sentence that holds the hit as a whole word or phrase: a bare
     substring would name "between" for a "bet" elsewhere, and the rewrite would miss the hit."""
     whole = re.compile(rf"(?<![a-z0-9]){re.escape(hit.found.lower())}(?![a-z0-9])")
-    sentence = next(
+    sentence = hit.sentence or next(
         (s for s in split_sentences(text) if whole.search(s.replace("\u2019", "'").replace("\u2018", "'").lower())),
         text,
     )
@@ -228,61 +229,7 @@ def _voice_violation(hit: VoiceRuleHit, text: str) -> str:
     return f'The text carries {article} {hit.rule}, "{hit.found}", in the sentence "{sentence}". Rewrite that sentence.'
 
 
-def is_voice_rule_violation(violation: str) -> bool:
-    return _VOICE_RULE_VIOLATION.match(violation) is not None
-
-
-def voice_rule_correction_for(violation: str) -> str | None:
-    match = _VOICE_RULE_VIOLATION.match(violation)
-    if match is None:
-        return None
-    return (
-        f'Rewrite this sentence: "{match.group(3)}". Say only what it means, plainly and in your own words, without '
-        f'"{match.group(2)}" or anything like it. Use fantasy football words, never betting or trading words. Then leave '
-        "everything else as it is."
-    )
-
-
-def _page_correction(violation: str) -> str | None:
-    """The corrections that hand the writer the page's own numbers: its ADP, or the renderings that count."""
-    if violation.startswith(ADP_FIGURE_VIOLATION):
-        return f"{violation.removeprefix(ADP_FIGURE_VIOLATION + ': ')} Rewrite only that sentence and leave everything else as it is."
-    if violation.startswith(NO_PAGE_NUMBER_VIOLATION):
-        choices = violation.removeprefix(NO_PAGE_NUMBER_VIOLATION).removeprefix(": ").removesuffix(".")
-        return (
-            "Work one of these numbers into one sentence, printed exactly as written here, in your own words: "
-            f"{choices}. Leave everything else as it is."
-        )
-    return None
-
-
-def soft_correction_for(violation: str) -> str | None:
-    """The correction a soft violation is handed back with, or None for one that costs a rewrite."""
-    if violation in SOFT_CORRECTIONS:
-        return SOFT_CORRECTIONS[violation]
-    page = _page_correction(violation)
-    if page is not None:
-        return page
-    banned = _BANNED_TERM_VIOLATION.match(violation)
-    if banned is not None and banned.group(1) in TRADING_REPLACEMENTS:
-        return (
-            f'Your text uses the trading word "{banned.group(1)}". Rewrite this sentence: "{banned.group(2)}". Say it in '
-            f"your own words, with drafting words instead: {_quoted(TRADING_REPLACEMENTS[banned.group(1)])}. Then leave "
-            "everything else as it is."
-        )
-    voice = voice_rule_correction_for(violation)
-    if voice is not None:
-        return voice
-    if violation.startswith("Mixed evidence:"):
-        number = _TENSION_NUMBER.search(violation)
-        downside = (
-            "the strongest downside on the sheet" if number is None else f"the {number.group(1)} pts/game downside"
-        )
-        return f"Your text never cites {downside}. Work that number in somewhere before your last sentence, in your own words, and leave everything else as it is."
-    return None
-
-
-def _copy_violations(text: str, names: Sequence[str]) -> list[str]:
+def _copy_violations(text: str, names: Sequence[str], clock: SeasonClock) -> list[str]:
     violations = []
     if EM_DASH in text:
         violations.append("The text contains an em-dash. Rewrite without one.")
@@ -290,11 +237,14 @@ def _copy_violations(text: str, names: Sequence[str]) -> list[str]:
         violations.append("The text contains a semicolon. Split it into two sentences instead.")
     term = banned_term_in(mask_names(text, names))
     if term is not None:
-        violations.append(_banned_term_violation(term, text))
+        violations.append(_banned_term_violation(term, text, clock))
     competitor = _competitor_in(text)
     if competitor is not None:
         violations.append(f'The text names a competitor product ("{competitor}"). Remove it.')
-    violations += [_voice_violation(hit, text) for hit in voice_rule_hits(text, names)]
+    # The time frame rules read the text as written: they hold no name-sized words, and the sentence a
+    # hit names goes back to the writer as he wrote it.
+    hits = [*voice_rule_hits(text, names), *time_frame_hits(text, clock)]
+    violations += [_voice_violation(hit, text) for hit in hits]
     if _unframed_floor(text):
         violations.append(UNFRAMED_FLOOR_VIOLATION)
     return violations
@@ -326,7 +276,9 @@ def _validate(
     if not band[0] <= words <= band[1]:
         message = f"Word count {words} is outside the required {band[0]}-{band[1]} word band."
         return ValidationResult(False, (message,), BandFailure(words, band[0], band[1]))
-    violations = [*_copy_violations(trimmed, source.name_ledger), *_grounding_violations(trimmed, source)]
+    violations = [*_copy_violations(trimmed, source.name_ledger, source.clock), *_grounding_violations(trimmed, source)]
+    if page_number and not names_missed_weeks(trimmed, source.clock):
+        violations.append(missed_weeks_violation(source.clock))
     if tension and source.tension is not None and not _cites_tension(trimmed, source.tension):
         figure = js_string(round_half_up(source.tension, 1))
         violations.append(
@@ -373,18 +325,6 @@ def validate_capsule(body: str, facts: "PlayerFacts", size: str, *, asked_shorte
     band = CAPSULE_CONFIG.size(size)
     cap = overrun_cap(band.max_words) if asked_shorter else band.max_words
     return _validate(body, grounding_of(facts), (band.min_words, cap), tension=True, page_number=size == "full")
-
-
-def banned_phrases_in(violations: Sequence[str]) -> tuple[str, ...]:
-    """The exact banned words and phrases these violations found (voice rules and trading words)."""
-    found: list[str] = []
-    for violation in violations:
-        voice = _VOICE_RULE_VIOLATION.match(violation)
-        banned = _BANNED_TERM_VIOLATION.match(violation)
-        phrase = voice.group(2) if voice is not None else banned.group(1) if banned is not None else None
-        if phrase is not None and phrase.lower() not in (f.lower() for f in found):
-            found.append(phrase)
-    return tuple(found)
 
 
 def validate_narrative_slot(body: str, source: Grounding, max_words: int) -> ValidationResult:

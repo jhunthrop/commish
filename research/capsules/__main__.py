@@ -68,8 +68,9 @@ def _facts(engine: Engine, player_id: str, prompt: bool) -> int:
 def _write(engine: Engine, players: Sequence[str], count: int, spread: int) -> int:
     with httpx.Client() as http:
         gateway = _gateway(http)
-        written = write_chosen(engine, gateway, datetime.now(UTC), Choice(tuple(players), count, spread))
-    report = gate_written(engine, written)
+        now = datetime.now(UTC)
+        written = write_chosen(engine, gateway, now, Choice(tuple(players), count, spread))
+    report = gate_written(engine, written, now)
     for line in report:
         _out(line)
     return 0 if all(not w.findings for w in written) else 1

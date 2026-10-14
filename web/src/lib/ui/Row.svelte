@@ -263,13 +263,23 @@
 		}
 	}
 
-	@media (min-width: 1181px) and (max-width: 1439px) {
+	@media (min-width: 961px) and (max-width: 1439px) {
 		.games > .rng {
 			display: none;
 		}
 	}
 
-	/* The band's 32px mark track holds the disc alone: his place on your sheet is in its name. */
+	/* A 32px mark track holds the disc alone: his place on your sheet is in its name. */
+	@media (min-width: 961px) and (max-width: 1180px) {
+		.action :global(.place) {
+			display: none;
+		}
+
+		.action :global(.add) {
+			padding-left: 2px;
+		}
+	}
+
 	@media (min-width: 1181px) and (max-width: 1439px) {
 		.games > .action :global(.place) {
 			display: none;
@@ -277,6 +287,18 @@
 
 		.games > .action :global(.add) {
 			padding-left: 2px;
+		}
+	}
+
+	/* iPad landscape: tighter columns and a 32px face, so the tier chip keeps its room. */
+	@media (min-width: 1181px) and (max-width: 1253px) {
+		.games {
+			column-gap: 9px;
+		}
+
+		.games > .face :global(.face) {
+			width: 32px;
+			height: 32px;
 		}
 	}
 
@@ -316,7 +338,8 @@
 	}
 
 	@media (max-width: 960px) {
-		.rng {
+		.rng,
+		.action {
 			display: none;
 		}
 	}

@@ -244,3 +244,17 @@ void test('the account page goes on only to a path on this site', () => {
 	assert.equal(safeThen('\n//evil.example', origin), null);
 	assert.equal(safeThen(null, origin), null);
 });
+
+void test('a frozen week says it is not played yet until its first kickoff, then waits on the stat lines', () => {
+	const frozen: RecordWeek = {
+		week: 6,
+		status: 'frozen',
+		frozenAt: '2026-10-13T12:00:17.450Z',
+		frozenBy: '2026-10-14T04',
+		gradedAt: null,
+		population: 0,
+		lines: []
+	};
+	assert.equal(weekLines([frozen], [6])[0]?.text, 'frozen Oct 13, not played yet');
+	assert.equal(weekLines([frozen])[0]?.text, 'frozen Oct 13, waiting on the stat lines');
+});

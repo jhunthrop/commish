@@ -2,31 +2,51 @@
 
 The founder's rule: every non-stat sentence on a page comes from the writer, and a stock sentence
 across players is a defect. The run fails when
-- the board's unwritten pages pass `unwritten_share_max` (2%) of the board: a facts block (the
+- the board's unwritten pages pass the run's line (`CapsuleConfig.unwritten_line`: 2% before the
+  season's first kickoff, 3% from it on, the run's date deciding): a facts block (the
   fallback for a player the writer could not serve, `capsules.facts_block`), a row still on the
   oracle's template, or no row at all; or
 - any sentence of four words or more (`shared_sentence_min_words`) of a written capsule appears on
   two players' pages (compared normalized, as the repetition measures compare, across both sizes of
   every written read on the board). Shorter ones, "Draft him." and "Let him go.", are the
-  product's vocabulary, not stock prose.
+  product's vocabulary, not stock prose; or
+- never for six words in a row (`capsules.spans`, case folded, punctuation stripped, player and club
+  names breaking the run) on two or more pages (the live review's M1, as the coordinator ruled it):
+  those are counted, named and repaired within the budget, never a failure. A span the sheets'
+  labelled stats print (a label or a stat name copied word for word, `capsules.span_rules`) is
+  exempt. Spans read the narrative sentences too; the whole-sentence rule reads the two reads only.
+  Each page's shared spans are kept, joined where they overlap, for the repair's prompt.
 
 Phase D extends this gate (the page findings of `capsules.pull_figures`, the run's other gates);
 the nightly's capsule step runs it after the sweep.
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from types import MappingProxyType
 from typing import Final
 
 from sqlalchemy import Connection
 
-from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.config import CAPSULE_CONFIG, UnwrittenLine
 from research.capsules.facts.board import board_rows
 from research.capsules.facts.collect import universe_ids_for
+from research.capsules.facts.season_so_far import in_season
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.narrative import normalize_sentence, sentences_verbatim
+from research.capsules.span_rules import span_rules_for
+from research.capsules.spans import (
+    Runs,
+    SharedSpan,
+    SpanRules,
+    page_runs,
+    page_texts,
+    phrases_on_page,
+    shared_spans,
+)
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, stored_capsules_for
+from research.capsules.sweep import Subjects
 from research.season import PRODUCT_SEASON
 
 _EXAMPLES: Final = 5
@@ -46,7 +66,17 @@ class CapsuleGateResult:
     template: int
     missing: int
     shared: tuple[SharedSentence, ...]
-    share_max: float = CAPSULE_CONFIG.unwritten_share_max
+    # The run's unwritten line (`CapsuleConfig.unwritten_line`), required: a gate never assumes one.
+    line: UnwrittenLine
+    # Every span on two pages or more that no fact sheet prints, queued for the repair.
+    spans: tuple[SharedSpan, ...] = ()
+    # Each page that carries a shared span, to its shared spans joined where they overlap.
+    span_phrases: Mapping[str, tuple[str, ...]] = field(default_factory=lambda: MappingProxyType({}))
+    # The carriers eligible for a span rewrite (every one but the first in board order); the night
+    # rewrites as many as its budget reaches.
+    queued: int = 0
+    # Spans two pages or more share that the sheets' labelled stats print, so not judged.
+    exempt_spans: int = 0
 
     @property
     def unwritten_share(self) -> float:
@@ -55,17 +85,27 @@ class CapsuleGateResult:
 
     @property
     def ok(self) -> bool:
-        return self.unwritten_share <= self.share_max and not self.shared
+        # Spans are counted and repaired, never a failure (the coordinator's Lane 17 ruling 1).
+        return self.unwritten_share <= self.line.share_max and not self.shared
 
     def summary(self) -> str:
         verdict = "passed" if self.ok else "failed"
         line = (
             f"capsule gate: {verdict}, {self.board_players} board pages, {self.written} written, "
             f"{self.facts_blocks} facts blocks, {self.template} on the oracle's template, {self.missing} missing "
-            f"({self.unwritten_share:.1%} unwritten, the line {self.share_max:.0%}), "
-            f"{len(self.shared)} written sentences on two pages"
+            f"({self.unwritten_share:.1%} unwritten, the {self.line.voice} line {self.line.share_max:.0%}: "
+            f"{self.line.basis}), "
+            f"{len(self.shared)} written sentences on two pages, {len(self.spans)} six-word spans on two pages or "
+            f"more, never a failure ({len(self.span_phrases)} pages carry one, {self.queued} eligible for a span "
+            "rewrite: every carrier but the first, as the budget reaches them), "
+            f"{self.exempt_spans} sheet-label spans exempt"
         )
-        examples = "; ".join(f'"{s.sentence}" on {len(s.player_ids)} pages' for s in self.shared[:_EXAMPLES])
+        examples = "; ".join(
+            [
+                *(f'"{s.sentence}" on {len(s.player_ids)} pages' for s in self.shared[:_EXAMPLES]),
+                *(f'span "{s.span}" on {len(s.player_ids)} pages' for s in self.spans[:_EXAMPLES]),
+            ]
+        )
         return line if not examples else f"{line}: {examples}"
 
 
@@ -86,10 +126,27 @@ def shared_written_sentences(rows: Mapping[str, StoredCapsule]) -> tuple[SharedS
     return tuple(sorted(shared, key=lambda s: (-len(s.player_ids), s.sentence)))
 
 
-def judge_capsules(board_ids: Sequence[str], rows: Mapping[str, StoredCapsule]) -> CapsuleGateResult:
-    """The gate over the board's universe ids and their stored rows."""
+def _written_runs(rows: Mapping[str, StoredCapsule], names: frozenset[str]) -> dict[str, Runs]:
+    return {
+        pid: page_runs(page_texts(row.body_compact, row.body_full, row.narrative), names)
+        for pid, row in rows.items()
+        if row.source == WRITTEN_SOURCE
+    }
+
+
+def judge_capsules(
+    board_ids: Sequence[str], rows: Mapping[str, StoredCapsule], rules: SpanRules, line: UnwrittenLine
+) -> CapsuleGateResult:
+    """The gate over the board's universe ids and their stored rows, spans judged by `rules`, the
+    unwritten share held to `line`."""
     on_board = {pid: rows[pid] for pid in board_ids if pid in rows}
     sources = [row.source for row in on_board.values()]
+    runs = _written_runs(on_board, rules.names)
+    spans = shared_spans(runs, rules.exempt)
+    exempt = len(shared_spans(runs)) - len(spans)
+    held = frozenset(s.span for s in spans)
+    carriers = {pid for s in spans for pid in s.player_ids}
+    queued = repair_targets([s.player_ids for s in spans], board_ids)
     return CapsuleGateResult(
         board_players=len(board_ids),
         written=sources.count(WRITTEN_SOURCE),
@@ -97,6 +154,11 @@ def judge_capsules(board_ids: Sequence[str], rows: Mapping[str, StoredCapsule]) 
         template=len(sources) - sources.count(WRITTEN_SOURCE) - sources.count(FACTS_SOURCE),
         missing=len(board_ids) - len(on_board),
         shared=shared_written_sentences(on_board),
+        spans=spans,
+        span_phrases=MappingProxyType({pid: phrases_on_page(runs[pid], held) for pid in sorted(carriers)}),
+        queued=len(queued),
+        exempt_spans=exempt,
+        line=line,
     )
 
 
@@ -107,7 +169,25 @@ def board_universe_ids(conn: Connection, as_of: datetime) -> list[str]:
     return list(dict.fromkeys(universe[pid] for pid in provider_ids if pid in universe))
 
 
-def capsule_gate(conn: Connection, as_of: datetime) -> CapsuleGateResult:
+def repair_targets(holders: Sequence[tuple[str, ...]], board_order: Sequence[str]) -> list[str]:
+    """Every page but the first (in board order) of each shared sentence or span (`holders`, each one's
+    pages), each once, in board order: the first keeps it, so each pass strictly shrinks the set."""
+    place = {player_id: index for index, player_id in enumerate(board_order)}
+    rewrite: set[str] = set()
+    for player_ids in holders:
+        ordered = sorted(player_ids, key=lambda pid: place.get(pid, len(place)))
+        rewrite.update(ordered[1:])
+    return sorted(rewrite, key=lambda pid: place.get(pid, len(place)))
+
+
+def span_rules(conn: Connection, as_of: datetime, subjects_at: Subjects) -> SpanRules:
+    """The span rules for the board's sheets at `as_of`, read from the night's facts pass (`subjects_at`,
+    the step's `FactsPassMemo`): build once a night, they are fixed by the instant."""
+    return span_rules_for(conn, (subject.facts for subject in subjects_at(conn, as_of)))
+
+
+def capsule_gate(conn: Connection, as_of: datetime, rules: SpanRules) -> CapsuleGateResult:
     """The gate over the board as served at `as_of` (its pages keyed on the universe id)."""
     board_ids = board_universe_ids(conn, as_of)
-    return judge_capsules(board_ids, stored_capsules_for(conn, board_ids))
+    line = CAPSULE_CONFIG.unwritten_line(in_season=in_season(conn, PRODUCT_SEASON, as_of))
+    return judge_capsules(board_ids, stored_capsules_for(conn, board_ids), rules, line)
