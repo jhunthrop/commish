@@ -191,8 +191,7 @@ func traded(d sleeper.Draft, picks []sleeper.Pick) int {
 // mock draft's preset board.
 func basisWords(b boards.Board) string {
 	if b.Raw.Custom {
-		return "Your league's scoring, every rule applied exactly, on our " + b.Raw.Format.Words() +
-			" board's players and where drafters take them, valued for its roster."
+		return "Your league's scoring, valued for its roster. " + boards.CustomBasis(b.Raw.Format)
 	}
 	return "Our " + b.Raw.Format.Words() + " board, valued for this draft's roster."
 }

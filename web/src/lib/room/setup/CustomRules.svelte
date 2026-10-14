@@ -80,7 +80,7 @@
 			<p class="took">{importLine(result)}</p>
 			{#if result.dropped.length > 0}
 				<p class="note">
-					Your league also scores these, which our board leaves out or reads as noted: {listWords(
+					Your league also scores these, which our board leaves out: {listWords(
 						result.dropped
 					)}.
 				</p>

@@ -210,14 +210,22 @@ func (b Board) Byes() map[string]int {
 	return out
 }
 
+// CustomBasis says what a board for a league's own rules is built on, and
+// no more: the 21 rules we score (a rule the import left out is named as
+// left out on the setup page), the stored board whose players and draft
+// positions it takes, and kickers and defenses in draft order.
+func CustomBasis(f Format) string {
+	return fmt.Sprintf("Built under the 21 scoring rules you set, on our %s board's players and draft positions "+
+		"(the board closest to your points per catch). Kickers and defenses rank in draft order.", f.Words())
+}
+
 // Basis is the sentence that names what the numbers are: whose points,
 // over replacement for what league.
 func (b Board) Basis() string {
 	tail := fmt.Sprintf("over replacement for %d teams on this roster. Kickers and defenses carry no projection and sit where drafters take them.", b.teams)
 	if b.Raw.Custom {
-		return fmt.Sprintf("Your league's scoring. Points are our %d projections with every one of its rules applied exactly, "+
-			"built on our %s board's players and where drafters take them (the board closest to its points per catch), %s",
-			b.Raw.Season, b.Raw.Format.Words(), tail)
+		return fmt.Sprintf("Your league's scoring. Points are our %d projections over replacement for %d teams on this roster. "+
+			"%s", b.Raw.Season, b.teams, CustomBasis(b.Raw.Format))
 	}
 	ranked := ""
 	if b.RankedFor != "" {
