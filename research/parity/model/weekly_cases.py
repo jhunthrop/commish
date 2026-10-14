@@ -30,6 +30,7 @@ from research.model.instants import js_iso
 from research.model.weekly.fit_data import fit_weekly_priors, read_fit_data
 from research.model.weekly.inputs import ORACLE_READER, load_week, week_moment
 from research.model.weekly.model import WeeklyPriors, project_week, weekly_priors_from, weekly_priors_payload
+from research.model.weekly.teams import oracle_latest_teams
 from research.parity.model.compare import Diff, diff_rows
 from research.parity.model.outcome import CaseResult, Claim
 from research.parity.model.sides import OracleRun, run_oracle
@@ -55,7 +56,7 @@ def _port_lines(season: int, week: int, priors_of: Callable[[Any], WeeklyPriors]
     with engine.connect() as conn:
         at = week_moment(conn, season, week)
         data = load_week(conn, season, week, at, ORACLE_READER)
-        projections = project_week(data, priors_of(conn))
+        projections = project_week(data, priors_of(conn), teams_of=oracle_latest_teams)
     engine.dispose()
     return js_iso(at), {p.line.player_id: {name: getattr(p.line, name) for name in STAT_FIELDS} for p in projections}
 
@@ -88,7 +89,7 @@ def weekly_layers_2024() -> CaseResult:
             data = load_week(conn, 2024, week, week_moment(conn, 2024, week), ORACLE_READER)
             mine = {
                 p.line.player_id: {name: getattr(p.line, name) for name in STAT_FIELDS}
-                for p in project_week(data, priors)
+                for p in project_week(data, priors, teams_of=oracle_latest_teams)
             }
             oracle = run_oracle_weekly("layers", str(write_week(Path(scratch) / f"week-{week}.json", data)))
             if oracle.error is not None:

@@ -101,18 +101,20 @@ def contextualise_weekly_rates(  # noqa: PLR0913, PLR0917 - the oracle's own par
     season: int,
     week: int,
     team_context: TeamContext,
-    teams: TeamsOf,
     features: FeatureFlags,
     priors: GameContextPriors,
+    *,
+    teams_of: TeamsOf,
 ) -> dict[str, dict[str, float]]:
-    """`contextualiseRates` with the game-context group; the unshipped rate groups are refused."""
+    """`contextualiseRates` with the game-context group; the unshipped rate groups are refused. The
+    team rule is named by every caller (`weekly/teams.py`): the oracle's is season-blind."""
     wanted = [name for name in _UNPORTED_RATE_GROUPS if getattr(features, name)]
     if wanted:
         raise NotImplementedError(f"the weekly rate features {wanted} are not ported; the oracle never shipped them")
     if not features.game_context:
         return {player_id: dict(player_rates) for player_id, player_rates in rates.items()}
     metrics = index_team_metrics(team_context)
-    team_of = teams(team_context)
+    team_of = teams_of(team_context)
     matchups: dict[str, Matchup] = {}
     at = WeekRef(season, week)
     adjusted: dict[str, dict[str, float]] = {}

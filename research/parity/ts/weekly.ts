@@ -3,6 +3,7 @@
 //   DATABASE_URL=<dev copy> npx tsx research/parity/ts/weekly.ts project <season> <week> <asOfIso>
 //   npx tsx research/parity/ts/weekly.ts layers <input.json>
 //   npx tsx research/parity/ts/weekly.ts fit <input.json>
+//   DATABASE_URL=<dev copy> npx tsx research/parity/ts/weekly.ts fit-reads <season>...
 //
 // `project` is the oracle's own `replay` with its own `modelSource()` (the committed `FITTED_MODEL`
 // and `SHIPPED_FEATURES`): every read, the as-of gate and the composition are the oracle's. A
@@ -16,19 +17,24 @@
 // `fit` runs the oracle's four shipped fits (`fitOpportunityPriors`, `fitEfficiencyPriors`,
 // `fitSchemePriors`, `fitGameContextPriors`) on the inputs the port read and wrote to a JSON file,
 // so the comparison is of the fit's arithmetic on identical inputs. It prints the fitted priors.
+//
+// `fit-reads` is the oracle fit script's own reads (`projection-fit.ts`'s `usageForSeasons`,
+// `historyForSeasons`, `contextForSeasons`: every season read at the far future, no as-of gate),
+// printed whole so the port's `read_fit_data` can be compared against them row for row.
 import { readFileSync } from "node:fs";
 import { createDb } from "@research-ts/db/client";
 import type { Position, StatLine } from "@research-ts/domain/player";
 import { PPR_SCORING } from "@research-ts/domain/scoring";
 import { replay, type ProjectionInput, type ProjectionSource } from "@research-ts/projections/backtest";
-import type { SeasonStatLine } from "@research-ts/projections/lines";
+import { statLinesAsOf, type SeasonStatLine } from "@research-ts/projections/lines";
 import { fitGameContextPriors } from "@research-ts/projections/model/context-fit";
 import { fitEfficiencyPriors, fitOpportunityPriors } from "@research-ts/projections/model/fit";
 import { fitSchemePriors } from "@research-ts/projections/model/scheme-fit";
 import { modelProjection, modelSource } from "@research-ts/projections/model/source";
 import type { TeamContext } from "@research-ts/projections/team-context";
-import type { PlayerWeekTeam, TeamWeekObservation } from "@research-ts/projections/team-store";
-import type { PlayerWeekUsage } from "@research-ts/projections/usage";
+import { LAST_POSSIBLE_WEEK } from "@research-ts/projections/store";
+import { playerTeamsAsOf, teamObservationsAsOf, type PlayerWeekTeam, type TeamWeekObservation } from "@research-ts/projections/team-store";
+import { usageAsOf, type PlayerWeekUsage } from "@research-ts/projections/usage";
 
 const emit = (value: unknown): void => {
   process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -54,6 +60,30 @@ async function project(season: number, week: number, asOfIso: string): Promise<v
     await db.$client.end();
   }
   emit({ lines });
+}
+
+const FINAL = new Date("9999-12-31T00:00:00.000Z");
+
+async function fitReads(seasons: readonly number[]): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (url === undefined) throw new Error("fit-reads needs DATABASE_URL");
+  const db = createDb(url, { max: 2 });
+  const usage: PlayerWeekUsage[] = [];
+  const history: SeasonStatLine[] = [];
+  const playerTeams: PlayerWeekTeam[] = [];
+  const teamObservations: TeamWeekObservation[] = [];
+  try {
+    for (const season of seasons) {
+      const span = { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: FINAL } as const;
+      usage.push(...(await usageAsOf(db, span)));
+      history.push(...(await statLinesAsOf(db, span)));
+      playerTeams.push(...(await playerTeamsAsOf(db, span)));
+      teamObservations.push(...(await teamObservationsAsOf(db, span)));
+    }
+  } finally {
+    await db.$client.end();
+  }
+  emit({ usage, history, playerTeams, teamObservations });
 }
 
 interface InputFile {
@@ -122,10 +152,12 @@ async function main(): Promise<void> {
     await project(Number(first), Number(second), third);
   } else if (command === "layers" && first !== undefined) {
     layers(first);
+  } else if (command === "fit-reads" && first !== undefined) {
+    await fitReads(process.argv.slice(3).map(Number));
   } else if (command === "fit" && first !== undefined) {
     fit(first);
   } else {
-    throw new Error("usage: weekly.ts project <season> <week> <asOfIso> | layers <input.json> | fit <input.json>");
+    throw new Error("usage: weekly.ts project <season> <week> <asOfIso> | layers <input.json> | fit <input.json> | fit-reads <season>...");
   }
 }
 

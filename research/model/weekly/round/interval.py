@@ -51,18 +51,6 @@ class WeeklyInterval:
         }
 
 
-def interval_from(payload: Mapping[str, Any]) -> WeeklyInterval:
-    return WeeklyInterval(
-        {
-            key: Bucketed(
-                tuple(float(edge) for edge in cell["edges"]),
-                tuple((float(o[0]), float(o[1]), float(o[2])) for o in cell["offsets"]),
-            )
-            for key, cell in payload.items()
-        }
-    )
-
-
 def _cell(pairs: list[tuple[float, float]]) -> Bucketed:
     projected = np.array([p for p, _ in pairs])
     edges = tuple(float(e) for e in np.percentile(projected, EDGE_PERCENTILES))

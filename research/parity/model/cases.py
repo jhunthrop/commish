@@ -33,6 +33,7 @@ from research.parity.model.register_cases import (
 from research.parity.model.sides import run_oracle
 from research.parity.model.store import oracle_fits, scratch_pair_at, source_url
 from research.parity.model.weekly_cases import weekly_fit, weekly_layers_2024, weekly_projection_2025
+from research.parity.model.weekly_read_cases import weekly_fit_reads
 
 _LIVE_COUNT: Final = 100_000
 _LIVE_SEED: Final = 20261012
@@ -201,5 +202,11 @@ MODEL_CASES: Final = (
         weekly_layers_2024,
     ),
     ModelCase("weekly-fit", "the four shipped weekly fits on 2021-2022, oracle against port", True, weekly_fit),
+    ModelCase(
+        "weekly-fit-reads",
+        "the weekly fit's reads (usage, lines, club edges, team facts) on 2024-2025, oracle against port",
+        True,
+        weekly_fit_reads,
+    ),
 )
 MODEL_CASES_BY_NAME: Final = MappingProxyType({case.name: case for case in MODEL_CASES})

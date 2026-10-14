@@ -108,7 +108,7 @@ class ScoredWeek:
 def score_week(conn: Connection, season: int, week: int, arm: Arm) -> ScoredWeek:
     """One week's board under `arm`, with the benchmarks and the outcome beside each player."""
     data = load_week(conn, season, week, week_moment(conn, season, week), arm.reader)
-    projections = project_week(data, arm.priors, SHIPPED_FEATURES, arm.teams_of)
+    projections = project_week(data, arm.priors, SHIPPED_FEATURES, teams_of=arm.teams_of)
     adp = {row.player_id: row.rank for row in preseason_rankings_as_of(conn, season, ADP_SOURCE, data.as_of)}
     form = recent_form(data)
     actual = actual_points(conn, season, week, data.positions)

@@ -6,13 +6,14 @@ a recent-form value and a recorded line that week; every source is scored on tho
 Ranks are average ranks, highest points first. Formats other than PPR are reported, never gated.
 """
 
+import warnings
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
 import numpy as np
 
-from research.model.backtest import Observation, spearman
+from research.model.backtest import Observation, _average_ranks, spearman
 from research.model.weekly.round.scoring import FORMATS, SKILL_POSITIONS, ScoredRow
 
 MIN_WEEK_POPULATION: Final = 8
@@ -40,18 +41,9 @@ def ordering_population(rows: Sequence[ScoredRow]) -> list[ScoredRow]:
 
 
 def _average_ranks_desc(values: Sequence[float]) -> list[float]:
-    """Average ranks, 1 for the largest value."""
-    order = sorted(range(len(values)), key=lambda i: -values[i])
-    ranks = [0.0] * len(values)
-    start = 0
-    while start < len(order):
-        end = start
-        while end + 1 < len(order) and values[order[end + 1]] == values[order[start]]:
-            end += 1
-        for i in range(start, end + 1):
-            ranks[order[i]] = (start + end) / 2 + 1
-        start = end + 1
-    return ranks
+    """Average ranks, 1 for the largest value: the backtest's own ranker (the one Spearman's rho
+    uses) on the negated values, so the places-off ranks and the rho ranks cannot drift apart."""
+    return _average_ranks([-value for value in values])
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,7 +118,9 @@ def rho_difference(
     usable = int(np.sum(~np.isnan(deltas)))
     if usable == 0:
         return Difference(None, None, 0)
-    with np.errstate(invalid="ignore"):
+    with warnings.catch_warnings():
+        # A resample made only of weeks with no answer has no mean; it is dropped just below.
+        warnings.simplefilter("ignore", RuntimeWarning)
         boot = np.nanmean(deltas[boot_spec.draws], axis=1)
     boot = boot[~np.isnan(boot)]
     return Difference(float(np.nanmean(deltas)), float(np.percentile(boot, boot_spec.level)), usable)

@@ -18,7 +18,7 @@ from research.model.weekly.game_context import ContextElasticity, GameContextPri
 from research.model.weekly.inputs import WeeklyInput
 from research.model.weekly.opportunity import OpportunityPriors, PredictedOpportunity, predict_opportunity
 from research.model.weekly.scheme import FeatureFlags, SchemePriors, contextualise_opportunity
-from research.model.weekly.teams import TeamsOf, oracle_latest_teams
+from research.model.weekly.teams import TeamsOf
 
 SHIPPED_FEATURES: Final = FeatureFlags(
     line=False, scheme=True, redistribution=False, game_context=True, red_zone=False, target_depth=False, news=False
@@ -138,9 +138,12 @@ def project_week(
     data: WeeklyInput,
     priors: WeeklyPriors,
     features: FeatureFlags = SHIPPED_FEATURES,
-    teams_of: TeamsOf = oracle_latest_teams,
+    *,
+    teams_of: TeamsOf,
 ) -> list[WeeklyProjection]:
-    """`modelProjection`, keeping each player's two layers beside his line."""
+    """`modelProjection`, keeping each player's two layers beside his line. The team rule has no
+    default: `oracle_latest_teams` reproduces the oracle (parity), `latest_teams_by_season` is the
+    corrected rule every new caller should name (`weekly/teams.py`)."""
     _refuse_unshipped(features)
     opportunity = contextualise_opportunity(
         predict_opportunity(data.usage, data.season, data.week, data.positions, priors.opportunity),
@@ -164,9 +167,9 @@ def project_week(
         data.season,
         data.week,
         data.team_context,
-        teams_of,
         features,
         priors.game_context,
+        teams_of=teams_of,
     )
     projections: list[WeeklyProjection] = []
     for player_id, player in opportunity.items():

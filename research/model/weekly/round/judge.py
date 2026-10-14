@@ -1,19 +1,22 @@
 """THE ROUND, RUN: the fit, the interval, then the held-out weeks scored and every gate read.
 
 `fit_round` fits the four shipped groups on the fit seasons and the interval on the same seasons'
-scored weeks. `judge_round` builds every held-out week's board at its moment, scores it against the
+scored weeks, every regular-season week through 18 (`LAST_REGULAR_WEEK`), while the judgment reads
+only the weeks it was preregistered on (1-17). `judge_round` builds every held-out week's board at its moment, scores it against the
 two benchmarks and the outcome, and returns every preregistered number and every reported one. The
 store is only read; the isolation gate checks that by digest.
 """
 
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from types import MappingProxyType
 from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
 from research.model.arithmetic import Arithmetic
+from research.model.backtest import LAST_REGULAR_WEEK
 from research.model.reads.teams import kickoff_instants_by_week
 from research.model.weekly.fit_data import WeeklyFit, fit_weekly_priors, read_fit_data
 from research.model.weekly.inputs import ROUND_READER
@@ -54,7 +57,7 @@ class RoundFit:
 
 def _weeks_of(conn: Connection, season: int, weeks: Sequence[int] | None = None) -> list[int]:
     held = sorted(kickoff_instants_by_week(conn, season))
-    return [week for week in held if 1 <= week <= 18 and (weeks is None or week in weeks)]  # noqa: PLR2004
+    return [week for week in held if 1 <= week <= LAST_REGULAR_WEEK and (weeks is None or week in weeks)]
 
 
 def fit_round(conn: Connection, t: gates.Thresholds, arithmetic: Arithmetic) -> RoundFit:
@@ -72,7 +75,7 @@ def fit_round(conn: Connection, t: gates.Thresholds, arithmetic: Arithmetic) -> 
             weeks += 1
     interval = fit_interval(rows)
     done = time.monotonic()
-    seconds = {"read": read - started, "fit": fitted - read, "interval": done - fitted}
+    seconds = MappingProxyType({"read": read - started, "fit": fitted - read, "interval": done - fitted})
     return RoundFit(fit, interval, seconds, weeks)
 
 
@@ -91,9 +94,9 @@ def table_digests(conn: Connection) -> dict[str, str]:
 
 @dataclass(frozen=True, slots=True)
 class Judgment:
-    lines: list[gates.GateLine]
+    lines: tuple[gates.GateLine, ...]
     passed: bool
-    numbers: dict[str, Any]
+    numbers: Mapping[str, Any]
     seconds_per_week: float
     rows: int = field(default=0)
 
@@ -165,15 +168,11 @@ def judge_round(conn: Connection, t: gates.Thresholds, fitted: RoundFit, oracle_
         "weeks": weeks,
         "scored_rows": sum(1 for row in rows if row.actual is not None),
         "board_rows": len(rows),
-        "against_adp": {p: vars_of(d) for p, d in against_adp.items()},
-        "against_form": {p: vars_of(d) for p, d in against_form.items()},
-        "places": {bench: vars_of(d) for bench, d in places.items()},
-        "calibration": {key: vars_of(c) for key, c in calibrated.items()},
+        "against_adp": {p: asdict(d) for p, d in against_adp.items()},
+        "against_form": {p: asdict(d) for p, d in against_form.items()},
+        "places": {bench: asdict(d) for bench, d in places.items()},
+        "calibration": {key: asdict(c) for key, c in calibrated.items()},
         "digests": {"before": before, "after": after},
         "reported": _reported(rows, oracle_rows, weeks),
     }
-    return Judgment(lines, gates.verdict(lines), numbers, per_week, len(rows))
-
-
-def vars_of(value: Any) -> dict[str, Any]:
-    return {name: getattr(value, name) for name in value.__dataclass_fields__}
+    return Judgment(tuple(lines), gates.verdict(lines), MappingProxyType(numbers), per_week, len(rows))

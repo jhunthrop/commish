@@ -11,8 +11,9 @@ import argparse
 import json
 import sys
 from collections.abc import Sequence
+from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 from urllib.parse import urlparse
 
 from sqlalchemy import Engine, text
@@ -25,7 +26,7 @@ from research.model.arithmetic import ARM64_BOARDS, model_version
 from research.model.artifacts import read_artifact
 from research.model.weekly.model import weekly_priors_from, weekly_priors_payload
 from research.model.weekly.round import gates
-from research.model.weekly.round.judge import Judgment, RoundFit, fit_round, judge_round, vars_of
+from research.model.weekly.round.judge import Judgment, RoundFit, fit_round, judge_round
 from research.pipeline.http import LiveFetcher
 from research.pipeline.nflverse import ingest
 from research.pipeline.nflverse.client import NflverseClient
@@ -65,7 +66,12 @@ def _render(fitted: RoundFit, judged: Judgment) -> list[str]:
     return lines
 
 
-def _run(url: str, thresholds: gates.Thresholds, out: Path) -> int:
+# The one judgment's record. Its existence closes the judgment: the preregistration says a second
+# run against 2025 voids the record, so `judge` refuses unless told it is a marked rerun.
+JUDGMENT_RECORD: Final = Path(__file__).resolve().parents[4] / "docs/research/2026-10-13-weekly-projection-results.json"
+
+
+def _run(url: str, thresholds: gates.Thresholds, out: Path, rerun: bool = False) -> int:
     engine = _engine(url)
     with engine.connect() as conn:
         conn.execute(text("set transaction read only"))
@@ -80,7 +86,7 @@ def _run(url: str, thresholds: gates.Thresholds, out: Path) -> int:
         "model": "commish_weekly_v1",
         "model_version": model_version(),
         "arithmetic": ARM64_BOARDS.label,
-        "thresholds": vars_of(thresholds),
+        "thresholds": asdict(thresholds),
         "priors": {
             **weekly_priors_payload(fitted.fit.priors),
             "fitSeasons": list(thresholds.fit_seasons),
@@ -89,11 +95,12 @@ def _run(url: str, thresholds: gates.Thresholds, out: Path) -> int:
         "interval": fitted.interval.payload(),
         "fit_seconds": dict(fitted.seconds),
         "share_rmse": fitted.fit.share_rmse,
-        "gates": [vars_of(line) for line in judged.lines],
+        "gates": [asdict(line) for line in judged.lines],
         "passed": judged.passed,
-        "numbers": judged.numbers,
+        "numbers": dict(judged.numbers),
         "seconds_per_week": judged.seconds_per_week,
         "report": report,
+        "rerun": rerun,
     }
     out.write_text(json.dumps(payload, indent=1, default=str))
     return 0
@@ -109,11 +116,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         run = sub.add_parser(name)
         run.add_argument("--database", required=True)
         run.add_argument("--out", type=Path, required=True)
+        run.add_argument("--rerun", action="store_true", help="judge again, marked as a rerun that voids the record")
     args = parser.parse_args(argv)
     if args.command == "ingest-gap-season":
         return _ingest_gap_season(args.database, args.season)
-    thresholds = gates.DEVELOPMENT_CHECK if args.command == "dev-check" else gates.PREREGISTERED
-    return _run(args.database, thresholds, args.out)
+    judging = args.command == "judge"
+    if judging and JUDGMENT_RECORD.exists() and not args.rerun:
+        raise ConfigurationError(f"the 2025 judgment was taken once ({JUDGMENT_RECORD.name}); a rerun voids it")
+    thresholds = gates.PREREGISTERED if judging else gates.DEVELOPMENT_CHECK
+    return _run(args.database, thresholds, args.out, rerun=args.rerun)
 
 
 if __name__ == "__main__":
