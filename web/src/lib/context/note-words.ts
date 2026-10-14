@@ -19,7 +19,8 @@ export function leagueScores(league: ContextLeague): string {
 	return scoresSentence(league.scoring);
 }
 
-/** The same sentence for a scoring preset (the league page reads it off its sync). */
+/** The same sentence for a scoring preset: the league line's, and the league page's basis (which
+ * reads it here, loaded with the league, so no first load carries it). */
 export function scoresSentence(scoring: ContextLeague['scoring']): string {
 	return scoring === 'te_premium'
 		? 'Your league gives tight ends extra points per catch.'
@@ -28,7 +29,7 @@ export function scoresSentence(scoring: ContextLeague['scoring']): string {
 
 /** Where the line sends a Draft Pass holder for the league's exact board: its saved league's mock
  * (the setup with the league filled in), or the mock setup to enter its rules when no saved league
- * exists yet. */
+ * exists yet. note-line.ts turns it into an href. */
 export interface NoteLink {
 	words: string;
 	/** The saved league the mock opens on, null for the setup itself. */

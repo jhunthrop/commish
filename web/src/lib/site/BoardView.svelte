@@ -58,7 +58,7 @@
 		const league = siteContext.league;
 		const notes = siteContext.notes;
 		if (figures === null || league === null || notes === null) return null;
-		return notes.contextNote(
+		return notes.contextLine(
 			league,
 			figures,
 			siteContext.features.includes('custom_scoring'),

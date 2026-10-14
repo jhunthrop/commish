@@ -153,7 +153,14 @@
 	/** What every number on the page is, said once under the title: the scoring, the season's
 	 * figures, then the preseason board's. */
 	const basis = $derived(
-		board && sync ? leagueBasis(board.seasonScoring, board.seasonThrough, sync.scoring_like) : ''
+		board && sync && siteContext.notes
+			? leagueBasis(
+					board.seasonScoring,
+					board.seasonThrough,
+					sync.scoring_like,
+					siteContext.notes.scoresSentence
+				)
+			: ''
 	);
 </script>
 

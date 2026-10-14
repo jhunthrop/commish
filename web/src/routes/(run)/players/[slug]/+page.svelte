@@ -52,7 +52,7 @@
 	const note = $derived(
 		figures === null
 			? null
-			: (siteContext.notes?.contextNote(
+			: (siteContext.notes?.contextLine(
 					siteContext.league,
 					figures,
 					siteContext.features.includes('custom_scoring'),

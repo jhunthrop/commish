@@ -3,7 +3,6 @@
  * over the API's answer. */
 import { fixed, plural, signed } from '#lib/format/number.ts';
 import { midSentence } from '#lib/format/sentence.ts';
-import { scoresSentence } from '#lib/context/note-words.ts';
 import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
 import type { IndexSeason } from '#lib/run/schema.ts';
 import type { LeagueBoard, LeagueBoardPlayer } from './board.ts';
@@ -197,11 +196,13 @@ export function poolBasis(board: LeagueBoard): string {
  * never a lineup shape such as superflex), which figures are this season's and which are preseason,
  * and the league's own scoring in plain words when it differs: "PPR. This season's games and points
  * a game through week 5, beside our preseason proj and over repl. Your league gives tight ends extra
- * points per catch." No page promises the league's exact rules here. */
+ * points per catch." The league's sentence is note-words' scoresSentence, passed in. No page
+ * promises the league's exact rules here. */
 export function leagueBasis(
 	figuresScoring: string,
 	through: number,
-	scoringLike: ScoringPreset
+	scoringLike: ScoringPreset,
+	scoresSentence: (scoring: ScoringPreset) => string
 ): string {
 	const reach = through === 0 ? '' : ` through week ${String(through)}`;
 	const same =

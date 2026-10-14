@@ -13,7 +13,7 @@ import { sessionToken } from '#lib/api/session.ts';
 import type { components } from '#lib/api/types.ts';
 import { CONTEXT_KEY, LEAGUE_ATTR, LINES_KEY } from './boot.ts';
 import type { Marks } from './held-words.ts';
-import type * as NoteWords from './note-words.ts';
+import type * as NoteLine from './note-line.ts';
 import type { BoardFormat, ContextLeague } from './words.ts';
 
 type Account = components['schemas']['Account'];
@@ -53,9 +53,9 @@ class SiteContext {
 	features = $state<readonly Feature[]>([]);
 	/** The selected league's roster marks, null until read or with no league (held.ts). */
 	held = $state<Marks | null>(null);
-	/** The basis line's words (note-words.ts), loaded once a league is selected: a page with none
+	/** The basis line's words (note-line.ts), loaded once a league is selected: a page with none
 	 * prints no line and carries none of them. */
-	notes = $state<typeof NoteWords | null>(null);
+	notes = $state<typeof NoteLine | null>(null);
 	/** The league the rosters are, or are being read, for. */
 	heldFor: string | null = null;
 	/** The switch's menu is open: the bar's switch and the rail's Leagues open the one menu. */
@@ -160,15 +160,13 @@ class SiteContext {
 		this.leagues = leagues;
 		this.format = league ? league.format : format;
 		if (league && !this.notes) {
-			import('./note-words.ts')
+			import('./note-line.ts')
 				.then((module) => {
 					this.notes = module;
 				})
-				.catch(() => {
-					// A chunk that fails to load (a deploy between pages) leaves the line unsaid in its
-					// kept room, never a broken page or an unhandled rejection; the next page loads it again.
-					this.notes = null;
-				});
+				// A chunk that fails to load (a deploy between pages) leaves the line unsaid in its kept
+				// room, never an unhandled rejection; the next page loads it again.
+				.catch(() => undefined);
 		}
 		if (this.heldFor !== league?.id) {
 			this.held = null;
