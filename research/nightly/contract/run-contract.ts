@@ -76,7 +76,15 @@ await check('adp.json', () => web.adp());
 await check('record.json', () => web.record());
 await check('clubs.json', () => web.clubs());
 await check('schedule.json', () => web.schedule());
-await check('schedule.json', () => web.firstKickoff());
+// The run-wide loaders the build's pages call (fix round 3, R5): each holds the run to a rule no single
+// file carries (the season blocks' reach and format, the first kickoff, the default format).
+for (const name of ['firstKickoff', 'seasonUnderway', 'seasonReach', 'defaultFormat'] as const) {
+	if (typeof web[name] !== 'function') {
+		refusals.set(`missing ${name}`, `schema:run:the web reader exports no ${name}`);
+		continue;
+	}
+	await check('run', () => web[name]());
+}
 
 for (const line of refusals.values()) process.stdout.write(`${line}\n`);
 process.stdout.write(
