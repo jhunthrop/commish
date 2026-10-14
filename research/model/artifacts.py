@@ -3,6 +3,10 @@
 Ported from `research-ts/src/projections/model/artifacts.ts` (publish and read, a version is
 immutable) and extended to every fit the TypeScript still read from committed constants. The
 catalog pins one version of each; the board reads exactly the pinned versions.
+
+The table also holds the read cache's rows (`db.read_cache`), named `cache/<name>` and never in the
+catalog. They are derived results, not fits: a new version is written whenever a cached read is read
+again, and older versions of a cache name are deleted, which no fit's version ever is.
 """
 
 import hashlib

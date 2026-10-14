@@ -3,8 +3,10 @@ package boards
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -182,6 +184,8 @@ type Cache struct {
 	mu      sync.Mutex
 	entries map[Format]cached
 	loading map[Format]*sync.Mutex
+	// warned is set once a version read has failed and been logged.
+	warned atomic.Bool
 }
 
 type cached struct {
@@ -228,6 +232,11 @@ func (c *Cache) version(ctx context.Context, f Format) string {
 	}
 	version, err := v.Version(ctx, f)
 	if err != nil {
+		// Logged once a process: a broken version read would otherwise quietly
+		// bring back a full board read every TTL.
+		if c.warned.CompareAndSwap(false, true) {
+			slog.Warn("boards: the board version could not be read; reading boards in full", "format", f, "error", err)
+		}
 		return ""
 	}
 	return version
