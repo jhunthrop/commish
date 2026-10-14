@@ -1,4 +1,5 @@
-/** Connected host accounts (FFPC, read as the member) and paired devices, typed from the contract.
+/** Connected host accounts (FFPC and Yahoo, read as the member) and paired devices, typed from the
+ * contract.
  * The password goes to the API once, on connect, and is never read back: no route answers it. */
 import { PUBLIC_API_URL } from '$app/env/public';
 import { ApiError, apiClient } from '#lib/api/client.ts';
@@ -10,6 +11,8 @@ export type HostConnections = Schemas['HostConnections'];
 export type HostConnected = Schemas['HostConnected'];
 export type HostLeague = Schemas['HostLeague'];
 export type Device = Schemas['Device'];
+export type ConnectedHost = Schemas['ConnectedHost'];
+type Redirect = Schemas['Redirect'];
 
 /** What a pick of several FFPC leagues came to, said under the verb: a summary and each miss. */
 export interface PickAnswer {
@@ -31,6 +34,10 @@ export const hostsApi = {
 		}),
 	ffpcLeagues: () => client.call<HostLeague[]>('/hosts/ffpc/leagues'),
 	disconnectFFPC: () => client.call<null>('/hosts/ffpc', { method: 'DELETE' }),
+	/** Yahoo's authorize address, with a state bound to this account for ten minutes. */
+	connectYahoo: () => client.call<Redirect>('/hosts/yahoo/connect', { method: 'POST' }),
+	yahooLeagues: () => client.call<HostLeague[]>('/hosts/yahoo/leagues'),
+	disconnectYahoo: () => client.call<null>('/hosts/yahoo', { method: 'DELETE' }),
 	devices: () => client.call<Device[]>('/devices'),
 	pairCode: () => client.call<PairCode>('/devices/codes', { method: 'POST' }),
 	revokeDevice: (id: string) =>
@@ -49,6 +56,26 @@ export const FFPC_TERMS =
 /** Whether FFPC is open here (HOST_FFPC_ENABLED), from the hosts answer. */
 export function ffpcOpen(hosts: HostConnections): boolean {
 	return hosts.enabled.includes('ffpc');
+}
+
+/** Whether Yahoo is open here (HOST_YAHOO_ENABLED with the app's keys), from the hosts answer. */
+export function yahooOpen(hosts: HostConnections): boolean {
+	return hosts.enabled.includes('yahoo');
+}
+
+/** The account's connection to one host, if any. */
+export function connectionTo(
+	hosts: HostConnections,
+	host: ConnectedHost
+): HostConnection | undefined {
+	return hosts.connections.find((c) => c.host === host);
+}
+
+/** Open Yahoo's own sign-in in this tab: Yahoo sends the member back to the account page, which says
+ * how it went (yahooOutcome). */
+export async function goToYahoo(): Promise<void> {
+	const { url } = await hostsApi.connectYahoo();
+	window.location.assign(url);
 }
 
 /** Whether an answer says the FFPC connection needs a fresh sign-in (409). */

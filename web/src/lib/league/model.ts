@@ -18,7 +18,7 @@ import type {
 	RosterSpot
 } from './api.ts';
 import type { components } from '#lib/api/types.ts';
-import { SCORING_WORDS, hostWords } from './names.ts';
+import { SCORING_WORDS, hostWords, memberWords } from './names.ts';
 
 export { followedName, hostWords } from './names.ts';
 
@@ -28,12 +28,14 @@ type ScoringPreset = components['schemas']['ScoringPreset'];
  * minute whatever the number of viewers, so a faster page would only see the same read. */
 export const POLL_MS = 60_000;
 
-/** The hosts a league may come from here, as the attach page says it: FFPC only where it is open
- * (HOST_FFPC_ENABLED). */
-export function hostsLine(ffpcOn: boolean): string {
-	return ffpcOn
-		? 'Works with Sleeper leagues, public MyFantasyLeague leagues and FFPC leagues.'
-		: 'Works with Sleeper leagues and public MyFantasyLeague leagues.';
+/** The hosts a league may come from here, as the attach page says it: FFPC and Yahoo only where each
+ * is open (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED). */
+export function hostsLine(open: { readonly ffpc: boolean; readonly yahoo: boolean }): string {
+	const hosts = ['Sleeper leagues', 'public MyFantasyLeague leagues'];
+	if (open.ffpc) hosts.push('FFPC leagues');
+	if (open.yahoo) hosts.push('Yahoo leagues');
+	const last = hosts.pop() ?? '';
+	return `Works with ${hosts.join(', ')} and ${last}.`;
 }
 
 const SECOND = 1;
@@ -54,7 +56,9 @@ export function readLine(sync: LeagueSync, now: Date): string {
 	const host = hostWords(sync.host);
 	const read = `Read from ${host} ${agoWords(age)}.`;
 	const last = `This is our last read, ${agoWords(age)}.`;
-	if (sync.host_signed_out) return `No one in this league is signed in to ${host}. ${last}`;
+	if (sync.host_signed_out) {
+		return `No one in this league is ${memberWords(sync.host)} ${host}. ${last}`;
+	}
 	if (sync.host_failed) return `${host} is not answering. ${last}`;
 	if (sync.host_stale_seconds > 0) return `${read} Reading again.`;
 	return read;

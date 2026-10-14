@@ -1097,7 +1097,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** The hosts connecting is open for here (HOST_FFPC_ENABLED), and the hosts the account is connected to, each with its state and when it was last read. No credential is ever answered. Signed out it answers the switches with no connections: a switch is not account data. */
+		/** The hosts connecting is open for here (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED, each with the credentials key present), and the hosts the account is connected to, each with its state and when it was last read. No credential is ever answered. Signed out it answers the switches with no connections: a switch is not account data. */
 		get: operations['listHostConnections'];
 		put?: never;
 		post?: never;
@@ -1153,6 +1153,74 @@ export interface paths {
 		post?: never;
 		/** Disconnect FFPC. The kept sign-in and session are deleted at once; leagues read from FFPC stop updating. */
 		delete: operations['disconnectFFPC'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/yahoo/connect': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Start connecting Yahoo: answers Yahoo's authorize address for the member to open, carrying a state bound to the account that expires in ten minutes, one use, and a PKCE S256 challenge. The permission Yahoo shows is Fantasy Sports, read only. 5 an hour an account. 503 when Yahoo is not open here. */
+		post: operations['connectYahoo'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/yahoo/callback': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** Yahoo returns here. The state must be one this account started in the last ten minutes, and the browser must be signed in as that account. The code is exchanged for Yahoo's tokens, which are kept envelope encrypted. Always redirects to the site's account page with yahoo=connected, or yahoo=refused and why (denied, expired, signed_out, failed, off), never anywhere else. */
+		get: operations['yahooCallback'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/yahoo/leagues': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The member's Yahoo football leagues for the current season, read from Yahoo as them, each with its size, its scoring type and whether the account follows it already. 404 when not connected; 409 when Yahoo refused the kept token and the member connects again. */
+		get: operations['yahooLeagues'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/yahoo': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post?: never;
+		/** Disconnect Yahoo. The kept tokens are deleted at once; leagues read from Yahoo keep their last read, shown as stale. */
+		delete: operations['disconnectYahoo'];
 		options?: never;
 		head?: never;
 		patch?: never;
@@ -2071,7 +2139,7 @@ export interface components {
 		 * @description the host a league runs on, named as a mechanism
 		 * @enum {string}
 		 */
-		LeagueHost: 'sleeper' | 'mfl' | 'ffpc';
+		LeagueHost: 'sleeper' | 'mfl' | 'ffpc' | 'yahoo';
 		AttachPreviewInput: {
 			host?: components['schemas']['LeagueHost'];
 			/** @description the league link as pasted */
@@ -2294,9 +2362,9 @@ export interface components {
 		 * @description a host the member connects their own account on, named as a mechanism
 		 * @enum {string}
 		 */
-		ConnectedHost: 'ffpc';
+		ConnectedHost: 'ffpc' | 'yahoo';
 		/**
-		 * @description connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did not mend it; the member signs in again on our form
+		 * @description connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, or a Yahoo refresh Yahoo refused); the member connects again
 		 * @enum {string}
 		 */
 		HostConnectionStatus: 'connected' | 'signed_out';
@@ -2325,8 +2393,14 @@ export interface components {
 			league_id: string;
 			name: string;
 			team_name: string;
-			/** @description the team's record as FFPC writes it, 2 - 3 */
+			/** @description the team's record as the host writes it (FFPC 2 - 3), empty when the list does not carry it */
 			record: string;
+			/** @description the league's team count */
+			teams?: number;
+			/** @description the league's scoring type in our words: points, categories, best ball */
+			scoring_type?: string;
+			/** @description whether the account follows the league already */
+			attached?: boolean;
 		};
 		HostConnected: {
 			connection: components['schemas']['HostConnection'];
@@ -3891,6 +3965,85 @@ export interface operations {
 		};
 	};
 	disconnectFFPC: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['EmptyResponse'];
+			404: components['responses']['ErrorResponse'];
+		};
+	};
+	connectYahoo: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the authorize address */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['Redirect'];
+					};
+				};
+			};
+			429: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	yahooCallback: {
+		parameters: {
+			query?: {
+				code?: string;
+				state?: string;
+				error?: string;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description to the site's account page with the outcome */
+			302: {
+				headers: Record<string, unknown>;
+				content?: never;
+			};
+		};
+	};
+	yahooLeagues: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the leagues */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['HostLeague'][];
+					};
+				};
+			};
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	disconnectYahoo: {
 		parameters: {
 			query?: never;
 			header?: never;
