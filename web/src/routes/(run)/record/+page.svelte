@@ -3,7 +3,13 @@
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { SCORING_WORDS } from '#lib/league/names.ts';
 	import { fixed, plural } from '#lib/format/number.ts';
-	import { allLine, recordHeadline, weekLines, type WeekLine } from '#lib/run/record.ts';
+	import {
+		allLine,
+		rankAgreement,
+		recordHeadline,
+		weekLines,
+		type WeekLine
+	} from '#lib/run/record.ts';
 	import type { Score } from '#lib/run/schema.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
@@ -45,7 +51,7 @@
 		const adp = line.adp.agreement === null ? '' : `, ADP ${fixed(line.adp.agreement, 2)}`;
 		return {
 			lead,
-			text: `${text}. Our ${stat.agreement} over ${plural(line.ours.graded, 'player')}${adp}`,
+			text: `${text}. Our ${rankAgreement(record)} over ${plural(line.ours.graded, 'player')}${adp}`,
 			figure: fixed(line.ours.agreement, 2)
 		};
 	}
@@ -80,7 +86,7 @@
 		{#if record.toDate.length > 0}
 			<section aria-label="By position">
 				<Table
-					caption="By position, every graded week: {stat.agreement}, and {stat.placesOff}"
+					caption="By position, every graded week: {rankAgreement(record)}, and {stat.placesOff}"
 					showCaption
 					columns={positionColumns}
 				>

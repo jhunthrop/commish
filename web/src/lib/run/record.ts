@@ -34,8 +34,16 @@ function weekSpan(weeks: readonly RecordWeek[]): string {
 	return first === last ? `week ${String(first)}` : `weeks ${String(first)} to ${String(last)}`;
 }
 
-/** Graded: our agreement with the finish over every graded week, with the span and the players it
- * counts, and ADP's beside it. Not yet: how many of the frozen weeks are graded, said plainly. */
+/** The agreement statistic named as a rank figure: "rank agreement with the finish". */
+export function rankAgreement(record: RunRecord): string {
+	return `rank ${record.statistic.agreement}`;
+}
+
+/** The agreement's scale, said inside its label wherever the headline number prints. */
+const AGREEMENT_SCALE = 'where 1 is a perfect order';
+
+/** Graded: our rank agreement with the finish over every graded week, its scale, the span and the
+ * players it counts, and ADP's beside it. Not yet: how many of the frozen weeks are graded. */
 export function recordHeadline(record: RunRecord): RecordHeadline {
 	const graded = gradedWeeks(record);
 	const overall = allLine(record.toDate);
@@ -45,7 +53,7 @@ export function recordHeadline(record: RunRecord): RecordHeadline {
 		const adpPart = adp === null ? '' : `. ADP ${fixed(adp, 2)} on the same players`;
 		return {
 			value: fixed(agreement, 2),
-			caption: `our ${record.statistic.agreement}, ${weekSpan(graded)}, ${plural(overall.ours.graded, 'player')}${adpPart}`,
+			caption: `${rankAgreement(record)}, ${AGREEMENT_SCALE}. Ours over ${weekSpan(graded)} and ${plural(overall.ours.graded, 'player')}${adpPart}`,
 			graded: true
 		};
 	}
