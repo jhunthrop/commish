@@ -188,7 +188,10 @@ function poolOrder(a: LeagueBoardPlayer, b: LeagueBoardPlayer): number {
 /** The waiver pool: our board without every player a team in the league holds, ranked as
  * poolBasis says. */
 export function poolRows(board: LeagueBoard, sync: LeagueSync): readonly LeagueBoardPlayer[] {
-	const held = new Set(Object.keys(sync.held_by));
+	// An API from before held_by omits it and still names the rostered ids: read those then.
+	const byId = sync.held_by as LeagueSync['held_by'] | undefined;
+	// eslint-disable-next-line @typescript-eslint/no-deprecated -- the deploy window's fallback, removed with the field.
+	const held = new Set(byId === undefined ? sync.rostered : Object.keys(byId));
 	const pool = board.players.filter((p) => !held.has(p.id));
 	return seasonStarted(board) ? pool.toSorted(poolOrder) : pool;
 }

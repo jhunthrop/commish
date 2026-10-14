@@ -36,9 +36,9 @@
 		aria-expanded={siteContext.open}
 		aria-controls={MENU_ID}
 		aria-label="{label}, your league and scoring"
+		title={label}
 		onclick={() => (siteContext.open = !siteContext.open)}
 		onpointerenter={preload}
-		onfocus={preload}
 	>
 		<span class="mark"><Icon name="league" size={18} /></span>
 		<span class="words">{label}</span>

@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
-	import { contextLine } from '#lib/context/follow.svelte.ts';
+	import { contextLine } from '#lib/context/context-format.ts';
 	import { contextNote } from '#lib/context/words.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { draftersGap } from '#lib/format/draft.ts';

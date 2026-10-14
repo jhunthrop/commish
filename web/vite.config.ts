@@ -13,10 +13,10 @@ const PRERENDER_CONCURRENCY = 8;
 const ROW_PARTS =
 	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|RangeBar|AdpCell|SheetMark|HeldMark)\.|site[\\/]RowSheetMark\.)/;
 /** The board and ADP pages' own parts: the views, the tier strip, the rail's jump list and toggles,
- * the scoring chip that opens the league switch, the chips, and a missing format's page. One file for
- * those pages. */
+ * the scoring chip that opens the league switch and the follow of its format, the chips, and a missing
+ * format's page. One file for those pages. */
 const BOARD_PARTS =
-	/[\\/]src[\\/]lib[\\/](ui[\\/](TierStrip|TierJump|Toggle|Chip|ChipGroup|chips|FilterBar)\.|site[\\/](BoardView|BoardPageView|AdpView|AbsentFormatView|absent)\.|context[\\/]ScoringChoice\.)/;
+	/[\\/]src[\\/]lib[\\/](ui[\\/](TierStrip|TierJump|Toggle|Chip|ChipGroup|chips|FilterBar)\.|site[\\/](BoardView|BoardPageView|AdpView|AbsentFormatView|absent)\.|context[\\/](ScoringChoice|follow)\.)/;
 /** What only the user pages run: the mock room and its parts, the account, the pass and the live
  * draft companion, the request API client and the sheet's store. A nightly page never loads any of
  * it with the page; the sheet arrives on a reader's first intent, the rest only on the pages that

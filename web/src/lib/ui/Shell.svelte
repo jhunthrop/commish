@@ -3,8 +3,6 @@
 	import { page } from '$app/state';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import LeagueSwitch from '#lib/context/LeagueSwitch.svelte';
-	import { contextFormatId } from '#lib/context/follow.svelte.ts';
-	import { resolve } from '$app/paths';
 	import Icon from './Icon.svelte';
 	import Stamp from './Stamp.svelte';
 	import {
@@ -31,22 +29,15 @@
 		 * theme switch lives in the account room at every width, so the bar holds only the league
 		 * switch, the account, the verb and search. */
 		tail?: Snippet;
-		/** The formats the page's run carries, by run id: the rail's Board opens in the context's
-		 * format when the run carries it. A page with no run leaves Board on the default board. */
-		boardFormats?: readonly string[];
 		children: Snippet;
 	}
 
-	let { title, stamp, active, search, tail, boardFormats = [], children }: Props = $props();
+	let { title, stamp, active, search, tail, children }: Props = $props();
 
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
-	// The site's context: the session's copy at once, then /me.
+	// The site's context: the session's copy at once, then /me. The rail's Board (/board, which
+	// names no format) opens in the context's format by itself (follow.svelte.ts).
 	onMount(() => void siteContext.load());
-	/** Board opens in the context's format, so the rail's tap lands on the board it means. */
-	const boardHref = $derived.by(() => {
-		const id = contextFormatId(boardFormats);
-		return id === null ? null : resolve('/(run)/board/[format]', { format: id });
-	});
 
 	/** Leagues opens the switch's menu in place of its page, which stays the way without script. */
 	function openLeagues(event: MouseEvent): void {
@@ -59,9 +50,10 @@
 	<a
 		class="item"
 		class:wide-only={item.wideOnly}
-		href={item.section === 'board' && boardHref !== null ? boardHref : item.href}
+		href={item.href}
 		aria-current={item.section === current ? 'page' : undefined}
 		data-opens-leagues={item.opensLeagues ? '' : undefined}
+		role={item.opensLeagues ? 'button' : undefined}
 		aria-expanded={item.opensLeagues ? siteContext.open : undefined}
 		onclick={item.opensLeagues ? openLeagues : undefined}
 	>

@@ -60,22 +60,24 @@
 	let boardFailed = $state(false);
 	let refreshing = $state(false);
 	let now = $state(new Date());
-	/** This page has made its league the context: once, when /me first answers. After that, a switch
-	 * to another league opens that league's page. */
-	let adopted = $state(false);
+	/** The switch's choices once this page made its league the context (when /me first answers),
+	 * null before. Only a later choice made in the switch opens another league's page: a refused
+	 * selection stays here, its sentence in the switch. */
+	let adoptedAt = $state<number | null>(null);
 
 	onMount(() => {
-		void siteContext.load().then(() => {
+		void siteContext.load().then(async () => {
 			if (siteContext.league?.id !== id && siteContext.leagues.some((l) => l.id === id)) {
-				void choose({ league: id });
+				await choose({ league: id });
 			}
-			adopted = true;
+			adoptedAt = siteContext.choices;
 		});
 	});
 
 	$effect(() => {
 		const selected = siteContext.league?.id ?? null;
-		if (adopted && selected !== null && selected !== id) void goto(links.league(selected));
+		const switched = adoptedAt !== null && siteContext.choices !== adoptedAt;
+		if (switched && selected !== null && selected !== id) void goto(links.league(selected));
 	});
 
 	function take(answer: LeagueSync): void {

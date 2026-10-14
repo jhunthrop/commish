@@ -179,8 +179,9 @@ async function measureSwitch(): Promise<void> {
 		await settle(page);
 		const league = await read();
 		await openSwitch(page);
-		await page.locator(MENU).getByRole('button', { name: 'Half PPR' }).click();
-		await page.locator(SWITCH).getByText('Half PPR').waitFor();
+		// The menu offers the boards the run carries: the stand-in carries PPR alone.
+		await page.locator(MENU).getByRole('button', { name: 'PPR', exact: true }).click();
+		await page.locator(SWITCH).getByText('PPR', { exact: true }).waitFor();
 		await settle(page);
 		const format = await read();
 		process.stdout.write(

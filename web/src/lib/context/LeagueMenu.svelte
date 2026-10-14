@@ -1,18 +1,19 @@
 <script lang="ts">
 	import { PUBLIC_API_URL } from '$app/env/public';
+	import { onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { hasFeature } from '#lib/account/features.ts';
 	import { apiClient } from '#lib/api/client.ts';
 	import OneLeagueFree from '#lib/league/OneLeagueFree.svelte';
 	import { links } from '#lib/site/links.ts';
-	import { FORMAT_LABELS } from '#lib/sheet/format.ts';
 	import Label from '#lib/ui/Label.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import { choose, switchProblem } from './choose.svelte.ts';
 	import { siteContext } from './context.svelte.ts';
-	import { CONTEXT_FORMATS, leagueLine } from './menu-words.ts';
+	import { leagueLine } from './menu-words.ts';
+	import { runBoards, type RunBoard } from './run-boards.ts';
 	import { DEFAULT_CONTEXT_FORMAT, leagueName } from './words.ts';
 
 	/** The switch's menu: every league the account follows, its host and scoring in words, one tap
@@ -41,6 +42,15 @@
 		siteContext.open = false;
 		document.querySelector<HTMLElement>('[aria-controls="league-menu"]')?.focus();
 	}
+
+	/** The boards the run carries, offered with no league; none until they load. */
+	let boards = $state<readonly RunBoard[]>([]);
+	let boardsFailed = $state(false);
+	onMount(() => {
+		runBoards()
+			.then((loaded) => (boards = loaded))
+			.catch(() => (boardsFailed = true));
+	});
 
 	const signInHref = $derived(apiClient(PUBLIC_API_URL).signInUrl(page.url.pathname));
 	const many = $derived(hasFeature(siteContext.features, 'many_leagues'));
@@ -76,15 +86,17 @@
 		<!-- The menu's own choices, not the page chips: the board chunk stays off every page that only
 		     opens the switch, and the page's styles keep their place in its first paint. -->
 		<div class="formats-row" role="group" aria-label="Scoring">
-			{#each CONTEXT_FORMATS as format (format)}
+			{#each boards as board (board.format)}
 				<button
 					type="button"
 					class="choice"
-					aria-pressed={format === noLeagueFormat}
-					onclick={() => void choose({ format })}>{FORMAT_LABELS[format]}</button
+					aria-pressed={board.format === noLeagueFormat}
+					onclick={() => void choose({ format: board.format })}>{board.label}</button
 				>
 			{/each}
 		</div>
+		{#if boardsFailed}<ProblemLine>Our boards did not load. Reopen this in a moment.</ProblemLine
+			>{/if}
 	</section>
 
 	{#if switchProblem.text}<ProblemLine>{switchProblem.text}</ProblemLine>{/if}

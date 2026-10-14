@@ -1,10 +1,7 @@
-/** What the switch's menu lists, apart from words.ts so a page carries these only once the menu is
- * opened: the formats with no league, and each league's line under its name. */
+/** What the switch's menu says of each league, apart from words.ts so a page carries it only once
+ * the menu is opened. */
 import { SCORING_WORDS, hostWords } from '#lib/league/names.ts';
-import type { ContextFormat, ContextLeague } from './words.ts';
-
-/** The formats the switch offers with no league, in the order it lists them. */
-export const CONTEXT_FORMATS: readonly ContextFormat[] = ['ppr', 'half_ppr', 'standard'];
+import type { ContextLeague } from './words.ts';
 
 /** A league's line under its name in the switch: its host and its scoring, "FFPC, TE premium", and
  * the lineup when it reads on its own board, "Sleeper, half PPR, superflex". */

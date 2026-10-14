@@ -8,11 +8,10 @@ import { FORMAT_LABELS } from '#lib/sheet/format.ts';
 
 type Schemas = components['schemas'];
 export type ContextLeague = Schemas['ContextLeague'];
-export type ContextFormat = Schemas['ContextFormat'];
 export type BoardFormat = Schemas['BoardFormat'];
 
 /** The format every page opens in when the context names none: the run's default board. */
-export const DEFAULT_CONTEXT_FORMAT: ContextFormat = 'ppr';
+export const DEFAULT_CONTEXT_FORMAT: BoardFormat = 'ppr';
 
 /** A followed league's name, or its host's when its read has none yet. */
 export const leagueName = followedName;
@@ -33,17 +32,20 @@ export type FiguresSubject = 'This board is' | 'These figures are';
 
 /** The page's one line about the league, null with no league selected. The figures' scoring names
  * its basis against the league's: the same, the nearest preset until exact rules arrive with the
- * Draft Pass (TE premium), or a format this run does not carry. */
+ * Draft Pass (TE premium), a format this run does not carry, or (a link that named another board
+ * the run carries) simply what this board is. */
 export function contextNote(
 	league: ContextLeague | null,
 	figures: BoardFormat,
-	subject: FiguresSubject = 'This board is'
+	subject: FiguresSubject = 'This board is',
+	leagueBoardOnRun = false
 ): string | null {
 	if (!league) return null;
 	const scoring = SCORING_WORDS[league.scoring];
 	const scores = `Your league scores ${scoring}.`;
 	const figuresAre = `${subject} ${figuresWords(figures)}`;
 	if (league.format !== figures) {
+		if (leagueBoardOnRun) return `${scores} ${figuresAre}.`;
 		const lower = figuresAre.charAt(0).toLowerCase() + figuresAre.slice(1);
 		return `${scores} This run has no ${figuresWords(league.format)} board, so ${lower}.`;
 	}

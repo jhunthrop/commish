@@ -1,22 +1,27 @@
 /**
  * The site's context (founder ruling 2026-10-13: the league is the site's context): the selected
  * league, or a format with no league. One store, one reader. Signed in, /me answers it and
- * PUT /me/league sets it; signed out, it is a format this browser chose. The session keeps a copy
- * (boot.ts), so the shell's switch and the pages read it before /me answers. Every page reads the
- * context from here and nowhere else: the board opens in its format, rows mark who holds a player
- * (the rosters arrive through held.ts, loaded only with a league selected).
+ * PUT /me/league sets it (choose.svelte.ts); signed out, it is a format this browser chose. The
+ * session keeps a copy (boot.ts), tied to the session that wrote it, so the shell's switch and the
+ * pages read it before /me answers and no other session ever does. Every page reads the context
+ * from here and nowhere else: the board opens in its format, rows mark who holds a player (the
+ * rosters arrive through held.ts, loaded only with a league selected).
  */
 import { PUBLIC_API_URL } from '$app/env/public';
-import { apiClient, hasSessionCookie } from '#lib/api/client.ts';
+import { apiClient } from '#lib/api/client.ts';
+import { sessionToken } from '#lib/api/session.ts';
 import type { components } from '#lib/api/types.ts';
-import { CONTEXT_KEY, LEAGUE_ATTR, LINES_KEY, ONE_PHONE_LINE } from './boot.ts';
-import { contextNote, type BoardFormat, type ContextLeague, type Held } from './words.ts';
+import { CONTEXT_KEY, LEAGUE_ATTR, LINES_KEY } from './boot.ts';
+import type { BoardFormat, ContextLeague, Held } from './words.ts';
 
 type Account = components['schemas']['Account'];
 type Feature = components['schemas']['Feature'];
 
-/** What the session keeps of the context. */
+/** What the browser keeps of the context, with the session it is for (null: signed out, a format
+ * this browser chose and never a league) and the account /me named. */
 interface Kept {
+	session: string | null;
+	account: string | null;
 	league: ContextLeague | null;
 	leagues: readonly ContextLeague[];
 	format: BoardFormat | null;
@@ -24,10 +29,11 @@ interface Kept {
 
 const client = apiClient(PUBLIC_API_URL);
 
-/** The lines a league's basis line takes on a phone, 0 with no league. */
+/** The lines a league's basis line takes on a phone, 0 with no league: two for the long sentences
+ * (TE premium's Draft Pass line, a lineup, a board other than PPR the run may lack), else one. */
 function linesFor(league: ContextLeague | null): 0 | 1 | 2 {
 	if (!league) return 0;
-	return (contextNote(league, league.format)?.length ?? 0) > ONE_PHONE_LINE ? 2 : 1;
+	return league.scoring === 'te_premium' || league.format !== 'ppr' ? 2 : 1;
 }
 
 class SiteContext {
@@ -47,9 +53,14 @@ class SiteContext {
 	heldFor: string | null = null;
 	/** The switch's menu is open: the bar's switch and the rail's Leagues open the one menu. */
 	open = $state(false);
+	/** How many choices the switch has made in this page load: a format page follows the context
+	 * only after one (follow.svelte.ts), and a choice's answer counts only while it is the latest. */
+	choices = $state(0);
 
 	#asked: Promise<void> | null = null;
 	#heldWanted = false;
+	#session: string | null = null;
+	#account: string | null = null;
 
 	/** Reads the session's copy, then /me, the first time any page asks in this page load. */
 	load(): Promise<void> {
@@ -57,29 +68,41 @@ class SiteContext {
 		return this.#asked;
 	}
 
-	async #start(): Promise<void> {
-		this.signedIn = hasSessionCookie();
+	/** The kept copy when this session (or, signed out, this browser) wrote it; null otherwise. */
+	#copy(): Kept | null {
 		try {
 			const kept = JSON.parse(sessionStorage.getItem(CONTEXT_KEY) ?? 'null') as Kept | null;
-			if (kept && this.signedIn) this.#show(kept.league, kept.leagues, kept.format);
-			else if (kept) this.format = kept.format;
+			return kept?.session === this.#session ? kept : null;
 		} catch {
-			// No copy to read: /me answers.
+			return null;
+		}
+	}
+
+	async #start(): Promise<void> {
+		this.#session = sessionToken();
+		this.signedIn = this.#session !== null;
+		const kept = this.#copy();
+		if (kept) {
+			this.#account = kept.account;
+			this.#show(kept.league, kept.leagues, kept.format);
 		}
 		await this.refresh();
 	}
 
 	/** Reads /me again: after the account's leagues change. */
 	async refresh(): Promise<void> {
-		this.signedIn = hasSessionCookie();
+		this.#session = sessionToken();
+		this.signedIn = this.#session !== null;
 		if (!this.signedIn) {
-			this.#show(null, [], this.format);
+			this.#account = null;
+			this.#show(null, [], this.#copy()?.format ?? null);
 			this.features = [];
 		} else {
 			try {
-				this.#take(await client.call<Account>('/me'));
+				this.take(await client.call<Account>('/me'));
+				return;
 			} catch {
-				// The session's copy, or nothing, stands: the pages read the format they were built in.
+				// The session's own copy, or nothing, stands: the pages read the format they were built in.
 				this.features = [];
 			}
 		}
@@ -93,9 +116,18 @@ class SiteContext {
 		this.#keep();
 	}
 
-	/** Takes an Account answer's context: /me, or the answer to a choice. */
+	/** Takes an Account answer's context: /me, or the answer to a choice. An answer for another
+	 * account than the one shown drops everything of the one shown first. */
 	take(me: Account): void {
-		this.#take(me);
+		if (this.#account !== me.id) {
+			this.held = null;
+			this.heldFor = null;
+			this.#account = me.id;
+		}
+		this.features = me.features;
+		// An API from before the context answers neither; read it as no league.
+		const leagues = Array.isArray(me.leagues) ? me.leagues : [];
+		this.#show(me.league ?? null, leagues, me.format ?? null);
 		this.#keep();
 	}
 
@@ -127,16 +159,15 @@ class SiteContext {
 		this.#readHeld();
 	}
 
-	#take(me: Account): void {
-		this.features = me.features;
-		// An API from before the context answers neither; read it as no league.
-		const leagues = Array.isArray(me.leagues) ? me.leagues : [];
-		this.#show(me.league ?? null, leagues, me.format ?? null);
-	}
-
 	#keep(): void {
 		const lines = this.signedIn ? linesFor(this.league) : 0;
-		const kept: Kept = { league: this.league, leagues: this.leagues, format: this.format };
+		const kept: Kept = {
+			session: this.#session,
+			account: this.#account,
+			league: this.league,
+			leagues: this.leagues,
+			format: this.format
+		};
 		try {
 			sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(kept));
 			if (lines === 0) localStorage.removeItem(LINES_KEY);

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
-	import { contextLine } from '#lib/context/follow.svelte.ts';
+	import { contextLine } from '#lib/context/context-format.ts';
 	import { contextNote, heldMark } from '#lib/context/words.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { draftersGap } from '#lib/format/draft.ts';
@@ -49,12 +49,15 @@
 	const gap = $derived(draftersGap(n.adp, n.ourRank));
 	const sources = $derived(lead.adpSources.join(' and '));
 	const figures = $derived(apiFormatOf(lead.format));
-	const held = $derived(heldMark(siteContext.held, page.id));
-	/** The league's line, and whose roster he is on in it. */
-	const note = $derived.by(() => {
-		const line =
-			figures === null ? null : contextNote(siteContext.league, figures, 'These figures are');
-		return line === null || held === null ? line : `${line} ${held.words}.`;
+	/** The league's line. */
+	const note = $derived(
+		figures === null ? null : contextNote(siteContext.league, figures, 'These figures are')
+	);
+	/** Whose roster he is on in the league, on its own line with its own room, once the rosters are
+	 * read: the free-agent read in one glance. */
+	const rostered = $derived.by(() => {
+		if (siteContext.held === null) return null;
+		return heldMark(siteContext.held, page.id)?.words ?? 'Unrostered in your league';
 	});
 	const drafters = $derived.by(() => {
 		if (n.adp === null || gap === null) {
@@ -139,7 +142,10 @@
 				/>
 			{/snippet}
 		</HeroCard>
-		<ContextNote {note} />
+		<div class="league-lines">
+			<ContextNote {note} />
+			<ContextNote note={rostered === null ? null : `${rostered}.`} short />
+		</div>
 
 		{#if page.underway}{@render thisSeason()}{/if}
 
@@ -217,6 +223,17 @@
 </SiteShell>
 
 <style>
+	/* The league's two lines sit close as one block; with no league selected they take no place. */
+	.league-lines {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-1);
+	}
+
+	:global(html:not([data-league])) .league-lines:not(:has(:global(.filled))) {
+		display: contents;
+	}
+
 	.player {
 		padding: var(--s-5);
 		display: flex;

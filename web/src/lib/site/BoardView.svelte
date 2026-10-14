@@ -23,7 +23,7 @@
 	import TierStrip from '#lib/ui/TierStrip.svelte';
 	import Toggle from '#lib/ui/Toggle.svelte';
 	import { scoringBasis } from '#lib/run/catalog.ts';
-	import { apiFormatOf } from '#lib/run/format-ids.ts';
+	import { apiFormatOf, runFormatId } from '#lib/run/format-ids.ts';
 	import type { BoardRowView } from '#lib/run/schema.ts';
 	import { links, tierAnchor } from './links.ts';
 
@@ -55,9 +55,17 @@
 		(id) => links.board(id, page.position)
 	);
 	const figures = $derived(apiFormatOf(page.format));
-	const note = $derived(
-		figures === null ? null : contextNote(siteContext.league, figures, 'This board is')
-	);
+	/** What this board is against the league's scoring, also when a link named another board. */
+	const note = $derived.by(() => {
+		const league = siteContext.league;
+		if (figures === null || league === null) return null;
+		return contextNote(
+			league,
+			figures,
+			'This board is',
+			carried.includes(runFormatId(league.format))
+		);
+	});
 	$effect(() => {
 		if (onlySheet) void lazySheet.load();
 	});

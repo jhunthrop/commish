@@ -25,7 +25,7 @@
 	<title>{title} · Commish</title>
 </svelte:head>
 
-<Shell title={heading ?? title} {stamp} {tail} boardFormats={run.formats}>
+<Shell title={heading ?? title} {stamp} {tail}>
 	{#snippet search()}<PlayerSearch players={run.players} />{/snippet}
 	{@render children()}
 </Shell>

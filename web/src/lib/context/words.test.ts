@@ -49,6 +49,13 @@ void test('a format the run does not carry says so and names what the page is in
 	);
 });
 
+void test('a link to another board the run carries says what this board is', () => {
+	assert.equal(
+		contextNote(league(), 'half_ppr', 'This board is', true),
+		'Your league scores PPR. This board is half PPR.'
+	);
+});
+
 void test('a matching league says its scoring, and no league says nothing', () => {
 	assert.equal(contextNote(league(), 'ppr'), 'Your league scores PPR.');
 	assert.equal(
