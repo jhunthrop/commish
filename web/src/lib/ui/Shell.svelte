@@ -229,6 +229,14 @@
 		min-width: var(--switch-min-w);
 	}
 
+	/* With no league selected (signed out, or a format only) the switch says a format, "PPR", and
+	   takes only its words' width, so the search keeps the room for its placeholder. The boot script
+	   marks a selected league before the first paint, so the width never changes as a page loads. */
+	:global(html:not([data-league])) .league {
+		flex: 0 1 auto;
+		min-width: 0;
+	}
+
 	/* Under 1024px the bar's title gives way, as on the phone (the rail names the section), so the
 	   search, the verb and the switch keep their room and the bar never runs past the screen. */
 	@media (max-width: 1024px) {
