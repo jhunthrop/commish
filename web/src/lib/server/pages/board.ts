@@ -57,8 +57,8 @@ export interface BoardPage {
 }
 
 /** The Basis panel: the scoring; in season the order and the tiers (the lead names the sort and the
- * season); the round tint against the whole board; below replacement; the range, when the rows
- * carry one; the drafters' ADP. */
+ * season); the round tint against the whole board; below replacement; the drafters' ADP; and last
+ * the range, when the rows carry one, so the band that hides its column hides its line. */
 function basisTerms(
 	format: Format,
 	seasonLead: string | null,
@@ -74,8 +74,9 @@ function basisTerms(
 			means: `The round his points over replacement rank in, among ${String(boardSize)}`
 		},
 		{ term: 'Rose', means: 'Below replacement' },
-		...(range ? [{ term: 'Range', means: 'Floor to ceiling' }] : []),
-		{ term: 'Drafters', means: `Their ADP from ${adpBasis.join(' and ')}, against our rank` }
+		{ term: 'Drafters', means: `Their ADP from ${adpBasis.join(' and ')}, against our rank` },
+		// Last, so the band that hides the range column hides its line too (BoardView's style).
+		...(range ? [{ term: 'Range', means: 'Floor to ceiling' }] : [])
 	];
 }
 

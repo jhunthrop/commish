@@ -263,9 +263,15 @@
 		display: contents;
 	}
 
-	/* From 1181 to 1439px an in-season row has no floor to ceiling column, so no switch for it. */
-	@media (min-width: 1181px) and (max-width: 1439px) {
+	/* From 961 to 1439px an in-season row has no floor to ceiling column, so no switch for it. */
+	@media (min-width: 961px) and (max-width: 1439px) {
 		.board:has(:global(.row.games)) .range-toggle {
+			display: none;
+		}
+
+		/* The Range line, last in the Basis list, hides with its column. A board with no range has
+		   neither the line nor the switch, so its last line (Drafters) stays. */
+		.board:has(.range-toggle):has(:global(.row.games)) .side :global(dl > :nth-last-child(-n + 2)) {
 			display: none;
 		}
 	}
