@@ -6,6 +6,13 @@ none, report "skipped" and exit 0, losing the new register's first freezes with 
 now comes from the stored nflverse kickoffs: the season whose regular season, opened `LEAD` early
 (the week-one freeze) and held `TAIL` late (the last grades), contains the pass's instant. A date no
 stored schedule places is a failed pass, naming the newest schedule the store holds.
+
+Fix round 3 (the review's R1): the weekly crons fire September through February, and a season's
+stored schedule closes ten days after its last kickoff, so most of January and February sits between
+a closed season and the next. The pass then reports its season `closed` (or, early in September,
+`not open yet`) and exits 0. It fails only when the season the calendar names (the year of a date
+from September on, the year before for January to August) has no stored schedule at all, which is
+the late-ingest case N3 exists for.
 """
 
 from dataclasses import dataclass
@@ -22,6 +29,8 @@ from research.season import REGULAR_SEASON_WEEKS
 LEAD: Final = timedelta(days=14)
 # The last week grades 36 hours after its games and is overdue four days later.
 TAIL: Final = timedelta(days=10)
+# A season is named by the year its September falls in.
+SEASON_START_MONTH: Final = 9
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +54,26 @@ def season_spans(conn: Connection) -> list[SeasonSpan]:
 def placed_season(spans: list[SeasonSpan], now: datetime) -> int | None:
     """The season whose regular season, with its lead and tail, contains `now`, or None."""
     return next((s.season for s in spans if s.first_kickoff - LEAD <= now <= s.last_kickoff + TAIL), None)
+
+
+def calendar_season(now: datetime) -> int:
+    """The season a date belongs to on the calendar: September on is that year's, earlier the year before."""
+    return now.year if now.month >= SEASON_START_MONTH else now.year - 1
+
+
+def stored_span(spans: list[SeasonSpan], season: int) -> SeasonSpan | None:
+    return next((span for span in spans if span.season == season), None)
+
+
+def out_of_window_reason(span: SeasonSpan, now: datetime) -> str:
+    """Why a date the calendar's stored season does not place is no pass to make."""
+    if now < span.first_kickoff - LEAD:
+        return (
+            f"the {span.season} register opens {js_iso(span.first_kickoff - LEAD)}, two weeks before its first kickoff"
+        )
+    return (
+        f"the {span.season} register is closed: its last week kicked off {js_iso(span.last_kickoff)} and graded by then"
+    )
 
 
 def unplaced_reason(spans: list[SeasonSpan], now: datetime) -> str:

@@ -4,6 +4,7 @@
 #
 #   infra/research-alerts.sh apply           create the email channel and the policies, or bring each to this file
 #   infra/research-alerts.sh verify          list them and fail unless each is on the channel as this file says
+#   infra/research-alerts.sh verify-live     as verify, and fail unless the absence policies are on too (after cutover)
 #   infra/research-alerts.sh enable-absence  turn the absence policies on (the cutover step that resumes the schedule)
 #
 # THE ABSENCE POLICIES (fix round 2, N5; one condition each, as PromQL requires) are what catch a schedule that never fires: a paused or
@@ -62,7 +63,9 @@ name, channel, enabled = sys.argv[1], sys.argv[2], sys.argv[3] == "true"
 jobs = 'resource.label.job_name = one_of("nightly", "nightly-publish", "inseason", "inseason-capture")'
 # The selector without its closing brace: each query adds its job_name and closes it.
 succeeded = 'run_googleapis_com:job_completed_execution_count{monitored_resource="cloud_run_job",result="succeeded"'
-in_season = "and on() (month() >= 9 or month() <= 2)"
+# From September 8 (the first week's freeze passes run by then) through February (review R1: from
+# September 1 no pass had succeeded since January, so the alert fired until the first pass ran).
+in_season = "and on() ((month() == 9 and day_of_month() >= 8) or month() >= 10 or month() <= 2)"
 policies = {
     "Research job execution failed": {
         "displayName": "A research Cloud Run Job execution failed",
@@ -84,7 +87,7 @@ policies = {
             },
     },
     "Research in-season absent": {
-            "displayName": "No successful in-season run (weekly pass or capture) in 72 hours, September through February",
+            "displayName": "No successful in-season run (weekly pass or capture) in 72 hours, September 8 through February",
             "conditionPrometheusQueryLanguage": {
                 "query": f'absent_over_time({succeeded},job_name=~"inseason|inseason-capture"}}[72h]) {in_season}',
                 "duration": "0s",
@@ -92,7 +95,7 @@ policies = {
             },
     },
     "Research weekly pass absent": {
-            "displayName": "No successful weekly pass in 120 hours (its longest gap, Thursday to Tuesday, is 114), September through February",
+            "displayName": "No successful weekly pass in 120 hours (its longest gap, Thursday to Tuesday, is 114), September 8 through February",
             "conditionPrometheusQueryLanguage": {
                 "query": f'absent_over_time({succeeded},job_name="inseason"}}[120h]) {in_season}',
                 "duration": "0s",
@@ -156,19 +159,23 @@ apply() { # absence enabled (true|false)
       call PATCH "alertPolicies/${id##*/}" "$(policy_body "${name}" "${ch}" "${enabled}")" >/dev/null
     fi
   done
-  verify
+  verify "$1"
 }
 
-verify() {
-  local ch name line failed=0
+verify() { # live (true|false): every absence policy must be enabled too
+  local ch name line state failed=0
   ch="$(channel)"
   [[ -n "${ch}" ]] || { echo "FAIL no email channel for ${EMAIL}" >&2; exit 1; }
   for name in "${POLICIES[@]}"; do
     line="$(existing_policy "${name}")"
-    if [[ "${line}" == *"${ch}"* && ( "${line}" == *" True "* || "${name}" == *" absent" ) ]]; then
-      echo "ok   ${name}: ${line}"
-    else
+    state="disabled"
+    [[ "${line}" == *" True "* ]] && state="enabled"
+    if [[ "${line}" != *"${ch}"* ]]; then
       echo "FAIL ${name}: ${line:-missing}" >&2; failed=1
+    elif [[ "${state}" == "disabled" && ( "${name}" != *" absent" || "$1" == "true" ) ]]; then
+      echo "FAIL ${name}: disabled (${line})" >&2; failed=1
+    else
+      echo "ok   ${name}: ${state}, ${line%% *}"
     fi
   done
   exit "${failed}"
@@ -177,6 +184,7 @@ verify() {
 case "${1:-verify}" in
   apply) apply false ;;
   enable-absence) apply true ;;
-  verify) verify ;;
-  *) echo "usage: $0 apply|verify|enable-absence" >&2; exit 2 ;;
+  verify) verify false ;;
+  verify-live) verify true ;;
+  *) echo "usage: $0 apply|verify|verify-live|enable-absence" >&2; exit 2 ;;
 esac

@@ -21,7 +21,14 @@ from sqlalchemy import Engine
 from research.cli import log_line as _line
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
-from research.inseason.season_of import placed_season, season_spans, unplaced_reason
+from research.inseason.season_of import (
+    calendar_season,
+    out_of_window_reason,
+    placed_season,
+    season_spans,
+    stored_span,
+    unplaced_reason,
+)
 from research.inseason.season_week import STEPS, SeasonWeekContext, StepResult, run_season_week
 from research.nightly.publish import take_run_id
 from research.nightly.r2 import run_store
@@ -73,7 +80,14 @@ def _season(engine: Engine, given: int | None, now: datetime) -> int | StepResul
     with engine.connect() as conn:
         spans = season_spans(conn)
     placed = placed_season(spans, now)
-    return StepResult("season", "failed", unplaced_reason(spans, now)) if placed is None else placed
+    if placed is not None:
+        return placed
+    # Outside the calendar season's window is no pass to make (review R1); a calendar season with no
+    # stored schedule is the failure N3 exists for.
+    span = stored_span(spans, calendar_season(now))
+    if span is not None:
+        return StepResult("season", "skipped", out_of_window_reason(span, now))
+    return StepResult("season", "failed", unplaced_reason(spans, now))
 
 
 def _trail(
