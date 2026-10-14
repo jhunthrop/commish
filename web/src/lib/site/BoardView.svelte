@@ -81,8 +81,9 @@
 			means: `The round his points over replacement rank in, among ${String(page.boardSize)}`
 		},
 		{ term: 'Rose', means: 'Below replacement' },
-		{ term: 'Range', means: 'Floor to ceiling' },
-		{ term: 'Drafters', means: `Their ADP from ${page.adpBasis.join(' and ')}, against our rank` }
+		{ term: 'Drafters', means: `Their ADP from ${page.adpBasis.join(' and ')}, against our rank` },
+		// Last, so the band that hides the range column hides its line too (the style below).
+		{ term: 'Range', means: 'Floor to ceiling' }
 	]);
 
 	/** The side column's anchor: the basis, the toggles and the tiers. */
@@ -274,9 +275,13 @@
 		display: contents;
 	}
 
-	/* From 1181 to 1439px an in-season row has no floor to ceiling column, so no switch for it. */
-	@media (min-width: 1181px) and (max-width: 1439px) {
+	/* From 961 to 1439px an in-season row has no floor to ceiling column, so no switch for it. */
+	@media (min-width: 961px) and (max-width: 1439px) {
 		.board:has(:global(.row.games)) .range-toggle {
+			display: none;
+		}
+
+		.board:has(:global(.row.games)) .side :global(dl > :nth-last-child(-n + 2)) {
 			display: none;
 		}
 	}

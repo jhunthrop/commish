@@ -55,7 +55,7 @@
 		};
 	}
 
-	const lines = $derived(weekLines(record.weeks).map(withFigure));
+	const lines = $derived(weekLines(record.weeks, data.page.unplayed).map(withFigure));
 
 	const positionColumns: Column[] = [
 		{ label: 'Position' },
