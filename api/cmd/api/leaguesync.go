@@ -71,7 +71,7 @@ func (f ffpcWiring) host(store *leaguesync.Store, weeks leaguesync.WeekSource, l
 // second and FFPC third behind one poller, the rooms' board, and the
 // recorded leagues when COMPANION_REPLAY is on (development only). The
 // host directories are read at start, so the first view finds them.
-func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ents *entitlements.Store, ff ffpcWiring, log *slog.Logger) *leaguesync.Service {
+func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ents *entitlements.Store, accounts leaguesync.AccountViewer, ff ffpcWiring, log *slog.Logger) *leaguesync.Service {
 	now := time.Now
 	var sleeperAPI leaguesync.SleeperAPI = sleeper.New()
 	var mflAPI leaguesync.MFLAPI = mfl.New()
@@ -97,5 +97,6 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 		Admission: &leaguesync.Admission{Now: now},
 		Players:   players,
 		Links:     store, Saved: saved, Boards: board, FFPC: ffpcHost, Entitlements: ents, Now: now, Log: log,
+		Selection: store, Accounts: accounts,
 	}
 }

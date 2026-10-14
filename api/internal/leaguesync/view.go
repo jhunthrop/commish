@@ -38,12 +38,17 @@ func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.Leag
 	}
 	placed := Place(board.Raw, dir, ids)
 	p := players{dir: dir, placed: placed}
+	scoringLike, format := LeagueScoring(saved, snap.Scoring.Rules, snap.Shape.SuperFlex > 0)
+	held, twice := heldOnBoard(snap, placed)
+	if twice > 0 {
+		s.Log.Warn("leaguesync: players on two rosters in one read", "league", snap.Ref.Key(), "players", twice)
+	}
 	out := apitypes.LeagueSync{
 		Id: link.ID, Host: apitypes.LeagueHost(snap.Ref.Host), HostLeagueId: snap.Ref.LeagueID, Season: snap.Season,
 		Name: snap.Name, Status: snap.Status, Week: snap.Week, WeekAllPlay: snap.AllPlay, Me: link.RosterID, SettingsLeagueId: link.LeagueID,
 		ScoringDropped: nonNil(snap.Scoring.Dropped), ScoringDefaulted: nonNil(snap.Scoring.Defaulted),
-		ScoringLike: NearestPreset(snap.Scoring.Rules), Teams: standings(snap.Teams), Moves: p.moves(snap.Moves),
-		Rostered: rosteredIDs(rosteredOnBoard(snap, placed)), BoardFormat: boardFormat(snap), Byes: byes(board.Raw.Players),
+		ScoringLike: scoringLike, Teams: standings(snap.Teams), Moves: p.moves(snap.Moves),
+		HeldBy: held, Rostered: rosteredIDs(held), BoardFormat: format, Byes: byes(board.Raw.Players),
 		Placement: placement(snap, placed), ReadAt: snap.ReadAt, HostStaleSeconds: int(math.Round(read.Stale.Seconds())),
 		HostFailed: read.Failed, HostSignedOut: read.SignedOut,
 		Roster: []apitypes.RosterSpot{},
@@ -115,18 +120,38 @@ func namedPlayers(snap Snapshot) []string {
 	return out
 }
 
-// rosteredOnBoard is the board id of every rostered player we placed.
-func rosteredOnBoard(snap Snapshot, placed map[string]Placement) map[string]bool {
-	out := map[string]bool{}
+// heldOnBoard is the roster holding every rostered player we placed, by
+// his board id, and how many the read names on two rosters (a host glitch
+// or a trade read halfway): those keep the later team in the read's order.
+func heldOnBoard(snap Snapshot, placed map[string]Placement) (map[string]int, int) {
+	out := map[string]int{}
+	twice := 0
 	for _, t := range snap.Teams {
 		for _, list := range [][]string{t.Players, t.Reserve, t.Taxi} {
 			for _, id := range list {
-				if pl, ok := placed[id]; ok {
-					out[pl.BoardID] = true
+				pl, ok := placed[id]
+				if !ok {
+					continue
 				}
+				if was, seen := out[pl.BoardID]; seen && was != t.RosterID {
+					twice++
+				}
+				out[pl.BoardID] = t.RosterID
 			}
 		}
 	}
+	return out, twice
+}
+
+// rosteredIDs is held's board ids, sorted: the deprecated rostered field
+// a web from before held_by reads during the deploy window. Removed after
+// 2026-10-21 once the web that reads held_by has shipped.
+func rosteredIDs(held map[string]int) []string {
+	out := make([]string, 0, len(held))
+	for id := range held {
+		out = append(out, id)
+	}
+	sort.Strings(out)
 	return out
 }
 
@@ -189,32 +214,6 @@ func standings(teams []Team) []apitypes.LeagueTeam {
 		})
 	}
 	return out
-}
-
-// rosteredIDs is the rostered board ids, sorted.
-func rosteredIDs(set map[string]bool) []string {
-	out := make([]string, 0, len(set))
-	for id := range set {
-		out = append(out, id)
-	}
-	sort.Strings(out)
-	return out
-}
-
-// boardFormat is the run's board the league reads on: superflex for a
-// league that starts one, otherwise its nearest scoring (TE premium has
-// no board of its own and reads on PPR's).
-func boardFormat(snap Snapshot) apitypes.BoardFormat {
-	if snap.Shape.SuperFlex > 0 {
-		return apitypes.BoardFormatSuperflex
-	}
-	switch NearestPreset(snap.Scoring.Rules) {
-	case apitypes.ScoringPresetHalfPpr:
-		return apitypes.BoardFormatHalfPpr
-	case apitypes.ScoringPresetStandard:
-		return apitypes.BoardFormatStandard
-	}
-	return apitypes.BoardFormatPpr
 }
 
 // byes is each team's bye week, from our board's schedule.

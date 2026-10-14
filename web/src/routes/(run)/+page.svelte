@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { railLeague } from '#lib/account/rail-league.svelte.ts';
+	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { runStampText } from '#lib/run/stamp.ts';
 	import RowSheetMark from '#lib/site/RowSheetMark.svelte';
 	import SiteShell from '#lib/site/SiteShell.svelte';
@@ -29,9 +29,9 @@
 
 	onMount(() => lazySheet.armOnFirstIntent(window));
 
-	/** A member who follows a league is sent back to it, the newest when there are several; anyone
+	/** A member who follows a league is sent back to the one selected in the shell; anyone
 	 * else to follow one. */
-	const leagueId = $derived(railLeague.account?.leagueId ?? null);
+	const leagueId = $derived(siteContext.league?.id ?? null);
 </script>
 
 <svelte:head>

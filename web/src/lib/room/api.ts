@@ -70,7 +70,6 @@ export const rooms = {
 	leagues: () => call<League[]>('GET', '/leagues'),
 	saveLeague: (name: string, settings: LeagueSettings) =>
 		call<League>('POST', '/leagues', { name, settings }),
-	me: () => call<Account>('GET', '/me'),
 	setHandle: (handle: string) => call<Account>('PATCH', '/me', { handle }),
 	lobbies: () => call<LobbyFilling[]>('GET', '/lobbies'),
 	join: (format: LobbyFormat) => call<LobbySeat>('POST', '/lobbies/join', { format }),

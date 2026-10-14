@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { forgetContext } from '#lib/context/forget.ts';
 	import { page } from '$app/state';
 	import { PUBLIC_API_URL } from '$app/env/public';
 	import { ApiError, apiClient } from '#lib/api/client.ts';
@@ -133,7 +134,10 @@
 
 	const signOut = (): Promise<void> =>
 		act(async () => {
-			window.location.assign(await api.signOut());
+			const url = await api.signOut();
+			// Nothing of this account's leagues stays in the browser for whoever comes next.
+			forgetContext();
+			window.location.assign(url);
 		});
 
 	/** Opens the sheet on your account, then its page. */

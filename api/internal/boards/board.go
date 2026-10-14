@@ -80,6 +80,18 @@ func (f Format) Words() string {
 	}
 }
 
+// Board is the contract's name for the stored board: "half_ppr".
+func (f Format) Board() apitypes.BoardFormat {
+	switch f {
+	case Half:
+		return apitypes.BoardFormatHalfPpr
+	case Standard:
+		return apitypes.BoardFormatStandard
+	default:
+		return apitypes.BoardFormatPpr
+	}
+}
+
 // Player is one row of a stored board.
 type Player struct {
 	ID       string

@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { onMount, type Snippet } from 'svelte';
 	import { page } from '$app/state';
-	import { railLeague } from '#lib/account/rail-league.svelte.ts';
+	import { siteContext } from '#lib/context/context.svelte.ts';
+	import LeagueSwitch from '#lib/context/LeagueSwitch.svelte';
 	import Icon from './Icon.svelte';
 	import Stamp from './Stamp.svelte';
 	import {
 		HOME_HREF,
+		RAIL,
 		RAIL_FOOT,
 		phoneRailCount,
-		railItems,
 		sectionOf,
 		type RailItem,
 		type Section
@@ -24,8 +25,9 @@
 		active?: Section | null;
 		/** The top bar's search, usually a Search. */
 		search?: Snippet;
-		/** The top bar's right end: the page's verb or a quiet action. The theme switch lives in the
-		 * account room at every width, so the bar holds only the account, the verb and search. */
+		/** The top bar's right end, before the league switch: the page's verb or a quiet action. The
+		 * theme switch lives in the account room at every width, so the bar holds only the league
+		 * switch, the account, the verb and search. */
 		tail?: Snippet;
 		children: Snippet;
 	}
@@ -33,9 +35,15 @@
 	let { title, stamp, active, search, tail, children }: Props = $props();
 
 	const current = $derived(active === undefined ? sectionOf(page.url.pathname) : active);
-	// League opens the signed-in account's newest league once /me answers.
-	onMount(() => void railLeague.load());
-	const items = $derived(railItems(railLeague.account));
+	// The site's context: the session's copy at once, then /me. The rail's Board (/board, which
+	// names no format) opens in the context's format by itself (follow.svelte.ts).
+	onMount(() => void siteContext.load());
+
+	/** Leagues opens the switch's menu in place of its page, which stays the way without script. */
+	function openLeagues(event: MouseEvent): void {
+		event.preventDefault();
+		siteContext.open = !siteContext.open;
+	}
 </script>
 
 {#snippet railLink(item: RailItem)}
@@ -44,6 +52,10 @@
 		class:wide-only={item.wideOnly}
 		href={item.href}
 		aria-current={item.section === current ? 'page' : undefined}
+		data-opens-leagues={item.opensLeagues ? '' : undefined}
+		role={item.opensLeagues ? 'button' : undefined}
+		aria-expanded={item.opensLeagues ? siteContext.open : undefined}
+		onclick={item.opensLeagues ? openLeagues : undefined}
 	>
 		<Icon name={item.icon} />
 		<span>{item.label}</span>
@@ -51,9 +63,9 @@
 {/snippet}
 
 <div class="app">
-	<nav class="rail" aria-label="Sections" style="--phone-items: {phoneRailCount(items)}">
+	<nav class="rail" aria-label="Sections" style="--phone-items: {phoneRailCount(RAIL)}">
 		<a class="mark" href={HOME_HREF} aria-label="Commish"><b>C</b></a>
-		{#each items as item (item.section)}
+		{#each RAIL as item (item.section)}
 			{@render railLink(item)}
 		{/each}
 		<span class="spacer"></span>
@@ -76,6 +88,7 @@
 			<div class="tail">
 				{@render tail?.()}
 			</div>
+			<div class="league"><LeagueSwitch /></div>
 		</header>
 		{@render children()}
 	</div>
@@ -205,6 +218,13 @@
 		min-height: var(--verb-h);
 	}
 
+	/* The league switch closes the bar at the right on every width. */
+	.league {
+		display: flex;
+		flex: none;
+		min-width: 0;
+	}
+
 	@media (max-width: 760px) {
 		.app {
 			grid-template-columns: minmax(0, 1fr);
@@ -245,15 +265,16 @@
 		}
 
 		/* The phone bar is a grid with the account in its first row's last cell on every page, so the
-		   one way to the account, the pass and the companion is always in the same place, and only
-		   that row gives it room: the run's date (or the page's verb, on a page with no date) to its
-		   left, the verb on its own row under a date, the search across the last. */
+		   one way to the account, the pass and the companion is always in the same place, and the
+		   league switch, the bar's one menu, takes the rest of that row: after the run's date, or
+		   before the page's verb on a page with no date. Under a date the verb has its own row, and
+		   the search runs across the last. */
 		.top {
 			display: grid;
-			grid-template-columns: minmax(0, 1fr) auto;
+			grid-template-columns: minmax(0, 1fr) auto auto;
 			grid-template-areas:
-				'tail account'
-				'find find';
+				'league tail account'
+				'find find find';
 			align-items: center;
 			padding: var(--s-2) var(--s-4);
 			gap: var(--s-2);
@@ -261,10 +282,15 @@
 		}
 
 		.top:has(.stamp) {
+			grid-template-columns: auto minmax(0, 1fr) auto;
 			grid-template-areas:
-				'stamp account'
-				'tail tail'
-				'find find';
+				'stamp league account'
+				'tail tail tail'
+				'find find find';
+		}
+
+		.league {
+			grid-area: league;
 		}
 
 		h1 {

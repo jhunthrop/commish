@@ -3,7 +3,7 @@
  * the run carries. */
 import { windowLabel } from '#lib/format/date.ts';
 import { tierOf } from '#lib/run/derive.ts';
-import type { Capsule, Format, IndexEntry, PlayerFormat } from '#lib/run/schema.ts';
+import type { AdpSource, Capsule, Format, IndexEntry, PlayerFormat } from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
 import { seasonView, type KickoffOf, type SeasonView } from './player-season.ts';
@@ -32,6 +32,10 @@ export interface TierMate {
 export interface FormatLine {
 	format: Format;
 	numbers: PlayerFormat;
+	/** The drafts behind this format's ADP and their window: "PPR drafts, Sep 5 to Sep 9". */
+	adpSources: string[];
+	/** How many players this format's board ranks. */
+	boardSize: number;
 }
 
 export interface PlayerPage {
@@ -41,12 +45,14 @@ export interface PlayerPage {
 	position: Position;
 	team: string;
 	headshot: string;
+	/** The run's default format that ranks him, his tier's, and its numbers. */
 	format: Format;
 	numbers: PlayerFormat;
-	/** Every format that ranks him, the page's own first. */
+	/** Every format that ranks him, the default first, each with its numbers and basis: the page
+	 * leads with the context's when the run carries it. */
 	lines: FormatLine[];
 	tier: { tier: number; cliff: TierCliff | null; mates: TierMate[] };
-	/** The drafts behind the format's ADP and their window, in a drafter's words: "PPR drafts, Sep 5 to Sep 9". */
+	/** The default format's ADP drafts and board size, as its line carries them. */
 	adpSources: string[];
 	boardSize: number;
 	capsule: Capsule | null;
@@ -59,15 +65,26 @@ export async function playerEntries(): Promise<{ slug: string }[]> {
 	return (await index()).map(({ slug }) => ({ slug }));
 }
 
-/** His formats in the manifest's order, the first one that ranks him leading. */
-function linesFor(
+/** His formats in the manifest's order, the first one that ranks him leading, each with the drafts
+ * behind its ADP and its board's size. */
+async function linesFor(
 	formats: readonly Format[],
-	numbers: Readonly<Record<string, PlayerFormat>>
-): FormatLine[] {
-	return formats.flatMap((format) => {
+	numbers: Readonly<Record<string, PlayerFormat>>,
+	sources: readonly AdpSource[]
+): Promise<FormatLine[]> {
+	const ranked = formats.flatMap((format) => {
 		const found = numbers[format.id];
 		return found ? [{ format, numbers: found }] : [];
 	});
+	return Promise.all(
+		ranked.map(async (line) => ({
+			...line,
+			adpSources: sources
+				.filter((source) => source.formats.includes(line.format.id))
+				.map((source) => `${source.drafts}, ${windowLabel(source.window)}`),
+			boardSize: (await board(line.format.id)).rows.length
+		}))
+	);
 }
 
 async function mates(format: Format, entry: IndexEntry): Promise<PlayerPage['tier']> {
@@ -110,10 +127,9 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		kickoffsOf(entry.team),
 		seasonUnderway()
 	]);
-	const lines = linesFor(run.formats, loaded.formats);
+	const lines = await linesFor(run.formats, loaded.formats, sources.sources);
 	const [lead] = lines;
 	if (!lead) throw new Error(`${loaded.name} has a page but no format ranks him.`);
-	const loadedBoard = await board(lead.format.id);
 	return {
 		id: loaded.id,
 		slug: loaded.slug,
@@ -125,10 +141,8 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		numbers: lead.numbers,
 		lines,
 		tier: await mates(lead.format, entry),
-		adpSources: sources.sources
-			.filter((source) => source.formats.includes(lead.format.id))
-			.map((source) => `${source.drafts}, ${windowLabel(source.window)}`),
-		boardSize: loadedBoard.rows.length,
+		adpSources: lead.adpSources,
+		boardSize: lead.boardSize,
 		capsule: loaded.capsule,
 		season: seasonView(loaded.season, loaded.position, run.formats, kickoffOf),
 		underway

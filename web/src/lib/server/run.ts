@@ -248,6 +248,7 @@ export async function stamp(): Promise<RunStamp> {
 		runAt: run.runAt,
 		season: run.season,
 		standIn: run.standIn,
-		players: run.players
+		players: run.players,
+		formats: run.formats.map((format) => format.id)
 	};
 }

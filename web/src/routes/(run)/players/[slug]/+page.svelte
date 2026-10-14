@@ -1,5 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { siteContext } from '#lib/context/context.svelte.ts';
+	import ContextNote from '#lib/context/ContextNote.svelte';
+	import { contextLine } from '#lib/context/context-format.ts';
+	import { contextNote, heldMark } from '#lib/context/words.ts';
+	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, plural, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
@@ -29,15 +34,31 @@
 
 	let { data }: PageProps = $props();
 
-	onMount(() => lazySheet.armOnFirstIntent(window));
+	onMount(() => {
+		lazySheet.armOnFirstIntent(window);
+		siteContext.wantHeld();
+	});
 
 	const page = $derived(data.page);
-	const n = $derived(page.numbers);
+	/** His figures lead with the context's format when the run carries it (the league's). */
+	const lead = $derived(contextLine(page.lines) ?? page);
+	const n = $derived(lead.numbers);
 	const season = $derived(data.run.season);
-	const unit = $derived(page.format.unit);
-	const scoring = $derived(page.format.label);
+	const unit = $derived(lead.format.unit);
+	const scoring = $derived(lead.format.label);
 	const gap = $derived(draftersGap(n.adp, n.ourRank));
-	const sources = $derived(page.adpSources.join(' and '));
+	const sources = $derived(lead.adpSources.join(' and '));
+	const figures = $derived(apiFormatOf(lead.format));
+	/** The league's line. */
+	const note = $derived(
+		figures === null ? null : contextNote(siteContext.league, figures, 'These figures are')
+	);
+	/** Whose roster he is on in the league, on its own line with its own room, once the rosters are
+	 * read: the free-agent read in one glance. */
+	const rostered = $derived.by(() => {
+		if (siteContext.held === null) return null;
+		return heldMark(siteContext.held, page.id)?.words ?? 'Unrostered in your league';
+	});
 	const drafters = $derived.by(() => {
 		if (n.adp === null || gap === null) {
 			return `None of our ADP sources has him yet. We have him at pick ${String(n.ourRank)}.`;
@@ -50,8 +71,8 @@
 	});
 	const valueWords = $derived(
 		n.vor < 0
-			? `Below replacement, among the ${String(page.boardSize)} on our board`
-			: `Round ${String(n.vorRound)} value among the ${String(page.boardSize)} on our board`
+			? `Below replacement, among the ${String(lead.boardSize)} on our board`
+			: `Round ${String(n.vorRound)} value among the ${String(lead.boardSize)} on our board`
 	);
 	const mates = $derived(
 		page.tier.mates.map((mate) => ({ ...mate, href: links.player(mate.slug) }))
@@ -81,8 +102,8 @@
 	<main class="player">
 		<Crumb
 			trail={[
-				{ label: 'Board', href: links.board(page.format.id) },
-				{ label: page.position, href: links.board(page.format.id, page.position) },
+				{ label: 'Board', href: links.board(lead.format.id) },
+				{ label: page.position, href: links.board(lead.format.id, page.position) },
 				{ label: page.name }
 			]}
 		/>
@@ -121,6 +142,10 @@
 				/>
 			{/snippet}
 		</HeroCard>
+		<div class="league-lines">
+			<ContextNote {note} />
+			<ContextNote note={rostered === null ? null : `${rostered}.`} short />
+		</div>
 
 		{#if page.underway}{@render thisSeason()}{/if}
 
@@ -163,8 +188,8 @@
 					{mates}
 					currentId={page.id}
 					cliff={page.tier.cliff}
-					{unit}
-					basis="Projected {scoring} points, {season}"
+					unit={page.format.unit}
+					basis="Projected {page.format.label} points, {season}"
 				/>
 			</aside>
 		</div>
@@ -198,6 +223,17 @@
 </SiteShell>
 
 <style>
+	/* The league's two lines sit close as one block; with no league selected they take no place. */
+	.league-lines {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-1);
+	}
+
+	:global(html:not([data-league])) .league-lines:not(:has(:global(.filled))) {
+		display: contents;
+	}
+
 	.player {
 		padding: var(--s-5);
 		display: flex;

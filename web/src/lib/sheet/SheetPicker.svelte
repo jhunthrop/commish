@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { plural } from '#lib/format/number.ts';
 	import Label from '#lib/ui/Label.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
@@ -24,7 +25,7 @@
 	}
 
 	async function startNew(): Promise<void> {
-		await store.startNew(store.sheet.format);
+		await store.startNew(siteContext.format ?? store.sheet.format);
 		onclose();
 	}
 </script>

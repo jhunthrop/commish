@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { FormatChip } from '#lib/server/pages/format-route.ts';
 	import type { AbsentFormatPage } from '#lib/server/pages/format-route.ts';
 	import { runStampText, type RunStamp } from '#lib/run/stamp.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -9,11 +8,12 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
-	import FormatChips from './FormatChips.svelte';
+	import { followFormat } from '#lib/context/follow.svelte.ts';
+	import ScoringChoice from '#lib/context/ScoringChoice.svelte';
 	import SiteShell from './SiteShell.svelte';
 
-	/** A format page for a format the chooser offers and this run does not carry: the chooser, and a
-	 * line naming what the run has, with a way to each. */
+	/** A format page for a format the chooser offers and this run does not carry: its scoring, which
+	 * opens the league switch, and a line naming what the run has, with a way to each. */
 	interface Props {
 		page: AbsentFormatPage;
 		run: RunStamp;
@@ -26,6 +26,12 @@
 	let { page, run, noun, href }: Props = $props();
 
 	const carried = $derived(page.formats.filter((chip) => chip.onRun));
+	// A context in a format the run carries opens that format's page.
+	followFormat(
+		() => page.format.id,
+		() => carried.map((chip) => chip.id),
+		(id) => href(id)
+	);
 	const words = $derived(
 		absentWords(
 			page.format.label,
@@ -44,11 +50,7 @@
 	<main class="absent">
 		<PageHead title="{run.season} {noun}" />
 		<FilterBar>
-			<FormatChips
-				formats={page.formats}
-				current={page.format.id}
-				href={(chip: FormatChip) => href(chip.id)}
-			/>
+			<ScoringChoice label={page.format.label} />
 		</FilterBar>
 		<EmptyState title={words.title} line={words.line}>
 			{#snippet actions()}
