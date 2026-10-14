@@ -165,3 +165,16 @@ func TestCustomBasis(t *testing.T) {
 		t.Errorf("basis %q", got)
 	}
 }
+
+// A 400 is the service refusing what the api built: a contract bug, not
+// a reason to try again.
+func TestCustomSourceRefusalIsNotTransient(t *testing.T) {
+	src, _ := customServer(t, func(w http.ResponseWriter, _ wireCustom) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"ok":false,"data":null,"error":"shape.slots.7.count must be a whole number from 1 to 15"}`))
+	})
+	_, err := src.Load(context.Background(), halfRules(), 12, nil)
+	if !errors.Is(err, ErrCustomRefused) || errors.Is(err, ErrCustomUnavailable) {
+		t.Fatalf("%v, want ErrCustomRefused only", err)
+	}
+}

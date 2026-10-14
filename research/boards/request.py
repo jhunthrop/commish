@@ -24,7 +24,11 @@ MAX_SEASON: Final = 2100
 MIN_TEAMS: Final = 2
 MAX_TEAMS: Final = 32
 MAX_SLOTS: Final = 12
-MAX_SLOT_COUNT: Final = 12
+# The contract's bounds (api/openapi.yaml RosterCounts, whose bench reaches 15, the most any one
+# slot carries, and api/internal/leagues MaxRounds, the whole roster): every shape the api accepts
+# is one this service takes. tests/test_boards_request.py reads both from the api and checks them.
+MAX_SLOT_COUNT: Final = 15
+MAX_ROSTER: Final = 25
 _SLOT_TYPES: Final[tuple[str, ...]] = get_args(RosterSlotType)
 
 
@@ -116,7 +120,10 @@ def parse_shape(value: object) -> LeagueShape:
     slots = raw["slots"]
     if not isinstance(slots, list) or not 1 <= len(slots) <= MAX_SLOTS:
         raise RequestError(f"shape.slots must list 1 to {MAX_SLOTS} slots")
-    return LeagueShape(teams, scored_slots([_slot(slot, f"shape.slots.{i}") for i, slot in enumerate(slots)]))
+    parsed = [_slot(slot, f"shape.slots.{i}") for i, slot in enumerate(slots)]
+    if sum(slot.count for slot in parsed) > MAX_ROSTER:
+        raise RequestError(f"shape.slots must add up to at most {MAX_ROSTER} roster spots")
+    return LeagueShape(teams, scored_slots(parsed))
 
 
 def parse_request(body: bytes) -> CustomRequest:

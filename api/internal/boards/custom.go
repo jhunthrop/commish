@@ -27,6 +27,10 @@ import (
 // than ranking the league on a stored board it does not score by.
 var ErrCustomUnavailable = errors.New("boards: a board for this league's own scoring cannot be built right now")
 
+// ErrCustomRefused is the boards service refusing a request the api built
+// (a 400): a contract bug between the two, never a reason to try again.
+var ErrCustomRefused = errors.New("boards: the boards service refused the request")
+
 // The service's answer bounds: a stored board holds about 700 players.
 const (
 	maxCustomRows     = 3000
@@ -154,6 +158,13 @@ func (c *CustomSource) fetch(ctx context.Context, rules apitypes.ScoringRules, t
 	var wire wireCustomResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxCustomResponse)).Decode(&wire); err != nil {
 		return nil, fmt.Errorf("%w: decode (status %d): %w", ErrCustomUnavailable, resp.StatusCode, err)
+	}
+	if resp.StatusCode == http.StatusBadRequest {
+		msg := ""
+		if wire.Error != nil {
+			msg = *wire.Error
+		}
+		return nil, fmt.Errorf("%w: %s", ErrCustomRefused, msg)
 	}
 	if resp.StatusCode != http.StatusOK || !wire.OK {
 		msg := ""
