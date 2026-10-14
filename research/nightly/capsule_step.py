@@ -25,14 +25,17 @@ The order, and why each pass exists:
 6. **The capsule gate** (`capsule_gate`), whose verdict is the step's.
 
 Every pass shares one ceiling per player for the night, `NIGHT_CALLS_PER_PLAYER` (12, two of phase C's
-six-call generations): a player who reached it is left to the next night rather than written again.
+six-call generations): a player who reached it is left to the next night rather than written again,
+with one exception (the coordinator's Lane 17 ruling): a page still unwritten at the ceiling may start
+one more generation that night, once, in a pass over unwritten pages (`spent_out_for`). The night's
+page budget stays the hard ceiling.
 
 Without AI_GATEWAY_API_KEY the writing passes are skipped by name (a sweep without the key would
 demote written reads to facts blocks) and the gate still judges what is stored.
 """
 
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Final
@@ -137,6 +140,16 @@ def _regenerate_all(engine: Engine, now: datetime) -> str:
     return f"capsules: every board page stamped for regeneration ({queued} rows)"
 
 
+def spent_out_for(calls: Mapping[str, int], graced: frozenset[str], *, unwritten_only: bool) -> frozenset[str]:
+    """The players a pass may not start a generation for. A player is left for the next night once
+    another full generation could take him past the ceiling (review N12: at 11 calls a six-call
+    generation would reach 17); in a pass over unwritten pages each may go past it once (`graced`
+    holds those that already have)."""
+    last_start = NIGHT_CALLS_PER_PLAYER - CAPSULE_CONFIG.max_gateway_calls_per_player
+    spent = frozenset(pid for pid, n in calls.items() if n > last_start)
+    return spent & graced if unwritten_only else spent
+
+
 class _Passes:
     """The writing passes of one night: one gateway, one clock, one budget shared by every pass."""
 
@@ -162,20 +175,20 @@ class _Passes:
         self.log = log
         self.spend = CapsuleSpend()
         self.calls_by_player: dict[str, int] = {}
+        # Pages that took their one generation past the ceiling tonight.
+        self.graced: set[str] = set()
 
     @property
     def left(self) -> int:
         return self.budget - self.spend.processed
 
-    @property
-    def spent_out(self) -> frozenset[str]:
-        # A player is left for the next night once another full generation could take him past the
-        # ceiling (review N12: at 11 calls a six-call generation would reach 17).
-        last_start = NIGHT_CALLS_PER_PLAYER - CAPSULE_CONFIG.max_gateway_calls_per_player
-        return frozenset(pid for pid, calls in self.calls_by_player.items() if calls > last_start)
-
     def sweep(self, name: str, plan: SweepPlan) -> SweepReport:
-        plan = replace(plan, exclude=plan.exclude | self.spent_out, span_rules=self.rules)
+        graced = frozenset(self.graced)
+        spent = spent_out_for(self.calls_by_player, graced, unwritten_only=plan.unwritten_only)
+        if plan.unwritten_only:
+            # Those at the ceiling this pass may start for take their one generation past it now.
+            self.graced |= spent_out_for(self.calls_by_player, graced, unwritten_only=False) - spent
+        plan = replace(plan, exclude=plan.exclude | spent, span_rules=self.rules)
         report = sweep_capsules(self.engine, self.gateway, self.now, plan, self.facts)
         for pid, calls in report.calls_by_player.items():
             self.calls_by_player[pid] = self.calls_by_player.get(pid, 0) + calls
