@@ -528,6 +528,10 @@ uv run python -m research.nightly run --out DIR --skip ingest,fit   # the nightl
 uv run python -m research.parity decide all                 # room states, refusals, startSit, the numerics
 uv run python -m research.parity decide record              # re-record the room states (dev copy)
 PARITY_SOURCE_DATABASE_URL=... uv run python -m research.parity capsules all   # the facts, dev copy, against their recording (capsules record re-records)
+# The capsule cases are a self-regression check, not parity: since phase D fix round 3 they compare the
+# port with a recording of the port's own board pass (every facts hash, a 12-sheet sample, the narrow
+# read) as of 2026-10-13, so they catch a change in the port's facts, never an error the port shares
+# with its own recording. The oracle they once matched reads the legacy tables and retires at cutover.
 ```
 
 ### Module map

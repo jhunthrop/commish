@@ -1,4 +1,6 @@
-"""THE CAPSULE FACTS CASES: the sheet the writer is given, against a recording of it, exact.
+"""THE CAPSULE FACTS CASES: the sheet the writer is given, against a recording of it, exact. A
+self-regression check against the port's own recording, not parity with the oracle: it catches a change
+in the port's facts, never an error the port shares with its recording.
 
     uv run python -m research.parity capsules <case>|all
     uv run python -m research.parity capsules record
