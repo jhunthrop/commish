@@ -1,13 +1,12 @@
 /**
  * This season beside our board. Until the weekly projection round passes its gates, the board stays
- * sorted by the preseason projection, and once the run is past the season's first kickoff every row
- * carries what the season has delivered so far (index.json's games and points a game), under one
- * basis line that says so. Before the first kickoff nothing changes. The run decides, never the
+ * ranked by points over replacement from the preseason projection, and once the run is past the
+ * season's first kickoff every row carries what the season has delivered so far (index.json's games
+ * and points a game), under one basis line that says so. Before the first kickoff nothing changes. The run decides, never the
  * reader's clock (seasonUnderway).
  */
-import { scoringBasis } from '#lib/run/catalog.ts';
 import type { BoardRow, BoardRowView, Format, SeasonedRow } from '#lib/run/schema.ts';
-import { index, seasonReach, seasonUnderway, type SeasonReach } from './run.ts';
+import { index, manifest, seasonReach, seasonUnderway, type SeasonReach } from './run.ts';
 
 export interface BoardSeason {
 	rows: BoardRowView[];
@@ -28,12 +27,13 @@ export async function withSeasons(
 	});
 }
 
-/** "Sorted by our preseason projection, PPR, full 2026 season. Games and points a game are this
- * season's, through week 5." The run scores every season block in one format, so on a board of
- * another scoring the figures name theirs: "this season's, scored in PPR, through week 5". The
- * stand-in carries only PPR, so that branch waits on a run with a second format. */
-export function seasonLead(format: Format, reach: SeasonReach): string {
-	const sort = `Sorted by our preseason projection, ${scoringBasis(format)}.`;
+/** "Ranked by points over replacement, our preseason PPR projection for the full 2026 season. Games
+ * and points a game are this season's, through week 5." The order is the board's own (over
+ * replacement), so the line names it before the projection it comes from. The run scores every
+ * season block in one format, so on a board of another scoring the figures name theirs: "this
+ * season's, scored in PPR, through week 5". */
+export function seasonLead(format: Format, reach: SeasonReach, season: number): string {
+	const sort = `Ranked by points over replacement, our preseason ${format.label} projection for the full ${String(season)} season.`;
 	const scoring = reach.scoring === format.label ? '' : `, scored in ${reach.scoring}`;
 	const through = reach.through === 0 ? '' : `, through week ${String(reach.through)}`;
 	return `${sort} Games and points a game are this season's${scoring}${through}.`;
@@ -42,6 +42,10 @@ export function seasonLead(format: Format, reach: SeasonReach): string {
 /** A board's rows and basis line as its page prints them. */
 export async function boardSeason(format: Format, rows: BoardRow[]): Promise<BoardSeason> {
 	if (!(await seasonUnderway())) return { rows, lead: null };
-	const [seasoned, reach] = await Promise.all([withSeasons(rows, format.id), seasonReach()]);
-	return { rows: seasoned, lead: seasonLead(format, reach) };
+	const [seasoned, reach, run] = await Promise.all([
+		withSeasons(rows, format.id),
+		seasonReach(),
+		manifest()
+	]);
+	return { rows: seasoned, lead: seasonLead(format, reach, run.season) };
 }
