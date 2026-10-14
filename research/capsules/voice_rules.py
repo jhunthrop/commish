@@ -217,8 +217,8 @@ COMPETITOR_PRODUCT_CUES: Final = ("app", "league", "leagues", "draft", "drafts",
 _FOOTBALL_SENSES: Final = MappingProxyType(
     {
         "fade": r"\bfad(?:e|es|ed|ing) (?:him|them|this|that|the)\b(?! route)",
-        "sold": r"\bsold\b(?! (?:out|on)\b)",
-        "bought": r"\bbought\b(?! in(?:to)?\b)",
+        "sold": r"\bsold\b(?! (?:out|on|the (?:dummy|defense|fake|run|play-action))\b)",
+        "bought": r"\bbought\b(?! (?:in(?:to)?|time|himself time|him time)\b)",
     }
 )
 
