@@ -293,6 +293,9 @@ def doubled_words(text: str) -> list[str]:
 class VoiceRuleHit:
     rule: str
     found: str
+    # The sentence the hit stands in, when the rule knows it (the time frame rules read sentence by
+    # sentence): the correction names that sentence, never the first one that happens to hold `found`.
+    sentence: str = ""
 
 
 def _normalise_apostrophes(text: str) -> str:

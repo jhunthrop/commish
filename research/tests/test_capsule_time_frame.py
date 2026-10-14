@@ -146,6 +146,18 @@ def test_in_season_sentences_the_review_found_refused_pass(text: str) -> None:
     assert _rules(text, OCTOBER) == []
 
 
+def test_a_bare_week_beside_a_dated_one_takes_its_season() -> None:
+    assert _rules("He scored 27.7 in week 4 of 2026 and 37.7 in week 5.", OCTOBER) == []
+    mixed = "Week 4 of 2025 and week 5 of 2026, then week 6."
+    assert "time frame (a week without its season)" in _rules(mixed, OCTOBER)
+
+
+def test_a_hit_names_the_sentence_it_stands_in() -> None:
+    text = "The week 5 of 2026 game was his best. Hold him through the week 5 dud."
+    hits = time_frame_hits(text, OCTOBER)
+    assert [(h.found, h.sentence) for h in hits] == [("week 5", "Hold him through the week 5 dud.")]
+
+
 def test_points_a_game_against_the_season_number_is_handed_back() -> None:
     nacua = "At 25.9 points a game he is tracking exactly where our 344-point projection wanted him."
     assert "time frame (points a game against the season number)" in _rules(nacua, OCTOBER)

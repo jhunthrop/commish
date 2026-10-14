@@ -169,7 +169,9 @@ def _depth_chart(facts: "PlayerFacts") -> str | None:
         else "Listed with him: " + ", ".join(f"{peer.name} {_slot_word(peer.slot)}" for peer in chart.around_him)
     )
     team, position = facts.identity.team, facts.identity.position
-    return f"Depth chart as of {chart.as_of}: listed {_slot_word(chart.slot)} among {team} {position}s. {around}."
+    # In season a capture's day reads back as a month ("as of September"), which the floor refuses.
+    when = f"as of {chart.as_of}" if facts.season is None else "(the latest on file)"
+    return f"Depth chart {when}: listed {_slot_word(chart.slot)} among {team} {position}s. {around}."
 
 
 def _pct(fraction: float) -> str:
@@ -273,11 +275,11 @@ def _schedule(depth: Depth, season: int) -> str | None:
     return f"Schedule: {opener} {s.home_games} home and {s.road_games} away on the published schedule{roof}. {playoffs}"
 
 
-def _market_movement(depth: Depth) -> str | None:
+def _market_movement(depth: Depth, in_season: bool) -> str | None:
     m = depth.market_movement
     if m is None:
         return None
-    window = f"between {m.earlier_at} and {m.latest_at}"
+    window = "before the season" if in_season else f"between {m.earlier_at} and {m.latest_at}"
     if m.picks == 0:
         return f"ADP held at {js_string(m.latest_adp)} {window}."
     direction = "up" if m.picks > 0 else "down"
@@ -321,7 +323,7 @@ def render_depth_section(facts: "PlayerFacts") -> str | None:
         _scoring_usage(facts),
         _team_context(facts),
         _schedule(depth, facts.product_season),
-        _market_movement(depth),
+        _market_movement(depth, facts.season is not None),
         _volatility(depth),
         _prior_seasons(facts),
     ]

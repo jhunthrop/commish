@@ -106,6 +106,7 @@ _IN_SEASON_TIME: Final = """TIME
 - Our preseason number is points for the full season. Never set his points so far against it as if he were behind it: compare points a game with points a game.
 - A week of this season that is still to play can only be looked ahead to, never told as if it happened.
 - Place things by week and season, never by a date or the name of a month.
+- His ADP is the sheet's number, written exactly as the sheet prints it (7.4, never "pick 7"); with no ADP on file, no pick at all.
 - If he has missed weeks this season, the long note names them by week, before any talk of how many games to expect. Our games expectation and our projection were set before the season: say so if you use them, beside what has happened since."""
 _RULES: Final = f"""You sound like a sharp analyst talking to a friend in the same league: direct, specific, opinionated, never a lab report and never a style guide.
 

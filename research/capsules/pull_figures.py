@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.season_voice import SeasonClock, names_missed_weeks, time_frame_hits
-from research.capsules.voice_rules import gate_hits, mask_names
+from research.capsules.voice_rules import gate_hits
 from research.model.jsmath import js_round, js_to_fixed
 from research.pipeline.jscompat import js_number, js_string
 
@@ -123,9 +123,7 @@ def capsule_findings(
     findings += [f"pull_figure_off_page:{player_id}:{f.label}:{f.text}" for f in figures if not figure_matches_value(f)]
     found = dict.fromkeys(hit.found for hit in (*gate_hits(body_full, names), *gate_hits(body_compact, names)))
     findings += [f"capsule_voice_rule:{player_id}:{text}" for text in found]
-    slips = dict.fromkeys(
-        f"{hit.rule}:{hit.found}" for body in bodies for hit in time_frame_hits(mask_names(body, names), clock)
-    )
+    slips = dict.fromkeys(f"{hit.rule}:{hit.found}" for body in bodies for hit in time_frame_hits(body, clock))
     findings += [f"capsule_time_frame:{player_id}:{slip}" for slip in slips]
     return findings + ([] if names_missed_weeks(body_full, clock) else [f"capsule_missed_weeks_unnamed:{player_id}"])
 

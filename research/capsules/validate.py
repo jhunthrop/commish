@@ -221,7 +221,7 @@ def _voice_violation(hit: VoiceRuleHit, text: str) -> str:
     """The violation, naming the sentence that holds the hit as a whole word or phrase: a bare
     substring would name "between" for a "bet" elsewhere, and the rewrite would miss the hit."""
     whole = re.compile(rf"(?<![a-z0-9]){re.escape(hit.found.lower())}(?![a-z0-9])")
-    sentence = next(
+    sentence = hit.sentence or next(
         (s for s in split_sentences(text) if whole.search(s.replace("\u2019", "'").replace("\u2018", "'").lower())),
         text,
     )
@@ -241,7 +241,9 @@ def _copy_violations(text: str, names: Sequence[str], clock: SeasonClock) -> lis
     competitor = _competitor_in(text)
     if competitor is not None:
         violations.append(f'The text names a competitor product ("{competitor}"). Remove it.')
-    hits = [*voice_rule_hits(text, names), *time_frame_hits(mask_names(text, names), clock)]
+    # The time frame rules read the text as written: they hold no name-sized words, and the sentence a
+    # hit names goes back to the writer as he wrote it.
+    hits = [*voice_rule_hits(text, names), *time_frame_hits(text, clock)]
     violations += [_voice_violation(hit, text) for hit in hits]
     if _unframed_floor(text):
         violations.append(UNFRAMED_FLOOR_VIOLATION)

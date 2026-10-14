@@ -20,7 +20,7 @@ a flag: a sheet carries this season so far once the season's first kickoff has p
 """
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.voice_rules import NamedPattern, VoiceRuleHit, named_rule
@@ -69,6 +69,7 @@ _PAST_AFTER: Final = re.compile(
     r"put up|managed|logged|dropped)\b",
     re.IGNORECASE,
 )
+_SENTENCE: Final = re.compile(r"(?<=[.!?])\s+")
 _MISSED_WORDS: Final = re.compile(
     r"\b(?:miss(?:ed|ing)?|sat(?: out)?|did not play|didn't play|inactive|out for|without him|sidelined)\b",
     re.IGNORECASE,
@@ -186,21 +187,30 @@ def _unplayed_told_as_past(reference: WeekReference, clock: SeasonClock) -> bool
     return told_as_past or _PAST_AFTER.match(reference.after) is not None
 
 
-def time_frame_hits(text: str, clock: SeasonClock) -> list[VoiceRuleHit]:
-    """Every time frame slip in `text` for a page on the clock's day, in rule order."""
-    references = week_references(text)
+def _sentence_hits(sentence: str, clock: SeasonClock) -> list[VoiceRuleHit]:
+    references = week_references(sentence)
+    # A bare week beside a week this sentence dates takes that date ("27.7 in week 4 of 2026 and 37.7 in
+    # week 5"): the season is not in doubt, so the rule (whose law is an unambiguous season) passes it.
+    seasons = {r.season for r in references if r.season is not None}
+    inherited = next(iter(seasons)) if len(seasons) == 1 else None
+    references = [r if r.season is not None else replace(r, season=inherited) for r in references]
     hits = [VoiceRuleHit("time frame (a week without its season)", r.text) for r in references if r.season is None]
     hits += [
         VoiceRuleHit("time frame (a week still to play told as past)", r.text)
         for r in references
         if _unplayed_told_as_past(r, clock)
     ]
-    if not clock.in_season:
-        return hits
-    hits += _month_hits(text, clock)
-    hits += _draft_voice_hits(text, DRAFT_VOICE_PATTERNS)
-    hits += [VoiceRuleHit(PER_GAME_AGAINST_SEASON.name, m.group(0)) for m in _per_game_against_season(text)]
-    return hits
+    if clock.in_season:
+        hits += _month_hits(sentence, clock)
+        hits += _draft_voice_hits(sentence, DRAFT_VOICE_PATTERNS)
+        hits += [VoiceRuleHit(PER_GAME_AGAINST_SEASON.name, m.group(0)) for m in _per_game_against_season(sentence)]
+    return [replace(hit, sentence=sentence) for hit in hits]
+
+
+def time_frame_hits(text: str, clock: SeasonClock) -> list[VoiceRuleHit]:
+    """Every time frame slip in `text` for a page on the clock's day, sentence by sentence, each hit
+    carrying the sentence it stands in."""
+    return [hit for sentence in _SENTENCE.split(text) if sentence.strip() for hit in _sentence_hits(sentence, clock)]
 
 
 # In season, points a game set against our full-season number compare two different things (the
