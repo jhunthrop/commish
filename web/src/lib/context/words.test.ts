@@ -6,12 +6,21 @@ import { heldMark, holderWords } from './held-marks.ts';
 import type { Held } from './held-words.ts';
 import { contextNote } from './note-words.ts';
 import { leagueLine } from './menu-words.ts';
-import { clubCaption, clubsLead, scheduleLead } from '#lib/run/strength-words.ts';
-import { weekLines } from '#lib/run/record.ts';
+import {
+	clubCaption,
+	clubsLead,
+	hardestWords,
+	playedWords,
+	scheduleLead
+} from '#lib/run/strength-words.ts';
+import { leagueBasis } from '#lib/league/model.ts';
+import { seasonFigures } from '#lib/ui/season-figures.ts';
+import { recordHeadline, weekLines } from '#lib/run/record.ts';
 import type { RecordWeek } from '#lib/run/schema.ts';
 
-/** The copy guard's doubled word: "the the", "is is". */
-const DOUBLED_WORD = /\b(\w+)\s+\1\b/i;
+/** The copy guard's doubled word: "the the", "is is". Letters only, so a number pair ("10.5 5 games",
+ * "week 1 1 game") never trips it. */
+const DOUBLED_WORD = /\b([a-z]+)\s+\1\b/i;
 
 const league = (over: Partial<ContextLeague> = {}): ContextLeague => ({
 	id: '3f0c1a52-0000-4000-8000-000000000001',
@@ -124,23 +133,74 @@ void test('his page names whose roster he is on, or that he is a free agent', ()
 	assert.equal(holderWords(held, 'free'), 'Free agent in your league');
 });
 
-void test("copy guard: no line doubles a word, the run's strength method included", () => {
+void test("copy guard: no composed line doubles a word, the run's own phrases included", () => {
 	// The real run's method carries its own article; the pages once added a second ("the the").
 	const slate = {
 		method: "the average of its opponents' expected wins for the season, one per game",
 		window: { from: '2026-09-07T12:00:00.000Z', to: '2026-09-07T12:00:00.000Z' },
 		rank: 32
 	};
+	const graded: RecordWeek = {
+		week: 1,
+		status: 'graded',
+		frozenAt: '2026-09-08T12:00:00.000Z',
+		frozenBy: '2026-10-14T04',
+		gradedAt: '2026-10-14T04:36:03.983Z',
+		population: 341,
+		lines: [],
+		note: undefined
+	};
+	const upcoming: RecordWeek = {
+		...graded,
+		week: 7,
+		status: 'upcoming',
+		frozenBy: null,
+		gradedAt: null,
+		frozenAt: '2026-10-23T00:15:00.000Z'
+	};
+	const score = { graded: 203, agreement: 0.48, placesOff: 43.7 };
+	const record = {
+		season: 2026,
+		format: 'ppr-12',
+		statistic: { agreement: 'agreement with the finish', placesOff: 'places off, typical player' },
+		method:
+			"Each week our PPR board is frozen before the week's first kickoff and graded after its games.",
+		weeks: [graded, missed(3, 'Our weekly freeze failed that week.'), upcoming],
+		toDate: [{ position: 'All' as const, ours: score, adp: { ...score, agreement: 0.37 } }]
+	};
+	const te = league({ scoring: 'te_premium' });
+	const held: Held = { me: 1, teams: { 1: 'Nacua Matata', 2: 'Gmoneyman' }, by: { a: 1, b: 2 } };
 	const lines = [
 		scheduleLead(slate, 'Expected wins, set before the season', { count: 9, atLeast: '10.5' }, 5),
 		clubsLead('PPR', slate),
 		clubCaption(slate, 32),
-		contextNote(league({ scoring: 'te_premium' }), 'ppr', false)?.text,
+		hardestWords(1, 32),
+		hardestWords(32, 32),
+		playedWords(1),
+		playedWords(5),
+		contextNote(te, 'ppr', false)?.text,
+		contextNote(te, 'ppr', true)?.link?.words,
+		contextNote({ ...te, settings_league_id: 'x' }, 'ppr', true)?.link?.words,
 		contextNote(league({ scoring: 'half_ppr', format: 'half_ppr' }), 'ppr', false)?.text,
-		leagueLine(league({ host: 'sleeper', scoring: 'half_ppr', format: 'superflex' }))
+		contextNote(league({ format: 'superflex' }), 'superflex', false)?.text,
+		leagueLine(league({ host: 'sleeper', scoring: 'half_ppr', format: 'superflex' })),
+		leagueLine(te),
+		recordHeadline(record).caption,
+		...weekLines(record.weeks).map((line) => `${line.lead} ${line.text}`),
+		leagueBasis('PPR', 5, 'te_premium'),
+		leagueBasis('Half PPR', 0, 'half_ppr'),
+		heldMark(held, 'a')?.words,
+		heldMark(held, 'free')?.words,
+		holderWords(held, 'b'),
+		seasonFigures({ games: 5, pointsPerGame: 10.5 }).perGame +
+			(seasonFigures({ games: 5, pointsPerGame: 10.5 }).games ?? '')
 	];
-	for (const line of lines) assert.doesNotMatch(line ?? '', DOUBLED_WORD, line ?? '');
+	for (const line of lines) {
+		assert.ok(line, 'every composed line is said');
+		assert.doesNotMatch(line, DOUBLED_WORD, line);
+	}
 	assert.match('Strength is the the average', DOUBLED_WORD);
+	assert.doesNotMatch('10.5 5 games, week 1 1 game', DOUBLED_WORD);
 });
 
 const missed = (week: number, note: string): RecordWeek => ({
