@@ -75,7 +75,7 @@ class FactsInput:
     depth: Depth = EMPTY_DEPTH
     # The page's overall and position rank (`market_adp`), which replace the oracle's board rank and
     # the scarcity reason's position rank; None keeps the oracle's (the parity cases).
-    page_ranks: PageRanks | None = None
+    page_ranks: PageRanks | None = None  # None only where a sheet is built without a run (none today)
 
 
 @dataclass(frozen=True, slots=True)

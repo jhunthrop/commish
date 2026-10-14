@@ -125,7 +125,8 @@ class Availability:
 class Market:
     adp: float | None
     position_adp: str | None
-    board_rank: int
+    # The page's overall rank, None for a player the run's board lacks (review R4).
+    board_rank: int | None
     position_rank: int | None
     replacement_level: float | None
     players_left_in_tier: int | None

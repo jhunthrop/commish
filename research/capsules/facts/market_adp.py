@@ -31,8 +31,10 @@ from research.season import PRODUCT_SEASON
 
 @dataclass(frozen=True, slots=True)
 class PageRanks:
-    overall: int
-    position: int
+    """His ranks on the page; both None for a player the run's board lacks, who has no rank to state."""
+
+    overall: int | None
+    position: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,9 +44,9 @@ class MarketAdp:
     by_player: Mapping[str, float]
     ranks: Mapping[str, PageRanks]
 
-    def page_ranks(self, player_id: str) -> PageRanks | None:
-        """His ranks on the page, or None for a player the run's board lacks."""
-        return self.ranks.get(player_id)
+    def page_ranks(self, player_id: str) -> PageRanks:
+        """His ranks on the page; a player the run's board lacks has none, never the oracle's (review R4)."""
+        return self.ranks.get(player_id, PageRanks(None, None))
 
     def adp(self, player_id: str) -> float | None:
         return self.by_player.get(player_id)

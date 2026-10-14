@@ -39,7 +39,10 @@ def facts_lines(facts: "PlayerFacts") -> tuple[tuple[str, str], ...]:
         ("Projected points", f"{_points(p.projected_points)}{basis}"),
         ("Middle range", f"{whole(p.typical_low)} to {whole(p.typical_high)} points"),
         ("Full range", f"{whole(p.floor_points)} to {whole(p.ceiling_points)} points"),
-        ("Board rank", f"{market.board_rank} overall{position_rank}"),
+        (
+            "Board rank",
+            "not on our board" if market.board_rank is None else f"{market.board_rank} overall{position_rank}",
+        ),
         ("ADP", "none" if market.adp is None else f"{js_string(market.adp)}{by_adp}"),
     )
 
