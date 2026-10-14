@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { followFormat } from '#lib/context/follow.svelte.ts';
-	import { heldMark } from '#lib/context/held-words.ts';
 	import { windowLabel } from '#lib/format/date.ts';
 	import { plural } from '#lib/format/number.ts';
 	import { rangeScale } from '#lib/run/derive.ts';
@@ -80,7 +79,7 @@
 						unit={page.format.unit}
 						order="adp"
 						eager={i < EAGER_ROWS}
-						held={heldMark(siteContext.held, player.id)}
+						held={siteContext.held?.mark(player.id) ?? null}
 					>
 						{#snippet action()}
 							<RowSheetMark {player} />

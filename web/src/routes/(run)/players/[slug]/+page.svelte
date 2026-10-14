@@ -3,8 +3,6 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { contextLine } from '#lib/context/context-format.ts';
-	import { holderWords } from '#lib/context/holder-words.ts';
-	import { contextNote } from '#lib/context/note-words.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, plural, signed } from '#lib/format/number.ts';
@@ -54,18 +52,17 @@
 	const note = $derived(
 		figures === null
 			? null
-			: contextNote(
+			: (siteContext.notes?.contextNote(
 					siteContext.league,
 					figures,
 					siteContext.features.includes('custom_scoring'),
 					'These figures are'
-				)
+				) ?? null)
 	);
 	/** Whose roster he is on in the league, on its own line with its own room, once the rosters are
 	 * read: the free-agent read in one glance. */
 	const rostered = $derived.by(() => {
-		if (siteContext.held === null) return null;
-		return holderWords(siteContext.held, page.id);
+		return siteContext.held?.holder(page.id) ?? null;
 	});
 	const drafters = $derived.by(() => {
 		if (n.adp === null || gap === null) {

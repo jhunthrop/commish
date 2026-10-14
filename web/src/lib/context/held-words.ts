@@ -1,5 +1,6 @@
-/** The selected league's rosters in words: the mark a row carries. Its own module, so the pages
- * without rows carry none of it. */
+/** The selected league's rosters as the pages read them: the data a read keeps, and the marks the
+ * store holds once it is read. Types only: the words are held-marks.ts, which arrives with the
+ * rosters (held.ts), so no page's first load carries them. */
 
 /** The selected league's rosters as the pages mark them: who holds each player by our board id. */
 export interface Held {
@@ -20,15 +21,10 @@ export interface LeagueMark {
 	kind: 'mine' | 'free';
 }
 
-export const FREE_WORDS = 'Free agent in your league';
-
-/** A row's mark, null with no rosters read or for a player another team holds: on your roster,
- * named by your team ("On Grand Illusion BG 3"), or a free agent. */
-export function heldMark(held: Held | null, boardId: string): LeagueMark | null {
-	if (held === null) return null;
-	const roster = held.by[boardId];
-	if (roster === undefined) return { words: FREE_WORDS, kind: 'free' };
-	if (roster !== held.me) return null;
-	const team = held.teams[roster] ?? '';
-	return { words: team === '' ? 'On your roster' : `On ${team}`, kind: 'mine' };
+/** The rosters' two lookups, built where the rosters are read (held-marks.ts). */
+export interface Marks {
+	/** A row's mark: yours, a free agent, or null for another team's player. */
+	mark(boardId: string): LeagueMark | null;
+	/** Whose roster he is on, as his page says it. */
+	holder(boardId: string): string;
 }

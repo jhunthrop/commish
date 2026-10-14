@@ -10,7 +10,6 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import HeldMark from '#lib/ui/HeldMark.svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
-	import { heldMark } from '#lib/context/held-words.ts';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 
@@ -51,7 +50,7 @@
 									href={links.player(player.slug)}
 								>
 									{#snippet trailing()}
-										{@const held = heldMark(siteContext.held, player.id)}
+										{@const held = siteContext.held?.mark(player.id)}
 										{#if held}<HeldMark {...held} inline />{/if}
 										<Label>{player.ourRank}</Label>
 									{/snippet}

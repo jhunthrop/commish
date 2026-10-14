@@ -3,8 +3,6 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { followFormat } from '#lib/context/follow.svelte.ts';
-	import { heldMark } from '#lib/context/held-words.ts';
-	import { contextNote } from '#lib/context/note-words.ts';
 	import { POSITION_NAMES, tierGroups } from '#lib/run/derive.ts';
 	import type { BoardPage } from '#lib/server/pages/board.ts';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
@@ -58,8 +56,9 @@
 	/** What this board is against the league's scoring, also when a link named another board. */
 	const note = $derived.by(() => {
 		const league = siteContext.league;
-		if (figures === null || league === null) return null;
-		return contextNote(
+		const notes = siteContext.notes;
+		if (figures === null || league === null || notes === null) return null;
+		return notes.contextNote(
 			league,
 			figures,
 			siteContext.features.includes('custom_scoring'),
@@ -110,7 +109,7 @@
 		{range}
 		eager={i < EAGER_ROWS}
 		season={player.season}
-		held={heldMark(siteContext.held, player.id)}
+		held={siteContext.held?.mark(player.id) ?? null}
 	>
 		{#snippet action()}
 			<RowSheetMark {player} />

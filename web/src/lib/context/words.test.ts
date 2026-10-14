@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { labelEnds, switchLabel, type ContextLeague } from './words.ts';
-import { heldMark, type Held } from './held-words.ts';
-import { holderWords } from './holder-words.ts';
+import { heldMark, holderWords } from './held-marks.ts';
+import type { Held } from './held-words.ts';
 import { contextNote } from './note-words.ts';
 import { leagueLine } from './menu-words.ts';
 import { clubCaption, clubsLead, scheduleLead } from '#lib/run/strength-words.ts';
@@ -103,7 +103,6 @@ void test('a row marks your own players by your team and the free agents, never 
 	});
 	assert.equal(heldMark(held, 'b'), null);
 	assert.deepEqual(heldMark(held, 'free'), { words: 'Free agent in your league', kind: 'free' });
-	assert.equal(heldMark(null, 'a'), null);
 });
 
 void test('his page names whose roster he is on, or that he is a free agent', () => {

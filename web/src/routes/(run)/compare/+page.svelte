@@ -4,7 +4,6 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { contextLine } from '#lib/context/context-format.ts';
-	import { contextNote } from '#lib/context/note-words.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed } from '#lib/format/number.ts';
@@ -63,12 +62,12 @@
 	const note = $derived(
 		figures === null
 			? null
-			: contextNote(
+			: (siteContext.notes?.contextNote(
 					siteContext.league,
 					figures,
 					siteContext.features.includes('custom_scoring'),
 					'These figures are'
-				)
+				) ?? null)
 	);
 
 	function pickOf(slot: Slot): Chosen | null {
