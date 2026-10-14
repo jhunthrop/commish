@@ -16,7 +16,8 @@
 	import { presetWords } from '#lib/room/setup/scoring.ts';
 	import { droppedKinds } from './scoring-words.ts';
 	import FFPCSignIn from '#lib/hosts/FFPCSignIn.svelte';
-	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
+	import { ApiError, leagueApi, type AttachedLeague, type LeagueSync } from './api.ts';
+	import LeagueTitle from './LeagueTitle.svelte';
 	import { loadBoard, type LeagueBoard } from './board.ts';
 	import MatchupPanel from './MatchupPanel.svelte';
 	import MovesPanel from './MovesPanel.svelte';
@@ -43,6 +44,8 @@
 	/** The run's board file could not be read; cleared when one loads. */
 	let boardFailed = $state(false);
 	let refreshing = $state(false);
+	/** Every league the account follows, for the title's switch; empty until read or when it fails. */
+	let followed = $state<readonly AttachedLeague[]>([]);
 	let now = $state(new Date());
 
 	function take(answer: LeagueSync): void {
@@ -99,6 +102,10 @@
 	onMount(() => {
 		void lazySheet.load();
 		void read();
+		leagueApi
+			.attached()
+			.then((list) => (followed = list))
+			.catch(() => (followed = []));
 		const timer = setInterval(() => void read(), POLL_MS);
 		return () => clearInterval(timer);
 	});
@@ -169,9 +176,11 @@
 		<main class="league">
 			<header class="lead">
 				<div class="title">
-					<DisplayTitle size="page"
-						>{sync.name || `Your ${hostWords(sync.host)} league`}</DisplayTitle
-					>
+					<LeagueTitle
+						{id}
+						name={sync.name || `Your ${hostWords(sync.host)} league`}
+						leagues={followed}
+					/>
 					<p class="sub">
 						{#if team}
 							{team.name}, {recordWords(team)}, {myPlace(sync)} of {sync.teams.length}.

@@ -790,6 +790,9 @@ type Account struct {
 	Id       openapi_types.UUID `json:"id"`
 	LastName *string            `json:"last_name"`
 
+	// LeagueCount how many leagues the account follows now (detached ones not counted); more than one, the rail's League opens the list
+	LeagueCount int `json:"league_count"`
+
 	// LeagueId the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
 	LeagueId   *openapi_types.UUID `json:"league_id"`
 	Membership *MembershipState    `json:"membership"`

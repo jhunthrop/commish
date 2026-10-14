@@ -1201,6 +1201,8 @@ export interface components {
 			 * @description the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
 			 */
 			league_id: string | null;
+			/** @description how many leagues the account follows now (detached ones not counted); more than one, the rail's League opens the list */
+			league_count: number;
 			first_name: string | null;
 			last_name: string | null;
 			/** @description the name shown in lobbies, 3 to 20 letters, digits or underscores, not starting with a digit */

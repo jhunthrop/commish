@@ -1360,7 +1360,7 @@ components:
 
     Account:
       type: object
-      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, league_id, created_at]
+      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, league_id, league_count, created_at]
       properties:
         id: { type: string, format: uuid }
         email: { type: string }
@@ -1369,6 +1369,9 @@ components:
           format: uuid
           nullable: true
           description: the account's newest attached league (AttachedLeague.id), what the rail's League opens; null with none
+        league_count:
+          type: integer
+          description: how many leagues the account follows now (detached ones not counted); more than one, the rail's League opens the list
         first_name: { type: string, nullable: true }
         last_name: { type: string, nullable: true }
         handle:

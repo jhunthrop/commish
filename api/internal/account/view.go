@@ -34,7 +34,7 @@ type Viewer struct {
 
 // Leagues is the part of the league sync store the account answer reads.
 type Leagues interface {
-	Newest(ctx context.Context, accountID uuid.UUID) (*uuid.UUID, error)
+	Newest(ctx context.Context, accountID uuid.UUID) (*uuid.UUID, int, error)
 }
 
 // View is a's Account answer at now.
@@ -56,15 +56,16 @@ func (v *Viewer) View(ctx context.Context, a auth.Account) (apitypes.Account, er
 		features = []entitlements.Feature{}
 	}
 	var league *uuid.UUID
+	var count int
 	if v.Leagues != nil {
-		if league, err = v.Leagues.Newest(ctx, a.ID); err != nil {
+		if league, count, err = v.Leagues.Newest(ctx, a.ID); err != nil {
 			return apitypes.Account{}, fmt.Errorf("account: view %s: %w", a.ID, err)
 		}
 	}
 	return apitypes.Account{
 		Id: a.ID, Email: a.Email, FirstName: a.FirstName, LastName: a.LastName, Handle: a.Handle,
 		Features: features, DraftPass: passView(pass), Membership: membershipView(membership),
-		LeagueId: league, CreatedAt: a.CreatedAt,
+		LeagueId: league, LeagueCount: count, CreatedAt: a.CreatedAt,
 	}, nil
 }
 

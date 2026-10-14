@@ -31,7 +31,8 @@ class RailLeague {
 			return;
 		}
 		try {
-			this.account = { leagueId: (await client.call<Account>('/me')).league_id };
+			const me = await client.call<Account>('/me');
+			this.account = { leagueId: me.league_id, leagueCount: me.league_count };
 		} catch {
 			this.account = null;
 		}

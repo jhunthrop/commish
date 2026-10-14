@@ -171,18 +171,20 @@ func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, 
 	return out, nil
 }
 
-// Newest is the account's newest attached league, nil when it has none.
-func (s *Store) Newest(ctx context.Context, accountID uuid.UUID) (*uuid.UUID, error) {
+// Newest is the account's newest attached league, nil when it has none,
+// and how many the account follows.
+func (s *Store) Newest(ctx context.Context, accountID uuid.UUID) (*uuid.UUID, int, error) {
 	var id uuid.UUID
-	err := s.Pool.QueryRow(ctx, `select id from app.league_links where account_id = $1 and detached_at is null
-		order by attached_at desc, id limit 1`, accountID).Scan(&id)
+	var count int
+	err := s.Pool.QueryRow(ctx, `select id, count(*) over () from app.league_links where account_id = $1 and detached_at is null
+		order by attached_at desc, id limit 1`, accountID).Scan(&id, &count)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
+		return nil, 0, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("leaguesync: newest for %s: %w", accountID, err)
+		return nil, 0, fmt.Errorf("leaguesync: newest for %s: %w", accountID, err)
 	}
-	return &id, nil
+	return &id, count, nil
 }
 
 // Detach marks the account's link detached. The row and the saved league
